@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SectionOffer, TaskItem, TaskKey } from "../../core/application/contracts";
-import { carriedWith, labelOn, levelOn, menuOffer, quickMoves, taskMenu, tileStatus, toggledLabels, toggledPriority } from "../../core/application/menus";
+import { canPick, carriedWith, labelOn, levelOn, menuOffer, quickMoves, taskMenu, tileStatus, toggledLabels, toggledPriority } from "../../core/application/menus";
 import { onDay } from "../fakes/itemOnDay";
 
 const T = "2026-11-03";
@@ -178,20 +178,20 @@ describe("the edit group", () => {
 	const offer: SectionOffer = { lists: { now: ["Work"], soon: [], inbox: [], backlog: [] }, ungrouped: "No section" };
 	const edits = (task: TaskItem, of: Parameters<typeof taskMenu>[5] = { kind: "task", from: "day" }, sections: SectionOffer | null = null) => taskMenu([task], T, [], [], sections, of).edits;
 
-	it("offers Rename, Add description, Repeat and Add subtask to a task without a time or a description", () => {
-		expect(edits(item())).toEqual(["rename", "description", "repeat", "subtask"]);
+	it("offers Rename, Add description, Repeat, Project and Add subtask to a task without a time or a description", () => {
+		expect(edits(item())).toEqual(["rename", "description", "repeat", "project", "subtask"]);
 	});
 
 	it("offers the reminder of a task on a time, after Rename, by what the task may have", () => {
-		expect(edits(item({ description: "- note", can: { ...item().can, remind: true, addDescription: false } }))).toEqual(["rename", "reminder", "repeat", "subtask"]);
+		expect(edits(item({ description: "- note", can: { ...item().can, remind: true, addDescription: false } }))).toEqual(["rename", "reminder", "repeat", "project", "subtask"]);
 	});
 
 	it("offers no Add description to a task that has one, no Repeat to one that may not repeat", () => {
-		expect(edits(item({ can: { ...item().can, addDescription: false }, repeatable: false }))).toEqual(["rename", "subtask"]);
+		expect(edits(item({ can: { ...item().can, addDescription: false }, repeatable: false }))).toEqual(["rename", "project", "subtask"]);
 	});
 
-	it("offers Section before Add subtask where the sections are offered", () => {
-		expect(edits(item({ description: "- note", can: { ...item().can, addDescription: false } }), { kind: "task", from: "day" }, offer)).toEqual(["rename", "repeat", "section", "subtask"]);
+	it("offers Section, then Project, before Add subtask where the sections are offered", () => {
+		expect(edits(item({ description: "- note", can: { ...item().can, addDescription: false } }), { kind: "task", from: "day" }, offer)).toEqual(["rename", "repeat", "section", "project", "subtask"]);
 	});
 
 	it("offers no Add subtask to a subtask opened from a timeline card's stack", () => {
@@ -201,9 +201,23 @@ describe("the edit group", () => {
 		expect(edits(sub, { kind: "task", from: "full" })).toContain("subtask");
 	});
 
-	it("gives the picked tasks Section alone, where it is offered", () => {
-		expect(edits(item(), { kind: "bulk" })).toEqual([]);
-		expect(edits(item(), { kind: "bulk" }, offer)).toEqual(["section"]);
+	it("words the task's rule on the Repeat row, and none for the picked tasks", () => {
+		const every3 = item({ repeat: { kind: "schedule", every: 3, unit: "day", days: [], dayOfMonth: null, from: T } });
+		expect(taskMenu([every3], T, [], [], null, { kind: "task", from: "day" }).repeat).toEqual({ value: "Every 3 days", days: null });
+		expect(taskMenu([item()], T, [], [], null, { kind: "task", from: "day" }).repeat).toEqual({ value: "", days: null });
+		expect(taskMenu([every3], T, [], [], null, { kind: "bulk" }).repeat).toEqual({ value: "", days: null });
+	});
+
+	it("gives the picked tasks Section, where it is offered, and Project", () => {
+		expect(edits(item(), { kind: "bulk" })).toEqual(["project"]);
+		expect(edits(item(), { kind: "bulk" }, offer)).toEqual(["section", "project"]);
+	});
+});
+
+describe("Select tasks", () => {
+	it("picks the cards of the list columns, never the timeline's, Done's, a stack's or the whole screen's", () => {
+		expect((["day", "soon", "inbox", "backlog"] as const).map(canPick)).toEqual([true, true, true, true]);
+		expect((["timeline", "done", "stack", "full"] as const).map(canPick)).toEqual([false, false, false, false]);
 	});
 });
 

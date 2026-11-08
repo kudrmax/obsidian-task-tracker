@@ -3,6 +3,7 @@ import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from ".
 import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
 import { snapMinute } from "../../core/application/snapGrid";
+import { dayMonth } from "../../core/application/dayLabels";
 import { keyId } from "../../core/application/taskKeys";
 import { NO_SECTION_ID } from "../../core/application/sections";
 import { fullTree } from "../../core/application/fullTree";
@@ -341,6 +342,10 @@ export class DemoTaskService implements TaskService {
 
 	listName(list: SectionKey): string {
 		return DEFAULT_SETTINGS.sections[list];
+	}
+
+	placementTitle(placement: Placement): string {
+		return placement.kind === "date" ? dayMonth(placement.date) : this.listName(placement.kind);
 	}
 
 	dayOfPlacement(placement: Placement): LocalDate | null {

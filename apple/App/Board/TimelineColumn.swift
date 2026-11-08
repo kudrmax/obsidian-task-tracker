@@ -48,6 +48,10 @@ struct TimelineColumn: View {
         static let nowWidth: CGFloat = 34
         static let allDayHeight: CGFloat = 22
         static let allDayGap: CGFloat = 4
+        /// A selected card's dots (`--tc-grip`, `--tc-grip-start-right`, `--tc-grip-hit`).
+        static let grip: CGFloat = 10
+        static let gripInset: CGFloat = 14
+        static let gripHit: CGFloat = 17
         static let grid = GridMeasures(divisions: [5, 15, 30], labelGap: 40, tickMinutes: 5, tickGap: 16)
     }
 
@@ -88,6 +92,7 @@ struct TimelineColumn: View {
                 .keyboardRoom()
                 .softEdges()
                 .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, y in scroll.y = y }
+                .onScrollGeometryChange(for: ScrollSpot.Reach.self) { ScrollSpot.Reach($0) } action: { _, reach in scroll.reach = reach }
                 .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height - $0.contentInsets.top - $0.contentInsets.bottom } action: { _, height in
                     zoom.visible = height
                     settleZoom()
@@ -99,7 +104,13 @@ struct TimelineColumn: View {
                     scroll.contentHeight = height
                     holdPinchedMinute()
                 }
+                .onChange(of: timeline.zoomLevels) { settleZoom() }
                 .onChange(of: model.entry.moved) { reveal(hour) }
+                .onChange(of: model.found) { showFound(hour) }
+                .onChange(of: model.dayMoved) {
+                    opened = false
+                    open()
+                }
                 .simultaneousGesture(pinchGesture)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(Self.key, visible: $0) }
             }
@@ -108,7 +119,11 @@ struct TimelineColumn: View {
             Rectangle().fill(Color(.separator)).frame(width: 1).padding(.top, -8)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { columnWidth = $0 }
-        .onAppear { model.registerCalendar() }
+        .onAppear {
+            model.registerCalendar()
+            let spot = scroll, position = $position
+            model.dropping.scrolls(Self.key) { dy in spot.scroll(by: dy) { position.wrappedValue.scrollTo(y: $0) } }
+        }
         .onDisappear { model.dropping.remove(Self.key) }
     }
 
@@ -126,10 +141,16 @@ struct TimelineColumn: View {
             DayLane(model: model, width: width, shown: ZStack(alignment: .topLeading) {
                 events(timeline, hour: hour)
                 ForEach(slots.filter { $0.card.item.id != model.entry.state?.renaming?.id }) { slot in
-                    slotCard(slot)
+                    let stretched = model.stretched.flatMap { $0.id == slot.id ? $0 : nil }
+                    let top = stretched.map { y($0.start, hour) + Measure.itemInset } ?? y(0, hour) + CGFloat(slot.box.top)
+                    let tall = stretched.map { max(CardMetrics.height, CGFloat($0.end - $0.start) / 60 * hour - Measure.itemGap) }
+                    slotCard(slot, tall: tall)
+                        .overlay { if model.selectedSlot == slot.id { grips(slot, hour: hour) } }
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { if model.selectedSlot == slot.id { model.selectedFrame = $0 } }
                         .padding(.leading, Measure.itemsLeft + CGFloat(slot.box.left))
                         .padding(.trailing, Measure.itemsRight + Measure.itemInset)
-                        .offset(y: y(0, hour) + CGFloat(slot.box.top))
+                        .offset(y: top)
+                        .zIndex(model.selectedSlot == slot.id ? 1 : 0)
                 }
             }) { peek in
                 ZStack(alignment: .topLeading) {
@@ -158,6 +179,7 @@ struct TimelineColumn: View {
             if let minute = model.landing { landingLine(minute, hour: hour) }
         }
         .frame(width: width, height: height, alignment: .topLeading)
+        .coordinateSpace(.named(Self.canvasSpace))
         .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { model.dropping.move(Self.key, origin: $0) }
         .onChange(of: hour, initial: true) { model.calendarHour = hour }
         .onChange(of: width, initial: true) { model.calendarWidth = width }
@@ -168,7 +190,7 @@ struct TimelineColumn: View {
     private func allDay(_ timeline: BoardTimeline) -> some View {
         VStack(alignment: .leading, spacing: Measure.allDayGap) {
             ForEach(timeline.allDay) { event in
-                AllDayRow(event: event, paint: paint(event, of: timeline))
+                EventMenu(event: event, model: model) { AllDayRow(event: event, paint: paint(event, of: timeline)) }
                     .padding(.leading, Measure.itemsLeft)
                     .padding(.trailing, Measure.itemsRight)
             }
@@ -179,7 +201,7 @@ struct TimelineColumn: View {
         ForEach(timeline.events.sorted { $0.layer < $1.layer }) { event in
             let top = y(event.start, hour) + Measure.itemInset
             let length = CGFloat(event.end - event.start) / 60 * hour - Measure.itemGap
-            EventBlock(event: event, paint: paint(event, of: timeline), height: max(length, 1), contentTop: top)
+            EventMenu(event: event, model: model) { EventBlock(event: event, paint: paint(event, of: timeline), height: max(length, 1), contentTop: top) }
                 .padding(.leading, Measure.itemsLeft + CGFloat(event.left))
                 .padding(.trailing, Measure.itemsRight + Measure.itemInset)
                 .offset(y: top)
@@ -208,6 +230,18 @@ struct TimelineColumn: View {
             withAnimation(.snappy) { position.scrollTo(y: bottom - visible) }
         } else if top < scroll.y {
             withAnimation(.snappy) { position.scrollTo(y: max(0, top - 16)) }
+        }
+    }
+
+    /// The card the search led to is scrolled into sight, and nothing more, as the plugin's `FoundCard`.
+    private func showFound(_ hour: CGFloat) {
+        guard let found = model.found, visible > 0, let slot = model.stacked(timeline, hour: hour).first(where: { $0.id == found }) else { return }
+        let top = y(0, hour) + CGFloat(slot.box.top)
+        let bottom = top + max(CardMetrics.height, CGFloat(slot.box.height))
+        if top < scroll.y {
+            withAnimation(.snappy) { position.scrollTo(y: max(0, top - SoftEdges.fade)) }
+        } else if bottom > scroll.y + visible {
+            withAnimation(.snappy) { position.scrollTo(y: min(top - SoftEdges.fade, bottom - visible + SoftEdges.fade)) }
         }
     }
 
@@ -258,29 +292,71 @@ struct TimelineColumn: View {
         return scheme == .dark ? themed.dark : themed.light
     }
 
-    private func slotCard(_ slot: BoardSlot) -> some View {
-        let tall = CGFloat(slot.box.height)
-        let selecting = model.selecting
-        // One card in and out of Select Tasks: the calendar's cannot be picked, so they dim and take no touch.
+    private func slotCard(_ slot: BoardSlot, tall stretched: CGFloat? = nil) -> some View {
+        let tall = stretched ?? CGFloat(slot.box.height)
+        // One card in and out of Select Tasks: a card the core says can't be picked (the calendar's) dims and takes no touch.
+        let dimmed = model.selecting && !model.canPick("timeline")
         return CardButton(
             card: slot.card,
             renamedText: model.entry.renamedTexts[slot.card.id],
-            menu: { later in selecting ? nil : model.cardMenu(slot.card.item, later: later) },
-            ringed: model.found == slot.id,
+            menu: { later in dimmed ? nil : model.cardMenu(slot.card.item, from: "timeline", later: later) },
+            ringed: model.found == slot.id || model.selectedSlot == slot.id,
             height: tall,
-            draggable: !selecting,
+            draggable: !dimmed,
             carried: model.isHidden(slot.card),
             arrival: model.arrival?.id == slot.id ? model.arrival?.from : nil,
-            onTouch: { model.found = nil },
+            onTouch: {
+                model.found = nil
+                model.select(slot)
+            },
             onCarry: { model.startCarry(slot.card, from: "timeline", grab: $0) },
             onCancel: { model.cancelCarry() },
             onEnd: { model.carryEnded() },
             onDropped: { model.carryDropped() },
-            onProject: { model.openProject(of: slot.card.item) })
+            onLink: { model.openLink($0) },
+            onProject: model.projectOpener(slot.card.item))
             .frame(height: max(tall, CardMetrics.height))
-            .opacity(selecting ? 0.5 : 1)
-            .allowsHitTesting(!selecting)
+            .opacity(dimmed ? 0.5 : 1)
+            .allowsHitTesting(!dimmed)
     }
+
+    /// The selected card's two dots, as the plugin's: the top one on its top edge near the right moves its start, the
+    /// bottom one on its bottom edge near the left its end, a grid step at a time; let go, the core writes the new time.
+    private func grips(_ slot: BoardSlot, hour: CGFloat) -> some View {
+        ZStack {
+            grip(slot, edge: "start", hour: hour)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(.trailing, Measure.gripInset - Measure.gripHit)
+                .offset(y: -Measure.gripHit)
+            grip(slot, edge: "end", hour: hour)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .padding(.leading, Measure.gripInset - Measure.gripHit)
+                .offset(y: Measure.gripHit)
+        }
+    }
+
+    private func grip(_ slot: BoardSlot, edge: String, hour: CGFloat) -> some View {
+        Circle()
+            .strokeBorder(Palette.accent(scheme), lineWidth: 2)
+            .background(Circle().fill(Color(.systemBackground)))
+            .frame(width: Measure.grip, height: Measure.grip)
+            .frame(width: 2 * Measure.gripHit, height: 2 * Measure.gripHit)
+            .contentShape(.rect)
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.canvasSpace))
+                    .onChanged { drag in
+                        model.stretch(slot, edge: edge, minute: model.snap(minute(at: drag.location.y, hour), hourHeight: hour))
+                    }
+                    .onEnded { drag in
+                        let at = model.snap(minute(at: drag.location.y, hour), hourHeight: hour)
+                        let least = Double((CardMetrics.height + Measure.itemGap) / hour * 60)
+                        Task { await model.endStretch(slot, edge: edge, minute: at, least: least) }
+                    }
+            )
+            .accessibilityLabel(edge == "start" ? "Start" : "End")
+    }
+
+    private static let canvasSpace = "timelineCanvas"
 
     /// Where a carried card would land: the line at its start and the time in the accent, as Calendar draws a moved event.
     private func landingLine(_ minute: Int, hour: CGFloat) -> some View {
@@ -401,11 +477,36 @@ enum TimelineGeometry {
     static let itemsRight: CGFloat = 4
 }
 
-/// Where the timeline stands scrolled: read by a pinch as it starts, never drawn.
+/// Where a column stands scrolled: read by a pinch as it starts and by a carry held at an edge, never drawn.
 @Observable
 final class ScrollSpot {
     @ObservationIgnored var y: CGFloat = 0
     @ObservationIgnored var contentHeight: CGFloat = 0
+    @ObservationIgnored var reach = Reach()
+
+    /// How far the content scrolls: where it stands and its furthest offset.
+    struct Reach: Equatable {
+        var offset: CGFloat = 0
+        var most: CGFloat = 0
+
+        init() {}
+
+        init(_ geometry: ScrollGeometry) {
+            offset = geometry.contentOffset.y
+            most = max(0, geometry.contentSize.height + geometry.contentInsets.top + geometry.contentInsets.bottom - geometry.containerSize.height)
+        }
+    }
+
+    /// Scrolled on by `dy` within the content, the room at its end (`trailing`) left out: false at an end.
+    @MainActor
+    func scroll(by dy: CGFloat, trailing: CGFloat = 0, to: (CGFloat) -> Void) -> Bool {
+        let next = min(max(0, reach.offset + dy), max(0, reach.most - trailing))
+        guard abs(next - reach.offset) >= 0.5 else { return false }
+        reach.offset = next
+        y = next
+        to(next)
+        return true
+    }
 }
 
 /// A calendar's event, as the plugin draws it: a block in its calendar's colour over the ground with a bar on the left and
@@ -449,6 +550,24 @@ struct EventBlock: View {
         .background(Color(.systemBackground))
         .clipShape(.rect(cornerRadius: 6))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A tap on an event opens its menu, as the plugin's: one row, Open in Calendar, Apple's Calendar at the event's start.
+struct EventMenu<Block: View>: View {
+    let event: BoardEvent
+    let model: BoardModel
+    @ViewBuilder let block: Block
+
+    var body: some View {
+        Menu {
+            Button("Open in Calendar", systemImage: "calendar") { model.openInCalendar(event.event) }
+        } label: {
+            block
+        }
+        .buttonStyle(.plain)
+        .menuStyle(.button)
+        .accessibilityLabel(event.event.title)
     }
 }
 
@@ -502,8 +621,12 @@ struct CalendarPress: UIGestureRecognizerRepresentable {
 
     func makeUIGestureRecognizer(context: Context) -> UILongPressGestureRecognizer {
         let press = UILongPressGestureRecognizer()
-        press.minimumPressDuration = 0.25
+        press.minimumPressDuration = CardMetrics.press
         return press
+    }
+
+    func updateUIGestureRecognizer(_ press: UILongPressGestureRecognizer, context: Context) {
+        press.minimumPressDuration = CardMetrics.press
     }
 
     func handleUIGestureRecognizerAction(_ press: UILongPressGestureRecognizer, context: Context) {

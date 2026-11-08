@@ -1,6 +1,6 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type ProjectGroup, type ProjectZone, type MenuFrom, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock } from "../../core/application/contracts";
-import { LIST_WIDTH_MIN, type RightMode, type ShownSettings, type ShownSettingsStore, type ZoomLevel } from "./viewSettings";
+import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type ProjectGroup, type ProjectZone, type MenuFrom, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, type ZoomLevel } from "../../core/application/contracts";
+import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
 import { FoundCard } from "./FoundCard";
@@ -358,7 +358,7 @@ export class CalendarScreen extends Component {
 			width: () => shownListWidth(this.settings.listShare, root.clientWidth),
 			onWidth: (width) => root.style.setProperty(PROPERTY.listWidth, px(width)),
 			onRelease: (width) => void this.deps.settings.set({ listShare: listShareOf(width, root.clientWidth) }).then(() => this.parts.request("frame")),
-			min: LIST_WIDTH_MIN,
+			min: LIST_WIDTHS.min,
 			max: () => listWidthMax(root.clientWidth),
 			center: () => centeredListWidth(root.clientWidth),
 			onSnap: () => this.haptics.tap(),

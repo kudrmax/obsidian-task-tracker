@@ -247,7 +247,7 @@ iPhone app (projects in full, replacing 12 and the stopgap part of 11):
     the header cuts ends in the system's ellipsis, the count and the arrow right after it (iOS truncation, not the
     plugin's fade, 18). Every list takes exactly its column's width (Inbox and Backlog each the left column's), its rows
     laid out at that width: no header or row can widen a list or push it out of its column. No project's group (zone null) is muted and has no arrow (`canOpenNote`).
-40. **The arrow and the folder mark open the note** through Advanced URI (`obsidian://advanced-uri?vault=…&filepath=<the
+40. **The arrow and the folder mark open the note** (in the app since the parity round they open the project's view, whose Open in Obsidian opens the note this way: `2026-11-08-app-plugin-parity.md`, Decisions 1 and 33) through Advanced URI (`obsidian://advanced-uri?vault=…&filepath=<the
     note's path>`), as the app's Open in Obsidian does. The mark's tap target is its 24 pt plus 3 pt each side, the card's
     height; a mark of a project with no note (`canOpenNote` false) has no target: a tap there opens the menu, as the rest
     of the card. On the timeline the mark stands left of the stack's corner. In Select Tasks the card is drawn without

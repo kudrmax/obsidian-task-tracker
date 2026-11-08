@@ -363,19 +363,25 @@
       if (!wantsFrom && from !== null) return "from belongs to a schedule with every above 1 only";
       return null;
     }
-    static parse(text) {
+    /**
+     * The rule a line's field writes. A schedule of every few units written without `from` (by hand: `every 2 months on
+     * the 5th`) counts from `anchor`, the task's own day, as though written with it; without an anchor it is no rule.
+     */
+    static parse(text, anchor = null) {
       const m = RULE_RE.exec(text.trim());
       if (!m) return null;
-      const [, count, unit, plural, whenDone, on, from] = m;
+      const [, count, unit, plural, whenDone, on, written] = m;
       const every = count === void 0 ? 1 : Number(count);
       if (every < 1 || count !== void 0 && every === 1) return null;
-      if (from !== void 0 && (every === 1 || !isValidLocalDate(from))) return null;
+      if (written !== void 0 && (every === 1 || !isValidLocalDate(written))) return null;
       if (plural !== void 0 !== every > 1) return null;
-      const rule = { every, unit, days: [], dayOfMonth: null, from: from ?? null };
       if (whenDone !== void 0) {
-        return from === void 0 ? new _Repeat({ ...rule, kind: "afterDone" }) : null;
+        const rule2 = { every, unit, days: [], dayOfMonth: null, from: null };
+        return written === void 0 ? new _Repeat({ ...rule2, kind: "afterDone" }) : null;
       }
-      if (every > 1 && from === void 0) return null;
+      const from = written ?? (every > 1 ? anchor : null);
+      if (every > 1 && from === null) return null;
+      const rule = { every, unit, days: [], dayOfMonth: null, from };
       if (unit === "day") return on === void 0 ? new _Repeat({ ...rule, kind: "schedule" }) : null;
       if (on === void 0) return null;
       if (unit === "week") {
@@ -519,6 +525,7 @@
   }
 
   // core/domain/TaskLine.ts
+  var ANY_DAY = "2000-01-01";
   var LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
   var DATE = "(\\d{4}-\\d{2}-\\d{2})";
   var TIME = "(\\d{2}:\\d{2})";
@@ -551,7 +558,19 @@
       this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.repeat)}\\s+(.+?)$`) : null;
       this.collapsedRe = markers.collapsed ? new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.collapsed)}$`) : null;
     }
+    /**
+     * The fields at the end of a line's body. A rule of every few units written without `from` counts from the line's own
+     * day, its due date or its slot's, whichever stands on it; a line with neither keeps it as text.
+     */
     slice(body) {
+      const { unanchored, ...read } = this.fields(body, true);
+      if (!unanchored || read.repeat === null) return read;
+      const day = read.dueDate ?? read.slot?.date ?? null;
+      return day === null ? this.fields(body, false) : { ...read, repeat: read.repeat.anchoredAt(day) };
+    }
+    /** The fields; `lenient`, a rule without its `from` is read anchored anywhere, and said to be (`unanchored`). */
+    fields(body, lenient) {
+      let unanchored = false;
       let text = body;
       let dueDate = null;
       let slot = null;
@@ -583,15 +602,17 @@
         }
         const repeatMatch = repeat === null ? this.repeatRe?.exec(text) ?? null : null;
         if (repeatMatch) {
-          const parsed = Repeat.parse(repeatMatch[1]);
+          const strict = Repeat.parse(repeatMatch[1]);
+          const parsed = strict ?? (lenient ? Repeat.parse(repeatMatch[1], ANY_DAY) : null);
           if (!parsed) break;
+          unanchored = strict === null;
           repeat = parsed;
           text = text.slice(0, repeatMatch.index);
           continue;
         }
         break;
       }
-      return { text: text.trim(), dueDate, slot, reminder, repeat, collapsed };
+      return { text: text.trim(), dueDate, slot, reminder, repeat, collapsed, unanchored };
     }
     slotOf(m) {
       const date = m[2];
@@ -2029,6 +2050,11 @@
   }
 
   // core/settings.ts
+  var LABEL_PAINTS = ["stripes", "blend"];
+  var CARD_HEIGHTS = { min: 28, max: 40 };
+  var CARD_GAPS = { min: 0, max: 10 };
+  var DEFAULT_CARD_SIZE = { height: 35, gap: 2 };
+  var DEFAULT_ZOOM_LEVELS = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
   var DEFAULT_SETTINGS = {
     tasksFile: "TODOs Tasks.md",
     sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
@@ -2054,6 +2080,10 @@
     ],
     labelTag: "label",
     labels: [],
+    labelPaint: LABEL_PAINTS[0],
+    cardHeight: DEFAULT_CARD_SIZE.height,
+    cardGap: DEFAULT_CARD_SIZE.gap,
+    zoomLevels: DEFAULT_ZOOM_LEVELS,
     projectTag: "#project",
     groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" }
   };
@@ -2064,8 +2094,26 @@
       ...s,
       sections: { ...DEFAULT_SETTINGS.sections, ...s.sections ?? {} },
       google: { ...DEFAULT_SETTINGS.google, ...s.google ?? {} },
-      groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} }
+      groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} },
+      labelPaint: labelPaintOf(s.labelPaint),
+      cardHeight: sizeOf(s.cardHeight, CARD_HEIGHTS, DEFAULT_SETTINGS.cardHeight),
+      cardGap: sizeOf(s.cardGap, CARD_GAPS, DEFAULT_SETTINGS.cardGap),
+      zoomLevels: zoomLevelsOf(saved)
     };
+  }
+  function sizeOf(saved, bounds, fallback) {
+    if (typeof saved !== "number" || !Number.isFinite(saved)) return fallback;
+    return Math.min(bounds.max, Math.max(bounds.min, Math.round(saved)));
+  }
+  function labelPaintOf(saved) {
+    return LABEL_PAINTS.find((paint) => paint === saved) ?? DEFAULT_SETTINGS.labelPaint;
+  }
+  function zoomLevelsOf(saved) {
+    const kept = saved !== null && typeof saved === "object" ? saved.zoomLevels : void 0;
+    if (!Array.isArray(kept) || kept.length === 0) return [...DEFAULT_ZOOM_LEVELS];
+    const levels = kept.map((level) => level !== null && typeof level === "object" ? level.hourPx : void 0);
+    if (!levels.every((hourPx) => typeof hourPx === "number" && Number.isFinite(hourPx) && hourPx > 0)) return [...DEFAULT_ZOOM_LEVELS];
+    return levels.map((hourPx) => ({ hourPx }));
   }
 
   // core/application/documentText.ts
@@ -2373,6 +2421,50 @@ ${e.calendar}`;
     }
   }
 
+  // core/application/dayLabels.ts
+  var WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var WORDS = { today: "Today", tomorrow: "Tomorrow", yesterday: "Yesterday" };
+  function dayTitle(date, relation, today) {
+    if (relation !== "other") return WORDS[relation];
+    const { year, month, day } = partsOf(date);
+    const base = `${WEEKDAYS[weekdayOf(date)]}, ${day} ${MONTHS[month - 1]}`;
+    return year === partsOf(today).year ? base : `${base} ${year}`;
+  }
+  function dayMonth(date) {
+    const { month, day } = partsOf(date);
+    return `${day} ${MONTHS[month - 1]}`;
+  }
+  function dueLabel(date) {
+    const { month, day } = partsOf(date);
+    return { day: String(day), month: MONTHS[month - 1].toUpperCase() };
+  }
+
+  // core/application/sourceWords.ts
+  var NAMES = { google: { name: "Google Calendar", short: "Google" }, iphone: { name: "iPhone calendars", short: "iPhone" }, work: { name: "Work calendar", short: "Work" } };
+  function problemText(problem) {
+    switch (problem.kind) {
+      case "loggedOut":
+        return "not logged in";
+      case "fileMissing":
+        return "file missing";
+      case "noAnswer":
+        return `no answer in ${problem.seconds} s`;
+      case "failed":
+        return problem.detail;
+    }
+  }
+  function sourceWords(status) {
+    const names = NAMES[status.source];
+    const at = status.updatedAt;
+    const date = status.updatedDate === null ? "" : dayMonth(status.updatedDate);
+    const relative = !at ? "" : status.updatedDay === "today" ? "today" : status.updatedDay === "yesterday" ? "yesterday" : date;
+    const clock = at ? minutesToHHMM(at.getHours() * 60 + at.getMinutes()) : "";
+    const time = !at ? "" : status.updatedDay === "today" ? clock : status.updatedDay === "yesterday" ? `Yesterday ${clock}` : `${date} ${clock}`;
+    const sub = status.problem ? problemText(status.problem) : status.kind === "exported" ? `Exported from ${status.detail ?? "file"}` : at ? `Updated ${relative}` : "Not updated yet";
+    return { name: names.name, short: names.short, sub, time };
+  }
+
   // core/application/calendarChoice.ts
   var keyText = (key) => `${key.account}
 ${key.title}`.toLowerCase();
@@ -2594,9 +2686,15 @@ ${key.title}`.toLowerCase();
     }
   };
 
+  // core/application/googleLogin.ts
+  function googleLoggedIn(settings) {
+    return settings.google.refreshToken !== "";
+  }
+
   // core/application/calendarDay.ts
   var KINDS2 = { google: "synced", iphone: "exported", work: "exported" };
   var MINUTE_MS4 = 6e4;
+  var LOGGED_OUT = { kind: "loggedOut" };
   var CalendarDay = class {
     constructor(reading, settings, now) {
       this.reading = reading;
@@ -2648,20 +2746,24 @@ ${key.title}`.toLowerCase();
       return new ShownCalendars(this.reading.files, this.settings, this.now);
     }
     status(source, shown) {
-      const problem = this.reading.problem(source);
+      const problem = this.problem(source);
       const file = this.reading.files.get(source);
       const updatedAt = file?.exportedAt ?? null;
-      return {
+      const facts = {
         source,
         kind: KINDS2[source],
         problem,
-        events: shown,
         updatedAt,
         updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
         updatedDate: updatedAt === null ? null : localDateOf(updatedAt),
-        detail: this.reading.fed(source) ? null : file?.device ?? null,
-        stale: problem !== null || this.isOld(updatedAt)
+        detail: this.reading.fed(source) ? null : file?.device ?? null
       };
+      return { ...facts, events: shown, stale: problem !== null || this.isOld(updatedAt), words: sourceWords(facts) };
+    }
+    /** Google logged out says so, whatever its file: there is none to fetch, or what is left of an old login. */
+    problem(source) {
+      if (source === "google" && !googleLoggedIn(this.settings)) return LOGGED_OUT;
+      return this.reading.problem(source);
     }
     /** How the calendar date of `at` stands to the clock's: a moment's today and yesterday are calendar days, not the plugin's day. */
     relationOf(at) {
@@ -2689,21 +2791,6 @@ ${key.title}`.toLowerCase();
     const date = item.dueDate !== null && item.dueDate !== day ? item.dueDate : null;
     const repeats = item.repeat !== null;
     return date === null && !repeats ? null : { date, repeats };
-  }
-
-  // core/application/dayLabels.ts
-  var WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  var WORDS = { today: "Today", tomorrow: "Tomorrow", yesterday: "Yesterday" };
-  function dayTitle(date, relation, today) {
-    if (relation !== "other") return WORDS[relation];
-    const { year, month, day } = partsOf(date);
-    const base = `${WEEKDAYS[weekdayOf(date)]}, ${day} ${MONTHS[month - 1]}`;
-    return year === partsOf(today).year ? base : `${base} ${year}`;
-  }
-  function dueLabel(date) {
-    const { month, day } = partsOf(date);
-    return { day: String(day), month: MONTHS[month - 1].toUpperCase() };
   }
 
   // core/application/eventLevels.ts
@@ -2881,7 +2968,6 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/timelineZoom.ts
-  var DEFAULT_ZOOM_LEVELS = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
   var DEFAULT_ZOOM_HOUR = 56;
   function parseZoomLevels(text) {
     const levels = [];
@@ -2917,13 +3003,6 @@ ${key.title}`.toLowerCase();
     }
     return marks;
   }
-  function zoomLevelsOf(saved) {
-    const kept = saved !== null && typeof saved === "object" ? saved.zoomLevels : void 0;
-    if (!Array.isArray(kept) || kept.length === 0) return [...DEFAULT_ZOOM_LEVELS];
-    const levels = kept.map((level) => level !== null && typeof level === "object" ? level.hourPx : void 0);
-    if (!levels.every((hourPx) => typeof hourPx === "number" && Number.isFinite(hourPx) && hourPx > 0)) return [...DEFAULT_ZOOM_LEVELS];
-    return levels.map((hourPx) => ({ hourPx }));
-  }
   function wholeDayOr(wholeDayPx, levels) {
     return wholeDayPx ?? Math.min(...levels.map((level) => level.hourPx));
   }
@@ -2956,6 +3035,27 @@ ${key.title}`.toLowerCase();
   }
   function isUnder(a, b) {
     return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
+  }
+
+  // core/application/marks.ts
+  var MOST_CARD_COLORS = 4;
+  function markColors(priority, labels) {
+    return priority ? [priority.color] : labels.slice(0, MOST_CARD_COLORS).map((label) => label.color);
+  }
+  function draftMarksOf(marks, levels, labels) {
+    const choices = markChoices(marks);
+    const priority = levels.find((l) => l.prefix === marks.priority) ?? null;
+    const chosen = labels.filter((l) => marks.labels.includes(l.name));
+    return {
+      priority,
+      labels: chosen,
+      can: { setPriority: choices.priority, setLabels: choices.labels },
+      tint: markColors(priority, chosen)[0] ?? null,
+      tiles: {
+        levels: levels.map((mark) => ({ mark, on: mark.prefix === priority?.prefix, enabled: choices.priority })),
+        labels: labels.map((mark) => ({ mark, on: chosen.includes(mark), enabled: choices.labels }))
+      }
+    };
   }
 
   // core/application/nesting.ts
@@ -3614,6 +3714,19 @@ ${key.title}`.toLowerCase();
     return a.length === b.length && a.every((name, i) => name === b[i]);
   }
 
+  // core/application/wholeCard.ts
+  function wholeWidth(card, room) {
+    if (card.textWidth <= card.titleWidth - card.fade) return null;
+    const missing = Math.ceil(card.textWidth - card.titleWidth);
+    const widest = room.width - 2 * room.margin;
+    const width = Math.max(card.width, Math.min(card.width + missing, widest));
+    return { width, cut: width < card.width + missing };
+  }
+  function grownStart(start, size, grown, room, margin) {
+    const end = Math.max(start + size, room - margin);
+    return Math.max(Math.min(start, margin), Math.min(start, end - grown));
+  }
+
   // core/application/SectionNameEntry.ts
   function sectionNameEnd(ended, event, text) {
     if (ended) return { ended: true };
@@ -3707,6 +3820,24 @@ ${key.title}`.toLowerCase();
   }
   function groupKeyOf(item) {
     return item.project ? projectKey(item.project.name) : "";
+  }
+
+  // core/application/listWidth.ts
+  var LIST_WIDTHS = { min: 110, max: 280 };
+  function listWidths(share, viewWidth, dividerWidth) {
+    const columns = viewWidth - dividerWidth;
+    const max = Math.max(LIST_WIDTHS.max, columns - LIST_WIDTHS.min);
+    return { width: Math.min(max, Math.max(LIST_WIDTHS.min, share * columns)), min: LIST_WIDTHS.min, max, center: columns / 2 };
+  }
+  function listShareOf(width, viewWidth, dividerWidth) {
+    return width / (viewWidth - dividerWidth);
+  }
+  var DIVIDER_SNAP = { distance: 8, slowSpeed: 0.08 };
+  function dividerAt(wanted, widths, speed) {
+    const reachable = widths.center >= widths.min && widths.center <= widths.max;
+    const snapped = reachable && speed < DIVIDER_SNAP.slowSpeed && Math.abs(wanted - widths.center) <= DIVIDER_SNAP.distance;
+    const width = snapped ? widths.center : Math.round(wanted);
+    return { width: Math.min(widths.max, Math.max(widths.min, width)), snapped };
   }
 
   // core/application/listDrop.ts
@@ -3810,212 +3941,38 @@ ${key.title}`.toLowerCase();
     return { kind: "many", steps };
   }
 
-  // core/application/contracts.ts
-  var StaleTaskError = class extends Error {
-    constructor() {
-      super("stale task");
-      this.code = "staleTask";
-      this.name = "StaleTaskError";
-    }
-  };
-  var TasksFileMissingError = class extends Error {
-    constructor(path) {
-      super(`tasks file missing: ${path}`);
-      this.path = path;
-      this.code = "tasksFileMissing";
-      this.name = "TasksFileMissingError";
-    }
-  };
-
-  // core/application/ScreenSettingsImpl.ts
-  function screenSettingsOf(settings) {
-    return {
-      longPressMs: settings.longPressMs,
-      scrollToHour: settings.scrollToHour,
-      tasksFile: settings.tasksFile,
-      sections: settings.sections,
-      ungrouped: settings.groups.ungrouped,
-      priorities: settings.priorities,
-      labels: settings.labels
-    };
+  // core/application/repeatWords.ts
+  function capital(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1);
   }
-
-  // core/application/SettingsServiceImpl.ts
-  function countOf(text) {
-    const n = Number(text);
-    return text.trim() !== "" && Number.isFinite(n) && n >= 0 ? n : null;
+  function onTheDay(rule) {
+    return capital(repeatParts(rule).on ?? "");
   }
-  var SECTION_ORDER = ["inbox", "now", "soon", "backlog", "done"];
-  var MARKER_ORDER = ["dueDateMarker", "slotMarker", "alarmSlotMarker", "liveSlotMarker", "silentSlotMarker", "repeatMarker", "collapsedMarker"];
-  var DAY_START_HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-  var SettingsServiceImpl = class {
-    constructor(store) {
-      this.store = store;
-    }
-    form() {
-      const s = this.settings;
-      return {
-        tasksFile: s.tasksFile,
-        sections: s.sections,
-        sectionOrder: SECTION_ORDER,
-        markerOrder: MARKER_ORDER,
-        markers: {
-          dueDateMarker: s.dueDateMarker,
-          slotMarker: s.slotMarker,
-          alarmSlotMarker: s.alarmSlotMarker,
-          liveSlotMarker: s.liveSlotMarker,
-          silentSlotMarker: s.silentSlotMarker,
-          repeatMarker: s.repeatMarker,
-          collapsedMarker: s.collapsedMarker
-        },
-        priorities: s.priorities,
-        labelTag: s.labelTag,
-        labels: s.labels,
-        projectTag: s.projectTag,
-        presets: s.groups.presets,
-        ungrouped: s.groups.ungrouped,
-        longPressMs: s.longPressMs,
-        dayStartHour: s.dayStartHour,
-        scrollToHour: s.scrollToHour,
-        staleAfterMinutes: s.staleAfterMinutes,
-        googleClientId: s.google.clientId,
-        refreshSeconds: s.google.refreshSeconds,
-        workCalendarFile: s.workCalendarFile,
-        dayStartHours: DAY_START_HOURS,
-        googleClientReady: s.google.clientId !== ""
-      };
-    }
-    setTasksFile(tasksFile) {
-      return this.store.update({ tasksFile });
-    }
-    setSection(key, name) {
-      return this.store.update({ sections: { ...this.settings.sections, [key]: name } });
-    }
-    setMarker(marker, text) {
-      return this.store.update({ [marker]: text });
-    }
-    async setCount(field, text) {
-      const n = countOf(text);
-      if (n === null) return;
-      await this.store.update(field === "refreshSeconds" ? this.google({ refreshSeconds: n }) : { [field]: n });
-    }
-    setDayStartHour(dayStartHour) {
-      return this.store.update({ dayStartHour });
-    }
-    renameLevel(index, prefix) {
-      return this.patchLevel(index, { prefix: prefix.trim() });
-    }
-    recolourLevel(index, color) {
-      return this.patchLevel(index, { color });
-    }
-    removeLevel(index) {
-      return this.saveLevels(this.settings.priorities.filter((_, i) => i !== index));
-    }
-    addLevel() {
-      const levels = this.settings.priorities;
-      let n = levels.length + 1;
-      while (levels.some((l) => l.prefix === `p${n}`)) n++;
-      const color = PRIORITY_COLORS.find((c) => !levels.some((l) => l.color === c)) ?? PRIORITY_COLORS[0];
-      return this.saveLevels([...levels, { prefix: `p${n}`, color }]);
-    }
-    moveLevel(from, to) {
-      return this.saveLevels(moved(this.settings.priorities, from, to));
-    }
-    async setLabelTag(tag) {
-      const labelTag = tag.trim();
-      if (usableLabelTag(labelTag)) await this.store.update({ labelTag });
-    }
-    async setProjectTag(tag) {
-      const bare = tag.trim().replace(/^#/, "");
-      if (/^[^\s#]+$/.test(bare)) await this.store.update({ projectTag: `#${bare}` });
-    }
-    renameLabel(index, title) {
-      return this.patchLabel(index, { name: labelNameOf(title) });
-    }
-    recolourLabel(index, color) {
-      return this.patchLabel(index, { color });
-    }
-    removeLabel(index) {
-      return this.saveLabels(this.settings.labels.filter((_, i) => i !== index));
-    }
-    addLabel() {
-      const labels = this.settings.labels;
-      let n = labels.length + 1;
-      while (labels.some((l) => l.name === `Label_${n}`)) n++;
-      const color = PRIORITY_COLORS.find((c) => !labels.some((l) => l.color === c)) ?? PRIORITY_COLORS[0];
-      return this.saveLabels([...labels, { name: `Label_${n}`, color }]);
-    }
-    moveLabel(from, to) {
-      return this.saveLabels(moved(this.settings.labels, from, to));
-    }
-    colourOf(text, shades) {
-      const hex = hexColor(text);
-      if (!hex) return null;
-      return PRIORITY_COLORS.find((preset) => shades[preset].toUpperCase() === hex) ?? hex;
-    }
-    typedColour(of, index, text, shades) {
-      const color = this.colourOf(text, shades);
-      const own = (of === "level" ? this.settings.priorities : this.settings.labels)[index]?.color;
-      return color === own ? null : color;
-    }
-    renamePreset(index, name) {
-      return this.savePresets(this.presets.map((preset, i) => i === index ? name.trim() : preset));
-    }
-    removePreset(index) {
-      return this.savePresets(this.presets.filter((_, i) => i !== index));
-    }
-    addPreset() {
-      return this.savePresets([...this.presets, ""]);
-    }
-    movePreset(from, to) {
-      return this.savePresets(moved(this.presets, from, to));
-    }
-    setUngrouped(name) {
-      return this.store.update(this.groups({ ungrouped: name.trim() || DEFAULT_SETTINGS.groups.ungrouped }));
-    }
-    setGoogleClientId(clientId) {
-      return this.store.update(this.google({ clientId }));
-    }
-    bindClientSecret(field) {
-      field.setValue(this.settings.google.clientSecret);
-      field.onChange((clientSecret) => void this.store.update(this.google({ clientSecret })));
-    }
-    setWorkCalendarFile(workCalendarFile) {
-      return this.store.update({ workCalendarFile });
-    }
-    get settings() {
-      return this.store.get();
-    }
-    get presets() {
-      return this.settings.groups.presets;
-    }
-    patchLevel(index, patch2) {
-      return this.saveLevels(this.settings.priorities.map((level, i) => i === index ? { ...level, ...patch2 } : level));
-    }
-    saveLevels(priorities) {
-      return this.store.update({ priorities });
-    }
-    patchLabel(index, patch2) {
-      return this.saveLabels(this.settings.labels.map((label, i) => i === index ? { ...label, ...patch2 } : label));
-    }
-    saveLabels(labels) {
-      return this.store.update({ labels });
-    }
-    savePresets(presets) {
-      return this.store.update(this.groups({ presets }));
-    }
-    groups(patch2) {
-      return { groups: { ...this.settings.groups, ...patch2 } };
-    }
-    google(patch2) {
-      return { google: { ...this.settings.google, ...patch2 } };
-    }
+  function repeatValue(rule) {
+    const { every, on, days, afterDone } = repeatParts(rule);
+    if (afterDone) return `${capital(every)} after done`;
+    if (days) return null;
+    if (on) return rule.every === 1 ? capital(on) : `${capital(every)} ${on}`;
+    return capital(every);
+  }
+  var REPEAT_WORDS = {
+    kinds: { schedule: "Schedule", afterDone: "After done" },
+    every: "Every",
+    units: { day: "days", week: "weeks", month: "months" },
+    weekdays: [
+      { short: "Mon", name: "Monday", letter: "M" },
+      { short: "Tue", name: "Tuesday", letter: "T" },
+      { short: "Wed", name: "Wednesday", letter: "W" },
+      { short: "Thu", name: "Thursday", letter: "T" },
+      { short: "Fri", name: "Friday", letter: "F" },
+      { short: "Sat", name: "Saturday", letter: "S" },
+      { short: "Sun", name: "Sunday", letter: "S" }
+    ],
+    remove: "Remove repeat"
   };
-  function moved(list, from, to) {
-    const items = [...list];
-    const [item] = items.splice(from, 1);
-    items.splice(to, 0, item);
-    return items;
+  function repeatRow(rule) {
+    if (rule === null) return { value: "", days: null };
+    return { value: repeatValue(rule) ?? "", days: repeatParts(rule).days };
   }
 
   // core/domain/NoteTags.ts
@@ -4200,6 +4157,444 @@ ${key.title}`.toLowerCase();
     return isFolded(state, list, key) ? withFolded(state, list, key, false) : state;
   }
 
+  // core/application/menus.ts
+  function priorityHolders(items) {
+    return items.filter((item) => item.can.setPriority);
+  }
+  function labelHolders(items) {
+    return items.filter((item) => item.can.setLabels);
+  }
+  function levelOn(items, prefix) {
+    const holders = priorityHolders(items);
+    return holders.length > 0 && holders.every((item) => item.priority?.prefix === prefix);
+  }
+  function toggledPriority(items, prefix) {
+    return levelOn(items, prefix) ? null : prefix;
+  }
+  function labelOn(items, name) {
+    const holders = labelHolders(items);
+    return holders.length > 0 && holders.every((item) => item.labels.some((label) => label.name === name));
+  }
+  function toggledLabels(items, name) {
+    const on = labelOn(items, name);
+    return items.map((item) => {
+      const names = item.labels.map((label) => label.name);
+      if (!item.can.setLabels) return names;
+      if (on) return names.filter((n) => n !== name);
+      return names.includes(name) ? names : [...names, name];
+    });
+  }
+  var MOVE_ORDER = ["today", "tomorrow", "pick"];
+  function quickMoves(item, today) {
+    if (!item.can.postpone) return [];
+    const moves = [
+      { id: "today", date: today },
+      { id: "tomorrow", date: addDays(today, 1) },
+      { id: "pick", date: null }
+    ];
+    return moves.filter((move) => move.date === null || move.date !== item.day);
+  }
+  function sharedMoves(items, today) {
+    const offered = items.flatMap((item) => quickMoves(item, today));
+    return MOVE_ORDER.flatMap((id) => offered.find((move) => move.id === id) ?? []);
+  }
+  function sharedDueDate(items) {
+    const first = items[0]?.dueDate ?? null;
+    return items.every((item) => item.dueDate === first) ? first : null;
+  }
+  var A_LIST_CARD = { kind: "task", from: "day" };
+  var COLUMNS = /* @__PURE__ */ new Set(["day", "soon", "inbox", "backlog"]);
+  function canPick(from) {
+    return COLUMNS.has(from);
+  }
+  function menuOffer(froms, screen, columnSections) {
+    const shown = froms.every((from) => COLUMNS.has(from) && columnSections(from, screen.day) !== null);
+    return shown ? screen.offer : null;
+  }
+  function tileStatus(id) {
+    const statuses = { done: "done", inProgress: "inProgress", stopProgress: "todo", wontDo: "cancelled", stop: null };
+    return statuses[id];
+  }
+  function menuStatuses(items, of) {
+    const one = of.kind === "task";
+    const progress = nextProgress(items.map((item) => item.status)) === "todo" ? "stopProgress" : "inProgress";
+    return [
+      { id: "done", confirm: false },
+      { id: progress, confirm: false },
+      { id: "wontDo", confirm: one },
+      ...one && items.every((item) => item.can.stop) ? [{ id: "stop", confirm: true }] : []
+    ];
+  }
+  function menuEdits(items, of, sections) {
+    const section = sections ? ["section"] : [];
+    if (of.kind === "bulk") return [...section, "project"];
+    const item = items[0];
+    const edits = [
+      ["rename", true],
+      ["reminder", item.can.remind],
+      ["description", item.can.addDescription],
+      ["repeat", item.repeatable],
+      ["section", sections !== null],
+      ["project", true],
+      ["subtask", of.from !== "stack"]
+    ];
+    return edits.flatMap(([id, offered]) => offered ? [id] : []);
+  }
+  function menuSections(items, offer, of) {
+    const choice = offer ? sectionChoice(items, offer) : null;
+    if (!choice) return null;
+    const shared = items.every((item) => item.group === choice.current);
+    const names = [...choice.names, null];
+    return { choice, options: names.map((name) => ({ name, checked: shared && name === choice.current })), create: of.kind === "task" };
+  }
+  function menuProject(items, known) {
+    const key = (ref) => ref ? projectKey(ref.name) : "";
+    const first = items[0]?.project ?? null;
+    const shared = items.every((item) => key(item.project) === key(first));
+    const options = [...known];
+    for (const item of items) if (item.project && !options.some((ref) => key(ref) === key(item.project))) options.push({ ...item.project, mark: true });
+    const none = items.every((item) => item.project === null);
+    return {
+      value: shared && first ? first.name : none ? NO_PROJECT : "",
+      current: shared ? first : null,
+      options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
+      none,
+      noneLabel: NO_PROJECT,
+      disabled: items.every((item) => !item.can.setProject)
+    };
+  }
+  var MENU_GROUPS = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
+  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = []) {
+    const sections = menuSections(items, offer, of);
+    const edits = menuEdits(items, of, sections);
+    return {
+      groups: MENU_GROUPS,
+      statuses: menuStatuses(items, of),
+      levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
+      labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },
+      moves: sharedMoves(items, today),
+      removeDue: items.some((item) => item.can.removeDue),
+      dueDate: sharedDueDate(items),
+      sections,
+      project: menuProject(items, projects),
+      edits,
+      reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
+      repeat: repeatRow(of.kind === "task" ? items[0]?.repeat ?? null : null),
+      remove: { confirm: of.kind === "task" }
+    };
+  }
+  function carriedWith(lifted, picked) {
+    const id = keyId(lifted);
+    return picked.filter((key) => keyId(key) !== id && !picked.some((other) => other !== key && isUnder(key, other)));
+  }
+
+  // core/application/contracts.ts
+  var StaleTaskError = class extends Error {
+    constructor() {
+      super("stale task");
+      this.code = "staleTask";
+      this.name = "StaleTaskError";
+    }
+  };
+  var TasksFileMissingError = class extends Error {
+    constructor(path) {
+      super(`tasks file missing: ${path}`);
+      this.path = path;
+      this.code = "tasksFileMissing";
+      this.name = "TasksFileMissingError";
+    }
+  };
+
+  // core/application/notes.ts
+  var MD = ".md";
+  function nameOf(path) {
+    const file = path.slice(path.lastIndexOf("/") + 1);
+    return file.toLowerCase().endsWith(MD) ? file.slice(0, -MD.length) : file;
+  }
+  function withoutMd(path) {
+    return path.toLowerCase().endsWith(MD) ? path.slice(0, -MD.length) : path;
+  }
+  function linkedNotes(notes) {
+    const named = /* @__PURE__ */ new Map();
+    for (const { path } of notes) named.set(projectKey(nameOf(path)), (named.get(projectKey(nameOf(path))) ?? 0) + 1);
+    return notes.map(({ path }) => {
+      const name = nameOf(path);
+      return { name, path, link: named.get(projectKey(name)) === 1 ? name : withoutMd(path) };
+    });
+  }
+  var OPEN = "[[";
+  var CLOSE = "]]";
+  function linkQuery(text, caret) {
+    const before = text.slice(0, caret);
+    const from = before.lastIndexOf(OPEN);
+    if (from < 0) return null;
+    const query = before.slice(from + OPEN.length);
+    if (/[\]\[\n|]/.test(query)) return null;
+    return { query, from, to: text.startsWith(CLOSE, caret) ? caret + CLOSE.length : caret };
+  }
+  var NOTE_SUGGESTIONS = 20;
+  function noteSuggestions(query, notes, limit = NOTE_SUGGESTIONS) {
+    const typed2 = query.trim().toLowerCase();
+    const words = typed2.split(/\s+/).filter((word) => word !== "");
+    const rank = (note) => {
+      const name = note.name.toLowerCase();
+      const path = note.path.toLowerCase();
+      if (typed2 === "") return 0;
+      if (name === typed2) return 0;
+      if (name.startsWith(typed2)) return 1;
+      if (name.includes(typed2)) return 2;
+      if (path.includes(typed2)) return 3;
+      return words.every((word) => path.includes(word)) ? 4 : null;
+    };
+    const ranked = linkedNotes(notes).flatMap((note) => {
+      const r = rank(note);
+      return r === null ? [] : [{ note: { name: note.name, path: note.path, link: note.link }, rank: r }];
+    });
+    ranked.sort((a, b) => a.rank - b.rank || (typed2 === "" ? 0 : a.note.name.length - b.note.name.length) || compare(a.note.name, b.note.name) || compare(a.note.path, b.note.path));
+    return ranked.slice(0, limit).map(({ note }) => note);
+  }
+  function compare(a, b) {
+    const x = a.toLowerCase();
+    const y = b.toLowerCase();
+    return x < y ? -1 : x > y ? 1 : 0;
+  }
+  function withNoteLink(text, at, link) {
+    const written = `${OPEN}${link}${CLOSE}`;
+    return { text: text.slice(0, at.from) + written + text.slice(at.to), caret: at.from + written.length };
+  }
+  function noteOfLink(target, notes) {
+    const bare = target.split("#")[0].split("|")[0].trim().replace(/^\//, "");
+    if (bare === "") return null;
+    const wanted = projectKey(withoutMd(bare));
+    const linked = linkedNotes(notes);
+    const found = linked.find((note) => projectKey(withoutMd(note.path)) === wanted) ?? linked.find((note) => projectKey(withoutMd(note.path)).endsWith(`/${wanted}`)) ?? linked.find((note) => projectKey(note.name) === wanted);
+    return found ? { name: found.name, path: found.path, link: found.link } : null;
+  }
+
+  // core/application/ScreenSettingsImpl.ts
+  function screenSettingsOf(settings) {
+    return {
+      longPressMs: settings.longPressMs,
+      scrollToHour: settings.scrollToHour,
+      tasksFile: settings.tasksFile,
+      sections: settings.sections,
+      ungrouped: settings.groups.ungrouped,
+      priorities: settings.priorities,
+      labels: settings.labels,
+      labelPaint: settings.labelPaint,
+      cardHeight: settings.cardHeight,
+      cardGap: settings.cardGap,
+      zoomLevels: settings.zoomLevels
+    };
+  }
+
+  // core/application/SettingsServiceImpl.ts
+  function countOf(text) {
+    const n = Number(text);
+    return text.trim() !== "" && Number.isFinite(n) && n >= 0 ? n : null;
+  }
+  var SECTION_ORDER = ["inbox", "now", "soon", "backlog", "done"];
+  var MARKER_ORDER = ["dueDateMarker", "slotMarker", "alarmSlotMarker", "liveSlotMarker", "silentSlotMarker", "repeatMarker", "collapsedMarker"];
+  var DAY_START_HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+  var SettingsServiceImpl = class {
+    constructor(store) {
+      this.store = store;
+    }
+    form() {
+      const s = this.settings;
+      return {
+        tasksFile: s.tasksFile,
+        sections: s.sections,
+        sectionOrder: SECTION_ORDER,
+        markerOrder: MARKER_ORDER,
+        markers: {
+          dueDateMarker: s.dueDateMarker,
+          slotMarker: s.slotMarker,
+          alarmSlotMarker: s.alarmSlotMarker,
+          liveSlotMarker: s.liveSlotMarker,
+          silentSlotMarker: s.silentSlotMarker,
+          repeatMarker: s.repeatMarker,
+          collapsedMarker: s.collapsedMarker
+        },
+        priorities: s.priorities,
+        labelTag: s.labelTag,
+        labels: s.labels,
+        labelPaint: s.labelPaint,
+        labelPaints: LABEL_PAINTS,
+        cardHeight: s.cardHeight,
+        cardGap: s.cardGap,
+        cardHeights: CARD_HEIGHTS,
+        cardGaps: CARD_GAPS,
+        zoomLevels: formatZoomLevels(s.zoomLevels),
+        projectTag: s.projectTag,
+        presets: s.groups.presets,
+        ungrouped: s.groups.ungrouped,
+        longPressMs: s.longPressMs,
+        dayStartHour: s.dayStartHour,
+        scrollToHour: s.scrollToHour,
+        staleAfterMinutes: s.staleAfterMinutes,
+        googleClientId: s.google.clientId,
+        refreshSeconds: s.google.refreshSeconds,
+        workCalendarFile: s.workCalendarFile,
+        dayStartHours: DAY_START_HOURS,
+        googleClientReady: s.google.clientId !== "",
+        googleLoggedIn: googleLoggedIn(s)
+      };
+    }
+    setTasksFile(tasksFile) {
+      return this.store.update({ tasksFile });
+    }
+    setSection(key, name) {
+      return this.store.update({ sections: { ...this.settings.sections, [key]: name } });
+    }
+    setMarker(marker, text) {
+      return this.store.update({ [marker]: text });
+    }
+    async setCount(field, text) {
+      const n = countOf(text);
+      if (n === null) return;
+      await this.store.update(field === "refreshSeconds" ? this.google({ refreshSeconds: n }) : { [field]: n });
+    }
+    setDayStartHour(dayStartHour) {
+      return this.store.update({ dayStartHour });
+    }
+    renameLevel(index, prefix) {
+      return this.patchLevel(index, { prefix: prefix.trim() });
+    }
+    recolourLevel(index, color) {
+      return this.patchLevel(index, { color });
+    }
+    removeLevel(index) {
+      return this.saveLevels(this.settings.priorities.filter((_, i) => i !== index));
+    }
+    addLevel() {
+      const levels = this.settings.priorities;
+      let n = levels.length + 1;
+      while (levels.some((l) => l.prefix === `p${n}`)) n++;
+      const color = PRIORITY_COLORS.find((c) => !levels.some((l) => l.color === c)) ?? PRIORITY_COLORS[0];
+      return this.saveLevels([...levels, { prefix: `p${n}`, color }]);
+    }
+    moveLevel(from, to) {
+      return this.saveLevels(moved(this.settings.priorities, from, to));
+    }
+    async setLabelTag(tag) {
+      const labelTag = tag.trim();
+      if (usableLabelTag(labelTag)) await this.store.update({ labelTag });
+    }
+    async setLabelPaint(paint) {
+      const labelPaint = LABEL_PAINTS.find((offered) => offered === paint);
+      if (labelPaint) await this.store.update({ labelPaint });
+    }
+    async setCardHeight(px) {
+      const cardHeight = withinBounds(px, CARD_HEIGHTS);
+      if (cardHeight !== null) await this.store.update({ cardHeight });
+    }
+    async setCardGap(px) {
+      const cardGap = withinBounds(px, CARD_GAPS);
+      if (cardGap !== null) await this.store.update({ cardGap });
+    }
+    async setZoomLevels(text) {
+      const zoomLevels = parseZoomLevels(text);
+      if (zoomLevels) await this.store.update({ zoomLevels });
+    }
+    async setProjectTag(tag) {
+      const bare = tag.trim().replace(/^#/, "");
+      if (/^[^\s#]+$/.test(bare)) await this.store.update({ projectTag: `#${bare}` });
+    }
+    renameLabel(index, title) {
+      return this.patchLabel(index, { name: labelNameOf(title) });
+    }
+    recolourLabel(index, color) {
+      return this.patchLabel(index, { color });
+    }
+    removeLabel(index) {
+      return this.saveLabels(this.settings.labels.filter((_, i) => i !== index));
+    }
+    addLabel() {
+      const labels = this.settings.labels;
+      let n = labels.length + 1;
+      while (labels.some((l) => l.name === `Label_${n}`)) n++;
+      const color = PRIORITY_COLORS.find((c) => !labels.some((l) => l.color === c)) ?? PRIORITY_COLORS[0];
+      return this.saveLabels([...labels, { name: `Label_${n}`, color }]);
+    }
+    moveLabel(from, to) {
+      return this.saveLabels(moved(this.settings.labels, from, to));
+    }
+    colourOf(text, shades) {
+      const hex = hexColor(text);
+      if (!hex) return null;
+      return PRIORITY_COLORS.find((preset) => shades[preset].toUpperCase() === hex) ?? hex;
+    }
+    typedColour(of, index, text, shades) {
+      const color = this.colourOf(text, shades);
+      const own = (of === "level" ? this.settings.priorities : this.settings.labels)[index]?.color;
+      return color === own ? null : color;
+    }
+    renamePreset(index, name) {
+      return this.savePresets(this.presets.map((preset, i) => i === index ? name.trim() : preset));
+    }
+    removePreset(index) {
+      return this.savePresets(this.presets.filter((_, i) => i !== index));
+    }
+    addPreset() {
+      return this.savePresets([...this.presets, ""]);
+    }
+    movePreset(from, to) {
+      return this.savePresets(moved(this.presets, from, to));
+    }
+    setUngrouped(name) {
+      return this.store.update(this.groups({ ungrouped: name.trim() || DEFAULT_SETTINGS.groups.ungrouped }));
+    }
+    setGoogleClientId(clientId) {
+      return this.store.update(this.google({ clientId }));
+    }
+    bindClientSecret(field) {
+      field.setValue(this.settings.google.clientSecret);
+      field.onChange((clientSecret) => void this.store.update(this.google({ clientSecret })));
+    }
+    setWorkCalendarFile(workCalendarFile) {
+      return this.store.update({ workCalendarFile });
+    }
+    get settings() {
+      return this.store.get();
+    }
+    get presets() {
+      return this.settings.groups.presets;
+    }
+    patchLevel(index, patch2) {
+      return this.saveLevels(this.settings.priorities.map((level, i) => i === index ? { ...level, ...patch2 } : level));
+    }
+    saveLevels(priorities) {
+      return this.store.update({ priorities });
+    }
+    patchLabel(index, patch2) {
+      return this.saveLabels(this.settings.labels.map((label, i) => i === index ? { ...label, ...patch2 } : label));
+    }
+    saveLabels(labels) {
+      return this.store.update({ labels });
+    }
+    savePresets(presets) {
+      return this.store.update(this.groups({ presets }));
+    }
+    groups(patch2) {
+      return { groups: { ...this.settings.groups, ...patch2 } };
+    }
+    google(patch2) {
+      return { google: { ...this.settings.google, ...patch2 } };
+    }
+  };
+  function moved(list, from, to) {
+    const items = [...list];
+    const [item] = items.splice(from, 1);
+    items.splice(to, 0, item);
+    return items;
+  }
+  function withinBounds(value, bounds) {
+    if (typeof value !== "number" || !Number.isFinite(value)) return null;
+    const whole = Math.round(value);
+    return whole >= bounds.min && whole <= bounds.max ? whole : null;
+  }
+
   // core/domain/search.ts
   var SNIPPET_LEAD = 24;
   var ELLIPSIS = "…";
@@ -4328,152 +4723,6 @@ ${key.title}`.toLowerCase();
     const cut = first - lead.length;
     const shifted = found.map((piece) => ({ start: piece.start - cut + 1, end: piece.end - cut + 1 }));
     return matchParts(ELLIPSIS + text.slice(cut), shifted);
-  }
-
-  // core/application/marks.ts
-  function markColors(priority, labels) {
-    return priority ? [priority.color] : labels.map((label) => label.color);
-  }
-  function draftMarksOf(marks, levels, labels) {
-    const choices = markChoices(marks);
-    const priority = levels.find((l) => l.prefix === marks.priority) ?? null;
-    const chosen = labels.filter((l) => marks.labels.includes(l.name));
-    return {
-      priority,
-      labels: chosen,
-      can: { setPriority: choices.priority, setLabels: choices.labels },
-      tint: markColors(priority, chosen)[0] ?? null,
-      tiles: {
-        levels: levels.map((mark) => ({ mark, on: mark.prefix === priority?.prefix, enabled: choices.priority })),
-        labels: labels.map((mark) => ({ mark, on: chosen.includes(mark), enabled: choices.labels }))
-      }
-    };
-  }
-
-  // core/application/menus.ts
-  function priorityHolders(items) {
-    return items.filter((item) => item.can.setPriority);
-  }
-  function labelHolders(items) {
-    return items.filter((item) => item.can.setLabels);
-  }
-  function levelOn(items, prefix) {
-    const holders = priorityHolders(items);
-    return holders.length > 0 && holders.every((item) => item.priority?.prefix === prefix);
-  }
-  function toggledPriority(items, prefix) {
-    return levelOn(items, prefix) ? null : prefix;
-  }
-  function labelOn(items, name) {
-    const holders = labelHolders(items);
-    return holders.length > 0 && holders.every((item) => item.labels.some((label) => label.name === name));
-  }
-  function toggledLabels(items, name) {
-    const on = labelOn(items, name);
-    return items.map((item) => {
-      const names = item.labels.map((label) => label.name);
-      if (!item.can.setLabels) return names;
-      if (on) return names.filter((n) => n !== name);
-      return names.includes(name) ? names : [...names, name];
-    });
-  }
-  var MOVE_ORDER = ["today", "tomorrow", "pick"];
-  function quickMoves(item, today) {
-    if (!item.can.postpone) return [];
-    const moves = [
-      { id: "today", date: today },
-      { id: "tomorrow", date: addDays(today, 1) },
-      { id: "pick", date: null }
-    ];
-    return moves.filter((move) => move.date === null || move.date !== item.day);
-  }
-  function sharedMoves(items, today) {
-    const offered = items.flatMap((item) => quickMoves(item, today));
-    return MOVE_ORDER.flatMap((id) => offered.find((move) => move.id === id) ?? []);
-  }
-  function sharedDueDate(items) {
-    const first = items[0]?.dueDate ?? null;
-    return items.every((item) => item.dueDate === first) ? first : null;
-  }
-  var A_LIST_CARD = { kind: "task", from: "day" };
-  var COLUMNS = /* @__PURE__ */ new Set(["day", "soon", "inbox", "backlog"]);
-  function menuOffer(froms, screen, columnSections) {
-    const shown = froms.every((from) => COLUMNS.has(from) && columnSections(from, screen.day) !== null);
-    return shown ? screen.offer : null;
-  }
-  function tileStatus(id) {
-    const statuses = { done: "done", inProgress: "inProgress", stopProgress: "todo", wontDo: "cancelled", stop: null };
-    return statuses[id];
-  }
-  function menuStatuses(items, of) {
-    const one = of.kind === "task";
-    const progress = nextProgress(items.map((item) => item.status)) === "todo" ? "stopProgress" : "inProgress";
-    return [
-      { id: "done", confirm: false },
-      { id: progress, confirm: false },
-      { id: "wontDo", confirm: one },
-      ...one && items.every((item) => item.can.stop) ? [{ id: "stop", confirm: true }] : []
-    ];
-  }
-  function menuEdits(items, of, sections) {
-    const section = sections ? ["section"] : [];
-    if (of.kind === "bulk") return section;
-    const item = items[0];
-    const edits = [
-      ["rename", true],
-      ["reminder", item.can.remind],
-      ["description", item.can.addDescription],
-      ["repeat", item.repeatable],
-      ["section", sections !== null],
-      ["subtask", of.from !== "stack"]
-    ];
-    return edits.flatMap(([id, offered]) => offered ? [id] : []);
-  }
-  function menuSections(items, offer, of) {
-    const choice = offer ? sectionChoice(items, offer) : null;
-    if (!choice) return null;
-    const shared = items.every((item) => item.group === choice.current);
-    const names = [...choice.names, null];
-    return { choice, options: names.map((name) => ({ name, checked: shared && name === choice.current })), create: of.kind === "task" };
-  }
-  function menuProject(items, known) {
-    const key = (ref) => ref ? projectKey(ref.name) : "";
-    const first = items[0]?.project ?? null;
-    const shared = items.every((item) => key(item.project) === key(first));
-    const options = [...known];
-    for (const item of items) if (item.project && !options.some((ref) => key(ref) === key(item.project))) options.push({ ...item.project, mark: true });
-    const none = items.every((item) => item.project === null);
-    return {
-      value: shared && first ? first.name : none ? NO_PROJECT : "",
-      current: shared ? first : null,
-      options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
-      none,
-      noneLabel: NO_PROJECT,
-      disabled: items.every((item) => !item.can.setProject)
-    };
-  }
-  var MENU_GROUPS = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
-  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = []) {
-    const sections = menuSections(items, offer, of);
-    const edits = menuEdits(items, of, sections);
-    return {
-      groups: MENU_GROUPS,
-      statuses: menuStatuses(items, of),
-      levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
-      labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },
-      moves: sharedMoves(items, today),
-      removeDue: items.some((item) => item.can.removeDue),
-      dueDate: sharedDueDate(items),
-      sections,
-      project: menuProject(items, projects),
-      edits,
-      reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
-      remove: { confirm: of.kind === "task" }
-    };
-  }
-  function carriedWith(lifted, picked) {
-    const id = keyId(lifted);
-    return picked.filter((key) => keyId(key) !== id && !picked.some((other) => other !== key && isUnder(key, other)));
   }
 
   // core/application/taskItems.ts
@@ -4854,6 +5103,9 @@ ${key.title}`.toLowerCase();
     }
     listName(list) {
       return this.settings.get().sections[list];
+    }
+    placementTitle(placement) {
+      return placement.kind === "date" ? dayMonth(placement.date) : this.listName(placement.kind);
     }
     dayOfPlacement(placement) {
       return dayOfPlacement(placement, this.today());
@@ -6079,6 +6331,7 @@ ${key.title}`.toLowerCase();
     columnSections: (c, [column, date]) => c.reads.columnSections(column, date),
     placementOfDay: (c, [date]) => c.reads.placementOfDay(date),
     listName: (c, [list]) => c.reads.listName(list),
+    placementTitle: (c, [placement]) => c.reads.placementTitle(placement),
     dayOfPlacement: (c, [placement]) => c.reads.dayOfPlacement(placement),
     setStatus: (c, [key, status]) => c.run(c.writes.setStatus(key, status)),
     toggleDone: (c, [key]) => c.run(c.writes.toggleDone(key)),
@@ -6239,6 +6492,10 @@ ${key.title}`.toLowerCase();
     "addLevel",
     "moveLevel",
     "setLabelTag",
+    "setLabelPaint",
+    "setCardHeight",
+    "setCardGap",
+    "setZoomLevels",
     "setProjectTag",
     "renameLabel",
     "recolourLabel",
@@ -6348,6 +6605,7 @@ ${key.title}`.toLowerCase();
     eventColors: (hex, bgAlpha, theme) => eventColors(hex, bgAlpha ?? EVENT_BG_ALPHA, theme ?? "dark"),
     dayTitle,
     dueLabel,
+    dayMonth,
     eventLevels,
     stackTasks,
     overlayLeft,
@@ -6369,9 +6627,17 @@ ${key.title}`.toLowerCase();
     placeAt: (cards, y, level, shift, room, heads, held, hysteresis) => placeAt(cards, y, level, shift, room ?? null, heads ?? [], held ?? null, hysteresis ?? 0),
     branchOf,
     gapBranch,
-    placeShowing
+    placeShowing,
+    wholeWidth,
+    grownStart,
+    listWidths,
+    listShareOf,
+    dividerAt,
+    repeatValue,
+    onTheDay,
+    canPick
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };
@@ -6446,6 +6712,12 @@ ${key.title}`.toLowerCase();
     save: (_c, [state]) => descriptionSave(state),
     read: (_c, [state, description, editor]) => descriptionRead(state, description ?? null, editor)
   };
+  var NOTES = {
+    linkQuery: (_c, [text, caret]) => linkQuery(text, caret),
+    suggest: (_c, [query, notes, limit]) => noteSuggestions(query, notes, limit ?? void 0),
+    insert: (_c, [text, at, link]) => withNoteLink(text, at, link),
+    open: (_c, [target, notes]) => noteOfLink(target, notes)
+  };
   var SPACES = {
     tasks: TASKS,
     days: DAYS,
@@ -6461,6 +6733,7 @@ ${key.title}`.toLowerCase();
     reminders: REMINDERS,
     capture: CAPTURE,
     timeline: TIMELINE,
+    notes: NOTES,
     rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c, args) => fn(...args)])), constants: () => CONSTANTS }
   };
   function doorMethods() {

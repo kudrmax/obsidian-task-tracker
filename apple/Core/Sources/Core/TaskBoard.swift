@@ -42,12 +42,13 @@ public final class TaskBoard: @unchecked Sendable {
     /// Held while the tasks file is read with the count of writes, and while a write puts its text and its ids in.
     private let fileLock = NSLock()
     private var history: DoorHistory?
+    /// The calendar files as the settings last read name them: asked again when the settings change.
+    private var calendarSources: (settings: String, files: [CalendarFile])?
     /// Who the tasks and sections are, as the last answer over the file gave it: handed in with every call over the file,
     /// so a task keeps its `id` through every write, read and undo (`docs/door.md`, «Ids»).
     private var ids: DoorIds?
     /// The writes made so far: an answer over files read before the last write never replaces the ids that write gave.
     private var generation = 0
-    private var calendarSources: [CalendarFile]?
     /// How this device groups its lists by project (`GroupingState`), as the door last answered it.
     private let grouping: DeviceText
     private let projects: ProjectSource?
@@ -55,6 +56,8 @@ public final class TaskBoard: @unchecked Sendable {
     private var projectsJSON: String?
     /// The project tag of the settings last read, and the settings it was read from.
     private var projectTag: (settings: String, tag: String)?
+    /// The vault's files, for the `[[` search and a title's links.
+    private let fileList = VaultFileList()
 
     /// `pure`: a second core for the pure rules a screen asks in the same frame; the reading core when none is given.
     /// `grouping`: where the device keeps how it groups its lists by project; `projects`: who finds the project notes.
@@ -248,11 +251,69 @@ public final class TaskBoard: @unchecked Sendable {
         return projectsJSON
     }
 
+    /// The vault's files listed again: a note made or renamed elsewhere is offered by the next `[[`. The project notes
+    /// look again on their own (`VaultProjects`).
+    public func refreshNotes() {
+        fileList.forget()
+    }
+
+    // MARK: Notes
+
+    /// The `[[` the caret (UTF-16 offset) stands in, typed in a title; `nil` for none.
+    public func linkQuery(in text: String, caret: Int) throws -> LinkQuery? {
+        try rule("notes.linkQuery", [.string(text), .number(Double(caret))])
+    }
+
+    /// The files `[[query` offers, best first.
+    public func suggestNotes(_ query: String) throws -> [ProjectNote] {
+        try rule("notes.suggest", [.string(query), fileList.all(vault)])
+    }
+
+    /// The title with the picked note's link in place of the `[[` typed, and the caret after it.
+    public func insertLink(_ note: ProjectNote, in text: String, at query: LinkQuery) throws -> LinkInsert {
+        try rule("notes.insert", [.string(text), query.json, .string(note.link)])
+    }
+
+    /// The file a note link of a title opens (`TextPart.target`); `nil` for a link to no file of the vault.
+    public func noteToOpen(_ target: String) throws -> ProjectNote? {
+        try rule("notes.open", [.string(target), fileList.all(vault)])
+    }
+
+    // MARK: Words and sizes
+
+    /// A title in pieces: text, and links drawn in the accent with what a tap opens.
+    public func titleParts(_ text: String) throws -> [TextPart] {
+        try rule("rules.textParts", [.string(text)])
+    }
+
+    /// What every screen reads of the shared settings: the cards' height and gap, the long press, the labels' paint.
+    public func screenSettings() throws -> ScreenSettings {
+        try read("screenSettings.get", over: settingsOnly())
+    }
+
+    /// The list column beside the calendar for the saved share of the width, the divider `dividerWidth` points wide.
+    public func listWidths(share: Double, viewWidth: Double, dividerWidth: Double) throws -> ListWidths {
+        try rule("rules.listWidths", [.number(share), .number(viewWidth), .number(dividerWidth)])
+    }
+
+    /// The divider dragged to make the list `wanted` wide at `speed` points per millisecond (`rules.dividerAt`): brought
+    /// slowly near the middle it holds to it.
+    public func dividerAt(_ wanted: Double, widths: ListWidths, speed: Double) throws -> DividerStop {
+        try rule("rules.dividerAt", [.number(wanted), widths.json, .number(speed)])
+    }
+
+    /// The repeat page's words.
+    public func repeatWords() throws -> RepeatWords {
+        try rule("rules.constants", as: JSONValue.self)["REPEAT_WORDS"].decode(RepeatWords.self)
+    }
+
     private func sources(_ settings: String) -> [CalendarFile] {
         lock.lock()
         defer { lock.unlock() }
-        if calendarSources == nil { calendarSources = try? core.calendarFiles(settingsJSON: settings) }
-        return calendarSources ?? []
+        if let known = calendarSources, known.settings == settings { return known.files }
+        guard let files = try? core.calendarFiles(settingsJSON: settings) else { return [] }
+        calendarSources = (settings, files)
+        return files
     }
 
     private func kept() -> DoorHistory? {

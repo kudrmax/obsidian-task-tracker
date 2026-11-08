@@ -11,6 +11,7 @@ struct CalendarsView: View {
     @State private var calendars: [ShownCalendar] = []
     @State private var refreshing = false
     @State private var access = EKEventStore.authorizationStatus(for: .event)
+    @State private var plugin = PluginSettings()
     @Environment(\.dismiss) private var dismiss
 
     private let board = AppServices.shared.board
@@ -18,17 +19,22 @@ struct CalendarsView: View {
     var body: some View {
         Form {
             Section("Sources") {
+                // Each calendar file's row as the core words it (`SourceStatus.words`), the same as the plugin's window:
+                // the source, how it was updated or its problem, and the time, orange once out of date.
                 ForEach(statuses, id: \.source) { status in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(Self.name(status.source))
-                            Text(Self.words(status))
+                            Text(status.words.name)
+                            Text(status.words.sub)
                                 .font(.footnote)
-                                .foregroundStyle(status.stale ? Color.orange : Color.secondary)
+                                .foregroundStyle(status.problem.isNull ? Color.secondary : Color.red)
                         }
                         Spacer()
-                        if let device = status.detail {
-                            Text(device).font(.footnote).foregroundStyle(.secondary)
+                        if !status.words.time.isEmpty {
+                            Text(status.words.time)
+                                .font(.footnote)
+                                .monospacedDigit()
+                                .foregroundStyle(status.stale ? Color.orange : Color.secondary)
                         }
                         if status.stale {
                             Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange).accessibilityLabel("Out of date")
@@ -46,23 +52,49 @@ struct CalendarsView: View {
                     await refresh()
                 }
             }
-            Section {
-                ForEach(calendars) { calendar in
-                    Toggle(isOn: Binding(get: { calendar.shown }, set: { shown in Task { await show(calendar, shown) } })) {
-                        HStack(spacing: 12) {
-                            Circle().fill(calendar.color.map(Color.init(hex:)) ?? .blue).frame(width: 12, height: 12)
-                            VStack(alignment: .leading) {
+            // Every calendar under its account, as the plugin's settings list them.
+            ForEach(Array(accounts.enumerated()), id: \.offset) { index, account in
+                Section {
+                    ForEach(account.calendars) { calendar in
+                        Toggle(isOn: Binding(get: { calendar.shown }, set: { shown in Task { await show(calendar, shown) } })) {
+                            HStack(spacing: 12) {
+                                Circle().fill(calendar.color.map(Color.init(hex:)) ?? .blue).frame(width: 12, height: 12)
                                 Text(calendar.name)
-                                Text(calendar.accountName).font(.footnote).foregroundStyle(.secondary)
                             }
                         }
+                        .tint(Color(.systemGreen))
                     }
-                    .tint(Color(.systemGreen))
+                } header: {
+                    Text(account.name)
+                } footer: {
+                    if index == accounts.count - 1 { Text("The timeline shows the events of the calendars switched on.") }
                 }
-            } header: {
-                Text("Shown")
-            } footer: {
-                Text("The timeline shows the events of these calendars.")
+            }
+            if let form = plugin.form {
+                // Google Calendar as the plugin's settings set it up: the plugin fetches it and writes the file the app
+                // reads, so its sign-in and secret stay in Obsidian; the client and the interval are shared settings.
+                Section {
+                    LabeledContent("Account", value: form.googleLoggedIn ? "Logged In" : "Not Logged In")
+                    TextRow(title: "Client ID", value: form.googleClientId) { id in
+                        await plugin.write("settings.setGoogleClientId", [.string(id)])
+                    }
+                    CountRow(title: "Refresh Interval", unit: "s", value: form.refreshSeconds) { text in
+                        await plugin.write("settings.setCount", ["refreshSeconds", .string(text)])
+                    }
+                } header: {
+                    Text("Google Calendar")
+                } footer: {
+                    Text("Obsidian fetches Google Calendar and syncs it here: log in and paste the client secret in its settings. Seconds between fetches while Obsidian is open; 0 turns the timer off.")
+                }
+                Section {
+                    TextRow(title: "File Path", value: form.workCalendarFile) { path in
+                        await plugin.write("settings.setWorkCalendarFile", [.string(path)])
+                    }
+                } header: {
+                    Text("Work Calendar")
+                } footer: {
+                    Text("The work calendar's file in the vault, as Obsidian's export writes it. This iPhone's own calendars need no script: the app exports them itself.")
+                }
             }
         }
         .navigationTitle("Calendars")
@@ -71,7 +103,19 @@ struct CalendarsView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.tint(.primary) }
             }
         }
-        .task { await load() }
+        .task {
+            await load()
+            await plugin.load()
+        }
+    }
+
+    /// The calendars by account, in the order the core lists them.
+    private var accounts: [(name: String, calendars: [ShownCalendar])] {
+        var grouped: [(name: String, calendars: [ShownCalendar])] = []
+        for calendar in calendars {
+            if grouped.last?.name == calendar.accountName { grouped[grouped.count - 1].calendars.append(calendar) } else { grouped.append((calendar.accountName, [calendar])) }
+        }
+        return grouped
     }
 
     private func load() async {
@@ -100,24 +144,5 @@ struct CalendarsView: View {
         }.value
         await load()
         await model?.reload()
-    }
-
-    static func name(_ source: String) -> String {
-        switch source {
-        case "google": "Google Calendar"
-        case "iphone": "iPhone Calendars"
-        case "work": "Work Calendar"
-        default: source
-        }
-    }
-
-    static func words(_ status: SourceStatus) -> String {
-        guard let at = status.updatedAtMs else { return "No file yet" }
-        let date = Date(timeIntervalSince1970: at / 1000)
-        let verb = status.kind == "exported" ? "Exported" : "Updated"
-        let when = status.updatedDay == "today"
-            ? date.formatted(date: .omitted, time: .shortened)
-            : date.formatted(.relative(presentation: .named))
-        return "\(verb) \(when)"
     }
 }

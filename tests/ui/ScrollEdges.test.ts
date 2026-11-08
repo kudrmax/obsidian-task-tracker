@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import { ScrollEdges } from "../../obsidian/ui/ScrollEdges";
-import { CARD_HEIGHT_MAX } from "../../obsidian/ui/viewSettings";
+import { CARD_HEIGHTS } from "../../core/application/contracts";
 
 function scroller(scrollHeight: number, clientHeight: number): HTMLElement {
 	const el = document.createElement("div");
@@ -57,7 +57,7 @@ describe("ScrollEdges: how deep each fade is", () => {
 			edges.update();
 			return [el.style.getPropertyValue("--tc-scrolled"), el.style.getPropertyValue("--tc-scrolled-below")];
 		});
-		const max = `${CARD_HEIGHT_MAX}px`;
+		const max = `${CARD_HEIGHTS.max}px`;
 		expect(depths).toEqual([["0px", max], ["1px", max], ["5px", max], ["20px", max], [max, max], [max, "0px"]]);
 	});
 });

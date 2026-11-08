@@ -134,7 +134,7 @@ describe("the menu's model", () => {
 		const [a, b] = (await svc.dayView(T)).list;
 		const screen = await screenOf(svc);
 		expect(svc.bulkMenu([{ item: a, from: "day" }, { item: b, from: "day" }], screen).sections?.options[0]).toEqual({ name: "Work", checked: true });
-		expect(svc.bulkMenu([{ item: a, from: "day" }, { item: b, from: "day" }], screen).edits).toEqual(["section"]);
+		expect(svc.bulkMenu([{ item: a, from: "day" }, { item: b, from: "day" }], screen).edits).toEqual(["section", "project"]);
 		expect(svc.bulkMenu([{ item: a, from: "day" }, { item: b, from: "timeline" }], screen).sections).toBeNull();
 	});
 });

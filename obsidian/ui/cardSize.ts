@@ -1,4 +1,4 @@
-import { DEFAULT_CARD_SIZE } from "./viewSettings";
+import { DEFAULT_CARD_SIZE } from "../../core/application/contracts";
 import { PROPERTY } from "./design";
 import { px } from "./dom";
 import { onWindowDocument, windowDocuments } from "./windowDocuments";

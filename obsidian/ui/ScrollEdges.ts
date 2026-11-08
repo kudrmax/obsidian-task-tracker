@@ -1,6 +1,6 @@
 import { PROPERTY } from "./design";
 import { px } from "./dom";
-import { CARD_HEIGHT_MAX } from "./viewSettings";
+import { CARD_HEIGHTS } from "../../core/application/contracts";
 
 /** Less than this past an edge counts as resting at it: a fraction of a pixel left by a zoom or a scaled screen. */
 const RESTING_PX = 1;
@@ -37,7 +37,7 @@ export class ScrollEdges {
 
 	/** How much content is under an edge, held at the tallest card's height, which no fade passes: written only while it changes, so the scroll beyond restyles nothing. */
 	private show(property: string, under: number): void {
-		const depth = Math.min(Math.max(under, 0), CARD_HEIGHT_MAX);
+		const depth = Math.min(Math.max(under, 0), CARD_HEIGHTS.max);
 		if (this.shown.get(property) === depth) return;
 		this.shown.set(property, depth);
 		this.el.style.setProperty(property, px(depth));

@@ -1,3 +1,4 @@
+import { dayMonth } from "./dayLabels";
 import { GROUPED_LISTS } from "../domain/Lists";
 import type { DayBoundary } from "../domain/DayBoundary";
 import { dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../domain/Days";
@@ -395,6 +396,10 @@ export class TaskReads {
 
 	listName(list: SectionKey): string {
 		return this.settings.get().sections[list];
+	}
+
+	placementTitle(placement: Placement): string {
+		return placement.kind === "date" ? dayMonth(placement.date) : this.listName(placement.kind);
 	}
 
 	dayOfPlacement(placement: Placement): LocalDate | null {

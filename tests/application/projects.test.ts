@@ -124,7 +124,7 @@ describe("the Project page", () => {
 			["Старый", true],
 		]);
 		expect(old.none).toBe(false);
-		expect(svc.menu(screen.backlog[1], "backlog", at).project).toMatchObject({ current: null, none: true, noneLabel: NO_PROJECT, disabled: false });
+		expect(svc.menu(screen.backlog[1], "backlog", at).project).toMatchObject({ current: null, none: true, noneLabel: NO_PROJECT, value: NO_PROJECT, disabled: false });
 		expect(svc.menu(screen.backlog[0].allSubtasks[0], "stack", at).project).toMatchObject({ current: { name: "Окружение" }, disabled: true });
 		const bulk = svc.bulkMenu([{ item: screen.backlog[0], from: "backlog" }, { item: screen.backlog[1], from: "backlog" }], at).project;
 		expect(bulk).toMatchObject({ current: null, none: false, noneLabel: "No project", disabled: false });

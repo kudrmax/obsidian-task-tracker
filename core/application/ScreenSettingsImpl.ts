@@ -12,6 +12,10 @@ export function screenSettingsOf(settings: TaskCalendarSettings): ScreenSettings
 		ungrouped: settings.groups.ungrouped,
 		priorities: settings.priorities,
 		labels: settings.labels,
+		labelPaint: settings.labelPaint,
+		cardHeight: settings.cardHeight,
+		cardGap: settings.cardGap,
+		zoomLevels: settings.zoomLevels,
 	};
 }
 

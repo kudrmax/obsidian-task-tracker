@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatZoomLevels, parseZoomLevels, VIEW_DEFAULTS } from "../../obsidian/ui/viewSettings";
+import { DEFAULT_ZOOM_LEVELS, formatZoomLevels, parseZoomLevels } from "../../core/application/contracts";
 
 describe("zoom levels text", () => {
 	it("formats the defaults as the hour's heights", () => {
-		expect(formatZoomLevels(VIEW_DEFAULTS.zoomLevels)).toBe("28, 56, 112, 224");
+		expect(formatZoomLevels(DEFAULT_ZOOM_LEVELS)).toBe("28, 56, 112, 224");
 	});
 
 	it("parses what it formats", () => {
-		expect(parseZoomLevels("28, 56, 112, 224")).toEqual(VIEW_DEFAULTS.zoomLevels);
+		expect(parseZoomLevels("28, 56, 112, 224")).toEqual(DEFAULT_ZOOM_LEVELS);
 		expect(parseZoomLevels(" 40 ")).toEqual([{ hourPx: 40 }]);
 	});
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VIEW_DEFAULTS } from "../../obsidian/ui/viewSettings";
+import { DEFAULT_CARD_SIZE } from "../../core/application/contracts";
 import { clearCardSize, showCardSize, shownCardSize } from "../../obsidian/ui/cardSize";
 
 describe("cardSize", () => {
@@ -10,7 +10,7 @@ describe("cardSize", () => {
 	});
 
 	it("gives the settings' defaults before any size is shown", () => {
-		expect(shownCardSize()).toEqual({ height: VIEW_DEFAULTS.cardHeight, gap: VIEW_DEFAULTS.cardGap });
+		expect(shownCardSize()).toEqual({ height: DEFAULT_CARD_SIZE.height, gap: DEFAULT_CARD_SIZE.gap });
 	});
 
 	it("gives the size last shown without reading the styles", () => {
@@ -24,7 +24,7 @@ describe("cardSize", () => {
 	it("goes back to the defaults once cleared", () => {
 		showCardSize({ height: 44, gap: 6 });
 		clearCardSize();
-		expect(shownCardSize()).toEqual({ height: VIEW_DEFAULTS.cardHeight, gap: VIEW_DEFAULTS.cardGap });
+		expect(shownCardSize()).toEqual({ height: DEFAULT_CARD_SIZE.height, gap: DEFAULT_CARD_SIZE.gap });
 		expect(document.body.style.getPropertyValue("--tc-card-h")).toBe("");
 	});
 });

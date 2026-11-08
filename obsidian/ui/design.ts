@@ -133,11 +133,11 @@ export const LAYOUT = {
 	dragStartDistance: 4,
 	/** A second click this soon after the first is a double click: the first waits it out before it counts as a click. */
 	doubleClickMs: 250,
-	/** The divider holds to the middle of the window while dragged this close to it. */
-	dividerSnapDistance: 8,
+	/** A column that has gone this long without a scroll step has stopped: what its scroll brought into view opens its menu. */
+	scrollIdleMs: 120,
 	/**
-	 * A finger slower than this, px per ms, is placing something with care: the divider holds to the middle only then, so a
-	 * quick swipe passes it by without a tick, and the switch's wheel turns freely only then, a quick swipe turning it one place.
+	 * A finger slower than this, px per ms, is placing something with care: the switch's wheel turns freely only then, a
+	 * quick swipe turning it one place. (The divider's hold to the middle is the core's `dividerAt`.)
 	 */
 	slowSpeed: 0.08,
 	/** The wheel turns freely once the finger has gone slowly this long in a drag, and stays free to its end. */

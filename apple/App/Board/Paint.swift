@@ -25,6 +25,8 @@ enum Palette {
     /// A drop's lit plate (`--tc-drop-bg`) and a waiting place's dashes (`--tc-dash`).
     static func dropBg(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#251F3D" : "#F1ECFE") }
     static func dash(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#3A3A3C" : "#C7C7CC") }
+    /// A search's found piece (`--tc-selection`).
+    static func selection(_ scheme: ColorScheme) -> Color { scheme == .dark ? Color(.sRGB, red: 149 / 255, green: 128 / 255, blue: 1, opacity: 0.38) : Color(.sRGB, red: 138 / 255, green: 92 / 255, blue: 245 / 255, opacity: 0.28) }
     /// A plain card: the ground lifted towards the text.
     static func card(_ scheme: ColorScheme) -> Color { Color(.secondarySystemBackground) }
 }
@@ -41,22 +43,53 @@ enum ColumnMetrics {
     static let sectionGap: CGFloat = 10
 }
 
-/// The card's measures, as the plugin draws a card (`docs/design/README.md`).
+/// The shared settings' size of a card, observed: every view that reads it while it draws is drawn again when it
+/// changes, as the plugin's `--tc-card-h` and `--tc-card-gap` restyle every card at once.
+@Observable
+final class CardSize: @unchecked Sendable {
+    static let shared = CardSize()
+    var height: CGFloat = 35
+    var gap: CGFloat = 2
+    /// When a touch becomes a carry, on a card and on the empty calendar alike (Settings → Long press delay), seconds.
+    var press: TimeInterval = 0.25
+}
+
+/// The card's measures, as the plugin draws a card (`docs/design/README.md`). The height and the gap are the shared
+/// settings' (Settings → Cards), as the plugin sets its `--tc-card-h` and `--tc-card-gap` for the whole screen: the screen
+/// sets them from each read (`follow(_:)`) into `CardSize`, which every card drawn observes; the ends of a card round at
+/// half its height.
 enum CardMetrics {
-    static let height: CGFloat = 35
-    static let radius: CGFloat = 17.5
-    static let gap: CGFloat = 2
+    static var height: CGFloat { CardSize.shared.height }
+    static var radius: CGFloat { height / 2 }
+    static var gap: CGFloat { CardSize.shared.gap }
+    static var press: TimeInterval { CardSize.shared.press }
+
+    /// The shared settings' size of a card, read with the screen: true when it changed.
+    @discardableResult
+    static func follow(_ look: ScreenSettings) -> Bool {
+        let size = CardSize.shared
+        let changed = size.height != CGFloat(look.cardHeight) || size.gap != CGFloat(look.cardGap)
+        let press = TimeInterval(look.longPressMs) / 1000
+        if size.press != press { size.press = press }
+        if size.height != CGFloat(look.cardHeight) { size.height = CGFloat(look.cardHeight) }
+        if size.gap != CGFloat(look.cardGap) { size.gap = CGFloat(look.cardGap) }
+        return changed
+    }
     static let leading: CGFloat = 14
     static let trailing: CGFloat = 10
     static let title: CGFloat = 15
+    /// A title's line (`--tc-leading-card`): one on a card, as many as a copy over the menu needs.
+    static let titleLine: CGFloat = 18
     static let fade: CGFloat = 12
+    /// What a copy grown over a menu keeps from the window's edges (`--tc-whole-margin`).
+    static let wholeMargin: CGFloat = 10
     static let indent: CGFloat = 20
     static let branchWidth: CGFloat = 1.5
     static let columnInset: CGFloat = 10
     /// The hour's height the screen is read at; the timeline stacks its cards anew at the zoom it shows.
     static let hour: CGFloat = 56
     /// The timeline's measures the core lays out the stack of task cards in, as the plugin's design has them.
-    static let timeline = TimelineMeasures(hour: hour, cardHeight: height, cardGap: gap, itemInset: 1, itemGap: 2, overlayInset: 18)
+    static var timeline: TimelineMeasures { TimelineMeasures(hour: hour, cardHeight: height, cardGap: gap, itemInset: 1, itemGap: 2, overlayInset: 18) }
 }
 
 extension Color {

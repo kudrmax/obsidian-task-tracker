@@ -1,10 +1,10 @@
-import type { TaskItem } from "../../../core/application/contracts";
+import { grownStart, type TaskItem } from "../../../core/application/contracts";
 import type { LocalDate } from "../types";
 import { DESIGN, DURATION, tokenMs, tokenPx } from "../design";
 import { el, px } from "../dom";
 import { fillCard } from "../TaskCard";
 import { timingOf } from "../motion/Motion";
-import { roomWidth, stretchWhole, windowRoom } from "../wholeCard";
+import { stretchWhole, windowRoom } from "../wholeCard";
 import type { Float } from "./DropTarget";
 
 export interface Grab {
@@ -47,7 +47,7 @@ export class FloatingCard implements Float {
 			for (let depth = STACK_DEPTH; depth >= 1; depth--) this.stack.push(el(activeDocument.body, "div", `tc-float-under is-${depth}`));
 		}
 		activeDocument.body.appendChild(this.el);
-		stretchWhole(this.el, { width: DESIGN.floatWidth, height: this.el.getBoundingClientRect().height }, roomWidth(windowRoom(this.el)));
+		stretchWhole(this.el, { width: DESIGN.floatWidth, height: this.el.getBoundingClientRect().height }, windowRoom(this.el));
 		this.fitStack();
 		if (count > 1) this.showCount(count);
 	}
@@ -64,8 +64,14 @@ export class FloatingCard implements Float {
 		this.stack.forEach((layer, i) => (layer.style.width = px(this.el.offsetWidth - 2 * inset * (STACK_DEPTH - i))));
 	}
 
+	/**
+	 * The card under the finger as it was grabbed; stretched further right than the window lets it, it is pulled back
+	 * inside the window's margin as the menu's copy is (`grownStart`), never past the card's own end under the finger.
+	 */
 	moveTo(x: number, y: number): void {
-		const transform = `translate3d(${x - this.grab.dx}px, ${y - this.grab.dy}px, 0)`;
+		const room = windowRoom(this.el);
+		const left = grownStart(x - this.grab.dx, DESIGN.floatWidth, this.el.offsetWidth, room.width, room.margin);
+		const transform = `translate3d(${left}px, ${y - this.grab.dy}px, 0)`;
 		this.el.style.transform = transform;
 		for (const layer of this.stack) layer.style.transform = transform;
 		if (this.count) this.count.style.transform = transform;

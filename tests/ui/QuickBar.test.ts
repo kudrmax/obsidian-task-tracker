@@ -5,6 +5,7 @@ import type { DraftMarks, LabelLevel, PriorityLevel } from "../../core/applicati
 import { QuickBar, type QuickBarState } from "../../obsidian/ui/quick/QuickBar";
 import { placementOfDay } from "../../core/domain/Days";
 import { draftMarksOf } from "../../core/application/marks";
+import { dayMonth } from "../../core/application/dayLabels";
 
 const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p1", color: "red" },
@@ -30,6 +31,7 @@ const RENAMED: Readonly<Record<GroupedList, string>> = { inbox: "Входящи�
 /** The lists' names the next bar set up is given: the default ones unless a test renames them. */
 let listNames = DEFAULT_NAMES;
 const listName = (list: GroupedList) => listNames[list];
+const placementTitle = (placement: Placement) => (placement.kind === "date" ? dayMonth(placement.date) : listName(placement.kind));
 
 const PLACES: readonly GroupedList[] = ["inbox", "backlog", "soon", "now"];
 
@@ -65,6 +67,7 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf:
 				onLabel: (name: string) => labelled.push(name),
 		today: () => TODAY,
 		listName,
+		placementTitle,
 		placementOfDay: placementOf,
 		onIndent: (delta) => indents.push(delta),
 		onPriority: (prefix) => priorities.push(prefix),
@@ -90,7 +93,7 @@ describe("QuickBar", () => {
 		const parent = document.createElement("div");
 		const first = document.createElement("span");
 		parent.appendChild(first);
-		const bar = new QuickBar(parent, { desktop: () => false, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, today: () => TODAY, listName, placementTitle, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 		expect(parent.lastElementChild?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(true);
 		bar.show(full());
@@ -224,7 +227,7 @@ describe("the priority panel", () => {
 
 	it("has no flag while the session says there is nothing to mark", () => {
 		const parent = document.createElement("div");
-		const bar = new QuickBar(parent, { desktop: () => false, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, today: () => TODAY, listName, placementTitle, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 		bar.show(full({ markable: false }));
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(true);
 	});
@@ -710,7 +713,7 @@ describe("QuickBar on the phone keyboard", () => {
 		for (const desktop of [false, true]) {
 			const parent = document.createElement("div");
 			const other = parent.appendChild(document.createElement("span"));
-			const bar = new QuickBar(parent, { desktop: () => desktop, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+			const bar = new QuickBar(parent, { desktop: () => desktop, today: () => TODAY, listName, placementTitle, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 			bar.show(full({ section: false }));
 			const own = [...parent.querySelectorAll("*")].filter((node) => !other.contains(node));
 			expect(own.length).toBeGreaterThan(0);

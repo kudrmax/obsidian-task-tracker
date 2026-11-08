@@ -214,6 +214,7 @@ import Testing
         let child = try #require(page.tree?.rows.first { $0.item.title == "Child" })
         #expect(page.subtaskMenus[child.item.id] != nil)
         #expect(page.menu != nil)
-        #expect(!page.listName.isEmpty)
+        #expect(page.cards[child.item.id] != nil)
+        #expect(!page.gone)
     }
 }

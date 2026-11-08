@@ -129,6 +129,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "columnSections", args: () => ["day", T] },
 	{ method: "placementOfDay", args: () => [LATER] },
 	{ method: "listName", args: () => ["backlog"] },
+	{ method: "placementTitle", args: () => [{ kind: "date", date: "2026-11-05" }] },
 	{ method: "dayOfPlacement", args: () => [{ kind: "now" }] },
 	{ method: "setStatus", args: (s) => [key(s, "Lunch"), "done"] },
 	{ method: "toggleDone", args: (s) => [key(s, "Idea")] },
@@ -294,7 +295,7 @@ describe("the door's coverage", () => {
 
 	it("answers in no space no interface names", () => {
 		const spaces = new Set(Object.values(DOOR_COVERAGE).flatMap((c) => ("space" in c ? [c.space] : [])));
-		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline"];
+		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline", "notes"];
 		expect(new Set(doorMethods().map((m) => m.split(".")[0]))).toEqual(new Set([...spaces, ...own]));
 	});
 });
@@ -306,11 +307,30 @@ describe("the door's screen settings", () => {
 	});
 });
 
+describe("the door's notes", () => {
+	const ok = (answer: DoorAnswer) => (answer as Extract<DoorAnswer, { ok: true }>).result;
+
+	it("finds the projects among the vault's notes by the settings' tag, and a task's project opens its note once they are handed in", () => {
+		const vault = [{ path: "Clients/Acme.md", text: "---\ntags: [client]\n---\n" }, { path: "Home.md", text: "#project" }];
+		const projects = ok(callDoor("rules.projectNotes", [vault, "#client"], context()));
+		expect(projects).toEqual([{ name: "Acme", path: "Clients/Acme.md", link: "Acme" }]);
+		const text = "## Inbox\n- [ ] Call 🗂️ [[Acme]]\n";
+		const screen = ok(callDoor("tasks.screen", [T], context(text, { projects: projects as never }))) as { inbox: { project: unknown }[] };
+		expect(screen.inbox[0].project).toMatchObject({ name: "Acme", note: "Clients/Acme.md", canOpenNote: true });
+	});
+});
+
 describe("the door's timeline", () => {
 	const levels = (settings?: string) => callDoor("timeline.zoomLevels", [], { tasks: null, settings, nowMs: NOW.getTime() });
 
 	it("answers the zoom's levels data.json keeps", () => {
 		expect(levels(JSON.stringify({ zoomLevels: [{ hourPx: 40 }, { hourPx: 80 }] }))).toEqual({ ok: true, result: [{ hourPx: 40 }, { hourPx: 80 }] });
+	});
+
+	it("answers the levels settings.setZoomLevels wrote", () => {
+		const written = callDoor("settings.setZoomLevels", ["40, 80"], { tasks: null, settings: DATA, nowMs: NOW.getTime() }) as Extract<DoorAnswer, { ok: true }>;
+		expect(levels(written.settings)).toEqual({ ok: true, result: [{ hourPx: 40 }, { hourPx: 80 }] });
+		expect(callDoor("settings.form", [], { tasks: null, settings: written.settings, nowMs: NOW.getTime() })).toMatchObject({ ok: true, result: { zoomLevels: "40, 80" } });
 	});
 
 	it("answers the defaults for no data.json, or one without levels that read", () => {
@@ -344,6 +364,14 @@ const SETTINGS_CASES: readonly (readonly [string, ...unknown[]])[] = [
 	["moveLevel", 1, 0],
 	["setLabelTag", " tags "],
 	["setLabelTag", "two words"],
+	["setLabelPaint", "blend"],
+	["setLabelPaint", "plaid"],
+	["setCardHeight", 30.4],
+	["setCardHeight", 41],
+	["setCardGap", 0],
+	["setCardGap", -1],
+	["setZoomLevels", " 40 , 80"],
+	["setZoomLevels", "28, x"],
 	["setProjectTag", " проект "],
 	["setProjectTag", "two words"],
 	["renameLabel", 0, " Very fast "],
@@ -484,7 +512,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.repeatDraft", T, rule),
 		plain("rules.editRepeat", wire(callDoor("rules.repeatDraft", [T, null], context()) as { result: unknown }).result, { what: "kind", to: "schedule" }),
 		plain("rules.samePlacement", { kind: "now" }, { kind: "date", date: T }),
-		...["keyId"].map((m) => plain(`rules.${m}`, key(screen, "Shop"))),
+		plain("rules.keyId", key(screen, "Shop")),
 		...["sameLine", "samePlace", "sameTaskTree"].map((m) => plain(`rules.${m}`, key(screen, "Shop"), key(screen, "Parent"))),
 		plain("rules.fitLevel", look.cards.day, gap),
 		plain("rules.gapOfPlace", look.cards.day, { kind: "task", group: null, before: null }),
@@ -539,7 +567,24 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.branchOf", [0, 1, 1], 1),
 		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
 		plain("rules.placeShowing", "day", "inbox"),
+		plain("rules.listWidths", 0.5, 390, 16),
+		plain("rules.listShareOf", 187, 390, 16),
+		plain("rules.dividerAt", 190, { width: 187, min: 110, max: 280, center: 187 }, 0.01),
+		plain("rules.dayMonth", "2026-11-05"),
+		plain("rules.canPick", "timeline"),
+		plain("rules.repeatValue", { kind: "schedule", every: 2, unit: "month", days: [], dayOfMonth: 5, from: "2026-11-05" }),
+		plain("rules.repeatValue", { kind: "schedule", every: 1, unit: "week", days: [0, 2], dayOfMonth: null, from: null }),
+		plain("rules.onTheDay", { kind: "schedule", every: 1, unit: "month", days: [], dayOfMonth: 22, from: null }),
+		plain("rules.wholeWidth", { width: 170, titleWidth: 140, textWidth: 200, fade: 16 }, { width: 390, margin: 10 }),
+		plain("rules.wholeWidth", { width: 170, titleWidth: 140, textWidth: 100, fade: 16 }, { width: 390, margin: 10 }),
+		plain("rules.grownStart", 200, 180, 230, 390, 10),
 		plain("timeline.zoomLevels"),
+		plain("notes.linkQuery", "Call [[Alp", 10),
+		plain("notes.linkQuery", "Call", 4),
+		plain("notes.suggest", "alp", [{ path: "Projects/Alpha.md" }, { path: "Beta.md" }]),
+		plain("notes.insert", "Call [[Alp", { query: "Alp", from: 5, to: 10 }, "Alpha"),
+		plain("notes.open", "Alpha#Plan", [{ path: "Projects/Alpha.md" }]),
+		plain("notes.open", "Gone", [{ path: "Projects/Alpha.md" }]),
 		...[
 			["openAtEnd", "soon"],
 			["openFromPlus"],

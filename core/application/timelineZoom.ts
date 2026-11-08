@@ -1,10 +1,6 @@
-/** A level of the timeline's zoom: the height of one hour, in the frontend's units. */
-export interface ZoomLevel {
-	readonly hourPx: number;
-}
+import type { ZoomLevel } from "../settings";
 
-/** The levels a settings file without its own gives: from the whole day to the closest hour. */
-export const DEFAULT_ZOOM_LEVELS: readonly ZoomLevel[] = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
+export { DEFAULT_ZOOM_LEVELS, type ZoomLevel, zoomLevelsOf } from "../settings";
 
 /** The zoom a timeline opens at the first time, before a pinch has settled on another. */
 export const DEFAULT_ZOOM_HOUR = 56;
@@ -71,15 +67,6 @@ export function gridMarks(grid: Grid, dayHours: number): GridMark[] {
 		marks.push({ minute: minutes, label: minute % grid.labels === 0 ? `:${String(minute).padStart(2, "0")}` : null });
 	}
 	return marks;
-}
-
-/** The levels `data.json` keeps under `zoomLevels`, each only its height; the defaults when it keeps none, or one doesn't read. */
-export function zoomLevelsOf(saved: unknown): ZoomLevel[] {
-	const kept = saved !== null && typeof saved === "object" ? (saved as { zoomLevels?: unknown }).zoomLevels : undefined;
-	if (!Array.isArray(kept) || kept.length === 0) return [...DEFAULT_ZOOM_LEVELS];
-	const levels = kept.map((level) => (level !== null && typeof level === "object" ? (level as { hourPx?: unknown }).hourPx : undefined));
-	if (!levels.every((hourPx): hourPx is number => typeof hourPx === "number" && Number.isFinite(hourPx) && hourPx > 0)) return [...DEFAULT_ZOOM_LEVELS];
-	return levels.map((hourPx) => ({ hourPx }));
 }
 
 /** Where a timeline was left: an hour's height, or the whole day, whatever the screen's height. */

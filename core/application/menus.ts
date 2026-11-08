@@ -1,3 +1,4 @@
+import { repeatRow } from "./repeatWords";
 import { addDays } from "../domain/LocalDate";
 import type { LabelLevel } from "../domain/Label";
 import type { PriorityLevel } from "../domain/Priority";
@@ -78,6 +79,11 @@ const A_LIST_CARD: MenuOf = { kind: "task", from: "day" };
 
 const COLUMNS: ReadonlySet<MenuFrom> = new Set<DropColumn>(["day", "soon", "inbox", "backlog"]);
 
+/** Whether Select tasks picks a card drawn there: a list column's; never the timeline's, Done's, a stack's or the whole screen's. */
+export function canPick(from: MenuFrom): boolean {
+	return COLUMNS.has(from);
+}
+
 /**
  * The sections a menu offers, opened from cards at `froms`: the screen's offer when every card stands in a list column
  * that shows its list's sections (`columnSections`); none from the timeline, Done, a stack or the whole screen.
@@ -107,7 +113,7 @@ function menuStatuses(items: readonly TaskItem[], of: MenuOf): readonly MenuStat
 
 function menuEdits(items: readonly TaskItem[], of: MenuOf, sections: MenuSections | null): readonly MenuEditId[] {
 	const section: MenuEditId[] = sections ? ["section"] : [];
-	if (of.kind === "bulk") return section;
+	if (of.kind === "bulk") return [...section, "project"];
 	const item = items[0];
 	const edits: [MenuEditId, boolean][] = [
 		["rename", true],
@@ -115,6 +121,7 @@ function menuEdits(items: readonly TaskItem[], of: MenuOf, sections: MenuSection
 		["description", item.can.addDescription],
 		["repeat", item.repeatable],
 		["section", sections !== null],
+		["project", true],
 		["subtask", of.from !== "stack"],
 	];
 	return edits.flatMap(([id, offered]) => (offered ? [id] : []));
@@ -168,6 +175,7 @@ export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: r
 		project: menuProject(items, projects),
 		edits,
 		reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
+		repeat: repeatRow(of.kind === "task" ? (items[0]?.repeat ?? null) : null),
 		remove: { confirm: of.kind === "task" },
 	};
 }

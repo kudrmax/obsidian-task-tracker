@@ -14,6 +14,8 @@ struct DropPlace {
     /// Let go: where the card will stand, in the content's space, for the system to settle the carried card into; nil
     /// when the drop writes nothing.
     let land: () -> CGRect?
+    /// The plus may be let go here: a column's title takes only cards, as the plugin's.
+    var takesPlus = true
 }
 
 /// The screen's one drop interaction, UIKit's own, on the window: every list and the calendar register as places, and
@@ -41,24 +43,39 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     /// The copy the system flies, kept to fade it.
     private weak var flown: UIView?
     private var places: [String: DropPlace] = [:]
+    /// How each place that scrolls is scrolled by a carry held at its edge: by `dy` points, true when it moved.
+    private var scrolls: [String: (CGFloat) -> Bool] = [:]
+    /// Where the carry is held, in the window: the edge scroll reads it on every frame, the finger still or not.
+    private var held: CGPoint?
+    private var edgeLink: CADisplayLink?
+    /// The top of the bar over the screen's bottom (the tab bar and the plus), in the window: a list's edge there is
+    /// where it stops showing, not where it ends under the bar.
+    var floor: CGFloat?
     private var current: String?
     /// Where the card let go will stand, in the window, kept for the drop's preview.
     private var landing: CGRect?
 
+    /// Where each place last told it stands, kept apart from the places themselves: SwiftUI reports a view's geometry
+    /// before its `onAppear` registers it, and a ribbon that opens where it last stood never moves again to report anew.
+    private var spots: [String: (visible: CGRect, origin: CGPoint)] = [:]
+
     func register(_ key: String, _ place: DropPlace) {
-        let kept = places[key]
         var place = place
-        if let kept {
-            place.visible = kept.visible
-            place.origin = kept.origin
+        if let spot = spots[key] {
+            place.visible = spot.visible
+            place.origin = spot.origin
         }
         places[key] = place
     }
 
-    /// The place moved on the screen: a scroll, the ribbon, a new day.
+    /// The place moved on the screen: a scroll, the ribbon, a new day. Told before the place registers too.
     func move(_ key: String, visible: CGRect? = nil, origin: CGPoint? = nil) {
-        if let visible { places[key]?.visible = visible }
-        if let origin { places[key]?.origin = origin }
+        var spot = spots[key] ?? (visible: .null, origin: .zero)
+        if let visible { spot.visible = visible }
+        if let origin { spot.origin = origin }
+        spots[key] = spot
+        places[key]?.visible = spot.visible
+        places[key]?.origin = spot.origin
     }
 
     /// Where a place's content origin stands, in the window.
@@ -67,27 +84,68 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     func remove(_ key: String) {
         if current == key { leave() }
         places[key] = nil
+        scrolls[key] = nil
     }
 
-    private func place(at point: CGPoint) -> String? {
+    /// The place scrolls while a carry is held near its top or bottom edge, as the plugin's lists and calendar do.
+    func scrolls(_ key: String, by scroll: @escaping (CGFloat) -> Bool) {
+        scrolls[key] = scroll
+    }
+
+    // MARK: Scrolling at the edges
+
+    /// The carry held at `point`: a place it is near the edge of starts scrolling, faster the nearer.
+    private func hold(_ point: CGPoint?) {
+        held = point
+        guard point != nil, let current, scrolls[current] != nil else { return stopEdges() }
+        guard edgeLink == nil else { return }
+        let link = CADisplayLink(target: self, selector: #selector(edgeTick))
+        link.add(to: .main, forMode: .common)
+        edgeLink = link
+    }
+
+    private func stopEdges() {
+        edgeLink?.invalidate()
+        edgeLink = nil
+    }
+
+    @objc private func edgeTick() {
+        guard let key = current, let point = held, let place = places[key], let scroll = scrolls[key] else { return stopEdges() }
+        let fromTop = point.y - place.visible.minY
+        let fromBottom = min(place.visible.maxY, floor ?? .infinity) - point.y
+        var dy: CGFloat = 0
+        if fromTop < Self.edgeBand { dy = -Self.edgeSpeed * (1 - max(0, fromTop) / Self.edgeBand) }
+        else if fromBottom < Self.edgeBand { dy = Self.edgeSpeed * (1 - max(0, fromBottom) / Self.edgeBand) }
+        guard dy != 0, scroll(dy) else { return }
+        // The content moved under the still finger: the place reads where it now points, before its origin is told.
+        place.hover(CGPoint(x: point.x - place.origin.x, y: point.y - place.origin.y + dy))
+    }
+
+    /// How near an edge a carry starts the scroll, and the fastest it scrolls, points a frame.
+    private static let edgeBand: CGFloat = 48
+    private static let edgeSpeed: CGFloat = 9
+
+    private func place(at point: CGPoint, plus: Bool = false) -> String? {
         // By key, so a point two places share always goes to the same one.
-        places.keys.sorted().first { places[$0]?.visible.contains(point) == true }
+        places.keys.sorted().first { key in places[key].map { $0.visible.contains(point) && (!plus || $0.takesPlus) } == true }
     }
 
     private func leave() {
         if let current { places[current]?.leave() }
         current = nil
+        stopEdges()
     }
 
     // MARK: The plus, carried by the finger itself
 
     /// The plus held at `point` of the window: the place under it shows where the new task would stand.
     func carry(at point: CGPoint) {
-        let key = place(at: point)
+        let key = place(at: point, plus: true)
         if key != current { leave() }
         current = key
         guard let key, let place = places[key] else { return }
         place.hover(CGPoint(x: point.x - place.origin.x, y: point.y - place.origin.y))
+        hold(point)
     }
 
     /// The plus held over no place (the cancel target, the bars).
@@ -102,6 +160,7 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     func letGo() -> LetGo {
         guard let current, let place = places[current] else { return .missed }
         self.current = nil
+        stopEdges()
         return .taken(place.land().map { $0.offsetBy(dx: place.origin.x, dy: place.origin.y) })
     }
 
@@ -119,6 +178,7 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
         current = key
         guard let key, let place = places[key] else { return UIDropProposal(operation: .cancel) }
         place.hover(CGPoint(x: point.x - place.origin.x, y: point.y - place.origin.y))
+        hold(point)
         return UIDropProposal(operation: .move)
     }
 
@@ -126,6 +186,7 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) {
         current = nil
+        stopEdges()
         guard !flying else {
             endAfterFlight = true
             return
@@ -136,6 +197,7 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
+        stopEdges()
         performed = true
         guard let current, let place = places[current] else { return }
         landing = place.land().map { $0.offsetBy(dx: place.origin.x, dy: place.origin.y) }
@@ -225,5 +287,55 @@ struct DropAnchor: UIViewRepresentable {
             guard let drop, let window, drop.interaction.view !== window else { return }
             window.addInteraction(drop.interaction)
         }
+    }
+}
+
+/// Tells of every touch that begins anywhere in the window, taking none: the found card's ring goes at the next touch, as
+/// the plugin's (`FoundCard`).
+struct TouchWatch: UIViewRepresentable {
+    /// Where the touch began, in the window.
+    let touched: @MainActor (CGPoint) -> Void
+
+    func makeUIView(context: Context) -> Probe { Probe(touched: touched) }
+
+    func updateUIView(_ probe: Probe, context: Context) { probe.watch.touched = touched }
+
+    final class Probe: UIView {
+        let watch: Watch
+
+        init(touched: @escaping @MainActor (CGPoint) -> Void) {
+            watch = Watch(touched: touched)
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("not from a storyboard") }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if let window, watch.view !== window { window.addGestureRecognizer(watch) }
+        }
+    }
+
+    /// Fails at once on every touch, after telling of it: no other gesture ever waits for it or loses its touches.
+    final class Watch: UIGestureRecognizer, UIGestureRecognizerDelegate {
+        var touched: @MainActor (CGPoint) -> Void
+
+        init(touched: @escaping @MainActor (CGPoint) -> Void) {
+            self.touched = touched
+            super.init(target: nil, action: nil)
+            cancelsTouchesInView = false
+            delaysTouchesBegan = false
+            delaysTouchesEnded = false
+            delegate = self
+        }
+
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+            touched(touches.first?.location(in: nil) ?? .zero)
+            state = .failed
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
     }
 }
