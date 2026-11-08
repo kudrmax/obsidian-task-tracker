@@ -214,6 +214,11 @@ class SectionFloat implements Float {
 		return this.animate([{ transform: this.el.style.transform }, { transform: `translate3d(${rect.left}px, ${rect.top}px, 0)` }]);
 	}
 
+	/** Flies to `rect`'s top left, fading as it goes. */
+	sink(rect: DOMRect): Promise<void> {
+		return this.animate([{ transform: this.el.style.transform, opacity: "1" }, { transform: `translate3d(${rect.left}px, ${rect.top}px, 0)`, opacity: "0" }]);
+	}
+
 	vanish(): Promise<void> {
 		return this.animate([{ opacity: "1" }, { opacity: "0" }]);
 	}

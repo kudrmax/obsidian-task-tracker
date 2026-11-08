@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../core/application/contracts";
-import { DragSession, type DragPayload, type DropResult, type DropTarget, type Float, type NewTaskPayload } from "../../obsidian/ui/drag/DragSession";
+import { DragSession, type DragPayload, type DropResult, type DropTarget, type Float, type HeldOut, type NewTaskPayload } from "../../obsidian/ui/drag/DragSession";
 import { onDay } from "../fakes/itemOnDay";
 
 const item: TaskItem = onDay({ key: { section: "now", index: 1, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-11-01");
@@ -46,6 +46,9 @@ class FakeFloat implements Float {
 	async flyTo(to: DOMRect): Promise<void> {
 		this.log.push(`fly ${to.x},${to.y}`);
 	}
+	async sink(to: DOMRect): Promise<void> {
+		this.log.push(`sink ${to.x},${to.y}`);
+	}
 	async vanish(): Promise<void> {
 		this.log.push("vanish");
 	}
@@ -54,7 +57,7 @@ class FakeFloat implements Float {
 	}
 }
 
-function session(targets: DropTarget[], float: FakeFloat, ended: unknown[], carried: DragPayload = payload, drawn: HTMLElement | null = null) {
+function session(targets: DropTarget[], float: FakeFloat, ended: unknown[], carried: DragPayload = payload, drawn: HTMLElement | HeldOut | null = null) {
 	return new DragSession({
 		payload: carried,
 		targets,
@@ -113,6 +116,15 @@ describe("DragSession", () => {
 		expect(a.log).toEqual(["preview 50,10", "drop", "clear"]);
 		expect(float.log).toEqual(["move 50,10", "land 30,240", "remove"]);
 		expect(ended).toEqual([slot]);
+	});
+
+	it("goes into the header of the folded group its task went into, as no card of it is drawn", async () => {
+		const a = new FakeTarget("a", 0, 100, { kind: "clearSlot" });
+		const float = new FakeFloat();
+		const s = session([a], float, [], payload, { behind: drawnCard(120) });
+		s.move(50, 10);
+		await s.release(50, 10);
+		expect(float.log).toEqual(["move 50,10", "sink 30,120", "remove"]);
 	});
 
 	it("lands only once the drop is written and drawn", async () => {

@@ -29,6 +29,11 @@ export class PlusFloat implements Float {
 		return this.fly(`translate3d(${rect.left}px, ${rect.top}px, 0)`);
 	}
 
+	/** Goes to the start of `rect` and fades there. */
+	sink(rect: DOMRect): Promise<void> {
+		return this.fly(`translate3d(${rect.left}px, ${rect.top}px, 0)`, true);
+	}
+
 	/** Fades away where it is. */
 	vanish(): Promise<void> {
 		return this.fly(this.el.style.transform, true);

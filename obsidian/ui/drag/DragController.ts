@@ -10,7 +10,7 @@ import type { Timeline } from "../Timeline";
 import type { TimelineDrop } from "./TimelineDrop";
 import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
-import type { DropResult, DropTarget, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
+import type { DropResult, DropTarget, HeldOut, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
 import { FloatingCard } from "./FloatingCard";
 import { PlusFloat } from "./PlusFloat";
 import { LongPress } from "./LongPress";
@@ -45,7 +45,7 @@ export interface DragControllerDeps {
 	/** A card is lifted or settled: the plus hides while it is carried. */
 	onDragging(active: boolean): void;
 	/** Writes the drop and draws it: gives the dropped task's card as drawn now, null when none shows. */
-	onResult(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | null>;
+	onResult(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | HeldOut | null>;
 	/** The card of `item` while its `edge` dot is held at `minute` of the shown day. */
 	stretch(item: TaskItem, edge: ResizeEdge, minute: number): StretchSpan;
 	/** The `edge` dot let go at `minute`, a card being `minDurationMin` tall: true once the new time is written, false when nothing changes. */

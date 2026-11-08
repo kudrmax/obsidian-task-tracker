@@ -73,11 +73,18 @@ export interface DropTarget<P = DragPayload, R = DropResult> {
 	drop(x: number, y: number, drag: P): R | null;
 }
 
+/** A drop's task stands where no card of it is drawn: in a folded project group, behind its header. */
+export interface HeldOut {
+	readonly behind: HTMLElement;
+}
+
 /** The card under the finger. */
 export interface Float {
 	moveTo(x: number, y: number): void;
 	/** Settles where the drop puts it. */
 	land(rect: DOMRect): Promise<void>;
+	/** Goes into `rect` and fades there: the drop is written into a part held out of sight under that header. */
+	sink(rect: DOMRect): Promise<void>;
 	/** Fades where it is: the drop is written but its card does not show. */
 	vanish(): Promise<void>;
 	/** Flies back to where it came from. */

@@ -1,7 +1,7 @@
 import { restingRect } from "../motion/Motion";
-import type { DragPayload, DropResult, DropTarget, Float } from "./DropTarget";
+import type { DragPayload, DropResult, DropTarget, Float, HeldOut } from "./DropTarget";
 
-export type { DragOrigin, DragPayload, DropResult, DropTarget, Float, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
+export type { DragOrigin, DragPayload, DropResult, DropTarget, Float, HeldOut, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
 
 export interface DragSessionOptions<P = DragPayload, R = DropResult> {
 	readonly payload: P;
@@ -11,8 +11,11 @@ export interface DragSessionOptions<P = DragPayload, R = DropResult> {
 	origin(): DOMRect;
 	/** The copy has landed, on the task's new place or back on its old one: the place is released and the card shows. */
 	onReturn?(): void;
-	/** The drop, or null for a cancelled drag. A task's drop gives its card once written and drawn: the float lands on it. */
-	onEnd(result: R | null): Promise<HTMLElement | null | void>;
+	/**
+	 * The drop, or null for a cancelled drag. A task's drop gives its card once written and drawn: the float lands on it;
+	 * or the header its card is held behind, folded away: the float goes into it.
+	 */
+	onEnd(result: R | null): Promise<HTMLElement | HeldOut | null | void>;
 	/** What it carries has no card of its own to land on (a new task): it lands where the target shows its place. */
 	readonly landsOnTarget?: boolean;
 }
@@ -48,8 +51,11 @@ export class DragSession<P = DragPayload, R = DropResult> {
 		if (!target || !result) return this.settleBack();
 		const line = target.landing();
 		const card = await this.opts.onEnd(result);
-		const landing = card ? restingRect(card) : this.opts.landsOnTarget ? line : null;
-		await (landing ? this.opts.float.land(landing) : this.opts.float.vanish());
+		if (card && !(card instanceof HTMLElement)) await this.opts.float.sink(restingRect(card.behind));
+		else {
+			const landing = card ? restingRect(card) : this.opts.landsOnTarget ? line : null;
+			await (landing ? this.opts.float.land(landing) : this.opts.float.vanish());
+		}
 		this.opts.onReturn?.();
 		this.clearAll();
 		this.opts.float.remove();
