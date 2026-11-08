@@ -6,7 +6,7 @@ import { linkAt, type TaskLink } from "../TaskTitle";
 import { showWhole } from "../wholeCard";
 import type { LocalDate } from "../types";
 import type { CloseHow } from "./Overlay";
-import { LiftedMenu } from "./LiftedMenu";
+import { LiftedMenu, type Sheet } from "./LiftedMenu";
 import { moveTiles } from "./quickMoves";
 import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
 import type { IconName } from "../kit/icons";
@@ -162,7 +162,9 @@ export interface TaskMenuContext {
 	/** Dresses the copy over the blur: a selected timeline card gives its copy the dots that stretch it. */
 	readonly lifted?: (copy: HTMLElement, close: () => void) => void;
 	/** A timeline card's subtasks stand between its copy and the panel; a tap on one opens its own menu instead. */
-	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement) => void;
+	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement, sheet: Sheet) => void;
+	/** The sheet of the menu this one replaces, taken over as it stands: a subtask's menu opened from its task's stack. */
+	readonly sheet?: Sheet;
 	/** Draws the start of the task's description over its copy; without it the menu shows none. */
 	readonly markdown?: MarkdownSurface;
 	/** Opened by a finger still held on the card: its column stays still under it. */
@@ -210,7 +212,7 @@ export class TaskMenu extends LiftedMenu {
 	private labelling = false;
 
 	private constructor(private context: TaskMenuContext) {
-		super(context.source);
+		super(context.source, context.sheet);
 		this.openOver(context.source, () => this.build(), context.held !== true);
 	}
 
@@ -329,7 +331,10 @@ export class TaskMenu extends LiftedMenu {
 		for (const subtask of subtasks) {
 			const card = renderTaskCard(null, subtask, { day });
 			stack.insertBefore(card, this.stackRow);
-			card.addEventListener("click", this.pick(() => onSubtask?.(subtask, card)));
+			card.addEventListener(
+				"click",
+				this.picks.handOff(() => onSubtask?.(subtask, card, (onClose) => this.overlay.handOver(onClose))),
+			);
 		}
 	}
 

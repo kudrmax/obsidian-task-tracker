@@ -701,6 +701,28 @@ describe("the calendar menu's stack for a new subtask", () => {
 	const panel = () => document.querySelector<HTMLElement>(".tc-panel.is-task")!;
 	const stack = () => [...document.querySelectorAll<HTMLElement>(".tc-menu-subtasks > *")].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent));
 
+	it("opens a subtask's menu from its card in the stack, the card still on the page, the task's sheet handed over", () => {
+		const actions = { setRepeat: vi.fn(async () => {}), pickStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setProject: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), toggleLabel: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const source = document.body.appendChild(document.createElement("div"));
+		source.className = "tc-block";
+		const opened: boolean[] = [];
+		TaskMenu.open({
+			item: item({ subtasks: [sub(0, "A1")] }),
+			source,
+			today: "2026-11-01",
+			day: "2026-11-01",
+			menu: menuOf(LEVELS),
+			actions,
+			onSubtask: (_subtask, card, sheet) => {
+				opened.push(card.isConnected);
+				sheet(() => {});
+			},
+		});
+		document.querySelector<HTMLElement>(".tc-menu-subtasks .tc-card")!.click();
+		expect(opened).toEqual([true]);
+		expect(document.querySelectorAll(".tc-backdrop")).toHaveLength(1);
+	});
+
 	it("keeps the menu open on Add subtask and hands it to the action", () => {
 		const { menu, actions } = openOnBlock(item({ subtasks: [sub(0, "A1")] }));
 		[...panel().querySelectorAll<HTMLElement>(".tc-menu-row")].find((row) => row.textContent?.includes("Add subtask"))!.click();

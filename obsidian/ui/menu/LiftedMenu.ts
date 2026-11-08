@@ -4,6 +4,9 @@ import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel, Picks } from "../kit/Panel";
 import { grownStart, roomWidth, type Size, windowRoom } from "../wholeCard";
 import { type CloseHow, Overlay } from "./Overlay";
+
+/** How a window takes over the sheet of the one it replaces: its own close handed in, the overlay it now owns handed back. */
+export type Sheet = (onClose: (how: CloseHow) => void) => Overlay;
 import { scrollIntoColumn, shownPart, topInside } from "./inView";
 import { menuRoom, placePanel } from "./MenuPanel";
 
@@ -30,8 +33,9 @@ export abstract class LiftedMenu {
 	private gone = false;
 	private stopScroll: () => void = () => undefined;
 
-	protected constructor(source: HTMLElement) {
-		this.overlay = new Overlay((how) => this.close(how), source);
+	/** `sheet`: the sheet of the menu this one replaces (a subtask's menu over its task's), taken over as it stands. */
+	protected constructor(source: HTMLElement, sheet?: Sheet) {
+		this.overlay = sheet ? sheet((how) => this.close(how)) : new Overlay((how) => this.close(how), source);
 		this.liftedCopy = LiftedCopy.over(this.overlay, el(null, "div", "tc-lifted"), true);
 	}
 

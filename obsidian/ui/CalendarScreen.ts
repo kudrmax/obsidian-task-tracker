@@ -23,6 +23,7 @@ import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { EventMenu } from "./menu/EventMenu";
 import { TaskMenu } from "./menu/TaskMenu";
+import type { Sheet } from "./menu/LiftedMenu";
 import type { EditorOwner } from "./markdown/EmbeddedEditor";
 import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
 import { MarkdownTitleField } from "./quick/MarkdownTitleField";
@@ -1102,7 +1103,7 @@ export class CalendarScreen extends Component {
 	}
 
 	/** The task menu; a list card's offers the sections of its list too. On the whole screen, typing and opening stay there. */
-	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen, held?: boolean): TaskMenu {
+	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen, held?: boolean, sheet?: Sheet): TaskMenu {
 		const tasks = this.deps.tasks;
 		const from = this.menuFrom(source, full);
 		const column = this.columnOf(source);
@@ -1115,8 +1116,9 @@ export class CalendarScreen extends Component {
 			source,
 			lifted,
 			held,
+			sheet,
 			menu: (task) => tasks.menu(task, from, screen),
-			onSubtask: (subtask, card) => this.showMenu(subtask, card),
+			onSubtask: (subtask, card, taken) => this.showMenu(subtask, card, undefined, undefined, undefined, taken),
 			markdown: full?.holds(item) ? undefined : this.markdown,
 			today,
 			day: this.selectedDate,
