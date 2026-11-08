@@ -71,6 +71,7 @@ struct TimelineColumn: View {
                     open()
                     reveal(hour)
                 }
+                .onChange(of: timeline.zoomLevels) { settleZoom() }
                 .onChange(of: model.entry.moved) { reveal(hour) }
                 .onChange(of: model.found) { showFound(hour) }
                 .onChange(of: model.dayMoved) {

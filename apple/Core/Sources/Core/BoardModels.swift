@@ -597,6 +597,8 @@ public struct SettingsForm: Decodable, Sendable {
     public let cardGap: Int
     public let cardHeights: SizeBounds
     public let cardGaps: SizeBounds
+    /// Zoom Levels as typed, the hour's heights (`28, 56, 112, 224`); `settings.setZoomLevels(text)` writes text that reads.
+    public let zoomLevels: String
     public let projectTag: String
     /// The line markers by name (`dueDateMarker`, `slotMarker`, …) and the order the screen edits them in; their words are
     /// the host's. `settings.setMarker(marker, text)`.

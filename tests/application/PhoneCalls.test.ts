@@ -325,6 +325,12 @@ describe("the door's timeline", () => {
 		expect(levels(JSON.stringify({ zoomLevels: [{ hourPx: 40 }, { hourPx: 80 }] }))).toEqual({ ok: true, result: [{ hourPx: 40 }, { hourPx: 80 }] });
 	});
 
+	it("answers the levels settings.setZoomLevels wrote", () => {
+		const written = callDoor("settings.setZoomLevels", ["40, 80"], { tasks: null, settings: DATA, nowMs: NOW.getTime() }) as Extract<DoorAnswer, { ok: true }>;
+		expect(levels(written.settings)).toEqual({ ok: true, result: [{ hourPx: 40 }, { hourPx: 80 }] });
+		expect(callDoor("settings.form", [], { tasks: null, settings: written.settings, nowMs: NOW.getTime() })).toMatchObject({ ok: true, result: { zoomLevels: "40, 80" } });
+	});
+
 	it("answers the defaults for no data.json, or one without levels that read", () => {
 		const defaults = { ok: true, result: wire(DEFAULT_ZOOM_LEVELS) };
 		for (const settings of [undefined, "", DATA, JSON.stringify({ zoomLevels: [{ hourPx: -1 }] })]) expect(levels(settings)).toEqual(defaults);
@@ -362,6 +368,8 @@ const SETTINGS_CASES: readonly (readonly [string, ...unknown[]])[] = [
 	["setCardHeight", 41],
 	["setCardGap", 0],
 	["setCardGap", -1],
+	["setZoomLevels", " 40 , 80"],
+	["setZoomLevels", "28, x"],
 	["setProjectTag", " проект "],
 	["setProjectTag", "two words"],
 	["renameLabel", 0, " Very fast "],

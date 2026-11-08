@@ -114,6 +114,20 @@ import Testing
         #expect(try board.rule("rules.formatZoomLevels", [[["hourPx": 28], ["hourPx": 56]]], as: String.self) == "28, 56")
     }
 
+    @Test func theZoomLevelsAreTheSharedSettingsAndTheAppWritesThem() throws {
+        let vault = vault()
+        let board = TaskBoard(core: core, vault: vault)
+        let form: SettingsForm = try board.read("settings.form", over: board.settingsOnly())
+        #expect(form.zoomLevels == "28, 56, 112, 224")
+        try board.writeSettings("settings.setZoomLevels", [" 40 , 80"])
+        vault.settings = vault.files[try core.settingsFile()] ?? ""
+        try board.writeSettings("settings.setZoomLevels", ["40, x"])
+        vault.settings = vault.files[try core.settingsFile()] ?? ""
+        let written: SettingsForm = try board.read("settings.form", over: board.settingsOnly())
+        #expect(written.zoomLevels == "40, 80")
+        #expect(try board.snapshot(day: Self.day, measures: Self.measures, now: at).timeline.zoomLevels == [40, 80])
+    }
+
     @Test func theWordsAndBoundsTheAppShowsAreTheCores() throws {
         let board = TaskBoard(core: core, vault: vault())
         #expect(try board.listWidths(share: 0.9, viewWidth: 390, dividerWidth: 16) == ListWidths(width: 280, min: 110, max: 280, center: 187))

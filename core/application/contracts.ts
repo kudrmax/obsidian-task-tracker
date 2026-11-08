@@ -8,6 +8,7 @@ import type { DayColumn, DayRelation, TaskScreen } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionChoice, SectionOffer } from "./sections";
 import type { ListPlace } from "./nesting";
+import type { ZoomLevel } from "./timelineZoom";
 import type { ProjectZone } from "../domain/Project";
 import type { ListGroup } from "./sections";
 
@@ -1174,6 +1175,8 @@ export interface ScreenSettings extends ScreenBehaviour {
 	/** A task card's height and the gap between two cards, px (points on the phone). */
 	readonly cardHeight: number;
 	readonly cardGap: number;
+	/** The hour's heights a pinch on the timeline settles between. */
+	readonly zoomLevels: readonly ZoomLevel[];
 }
 
 /** A setting's bounds, both kept. */
@@ -1214,6 +1217,8 @@ export interface SettingsForm {
 	/** The bounds Card height and Gap between cards move within, whole px. */
 	readonly cardHeights: SizeBounds;
 	readonly cardGaps: SizeBounds;
+	/** Zoom levels as typed: the hour's heights, `28, 56, 112, 224`. */
+	readonly zoomLevels: string;
 	/** The tag that makes a note a project, `#project` by default. */
 	readonly projectTag: string;
 	readonly presets: readonly string[];
@@ -1266,6 +1271,8 @@ export interface SettingsService {
 	setCardHeight(px: number): Promise<void>;
 	/** Written, rounded, when within the form's `cardGaps`. */
 	setCardGap(px: number): Promise<void>;
+	/** Written when the text reads as the hour's heights (`parseZoomLevels`). */
+	setZoomLevels(text: string): Promise<void>;
 	/** The tag trimmed, `#` first; written when it is one word. */
 	setProjectTag(tag: string): Promise<void>;
 	/** The name as shown, its spaces written as underscores. */

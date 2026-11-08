@@ -446,11 +446,12 @@ struct BulkMenu<Label: View>: View {
     @Binding var question: MenuQuestion?
     @ViewBuilder let label: Label
     @State private var menu: TaskMenuModel?
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let items = model.pickedItems
         Menu {
-            if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model) { question = $0 }.nodes) }
+            if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model) { question = $0 }.nodes, palette: { model.ink($0, dark: scheme == .dark) }) }
         } label: {
             label
         }

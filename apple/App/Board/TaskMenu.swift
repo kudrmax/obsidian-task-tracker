@@ -225,22 +225,24 @@ extension MenuNode {
 
 // MARK: SwiftUI: a bar's menu
 
-/// The same rows inside a SwiftUI `Menu`: the bulk menu's «⋯» and the full screen's.
+/// The same rows inside a SwiftUI `Menu`: the bulk menu's «⋯» and the full screen's. A row's flag or tag is drawn in its
+/// level's or label's colour (`palette`), as the card's UIKit menu draws it.
 struct MenuNodes: View {
     let nodes: [MenuNode]
+    let palette: (String) -> UIColor?
 
     var body: some View {
         ForEach(Array(nodes.enumerated()), id: \.offset) { _, node in
             switch node {
-            case .action(let title, let symbol, _, let destructive, let checked, let keepsOpen, _, let disabled, let subtitle, let run):
+            case .action(let title, let symbol, let tint, let destructive, let checked, let keepsOpen, _, let disabled, let subtitle, let run):
                 let button = Button(role: destructive ? .destructive : nil) { run() } label: {
-                    if let symbol { Label(title, systemImage: checked ? "checkmark" : symbol) } else if checked { Label(title, systemImage: "checkmark") } else { Text(title) }
+                    if let symbol { Label { Text(title) } icon: { icon(checked ? "checkmark" : symbol, tint: checked ? nil : tint) } } else if checked { Label(title, systemImage: "checkmark") } else { Text(title) }
                     if let subtitle { Text(subtitle) }
                 }
                 if keepsOpen { button.menuActionDismissBehavior(.disabled).disabled(disabled) } else { button.disabled(disabled) }
             case .submenu(let title, let symbol, let subtitle, let children):
                 Menu {
-                    MenuNodes(nodes: children)
+                    MenuNodes(nodes: children, palette: palette)
                 } label: {
                     Label(title, systemImage: symbol)
                     if let subtitle { Text(subtitle) }
@@ -249,16 +251,24 @@ struct MenuNodes: View {
                 if row {
                     // A row whose tiles keep the menu open (the labels) keeps it open as a whole: SwiftUI reads the
                     // behaviour from the group, not from its buttons.
-                    ControlGroup { MenuNodes(nodes: children) }
+                    ControlGroup { MenuNodes(nodes: children, palette: palette) }
                         .controlGroupStyle(.menu)
                         .menuActionDismissBehavior(children.contains(where: \.keepsOpen) ? .disabled : .automatic)
                 } else {
-                    Section { MenuNodes(nodes: children) }
+                    Section { MenuNodes(nodes: children, palette: palette) }
                 }
             case .deferred(let title, let symbol, let subtitle, let load):
-                DeferredMenu(title: title, symbol: symbol, subtitle: subtitle, load: load)
+                DeferredMenu(title: title, symbol: symbol, subtitle: subtitle, palette: palette, load: load)
             }
         }
+    }
+
+    /// The symbol in its colour, kept by the menu as drawn (`.alwaysOriginal`); a row with no colour takes the menu's.
+    private func icon(_ symbol: String, tint: String?) -> Image {
+        if let tint, let color = palette(tint), let image = UIImage(systemName: symbol)?.withTintColor(color, renderingMode: .alwaysOriginal) {
+            return Image(uiImage: image)
+        }
+        return Image(systemName: symbol)
     }
 }
 
@@ -267,12 +277,13 @@ private struct DeferredMenu: View {
     let title: String
     let symbol: String
     let subtitle: String?
+    let palette: (String) -> UIColor?
     let load: @MainActor () async -> [MenuNode]
     @State private var nodes: [MenuNode] = []
 
     var body: some View {
         Menu {
-            MenuNodes(nodes: nodes)
+            MenuNodes(nodes: nodes, palette: palette)
         } label: {
             Label(title, systemImage: symbol)
             if let subtitle { Text(subtitle) }

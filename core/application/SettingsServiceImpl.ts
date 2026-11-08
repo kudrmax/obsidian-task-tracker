@@ -3,6 +3,7 @@ import { hexColor, type PresetColor } from "../domain/Priority";
 import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, LABEL_PAINTS, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import type { CountField, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
 import type { SettingsStore } from "./ports";
+import { formatZoomLevels, parseZoomLevels } from "./timelineZoom";
 
 /** A count as typed: a number of zero or more, or nothing. */
 function countOf(text: string): number | null {
@@ -48,6 +49,7 @@ export class SettingsServiceImpl implements SettingsService {
 			cardGap: s.cardGap,
 			cardHeights: CARD_HEIGHTS,
 			cardGaps: CARD_GAPS,
+			zoomLevels: formatZoomLevels(s.zoomLevels),
 			projectTag: s.projectTag,
 			presets: s.groups.presets,
 			ungrouped: s.groups.ungrouped,
@@ -127,6 +129,11 @@ export class SettingsServiceImpl implements SettingsService {
 	async setCardGap(px: number): Promise<void> {
 		const cardGap = withinBounds(px, CARD_GAPS);
 		if (cardGap !== null) await this.store.update({ cardGap });
+	}
+
+	async setZoomLevels(text: string): Promise<void> {
+		const zoomLevels = parseZoomLevels(text);
+		if (zoomLevels) await this.store.update({ zoomLevels });
 	}
 
 	async setProjectTag(tag: string): Promise<void> {

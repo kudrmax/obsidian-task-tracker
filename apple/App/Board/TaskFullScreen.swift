@@ -72,7 +72,7 @@ struct TaskFullScreen: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     if let menu = menuModel {
                         Menu("More", systemImage: "ellipsis") {
-                            MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, ask: { question = $0 }, inStack: true, ownPage: true, describe: { describeLater() }).nodes)
+                            MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, ask: { question = $0 }, inStack: true, ownPage: true, describe: { describeLater() }).nodes, palette: { model.ink($0, dark: scheme == .dark) })
                         }
                         .tint(.primary)
                     }

@@ -1789,6 +1789,7 @@
   var CARD_HEIGHTS = { min: 28, max: 40 };
   var CARD_GAPS = { min: 0, max: 10 };
   var DEFAULT_CARD_SIZE = { height: 35, gap: 2 };
+  var DEFAULT_ZOOM_LEVELS = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
   var DEFAULT_SETTINGS = {
     tasksFile: "TODOs Tasks.md",
     sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
@@ -1817,6 +1818,7 @@
     labelPaint: LABEL_PAINTS[0],
     cardHeight: DEFAULT_CARD_SIZE.height,
     cardGap: DEFAULT_CARD_SIZE.gap,
+    zoomLevels: DEFAULT_ZOOM_LEVELS,
     projectTag: "#project",
     groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" }
   };
@@ -1830,7 +1832,8 @@
       groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} },
       labelPaint: labelPaintOf(s.labelPaint),
       cardHeight: sizeOf(s.cardHeight, CARD_HEIGHTS, DEFAULT_SETTINGS.cardHeight),
-      cardGap: sizeOf(s.cardGap, CARD_GAPS, DEFAULT_SETTINGS.cardGap)
+      cardGap: sizeOf(s.cardGap, CARD_GAPS, DEFAULT_SETTINGS.cardGap),
+      zoomLevels: zoomLevelsOf(saved)
     };
   }
   function sizeOf(saved, bounds, fallback) {
@@ -1839,6 +1842,13 @@
   }
   function labelPaintOf(saved) {
     return LABEL_PAINTS.find((paint) => paint === saved) ?? DEFAULT_SETTINGS.labelPaint;
+  }
+  function zoomLevelsOf(saved) {
+    const kept = saved !== null && typeof saved === "object" ? saved.zoomLevels : void 0;
+    if (!Array.isArray(kept) || kept.length === 0) return [...DEFAULT_ZOOM_LEVELS];
+    const levels = kept.map((level) => level !== null && typeof level === "object" ? level.hourPx : void 0);
+    if (!levels.every((hourPx) => typeof hourPx === "number" && Number.isFinite(hourPx) && hourPx > 0)) return [...DEFAULT_ZOOM_LEVELS];
+    return levels.map((hourPx) => ({ hourPx }));
   }
 
   // core/application/documentText.ts
@@ -2682,7 +2692,6 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/timelineZoom.ts
-  var DEFAULT_ZOOM_LEVELS = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
   var DEFAULT_ZOOM_HOUR = 56;
   function parseZoomLevels(text) {
     const levels = [];
@@ -2717,13 +2726,6 @@ ${key.title}`.toLowerCase();
       marks.push({ minute: minutes, label: minute % grid.labels === 0 ? `:${String(minute).padStart(2, "0")}` : null });
     }
     return marks;
-  }
-  function zoomLevelsOf(saved) {
-    const kept = saved !== null && typeof saved === "object" ? saved.zoomLevels : void 0;
-    if (!Array.isArray(kept) || kept.length === 0) return [...DEFAULT_ZOOM_LEVELS];
-    const levels = kept.map((level) => level !== null && typeof level === "object" ? level.hourPx : void 0);
-    if (!levels.every((hourPx) => typeof hourPx === "number" && Number.isFinite(hourPx) && hourPx > 0)) return [...DEFAULT_ZOOM_LEVELS];
-    return levels.map((hourPx) => ({ hourPx }));
   }
   function wholeDayOr(wholeDayPx, levels) {
     return wholeDayPx ?? Math.min(...levels.map((level) => level.hourPx));
@@ -4056,7 +4058,8 @@ ${key.title}`.toLowerCase();
       labels: settings.labels,
       labelPaint: settings.labelPaint,
       cardHeight: settings.cardHeight,
-      cardGap: settings.cardGap
+      cardGap: settings.cardGap,
+      zoomLevels: settings.zoomLevels
     };
   }
 
@@ -4097,6 +4100,7 @@ ${key.title}`.toLowerCase();
         cardGap: s.cardGap,
         cardHeights: CARD_HEIGHTS,
         cardGaps: CARD_GAPS,
+        zoomLevels: formatZoomLevels(s.zoomLevels),
         projectTag: s.projectTag,
         presets: s.groups.presets,
         ungrouped: s.groups.ungrouped,
@@ -4162,6 +4166,10 @@ ${key.title}`.toLowerCase();
     async setCardGap(px) {
       const cardGap = withinBounds(px, CARD_GAPS);
       if (cardGap !== null) await this.store.update({ cardGap });
+    }
+    async setZoomLevels(text) {
+      const zoomLevels = parseZoomLevels(text);
+      if (zoomLevels) await this.store.update({ zoomLevels });
     }
     async setProjectTag(tag) {
       const bare = tag.trim().replace(/^#/, "");
@@ -6157,6 +6165,7 @@ ${key.title}`.toLowerCase();
     "setLabelPaint",
     "setCardHeight",
     "setCardGap",
+    "setZoomLevels",
     "setProjectTag",
     "renameLabel",
     "recolourLabel",

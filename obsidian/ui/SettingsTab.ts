@@ -1,6 +1,5 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
 import { type CalendarService, type CountField, type GoogleAccount, isPresetColor, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../../core/application/contracts";
-import { formatZoomLevels, type ViewSettings, type ViewSettingsStore } from "./viewSettings";
 import type { Theme } from "./eventColors";
 import { inkOf, showPriorityColors } from "./priorityColors";
 import { formatTime } from "./dates";
@@ -11,8 +10,6 @@ import { SettingsPage } from "./SettingsPage";
 
 export interface SettingsTabDeps {
 	readonly settings: SettingsService;
-	/** This view's own settings: the cards' size, the zoom levels. */
-	readonly view: ViewSettingsStore;
 	readonly google: GoogleAccount;
 	readonly work: WorkCalendarSetup;
 	readonly calendars: Pick<CalendarService, "known" | "setShown">;
@@ -84,10 +81,6 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 
 	private get service(): SettingsService {
 		return this.deps.settings;
-	}
-
-	private get view(): ViewSettings {
-		return this.deps.view.get();
 	}
 
 	/** The set-up-once part, each on a page of its own behind a row. */
@@ -303,7 +296,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		new Setting(el)
 			.setName("Zoom levels")
 			.setDesc("Pixels per hour, like 28, 56, 112, 224: a pinch stops wherever the fingers lift, up to the largest. Zoomed out all the way, it shows the whole day instead of the smallest one. A drag snaps to 30 minutes at 28, 15 at 56, 5 from 112 on.")
-			.addText((t) => t.setValue(formatZoomLevels(this.view.zoomLevels)).onChange((text) => this.deps.view.setZoomLevels(text)));
+			.addText((t) => t.setValue(this.settings.zoomLevels).onChange((text) => this.service.setZoomLevels(text)));
 	}
 
 	/** Which calendars show first; the Google account and the client it needs; the work calendar; when a file counts as stale. */

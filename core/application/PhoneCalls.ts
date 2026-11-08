@@ -555,6 +555,7 @@ const SETTINGS_METHODS: readonly string[] = [
 	"setLabelPaint",
 	"setCardHeight",
 	"setCardGap",
+	"setZoomLevels",
 	"setProjectTag",
 	"renameLabel",
 	"recolourLabel",

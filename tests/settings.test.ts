@@ -29,7 +29,15 @@ describe("settingsFrom", () => {
 	});
 
 	it("hold nothing of how a frontend lays out its screen", () => {
-		for (const key of ["listShare", "rightMode", "zoom", "zoomLevels"]) expect(key in DEFAULT_SETTINGS).toBe(false);
+		for (const key of ["listShare", "rightMode", "zoom"]) expect(key in DEFAULT_SETTINGS).toBe(false);
+	});
+
+	it("zoom the timeline by 28, 56, 112 and 224 unless levels that read are saved: every frontend's alike", () => {
+		expect(settingsFrom(null).zoomLevels).toEqual([{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }]);
+		expect(settingsFrom({ zoomLevels: [{ hourPx: 40 }, { hourPx: 80 }] }).zoomLevels).toEqual([{ hourPx: 40 }, { hourPx: 80 }]);
+		expect(settingsFrom({ zoomLevels: [{ hourPx: 40, minutes: 15 }] }).zoomLevels).toEqual([{ hourPx: 40 }]);
+		for (const zoomLevels of [[], [{ hourPx: -1 }], "28, 56", [{ hourPx: "40" }]]) expect(settingsFrom({ zoomLevels }).zoomLevels).toEqual(DEFAULT_SETTINGS.zoomLevels);
+		expect(storedSettingsFrom({ zoomLevels: [{ hourPx: 40 }] }).zoomLevels).toEqual([{ hourPx: 40 }]);
 	});
 
 	it("paint a card of several labels in stripes unless blend is saved", () => {

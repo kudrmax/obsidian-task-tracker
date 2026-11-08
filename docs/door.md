@@ -209,14 +209,17 @@ The settings screen, every read and write but one, answered by the plugin's own 
 `renameLevel(index, prefix)`, `recolourLevel(index, color)`, `removeLevel(index)`, `addLevel()`, `moveLevel(from, to)`,
 `setLabelTag(tag)`, `setLabelPaint(paint)` (how a card of several labels is painted: one of the form's `labelPaints`,
 `"stripes"` or `"blend"`; anything else writes nothing), `setCardHeight(px)` and `setCardGap(px)` (Cards: written rounded
-while within the form's `cardHeights` `{ min: 28, max: 40 }` and `cardGaps` `{ min: 0, max: 10 }`, else nothing), `setProjectTag(tag)` (the tag that makes a note a project, `#project`; stored with its `#`), `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
+while within the form's `cardHeights` `{ min: 28, max: 40 }` and `cardGaps` `{ min: 0, max: 10 }`, else nothing), `setZoomLevels(text)` (Zoom
+levels as typed, the hour's heights: `"40, 80"` writes `[{ hourPx: 40 }, { hourPx: 80 }]`, the old `"28:60, 56:30"` reads
+too; text that is no list of positive whole numbers writes nothing), `setProjectTag(tag)` (the tag that makes a note a project, `#project`; stored with its `#`), `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
 `moveLabel(from, to)`, `colourOf(text, shades)` (the preset a typed code is, by the shades the host draws presets in),
 `renamePreset(index, name)`, `removePreset(index)`, `addPreset()`, `movePreset(from, to)`, `setUngrouped(name)`,
 `setGoogleClientId(id)`, `setWorkCalendarFile(path)`, `typedColour(of, index, text, shades)` (a colour code typed for a
 level or a label and left: the colour to write, `null` for no colour or the one it has). `form()` also answers
 `dayStartHours` (what Day starts at offers), `labelPaint` and `labelPaints` (Several labels: the paint saved, and the
 paints offered in order, `["stripes", "blend"]`), `cardHeight`, `cardGap`, `cardHeights` and `cardGaps` (Cards: the
-sizes saved and the bounds the sliders move within), `googleClientReady` (Log in has a client id to go with), and
+sizes saved and the bounds the sliders move within), `zoomLevels` (Zoom levels as the field shows them, `"28, 56, 112,
+224"`), `googleClientReady` (Log in has a client id to go with), and
 `sectionOrder` and `markerOrder`: the sections' names and the line markers the screen edits, in its order (the words
 for each are the host's).
 
@@ -233,14 +236,16 @@ labels, how a card of several labels is painted (`labelPaint`: `"blend"`, one co
 `"stripes"`, the default and what any other saved value reads as), a card's height and the gap between two cards
 (`cardHeight`, `cardGap`, points on the phone: a list's cards, a stack on the timeline, a lifted card; 35 and 2 unless
 set), when a touch becomes a drag (`longPressMs`, the long press on a card and on the empty timeline alike) and the
-hour another day opens at (`scrollToHour`). Every frontend's screen behaves by them alike. `labelPaint`, `cardHeight` and `cardGap` live in
+hour another day opens at (`scrollToHour`), and the zoom's levels (`zoomLevels`, `[{ hourPx }]`, as
+`timeline.zoomLevels()` answers them). Every frontend's screen behaves by them alike. `labelPaint`, `cardHeight`, `cardGap` and `zoomLevels` live in
 `data.json` and travel with the vault: the plugin's settings tab and the app read and write the same key. `onChange` is the host's: it watches `data.json`.
 
 ### `timeline.zoomLevels()`: the zoom's levels
 
 The hour's heights a pinch settles on, `[{ hourPx }]`, as `data.json` keeps them under `zoomLevels`; `DEFAULT_ZOOM_LEVELS`
-when it keeps none or one doesn't read (a height not a positive number). The settings tab of the plugin writes them; the
-host hands them to `rules.levelsFor` with its screen's whole-day height.
+when it keeps none or one doesn't read (a height not a positive number). They are shared settings: the plugin's settings
+tab and the app write them through `settings.setZoomLevels(text)`; the host hands them to `rules.levelsFor` with its
+screen's whole-day height.
 
 ### `notes.*`: the vault's notes, for a host without Obsidian
 

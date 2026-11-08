@@ -15,6 +15,7 @@ export function screenSettingsOf(settings: TaskCalendarSettings): ScreenSettings
 		labelPaint: settings.labelPaint,
 		cardHeight: settings.cardHeight,
 		cardGap: settings.cardGap,
+		zoomLevels: settings.zoomLevels,
 	};
 }
 

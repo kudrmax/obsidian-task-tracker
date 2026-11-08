@@ -18,6 +18,7 @@ describe("ScreenSettingsImpl", () => {
 			labelPaint: "stripes",
 			cardHeight: 35,
 			cardGap: 2,
+			zoomLevels: [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }],
 		});
 		expect(JSON.stringify(shown)).not.toMatch(/secret|token|google/);
 	});

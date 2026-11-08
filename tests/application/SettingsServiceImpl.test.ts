@@ -78,6 +78,24 @@ describe("how a card of several labels is painted", () => {
 	});
 });
 
+describe("the timeline's zoom levels", () => {
+	it("are offered as the hour's heights typed, the defaults unless set", () => {
+		expect(service().svc.form().zoomLevels).toBe("28, 56, 112, 224");
+		expect(service({ zoomLevels: [{ hourPx: 40 }, { hourPx: 80 }] }).svc.form().zoomLevels).toBe("40, 80");
+	});
+
+	it("write only text that reads as the hour's heights", async () => {
+		const { svc, now, writes } = service();
+		await svc.setZoomLevels(" 40 , 80");
+		expect(now().zoomLevels).toEqual([{ hourPx: 40 }, { hourPx: 80 }]);
+		await svc.setZoomLevels("28:60, 56:30");
+		expect(now().zoomLevels).toEqual([{ hourPx: 28 }, { hourPx: 56 }]);
+		for (const text of ["", "28, x", "0", "28:"]) await svc.setZoomLevels(text);
+		expect(now().zoomLevels).toEqual([{ hourPx: 28 }, { hourPx: 56 }]);
+		expect(writes()).toBe(2);
+	});
+});
+
 describe("editing the priority levels", () => {
 	const DEFAULT: readonly PriorityLevel[] = [
 		{ prefix: "p1", color: "red" },

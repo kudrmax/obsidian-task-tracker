@@ -317,9 +317,12 @@ struct DayPage: View {
                     CountRow(title: "Long Press Delay", unit: "ms", value: form.longPressMs) { text in
                         await plugin.write("settings.setCount", ["longPressMs", .string(text)])
                     }
-                    LabeledContent("Zoom Levels", value: plugin.zoomLevels)
+                    TextRow(title: "Zoom Levels", value: form.zoomLevels) { text in
+                        await plugin.write("settings.setZoomLevels", [.string(text)])
+                    }
+                    .keyboardType(.numbersAndPunctuation)
                 } footer: {
-                    Text("Milliseconds before a touch becomes a drag, on a card and on the empty timeline. The zoom's hour heights in points: a pinch stops wherever the fingers lift, up to the largest; they are set in Obsidian's settings.")
+                    Text("Milliseconds before a touch becomes a drag, on a card and on the empty timeline. The zoom's hour heights in points, like 28, 56, 112, 224: a pinch stops wherever the fingers lift, up to the largest. Zoomed out all the way, the timeline shows the whole day instead of the smallest one.")
                 }
             }
         }
