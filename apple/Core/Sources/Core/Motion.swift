@@ -63,12 +63,23 @@ public struct DropLanding: Decodable, Sendable {
     public let span: DaySpan?
     public let ridesNow: Bool?
     public let slotted: [LandingSpan]?
-    /// A card of a column: its section and its index among that section's tasks there.
+    /// A card of a column: its section and its index among that section's tasks there, in the file's order.
     public let column: String?
     public let group: String?
     public let index: Int?
+    /// In a list drawn in project parts: the part it is drawn in, the section there and its index among that section's
+    /// cards in the part.
+    public let part: LandingPart?
     /// A subtask: its parent's id, and its index among the parent's open subtasks.
     public let parent: String?
+}
+
+/// The project part a card lands in (`LandingPart`): the part's key and zone, its section and index there.
+public struct LandingPart: Decodable, Sendable, Equatable {
+    public let key: String
+    public let zone: JSONValue
+    public let section: String?
+    public let index: Int
 }
 
 /// Where a landed card stands among a column's cards without the carried ones: before card `at`, at `level`, in `group`.
@@ -93,16 +104,16 @@ extension DropLanding {
     public func gap(in column: BoardColumn, among others: [BoardCard]) -> LandingGap? {
         switch kind {
         case "list":
-            guard self.column == column.rawValue, let index else { return nil }
-            // In a list grouped by project a section stands once in each project's part: the part is the task's project.
-            let zone: JSONValue = item?.project.map { .string($0.link) } ?? .null
-            let here = { (card: BoardCard) in card.item.group == group && card.zone.map { $0 == zone } ?? true }
+            guard self.column == column.rawValue else { return nil }
+            // A list drawn in project parts: the core names the part and the place in it; a plain list counts in file order.
+            let section = part.map(\.section) ?? group
+            let zone: JSONValue? = part.map { .some($0.zone) } ?? .none
+            guard let index = part?.index ?? index else { return nil }
+            let here = { (card: BoardCard) in card.item.group == section && (zone == nil || card.zone == zone) }
             let tops = others.indices.filter { others[$0].level == 0 && here(others[$0]) }
-            let grouped = others.contains { card in if case .some = card.zone { true } else { false } }
-            let part: JSONValue? = grouped ? .some(zone) : .none
-            if let at = tops[safe: index] { return LandingGap(at: at, level: 0, group: group, zone: part) }
+            if let at = tops[safe: index] { return LandingGap(at: at, level: 0, group: section, zone: zone) }
             let end = others.indices.last { here(others[$0]) }.map { $0 + 1 } ?? others.count
-            return LandingGap(at: end, level: 0, group: group, zone: part)
+            return LandingGap(at: end, level: 0, group: section, zone: zone)
         case "subtask":
             guard let parent, let index, let at = others.firstIndex(where: { $0.id == parent }) else { return nil }
             let level = others[at].level + 1

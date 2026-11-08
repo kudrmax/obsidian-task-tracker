@@ -413,11 +413,13 @@ every condition that changes the layout is animated by the transaction that chan
 50. **iPhone, R7: the slot is the cancel target while a finger holds a carry**, and for the plus until its own copy is
     home (it flies into the slot); a card's copy flies to its own place, so the slot is the plus again as it is let go,
     not when the system's drop animator ends a second later.
-51. **Obsidian, R9 with the day turn (0.4.179): a tap on a day's arrow or name during a turn lets that turn run on**
+51. **Obsidian and iPhone, R9 with the day turn (0.4.179): a tap on a day's arrow or name during a turn lets that turn run on**
     from where it is to its day, and the next turn starts once the screen has drawn it: `ScreenPager.stand` puts nothing
     in its place in one frame (decision 32), and `turnDay` already waits for the turn under way. The other day is still
     drawn at once (decision 20): the turn slides the day drawn before and the peek, and the lists draw the day it brings
-    in, in place, when it has landed, with no row folding or growing.
+    in, in place, when it has landed, with no row folding or growing. On the iPhone every turn (the arrows, the day's
+    name, a day asked from elsewhere, a swipe let go) waits in `BoardModel.afterTurns` for the one asked before it to land
+    and its day to be read; `landTurn` no longer stops a slide midway, and a new swipe waits while turns are queued.
 52. **iPhone, merging the day turn of master (0.4.179): one way a day turns, the plugin's.** Two mechanisms met: this
     branch's `.turn` (the whole day part, list and calendar, pushed in by a SwiftUI transition keyed by the day) and
     master's `DayTurn` (header and hours stand, each column slides its own day through `DayLane` over 300 ms with the
