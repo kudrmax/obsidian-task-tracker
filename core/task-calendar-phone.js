@@ -511,7 +511,7 @@
     return last.replace(/\.md$/i, "").trim();
   }
   function projectKey(name) {
-    return name.toLowerCase();
+    return name.normalize("NFC").toLowerCase();
   }
   function inProject(link, zone) {
     if (link === null || zone === null) return link === zone;

@@ -29,9 +29,9 @@ export function projectName(link: string): string {
 	return last.replace(/\.md$/i, "").trim();
 }
 
-/** What makes two projects one: their names, case aside, as Obsidian resolves a link. */
+/** What makes two projects one: their names, case and Unicode composition aside, as Obsidian resolves a link. */
 export function projectKey(name: string): string {
-	return name.toLowerCase();
+	return name.normalize("NFC").toLowerCase();
 }
 
 /** A project's part of a list: the link text of its note, null for the tasks of no project. */
