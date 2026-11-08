@@ -205,7 +205,7 @@ export class DemoTaskService implements TaskService {
 		await this.normalize();
 		const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([this.dayView(date), this.soonWithoutDateView(), this.inboxView(), this.backlogView(), this.doneView(), this.listSections(), this.sectionOffer()]);
 		const off = { canGroup: false, on: false, groups: [] };
-		return { day, soon, inbox, backlog, done, sections, offer, missing: false, calendars: true, projects: { inbox: off, backlog: off, soon: off, now: off }, project: null };
+		return { day, soon, inbox, backlog, done, sections, offer, missing: false, calendars: true, projects: { inbox: off, backlog: off, soon: off, now: off }, project: null, titleDrops: { day: { kind: "list", column: "day", before: null }, soon: { kind: "title", list: "soon", date: null, byProject: false }, inbox: { kind: "title", list: "inbox", date: null, byProject: false }, backlog: { kind: "title", list: "backlog", date: null, byProject: false } } };
 	}
 
 	async dayView(date: LocalDate): Promise<DayView> {

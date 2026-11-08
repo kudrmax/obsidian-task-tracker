@@ -3765,7 +3765,7 @@ ${key.title}`.toLowerCase();
   function placesInGap(column, from, grouped) {
     return from === "new" || from === column || grouped;
   }
-  function dropMove(from, to, day) {
+  function dropMove(from, to, day, project) {
     switch (to.kind) {
       case "time":
         return { kind: "toTime", from, start: to.start, day };
@@ -3773,6 +3773,8 @@ ${key.title}`.toLowerCase();
         return { kind: "clearSlot" };
       case "group":
         return { kind: "moveToGroup", list: to.list, group: to.group, before: to.before, date: to.date ?? void 0, ...to.project !== void 0 && { project: to.project } };
+      case "title":
+        return { kind: "moveToGroup", list: to.list, group: null, before: null, date: to.date ?? void 0, ...to.byProject && { project } };
       case "nest":
         return { kind: "nest", parent: to.parent, before: to.before };
       case "list":
@@ -3782,10 +3784,10 @@ ${key.title}`.toLowerCase();
         return from === "day" ? { kind: "moveToSoon", date: day } : { kind: "moveToEnd", section: to.column };
     }
   }
-  function dropMoves(tasks, to, day) {
-    if (tasks.length === 1) return { kind: "one", key: tasks[0].key, move: dropMove(tasks[0].from, to, day) };
+  function dropMoves(tasks, to, day, projectOf = () => null) {
+    if (tasks.length === 1) return { kind: "one", key: tasks[0].key, move: dropMove(tasks[0].from, to, day, projectOf(tasks[0].key)) };
     const steps = tasks.flatMap(({ key, from }) => {
-      const move = dropMove(from, to, day);
+      const move = dropMove(from, to, day, projectOf(key));
       return move.kind === "toTime" || move.kind === "clearSlot" ? [] : [{ key, change: move }];
     });
     return { kind: "many", steps };
@@ -4056,8 +4058,10 @@ ${key.title}`.toLowerCase();
     if (list === "backlog") for (const ref of projects.known()) refs.set(projectKey(ref.name), ref);
     for (const item of items) if (item.project && !refs.has(projectKey(item.project.name))) refs.set(projectKey(item.project.name), item.project);
     const named = byName([...refs.values()]).map((ref) => groupOf2(list, projectKey(ref.name), ref, items.filter((item) => item.project !== null && projectKey(item.project.name) === projectKey(ref.name)), sections, state, false));
-    const none = groupOf2(list, "", null, items.filter((item) => item.project === null), sections, state, true);
-    return { canGroup: true, on, groups: [...named, none] };
+    const loose = items.filter((item) => item.project === null);
+    const none = groupOf2(list, "", null, loose, sections, state, true);
+    const showsNone = list === "backlog" || loose.length > 0 || sections.some((s) => s.name !== null && s.empty);
+    return { canGroup: true, on, groups: showsNone ? [...named, none] : named };
   }
   function groupOf2(list, key, project, items, sections, state, withEmpty) {
     const zone = project?.link ?? null;
@@ -4575,7 +4579,19 @@ ${key.title}`.toLowerCase();
         missing: false,
         calendars: true,
         projects,
-        project: scope.project === null ? null : scope.index.refOf(scope.project, false)
+        project: scope.project === null ? null : scope.index.refOf(scope.project, false),
+        titleDrops: this.titleDrops(date, projects)
+      };
+    }
+    /** What a drop on each column's title means: into its list, by project where the list groups by it; a day without sections, its end. */
+    titleDrops(date, projects) {
+      const title = (list, day2, grouping) => ({ kind: "title", list, date: day2, byProject: grouping.on });
+      const day = this.columnSections("day", date);
+      return {
+        day: day ? title(day.list, day.date, projects.now) : { kind: "list", column: "day", before: null },
+        soon: title("soon", null, projects.soon),
+        inbox: title("inbox", null, projects.inbox),
+        backlog: title("backlog", null, projects.backlog)
       };
     }
     /** Each list's grouping by project on this device; none in a project's view. */
@@ -4609,7 +4625,8 @@ ${key.title}`.toLowerCase();
         missing: true,
         calendars: false,
         projects: off,
-        project: project === void 0 ? null : this.index().refOf(project, false)
+        project: project === void 0 ? null : this.index().refOf(project, false),
+        titleDrops: this.titleDrops(date, off)
       };
     }
     dayView({ doc, today, boundary }, date) {
@@ -5576,10 +5593,13 @@ ${key.title}`.toLowerCase();
      * the tasks' keys as the file now has them, in their order; one not found again is left out.
      */
     drop(tasks, to, day) {
-      const moves = dropMoves(tasks, readDrop(to, (column) => this.reads.columnSections(column, day)), day);
+      const read = readDrop(to, (column) => this.reads.columnSections(column, day));
       return {
-        reads: moves.kind === "one" && moves.move.kind === "toTime",
-        answer: (s) => this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps))
+        reads: read.kind === "title" || tasks.length === 1 && read.kind === "time",
+        answer: (s) => {
+          const moves = dropMoves(tasks, read, day, (key) => s ? this.rules.entryOf(s.doc, key).project : null);
+          return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
+        }
       };
     }
     /**

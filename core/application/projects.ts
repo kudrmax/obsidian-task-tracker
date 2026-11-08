@@ -111,7 +111,7 @@ export interface GroupingInput {
 
 /**
  * A list's grouping: off, none; on, a group for each project with tasks there (in Backlog for every project note too,
- * empty ones drawing «No tasks»), by name, then No project. Inside a group its tasks without a section, then its sections
+ * empty ones drawing «No tasks»), by name, then No project (outside Backlog only with a task or an empty section). Inside a group its tasks without a section, then its sections
  * in file order; the list's empty sections only in No project.
  */
 export function listGrouping({ list, items, sections, projects, state }: GroupingInput): ListGrouping {
@@ -121,8 +121,10 @@ export function listGrouping({ list, items, sections, projects, state }: Groupin
 	if (list === "backlog") for (const ref of projects.known()) refs.set(projectKey(ref.name), ref);
 	for (const item of items) if (item.project && !refs.has(projectKey(item.project.name))) refs.set(projectKey(item.project.name), item.project);
 	const named = byName([...refs.values()]).map((ref) => groupOf(list, projectKey(ref.name), ref, items.filter((item) => item.project !== null && projectKey(item.project.name) === projectKey(ref.name)), sections, state, false));
-	const none = groupOf(list, "", null, items.filter((item) => item.project === null), sections, state, true);
-	return { canGroup: true, on, groups: [...named, none] };
+	const loose = items.filter((item) => item.project === null);
+	const none = groupOf(list, "", null, loose, sections, state, true);
+	const showsNone = list === "backlog" || loose.length > 0 || sections.some((s) => s.name !== null && s.empty);
+	return { canGroup: true, on, groups: showsNone ? [...named, none] : named };
 }
 
 function groupOf(list: GroupedList, key: string, project: ProjectRef | null, items: readonly TaskItem[], sections: readonly ListSection[], state: GroupingState, withEmpty: boolean): ProjectGroup {

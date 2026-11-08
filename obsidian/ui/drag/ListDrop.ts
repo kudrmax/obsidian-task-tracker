@@ -1,4 +1,4 @@
-import { carriedMiddle, type GapPlace, levelAt, placeOfDrop, placesInGap, sameGap } from "../../../core/application/contracts";
+import { carriedMiddle, type DropTo, type GapPlace, levelAt, placeOfDrop, placesInGap, sameGap } from "../../../core/application/contracts";
 import { type CardSize, shownCardSize } from "../cardSize";
 import { DESIGN, LAYOUT, tokenPx } from "../design";
 import { type ListEntry, PLATE, type TaskList } from "../TaskList";
@@ -12,8 +12,14 @@ const INDENT = "--tc-subtask-indent";
 const LIFTED = "is-lifted";
 /** A lifted card that stays where it stood as a dashed place; the other lifted ones, its subtasks, fold away under it. */
 const WAITING = "is-waiting";
-/** An empty section's plate under the card. */
+/** An empty section's plate under the card, or the column's title under a task carried onto it. */
 const HOT = "is-hot";
+
+/** A column's title as a place to drop: its element, and what a drop on it means (`ScreenView.titleDrops`), none before the screen is read. */
+export interface ColumnTitle {
+	el(): HTMLElement | null;
+	drop(): DropTo | null;
+}
 
 /** A card where it stands in the list's content, the folded cards gone. */
 interface Measured {
@@ -56,6 +62,8 @@ export class ListDrop implements DropTarget {
 	private readonly line: DropLine;
 	/** The No tasks plate the drop puts the card on, lit while it does. */
 	private plate: HTMLElement | null = null;
+	/** The column's title, lit while a drop would go on it. */
+	private litTitle: HTMLElement | null = null;
 	private readonly scroll: AutoScroll;
 
 	constructor(
@@ -70,6 +78,8 @@ export class ListDrop implements DropTarget {
 		private readonly titleOver = true,
 		/** A new task's place moved to another gap or level. */
 		private readonly onNewPlace: () => void = () => undefined,
+		/** The column's title: a task carried onto it goes into the list as the core says, the title lit as an empty section's plate is. */
+		private readonly title: ColumnTitle | null = null,
 	) {
 		this.line = new DropLine(() => this.list.el);
 		this.scroll = new AutoScroll(
@@ -87,6 +97,16 @@ export class ListDrop implements DropTarget {
 	}
 
 	preview(x: number, y: number, drag: DragPayload): void {
+		const title = this.titleAt(x, y, drag);
+		this.lightTitle(title);
+		if (title) {
+			this.line.hide();
+			this.light(null);
+			this.scroll.stop();
+			this.place = null;
+			this.last = null;
+			return;
+		}
 		const frame = readFrame(this.list.el);
 		this.last = { x, y, drag };
 		const layout = this.layoutFor(frame);
@@ -145,8 +165,26 @@ export class ListDrop implements DropTarget {
 		this.plate = plate;
 	}
 
+	/** The title under a task carried onto it (never under the plus: a new task's place is a gap), while it means a drop. */
+	private titleAt(x: number, y: number, drag: DragPayload): HTMLElement | null {
+		if (drag.from === "new" || !this.title?.drop()) return null;
+		const title = this.title.el();
+		if (!title) return null;
+		const t = title.getBoundingClientRect();
+		const r = this.area.getBoundingClientRect();
+		return t.height > 0 && x >= r.left && x < r.right && y >= t.top && y < t.bottom ? title : null;
+	}
+
+	private lightTitle(title: HTMLElement | null): void {
+		if (title === this.litTitle) return;
+		this.litTitle?.classList.remove(HOT);
+		title?.classList.add(HOT);
+		this.litTitle = title;
+	}
+
 	private reset(): void {
 		this.light(null);
+		this.lightTitle(null);
 		this.scroll.stop();
 		this.place = null;
 		this.last = null;
@@ -154,6 +192,7 @@ export class ListDrop implements DropTarget {
 
 	drop(x: number, y: number, drag: DragPayload): DropResult | null {
 		if (!this.takes(drag)) return null;
+		if (this.titleAt(x, y, drag)) return this.title?.drop() ?? null;
 		if (!this.placesAnywhere(drag)) return { kind: "place", column: this.column, place: null };
 		if (!this.place) this.preview(x, y, drag);
 		if (!this.place) return null;

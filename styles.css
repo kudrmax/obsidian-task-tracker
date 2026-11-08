@@ -734,6 +734,8 @@ button.tc-btn.is-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc
 .task-calendar.is-lists .tc-day-nav { left: calc(var(--tc-half-column) + var(--tc-divider)); width: var(--tc-half-column); padding: var(--tc-column-pad-far); gap: var(--tc-space-2); }
 .task-calendar.is-inbox .tc-day-nav { left: calc(100% + var(--tc-divider)); width: var(--tc-half-column); padding: var(--tc-column-pad-far); gap: var(--tc-space-2); }
 .tc-day-nav > button.tc-day-title { padding: 0 var(--tc-space-4); }
+/* A task carried onto a column's title: the title lights as an empty section's plate does under a drop, in its own rounded box. */
+.task-calendar .tc-head-title.is-hot, .tc-day-nav > button.tc-day-title.is-hot { background: var(--tc-drop-bg); color: var(--tc-accent); }
 .task-calendar:is(.is-lists, .is-inbox) .tc-day-nav .tc-arrow { width: var(--tc-arrow-narrow); }
 .task-calendar .tc-arrow { width: var(--tc-arrow); height: var(--tc-arrow); flex-shrink: 0; }
 .tc-arrow svg { width: var(--tc-chevron); height: var(--tc-chevron); stroke-width: var(--tc-stroke-chevron); }

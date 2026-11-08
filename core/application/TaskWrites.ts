@@ -328,10 +328,13 @@ export class TaskWrites {
 	 * the tasks' keys as the file now has them, in their order; one not found again is left out.
 	 */
 	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Read<Write<readonly TaskKey[]>> {
-		const moves = dropMoves(tasks, readDrop(to, (column) => this.reads.columnSections(column, day)), day);
+		const read = readDrop(to, (column) => this.reads.columnSections(column, day));
 		return {
-			reads: moves.kind === "one" && moves.move.kind === "toTime",
-			answer: (s) => this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps)),
+			reads: read.kind === "title" || (tasks.length === 1 && read.kind === "time"),
+			answer: (s) => {
+				const moves = dropMoves(tasks, read, day, (key) => (s ? this.rules.entryOf(s.doc, key).project : null));
+				return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
+			},
 		};
 	}
 

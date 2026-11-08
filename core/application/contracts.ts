@@ -370,6 +370,12 @@ export type DropTo =
 	| { readonly kind: "group"; readonly list: GroupedList; readonly date: LocalDate | null; readonly group: GroupName; readonly before: TaskKey | null; readonly project?: ProjectZone }
 	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null }
 	/**
+	 * A column's title (`ScreenView.titleDrops`): into `list` (of the later day `date`), each task to the end of the part
+	 * without a section, its project kept; `byProject`, a list grouped by project: to the end of its own project's part
+	 * there (its group appears if absent).
+	 */
+	| { readonly kind: "title"; readonly list: GroupedList; readonly date: LocalDate | null; readonly byProject: boolean }
+	/**
 	 * A gap of a list column as the gesture found it: what it means there (`ListPlace`), or null for the column's end where
 	 * it places nothing in a gap (`placesInGap`). The service reads it as one of the three above by whose sections the
 	 * column shows on the drop's day (`columnSections`): a frontend never picks between them.
@@ -612,6 +618,8 @@ export interface ScreenView {
 	readonly projects: Readonly<Record<GroupedList, ListGrouping>>;
 	/** The project whose view this is (the note's block: every list holds only its tasks); null for the main screen. */
 	readonly project: ProjectRef | null;
+	/** What a drop on each column's title means, handed back to `TaskService.drop` as it is; the title lights up under a drag as a section header does. */
+	readonly titleDrops: Readonly<Record<DropColumn, DropTo>>;
 }
 
 /**

@@ -98,6 +98,10 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   its task where it stands. A drop in a list column is `{ kind: "place", column, place }`: the `ListPlace` its gap means
   (`rules.placeOfDrop`), or `null` at the end of a column that places nothing in a gap (`rules.placesInGap`). The door
   reads it by whose sections the column shows on `day`; the host never builds `list`, `group` or `nest` itself.
+  A drop on a column's title is `screen.titleDrops[column]` (`day`, `soon`, `inbox`, `backlog`) handed back as it is:
+  `{ kind: "title", list, date, byProject }` puts each task at the end of the list's part without a section, its
+  project kept (where the list groups by project, `byProject`, at the end of its own project's part there), e.g.
+  `tasks.drop([{ key, from: "soon" }], screen.titleDrops.backlog, day)`.
 - `tasks.landing(tasks, to, day, project?)`: where `tasks.drop` with the same arguments would leave each task, in
   their order, writing nothing (no `tasks` in the answer): the drop's own operation tried over the file, the screen of
   `day` read over the result by the screen's own code. Ask it at the moment of the drop, before `tasks.drop`, and fly

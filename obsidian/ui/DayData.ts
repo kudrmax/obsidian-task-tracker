@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarService, DayEvents, DayView, GroupedList, ListGrouping, ListSection, ProjectRef, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
+import type { CalendarEvent, CalendarService, DayEvents, DayView, DropColumn, DropTo, GroupedList, ListGrouping, ListSection, ProjectRef, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
 import { Reload } from "./Reload";
 import type { LocalDate } from "./types";
 
@@ -34,6 +34,8 @@ interface TasksState {
 	readonly projects: Readonly<Record<GroupedList, ListGrouping>>;
 	/** The project whose view this is; null on the main screen. */
 	readonly project: ProjectRef | null;
+	/** What a drop on each column's title means; none before the screen is read. */
+	readonly titleDrops: Readonly<Record<DropColumn, DropTo>> | null;
 }
 
 const NOT_GROUPED: ListGrouping = { canGroup: false, on: false, groups: [] };
@@ -54,7 +56,7 @@ const NO_EVENTS: DayEvents = { events: [], allDay: [], timed: [], statuses: [], 
  * A change to a task never waits for the calendars.
  */
 export class DayData {
-	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true, projects: NO_GROUPING, project: null };
+	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true, projects: NO_GROUPING, project: null, titleDrops: null };
 	private dayEvents: DayEvents = NO_EVENTS;
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
@@ -98,6 +100,11 @@ export class DayData {
 	/** How `list` groups by project, as the screen last read it. */
 	grouping(list: GroupedList): ListGrouping {
 		return this.state.projects[list];
+	}
+
+	/** What a drop on `column`'s title means, handed to the drop as it is; none before the screen is read. */
+	titleDrop(column: DropColumn): DropTo | null {
+		return this.state.titleDrops?.[column] ?? null;
 	}
 
 	/** The project whose view the screen is; null on the main screen. */
