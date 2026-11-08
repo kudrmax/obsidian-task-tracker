@@ -120,17 +120,18 @@ export class TaskRules {
 	read(text: string, at: Moment = this.moment()): Reading {
 		const { settings, today, boundary } = at;
 		const presets = ops.usablePresets(settings.groups.presets);
-		const parsed = parseText(text, settings, this.idsOf(text));
+		const parsed = parseText(text, settings);
 		const whole = parsed.ensureSections(sectionNames(settings));
 		const doc = normalize(whole, today, boundary, presets);
 		const changed = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
-		return { doc, changed };
+		return { doc: this.identified(text, doc, () => doc), changed };
 	}
 
 	/** The text after `operation` on the document read and normalized; the result is normalized again. */
 	change(text: string, operation: Operation, at: Moment = this.moment()): TextChange {
 		const { settings, today, boundary } = at;
-		return this.written(readDocument(text, settings, today, boundary, this.idsOf(text)), operation, at);
+		const doc = readDocument(text, settings, today, boundary);
+		return this.written(this.identified(text, doc, () => doc), operation, at);
 	}
 
 	/**
@@ -143,17 +144,35 @@ export class TaskRules {
 
 	/** The document as the file has it, with every section, not normalized. */
 	asRead(text: string, at: Moment = this.moment()): TaskDocument {
-		return parseText(text, at.settings, this.idsOf(text)).ensureSections(sectionNames(at.settings));
+		const whole = parseText(text, at.settings).ensureSections(sectionNames(at.settings));
+		return this.identified(text, whole, () => this.tidied(whole, at));
 	}
 
 	/** The text as the file has it, unnormalized and without the sections it lacks: where a line stands in it. */
 	parse(text: string): TaskDocument {
-		return parseText(text, this.settings.get(), this.idsOf(text));
+		const at = this.moment();
+		const parsed = parseText(text, at.settings);
+		return this.identified(text, parsed, () => this.tidied(parsed.ensureSections(sectionNames(at.settings)), at));
 	}
 
-	/** Who the tasks of `text` are, when the rules keep their identity. */
-	private idsOf(text: string): LineIds | undefined {
-		return this.identity?.of(text);
+	/** Who the tasks and headings of `text` are, by its lines: every id of its tidied reading the rules keep. */
+	idsOf(text: string): ReadonlyMap<number, string> {
+		return this.idsFor(text)?.known ?? new Map();
+	}
+
+	/** `doc`, read from `text` with each line tagged by its line, tagged by who its lines are; `reading`, the text tidied for today. */
+	private identified(text: string, doc: TaskDocument, reading: () => TaskDocument): TaskDocument {
+		const ids = this.identity?.of(text, reading);
+		return ids ? doc.retagged(ids) : doc;
+	}
+
+	private idsFor(text: string): LineIds | undefined {
+		return this.identity?.of(text, () => this.tidied(parseText(text, this.settings.get()).ensureSections(sectionNames(this.settings.get())), this.moment()));
+	}
+
+	/** A document as today's tidying leaves it. */
+	private tidied(doc: TaskDocument, at: Moment): TaskDocument {
+		return normalize(doc, at.today, at.boundary, ops.usablePresets(at.settings.groups.presets));
 	}
 
 	/** The document after `operation` on `doc`, already read and normalized at `at`, normalized again. */

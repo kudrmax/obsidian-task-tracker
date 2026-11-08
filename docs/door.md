@@ -73,8 +73,9 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
   over, once). The host writes this text as `data.json`; every key it does not know is kept.
 - `grouping`: the call changed how this device groups its lists (`tasks.setGrouping`, `tasks.toggleFold`, `tasks.reveal`
   of a task in a folded group). The host keeps it on the device, never synced, and hands it in again.
-- `ids`: who the tasks and sections are after the call (`TaskIdState` in `core/application/TaskIdentity.ts`: the file's
-  headings and task lines with their ids, and where new ids go on from). It comes whenever it changed: after a write, an
+- `ids`: who the tasks and sections are after the call (`TaskIdState` in `core/application/TaskIdentity.ts`: the
+  headings and task lines of the file as read, tidied for today, with their ids, and where new ids go on from). The ids
+  are the same whether the host hands in the file as the door tidied it or as it still is on disk. It comes whenever it changed: after a write, an
   undo or redo, and a read of a text other than the one it was for. The host keeps it as it is, in memory (never synced,
   never parsed), and hands it in as `ids` with the next call; a host that leaves it out still gets ids, new ones each call.
 - `staleTask`: a task or section the call names is no longer there as read: read again (`tasks.screen`) and redraw.

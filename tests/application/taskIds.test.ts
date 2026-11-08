@@ -388,3 +388,27 @@ describe("a section's id", () => {
 		expect(await sectionIds(svc)).toEqual(before);
 	});
 });
+
+describe("a file not yet tidied for today", () => {
+	const UNTIDY = "## Inbox\n\n- [ ] Idea\n\n## Now\n\n- [ ] A\n- [x] Finished ✅ 2026-10-29\n- [ ] B\n\n## Soon\n\n- [ ] Later 📅 2026-10-30\n- [ ] S2\n\n## Backlog\n\n## Done\n";
+
+	it("keeps every id over reads that do not tidy it, the tasks tidying moves too", async () => {
+		const { svc } = setup(UNTIDY);
+		const day = async () => Object.fromEntries([...(await svc.dayView(T)).list, ...(await svc.inboxView()), ...(await svc.doneView())].map((i) => [i.title, i.id]));
+		const first = await day();
+		expect(first.Later).toBeDefined();
+		for (let n = 0; n < 3; n++) expect(await day()).toEqual(first);
+		await svc.normalize();
+		expect(await day()).toEqual(first);
+	});
+
+	it("keeps a task's id from its landing to the drop, for a task tidying moves", async () => {
+		const { store, svc } = setup(UNTIDY);
+		const later = (await svc.dayView(T)).list.find((i) => i.title === "Later")!;
+		const [landing] = await svc.landing([{ key: later.key, from: "day" }], { kind: "time", start: 600 }, T);
+		expect(landing.id).toBe(later.id);
+		expect(store.text).toBe(UNTIDY);
+		await svc.drop([{ key: later.key, from: "day" }], { kind: "time", start: 600 }, T);
+		expect((await svc.dayView(T)).slotted.map((i) => i.id)).toEqual([later.id]);
+	});
+});

@@ -282,10 +282,10 @@ class Call {
 	 */
 	write(make: (text: string) => string | null): boolean {
 		const before = this.tasks();
-		const was = this.identity.idsOf(before);
+		const was = this.rules.idsOf(before);
 		const text = make(before);
 		if (text === null) return false;
-		this.setText(text, true, { before: was, after: this.identity.idsOf(text) });
+		this.setText(text, true, { before: was, after: this.rules.idsOf(text) });
 		return true;
 	}
 
@@ -298,13 +298,17 @@ class Call {
 		return write.answer({ before: change!.before, after: change!.after });
 	}
 
-	/** The tasks text a step back or forward leaves. */
+	/** The tasks text a step back or forward leaves; its tasks keep who they were: read before the step, and after it for the answer's ids. */
 	undo(way: UndoWay): string {
 		const steps = new UndoSteps(this.context.history);
 		const before = this.tasks();
+		this.rules.idsOf(before);
 		const { outcome, text, carried } = steps.step(way, before);
 		this.effects.history = steps.state;
-		if (carried) this.identity.carried(before, text, carried);
+		if (carried) {
+			this.identity.carried(before, text, carried);
+			this.rules.idsOf(text);
+		}
 		if (text !== this.text) this.setText(text, false);
 		return outcome;
 	}

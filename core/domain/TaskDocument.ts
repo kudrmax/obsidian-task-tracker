@@ -64,19 +64,21 @@ export function ungroupedIndex(groups: readonly TaskGroup[]): number {
 }
 
 /**
- * The tags a parse gives a text's lines: `known`, by line from 0; any other line `t` and `next` plus its line. Lines made
- * by a change after it are tagged on from `next` plus the number of lines.
+ * What `retagged` makes of a document's tags: `t<n>` becomes `known`'s id for `n` when it has one, else `t` and `next`
+ * plus `n`. A parse tags each line by its line, from `t0`, and the lines a change makes after it on from there; so a
+ * document read from a text is retagged by the ids of that text's lines, wherever its changes moved them.
  */
 export interface LineIds {
 	readonly known: ReadonlyMap<number, string>;
 	readonly next: number;
 }
 
-/** A heading or a task line, where it stands: what tells two texts' tasks apart by place and line. */
+/** A heading or a task line of a document, where it stands, with its tag's number. */
 export interface OutlineLine {
 	readonly line: number;
 	readonly raw: string;
 	readonly task: boolean;
+	readonly tag: number;
 }
 
 /** The lines of a text as `TaskDocument.parse` splits it. */
@@ -84,14 +86,6 @@ function linesOfText(text: string): string[] {
 	const eol = text.includes("\r\n") ? "\r\n" : "\n";
 	const body = text.endsWith(eol) ? text.slice(0, -eol.length) : text;
 	return body === "" && text === "" ? [] : body.split(eol);
-}
-
-/** A text's headings and task lines in file order, read without parsing it: each line by its own look. */
-export function outlineOf(text: string): readonly OutlineLine[] {
-	return linesOfText(text).flatMap((raw, line): OutlineLine[] => {
-		if (isTaskLine(raw)) return [{ line, raw, task: true }];
-		return SECTION_HEADING_RE.test(raw) || GROUP_HEADING_RE.test(raw) ? [{ line, raw, task: false }] : [];
-	});
 }
 
 /** A line of the document and its tag. */
@@ -228,12 +222,30 @@ export class TaskDocument {
 		this.blockLists = blocks;
 	}
 
-	static parse(text: string, sections: SectionNamesOf, markers: Markers, ids: LineIds = { known: new Map(), next: 0 }): TaskDocument {
+	/** Each line tagged by its line, `t0` on. */
+	static parse(text: string, sections: SectionNamesOf, markers: Markers): TaskDocument {
 		const eol = text.includes("\r\n") ? "\r\n" : "\n";
 		const trailingEol = text.endsWith(eol);
 		const lines = linesOfText(text);
-		const rows = lines.map((line, i) => ({ line, tag: ids.known.get(i) ?? `t${ids.next + i}` }));
-		return new TaskDocument(rows, eol, trailingEol, sections, markers, ids.next + lines.length);
+		const rows = lines.map((line, i) => ({ line, tag: `t${i}` }));
+		return new TaskDocument(rows, eol, trailingEol, sections, markers, lines.length);
+	}
+
+	/** The document with every tag renamed by `ids`; the tags its changes make go on past every new one. */
+	retagged(ids: LineIds): TaskDocument {
+		const rows = this.rows.map((row) => {
+			const n = tagNumber(row.tag);
+			return { line: row.line, tag: ids.known.get(n) ?? `t${ids.next + n}` };
+		});
+		return new TaskDocument(rows, this.eol, this.trailingEol, this.names, this.markers, ids.next + this.next);
+	}
+
+	/** The headings and the task lines, in file order, each with its tag's number. */
+	outline(): readonly OutlineLine[] {
+		return this.rows.flatMap((row, line): OutlineLine[] => {
+			const task = isTaskLine(row.line);
+			return task || SECTION_HEADING_RE.test(row.line) || GROUP_HEADING_RE.test(row.line) ? [{ line, raw: row.line, task, tag: tagNumber(row.tag) }] : [];
+		});
 	}
 
 	static empty(all: readonly string[]): string {
@@ -285,9 +297,9 @@ export class TaskDocument {
 		return this.next;
 	}
 
-	/** Each line's tag, from 0. */
-	lineTags(): readonly string[] {
-		return this.rows.map((row) => row.tag);
+	/** The tag of each heading and task line, by its line, from 0. */
+	outlineTags(): ReadonlyMap<number, string> {
+		return new Map(this.outline().map((o) => [o.line, this.rows[o.line].tag]));
 	}
 
 	/**

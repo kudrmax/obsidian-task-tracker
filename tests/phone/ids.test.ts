@@ -141,3 +141,36 @@ describe("a task's id through the door", () => {
 		expect(phone.methods()).toContain("tasks.screen");
 	});
 });
+
+describe("a task's id over a file not yet tidied for today", () => {
+	const UNTIDY = ["## Inbox", "", "- [ ] Idea", "", "## Now", "", "- [ ] A", "- [x] Finished ✅ 2026-11-03", "- [ ] B", "", "## Soon", "", "- [ ] Later 📅 2026-11-04", "- [ ] S2", "", "## Backlog", "", "## Done", ""].join("\n");
+
+	/** A host that hands in the file as it is on disk every time, whatever the door tidied: the ids it keeps are the answers'. */
+	function rawHost() {
+		let ids: unknown;
+		return (method: string, ...args: unknown[]) => {
+			const answer = JSON.parse(phone.call(method, JSON.stringify(args), JSON.stringify({ tasks: UNTIDY, nowMs: NOW, ...(ids !== undefined && { ids }) })) as string);
+			if (!answer.ok) throw new Error(answer.error.message);
+			if (answer.ids !== undefined) ids = answer.ids;
+			return answer.result;
+		};
+	}
+
+	const titled = (screen: { inbox: Item[]; day: { list: Item[]; slotted: Item[] }; soon: Item[]; backlog: Item[]; done: Item[] }) =>
+		Object.fromEntries([...screen.inbox, ...screen.day.list, ...screen.day.slotted, ...screen.soon, ...screen.backlog, ...screen.done].map((i) => [i.title, i.id]));
+
+	it("stays the same over reads of the untidied file, the tasks tidying moves too", () => {
+		const call = rawHost();
+		const first = titled(call("tasks.screen", T) as never);
+		for (let n = 0; n < 3; n++) expect(titled(call("tasks.screen", T) as never)).toEqual(first);
+	});
+
+	it("is the same in a landing and in the drop after it, for a task tidying moves", () => {
+		const call = rawHost();
+		const screen = call("tasks.screen", T) as { day: { list: Item[] } };
+		const later = screen.day.list.find((i) => i.title === "Later")!;
+		const [landing] = call("tasks.landing", [{ key: later.key, from: "day" }], { kind: "time", start: 600 }, T) as { id: string }[];
+		expect(landing.id).toBe(later.id);
+		call("tasks.drop", [{ key: later.key, from: "day" }], { kind: "time", start: 600 }, T);
+	});
+});

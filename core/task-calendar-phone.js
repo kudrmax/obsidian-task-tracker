@@ -882,12 +882,6 @@
     const body = text.endsWith(eol) ? text.slice(0, -eol.length) : text;
     return body === "" && text === "" ? [] : body.split(eol);
   }
-  function outlineOf(text) {
-    return linesOfText(text).flatMap((raw, line) => {
-      if (isTaskLine(raw)) return [{ line, raw, task: true }];
-      return SECTION_HEADING_RE.test(raw) || GROUP_HEADING_RE.test(raw) ? [{ line, raw, task: false }] : [];
-    });
-  }
   var Mint = class {
     constructor(next) {
       this.next = next;
@@ -953,12 +947,28 @@
       this.groupLists = groups;
       this.blockLists = blocks;
     }
-    static parse(text, sections, markers, ids = { known: /* @__PURE__ */ new Map(), next: 0 }) {
+    /** Each line tagged by its line, `t0` on. */
+    static parse(text, sections, markers) {
       const eol = text.includes("\r\n") ? "\r\n" : "\n";
       const trailingEol = text.endsWith(eol);
       const lines = linesOfText(text);
-      const rows = lines.map((line, i) => ({ line, tag: ids.known.get(i) ?? `t${ids.next + i}` }));
-      return new _TaskDocument(rows, eol, trailingEol, sections, markers, ids.next + lines.length);
+      const rows = lines.map((line, i) => ({ line, tag: `t${i}` }));
+      return new _TaskDocument(rows, eol, trailingEol, sections, markers, lines.length);
+    }
+    /** The document with every tag renamed by `ids`; the tags its changes make go on past every new one. */
+    retagged(ids) {
+      const rows = this.rows.map((row) => {
+        const n = tagNumber(row.tag);
+        return { line: row.line, tag: ids.known.get(n) ?? `t${ids.next + n}` };
+      });
+      return new _TaskDocument(rows, this.eol, this.trailingEol, this.names, this.markers, ids.next + this.next);
+    }
+    /** The headings and the task lines, in file order, each with its tag's number. */
+    outline() {
+      return this.rows.flatMap((row, line) => {
+        const task = isTaskLine(row.line);
+        return task || SECTION_HEADING_RE.test(row.line) || GROUP_HEADING_RE.test(row.line) ? [{ line, raw: row.line, task, tag: tagNumber(row.tag) }] : [];
+      });
     }
     static empty(all) {
       return _TaskDocument.parse("", { inbox: "", now: "", soon: "", done: "" }, { dueDate: "", slot: "" }).ensureSections(all).serialize();
@@ -997,9 +1007,9 @@
     nextTag() {
       return this.next;
     }
-    /** Each line's tag, from 0. */
-    lineTags() {
-      return this.rows.map((row) => row.tag);
+    /** The tag of each heading and task line, by its line, from 0. */
+    outlineTags() {
+      return new Map(this.outline().map((o) => [o.line, this.rows[o.line].tag]));
     }
     /**
      * The task a change made since `before`, wherever the rules then moved it: the first one it made, as its tag tells; the
@@ -2083,17 +2093,16 @@
     const s = settings.sections;
     return [s.inbox, s.now, s.soon, s.backlog, s.done];
   }
-  function parseText(text, settings, ids) {
+  function parseText(text, settings) {
     const s = settings.sections;
     return TaskDocument.parse(
       text,
       { inbox: s.inbox, backlog: s.backlog, now: s.now, soon: s.soon, done: s.done, ungrouped: settings.groups.ungrouped },
-      markersOf(settings),
-      ids
+      markersOf(settings)
     );
   }
-  function readDocument(text, settings, today, boundary = boundaryOf(settings), ids) {
-    return normalize(parseText(text, settings, ids).ensureSections(sectionNames(settings)), today, boundary, usablePresets(settings.groups.presets));
+  function readDocument(text, settings, today, boundary = boundaryOf(settings)) {
+    return normalize(parseText(text, settings).ensureSections(sectionNames(settings)), today, boundary, usablePresets(settings.groups.presets));
   }
   function readingKey(settings) {
     return JSON.stringify([settings.sections, settings.groups.ungrouped, settings.groups.presets, markersOf(settings)]);
@@ -4885,16 +4894,17 @@ ${key.title}`.toLowerCase();
     read(text, at = this.moment()) {
       const { settings, today, boundary } = at;
       const presets = usablePresets(settings.groups.presets);
-      const parsed = parseText(text, settings, this.idsOf(text));
+      const parsed = parseText(text, settings);
       const whole = parsed.ensureSections(sectionNames(settings));
       const doc = normalize(whole, today, boundary, presets);
       const changed2 = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
-      return { doc, changed: changed2 };
+      return { doc: this.identified(text, doc, () => doc), changed: changed2 };
     }
     /** The text after `operation` on the document read and normalized; the result is normalized again. */
     change(text, operation, at = this.moment()) {
       const { settings, today, boundary } = at;
-      return this.written(readDocument(text, settings, today, boundary, this.idsOf(text)), operation, at);
+      const doc = readDocument(text, settings, today, boundary);
+      return this.written(this.identified(text, doc, () => doc), operation, at);
     }
     /**
      * The text after `operation` on the file as it is, before today's normalizing: for a task that normalizing would change,
@@ -4905,15 +4915,30 @@ ${key.title}`.toLowerCase();
     }
     /** The document as the file has it, with every section, not normalized. */
     asRead(text, at = this.moment()) {
-      return parseText(text, at.settings, this.idsOf(text)).ensureSections(sectionNames(at.settings));
+      const whole = parseText(text, at.settings).ensureSections(sectionNames(at.settings));
+      return this.identified(text, whole, () => this.tidied(whole, at));
     }
     /** The text as the file has it, unnormalized and without the sections it lacks: where a line stands in it. */
     parse(text) {
-      return parseText(text, this.settings.get(), this.idsOf(text));
+      const at = this.moment();
+      const parsed = parseText(text, at.settings);
+      return this.identified(text, parsed, () => this.tidied(parsed.ensureSections(sectionNames(at.settings)), at));
     }
-    /** Who the tasks of `text` are, when the rules keep their identity. */
+    /** Who the tasks and headings of `text` are, by its lines: every id of its tidied reading the rules keep. */
     idsOf(text) {
-      return this.identity?.of(text);
+      return this.idsFor(text)?.known ?? /* @__PURE__ */ new Map();
+    }
+    /** `doc`, read from `text` with each line tagged by its line, tagged by who its lines are; `reading`, the text tidied for today. */
+    identified(text, doc, reading) {
+      const ids = this.identity?.of(text, reading);
+      return ids ? doc.retagged(ids) : doc;
+    }
+    idsFor(text) {
+      return this.identity?.of(text, () => this.tidied(parseText(text, this.settings.get()).ensureSections(sectionNames(this.settings.get())), this.moment()));
+    }
+    /** A document as today's tidying leaves it. */
+    tidied(doc, at) {
+      return normalize(doc, at.today, at.boundary, usablePresets(at.settings.groups.presets));
     }
     /** The document after `operation` on `doc`, already read and normalized at `at`, normalized again. */
     changeOf(doc, operation, at = this.moment()) {
@@ -5661,65 +5686,77 @@ ${key.title}`.toLowerCase();
   var TaskIdentity = class {
     constructor(state = NO_TASK_IDS) {
       this.last = null;
+      /** The ids an undo step gave the lines of its text, by line, until that text is read. */
+      this.pending = null;
       this.current = state;
     }
     get state() {
       return this.current;
     }
-    /** The tags `text`'s lines are parsed with: the ids its tasks and headings have, reconciled first when the ids are another text's. */
-    of(text) {
+    /**
+     * What `text`'s reading is retagged by (`TaskDocument.retagged`): `read` gives it parsed and tidied, each line tagged by
+     * its line. Kept, with the ids of the reading's lines, until another text is read.
+     */
+    of(text, read) {
       if (this.last?.text === text) return this.last.ids;
-      const outline = outlineOf(text);
-      const known = sameOutline(this.current.lines, outline) ? this.inOrder(outline) : this.reconciled(text, outline);
-      return this.keep(text, known);
-    }
-    /** Every task's and heading's id in `text`, by its line. */
-    idsOf(text) {
-      return this.of(text).known;
+      const doc = read();
+      const outline = doc.outline();
+      const next = this.current.next;
+      const known = this.pending?.text === text ? this.given(outline, this.pending.ids) : sameOutline(this.current.lines, outline) ? this.inOrder(outline) : this.matched(outline);
+      this.pending = null;
+      const fresh = outline.some((o) => !known.has(o.tag));
+      for (const o of outline) if (!known.has(o.tag)) known.set(o.tag, `t${next + o.tag}`);
+      const settled = !fresh && sameOutline(this.current.lines, outline) && outline.every((o, i) => known.get(o.tag) === this.current.lines[i].id);
+      if (!settled) this.current = { next: next + doc.nextTag(), lines: outline.map((o) => ({ raw: o.raw, task: o.task, id: known.get(o.tag) })) };
+      const ids = { known, next };
+      this.last = { text, ids };
+      return ids;
     }
     /** A write left `text`, the document `after`: its tasks and headings are who its lines' tags say. */
     wrote(text, after) {
-      const tags = after.lineTags();
-      this.commit(text, after.nextTag(), outlineOf(text).map((line) => ({ ...line, id: tags[line.line] })));
+      const tags = after.outlineTags();
+      this.current = { next: after.nextTag(), lines: after.outline().map((o) => ({ raw: o.raw, task: o.task, id: tags.get(o.line) })) };
+      this.pending = null;
+      this.last = { text, ids: { known: new Map([...tags].map(([line, tag]) => [line, tag])), next: this.current.next } };
     }
-    /** An undo step made `after` of `before`: a line it gave back is who it was, a line it left is who it was. */
+    /**
+     * An undo step made `after` of `before`: a line it gave back is who it was, a line it left is who it was. Known once
+     * `after` is read (`of`).
+     */
     carried(before, after, step) {
-      const was = this.of(before).known;
-      const next = this.current.next;
+      const was = this.last?.text === before ? this.last.ids.known : this.pending?.text === before ? this.pending.ids : /* @__PURE__ */ new Map();
       const given = new Set(step.ids.values());
-      const lines = outlineOf(after).map((line) => {
-        const origin = step.origins[line.line];
-        const kept = origin === null || origin === void 0 ? void 0 : was.get(origin);
-        return { ...line, id: step.ids.get(line.line) ?? (kept !== void 0 && !given.has(kept) ? kept : `t${next + line.line}`) };
+      const ids = /* @__PURE__ */ new Map();
+      step.origins.forEach((origin, line) => {
+        const own = step.ids.get(line) ?? (origin === null ? void 0 : was.get(origin));
+        if (own !== void 0 && (step.ids.has(line) || !given.has(own))) ids.set(line, own);
       });
-      this.commit(after, next + after.split("\n").length, lines);
+      this.pending = { text: after, ids };
+      this.last = null;
+    }
+    /** The ids of the reading's lines that an undo step gave its text's lines. */
+    given(outline, ids) {
+      const known = /* @__PURE__ */ new Map();
+      for (const o of outline) {
+        const id = ids.get(o.tag);
+        if (id !== void 0) known.set(o.tag, id);
+      }
+      return known;
     }
     inOrder(outline) {
-      return new Map(outline.map((line, i) => [line.line, this.current.lines[i].id]));
+      return new Map(outline.map((o, i) => [o.tag, this.current.lines[i].id]));
     }
-    /** The ids of another text carried over to `text`'s lines by place and line; a line it added gets a new one. */
-    reconciled(text, outline) {
+    /** The ids of the reading the state is for, carried to this reading's lines by place and line. */
+    matched(outline) {
       const old = this.current.lines;
       const pairs = matchLines(
         old.map((l) => l.raw),
-        outline.map((l) => l.raw),
+        outline.map((o) => o.raw),
         (b, a) => old[b].task === outline[a].task
       );
       const known = /* @__PURE__ */ new Map();
-      for (const [b, a] of pairs) if (old[b].task === outline[a].task) known.set(outline[a].line, old[b].id);
-      const next = this.current.next;
-      for (const line of outline) if (!known.has(line.line)) known.set(line.line, `t${next + line.line}`);
-      this.current = { next: next + text.split("\n").length, lines: outline.map((l) => ({ raw: l.raw, task: l.task, id: known.get(l.line) })) };
+      for (const [b, a] of pairs) if (old[b].task === outline[a].task) known.set(outline[a].tag, old[b].id);
       return known;
-    }
-    commit(text, next, lines) {
-      this.current = { next, lines: lines.map(({ raw, task, id }) => ({ raw, task, id })) };
-      this.last = { text, ids: { known: new Map(lines.map((l) => [l.line, l.id])), next } };
-    }
-    keep(text, known) {
-      const ids = { known, next: this.current.next };
-      this.last = { text, ids };
-      return ids;
     }
   };
   function sameOutline(lines, outline) {
@@ -5824,10 +5861,10 @@ ${key.title}`.toLowerCase();
      */
     write(make) {
       const before = this.tasks();
-      const was = this.identity.idsOf(before);
+      const was = this.rules.idsOf(before);
       const text = make(before);
       if (text === null) return false;
-      this.setText(text, true, { before: was, after: this.identity.idsOf(text) });
+      this.setText(text, true, { before: was, after: this.rules.idsOf(text) });
       return true;
     }
     /** A write as one action: its operation over the text, the new text a step of the history. */
@@ -5838,13 +5875,17 @@ ${key.title}`.toLowerCase();
       this.write((text) => (change = this.rules.change(text, operation)).text);
       return write.answer({ before: change.before, after: change.after });
     }
-    /** The tasks text a step back or forward leaves. */
+    /** The tasks text a step back or forward leaves; its tasks keep who they were: read before the step, and after it for the answer's ids. */
     undo(way) {
       const steps = new UndoSteps(this.context.history);
       const before = this.tasks();
+      this.rules.idsOf(before);
       const { outcome, text, carried } = steps.step(way, before);
       this.effects.history = steps.state;
-      if (carried) this.identity.carried(before, text, carried);
+      if (carried) {
+        this.identity.carried(before, text, carried);
+        this.rules.idsOf(text);
+      }
       if (text !== this.text) this.setText(text, false);
       return outcome;
     }
