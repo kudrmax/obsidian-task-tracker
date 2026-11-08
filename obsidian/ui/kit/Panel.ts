@@ -4,13 +4,33 @@ import type { Overlay } from "../menu/Overlay";
 /** What a window is drawn as: a menu's panel, the sources window, the start of a description. */
 export type PanelRoot = "tc-panel" | "tc-popover" | "tc-desc-peek";
 
-/** A window's picks: the first closes what it stands in, then acts; any pick after it, while that closes, does nothing. */
+/**
+ * A window's picks: the first closes what it stands in, and acts once the close has ended, so what it does happens on
+ * the screen under it, never under its fading copy; any pick after it, while that closes, does nothing. One that opens
+ * a field acts inside the tap itself (`pickNow`): iOS raises the keyboard only for a field focused by the finger's own tap.
+ */
 export class Picks {
 	private picked = false;
 
-	constructor(private readonly close: () => void) {}
+	/** `closed` resolves once the window has gone, null when it has gone already; without it the pick acts at once. */
+	constructor(
+		private readonly close: () => void,
+		private readonly closed: () => Promise<void> | null = () => null,
+	) {}
 
 	pick(then: () => void | Promise<void>): () => void {
+		return () => {
+			if (this.picked) return;
+			this.picked = true;
+			this.close();
+			const closing = this.closed();
+			if (closing) void closing.then(then);
+			else void then();
+		};
+	}
+
+	/** A pick that types: the window closes and the field opens in the same tap. */
+	pickNow(then: () => void | Promise<void>): () => void {
 		return () => {
 			if (this.picked) return;
 			this.picked = true;
@@ -66,6 +86,10 @@ export class Panel {
 
 	pick(then: () => void | Promise<void>): () => void {
 		return this.spec.picks.pick(then);
+	}
+
+	pickNow(then: () => void | Promise<void>): () => void {
+		return this.spec.picks.pickNow(then);
 	}
 
 	/** Another page of the window in its place: what it showed goes, `build` lays out the new one, and it is placed again. */

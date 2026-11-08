@@ -21,16 +21,19 @@ export const GroupMenu = {
 		const copy = LiftedCopy.over(overlay, el(null, "div", "tc-lifted is-head"), false);
 		el(copy.el, "span", "tc-group-name", opts.name);
 		copy.pin(rect, { width: true, height: true });
-		const panel = Panel.over(overlay, { root: "tc-panel", picks: new Picks(() => overlay.close()), place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
+		const panel = Panel.over(overlay, { root: "tc-panel", picks: new Picks(
+                () => void overlay.close(),
+                () => overlay.closed,
+            ), place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
 		const { onRename, onRemove } = opts;
 		panel.replace((p) =>
 			menuGroup(p, [
-				...(onRename ? [{ label: "Rename", icon: "rename", onPick: panel.pick(onRename) } as const] : []),
+				...(onRename ? [{ label: "Rename", icon: "rename", onPick: panel.pickNow(onRename) } as const] : []),
 				...(onRemove ? [{ label: "Remove section", icon: "removeSection", onPick: panel.pick(onRemove) } as const] : []),
 			]),
 		);
 		overlay.show();
-		return { close: () => overlay.close() };
+		return { close: () => void overlay.close() };
 	},
 };
 
@@ -53,13 +56,16 @@ export const ColumnMenu = {
 		const copy = LiftedCopy.over(overlay, el(null, "div", "tc-lifted is-title"), false);
 		el(copy.el, "span", "tc-lifted-title", opts.title);
 		copy.pin(rect, { width: true, height: true });
-		const panel = Panel.over(overlay, { root: "tc-panel", picks: new Picks(() => overlay.close()), place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
+		const panel = Panel.over(overlay, { root: "tc-panel", picks: new Picks(
+                () => void overlay.close(),
+                () => overlay.closed,
+            ), place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
 		panel.replace((p) => {
 			const group = menuGroup(p, []);
 			menuRow(group, { label: "Group by project", icon: opts.grouped ? "check" : undefined, choice: true, onPick: panel.pick(() => opts.onGroup(!opts.grouped)) });
 			return group;
 		});
 		overlay.show();
-		return { close: () => overlay.close() };
+		return { close: () => void overlay.close() };
 	},
 };

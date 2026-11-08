@@ -68,12 +68,15 @@ export class BulkMenu {
 	private asking: Asking | null = null;
 
 	private constructor(private context: BulkMenuContext) {
-		this.overlay = new Overlay(() => this.close());
+		this.overlay = new Overlay(() => this.close(), context.source);
 		const rects = context.cards.map((card) => card.getBoundingClientRect());
 		this.source = context.at === "beside" ? this.besideList(context.source) : context.source.getBoundingClientRect();
 		context.cards.forEach((card, i) => this.lift(card, rects[i]));
 		if (context.at === "over") LiftedCopy.over(this.overlay, context.source.cloneNode(true) as HTMLElement, false).pin(this.source).el.classList.add("tc-control-copy");
-		this.panel = Panel.over(this.overlay, { root: "tc-panel", cls: `is-task is-bulk is-${context.at}`, picks: new Picks(() => this.close()), place: (panel) => this.place(panel) });
+		this.panel = Panel.over(this.overlay, { root: "tc-panel", cls: `is-task is-bulk is-${context.at}`, picks: new Picks(
+				() => this.close(),
+				() => this.overlay.closed,
+			), place: (panel) => this.place(panel) });
 		this.showMenu();
 		this.overlay.show();
 	}
@@ -214,6 +217,8 @@ export class BulkMenu {
 	}
 
 	close(): void {
-		if (this.overlay.close()) this.context.onClose();
+		if (this.overlay.isClosed) return;
+		void this.overlay.close();
+		this.context.onClose();
 	}
 }

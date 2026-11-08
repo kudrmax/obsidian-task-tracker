@@ -76,6 +76,8 @@ body {
 	--tc-shadow-panel: 0 16px 40px rgba(0, 0, 0, 0.6);
 	/* The task menu's card and its panels stand at one depth: one shadow falls from them all, none on another. */
 	--tc-level-shadow: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.6));
+	/* The same shadow before it falls: the overlay fades it in with its other parts. */
+	--tc-level-shadow-off: drop-shadow(0 16px 40px rgba(0, 0, 0, 0));
 	--tc-level-ring: none;
 	/* A source gone stale, and its dot. */
 	--tc-stale: #FF9F0A;
@@ -1067,9 +1069,15 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-lifted.is-whole .tc-due.is-repeat-only { margin-top: calc((var(--tc-card-h) - var(--tc-leading-due-day)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 
 /* The task menu: a blurred dark sheet over everything, the pressed card lifted over it, the panel under the card. */
-.tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+/* Every part of an overlay opens in --tc-duration-menu and closes in --tc-duration-collapse, on one curve: the sheet, the shadow its level casts, the windows and the copies over it. */
+.tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-backdrop.is-shown { opacity: 1; }
-.tc-level { position: fixed; inset: 0; z-index: var(--tc-layer-panel); pointer-events: none; filter: var(--tc-level-shadow); }
+.tc-backdrop.is-closing { transition-duration: var(--tc-duration-collapse); }
+.tc-level { position: fixed; inset: 0; z-index: var(--tc-layer-panel); pointer-events: none; filter: var(--tc-level-shadow-off); transition: filter var(--tc-duration-menu) var(--tc-ease-out); }
+.tc-level.is-shown { filter: var(--tc-level-shadow); }
+.tc-level.is-closing { transition-duration: var(--tc-duration-collapse); }
+.tc-lifted, .tc-seg-copy, .tc-control-copy, .tc-menu-subtasks, .tc-menu-field { opacity: 0; transition: opacity var(--tc-duration-menu) var(--tc-ease-out); }
+:is(.tc-lifted, .tc-seg-copy, .tc-control-copy, .tc-menu-subtasks, .tc-menu-field).is-shown { opacity: 1; }
 .tc-level > :not(.tc-lifted) { pointer-events: auto; }
 .tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-body); overflow: hidden; pointer-events: none; }
 .tc-link { color: var(--tc-accent); }
@@ -1099,7 +1107,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 /* Closing, the copy fades with the sheet and the panel: they go together. */
 /* A timeline card's subtasks, between its copy and the menu. */
 .tc-menu-subtasks { position: fixed; z-index: var(--tc-layer-panel); padding-top: var(--tc-card-gap); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--tc-card-gap); font-size: var(--tc-font-body); }
-.tc-lifted.is-closing, .tc-seg-copy.is-closing, .tc-control-copy.is-closing, .tc-menu-subtasks.is-closing { opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+:is(.tc-lifted, .tc-seg-copy, .tc-control-copy, .tc-menu-subtasks, .tc-menu-field).is-closing { opacity: 0; transition-duration: var(--tc-duration-collapse); }
 
 /* A task with a priority: its card, wherever it stands, takes the level's tint; a dot shows the level's colour. The shades come per colour from obsidian/ui/priorityColors.ts; a field's row takes its field's, for the dot of the task it renames. */
 .tc-card[data-priority], .tc-block-card[data-priority], .tc-float[data-priority], .tc-lifted[data-priority] { background: var(--tc-priority-fill); }
@@ -1132,6 +1140,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-desc-peek { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-menu-w); max-height: var(--tc-desc-peek-max); padding: var(--tc-desc-peek-pad); cursor: pointer; opacity: 0; transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-desc-peek.is-under { transform-origin: 0 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); }
 .tc-desc-peek.is-shown { opacity: 1; transform: none; }
+.tc-desc-peek.is-away { opacity: 0; pointer-events: none; }
 .tc-desc-peek.is-closing { transition-duration: var(--tc-duration-collapse); }
 .tc-desc-peek.is-cut { -webkit-mask-image: var(--tc-fade-peek-bottom); mask-image: var(--tc-fade-peek-bottom); }
 .tc-desc-peek .tc-desc-text { --font-text-size: var(--tc-font-desc-peek); font-size: var(--tc-font-desc-peek); }
@@ -1346,7 +1355,9 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .task-calendar button.tc-btn.tc-missing-btn { height: var(--tc-card-h); padding: 0 var(--tc-space-16); border-radius: var(--tc-radius-card); background: var(--tc-card-bg); font-size: var(--tc-font-body); }
 
 /* The search: on the phone over the whole view, the field over the keyboard and what it found above; on the desktop a panel at the top in the middle. */
-.task-calendar > .tc-search { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); }
+.task-calendar > .tc-search { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); opacity: 0; transform: translate3d(0, var(--tc-rise), 0); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
+.task-calendar > .tc-search.is-shown { opacity: 1; transform: none; }
+.tc-search.is-closing { transition-duration: var(--tc-duration-collapse); }
 .tc-search-results { display: flex; flex-direction: column; gap: var(--tc-card-gap); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
 .task-calendar > .tc-search > .tc-search-results { position: absolute; left: 0; right: 0; top: 0; bottom: calc(var(--tc-search-bottom) + var(--tc-bar-h)); box-sizing: border-box; padding: var(--tc-space-16) var(--tc-space-10) var(--tc-space-8); }
 .task-calendar.is-keyboard-up > .tc-search { --tc-search-bottom: var(--tc-bar-bottom); }
@@ -1358,8 +1369,8 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .task-calendar input[type="text"].tc-search-input, .tc-search.is-desk input[type="text"].tc-search-input { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); color: var(--tc-text); caret-color: var(--tc-accent); -webkit-user-select: text; user-select: text; }
 .tc-search-bar > button.tc-search-cancel { height: var(--tc-bar-btn-h); flex-shrink: 0; color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
 .tc-search-empty { margin: auto 0; text-align: center; color: var(--tc-muted); font-size: var(--tc-font-body); }
-.tc-search.is-desk { position: fixed; z-index: var(--tc-layer-panel); left: var(--tc-search-left); top: calc(var(--tc-search-top) + var(--tc-space-16)); width: var(--tc-search-w); max-height: calc(var(--tc-search-room) - 2 * var(--tc-space-16)); margin-left: calc(-1 * var(--tc-search-w) / 2); box-sizing: border-box; padding: var(--tc-space-8); border-radius: var(--tc-radius-panel); background: var(--tc-panel-bg); box-shadow: var(--tc-shadow-panel); color: var(--tc-text); font-family: var(--tc-font-ui); display: flex; flex-direction: column; gap: var(--tc-space-8); opacity: 0; transition: opacity var(--tc-duration-menu) var(--tc-ease-out); }
-.tc-search.is-desk.is-shown { opacity: 1; }
+.tc-search.is-desk { position: fixed; z-index: var(--tc-layer-panel); left: var(--tc-search-left); top: calc(var(--tc-search-top) + var(--tc-space-16)); width: var(--tc-search-w); max-height: calc(var(--tc-search-room) - 2 * var(--tc-space-16)); margin-left: calc(-1 * var(--tc-search-w) / 2); box-sizing: border-box; padding: var(--tc-space-8); border-radius: var(--tc-radius-panel); background: var(--tc-panel-bg); box-shadow: var(--tc-shadow-panel); color: var(--tc-text); font-family: var(--tc-font-ui); display: flex; flex-direction: column; gap: var(--tc-space-8); opacity: 0; transform-origin: 50% 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
+.tc-search.is-desk.is-shown { opacity: 1; transform: none; }
 .tc-search.is-desk .tc-search-field { flex: none; background: var(--tc-track-bg); }
 .tc-search.is-desk > .tc-search-results { min-height: 0; }
 .tc-search.is-desk > .tc-search-results:empty { display: none; }

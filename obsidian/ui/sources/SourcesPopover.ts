@@ -24,12 +24,15 @@ export class SourcesPopover {
 	}
 
 	private constructor(opts: SourcesPopoverOptions) {
-		this.overlay = new Overlay(() => this.close());
+		this.overlay = new Overlay(() => this.close(), opts.anchor);
 		const rect = opts.anchor.getBoundingClientRect();
 		const copy = LiftedCopy.over(this.overlay, opts.anchor.cloneNode(true) as HTMLElement, false);
 		copy.el.classList.add("tc-seg-copy");
 		copy.pin(rect);
-		const panel = Panel.over(this.overlay, { root: "tc-popover", picks: new Picks(() => this.close()), place: (p) => SourcesPopover.over(p, rect) }, false);
+		const panel = Panel.over(this.overlay, { root: "tc-popover", picks: new Picks(
+				() => this.close(),
+				() => this.overlay.closed,
+			), place: (p) => SourcesPopover.over(p, rect) }, false);
 		panel.replace((p) => {
 			for (const status of opts.statuses) SourcesPopover.row(p, sourceText(status), status);
 			menuRow(p, { label: "Refresh now", icon: "refresh", root: "tc-source-refresh", iconSide: "start", onPick: panel.pick(() => opts.onRefresh()) });
@@ -54,6 +57,6 @@ export class SourcesPopover {
 	}
 
 	close(): void {
-		this.overlay.close();
+		void this.overlay.close();
 	}
 }

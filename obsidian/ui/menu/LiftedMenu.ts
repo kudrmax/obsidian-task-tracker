@@ -18,7 +18,10 @@ export type ShowWhole = (copy: HTMLElement, size: Size, widest: number) => Size;
 export abstract class LiftedMenu {
 	protected readonly overlay: Overlay;
 	/** Every window of the menu picks through these: one pick closes the menu, then acts. */
-	protected readonly picks = new Picks(() => this.close());
+	protected readonly picks = new Picks(
+		() => this.close(),
+		() => this.overlay.closed,
+	);
 	private readonly liftedCopy: LiftedCopy;
 	/** Where the copy stands before it is raised. */
 	protected copy = new DOMRect();
@@ -28,8 +31,8 @@ export abstract class LiftedMenu {
 	private gone = false;
 	private stopScroll: () => void = () => undefined;
 
-	protected constructor() {
-		this.overlay = new Overlay((how) => this.close(how));
+	protected constructor(source: HTMLElement) {
+		this.overlay = new Overlay((how) => this.close(how), source);
 		this.liftedCopy = LiftedCopy.over(this.overlay, el(null, "div", "tc-lifted"), true);
 	}
 
@@ -94,11 +97,18 @@ export abstract class LiftedMenu {
 		return this.picks.pick(action);
 	}
 
+	/** A row that opens a field: the menu closes and the field opens in the same tap. */
+	protected pickNow(action: () => void | Promise<void>): () => void {
+		return this.picks.pickNow(action);
+	}
+
 	/** `how`: Escape, or anything else that closed it. */
 	close(how: CloseHow = "away"): void {
 		this.gone = true;
 		this.stopScroll();
-		if (this.overlay.close()) this.closed(how);
+		if (this.overlay.isClosed) return;
+		void this.overlay.close();
+		this.closed(how);
 	}
 
 	/** Hears that the menu closed, and how. */

@@ -712,7 +712,7 @@ describe("the calendar menu's stack for a new subtask", () => {
 	it("hides the panel and puts the field's row last in the stack", () => {
 		const { menu } = openOnBlock(item({ subtasks: [sub(0, "A1"), sub(1, "A2")] }));
 		const row = menu.openStack(() => {});
-		expect(panel().hidden).toBe(true);
+		expect(panel().classList.contains("is-closing")).toBe(true);
 		expect(stack()).toEqual(["A1", "A2", "field"]);
 		expect(row.parentElement!.lastElementChild).toBe(row);
 	});
@@ -720,9 +720,9 @@ describe("the calendar menu's stack for a new subtask", () => {
 	it("takes the start of the description away with the panel while a subtask is typed", () => {
 		const { menu } = openOnBlock(item({ description: "- note" }));
 		const peek = document.querySelector<HTMLElement>(".tc-desc-peek")!;
-		expect(peek.hidden).toBe(false);
+		expect(peek.classList.contains("is-away")).toBe(false);
 		menu.openStack(() => {});
-		expect(peek.hidden).toBe(true);
+		expect(peek.classList.contains("is-away")).toBe(true);
 	});
 
 	it("opens a stack under the copy for a task with no subtasks yet", () => {
@@ -805,7 +805,7 @@ describe("the menu of a subtask from the calendar menu's stack", () => {
 		const { menu } = openOnStackCard("- note");
 		const peek = document.querySelector<HTMLElement>(".tc-desc-peek")!;
 		menu.openRename(() => {});
-		expect(peek.hidden).toBe(true);
+		expect(peek.classList.contains("is-away")).toBe(true);
 	});
 
 	it("draws no Add subtask, which the model offers no subtask of a stack", () => {
@@ -824,7 +824,7 @@ describe("the menu of a subtask from the calendar menu's stack", () => {
 	it("turns the card into a row for the field in its place: the panel and the copy go, the strip stays", () => {
 		const { menu } = openOnStackCard();
 		const row = menu.openRename(() => {});
-		expect(panel().hidden).toBe(true);
+		expect(panel().classList.contains("is-closing")).toBe(true);
 		expect(document.querySelector(".tc-lifted")!.classList.contains("tc-invisible")).toBe(true);
 		expect(row.classList.contains("tc-menu-field")).toBe(true);
 		expect(row.classList.contains("tc-quick-row")).toBe(true);

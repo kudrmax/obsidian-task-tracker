@@ -30,6 +30,7 @@ import { QuickEntryController } from "./quick/QuickEntryController";
 import { ObsidianChrome } from "./quick/ObsidianChrome";
 import { FullScreen } from "./full/FullScreen";
 import { MoreMenu } from "./menu/MoreMenu";
+import type { CloseHow, Overlay } from "./menu/Overlay";
 import type { TaskLink } from "./TaskTitle";
 import { SourcesPopover } from "./sources/SourcesPopover";
 import { levelsFor, zoomAfterPinch, zoomShown } from "./zoomLevels";
@@ -443,7 +444,7 @@ export class CalendarScreen extends Component {
 		if (this.where.view) {
 			const capsule = new BottomCapsule(root, this.deps.undo, {
 				onUndo: () => void this.undoStep("undo"),
-				onMore: (anchor) => MoreMenu.open({ anchor, onSearch: () => this.openSearch(), onSelect: () => this.bulk.start() }),
+				onMore: (anchor) => MoreMenu.open({ anchor, onSearch: (sheet) => this.openSearch(sheet), onSelect: () => this.bulk.start() }),
 			});
 			this.unsubscribe.push(() => capsule.destroy());
 		}
@@ -753,7 +754,8 @@ export class CalendarScreen extends Component {
 		return true;
 	}
 
-	private openSearch(): void {
+	/** `sheet`: the sheet of the window the search replaces, which it takes over. */
+	private openSearch(sheet?: (onClose: (how: CloseHow) => void) => Overlay): void {
 		if (this.search) return;
 		void this.afterEntry(() => {
 			this.search = SearchWindow.open({
@@ -761,6 +763,7 @@ export class CalendarScreen extends Component {
 				tasks: this.deps.tasks,
 				desktop: !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
 				project: this.where.project?.(),
+				...(sheet && { sheet }),
 				sectionName: (section) => this.deps.tasks.listName(section),
 				onPick: (hit) => {
 					this.search = null;

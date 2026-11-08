@@ -1133,7 +1133,7 @@ describe("QuickEntryController", () => {
 				const task = onTimeline("Report", 0, [item("A1", key("now", 0, [0]))]);
 				const { controller } = setUp({ slotted: [task] });
 				controller.addSubtask(task, openMenu(task));
-				expect(document.querySelector<HTMLElement>(".tc-panel.is-task")!.hidden).toBe(true);
+				expect(document.querySelector<HTMLElement>(".tc-panel.is-task")!.classList.contains("is-closing")).toBe(true);
 				expect(stack()).toEqual(["A1", "field"]);
 				expect(document.activeElement).toBe(document.querySelector(".tc-menu-subtasks textarea.tc-quick-field"));
 				const quickBar = document.querySelector<HTMLElement>(".tc-quick-bar")!;
