@@ -19,6 +19,9 @@ struct BoardScreen: View {
     var body: some View {
         NavigationStack(path: $model.fullScreen) {
             content
+                // The board stands under the keyboard, which slides over it; each list and the calendar take the part
+                // it covers as room to scroll (`keyboardRoom`), so nothing is cut ahead of the keyboard's own motion.
+                .ignoresSafeArea(.keyboard, edges: .bottom)
                 .toolbar {
                     if model.selecting { selectionBar } else { mainBar }
                 }

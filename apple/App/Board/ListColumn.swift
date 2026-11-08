@@ -110,15 +110,16 @@ struct ListColumn: View {
                     }
                 }
                 .scrollIndicators(.hidden)
+                .keyboardRoom()
                 .softEdges(trailing: ListColumn.trailingRoom)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
                     width = $0
                     model.rest(column, width: $0)
                 }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(key, visible: $0) }
-                // The field stays in sight: when it opens or moves, and when the keyboard takes the bottom of the list.
+                // The field stays in sight: when it opens or moves, and when the keyboard comes over the bottom of the list.
                 .onChange(of: model.entry.moved) { reveal(scroller) }
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { _ in reveal(scroller) }
+                .onChange(of: KeyboardRise.shared.top) { reveal(scroller) }
             }
         }
         .onAppear { model.registerList(column) }
