@@ -24,6 +24,9 @@ import { WriteQueue } from "./WriteQueue";
 /** A list as a place to drop, and the column it is. */
 export type ColumnDrop = DropTarget & { readonly column: ListColumn };
 
+/** The list columns a field types in. */
+const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox", "backlog"];
+
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
@@ -144,7 +147,7 @@ export class QuickEntryController {
 
 	constructor(private readonly deps: QuickEntryControllerDeps) {
 		this.entry = new QuickEntrySession(
-			deps.tasks,
+			this.telling(deps.tasks),
 			{
 				cards: (column) => this.cards(column),
 				sections: (column) => deps.list(column)?.sections ?? [],
@@ -385,6 +388,22 @@ export class QuickEntryController {
 	}
 
 	/** The plus came to rest: the field opens where it landed, in a list or in a slot of the timeline. */
+	/** The tasks the session writes through: each task the field writes is told to the lists by the key the write answers, so its card takes the typed text's row. */
+	private telling(tasks: QuickEntryTasks): QuickEntryTasks {
+		const createInPlace: QuickEntryTasks["createInPlace"] = async (...args) => {
+			const key = await tasks.createInPlace(...args);
+			if (key) for (const column of COLUMNS) this.deps.list(column)?.adopt(key);
+			return key;
+		};
+		return new Proxy(tasks, {
+			get: (target, name) => {
+				if (name === "createInPlace") return createInPlace;
+				const value: unknown = Reflect.get(target, name, target);
+				return typeof value === "function" ? value.bind(target) : value;
+			},
+		});
+	}
+
 	/** The plus let go: on a place the field opens there in the same tap, and the plus lands in it (this gives the field). */
 	private dropped(result: DropResult | null): HTMLElement | null {
 		this.carrying = false;
@@ -551,6 +570,7 @@ export class QuickEntryController {
 		const before = this.state;
 		this.state = state;
 		if (!state) {
+			for (const column of COLUMNS) this.deps.list(column)?.forgetTyped();
 			this.glide.stop();
 			this.revealing = false;
 			this.pass.cancel();
