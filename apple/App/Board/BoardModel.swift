@@ -88,6 +88,7 @@ final class BoardModel {
     init() {
         dropping.ended = { [weak self] in self?.dropSessionEnded(performed: $0) }
         dropping.foldsOnDrop = { [weak self] in self?.carry?.section != nil }
+        dropping.fadesOnDrop = { [weak self] in self?.landsInFold == true }
         dropping.landed = { [weak self] in self?.carryLanded(at: $0) }
         entry.model = self
     }
@@ -217,6 +218,8 @@ final class BoardModel {
             let serial = readsStarted
             do {
                 let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
+                // Another day was asked for meanwhile (a turn that went on): this read is not drawn, the day asked is read.
+                guard shownDay == day else { readAgain = true; continue }
                 show(read, serial: serial)
                 problem = nil
             } catch {
@@ -368,7 +371,7 @@ final class BoardModel {
             shownDay = turn.peek.day == turn.peek.today ? nil : turn.peek.day
             neighbours = nil
             landTurn()
-            await reload()
+            Task { await reload() }
         } else {
             dayTurn = nil
             dayShare = 0
@@ -406,7 +409,7 @@ final class BoardModel {
     @ObservationIgnored private var lastTurn: Task<Void, Never>?
 
     /// A turn waits for the one under way, as the plugin's (decision 51): that one runs on from where it is to its day,
-    /// never set down in one frame, and this one starts from the day it brought in.
+    /// never set down in one frame, and this one starts once that day is drawn, not once it is read again.
     private func afterTurns(_ work: @escaping @MainActor () async -> Void) async {
         let before = lastTurn
         turnsAhead += 1
@@ -436,7 +439,9 @@ final class BoardModel {
         dayShare = 0
         let arrived = await daySlide.run(from: 0, to: 1) { [weak self] share in self?.dayShare = share }
         if arrived { landTurn() }
-        await reload()
+        // The next turn starts from the day this one brought in, drawn now; the screen is read anew underneath, and a
+        // read of a day no longer asked for is never drawn.
+        Task { await reload() }
     }
 
     /// The day that came in stands for good: the screen is drawn from it, with no animation.
@@ -959,6 +964,7 @@ final class BoardModel {
     }
 
     private func endCarry() {
+        landsInFold = false
         carry = nil
         released = false
         gap = nil
@@ -1092,7 +1098,7 @@ final class BoardModel {
         }
         Task { await drop(item, from: carry.from, to: to) }
         // The room is the list's, in its content's space; the drop came down on the title, whose space it is given in.
-        guard let rect = room.flatMap({ gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: .null, line: nil)) }),
+        guard let rect = room.flatMap({ gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: .null, line: nil)) }) ?? foldedHead(column, landed),
               let list = dropping.origin(of: "list.\(column.rawValue)"), let title = dropping.origin(of: "title.\(column.rawValue)") else { return nil }
         return rect.offsetBy(dx: list.x - title.x, dy: list.y - title.y)
     }
@@ -1193,8 +1199,21 @@ final class BoardModel {
             await drop(item, from: carry.from, to: to)
             DropTiming.report(since: dropAt)
         }
-        return room.flatMap { gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: place, line: nil)) }
+        return room.flatMap { gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: place, line: nil)) } ?? foldedHead(column, landed)
     }
+
+    /// A card landing in a folded project part (`tasks.landing`'s `part.folded`) flies to that part's header, found by its
+    /// key: nothing of the part is drawn to open a room in.
+    private func foldedHead(_ column: BoardColumn, _ landed: DropLanding?) -> CGRect? {
+        guard let part = landed?.part, part.folded == true, let shape = geometry[column],
+              let project = snapshot?.lists[column]?.projects.first(where: { $0.key == part.key }),
+              let head = shape.heads[project.id] else { return nil }
+        landsInFold = true
+        return head
+    }
+
+    /// The carry's copy lands in a folded part's header: it takes the header's size and fades out on the way.
+    @ObservationIgnored private var landsInFold = false
 
     /// Where the core will leave `item` dropped `to`, asked before the write over the text the screen is drawn from, on
     /// the pure rules' context: no file is read and no background read is waited for in the frame of the drop.

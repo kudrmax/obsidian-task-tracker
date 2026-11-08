@@ -35,6 +35,11 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     /// The carry's copy folds shut onto the top of its place as it flies there (a section's, which lands on the room the
     /// section opens rather than on a card that looks like it): nothing of it is left while the system keeps it there.
     var foldsOnDrop: () -> Bool = { false }
+    /// The carry's copy takes the size of where it lands and fades out on the way: a card dropped into a folded project
+    /// part flies into the part's header (decision 56).
+    var fadesOnDrop: () -> Bool = { false }
+    /// The copy the system flies, kept to fade it.
+    private weak var flown: UIView?
     private var places: [String: DropPlace] = [:]
     private var current: String?
     /// Where the card let go will stand, in the window, kept for the drop's preview.
@@ -141,6 +146,7 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {
         flying = true
         let target = landing
+        if fadesOnDrop(), let flown { animator.addAnimations { flown.alpha = 0 } }
         animator.addCompletion { [weak self] _ in
             guard let self else { return }
             self.flying = false
@@ -167,7 +173,34 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
             let folded = UIDragPreviewTarget(container: view, center: center, transform: CGAffineTransform(scaleX: 1, y: 0.001))
             return UITargetedDragPreview(view: defaultPreview.view, parameters: parameters, target: folded)
         }
-        return defaultPreview.retargetedPreview(with: target)
+        // The copy comes down at the size of where it lands: a card landing taller or narrower than it was lifted
+        // never comes down at its old size and jumps when its place is drawn.
+        let size = defaultPreview.size
+        guard size.width > 0, size.height > 0, abs(size.width - landing.width) > 0.5 || abs(size.height - landing.height) > 0.5 else {
+            flown = defaultPreview.view
+            return defaultPreview.retargetedPreview(with: target)
+        }
+        let sized = UIDragPreviewTarget(container: view, center: target.center, transform: CGAffineTransform(scaleX: landing.width / size.width, y: landing.height / size.height))
+        guard fadesOnDrop(), let copy = Self.picture(of: defaultPreview.view, size: size) else {
+            flown = defaultPreview.view
+            return defaultPreview.retargetedPreview(with: sized)
+        }
+        // A copy of its own the system flies, so the fade reaches what is drawn; no shadow is left on the header.
+        let parameters = UIDragPreviewParameters()
+        parameters.backgroundColor = .clear
+        parameters.shadowPath = UIBezierPath()
+        flown = copy
+        return UITargetedDragPreview(view: copy, parameters: parameters, target: sized)
+    }
+}
+
+extension BoardDrop {
+    /// A still picture of the carried card, which the system's preview holds out of any window: a view of our own to fade.
+    static func picture(of view: UIView, size: CGSize) -> UIView? {
+        let image = UIGraphicsImageRenderer(size: size).image { context in view.layer.render(in: context.cgContext) }
+        let copy = UIImageView(image: image)
+        copy.frame = CGRect(origin: .zero, size: size)
+        return copy
     }
 }
 

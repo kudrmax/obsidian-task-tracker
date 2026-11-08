@@ -80,6 +80,8 @@ public struct LandingPart: Decodable, Sendable, Equatable {
     public let zone: JSONValue
     public let section: String?
     public let index: Int
+    /// The part is folded: its cards are not drawn, the card lands under its header.
+    public let folded: Bool?
 }
 
 /// Where a landed card stands among a column's cards without the carried ones: before card `at`, at `level`, in `group`.
@@ -104,7 +106,8 @@ extension DropLanding {
     public func gap(in column: BoardColumn, among others: [BoardCard]) -> LandingGap? {
         switch kind {
         case "list":
-            guard self.column == column.rawValue else { return nil }
+            // Into a folded part no room opens: nothing of it is drawn.
+            guard self.column == column.rawValue, part?.folded != true else { return nil }
             // A list drawn in project parts: the core names the part and the place in it; a plain list counts in file order.
             let section = part.map(\.section) ?? group
             let zone: JSONValue? = part.map { .some($0.zone) } ?? .none

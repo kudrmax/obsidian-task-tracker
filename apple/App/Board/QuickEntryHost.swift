@@ -1086,10 +1086,10 @@ struct EntryDateSheet: View {
 }
 
 
-/// The keyboard as its four notices tell it: where its top stands on the screen (the bar over it included), and its next
-/// rise, for what waits for it. What waits runs as the keyboard starts to move (its views reloaded, the main thread free),
-/// or at once while it stands; a field taken while the keyboard goes down waits for its rise back, which UIKit announces
-/// when the field takes it. Nothing is guessed by time.
+/// The keyboard: where its top stands on the screen (the bar over it included), frame by frame as it moves, and its next
+/// rise, for what waits for it. What waits runs as the keyboard starts to move (its views
+/// reloaded, the main thread free), or at once while it stands; a field taken while the keyboard goes down waits for its
+/// rise back, which UIKit announces when the field takes it. Nothing is guessed by time.
 @MainActor
 @Observable
 final class KeyboardRise {
@@ -1097,8 +1097,17 @@ final class KeyboardRise {
 
     private enum Stand { case down, rising, up, falling }
 
-    /// The keyboard's top on the screen, where it is going: infinity while it is down or going down.
+    /// The keyboard's top on the screen as it is drawn now, frame by frame while it moves. It is read from a probe the
+    /// window's keyboard layout guide holds, which UIKit moves in the keyboard's own animation: the notices' duration and
+    /// curve are not trusted, since a keyboard sent down by a field giving it up is announced with a duration of 0 and
+    /// still slides.
     private(set) var top: CGFloat = .infinity
+    @ObservationIgnored private let probe = UIView()
+    @ObservationIgnored private var follow: CADisplayLink?
+    /// Frames the probe has stood still since it last moved: the following stops after a few.
+    @ObservationIgnored private var still = 0
+    /// The keyboard stands down: nothing of the screen is under it.
+    private(set) var isDown = true
     @ObservationIgnored private var waiting: [() -> Void] = []
     @ObservationIgnored private var stand = Stand.down
 
@@ -1106,34 +1115,80 @@ final class KeyboardRise {
         let center = NotificationCenter.default
         // Will-show is posted from inside the keyboard's setting up of its views, which holds the main thread a while
         // longer: what waits runs on the next turn, once that has returned and the keyboard's own animation is running.
-        observe(center, UIResponder.keyboardWillShowNotification) { rise, end in
+        observe(center, UIResponder.keyboardWillShowNotification) { rise in
             rise.stand = .rising
-            rise.top = end?.minY ?? rise.top
+            rise.isDown = false
             DispatchQueue.main.async {
                 guard rise.stand == .rising else { return }
                 rise.stand = .up
                 rise.run()
             }
         }
-        observe(center, UIResponder.keyboardDidShowNotification) { rise, _ in
+        observe(center, UIResponder.keyboardDidShowNotification) { rise in
             rise.stand = .up
             rise.run()
         }
-        observe(center, UIResponder.keyboardWillChangeFrameNotification) { rise, end in
-            guard rise.stand == .rising || rise.stand == .up, let end else { return }
-            rise.top = end.minY
+        observe(center, UIResponder.keyboardWillHideNotification) { rise in rise.stand = .falling }
+        observe(center, UIResponder.keyboardDidHideNotification) { rise in
+            rise.stand = .down
+            rise.isDown = true
         }
-        observe(center, UIResponder.keyboardWillHideNotification) { rise, _ in
-            rise.stand = .falling
-            rise.top = .infinity
-        }
-        observe(center, UIResponder.keyboardDidHideNotification) { rise, _ in rise.stand = .down }
+        // Every move of the keyboard, up, down or a new height, is announced here: its top is followed from now.
+        observe(center, UIResponder.keyboardWillChangeFrameNotification) { rise in rise.startFollowing() }
     }
 
-    private func observe(_ center: NotificationCenter, _ name: Notification.Name, _ body: @escaping (KeyboardRise, CGRect?) -> Void) {
-        center.addObserver(forName: name, object: nil, queue: .main) { note in
-            let end = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
-            MainActor.assumeIsolated { body(KeyboardRise.shared, end) }
+    /// The keyboard is about to move: its top is read from the probe every frame until the probe stands still.
+    private func startFollowing() {
+        if probe.window == nil, let host = UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow?.rootViewController?.view }).first {
+            probe.isHidden = true
+            probe.isUserInteractionEnabled = false
+            probe.translatesAutoresizingMaskIntoConstraints = false
+            host.addSubview(probe)
+            host.keyboardLayoutGuide.usesBottomSafeArea = false
+            NSLayoutConstraint.activate([
+                probe.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+                probe.widthAnchor.constraint(equalToConstant: 1),
+                probe.heightAnchor.constraint(equalToConstant: 1),
+                probe.bottomAnchor.constraint(equalTo: host.keyboardLayoutGuide.topAnchor),
+            ])
+            // Put in place at once, outside the keyboard's animation it is often added in: never seen moving into place.
+            UIView.performWithoutAnimation { host.layoutIfNeeded() }
+            probe.layer.removeAllAnimations()
+        }
+        still = 0
+        guard follow == nil, probe.window != nil else { return }
+        let link = CADisplayLink(target: Follower(self), selector: #selector(Follower.tick))
+        link.add(to: .main, forMode: .common)
+        follow = link
+    }
+
+    fileprivate func tick() {
+        guard let host = probe.superview else { return }
+        let now = host.convert((probe.layer.presentation() ?? probe.layer).frame, to: nil).maxY
+        if top != now {
+            top = now
+            still = 0
+        } else if probe.layer.animationKeys()?.isEmpty ?? true {
+            still += 1
+            if still > 30 { stopFollowing() }
+        }
+    }
+
+    private func stopFollowing() {
+        follow?.invalidate()
+        follow = nil
+    }
+
+    /// The display link holds its target strongly: a small one that holds the keyboard's state weakly.
+    private final class Follower: NSObject {
+        weak var rise: KeyboardRise?
+        init(_ rise: KeyboardRise) { self.rise = rise }
+        @MainActor @objc func tick() { rise?.tick() }
+    }
+
+    private func observe(_ center: NotificationCenter, _ name: Notification.Name, _ body: @escaping (KeyboardRise) -> Void) {
+        center.addObserver(forName: name, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { body(KeyboardRise.shared) }
         }
     }
 
@@ -1151,28 +1206,33 @@ final class KeyboardRise {
 
 extension View {
     /// A scroll view that stands under the keyboard instead of shrinking above it: the keyboard slides over its rows, and
-    /// the part it covers is only room to scroll the last rows above it, never a cut in what is drawn.
+    /// the part it covers is only room to scroll the last rows above it, opened and closed frame by frame with the keyboard.
     func keyboardRoom() -> some View {
         modifier(KeyboardRoom())
     }
 }
 
 private struct KeyboardRoom: ViewModifier {
-    /// The scroll view's frame as laid out with the keyboard down: the room it gives never changes the frame it is measured
-    /// from (a scroll view is never shorter than its margins, and a list stacked under another would grow by them).
-    @State private var frame: CGRect = .null
+    /// The scroll view's top and bottom on the screen as laid out with the keyboard down: the room it gives never changes
+    /// what it is measured from (a scroll view is never shorter than its margins, and a list stacked under another would
+    /// grow by them).
+    @State private var span: ClosedRange<CGFloat>?
+    @State private var room: CGFloat = 0
 
     func body(content: Content) -> some View {
+        let rise = KeyboardRise.shared
         content
             .contentMargins(.bottom, room, for: .scrollContent)
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { laid in
-                if KeyboardRise.shared.top == .infinity { frame = laid }
+            .onGeometryChange(for: ClosedRange<CGFloat>.self) { $0.frame(in: .global).minY...$0.frame(in: .global).maxY } action: { laid in
+                if rise.isDown { span = laid }
             }
+            .onChange(of: rise.top) { room = covered(by: rise.top) }
+            .onChange(of: span) { room = covered(by: rise.top) }
     }
 
-    /// The part of the scroll view the keyboard covers, at most all of it.
-    private var room: CGFloat {
-        guard !frame.isNull else { return 0 }
-        return min(frame.height, max(0, frame.maxY - max(frame.minY, KeyboardRise.shared.top)))
+    /// The part of the scroll view the keyboard's top at `top` covers, at most all of it.
+    private func covered(by top: CGFloat) -> CGFloat {
+        guard let span else { return 0 }
+        return min(span.upperBound - span.lowerBound, max(0, span.upperBound - max(span.lowerBound, top)))
     }
 }

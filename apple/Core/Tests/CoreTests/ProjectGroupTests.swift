@@ -217,6 +217,19 @@ final class FakeFolder: NoteFolder, @unchecked Sendable {
         #expect(landed.gap(in: .backlog, among: others) == LandingGap(at: club, level: 0, group: others[club].item.group, zone: .string(Self.friends)))
     }
 
+    @Test func aDropIntoAFoldedPartLandsUnderItsHeaderWithNoRoom() throws {
+        let board = board(FakeVault(Self.file))
+        try board.group("tasks.toggleFold", ["backlog", .string(Self.friends.lowercased())])
+        let snapshot = try snapshot(board)
+        let exchange = try #require(snapshot.lists[.soon]?.cards.first { $0.item.title == "Exchange" })
+        let backlog = try #require(snapshot.lists[.backlog])
+        let friends = try #require(backlog.projects.first { $0.title == Self.friends })
+        let title = try #require(backlog.titleDrop)
+        let landed = try #require(try board.landing([["key": exchange.item.key.json, "from": "soon"]], to: title, over: snapshot).first)
+        #expect(landed.part?.folded == true && landed.part?.key == friends.key)
+        #expect(landed.gap(in: .backlog, among: backlog.cards) == nil)
+    }
+
     @Test func aDropIntoNoProjectTakesTheFieldOff() throws {
         let vault = FakeVault(Self.file)
         let board = board(vault)

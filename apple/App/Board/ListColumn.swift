@@ -488,11 +488,17 @@ struct ProjectHeader: View {
                 .lineLimit(1)
                 .frame(height: ColumnMetrics.groupLeading)
             if project.folded {
-                Text(verbatim: "\(project.count)")
-                    .font(.system(size: 12, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(Palette.muted)
-                    .frame(height: ColumnMetrics.groupLeading)
+                // A card dropped into the folded part: the old number fades out and the new one in (decision 56).
+                ZStack {
+                    Text(verbatim: "\(project.count)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(Palette.muted)
+                        .id(project.count)
+                        .transition(.opacity)
+                }
+                .frame(height: ColumnMetrics.groupLeading)
+                .animation(.easeInOut(duration: 0.25), value: project.count)
             }
             if project.canOpenNote, let ref = project.project {
                 Button { Task { await model.openNote(ref) } } label: {
