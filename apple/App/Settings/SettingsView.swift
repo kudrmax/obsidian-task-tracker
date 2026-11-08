@@ -99,6 +99,23 @@ struct MarkRow: View {
                 .autocorrectionDisabled()
                 .onSubmit { rename(name) }
             Spacer()
+            // The six preset colours, each its own shade in either theme, as the plugin's circles; the system picker for
+            // any other.
+            HStack(spacing: 6) {
+                ForEach(plugin.presets, id: \.self) { preset in
+                    Button {
+                        Task { await plugin.write(of == "level" ? "settings.recolourLevel" : "settings.recolourLabel", [.number(Double(index)), .string(preset)]) }
+                    } label: {
+                        Circle()
+                            .fill(plugin.ink(preset, scheme))
+                            .frame(width: 18, height: 18)
+                            .overlay { if preset == color { Circle().strokeBorder(Color.primary, lineWidth: 2).padding(-3) } }
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(preset.capitalized)
+                    .accessibilityAddTraits(preset == color ? .isSelected : [])
+                }
+            }
             ColorPicker("Color", selection: Binding(
                 get: { plugin.ink(color, scheme) },
                 set: { picked in Task { await plugin.recolour(of, index, to: picked, scheme: scheme) } }

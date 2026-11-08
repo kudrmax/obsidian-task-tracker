@@ -10,6 +10,8 @@ final class PluginSettings {
     private(set) var form: SettingsForm?
     /// Each preset colour's own shade in either theme, as the core draws presets: a typed code that is one reads as it.
     private(set) var presetInk: [String: Themed<String>] = [:]
+    /// The six preset colours in the core's order (`PRIORITY_COLORS`).
+    private(set) var presets: [String] = []
     private var shades: [String: Themed<Shades>] = [:]
     /// The timeline's zoom levels as the settings keep them, in the plugin's words (`28, 56, 112, 224`).
     private(set) var zoomLevels = ""
@@ -27,7 +29,8 @@ final class PluginSettings {
         let config = AppServices.shared.vault.read(path: ".obsidian/app.json").flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] }
         updatesLinks = (config?["alwaysUpdateLinks"] as? Bool) != false
         if presetInk.isEmpty, let constants: [String: JSONValue] = try? board.rule("rules.constants") {
-            for preset in constants["PRIORITY_COLORS"]?.array.compactMap(\.string) ?? [] {
+            presets = constants["PRIORITY_COLORS"]?.array.compactMap(\.string) ?? []
+            for preset in presets {
                 let dark: String = (try? board.rule("rules.inkOf", [.string(preset), "dark"])) ?? preset
                 let light: String = (try? board.rule("rules.inkOf", [.string(preset), "light"])) ?? preset
                 presetInk[preset] = Themed(dark: dark, light: light)

@@ -107,7 +107,6 @@ final class BoardModel {
         self.project = project
         place = RibbonPlace.remembered(for: project)
         dropping.ended = { [weak self] in self?.carryEnded() }
-        dropping.moving = { [weak self] in self?.beginLiftedSection() }
         entry.model = self
     }
 
@@ -893,7 +892,6 @@ final class BoardModel {
 
     /// A card lifted: it waits as a dashed place where it stood and its subtasks fold away under it, as the plugin's.
     func startCarry(_ card: BoardCard, from column: String, grab: CGFloat) {
-        liftedSection = nil
         found = nil
         withAnimation(.snappy(duration: 0.25)) { carry = Carry(id: card.id, item: card.item, from: column, grab: grab) }
     }
@@ -901,7 +899,6 @@ final class BoardModel {
     /// Select Tasks: a picked card lifted carries every picked task as a stack, as the plugin's. The core says which go
     /// along with it (`tasks.carried`: the rest of the picked, but a subtask whose task is picked goes with that task).
     func startGroupCarry(_ card: BoardCard, from column: String) {
-        liftedSection = nil
         guard let snapshot else { return }
         found = nil
         let picked = pickedItems
@@ -917,21 +914,6 @@ final class BoardModel {
             let going = kept.compactMap { key in all.first { $0.item.key.section == key.section && $0.item.key.index == key.index && $0.item.key.path == key.path } }
             carry?.group = [(item: card.item, from: column)] + going
         }
-    }
-
-    /// A section's header lifted by the system's drag: its carry starts once the drag moves over the screen, so a lift let
-    /// go where it stood (which starts no drag session, and so would never end one) carries nothing.
-    func liftSection(_ column: BoardColumn, _ group: BoardGroup) {
-        liftedSection = (column, group)
-    }
-
-    @ObservationIgnored private var liftedSection: (column: BoardColumn, group: BoardGroup)?
-
-    private func beginLiftedSection() {
-        guard let lifted = liftedSection else { return }
-        liftedSection = nil
-        guard carry == nil else { return }
-        startSectionCarry(lifted.column, lifted.group)
     }
 
     /// A section's header carried: its header and tasks fold away and the list closes over them, as the plugin's.
@@ -1005,7 +987,6 @@ final class BoardModel {
     func isWaiting(_ card: BoardCard) -> Bool { card.id == carry?.id }
 
     func startCarryingPlus() {
-        liftedSection = nil
         carry = Carry(id: Carried.plus, item: nil, from: "new", grab: 0)
     }
 
@@ -1027,7 +1008,6 @@ final class BoardModel {
     /// The drag session ended, whatever came of it: a carry still standing ends now, unless its drop is still being
     /// written, which ends it once the screen shows the write.
     func carryEnded() {
-        liftedSection = nil
         guard carry != nil, !writingDrop else { return }
         cancelCarry()
     }

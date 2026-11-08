@@ -434,8 +434,8 @@ struct SectionHeader: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        heading
-            .modifier(SectionLift(group: group, column: column, model: model))
+        SectionHeaderControl(group: group, column: column, model: model, menu: { rows }) { label }
+            .frame(height: ColumnMetrics.groupHead)
             .alert("Rename Section", isPresented: $renaming) {
                 TextField("Name", text: $name)
                 Button("Cancel", role: .cancel) {}
@@ -443,21 +443,24 @@ struct SectionHeader: View {
             }
     }
 
-    @ViewBuilder
-    private var heading: some View {
-        if let menu = group.menu, menu.rename || menu.remove {
-            Menu {
-                if menu.rename { Button("Rename", systemImage: "pencil") { name = menu.section; renaming = true } }
-                if menu.remove {
-                    Button("Remove Section", systemImage: "trash", role: .destructive) { Task { await model.removeSection(column, menu) } }
+    /// The header's menu as the core offers it: Rename, Remove Section; none for No section.
+    private var rows: [UIMenuElement] {
+        guard let menu = group.menu else { return [] }
+        var rows: [UIMenuElement] = []
+        if menu.rename {
+            rows.append(UIAction(title: "Rename", image: UIImage(systemName: "pencil")) { _ in
+                DispatchQueue.main.async {
+                    name = menu.section
+                    renaming = true
                 }
-            } label: {
-                label
-            }
-            .buttonStyle(.plain)
-        } else {
-            label
+            })
         }
+        if menu.remove {
+            rows.append(UIAction(title: "Remove Section", image: UIImage(systemName: "trash"), attributes: .destructive) { _ in
+                Task { await model.removeSection(column, menu) }
+            })
+        }
+        return rows
     }
 
     private var label: some View {
@@ -527,30 +530,9 @@ struct ProjectHeader: View {
     }
 }
 
-/// A long press on a section's header lifts the section, as the plugin's (`GroupDrag`): moving on carries it among the
-/// list's sections; it shows as a card with the section's name and count over two layers of its tasks.
-private struct SectionLift: ViewModifier {
-    let group: BoardGroup
-    let column: BoardColumn
-    let model: BoardModel
-
-    func body(content: Content) -> some View {
-        if group.reorder {
-            content.onDrag {
-                model.liftSection(column, group)
-                return NSItemProvider(object: "section" as NSString)
-            } preview: {
-                SectionFloat(name: group.header ?? "", count: group.cards.filter { $0.level == 0 }.count)
-            }
-        } else {
-            content
-        }
-    }
-}
-
 /// The lifted section under the finger (`.tc-section-float`): its name and the number of its tasks on a card, two layers
 /// of its tasks beneath.
-private struct SectionFloat: View {
+struct SectionFloat: View {
     let name: String
     let count: Int
     @Environment(\.colorScheme) private var scheme
