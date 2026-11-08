@@ -407,7 +407,7 @@ every condition that changes the layout is animated by the transaction that chan
 50. **iPhone, R7: the slot is the cancel target while a finger holds a carry**, and for the plus until its own copy is
     home (it flies into the slot); a card's copy flies to its own place, so the slot is the plus again as it is let go,
     not when the system's drop animator ends a second later.
-51. **iPhone, merging the day turn of master (0.4.179): one way a day turns, the plugin's.** Two mechanisms met: this
+52. **iPhone, merging the day turn of master (0.4.179): one way a day turns, the plugin's.** Two mechanisms met: this
     branch's `.turn` (the whole day part, list and calendar, pushed in by a SwiftUI transition keyed by the day) and
     master's `DayTurn` (header and hours stand, each column slides its own day through `DayLane` over 300 ms with the
     pager's ease, the swipe past Today led by `days.stepScreen`). Master's is kept: it is the plugin's, it follows the
@@ -415,7 +415,10 @@ every condition that changes the layout is animated by the transaction that chan
     them anew. Every day change goes through it: the arrows, the swipe, Today, a found task on another day and the
     bar's Date… (`go(toDay:)`); `motion(from:)` still names `.turn`, which `draw` now draws still, the day having come in
     by its own slide. The rows inside the sliding day keep this branch's keys, `FoldAway` and heirs; the widths stay
-    decision 18's.
+    decision 18's. The day swipe's pan makes the ribbon's own pan wait for it; a lift takes the touch before
+    that pan has seen it move, so it stayed waiting the whole carry, and with the ribbon's pan held so a dropped
+    section's rows came in at their old place under the rows below. The moment a carry starts (`carryBegins`) the day
+    pan fails, and the ribbon's pan stops waiting.
 
 ## Done when
 

@@ -452,6 +452,13 @@ final class DaySwipe: NSObject, UIGestureRecognizerDelegate {
         let pan = UIPanGestureRecognizer(target: self, action: #selector(pan(_:)))
         pan.delegate = self
         ribbon.addGestureRecognizer(pan)
+        // A lift takes the touch before the pan has seen it move, so the pan would stay waiting the whole carry and keep
+        // the ribbon's pan waiting on it (a dropped section's rows then came in under the rows below): it fails then.
+        model?.carryBegins = { [weak pan] in
+            guard let pan, pan.state == .possible else { return }
+            pan.isEnabled = false
+            pan.isEnabled = true
+        }
         ribbon.panGestureRecognizer.require(toFail: pan)
     }
 

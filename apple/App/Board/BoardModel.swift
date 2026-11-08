@@ -644,6 +644,9 @@ final class BoardModel {
     private(set) var landing: Int?
 
     var carried: String? { carry?.id }
+    /// Told the moment a carry starts (a card, a section or the plus lifted): a gesture still waiting on the touch the
+    /// drag took gives way, so the ribbon's own pan, which waits for the day swipe to fail, stops waiting.
+    @ObservationIgnored var carryBegins: (() -> Void)?
     /// The card the drawing of a drop's write put in its new place: it goes there at once, hidden or not, never sliding
     /// over the list (its copy flies there). Until the next drawing.
     private(set) var placedByDrop: String?
@@ -669,6 +672,7 @@ final class BoardModel {
 
     /// A card lifted: it waits as a dashed place where it stood and its subtasks fold away under it, as the plugin's.
     func startCarry(_ card: BoardCard, from column: String, grab: CGFloat) {
+        carryBegins?()
         found = nil
         arrival = nil
         ending = nil
@@ -679,6 +683,7 @@ final class BoardModel {
 
     /// A section's header lifted: its header and tasks fold away and the list closes over them, as the plugin's.
     func startSectionCarry(_ column: BoardColumn, _ group: BoardGroup) {
+        carryBegins?()
         guard let list = snapshot?.lists[column], let name = list.sectionsOf, let lifted = list.groups.firstIndex(where: { $0.id == group.id }),
               let shape = geometry[column] else { return }
         let heads = list.groups.map { shape.heads[$0.id]?.minY }
@@ -764,6 +769,7 @@ final class BoardModel {
     }
 
     func startCarryingPlus() {
+        carryBegins?()
         ending = nil
         released = false
         touchdown = nil
