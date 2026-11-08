@@ -1,4 +1,4 @@
-import { LAYOUT } from "./design";
+import { dividerAt, type DividerStop } from "../../core/application/contracts";
 import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { PointerSpeed } from "./PointerSpeed";
@@ -57,21 +57,12 @@ export class Divider {
 		e.preventDefault();
 	}
 
-	/** Where the line goes for this event, and whether it holds to the middle there. */
-	private place(e: PointerEvent): { width: number; snapped: boolean } {
+	/** Where the line goes for this event, and whether it holds to the middle there: the core's `dividerAt`. */
+	private place(e: PointerEvent): DividerStop {
 		const press = this.press!;
 		press.speed.update(e.clientX, e.timeStamp);
 		const wanted = press.width + e.clientX - press.x;
-		const snapped = this.snaps(wanted);
-		const width = snapped ? this.opts.center() : Math.round(wanted);
-		return { width: Math.min(this.opts.max(), Math.max(this.opts.min, width)), snapped };
-	}
-
-	private snaps(width: number): boolean {
-		const center = this.opts.center();
-		const reachable = center >= this.opts.min && center <= this.opts.max();
-		const slow = this.press!.speed.value < LAYOUT.slowSpeed;
-		return reachable && slow && Math.abs(width - center) <= LAYOUT.dividerSnapDistance;
+		return dividerAt(wanted, { width: wanted, min: this.opts.min, max: this.opts.max(), center: this.opts.center() }, press.speed.value);
 	}
 
 	private move(e: PointerEvent): void {

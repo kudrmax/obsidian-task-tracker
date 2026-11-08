@@ -3,9 +3,12 @@ import { markChoices, type Marks } from "../domain/Marks";
 import type { PriorityColor, PriorityLevel } from "../domain/Priority";
 import type { DraftMarks } from "./contracts";
 
-/** The colours a task is drawn in: its priority's alone, else each of its labels'; the first tints it. */
+/** The most colours a card of several labels is painted in: its first labels' in the settings' order. */
+export const MOST_CARD_COLORS = 4;
+
+/** The colours a task is drawn in: its priority's alone, else its labels', at most `MOST_CARD_COLORS`; the first tints it. */
 export function markColors(priority: PriorityLevel | null, labels: readonly LabelLevel[]): readonly PriorityColor[] {
-	return priority ? [priority.color] : labels.map((label) => label.color);
+	return priority ? [priority.color] : labels.slice(0, MOST_CARD_COLORS).map((label) => label.color);
 }
 
 /** What the bar shows for a task typed with `marks`, over the usable `levels` and `labels` in the settings' order. */

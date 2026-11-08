@@ -52,6 +52,14 @@ public struct ListWidths: Decodable, Hashable, Sendable {
     public let min: Double
     public let max: Double
     public let center: Double
+
+    public var json: JSONValue { ["width": .number(width), "min": .number(min), "max": .number(max), "center": .number(center)] }
+}
+
+/// `DividerStop`: where a dragged divider stands, and whether it holds to the middle there.
+public struct DividerStop: Decodable, Hashable, Sendable {
+    public let width: Double
+    public let snapped: Bool
 }
 
 /// `REPEAT_WORDS`: the repeat page's words.

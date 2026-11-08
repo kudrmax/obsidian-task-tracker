@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PRIORITY_COLORS, type PriorityColor } from "../../core/application/contracts";
-import { contrast, inkOf, priorityRules, shadesOf } from "../../obsidian/ui/priorityColors";
+import { MOST_CARD_COLORS, PRIORITY_COLORS, type PriorityColor } from "../../core/application/contracts";
+import { contrast, inkOf, LABEL_SLOTS, priorityRules, shadesOf } from "../../obsidian/ui/priorityColors";
 
 const THEMES = ["dark", "light"] as const;
 const BOARD_CARD = { dark: "#1C1C1E", light: "#F2F2F7" };
@@ -60,6 +60,10 @@ describe("the priority stylesheet", () => {
 });
 
 describe("the labels' fills", () => {
+	it("has a slot for each colour the core paints a card in, and the stylesheet a rule for each count", () => {
+		expect(LABEL_SLOTS).toHaveLength(MOST_CARD_COLORS);
+	});
+
 	it("give a card of several labels each colour's fill in its place, in both themes", () => {
 		const rules = priorityRules([{ name: "Свой", color: "#123456" }]);
 		expect(rules).toContain(`[data-label1="orange"] { --tc-label-fill-1: ${shadesOf("orange", "dark").fill}; }`);

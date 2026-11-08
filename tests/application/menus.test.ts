@@ -178,20 +178,20 @@ describe("the edit group", () => {
 	const offer: SectionOffer = { lists: { now: ["Work"], soon: [], inbox: [], backlog: [] }, ungrouped: "No section" };
 	const edits = (task: TaskItem, of: Parameters<typeof taskMenu>[5] = { kind: "task", from: "day" }, sections: SectionOffer | null = null) => taskMenu([task], T, [], [], sections, of).edits;
 
-	it("offers Rename, Add description, Repeat and Add subtask to a task without a time or a description", () => {
-		expect(edits(item())).toEqual(["rename", "description", "repeat", "subtask"]);
+	it("offers Rename, Add description, Repeat, Project and Add subtask to a task without a time or a description", () => {
+		expect(edits(item())).toEqual(["rename", "description", "repeat", "project", "subtask"]);
 	});
 
 	it("offers the reminder of a task on a time, after Rename, by what the task may have", () => {
-		expect(edits(item({ description: "- note", can: { ...item().can, remind: true, addDescription: false } }))).toEqual(["rename", "reminder", "repeat", "subtask"]);
+		expect(edits(item({ description: "- note", can: { ...item().can, remind: true, addDescription: false } }))).toEqual(["rename", "reminder", "repeat", "project", "subtask"]);
 	});
 
 	it("offers no Add description to a task that has one, no Repeat to one that may not repeat", () => {
-		expect(edits(item({ can: { ...item().can, addDescription: false }, repeatable: false }))).toEqual(["rename", "subtask"]);
+		expect(edits(item({ can: { ...item().can, addDescription: false }, repeatable: false }))).toEqual(["rename", "project", "subtask"]);
 	});
 
-	it("offers Section before Add subtask where the sections are offered", () => {
-		expect(edits(item({ description: "- note", can: { ...item().can, addDescription: false } }), { kind: "task", from: "day" }, offer)).toEqual(["rename", "repeat", "section", "subtask"]);
+	it("offers Section, then Project, before Add subtask where the sections are offered", () => {
+		expect(edits(item({ description: "- note", can: { ...item().can, addDescription: false } }), { kind: "task", from: "day" }, offer)).toEqual(["rename", "repeat", "section", "project", "subtask"]);
 	});
 
 	it("offers no Add subtask to a subtask opened from a timeline card's stack", () => {
@@ -208,9 +208,9 @@ describe("the edit group", () => {
 		expect(taskMenu([every3], T, [], [], null, { kind: "bulk" }).repeat).toEqual({ value: "", days: null });
 	});
 
-	it("gives the picked tasks Section alone, where it is offered", () => {
-		expect(edits(item(), { kind: "bulk" })).toEqual([]);
-		expect(edits(item(), { kind: "bulk" }, offer)).toEqual(["section"]);
+	it("gives the picked tasks Section, where it is offered, and Project", () => {
+		expect(edits(item(), { kind: "bulk" })).toEqual(["project"]);
+		expect(edits(item(), { kind: "bulk" }, offer)).toEqual(["section", "project"]);
 	});
 });
 

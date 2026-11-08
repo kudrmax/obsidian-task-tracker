@@ -86,6 +86,12 @@ priority, place, repeat?, labels?)`, … (87 methods; `methods()` lists them). T
 TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` checks method by method.
 
 - Reads take a `TaskItem`, a `TaskKey` and the like as the door gave them; a key names a task as read.
+- What counts as the same task is the core's: `TaskItem.id` (`rules.keyId(key)`: the task as read, its line included;
+  a card's or a row's identity) and `TaskItem.place` (`rules.placeId(key)`: its place in the file, whatever its line, so
+  a task whose line a write changed is found again by it; `"now:1:"`). A host compares these strings, never a key's
+  fields. For keys a call answers alone (`tasks.carried`), `rules.placeId(key)` names each.
+- `TaskItem.colors`: at most `MOST_CARD_COLORS` (4) colours, the first labels' in the settings' order; a host paints
+  every one it is given.
 - `tasks.screen(date)` with no tasks file answers the empty screen with `missing: true`.
 - `tasks.createFile()` answers the new file's text in `tasks`; with a file already there it fails.
 - `tasks.placementTitle(placement)`: the quick entry's place button's words for its `place`: the list's name as the
@@ -131,7 +137,10 @@ parent's. Every write keeps it, and no title (`TaskItem.title`, `text`, a remind
   no task to stand before. `entry.*` reads the same: `WireLook.sections` holds `{ group, project }` headers, and
   `WireLook.project` is the project of a project's view (every task written there gets it).
 - `tasks.setProject(keys, link | null)`: one write; a subtask is left as it is. `tasks.projectNotes()`: the project notes
-  by name. A menu's `project` (`MenuProject` `{ current, options, none, disabled }`) is the Project row's page.
+  by name. A menu's `project` (`MenuProject` `{ current, options, none, noneName, disabled }`) is the Project row's
+  page; `noneName` is No project's own row (`"No project"`). Where the row stands is the menu's `edits`: `"project"`
+  comes right after `"section"` (where Section would stand when it is not offered), before `"subtask"`, in one task's
+  menu and in the bulk menu (`["section", "project"]`); a host draws the edits in that order and places nothing itself.
 - `tasks.setGrouping(list, on)`, `tasks.toggleFold(list, key)`: answer the new `grouping`.
 - `tasks.renameGroup(list, group, name, project?)`, `tasks.removeGroup(list, group, project?)`: with `project` (null: No
   project), only that project's tasks of the section move.
@@ -175,7 +184,8 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 - Each status's `words` (`SourceWords`) is its row in the sources window, worded: `name` (`Google Calendar`, `iPhone
   calendars`, `Work calendar`), `short`, `sub` (`Updated today`, `Exported from iPhone`, `Not updated yet`, or the
   problem: `not logged in`, `file missing`, `no answer in 15 s`, a failure's own text) and `time` (`14:19`, `Yesterday
-  08:02`, `3 Oct 08:02`, empty with no update); the orange mark is `stale`.
+  08:02`, `3 Oct 08:02`, empty with no update); the orange mark is `stale`. Google's problem is `loggedOut` (`not
+  logged in`) whenever the shared settings keep no Google token, whatever its file: there is no file to miss then.
 - An event's `color` is `null` when its calendar's file gives none: the frontend draws the source's own colour.
 
 ### `reminders.*`: the phone's reminders
@@ -219,7 +229,8 @@ level or a label and left: the colour to write, `null` for no colour or the one 
 `dayStartHours` (what Day starts at offers), `labelPaint` and `labelPaints` (Several labels: the paint saved, and the
 paints offered in order, `["stripes", "blend"]`), `cardHeight`, `cardGap`, `cardHeights` and `cardGaps` (Cards: the
 sizes saved and the bounds the sliders move within), `zoomLevels` (Zoom levels as the field shows them, `"28, 56, 112,
-224"`), `googleClientReady` (Log in has a client id to go with), and
+224"`), `googleClientReady` (Log in has a client id to go with), `googleLoggedIn` (Google is logged in: the shared
+settings keep its token; the app's Account row shows it), and
 `sectionOrder` and `markerOrder`: the sections' names and the line markers the screen edits, in its order (the words
 for each are the host's).
 
@@ -377,7 +388,12 @@ schedule), `onTheDay(rule)` (`"On the 5th"` under a monthly schedule's unit, emp
 `{ width, min, max, center }`: the width drawn for the saved share of the columns' width, `viewWidth` less the divider's
 own `dividerWidth`, within the design's bounds on a phone and growing on a wider window, the bounds a drag of the divider
 moves within, and the width that centres it; `listWidths(0.5, 390, 16)` → `{ width: 187, min: 110, max: 280, center:
-187 }`), `listShareOf(width, viewWidth, dividerWidth)` (the share a divider let go at `width` saves); the paints every frontend draws alike: `shadesOf(color, theme)` (a level's or a label's `ink`, a card's
+187 }`), `listShareOf(width, viewWidth, dividerWidth)` (the share a divider let go at `width` saves),
+`dividerAt(wanted, widths, speed)` (where the dragged divider stands: `widths` a `listWidths` answer, `speed` the
+finger's in points or px per ms; brought within `DIVIDER_SNAP.distance` of the middle slower than
+`DIVIDER_SNAP.slowSpeed` it holds to `center`, else it stands at `wanted` rounded, within `min` and `max`; answers
+`{ width, snapped }`, and a host gives a tap of haptics as `snapped` turns on; `dividerAt(190, { width: 187, min: 110,
+max: 280, center: 187 }, 0.01)` → `{ width: 187, snapped: true }`), `keyId(key)` and `placeId(key)` (above); the paints every frontend draws alike: `shadesOf(color, theme)` (a level's or a label's `ink`, a card's
 `fill`, its date and dot's `meta`), `inkOf`, `contrast`, `eventHex(event)`, `bgAlphaFor(source)`, `eventColors(hex,
 bgAlpha, theme)` (an event's `bg`, `bar`, `text`); `dayTitle(date, relation, today)` (`Today`, `Tue, 3 Nov`) and
 `dueLabel(date)` (a card's corner: `{ day, month }`); `eventLevels(spans)` (how deep each event lies over the others); `stackTasks(tasks, events, hourPx, card, insets)` (each task card's top, height and left edge on the timeline: they never share the width), `overlayLeft(level, insets)`, `eventLeft(level, insets)`, `stackCorner(box, slotStart, span)` (what a stack card shows on the right: its start when stacked, its duration when shorter than one; null for neither), `timeParts`, `durationParts`; a past event's paint: `pastEventPaint(ground, text, theme)` (`{ bg, bar, text }` as
@@ -421,7 +437,7 @@ far as it takes to end inside the margin, or at the card's own end if that is fu
 `DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS`, `EVENT_BG_ALPHA`, `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon),
 `DEFAULT_ZOOM_LEVELS` and `DEFAULT_ZOOM_HOUR` (the zoom a timeline opens at before a pinch settled on another),
 `CARD_HEIGHTS`, `CARD_GAPS` and `DEFAULT_CARD_SIZE` (the Cards bounds and defaults), `LIST_WIDTHS` (`{ min: 110,
-max: 280 }`), `REPEAT_WORDS` (the repeat page's words: `kinds` `{ schedule: "Schedule", afterDone: "After done" }`,
+max: 280 }`), `DIVIDER_SNAP` (`{ distance: 8, slowSpeed: 0.08 }`), `MOST_CARD_COLORS` (4), `REPEAT_WORDS` (the repeat page's words: `kinds` `{ schedule: "Schedule", afterDone: "After done" }`,
 `every` `"Every"`, `units` `{ day: "days", week: "weeks", month: "months" }`, `weekdays` Monday first `{ short: "Mon",
 name: "Monday", letter: "M" }`, `remove` `"Remove repeat"`),
 `SCREEN_PLACES` (`["inbox", "soon", "calendar"]`, left to right) and `SHOWN_LISTS` (the lists each place shows, in its

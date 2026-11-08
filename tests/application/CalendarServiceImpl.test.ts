@@ -74,7 +74,10 @@ class FakeClock implements Clock {
 const NO_EXPORT = { export: () => undefined };
 const DAY = "2026-10-30";
 
-function service(files: EventFile[], feeds: EventFeed[] = [], clock = new FakeClock(), dayStartHour = 0, settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour }), onPhone = false, timers = new FakeTimers()) {
+/** Google logged in, as the tests of its file and feed have it; a test of the logged-out account gives its own settings. */
+const LOGGED_IN = { ...DEFAULT_SETTINGS.google, refreshToken: "token" };
+
+function service(files: EventFile[], feeds: EventFeed[] = [], clock = new FakeClock(), dayStartHour = 0, settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour, google: LOGGED_IN }), onPhone = false, timers = new FakeTimers()) {
 	return new CalendarServiceImpl(files, feeds, clock, settings, timers, NO_EXPORT, { canMigrate: () => onPhone });
 }
 
@@ -189,6 +192,15 @@ describe("CalendarServiceImpl", () => {
 		const feed = new FakeFeed("google", file);
 		feed.failWith = new SourceProblemError({ kind: "loggedOut" }, "not logged in");
 		expect((await refreshed(service([file], [feed]))).statuses[0].problem).toEqual({ kind: "loggedOut" });
+	});
+
+	it("Google logged out says not logged in, not that its file is missing", async () => {
+		const file = new FakeFile("google");
+		file.failWith = new SourceProblemError({ kind: "fileMissing" }, "file missing");
+		const feed = new FakeFeed("google", file);
+		feed.failWith = new SourceProblemError({ kind: "loggedOut" }, "not logged in");
+		const day = await refreshed(service([file], [feed], new FakeClock(), 0, new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 0 })));
+		expect(day.statuses[0]).toMatchObject({ problem: { kind: "loggedOut" }, words: { sub: "not logged in" } });
 	});
 
 	it("a feed that answers clears its timer", async () => {

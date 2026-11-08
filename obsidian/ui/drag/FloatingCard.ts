@@ -1,4 +1,4 @@
-import type { TaskItem } from "../../../core/application/contracts";
+import { grownStart, type TaskItem } from "../../../core/application/contracts";
 import type { LocalDate } from "../types";
 import { DESIGN, DURATION, tokenMs, tokenPx } from "../design";
 import { el, px } from "../dom";
@@ -55,8 +55,14 @@ export class FloatingCard implements Float {
 		this.stack.forEach((layer, i) => (layer.style.width = px(this.el.offsetWidth - 2 * inset * (STACK_DEPTH - i))));
 	}
 
+	/**
+	 * The card under the finger as it was grabbed; stretched further right than the window lets it, it is pulled back
+	 * inside the window's margin as the menu's copy is (`grownStart`), never past the card's own end under the finger.
+	 */
 	moveTo(x: number, y: number): void {
-		const transform = `translate3d(${x - this.grab.dx}px, ${y - this.grab.dy}px, 0)`;
+		const room = windowRoom(this.el);
+		const left = grownStart(x - this.grab.dx, DESIGN.floatWidth, this.el.offsetWidth, room.width, room.margin);
+		const transform = `translate3d(${left}px, ${y - this.grab.dy}px, 0)`;
 		this.el.style.transform = transform;
 		for (const layer of this.stack) layer.style.transform = transform;
 		if (this.count) this.count.style.transform = transform;

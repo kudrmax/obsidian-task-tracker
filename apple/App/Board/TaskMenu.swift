@@ -94,10 +94,7 @@ struct TaskMenu {
         let items = items, model = model, inStack = inStack, describe = describe
         guard let item = items.first else { return [] }
         var rows: [MenuNode] = []
-        var ids: [String] = []
         for edit in menu.edits {
-            let before = rows.count
-            defer { if rows.count > before { ids.append(edit) } }
             switch edit {
             case "rename" where single:
                 rows.append(.action(title: "Rename", symbol: "pencil", opens: true) { if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } })
@@ -111,14 +108,13 @@ struct TaskMenu {
                 rows.append(.action(title: "Repeat…", symbol: "repeat", opens: true, subtitle: repeatValue) { model.repeatFor = item })
             case "section":
                 if let section = sectionPage { rows.append(section) }
+            case "project":
+                rows.append(projectRow)
             case "subtask" where single:
                 rows.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } })
             default: break
             }
         }
-        // The Project row, in every menu: right after Section, or where Section would stand, before Add Subtask.
-        let at = ids.firstIndex(of: "section").map { $0 + 1 } ?? ids.firstIndex(of: "subtask") ?? rows.count
-        rows.insert(projectRow, at: at)
         return rows
     }
 
@@ -131,7 +127,7 @@ struct TaskMenu {
     }
 
     /// The Project row and its page: the project notes by name, No Project last, the current one checked; for subtasks
-    /// only, the parent's project shown and the row disabled. «No project» in the core's words, as the row's value.
+    /// only, the parent's project shown and the row disabled. «No project» in the core's words, as the row's value and its own row.
     private var projectRow: MenuNode {
         let project = menu.project, items = items, model = model
         let value = project.value.isEmpty ? nil : project.value
@@ -139,7 +135,7 @@ struct TaskMenu {
         var rows: [MenuNode] = project.options.map { option in
             .action(title: option.project.name, symbol: nil, checked: option.checked) { Task { await model.setProject(items, option.project.link) } }
         }
-        rows.append(.action(title: "No project", symbol: nil, checked: project.none) { Task { await model.setProject(items, nil) } })
+        rows.append(.action(title: project.noneName, symbol: nil, checked: project.none) { Task { await model.setProject(items, nil) } })
         return .submenu(title: "Project", symbol: "folder", subtitle: value, children: rows)
     }
 

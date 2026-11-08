@@ -43,23 +43,36 @@ enum ColumnMetrics {
     static let sectionGap: CGFloat = 10
 }
 
+/// The shared settings' size of a card, observed: every view that reads it while it draws is drawn again when it
+/// changes, as the plugin's `--tc-card-h` and `--tc-card-gap` restyle every card at once.
+@Observable
+final class CardSize: @unchecked Sendable {
+    static let shared = CardSize()
+    var height: CGFloat = 35
+    var gap: CGFloat = 2
+    /// When a touch becomes a carry, on a card and on the empty calendar alike (Settings → Long press delay), seconds.
+    var press: TimeInterval = 0.25
+}
+
 /// The card's measures, as the plugin draws a card (`docs/design/README.md`). The height and the gap are the shared
 /// settings' (Settings → Cards), as the plugin sets its `--tc-card-h` and `--tc-card-gap` for the whole screen: the screen
-/// sets them from each read (`follow(_:)`), the ends of a card round at half its height.
+/// sets them from each read (`follow(_:)`) into `CardSize`, which every card drawn observes; the ends of a card round at
+/// half its height.
 enum CardMetrics {
-    nonisolated(unsafe) private(set) static var height: CGFloat = 35
+    static var height: CGFloat { CardSize.shared.height }
     static var radius: CGFloat { height / 2 }
-    nonisolated(unsafe) private(set) static var gap: CGFloat = 2
-    /// When a touch becomes a carry, on a card and on the empty calendar alike (Settings → Long press delay), seconds.
-    nonisolated(unsafe) private(set) static var press: TimeInterval = 0.25
+    static var gap: CGFloat { CardSize.shared.gap }
+    static var press: TimeInterval { CardSize.shared.press }
 
     /// The shared settings' size of a card, read with the screen: true when it changed.
     @discardableResult
     static func follow(_ look: ScreenSettings) -> Bool {
-        let changed = height != CGFloat(look.cardHeight) || gap != CGFloat(look.cardGap)
-        press = TimeInterval(look.longPressMs) / 1000
-        height = CGFloat(look.cardHeight)
-        gap = CGFloat(look.cardGap)
+        let size = CardSize.shared
+        let changed = size.height != CGFloat(look.cardHeight) || size.gap != CGFloat(look.cardGap)
+        let press = TimeInterval(look.longPressMs) / 1000
+        if size.press != press { size.press = press }
+        if size.height != CGFloat(look.cardHeight) { size.height = CGFloat(look.cardHeight) }
+        if size.gap != CGFloat(look.cardGap) { size.gap = CGFloat(look.cardGap) }
         return changed
     }
     static let leading: CGFloat = 14

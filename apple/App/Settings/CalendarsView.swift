@@ -74,7 +74,7 @@ struct CalendarsView: View {
                 // Google Calendar as the plugin's settings set it up: the plugin fetches it and writes the file the app
                 // reads, so its sign-in and secret stay in Obsidian; the client and the interval are shared settings.
                 Section {
-                    LabeledContent("Account", value: form.googleClientReady ? "In Obsidian" : "Client ID First")
+                    LabeledContent("Account", value: form.googleLoggedIn ? "Logged In" : "Not Logged In")
                     TextRow(title: "Client ID", value: form.googleClientId) { id in
                         await plugin.write("settings.setGoogleClientId", [.string(id)])
                     }

@@ -250,8 +250,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// A card drawn: when it is the task whose menu shows, the menu and the copy over it take the new drawing.
     static func follow(card: BoardCard, look: Look, menu: @escaping (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?, from control: CardControl) {
         guard let owner = menuOwner, owner.opener.showing, let shown = owner.look else { return }
-        let same = shown.card.item.key.section == card.item.key.section && shown.card.item.key.index == card.item.key.index && shown.card.item.key.path == card.item.key.path
-        guard same, shown != look || owner === control else { return }
+        guard shown.card.item.place == card.item.place, shown != look || owner === control else { return }
         owner.menuMaker = menu
         owner.redrawn(look)
     }
@@ -315,8 +314,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     private func wholePreview() -> UITargetedPreview? {
         guard let look, let window, let room = titleFrame else { return nil }
         let board = AppServices.shared.board
-        let text = look.card.item.text as NSString
-        let natural = text.size(withAttributes: [.font: UIFont.systemFont(ofSize: CardMetrics.title)]).width
+        // The title as the card draws it: each piece's words, a link by its label, as the plugin measures its drawn title.
+        let drawn = look.card.parts.map(\.shown).joined() as NSString
+        let natural = drawn.size(withAttributes: [.font: UIFont.systemFont(ofSize: CardMetrics.title)]).width
         let margin = Double(CardMetrics.wholeMargin)
         let fit = TitleFit(width: Double(bounds.width), titleWidth: Double(room.width), textWidth: Double(natural), fade: Double(CardMetrics.fade))
         guard let grown = try? board.wholeWidth(card: fit, room: Double(window.bounds.width), margin: margin) else { return nil }

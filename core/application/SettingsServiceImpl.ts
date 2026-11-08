@@ -1,3 +1,4 @@
+import { googleLoggedIn } from "./googleLogin";
 import { labelNameOf, usableLabelTag } from "../domain/Label";
 import { hexColor, type PresetColor } from "../domain/Priority";
 import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, LABEL_PAINTS, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
@@ -62,6 +63,7 @@ export class SettingsServiceImpl implements SettingsService {
 			workCalendarFile: s.workCalendarFile,
 			dayStartHours: DAY_START_HOURS,
 			googleClientReady: s.google.clientId !== "",
+			googleLoggedIn: googleLoggedIn(s),
 		};
 	}
 

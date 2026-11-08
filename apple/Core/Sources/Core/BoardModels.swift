@@ -70,6 +70,10 @@ public struct ProjectRef: Decodable, Hashable, Sendable {
 
 public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
     public let key: TaskKey
+    /// The core's name of the task as read, its line included (`keyId`).
+    public let id: String
+    /// The core's name of its place in the file, whatever its line (`placeId`): two reads of one task share it.
+    public let place: String
     public let text: String
     public let title: String
     public let status: String
@@ -101,13 +105,12 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
     public let parentText: String?
     public let json: JSONValue
 
-    public var id: String { "\(key.section)/\(key.index)/\(key.path.map(String.init).joined(separator: "."))/\(key.raw)" }
     public var repeats: Bool { !repeatRule.isNull }
     public var inProgress: Bool { status == "inProgress" }
     public var closed: Bool { !open }
 
     enum CodingKeys: String, CodingKey {
-        case key, text, title, status, dueDate, slot, durationMin, reminder, open, repeatable, priority, labels, colors, group, list
+        case key, id, place, text, title, status, dueDate, slot, durationMin, reminder, open, repeatable, priority, labels, colors, group, list
         case isSubtask, day, repeatDay, can, subtasks, allSubtasks, progress, collapsed, description, parentKey, project, parentText
         case repeatRule = "repeat"
     }
@@ -115,6 +118,8 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         key = try c.decode(TaskKey.self, forKey: .key)
+        id = try c.decode(String.self, forKey: .id)
+        place = try c.decode(String.self, forKey: .place)
         text = try c.decode(String.self, forKey: .text)
         title = try c.decode(String.self, forKey: .title)
         status = try c.decode(String.self, forKey: .status)
@@ -451,6 +456,8 @@ public struct MenuProject: Decodable, Hashable, Sendable {
     public let options: [MenuProjectOption]
     /// No project, last: checked.
     public let none: Bool
+    /// No project's own row: «No project».
+    public let noneName: String
     /// The row's value: the shared project's name, «No project», or empty when they differ.
     public let value: String
     /// Only subtasks: the row can't be pressed.
@@ -610,6 +617,8 @@ public struct SettingsForm: Decodable, Sendable {
     public let googleClientId: String
     public let refreshSeconds: Int
     public let googleClientReady: Bool
+    /// Google is logged in (in Obsidian: the shared settings keep its token).
+    public let googleLoggedIn: Bool
 }
 
 public struct SizeBounds: Decodable, Hashable, Sendable {

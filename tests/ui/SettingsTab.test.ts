@@ -467,6 +467,22 @@ describe("the settings tab: the order", () => {
 		expect(rows("Client id")).toHaveLength(0);
 	});
 
+	it("closes the page shown when the settings close, and when the plugin unloads", () => {
+		page("Day and timeline");
+		expect(document.querySelectorAll(".modal")).toHaveLength(1);
+		tab.hide();
+		expect(document.querySelectorAll(".modal")).toHaveLength(0);
+		page("Tasks file");
+		tab.closePage();
+		expect(document.querySelectorAll(".modal")).toHaveLength(0);
+	});
+
+	it("shows one page at a time", () => {
+		page("Day and timeline");
+		page("Tasks file");
+		expect([...document.querySelectorAll(".modal-title")].map((title) => title.textContent)).toEqual(["Tasks file"]);
+	});
+
 	it("draws the Calendars page anew on logging out", async () => {
 		let loggedIn = true;
 		const google: GoogleAccount = {

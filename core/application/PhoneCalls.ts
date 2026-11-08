@@ -41,7 +41,7 @@ import { branchOf, carriedMiddle, gapBranch, levelAt, placeAt } from "./listDrop
 import { grownStart, wholeWidth } from "./wholeCard";
 import { onTheDay, REPEAT_WORDS, repeatValue } from "./repeatWords";
 import { canPick } from "./menus";
-import { LIST_WIDTHS, listShareOf, listWidths } from "./listWidth";
+import { DIVIDER_SNAP, dividerAt, LIST_WIDTHS, listShareOf, listWidths } from "./listWidth";
 import { type LinkQuery, linkQuery, noteOfLink, noteSuggestions, noteTags, type VaultNote, vaultProjects, withNoteLink } from "./notes";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, type Header, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
@@ -51,7 +51,8 @@ import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
 import { revealedGrouping, withFoldToggled, withGrouping } from "./projects";
-import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
+import { keyId, placeId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
+import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
 import { type Operation, TaskRules } from "./TaskRules";
 import { TaskReminders } from "./TaskReminders";
@@ -657,6 +658,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	repeatDraft: (day, rule) => repeatDraft(day, rule ?? null),
 	samePlacement,
 	keyId,
+	placeId,
 	sameLine,
 	samePlace,
 	sameTaskTree,
@@ -716,13 +718,14 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	grownStart,
 	listWidths,
 	listShareOf,
+	dividerAt,
 	repeatValue,
 	onTheDay,
 	canPick,
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS };
+const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {

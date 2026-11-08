@@ -81,9 +81,9 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
 		this.registerObsidianProtocolHandler(SYNC_ACTION, () => services.syncForApp());
 		this.register(() => services.stopSyncForApp());
-		this.addSettingTab(
-			new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars, updatesLinks: () => (this.app.vault as unknown as { getConfig(key: string): unknown }).getConfig("alwaysUpdateLinks") !== false }),
-		);
+		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars, updatesLinks: () => (this.app.vault as unknown as { getConfig(key: string): unknown }).getConfig("alwaysUpdateLinks") !== false });
+		this.addSettingTab(settingsTab);
+		this.register(() => settingsTab.closePage());
 		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), runScript: runAppleScript });
 		return {
 			tasks: services.tasks,

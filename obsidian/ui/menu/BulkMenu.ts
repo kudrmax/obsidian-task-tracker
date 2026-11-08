@@ -1,4 +1,4 @@
-import type { GroupName, MenuStatusId, TaskItem, TaskMenuModel } from "../../../core/application/contracts";
+import type { GroupName, MenuEditId, MenuStatusId, TaskItem, TaskMenuModel } from "../../../core/application/contracts";
 import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
@@ -6,12 +6,12 @@ import { Panel, Picks } from "../kit/Panel";
 import { fillCard } from "../TaskCard";
 import { pickMark } from "../TaskSelection";
 import type { LocalDate } from "../types";
-import { askGroup, menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup, tileRows } from "./MenuPanel";
+import { askGroup, menuGroup, menuRow, type MenuRowSpec, type MenuTileSpec, menuRoom, placePanel, tileGroup, tileRows } from "./MenuPanel";
 import { datePage } from "./DatePage";
 import { projectChooser, sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
 import { moveTiles } from "./quickMoves";
-import { type Asking, askLooks, labelTiles, priorityTiles, projectRow, statusTiles } from "./TaskMenu";
+import { type Asking, askLooks, labelTiles, priorityTiles, statusTiles } from "./TaskMenu";
 
 /** "3 tasks". */
 export function countLabel(count: number): string {
@@ -126,11 +126,11 @@ export class BulkMenu {
 		if (labels.length > 0) tileGroup(panel, "is-labels", tileRows(labels));
 		const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({ label, icon, onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)) }));
 		if (moves.length > 0) tileGroup(panel, "is-move", [moves]);
-		const project = projectRow(model);
-		menuGroup(panel, [
-			...(model.edits.includes("section") ? [{ label: "Section", icon: "section", onPick: () => this.showSections() } as const] : []),
-			{ ...project, onPick: () => this.showProjects() },
-		]);
+		const rows: Partial<Record<MenuEditId, MenuRowSpec>> = {
+			section: { label: "Section", icon: "section", onPick: () => this.showSections() },
+			project: { label: "Project", value: model.project.value, icon: "project", disabled: model.project.disabled, onPick: () => this.showProjects() },
+		};
+		menuGroup(panel, model.edits.flatMap((id) => rows[id] ?? []));
 		const remove = model.remove;
 		if (this.asking === "delete") this.askGroup(panel, "delete");
 		else if (remove) menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });

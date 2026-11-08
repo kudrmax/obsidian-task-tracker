@@ -27,3 +27,24 @@ export function listWidths(share: number, viewWidth: number, dividerWidth: numbe
 export function listShareOf(width: number, viewWidth: number, dividerWidth: number): number {
 	return width / (viewWidth - dividerWidth);
 }
+
+/** How a drag of the divider holds to the middle: brought within `distance` of it slower than `slowSpeed` (px or points per ms). */
+export const DIVIDER_SNAP = { distance: 8, slowSpeed: 0.08 } as const;
+
+/** Where a dragged divider stands: the width the list is drawn at, and whether it holds to the middle there. */
+export interface DividerStop {
+	readonly width: number;
+	readonly snapped: boolean;
+}
+
+/**
+ * The divider dragged to make the list `wanted` wide, the finger moving at `speed` (px or points per ms): brought slowly
+ * near the middle, it holds to it (`center`, when the bounds reach it); else it stands where the finger asks, whole, within
+ * `min` and `max`. A frontend gives a tap of haptics when `snapped` turns on.
+ */
+export function dividerAt(wanted: number, widths: ListWidths, speed: number): DividerStop {
+	const reachable = widths.center >= widths.min && widths.center <= widths.max;
+	const snapped = reachable && speed < DIVIDER_SNAP.slowSpeed && Math.abs(wanted - widths.center) <= DIVIDER_SNAP.distance;
+	const width = snapped ? widths.center : Math.round(wanted);
+	return { width: Math.min(widths.max, Math.max(widths.min, width)), snapped };
+}

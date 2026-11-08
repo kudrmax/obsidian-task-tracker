@@ -43,7 +43,9 @@ export type { ResizeEdge, StretchSpan } from "./TimelineSpans";
 /** Whether two placements are the same place: the same kind, and for a date the same day. */
 export { samePlacement } from "../domain/operations";
 /** How the UI tells tasks apart by their keys: the same place, the same line, one task with its subtasks, an id. */
-export { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
+export { keyId, placeId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
+/** The most colours a card is painted in (`TaskItem.colors` never has more). */
+export { MOST_CARD_COLORS } from "./marks";
 /** Where a card may go among cards with levels, and what a gap among them means: the nesting rules of the file. */
 export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace, type Header, type LevelCard, type ListCard, type ListPlace } from "./nesting";
 /** What a drop in a gap means, and none when it changes nothing; which section a gap is in; where a lifted section goes. */
@@ -84,7 +86,7 @@ export { CARD_GAPS, CARD_HEIGHTS, DEFAULT_CARD_SIZE } from "../settings";
 /** A date as the quick entry's place button and the sources window write it: `5 Nov`. */
 export { dayMonth } from "./dayLabels";
 /** The list column's width beside the calendar: drawn, its bounds, its middle, and the share a divider let go saves. */
-export { LIST_WIDTHS, listShareOf, type ListWidths, listWidths } from "./listWidth";
+export { DIVIDER_SNAP, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths } from "./listWidth";
 export type { Clock } from "./ports";
 
 /** A priority level, its colours in the order the settings offer them. */
@@ -174,6 +176,10 @@ export interface ProjectNote {
 
 export interface TaskItem {
 	readonly key: TaskKey;
+	/** `keyId(key)`: names the task as read, its line included; what a frontend keys a task's card or row by. */
+	readonly id: string;
+	/** `placeId(key)`: names its place in the file whatever its line; two reads of one task, its line changed, share it. */
+	readonly place: string;
 	readonly text: string;
 	/** `text` with each link's word in its place: for where a link can't be shown, such as a question about the task. */
 	readonly title: string;
@@ -194,7 +200,7 @@ export interface TaskItem {
 	readonly priority: PriorityLevel | null;
 	/** The labels the task is tagged with, in the settings' order; none while it has a priority, which wins on a line with both. */
 	readonly labels: readonly LabelLevel[];
-	/** The colours its card is drawn in: its priority's alone, else each label's in the settings' order; the first tints it. None without either. */
+	/** The colours its card is drawn in: its priority's alone, else its labels' in the settings' order, at most `MOST_CARD_COLORS`; the first tints it. None without either. */
 	readonly colors: readonly PriorityColor[];
 	/** The section of its list it sits in; null outside any. */
 	readonly group: GroupName;
@@ -465,8 +471,8 @@ export interface MenuReminder {
 	readonly checked: boolean;
 }
 
-/** A row of the edit group. */
-export type MenuEditId = "rename" | "reminder" | "description" | "repeat" | "section" | "subtask";
+/** A row of the edit group. Project is in every menu, one task's and the bulk menu's, right after Section or where it would stand. */
+export type MenuEditId = "rename" | "reminder" | "description" | "repeat" | "section" | "project" | "subtask";
 /** A task menu's groups: the statuses, the priorities, the labels, the moves, the edit rows, Open full screen and Open in Obsidian, Delete. */
 export type MenuGroupId = "statuses" | "levels" | "labels" | "moves" | "edits" | "opens" | "remove";
 
@@ -490,6 +496,8 @@ export interface MenuProject {
 	readonly options: readonly MenuProjectOption[];
 	/** No project, last: checked when no task has one. */
 	readonly none: boolean;
+	/** No project's own row: «No project». */
+	readonly noneName: string;
 	/** What the row shows beside «Project»: the shared project's name, «No project» when none has one, nothing when they differ. */
 	readonly value: string;
 	/** The row can't be pressed: only subtasks, whose project is their parent's. */
@@ -531,7 +539,8 @@ export interface TaskMenuModel {
 	readonly project: MenuProject;
 	/**
 	 * One task's: Rename; Reminder (a task on a time); Add description (one without any); Repeat (one that may repeat);
-	 * Section (with `sections`); Add subtask, except for a subtask of a timeline card's stack. The bulk menu's: Section alone.
+	 * Section (with `sections`); Project, always; Add subtask, except for a subtask of a timeline card's stack. The bulk
+	 * menu's: Section (with `sections`), then Project.
 	 */
 	readonly edits: readonly MenuEditId[];
 	/** The Reminder page's rows, Off last; none without the Reminder row. */
@@ -1234,6 +1243,8 @@ export interface SettingsForm {
 	readonly dayStartHours: readonly number[];
 	/** A client id is filled in, so Log in can open Google; without one the account asks for it first. */
 	readonly googleClientReady: boolean;
+	/** Google is logged in (in Obsidian: the settings keep its token), so the plugin fetches its calendars. */
+	readonly googleLoggedIn: boolean;
 }
 
 /** A field the service fills with a secret and takes typed text from: the UI never asks for the secret. */

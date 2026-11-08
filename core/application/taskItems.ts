@@ -11,6 +11,7 @@ import { canRemind, isOpen, type LocalDate } from "../domain/Task";
 import type { TaskEntry } from "../domain/TaskDocument";
 import { plainText } from "../domain/TaskText";
 import { markColors } from "./marks";
+import { keyId, placeId } from "./taskKeys";
 import type { ProjectRef, SubtaskProgress, TaskItem, TaskKey } from "./contracts";
 
 /** Of the task's own subtasks, the done ones out of all but those given up. */
@@ -51,8 +52,11 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 	const labels = levels.labelsOf(marks.labels);
 	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary));
 	const description = descriptionMarkdown(entry);
+	const key = keyOf(entry);
 	return {
-		key: keyOf(entry),
+		key,
+		id: keyId(key),
+		place: placeId(key),
 		text: entry.task.text,
 		title: plainText(entry.task.text),
 		status: entry.task.status,

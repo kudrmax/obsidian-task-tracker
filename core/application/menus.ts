@@ -113,7 +113,7 @@ function menuStatuses(items: readonly TaskItem[], of: MenuOf): readonly MenuStat
 
 function menuEdits(items: readonly TaskItem[], of: MenuOf, sections: MenuSections | null): readonly MenuEditId[] {
 	const section: MenuEditId[] = sections ? ["section"] : [];
-	if (of.kind === "bulk") return section;
+	if (of.kind === "bulk") return [...section, "project"];
 	const item = items[0];
 	const edits: [MenuEditId, boolean][] = [
 		["rename", true],
@@ -121,6 +121,7 @@ function menuEdits(items: readonly TaskItem[], of: MenuOf, sections: MenuSection
 		["description", item.can.addDescription],
 		["repeat", item.repeatable],
 		["section", sections !== null],
+		["project", true],
 		["subtask", of.from !== "stack"],
 	];
 	return edits.flatMap(([id, offered]) => (offered ? [id] : []));
@@ -150,6 +151,7 @@ export function menuProject(items: readonly TaskItem[], known: readonly ProjectR
 		current: shared ? first : null,
 		options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
 		none,
+		noneName: NO_PROJECT,
 		disabled: items.every((item) => !item.can.setProject),
 	};
 }

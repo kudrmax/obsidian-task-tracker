@@ -296,7 +296,7 @@ struct CardLink: Equatable {
 
 /// A card of several labels, painted as the plugin paints it (`styles.css`, «A task with several labels»): narrow bands
 /// of their fills in turn across the card at a slant, or, with the settings' blend, one fill flowing into the next from
-/// left to right. The plugin paints up to four.
+/// left to right. The core gives at most `MOST_CARD_COLORS` colours.
 struct LabelFills: View {
     let fills: [Color]
     let blend: Bool
@@ -304,11 +304,10 @@ struct LabelFills: View {
     /// A band's width across (`--tc-label-stripe`) and the slant, as CSS turns a gradient (`--tc-label-stripe-angle`).
     static let stripe: CGFloat = 6
     static let angle: Angle = .degrees(120)
-    static let most = 4
 
     init?(_ paint: CardPaint, _ scheme: ColorScheme) {
         guard paint.colors.count > 1 else { return nil }
-        fills = paint.colors.prefix(Self.most).map { Color(hex: scheme == .dark ? $0.dark.fill : $0.light.fill) }
+        fills = paint.colors.map { Color(hex: scheme == .dark ? $0.dark.fill : $0.light.fill) }
         blend = paint.blend
     }
 

@@ -625,7 +625,7 @@ final class BoardModel {
 
     /// The menu and the picks stay for the next label: the picked tasks are picked again as the file now has them.
     func toggleLabel(_ items: [TaskItem], _ name: String) async {
-        if selecting { repicking = Set(items.map(Self.place)) }
+        if selecting { repicking = Set(items.map(\.place)) }
         await write("tasks.toggleLabel", [keys(items), .string(name)])
     }
 
@@ -633,13 +633,11 @@ final class BoardModel {
     /// tasks, found by their place in the file, are picked again in the drawing that shows them.
     @ObservationIgnored private var repicking: Set<String>?
 
-    private static func place(_ item: TaskItem) -> String { "\(item.key.section)/\(item.key.index)/\(item.key.path)" }
-
     private func repick(in read: BoardSnapshot) {
         guard let places = repicking else { return }
         repicking = nil
         guard selecting else { return }
-        picked = Set(read.lists.values.flatMap(\.cards).filter { places.contains(Self.place($0.item)) }.map(\.id))
+        picked = Set(read.lists.values.flatMap(\.cards).filter { places.contains($0.item.place) }.map(\.id))
     }
 
     func postpone(_ items: [TaskItem], to date: String) async {
@@ -825,6 +823,12 @@ final class BoardModel {
 
     @ObservationIgnored private var widths: [String: ListWidths] = [:]
 
+    /// Where the divider dragged towards `wanted` stands, the finger moving `speed` points per millisecond: brought slowly
+    /// near the middle it holds to it (`rules.dividerAt`).
+    func dividerAt(_ wanted: CGFloat, widths: ListWidths, speed: Double) -> DividerStop? {
+        try? board.dividerAt(Double(wanted), widths: widths, speed: speed)
+    }
+
     /// The share a divider let go at `width` saves (`rules.listShareOf`).
     func listShare(of width: CGFloat, viewWidth: CGFloat) -> Double? {
         ruleNow("rules.listShareOf", [.number(Double(width)), .number(Double(viewWidth)), .number(0)])
@@ -908,10 +912,12 @@ final class BoardModel {
         let board = board
         let arguments: [JSONValue] = [card.item.key.json, keys(picked)]
         Task {
-            guard let kept: [TaskKey] = try? await Task.detached(operation: { try board.read("tasks.carried", arguments, over: try board.files()) }).value,
+            guard let kept: [String] = try? await Task.detached(operation: {
+                try board.read("tasks.carried", arguments, over: try board.files(), as: [TaskKey].self).map { try board.placeId($0) }
+            }).value,
                   carry?.id == card.id else { return }
-            // The core names the ones that go along with the lifted one, which leads.
-            let going = kept.compactMap { key in all.first { $0.item.key.section == key.section && $0.item.key.index == key.index && $0.item.key.path == key.path } }
+            // The core names the ones that go along with the lifted one, which leads, by their places in the file.
+            let going = kept.compactMap { place in all.first { $0.item.place == place } }
             carry?.group = [(item: card.item, from: column)] + going
         }
     }
@@ -1486,11 +1492,12 @@ final class BoardModel {
         return lead
     }
 
-    /// The start of a task's description: its first lines as they read (links by their words, no markup), a tap opening
-    /// the task on the whole screen; under it each link of it, a tap opening the link.
+    /// The start of a task's description, as the plugin's peek: its lines as they read (links by their words, no
+    /// markup), the menu cutting it at its own height, a tap opening the task on the whole screen; under it each link of
+    /// it, a tap opening the link.
     private func descriptionPeek(_ item: TaskItem) -> [MenuNode]? {
         guard let description = item.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty else { return nil }
-        let start = description.split(separator: "\n", omittingEmptySubsequences: true).prefix(Self.peekLines).joined(separator: "\n")
+        let start = description.split(separator: "\n", omittingEmptySubsequences: true).joined(separator: "\n")
         let parts = ruleNow("rules.textParts", [.string(start)]) ?? [TextPart(text: start)]
         let shown = parts.map { $0.isLink ? $0.shown : Self.readable($0.text ?? "") }.joined()
         var rows: [MenuNode] = [.action(title: shown, symbol: "text.alignleft", opens: true) { [weak self] in self?.fullScreen.append(item) }]
@@ -1501,8 +1508,6 @@ final class BoardModel {
         }
         return rows
     }
-
-    private static let peekLines = 3
 
     /// Markdown's inline marks read as text, as Obsidian draws them: `**intro**` reads «intro».
     private static func readable(_ markdown: String) -> String {

@@ -57,6 +57,9 @@ const SECTION_LABELS: Readonly<Record<keyof SectionNames, string>> = {
 };
 
 export class TaskCalendarSettingsTab extends PluginSettingTab {
+	/** The page a row opened, while it shows: it goes with the settings, never outliving them. */
+	private page: SettingsPage | null = null;
+
 	constructor(
 		app: App,
 		plugin: Plugin,
@@ -97,7 +100,30 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setDesc(desc)
 			.addExtraButton((b) => b.setIcon("chevron-right"));
 		row.settingEl.addClass("tc-settings-link", "mod-navigable");
-		row.settingEl.addEventListener("click", () => new SettingsPage(this.app, name, build, () => this.display()).open());
+		row.settingEl.addEventListener("click", () => this.openPage(name, build));
+	}
+
+	private openPage(name: string, build: (page: HTMLElement, redraw: () => void) => void): void {
+		this.closePage();
+		const page = new SettingsPage(this.app, name, build, () => {
+			if (this.page === page) this.page = null;
+			this.display();
+		});
+		this.page = page;
+		page.open();
+	}
+
+	/** The settings closed: the page shown over them closes too. */
+	override hide(): void {
+		this.closePage();
+		super.hide();
+	}
+
+	/** Closes the page shown, if any: with the settings, and when the plugin unloads. */
+	closePage(): void {
+		const page = this.page;
+		this.page = null;
+		page?.close();
 	}
 
 	private tasksFilePage(el: HTMLElement): void {

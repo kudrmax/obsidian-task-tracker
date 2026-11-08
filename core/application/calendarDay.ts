@@ -7,11 +7,14 @@ import { type CalendarKey, keyText } from "./calendarChoice";
 import type { CalendarFile } from "./calendarFile";
 import type { CalendarEvent, CalendarSource, DayEvents, ShownCalendar, SourceKind, SourceProblem, SourceStatus } from "./contracts";
 import { ShownCalendars } from "./shownCalendars";
+import { googleLoggedIn } from "./googleLogin";
 
 /** Google is fetched by the plugin; the work calendar is a file the iPhone exports. */
 const KINDS: Readonly<Record<CalendarSource, SourceKind>> = { google: "synced", iphone: "exported", work: "exported" };
 
 const MINUTE_MS = 60_000;
+
+const LOGGED_OUT: SourceProblem = { kind: "loggedOut" };
 
 /** The calendars' files as last read, and why a source has nothing fresh: what a day's events are read from. */
 export interface CalendarReading {
@@ -90,7 +93,7 @@ export class CalendarDay {
 	}
 
 	private status(source: CalendarSource, shown: number): SourceStatus {
-		const problem = this.reading.problem(source);
+		const problem = this.problem(source);
 		const file = this.reading.files.get(source);
 		const updatedAt = file?.exportedAt ?? null;
 		const facts = {
@@ -103,6 +106,12 @@ export class CalendarDay {
 			detail: this.reading.fed(source) ? null : (file?.device ?? null),
 		};
 		return { ...facts, events: shown, stale: problem !== null || this.isOld(updatedAt), words: sourceWords(facts) };
+	}
+
+	/** Google logged out says so, whatever its file: there is none to fetch, or what is left of an old login. */
+	private problem(source: CalendarSource): SourceProblem | null {
+		if (source === "google" && !googleLoggedIn(this.settings)) return LOGGED_OUT;
+		return this.reading.problem(source);
 	}
 
 	/** How the calendar date of `at` stands to the clock's: a moment's today and yesterday are calendar days, not the plugin's day. */

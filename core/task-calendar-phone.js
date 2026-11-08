@@ -363,19 +363,25 @@
       if (!wantsFrom && from !== null) return "from belongs to a schedule with every above 1 only";
       return null;
     }
-    static parse(text) {
+    /**
+     * The rule a line's field writes. A schedule of every few units written without `from` (by hand: `every 2 months on
+     * the 5th`) counts from `anchor`, the task's own day, as though written with it; without an anchor it is no rule.
+     */
+    static parse(text, anchor = null) {
       const m = RULE_RE.exec(text.trim());
       if (!m) return null;
-      const [, count, unit, plural, whenDone, on, from] = m;
+      const [, count, unit, plural, whenDone, on, written] = m;
       const every = count === void 0 ? 1 : Number(count);
       if (every < 1 || count !== void 0 && every === 1) return null;
-      if (from !== void 0 && (every === 1 || !isValidLocalDate(from))) return null;
+      if (written !== void 0 && (every === 1 || !isValidLocalDate(written))) return null;
       if (plural !== void 0 !== every > 1) return null;
-      const rule = { every, unit, days: [], dayOfMonth: null, from: from ?? null };
       if (whenDone !== void 0) {
-        return from === void 0 ? new _Repeat({ ...rule, kind: "afterDone" }) : null;
+        const rule2 = { every, unit, days: [], dayOfMonth: null, from: null };
+        return written === void 0 ? new _Repeat({ ...rule2, kind: "afterDone" }) : null;
       }
-      if (every > 1 && from === void 0) return null;
+      const from = written ?? (every > 1 ? anchor : null);
+      if (every > 1 && from === null) return null;
+      const rule = { every, unit, days: [], dayOfMonth: null, from };
       if (unit === "day") return on === void 0 ? new _Repeat({ ...rule, kind: "schedule" }) : null;
       if (on === void 0) return null;
       if (unit === "week") {
@@ -519,6 +525,7 @@
   }
 
   // core/domain/TaskLine.ts
+  var ANY_DAY = "2000-01-01";
   var LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
   var DATE = "(\\d{4}-\\d{2}-\\d{2})";
   var TIME = "(\\d{2}:\\d{2})";
@@ -551,7 +558,19 @@
       this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.repeat)}\\s+(.+?)$`) : null;
       this.collapsedRe = markers.collapsed ? new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.collapsed)}$`) : null;
     }
+    /**
+     * The fields at the end of a line's body. A rule of every few units written without `from` counts from the line's own
+     * day, its due date or its slot's, whichever stands on it; a line with neither keeps it as text.
+     */
     slice(body) {
+      const { unanchored, ...read } = this.fields(body, true);
+      if (!unanchored || read.repeat === null) return read;
+      const day = read.dueDate ?? read.slot?.date ?? null;
+      return day === null ? this.fields(body, false) : { ...read, repeat: read.repeat.anchoredAt(day) };
+    }
+    /** The fields; `lenient`, a rule without its `from` is read anchored anywhere, and said to be (`unanchored`). */
+    fields(body, lenient) {
+      let unanchored = false;
       let text = body;
       let dueDate = null;
       let slot = null;
@@ -583,15 +602,17 @@
         }
         const repeatMatch = repeat === null ? this.repeatRe?.exec(text) ?? null : null;
         if (repeatMatch) {
-          const parsed = Repeat.parse(repeatMatch[1]);
+          const strict = Repeat.parse(repeatMatch[1]);
+          const parsed = strict ?? (lenient ? Repeat.parse(repeatMatch[1], ANY_DAY) : null);
           if (!parsed) break;
+          unanchored = strict === null;
           repeat = parsed;
           text = text.slice(0, repeatMatch.index);
           continue;
         }
         break;
       }
-      return { text: text.trim(), dueDate, slot, reminder, repeat, collapsed };
+      return { text: text.trim(), dueDate, slot, reminder, repeat, collapsed, unanchored };
     }
     slotOf(m) {
       const date = m[2];
@@ -2421,9 +2442,15 @@ ${key.title}`.toLowerCase();
     }
   };
 
+  // core/application/googleLogin.ts
+  function googleLoggedIn(settings) {
+    return settings.google.refreshToken !== "";
+  }
+
   // core/application/calendarDay.ts
   var KINDS2 = { google: "synced", iphone: "exported", work: "exported" };
   var MINUTE_MS4 = 6e4;
+  var LOGGED_OUT = { kind: "loggedOut" };
   var CalendarDay = class {
     constructor(reading, settings, now) {
       this.reading = reading;
@@ -2475,7 +2502,7 @@ ${key.title}`.toLowerCase();
       return new ShownCalendars(this.reading.files, this.settings, this.now);
     }
     status(source, shown) {
-      const problem = this.reading.problem(source);
+      const problem = this.problem(source);
       const file = this.reading.files.get(source);
       const updatedAt = file?.exportedAt ?? null;
       const facts = {
@@ -2488,6 +2515,11 @@ ${key.title}`.toLowerCase();
         detail: this.reading.fed(source) ? null : file?.device ?? null
       };
       return { ...facts, events: shown, stale: problem !== null || this.isOld(updatedAt), words: sourceWords(facts) };
+    }
+    /** Google logged out says so, whatever its file: there is none to fetch, or what is left of an old login. */
+    problem(source) {
+      if (source === "google" && !googleLoggedIn(this.settings)) return LOGGED_OUT;
+      return this.reading.problem(source);
     }
     /** How the calendar date of `at` stands to the clock's: a moment's today and yesterday are calendar days, not the plugin's day. */
     relationOf(at) {
@@ -2748,6 +2780,9 @@ ${key.title}`.toLowerCase();
   function samePlace2(a, b) {
     return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
   }
+  function placeId(key) {
+    return `${key.section}:${key.index}:${key.path.join(".")}`;
+  }
   function sameLine(a, b) {
     return a.raw === b.raw;
   }
@@ -2759,6 +2794,27 @@ ${key.title}`.toLowerCase();
   }
   function isUnder(a, b) {
     return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
+  }
+
+  // core/application/marks.ts
+  var MOST_CARD_COLORS = 4;
+  function markColors(priority, labels) {
+    return priority ? [priority.color] : labels.slice(0, MOST_CARD_COLORS).map((label) => label.color);
+  }
+  function draftMarksOf(marks, levels, labels) {
+    const choices = markChoices(marks);
+    const priority = levels.find((l) => l.prefix === marks.priority) ?? null;
+    const chosen = labels.filter((l) => marks.labels.includes(l.name));
+    return {
+      priority,
+      labels: chosen,
+      can: { setPriority: choices.priority, setLabels: choices.labels },
+      tint: markColors(priority, chosen)[0] ?? null,
+      tiles: {
+        levels: levels.map((mark) => ({ mark, on: mark.prefix === priority?.prefix, enabled: choices.priority })),
+        labels: labels.map((mark) => ({ mark, on: chosen.includes(mark), enabled: choices.labels }))
+      }
+    };
   }
 
   // core/application/nesting.ts
@@ -3521,6 +3577,13 @@ ${key.title}`.toLowerCase();
   function listShareOf(width, viewWidth, dividerWidth) {
     return width / (viewWidth - dividerWidth);
   }
+  var DIVIDER_SNAP = { distance: 8, slowSpeed: 0.08 };
+  function dividerAt(wanted, widths, speed) {
+    const reachable = widths.center >= widths.min && widths.center <= widths.max;
+    const snapped = reachable && speed < DIVIDER_SNAP.slowSpeed && Math.abs(wanted - widths.center) <= DIVIDER_SNAP.distance;
+    const width = snapped ? widths.center : Math.round(wanted);
+    return { width: Math.min(widths.max, Math.max(widths.min, width)), snapped };
+  }
 
   // core/application/listDrop.ts
   function levelAt(x, list, indent) {
@@ -3846,7 +3909,7 @@ ${key.title}`.toLowerCase();
   }
   function menuEdits(items, of, sections) {
     const section = sections ? ["section"] : [];
-    if (of.kind === "bulk") return section;
+    if (of.kind === "bulk") return [...section, "project"];
     const item = items[0];
     const edits = [
       ["rename", true],
@@ -3854,6 +3917,7 @@ ${key.title}`.toLowerCase();
       ["description", item.can.addDescription],
       ["repeat", item.repeatable],
       ["section", sections !== null],
+      ["project", true],
       ["subtask", of.from !== "stack"]
     ];
     return edits.flatMap(([id, offered]) => offered ? [id] : []);
@@ -3877,6 +3941,7 @@ ${key.title}`.toLowerCase();
       current: shared ? first : null,
       options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
       none,
+      noneName: NO_PROJECT,
       disabled: items.every((item) => !item.can.setProject)
     };
   }
@@ -4112,7 +4177,8 @@ ${key.title}`.toLowerCase();
         refreshSeconds: s.google.refreshSeconds,
         workCalendarFile: s.workCalendarFile,
         dayStartHours: DAY_START_HOURS,
-        googleClientReady: s.google.clientId !== ""
+        googleClientReady: s.google.clientId !== "",
+        googleLoggedIn: googleLoggedIn(s)
       };
     }
     setTasksFile(tasksFile) {
@@ -4399,26 +4465,6 @@ ${key.title}`.toLowerCase();
     return matchParts(ELLIPSIS + text.slice(cut), shifted);
   }
 
-  // core/application/marks.ts
-  function markColors(priority, labels) {
-    return priority ? [priority.color] : labels.map((label) => label.color);
-  }
-  function draftMarksOf(marks, levels, labels) {
-    const choices = markChoices(marks);
-    const priority = levels.find((l) => l.prefix === marks.priority) ?? null;
-    const chosen = labels.filter((l) => marks.labels.includes(l.name));
-    return {
-      priority,
-      labels: chosen,
-      can: { setPriority: choices.priority, setLabels: choices.labels },
-      tint: markColors(priority, chosen)[0] ?? null,
-      tiles: {
-        levels: levels.map((mark) => ({ mark, on: mark.prefix === priority?.prefix, enabled: choices.priority })),
-        labels: labels.map((mark) => ({ mark, on: chosen.includes(mark), enabled: choices.labels }))
-      }
-    };
-  }
-
   // core/application/taskItems.ts
   function progressOf(entry) {
     if (entry.subtasks.length === 0) return null;
@@ -4443,8 +4489,11 @@ ${key.title}`.toLowerCase();
     const labels = levels.labelsOf(marks.labels);
     const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary));
     const description = descriptionMarkdown(entry);
+    const key = keyOf(entry);
     return {
-      key: keyOf(entry),
+      key,
+      id: keyId(key),
+      place: placeId(key),
       text: entry.task.text,
       title: plainText(entry.task.text),
       status: entry.task.status,
@@ -6243,6 +6292,7 @@ ${key.title}`.toLowerCase();
     repeatDraft: (day, rule) => repeatDraft(day, rule ?? null),
     samePlacement,
     keyId,
+    placeId,
     sameLine,
     samePlace: samePlace2,
     sameTaskTree,
@@ -6302,11 +6352,12 @@ ${key.title}`.toLowerCase();
     grownStart,
     listWidths,
     listShareOf,
+    dividerAt,
     repeatValue,
     onTheDay,
     canPick
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };

@@ -280,6 +280,9 @@ struct Ribbon: View {
     @State private var toToday: CGFloat = 0
     @AppStorage("listShare") private var listShare: Double = 0.5
     @State private var dragStart: CGFloat?
+    /// The divider holds to the middle now; each time it comes to hold, `snaps` counts one, and a tap is felt.
+    @State private var dividerSnapped = false
+    @State private var snaps = 0
     @State private var phase = ScrollPhase.idle
     /// The place the ribbon last came to rest on.
     @State private var rested: RibbonPlace?
@@ -413,13 +416,19 @@ struct Ribbon: View {
                     .onChanged { drag in
                         let start = dragStart ?? listWidth(width)
                         if dragStart == nil { dragStart = start }
-                        guard let bounds = model.listWidths(share: listShare, viewWidth: width) else { return }
-                        let dragged = min(CGFloat(bounds.max), max(CGFloat(bounds.min), start + drag.translation.width))
-                        listShare = model.listShare(of: dragged, viewWidth: width) ?? listShare
+                        guard let bounds = model.listWidths(share: listShare, viewWidth: width),
+                              let stop = model.dividerAt(start + drag.translation.width, widths: bounds, speed: Double(abs(drag.velocity.width)) / 1000) else { return }
+                        if stop.snapped, !dividerSnapped { snaps += 1 }
+                        dividerSnapped = stop.snapped
+                        listShare = model.listShare(of: CGFloat(stop.width), viewWidth: width) ?? listShare
                     }
-                    .onEnded { _ in dragStart = nil }
+                    .onEnded { _ in
+                        dragStart = nil
+                        dividerSnapped = false
+                    }
             )
             .sensoryFeedback(.selection, trigger: dragStart == nil)
+            .sensoryFeedback(.impact(weight: .light), trigger: snaps)
             .accessibilityLabel("Divider")
             .accessibilityHint("Drag to make the list wider or narrower")
     }

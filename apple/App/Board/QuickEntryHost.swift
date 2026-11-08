@@ -207,10 +207,8 @@ final class QuickEntryHost {
         let caret = field.selectedTextRange.map { field.offset(from: field.beginningOfDocument, to: $0.start) } ?? (text as NSString).length
         let query = isOpen ? (try? board.linkQuery(in: text, caret: caret)) ?? nil : nil
         linking = query
-        notes = query.map { (try? board.suggestNotes($0.query)) ?? [] }.map { Array($0.prefix(Self.notesShown)) } ?? []
+        notes = query.map { (try? board.suggestNotes($0.query)) ?? [] } ?? []
     }
-
-    private static let notesShown = 6
 
     /// A note picked: its link takes the `[[` typed, the caret after it, and typing goes on.
     func pickNote(_ note: NoteLink) {
@@ -871,8 +869,27 @@ struct PendingCapsule: View {
 struct NoteSuggestions: View {
     let host: QuickEntryHost
 
+    /// How tall the list grows over the bar before it scrolls: five rows and a half, so a sixth shows there are more.
+    private static let tallest: CGFloat = 5.5 * 51
+    /// The rows' own height, as they lay out: the list is as tall, up to `tallest`.
+    @State private var rowsHeight: CGFloat = 0
+
     var body: some View {
         if !host.notes.isEmpty {
+            ScrollView {
+                rows.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowsHeight = $0 }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(height: min(rowsHeight, Self.tallest))
+            .glassEffect(.regular, in: .rect(cornerRadius: 22))
+            .padding(.horizontal, Layout.margin)
+            .padding(.bottom, 8)
+            .transition(.opacity.combined(with: .move(edge: .bottom)))
+        }
+    }
+
+    /// Every note the core offers (`notes.suggest`), best first.
+    private var rows: some View {
             VStack(spacing: 0) {
                 ForEach(Array(host.notes.enumerated()), id: \.element.path) { index, note in
                     Button { host.pickNote(note) } label: {
@@ -894,11 +911,6 @@ struct NoteSuggestions: View {
                     if index < host.notes.count - 1 { Divider().padding(.leading, 44) }
                 }
             }
-            .glassEffect(.regular, in: .rect(cornerRadius: 22))
-            .padding(.horizontal, Layout.margin)
-            .padding(.bottom, 8)
-            .transition(.opacity.combined(with: .move(edge: .bottom)))
-        }
     }
 
     /// The folder a note lies in, as the suggestion's second line; none for a note at the vault's root.

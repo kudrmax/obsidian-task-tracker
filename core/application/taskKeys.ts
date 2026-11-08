@@ -5,6 +5,11 @@ export function samePlace(a: TaskKey, b: TaskKey): boolean {
 	return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
 }
 
+/** A string that names a place in the file: equal for keys `samePlace` calls the same, whatever their lines. */
+export function placeId(key: TaskKey): string {
+	return `${key.section}:${key.index}:${key.path.join(".")}`;
+}
+
 /** The same line as read, wherever it stands. */
 export function sameLine(a: TaskKey, b: TaskKey): boolean {
 	return a.raw === b.raw;

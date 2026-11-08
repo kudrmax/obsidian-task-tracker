@@ -1,5 +1,6 @@
 import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../core/application/contracts";
 import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
+import { keyId, placeId } from "../../core/application/taskKeys";
 import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
 import { snapMinute } from "../../core/application/snapGrid";
@@ -146,8 +147,11 @@ export class DemoTaskService implements TaskService {
 
 	private item(section: SectionKey, index: number): TaskItem {
 		const t = this.sections[section][index];
+		const key: TaskKey = { section, index, path: [], raw: this.raw(t) };
 		return {
-			key: { section, index, path: [], raw: this.raw(t) },
+			key,
+			id: keyId(key),
+			place: placeId(key),
 			text: t.text,
 			title: plainText(t.text),
 			status: t.status,

@@ -18,6 +18,11 @@ describe("the form's answers", () => {
 		expect(service({ google: { ...DEFAULT_SETTINGS.google, clientId: "id" } }).svc.form().googleClientReady).toBe(true);
 	});
 
+	it("says whether Google is logged in: the settings keep its token", () => {
+		expect(service().svc.form().googleLoggedIn).toBe(false);
+		expect(service({ google: { ...DEFAULT_SETTINGS.google, refreshToken: "token" } }).svc.form().googleLoggedIn).toBe(true);
+	});
+
 	it("reads a colour code typed and left: none for no colour or the one the level or label has", () => {
 		const shades = { red: "#FF453A", orange: "#FF9F0A", yellow: "#FFD60A", green: "#30D158", teal: "#40C8E0", blue: "#0A84FF" } as const;
 		const { svc } = service({ priorities: [{ prefix: "p1", color: "red" }], labels: [{ name: "A", color: "#123456" }] });

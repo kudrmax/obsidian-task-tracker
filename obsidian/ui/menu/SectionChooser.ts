@@ -29,9 +29,9 @@ export interface ProjectChooserSpec {
 
 /** The Project page: the way back, the projects the model offers by name, the one the tasks have checked, No project last. */
 export function projectChooser(panel: HTMLElement, spec: ProjectChooserSpec): void {
-	const { options, none } = spec.project;
+	const { options, none, noneName } = spec.project;
 	backRow(panel, "Project", () => spec.onBack());
 	const group = menuGroup(panel, []);
 	for (const { project, checked } of options) menuRow(group, { label: project.name, icon: checked ? "check" : undefined, choice: true, onPick: () => spec.onPick(project.link) });
-	menuRow(group, { label: "No project", icon: none ? "check" : undefined, choice: true, quiet: true, onPick: () => spec.onPick(null) });
+	menuRow(group, { label: noneName, icon: none ? "check" : undefined, choice: true, quiet: true, onPick: () => spec.onPick(null) });
 }

@@ -6,6 +6,9 @@ import { projectField, projectOfText } from "./Project";
 
 import { DEFAULT_REMINDER, STATUS_CHARS, type ReminderKind, type Slot, type Task, type TaskStatus } from "./Task";
 
+/** Any day: a rule without its `from` is read at it first, then anchored at the line's own. */
+const ANY_DAY = "2000-01-01";
+
 export interface Markers {
 	readonly dueDate: string;
 	/** Precedes a slot that rings as a notification; also the marker written when a kind has none of its own. */
@@ -74,7 +77,20 @@ class FieldSlicer {
 		this.collapsedRe = markers.collapsed ? new RegExp(`(?:^|\\s+)${escapeRegExp(markers.collapsed)}$`) : null;
 	}
 
+	/**
+	 * The fields at the end of a line's body. A rule of every few units written without `from` counts from the line's own
+	 * day, its due date or its slot's, whichever stands on it; a line with neither keeps it as text.
+	 */
 	slice(body: string): { text: string; dueDate: string | null; slot: Slot | null; reminder: ReminderKind; repeat: Repeat | null; collapsed: boolean } {
+		const { unanchored, ...read } = this.fields(body, true);
+		if (!unanchored || read.repeat === null) return read;
+		const day = read.dueDate ?? read.slot?.date ?? null;
+		return day === null ? this.fields(body, false) : { ...read, repeat: read.repeat.anchoredAt(day) };
+	}
+
+	/** The fields; `lenient`, a rule without its `from` is read anchored anywhere, and said to be (`unanchored`). */
+	private fields(body: string, lenient: boolean): { text: string; dueDate: string | null; slot: Slot | null; reminder: ReminderKind; repeat: Repeat | null; collapsed: boolean; unanchored: boolean } {
+		let unanchored = false;
 		let text = body;
 		let dueDate: string | null = null;
 		let slot: Slot | null = null;
@@ -106,15 +122,17 @@ class FieldSlicer {
 			}
 			const repeatMatch: RegExpExecArray | null = repeat === null ? (this.repeatRe?.exec(text) ?? null) : null;
 			if (repeatMatch) {
-				const parsed = Repeat.parse(repeatMatch[1]);
+				const strict: Repeat | null = Repeat.parse(repeatMatch[1]);
+				const parsed: Repeat | null = strict ?? (lenient ? Repeat.parse(repeatMatch[1], ANY_DAY) : null);
 				if (!parsed) break;
+				unanchored = strict === null;
 				repeat = parsed;
 				text = text.slice(0, repeatMatch.index);
 				continue;
 			}
 			break;
 		}
-		return { text: text.trim(), dueDate, slot, reminder, repeat, collapsed };
+		return { text: text.trim(), dueDate, slot, reminder, repeat, collapsed, unanchored };
 	}
 
 	private slotOf(m: RegExpExecArray): Slot | null {

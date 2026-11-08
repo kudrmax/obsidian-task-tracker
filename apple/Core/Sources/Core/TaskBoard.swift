@@ -251,6 +251,17 @@ public final class TaskBoard: @unchecked Sendable {
         try rule("rules.listWidths", [.number(share), .number(viewWidth), .number(dividerWidth)])
     }
 
+    /// The divider dragged to make the list `wanted` wide at `speed` points per millisecond (`rules.dividerAt`): brought
+    /// slowly near the middle it holds to it.
+    public func dividerAt(_ wanted: Double, widths: ListWidths, speed: Double) throws -> DividerStop {
+        try rule("rules.dividerAt", [.number(wanted), widths.json, .number(speed)])
+    }
+
+    /// The core's name of a key's place in the file (`rules.placeId`): what `TaskItem.place` says of a task read there.
+    public func placeId(_ key: TaskKey) throws -> String {
+        try rule("rules.placeId", [key.json])
+    }
+
     /// The repeat page's words.
     public func repeatWords() throws -> RepeatWords {
         try rule("rules.constants", as: JSONValue.self)["REPEAT_WORDS"].decode(RepeatWords.self)

@@ -113,7 +113,7 @@ struct TaskFullScreen: View {
         let shown = task
         model.entry.stackRead = { await readStack() }
         model.entry.renamed = { item in
-            if item.key.section == shown.key.section, item.key.index == shown.key.index, item.key.path == shown.key.path { current = item }
+            if item.place == shown.place { current = item }
         }
     }
 
