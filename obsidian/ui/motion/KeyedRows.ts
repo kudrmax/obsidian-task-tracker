@@ -37,6 +37,15 @@ export class KeyedRows {
 		return new RowsDrawing(this, moving);
 	}
 
+	/** The row of `key` goes from the page at once, not folding away: another row takes its place in the same frame. */
+	forget(key: string): void {
+		const row = this.rows.get(key);
+		if (!row) return;
+		row.listening.abort();
+		row.node.remove();
+		this.rows.delete(key);
+	}
+
 	/** The row of `key` as drawn now, if any. */
 	nodeOf(key: string): HTMLElement | null {
 		return this.rows.get(key)?.node ?? null;
@@ -117,6 +126,16 @@ export class RowsDrawing {
 		return taken;
 	}
 
+	/** The row of `key` goes at once, measured where it stood: the row it stood in for takes its place in this frame. */
+	forget(key: string): void {
+		this.rows.forget(key);
+	}
+
+	/** A new row that stands in for one of the same height in the same frame (a renamed card's field): it does not grow in. */
+	standIn(node: HTMLElement): void {
+		this.fresh.delete(node);
+	}
+
 	/**
 	 * The rows stand in the page in the order taken; the new ones grow in, the moved ones slide, the rest leave. The new
 	 * ones start growing first, from nothing: a moved row slides to where it stands with them at that height, and their
@@ -134,7 +153,8 @@ export class RowsDrawing {
 		for (const node of this.order) {
 			if (this.fresh.has(node)) continue;
 			const from = this.before.get(node);
-			if (from) Motion.slide(node, from);
+			/** A row that was not laid out (a renamed card, its field in its place) stands where it is at once. */
+			if (from && (from.width > 0 || from.height > 0)) Motion.slide(node, from);
 		}
 	}
 }

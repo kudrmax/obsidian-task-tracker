@@ -140,6 +140,9 @@ export class TaskList {
 	 * the first new cards drawn now take over their rows (`heirs`), so a written text stays the same card on the screen.
 	 */
 	private typedDrawn = 0;
+	/** A card was renamed in place last time, and is now: its field's row comes and goes with the card's in the same frame. */
+	private renamedDrawn = false;
+	private renamingNow = false;
 	private written = 0;
 	private heirs: string[] = [];
 	/** The day of the last drawing: another day is drawn at once, never moved into. */
@@ -191,6 +194,9 @@ export class TaskList {
 		const moves = moving && this.drawnDay === day;
 		if (moves) this.hold.keep();
 		const drawing = this.keyed.begin(moves);
+		if (this.renamedDrawn && renaming === null) drawing.forget(ENTRY);
+		this.renamedDrawn = renaming !== null;
+		this.renamingNow = renaming !== null;
 		this.drawnDay = day;
 		const typed = entry?.pending.length ?? 0;
 		this.written = Math.max(0, this.typedDrawn - typed);
@@ -290,6 +296,7 @@ export class TaskList {
 		});
 		if (entry.newSection) this.namedHeader(drawing, entry.newSection);
 		const row = drawing.take(ENTRY, () => el(null, "div", QUICK_ROW)).node;
+		if (this.renamingNow) drawing.standIn(row);
 		for (const old of row.querySelectorAll(":scope > .tc-branch, :scope > .tc-branch-pass")) old.remove();
 		entry.field(row);
 		row.classList.toggle("is-section", entry.section === true);
