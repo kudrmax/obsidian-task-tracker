@@ -18,7 +18,7 @@ final class AppServices: Sendable {
         vault = Vault(bookmarks: UserDefaultsBookmarks(), rule: rules)
         sync = ReminderSync(vault: vault, rules: rules, notifications: UserNotifications(), alarms: Alarms(), cards: Cards(), calendar: PhoneCalendarExport(rules: rules))
         tasks = TaskCapture(vault: vault, rules: rules)
-        board = TaskBoard(core: rules, vault: vault, pure: Self.rules())
+        board = TaskBoard(core: rules, vault: vault, pure: Self.rules(), grouping: UserDefaultsGrouping())
     }
 
     /// The lists a new task goes into, by their headings' names, in the order the screen offers them: the first is where Siri's goes.

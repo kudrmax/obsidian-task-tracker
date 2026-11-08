@@ -31,7 +31,9 @@ struct ListColumn: View {
         let column = list.column
         let drawn = rows
         VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
-            ColumnTitle(title: title, dayArrows: dayArrows, model: model)
+            ColumnTitle(title: title, dayArrows: dayArrows, grouping: list.canGroup ? list.grouped : nil, model: model) { on in
+                Task { await model.setGrouping(list.column, on: on) }
+            }
             ScrollViewReader { scroller in
                 ScrollView {
                     DayLane(model: model, width: width, slides: column == .day, shown: VStack(alignment: .leading, spacing: CardMetrics.gap) {
@@ -43,8 +45,13 @@ struct ListColumn: View {
                                     // As the plugin's header: room above it but at the list's top, its bottom on the first card.
                                     .padding(.top, row.id == drawn.first?.id ? 0 : ColumnMetrics.sectionGap)
                                     .padding(.bottom, -CardMetrics.gap)
+                            case .project(let head):
+                                ProjectHeader(head: head, model: model) { Task { await model.toggleFold(column, head) } }
+                                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, head: head.id, $0) }
+                                    .padding(.top, row.id == drawn.first?.id ? 0 : ColumnMetrics.sectionGap)
+                                    .padding(.bottom, -CardMetrics.gap)
                             case .plate(let group):
-                                EmptyPlate(hot: gap?.group == group.name && gap?.line == nil) { model.entry.openIn(column, group.name) }
+                                EmptyPlate(hot: gap.map { group.names($0.group, zone: $0.zone) && $0.line == nil } ?? false) { model.entry.openIn(column, group.name, zone: group.zone) }
                             case .card(let card):
                                 CardRow(card: card, column: column, model: model, question: $question)
                                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, card: card.id, $0) }
@@ -105,7 +112,9 @@ struct ListColumn: View {
         var rows: [ListRowView] = []
         if entry?.at.kind == "top" { rows += typed }
         let slot = model.carry?.section?.column == list.column ? model.sectionSlot : nil
+        let heads = Dictionary(grouping: list.heads, by: \.before)
         for (index, group) in list.groups.enumerated() {
+            rows += (heads[index] ?? []).map(ListRowView.project)
             if slot == index { rows.append(.mark(first: rows.isEmpty)) }
             // A lifted section folds away, header and tasks, and the list closes over it.
             if model.isLifted(group, in: list.column) { continue }
@@ -122,6 +131,7 @@ struct ListColumn: View {
                 if case .card(let card) = row { card.item.id != renaming } else { true }
             }
         }
+        rows += (heads[list.groups.count] ?? []).map(ListRowView.project)
         if let slot, slot >= list.groups.count { rows.append(.mark(first: rows.isEmpty)) }
         if entry?.at.kind == "end" { rows += typed }
         // The card carried keeps its row, a dashed place; its subtasks fold away under it.
@@ -142,7 +152,7 @@ struct ListColumn: View {
             let branch = level > 0 ? branches[safe: at] ?? nil : nil
             switch row {
             case .card(let card) where card.branch != branch:
-                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, paint: card.paint, corner: card.corner, id: card.id))
+                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, paint: card.paint, corner: card.corner, id: card.id, zone: card.zone, parts: card.parts))
             case .gap: return .gap(level: level, branch: branch)
             case .pending(let index, let text, _, _): return .pending(index: index, text: text, level: level, branch: branch)
             case .field(_, _, let section): return .field(level: level, branch: branch, section: section)
@@ -154,9 +164,9 @@ struct ListColumn: View {
     /// A group's cards as drawn, with the room a card let go flies into when it lands in this group.
     private func cardRows(of group: BoardGroup) -> [ListRowView] {
         var rows = group.cards.map(ListRowView.card)
-        guard let gap = settling, gap.group == group.name, !group.empty else { return rows }
+        guard let gap = settling, group.names(gap.group, zone: gap.zone), !group.empty else { return rows }
         let others = model.others(in: list.column)
-        let next = others[safe: gap.at].flatMap { $0.item.group == gap.group ? $0 : nil }
+        let next = others[safe: gap.at].flatMap { $0.stands(in: gap.group, zone: gap.zone) ? $0 : nil }
         let at = next.flatMap { card in rows.firstIndex { $0.id == card.id } } ?? rows.count
         rows.insert(.gap(level: gap.level, branch: nil), at: at)
         return rows
@@ -167,6 +177,8 @@ struct ListColumn: View {
 /// typed and not written yet, or the field it is typed in.
 private enum ListRowView: Identifiable {
     case header(BoardGroup, String)
+    /// A project group's header in a list grouped by project.
+    case project(BoardProjectHead)
     case plate(BoardGroup)
     case card(BoardCard)
     case gap(level: Int, branch: Branch?)
@@ -180,6 +192,7 @@ private enum ListRowView: Identifiable {
     var id: String {
         switch self {
         case .header(let group, _): "\u{0}head/\(group.id)"
+        case .project(let head): head.id
         case .plate(let group): "\u{0}plate/\(group.id)"
         case .card(let card): card.id
         case .gap: "\u{0}gap"
@@ -198,7 +211,7 @@ private enum ListRowView: Identifiable {
         switch self {
         case .card(let card): card.level
         case .gap(let level, _), .pending(_, _, let level, _), .field(let level, _, _): level
-        case .header, .plate, .mark: nil
+        case .header, .project, .plate, .mark: nil
         }
     }
 }
@@ -305,10 +318,14 @@ private struct DropLine: View {
 }
 
 /// A column's title, 20 points bold; the day list's has the arrows that turn the day, and a tap on it comes back to today.
+/// Backlog's and Soon's open a menu with Group by Project, checked while the list groups (`grouping`), as the plugin's.
 struct ColumnTitle: View {
     let title: String
     var dayArrows = false
+    /// The list may group by project: whether it does; nil for a list that never groups.
+    var grouping: Bool? = nil
     @Bindable var model: BoardModel
+    var setGrouping: (Bool) -> Void = { _ in }
 
     var body: some View {
         HStack(spacing: 4) {
@@ -319,6 +336,14 @@ struct ColumnTitle: View {
             if dayArrows {
                 Button { Task { await model.showToday() } } label: { titleText.frame(height: ColumnMetrics.titleRow).contentShape(.rect) }
                     .accessibilityHint("Back to today")
+            } else if let grouping {
+                Menu {
+                    Toggle("Group by Project", systemImage: "folder", isOn: Binding(get: { grouping }, set: { setGrouping($0) }))
+                } label: {
+                    titleText.frame(height: ColumnMetrics.titleRow).contentShape(.rect)
+                }
+                .tint(.primary)
+                .accessibilityAddTraits(.isHeader)
             } else {
                 titleText.accessibilityAddTraits(.isHeader)
             }
@@ -349,7 +374,8 @@ struct ColumnTitle: View {
     }
 }
 
-/// A section's heading in a list: its menu renames or removes it, as the core offers.
+/// A section's heading in a list: a tap opens its menu, which renames or removes it as the core offers (inside a
+/// project's group, only that project's tasks); a long press lifts it, as the plugin's.
 struct SectionHeader: View {
     let title: String
     let group: BoardGroup
@@ -360,6 +386,33 @@ struct SectionHeader: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        heading
+            .modifier(SectionLift(group: group, column: column, model: model))
+            .alert("Rename Section", isPresented: $renaming) {
+                TextField("Name", text: $name)
+                Button("Cancel", role: .cancel) {}
+                Button("Rename") { if let menu = group.menu { Task { await model.renameSection(column, menu, to: name) } } }
+            }
+    }
+
+    @ViewBuilder
+    private var heading: some View {
+        if let menu = group.menu, menu.rename || menu.remove {
+            Menu {
+                if menu.rename { Button("Rename", systemImage: "pencil") { name = menu.section; renaming = true } }
+                if menu.remove {
+                    Button("Remove Section", systemImage: "trash", role: .destructive) { Task { await model.removeSection(column, menu) } }
+                }
+            } label: {
+                label
+            }
+            .buttonStyle(.plain)
+        } else {
+            label
+        }
+    }
+
+    private var label: some View {
         Text(title)
             .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
             .frame(height: ColumnMetrics.groupLeading)
@@ -370,20 +423,59 @@ struct SectionHeader: View {
             .padding(.trailing, 4)
             .frame(height: ColumnMetrics.groupHead)
             .contentShape(.rect)
-            .modifier(SectionLift(group: group, column: column, model: model))
-            .contextMenu {
-                if let menu = group.menu {
-                    if menu.rename { Button("Rename", systemImage: "pencil") { name = menu.section; renaming = true } }
-                    if menu.remove {
-                        Button("Remove Section", systemImage: "trash", role: .destructive) { Task { await model.removeSection(column, menu.section) } }
-                    }
+    }
+}
+
+/// A project group's header in a list grouped by project, as the plugin draws it: a section's header with a chevron before
+/// the title, turned down while the group is open; the count of its open tasks while folded; the arrow that opens the
+/// project's note. A tap folds or unfolds the group, the arrow opens the note.
+struct ProjectHeader: View {
+    let head: BoardProjectHead
+    let model: BoardModel
+    let toggle: () -> Void
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .bold))
+                .rotationEffect(.degrees(head.folded ? 0 : 90))
+                .frame(width: 16, height: ColumnMetrics.groupLeading)
+                .padding(.leading, -6)
+            Text(head.title)
+                .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
+                .lineLimit(1)
+                .frame(height: ColumnMetrics.groupLeading)
+            if head.folded {
+                Text(verbatim: "\(head.count)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.muted)
+                    .frame(height: ColumnMetrics.groupLeading)
+                    .accessibilityLabel("\(head.count) tasks")
+            }
+            if head.canOpenNote, let project = head.project {
+                Button { model.openProject(project) } label: {
+                    Image(systemName: "arrow.up.forward.app")
+                        .font(.system(size: 12, weight: .medium))
+                        .frame(width: 28, height: ColumnMetrics.groupHead)
+                        .contentShape(.rect)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open \(head.title)")
             }
-            .alert("Rename Section", isPresented: $renaming) {
-                TextField("Name", text: $name)
-                Button("Cancel", role: .cancel) {}
-                Button("Rename") { if let section = group.menu?.section { Task { await model.renameSection(column, section, to: name) } } }
-            }
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(head.project == nil ? Palette.muted : Palette.pullInk(scheme))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .padding(.leading, CardMetrics.leading)
+        .padding(.trailing, 4)
+        .frame(height: ColumnMetrics.groupHead)
+        .contentShape(.rect)
+        .onTapGesture(perform: toggle)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(head.folded ? "Folded" : "Open")
     }
 }
 
@@ -415,7 +507,7 @@ private struct SectionFloat: View {
     let count: Int
     @Environment(\.colorScheme) private var scheme
     static let width: CGFloat = 190
-    static let height: CGFloat = CardMetrics.height + 2
+    static var height: CGFloat { CardMetrics.height + 2 }
     static let step = CGSize(width: 7, height: 6)
 
     var body: some View {
@@ -457,6 +549,48 @@ private struct SectionMark: View {
             .strokeBorder(Palette.dash(scheme), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             .frame(height: CardMetrics.height)
             .accessibilityHidden(true)
+    }
+}
+
+/// The Done column, left of Inbox, as the plugin's: done and dropped tasks in the file's order. Only the search opens it;
+/// a tap on a card opens its menu.
+struct DoneColumn: View {
+    @Bindable var model: BoardModel
+    @Binding var question: MenuQuestion?
+    @State private var title = "Done"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
+            ColumnTitle(title: title, model: model)
+            ScrollViewReader { scroller in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: CardMetrics.gap) {
+                        if model.doneCards.isEmpty { EmptyPlate() }
+                        ForEach(model.doneCards) { card in
+                            CardButton(
+                                card: card,
+                                menu: { later in model.cardMenu(card.item, ask: { question = $0 }, later: later) },
+                                ringed: model.found == card.id,
+                                draggable: false,
+                                onTouch: { model.found = nil },
+                                onLink: { model.openLink($0) },
+                                onProject: model.projectOpener(card.item))
+                                .frame(height: CardMetrics.height)
+                                .id(card.id)
+                        }
+                        Color.clear.frame(height: ListColumn.trailingRoom)
+                    }
+                    .padding(.horizontal, CardMetrics.columnInset)
+                }
+                .scrollIndicators(.hidden)
+                .softEdges(trailing: ListColumn.trailingRoom)
+                .onChange(of: model.found, initial: true) {
+                    guard let found = model.found, model.doneCards.contains(where: { $0.id == found }) else { return }
+                    scroller.scrollTo(found, anchor: .center)
+                }
+            }
+        }
+        .task { title = (try? await model.read("tasks.listName", ["done"])) ?? title }
     }
 }
 
@@ -533,7 +667,9 @@ struct CardRow: View {
                 onCarry: { model.startCarry(card, from: column.rawValue, grab: $0) },
                 onCancel: { model.cancelCarry() },
                 onEnd: { model.carryEnded() },
-                onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item) } } : nil)
+                onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item) } } : nil,
+                onLink: { model.openLink($0) },
+                onProject: model.projectOpener(card.item))
                 .frame(height: CardMetrics.height)
         }
     }
@@ -573,7 +709,7 @@ struct SelectionCircle: View {
 private struct SoftEdges: ViewModifier {
     var trailing: CGFloat = 0
     @State private var edges = Edges()
-    static let fade = CardMetrics.height / 2
+    static var fade: CGFloat { CardMetrics.height / 2 }
 
     struct Edges: Equatable {
         var top: CGFloat = 0

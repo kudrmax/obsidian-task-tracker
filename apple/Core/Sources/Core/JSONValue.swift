@@ -56,6 +56,12 @@ public enum JSONValue: Codable, Hashable, Sendable {
         }
     }
 
+    /// The object's field `key` as it is, `.null` included; `nil` when the object has no such field.
+    public func field(_ key: String) -> JSONValue? {
+        if case .object(let object) = self { return object[key] }
+        return nil
+    }
+
     public subscript(key: String) -> JSONValue {
         if case .object(let object) = self { return object[key] ?? .null }
         return .null

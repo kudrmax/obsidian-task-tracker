@@ -147,9 +147,10 @@ final class QuickEntryHost {
         opening { call("openAtDrop", [column.map { .string($0.rawValue) } ?? .null, result]) }
     }
 
-    /// A tap on a «No tasks» plate: the field of a new task in that section.
-    func openIn(_ column: BoardColumn, _ group: String?) {
-        opening { call("openIn", [.string(column.rawValue), group.json]) }
+    /// A tap on a «No tasks» plate: the field of a new task in that section, of the project's part `zone` in a list
+    /// grouped by project (the task written there gets that project).
+    func openIn(_ column: BoardColumn, _ group: String?, zone: JSONValue? = nil) {
+        opening { call("openIn", [.string(column.rawValue), group.json] + (zone.map { [$0] } ?? [])) }
     }
 
     /// Add Subtask: the field last among the task's subtasks in its list; a task only on the calendar opens full
@@ -305,15 +306,18 @@ final class QuickEntryHost {
         var sectioned: [String: JSONValue] = [:]
         for (column, list) in snapshot.lists {
             cards[column.rawValue] = Self.listCards(list.cards)
-            sections[column.rawValue] = .array(list.groups.map(\.name.json))
+            sections[column.rawValue] = list.places
             sectioned[column.rawValue] = .bool(list.sectioned)
         }
         let shown = shown(at: model?.place ?? .today)
-        return ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map(JSONValue.string))]
+        var look: [String: JSONValue] = ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map(JSONValue.string))]
+        // A project's view: every task written here gets its project.
+        if let link = model?.projectLink { look["project"] = .string(link) }
+        return .object(look)
     }
 
     private static func listCards(_ cards: [BoardCard]) -> JSONValue {
-        .array(cards.map { ["key": $0.item.key.json, "level": .number(Double($0.level)), "group": $0.item.group.json] })
+        .array(cards.map(\.listCard))
     }
 
     private func answer(_ method: String, _ arguments: [JSONValue], over snapshot: BoardSnapshot? = nil) -> JSONValue? {
@@ -377,7 +381,7 @@ final class QuickEntryHost {
         var found: [BoardColumn: ListEntryView] = [:]
         if state.spotKind == "list" {
             for (column, list) in snapshot.lists {
-                let drawn: JSONValue = ["cards": Self.listCards(list.cards), "sections": .array(list.groups.map(\.name.json))]
+                let drawn: JSONValue = ["cards": Self.listCards(list.cards), "sections": list.places]
                 if let entry = answer("listEntry", [.string(column.rawValue), drawn], over: snapshot)?["value"], !entry.isNull {
                     found[column] = try? entry.decode(ListEntryView.self)
                 }
@@ -456,7 +460,8 @@ final class QuickEntryHost {
         if case .failure(let error) = written { model.problem(error) }
         let read: BoardSnapshot?
         do {
-            read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
+            let link = model.projectLink
+            read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline, project: link) }.value
         } catch {
             model.problem(error)
             read = nil

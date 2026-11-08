@@ -88,12 +88,13 @@ import Testing
 
     // MARK: Moves
 
+    /// In Backlog's sections, as a device that groups it not by project draws them.
     @Test func aDragIntoAnotherSectionKeepsTheField() throws {
         let vault = FakeVault(Self.file)
-        let board = TaskBoard(core: core, vault: vault)
+        let board = TaskBoard(core: core, vault: vault, grouping: Self.ungrouped)
         try drag("Someday", in: .backlog, before: 3, passed: ["Дальний"], vault: vault, board: board)
         try keeps(vault, "Someday")
-        let backlog = try #require(try snapshot(vault).lists[.backlog])
+        let backlog = try #require(try snapshot(vault, grouping: Self.ungrouped).lists[.backlog])
         #expect(backlog.groups.last?.cards.map(\.item.title) == ["Far", "Someday"])
     }
 
@@ -157,7 +158,7 @@ import Testing
     @Test func aSectionRenamedOrRemovedKeepsItsProjectTasksField() throws {
         let vault = FakeVault(Self.file.replacingOccurrences(of: "- [ ] Far", with: "- [ ] Far \(Self.field)"))
         let board = TaskBoard(core: core, vault: vault)
-        let section = try #require(try snapshot(vault).lists[.backlog]?.groups.last?.menu)
+        let section = try #require(try snapshot(vault, grouping: Self.ungrouped).lists[.backlog]?.groups.last?.menu)
         #expect(section.section == "Дальний")
         try board.write("tasks.renameGroup", ["backlog", "Дальний", "Ближний"])
         try keeps(vault, "Far")
@@ -197,9 +198,12 @@ import Testing
 
     // MARK: Helpers
 
-    private func snapshot(_ vault: FakeVault, day: String = Self.day) throws -> BoardSnapshot {
-        try TaskBoard(core: core, vault: vault).snapshot(day: day, measures: Self.measures, now: at)
+    private func snapshot(_ vault: FakeVault, day: String = Self.day, grouping: GroupingStore = MemoryGrouping()) throws -> BoardSnapshot {
+        try TaskBoard(core: core, vault: vault, grouping: grouping).snapshot(day: day, measures: Self.measures, now: at)
     }
+
+    /// A device that switched Group by project off for Backlog.
+    static var ungrouped: MemoryGrouping { MemoryGrouping(#"{"on":{"backlog":false}}"#) }
 
     private func item(_ title: String, in snapshot: BoardSnapshot) throws -> TaskItem {
         let cards = snapshot.lists.values.flatMap(\.cards) + snapshot.timeline.slots.map(\.card)
@@ -208,7 +212,7 @@ import Testing
 
     /// A card let go in `column` before its card `index`, past the headers `passed`: the app's drop (`BoardModel.drop`).
     private func drag(_ title: String, in column: BoardColumn, before index: Int, passed: [String?], vault: FakeVault, board: TaskBoard) throws {
-        let snapshot = try snapshot(vault)
+        let snapshot = try board.snapshot(day: Self.day, measures: Self.measures, now: at)
         let list = try #require(snapshot.lists[column])
         let lifted = try item(title, in: snapshot)
         let others = list.cards.filter { $0.item.id != lifted.id }

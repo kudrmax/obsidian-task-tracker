@@ -31,6 +31,10 @@ struct CardButton: UIViewRepresentable {
     var onEnd: () -> Void = {}
     /// A tap on the subtask counter, when the card offers it: its subtasks fold away or show again.
     var onFold: (() -> Void)?
+    /// A tap on a link of the title: it opens, in place of the menu.
+    var onLink: ((TextPart) -> Void)?
+    /// A tap on the project's folder mark, when its note can open: the note opens, in place of the menu.
+    var onProject: (() -> Void)?
 
     func makeUIView(context: Context) -> CardControl {
         let control = CardControl(content: configuration(control: nil).makeContentView())
@@ -40,7 +44,12 @@ struct CardButton: UIViewRepresentable {
 
     private func configuration(control: CardControl?) -> UIHostingConfiguration<TaskCapsule, EmptyView> {
         UIHostingConfiguration {
-            TaskCapsule(card: card, ringed: ringed, height: height, onCounter: { [weak control] in control?.counterFrame = $0 }, onTitle: { [weak control] in control?.titleFrame = $0 })
+            TaskCapsule(
+                card: card, ringed: ringed, height: height,
+                onCounter: { [weak control] in control?.counterFrame = $0 },
+                onTitle: { [weak control] in control?.titleFrame = $0 },
+                onLinks: { [weak control] in control?.links = $0 },
+                onFolder: { [weak control] in control?.folderFrame = $0 })
         }
         .margins(.all, 0)
     }
@@ -66,6 +75,8 @@ struct CardButton: UIViewRepresentable {
         control.onCancel = onCancel
         control.onEnd = onEnd
         control.onFold = onFold
+        control.onLink = onLink
+        control.onProject = onProject
         control.draggable = draggable
         control.carried = carried
         control.accessibilityLabel = card.item.title
@@ -82,6 +93,11 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     var onFold: (() -> Void)? {
         didSet { fold.isHidden = onFold == nil }
     }
+    var onLink: ((TextPart) -> Void)?
+    var onProject: (() -> Void)?
+    /// Where the title's links are drawn, and the project's folder mark.
+    var links: [CardLink] = []
+    var folderFrame: CGRect?
     var draggable = true {
         didSet { drag.isEnabled = draggable }
     }
@@ -200,6 +216,17 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     @objc private func tapped(_ tap: UITapGestureRecognizer) {
         onTouch()
+        let point = tap.location(in: self)
+        // A link opens and the folder mark opens the project's note, as the plugin's card: only within the title's room,
+        // where the link is seen.
+        if let onLink, let link = links.first(where: { $0.frame.insetBy(dx: -2, dy: -8).contains(point) && (titleFrame?.contains(CGPoint(x: point.x, y: titleFrame?.midY ?? 0)) ?? true) }) {
+            onLink(link.part)
+            return
+        }
+        if let onProject, let folder = folderFrame, folder.insetBy(dx: -4, dy: -8).contains(point) {
+            onProject()
+            return
+        }
         openMenu(at: tap.location(in: opener))
     }
 

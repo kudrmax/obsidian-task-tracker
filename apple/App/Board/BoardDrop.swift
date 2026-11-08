@@ -143,3 +143,52 @@ struct DropAnchor: UIViewRepresentable {
         }
     }
 }
+
+/// Tells of every touch that begins anywhere in the window, taking none: the found card's ring goes at the next touch, as
+/// the plugin's (`FoundCard`).
+struct TouchWatch: UIViewRepresentable {
+    let touched: @MainActor () -> Void
+
+    func makeUIView(context: Context) -> Probe { Probe(touched: touched) }
+
+    func updateUIView(_ probe: Probe, context: Context) { probe.watch.touched = touched }
+
+    final class Probe: UIView {
+        let watch: Watch
+
+        init(touched: @escaping @MainActor () -> Void) {
+            watch = Watch(touched: touched)
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("not from a storyboard") }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if let window, watch.view !== window { window.addGestureRecognizer(watch) }
+        }
+    }
+
+    /// Fails at once on every touch, after telling of it: no other gesture ever waits for it or loses its touches.
+    final class Watch: UIGestureRecognizer, UIGestureRecognizerDelegate {
+        var touched: @MainActor () -> Void
+
+        init(touched: @escaping @MainActor () -> Void) {
+            self.touched = touched
+            super.init(target: nil, action: nil)
+            cancelsTouchesInView = false
+            delaysTouchesBegan = false
+            delaysTouchesEnded = false
+            delegate = self
+        }
+
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+            touched()
+            state = .failed
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+    }
+}

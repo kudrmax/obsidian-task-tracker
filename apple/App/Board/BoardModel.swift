@@ -38,6 +38,20 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
         self = place
     }
 
+    /// Where the ribbon stood when the app last showed it, on this device: Today the first time. A project's view keeps its
+    /// own, by its note, and opens on Inbox the first time, as the plugin's block.
+    static func remembered(for project: ProjectRef?) -> RibbonPlace {
+        UserDefaults.standard.object(forKey: key(project)).flatMap { $0 as? Int }.flatMap(RibbonPlace.init(rawValue:)) ?? (project == nil ? .today : .inbox)
+    }
+
+    func remember(for project: ProjectRef?) {
+        UserDefaults.standard.set(rawValue, forKey: Self.key(project))
+    }
+
+    private static func key(_ project: ProjectRef?) -> String {
+        project.map { "ribbonPlace/" + ($0.note ?? $0.link) } ?? "ribbonPlace"
+    }
+
     var symbol: String {
         switch self {
         case .inbox: "tray"
@@ -54,6 +68,8 @@ struct ListGap: Equatable {
     let at: Int
     let level: Int
     let group: String?
+    /// The project's part of a list grouped by project it stands in; nil in a list that groups nothing.
+    let zone: JSONValue?
     let place: JSONValue
     /// The drop line as the plugin draws it (`DropLine`), in the list's content space: from `line.x`, the left edge of
     /// the gap's level, to the list's right edge, through `line.y`, the middle of the gap; nil where the drop changes
@@ -81,7 +97,15 @@ final class BoardModel {
     /// Typing tasks in place: the core's quick entry, driven for this screen.
     @ObservationIgnored let entry = QuickEntryHost()
 
-    init() {
+    /// The project whose own view this screen is, as the plugin's block at the end of a project's note: every list holds
+    /// only its tasks and every task written here gets it. `nil` for the main screen.
+    nonisolated let project: ProjectRef?
+    /// What `tasks.screen` takes for the project's view.
+    nonisolated var projectLink: String? { project?.link }
+
+    init(project: ProjectRef? = nil) {
+        self.project = project
+        place = RibbonPlace.remembered(for: project)
         dropping.ended = { [weak self] in self?.carryEnded() }
         entry.model = self
     }
@@ -113,13 +137,18 @@ final class BoardModel {
 
     @ObservationIgnored private var shadesByColor: [String: Themed<Shades>] = [:]
 
-    /// Where the ribbon stands. A swipe sets it as the ribbon settles; `go(to:)` moves the ribbon there.
-    var place = RibbonPlace.today
+    /// Where the ribbon stands, remembered on the device as the plugin's wheel is. A swipe sets it as the ribbon settles;
+    /// `go(to:)` moves the ribbon there.
+    var place: RibbonPlace {
+        didSet { if place != oldValue { place.remember(for: project) } }
+    }
     /// The place a tap on a tab asked the ribbon to scroll to, each ask new.
     private(set) var asked: PlaceAsk?
 
     struct PlaceAsk: Equatable {
         let place: RibbonPlace
+        /// To the Done column, left of the place.
+        var done = false
         let id = UUID()
     }
 
@@ -127,7 +156,9 @@ final class BoardModel {
         self.place = place
         asked = PlaceAsk(place: place)
     }
-    private(set) var snapshot: BoardSnapshot?
+    private(set) var snapshot: BoardSnapshot? {
+        didSet { if let snapshot { CardMetrics.follow(snapshot.look) } }
+    }
     private(set) var problem: String?
     private(set) var shownDay: String?
 
@@ -182,6 +213,7 @@ final class BoardModel {
         running = task
         await task.value
         running = nil
+        if doneShown { await readDone() }
         readAhead()
         rewatchIfMoved()
     }
@@ -195,10 +227,11 @@ final class BoardModel {
             readAgain = false
             let day = shownDay
             let board = board
+            let link = projectLink
             readsStarted += 1
             let serial = readsStarted
             do {
-                let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
+                let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline, project: link) }.value
                 let instant = instantNext
                 instantNext = false
                 show(read, animated: !instant, serial: serial)
@@ -315,13 +348,14 @@ final class BoardModel {
         guard let shown = snapshot else { return }
         let board = board
         let day = shown.day
+        let link = projectLink
         Task {
             guard let previous: String = try? await read("days.step", [.string(day), -1]),
                   let next: String = try? await read("days.step", [.string(day), 1]) else { return }
             neighbours = (previous, next)
             for other in [previous, next] {
                 if let kept = ahead[other], kept.readAlike(shown) { continue }
-                if let read = try? await Task.detached(operation: { try board.snapshot(day: other, measures: CardMetrics.timeline) }).value {
+                if let read = try? await Task.detached(operation: { try board.snapshot(day: other, measures: CardMetrics.timeline, project: link) }).value {
                     ahead[other] = read
                 }
             }
@@ -351,7 +385,7 @@ final class BoardModel {
             return true
         }
         let kept = ahead[at.date].flatMap { $0.readAlike(snapshot) ? $0 : nil }
-        guard let peek = kept ?? (try? board.snapshot(day: at.date, measures: CardMetrics.timeline)) else { return true }
+        guard let peek = kept ?? (try? board.snapshot(day: at.date, measures: CardMetrics.timeline, project: projectLink)) else { return true }
         dayTurn = DayTurn(peek: peek, shift: shift)
         dayShare = 0
         return true
@@ -410,7 +444,8 @@ final class BoardModel {
         var peek = ahead[day].flatMap { shown in snapshot.map(shown.readAlike) == true ? shown : nil }
         if peek == nil {
             let board = board
-            peek = try? await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
+            let link = projectLink
+            peek = try? await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline, project: link) }.value
         }
         guard let peek, shownDay == day else { return await reload() }
         dayTurn = DayTurn(peek: peek, shift: motion)
@@ -456,10 +491,51 @@ final class BoardModel {
             go(to: .inbox)
         }
         await reload()
+        if place.list == "done" {
+            await openDone()
+            found = doneCards.first { $0.item.key.raw == item.key.raw }?.id
+            return
+        }
         found = snapshot.flatMap { snapshot in
             snapshot.lists.values.flatMap(\.cards).first { $0.item.key.raw == item.key.raw }?.id
                 ?? snapshot.timeline.slots.first { $0.card.item.key.raw == item.key.raw }?.id
         }
+    }
+
+    // MARK: Done
+
+    /// The Done column, left of Inbox: only the search opens it, and the ribbon leaving it for Inbox closes it.
+    private(set) var doneShown = false
+    /// Its cards and their menus, read as it opens and again with each read while it shows.
+    private(set) var doneCards: [BoardCard] = []
+    @ObservationIgnored private var doneMenus: [String: TaskMenuModel] = [:]
+
+    func openDone() async {
+        await readDone()
+        withAnimation(.snappy) { doneShown = true }
+        asked = PlaceAsk(place: .inbox, done: true)
+    }
+
+    func closeDone() {
+        guard doneShown else { return }
+        doneShown = false
+        doneCards = []
+        doneMenus = [:]
+    }
+
+    private func readDone() async {
+        guard let snapshot else { return }
+        let board = board
+        let rows = snapshot.screen.done.map { ListRow(item: $0, level: 0) }
+        let screen = menuScreen
+        guard let read = try? await Task.detached(operation: { () throws -> ([BoardCard], [String: TaskMenuModel]) in
+            let cards = try board.cards(rows)
+            var menus: [String: TaskMenuModel] = [:]
+            for card in cards { menus[card.item.id] = try board.read("tasks.menu", [card.item.json, "done", screen], over: board.settingsOnly()) }
+            return (cards, menus)
+        }).value else { return }
+        doneCards = read.0
+        doneMenus = read.1
     }
 
     // MARK: Writing
@@ -571,14 +647,106 @@ final class BoardModel {
         await write("tasks.setRepeat", [item.key.json, rule])
     }
 
-    func renameSection(_ column: BoardColumn, _ section: String, to name: String) async {
+    /// Inside a project's group (`menu.project`), only that project's tasks of the section move, as the plugin's.
+    func renameSection(_ column: BoardColumn, _ menu: GroupMenu, to name: String) async {
         guard let list = sectionList(column) else { return }
-        await write("tasks.renameGroup", [.string(list), .string(section), .string(name)])
+        await write("tasks.renameGroup", [.string(list), .string(menu.section), .string(name)] + (menu.project.map { [$0] } ?? []))
     }
 
-    func removeSection(_ column: BoardColumn, _ section: String) async {
+    func removeSection(_ column: BoardColumn, _ menu: GroupMenu) async {
         guard let list = sectionList(column) else { return }
-        await write("tasks.removeGroup", [.string(list), .string(section)])
+        await write("tasks.removeGroup", [.string(list), .string(menu.section)] + (menu.project.map { [$0] } ?? []))
+    }
+
+    // MARK: Projects
+
+    /// The Project page's pick: the project's link, nil for No project.
+    func setProject(_ items: [TaskItem], _ link: String?) async {
+        await write("tasks.setProject", [keys(items), link.json])
+        endSelection()
+    }
+
+    /// Group by project in Backlog's or Soon's title menu, kept on the device.
+    func setGrouping(_ column: BoardColumn, on: Bool) async {
+        let board = board
+        do {
+            try await Task.detached { try board.setGrouping(column.rawValue, on: on) }.value
+        } catch {
+            problem = Self.words(error)
+        }
+        await reload(animated: true)
+    }
+
+    /// A project group's header tapped: it folds or unfolds, kept on the device.
+    func toggleFold(_ column: BoardColumn, _ head: BoardProjectHead) async {
+        let board = board
+        UISelectionFeedbackGenerator().selectionChanged()
+        do {
+            try await Task.detached { try board.toggleFold(column.rawValue, key: head.key) }.value
+        } catch {
+            problem = Self.words(error)
+        }
+        await reload(animated: true)
+    }
+
+    /// A project's note, opened in Obsidian: the group's arrow and a card's folder mark.
+    func openNote(_ path: String) {
+        guard let vault = UserDefaults.standard.string(forKey: "vaultFolderName") else { return }
+        var link = URLComponents(string: "obsidian://open")!
+        link.queryItems = [URLQueryItem(name: "vault", value: vault), URLQueryItem(name: "file", value: path)]
+        if let url = link.url { UIApplication.shared.open(url) }
+    }
+
+    /// Cards for rows drawn outside the lists (the full screen's subtasks), coloured and dated as a list draws them.
+    func cards(_ rows: [ListRow]) async -> [BoardCard] {
+        let board = board
+        return (try? await Task.detached { try board.cards(rows) }.value) ?? []
+    }
+
+    /// What a tap on a card's folder mark does: opens the project's view, the note's block, when it has a note.
+    func projectOpener(_ item: TaskItem) -> (() -> Void)? {
+        guard let project = item.project, project.canOpenNote else { return nil }
+        return { [weak self] in self?.openProject(project) }
+    }
+
+    /// The project's own view over the screen, as the plugin's block at the end of its note: a group's arrow and a card's
+    /// folder mark open it; its bar opens the note itself in Obsidian.
+    var projectShown: ShownProject?
+
+    struct ShownProject: Identifiable {
+        let project: ProjectRef
+        var id: String { project.link }
+    }
+
+    func openProject(_ project: ProjectRef) {
+        guard self.project == nil else { return }
+        projectShown = ShownProject(project: project)
+    }
+
+    /// A link in a title tapped: an address opens as it is, a note in Obsidian, the file the core resolves it to.
+    func openLink(_ part: TextPart) {
+        guard let target = part.target else { return }
+        if part.kind == "url" {
+            if let url = URL(string: target) { UIApplication.shared.open(url) }
+            return
+        }
+        let board = board
+        Task {
+            guard let note = try? await Task.detached(operation: { try board.noteToOpen(target) }).value else { return }
+            openNote(note.path)
+        }
+    }
+
+    /// The vault's notes listed again, back in front: a note tagged or untagged as a project elsewhere, renamed or moved,
+    /// redraws the screen.
+    func refreshNotes() async {
+        let board = board
+        let changed = await Task.detached { () -> Bool in
+            let before = try? board.projectNotes()
+            board.refreshNotes()
+            return (try? board.projectNotes()) != before
+        }.value
+        if changed { await reload(animated: true) }
     }
 
     /// Whose sections a column shows, as the core names the list.
@@ -819,17 +987,23 @@ final class BoardModel {
         let others = others(in: column)
         let placed = others.map { card in
             let frame = shape.cards[card.id] ?? .zero
-            return PlacedCard(level: card.level, group: card.item.group, top: Double(frame.minY), height: Double(frame.height))
+            return PlacedCard(level: card.level, group: card.item.group, zone: card.zone, top: Double(frame.minY), height: Double(frame.height))
         }
-        let order = Dictionary(list.groups.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
-        let orderOf = { (name: String?) in order[name ?? "\u{0}"] ?? 0 }
+        // Which of the list's sections each card stands in, by its order: the first card after a header is the first of a
+        // section at or after the header's.
+        var order: [String: Int] = [:]
+        for (index, group) in list.groups.enumerated() { for card in group.cards { order[card.id] = index } }
+        let firstFrom = { (section: Int) in others.firstIndex { (order[$0.id] ?? 0) >= section } ?? others.count }
         var heads: [PlacedHead] = []
-        for group in list.groups where group.header != nil {
+        for (index, group) in list.groups.enumerated() where group.header != nil {
             guard let frame = shape.heads[group.id] else { continue }
-            let mine = orderOf(group.name)
-            let first = others.firstIndex { orderOf($0.item.group) >= mine } ?? others.count
-            heads.append(PlacedHead(group: group.name, firstCard: first, top: Double(frame.minY), height: Double(frame.height)))
+            heads.append(PlacedHead(group: group.place, firstCard: firstFrom(index), top: Double(frame.minY), height: Double(frame.height)))
         }
+        for head in list.heads {
+            guard let frame = shape.heads[head.id] else { continue }
+            heads.append(PlacedHead(group: head.head, opens: true, firstCard: firstFrom(head.before), top: Double(frame.minY), height: Double(frame.height)))
+        }
+        heads.sort { $0.top < $1.top }
         let inset = Double(CardMetrics.columnInset)
         let y = carry.id == Carried.plus ? Double(point.y) : (try? board.carriedMiddle(y: Double(point.y), grab: Double(carry.grab), cardHeight: Double(CardMetrics.height))) ?? Double(point.y)
         let level = (try? board.levelAt(x: Double(point.x), left: inset, width: Double(shape.width) - 2 * inset, indent: Double(CardMetrics.indent))) ?? 0
@@ -839,14 +1013,15 @@ final class BoardModel {
         guard let place = try? board.placeAt(placed, y: y, level: level, shift: 0, room: .null, heads: heads, held: held, hysteresis: 6),
               let at = place["index"].number, let fitted = place["level"].number else { return }
         let group = place["group"].string
+        let zone = place.field("project")
         // The card back where it was lifted from, at its level, changes nothing: the core's null, which comes back as no value.
         let stays = home.map { home in
             let drop: JSONValue? = ruleNow("rules.placeOfDrop", [Self.listCards(others), place, home])
             return drop == nil || drop == .null
         } ?? false
-        let lights = list.groups.contains { $0.name == group && $0.empty }
-        let shown = stays || lights ? nil : lineAt(column, at: Int(at), level: Int(fitted), group: group, home: home)
-        let next = ListGap(column: column, at: Int(at), level: Int(fitted), group: group, place: place, line: shown)
+        let lights = list.groups.contains { $0.names(group, zone: zone) && $0.empty }
+        let shown = stays || lights ? nil : lineAt(column, at: Int(at), level: Int(fitted), group: group, zone: zone, home: home)
+        let next = ListGap(column: column, at: Int(at), level: Int(fitted), group: group, zone: zone, place: place, line: shown)
         guard next != gap else { return }
         if next.place != gap?.place { UISelectionFeedbackGenerator().selectionChanged() }
         landing = nil
@@ -880,7 +1055,7 @@ final class BoardModel {
     /// The gap is the one the carried card was lifted from: it lands in its dashed place.
     private func returnsHome(_ gap: ListGap) -> Bool {
         guard let carry, let home = homeGap(carry.id, in: gap.column) else { return false }
-        return home["index"] == gap.place["index"] && home["group"] == gap.place["group"]
+        return home["index"] == gap.place["index"] && home["group"] == gap.place["group"] && home.field("project") == gap.zone
     }
 
     /// Where the card lands: its dashed place when the gap is the one it was lifted from, else the room the rows part to.
@@ -892,10 +1067,10 @@ final class BoardModel {
 
     /// The drop line of a gap: through the middle of the room above the card it parts from, or above the dashed place
     /// when the card goes back where it was lifted from at another level, from the left edge of its level.
-    private func lineAt(_ column: BoardColumn, at: Int, level: Int, group: String?, home: JSONValue?) -> CGPoint? {
-        let probe = ListGap(column: column, at: at, level: level, group: group, place: .null, line: nil)
+    private func lineAt(_ column: BoardColumn, at: Int, level: Int, group: String?, zone: JSONValue?, home: JSONValue?) -> CGPoint? {
+        let probe = ListGap(column: column, at: at, level: level, group: group, zone: zone, place: .null, line: nil)
         guard let rect = gapRect(column, probe) else { return nil }
-        if let home, let carry, home["index"].number.map(Int.init) == at, home["group"].string == group, let waiting = geometry[column]?.cards[carry.id] {
+        if let home, let carry, home["index"].number.map(Int.init) == at, home["group"].string == group, home.field("project") == zone, let waiting = geometry[column]?.cards[carry.id] {
             return CGPoint(x: rect.minX, y: waiting.minY - CardMetrics.gap / 2)
         }
         return CGPoint(x: rect.minX, y: rect.minY - CardMetrics.gap / 2)
@@ -908,11 +1083,15 @@ final class BoardModel {
         let indent = CGFloat(gap.level) * CardMetrics.indent
         let x = CardMetrics.columnInset + indent
         let w = shape.width - CardMetrics.columnInset * 2 - indent
-        if let next = others[safe: gap.at], next.item.group == gap.group, let frame = shape.cards[next.id] {
+        if let next = others[safe: gap.at], next.stands(in: gap.group, zone: gap.zone), let frame = shape.cards[next.id] {
             return CGRect(x: x, y: frame.minY, width: w, height: CardMetrics.height)
         }
-        let above = others.prefix(gap.at).last { $0.item.group == gap.group }
-        guard let frame = above.flatMap({ shape.cards[$0.id] }) ?? list.groups.first(where: { $0.name == gap.group }).flatMap({ shape.heads[$0.id] }) else { return nil }
+        let above = others.prefix(gap.at).last { $0.stands(in: gap.group, zone: gap.zone) }
+        // Under the last card of its section, else under its header: the section's own, or, for a project's part without a
+        // section, its project group's.
+        let section = list.groups.first { $0.names(gap.group, zone: gap.zone) }
+        let header = section.flatMap { shape.heads[$0.id] ?? $0.under.flatMap { shape.heads[$0] } }
+        guard let frame = above.flatMap({ shape.cards[$0.id] }) ?? header else { return nil }
         return CGRect(x: x, y: frame.maxY + CardMetrics.gap, width: w, height: CardMetrics.height)
     }
 
@@ -1047,11 +1226,13 @@ final class BoardModel {
     private func homeGap(_ id: String, in column: BoardColumn) -> JSONValue? {
         guard let cards = snapshot?.lists[column]?.cards, let index = cards.firstIndex(where: { $0.names(id) }) else { return nil }
         let card = cards[index]
-        return ["kind": "gap", "index": .number(Double(index)), "level": .number(Double(card.level)), "group": card.item.group.json]
+        var gap: [String: JSONValue] = ["kind": "gap", "index": .number(Double(index)), "level": .number(Double(card.level)), "group": card.item.group.json]
+        if let zone = card.zone { gap["project"] = zone }
+        return .object(gap)
     }
 
-    private static func listCards(_ cards: [BoardCard]) -> JSONValue {
-        .array(cards.map { ["key": $0.item.key.json, "level": .number(Double($0.level)), "group": $0.item.group.json] })
+    static func listCards(_ cards: [BoardCard]) -> JSONValue {
+        .array(cards.map(\.listCard))
     }
 
     private static func contains(_ tree: TaskItem, _ item: TaskItem) -> Bool {
@@ -1082,7 +1263,7 @@ final class BoardModel {
     /// The card's menu as UIKit draws it, read from the screen as it stands. `later` holds a row that opens a sheet or a
     /// page until the menu has gone.
     func cardMenu(_ item: TaskItem, ask: @escaping (MenuQuestion) -> Void, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
-        guard let menu = snapshot?.menus[item.id] else { return nil }
+        guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
         return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: self, ask: ask).nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
     }

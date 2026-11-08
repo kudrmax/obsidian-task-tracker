@@ -37,7 +37,7 @@ struct SearchScreen: View {
             .onChange(of: focused) { if !focused, query.isEmpty { dismiss() } }
             .task(id: query) {
                 try? await Task.sleep(for: .milliseconds(150))
-                groups = (try? await model.read("tasks.search", [.string(query)])) ?? []
+                groups = (try? await model.read("tasks.search", [.string(query)] + (model.projectLink.map { [JSONValue.string($0)] } ?? []))) ?? []
                 for group in groups where names[group.list] == nil {
                     names[group.list] = try? await model.read("tasks.listName", [.string(group.list)])
                 }

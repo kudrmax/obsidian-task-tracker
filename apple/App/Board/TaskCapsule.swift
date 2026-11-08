@@ -15,6 +15,10 @@ struct TaskCapsule: View {
     var onCounter: ((CGRect) -> Void)?
     /// Where the title's room is, in the capsule's own space: the menu's copy grows by what the title lacks of it.
     var onTitle: ((CGRect) -> Void)?
+    /// Where each link of the title is drawn, in the capsule's own space: a tap there opens it instead of the menu.
+    var onLinks: (([CardLink]) -> Void)?
+    /// Where the project's folder mark is drawn: a tap there opens the project's note.
+    var onFolder: ((CGRect) -> Void)?
 
     @Environment(\.colorScheme) private var scheme
 
@@ -34,11 +38,12 @@ struct TaskCapsule: View {
                 // The title never widens the card: it runs on past the room and fades out over its last points.
                 Color.clear
                     .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, maxHeight: CardMetrics.titleLine)
-                    .overlay(alignment: .leading) { title.lineLimit(1).fixedSize() }
+                    .overlay(alignment: .leading) { linedTitle }
                     .mask(fadeMask)
                     .accessibilityElement(children: .combine)
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onTitle?($0) }
             }
+            if let project = card.item.project, project.mark { folder(project) }
             if card.item.progress != nil || card.item.description != nil { meta }
             if let corner = card.corner { stackCorner(corner) }
             if let due = card.due {
@@ -81,11 +86,52 @@ struct TaskCapsule: View {
         .coordinateSpace(.named(Self.space))
     }
 
+    /// The title as the plugin's card writes it: the text as typed, each link by its word in the accent.
     private var title: Text {
-        Text(card.item.text)
+        card.parts.reduce(Text(verbatim: "")) { text, part in
+            text + (part.isLink ? Text(verbatim: part.shown).foregroundColor(Palette.accent(scheme)) : Text(verbatim: part.shown))
+        }
+        .font(.system(size: CardMetrics.title))
+        .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
+        .strikethrough(card.item.closed, color: Palette.muted)
+    }
+
+    /// The title on its one line, each piece its own text so a link's place is known for the tap that opens it.
+    @ViewBuilder private var linedTitle: some View {
+        if card.parts.contains(where: \.isLink) {
+            HStack(spacing: 0) {
+                ForEach(Array(card.parts.enumerated()), id: \.offset) { index, part in
+                    piece(part)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frame in
+                            guard part.isLink else { return }
+                            linkFrames[index] = CardLink(part: part, frame: frame)
+                        }
+                }
+            }
+            .lineLimit(1)
+            .fixedSize()
             .font(.system(size: CardMetrics.title))
-            .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
             .strikethrough(card.item.closed, color: Palette.muted)
+            .onChange(of: linkFrames, initial: true) { onLinks?(Array(linkFrames.values)) }
+        } else {
+            title.lineLimit(1).fixedSize()
+        }
+    }
+
+    @State private var linkFrames: [Int: CardLink] = [:]
+
+    private func piece(_ part: TextPart) -> Text {
+        Text(verbatim: part.shown).foregroundColor(part.isLink ? Palette.accent(scheme) : card.item.closed ? Palette.muted : Color.primary)
+    }
+
+    /// The project's folder, in the date's place and of its width, left of the counter, the date and the repeat.
+    private func folder(_ project: ProjectRef) -> some View {
+        Image(systemName: "folder")
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(metaColor)
+            .frame(width: 24, height: CardMetrics.titleLine)
+            .accessibilityLabel(project.name)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onFolder?($0) }
     }
 
     /// The subtask counter over the description's mark, as the plugin stacks them; either alone when the task has only it.
@@ -186,6 +232,12 @@ struct TaskCapsule: View {
         .frame(width: 20, height: 20)
         .accessibilityLabel(picked ? "Selected" : "Not selected")
     }
+}
+
+/// A link of a card's title and where it is drawn.
+struct CardLink: Equatable {
+    let part: TextPart
+    let frame: CGRect
 }
 
 /// A card of several labels, painted as the plugin paints it (`styles.css`, «A task with several labels»): narrow bands

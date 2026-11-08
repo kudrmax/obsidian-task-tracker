@@ -11,6 +11,14 @@ public struct TextPart: Decodable, Hashable, Sendable {
     /// Where a tap on a link goes: an address, or the link text of a note (`TaskBoard.noteToOpen`).
     public let target: String?
 
+    /// Plain text, as typed.
+    public init(text: String) {
+        kind = "text"
+        self.text = text
+        label = nil
+        target = nil
+    }
+
     public var isLink: Bool { kind != "text" }
     /// What the piece shows.
     public var shown: String { label ?? text ?? "" }

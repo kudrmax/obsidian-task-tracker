@@ -154,11 +154,14 @@ struct TaskFullScreen: View {
     }
 
     @State private var subtaskMenus: [String: TaskMenuModel] = [:]
+    /// The subtasks' cards as a list draws them: their colours, dates and title pieces.
+    @State private var cards: [String: BoardCard] = [:]
 
     /// A subtask as the same capsule as on the main screen, at its depth; a long press shows its own menu.
     private func subtask(_ row: FullRow, branch: Branch?) -> some View {
-        let card = BoardCard(item: row.item, level: row.level, branch: row.level > 0 ? branch : nil, due: nil, repeats: row.item.repeats, paint: nil)
-        return CardButton(card: card, menu: { later in menu(for: row.item, later: later) }, draggable: false)
+        let drawn = cards[row.item.id]
+        let card = BoardCard(item: row.item, level: row.level, branch: row.level > 0 ? branch : nil, due: drawn?.due, repeats: drawn?.repeats ?? row.item.repeats, paint: drawn?.paint, parts: drawn?.parts)
+        return CardButton(card: card, menu: { later in menu(for: row.item, later: later) }, draggable: false, onLink: { model.openLink($0) }, onProject: model.projectOpener(row.item))
             .frame(height: CardMetrics.height)
             .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
             .padding(.leading, CGFloat(row.level) * CardMetrics.indent)
@@ -197,9 +200,11 @@ struct TaskFullScreen: View {
     private func readStack() async -> () -> Void {
         let found: TaskItem? = try? await model.read("tasks.find", [task.key.json, .string(task.text)])
         let read: FullTree? = try? await model.rule("tasks.fullTree", [(found ?? task).json])
+        let drawn = await model.cards((read?.rows ?? []).map { ListRow(item: $0.item, level: $0.level) })
         return {
             if let found { current = found }
             tree = read
+            cards = Dictionary(drawn.map { ($0.item.id, $0) }, uniquingKeysWith: { first, _ in first })
         }
     }
 

@@ -244,7 +244,9 @@ struct TimelineColumn: View {
                 onTouch: { model.found = nil },
                 onCarry: { model.startCarry(slot.card, from: "timeline", grab: $0) },
                 onCancel: { model.cancelCarry() },
-                onEnd: { model.carryEnded() })
+                onEnd: { model.carryEnded() },
+                onLink: { model.openLink($0) },
+                onProject: model.projectOpener(slot.card.item))
                 .frame(height: max(tall, CardMetrics.height))
         }
     }

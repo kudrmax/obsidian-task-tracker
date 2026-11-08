@@ -41,11 +41,22 @@ enum ColumnMetrics {
     static let sectionGap: CGFloat = 10
 }
 
-/// The card's measures, as the plugin draws a card (`docs/design/README.md`).
+/// The card's measures, as the plugin draws a card (`docs/design/README.md`). The height and the gap are the shared
+/// settings' (Settings → Cards), as the plugin sets its `--tc-card-h` and `--tc-card-gap` for the whole screen: the screen
+/// sets them from each read (`follow(_:)`), the ends of a card round at half its height.
 enum CardMetrics {
-    static let height: CGFloat = 35
-    static let radius: CGFloat = 17.5
-    static let gap: CGFloat = 2
+    nonisolated(unsafe) private(set) static var height: CGFloat = 35
+    static var radius: CGFloat { height / 2 }
+    nonisolated(unsafe) private(set) static var gap: CGFloat = 2
+
+    /// The shared settings' size of a card, read with the screen: true when it changed.
+    @discardableResult
+    static func follow(_ look: ScreenSettings) -> Bool {
+        let changed = height != CGFloat(look.cardHeight) || gap != CGFloat(look.cardGap)
+        height = CGFloat(look.cardHeight)
+        gap = CGFloat(look.cardGap)
+        return changed
+    }
     static let leading: CGFloat = 14
     static let trailing: CGFloat = 10
     static let title: CGFloat = 15
@@ -60,7 +71,7 @@ enum CardMetrics {
     /// The hour's height the screen is read at; the timeline stacks its cards anew at the zoom it shows.
     static let hour: CGFloat = 56
     /// The timeline's measures the core lays out the stack of task cards in, as the plugin's design has them.
-    static let timeline = TimelineMeasures(hour: hour, cardHeight: height, cardGap: gap, itemInset: 1, itemGap: 2, overlayInset: 18)
+    static var timeline: TimelineMeasures { TimelineMeasures(hour: hour, cardHeight: height, cardGap: gap, itemInset: 1, itemGap: 2, overlayInset: 18) }
 }
 
 extension Color {

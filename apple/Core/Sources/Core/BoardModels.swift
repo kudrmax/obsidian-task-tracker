@@ -182,6 +182,11 @@ public struct ScreenView: Decodable, Sendable {
 public struct ListRow: Decodable, Sendable {
     public let item: TaskItem
     public let level: Int
+
+    public init(item: TaskItem, level: Int) {
+        self.item = item
+        self.level = level
+    }
 }
 
 public struct GroupMenu: Decodable, Hashable, Sendable {

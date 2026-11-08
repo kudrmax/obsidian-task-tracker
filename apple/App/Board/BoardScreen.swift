@@ -6,7 +6,13 @@ import UIKit
 /// places it stands at; the system tab bar under it only says where it stands and moves it there, and the plus beside
 /// the tab bar opens a new task.
 struct BoardScreen: View {
-    @State private var model = BoardModel()
+    @State private var model: BoardModel
+    @Environment(\.dismiss) private var dismiss
+
+    /// `project`: that project's own view, as the plugin's block in its note.
+    init(project: ProjectRef? = nil) {
+        _model = State(initialValue: BoardModel(project: project))
+    }
     @State private var router = CaptureRouter.shared
     @State private var sync = ObsidianSync.shared
     @State private var question: MenuQuestion?
@@ -20,7 +26,7 @@ struct BoardScreen: View {
         NavigationStack(path: $model.fullScreen) {
             content
                 .toolbar {
-                    if model.selecting { selectionBar } else { mainBar }
+                    if model.selecting { selectionBar } else if let project = model.project { projectBar(project) } else { mainBar }
                 }
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationDestination(for: TaskItem.self) { item in TaskFullScreen(item: item, model: model) }
@@ -34,6 +40,7 @@ struct BoardScreen: View {
         .animation(.snappy, value: model.selecting)
         .animation(.snappy, value: model.entry.isOpen)
         .background { DropAnchor(drop: model.dropping) }
+        .background { TouchWatch { if model.found != nil { model.found = nil } } }
         .notSyncedAlert(sync)
         // Obsidian hands the phone back after Sync: the board reads the file again.
         .onChange(of: sync.returns) { Task { await model.reload() } }
@@ -52,6 +59,9 @@ struct BoardScreen: View {
             }
         }
         .boardSheets(model: model)
+        .fullScreenCover(item: $model.projectShown, onDismiss: { Task { await model.reloadIfChanged() } }) { shown in
+            BoardScreen(project: shown.project)
+        }
         .menuQuestions($question, model: model)
         .task { await model.reload() }
         .onChange(of: scene, initial: true) {
@@ -61,7 +71,10 @@ struct BoardScreen: View {
             if scene == .active {
                 model.watchFile()
                 model.startClock()
-                Task { await model.reloadIfChanged() }
+                Task {
+                    await model.reloadIfChanged()
+                    await model.refreshNotes()
+                }
             } else {
                 model.stopWatching()
                 model.stopClock()
@@ -161,6 +174,40 @@ struct BoardScreen: View {
         }
     }
 
+    /// A project's view: Close, Undo, the project's name, and its note opened in Obsidian.
+    @ToolbarContentBuilder
+    private func projectBar(_ project: ProjectRef) -> some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button("Close", systemImage: "xmark") { model.entry.blur(); dismiss() }
+                .tint(.primary)
+        }
+        ToolbarItem(placement: .topBarLeading) {
+            Button("Undo", systemImage: "arrow.uturn.backward") { Task { await model.undo() } }
+                .disabled(model.snapshot?.canUndo != true)
+                .tint(.primary)
+        }
+        ToolbarItem(placement: .principal) {
+            Label(project.name, systemImage: "folder").labelStyle(.titleAndIcon).font(.headline)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            if model.entry.isOpen {
+                Button("Done", systemImage: "checkmark") { model.entry.blur() }
+                    .buttonStyle(.glassProminent)
+                    .tint(Palette.accent(scheme))
+            } else {
+                Menu("More", systemImage: "ellipsis") {
+                    Button("Search", systemImage: "magnifyingglass") { sheet = .search }
+                    Button("Select Tasks", systemImage: "checkmark.circle") { model.startSelection() }
+                    if let note = project.note {
+                        Divider()
+                        Button("Open in Obsidian", systemImage: "arrow.up.forward.app") { model.openNote(note) }
+                    }
+                }
+                .tint(.primary)
+            }
+        }
+    }
+
     private var more: some View {
             Menu("More", systemImage: "ellipsis") {
                 Button("Search", systemImage: "magnifyingglass") { sheet = .search }
@@ -222,8 +269,15 @@ struct Ribbon: View {
             // As the plugin's ribbon: Inbox and Soon are half the screen each, and so is the day list beside Soon; at Today
             // the day list takes its own width and the calendar the rest, the day list's width following the swipe there.
             let list = half + (listWidth(width) - half) * toToday
+            // The Done column, while the search has opened it, stands left of Inbox: every place moves right by it.
+            let lead = model.doneShown ? half : 0
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
+                    if model.doneShown {
+                        DoneColumn(model: model, question: $question)
+                            .frame(width: half)
+                            .frame(maxHeight: .infinity, alignment: .top)
+                    }
                     column(.inbox, half) {
                         VStack(spacing: ColumnMetrics.headGap) {
                             lists(.inbox)
@@ -250,27 +304,38 @@ struct Ribbon: View {
                 .scrollTargetLayout()
                 .background { RibbonHooks(model: model, distance: width - list) }
                 }
-            .scrollTargetBehavior(OnePlacePerSwipe(stops: [0, half, width]))
+            .scrollTargetBehavior(NearestPlace(stops: (lead > 0 ? [0] : []) + [lead, lead + half, lead + width]))
             .scrollPosition($position, anchor: .leading)
             .scrollIndicators(.hidden)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 geometry.contentOffset.x
             } action: { _, x in
                 offset = x
-                toToday = min(1, max(0, (x - half) / max(1, half)))
+                let from = x - lead
+                toToday = min(1, max(0, (from - half) / max(1, half)))
                 // The selection moves along with a swipe; a tab's own scroll leaves it on the tab chosen.
                 guard phase == .interacting || phase == .decelerating else { return }
-                let near = nearest(x, half: half, width: width)
+                let near = nearest(from, half: half, width: width)
                 if near != model.place { model.place = near }
             }
             .onScrollPhaseChange { _, new in
                 phase = new
-                // A touch that stops a tab's scroll on its way leaves the ribbon between two places: it goes on to the
-                // nearer one, as a swipe would.
                 if new == .idle {
-                    let near = nearest(offset, half: half, width: width)
+                    // Off the Done column, onto Inbox or further: it closes until the next search, Inbox where it stood.
+                    if lead > 0, offset > half / 2 {
+                        var instant = Transaction()
+                        instant.disablesAnimations = true
+                        withTransaction(instant) {
+                            model.closeDone()
+                            position.scrollTo(id: model.place, anchor: .leading)
+                        }
+                        return
+                    }
+                    // A touch that stops a tab's scroll on its way leaves the ribbon between two places: it goes on to the
+                    // nearer one, as a swipe would.
+                    let near = nearest(offset - lead, half: half, width: width)
                     let stop: CGFloat = switch near { case .inbox: 0; case .soon: half; case .today: width }
-                    if abs(offset - stop) > 0.5 {
+                    if lead == 0, abs(offset - stop) > 0.5 {
                         model.place = near
                         withAnimation(.smooth) { position.scrollTo(id: near, anchor: .leading) }
                         return
@@ -287,7 +352,12 @@ struct Ribbon: View {
             }
             .onChange(of: model.asked) {
                 guard let asked = model.asked else { return }
-                withAnimation(.smooth) { position.scrollTo(id: asked.place, anchor: .leading) }
+                guard asked.done else {
+                    withAnimation(.smooth) { position.scrollTo(id: asked.place, anchor: .leading) }
+                    return
+                }
+                // The Done column is laid out first, then the ribbon goes to it.
+                DispatchQueue.main.async { withAnimation(.smooth) { position.scrollTo(x: 0) } }
             }
         }
     }
@@ -486,22 +556,14 @@ final class DaySwipe: NSObject, UIGestureRecognizerDelegate {
     }
 }
 
-/// The ribbon pages as the plugin's: a swipe, however fast or long, comes to rest on the place next to the one it started
-/// from, or back on it; a tab's own scroll goes straight where it was asked.
-private struct OnePlacePerSwipe: ScrollTargetBehavior {
+/// The ribbon follows the finger and, let go, settles on the place nearest where its glide would end, as the plugin's
+/// screen swipe: a long or quick swipe may pass a place.
+private struct NearestPlace: ScrollTargetBehavior {
     /// Where each place's left edge stands in the ribbon, left to right.
     let stops: [CGFloat]
 
     func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
-        var x = target.rect.minX
-        if context.velocity.dx != 0 {
-            let start = context.originalTarget.rect.minX
-            let from = nearest(start)
-            let lower = stops.last { $0 < from } ?? from
-            let upper = stops.first { $0 > from } ?? from
-            x = min(upper, max(lower, x))
-        }
-        target.rect.origin.x = nearest(x)
+        target.rect.origin.x = nearest(target.rect.minX)
     }
 
     private func nearest(_ x: CGFloat) -> CGFloat {

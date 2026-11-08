@@ -136,4 +136,69 @@ import Testing
         #expect(draft.detail == nil)
         #expect(draft.kind == "afterDone")
     }
+
+    @Test func backlogComesGroupedByProjectEachCardInItsProjectsPart() throws {
+        let board = TaskBoard(core: core, vault: vault())
+        let snapshot = try board.snapshot(day: Self.day, measures: Self.measures, now: at)
+        let backlog = try #require(snapshot.lists[.backlog])
+        #expect(backlog.grouped)
+        #expect(backlog.canGroup)
+        #expect(backlog.heads.map(\.title) == ["Acme", "No project"])
+        #expect(backlog.heads.first?.before == 0)
+        let draft = try #require(backlog.cards.first { $0.item.title == "Draft the offer" })
+        #expect(draft.zone == "Acme")
+        #expect(draft.listCard["project"] == "Acme")
+        let free = try #require(backlog.cards.first { $0.item.title == "Free" })
+        #expect(free.zone == .null)
+        #expect(backlog.groups.first?.under == backlog.heads.first?.id)
+        #expect(backlog.places.array.first?["project"] == "Acme")
+        #expect(snapshot.lists[.inbox]?.grouped == false)
+        #expect(snapshot.lists[.inbox]?.cards.first?.zone == nil)
+    }
+
+    @Test func aFoldedGroupDrawsItsHeaderAlone() throws {
+        let board = TaskBoard(core: core, vault: vault())
+        try board.toggleFold("backlog", key: "acme")
+        let backlog = try #require(try board.snapshot(day: Self.day, measures: Self.measures, now: at).lists[.backlog])
+        let acme = try #require(backlog.heads.first)
+        #expect(acme.folded)
+        #expect(acme.count == 1)
+        #expect(!backlog.cards.contains { $0.item.title == "Draft the offer" })
+        #expect(backlog.heads.last?.before == 0)
+    }
+
+    @Test func aDropInAProjectsPartGivesTheTaskThatProject() throws {
+        let vault = vault()
+        let board = TaskBoard(core: core, vault: vault)
+        let backlog = try #require(try board.snapshot(day: Self.day, measures: Self.measures, now: at).lists[.backlog])
+        let free = try #require(backlog.cards.first { $0.item.title == "Free" })
+        let place: JSONValue = try board.rule("rules.placeOfDrop", [.array(backlog.cards.map(\.listCard)), ["kind": "gap", "index": 0, "level": 0, "group": .null, "project": "Acme"], .null])
+        #expect(place["project"] == "Acme")
+        try board.write("tasks.drop", [[["key": free.item.key.json, "from": "backlog"]], ["kind": "place", "column": "backlog", "place": place], .string(Self.day)])
+        #expect(vault.text.contains("- [ ] Free 🗂️ [[Acme]]"))
+    }
+
+    @Test func aProjectGroupsHeaderOpensItsPartToADrop() throws {
+        let cards = [PlacedCard(level: 0, group: nil, zone: "Acme", top: 30, height: 35)]
+        let heads = [PlacedHead(group: ["group": .null, "project": "Acme"], opens: true, firstCard: 0, top: 0, height: 26)]
+        let board = TaskBoard(core: core, vault: vault())
+        let place = try board.placeAt(cards, y: 10, level: 0, shift: 0, room: .null, heads: heads, held: .null, hysteresis: 6)
+        #expect(place["project"] == "Acme")
+        #expect(place["index"].number == 0)
+    }
+
+    @Test func theCardsAreTheSettingsSizeAndCarryTheirTitlesLinks() throws {
+        let vault = vault()
+        let board = TaskBoard(core: core, vault: vault)
+        try board.writeSettings("settings.setCardHeight", [30])
+        vault.settings = vault.files[try core.settingsFile()] ?? ""
+        let snapshot = try board.snapshot(day: Self.day, measures: Self.measures, now: at)
+        #expect(snapshot.look.cardHeight == 30)
+        let call = try #require(snapshot.lists[.inbox]?.cards.first)
+        #expect(call.parts.map(\.kind) == ["text", "note", "text", "url", "text"])
+        let weekly = try #require(snapshot.lists[.day]?.cards.first { $0.item.title == "Weekly" })
+        let drawn = try board.cards([ListRow(item: weekly.item, level: 0)])
+        #expect(drawn.first?.repeats == true)
+        #expect(drawn.first?.due != nil)
+    }
 }
