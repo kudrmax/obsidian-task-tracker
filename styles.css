@@ -607,10 +607,9 @@ body {
 
 	/* Motion: the cards of a list step aside for a dragged card and the dashed place eases along; a dropped card flies to its place; the drop target slides between grid steps. */
 	--tc-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-	/* The strip slides to the other pair of columns, the switch's pill with it; what changes side flips halfway. */
+	/* The strip slides to the other pair of columns, the switch's pill with it; a column's padding and gap, which change with its side, slide along. */
 	--tc-ease-in-out: ease-in-out;
 	--tc-duration-slide: 300ms;
-	--tc-slide-flip: calc(var(--tc-duration-slide) / 2);
 	--tc-duration-collapse: 150ms;
 	--tc-duration-menu: 200ms;
 	--tc-duration-fly: 180ms;
@@ -853,7 +852,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-right { position: absolute; left: calc(var(--tc-list-width) + var(--tc-divider)); width: calc(100% - var(--tc-list-width) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; overflow: hidden; }
 .task-calendar.is-lists .tc-right { left: calc(100% + var(--tc-divider)); }
 .task-calendar.is-inbox .tc-right { left: calc(100% + 2 * var(--tc-divider) + var(--tc-half-column)); }
-.task-calendar.is-switching :is(.tc-done, .tc-inbox, .tc-left, .tc-soon, .tc-divider, .tc-right, .tc-head, .tc-day-nav .tc-arrow) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding 0s linear var(--tc-slide-flip), gap 0s linear var(--tc-slide-flip); }
+.task-calendar.is-switching :is(.tc-done, .tc-inbox, .tc-left, .tc-soon, .tc-divider, .tc-right, .tc-head, .tc-day-nav .tc-arrow) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding var(--tc-duration-slide) var(--tc-ease-in-out), gap var(--tc-duration-slide) var(--tc-ease-in-out); }
 /* The next day under the screen while a finger draws it in: drawn as the screen draws a day, under the foot, out of reach of the fingers. */
 .tc-peek { position: absolute; inset: 0; isolation: isolate; pointer-events: none; }
 /* The hours and the ground under the all-day events are the screen's own, standing still: the next day shows only what is its own. */

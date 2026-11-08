@@ -3,8 +3,8 @@ import { type CalendarEvent, type DayBoundary, labelHidesNearNow, type ResizeEdg
 import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
-import { DESIGN, PROPERTY } from "./design";
-import { type Box, boxOf, Motion } from "./motion/Motion";
+import { DESIGN, DURATION, PROPERTY } from "./design";
+import { type Box, boxOf, type DurationToken, Motion } from "./motion/Motion";
 import { clear, el, px } from "./dom";
 import { Grips } from "./kit/Grips";
 import { markColours, renderMeta, renderProjectMark, showProgressDot } from "./TaskCard";
@@ -544,7 +544,7 @@ export class Timeline {
 		this.stretch = span ? { el, held, span, edge, key, from } : null;
 		if (!span) this.frame = null;
 		el.classList.toggle("is-resizing", span !== null);
-		this.layoutTasks();
+		this.layoutTasks(true, DURATION.snap);
 	}
 
 	/** The change of task `key`'s time is written, or failed: its card stands as its task says. A stretch of another task, begun meanwhile, stays. */
@@ -554,7 +554,7 @@ export class Timeline {
 		this.stretch = null;
 		this.frame = null;
 		stretch.el.classList.remove("is-resizing");
-		this.layoutTasks();
+		this.layoutTasks(true, DURATION.snap);
 	}
 
 	/** A redraw while the new time is written: the task, still on the time it had, stays stretched on its new card. */
@@ -569,7 +569,8 @@ export class Timeline {
 	 * A card lifted for a drag leaves the stack; the others close over its place. The cards stand in the page in the
 	 * stack's order, so a card that lies over another is drawn over it; the dots of the selected card lie over them all.
 	 */
-	layoutTasks(moving = false): void {
+	/** `moving`: the cards that change their place or size glide to it, in `duration` (a grid step's snap while stretched). */
+	layoutTasks(moving = false, duration: DurationToken = DURATION.collapse): void {
 		const present = this.present();
 		const before = new Map(moving ? present.map((task) => [task.el, boxOf(task.el)] as const) : []);
 		if (!moving) for (const task of present) Motion.settle(task.el);
@@ -589,7 +590,7 @@ export class Timeline {
 			bottom = Math.max(bottom, box.top + box.height);
 		});
 		this.canvas.style.setProperty(PROPERTY.stackEnd, px(bottom));
-		for (const [block, from] of before) Motion.reshape(block, from);
+		for (const [block, from] of before) Motion.reshape(block, from, duration);
 		this.coverRenamed(present);
 		const selected = present.find((t) => t.el.classList.contains("is-selected") && !this.isRenamed(t.item));
 		this.grips.classList.toggle("is-shown", !!selected);

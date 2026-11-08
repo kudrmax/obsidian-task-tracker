@@ -283,7 +283,7 @@ export class DragController {
 	private lift(source: HTMLElement, payload: TaskDragPayload, e: PointerEvent, subtree: readonly HTMLElement[] = [], carried: readonly PickedCard[] = []): void {
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
-		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day(), 1 + carried.length);
+		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day(), 1 + carried.length, origin.width);
 		float.moveTo(e.clientX, e.clientY);
 		const timeline = payload.from === "timeline" ? this.deps.timeline() : null;
 		const waiting = [source, ...carried.map((c) => c.card)];

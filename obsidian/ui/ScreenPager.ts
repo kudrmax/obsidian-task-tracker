@@ -83,9 +83,8 @@ export class ScreenPager implements SwipeTarget {
 		});
 	}
 
-	stand(): void {
-		this.finish();
-	}
+	/** A tap while the screen runs to its place: it runs on from where it is, never put there in one frame; the tap is free to go to what it hit. */
+	stand(): void {}
 
 	private frame(settling: Settling, time: number): void {
 		if (this.settling !== settling) return;

@@ -3,6 +3,7 @@ import type { LocalDate } from "../types";
 import { DESIGN, DURATION, tokenMs, tokenPx } from "../design";
 import { el, px } from "../dom";
 import { fillCard } from "../TaskCard";
+import { timingOf } from "../motion/Motion";
 import { roomWidth, stretchWhole, windowRoom } from "../wholeCard";
 import type { Float } from "./DropTarget";
 
@@ -26,10 +27,18 @@ export class FloatingCard implements Float {
 	private readonly stack: HTMLElement[] = [];
 	private count: HTMLElement | null = null;
 
-	/** `count`: how many tasks are carried, this one among them. */
-	constructor(item: TaskItem, private readonly grab: Grab, day: LocalDate, count = 1) {
+	/** `count`: how many tasks are carried, this one among them; `fromWidth`: the lifted card's, which the copy narrows or widens from to its own. */
+	constructor(item: TaskItem, private readonly grab: Grab, day: LocalDate, count = 1, fromWidth?: number) {
 		this.el = el(null, "div", "tc-float");
 		this.showTask(item, day, count);
+		if (fromWidth !== undefined) this.growFrom(fromWidth);
+	}
+
+	/** The copy takes its width from the card's smoothly, in a card's flight: never in one frame. */
+	private growFrom(width: number): void {
+		const timing = timingOf(this.el, DURATION.fly);
+		const to = this.el.offsetWidth;
+		if (timing && Math.abs(to - width) >= 1) this.el.animate([{ width: px(width) }, { width: px(to) }], timing);
 	}
 
 	private showTask(item: TaskItem, day: LocalDate, count: number): void {
