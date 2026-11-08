@@ -77,7 +77,7 @@ struct BoardScreen: View {
         ZStack(alignment: .topLeading) {
             PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: { plusSlot = $0 })
             if let slot = plusSlot {
-                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
+                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry($0) }, onEnd: { model.carryEnded($0) })
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }
@@ -484,10 +484,9 @@ final class DaySwipe: NSObject, UIGestureRecognizerDelegate {
             model.followDaySwipe(share)
         case .ended:
             let speed = -CGFloat(shift) * pan.velocity(in: ribbon).x
-            let arrive = abs(speed) >= Self.flick ? speed > 0 : share * 2 >= 1
-            Task { await model.endDaySwipe(arrive: arrive) }
+            Task { await model.endDaySwipe(flicked: abs(speed) >= Self.flick, onward: speed > 0) }
         case .cancelled, .failed:
-            Task { await model.endDaySwipe(arrive: false) }
+            Task { await model.endDaySwipe(flicked: false, onward: false) }
         default:
             break
         }

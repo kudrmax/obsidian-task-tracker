@@ -677,8 +677,9 @@ struct CardRow: View {
 
     var body: some View {
         let waiting = model.isWaiting(card)
-        // Its subtasks go with a carried card: they fold away under its dashed place.
-        let folded = model.isFolded(card)
+        // Its subtasks go with a carried card: they fold away under its dashed place; the place itself closes once the card
+        // is let go where it writes, its view kept, for the system still ends its drag from it.
+        let folded = model.isFolded(card) || model.isLeaving(card)
         let selecting = model.selecting
         HStack(spacing: 10) {
             if selecting {
@@ -694,14 +695,14 @@ struct CardRow: View {
                 menu: { later in selecting ? nil : model.cardMenu(card.item, later: later) },
                 ringed: model.found == card.id,
                 draggable: !selecting,
-                carried: folded || model.isHidden(card),
+                carried: model.isFolded(card) || model.isHidden(card),
                 arrival: model.arrival?.id == card.id ? model.arrival?.from : nil,
                 onTouch: { model.found = nil },
                 onPick: selecting ? { pick() } : nil,
                 onCarry: { model.startCarry(card, from: column.rawValue, grab: $0) },
-                onCancel: { model.cancelCarry() },
-                onEnd: { model.carryEnded() },
-                onDropped: { model.carryDropped() },
+                onCancel: { model.cancelCarry($0) },
+                onEnd: { model.carryEnded($0) },
+                onDropped: { model.carryDropped($0) },
                 onFold: card.item.can.fold && !selecting ? { Task { await model.toggleCollapsed(card.item) } } : nil,
                 onProject: { model.openProject(of: card.item) })
                 .frame(height: CardMetrics.height)
@@ -790,10 +791,10 @@ enum SoftEdge {
 
 /// A row that comes or goes in a list folds open or shut from its top while the rows below slide to make or close its
 /// room: its visible part shrinks as fast as the gap closes, so the row below never draws over it, and it fades.
-/// The clip is a shape, not a mask's view builder: SwiftUI renders a running transition off the main thread, where a
-/// main-actor closure traps.
+/// SwiftUI renders a running transition off the main thread (`renderAsync`): the body is nonisolated, so neither it nor
+/// the layout's content closure is a main-actor closure, which traps there; the clip is a shape for the same reason.
 struct FoldAway: Transition {
-    func body(content: Content, phase: TransitionPhase) -> some View {
+    nonisolated func body(content: Content, phase: TransitionPhase) -> some View {
         let share: CGFloat = phase.isIdentity ? 1 : 0
         // The row's own height folds, so the rows below move by exactly what shows of it, one row or a whole block; the
         // list's gap after it folds with it (a margin down to minus the gap), never left standing until the row is gone.

@@ -273,9 +273,9 @@ struct TimelineColumn: View {
             arrival: model.arrival?.id == slot.id ? model.arrival?.from : nil,
             onTouch: { model.found = nil },
             onCarry: { model.startCarry(slot.card, from: "timeline", grab: $0) },
-            onCancel: { model.cancelCarry() },
-            onEnd: { model.carryEnded() },
-            onDropped: { model.carryDropped() },
+            onCancel: { model.cancelCarry($0) },
+            onEnd: { model.carryEnded($0) },
+            onDropped: { model.carryDropped($0) },
             onProject: { model.openProject(of: slot.card.item) })
             .frame(height: max(tall, CardMetrics.height))
             .opacity(selecting ? 0.5 : 1)

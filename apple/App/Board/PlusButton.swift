@@ -12,9 +12,9 @@ struct PlusButton: UIViewRepresentable {
     let cancelling: Bool
     /// The places a carried plus is let go on.
     var drop: BoardDrop?
-    var onCarry: () -> Void = {}
-    var onCancel: () -> Void = {}
-    var onEnd: () -> Void = {}
+    var onCarry: () -> Int = { 0 }
+    var onCancel: (Int) -> Void = { _ in }
+    var onEnd: (Int) -> Void = { _ in }
 
     /// The design's size of the round button beside the tab bar, and its gap to the screen's edges.
     static let side: CGFloat = 62
@@ -41,9 +41,11 @@ struct PlusButton: UIViewRepresentable {
 final class PlusControl: UIControl, UIDropInteractionDelegate {
     var open: () -> Void = {}
     weak var drop: BoardDrop?
-    var onCarry: () -> Void = {}
-    var onCancel: () -> Void = {}
-    var onEnd: () -> Void = {}
+    var onCarry: () -> Int = { 0 }
+    var onCancel: (Int) -> Void = { _ in }
+    var onEnd: (Int) -> Void = { _ in }
+    /// The carry the plus's copy is: what its end names.
+    private var token = 0
     var accent = UIColor.tintColor {
         didSet { if accent != oldValue { look() } }
     }
@@ -181,7 +183,7 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
             }()
             if let lifted { grip = CGPoint(x: point.x - lifted.center.x, y: point.y - lifted.center.y) }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            onCarry()
+            token = onCarry()
         case .changed:
             guard let lifted, let space = lifted.superview else { return }
             let point = pan.location(in: space)
@@ -204,20 +206,20 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
             if !trembled, !onTarget, case .taken(let field) = drop?.letGo() ?? .missed {
                 if let field {
                     become(field)
-                    onEnd()
+                    onEnd(token)
                 } else {
                     flyHome()
                 }
                 return
             }
             drop?.carryOff()
-            onCancel()
+            onCancel(token)
             flyHome()
             if trembled { open() }
         default:
             guard lifted != nil else { return }
             drop?.carryOff()
-            onCancel()
+            onCancel(token)
             flyHome()
         }
     }
@@ -236,11 +238,11 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
     /// drag; the carry ends once it is there (the slot turns from the cancel target back into the plus then, not while the
     /// copy flies). A finger that comes down on the plus before it lands takes it again from where it flies.
     private func flyHome() {
-        guard let lifted else { return onEnd() }
+        guard let lifted else { return onEnd(token) }
         self.lifted = nil
         guard let space = lifted.superview, window != nil else {
             settle(lifted)
-            return onEnd()
+            return onEnd(token)
         }
         homing = lifted
         UIView.animate(springDuration: 0.4, bounce: 0.15, options: [.allowUserInteraction]) {
@@ -248,7 +250,7 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
         } completion: { _ in
             guard self.homing === lifted else { return }
             self.settle(lifted)
-            self.onEnd()
+            self.onEnd(self.token)
         }
     }
 
@@ -281,16 +283,16 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
         super.didMoveToWindow()
         guard window == nil else { return }
         if lifted == nil, homing != nil {
-            let onEnd = onEnd
-            DispatchQueue.main.async { onEnd() }
+            let (onEnd, token) = (onEnd, token)
+            DispatchQueue.main.async { onEnd(token) }
         }
         if lifted != nil {
-            let (drop, onCancel, onEnd) = (drop, onCancel, onEnd)
+            let (drop, onCancel, onEnd, token) = (drop, onCancel, onEnd, token)
             // Out of the screen's update that took the plus away.
             DispatchQueue.main.async {
                 drop?.carryOff()
-                onCancel()
-                onEnd()
+                onCancel(token)
+                onEnd(token)
             }
         }
         for copy in [lifted, homing].compactMap({ $0 }) { settle(copy) }
