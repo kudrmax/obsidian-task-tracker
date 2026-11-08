@@ -204,8 +204,9 @@ class SectionFloat implements Float {
 		this.el.style.transform = `translate3d(${x - this.grab.dx}px, ${y - this.grab.dy}px, 0)`;
 	}
 
+	/** Lands folding shut onto the place its section opens at: a line at the header's top as the section unfolds from it. */
 	land(rect: DOMRect): Promise<void> {
-		return this.flyTo(rect);
+		return this.animate([{ transform: this.el.style.transform }, { transform: `translate3d(${rect.left}px, ${rect.top}px, 0) scale(1, 0)` }]);
 	}
 
 	/** Flies to `rect`'s top left, as a dropped card's copy does. */

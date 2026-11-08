@@ -303,15 +303,22 @@ export class TaskList {
 			row.style.setProperty(PROPERTY.level, String(level));
 			rows.push({ node: row, level });
 		};
+		/** Lines typed since the last drawing: each stands where the field stood, and the field's row opens anew under them. */
+		let typed = false;
 		entry.pending.forEach(({ text, level }, i) => {
 			const { node, fresh } = drawing.take(`${UNWRITTEN}${i}`, () => el(null, "div", "tc-card"), `${UNWRITTEN}${i + this.written}`);
 			if (!fresh) node.replaceChildren();
+			else if (this.keyed.nodeOf(ENTRY)) {
+				drawing.standIn(node);
+				typed = true;
+			}
 			fillUnwrittenCard(node, text);
 			put(node, level);
 		});
 		if (entry.newSection) this.namedHeader(drawing, entry.newSection);
 		const row = drawing.take(ENTRY, () => el(null, "div", QUICK_ROW)).node;
 		if (this.renamingNow) drawing.standIn(row);
+		else if (typed) drawing.regrow(row);
 		for (const old of row.querySelectorAll(":scope > .tc-branch, :scope > .tc-branch-pass")) old.remove();
 		entry.field(row);
 		row.classList.toggle("is-section", entry.section === true);

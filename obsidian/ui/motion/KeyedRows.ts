@@ -148,6 +148,11 @@ export class RowsDrawing {
 		this.fresh.delete(node);
 	}
 
+	/** A kept row that opens anew where it now stands (the field's row once its text became a line over it): it grows in, it does not slide. */
+	regrow(node: HTMLElement): void {
+		this.fresh.add(node);
+	}
+
 	/**
 	 * The rows stand in the page in the order taken; the new ones grow in, the moved ones slide, the rest leave. The new
 	 * ones start growing first, from nothing: a moved row slides to where it stands with them at that height, and their

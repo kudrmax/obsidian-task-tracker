@@ -1108,7 +1108,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .task-calendar .tc-head-title.has-menu { cursor: pointer; }
 .tc-lifted.is-head { background: none; border-radius: 0; padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); align-items: flex-end; }
 /* A lifted section under the finger: its header as a lifted card, its count on the right, two layers of its cards beneath. */
-.tc-section-float { width: var(--tc-float-w); height: var(--tc-float-h); }
+/* It lands folding shut from its top, onto the line its section opens from. */
+.tc-section-float { width: var(--tc-float-w); height: var(--tc-float-h); transform-origin: 0 0; }
 .tc-stack-layer { position: absolute; left: 0; top: 0; height: var(--tc-float-h); border-radius: var(--tc-radius-float); box-shadow: var(--tc-shadow-lift); }
 .tc-stack-layer.is-1 { width: calc(var(--tc-float-w) - 2 * var(--tc-stack-step-x)); transform: translate(var(--tc-stack-step-x), var(--tc-stack-step-y)); background: var(--tc-stack-1); }
 .tc-stack-layer.is-2 { width: calc(var(--tc-float-w) - 2 * var(--tc-stack-step-x) - 2 * var(--tc-stack-step-x)); transform: translate(calc(2 * var(--tc-stack-step-x)), calc(2 * var(--tc-stack-step-y))); background: var(--tc-stack-2); }
