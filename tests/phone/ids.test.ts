@@ -122,6 +122,19 @@ describe("a task's id through the door", () => {
 		expect(sections().find((s) => s.name === "Errands")?.id).toBe(errands.id);
 	});
 
+	it("tells where a drop will leave a task without writing, the place the drop then gives", () => {
+		const app = new App();
+		const a = app.item("A");
+		const before = app.tasks;
+		const [landing] = app.call("tasks.landing", [{ key: a.key, from: "day" }], { kind: "time", start: 120 }, T).result as { kind: string; id: string; ridesNow: boolean; span: { start: number } }[];
+		expect(app.tasks).toBe(before);
+		expect(landing).toMatchObject({ kind: "timeline", id: a.id, ridesNow: true });
+		app.call("tasks.drop", [{ key: a.key, from: "day" }], { kind: "time", start: 120 }, T);
+		const screen = app.call("tasks.screen", T).result as { day: { slotted: Item[] } };
+		expect(screen.day.slotted.map((i) => i.id)).toEqual([a.id]);
+		expect(app.call("tasks.shownSpan", screen.day.slotted[0], T).result).toEqual(landing.span);
+	});
+
 	it("keeps the door's functions as they were: the old ones answer without ids", () => {
 		const reminders = phone.reminders(FILE, "", NOW);
 		expect(Array.isArray(reminders)).toBe(true);

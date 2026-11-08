@@ -382,6 +382,31 @@ export interface DroppedTask {
 	readonly from: DropFrom;
 }
 
+/** A column of the screen a task can stand in after a drop. */
+export type LandingColumn = "day" | "soon" | "inbox" | "backlog" | "done";
+
+/** A slotted task of the day's timeline after a drop: its id and its minutes from the start of the day as shown. */
+export interface LandingSpan {
+	readonly id: string;
+	readonly span: DaySpan;
+}
+
+/**
+ * Where a dropped task stands once the drop is written, on the screen of the day it was dropped on (`TaskService.landing`).
+ * `id` is the task's (`TaskItem.id`), `item` the task as the screen will read it (null for `away`).
+ * - `timeline`: a block of the day's timeline, at `span` (minutes from the start of the day, as `shownSpan` gives them);
+ *   `ridesNow`: its own start has passed today, so it rides the now line. `slotted`: every block of the day after the
+ *   drop in the screen's order, for the frontend's stack (`stackTasks`) to say where the card sits among them.
+ * - `list`: a card of `column`, in section `group`, `index` among the cards of that section there.
+ * - `subtask`: under the task `parent` (its id), `index` among its open subtasks.
+ * - `away`: not on this screen (another day, out of this project's view).
+ */
+export type DropLanding =
+	| { readonly kind: "timeline"; readonly id: string; readonly item: TaskItem; readonly span: DaySpan; readonly ridesNow: boolean; readonly slotted: readonly LandingSpan[] }
+	| { readonly kind: "list"; readonly id: string; readonly item: TaskItem; readonly column: LandingColumn; readonly group: GroupName; readonly index: number }
+	| { readonly kind: "subtask"; readonly id: string; readonly item: TaskItem; readonly parent: string; readonly index: number }
+	| { readonly kind: "away"; readonly id: string; readonly item: null };
+
 /** Whether a target takes the tasks carried from these places, and whether a list shows where in it a task goes or puts it at its end. */
 export { acceptsDrop, placesInGap } from "./drops";
 
@@ -932,6 +957,13 @@ export interface TaskService {
 	 * order, so the screen settles the card on the task where it stands; one not found again is left out.
 	 */
 	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly TaskKey[]>;
+	/**
+	 * Where `drop` with the same arguments would leave each task, in their order, writing nothing: the drop's own
+	 * operation run over the file as read, and the screen of `day` (a project's view with `project`) read over the result
+	 * by the same code as `screen`. So a copy flies to the very place the write gives, a past time on today included (the
+	 * card rides the now line). Rejects as `drop` would.
+	 */
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Promise<readonly DropLanding[]>;
 
 	/** Applies the normalization rules (spec §4.4). Writes only when something changed. */
 	normalize(): Promise<void>;

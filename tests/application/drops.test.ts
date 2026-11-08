@@ -290,3 +290,48 @@ describe("which drops a target takes", () => {
 		expect(placesInGap("day", "new", false)).toBe(true);
 	});
 });
+
+/** Where the task `id` stands on the screen of `day` as read after a write, found the plain way: by looking. */
+async function placeAfter(svc: Svc, id: string, day: string): Promise<unknown> {
+	const screen = await svc.screen(day);
+	const block = screen.day.slotted.find((i) => i.id === id);
+	if (block) return { kind: "timeline", item: block, span: svc.shownSpan(block, day), slotted: screen.day.slotted.map((i) => ({ id: i.id, span: svc.shownSpan(i, day) })) };
+	const columns = { day: screen.day.list, soon: screen.soon, inbox: screen.inbox, backlog: screen.backlog, done: screen.done };
+	for (const [column, items] of Object.entries(columns)) {
+		const card = items.find((i) => i.id === id);
+		if (card) return { kind: "list", item: card, column, group: card.group, index: items.filter((i) => i.group === card.group).indexOf(card) };
+		const parent = items.flatMap(function walk(i: TaskItem): TaskItem[] {
+			return [i, ...i.subtasks.flatMap(walk)];
+		}).find((i) => i.subtasks.some((s) => s.id === id));
+		if (parent) return { kind: "subtask", item: parent.subtasks.find((s) => s.id === id), parent: parent.id, index: parent.subtasks.findIndex((s) => s.id === id) };
+	}
+	return { kind: "away", item: null };
+}
+
+describe("landing: where a drop leaves a task, before it is written", () => {
+	for (const c of [...SINGLE, ...SEVERAL, { name: "today's list → a past time of today: it rides the now line", day: T, tasks: [["N1", "day"]] as const, to: () => ({ kind: "time" as const, start: hourAt(9) }) }]) {
+		it(`is where the write leaves it: ${c.name}`, async () => {
+			const { store, svc } = setup();
+			const items = await itemsOf(svc);
+			const tasks = c.tasks.map(([text, from]) => ({ key: items.get(text)!.key, from }));
+			const before = store.text;
+			const landing = await svc.landing(tasks, c.to((text) => items.get(text)!.key), c.day);
+			expect(store.text).toBe(before);
+			expect(store.writes).toBe(0);
+			await svc.drop(tasks, c.to((text) => items.get(text)!.key), c.day);
+			const ids = c.tasks.map(([text]) => items.get(text)!.id);
+			const after = await Promise.all(ids.map((id) => placeAfter(svc, id, c.day)));
+			expect(landing.map(({ id: _id, ridesNow: _r, ...place }: Record<string, unknown>) => place)).toEqual(after);
+			expect(landing.map((l) => l.id)).toEqual(ids);
+		});
+	}
+
+	it("tells a past time of today rides the now line, and a time to come does not", async () => {
+		const { svc } = setup();
+		const n1 = (await itemsOf(svc)).get("N1")!;
+		const [past] = await svc.landing([{ key: n1.key, from: "day" }], { kind: "time", start: hourAt(9) }, T);
+		const [later] = await svc.landing([{ key: n1.key, from: "day" }], { kind: "time", start: hourAt(16) }, T);
+		expect(past).toMatchObject({ kind: "timeline", ridesNow: true, span: { start: hourAt(14) + 20 } });
+		expect(later).toMatchObject({ kind: "timeline", ridesNow: false, span: { start: hourAt(16) } });
+	});
+});

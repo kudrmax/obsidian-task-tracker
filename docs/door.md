@@ -97,6 +97,19 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   its task where it stands. A drop in a list column is `{ kind: "place", column, place }`: the `ListPlace` its gap means
   (`rules.placeOfDrop`), or `null` at the end of a column that places nothing in a gap (`rules.placesInGap`). The door
   reads it by whose sections the column shows on `day`; the host never builds `list`, `group` or `nest` itself.
+- `tasks.landing(tasks, to, day, project?)`: where `tasks.drop` with the same arguments would leave each task, in
+  their order, writing nothing (no `tasks` in the answer): the drop's own operation tried over the file, the screen of
+  `day` read over the result by the screen's own code. Ask it at the moment of the drop, before `tasks.drop`, and fly
+  the copy there. Each answer is a `DropLanding` with the task's `id` and `item` (the task as the next screen reads it):
+  - `{ kind: "timeline", span, ridesNow, slotted }`: a block of the day's timeline at `span` (minutes from the start of
+    the day, as `tasks.shownSpan` gives them); `ridesNow`, a past time of today: the block rides the now line; `slotted`,
+    every block of the day after the drop (`{ id, span }`, in the screen's order) to lay the stack out with
+    `rules.stackTasks` and find the card's box.
+  - `{ kind: "list", column, group, index }`: a card of `column` (`day`, `soon`, `inbox`, `backlog`, `done`), in section
+    `group`, `index` among that section's cards there.
+  - `{ kind: "subtask", parent, index }`: under the task `parent` (its id), `index` among its open subtasks.
+  - `{ kind: "away" }`: not on this screen (another day, out of this project's view).
+  It needs the tasks file, so it is a `tasks.*` method; `rules.*` are the rules that need no file.
 - `tasks.toggleCollapsed(key)`: a tap on a card's subtask counter (offered while `item.can.fold`).
 - `tasks.snap(minute, hourPx, tolerancePx)`: the minute a drag, a drop or a stretch on the timeline stands at, the
   timeline drawn `hourPx` points an hour: the finest of 5, 15, 30 and 60 minutes a finger moves at least `tolerancePx`
