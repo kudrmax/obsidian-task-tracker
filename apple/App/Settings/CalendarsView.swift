@@ -11,6 +11,7 @@ struct CalendarsView: View {
     @State private var calendars: [ShownCalendar] = []
     @State private var refreshing = false
     @State private var access = EKEventStore.authorizationStatus(for: .event)
+    @State private var plugin = PluginSettings()
     @Environment(\.dismiss) private var dismiss
 
     private let board = AppServices.shared.board
@@ -69,6 +70,32 @@ struct CalendarsView: View {
                     if index == accounts.count - 1 { Text("The timeline shows the events of the calendars switched on.") }
                 }
             }
+            if let form = plugin.form {
+                // Google Calendar as the plugin's settings set it up: the plugin fetches it and writes the file the app
+                // reads, so its sign-in and secret stay in Obsidian; the client and the interval are shared settings.
+                Section {
+                    LabeledContent("Account", value: form.googleClientReady ? "In Obsidian" : "Client ID First")
+                    TextRow(title: "Client ID", value: form.googleClientId) { id in
+                        await plugin.write("settings.setGoogleClientId", [.string(id)])
+                    }
+                    CountRow(title: "Refresh Interval", unit: "s", value: form.refreshSeconds) { text in
+                        await plugin.write("settings.setCount", ["refreshSeconds", .string(text)])
+                    }
+                } header: {
+                    Text("Google Calendar")
+                } footer: {
+                    Text("Obsidian fetches Google Calendar and syncs it here: log in and paste the client secret in its settings. Seconds between fetches while Obsidian is open; 0 turns the timer off.")
+                }
+                Section {
+                    TextRow(title: "File Path", value: form.workCalendarFile) { path in
+                        await plugin.write("settings.setWorkCalendarFile", [.string(path)])
+                    }
+                } header: {
+                    Text("Work Calendar")
+                } footer: {
+                    Text("The work calendar's file in the vault, as Obsidian's export writes it. This iPhone's own calendars need no script: the app exports them itself.")
+                }
+            }
         }
         .navigationTitle("Calendars")
         .toolbar {
@@ -76,7 +103,10 @@ struct CalendarsView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.tint(.primary) }
             }
         }
-        .task { await load() }
+        .task {
+            await load()
+            await plugin.load()
+        }
     }
 
     /// The calendars by account, in the order the core lists them.

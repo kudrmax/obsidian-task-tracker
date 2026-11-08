@@ -107,6 +107,7 @@ final class BoardModel {
         self.project = project
         place = RibbonPlace.remembered(for: project)
         dropping.ended = { [weak self] in self?.carryEnded() }
+        dropping.moving = { [weak self] in self?.beginLiftedSection() }
         entry.model = self
     }
 
@@ -812,11 +813,33 @@ final class BoardModel {
         if picked.contains(id) { picked.remove(id) } else { picked.insert(id) }
     }
 
-    /// Every card of the lists: the calendar's cannot be picked, as in the plugin.
-    func pickAll() {
-        guard let snapshot else { return }
-        picked = Set(snapshot.lists.values.flatMap { $0.cards.map(\.id) })
+    /// The day list's width beside the calendar for the saved share of the screen, and the bounds the divider moves
+    /// within (`rules.listWidths`); the divider is drawn over the line, taking no width of its own.
+    func listWidths(share: Double, viewWidth: CGFloat) -> ListWidths? {
+        let key = "\(share)/\(viewWidth)"
+        if let known = widths[key] { return known }
+        guard let found = try? board.listWidths(share: share, viewWidth: Double(viewWidth), dividerWidth: 0) else { return nil }
+        if widths.count > 256 { widths = [:] }
+        widths[key] = found
+        return found
     }
+
+    @ObservationIgnored private var widths: [String: ListWidths] = [:]
+
+    /// The share a divider let go at `width` saves (`rules.listShareOf`).
+    func listShare(of width: CGFloat, viewWidth: CGFloat) -> Double? {
+        ruleNow("rules.listShareOf", [.number(Double(width)), .number(Double(viewWidth)), .number(0)])
+    }
+
+    /// Whether Select Tasks picks a card drawn at `from` (a list column's, never the calendar's), as the core says.
+    func canPick(_ from: String) -> Bool {
+        if let known = pickable[from] { return known }
+        let found: Bool = ruleNow("rules.canPick", [.string(from)]) ?? false
+        pickable[from] = found
+        return found
+    }
+
+    @ObservationIgnored private var pickable: [String: Bool] = [:]
 
     // MARK: Drag and drop
 
@@ -870,6 +893,7 @@ final class BoardModel {
 
     /// A card lifted: it waits as a dashed place where it stood and its subtasks fold away under it, as the plugin's.
     func startCarry(_ card: BoardCard, from column: String, grab: CGFloat) {
+        liftedSection = nil
         found = nil
         withAnimation(.snappy(duration: 0.25)) { carry = Carry(id: card.id, item: card.item, from: column, grab: grab) }
     }
@@ -877,6 +901,7 @@ final class BoardModel {
     /// Select Tasks: a picked card lifted carries every picked task as a stack, as the plugin's. The core says which go
     /// along with it (`tasks.carried`: the rest of the picked, but a subtask whose task is picked goes with that task).
     func startGroupCarry(_ card: BoardCard, from column: String) {
+        liftedSection = nil
         guard let snapshot else { return }
         found = nil
         let picked = pickedItems
@@ -894,7 +919,22 @@ final class BoardModel {
         }
     }
 
-    /// A section's header lifted: its header and tasks fold away and the list closes over them, as the plugin's.
+    /// A section's header lifted by the system's drag: its carry starts once the drag moves over the screen, so a lift let
+    /// go where it stood (which starts no drag session, and so would never end one) carries nothing.
+    func liftSection(_ column: BoardColumn, _ group: BoardGroup) {
+        liftedSection = (column, group)
+    }
+
+    @ObservationIgnored private var liftedSection: (column: BoardColumn, group: BoardGroup)?
+
+    private func beginLiftedSection() {
+        guard let lifted = liftedSection else { return }
+        liftedSection = nil
+        guard carry == nil else { return }
+        startSectionCarry(lifted.column, lifted.group)
+    }
+
+    /// A section's header carried: its header and tasks fold away and the list closes over them, as the plugin's.
     func startSectionCarry(_ column: BoardColumn, _ group: BoardGroup) {
         guard let list = snapshot?.lists[column], let name = list.sectionsOf, let lifted = list.groups.firstIndex(where: { $0.id == group.id }),
               let shape = geometry[column] else { return }
@@ -965,6 +1005,7 @@ final class BoardModel {
     func isWaiting(_ card: BoardCard) -> Bool { card.id == carry?.id }
 
     func startCarryingPlus() {
+        liftedSection = nil
         carry = Carry(id: Carried.plus, item: nil, from: "new", grab: 0)
     }
 
@@ -986,6 +1027,7 @@ final class BoardModel {
     /// The drag session ended, whatever came of it: a carry still standing ends now, unless its drop is still being
     /// written, which ends it once the screen shows the write.
     func carryEnded() {
+        liftedSection = nil
         guard carry != nil, !writingDrop else { return }
         cancelCarry()
     }

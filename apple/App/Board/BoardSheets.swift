@@ -217,8 +217,9 @@ struct RepeatSheet: View {
                                 }
                             }
                         }
-                    } else if draft.detail == "monthDay", let day = draft.dayOfMonth {
-                        Section { LabeledContent("On Day", value: "\(day)") }
+                    } else if draft.detail == "monthDay", let on: String = model.ruleNow("rules.onTheDay", [draft.rule]), !on.isEmpty {
+                        // The day a monthly schedule falls on, in the core's words: «On the 5th».
+                        Section { Text(on) }
                     }
                     if draft.removable {
                         Section {

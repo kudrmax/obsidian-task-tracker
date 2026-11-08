@@ -598,6 +598,16 @@ public struct SettingsForm: Decodable, Sendable {
     public let cardHeights: SizeBounds
     public let cardGaps: SizeBounds
     public let projectTag: String
+    /// The line markers by name (`dueDateMarker`, `slotMarker`, …) and the order the screen edits them in; their words are
+    /// the host's. `settings.setMarker(marker, text)`.
+    public let markers: [String: String]
+    public let markerOrder: [String]
+    /// Google Calendar, as far as a host without the plugin's sign-in edits it: the OAuth client's id
+    /// (`settings.setGoogleClientId`), the seconds between fetches (`settings.setCount("refreshSeconds", …)`), and whether
+    /// a client id is there for Log in to go with.
+    public let googleClientId: String
+    public let refreshSeconds: Int
+    public let googleClientReady: Bool
 }
 
 public struct SizeBounds: Decodable, Hashable, Sendable {

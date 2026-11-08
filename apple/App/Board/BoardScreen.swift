@@ -233,20 +233,31 @@ struct BoardScreen: View {
             .tint(.primary)
     }
 
+    /// Select Tasks, as the plugin's: in place of Undo and «⋯» a capsule with the cross that ends it and the number picked;
+    /// in place of the plus a circle with «⋯». The number and «⋯» open the menu for every picked task, dimmed while none is.
     @ToolbarContentBuilder
     private var selectionBar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            Button("Select All") { model.pickAll() }
+            Button("End Selecting", systemImage: "xmark") { model.endSelection() }
+                .tint(.primary)
         }
-        ToolbarItem(placement: .principal) {
-            Text("\(model.picked.count) Selected").font(.headline)
+        ToolbarItem(placement: .topBarLeading) {
+            BulkMenu(model: model, question: $question) {
+                Text(verbatim: "\(model.picked.count)")
+                    .font(.headline)
+                    .monospacedDigit()
+                    .frame(minWidth: 28)
+            }
+            .accessibilityLabel("\(model.picked.count) selected")
         }
-        ToolbarItem(placement: .topBarTrailing) {
-            Button("Done", systemImage: "checkmark") { model.endSelection() }
-                .buttonStyle(.glassProminent)
-        }
-        ToolbarItemGroup(placement: .bottomBar) {
-            BulkActions(model: model, question: $question)
+        ToolbarSpacer(placement: .bottomBar)
+        ToolbarItem(placement: .bottomBar) {
+            BulkMenu(model: model, question: $question) {
+                Image(systemName: "ellipsis")
+            }
+            .buttonStyle(.glassProminent)
+            .tint(Palette.accent(scheme))
+            .accessibilityLabel("Actions for the selected tasks")
         }
     }
 }
@@ -381,14 +392,10 @@ struct Ribbon: View {
         return stops.min { abs($0.1 - x) < abs($1.1 - x) }?.0 ?? .today
     }
 
-    /// The day list's width: its share of the screen, within the plugin's bounds for a phone.
+    /// The day list's width for its saved share of the screen, within the bounds the core gives (`rules.listWidths`).
     private func listWidth(_ width: CGFloat) -> CGFloat {
-        min(Self.maxList, width - Self.minList, max(Self.minList, listShare * width))
+        model.listWidths(share: listShare, viewWidth: width).map { CGFloat($0.width) } ?? width / 2
     }
-
-    /// The plugin's bounds on a list's width on a phone (`LIST_WIDTH_MIN`, `LIST_WIDTH_MAX`).
-    static let minList: CGFloat = 110
-    static let maxList: CGFloat = 280
 
     /// The handle on the line between the day list and the calendar; it shows and moves only at Today.
     private func divider(_ width: CGFloat) -> some View {
@@ -406,7 +413,9 @@ struct Ribbon: View {
                     .onChanged { drag in
                         let start = dragStart ?? listWidth(width)
                         if dragStart == nil { dragStart = start }
-                        listShare = Double(min(Self.maxList, width - Self.minList, max(Self.minList, start + drag.translation.width)) / width)
+                        guard let bounds = model.listWidths(share: listShare, viewWidth: width) else { return }
+                        let dragged = min(CGFloat(bounds.max), max(CGFloat(bounds.min), start + drag.translation.width))
+                        listShare = model.listShare(of: dragged, viewWidth: width) ?? listShare
                     }
                     .onEnded { _ in dragStart = nil }
             )
@@ -430,52 +439,26 @@ struct Ribbon: View {
     }
 }
 
-/// Select Tasks' actions in the bottom bar, in place of the tab bar: Done, priority, move, more, Delete — the bulk menu
-/// as the core reads it for the picked tasks.
-struct BulkActions: View {
+/// The menu for every picked task (`tasks.bulkMenu`), the plugin's bulk menu: the statuses, priorities, labels, moves,
+/// Section, Project, Delete. Any action ends Select Tasks but a label, which keeps the menu and the picks for the next.
+struct BulkMenu<Label: View>: View {
     @Bindable var model: BoardModel
     @Binding var question: MenuQuestion?
+    @ViewBuilder let label: Label
     @State private var menu: TaskMenuModel?
 
     var body: some View {
         let items = model.pickedItems
-        Group {
-            Button("Done", systemImage: "checkmark.circle") {
-                guard let done = menu?.statuses.first(where: { $0.id == "done" }) else { return }
-                if done.confirm { question = .status(items, done.id) } else { Task { await model.pickStatus(items, done.id) } }
-            }
-            .disabled(menu?.statuses.contains { $0.id == "done" } != true)
-            Menu("Priority", systemImage: "flag") {
-                if let menu, !menu.levels.disabled {
-                    ForEach(menu.levels.tiles, id: \.mark) { tile in
-                        Toggle(tile.mark.title, isOn: Binding(get: { tile.on }, set: { _ in Task { await model.togglePriority(items, tile.mark.title) } }))
-                    }
-                }
-            }
-            .disabled(menu?.levels.disabled ?? true)
-            Menu("Move", systemImage: "calendar") {
-                if let menu {
-                    ForEach(menu.moves, id: \.id) { move in
-                        Button(MoveWords.title(move.id), systemImage: MoveWords.symbol(move.id)) {
-                            if let date = move.date { Task { await model.postpone(items, to: date) } } else { model.dateFor = items }
-                        }
-                    }
-                    if menu.removeDue {
-                        Button("Remove Due Date", systemImage: "calendar.badge.minus") { Task { await model.removeDue(items) } }
-                    }
-                }
-            }
-            .disabled(menu?.moves.isEmpty ?? true)
-            Menu("More", systemImage: "ellipsis.circle") {
-                if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model) { question = $0 }.nodes) }
-            }
+        Menu {
+            if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model) { question = $0 }.nodes) }
+        } label: {
+            label
         }
+        // The core's order, the plugin's, wherever the menu opens: Delete stays last even over the bottom bar.
+        .menuOrder(.fixed)
         .tint(.primary)
         .disabled(items.isEmpty)
         .task(id: BulkRead(picked: model.picked, file: model.snapshot?.tasksText)) { menu = items.isEmpty ? nil : await model.bulkMenu() }
-        Button("Delete", systemImage: "trash", role: .destructive) { Task { await model.remove(items) } }
-            .tint(.red)
-            .disabled(items.isEmpty || menu?.remove == nil)
     }
 }
 

@@ -537,7 +537,7 @@ private struct SectionLift: ViewModifier {
     func body(content: Content) -> some View {
         if group.reorder {
             content.onDrag {
-                model.startSectionCarry(column, group)
+                model.liftSection(column, group)
                 return NSItemProvider(object: "section" as NSString)
             } preview: {
                 SectionFloat(name: group.header ?? "", count: group.cards.filter { $0.level == 0 }.count)
@@ -680,7 +680,7 @@ struct CardRow: View {
         // Its subtasks go with a carried card: they fold away under its dashed place.
         let carried = model.isCarried(card) && !waiting
         HStack(spacing: 10) {
-            if model.selecting, !carried {
+            if picks, !carried {
                 SelectionCircle(on: model.picked.contains(card.id))
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
@@ -692,7 +692,7 @@ struct CardRow: View {
         }
         .contentShape(.rect)
         .onTapGesture {
-            guard model.selecting else { return }
+            guard picks else { return }
             UISelectionFeedbackGenerator().selectionChanged()
             withAnimation(.snappy(duration: 0.2)) { model.togglePick(card.id) }
         }
@@ -701,9 +701,12 @@ struct CardRow: View {
         .accessibilityHidden(carried)
     }
 
+    /// Select Tasks picks this card: the core says which columns' cards are picked.
+    private var picks: Bool { model.selecting && model.canPick(column.rawValue) }
+
     @ViewBuilder
     private func capsule(carried: Bool) -> some View {
-        if model.selecting {
+        if picks {
             // A picked card lifted carries every picked task as a stack, as the plugin's.
             CardButton(
                 card: card,

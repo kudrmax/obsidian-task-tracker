@@ -261,7 +261,7 @@ struct TimelineColumn: View {
     @ViewBuilder
     private func slotCard(_ slot: BoardSlot, tall stretched: CGFloat? = nil) -> some View {
         let tall = stretched ?? CGFloat(slot.box.height)
-        if model.selecting {
+        if model.selecting, !model.canPick("timeline") {
             TaskCapsule(card: slot.card, height: tall).opacity(0.5)
         } else {
             CardButton(

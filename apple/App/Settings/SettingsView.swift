@@ -32,6 +32,9 @@ struct SettingsView: View {
                 }
                 Button("Add Priority") { Task { await plugin.write("settings.addLevel") } }
             }
+            if let form = plugin.form {
+                CardsSection(form: form, plugin: plugin)
+            }
             Section("Show and set up") {
                 link("Labels", value: plugin.form.map { "\($0.labels.count)" }, symbol: "tag.fill", tint: .green) { LabelsPage(plugin: plugin) }
                 link("Sections", value: plugin.form.map { "\($0.presets.count)" }, symbol: "rectangle.stack.fill", tint: .indigo) { SectionsPage(plugin: plugin) }
@@ -130,6 +133,15 @@ struct LabelsPage: View {
             } footer: {
                 Text("A task tagged with a label is drawn in its colour.")
             }
+            if let form = plugin.form {
+                Section {
+                    Picker("Several Labels", selection: Binding(get: { form.labelPaint }, set: { paint in Task { await plugin.write("settings.setLabelPaint", [.string(paint)]) } })) {
+                        ForEach(form.labelPaints, id: \.self) { Text(LabelsPage.paintTitle($0)).tag($0) }
+                    }
+                } footer: {
+                    Text("A card of several labels: thin slanted stripes of their colours in turn, or the colours flowing into each other from left to right.")
+                }
+            }
             Section {
                 LabeledContent("Tag") {
                     TextField("label", text: $tag)
@@ -145,6 +157,60 @@ struct LabelsPage: View {
         .navigationTitle("Labels")
         .toolbar { EditButton() }
         .onAppear { tag = plugin.form?.labelTag ?? "" }
+    }
+}
+
+extension LabelsPage {
+    /// Several labels' paints in the app's words.
+    static func paintTitle(_ paint: String) -> String {
+        switch paint {
+        case "stripes": "Stripes"
+        case "blend": "Blend"
+        default: paint.capitalized
+        }
+    }
+}
+
+/// Cards: a card's height and the gap between two cards, each a slider within the core's bounds, as the plugin's.
+struct CardsSection: View {
+    let form: SettingsForm
+    let plugin: PluginSettings
+    @State private var height: Double = 35
+    @State private var gap: Double = 2
+
+    var body: some View {
+        Section {
+            slider("Card Height", value: $height, bounds: form.cardHeights) { await plugin.write("settings.setCardHeight", [.number($0)]) }
+            slider("Gap Between Cards", value: $gap, bounds: form.cardGaps) { await plugin.write("settings.setCardGap", [.number($0)]) }
+        } header: {
+            Text("Cards")
+        } footer: {
+            Text("Points. The ends of a card are round: half its height. The gap is between cards in a list and in a stack on the timeline.")
+        }
+        .onAppear { follow() }
+        .onChange(of: form.cardHeight) { follow() }
+        .onChange(of: form.cardGap) { follow() }
+    }
+
+    private func follow() {
+        height = Double(form.cardHeight)
+        gap = Double(form.cardGap)
+    }
+
+    private func slider(_ title: String, value: Binding<Double>, bounds: SizeBounds, write: @escaping (Double) async -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            LabeledContent(title, value: "\(Int(value.wrappedValue))")
+            Slider(value: value, in: Double(bounds.min)...Double(bounds.max), step: 1) {
+                Text(title)
+            } minimumValueLabel: {
+                Text("\(bounds.min)").font(.caption).foregroundStyle(.secondary)
+            } maximumValueLabel: {
+                Text("\(bounds.max)").font(.caption).foregroundStyle(.secondary)
+            } onEditingChanged: { editing in
+                if !editing { Task { await write(value.wrappedValue) } }
+            }
+            .accessibilityLabel(title)
+        }
     }
 }
 
@@ -230,6 +296,14 @@ struct DayPage: View {
                 } footer: {
                     Text("Today opens on the now line. A calendar file older than this is shown in orange.")
                 }
+                Section {
+                    CountRow(title: "Long Press Delay", unit: "ms", value: form.longPressMs) { text in
+                        await plugin.write("settings.setCount", ["longPressMs", .string(text)])
+                    }
+                    LabeledContent("Zoom Levels", value: plugin.zoomLevels)
+                } footer: {
+                    Text("Milliseconds before a touch becomes a drag, on a card and on the empty timeline. The zoom's hour heights in points: a pinch stops wherever the fingers lift, up to the largest; they are set in Obsidian's settings.")
+                }
             }
         }
         .navigationTitle("Day and Timeline")
@@ -258,6 +332,28 @@ struct TasksFilePage: View {
             } footer: {
                 Text("Your Obsidian vault: On My iPhone → Obsidian → your vault. The tasks file is a path in it.")
             }
+            if let form = plugin.form {
+                Section {
+                    ForEach(form.markerOrder, id: \.self) { marker in
+                        TextRow(title: TasksFilePage.markerTitle(marker), value: form.markers[marker] ?? "") { text in
+                            await plugin.write("settings.setMarker", [.string(marker), .string(text)])
+                        }
+                    }
+                } header: {
+                    Text("Line Markers")
+                } footer: {
+                    Text("Lines written with an old marker are no longer read: change them in the file by hand.")
+                }
+                Section {
+                    TextRow(title: "Project Tag", value: form.projectTag) { tag in
+                        await plugin.write("settings.setProjectTag", [.string(tag)])
+                    }
+                } footer: {
+                    Text(!plugin.updatesLinks
+                        ? "A note with this tag, in its properties or its text, is a project: the task menu's Project offers it. One word. Turn on Files and links → Automatically update internal links in Obsidian: otherwise renaming a project's note breaks its tasks' links."
+                        : "A note with this tag, in its properties or its text, is a project: the task menu's Project offers it. One word.")
+                }
+            }
             Section {
                 LabeledContent("Recording Tag") {
                     TextField("None", text: $model.recordingTag)
@@ -274,6 +370,82 @@ struct TasksFilePage: View {
             Task { await model.choose(picked); await plugin.load() }
         }
         .onAppear { path = plugin.form?.tasksFile ?? "" }
+    }
+}
+
+extension TasksFilePage {
+    /// A line marker's name, as the plugin's settings name it.
+    static func markerTitle(_ marker: String) -> String {
+        switch marker {
+        case "dueDateMarker": "Due Date"
+        case "slotMarker": "Slot"
+        case "alarmSlotMarker": "Alarm"
+        case "liveSlotMarker": "Live Activity"
+        case "silentSlotMarker": "No Reminder"
+        case "repeatMarker": "Repeat"
+        case "collapsedMarker": "Collapsed"
+        default: marker
+        }
+    }
+}
+
+/// A setting typed as text, written when it is left (Return): the field shows what the settings hold again after the
+/// write, so a value the core refused goes back to the one saved.
+struct TextRow: View {
+    let title: String
+    let value: String
+    let write: (String) async -> Void
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        LabeledContent(title) {
+            TextField(title, text: $text)
+                .focused($focused)
+                .multilineTextAlignment(.trailing)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onSubmit { focused = false }
+                .onChange(of: focused) { if !focused, text != value { Task { await write(text); text = value } } }
+        }
+        .onAppear { text = value }
+        .onChange(of: value) { text = value }
+    }
+}
+
+/// A setting typed as a count: digits, its unit after the field.
+struct CountRow: View {
+    let title: String
+    let unit: String
+    let value: Int
+    let write: (String) async -> Void
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack(spacing: 4) {
+                TextField(title, text: $text)
+                    .focused($focused)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.numberPad)
+                    .onSubmit { focused = false }
+                    // The number pad has no return: the bar over it ends the typing, as the plugin's field is left.
+                    .toolbar {
+                        if focused {
+                            ToolbarItemGroup(placement: .keyboard) {
+                                Spacer()
+                                Button("Done") { focused = false }
+                            }
+                        }
+                    }
+                    .onChange(of: focused) { if !focused, text != "\(value)" { Task { await write(text); text = "\(value)" } } }
+                    .frame(maxWidth: 90)
+                Text(unit).foregroundStyle(.secondary)
+            }
+        }
+        .onAppear { text = "\(value)" }
+        .onChange(of: value) { text = "\(value)" }
     }
 }
 

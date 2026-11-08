@@ -26,6 +26,9 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     private(set) lazy var interaction = UIDropInteraction(delegate: self)
     /// Told when a carry's drag session ends, whatever came of it: the screen's way to end a carry whose card is gone.
     var ended: () -> Void = {}
+    /// Told as a system carry first moves over the screen: a section lifted by its header starts its carry only then, so
+    /// a lift let go where it stood (no drag session at all) leaves nothing carried.
+    var moving: () -> Void = {}
     private var places: [String: DropPlace] = [:]
     /// How each place that scrolls is scrolled by a carry held at its edge: by `dy` points, true when it moved.
     private var scrolls: [String: (CGFloat) -> Bool] = [:]
@@ -141,6 +144,7 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: any UIDropSession) -> UIDropProposal {
         guard let view = interaction.view else { return UIDropProposal(operation: .cancel) }
+        moving()
         let point = session.location(in: view)
         let key = place(at: point)
         if key != current { leave() }
