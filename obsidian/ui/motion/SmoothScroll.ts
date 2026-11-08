@@ -1,15 +1,18 @@
 import { DURATION, EASING, tokenMs } from "../design";
 import { easingOf } from "../easing";
-import { ScrollGlide } from "../quick/ScrollGlide";
+import { type GlideEnd, ScrollGlide } from "../quick/ScrollGlide";
 
 const GLIDES = new WeakMap<HTMLElement, ScrollGlide>();
+/** What takes a scroller from the plugin: a finger or a wheel on it. */
+const FINGER = ["pointerdown", "wheel", "touchstart"] as const;
 
 /**
  * The one scroll the plugin makes by itself: `scroller` glides to `top` in the list's motion tokens, one glide per
- * scroller at a time (a new one takes over from where the last stands); at once where nothing moves (a test). `done` runs
- * once it stands there. Answers how to stop it where it is.
+ * scroller at a time. `done` hears exactly once how it ended: it got there, its content ended short of it, another glide
+ * took over, it was called off, or a finger or a wheel took the scroller (it yields at once). At once where nothing moves
+ * (a test). Answers how to call it off.
  */
-export function scrollSmoothly(scroller: HTMLElement, top: number, done: () => void = () => undefined): () => void {
+export function scrollSmoothly(scroller: HTMLElement, top: number, done: (how: GlideEnd) => void = () => undefined): () => void {
 	const glide = GLIDES.get(scroller) ?? new ScrollGlide();
 	GLIDES.set(scroller, glide);
 	const ms = tokenMs(scroller, DURATION.collapse);
@@ -17,11 +20,19 @@ export function scrollSmoothly(scroller: HTMLElement, top: number, done: () => v
 	if (ms <= 0 || Math.abs(to - scroller.scrollTop) < 1) {
 		glide.stop();
 		scroller.scrollTop = to;
-		done();
+		done(Math.abs(scroller.scrollTop - top) < 1 ? "arrived" : "blocked");
 		return () => undefined;
 	}
-	glide.start(scroller, to, { ms, ease: easingOf(getComputedStyle(scroller).getPropertyValue(EASING.out)), rise: 0 }, (at) => {
-		if (Math.abs(at - to) < 1) done();
+	const finger = () => glide.stop("finger");
+	for (const type of FINGER) scroller.addEventListener(type, finger, { passive: true });
+	glide.start(scroller, to, { ms, ease: easingOf(getComputedStyle(scroller).getPropertyValue(EASING.out)), rise: 0 }, () => undefined, (how) => {
+		for (const type of FINGER) scroller.removeEventListener(type, finger);
+		done(how === "arrived" && Math.abs(to - top) >= 1 ? "blocked" : how);
 	});
-	return () => glide.stop();
+	let running = true;
+	return () => {
+		if (!running) return;
+		running = false;
+		glide.stop();
+	};
 }

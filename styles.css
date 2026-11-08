@@ -1083,6 +1083,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 /* Every part of an overlay opens in --tc-duration-menu and closes in --tc-duration-collapse, on one curve: the sheet, the shadow its level casts, the windows and the copies over it. */
 .tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-backdrop.is-shown { opacity: 1; }
+/* Not shown yet (a menu waiting for its column to scroll) or closing, the sheet takes no tap: the finger reaches the screen. */
+.tc-backdrop:not(.is-shown) { pointer-events: none; }
 .tc-backdrop.is-closing { transition-duration: var(--tc-duration-collapse); }
 .tc-level { position: fixed; inset: 0; z-index: var(--tc-layer-panel); pointer-events: none; filter: var(--tc-level-shadow-off); transition: filter var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-level.is-shown { filter: var(--tc-level-shadow); }
