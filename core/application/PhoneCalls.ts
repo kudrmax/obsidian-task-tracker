@@ -373,6 +373,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	createInSoon: (c, [text]) => c.run(c.writes.createInSoon(text as string)),
 	createAtTime: (c, [date, start, text]) => c.run(c.writes.createAtTime(date as string, start as number, text as string)),
 	createInPlace: (c, [text, priority, place, repeat, labels]) => c.run(c.writes.createInPlace(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A)),
+	createWithId: (c, [text, priority, place, repeat, labels]) => c.run(c.writes.createWithId(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A)),
 	create: (c, [draft, slot]) => c.run(c.writes.create(draft as A, (slot ?? undefined) as A)),
 	createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent as A, draft as A)),
 	edit: (c, [key, draft]) => c.run(c.writes.edit(key as A, draft as A)),

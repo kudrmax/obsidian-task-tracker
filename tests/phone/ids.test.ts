@@ -135,6 +135,15 @@ describe("a task's id through the door", () => {
 		expect(app.call("tasks.shownSpan", screen.day.slotted[0], T).result).toEqual(landing.span);
 	});
 
+	it("answers a task made by tasks.createWithId with its key and id; tasks.createInPlace still answers the key", () => {
+		const app = new App();
+		const made = app.call("tasks.createWithId", "Fresh", null, { kind: "list", list: "inbox", group: null, before: null }).result as { key: unknown; id: string };
+		expect(made).toEqual({ key: app.item("Fresh").key, id: app.item("Fresh").id });
+		const key = app.call("tasks.createInPlace", "Plain", null, { kind: "list", list: "inbox", group: null, before: null }).result;
+		expect(key).toEqual(app.item("Plain").key);
+		expect(app.item("Fresh").id).toBe(made.id);
+	});
+
 	it("keeps the door's functions as they were: the old ones answer without ids", () => {
 		const reminders = phone.reminders(FILE, "", NOW);
 		expect(Array.isArray(reminders)).toBe(true);

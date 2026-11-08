@@ -94,6 +94,11 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
 - Reads take a `TaskItem`, a `TaskKey` and the like as the door gave them; a key names a task as read.
 - `tasks.screen(date)` with no tasks file answers the empty screen with `missing: true`.
 - `tasks.createFile()` answers the new file's text in `tasks`; with a file already there it fails.
+- `tasks.createWithId(text, priority, place, repeat?, labels?)`: `tasks.createInPlace`, answering `CreatedTask`
+  `{ key, id }` (null when nothing was created) instead of the key alone. The key names the new task as the file stands
+  right after this write; the id names it whatever is written before the screen draws it. `tasks.createInPlace` answers
+  the key as before. `entry.shown(session, look, job, created, coming)` takes either: with a `CreatedTask`, and the
+  `coming` cards (`ListCard`) carrying `id`, the typed task's card is found by its id.
 - `tasks.drop(tasks, to, day)` answers the dropped tasks' keys as the file now has them: the screen settles the card on
   its task where it stands. A drop in a list column is `{ kind: "place", column, place }`: the `ListPlace` its gap means
   (`rules.placeOfDrop`), or `null` at the end of a column that places nothing in a gap (`rules.placesInGap`). The door

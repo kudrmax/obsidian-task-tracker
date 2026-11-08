@@ -3345,6 +3345,7 @@ ${key.title}`.toLowerCase();
      * leaves the queue, and the places at or past its card move down, in the very drawing that shows its card: where the
      * lists draw the task the file holds (`created`, the key the write gave), which its rules may have put elsewhere.
      */
+    /** `created`: the task the write made, its key, or with its id (`createWithId`), which finds its card whatever wrote since. */
     shown(id, created, coming) {
       const job = this.job(id);
       if (job.kind !== "create") return;
@@ -3532,7 +3533,9 @@ ${key.title}`.toLowerCase();
      * is, as for a task put elsewhere.
      */
     landed(column, created, cards) {
-      const index = cards.findIndex((card) => samePlace2(card.key, created) && sameLine(card.key, created));
+      const made = "id" in created ? created : null;
+      const key = made ? made.key : created;
+      const index = cards.findIndex((card) => made && card.id !== void 0 ? card.id === made.id : samePlace2(card.key, key) && sameLine(card.key, key));
       if (index < 0) return;
       for (const run of Object.values(this.session.runs)) {
         const list = listSpot(run.spot);
@@ -5375,11 +5378,15 @@ ${key.title}`.toLowerCase();
       return nothing(this.rules.createAtTime(date, start, text));
     }
     createInPlace(text, priority, place, repeat, labels = []) {
+      const write = this.createWithId(text, priority, place, repeat, labels);
+      return { operation: write.operation, answer: (change) => write.answer(change)?.key ?? null };
+    }
+    createWithId(text, priority, place, repeat, labels = []) {
       return {
         operation: this.rules.createInPlace(text, priority, place, repeat, labels),
         answer: (change) => {
           const created = change?.after.insertedSince(change.before);
-          return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
+          return created ? { key: { section: created.section, index: created.index, path: created.path, raw: created.raw }, id: created.id } : null;
         }
       };
     }
@@ -5960,6 +5967,7 @@ ${key.title}`.toLowerCase();
     createInSoon: (c, [text]) => c.run(c.writes.createInSoon(text)),
     createAtTime: (c, [date, start, text]) => c.run(c.writes.createAtTime(date, start, text)),
     createInPlace: (c, [text, priority, place, repeat, labels]) => c.run(c.writes.createInPlace(text, priority ?? null, place, repeat ?? null, labels ?? [])),
+    createWithId: (c, [text, priority, place, repeat, labels]) => c.run(c.writes.createWithId(text, priority ?? null, place, repeat ?? null, labels ?? [])),
     create: (c, [draft, slot]) => c.run(c.writes.create(draft, slot ?? void 0)),
     createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent, draft)),
     edit: (c, [key, draft]) => c.run(c.writes.edit(key, draft)),

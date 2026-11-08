@@ -37,6 +37,8 @@ function withProject<T extends object>(place: T, project: ProjectZone | undefine
 /** A card of the list as a place in it sees it: also its task. */
 export interface ListCard extends LevelCard {
 	readonly key: TaskKey;
+	/** Its task's id (`TaskItem.id`): a card given one is found by it, wherever writes since moved its key. */
+	readonly id?: string;
 }
 
 /** Where a dropped card goes: only ever between cards, into the gap before card `index` at `level`, in section `group`. */

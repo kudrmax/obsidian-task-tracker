@@ -388,6 +388,12 @@ export interface DroppedTask {
 	readonly from: DropFrom;
 }
 
+/** A task a write made: its key as the file stands right after the write, and its id (`TaskItem.id`). */
+export interface CreatedTask {
+	readonly key: TaskKey;
+	readonly id: string;
+}
+
 /** A column of the screen a task can stand in after a drop. */
 export type LandingColumn = "day" | "soon" | "inbox" | "backlog" | "done";
 
@@ -728,6 +734,11 @@ export interface TaskService {
 	 * takes an Inbox task to Soon); null when nothing was created.
 	 */
 	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[]): Promise<TaskKey | null>;
+	/**
+	 * `createInPlace`, answering the new task's id with its key: the key names it as the file stands right after this write,
+	 * the id for as long as the service runs, whatever writes come before the screen draws it. Null when nothing was created.
+	 */
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[]): Promise<CreatedTask | null>;
 	/**
 	 * The marks `createInPlace`, `create` or `edit` writes for a title typed as `text` with `priority` (a level's prefix or
 	 * null) and `labels` chosen: the chosen priority, else the level the text's first word is; the labels only without one.

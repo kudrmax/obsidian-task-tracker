@@ -1,6 +1,7 @@
 import { isOpen, type LocalDate, type ReminderKind, type Slot, type TaskStatus } from "../domain/Task";
 import type { TaskDocument } from "../domain/TaskDocument";
 import type {
+	CreatedTask,
 	DroppedTask,
 	DropFrom,
 	DropLanding,
@@ -64,11 +65,16 @@ export class TaskWrites {
 	}
 
 	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Write<TaskKey | null> {
+		const write = this.createWithId(text, priority, place, repeat, labels);
+		return { operation: write.operation, answer: (change) => write.answer(change)?.key ?? null };
+	}
+
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Write<CreatedTask | null> {
 		return {
 			operation: this.rules.createInPlace(text, priority, place, repeat, labels),
 			answer: (change) => {
 				const created = change?.after.insertedSince(change.before);
-				return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
+				return created ? { key: { section: created.section, index: created.index, path: created.path, raw: created.raw }, id: created.id } : null;
 			},
 		};
 	}
