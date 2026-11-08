@@ -22,24 +22,24 @@ KNOWN = already named by the lead.
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 1.1 KNOWN | Links in titles drawn as links: `[[note]]`, `[[note\|alias]]`, `[text](url)`, bare `https://` show their word in the accent (file.md «Строка задачи»; P/TaskTitle.ts). | Raw text `Text(card.item.text)` (A/TaskCapsule.swift:28). | MISSING | CORE (title pieces: text/link/target) + SWIFT; core: done — `rules.textParts(text)` (`TaskBoard.titleParts`) |
-| 1.2 | Tap on a link in a title opens the note / address (P/TaskTitle.ts «The link a tap landed on»). | absent | MISSING | CORE + SWIFT; core: done — `TextPart.target`; a note by `notes.open(target, notes)` (`TaskBoard.noteToOpen`) |
-| 1.3 KNOWN | Several labels: stripes or blend of up to 4 colours (screen.md «Карточка»; settings.md Several labels; P/TaskCard.ts:106 markColours). | Only the first colour (`colors.first`, C/BoardSnapshot.swift:347,374). | MISSING | CORE (labelPaint is a view setting in P/viewSettings.ts, not in the door) + SWIFT; core: done — `screenSettings.get().labelPaint`, `settings.setLabelPaint` (ios-labels) |
-| 1.4 KNOWN | Label names with `_` shown as spaces. | Fixed on branch ios-labels (not on master: menu titles still `tile.mark.title`, A/TaskMenu.swift:60). | WRONG | in progress |
-| 1.5 | Project folder icon on every card of a project task (lists, groups, timeline, subtasks), in the date's place (screen.md «Карточка»; P/TaskCard.ts:73). | absent; `TaskItem.project` not even decoded (C/BoardModels.swift:57-95); door context has no `projects` (C/TaskBoard.swift:156). | MISSING | CORE (project notes for the context) + SWIFT; core: done — `notes.tags`, `notes.projects` → `context.projects` (TaskBoard hands them in); `TaskItem.project` decoded |
-| 1.6 | Tap on the folder icon opens the project note; in Select mode it selects. | absent | MISSING | SWIFT (after 1.5) |
-| 1.7 | Card height (28–40) and gap (0–10) from Settings → Cards. | Fixed 35 / 2 (A/Paint.swift:46-48). | WRONG | CORE (cardHeight/cardGap live in P/viewSettings.ts, not the door) + SWIFT; core: done — `screenSettings.get()` `cardHeight`/`cardGap` (`TaskBoard.screenSettings`) |
-| 1.8 | A long title shows whole in the menu and under the finger (card grows, P/wholeCard.ts, P/menu/LiftedMenu.ts). | The menu/drag preview is the same faded capsule (A/CardButton.swift:190-238). | MISSING | SWIFT |
-| 1.9 | Search result rows are real cards (priority colour, due, counter, marks). | Plain grey capsule with title only (A/SearchScreen.swift:48-65). | LOOK | SWIFT |
-| 1.10 | Full screen subtasks are list cards with priority/label colours and due (FullScreen uses TaskList). | `shades: nil, due: nil` — subtasks always grey, no date (A/TaskFullScreen.swift:160). | WRONG | SWIFT |
-| 1.11 | Found card ring stays until the next touch anywhere. | Cleared only by touching a card or lifting one (A/ListColumn.swift:532, A/BoardModel.swift:608). | WRONG (minor) | SWIFT |
+| 1.1 KNOWN | Links in titles drawn as links: `[[note]]`, `[[note\|alias]]`, `[text](url)`, bare `https://` show their word in the accent (file.md «Строка задачи»; P/TaskTitle.ts). | Raw text `Text(card.item.text)` (A/TaskCapsule.swift:28). | MISSING | CORE (title pieces: text/link/target) + SWIFT; core: done — `rules.textParts(text)` (`TaskBoard.titleParts`); app: done — each card carries `parts` (`rules.textParts`, BoardCard.parts), links in the accent |
+| 1.2 | Tap on a link in a title opens the note / address (P/TaskTitle.ts «The link a tap landed on»). | absent | MISSING | CORE + SWIFT; core: done — `TextPart.target`; a note by `notes.open(target, notes)` (`TaskBoard.noteToOpen`); app: done — a tap on a link opens it (url in Safari; a note in Obsidian by `notes.open`), elsewhere the menu |
+| 1.3 KNOWN | Several labels: stripes or blend of up to 4 colours (screen.md «Карточка»; settings.md Several labels; P/TaskCard.ts:106 markColours). | Only the first colour (`colors.first`, C/BoardSnapshot.swift:347,374). | MISSING | CORE (labelPaint is a view setting in P/viewSettings.ts, not in the door) + SWIFT; core: done — `screenSettings.get().labelPaint`, `settings.setLabelPaint` (ios-labels); app: done (ios-labels, verified: stripes in lists, on the timeline, in the menu copy) |
+| 1.4 KNOWN | Label names with `_` shown as spaces. | Fixed on branch ios-labels (not on master: menu titles still `tile.mark.title`, A/TaskMenu.swift:60). | WRONG | in progress; app: done (ios-labels: `rules.labelTitle` in the menu) |
+| 1.5 | Project folder icon on every card of a project task (lists, groups, timeline, subtasks), in the date's place (screen.md «Карточка»; P/TaskCard.ts:73). | absent; `TaskItem.project` not even decoded (C/BoardModels.swift:57-95); door context has no `projects` (C/TaskBoard.swift:156). | MISSING | CORE (project notes for the context) + SWIFT; core: done — `notes.tags`, `notes.projects` → `context.projects` (TaskBoard hands them in); `TaskItem.project` decoded; app: done — folder mark after the title, left of the counter and the date, on lists, groups, timeline, subtasks, Done, full screen |
+| 1.6 | Tap on the folder icon opens the project note; in Select mode it selects. | absent | MISSING | SWIFT (after 1.5); app: done — a tap on the mark opens the project's view (Decisions 1); in Select mode it selects |
+| 1.7 | Card height (28–40) and gap (0–10) from Settings → Cards. | Fixed 35 / 2 (A/Paint.swift:46-48). | WRONG | CORE (cardHeight/cardGap live in P/viewSettings.ts, not the door) + SWIFT; core: done — `screenSettings.get()` `cardHeight`/`cardGap` (`TaskBoard.screenSettings`); app: done — `CardMetrics.height`/`gap` follow each read's `look` (`screenSettings.get`), radius half the height; the timeline stacks at them |
+| 1.8 | A long title shows whole in the menu and under the finger (card grows, P/wholeCard.ts, P/menu/LiftedMenu.ts). | The menu/drag preview is the same faded capsule (A/CardButton.swift:190-238). | MISSING | SWIFT; app: done in the menu (ios-labels, `rules.wholeWidth`); the drag lifts the capsule itself (Decisions 2) |
+| 1.9 | Search result rows are real cards (priority colour, due, counter, marks). | Plain grey capsule with title only (A/SearchScreen.swift:48-65). | LOOK | SWIFT; app: left to section 9 (search rows with the project line and the match highlight are one piece of work there); `TaskBoard.cards(_:)` is ready for it |
+| 1.10 | Full screen subtasks are list cards with priority/label colours and due (FullScreen uses TaskList). | `shades: nil, due: nil` — subtasks always grey, no date (A/TaskFullScreen.swift:160). | WRONG | SWIFT; app: done — subtasks drawn by `TaskBoard.cards` (paint, due, title links, folder) |
+| 1.11 | Found card ring stays until the next touch anywhere. | Cleared only by touching a card or lifting one (A/ListColumn.swift:532, A/BoardModel.swift:608). | WRONG (minor) | SWIFT; app: done — `TouchWatch` on the window clears the ring at any touch |
 | — | In parity: title fade, due corner (core `rules.cardDue`), repeat mark, counter over description mark, in-progress dot, priority/one-label fill, collapsed peek, branch lines, timeline stack corner. | | | |
 
 ## 2. Task menu
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 2.1 KNOWN | Project row in every menu (single and bulk): projects A–Z, No project, check on current; subtask row disabled; value on the right (tasks.md «Меню задачи» 4; core `menu.project`). | absent (A/TaskMenu.swift:88-107 has no `project`; MenuProject not decoded). | MISSING | CORE (project notes in context) + SWIFT; core: done — `TaskMenuModel.project` over `context.projects`; write `tasks.setProject` |
+| 2.1 KNOWN | Project row in every menu (single and bulk): projects A–Z, No project, check on current; subtask row disabled; value on the right (tasks.md «Меню задачи» 4; core `menu.project`). | absent (A/TaskMenu.swift:88-107 has no `project`; MenuProject not decoded). | MISSING | CORE (project notes in context) + SWIFT; core: done — `TaskMenuModel.project` over `context.projects`; write `tasks.setProject`; app: done — Project › after Section (or before Add Subtask), options A–Z, No project, value on the right, disabled for subtasks; writes `tasks.setProject`; also in the bulk menu |
 | 2.2 | Labels: menu stays open after a label tap, card re-colours live, to set another. | Label rows not `keepsOpen` → menu closes each time (A/TaskMenu.swift:59-61). Same in bulk «More» (MenuNodes). | WRONG | SWIFT |
 | 2.3 | Description start shown over the card in the menu; tap opens full screen, tap on a link opens it (tasks.md, P/menu/DescriptionPeek.ts). | absent | MISSING | SWIFT (markdown rendering) |
 | 2.4 | Timeline card with subtasks: its open subtasks between card and menu; tap a subtask → its menu (tasks.md). | absent | MISSING | SWIFT |
@@ -47,7 +47,7 @@ KNOWN = already named by the lead.
 | 2.6 | Repeat row shows the current rule on the right ("Every 3 days", weekday letters). | «Repeat…» without value (A/TaskMenu.swift:99). | LOOK/MISSING info | CORE (words are built in P/repeat/repeatLabel.ts — move to core) + SWIFT; core: done — `TaskMenuModel.repeat` `{ value, days }`, `rules.repeatValue` |
 | 2.7 | Repeat page writes once when the menu closes; there is no discard. | Sheet: ✕ discards, only ✓ writes (A/BoardSheets.swift:181-185). | WRONG | SWIFT (core `repeatPage.end` already) |
 | 2.8 | Pick a date page marks today/the due date; Remove due date at the bottom. | In parity (DateSheet). See bug 0.5. | — | — |
-| 2.9 | Section page lists in a project group the group's sections. | Grouping forced off, so always the whole list's (C/TaskBoard.swift:167-169). | WRONG (follows 5.x) | CORE context + SWIFT; core: done — grouping no longer forced off: `TaskBoard(grouping:)` keeps the door's `grouping` |
+| 2.9 | Section page lists in a project group the group's sections. | Grouping forced off, so always the whole list's (C/TaskBoard.swift:167-169). | WRONG (follows 5.x) | CORE context + SWIFT; core: done — grouping no longer forced off: `TaskBoard(grouping:)` keeps the door's `grouping`; app: done — the board keeps the device's grouping, so a grouped card's Section page is its group's (seen on Backlog cards) |
 | 2.10 | Rename / New section inline. | Alerts with a text field (A/BoardSheets.swift:22; A/ListColumn.swift:382). | LOOK | — |
 | — | In parity: groups order from core, statuses (Done, In progress/Stop progress, Won't do, Stop), confirmations, priorities, moves, Reminder page, Add subtask (lists), Open full screen, Open in Obsidian, Delete. | | | |
 
@@ -55,25 +55,25 @@ KNOWN = already named by the lead.
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 3.1 | Tap on a section header opens its menu (Rename / Remove section); long press lifts it. | Tap does nothing; the menu is a long-press context menu sharing the long press with the lift (A/ListColumn.swift:374-381). | WRONG | SWIFT |
-| 3.2 | Rename section: the name edits in place. | Alert. | LOOK | — |
-| 3.3 | Done column left of Inbox, opened by search, its cards open the menu (screen.md «Колонка Done»). | absent: `screen.done` decoded and never drawn (C/BoardModels.swift:149); reveal of a Done hit goes nowhere (A/BoardModel.swift:403-411). | MISSING | SWIFT |
-| 3.4 | Ribbon position remembered on the device. | Always opens on Today (`var place = .today`, A/BoardModel.swift:117). | WRONG | SWIFT |
-| 3.5 | Wheel tap on an icon already in the window does not move; otherwise nearest position showing it. | Tab always goes to its fixed place (A/BoardModel.swift:126). | WRONG (minor) | SWIFT |
-| 3.6 | Screen swipe: follows the finger and settles on the nearest place (may pass one). | Exactly one place per swipe (A/BoardScreen.swift:488-507; app.md says so). | WRONG (minor) | SWIFT |
-| 3.7 KNOWN | Section row icon/look. | | LOOK | SWIFT |
+| 3.1 | Tap on a section header opens its menu (Rename / Remove section); long press lifts it. | Tap does nothing; the menu is a long-press context menu sharing the long press with the lift (A/ListColumn.swift:374-381). | WRONG | SWIFT; app: done — a tap on a header opens its Rename / Remove Section menu; a long press still lifts it |
+| 3.2 | Rename section: the name edits in place. | Alert. | LOOK | —; app: left — LOOK only (Rename stays the system alert) |
+| 3.3 | Done column left of Inbox, opened by search, its cards open the menu (screen.md «Колонка Done»). | absent: `screen.done` decoded and never drawn (C/BoardModels.swift:149); reveal of a Done hit goes nowhere (A/BoardModel.swift:403-411). | MISSING | SWIFT; app: done — Done column left of Inbox, opened by a Done hit of the search with the card ringed; its cards open the core's menu (`from: done`); a swipe onto Inbox closes it |
+| 3.4 | Ribbon position remembered on the device. | Always opens on Today (`var place = .today`, A/BoardModel.swift:117). | WRONG | SWIFT; app: done — the place is kept in UserDefaults (`ribbonPlace`; a project's view by its note) |
+| 3.5 | Wheel tap on an icon already in the window does not move; otherwise nearest position showing it. | Tab always goes to its fixed place (A/BoardModel.swift:126). | WRONG (minor) | SWIFT; app: n/a — Decisions 3 |
+| 3.6 | Screen swipe: follows the finger and settles on the nearest place (may pass one). | Exactly one place per swipe (A/BoardScreen.swift:488-507; app.md says so). | WRONG (minor) | SWIFT; app: done — the ribbon settles on the place nearest where its glide ends (may pass one) |
+| 3.7 KNOWN | Section row icon/look. | | LOOK | SWIFT; app: left — LOOK, no behaviour named; the headers match the plugin's metrics |
 | — | In parity: Inbox over Backlog halves, Soon undated only, day column (core), sections, No section header, No tasks plates + tap to type, empty sections, section lift/reorder, divider + remembered width, soft edges, subtask fold by counter. | | | |
 
 ## 4. Projects
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 4.1 | Backlog grouped by project by default, Soon optionally: header per project with chevron, fold (count when folded, remembered), arrow opening the note, A–Z, No project last, empty project groups in Backlog with «No tasks» (screen.md «Группы проектов»). | absent: grouping forced off (`ungrouped`, C/TaskBoard.swift:156,169); `screen.projects` not decoded. Max's Backlog looks different on the two. | MISSING | CORE (project notes for the context; the core already groups) + SWIFT; core: done — `screen.projects` decoded, `context.projects`, device grouping kept; `TaskBoard.setGrouping`/`toggleFold` |
-| 4.2 | Tap on the Backlog / Soon title → menu with Group by project ✓. | absent | MISSING | SWIFT (core `tasks.setGrouping`, `grouping` handed back) |
-| 4.3 | Drop into another project's group sets `🗂️`; drop on a folded group header → end of group; plus into a group writes the project. | absent (no groups) | MISSING | SWIFT |
-| 4.4 | Section rename/remove inside a project group touch only that project's tasks. | absent | MISSING | SWIFT |
-| 4.5 | Project view inside the project note (Obsidian block). | No project view in the app at all. | MISSING (needs a product decision) | CORE (project notes) + SWIFT; core: done — `tasks.screen(date, project)` with `context.projects` |
-| 4.6 | Bulk menu Project for all picked. | absent | MISSING | SWIFT (after 2.1) |
+| 4.1 | Backlog grouped by project by default, Soon optionally: header per project with chevron, fold (count when folded, remembered), arrow opening the note, A–Z, No project last, empty project groups in Backlog with «No tasks» (screen.md «Группы проектов»). | absent: grouping forced off (`ungrouped`, C/TaskBoard.swift:156,169); `screen.projects` not decoded. Max's Backlog looks different on the two. | MISSING | CORE (project notes for the context; the core already groups) + SWIFT; core: done — `screen.projects` decoded, `context.projects`, device grouping kept; `TaskBoard.setGrouping`/`toggleFold`; app: done — `screen.projects` groups drawn: chevron, title, count while folded, arrow, No project last, empty groups with No tasks; fold via `TaskBoard.toggleFold`, kept in `UserDefaultsGrouping` |
+| 4.2 | Tap on the Backlog / Soon title → menu with Group by project ✓. | absent | MISSING | SWIFT (core `tasks.setGrouping`, `grouping` handed back); app: done — Backlog's and Soon's title is a menu with Group by Project ✓ (`TaskBoard.setGrouping`) |
+| 4.3 | Drop into another project's group sets `🗂️`; drop on a folded group header → end of group; plus into a group writes the project. | absent (no groups) | MISSING | SWIFT; app: done — cards and headers carry their zone (`BoardCard.zone`, `PlacedCard.zone`, `PlacedHead` with `opens`), so a drop into a group writes its project; a plate and the plus in a group pass it (`entry.openIn(…, project)`) |
+| 4.4 | Section rename/remove inside a project group touch only that project's tasks. | absent | MISSING | SWIFT; app: done — `renameGroup`/`removeGroup` take the header's `menu.project` |
+| 4.5 | Project view inside the project note (Obsidian block). | No project view in the app at all. | MISSING (needs a product decision) | CORE (project notes) + SWIFT; core: done — `tasks.screen(date, project)` with `context.projects`; app: done — the project's view as a full-screen cover (`tasks.screen(date, link)`, `WireLook.project`, search scoped, own remembered place); Decisions 1 |
+| 4.6 | Bulk menu Project for all picked. | absent | MISSING | SWIFT (after 2.1); app: done — the bulk menu's «⋯» draws the same Project row |
 
 ## 5. Drag & drop
 
@@ -190,3 +190,13 @@ Nothing missing on the app side: the plugin only writes the markers and the Remi
 7. Each swipe moves exactly one place (3.6); a tab always goes to its fixed place (3.5).
 8. Sync button (Obsidian Sync round trip), problem banner that re-reads on tap.
 9. App-only by platform (no plugin counterpart, fine): reminders/alarms/Live Activity, lock-screen widget, Siri/Shortcuts Add Task, voice notes, iPhone calendar export, signing plate, vault folder picker, Recording tag.
+
+## Decisions
+
+1. **The project's view lives in the app** (4.5, 1.6). In the plugin the group's arrow and a card's folder mark open the project's note, whose end shows the project's block. The app can't show a note, so both open the block itself: the project's view over the screen (full-screen cover, the same ribbon, tabs and plus, every list only the project's tasks, a task written there gets the project). Its bar: Close, Undo, the project's name with a folder, and «⋯» with Search (only the project's tasks), Select Tasks and Open in Obsidian, which opens the note itself. It opens on Inbox the first time and remembers its place by the note.
+2. **A dragged card lifts as the capsule itself** (1.8). iOS lets a menu give way to a drag only when the lifted view is the menu's own preview; the copy grown to the whole title shows over the menu, and the drag carries the card as it stands.
+3. **The tab bar names places, not columns** (3.5). The plugin's wheel has four column icons, so a tap on one already in the window can stay; the app's stock tab bar has the three places, its selected tab is where the ribbon stands, and a tap on a tab goes to that place. Nothing to change.
+4. **Group by Project** is the title menu's one row, as a system menu toggle with a folder icon and the check while on; the words in the app's title case.
+5. **A note link in a title opens in Obsidian** (`obsidian://open?vault=…&file=<path>`, the path `notes.open` resolves); an address opens in the system browser.
+6. **The Done column closes** when the ribbon comes to rest anywhere off it (a swipe or a tab), as the plugin's «уводят с неё на Inbox».
+
