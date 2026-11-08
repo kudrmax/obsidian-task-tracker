@@ -219,12 +219,6 @@ every condition that changes the layout is animated by the transaction that chan
    read and reads the screen of `day` over the result with the screen's own code, so it is the write's answer by
    construction; a test checks it against the place after the real drop for every drop case of `drops.test.ts`. It is a
    `tasks.*` method, not `rules.*`, because it needs the tasks file.
-9. **Backend, R1 fix: ids are kept for the file as read, tidied for today.** A host may keep a file the door tidied only
-   in memory; before this fix the ids described the tidied text and the next call matched the untidied one against it,
-   so every task tidying moves got a new id on each read. Now a text is matched by its own reading: parsed with each
-   line tagged by its line, then tidied, which carries those tags wherever it moves the lines; the reading is matched to
-   the kept ids (also a reading), and the text's lines get the ids their tags found. The file read raw or tidied gives
-   the same ids. The plugin's service did not show it (its tidying is a real write), and reads the same way now.
 9. **iPhone, R1: the board keeps `ids` as it keeps `history`** (`TaskBoard`): handed in with every call made over the
    tasks file, kept from every answer over it; a call over no file (a menu, a pure rule, the quick entry's lane) neither
    sends nor keeps them. An answer over files read before the board's last write never replaces that write's ids (a
@@ -328,6 +322,12 @@ every condition that changes the layout is animated by the transaction that chan
 33. **Obsidian, R3: a held block opens its menu without scrolling** its column under the finger (over what shows of it).
 34. **Obsidian, R12: a list's edge for scrolling itself is the top of the switch's row**, not the list's box, which runs
    under the foot and Obsidian's bar.
+35. **Backend, R1 fix: ids are kept for the file as read, tidied for today.** A host may keep a file the door tidied only
+    in memory; before this fix the ids described the tidied text and the next call matched the untidied one against it,
+    so every task tidying moves got a new id on each read. Now a text is matched by its own reading: parsed with each
+    line tagged by its line, then tidied, which carries those tags wherever it moves the lines; the reading is matched to
+    the kept ids (also a reading), and the text's lines get the ids their tags found. The file read raw or tidied gives
+    the same ids. The plugin's service did not show it (its tidying is a real write), and reads the same way now.
 
 ## Done when
 

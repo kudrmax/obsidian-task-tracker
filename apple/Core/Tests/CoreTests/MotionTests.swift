@@ -90,6 +90,18 @@ import Testing
         #expect(try card(after, "Typed in Obsidian").id != idea.id)
     }
 
+    @Test func aFileTheDoorTidiesKeepsItsIdsAcrossReads() throws {
+        let untidied = IdentityTests.file.replacingOccurrences(of: "- [ ] Parent", with: "- [x] Finished\n- [ ] Parent")
+        let vault = FakeVault(untidied)
+        let board = TaskBoard(core: core, vault: vault)
+        let first = try screen(board)
+        let second = try screen(board)
+        #expect(vault.text == untidied)
+        for title in ["Idea", "Parent", "Child", "Shop"] {
+            #expect(try card(second, title).id == card(first, title).id)
+        }
+    }
+
     @Test func aRuleOverNoFileLeavesTheIdsAlone() throws {
         let board = TaskBoard(core: core, vault: FakeVault(Self.file))
         let idea = try card(try screen(board), "Idea")
