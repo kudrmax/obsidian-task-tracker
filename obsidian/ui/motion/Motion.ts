@@ -38,7 +38,8 @@ export function restingRect(el: HTMLElement): DOMRect {
 		return new DOMRect(rect.left + reshaped.left - now.left, rect.top + reshaped.top - now.top, rect.width, reshaped.height);
 	}
 	const height = growing !== undefined && GROWTHS.get(el)?.playState === "running" ? growing : rect.height;
-	return new DOMRect(rect.left - shift.x, rect.top - shift.y, rect.width, height);
+	const width = SLIDES.get(el)?.playState === "running" ? (SLID_TO.get(el) ?? rect.width) : rect.width;
+	return new DOMRect(rect.left - shift.x, rect.top - shift.y, width, height);
 }
 
 /** The row gap of the flex column `el` stands in: a row folded to nothing gives it back with a negative margin. */
@@ -52,6 +53,7 @@ const GROWTHS = new WeakMap<Element, Animation>();
 /** The height a growing row grows to, and the box a reshaped one goes to. */
 const GROWN = new WeakMap<Element, number>();
 const RESHAPED = new WeakMap<Element, Box>();
+const SLID_TO = new WeakMap<Element, number>();
 
 /**
  * The moves a row of a list makes, and anything that floats over the screen: it grows in from nothing, fades and then
@@ -128,6 +130,7 @@ export const Motion = {
 		const resized = Math.abs(from.width - to.width) >= 0.5;
 		if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && !resized) return;
 		const width = resized ? [{ width: px(from.width) }, { width: px(to.width) }] : [{}, {}];
+		SLID_TO.set(row, to.width);
 		SLIDES.set(row, row.animate([{ transform: `translate(${dx}px, ${dy}px)`, ...width[0] }, { transform: "none", ...width[1] }], timing));
 	},
 
