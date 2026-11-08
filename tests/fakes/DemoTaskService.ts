@@ -1,4 +1,4 @@
-import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../core/application/contracts";
+import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../core/application/contracts";
 import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
 import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
@@ -638,6 +638,11 @@ export class DemoTaskService implements TaskService {
 		const moved = tasks.map((t) => this.taskOf(t.key));
 		await this.move(tasks, to, day);
 		return moved.flatMap((t) => this.keyOf(t) ?? []);
+	}
+
+	/** The demo keeps no file to try a drop over: each task lands away, where the screen finds it after the drop. */
+	async landing(tasks: readonly DroppedTask[]): Promise<readonly DropLanding[]> {
+		return tasks.map((t) => ({ kind: "away", id: keyId(t.key), item: null }));
 	}
 
 	private move(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {

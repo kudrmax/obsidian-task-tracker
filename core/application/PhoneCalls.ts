@@ -432,6 +432,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	createSection: (c, [name, place]) => c.run(c.writes.createSection(name as string, place as A)),
 	applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps as A)),
 	drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks as A, to as A, day as string))),
+	landing: (c, [tasks, to, day, project]) => c.ask(c.writes.landing(tasks as A, to as A, day as string, (project ?? undefined) as string | undefined)),
 	normalize: (c) => c.normalize(),
 	createFile: (c) => {
 		if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
