@@ -181,6 +181,20 @@ final class Waits: @unchecked Sendable {
         watch.cancel()
     }
 
+    @Test func aSettingsWriteElsewhereIsTold() async throws {
+        let tests = VaultTests()
+        try tests.put("first", "TODOs Tasks.md")
+        try tests.put(#"{"labelPaint":"stripes"}"#, ".obsidian/plugins/task-calendar/data.json")
+        let vault = try tests.vault()
+        let told = Waits()
+        let watch = try #require(vault.watchSettingsFile { told.record(.zero) })
+        // Obsidian on the phone, or Sync: another writer of the plugin's settings.
+        try tests.vault().write(path: ".obsidian/plugins/task-calendar/data.json", text: #"{"labelPaint":"blend"}"#)
+        for _ in 0..<50 where told.count == 0 { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(told.count > 0)
+        watch.cancel()
+    }
+
     @Test func aWriteInTheAppForSomeoneElseIsToldWhenAsked() async throws {
         let tests = VaultTests()
         try tests.put("first", "TODOs Tasks.md")

@@ -39,20 +39,27 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     /// Where the card let go will stand, in the window, kept for the drop's preview.
     private var landing: CGRect?
 
+    /// Where each place last told it stands, kept apart from the places themselves: SwiftUI reports a view's geometry
+    /// before its `onAppear` registers it, and a ribbon that opens where it last stood never moves again to report anew.
+    private var spots: [String: (visible: CGRect, origin: CGPoint)] = [:]
+
     func register(_ key: String, _ place: DropPlace) {
-        let kept = places[key]
         var place = place
-        if let kept {
-            place.visible = kept.visible
-            place.origin = kept.origin
+        if let spot = spots[key] {
+            place.visible = spot.visible
+            place.origin = spot.origin
         }
         places[key] = place
     }
 
-    /// The place moved on the screen: a scroll, the ribbon, a new day.
+    /// The place moved on the screen: a scroll, the ribbon, a new day. Told before the place registers too.
     func move(_ key: String, visible: CGRect? = nil, origin: CGPoint? = nil) {
-        if let visible { places[key]?.visible = visible }
-        if let origin { places[key]?.origin = origin }
+        var spot = spots[key] ?? (visible: .null, origin: .zero)
+        if let visible { spot.visible = visible }
+        if let origin { spot.origin = origin }
+        spots[key] = spot
+        places[key]?.visible = spot.visible
+        places[key]?.origin = spot.origin
     }
 
     func remove(_ key: String) {

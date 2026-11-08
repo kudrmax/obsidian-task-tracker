@@ -109,15 +109,11 @@ final class HeaderControl: UIView, UIDragInteractionDelegate {
 
     /// The section under the finger as the plugin's floating section: its name and count on a card over two layers.
     func dragInteraction(_ interaction: UIDragInteraction, previewForLifting item: UIDragItem, session: UIDragSession) -> UITargetedDragPreview? {
-        guard let window else { return nil }
-        let view = UIHostingConfiguration { float() }.margins(.all, 0).makeContentView()
-        view.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
-        view.backgroundColor = .clear
-        let size = view.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
-        view.frame = CGRect(origin: .zero, size: size)
+        guard let window, let view = FloatImage.view(float(), like: self, in: window) else { return nil }
+        let size = view.bounds.size
         let parameters = UIDragPreviewParameters()
         parameters.backgroundColor = .clear
-        parameters.visiblePath = UIBezierPath(rect: view.bounds)
+        parameters.visiblePath = SectionFloat.outline
         let origin = convert(CGPoint(x: 0, y: bounds.height - size.height), to: window)
         return UITargetedDragPreview(view: view, parameters: parameters, target: UIDragPreviewTarget(container: window, center: CGPoint(x: origin.x + size.width / 2, y: origin.y + size.height / 2)))
     }

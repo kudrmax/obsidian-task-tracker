@@ -226,6 +226,13 @@ public final class Vault: TasksVault, NoteFolder, @unchecked Sendable {
         return watch
     }
 
+    /// Tells `changed` whenever the plugin's settings (`data.json`) are written while the watch is kept: Obsidian changed
+    /// a setting (the cards' size, Several labels, a list's name) and the screen draws it at once, as the plugin does.
+    public func watchSettingsFile(_ changed: @escaping @Sendable () -> Void) -> FileWatch? {
+        guard let file = try? withFolder({ folder in folder.appendingPathComponent(try rule.settingsFile()) }) else { return nil }
+        return FileWatch(file, changed)
+    }
+
     /// The app wrote the tasks file in its own process for someone other than the screen (a reminder's button, Siri, the
     /// capture sheet): its writes are coordinated as the watch, which the system therefore does not tell, so it is told
     /// here. The screen's own writes are never told: it reads and draws after each of them itself.

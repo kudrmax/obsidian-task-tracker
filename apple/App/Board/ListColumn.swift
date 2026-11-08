@@ -592,6 +592,16 @@ struct SectionFloat: View {
         .frame(width: Self.width, height: Self.height + 2 * Self.step.height, alignment: .top)
     }
 
+    /// The floating section's shape, for the system's shadow round it: the card and its two layers.
+    static var outline: UIBezierPath {
+        let path = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: width, height: height), cornerRadius: height / 2)
+        for depth in [1, 2] as [CGFloat] {
+            let layer = CGRect(x: step.width * depth, y: step.height * depth, width: width - 2 * step.width * depth, height: height)
+            path.append(UIBezierPath(roundedRect: layer, cornerRadius: height / 2))
+        }
+        return path
+    }
+
     private func layer(_ fill: Color, depth: CGFloat) -> some View {
         Capsule().fill(fill)
             .frame(width: Self.width - 2 * Self.step.width * depth, height: Self.height)
@@ -774,7 +784,7 @@ struct StackFloat: View {
                             .monospacedDigit()
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
-                            .frame(minWidth: 20, minHeight: 20)
+                            .frame(minWidth: Self.badge, minHeight: Self.badge)
                             .background(Palette.accent(scheme), in: .capsule)
                             .offset(x: 6, y: -6)
                     }
@@ -786,11 +796,41 @@ struct StackFloat: View {
 
     /// Room round the stack for the number on its corner.
     static let room: CGFloat = 8
+    static let badge: CGFloat = 20
+
+    /// The stack's shape, for the system's shadow round the carried stack: the card, its two layers and the number.
+    static func outline(width: CGFloat, count: Int) -> UIBezierPath {
+        let height = CardMetrics.height
+        let path = UIBezierPath(roundedRect: CGRect(x: room, y: room, width: width, height: height), cornerRadius: height / 2)
+        for depth in [1, 2] as [CGFloat] {
+            let layer = CGRect(x: room + step.width * depth, y: room + step.height * depth, width: width - 2 * step.width * depth, height: height)
+            path.append(UIBezierPath(roundedRect: layer, cornerRadius: height / 2))
+        }
+        let digits = CGFloat(String(count).count)
+        let badgeWidth = max(badge, 12 + 7 * digits)
+        path.append(UIBezierPath(roundedRect: CGRect(x: room + width + 6 - badgeWidth, y: room - 6, width: badgeWidth, height: badge), cornerRadius: badge / 2))
+        path.usesEvenOddFillRule = false
+        return path
+    }
 
     private func layer(_ fill: Color, depth: CGFloat) -> some View {
         Capsule().fill(fill)
             .frame(width: width - 2 * Self.step.width * depth, height: CardMetrics.height)
             .offset(x: Self.step.width * depth, y: Self.step.height * depth)
+    }
+}
+
+/// A floating copy drawn for UIKit's drag preview: an image of the view at its own size, in the screen's look. A hosting
+/// view made for a preview has had no layout yet and drew the copy cut, or blank, on a plate.
+enum FloatImage {
+    @MainActor
+    static func view(_ content: some View, like host: UIView, in window: UIWindow) -> UIImageView? {
+        let renderer = ImageRenderer(content: content.environment(\.colorScheme, host.traitCollection.userInterfaceStyle == .dark ? .dark : .light))
+        renderer.scale = window.screen.scale
+        guard let image = renderer.uiImage else { return nil }
+        let view = UIImageView(image: image)
+        view.frame = CGRect(origin: .zero, size: image.size)
+        return view
     }
 }
 

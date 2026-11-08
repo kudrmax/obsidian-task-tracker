@@ -387,14 +387,11 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// Several picked tasks lifted: the card on two layers with their number, as the plugin's carried stack.
     private func stackPreview() -> UITargetedDragPreview? {
         guard let picking, picking.count > 1, let look, let window else { return nil }
-        let stack = UIHostingConfiguration { StackFloat(card: look.card, count: picking.count, width: bounds.width) }.margins(.all, 0).makeContentView()
-        stack.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
-        stack.backgroundColor = .clear
-        let size = stack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
-        stack.frame = CGRect(origin: .zero, size: size)
+        guard let stack = FloatImage.view(StackFloat(card: look.card, count: picking.count, width: bounds.width), like: self, in: window) else { return nil }
+        let size = stack.bounds.size
         let parameters = UIDragPreviewParameters()
         parameters.backgroundColor = .clear
-        parameters.visiblePath = UIBezierPath(rect: stack.bounds)
+        parameters.visiblePath = StackFloat.outline(width: bounds.width, count: picking.count)
         let origin = convert(CGPoint(x: -StackFloat.room, y: -StackFloat.room), to: window)
         let center = CGPoint(x: origin.x + size.width / 2, y: origin.y + size.height / 2)
         return UITargetedDragPreview(view: stack, parameters: parameters, target: UIDragPreviewTarget(container: window, center: center))

@@ -206,6 +206,7 @@ final class BoardModel {
         let shift: Int
     }
     @ObservationIgnored private var watch: FileWatch?
+    @ObservationIgnored private var settingsWatch: FileWatch?
 
     /// The screen read again. A read asked while one runs makes that one read once more, and waits for it: every caller
     /// returns with the screen drawn from the file as it was after its ask. A drop's read draws at once, the rest with the
@@ -349,15 +350,17 @@ final class BoardModel {
     /// The project notes changed while a carry or the quick entry held the read: it reads again whatever the file did.
     @ObservationIgnored private var projectsAsked = false
 
-    /// The tasks file watched while the screen shows: a coordinated write elsewhere (iCloud, a reminder's button) reads again.
+    /// The tasks file and the plugin's settings watched while the screen shows: a write elsewhere (Obsidian, iCloud, a
+    /// reminder's button) reads again, and a setting changed in Obsidian redraws the screen at once, as the plugin's.
     func watchFile() {
         AppServices.shared.projects.changed = { [weak self] in
             Task { @MainActor in await self?.projectsChanged() }
         }
-        guard watch == nil else { return }
-        watch = AppServices.shared.vault.watchTasksFile { [weak self] in
+        let changed: @Sendable () -> Void = { [weak self] in
             Task { @MainActor in await self?.reloadIfChanged() }
         }
+        if watch == nil { watch = AppServices.shared.vault.watchTasksFile(changed) }
+        if settingsWatch == nil { settingsWatch = AppServices.shared.vault.watchSettingsFile(changed) }
     }
 
     /// The settings named another tasks file: the watch follows it.
@@ -370,6 +373,8 @@ final class BoardModel {
     func stopWatching() {
         watch?.cancel()
         watch = nil
+        settingsWatch?.cancel()
+        settingsWatch = nil
     }
 
     private func readAhead() {
