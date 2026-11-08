@@ -189,7 +189,10 @@ class SectionSlots implements DropTarget<SectionPayload, GroupPlace> {
 	 */
 	standAfter(section: readonly HTMLElement[]): void {
 		const last = section[section.length - 1];
-		if (this.mark && last.isConnected && last.nextElementSibling !== this.mark) last.after(this.mark);
+		const mark = this.mark;
+		if (!mark || !last.isConnected || last.nextElementSibling === mark) return;
+		/** The folded section moves, never the mark: a mark kept in the page eases into its gap, one moved would step. */
+		mark.before(...section);
 	}
 
 	private fold(): void {

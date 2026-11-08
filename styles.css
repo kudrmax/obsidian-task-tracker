@@ -886,6 +886,8 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 /* Where a lifted section lands: a dashed capsule between the sections. */
 .tc-group-drop { flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); margin-top: var(--tc-section-gap); }
 .tc-group-drop:first-child { margin-top: 0; }
+/* The mark takes the gap over a section, or gives it up at the list's top, on the list's motion: it never steps. */
+.tc-group-drop { transition: margin var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-group-empty { flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; overflow: hidden; border: var(--tc-hairline) dashed var(--tc-dash); border-radius: var(--tc-radius-card); background: var(--tc-bg); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; white-space: nowrap; font-size: var(--tc-font-body); color: var(--tc-muted); cursor: pointer; touch-action: pan-y; transition: height var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-group-empty.is-hot { border-style: solid; border-color: var(--tc-accent); background: var(--tc-drop-bg); color: var(--tc-accent); }
 .tc-group-empty.is-folded { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); border-width: 0; opacity: 0; }
