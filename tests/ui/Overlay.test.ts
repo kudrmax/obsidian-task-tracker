@@ -81,3 +81,22 @@ describe("Overlay", () => {
 		expect(heard).toEqual(["escape", "away"]);
 	});
 });
+
+describe("a window's picks", () => {
+	it("act once the window's close has ended, and a pick that types acts inside the tap", async () => {
+		const { Picks } = await import("../../obsidian/ui/kit/Panel");
+		let end: () => void = () => {};
+		const closing = new Promise<void>((resolve) => (end = resolve));
+		const acted: string[] = [];
+		const picks = new Picks(() => acted.push("close"), () => closing);
+		picks.pick(() => void acted.push("write"))();
+		expect(acted).toEqual(["close"]);
+		end();
+		await closing;
+		await Promise.resolve();
+		expect(acted).toEqual(["close", "write"]);
+		const typing = new Picks(() => acted.push("close2"), () => new Promise(() => {}));
+		typing.pickNow(() => void acted.push("field"))();
+		expect(acted.slice(2)).toEqual(["close2", "field"]);
+	});
+});
