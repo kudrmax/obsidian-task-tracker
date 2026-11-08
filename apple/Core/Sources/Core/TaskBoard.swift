@@ -29,7 +29,8 @@ public final class TaskBoard: @unchecked Sendable {
     /// One write at a time: each is made over the file and the undo steps the one before it left.
     private let writing = NSLock()
     private var history: DoorHistory?
-    private var calendarSources: [CalendarFile]?
+    /// The calendar files as the settings last read name them: asked again when the settings change.
+    private var calendarSources: (settings: String, files: [CalendarFile])?
 
     /// `pure`: a second core for the pure rules a screen asks in the same frame; the reading core when none is given.
     public init(core: PhoneCore, vault: TasksVault, pure: PhoneCore? = nil) {
@@ -171,8 +172,10 @@ public final class TaskBoard: @unchecked Sendable {
     private func sources(_ settings: String) -> [CalendarFile] {
         lock.lock()
         defer { lock.unlock() }
-        if calendarSources == nil { calendarSources = try? core.calendarFiles(settingsJSON: settings) }
-        return calendarSources ?? []
+        if let known = calendarSources, known.settings == settings { return known.files }
+        guard let files = try? core.calendarFiles(settingsJSON: settings) else { return [] }
+        calendarSources = (settings, files)
+        return files
     }
 
     private func kept() -> DoorHistory? {

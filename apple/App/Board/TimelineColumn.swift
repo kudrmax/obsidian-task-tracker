@@ -67,6 +67,10 @@ struct TimelineColumn: View {
                     reveal(hour)
                 }
                 .onChange(of: model.entry.moved) { reveal(hour) }
+                .onChange(of: model.dayMoved) {
+                    opened = false
+                    open()
+                }
                 .simultaneousGesture(zoom)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(Self.key, visible: $0) }
             }

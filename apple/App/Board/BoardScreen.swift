@@ -55,13 +55,16 @@ struct BoardScreen: View {
         .menuQuestions($question, model: model)
         .task { await model.reload() }
         .onChange(of: scene, initial: true) {
-            // The tasks file changes outside the app too: back in front, the screen reads it again if it did; while in
-            // front, a coordinated write (iCloud, a reminder's button) tells the watch.
+            // The tasks file changes outside the app too: back in front, the screen reads it again if it did or the clock
+            // moved on; while in front, a coordinated write (iCloud, a reminder's button) tells the watch and the clock
+            // ticks each minute.
             if scene == .active {
                 model.watchFile()
+                model.startClock()
                 Task { await model.reloadIfChanged() }
             } else {
                 model.stopWatching()
+                model.stopClock()
             }
         }
     }

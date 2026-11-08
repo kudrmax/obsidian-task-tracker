@@ -71,7 +71,7 @@ struct TaskFullScreen: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     if let menu = menuModel {
                         Menu("More", systemImage: "ellipsis") {
-                            MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, ask: { question = $0 }, inStack: true, ownPage: true).nodes)
+                            MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, ask: { question = $0 }, inStack: true, ownPage: true, describe: { describeLater() }).nodes)
                         }
                         .tint(.primary)
                     }
@@ -201,6 +201,11 @@ struct TaskFullScreen: View {
             if let found { current = found }
             tree = read
         }
+    }
+
+    /// The caret goes into the description, as the plugin's Description on its own page.
+    private func describeLater() {
+        typing = true
     }
 
     private func place(_ new: String) {

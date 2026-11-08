@@ -379,7 +379,8 @@ public struct RepeatDraft: Decodable, Hashable, Sendable {
     public let removable: Bool
     public let kinds: [String]
     public let units: [String]
-    public let detail: String
+    /// What the rule shows under its unit: `weekdays`, `monthDay`, or nothing (After Done, every N days).
+    public let detail: String?
     public let can: Fewer
     public let rule: JSONValue
     public let json: JSONValue
@@ -401,7 +402,7 @@ public struct RepeatDraft: Decodable, Hashable, Sendable {
         removable = try c.decode(Bool.self, forKey: .removable)
         kinds = try c.decode([String].self, forKey: .kinds)
         units = try c.decode([String].self, forKey: .units)
-        detail = try c.decode(String.self, forKey: .detail)
+        detail = try c.decodeIfPresent(String.self, forKey: .detail)
         can = try c.decode(Fewer.self, forKey: .can)
         rule = try c.decode(JSONValue.self, forKey: .rule)
         json = try JSONValue(from: decoder)

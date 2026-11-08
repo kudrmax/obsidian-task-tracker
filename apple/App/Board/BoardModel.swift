@@ -212,6 +212,8 @@ final class BoardModel {
     /// The screen drawn from `read`; the read after a drop's write in one step with the end of its carry, so the card
     /// stands in its place at once. Any other read leaves a carry as it is.
     private func show(_ read: BoardSnapshot, animated: Bool, serial: Int) {
+        if let before = snapshot { follow(read.dayChange(since: before), from: before) }
+        defer { if reopen, read.day == read.today, !readAgain { reopen = false; dayMoved += 1 } }
         if animated {
             withAnimation(.snappy) {
                 snapshot = read
@@ -231,9 +233,10 @@ final class BoardModel {
         }
     }
 
-    /// Reads again only when the tasks file changed under the screen: Obsidian, Sync, a reminder's button. While a card is
-    /// carried or the quick entry's writes run, the read waits for them: the entry draws each of its writes itself, in
-    /// the same drawing as the line it ends.
+    /// Reads again only when the screen no longer stands for the files or the clock: the tasks file changed (Obsidian,
+    /// Sync, a reminder's button), the settings (a list renamed, a colour changed), a calendar file Sync brought, or a
+    /// minute passed since the read. While a card is carried or the quick entry's writes run, the read waits for them:
+    /// the entry draws each of its writes itself, in the same drawing as the line it ends.
     func reloadIfChanged() async {
         guard carried == nil, !entry.writing else {
             readAfterCarry = true
@@ -241,8 +244,51 @@ final class BoardModel {
         }
         let board = board
         guard let files = try? await Task.detached(operation: { try board.files() }).value else { return }
-        // The settings count too: a list renamed or a colour changed in Settings or in Obsidian redraws every name.
-        if files.tasks != snapshot?.tasksText || files.settingsJSON != snapshot?.settingsJSON { await reload(animated: true) }
+        guard let snapshot, snapshot.readFrom(files), snapshot.current(at: files.now) else { return await reload(animated: true) }
+    }
+
+    // MARK: The clock
+
+    /// The host's clock, as the plugin keeps it (`DayService`'s `onDayChange`, `catchUp`): while the screen shows, the
+    /// screen is read at each new minute, so the now line and an overdue task riding it move and a day that passed
+    /// brings the new today. A carry, a day's turn or the quick entry (typing or writing) hold the tick until they let go.
+    @ObservationIgnored private var clock: Task<Void, Never>?
+
+    /// Bumped when the day's start hour moved: the calendar opens today afresh, on the now line.
+    private(set) var dayMoved = 0
+    @ObservationIgnored private var reopen = false
+
+    func startClock() {
+        guard clock == nil else { return }
+        clock = Task { [weak self] in
+            while !Task.isCancelled {
+                let now = Date()
+                let next = Calendar.current.dateInterval(of: .minute, for: now)?.end ?? now.addingTimeInterval(60)
+                try? await Task.sleep(for: .seconds(next.timeIntervalSince(now) + 0.05))
+                while !Task.isCancelled, self?.clockHeld == true { try? await Task.sleep(for: .seconds(1)) }
+                guard !Task.isCancelled, let self else { return }
+                await self.reloadIfChanged()
+            }
+        }
+    }
+
+    func stopClock() {
+        clock?.cancel()
+        clock = nil
+    }
+
+    private var clockHeld: Bool { carried != nil || entry.isOpen || entry.writing || dayTurn != nil || running != nil }
+
+    /// Today by the clock: a screen that showed today shows the new today; another start hour opens today afresh.
+    private func follow(_ change: DayChange?, from before: BoardSnapshot) {
+        guard let change else { return }
+        neighbours = nil
+        ahead = [:]
+        let showedToday = shownDay == nil || shownDay == before.today
+        if change == .moved { reopen = true }
+        guard change == .moved || showedToday, shownDay != nil else { return }
+        shownDay = nil
+        readAgain = true
     }
 
     /// The tasks file watched while the screen shows: a coordinated write elsewhere (iCloud, a reminder's button) reads again.
@@ -274,7 +320,7 @@ final class BoardModel {
                   let next: String = try? await read("days.step", [.string(day), 1]) else { return }
             neighbours = (previous, next)
             for other in [previous, next] {
-                if let kept = ahead[other], kept.tasksText == shown.tasksText { continue }
+                if let kept = ahead[other], kept.readAlike(shown) { continue }
                 if let read = try? await Task.detached(operation: { try board.snapshot(day: other, measures: CardMetrics.timeline) }).value {
                     ahead[other] = read
                 }
@@ -304,7 +350,7 @@ final class BoardModel {
             entry.blur()
             return true
         }
-        let kept = ahead[at.date].flatMap { $0.tasksText == snapshot.tasksText ? $0 : nil }
+        let kept = ahead[at.date].flatMap { $0.readAlike(snapshot) ? $0 : nil }
         guard let peek = kept ?? (try? board.snapshot(day: at.date, measures: CardMetrics.timeline)) else { return true }
         dayTurn = DayTurn(peek: peek, shift: shift)
         dayShare = 0
@@ -361,7 +407,7 @@ final class BoardModel {
         landTurn()
         shownDay = day
         neighbours = nil
-        var peek = ahead[day].flatMap { $0.tasksText == snapshot?.tasksText ? $0 : nil }
+        var peek = ahead[day].flatMap { shown in snapshot.map(shown.readAlike) == true ? shown : nil }
         if peek == nil {
             let board = board
             peek = try? await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
