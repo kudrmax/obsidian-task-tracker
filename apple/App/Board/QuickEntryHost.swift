@@ -456,9 +456,9 @@ final class QuickEntryHost {
         let day = model.shownDay
         // A task typed is made by `createWithId`: its card is found in the next drawing by its id, whatever else wrote to
         // the file between the write and that read (a key names only the place right after the write).
-        let call = method == "createInPlace" ? "createWithId" : method
+        let door = method == "createInPlace" ? "createWithId" : method
         let written: Result<JSONValue, Error> = await Task.detached {
-            Result { try board.write("tasks." + call, args) }
+            Result { try board.write("tasks." + door, args) }
         }.value
         if case .failure(let error) = written { model.problem(error) }
         let read: BoardSnapshot?
