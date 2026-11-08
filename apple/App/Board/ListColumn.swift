@@ -588,9 +588,34 @@ enum SoftEdge {
 /// main-actor closure traps.
 struct FoldAway: Transition {
     func body(content: Content, phase: TransitionPhase) -> some View {
-        content
-            .clipShape(TopPart(share: phase.isIdentity ? 1 : 0))
-            .opacity(phase.isIdentity ? 1 : 0)
+        let share: CGFloat = phase.isIdentity ? 1 : 0
+        // The row's own height folds, so the rows below move by exactly what shows of it, one row or a whole block.
+        FoldedHeight(share: share) {
+            content.clipShape(TopPart(share: share))
+        }
+        .opacity(share)
+    }
+}
+
+/// Its content at the top `share` of its height: the height it takes in the list.
+private struct FoldedHeight: SwiftUI.Layout {
+    var share: CGFloat
+
+    var animatableData: CGFloat {
+        get { share }
+        set { share = newValue }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let content = subviews.first else { return .zero }
+        let size = content.sizeThatFits(proposal)
+        return CGSize(width: size.width, height: size.height * share)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let content = subviews.first else { return }
+        let size = content.sizeThatFits(proposal)
+        content.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, height: size.height))
     }
 }
 

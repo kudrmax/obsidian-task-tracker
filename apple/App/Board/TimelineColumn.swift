@@ -11,6 +11,8 @@ struct TimelineColumn: View {
     @State private var position: ScrollPosition
     @State private var opened: Bool
     @State private var pinch: Pinch?
+    /// A pinch ended before the content took the height of its last zoom: its minute is held until it has.
+    @State private var held: Pinch?
     @State private var scroll = ScrollSpot()
     /// The zoom and the column's height, the screen's: a new day's timeline opens at the zoom the last one showed.
     private var zoom: TimelineZoom { model.zoom }
@@ -55,15 +57,22 @@ struct TimelineColumn: View {
         let screenY: CGFloat
     }
 
-    /// The minute the pinch started under stays under the fingers at the hour's height drawn now.
+    /// The minute the pinch started under stays under the fingers at the hour's height drawn now; a pinch that has
+    /// ended lets go of it once the content is as tall as its zoom.
     private func holdPinchedMinute() {
-        guard let pinch, let hour else { return }
+        guard let anchor = pinch ?? held, let hour else { return }
+        let target = max(0, CGFloat(anchor.minute) / 60 * hour + Measure.labelLift - anchor.screenY)
         var instant = Transaction()
         instant.disablesAnimations = true
-        withTransaction(instant) {
-            position.scrollTo(y: max(0, CGFloat(pinch.minute) / 60 * hour + Measure.labelLift - pinch.screenY))
-        }
+        withTransaction(instant) { position.scrollTo(y: target) }
+        // Scrolled while the content changes height, the scroll view reports an offset from before the change and never
+        // the one it draws: the next pinch starts from where this one put the content.
+        scroll.y = min(target, max(0, scroll.contentHeight - visible))
+        if pinch == nil, isTall(at: hour) { held = nil }
     }
+
+    /// The content has the height of the day at `hour`.
+    private func isTall(at hour: CGFloat) -> Bool { scroll.contentHeight >= y(24 * 60, hour) + Measure.labelLift - 0.5 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Measure.allDayGap) {
@@ -88,7 +97,10 @@ struct TimelineColumn: View {
                     reveal(hour)
                 }
                 // A pinch's scroll is set once the content has its new height: never cut short by the old one.
-                .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in holdPinchedMinute() }
+                .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, height in
+                    scroll.contentHeight = height
+                    holdPinchedMinute()
+                }
                 .onChange(of: model.entry.moved) { reveal(hour) }
                 .simultaneousGesture(pinchGesture)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(Self.key, visible: $0) }
@@ -296,11 +308,21 @@ struct TimelineColumn: View {
                 holdPinchedMinute()
             }
             .onEnded { _ in
+                let ended = pinch
                 pinch = nil
                 guard let shown = hour, let wholeDay else { return }
                 let settled = model.zoomAfterPinch(hour: Double(shown), wholeDay: wholeDay, levels: timeline.zoomLevels)
                 savedZoom = settled.map { String($0) } ?? "wholeDay"
-                if settled == nil { zoom.hour = CGFloat(wholeDay) }
+                // The zoom the core settles on is drawn now, with the minute still under the fingers; the last step's
+                // scroll, cut short by the content's old height, is set again once the content has the new one.
+                held = ended
+                let next = CGFloat(settled ?? wholeDay)
+                if next != shown {
+                    var instant = Transaction()
+                    instant.disablesAnimations = true
+                    withTransaction(instant) { zoom.hour = next }
+                }
+                holdPinchedMinute()
             }
     }
 
@@ -343,6 +365,7 @@ enum TimelineGeometry {
 @Observable
 final class ScrollSpot {
     @ObservationIgnored var y: CGFloat = 0
+    @ObservationIgnored var contentHeight: CGFloat = 0
 }
 
 /// A calendar's event, as the plugin draws it: a block in its calendar's colour over the ground with a bar on the left and

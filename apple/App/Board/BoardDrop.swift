@@ -22,14 +22,19 @@ struct DropPlace {
 @MainActor
 final class BoardDrop: NSObject, UIDropInteractionDelegate {
     private(set) lazy var interaction = UIDropInteraction(delegate: self)
-    /// Told when a carry's drag session ends, whatever came of it, once its drop has flown: the screen's way to end a
-    /// carry whose card is gone.
-    var ended: () -> Void = {}
+    /// Told when a carry's drag session ends, whatever came of it, once its drop has flown, and whether a place took the
+    /// drop: the screen's way to end a carry whose card is gone.
+    var ended: (_ performed: Bool) -> Void = { _ in }
     /// Told when a drop's copy has come down, with where it came down in the window (nil: the system's own place).
     var landed: (CGRect?) -> Void = { _ in }
     /// A drop's copy is flying: the session's end waits for it.
     private var flying = false
     private var endAfterFlight = false
+    /// A place took the session's drop.
+    private var performed = false
+    /// The carry's copy folds shut onto the top of its place as it flies there (a section's, which lands on the room the
+    /// section opens rather than on a card that looks like it): nothing of it is left while the system keeps it there.
+    var foldsOnDrop: () -> Bool = { false }
     private var places: [String: DropPlace] = [:]
     private var current: String?
     /// Where the card let go will stand, in the window, kept for the drop's preview.
@@ -117,10 +122,12 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
             return
         }
         landing = nil
-        ended()
+        ended(performed)
+        performed = false
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
+        performed = true
         guard let current, let place = places[current] else { return }
         landing = place.land().map { $0.offsetBy(dx: place.origin.x, dy: place.origin.y) }
         self.current = nil
@@ -137,7 +144,8 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
             if self.endAfterFlight {
                 self.endAfterFlight = false
                 self.landing = nil
-                self.ended()
+                self.ended(self.performed)
+                self.performed = false
             }
         }
     }
@@ -146,6 +154,10 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
         guard let landing, let view = interaction.view else { return nil }
         let target = UIDragPreviewTarget(container: view, center: CGPoint(x: landing.midX, y: landing.midY))
+        let center = CGPoint(x: landing.midX, y: landing.minY)
+        if foldsOnDrop() {
+            return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: view, center: center, transform: CGAffineTransform(scaleX: 1, y: 0.001)))
+        }
         return defaultPreview.retargetedPreview(with: target)
     }
 }

@@ -84,7 +84,8 @@ final class BoardModel {
     @ObservationIgnored let zoom = TimelineZoom()
 
     init() {
-        dropping.ended = { [weak self] in self?.carryEnded() }
+        dropping.ended = { [weak self] in self?.dropSessionEnded(performed: $0) }
+        dropping.foldsOnDrop = { [weak self] in self?.carry?.section != nil }
         dropping.landed = { [weak self] in self?.carryLanded(at: $0) }
         entry.model = self
     }
@@ -737,6 +738,13 @@ final class BoardModel {
     /// its carry once the screen shows the write.
     func carryEnded() {
         carryLanded()
+    }
+
+    /// The screen's drop session ended. Not dropped, a card's copy is still flying home: its card ends the carry once it
+    /// is there. A section's lift has no end of its own, so its carry ends here.
+    private func dropSessionEnded(performed: Bool) {
+        if !performed, carry?.section == nil { return }
+        carryEnded()
     }
 
     private func endCarry() {
