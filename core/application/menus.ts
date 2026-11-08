@@ -151,7 +151,7 @@ export function menuProject(items: readonly TaskItem[], known: readonly ProjectR
 		current: shared ? first : null,
 		options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
 		none,
-		noneName: NO_PROJECT,
+		noneLabel: NO_PROJECT,
 		disabled: items.every((item) => !item.can.setProject),
 	};
 }

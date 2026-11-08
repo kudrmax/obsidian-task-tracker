@@ -42,7 +42,7 @@ import { grownStart, wholeWidth } from "./wholeCard";
 import { onTheDay, REPEAT_WORDS, repeatValue } from "./repeatWords";
 import { canPick } from "./menus";
 import { DIVIDER_SNAP, dividerAt, LIST_WIDTHS, listShareOf, listWidths } from "./listWidth";
-import { type LinkQuery, linkQuery, noteOfLink, noteSuggestions, noteTags, type VaultNote, vaultProjects, withNoteLink } from "./notes";
+import { type LinkQuery, linkQuery, noteOfLink, noteSuggestions, type VaultNote, withNoteLink } from "./notes";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, type Header, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
 import { emptySession, type EntryJob, type EntryLook, type EntrySession, type EntryState, QuickEntry } from "./QuickEntry";
@@ -50,7 +50,8 @@ import { sectionNameEnd } from "./SectionNameEntry";
 import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
-import { revealedGrouping, withFoldToggled, withGrouping } from "./projects";
+import { projectNotesOfTexts, revealedGrouping, withFoldToggled, withGrouping } from "./projects";
+import { noteTags } from "../domain/NoteTags";
 import { keyId, placeId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -683,6 +684,8 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	usableColor,
 	acceptsDrop,
 	placesInGap,
+	noteTags,
+	projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
 	shadesOf,
 	inkOf,
 	contrast,
@@ -824,12 +827,10 @@ const DESCRIPTION: Readonly<Record<string, Handler>> = {
 };
 
 /**
- * The vault's notes for a host without Obsidian: their tags, the projects among them (what it hands in as
- * `context.projects`), the `[[` typed in a title and the notes it offers, and the note a link in a title opens.
+ * The vault's notes for a host without Obsidian: the `[[` typed in a title and the notes it offers, and the note a link
+ * in a title opens. Its project notes come from `rules.noteTags` and `rules.projectNotes`.
  */
 const NOTES: Readonly<Record<string, Handler>> = {
-	tags: (_c, [texts]) => (texts as string[]).map((text) => noteTags(text)),
-	projects: (c, [notes]) => vaultProjects(notes as VaultNote[], c.settings.projectTag),
 	linkQuery: (_c, [text, caret]) => linkQuery(text as string, caret as number),
 	suggest: (_c, [query, notes, limit]) => noteSuggestions(query as string, notes as VaultNote[], (limit ?? undefined) as number | undefined),
 	insert: (_c, [text, at, link]) => withNoteLink(text as string, at as LinkQuery, link as string),

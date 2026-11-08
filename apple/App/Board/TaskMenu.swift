@@ -109,7 +109,7 @@ struct TaskMenu {
             case "section":
                 if let section = sectionPage { rows.append(section) }
             case "project":
-                rows.append(projectRow)
+                rows.append(projectPage)
             case "subtask" where single:
                 rows.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } })
             default: break
@@ -126,17 +126,20 @@ struct TaskMenu {
         return row.value.isEmpty ? nil : row.value
     }
 
-    /// The Project row and its page: the project notes by name, No Project last, the current one checked; for subtasks
-    /// only, the parent's project shown and the row disabled. «No project» in the core's words, as the row's value and its own row.
-    private var projectRow: MenuNode {
-        let project = menu.project, items = items, model = model
-        let value = project.value.isEmpty ? nil : project.value
-        if project.disabled { return .action(title: "Project", symbol: "folder", disabled: true, subtitle: value) {} }
-        var rows: [MenuNode] = project.options.map { option in
+    /// The Project row and its page (board Proj3Flow): the notes with the project tag by name, No Project last in its own
+    /// group, the tasks' own checked; a subtask's row shows its parent's project and can't be pressed. The words are the core's.
+    private var projectPage: MenuNode {
+        let page = menu.project, items = items, model = model
+        let subtitle = page.value.isEmpty ? nil : page.value
+        guard !page.disabled else {
+            return .action(title: "Project", symbol: "folder", disabled: true, subtitle: subtitle) {}
+        }
+        var rows: [MenuNode] = page.options.map { option in
             .action(title: option.project.name, symbol: nil, checked: option.checked) { Task { await model.setProject(items, option.project.link) } }
         }
-        rows.append(.action(title: project.noneName, symbol: nil, checked: project.none) { Task { await model.setProject(items, nil) } })
-        return .submenu(title: "Project", symbol: "folder", subtitle: value, children: rows)
+        let none: MenuNode = .action(title: page.noneLabel, symbol: nil, checked: page.none) { Task { await model.setProject(items, nil) } }
+        rows = rows.isEmpty ? [none] : [.group(row: false, children: rows), .group(row: false, children: [none])]
+        return .submenu(title: "Project", symbol: "folder", subtitle: subtitle, children: rows)
     }
 
     private var sectionPage: MenuNode? {

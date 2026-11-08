@@ -33,7 +33,7 @@ import Testing
         let milk = try #require(snapshot.screen.inbox.first)
         let menu = try #require(snapshot.menus[milk.id])
         #expect(menu.edits.suffix(2) == ["project", "subtask"])
-        #expect(menu.project.noneName == "No project")
+        #expect(menu.project.noneLabel == "No project")
         #expect(menu.project.value == "No project")
     }
 

@@ -50,7 +50,7 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 | `calendars` | `{ google?, iphone?, work? }`: each calendar file's text, `null` or left out for none (`calendarFiles` says where they are) |
 | `fetched` | the calendar sources the host fetches itself (a status names no device for them); `["google"]` when left out |
 | `history` | the undo steps as the last answer gave them; left out before the first |
-| `projects` | the notes with the project tag, `ProjectNote` `{ name, path, link }`, as `notes.projects` answers them over the vault's notes; left out for none: a task's project then comes from its own `🗂️` field alone (its name, no note to open), no project groups get a note's arrow, and the Project row offers only the projects tasks already name |
+| `projects` | the notes with the project tag, `ProjectNote` `{ name, path, link }`, as `rules.projectNotes` answers them over the vault's notes; left out for none: a task's project then comes from its own `🗂️` field alone (its name, no note to open), no project groups get a note's arrow, and the Project row offers only the projects tasks already name |
 | `grouping` | `GroupingState`, how this device groups its lists by project, as the last answer gave it; left out for the defaults (Backlog grouped, Soon not) |
 
 **Answer** (`DoorAnswer`):
@@ -137,8 +137,8 @@ parent's. Every write keeps it, and no title (`TaskItem.title`, `text`, a remind
   no task to stand before. `entry.*` reads the same: `WireLook.sections` holds `{ group, project }` headers, and
   `WireLook.project` is the project of a project's view (every task written there gets it).
 - `tasks.setProject(keys, link | null)`: one write; a subtask is left as it is. `tasks.projectNotes()`: the project notes
-  by name. A menu's `project` (`MenuProject` `{ current, options, none, noneName, disabled }`) is the Project row's
-  page; `noneName` is No project's own row (`"No project"`). Where the row stands is the menu's `edits`: `"project"`
+  by name. A menu's `project` (`MenuProject` `{ current, options, none, noneLabel, value, disabled }`) is the Project
+  row's page; `noneLabel` is No project's own row (`"No project"`), `value` what the row shows beside «Project». Where the row stands is the menu's `edits`: `"project"`
   comes right after `"section"` (where Section would stand when it is not offered), before `"subtask"`, in one task's
   menu and in the bulk menu (`["section", "project"]`); a host draws the edits in that order and places nothing itself.
 - `tasks.setGrouping(list, on)`, `tasks.toggleFold(list, key)`: answer the new `grouping`.
@@ -263,16 +263,10 @@ screen's whole-day height.
 The plugin reads the notes through Obsidian; an app reads the vault's files itself and asks these. Paths are from the
 vault folder (`Projects/Alpha.md`); caret offsets count UTF-16 code units, as `NSString` and `UITextField` do.
 
-- `tags(texts)`: each note's tags as Obsidian reads them, `#` first, each once: the properties' `tags:` (or `tag:`) as a
-  list, in brackets or as words, then `#tag` in the text after a space or the line's start, outside code blocks and code
-  spans (`#2026`, digits alone, is no tag). `tags(["---\ntags: [project]\n---\n#next"])` → `[["#project", "#next"]]`.
-  A host keeps each file's tags by its modification date and asks again only for the files changed.
-- `projects(notes)`: `notes` is every markdown file of the vault, `{ path, tags }`; the answer is the notes with exactly
-  the settings' project tag (`projectTag`, a nested `#project/sub` is not it), by name, each `ProjectNote` `{ name, path,
-  link }` with the link Obsidian writes: its name while no other note has it, else its path without `.md`. Hand it in as
-  `context.projects` on every call; with it the Project row, the project groups of Backlog and Soon (`screen.projects`),
-  a card's folder icon (`TaskItem.project.mark`, `canOpenNote`, `note`: the path to open) and a project's view
-  (`tasks.screen(date, project)`) work as in the plugin. A call made over a changed list redraws as any other.
+- The project notes are not asked here but of the pure rules, `rules.noteTags(text)` and `rules.projectNotes(notes,
+  tag)` (below); their answer is `context.projects` on every call, and with it the Project row, the project groups of
+  Backlog and Soon (`screen.projects`), a card's folder mark (`TaskItem.project.mark`, `canOpenNote`, `note`) and a
+  project's view (`tasks.screen(date, project)`) work as in the plugin.
 - `linkQuery(text, caret)`: the `[[` the caret stands in, typed and not closed before it, on its line: `{ query, from,
   to }` (`to` past a `]]` right after the caret), `null` for none: show the note list while it answers one.
   `linkQuery("Call [[Alp", 10)` → `{ query: "Alp", from: 5, to: 10 }`.
@@ -419,6 +413,14 @@ without the lifted ones, `shift` how far the open gap `room` pushes the cards af
 to leave it; `room`, `held` may be `null`, `heads` `[]`, `hysteresis` `0`); the branch lines: `branchOf(levels, index)`
 (the row's `{ last, through }`: `last` its line bends in, `through[k]` the line of level `k + 1` goes on past it; `null`
 for a task) and `gapBranch(cards, gap)` (the same for an open gap, as a row of its level before `cards[gap.index]`);
+the vault's project notes for a host without Obsidian's metadata: `noteTags(text)` (a note's tags as Obsidian reads them,
+each with its `#`: the properties' `tags` or `tag`, as a list, `[a, b]` or bare words, then the text's `#tags` outside
+fenced and inline code; `"---\ntags: [project]\n---\n#more"` → `["#project", "#more"]`) and `projectNotes(notes, tag)`
+(`notes` every markdown note of the vault `[{ path, text }]`, or `{ path, tags }` with tags `noteTags` gave before, or
+`{ path }` alone for a note only counted for its name; `tag` the settings' project tag; answers `ProjectNote[]`
+`{ name, path, link }` of the notes with exactly that tag, case aside, a nested child tag not it, by name; `link` the name,
+the path without `.md` when another note has that name: `[{ path: "Work/Plan.md", text: "#project" }, { path:
+"Home/Plan.md" }]` → `[{ name: "Plan", path: "Work/Plan.md", link: "Work/Plan" }]`; the context's `projects`);
 the screen's places: `placeShowing(column, place)` (the place a list is shown from: `place` itself when it shows
 `column`, else the nearest place that does; `placeShowing("day", "inbox")` → `"soon"`; a place is `"inbox"`, `"soon"`
 or `"calendar"`, the app's Today);
@@ -489,6 +491,7 @@ JavaScriptCore of its own set to that zone (`osascript -l JavaScript`: a process
 - `CalendarExport.path`, `CalendarExport.text(...)` and `CalendarExport.adds`: `iphoneCalendarFile()`,
   `iphoneCalendarText(...)` and `iphoneCalendarAdds(...)`.
 - `Vault.settingsPath`: `settingsFile()`.
+- `NoteTags.of(text)` and `VaultProjects.projects(...)`: `rules.noteTags(text)` and `rules.projectNotes(notes, tag)`.
 - The task's title from the words, the recording and the tag, and what is blank: `capture.add`.
 - The old functions: the app calls `reminders.*`, `capture.add`, `calendars.sources`, `calendars.meetings` through
   `call`, by their error codes (`staleTask`, `blank`).
@@ -496,7 +499,7 @@ JavaScriptCore of its own set to that zone (`osascript -l JavaScript`: a process
 - `CaptureList`'s cases and their titles: `capture.lists()`, by the headings' names.
 - `CardControl.grownStart` and the width a pressed card's copy grows to: `rules.wholeWidth` and `rules.grownStart`.
 - Grouping forced off (`TaskBoard.ungrouped`): the device's own `grouping`, kept as the door answers it, and the vault's
-  projects in `context.projects` (`notes.projects`).
+  projects in `context.projects` (`rules.projectNotes`).
 - A card's fixed 35 and 2 points: `screenSettings.get()`'s `cardHeight` and `cardGap`; the list's width bounds
   (`BoardScreen.minList`, `maxList`): `rules.listWidths`.
 - The Repeat row's and the repeat page's words (`BoardSheets.unit`, the weekday letters): the menu's `repeat` and
@@ -505,11 +508,13 @@ JavaScriptCore of its own set to that zone (`osascript -l JavaScript`: a process
 
 ### The bridge in `apple/Core`
 
-`TaskBoard` hands in with every call the device's grouping (`GroupingStore`: `UserDefaultsGrouping` in the app, kept as
-each answer's `grouping` gives it) and the vault's projects (`notes.projects` over `Vault.vaultFiles()`, the tags read
-once per file and again only for a file changed; `refreshNotes()` lists the vault again). Its own calls: `projectNotes()`,
-`setGrouping(list, on:)`, `toggleFold(list, key:)`, `titleParts(text)`, `noteToOpen(target)`, `linkQuery(in:caret:)`,
-`suggestNotes(query)`, `insertLink(note, in:at:)`, `screenSettings()`, `listWidths(share:viewWidth:dividerWidth:)`,
-`repeatWords()`. The answers decode as `ProjectRef`, `ProjectGroup`, `ListGrouping`, `MenuProject`, `RepeatRow`,
-`SourceWords`, `ScreenSettings`, `SizeBounds`, `TextPart`, `NoteLink`, `LinkQuery`, `LinkInsert`, `ListWidths`,
-`RepeatWords` (`BoardModels.swift`, `NoteModels.swift`).
+`TaskBoard` hands in with every call the device's grouping (a `DeviceText`: `UserDefaultsText` in the app, kept as each
+answer's `grouping` gives it) and the vault's projects (a `ProjectSource`: `VaultProjects` scans the vault's markdown
+notes through `Vault.scanNotes`, each note's tags read by `rules.noteTags` once and again only when it changed, kept on
+the device; the list is `rules.projectNotes`, looked at again at most every few seconds on its own core, and `changed`
+redraws the screen). Its own calls: `group(method, arguments)` for `tasks.setGrouping` and `tasks.toggleFold`,
+`titleParts(text)`, `noteToOpen(target)`, `linkQuery(in:caret:)`, `suggestNotes(query)`, `insertLink(note, in:at:)`
+(`notes.*` over `Vault.vaultFiles()`, every file of the vault, listed again by `refreshNotes()`), `screenSettings()`,
+`listWidths(share:viewWidth:dividerWidth:)`, `repeatWords()`. The answers decode as `ProjectRef`, `ProjectNote`,
+`ProjectGroup`, `ListGrouping`, `MenuProject`, `RepeatRow`, `SourceWords`, `ScreenSettings`, `SizeBounds`, `TextPart`,
+`LinkQuery`, `LinkInsert`, `ListWidths`, `RepeatWords` (`BoardModels.swift`, `NoteModels.swift`, `Projects.swift`).

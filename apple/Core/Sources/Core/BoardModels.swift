@@ -52,19 +52,19 @@ public struct TaskAbilities: Codable, Hashable, Sendable {
     public let addDescription: Bool
     public let fold: Bool
     public let resize: Bool
-    /// Put into a project or taken out: a task; a subtask's is its parent's.
+    /// The task menu's Project row can be pressed: off on a subtask, whose project is its parent's.
     public let setProject: Bool
 }
 
 /// `ProjectRef`: a task's project as the screens show it.
-public struct ProjectRef: Decodable, Hashable, Sendable {
+public struct ProjectRef: Codable, Hashable, Sendable {
     public let name: String
-    /// What a place's zone and `tasks.setProject` take.
+    /// What a place and `tasks.setProject` take.
     public let link: String
-    /// The note's path from the vault folder, which the folder icon and a group's arrow open; `nil` without a note.
+    /// The note's path from the vault's folder; nil when no note with the project tag has that name.
     public let note: String?
     public let canOpenNote: Bool
-    /// The card shows the folder icon.
+    /// The card shows the folder mark.
     public let mark: Bool
 }
 
@@ -176,12 +176,52 @@ public struct ScreenView: Decodable, Sendable {
     public let offer: JSONValue
     public let missing: Bool
     public let calendars: Bool
-    /// Each list's grouping by project, by list (`now`, `soon`, `inbox`, `backlog`).
+    /// Each list's grouping by project, by the list's key.
     public let projects: [String: ListGrouping]
     /// The project whose view this is; `nil` for the main screen.
     public let project: ProjectRef?
-    /// What a drop on each column's title means (`day`, `soon`, `inbox`, `backlog`), handed back to `tasks.drop` as it is.
+    /// What a drop on each column's title means (`DropTo`), handed back to `tasks.drop` as it is.
     public let titleDrops: [String: JSONValue]
+}
+
+/// `ListGrouping`: whether a list groups its tasks by project, and its groups while it does.
+public struct ListGrouping: Decodable, Sendable {
+    public let canGroup: Bool
+    public let on: Bool
+    public let groups: [ProjectGroup]
+}
+
+/// `ProjectGroup`: a project's group of a list grouped by project, or No project, last.
+public struct ProjectGroup: Decodable, Sendable {
+    /// What `tasks.toggleFold` takes.
+    public let key: String
+    public let project: ProjectRef?
+    public let title: String
+    public let folded: Bool
+    public let count: Int
+    public let canOpenNote: Bool
+    /// What its cards, headers, plates and places carry: the project's link, null for No project.
+    public let zone: JSONValue
+    public let titled: Bool
+    public let sections: [ListGroup]
+    /// What a drop on its header means, as a header passed (`{ group, project }`).
+    public let head: JSONValue
+
+    enum CodingKeys: String, CodingKey { case key, project, title, folded, count, canOpenNote, zone, titled, sections, head }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        key = try c.decode(String.self, forKey: .key)
+        project = try c.decodeIfPresent(ProjectRef.self, forKey: .project)
+        title = try c.decode(String.self, forKey: .title)
+        folded = try c.decode(Bool.self, forKey: .folded)
+        count = try c.decode(Int.self, forKey: .count)
+        canOpenNote = try c.decode(Bool.self, forKey: .canOpenNote)
+        zone = try c.decode(JSONValue.self, forKey: .zone)
+        titled = try c.decode(Bool.self, forKey: .titled)
+        sections = try c.decode([ListGroup].self, forKey: .sections)
+        head = try c.decode(JSONValue.self, forKey: .head)
+    }
 }
 
 public struct ListRow: Decodable, Sendable {
@@ -198,8 +238,7 @@ public struct GroupMenu: Decodable, Hashable, Sendable {
     public let section: String
     public let rename: Bool
     public let remove: Bool
-    /// Inside a project's group, its zone (`.string(link)`, `.null` for No project), which `tasks.renameGroup` and
-    /// `tasks.removeGroup` take as their last argument; `nil` outside any group.
+    /// Inside a project's group, that group's zone (null for No project): `renameGroup` and `removeGroup` take it last.
     public let project: JSONValue?
 
     enum CodingKeys: String, CodingKey { case section, rename, remove, project }
@@ -219,39 +258,8 @@ public struct ListGroup: Decodable, Sendable {
     public let empty: Bool
     public let menu: GroupMenu?
     public let reorder: Bool?
-    /// It draws a header: never the tasks without a section inside a project's group.
+    /// It draws a header: false for the tasks without a section inside a project's group.
     public let header: Bool?
-}
-
-/// `ProjectGroup`: a project's group of a list grouped by project, or No project, last.
-public struct ProjectGroup: Decodable, Sendable {
-    /// What `tasks.toggleFold` takes: the project's name, "" for No project.
-    public let key: String
-    public let project: ProjectRef?
-    public let title: String
-    public let folded: Bool
-    /// Its open tasks, the count a folded group shows.
-    public let count: Int
-    /// The arrow beside the title opens `project.note`.
-    public let canOpenNote: Bool
-    /// What its cards, headers, plates and places carry: the project's link, `nil` for No project.
-    public let zone: String?
-    /// It draws its own header (chevron, title, count, arrow).
-    public let titled: Bool
-    /// What it draws while unfolded: its part without a section, then its sections; never none.
-    public let sections: [ListGroup]
-    /// Where a drop on its title puts a task, handed back as it is.
-    public let end: JSONValue
-    /// What a drop on its header means, as a header passed (`{ group, project }`).
-    public let head: JSONValue
-}
-
-/// `ListGrouping`: whether a list groups its tasks by project, and its groups while it does.
-public struct ListGrouping: Decodable, Sendable {
-    /// Backlog and Soon: the column's title opens a menu with Group by project, checked while `on`.
-    public let canGroup: Bool
-    public let on: Bool
-    public let groups: [ProjectGroup]
 }
 
 /// `ListView`: a list in its sections, and whether it shows their headers.
@@ -456,8 +464,8 @@ public struct MenuProject: Decodable, Hashable, Sendable {
     public let options: [MenuProjectOption]
     /// No project, last: checked.
     public let none: Bool
-    /// No project's own row: «No project».
-    public let noneName: String
+    /// The No project row's words.
+    public let noneLabel: String
     /// The row's value: the shared project's name, «No project», or empty when they differ.
     public let value: String
     /// Only subtasks: the row can't be pressed.
@@ -484,7 +492,7 @@ public struct TaskMenuModel: Decodable, Hashable, Sendable {
     public let edits: [String]
     public let reminders: [MenuReminder]
     public let remove: Removal?
-    /// The Project row, in every menu.
+    /// The Project row, drawn right after Section (where `edits` puts `"project"`).
     public let project: MenuProject
     /// The Repeat row's value.
     public let `repeat`: RepeatRow
@@ -587,6 +595,7 @@ public struct SettingsForm: Decodable, Sendable {
     public let sectionOrder: [String]
     public let priorities: [Mark]
     public let labelTag: String
+    public let projectTag: String
     public let labels: [Mark]
     public let presets: [String]
     public let ungrouped: String
@@ -606,7 +615,6 @@ public struct SettingsForm: Decodable, Sendable {
     public let cardGaps: SizeBounds
     /// Zoom Levels as typed, the hour's heights (`28, 56, 112, 224`); `settings.setZoomLevels(text)` writes text that reads.
     public let zoomLevels: String
-    public let projectTag: String
     /// The line markers by name (`dueDateMarker`, `slotMarker`, …) and the order the screen edits them in; their words are
     /// the host's. `settings.setMarker(marker, text)`.
     public let markers: [String: String]

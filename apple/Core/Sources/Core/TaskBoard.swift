@@ -31,19 +31,24 @@ public final class TaskBoard: @unchecked Sendable {
     private var history: DoorHistory?
     /// The calendar files as the settings last read name them: asked again when the settings change.
     private var calendarSources: (settings: String, files: [CalendarFile])?
-    /// How this device groups its lists by project, as the door last answered it.
-    private let grouping: GroupingStore
-    private let notes = NoteIndex()
-    /// The vault's projects (`notes.projects`) as JSON, and the settings they were found by.
-    private var projects: (settings: String, json: String)?
+    /// How this device groups its lists by project (`GroupingState`), as the door last answered it.
+    private let grouping: DeviceText
+    private let projects: ProjectSource?
+    /// The project notes as last found, as the door's context takes them.
+    private var projectsJSON: String?
+    /// The project tag of the settings last read, and the settings it was read from.
+    private var projectTag: (settings: String, tag: String)?
+    /// The vault's files, for the `[[` search and a title's links.
+    private let fileList = VaultFileList()
 
     /// `pure`: a second core for the pure rules a screen asks in the same frame; the reading core when none is given.
-    /// `grouping`: where the device keeps its grouping by project; the door's defaults while the process runs when none.
-    public init(core: PhoneCore, vault: TasksVault, pure: PhoneCore? = nil, grouping: GroupingStore = MemoryGrouping()) {
+    /// `grouping`: where the device keeps how it groups its lists by project; `projects`: who finds the project notes.
+    public init(core: PhoneCore, vault: TasksVault, pure: PhoneCore? = nil, grouping: DeviceText = MemoryText(), projects: ProjectSource? = nil) {
         self.core = core
         self.pure = pure ?? core
         self.vault = vault
         self.grouping = grouping
+        self.projects = projects
     }
 
     /// The vault's files as they are now.
@@ -62,6 +67,7 @@ public final class TaskBoard: @unchecked Sendable {
         } catch VaultError.noTasksFile {
             throw BoardError.noTasksFile
         }
+        findProjects(settings)
         var calendars: [String: String] = [:]
         for file in sources(settings) {
             if let text = vault.read(path: file.path) { calendars[file.source] = text }
@@ -124,6 +130,7 @@ public final class TaskBoard: @unchecked Sendable {
             let files = try files()
             let reply = try answer(method, arguments, files)
             if let settings = reply.settings { try vault.write(path: try core.settingsFile(), text: settings) }
+            if let kept = reply.grouping { grouping.save(kept) }
             guard let tasks = reply.tasks else {
                 keep(reply.history)
                 return reply.result
@@ -158,15 +165,14 @@ public final class TaskBoard: @unchecked Sendable {
         let tasks: String?
         let settings: String?
         let history: DoorHistory?
+        let grouping: String?
     }
 
     private func answer(_ method: String, _ arguments: [JSONValue], _ files: BoardFiles, on lane: PhoneCore? = nil) throws -> Answer {
-        let projects = lane == nil ? projectsJSON(files.settingsJSON) : nil
-        let context = DoorContext(tasks: files.tasks, settingsJSON: files.settingsJSON, now: files.now, calendars: files.calendars, fetched: [], history: kept(), groupingJSON: grouping.load(), projectsJSON: projects)
+        let context = DoorContext(tasks: files.tasks, settingsJSON: files.settingsJSON, now: files.now, calendars: files.calendars, fetched: [], history: kept(), groupingJSON: grouping.load(), projectsJSON: foundProjects())
         do {
             let reply = try (lane ?? core).call(method, arguments.map(\.any), context: context)
-            if let changed = reply.groupingJSON { grouping.save(changed) }
-            return Answer(result: JSONValue(any: reply.result), tasks: reply.tasks, settings: reply.settingsJSON, history: reply.history)
+            return Answer(result: JSONValue(any: reply.result), tasks: reply.tasks, settings: reply.settingsJSON, history: reply.history, grouping: reply.groupingJSON)
         } catch PhoneCoreError.refused(let code, let message) {
             throw BoardError.refused(code: code, message: message)
         } catch PhoneCoreError.scriptFailed(let message) {
@@ -174,43 +180,41 @@ public final class TaskBoard: @unchecked Sendable {
         }
     }
 
-    // MARK: Projects and notes
+    /// A call that changes only how this device groups its lists (`tasks.setGrouping`, `tasks.toggleFold`): the answer's
+    /// grouping is kept, nothing is written to the vault.
+    public func group(_ method: String, _ arguments: [JSONValue]) throws {
+        let reply = try answer(method, arguments, settingsOnly())
+        if let kept = reply.grouping { grouping.save(kept) }
+    }
 
-    /// The vault's files listed again and the tags of the notes changed since read: a note tagged or untagged as a project
-    /// elsewhere shows on the next read. Call it when the app comes back to the screen.
+    /// The project notes for the settings' project tag (`settings.form`), as the context hands them to the door.
+    private func findProjects(_ settings: String) {
+        guard let projects else { return }
+        lock.lock()
+        let known = projectTag?.settings == settings ? projectTag?.tag : nil
+        lock.unlock()
+        let tag = known ?? ((try? core.call("settings.form", [], context: DoorContext(tasks: nil, settingsJSON: settings, now: Date())).result as? [String: Any])?["projectTag"] as? String) ?? ""
+        let notes = projects.notes(tag: tag)
+        let json = try? String(decoding: JSONEncoder().encode(notes), as: UTF8.self)
+        lock.lock()
+        projectTag = (settings, tag)
+        projectsJSON = json
+        lock.unlock()
+    }
+
+    private func foundProjects() -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return projectsJSON
+    }
+
+    /// The vault's files listed again: a note made or renamed elsewhere is offered by the next `[[`. The project notes
+    /// look again on their own (`VaultProjects`).
     public func refreshNotes() {
-        notes.refresh(vault: vault, core: core)
-        lock.withLock { projects = nil }
+        fileList.forget()
     }
 
-    /// The project notes handed in with every call (`context.projects`), found by the settings' project tag.
-    private func projectsJSON(_ settings: String) -> String? {
-        if !notes.hasRead { notes.refresh(vault: vault, core: core) }
-        if let kept = lock.withLock({ projects }), kept.settings == settings { return kept.json }
-        let context = DoorContext(tasks: nil, settingsJSON: settings, now: Date())
-        guard let found = try? core.call("notes.projects", [notes.notes.any], context: context).result, let json = try? PhoneCore.json(found) else { return nil }
-        lock.withLock { projects = (settings, json) }
-        return json
-    }
-
-    /// The project notes by name, as the Project row offers them.
-    public func projectNotes() throws -> [NoteLink] {
-        guard let json = projectsJSON(lastSettings()) else { return [] }
-        return try JSONDecoder().decode([NoteLink].self, from: Data(json.utf8))
-    }
-
-    /// The device's grouping by project (`GroupingState` as JSON): `nil` for the door's defaults.
-    public var groupingJSON: String? { grouping.load() }
-
-    /// Group by project in a list's title menu: on or off for `list` (`backlog`, `soon`) on this device.
-    public func setGrouping(_ list: String, on: Bool) throws {
-        try write("tasks.setGrouping", [.string(list), .bool(on)])
-    }
-
-    /// A project group's chevron: folds or unfolds the group of `key` (`ProjectGroup.key`) in `list`.
-    public func toggleFold(_ list: String, key: String) throws {
-        try write("tasks.toggleFold", [.string(list), .string(key)])
-    }
+    // MARK: Notes
 
     /// The `[[` the caret (UTF-16 offset) stands in, typed in a title; `nil` for none.
     public func linkQuery(in text: String, caret: Int) throws -> LinkQuery? {
@@ -218,20 +222,18 @@ public final class TaskBoard: @unchecked Sendable {
     }
 
     /// The files `[[query` offers, best first.
-    public func suggestNotes(_ query: String) throws -> [NoteLink] {
-        if !notes.hasRead { notes.refresh(vault: vault, core: core) }
-        return try rule("notes.suggest", [.string(query), notes.all])
+    public func suggestNotes(_ query: String) throws -> [ProjectNote] {
+        try rule("notes.suggest", [.string(query), fileList.all(vault)])
     }
 
     /// The title with the picked note's link in place of the `[[` typed, and the caret after it.
-    public func insertLink(_ note: NoteLink, in text: String, at query: LinkQuery) throws -> LinkInsert {
+    public func insertLink(_ note: ProjectNote, in text: String, at query: LinkQuery) throws -> LinkInsert {
         try rule("notes.insert", [.string(text), query.json, .string(note.link)])
     }
 
     /// The file a note link of a title opens (`TextPart.target`); `nil` for a link to no file of the vault.
-    public func noteToOpen(_ target: String) throws -> NoteLink? {
-        if !notes.hasRead { notes.refresh(vault: vault, core: core) }
-        return try rule("notes.open", [.string(target), notes.all])
+    public func noteToOpen(_ target: String) throws -> ProjectNote? {
+        try rule("notes.open", [.string(target), fileList.all(vault)])
     }
 
     // MARK: Words and sizes

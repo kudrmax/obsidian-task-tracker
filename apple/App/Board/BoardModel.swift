@@ -68,8 +68,8 @@ struct ListGap: Equatable {
     let at: Int
     let level: Int
     let group: String?
-    /// The project's part of a list grouped by project it stands in; nil in a list that groups nothing.
-    let zone: JSONValue?
+    /// In a list grouped by project, the project's part it stands in; nil in a plain list.
+    var zone: JSONValue? = nil
     let place: JSONValue
     /// The drop line as the plugin draws it (`DropLine`), in the list's content space: from `line.x`, the left edge of
     /// the gap's level, to the list's right edge, through `line.y`, the middle of the gap; nil where the drop changes
@@ -112,6 +112,7 @@ final class BoardModel {
 
     /// A screen the quick entry read after its write, drawn in the same step as the entry's state for it.
     func draw(_ read: BoardSnapshot) {
+        forgetGone(read)
         snapshot = read
         problem = nil
     }
@@ -255,6 +256,7 @@ final class BoardModel {
     private func show(_ read: BoardSnapshot, animated: Bool, serial: Int) {
         if let before = snapshot { follow(read.dayChange(since: before), from: before) }
         defer { if reopen, read.day == read.today, !readAgain { reopen = false; dayMoved += 1 } }
+        forgetGone(read)
         if animated {
             withAnimation(.snappy) {
                 snapshot = read
@@ -334,8 +336,24 @@ final class BoardModel {
         readAgain = true
     }
 
+    /// The vault's project notes changed: the screen reads again, once a carry or the quick entry's writes let it.
+    func projectsChanged() async {
+        guard carried == nil, !entry.writing else {
+            readAfterCarry = true
+            projectsAsked = true
+            return
+        }
+        await reload(animated: true)
+    }
+
+    /// The project notes changed while a carry or the quick entry held the read: it reads again whatever the file did.
+    @ObservationIgnored private var projectsAsked = false
+
     /// The tasks file watched while the screen shows: a coordinated write elsewhere (iCloud, a reminder's button) reads again.
     func watchFile() {
+        AppServices.shared.projects.changed = { [weak self] in
+            Task { @MainActor in await self?.projectsChanged() }
+        }
         guard watch == nil else { return }
         watch = AppServices.shared.vault.watchTasksFile { [weak self] in
             Task { @MainActor in await self?.reloadIfChanged() }
@@ -471,6 +489,7 @@ final class BoardModel {
         guard let turn = dayTurn else { return }
         var instant = Transaction()
         instant.disablesAnimations = true
+        forgetGone(turn.peek)
         withTransaction(instant) {
             snapshot = turn.peek
             entry.screenChanged()
@@ -672,7 +691,7 @@ final class BoardModel {
         await write("tasks.setRepeat", [item.key.json, rule])
     }
 
-    /// Inside a project's group (`menu.project`), only that project's tasks of the section move, as the plugin's.
+    /// A section's header menu: inside a project's group (`menu.project`) only that project's tasks move.
     func renameSection(_ column: BoardColumn, _ menu: GroupMenu, to name: String) async {
         guard let list = sectionList(column) else { return }
         await write("tasks.renameGroup", [.string(list), .string(menu.section), .string(name)] + (menu.project.map { [$0] } ?? []))
@@ -685,33 +704,31 @@ final class BoardModel {
 
     // MARK: Projects
 
-    /// The Project page's pick: the project's link, nil for No project.
+    /// The title's menu: the list groups its tasks by project, or stops.
+    func setGrouping(_ column: BoardColumn, _ on: Bool) async {
+        await group("tasks.setGrouping", [.string(column.rawValue), .bool(on)])
+    }
+
+    /// A project group's header tapped: it folds, or opens again.
+    func toggleFold(_ column: BoardColumn, _ key: String) async {
+        UISelectionFeedbackGenerator().selectionChanged()
+        await group("tasks.toggleFold", [.string(column.rawValue), .string(key)])
+    }
+
+    private func group(_ method: String, _ arguments: [JSONValue]) async {
+        let board = board
+        do {
+            try await Task.detached { try board.group(method, arguments) }.value
+        } catch {
+            problem = Self.words(error)
+        }
+        await reload(animated: true)
+    }
+
+    /// The Project page's pick: the tasks get the project (its link), or none.
     func setProject(_ items: [TaskItem], _ link: String?) async {
         await write("tasks.setProject", [keys(items), link.json])
         endSelection()
-    }
-
-    /// Group by project in Backlog's or Soon's title menu, kept on the device.
-    func setGrouping(_ column: BoardColumn, on: Bool) async {
-        let board = board
-        do {
-            try await Task.detached { try board.setGrouping(column.rawValue, on: on) }.value
-        } catch {
-            problem = Self.words(error)
-        }
-        await reload(animated: true)
-    }
-
-    /// A project group's header tapped: it folds or unfolds, kept on the device.
-    func toggleFold(_ column: BoardColumn, _ head: BoardProjectHead) async {
-        let board = board
-        UISelectionFeedbackGenerator().selectionChanged()
-        do {
-            try await Task.detached { try board.toggleFold(column.rawValue, key: head.key) }.value
-        } catch {
-            problem = Self.words(error)
-        }
-        await reload(animated: true)
     }
 
     /// Apple's Calendar at an event, as the plugin opens it on the iPhone (`calshow:`, seconds from 2001): at its start.
@@ -720,11 +737,12 @@ final class BoardModel {
         if let url = URL(string: "calshow:\(Int(start.timeIntervalSinceReferenceDate))") { UIApplication.shared.open(url) }
     }
 
-    /// A project's note, opened in Obsidian: the group's arrow and a card's folder mark.
+    /// A note of the vault in Obsidian, by its path, through Advanced URI as every Open in Obsidian of the app: a title's
+    /// note link, and the project view's Open in Obsidian.
     func openNote(_ path: String) {
         guard let vault = UserDefaults.standard.string(forKey: "vaultFolderName") else { return }
-        var link = URLComponents(string: "obsidian://open")!
-        link.queryItems = [URLQueryItem(name: "vault", value: vault), URLQueryItem(name: "file", value: path)]
+        var link = URLComponents(string: "obsidian://advanced-uri")!
+        link.queryItems = [URLQueryItem(name: "vault", value: vault), URLQueryItem(name: "filepath", value: path)]
         if let url = link.url { UIApplication.shared.open(url) }
     }
 
@@ -777,16 +795,11 @@ final class BoardModel {
         }
     }
 
-    /// The vault's notes listed again, back in front: a note tagged or untagged as a project elsewhere, renamed or moved,
-    /// redraws the screen.
+    /// The vault's files listed again, back in front: a note made, renamed or moved elsewhere is offered by `[[` and
+    /// opened by a link. The project notes look again on their own (`VaultProjects`), redrawing the screen when they change.
     func refreshNotes() async {
         let board = board
-        let changed = await Task.detached { () -> Bool in
-            let before = try? board.projectNotes()
-            board.refreshNotes()
-            return (try? board.projectNotes()) != before
-        }.value
-        if changed { await reload(animated: true) }
+        await Task.detached { board.refreshNotes() }.value
     }
 
     /// Whose sections a column shows, as the core names the list.
@@ -1008,7 +1021,12 @@ final class BoardModel {
     func readIfAsked() {
         guard readAfterCarry, carried == nil, !entry.writing else { return }
         readAfterCarry = false
-        Task { await reloadIfChanged() }
+        if projectsAsked {
+            projectsAsked = false
+            Task { await reload(animated: true) }
+        } else {
+            Task { await reloadIfChanged() }
+        }
     }
 
     /// The drag session ended, whatever came of it: a carry still standing ends now, unless its drop is still being
@@ -1025,7 +1043,7 @@ final class BoardModel {
         sectionSlot = nil
         landing = nil
         hovered = nil
-        titleLit = nil
+        litTitle = nil
     }
 
     /// Whether a card stands in the carry: the card itself or one of its subtasks, which go with it.
@@ -1054,6 +1072,19 @@ final class BoardModel {
     /// The last point a carry was read at over a list, so a finger standing still asks nothing.
     @ObservationIgnored private var hovered: (column: BoardColumn, point: CGPoint)?
 
+    /// The frames of cards and headers the new drawing no longer shows (a group folded, a section gone) are dropped, so a
+    /// carry never reads a header from an earlier drawing.
+    private func forgetGone(_ read: BoardSnapshot) {
+        for (column, list) in read.lists {
+            guard var shape = geometry[column] else { continue }
+            let cards = Set(list.cards.map(\.id))
+            let heads = Set(list.groups.map(\.id) + list.projects.map(\.id))
+            shape.cards = shape.cards.filter { cards.contains($0.key) }
+            shape.heads = shape.heads.filter { heads.contains($0.key) }
+            geometry[column] = shape
+        }
+    }
+
     /// A card's or a header's frame as the list lays it out; kept only while no gap is open in the list.
     func rest(_ column: BoardColumn, card id: String, _ frame: CGRect) {
         guard settling?.column != column else { return }
@@ -1080,6 +1111,54 @@ final class BoardModel {
             hover: { [weak self] in self?.hover(column, at: $0) },
             leave: { [weak self] in self?.leave(column) },
             land: { [weak self] in self?.land(column) }))
+        dropping.register("title.\(column.rawValue)", DropPlace(
+            hover: { [weak self] in self?.hoverTitle(column, at: $0) },
+            leave: { [weak self] in self?.leaveTitle(column) },
+            land: { [weak self] in self?.landOnTitle(column) }))
+        if let frame = titleFrames[column] { dropping.move("title.\(column.rawValue)", visible: frame, origin: frame.origin) }
+    }
+
+    // MARK: A list's title as a place to drop on
+
+    /// The title a carried card would land on: it lights as a drop target.
+    private(set) var litTitle: BoardColumn?
+    @ObservationIgnored private var titleFrames: [BoardColumn: CGRect] = [:]
+
+    /// The title's row across its column, in the window.
+    func titleMoved(_ column: BoardColumn, _ frame: CGRect) {
+        titleFrames[column] = frame
+        dropping.move("title.\(column.rawValue)", visible: frame, origin: frame.origin)
+    }
+
+    /// A card over the title lights it; the plus keeps the place at the list's top, as before.
+    private func hoverTitle(_ column: BoardColumn, at point: CGPoint) {
+        guard let carry, carry.section == nil else { return }
+        guard carry.id != Carried.plus, snapshot?.lists[column]?.titleDrop != nil else { return hover(column, at: CGPoint(x: point.x, y: 0)) }
+        if gap != nil { withAnimation(.snappy(duration: 0.12)) { gap = nil } }
+        landing = nil
+        guard litTitle != column else { return }
+        UISelectionFeedbackGenerator().selectionChanged()
+        withAnimation(.snappy(duration: 0.12)) { litTitle = column }
+    }
+
+    private func leaveTitle(_ column: BoardColumn) {
+        leave(column)
+        guard litTitle == column else { return }
+        withAnimation(.snappy(duration: 0.2)) { litTitle = nil }
+    }
+
+    /// Let go on the title: the task goes where the core's drop on it means (`ScreenView.titleDrops`), its project kept.
+    private func landOnTitle(_ column: BoardColumn) -> CGRect? {
+        guard let carry, carry.section == nil else { return nil }
+        guard carry.id != Carried.plus else { return land(column) }
+        guard let to = snapshot?.lists[column]?.titleDrop, carry.item != nil else { return nil }
+        writingDrop = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        Task {
+            await drop(carry, to: to)
+            finishDrop()
+        }
+        return nil
     }
 
     /// The carry held over `column` at `point`: the gap the core places under the finger, its level from the finger's
@@ -1094,21 +1173,22 @@ final class BoardModel {
             let frame = shape.cards[card.id] ?? .zero
             return PlacedCard(level: card.level, group: card.item.group, zone: card.zone, top: Double(frame.minY), height: Double(frame.height))
         }
-        // Which of the list's sections each card stands in, by its order: the first card after a header is the first of a
-        // section at or after the header's.
-        var order: [String: Int] = [:]
-        for (index, group) in list.groups.enumerated() { for card in group.cards { order[card.id] = index } }
-        let firstFrom = { (section: Int) in others.firstIndex { (order[$0.id] ?? 0) >= section } ?? others.count }
         var heads: [PlacedHead] = []
-        for (index, group) in list.groups.enumerated() where group.header != nil {
-            guard let frame = shape.heads[group.id] else { continue }
-            heads.append(PlacedHead(group: group.place, firstCard: firstFrom(index), top: Double(frame.minY), height: Double(frame.height)))
+        var before = 0
+        for part in list.parts {
+            switch part {
+            case .project(let project):
+                if let frame = shape.heads[project.id] {
+                    heads.append(PlacedHead(group: project.head, opens: true, firstCard: before, top: Double(frame.minY), height: Double(frame.height)))
+                }
+            case .section(let index):
+                let group = list.groups[index]
+                if group.header != nil, let frame = shape.heads[group.id] {
+                    heads.append(PlacedHead(group: group.place, firstCard: before, top: Double(frame.minY), height: Double(frame.height)))
+                }
+                before += group.cards.filter { !isCarried($0) }.count
+            }
         }
-        for head in list.heads {
-            guard let frame = shape.heads[head.id] else { continue }
-            heads.append(PlacedHead(group: head.head, opens: true, firstCard: firstFrom(head.before), top: Double(frame.minY), height: Double(frame.height)))
-        }
-        heads.sort { $0.top < $1.top }
         let inset = Double(CardMetrics.columnInset)
         let y = carry.id == Carried.plus ? Double(point.y) : (try? board.carriedMiddle(y: Double(point.y), grab: Double(carry.grab), cardHeight: Double(CardMetrics.height))) ?? Double(point.y)
         let level = (try? board.levelAt(x: Double(point.x), left: inset, width: Double(shape.width) - 2 * inset, indent: Double(CardMetrics.indent))) ?? 0
@@ -1124,9 +1204,10 @@ final class BoardModel {
             let drop: JSONValue? = ruleNow("rules.placeOfDrop", [Self.listCards(others), place, home])
             return drop == nil || drop == .null
         } ?? false
-        let lights = list.groups.contains { $0.names(group, zone: zone) && $0.empty }
+        let lights = list.groups.contains { $0.holds(group: group, zone: zone) && $0.empty }
         let shown = stays || lights ? nil : lineAt(column, at: Int(at), level: Int(fitted), group: group, zone: zone, home: home)
         let next = ListGap(column: column, at: Int(at), level: Int(fitted), group: group, zone: zone, place: place, line: shown)
+        if litTitle != nil { withAnimation(.snappy(duration: 0.12)) { litTitle = nil } }
         guard next != gap else { return }
         if next.place != gap?.place { UISelectionFeedbackGenerator().selectionChanged() }
         landing = nil
@@ -1188,15 +1269,15 @@ final class BoardModel {
         let indent = CGFloat(gap.level) * CardMetrics.indent
         let x = CardMetrics.columnInset + indent
         let w = shape.width - CardMetrics.columnInset * 2 - indent
-        if let next = others[safe: gap.at], next.stands(in: gap.group, zone: gap.zone), let frame = shape.cards[next.id] {
+        let inPart = { (card: BoardCard) in card.stands(in: gap.group, zone: gap.zone) }
+        if let next = others[safe: gap.at], inPart(next), let frame = shape.cards[next.id] {
             return CGRect(x: x, y: frame.minY, width: w, height: CardMetrics.height)
         }
-        let above = others.prefix(gap.at).last { $0.stands(in: gap.group, zone: gap.zone) }
-        // Under the last card of its section, else under its header: the section's own, or, for a project's part without a
-        // section, its project group's.
-        let section = list.groups.first { $0.names(gap.group, zone: gap.zone) }
-        let header = section.flatMap { shape.heads[$0.id] ?? $0.under.flatMap { shape.heads[$0] } }
-        guard let frame = above.flatMap({ shape.cards[$0.id] }) ?? header else { return nil }
+        let above = others.prefix(gap.at).last(where: inPart)
+        let header = list.groups.first { $0.holds(group: gap.group, zone: gap.zone) }.flatMap { shape.heads[$0.id] }
+        // A project's part without a section stands under the project's header.
+        let projectHead = gap.zone.flatMap { zone in list.projects.first { $0.zone == zone } }.flatMap { shape.heads[$0.id] }
+        guard let frame = above.flatMap({ shape.cards[$0.id] }) ?? header ?? projectHead else { return nil }
         return CGRect(x: x, y: frame.maxY + CardMetrics.gap, width: w, height: CardMetrics.height)
     }
 
@@ -1272,47 +1353,6 @@ final class BoardModel {
         dropReadFrom = nil
         await reload(animated: false)
         stretched = nil
-    }
-
-    // MARK: A column's title as a place to drop on
-
-    /// The column whose title a carried card would land on: lit as an empty section's plate.
-    private(set) var titleLit: BoardColumn?
-
-    /// A column's title takes a card as the core says (`screen.titleDrops`): the end of its part without a section, its
-    /// project kept. Never the plus or a section.
-    func registerTitle(_ column: BoardColumn) {
-        dropping.register("title.\(column.rawValue)", DropPlace(
-            hover: { [weak self] _ in self?.hoverTitle(column) },
-            leave: { [weak self] in self?.leaveTitle(column) },
-            land: { [weak self] in self?.landTitle(column) },
-            takesPlus: false))
-    }
-
-    private func hoverTitle(_ column: BoardColumn) {
-        guard let carry, carry.item != nil, carry.section == nil, snapshot?.screen.titleDrops[column.rawValue] != nil else { return leaveTitle(column) }
-        hovered = nil
-        landing = nil
-        if gap != nil { withAnimation(.snappy(duration: 0.12)) { gap = nil } }
-        guard titleLit != column else { return }
-        UISelectionFeedbackGenerator().selectionChanged()
-        withAnimation(.snappy(duration: 0.15)) { titleLit = column }
-    }
-
-    private func leaveTitle(_ column: BoardColumn) {
-        guard titleLit == column else { return }
-        withAnimation(.snappy(duration: 0.15)) { titleLit = nil }
-    }
-
-    private func landTitle(_ column: BoardColumn) -> CGRect? {
-        guard titleLit == column, let carry, carry.item != nil, let to = snapshot?.screen.titleDrops[column.rawValue] else { return nil }
-        titleLit = nil
-        writingDrop = true
-        Task {
-            await drop(carry, to: to)
-            finishDrop()
-        }
-        return nil
     }
 
     // MARK: The calendar as a place to drop on
@@ -1429,6 +1469,7 @@ final class BoardModel {
         return .object(gap)
     }
 
+    /// The cards as places in a list see them (`ListCard`): each in its section, and its project's part in a grouped list.
     static func listCards(_ cards: [BoardCard]) -> JSONValue {
         .array(cards.map(\.listCard))
     }

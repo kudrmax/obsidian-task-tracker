@@ -30,7 +30,7 @@ public struct DoorContext: Sendable {
     public let history: DoorHistory?
     /// How this device groups its lists by project (`GroupingState`) as JSON text; `nil` for the door's defaults.
     public let groupingJSON: String?
-    /// The vault's project notes (`ProjectNote` list, as `notes.projects` answers it) as JSON text; `nil` for none.
+    /// The notes with the project tag (`ProjectNote`s) as JSON text; `nil` for none.
     public let projectsJSON: String?
 
     public init(tasks: String?, settingsJSON: String = "", now: Date, calendars: [String: String] = [:], fetched: [String]? = nil, history: DoorHistory? = nil, groupingJSON: String? = nil, projectsJSON: String? = nil) {
@@ -56,7 +56,7 @@ public struct DoorReply: @unchecked Sendable {
     public let history: DoorHistory?
     /// The new `data.json`, when the call changed the settings.
     public let settingsJSON: String?
-    /// The device's grouping by project after this call (`GroupingState` as JSON text), when the call changed it.
+    /// The device's grouping by project after the call (`GroupingState` as JSON text), when the call changed it.
     public var groupingJSON: String? = nil
 }
 

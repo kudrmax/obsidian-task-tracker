@@ -307,10 +307,8 @@ describe("the door's notes", () => {
 	const ok = (answer: DoorAnswer) => (answer as Extract<DoorAnswer, { ok: true }>).result;
 
 	it("finds the projects among the vault's notes by the settings' tag, and a task's project opens its note once they are handed in", () => {
-		const notes = ok(callDoor("notes.tags", [["---\ntags: [client]\n---\n", "#project"]], context())) as string[][];
-		expect(notes).toEqual([["#client"], ["#project"]]);
-		const vault = [{ path: "Clients/Acme.md", tags: notes[0] }, { path: "Home.md", tags: notes[1] }];
-		const projects = ok(callDoor("notes.projects", [vault], context(FILE, { settings: JSON.stringify({ projectTag: "#client" }) })));
+		const vault = [{ path: "Clients/Acme.md", text: "---\ntags: [client]\n---\n" }, { path: "Home.md", text: "#project" }];
+		const projects = ok(callDoor("rules.projectNotes", [vault, "#client"], context()));
 		expect(projects).toEqual([{ name: "Acme", path: "Clients/Acme.md", link: "Acme" }]);
 		const text = "## Inbox\n- [ ] Call 🗂️ [[Acme]]\n";
 		const screen = ok(callDoor("tasks.screen", [T], context(text, { projects: projects as never }))) as { inbox: { project: unknown }[] };
@@ -533,6 +531,8 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.usableColor", "#12AB34"),
 		plain("rules.acceptsDrop", "inbox", ["soon"]),
 		plain("rules.placesInGap", "soon", "day", false),
+		plain("rules.noteTags", "---\ntags: [project]\n---\n#more"),
+		plain("rules.projectNotes", [{ path: "A.md", text: "#project" }, { path: "B.md", tags: ["#project"] }], "#project"),
 		plain("rules.shadesOf", "red", "dark"),
 		plain("rules.inkOf", "#12AB34", "light"),
 		plain("rules.contrast", "#FFFFFF", "#000000"),
@@ -575,8 +575,6 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.wholeWidth", { width: 170, titleWidth: 140, textWidth: 100, fade: 16 }, { width: 390, margin: 10 }),
 		plain("rules.grownStart", 200, 180, 230, 390, 10),
 		plain("timeline.zoomLevels"),
-		plain("notes.tags", ["---\ntags: [project]\n---\n#next", "plain"]),
-		plain("notes.projects", [{ path: "Projects/Alpha.md", tags: ["#project"] }, { path: "Beta.md" }]),
 		plain("notes.linkQuery", "Call [[Alp", 10),
 		plain("notes.linkQuery", "Call", 4),
 		plain("notes.suggest", "alp", [{ path: "Projects/Alpha.md" }, { path: "Beta.md" }]),

@@ -100,7 +100,8 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     private static let edgeSpeed: CGFloat = 9
 
     private func place(at point: CGPoint, plus: Bool = false) -> String? {
-        places.first { $0.value.visible.contains(point) && (!plus || $0.value.takesPlus) }?.key
+        // By key, so a point two places share always goes to the same one.
+        places.keys.sorted().first { key in places[key].map { $0.visible.contains(point) && (!plus || $0.takesPlus) } == true }
     }
 
     private func leave() {

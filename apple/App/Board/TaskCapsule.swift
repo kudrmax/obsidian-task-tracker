@@ -17,8 +17,8 @@ struct TaskCapsule: View {
     var onTitle: ((CGRect) -> Void)?
     /// Where each link of the title is drawn, in the capsule's own space: a tap there opens it instead of the menu.
     var onLinks: (([CardLink]) -> Void)?
-    /// Where the project's folder mark is drawn: a tap there opens the project's note.
-    var onFolder: ((CGRect) -> Void)?
+    /// Where the project's folder mark is drawn, in the capsule's own space: the card lays its button there.
+    var onMark: ((CGRect) -> Void)?
     /// A search's find: the found pieces picked out of the title, and the project's name or the description's line under
     /// it where the query was found there, as the plugin's search draws its cards.
     var found: SearchHit?
@@ -50,7 +50,7 @@ struct TaskCapsule: View {
                     .accessibilityElement(children: .combine)
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onTitle?($0) }
             }
-            if let project = card.item.project, project.mark { folder(project) }
+            if card.item.project?.mark == true { projectMark }
             if card.item.progress != nil || card.item.description != nil { meta }
             if let corner = card.corner { stackCorner(corner) }
             if let due = card.due {
@@ -178,16 +178,6 @@ struct TaskCapsule: View {
         Text(verbatim: part.shown).foregroundColor(part.isLink ? Palette.accent(scheme) : card.item.closed ? Palette.muted : Color.primary)
     }
 
-    /// The project's folder, in the date's place and of its width, left of the counter, the date and the repeat.
-    private func folder(_ project: ProjectRef) -> some View {
-        Image(systemName: "folder")
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(metaColor)
-            .frame(width: 24, height: CardMetrics.titleLine)
-            .accessibilityLabel(project.name)
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onFolder?($0) }
-    }
-
     /// The subtask counter over the description's mark, as the plugin stacks them; either alone when the task has only it.
     private var meta: some View {
         let pair = card.item.progress != nil && card.item.description != nil
@@ -212,6 +202,17 @@ struct TaskCapsule: View {
         }
         .frame(minWidth: 22)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onCounter?($0) }
+    }
+
+    /// The task's project (board Proj2V1): a folder in the caption colour, in the date's place and of its width, left of the
+    /// date, the repeat and the counter; the card's height does not change.
+    private var projectMark: some View {
+        Image(systemName: "folder")
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(metaColor)
+            .frame(width: 24, height: 18)
+            .accessibilityLabel("Project \(card.item.project?.name ?? "")")
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onMark?($0) }
     }
 
     /// A list card's corner: the due day over its month, the repeat mark beside the day; it grows with what it holds.

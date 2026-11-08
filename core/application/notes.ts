@@ -1,85 +1,17 @@
 import { projectKey } from "../domain/Project";
 import type { ProjectNote } from "./contracts";
-import { type NoteTags, projectNotesOf } from "./projects";
 
 /**
- * The vault's notes as a host without Obsidian reads them (the iOS app): their tags as Obsidian reads them, the link
- * Obsidian would write to each, the `[[` typed in a title and the notes it offers, and the note a link opens.
+ * The vault's notes as a host without Obsidian reads them (the iOS app): the link Obsidian would write to each, the `[[`
+ * typed in a title and the notes it offers, and the note a link opens.
  */
 
-/** A file of the vault by its path from the vault folder, with its tags (`noteTags`); a note without tags has none. */
+/** A file of the vault by its path from the vault folder. */
 export interface VaultNote {
 	readonly path: string;
-	readonly tags?: readonly string[];
 }
 
-const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/;
-const TAGS_KEY_RE = /^(tags?)[ \t]*:[ \t]*(.*)$/i;
-const LIST_ITEM_RE = /^[ \t]*-[ \t]*(.*)$/;
-const FENCE_RE = /^[ \t]*(```|~~~)/;
-const CODE_SPAN_RE = /`[^`\n]*`/g;
-/** `#tag` after the line's start or a space: letters, digits, `_`, `-`, `/`, and not digits alone, as Obsidian reads a tag. */
-const INLINE_TAG_RE = /(?<=^|\s)#([\p{L}\p{N}\p{M}_\-/]+)/gu;
-const DIGITS_RE = /^\d+$/;
 const MD = ".md";
-
-/** A tag as a note writes it, `#` first; null for one Obsidian would not read as a tag. */
-function tagOf(raw: string): string | null {
-	const bare = raw
-		.trim()
-		.replace(/^["']|["']$/g, "")
-		.trim()
-		.replace(/^#/, "");
-	if (bare === "" || /[\s#]/.test(bare) || DIGITS_RE.test(bare)) return null;
-	return `#${bare}`;
-}
-
-/** The tags of the properties: `tags:` (or `tag:`) as a list, a list in brackets, or words. */
-function propertyTags(yaml: string): string[] {
-	const lines = yaml.split(/\r?\n/);
-	const found: string[] = [];
-	for (let i = 0; i < lines.length; i++) {
-		const key = TAGS_KEY_RE.exec(lines[i]);
-		if (!key) continue;
-		const value = key[2].trim();
-		if (value === "") {
-			for (let j = i + 1; j < lines.length; j++) {
-				const item = LIST_ITEM_RE.exec(lines[j]);
-				if (!item) break;
-				found.push(item[1]);
-			}
-			continue;
-		}
-		const inner = value.startsWith("[") && value.endsWith("]") ? value.slice(1, -1) : value;
-		found.push(...inner.split(/[,\s]+/));
-	}
-	return found.flatMap((raw) => tagOf(raw) ?? []);
-}
-
-/** The tags of the text: `#tag` outside code blocks and code spans. */
-function textTags(body: string): string[] {
-	const found: string[] = [];
-	let fenced = false;
-	for (const line of body.split(/\r?\n/)) {
-		if (FENCE_RE.test(line)) {
-			fenced = !fenced;
-			continue;
-		}
-		if (fenced) continue;
-		for (const m of line.replace(CODE_SPAN_RE, " ").matchAll(INLINE_TAG_RE)) {
-			const tag = tagOf(m[1]);
-			if (tag) found.push(tag);
-		}
-	}
-	return found;
-}
-
-/** A note's tags as Obsidian reads them, `#` first: its properties' and its text's, each once, in the order they stand. */
-export function noteTags(text: string): string[] {
-	const front = FRONTMATTER_RE.exec(text);
-	const tags = [...(front ? propertyTags(front[1]) : []), ...textTags(front ? text.slice(front[0].length) : text)];
-	return [...new Set(tags)];
-}
 
 /** A file's name as a link shows it: a note without `.md`, any other file with its extension. */
 function nameOf(path: string): string {
@@ -92,20 +24,13 @@ function withoutMd(path: string): string {
 }
 
 /** Every file with the shortest link Obsidian writes to it: its name while no other file has it, else its path. */
-export function linkedNotes(notes: readonly VaultNote[]): (ProjectNote & { readonly tags: readonly string[] })[] {
+export function linkedNotes(notes: readonly VaultNote[]): ProjectNote[] {
 	const named = new Map<string, number>();
 	for (const { path } of notes) named.set(projectKey(nameOf(path)), (named.get(projectKey(nameOf(path))) ?? 0) + 1);
-	return notes.map(({ path, tags }) => {
+	return notes.map(({ path }) => {
 		const name = nameOf(path);
-		return { name, path, link: named.get(projectKey(name)) === 1 ? name : withoutMd(path), tags: tags ?? [] };
+		return { name, path, link: named.get(projectKey(name)) === 1 ? name : withoutMd(path) };
 	});
-}
-
-/** The notes with the project tag, by name (two of one name by path), each with the link a task's `🗂️` field writes. */
-export function vaultProjects(notes: readonly VaultNote[], tag: string): readonly ProjectNote[] {
-	const byPath = [...notes].sort((a, b) => compare(a.path, b.path));
-	const linked: NoteTags[] = linkedNotes(byPath.filter((note) => note.path.toLowerCase().endsWith(MD)));
-	return projectNotesOf(linked, tag);
 }
 
 /** A `[[` being typed: the words after it up to the caret, and the range a picked note's link takes the place of. */

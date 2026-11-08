@@ -64,6 +64,8 @@ struct ListEntryView: Decodable, Equatable {
     let place: Place
     let pending: [EntryView.Pending]
     let section: Bool
+    /// The section named for the task being typed in a project's group, drawn as its header over the field.
+    let newSection: String?
     let at: At
 }
 
@@ -199,7 +201,7 @@ final class QuickEntryHost {
 
     /// The `[[` the caret stands in, as the core reads it (`notes.linkQuery`), and the notes it offers, best first.
     private(set) var linking: LinkQuery?
-    private(set) var notes: [NoteLink] = []
+    private(set) var notes: [ProjectNote] = []
 
     /// The field's text or caret changed: the note search opens while the caret stands in a `[[`, as in an Obsidian note.
     func findLinks() {
@@ -211,7 +213,7 @@ final class QuickEntryHost {
     }
 
     /// A note picked: its link takes the `[[` typed, the caret after it, and typing goes on.
-    func pickNote(_ note: NoteLink) {
+    func pickNote(_ note: ProjectNote) {
         let text = field.text ?? ""
         guard let query = linking, let insert = try? board.insertLink(note, in: text, at: query) else { return }
         // The tap on the list is no tap elsewhere: the field stays open.

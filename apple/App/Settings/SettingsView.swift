@@ -38,6 +38,7 @@ struct SettingsView: View {
             Section("Show and set up") {
                 link("Labels", value: plugin.form.map { "\($0.labels.count)" }, symbol: "tag.fill", tint: .green) { LabelsPage(plugin: plugin) }
                 link("Sections", value: plugin.form.map { "\($0.presets.count)" }, symbol: "rectangle.stack.fill", tint: .indigo) { SectionsPage(plugin: plugin) }
+                link("Projects", value: plugin.form?.projectTag, symbol: "folder.fill", tint: .teal) { ProjectsPage(plugin: plugin) }
                 link("Calendars", symbol: "calendar", tint: .red) { CalendarsView(model: nil) }
                 link("Day and Timeline", symbol: "clock.fill", tint: .blue) { DayPage(plugin: plugin) }
                 link("Tasks File", symbol: "doc.text.fill", tint: .gray) { TasksFilePage(model: model, plugin: plugin) }
@@ -165,7 +166,7 @@ struct LabelsPage: View {
                         .multilineTextAlignment(.trailing)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                        .onSubmit { Task { await plugin.write("settings.setLabelTag", [.string(tag)]) } }
+                        .onSubmit(saveTag)
                 }
             } footer: {
                 Text("Labels are written as tags under this one: #\(tag)/Name.")
@@ -174,6 +175,48 @@ struct LabelsPage: View {
         .navigationTitle("Labels")
         .toolbar { EditButton() }
         .onAppear { tag = plugin.form?.labelTag ?? "" }
+        .onDisappear(perform: saveTag)
+    }
+
+    /// The tag typed is kept on Return and on leaving the page, as Settings keeps a field.
+    private func saveTag() {
+        guard let saved = plugin.form?.labelTag, tag != saved else { return }
+        Task { await plugin.write("settings.setLabelTag", [.string(tag)]) }
+    }
+}
+
+/// The tag that makes a note a project, as the plugin's Project tag setting.
+struct ProjectsPage: View {
+    let plugin: PluginSettings
+    @State private var tag = ""
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Project Tag") {
+                    TextField("#project", text: $tag)
+                        .multilineTextAlignment(.trailing)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onSubmit(saveTag)
+                }
+            } footer: {
+                // As the plugin's Project tag: the warning only while Obsidian would leave a renamed note's links behind.
+                Text(plugin.updatesLinks
+                    ? "A note with this tag, in its properties or its text, is a project: Backlog and Soon group their tasks by it, and a task’s menu offers it under Project."
+                    : "A note with this tag, in its properties or its text, is a project: Backlog and Soon group their tasks by it, and a task’s menu offers it under Project. Turn on Files and links → Automatically update internal links in Obsidian: otherwise renaming a project’s note breaks its tasks’ links.")
+            }
+        }
+        .navigationTitle("Projects")
+        .onAppear { tag = plugin.form?.projectTag ?? "" }
+        .onDisappear(perform: saveTag)
+        .onChange(of: plugin.form?.projectTag) { tag = plugin.form?.projectTag ?? "" }
+    }
+
+    /// The tag typed is kept on Return and on leaving the page, as Settings keeps a field.
+    private func saveTag() {
+        guard let saved = plugin.form?.projectTag, tag != saved else { return }
+        Task { await plugin.write("settings.setProjectTag", [.string(tag)]) }
     }
 }
 
@@ -363,15 +406,6 @@ struct TasksFilePage: View {
                     Text("Line Markers")
                 } footer: {
                     Text("Lines written with an old marker are no longer read: change them in the file by hand.")
-                }
-                Section {
-                    TextRow(title: "Project Tag", value: form.projectTag) { tag in
-                        await plugin.write("settings.setProjectTag", [.string(tag)])
-                    }
-                } footer: {
-                    Text(!plugin.updatesLinks
-                        ? "A note with this tag, in its properties or its text, is a project: the task menu's Project offers it. One word. Turn on Files and links → Automatically update internal links in Obsidian: otherwise renaming a project's note breaks its tasks' links."
-                        : "A note with this tag, in its properties or its text, is a project: the task menu's Project offers it. One word.")
                 }
             }
             Section {

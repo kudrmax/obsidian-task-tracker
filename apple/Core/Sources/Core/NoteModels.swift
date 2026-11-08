@@ -24,13 +24,6 @@ public struct TextPart: Decodable, Hashable, Sendable {
     public var shown: String { label ?? text ?? "" }
 }
 
-/// `ProjectNote`: a note of the vault by name, with its path and the link Obsidian writes to it.
-public struct NoteLink: Decodable, Hashable, Sendable {
-    public let name: String
-    public let path: String
-    public let link: String
-}
-
 /// `notes.linkQuery`: the `[[` the caret stands in, and the range (UTF-16 offsets) a picked note's link replaces.
 public struct LinkQuery: Decodable, Hashable, Sendable {
     public let query: String
@@ -80,78 +73,18 @@ public struct RepeatWords: Decodable, Hashable, Sendable {
     public let remove: String
 }
 
-/// Keeps how this device groups its lists by project (`GroupingState`, JSON text), never synced.
-public protocol GroupingStore: Sendable {
-    func load() -> String?
-    func save(_ json: String)
-}
-
-/// The grouping kept in `UserDefaults`.
-public final class UserDefaultsGrouping: GroupingStore, @unchecked Sendable {
-    private let defaults: UserDefaults
-    private let key: String
-
-    public init(defaults: UserDefaults = .standard, key: String = "projectGrouping") {
-        self.defaults = defaults
-        self.key = key
-    }
-
-    public func load() -> String? { defaults.string(forKey: key) }
-    public func save(_ json: String) { defaults.set(json, forKey: key) }
-}
-
-/// The grouping kept while the process runs: the door's defaults (Backlog grouped, Soon not) until a call changes it.
-public final class MemoryGrouping: GroupingStore, @unchecked Sendable {
+/// The vault's files, listed once and again only after `forget`: what `notes.suggest` and `notes.open` are asked over.
+final class VaultFileList: @unchecked Sendable {
     private let lock = NSLock()
-    private var kept: String?
-
-    public init(_ json: String? = nil) { kept = json }
-
-    public func load() -> String? { lock.withLock { kept } }
-    public func save(_ json: String) { lock.withLock { kept = json } }
-}
-
-/// The vault's files and each note's tags, read once and then again only for a file changed: what `notes.projects`,
-/// `notes.suggest` and `notes.open` are asked over.
-final class NoteIndex: @unchecked Sendable {
-    private let lock = NSLock()
-    private var tags: [String: (modified: Date, tags: [String])] = [:]
-    private var files: [VaultFile] = []
-    private var read = false
-
-    /// The vault listed again, the tags of each note new or changed since read through the door.
-    func refresh(vault: TasksVault, core: PhoneCore) {
-        let listed = vault.vaultFiles()
-        let notes = listed.filter { $0.path.lowercased().hasSuffix(".md") }
-        let known = lock.withLock { tags }
-        let changed = notes.filter { known[$0.path]?.modified != $0.modified }
-        var fresh: [String: (modified: Date, tags: [String])] = [:]
-        if !changed.isEmpty {
-            let texts = changed.map { vault.read(path: $0.path) ?? "" }
-            let context = DoorContext(tasks: nil, now: Date())
-            let answer = (try? core.call("notes.tags", [texts], context: context).result as? [[String]]) ?? []
-            for (index, file) in changed.enumerated() where index < answer.count { fresh[file.path] = (file.modified, answer[index]) }
-        }
-        lock.withLock {
-            var next: [String: (modified: Date, tags: [String])] = [:]
-            for note in notes { next[note.path] = fresh[note.path] ?? known[note.path] }
-            tags = next
-            files = listed
-            read = true
-        }
-    }
-
-    var hasRead: Bool { lock.withLock { read } }
-
-    /// Every markdown note with its tags, `{ path, tags }`.
-    var notes: JSONValue {
-        lock.withLock {
-            .array(tags.keys.sorted().map { path in ["path": .string(path), "tags": .array((tags[path]?.tags ?? []).map(JSONValue.string))] })
-        }
-    }
+    private var listed: JSONValue?
 
     /// Every file of the vault, `{ path }`.
-    var all: JSONValue {
-        lock.withLock { .array(files.map(\.path).sorted().map { ["path": .string($0)] }) }
+    func all(_ vault: TasksVault) -> JSONValue {
+        if let listed = lock.withLock({ listed }) { return listed }
+        let files = JSONValue.array(vault.vaultFiles().map(\.path).sorted().map { ["path": .string($0)] })
+        lock.withLock { listed = files }
+        return files
     }
+
+    func forget() { lock.withLock { listed = nil } }
 }

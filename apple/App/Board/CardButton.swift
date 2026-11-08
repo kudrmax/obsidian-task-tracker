@@ -33,7 +33,7 @@ struct CardButton: UIViewRepresentable {
     var onFold: (() -> Void)?
     /// A tap on a link of the title: it opens, in place of the menu.
     var onLink: ((TextPart) -> Void)?
-    /// A tap on the project's folder mark, when its note can open: the note opens, in place of the menu.
+    /// A tap on the project's folder mark: the project's note opens, in place of the menu.
     var onProject: (() -> Void)?
     /// Select Tasks: a tap picks the card or lets it go, and a picked card lifted carries every picked task as a stack.
     var picking: Picking?
@@ -58,7 +58,7 @@ struct CardButton: UIViewRepresentable {
                 onCounter: { [weak control] in control?.counterFrame = $0 },
                 onTitle: { [weak control] in control?.titleFrame = $0 },
                 onLinks: { [weak control] in control?.links = $0 },
-                onFolder: { [weak control] in control?.folderFrame = $0 })
+                onMark: { [weak control] in control?.markFrame = $0 })
         }
         .margins(.all, 0)
     }
@@ -86,7 +86,8 @@ struct CardButton: UIViewRepresentable {
         control.onEnd = onEnd
         control.onFold = onFold
         control.onLink = onLink
-        control.onProject = onProject
+        // The folder mark opens the note only where the note can open, and never while tasks are being picked.
+        control.onProject = picking == nil && card.item.project?.mark == true && card.item.project?.canOpenNote == true ? onProject : nil
         control.picking = picking
         control.draggable = picking.map(\.picked) ?? draggable
         control.carried = carried
@@ -106,11 +107,12 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         didSet { fold.isHidden = onFold == nil }
     }
     var onLink: ((TextPart) -> Void)?
-    var onProject: (() -> Void)?
+    var onProject: (() -> Void)? {
+        didSet { mark.isHidden = onProject == nil }
+    }
     var picking: CardButton.Picking?
-    /// Where the title's links are drawn, and the project's folder mark.
+    /// Where the title's links are drawn.
     var links: [CardLink] = []
-    var folderFrame: CGRect?
     var draggable = true {
         didSet { drag.isEnabled = draggable }
     }
@@ -150,7 +152,12 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     }
     /// Where the capsule's title has its room: the menu's copy grows by what the title lacks of it.
     var titleFrame: CGRect?
+    /// Where the capsule draws the project's folder mark: its button lies there.
+    var markFrame: CGRect? {
+        didSet { setNeedsLayout() }
+    }
     private let fold = UIButton(type: .custom)
+    private let mark = UIButton(type: .custom)
     /// Shows the menu, anchored to the card, when a tap has ended.
     private lazy var opener = MenuOpener { [weak self] in self?.menuEnded($0) }
     /// The press's highlight over the capsule, as a button's: outside the content, so a lifted preview never carries it.
@@ -194,6 +201,11 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
             self?.onFold?()
         }, for: .touchUpInside)
         addSubview(fold)
+        mark.isHidden = true
+        mark.accessibilityLabel = "Project"
+        mark.accessibilityHint = "Opens the project's note"
+        mark.addAction(UIAction { [weak self] _ in self?.onProject?() }, for: .touchUpInside)
+        addSubview(mark)
         addAction(UIAction { [weak self] _ in self?.onTouch() }, for: .touchUpInside)
         // A tap opens the menu once the finger is up, as the plugin's tap does; a long press lifts the card for the drag.
         addSubview(opener)
@@ -216,6 +228,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         // The counter's own button, as tall as the card and a little wider than the digits, as the plugin's hit area.
         if let counter = counterFrame {
             fold.frame = CGRect(x: counter.minX - Self.foldReach, y: 0, width: counter.width + Self.foldReach * 2, height: min(bounds.height, CardMetrics.height))
+        }
+        if let folder = markFrame {
+            mark.frame = CGRect(x: folder.minX - Self.foldReach / 2, y: 0, width: folder.width + Self.foldReach, height: min(bounds.height, CardMetrics.height))
         }
     }
 
@@ -279,14 +294,10 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
             return
         }
         let point = tap.location(in: self)
-        // A link opens and the folder mark opens the project's note, as the plugin's card: only within the title's room,
-        // where the link is seen.
+        // A link opens, as the plugin's card: only within the title's room, where the link is seen. The folder mark is its
+        // own button.
         if let onLink, let link = links.first(where: { $0.frame.insetBy(dx: -2, dy: -8).contains(point) && (titleFrame?.contains(CGPoint(x: point.x, y: titleFrame?.midY ?? 0)) ?? true) }) {
             onLink(link.part)
-            return
-        }
-        if let onProject, let folder = folderFrame, folder.insetBy(dx: -4, dy: -8).contains(point) {
-            onProject()
             return
         }
         openMenu(at: tap.location(in: opener))

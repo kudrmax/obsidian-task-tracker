@@ -18,6 +18,12 @@ import Testing
     let core = try! PhoneCore(script: Fixtures.phoneScript)
     let at = Fixtures.date(6, 10)
 
+    /// The board as the app makes it: the project notes found by a scan of the vault's notes (`VaultProjects`).
+    func board(_ vault: FakeVault) -> TaskBoard {
+        let notes = vault.files.filter { $0.key.hasSuffix(".md") }
+        return TaskBoard(core: core, vault: vault, projects: VaultProjects(folder: FakeFolder(notes), core: core, background: false))
+    }
+
     func vault() -> FakeVault {
         let vault = FakeVault(Self.file)
         vault.files["Clients/Acme.md"] = "---\ntags: [project]\n---\nThe client."
@@ -27,9 +33,7 @@ import Testing
     }
 
     @Test func theVaultsProjectNotesComeWithEveryCall() throws {
-        let vault = vault()
-        let board = TaskBoard(core: core, vault: vault)
-        #expect(try board.projectNotes() == [NoteLink(name: "Acme", path: "Clients/Acme.md", link: "Acme")])
+        let board = board(vault())
         let snapshot = try board.snapshot(day: Self.day, measures: Self.measures, now: at)
         let draft = try #require(snapshot.screen.backlog.first { $0.title == "Draft the offer" })
         #expect(draft.project?.note == "Clients/Acme.md")
@@ -38,31 +42,9 @@ import Testing
         #expect(draft.can.setProject)
         let menu = try #require(snapshot.menus[draft.id])
         #expect(menu.project.value == "Acme")
+        #expect(menu.project.noneLabel == "No project")
         #expect(menu.project.options.map(\.project.name) == ["Acme"])
         #expect(snapshot.screen.projects["backlog"]?.groups.first?.canOpenNote == true)
-    }
-
-    @Test func aNoteTaggedLaterIsAProjectOnceTheNotesAreReadAgain() throws {
-        let vault = vault()
-        let board = TaskBoard(core: core, vault: vault)
-        #expect(try board.projectNotes().map(\.name) == ["Acme"])
-        try vault.write(path: "Home.md", text: "#project at home")
-        #expect(try board.projectNotes().map(\.name) == ["Acme"])
-        board.refreshNotes()
-        #expect(try board.projectNotes().map(\.name) == ["Acme", "Home"])
-    }
-
-    @Test func theDeviceKeepsItsGroupingAsTheDoorAnswersIt() throws {
-        let kept = MemoryGrouping()
-        let board = TaskBoard(core: core, vault: vault(), grouping: kept)
-        try board.setGrouping("soon", on: true)
-        try board.toggleFold("backlog", key: "acme")
-        let grouping = try JSONValue(any: JSONSerialization.jsonObject(with: Data(try #require(kept.load()).utf8)))
-        #expect(grouping["on"]["soon"].bool == true)
-        #expect(grouping["folded"]["backlog"] == ["acme"])
-        let snapshot = try board.snapshot(day: Self.day, measures: Self.measures, now: at)
-        #expect(snapshot.screen.projects["soon"]?.on == true)
-        #expect(snapshot.screen.projects["backlog"]?.groups.first?.folded == true)
     }
 
     @Test func aTitleComesInPiecesItsLinksWithWhatATapOpens() throws {
@@ -161,38 +143,24 @@ import Testing
     }
 
     @Test func backlogComesGroupedByProjectEachCardInItsProjectsPart() throws {
-        let board = TaskBoard(core: core, vault: vault())
-        let snapshot = try board.snapshot(day: Self.day, measures: Self.measures, now: at)
+        let snapshot = try board(vault()).snapshot(day: Self.day, measures: Self.measures, now: at)
         let backlog = try #require(snapshot.lists[.backlog])
         #expect(backlog.grouped)
         #expect(backlog.canGroup)
-        #expect(backlog.heads.map(\.title) == ["Acme", "No project"])
-        #expect(backlog.heads.first?.before == 0)
+        #expect(backlog.projects.map(\.title) == ["Acme", "No project"])
         let draft = try #require(backlog.cards.first { $0.item.title == "Draft the offer" })
         #expect(draft.zone == "Acme")
         #expect(draft.listCard["project"] == "Acme")
         let free = try #require(backlog.cards.first { $0.item.title == "Free" })
         #expect(free.zone == .null)
-        #expect(backlog.groups.first?.under == backlog.heads.first?.id)
         #expect(backlog.places.array.first?["project"] == "Acme")
         #expect(snapshot.lists[.inbox]?.grouped == false)
         #expect(snapshot.lists[.inbox]?.cards.first?.zone == nil)
     }
 
-    @Test func aFoldedGroupDrawsItsHeaderAlone() throws {
-        let board = TaskBoard(core: core, vault: vault())
-        try board.toggleFold("backlog", key: "acme")
-        let backlog = try #require(try board.snapshot(day: Self.day, measures: Self.measures, now: at).lists[.backlog])
-        let acme = try #require(backlog.heads.first)
-        #expect(acme.folded)
-        #expect(acme.count == 1)
-        #expect(!backlog.cards.contains { $0.item.title == "Draft the offer" })
-        #expect(backlog.heads.last?.before == 0)
-    }
-
     @Test func aDropInAProjectsPartGivesTheTaskThatProject() throws {
         let vault = vault()
-        let board = TaskBoard(core: core, vault: vault)
+        let board = board(vault)
         let backlog = try #require(try board.snapshot(day: Self.day, measures: Self.measures, now: at).lists[.backlog])
         let free = try #require(backlog.cards.first { $0.item.title == "Free" })
         let place: JSONValue = try board.rule("rules.placeOfDrop", [.array(backlog.cards.map(\.listCard)), ["kind": "gap", "index": 0, "level": 0, "group": .null, "project": "Acme"], .null])

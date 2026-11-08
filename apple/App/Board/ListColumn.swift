@@ -30,16 +30,20 @@ struct ListColumn: View {
         return model.titleSnapshot?.lists[.day]?.title ?? list.title
     }
 
+    /// The list takes exactly the room its column gives it: the reader never grows with what it holds, and the rows are
+    /// laid out at its width, so a long name or a wide row can never widen the list or push it out of its column.
     var body: some View {
+        GeometryReader { box in
+            content(width: box.size.width)
+                .frame(width: box.size.width, height: box.size.height, alignment: .topLeading)
+        }
+    }
+
+    private func content(width columnWidth: CGFloat) -> some View {
         let column = list.column
         let drawn = rows
-        VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
-            ColumnTitle(title: title, dayArrows: dayArrows, grouping: list.canGroup ? list.grouped : nil, lit: model.titleLit == column, model: model) { on in
-                Task { await model.setGrouping(list.column, on: on) }
-            }
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move("title.\(column.rawValue)", visible: $0) }
-            .onAppear { model.registerTitle(column) }
-            .onDisappear { model.dropping.remove("title.\(column.rawValue)") }
+        return VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
+            ColumnTitle(title: title, dayArrows: dayArrows, model: model, list: list)
             ScrollViewReader { scroller in
                 ScrollView {
                     DayLane(model: model, width: width, slides: column == .day, shown: VStack(alignment: .leading, spacing: CardMetrics.gap) {
@@ -51,13 +55,17 @@ struct ListColumn: View {
                                     // As the plugin's header: room above it but at the list's top, its bottom on the first card.
                                     .padding(.top, row.id == drawn.first?.id ? 0 : ColumnMetrics.sectionGap)
                                     .padding(.bottom, -CardMetrics.gap)
-                            case .project(let head):
-                                ProjectHeader(head: head, model: model) { Task { await model.toggleFold(column, head) } }
-                                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, head: head.id, $0) }
+                            case .project(let project):
+                                ProjectHeader(project: project, column: column, model: model)
+                                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, head: project.id, $0) }
+                                    .padding(.top, row.id == drawn.first?.id ? 0 : ColumnMetrics.sectionGap)
+                                    .padding(.bottom, -CardMetrics.gap)
+                            case .newHead(let name):
+                                SectionTitle(title: name, muted: false)
                                     .padding(.top, row.id == drawn.first?.id ? 0 : ColumnMetrics.sectionGap)
                                     .padding(.bottom, -CardMetrics.gap)
                             case .plate(let group):
-                                EmptyPlate(hot: gap.map { group.names($0.group, zone: $0.zone) && $0.line == nil } ?? false) { model.entry.openIn(column, group.name, zone: group.zone) }
+                                EmptyPlate(hot: gap.map { group.holds(group: $0.group, zone: $0.zone) && $0.line == nil } ?? false) { model.entry.openIn(column, group.name, zone: group.zone) }
                             case .card(let card):
                                 CardRow(card: card, column: column, model: model, question: $question)
                                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, card: card.id, $0) }
@@ -74,6 +82,8 @@ struct ListColumn: View {
                         Color.clear.frame(height: Self.trailingRoom)
                     }
                     .padding(.horizontal, CardMetrics.columnInset)
+                    // The rows are exactly as wide as the column: no row, however long its words, widens the list.
+                    .frame(width: columnWidth, alignment: .leading)
                     .overlay(alignment: .topLeading) {
                         if let line = gap?.line { DropLine(from: line) }
                     }
@@ -108,7 +118,10 @@ struct ListColumn: View {
             let spot = scroll, position = $position
             model.dropping.scrolls(key) { dy in spot.scroll(by: dy, trailing: ListColumn.trailingRoom) { position.wrappedValue.scrollTo(y: $0) } }
         }
-        .onDisappear { model.dropping.remove(key) }
+        .onDisappear {
+            model.dropping.remove(key)
+            model.dropping.remove("title.\(list.column.rawValue)")
+        }
     }
 
     /// Where the list shows on the screen.
@@ -144,13 +157,17 @@ struct ListColumn: View {
         if let entry {
             typed = entry.pending.enumerated().map { .pending(index: $0.offset, text: $0.element.text, level: $0.element.level, branch: nil) }
             typed.append(.field(level: entry.section ? 0 : entry.place.level, branch: nil, section: entry.section))
+            if let name = entry.newSection { typed.insert(.newHead(name), at: 0) }
         }
         var rows: [ListRowView] = []
         if entry?.at.kind == "top" { rows += typed }
         let slot = model.carry?.section?.column == list.column ? model.sectionSlot : nil
-        let heads = Dictionary(grouping: list.heads, by: \.before)
-        for (index, group) in list.groups.enumerated() {
-            rows += (heads[index] ?? []).map(ListRowView.project)
+        for part in list.parts {
+            guard case .section(let index) = part else {
+                if case .project(let project) = part { rows.append(.project(project)) }
+                continue
+            }
+            let group = list.groups[index]
             if slot == index { rows.append(.mark(first: rows.isEmpty)) }
             // A lifted section folds away, header and tasks, and the list closes over it.
             if model.isLifted(group, in: list.column) { continue }
@@ -167,7 +184,6 @@ struct ListColumn: View {
                 if case .card(let card) = row { card.item.id != renaming } else { true }
             }
         }
-        rows += (heads[list.groups.count] ?? []).map(ListRowView.project)
         if let slot, slot >= list.groups.count { rows.append(.mark(first: rows.isEmpty)) }
         // At the end, or in a section the list doesn't draw (a day with no task yet has none): the field stands last.
         if entry?.at.kind == "end" || entry?.at.kind == "in" && !list.groups.indices.contains(entry?.at.section ?? 0) { rows += typed }
@@ -201,7 +217,7 @@ struct ListColumn: View {
     /// A group's cards as drawn, with the room a card let go flies into when it lands in this group.
     private func cardRows(of group: BoardGroup) -> [ListRowView] {
         var rows = group.cards.map(ListRowView.card)
-        guard let gap = settling, group.names(gap.group, zone: gap.zone), !group.empty else { return rows }
+        guard let gap = settling, group.holds(group: gap.group, zone: gap.zone), !group.empty else { return rows }
         let others = model.others(in: list.column)
         let next = others[safe: gap.at].flatMap { $0.stands(in: gap.group, zone: gap.zone) ? $0 : nil }
         let at = next.flatMap { card in rows.firstIndex { $0.id == card.id } } ?? rows.count
@@ -215,7 +231,9 @@ struct ListColumn: View {
 private enum ListRowView: Identifiable {
     case header(BoardGroup, String)
     /// A project group's header in a list grouped by project.
-    case project(BoardProjectHead)
+    case project(BoardProject)
+    /// The section named for the task being typed in a project's group, over the field.
+    case newHead(String)
     case plate(BoardGroup)
     case card(BoardCard)
     case gap(level: Int, branch: Branch?)
@@ -229,7 +247,8 @@ private enum ListRowView: Identifiable {
     var id: String {
         switch self {
         case .header(let group, _): "\u{0}head/\(group.id)"
-        case .project(let head): head.id
+        case .project(let project): "\u{0}project/\(project.id)"
+        case .newHead: "\u{0}newHead"
         case .plate(let group): "\u{0}plate/\(group.id)"
         case .card(let card): card.id
         case .gap: "\u{0}gap"
@@ -248,7 +267,7 @@ private enum ListRowView: Identifiable {
         switch self {
         case .card(let card): card.level
         case .gap(let level, _), .pending(_, _, let level, _), .field(let level, _, _): level
-        case .header, .project, .plate, .mark: nil
+        case .header, .plate, .mark, .project, .newHead: nil
         }
     }
 }
@@ -355,17 +374,16 @@ private struct DropLine: View {
 }
 
 /// A column's title, 20 points bold; the day list's has the arrows that turn the day, and a tap on it comes back to today.
-/// Backlog's and Soon's open a menu with Group by Project, checked while the list groups (`grouping`), as the plugin's.
+/// Backlog's and Soon's open a menu with Group by Project. A card carried over the title lights it: let go there, it goes
+/// into the list keeping its project.
 struct ColumnTitle: View {
     let title: String
     var dayArrows = false
-    /// The list may group by project: whether it does; nil for a list that never groups.
-    var grouping: Bool? = nil
-    /// A carried card would land on it: lit in the accent, as an empty section's plate.
-    var lit = false
     @Bindable var model: BoardModel
-    var setGrouping: (Bool) -> Void = { _ in }
+    var list: BoardList?
     @Environment(\.colorScheme) private var scheme
+
+    private var lit: Bool { list.map { model.litTitle == $0.column } ?? false }
 
     var body: some View {
         HStack(spacing: 4) {
@@ -374,18 +392,19 @@ struct ColumnTitle: View {
                     .accessibilityLabel("Previous Day")
             }
             if dayArrows {
-                Button { Task { await model.showToday() } } label: { titleText.frame(height: ColumnMetrics.titleRow).contentShape(.rect) }
+                Button { Task { await model.showToday() } } label: { litText.frame(height: ColumnMetrics.titleRow).contentShape(.rect) }
                     .accessibilityHint("Back to today")
-            } else if let grouping {
+            } else if let list, list.canGroup {
                 Menu {
-                    Toggle("Group by Project", systemImage: "folder", isOn: Binding(get: { grouping }, set: { setGrouping($0) }))
+                    Toggle(isOn: Binding(get: { list.grouped }, set: { on in Task { await model.setGrouping(list.column, on) } })) {
+                        Label("Group by Project", systemImage: "folder")
+                    }
                 } label: {
-                    titleText.frame(height: ColumnMetrics.titleRow).contentShape(.rect)
+                    litText.frame(height: ColumnMetrics.titleRow).contentShape(.rect)
                 }
-                .tint(.primary)
                 .accessibilityAddTraits(.isHeader)
             } else {
-                titleText.accessibilityAddTraits(.isHeader)
+                litText.accessibilityAddTraits(.isHeader)
             }
             if dayArrows {
                 Button { Task { await model.step(1) } } label: { arrow("chevron.right") }
@@ -396,13 +415,9 @@ struct ColumnTitle: View {
         .fontWeight(.semibold)
         .frame(height: ColumnMetrics.titleRow)
         .padding(.horizontal, dayArrows ? 0 : 16)
-        .foregroundStyle(lit ? Palette.accent(scheme) : Color.primary)
-        .background {
-            if lit {
-                RoundedRectangle(cornerRadius: CardMetrics.radius)
-                    .fill(Palette.dropBg(scheme))
-                    .strokeBorder(Palette.accent(scheme), lineWidth: 1)
-            }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+            if let list { model.titleMoved(list.column, frame) }
         }
     }
 
@@ -414,11 +429,91 @@ struct ColumnTitle: View {
             .contentShape(.rect)
     }
 
-    private var titleText: some View {
+    /// Lit under a carried card as a drop target, the way an empty section's plate lights: the accent on the drop's ground,
+    /// in its own rounded box.
+    private var litText: some View {
         Text(title)
             .font(.system(size: 20, weight: .bold))
             .lineLimit(1)
             .minimumScaleFactor(0.7)
+            .foregroundStyle(lit ? Palette.accent(scheme) : Color.primary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(lit ? Palette.dropBg(scheme) : .clear, in: .rect(cornerRadius: 10))
+            .padding(.horizontal, -8)
+    }
+}
+
+/// A section's name over its cards, as the plugin's header: 13 points semibold, its baseline on the first card.
+struct SectionTitle: View {
+    let title: String
+    let muted: Bool
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
+            .frame(height: ColumnMetrics.groupLeading)
+            .foregroundStyle(muted ? Palette.muted : Palette.pullInk(scheme))
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .padding(.leading, CardMetrics.leading)
+            .padding(.trailing, 4)
+            .frame(height: ColumnMetrics.groupHead)
+            .contentShape(.rect)
+    }
+}
+
+/// A project's group header, the section header with two additions (board Proj1): a chevron before the title, turned down
+/// while the group is open, which a tap on the header folds; folded, the count of its tasks after the title; and the arrow
+/// that opens the project's note. «No project» is muted and has no arrow.
+struct ProjectHeader: View {
+    let project: BoardProject
+    let column: BoardColumn
+    @Bindable var model: BoardModel
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .bold))
+                .rotationEffect(.degrees(project.folded ? 0 : 90))
+                .frame(width: 16, height: ColumnMetrics.groupLeading)
+                .padding(.leading, -6)
+            Text(project.title)
+                .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
+                .lineLimit(1)
+                .frame(height: ColumnMetrics.groupLeading)
+            if project.folded {
+                Text(verbatim: "\(project.count)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.muted)
+                    .frame(height: ColumnMetrics.groupLeading)
+            }
+            if project.canOpenNote, let ref = project.project {
+                Button { model.openProject(ref) } label: {
+                    Image(systemName: "arrow.up.forward.app")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 28, height: ColumnMetrics.groupHead)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, -6)
+                .accessibilityLabel("Open \(project.title)")
+            }
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(project.zone.isNull ? Palette.muted : Palette.pullInk(scheme))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .padding(.leading, CardMetrics.leading)
+        .padding(.trailing, 4)
+        .frame(height: ColumnMetrics.groupHead)
+        .contentShape(.rect)
+        .onTapGesture { Task { await model.toggleFold(column, project.key) } }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(project.folded ? "Collapsed, \(project.count) tasks" : "Expanded")
     }
 }
 
@@ -434,7 +529,7 @@ struct SectionHeader: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        SectionHeaderControl(group: group, column: column, model: model, menu: { rows }) { label }
+        SectionHeaderControl(group: group, column: column, model: model, menu: { rows }) { SectionTitle(title: title, muted: group.name == nil) }
             .frame(height: ColumnMetrics.groupHead)
             .alert("Rename Section", isPresented: $renaming) {
                 TextField("Name", text: $name)
@@ -461,72 +556,6 @@ struct SectionHeader: View {
             })
         }
         return rows
-    }
-
-    private var label: some View {
-        Text(title)
-            .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
-            .frame(height: ColumnMetrics.groupLeading)
-            .foregroundStyle(group.name == nil ? Palette.muted : Palette.pullInk(scheme))
-            .lineLimit(1)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-            .padding(.leading, CardMetrics.leading)
-            .padding(.trailing, 4)
-            .frame(height: ColumnMetrics.groupHead)
-            .contentShape(.rect)
-    }
-}
-
-/// A project group's header in a list grouped by project, as the plugin draws it: a section's header with a chevron before
-/// the title, turned down while the group is open; the count of its open tasks while folded; the arrow that opens the
-/// project's note. A tap folds or unfolds the group, the arrow opens the note.
-struct ProjectHeader: View {
-    let head: BoardProjectHead
-    let model: BoardModel
-    let toggle: () -> Void
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .bold))
-                .rotationEffect(.degrees(head.folded ? 0 : 90))
-                .frame(width: 16, height: ColumnMetrics.groupLeading)
-                .padding(.leading, -6)
-            Text(head.title)
-                .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
-                .lineLimit(1)
-                .frame(height: ColumnMetrics.groupLeading)
-            if head.folded {
-                Text(verbatim: "\(head.count)")
-                    .font(.system(size: 12, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(Palette.muted)
-                    .frame(height: ColumnMetrics.groupLeading)
-                    .accessibilityLabel("\(head.count) tasks")
-            }
-            if head.canOpenNote, let project = head.project {
-                Button { model.openProject(project) } label: {
-                    Image(systemName: "arrow.up.forward.app")
-                        .font(.system(size: 12, weight: .medium))
-                        .frame(width: 28, height: ColumnMetrics.groupHead)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open \(head.title)")
-            }
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(head.project == nil ? Palette.muted : Palette.pullInk(scheme))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-        .padding(.leading, CardMetrics.leading)
-        .padding(.trailing, 4)
-        .frame(height: ColumnMetrics.groupHead)
-        .contentShape(.rect)
-        .onTapGesture(perform: toggle)
-        .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityValue(head.folded ? "Folded" : "Open")
     }
 }
 
