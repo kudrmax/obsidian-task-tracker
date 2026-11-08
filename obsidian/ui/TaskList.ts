@@ -105,6 +105,11 @@ const QUICK_ROW = "tc-quick-row";
 /** The key of the field's row, and of the cards of the texts typed and not yet written, by their order. */
 const ENTRY = "entry";
 const UNWRITTEN = "unwritten:";
+/** The key of the dashed place a lifted section lands on. */
+const LANDING = "landing";
+
+/** Where a lifted section's landing place stands: over the `before`-th header drawn, or right after the section named `after`. */
+export type Landing = { readonly before: number } | { readonly after: GroupName };
 export const PLATE = "tc-group-empty";
 
 /** What a list about to draw `shape` shows the field among. */
@@ -126,6 +131,9 @@ export class TaskList {
 	private nodes: HTMLElement[] = [];
 	/** Each header drawn, as the places see it: a section's, or a project group's (its part without a section, or its end while folded). */
 	private heads = new Map<HTMLElement, Header>();
+	/** Where a lifted section will land, shown as a dashed place among the sections; none while no section is carried. */
+	private landing: Landing | null = null;
+	private headsByName = new Map<GroupName, HTMLElement>();
 	/** Each empty section's No tasks plate drawn, by its name and its project's part. */
 	private plates = new Map<string, HTMLElement>();
 	/** Each section's cards as drawn, its subtasks' among them. */
@@ -202,6 +210,7 @@ export class TaskList {
 		this.entries = [];
 		this.nodes = [];
 		this.heads = new Map();
+		this.headsByName = new Map();
 		this.plates = new Map();
 		this.sectionCards = new Map();
 		this.rendered = sectionsOf(shape);
@@ -241,6 +250,9 @@ export class TaskList {
 		};
 		if (at?.kind === "top") enter();
 		let i = -1;
+		let headsDrawn = 0;
+		const landing = this.landing;
+		const mark = () => drawing.takeMark(LANDING, () => el(null, "div", "tc-group-drop"));
 		for (const part of shape.drawn) {
 			if (part.kind === "project") {
 				this.nodes.push(this.projectHeader(drawing, part.group));
@@ -248,7 +260,11 @@ export class TaskList {
 			}
 			section = ++i;
 			const { group, project } = part;
-			if (this.withHeaders && group.header) this.nodes.push(this.header(drawing, group, project));
+			if (this.withHeaders && group.header) {
+				if (landing && "before" in landing && landing.before === headsDrawn) mark();
+				headsDrawn++;
+				this.nodes.push(this.header(drawing, group, project));
+			}
 			const platesField = at?.kind === "in" && at.section === i && !at.keepsPlate;
 			if (group.empty && !platesField) this.nodes.push(this.plate(drawing, group, project));
 			const groupStart = this.entries.length;
@@ -256,7 +272,9 @@ export class TaskList {
 			this.sectionCards.set(group, this.entries.slice(groupStart).map((e) => e.card));
 			subtrees(groupStart);
 			enterAtCard();
+			if (landing && "after" in landing && landing.after === group.name) mark();
 		}
+		if (landing && "before" in landing && landing.before >= headsDrawn) mark();
 		enter();
 		if (entryRow) this.markRenamed(entryRow, renaming);
 		rows.forEach((row, i) => {
@@ -381,6 +399,21 @@ export class TaskList {
 		return this.withHeaders;
 	}
 
+	/**
+	 * The place a lifted section lands, drawn as a row of the list (`before`: the header it stands over, counted among the
+	 * headers drawn, past the last for the end; `after`: right after the section of that name, once the move is drawn);
+	 * null takes it away, folding. The list draws itself again.
+	 */
+	showLanding(at: Landing | null): void {
+		this.landing = at;
+		this.render();
+	}
+
+	/** The header drawn for the section named `name`, if one is. */
+	headOf(name: GroupName): HTMLElement | null {
+		return this.headsByName.get(name) ?? null;
+	}
+
 	/** The No tasks plate of empty section `name` (of the project's part `project`); null when none is drawn. */
 	plateOf(name: GroupName, project?: ProjectZone): HTMLElement | null {
 		return this.plates.get(plateKey(name, project)) ?? null;
@@ -403,6 +436,7 @@ export class TaskList {
 		head.classList.toggle("is-in-project", project !== undefined);
 		el(head, "span", "tc-group-name", group.name ?? this.deps.ungroupedName?.() ?? "");
 		this.heads.set(head, headerOf({ group, project }));
+		if (project === undefined) this.headsByName.set(group.name, head);
 		this.deps.onHeader?.(head, group, signal);
 		return head;
 	}
