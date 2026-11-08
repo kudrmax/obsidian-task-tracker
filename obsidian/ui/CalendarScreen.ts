@@ -47,7 +47,7 @@ import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
 import { settingsEffect } from "./settingsEffect";
 import { StatusBarRoom } from "./StatusBarRoom";
-import { type Place, type Shift, stepScreen } from "./screens";
+import { type Place, type Shift } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
@@ -63,6 +63,8 @@ const PLACE_OF_LIST: Readonly<Record<Extract<TaskScreen, { kind: "list" }>["list
 
 /** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
 const NAMING = "naming";
+/** How long a tap waits at most for the screen to draw the day the last turn brought in. */
+const LANDING_WAIT_MS = 1000;
 
 export interface ViewDeps {
 	readonly tasks: TaskService;
@@ -155,6 +157,12 @@ export class CalendarScreen extends Component {
 	private shownMode: RightMode | null = null;
 	/** The day a swipe brought in, drawn over the screen until the screen has drawn it itself. */
 	private landing: { readonly peek: DayPeek; readonly parts: readonly HTMLElement[] } | null = null;
+	/** The screen a swipe or an arrow slides. */
+	private pager: ScreenPager | null = null;
+	/** The arrows' taps, one turn after another. */
+	private turning: Promise<void> = Promise.resolve();
+	/** Taps waiting for the screen to draw the day the last turn brought in. */
+	private drawnWaits: (() => void)[] = [];
 	/** The day a swipe has drawn nearer than the selected one: the header names it. */
 	private titleDay: LocalDate | null = null;
 	/** Typing tasks in place: the field, the bar over the keyboard, the plus. */
@@ -257,8 +265,8 @@ export class CalendarScreen extends Component {
 				const day = this.titleDay ?? this.selectedDate;
 				return dayTitle(day, this.deps.days.relation(day), this.today());
 			},
-			onStep: (days) => void this.afterEntry(() => this.select(this.deps.days.step(this.selectedDate, days))),
-			onToday: () => void this.afterEntry(() => this.select(this.today())),
+			onStep: (days) => this.turnDay(() => ({ date: this.deps.days.step(this.selectedDate, days), shift: days < 0 ? -1 : 1 })),
+			onToday: () => this.turnDay(() => (this.deps.days.relation(this.selectedDate) === "today" ? null : { date: this.today(), shift: this.selectedDate < this.today() ? 1 : -1 })),
 			inboxName: () => this.deps.tasks.listName("inbox"),
 			soonName: () => this.deps.tasks.listName("soon"),
 			doneName: () => this.deps.tasks.listName("done"),
@@ -450,10 +458,12 @@ export class CalendarScreen extends Component {
 			this.unsubscribe.push(() => capsule.destroy());
 		}
 		this.bulk.mount();
+		const pager = new ScreenPager({ track: (shift) => this.trackTo(shift), duration: () => tokenMs(root, DURATION.slide), width: () => root.clientWidth });
+		this.pager = pager;
 		new Swipe(root, {
 			arbiter: this.arbiter,
 			accepts: swipeStartsAt,
-			target: new ScreenPager({ track: (shift) => this.trackTo(shift), duration: () => tokenMs(root, DURATION.slide), width: () => root.clientWidth }),
+			target: pager,
 		});
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => {
@@ -613,7 +623,7 @@ export class CalendarScreen extends Component {
 		this.landed();
 		const root = this.contentEl;
 		const from = { mode: this.place(), date: this.selectedDate };
-		const to = stepScreen(from, shift, this.deps.days);
+		const to = this.deps.days.stepScreen(from, shift);
 		if (!to) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		if (to.mode !== from.mode) {
 			window.clearTimeout(this.switching);
@@ -627,8 +637,41 @@ export class CalendarScreen extends Component {
 				onArrive: (mode) => this.arriveAt(mode),
 			});
 		}
+		return this.dayTrack(to.date, shift);
+	}
+
+	/**
+	 * The day's arrows and its name turn the day as a swipe to it does, the whole way with no finger. A tap during a turn
+	 * stands that turn where it was going and turns on from there once the screen has drawn the day it brought in.
+	 */
+	private turnDay(to: () => { readonly date: LocalDate; readonly shift: Shift } | null): void {
+		this.pager?.stand();
+		this.turning = this.turning.then(async () => {
+			await this.drawnLanding();
+			await this.afterEntry(async () => {
+				const way = to();
+				const pager = this.pager;
+				if (!way || !pager) return;
+				await pager.run(way.shift, () => this.dayTrack(way.date, way.shift));
+			});
+		});
+	}
+
+	/** Resolves once the screen has drawn the day a turn brought in, or at once when none waits to be drawn. */
+	private drawnLanding(): Promise<void> {
+		if (!this.landing) return Promise.resolve();
+		return new Promise((resolve) => {
+			this.drawnWaits.push(resolve);
+			window.setTimeout(resolve, LANDING_WAIT_MS);
+		});
+	}
+
+	/** Another day `shift`'s way: in each column the shown day slides out and `day`'s comes in; the header and the hours stand. */
+	private dayTrack(day: LocalDate, shift: Shift): ScreenTrack {
+		this.landed();
+		const root = this.contentEl;
 		this.timeline?.stopHolding();
-		const peek = new DayPeek(root, to.date, {
+		const peek = new DayPeek(root, day, {
 			tasks: this.deps.tasks,
 			calendars: this.deps.calendars,
 			theme: () => this.theme(),
@@ -657,7 +700,7 @@ export class CalendarScreen extends Component {
 		};
 		return new DayTrack([list, timeline], timeline, peek, shift, {
 			onNearer: (nearer) => {
-				this.titleDay = nearer ? to.date : null;
+				this.titleDay = nearer ? day : null;
 				this.headers?.render();
 			},
 			onArrive: (arrived, shown) => {
@@ -699,6 +742,8 @@ export class CalendarScreen extends Component {
 		this.landing = null;
 		restore(landing.parts);
 		landing.peek.remove();
+		const waits = this.drawnWaits.splice(0);
+		for (const wait of waits) wait();
 	}
 
 	/**

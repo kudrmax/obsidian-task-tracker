@@ -92,15 +92,24 @@ final class BoardModel {
 
     /// A screen the quick entry read after its write, drawn in the transaction the entry draws its own state in.
     func draw(_ read: BoardSnapshot) {
-        if case .turn(let forward) = read.motion(from: snapshot) { dayMotion = forward ? 1 : -1 }
         snapshot = read
         problem = nil
     }
 
     /// Another day in the day list, as the quick entry's place menu asks: the screen read for it.
     func show(day: String) async {
-        shownDay = day
-        await reload()
+        await go(toDay: day)
+    }
+
+    /// Another day by its date, from wherever it is asked (the bar's Date…, a found task): it slides in as the arrows
+    /// bring it, from the side it lies on.
+    private func go(toDay day: String) async {
+        guard let shown = snapshot?.day, day != shown else {
+            shownDay = day
+            return await reload()
+        }
+        await turn(to: day, motion: day > shown ? 1 : -1)
+        if day == snapshot?.today { shownDay = nil }
     }
 
     func problem(_ error: Error) {
@@ -162,8 +171,16 @@ final class BoardModel {
     /// The day before and after the shown one, read ahead so the arrows show them in the same frame.
     @ObservationIgnored private var ahead: [String: BoardSnapshot] = [:]
     @ObservationIgnored private var neighbours: (previous: String, next: String)?
-    /// Which way the last change of the day went: the day list and the calendar slide in from that side.
-    private(set) var dayMotion = 1
+    /// Another day coming in, as the plugin's `DayTrack`: the day read for it and the side it comes from (1: the next).
+    private(set) var dayTurn: DayTurn?
+    /// How far the day has come in, 0 to 1. Only the parts that read it move: the day's cards in each column.
+    var dayShare: CGFloat = 0
+    @ObservationIgnored private let daySlide = DaySlide()
+
+    struct DayTurn {
+        let peek: BoardSnapshot
+        let shift: Int
+    }
     @ObservationIgnored private var watch: FileWatch?
 
     /// The screen read again. A read asked while one runs makes that one read once more, and waits for it: every caller
@@ -216,18 +233,15 @@ final class BoardModel {
         if landsDrop { carryDrawn() }
     }
 
-    /// One transaction for one drawing: still, the day turned (the day part slides in from the day's side), or the cards
-    /// moved (each by its id slides, folds away or unfolds with the system's spring).
+    /// One transaction for one drawing: still, or the cards moved (each by its id slides, folds away or unfolds with the
+    /// system's spring). Another day is drawn still: it came in through the day's own slide (`turn(to:)`).
     func draw(motion: BoardMotion, _ change: () -> Void) {
         if placedByDrop != nil { placedByDrop = nil }
         switch motion {
-        case .still:
+        case .still, .turn:
             var still = Transaction()
             still.disablesAnimations = true
             withTransaction(still, change)
-        case .turn(let forward):
-            dayMotion = forward ? 1 : -1
-            withAnimation(.smooth, change)
         case .change:
             withAnimation(.snappy, change)
         }
@@ -287,6 +301,54 @@ final class BoardModel {
 
     // MARK: The day
 
+    private struct ScreenAt: Decodable {
+        let mode: String
+        let date: String
+    }
+
+    /// The finger starts carrying the day `shift` way when the core's `days.stepScreen` leads from this day's calendar to
+    /// another day's (any other answer, Soon or the row's end, is the ribbon's own paging). Asked as the finger starts, so
+    /// a swipe never pages the ribbon where the core leads to a day; the day comes in under the finger as the arrows bring
+    /// it, the one read ahead, or read now when it is not yet.
+    func beginDaySwipe(_ shift: Int) -> Bool {
+        guard dayTurn == nil, carry == nil, let snapshot else { return false }
+        let from: JSONValue = ["mode": "calendar", "date": .string(snapshot.day)]
+        guard let at = try? board.read("days.stepScreen", [from, .number(Double(shift))], over: board.settingsOnly()).decode(ScreenAt.self),
+              at.mode == "calendar" else { return false }
+        // A text being typed is finished first, written for the day it was typed on, as before the arrows turn the day.
+        if entry.isOpen || entry.writing {
+            entry.blur()
+            return true
+        }
+        let kept = ahead[at.date].flatMap { $0.tasksText == snapshot.tasksText ? $0 : nil }
+        guard let peek = kept ?? (try? board.snapshot(day: at.date, measures: CardMetrics.timeline)) else { return true }
+        dayTurn = DayTurn(peek: peek, shift: shift)
+        dayShare = 0
+        return true
+    }
+
+    /// The finger has carried the day this share of the way.
+    func followDaySwipe(_ share: CGFloat) {
+        guard dayTurn != nil else { return }
+        dayShare = min(1, max(0, share))
+    }
+
+    /// Let go: the day runs on to the next one or back to where it stood, as the plugin's pager settles.
+    func endDaySwipe(arrive: Bool) async {
+        guard let turn = dayTurn else { return }
+        let reached = await daySlide.run(from: dayShare, to: arrive ? 1 : 0) { [weak self] share in self?.dayShare = share }
+        guard reached, dayTurn?.peek.day == turn.peek.day else { return }
+        if arrive {
+            shownDay = turn.peek.day == turn.peek.today ? nil : turn.peek.day
+            neighbours = nil
+            landTurn()
+            await reload()
+        } else {
+            dayTurn = nil
+            dayShare = 0
+        }
+    }
+
     var isToday: Bool { snapshot.map { $0.day == $0.today } ?? true }
 
     func step(_ days: Int) async {
@@ -308,19 +370,44 @@ final class BoardModel {
         shownDay = nil
     }
 
-    /// Another day: the one read ahead slides in at once, as Calendar slides days, then the screen is read for it anew.
+    /// Another day, as the plugin turns it: the header and the hours stand still while in each column the day slides out
+    /// and the next comes in, the header naming whichever stands nearer. The day read ahead comes in at once; another is
+    /// read first. Arrived, the screen is read anew underneath.
     private func turn(to day: String, motion: Int) async {
-        dayMotion = motion
+        landTurn()
         shownDay = day
-        if let kept = ahead[day], kept.tasksText == snapshot?.tasksText {
-            neighbours = nil
-            draw(motion: kept.motion(from: snapshot)) {
-                snapshot = kept
-                entry.screenChanged()
-            }
+        neighbours = nil
+        var peek = ahead[day].flatMap { $0.tasksText == snapshot?.tasksText ? $0 : nil }
+        if peek == nil {
+            let board = board
+            peek = try? await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
         }
-        // Read anew, the clock and the undo steps as they are now: the same screen draws nothing new.
+        guard let peek, shownDay == day else { return await reload() }
+        dayTurn = DayTurn(peek: peek, shift: motion)
+        dayShare = 0
+        let arrived = await daySlide.run(from: 0, to: 1) { [weak self] share in self?.dayShare = share }
+        if arrived { landTurn() }
         await reload()
+    }
+
+    /// The day that came in stands for good: the screen is drawn from it, with no animation.
+    private func landTurn() {
+        daySlide.stop()
+        guard let turn = dayTurn else { return }
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) {
+            snapshot = turn.peek
+            entry.screenChanged()
+            dayTurn = nil
+            dayShare = 0
+        }
+    }
+
+    /// The header's day while a day comes in: the one that stands nearer.
+    var titleSnapshot: BoardSnapshot? {
+        guard let turn = dayTurn, dayShare >= 0.5 else { return snapshot }
+        return turn.peek
     }
 
     // MARK: A task's page
@@ -357,8 +444,8 @@ final class BoardModel {
         let board = board
         guard let place = try? await Task.detached(operation: { try board.write("tasks.reveal", [item.json]).decode(TaskScreenPlace.self) }).value else { return }
         if place.kind == "day" {
-            shownDay = place.date
             go(to: .today)
+            if let date = place.date ?? snapshot?.today { await go(toDay: date) }
         } else if place.list == "soon" {
             shownDay = nil
             go(to: .soon)
@@ -1144,6 +1231,13 @@ final class BoardModel {
         if laid?.hour != hour { layOut(timeline, hour: hour) }
         guard let laid else { return Self.scaled(timeline.slots, from: CGFloat(CardMetrics.timeline.hour), to: hour) }
         return laid.hour == hour ? laid.slots : Self.scaled(laid.slots, from: laid.hour, to: hour)
+    }
+
+    /// Another day's calendar cards while it slides in: its read's stack, scaled to the hour shown. The stack laid out for
+    /// the day shown is left as it is; the core lays the new day out once it stands.
+    func slidingSlots(_ timeline: BoardTimeline, hour: CGFloat) -> [BoardSlot] {
+        let read = CGFloat(CardMetrics.timeline.hour)
+        return abs(hour - read) < 0.5 ? timeline.slots : Self.scaled(timeline.slots, from: read, to: hour)
     }
 
     /// The last stack the core laid out, and for which timeline and hour.

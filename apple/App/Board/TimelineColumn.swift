@@ -27,6 +27,8 @@ struct TimelineColumn: View {
         _position = State(initialValue: ScrollPosition(y: top ?? 0))
         _opened = State(initialValue: top != nil)
     }
+    /// The column's width: another day slides through it.
+    @State private var columnWidth: CGFloat = 0
     /// The zoom a pinch last settled on, kept on the device: `wholeDay`, or the hour's height.
     @AppStorage("timelineZoom") private var savedZoom: String = ""
 
@@ -74,11 +76,8 @@ struct TimelineColumn: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Measure.allDayGap) {
-            ForEach(timeline.allDay) { event in
-                AllDayRow(event: event, paint: paint(event))
-                    .padding(.leading, Measure.itemsLeft)
-                    .padding(.trailing, Measure.itemsRight)
-            }
+            DayLane(model: model, width: columnWidth, shown: allDay(timeline)) { peek in allDay(peek.timeline) }
+                .clipped()
             GeometryReader { box in
                 let hour = hour ?? CGFloat(timeline.zoomLevels.first ?? 56)
                 ScrollView {
@@ -107,6 +106,7 @@ struct TimelineColumn: View {
         .overlay(alignment: .leading) {
             Rectangle().fill(Color(.separator)).frame(width: 1).padding(.top, -8)
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { columnWidth = $0 }
         .onAppear { model.registerCalendar() }
         .onDisappear { model.dropping.remove(Self.key) }
     }
@@ -120,21 +120,33 @@ struct TimelineColumn: View {
                 .contentShape(.rect)
                 .gesture(newSlot(hour: hour))
             grid(hour: hour)
-            ForEach(timeline.events.sorted { $0.layer < $1.layer }) { event in
-                let top = y(event.start, hour) + Measure.itemInset
-                let length = CGFloat(event.end - event.start) / 60 * hour - Measure.itemGap
-                EventBlock(event: event, paint: paint(event), height: max(length, 1), contentTop: top)
-                    .padding(.leading, Measure.itemsLeft + CGFloat(event.left))
-                    .padding(.trailing, Measure.itemsRight + Measure.itemInset)
-                    .offset(y: top)
+            // The day itself, as the plugin's day layers: its events and cards slide within the items' place, its now
+            // line within its own; the hours and the grid stand.
+            DayLane(model: model, width: width, shown: ZStack(alignment: .topLeading) {
+                events(timeline, hour: hour)
+                ForEach(slots.filter { $0.card.item.id != model.entry.state?.renaming?.id }) { slot in
+                    slotCard(slot)
+                        .padding(.leading, Measure.itemsLeft + CGFloat(slot.box.left))
+                        .padding(.trailing, Measure.itemsRight + Measure.itemInset)
+                        .offset(y: y(0, hour) + CGFloat(slot.box.top))
+                }
+            }) { peek in
+                ZStack(alignment: .topLeading) {
+                    events(peek.timeline, hour: hour)
+                    ForEach(model.slidingSlots(peek.timeline, hour: hour)) { slot in
+                        TaskCapsule(card: slot.card, height: CGFloat(slot.box.height))
+                            .frame(height: max(CGFloat(slot.box.height), CardMetrics.height))
+                            .padding(.leading, Measure.itemsLeft + CGFloat(slot.box.left))
+                            .padding(.trailing, Measure.itemsRight + Measure.itemInset)
+                            .offset(y: y(0, hour) + CGFloat(slot.box.top))
+                    }
+                }
             }
-            ForEach(slots.filter { $0.card.item.id != model.entry.state?.renaming?.id }) { slot in
-                slotCard(slot)
-                    .padding(.leading, Measure.itemsLeft + CGFloat(slot.box.left))
-                    .padding(.trailing, Measure.itemsRight + Measure.itemInset)
-                    .offset(y: y(0, hour) + CGFloat(slot.box.top))
-            }
-            if let now = timeline.now { nowLine(now, hour: hour) }
+            .frame(width: width, height: height, alignment: .topLeading)
+            .mask(alignment: .topLeading) { Rectangle().padding(.leading, Measure.itemsLeft) }
+            DayLane(model: model, width: width, shown: nowLayer(timeline, hour: hour)) { peek in nowLayer(peek.timeline, hour: hour) }
+                .frame(width: width, height: height, alignment: .topLeading)
+                .clipped()
             // The quick entry's field at its time, a renamed card's over its own place.
             if let minute = model.entry.slotMinute {
                 EntryCapsule(host: model.entry)
@@ -151,6 +163,32 @@ struct TimelineColumn: View {
     }
 
     private static let key = "timeline"
+
+    private func allDay(_ timeline: BoardTimeline) -> some View {
+        VStack(alignment: .leading, spacing: Measure.allDayGap) {
+            ForEach(timeline.allDay) { event in
+                AllDayRow(event: event, paint: paint(event, of: timeline))
+                    .padding(.leading, Measure.itemsLeft)
+                    .padding(.trailing, Measure.itemsRight)
+            }
+        }
+    }
+
+    private func events(_ timeline: BoardTimeline, hour: CGFloat) -> some View {
+        ForEach(timeline.events.sorted { $0.layer < $1.layer }) { event in
+            let top = y(event.start, hour) + Measure.itemInset
+            let length = CGFloat(event.end - event.start) / 60 * hour - Measure.itemGap
+            EventBlock(event: event, paint: paint(event, of: timeline), height: max(length, 1), contentTop: top)
+                .padding(.leading, Measure.itemsLeft + CGFloat(event.left))
+                .padding(.trailing, Measure.itemsRight + Measure.itemInset)
+                .offset(y: top)
+        }
+    }
+
+    @ViewBuilder
+    private func nowLayer(_ timeline: BoardTimeline, hour: CGFloat) -> some View {
+        if let now = timeline.now { nowLine(now, hour: hour) } else { Color.clear.frame(height: 0) }
+    }
 
     /// A long press on the empty calendar: the line follows the finger while held, and the field of a new task opens at
     /// its time when let go.
@@ -214,7 +252,7 @@ struct TimelineColumn: View {
 
     // MARK: Blocks
 
-    private func paint(_ event: BoardEvent) -> EventPaint {
+    private func paint(_ event: BoardEvent, of timeline: BoardTimeline) -> EventPaint {
         let themed = event.event.past == true ? timeline.pastPaint : event.paint
         return scheme == .dark ? themed.dark : themed.light
     }

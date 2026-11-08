@@ -440,6 +440,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("days.today"),
 		plain("days.relation", LATER),
 		plain("days.step", T, -3),
+		plain("days.stepScreen", { mode: "calendar", date: T }, 1),
 		plain("days.boundary"),
 		plain("days.openAt", LATER),
 		...["startHour", "hourAt", "offsetOfHour"].map((m) => plain(`boundary.${m}`, 3)),
