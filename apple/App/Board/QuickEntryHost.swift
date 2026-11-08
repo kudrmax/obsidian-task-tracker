@@ -106,6 +106,8 @@ final class QuickEntryHost {
     /// going as another comes.
     private(set) var heirs: [String: String] = [:]
     @ObservationIgnored private var serial = 0
+    /// Counts the placings of the field: a placing put off to the next turn is dropped when a later one came first.
+    @ObservationIgnored private var placed = 0
     /// The id of the task a job just made, until its line leaves the list's rows.
     @ObservationIgnored private var heirComing: String?
     /// A sheet of the bar is up (repeat, date): the field gives the keyboard up for it without ending the entry.
@@ -394,8 +396,26 @@ final class QuickEntryHost {
             return
         }
         field.placeholder = next.namesSection ? "Section name" : nil
-        placeField(over: snapshot)
-        if before == nil || before?.spot != next.spot || before?.pending.count != next.pending.count || before?.section != next.section { moved += 1 }
+        let shift = before == nil || before?.spot != next.spot || before?.pending.count != next.pending.count || before?.section != next.section
+        // A new field's row opens with the keyboard's own rise, as a new row in Reminders does: the keyboard the field takes
+        // reloads its views on a later turn and holds the main thread meanwhile, which froze a row opened before it (its
+        // first frames came late, half open, or stood still midway). The session and the keyboard are the field's at
+        // once, so nothing typed meanwhile is lost; a renamed card's row is the field's at once.
+        if before == nil, next.renaming == nil {
+            placed += 1
+            let mine = placed
+            KeyboardRise.shared.next { [weak self] in
+                guard let self, self.placed == mine, self.state != nil else { return }
+                withAnimation(.snappy) {
+                    self.placeField(over: snapshot)
+                    self.moved += 1
+                }
+            }
+        } else {
+            placed += 1
+            placeField(over: snapshot)
+            if shift { moved += 1 }
+        }
         field.begin()
     }
 
@@ -464,6 +484,7 @@ final class QuickEntryHost {
     /// The screen was read anew (a write elsewhere, another day): the field keeps its place among the cards as drawn.
     func screenChanged() {
         guard state != nil else { return }
+        placed += 1
         placeField()
     }
 
@@ -1062,3 +1083,38 @@ struct EntryDateSheet: View {
     }
 }
 
+
+/// The keyboard's next rise: what waits for it runs as the keyboard starts to move (its views reloaded, the main thread
+/// free), at once when it already stands, and after a moment at most when it does not move at all.
+@MainActor
+final class KeyboardRise {
+    static let shared = KeyboardRise()
+    private var waiting: [() -> Void] = []
+    private var up = false
+    private static let longest: TimeInterval = 0.4
+
+    private init() {
+        let center = NotificationCenter.default
+        center.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                KeyboardRise.shared.up = true
+                KeyboardRise.shared.run()
+            }
+        }
+        center.addObserver(forName: UIResponder.keyboardDidHideNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { KeyboardRise.shared.up = false }
+        }
+    }
+
+    func next(_ body: @escaping () -> Void) {
+        if up { return body() }
+        waiting.append(body)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.longest) { [weak self] in self?.run() }
+    }
+
+    private func run() {
+        let all = waiting
+        waiting = []
+        for body in all { body() }
+    }
+}

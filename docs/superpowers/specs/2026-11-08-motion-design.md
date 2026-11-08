@@ -404,6 +404,9 @@ every condition that changes the layout is animated by the transaction that chan
     the opening drawing it swallowed the row's opening, and the plus's copy faded over nothing. Focused first (from where
     the field waits, parked in the window), whatever is typed goes into the field, and the row opens on a free main
     thread.
+    The new field's row itself opens with the keyboard's own rise (`keyboardWillShow`, at once when the keyboard stands,
+    after 0.4 s at most): UIKit reloads the keyboard's views on a later turn, and a row opened before that stood still
+    midway. A renamed card's row is the field's at once.
 50. **iPhone, R7: the slot is the cancel target while a finger holds a carry**, and for the plus until its own copy is
     home (it flies into the slot); a card's copy flies to its own place, so the slot is the plus again as it is let go,
     not when the system's drop animator ends a second later.
