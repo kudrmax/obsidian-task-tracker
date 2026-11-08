@@ -600,10 +600,15 @@ export class QuickEntryController {
 
 	/** The field and the bar show the state: its text, the marks it is written with, what the field may do. */
 	private sync(state: EntryState): void {
-		if (this.field && this.field.text !== state.text) this.field.setValue(state.text);
-		this.field?.setSection(state.section === true);
-		this.field?.setTint(state.marks.tint);
+		if (this.field) this.dress(this.field, state);
 		this.bar.show(state);
+	}
+
+	/** The field shows the state's text, as a section's or a task's, in its tint. */
+	private dress(field: QuickFieldHandle, state: EntryState): void {
+		if (field.text !== state.text) field.setValue(state.text);
+		field.setSection(state.section === true);
+		field.setTint(state.marks.tint);
 	}
 
 	/**
@@ -628,6 +633,8 @@ export class QuickEntryController {
 
 	private fieldIn(row: HTMLElement): HTMLElement {
 		const field = (this.field ??= this.openField(row));
+		const state = this.entry.state;
+		if (state) this.dress(field, state);
 		for (const child of [...row.children]) if (child !== field.el) child.remove();
 		if (field.el.parentElement !== row) row.appendChild(field.el);
 		return field.el;

@@ -800,6 +800,22 @@ describe("QuickEntryController", () => {
 		await vi.waitFor(() => expect(edits).toEqual([{ key: a.key, draft: { text: "A2", placement: { kind: "now" }, priority: null } }]));
 	});
 
+	it("the next field a rename's Enter opens is drawn empty, so it grows in at its own height", async () => {
+		const a = item("A", key("now", 0));
+		const { controller, lists, field, type, press } = setUp({ items: { day: [a, item("B", key("now", 1))] } });
+		controller.rename(a);
+		type("A2 with a title long enough to wrap");
+		const draw = lists.day.render.bind(lists.day);
+		const drawn: (string | undefined)[] = [];
+		lists.day.render = () => {
+			draw();
+			drawn.push(field()?.value);
+		};
+		press("Enter");
+		expect(drawn[0]).toBe("");
+		press("Escape");
+	});
+
 	it("keeps the dot of a task in progress on the field that renames it, and none on the field of a new task", () => {
 		const a: TaskItem = { ...item("A", key("now", 0)), status: "inProgress" };
 		const { controller, lists } = setUp({ items: { day: [a, item("B", key("now", 1))] } });
