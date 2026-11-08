@@ -1095,10 +1095,12 @@ final class KeyboardRise {
 
     private init() {
         let center = NotificationCenter.default
+        // Posted from inside the keyboard's setting up of its views, which holds the main thread a while longer: what
+        // waits runs on the next turn, once that has returned and the keyboard's own animation is running.
         center.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
                 KeyboardRise.shared.up = true
-                KeyboardRise.shared.run()
+                DispatchQueue.main.async { KeyboardRise.shared.run() }
             }
         }
         center.addObserver(forName: UIResponder.keyboardDidHideNotification, object: nil, queue: .main) { _ in
