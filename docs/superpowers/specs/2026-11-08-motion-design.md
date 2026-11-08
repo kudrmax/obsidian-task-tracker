@@ -230,14 +230,18 @@ every condition that changes the layout is animated by the transaction that chan
    Undo, search, the day arrows, the quick entry's writes), never a flag of the call. A row that comes or goes in a list
    folds open or shut from its top while it fades (`FoldAway`): its visible part shrinks as fast as the rows below close
    the gap, so they never draw over it.
-11. **iPhone, R7: one end of a carry** (`CarryEnd`, owned by `BoardModel`): a carry ends when its copy has landed (the
-    drop animation's completion, a cancel's flight home, the plus's flight home; the session's end only after them) and,
-    when the drop writes, when the first read made after the write is drawn. That read puts the dropped card in its new
-    place, still hidden, and takes away the room it flew into, the drop line and the section mark in the drawing's own
-    transaction. At the end the card shows; when the core put it elsewhere than the copy came down (a stack, the past
-    under now), it glides from there to its place with the system's spring. UIKit asks for the drop's target at the
-    drop, before the write: the copy flies to the place the gap or the line showed, and the card itself then glides to
-    the place the task took, found by its id in the new drawing. A cancel's card shows in the frame its copy lands.
+11. **iPhone, R7: one end of a carry** (`CarryEnd`, owned by `BoardModel`), **the copy flies to where the core puts the
+    task.** At the drop the app asks `rules.placeOfDrop` and `tasks.landing` (decision 8) over the file as it is, before
+    the write, and the copy flies straight there: a list's room is opened before the landing's index in its section (or
+    under its parent, for a subtask), a timeline block at the box `rules.stackTasks` gives with the landing's `slotted`
+    spans (on the now line when `ridesNow`); away: the system's own drop. A drop the core places nowhere new
+    (`placeOfDrop` null) flies into its dashed place and writes nothing. Swift no longer guesses the place from the
+    gap or the line (`landingRect`, `returnsHome` and the line's rect are gone). A carry ends when its copy has landed
+    (the drop animation's completion, a cancel's flight home, the plus's flight home; the session's end only after
+    them) and, when the drop writes, when the first read made after the write is drawn: that read puts the dropped card
+    in its new place, still hidden, and takes away the room, the drop line and the section mark in the drawing's own
+    transaction. At the end the card shows; only if the read differs from the landing does it glide from where the copy
+    came down (a guard, not the path). A cancel's card shows in the frame its copy lands.
 12. **iPhone, R7: a section's header opens its menu on a tap**, as a card does (Rename, Remove Section, as the core offers
     them); a long press only lifts it. No context menu on a header, so the lift never flashes one. A section dropped
     flies to the mark that showed its slot.

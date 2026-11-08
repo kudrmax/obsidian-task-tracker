@@ -381,7 +381,7 @@ final class BoardModel {
     func write(_ method: String, _ arguments: [JSONValue]) async {
         let board = board
         do {
-            try await Task.detached { try board.write(method, arguments) }.value
+            _ = try await Task.detached { try board.write(method, arguments) }.value
         } catch {
             problem = Self.words(error)
         }
@@ -643,7 +643,7 @@ final class BoardModel {
             let board = board
             let arguments: [JSONValue] = [.string(section.list), section.names[section.lifted].json, place]
             do {
-                try await Task.detached { try board.write("tasks.moveGroup", arguments) }.value
+                _ = try await Task.detached { try board.write("tasks.moveGroup", arguments) }.value
             } catch {
                 problem = Self.words(error)
             }
@@ -860,9 +860,10 @@ final class BoardModel {
         withAnimation(.snappy(duration: 0.25)) { gap = nil }
     }
 
-    /// Let go over a list: the drop is written, and the card settles where the line showed it (in the list's content
-    /// space): the rows part there for it, or it goes back into its dashed place. The plus opens the field there at
-    /// once, and its copy becomes the field's place.
+    /// Let go over a list (in the list's content space): the place is the core's (`rules.placeOfDrop`), and so is where
+    /// the task lands (`tasks.landing`), asked before the write: the rows part there and the copy flies straight into
+    /// that room, or into its dashed place when nothing is written. The plus opens the field there at once, and its
+    /// copy becomes the field's place.
     private func land(_ column: BoardColumn) -> CGRect? {
         guard let carry else { return nil }
         if let section = carry.section { return landSection(section, column) }
@@ -870,35 +871,43 @@ final class BoardModel {
             letGo(writes: false)
             return nil
         }
-        let spot = landingRect(column, gap)
         let home: JSONValue = homeGap(carry.id, in: column) ?? .null
         let others = others(in: column)
+        let place: JSONValue? = ruleNow("rules.placeOfDrop", [Self.listCards(others), gap.place, home])
         if carry.id == Carried.plus {
-            let place: JSONValue? = ruleNow("rules.placeOfDrop", [Self.listCards(others), gap.place, home])
             endPlus()
             if let place { entry.openAtDrop(column, ["kind": "place", "column": .string(column.rawValue), "place": place]) }
-            return spot
+            return gapRect(column, gap)
         }
-        let writes = !returnsHome(gap)
-        letGo(writes: writes)
-        guard writes, let item = carry.item else { return spot }
-        withAnimation(.snappy(duration: 0.25)) { settling = gap }
+        // The core's null: back where it was lifted from, nothing written.
+        guard let item = carry.item, let place, !place.isNull else {
+            letGo(writes: false)
+            return geometry[column]?.cards[carry.id]
+        }
+        let to: JSONValue = ["kind": "place", "column": .string(column.rawValue), "place": place]
+        letGo(writes: true)
+        let room = landing(item, from: carry.from, to: to)?.gap(in: column, among: others)
+        if let room {
+            withAnimation(.snappy(duration: 0.25)) { settling = ListGap(column: column, at: room.at, level: room.level, group: room.group, place: place, line: nil) }
+        }
         Task {
             let dropAt = ContinuousClock.now
-            do {
-                let place: JSONValue = try await rule("rules.placeOfDrop", [Self.listCards(others), gap.place, home])
-                if place.isNull {
-                    carryDrawn()
-                } else {
-                    await drop(item, from: carry.from, to: ["kind": "place", "column": .string(column.rawValue), "place": place])
-                    DropTiming.report(since: dropAt)
-                }
-            } catch {
-                problem = Self.words(error)
-                carryDrawn()
-            }
+            await drop(item, from: carry.from, to: to)
+            DropTiming.report(since: dropAt)
         }
-        return spot
+        return room.flatMap { gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, place: place, line: nil)) }
+    }
+
+    /// Where the core will leave `item` dropped `to`, asked over the file as it is, before the write.
+    private func landing(_ item: TaskItem, from: String, to: JSONValue) -> DropLanding? {
+        guard let day = snapshot?.day else { return nil }
+        let tasks: JSONValue = [["key": item.key.json, "from": .string(from)]]
+        do {
+            return try board.landing(tasks, to: to, day: day).first
+        } catch {
+            problem = Self.words(error)
+            return nil
+        }
     }
 
     /// The plus let go on a place: its carry ends at once, the field opening where it came down.
@@ -908,19 +917,6 @@ final class BoardModel {
         var still = Transaction()
         still.disablesAnimations = true
         withTransaction(still) { endCarry() }
-    }
-
-    /// The gap is the one the carried card was lifted from: it lands in its dashed place.
-    private func returnsHome(_ gap: ListGap) -> Bool {
-        guard let carry, let home = homeGap(carry.id, in: gap.column) else { return false }
-        return home["index"] == gap.place["index"] && home["group"] == gap.place["group"]
-    }
-
-    /// Where the card lands: its dashed place when the gap is the one it was lifted from, else the room the rows part to.
-    private func landingRect(_ column: BoardColumn, _ gap: ListGap) -> CGRect? {
-        guard let rect = gapRect(column, gap) else { return nil }
-        guard returnsHome(gap), let carry, let waiting = geometry[column]?.cards[carry.id] else { return rect }
-        return CGRect(x: rect.minX, y: waiting.minY, width: rect.width, height: CardMetrics.height)
     }
 
     /// The drop line of a gap: through the middle of the room above the card it parts from, or above the dashed place
@@ -998,31 +994,45 @@ final class BoardModel {
         entry.openAtDrop(nil, ["kind": "time", "start": .number(Double(minute))])
     }
 
-    /// Let go over the calendar: the copy settles at the time the line shows; the card shows where the core puts it
-    /// once the screen draws the write, gliding there if that is elsewhere (a stack, the past under now).
+    /// Let go over the calendar: the copy flies straight to the block the core will make (`tasks.landing`): its span
+    /// on the now line for a past time of today, its box in the stack the core lays out with the day's other blocks.
     private func landOnCalendar() -> CGRect? {
-        guard let carry, carry.section == nil, let minute = landing, snapshot != nil else {
+        guard let carry, carry.section == nil, let minute = landing, let snapshot else {
             letGo(writes: false)
             return nil
         }
-        let top = CGFloat(minute) / 60 * calendarHour + TimelineGeometry.labelLift
-        let spot = CGRect(x: TimelineGeometry.itemsLeft, y: top, width: calendarWidth - TimelineGeometry.itemsLeft - TimelineGeometry.itemsRight, height: CardMetrics.height)
+        let to: JSONValue = ["kind": "time", "start": .number(Double(minute))]
         if carry.id == Carried.plus {
+            let top = CGFloat(minute) / 60 * calendarHour + TimelineGeometry.labelLift
             endPlus()
-            entry.openAtDrop(nil, ["kind": "time", "start": .number(Double(minute))])
-            return spot
+            entry.openAtDrop(nil, to)
+            return CGRect(x: TimelineGeometry.itemsLeft, y: top, width: calendarWidth - TimelineGeometry.itemsLeft - TimelineGeometry.itemsRight, height: CardMetrics.height)
         }
         guard let item = carry.item else {
             letGo(writes: false)
             return nil
         }
         letGo(writes: true)
+        let spot = landing(item, from: carry.from, to: to).flatMap { blockRect($0, events: snapshot.timeline.events) }
         Task {
             let dropAt = ContinuousClock.now
-            await drop(item, from: carry.from, to: ["kind": "time", "start": .number(Double(minute))])
+            await drop(item, from: carry.from, to: to)
             DropTiming.report(since: dropAt)
         }
         return spot
+    }
+
+    /// The block a timeline landing makes, in the calendar's content space at the hour's height drawn now.
+    private func blockRect(_ landed: DropLanding, events: [BoardEvent]) -> CGRect? {
+        let m = CardMetrics.timeline
+        let measures = TimelineMeasures(hour: Double(calendarHour), cardHeight: m.cardHeight, cardGap: m.cardGap, itemInset: m.itemInset, itemGap: m.itemGap, overlayInset: m.overlayInset)
+        guard let box = try? board.box(of: landed, events: events, measures: measures) else { return nil }
+        let left = TimelineGeometry.itemsLeft + CGFloat(box.left)
+        return CGRect(
+            x: left,
+            y: TimelineGeometry.labelLift + CGFloat(box.top),
+            width: calendarWidth - left - TimelineGeometry.itemsRight - CGFloat(m.itemInset),
+            height: max(CGFloat(box.height), CardMetrics.height))
     }
 
     /// The minute a carry over the calendar stands at, on the grid's step for the timeline drawn `hourHeight` an hour.
@@ -1049,7 +1059,7 @@ final class BoardModel {
         let board = board
         let arguments: [JSONValue] = [[["key": item.key.json, "from": .string(from)]], to, .string(day)]
         do {
-            try await Task.detached { try board.write("tasks.drop", arguments) }.value
+            _ = try await Task.detached { try board.write("tasks.drop", arguments) }.value
         } catch {
             problem = Self.words(error)
         }

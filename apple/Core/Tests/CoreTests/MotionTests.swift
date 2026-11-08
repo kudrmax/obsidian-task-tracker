@@ -148,3 +148,45 @@ import Testing
         #expect(!landed && drawn)
     }
 }
+
+/// Where a drop lands, asked of the core before the write: the copy flies there.
+@Suite struct LandingTests {
+    let core = try! PhoneCore(script: Fixtures.phoneScript)
+
+    @Test func aDropOnThePastOfTodayRidesTheNowLineAndTheWriteAgrees() throws {
+        let vault = FakeVault(IdentityTests.file)
+        let board = TaskBoard(core: core, vault: vault)
+        // The write is made at the moment it runs: the screen is read at that moment too.
+        let before = try board.snapshot(day: nil, measures: IdentityTests.measures)
+        let today = before.day
+        let idea = try #require(before.lists[.inbox]?.cards.first { $0.item.title == "Idea" })
+        let tasks: JSONValue = [["key": idea.item.key.json, "from": "inbox"]]
+        let to: JSONValue = ["kind": "time", "start": 0]
+        let landed = try #require(try board.landing(tasks, to: to, day: today).first)
+        #expect(landed.kind == "timeline")
+        #expect(landed.id == idea.id)
+        #expect(landed.ridesNow == true)
+        let box = try #require(try board.box(of: landed, events: before.timeline.events, measures: IdentityTests.measures))
+        try board.write("tasks.drop", [tasks, to, .string(today)])
+        let after = try board.snapshot(day: nil, measures: IdentityTests.measures)
+        let slot = try #require(after.timeline.slots.first { $0.id == idea.id })
+        #expect(slot.start == landed.span?.start)
+        #expect(slot.box == box)
+    }
+
+    @Test func aListLandingIsTheRoomBeforeItsIndexInItsSection() throws {
+        let board = TaskBoard(core: core, vault: FakeVault(IdentityTests.file))
+        let screen = try board.snapshot(day: "2026-11-06", measures: IdentityTests.measures, now: Fixtures.date(6, 10))
+        let cards = try #require(screen.lists[.day]?.cards)
+        let shop = try #require(cards.firstIndex { $0.item.title == "Shop" })
+        let parent = try #require(cards.first { $0.item.title == "Parent" })
+        let child = try #require(cards.firstIndex { $0.item.title == "Child" })
+        let list: DropLanding = try JSONValue.object(["kind": "list", "id": "x", "item": .null, "column": "day", "group": "Errands", "index": 0]).decode()
+        #expect(list.gap(in: .day, among: cards) == LandingGap(at: shop, level: 0, group: "Errands"))
+        let last: DropLanding = try JSONValue.object(["kind": "list", "id": "x", "item": .null, "column": "day", "group": "Errands", "index": 1]).decode()
+        #expect(last.gap(in: .day, among: cards) == LandingGap(at: shop + 1, level: 0, group: "Errands"))
+        #expect(list.gap(in: .soon, among: cards) == nil)
+        let sub: DropLanding = try JSONValue.object(["kind": "subtask", "id": "x", "item": .null, "parent": .string(parent.id), "index": 0]).decode()
+        #expect(sub.gap(in: .day, among: cards) == LandingGap(at: child, level: 1, group: parent.item.group))
+    }
+}
