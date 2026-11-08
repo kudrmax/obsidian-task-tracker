@@ -126,6 +126,24 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// The press's highlight over the capsule, as a button's: outside the content, so a lifted preview never carries it.
     private let press = UIView()
     private var drag: UIDragInteraction!
+    /// While its menu is open and its preview flies home inside it, the card draws over the cards after it in the list:
+    /// SwiftUI stacks the wrappers of the cards' views in the order of the list and keeps no `zIndex` for them, so the
+    /// card's own wrapper, the first of its holders that has siblings, is raised.
+    private var raised = false {
+        didSet {
+            guard raised != oldValue else { return }
+            if raised {
+                var holder: UIView? = self
+                while let view = holder, let parent = view.superview, parent.subviews.count == 1 { holder = parent }
+                lifted = holder
+                lifted?.layer.zPosition = 1
+            } else {
+                lifted?.layer.zPosition = 0
+                lifted = nil
+            }
+        }
+    }
+    private weak var lifted: UIView?
     /// A menu row that opens a sheet or a page, run once the menu has begun to go.
     private var afterMenu: (@MainActor () -> Void)?
     /// Where the card stood when it was lifted, in the window: a cancelled carry flies back there.
@@ -221,14 +239,22 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     private func openMenu(at point: CGPoint) {
         guard let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return }
+        raised = true
         opener.present(menu, at: point) { [weak self] in
             guard let self else { return nil }
-            return UITargetedPreview(view: self.content, parameters: self.capsule)
+            let home = UIPreviewTarget(container: self, center: CGPoint(x: self.bounds.midX, y: self.bounds.midY))
+            return UITargetedPreview(view: self.content, parameters: self.capsule, target: home)
         }
     }
 
-    /// A row that opens a sheet or a page runs once the menu has gone.
+    /// A row that opens a sheet or a page runs once the menu has gone. The card stays over its neighbours until its
+    /// preview, which flies home inside the card, has landed.
     private func menuEnded(_ animator: (any UIContextMenuInteractionAnimating)?) {
+        if let animator {
+            animator.addCompletion { [weak self] in self?.raised = false }
+        } else {
+            raised = false
+        }
         guard let run = afterMenu else { return }
         afterMenu = nil
         // As the menu starts to go, not when its animation ends: the animator completes about a second later.
@@ -295,6 +321,8 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
             return
         }
         showsInPlace()
+        // A drop's copy is still in the air when the session ends here: the drop's own animation ends the carry.
+        guard operation == .cancel || operation == .forbidden else { return }
         onEnd()
     }
 

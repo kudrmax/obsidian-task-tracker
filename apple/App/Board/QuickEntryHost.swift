@@ -96,6 +96,15 @@ final class QuickEntryHost {
     private(set) var slotMinute: Int?
     /// Bumped whenever the field opens or moves: what holds it scrolls it into sight.
     private(set) var moved = 0
+    /// The rows of each list's typed lines and, last, its field, by keys that never repeat: Enter turns the field's row
+    /// into the line typed in it and opens a new row for the field under it; a line written leaves its row to its card.
+    private(set) var lineKeys: [BoardColumn: [String]] = [:]
+    /// A card made from a typed line keeps that line's row (its key): the text becomes the card in place, never one copy
+    /// going as another comes.
+    private(set) var heirs: [String: String] = [:]
+    @ObservationIgnored private var serial = 0
+    /// The id of the task a job just made, until its line leaves the list's rows.
+    @ObservationIgnored private var heirComing: String?
     /// A sheet of the bar is up (repeat, date): the field gives the keyboard up for it without ending the entry.
     var paused = false
     /// The sheet the bar asked for; the screen presents it.
@@ -194,7 +203,9 @@ final class QuickEntryHost {
     func typed(_ text: String) { call("type", [.string(text)], animated: false) }
     /// Enter: the text stands where it was typed and the next field is right under it in the same frame, as a line break
     /// in a text; nothing slides.
-    func enter() { call("enter", [], animated: false) }
+    /// Enter: the text stays in its row, now a line waiting to be written; the next field opens under it and the rows
+    /// below slide down, as any row that comes.
+    func enter() { call("enter", []) }
     func indent(_ delta: Int) { call("indent", [.number(Double(delta))]) }
     func toggleSection() { call("toggleSection", []) }
     func togglePriority(_ prefix: String) { call("togglePriority", [.string(prefix)]) }
@@ -367,6 +378,7 @@ final class QuickEntryHost {
         if field.text != (next?.text ?? "") { field.text = next?.text ?? "" }
         guard let next else {
             lists = [:]
+            lineKeys = [:]
             slotMinute = nil
             field.end()
             return
@@ -389,6 +401,7 @@ final class QuickEntryHost {
                 }
             }
         }
+        keepKeys(found, of: snapshot)
         lists = found
         if state.spotKind == "slot" {
             let slot = state.spot["slot"]
@@ -396,6 +409,35 @@ final class QuickEntryHost {
         } else {
             slotMinute = nil
         }
+    }
+
+    /// Each list's row keys for the lines and the field it now draws: lines written leave from the front (the first to the
+    /// card just made), lines typed take the field's row and the field a new one; a card gone from the lists frees its key.
+    private func keepKeys(_ found: [BoardColumn: ListEntryView], of snapshot: BoardSnapshot) {
+        var keys: [BoardColumn: [String]] = [:]
+        for (column, entry) in found {
+            let lines = entry.pending.count
+            var kept = lineKeys[column] ?? []
+            if kept.isEmpty {
+                kept = (0...lines).map { _ in newKey() }
+            } else if lines < kept.count - 1 {
+                let written = kept.count - 1 - lines
+                if let id = heirComing, let first = kept.first { heirs[id] = first }
+                heirComing = nil
+                kept.removeFirst(written)
+            } else if lines > kept.count - 1 {
+                kept += (0..<(lines - (kept.count - 1))).map { _ in newKey() }
+            }
+            keys[column] = kept
+        }
+        lineKeys = keys
+        let drawn = Set(snapshot.lists.values.flatMap { $0.cards.map(\.id) })
+        if heirs.keys.contains(where: { !drawn.contains($0) }) { heirs = heirs.filter { drawn.contains($0.key) } }
+    }
+
+    private func newKey() -> String {
+        serial += 1
+        return "\u{0}line/\(serial)"
     }
 
     /// Where `task`'s full screen draws the field, nil when it stands elsewhere.
@@ -483,6 +525,7 @@ final class QuickEntryHost {
                 if let created, let read {
                     let coming = JSONValue.object(Dictionary(uniqueKeysWithValues: read.lists.map { ($0.key.rawValue, Self.listCards($0.value.cards)) }))
                     reply = answer("shown", [.string(id), created, coming], over: read)
+                    heirComing = reply == nil ? nil : created["id"].string
                 }
                 if reply == nil { reply = answer("unshown", [.string(id)], over: read) }
                 if let read { model.draw(read) }

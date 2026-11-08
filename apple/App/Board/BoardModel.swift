@@ -216,6 +216,7 @@ final class BoardModel {
     /// One transaction for one drawing: still, the day turned (the day part slides in from the day's side), or the cards
     /// moved (each by its id slides, folds away or unfolds with the system's spring).
     func draw(motion: BoardMotion, _ change: () -> Void) {
+        if placedByDrop != nil { placedByDrop = nil }
         switch motion {
         case .still:
             var still = Transaction()
@@ -553,6 +554,9 @@ final class BoardModel {
     private(set) var landing: Int?
 
     var carried: String? { carry?.id }
+    /// The card the drawing of a drop's write put in its new place: it goes there at once, hidden or not, never sliding
+    /// over the list (its copy flies there). Until the next drawing.
+    private(set) var placedByDrop: String?
     var carrying: Bool { carry != nil }
     /// The screen's drop interaction, which every list and the calendar register with.
     @ObservationIgnored let dropping = BoardDrop()
@@ -704,6 +708,7 @@ final class BoardModel {
     /// The first drawing of the drop's write: the card takes its new place (still hidden), the room it flew into and the
     /// marks go, in the drawing's own transaction.
     private func carryWritten() {
+        placedByDrop = carry?.id
         carry?.written = true
         gap = nil
         settling = nil
