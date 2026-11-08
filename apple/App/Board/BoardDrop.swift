@@ -51,7 +51,8 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     }
 
     private func place(at point: CGPoint) -> String? {
-        places.first { $0.value.visible.contains(point) }?.key
+        // By key, so a point two places share always goes to the same one.
+        places.keys.sorted().first { places[$0]?.visible.contains(point) == true }
     }
 
     private func leave() {

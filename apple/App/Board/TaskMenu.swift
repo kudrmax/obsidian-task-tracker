@@ -130,7 +130,7 @@ struct TaskMenu {
         var rows: [MenuNode] = page.options.map { option in
             .action(title: option.project.name, symbol: nil, checked: option.checked) { Task { await model.setProject(items, option.project.link) } }
         }
-        let none: MenuNode = .action(title: "No project", symbol: nil, checked: page.none) { Task { await model.setProject(items, nil) } }
+        let none: MenuNode = .action(title: page.noneLabel, symbol: nil, checked: page.none) { Task { await model.setProject(items, nil) } }
         rows = rows.isEmpty ? [none] : [.group(row: false, children: rows), .group(row: false, children: [none])]
         return .submenu(title: "Project", symbol: "folder", subtitle: subtitle, children: rows)
     }

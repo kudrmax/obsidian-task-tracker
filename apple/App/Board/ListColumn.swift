@@ -92,7 +92,10 @@ struct ListColumn: View {
             }
         }
         .onAppear { model.registerList(column) }
-        .onDisappear { model.dropping.remove(key) }
+        .onDisappear {
+            model.dropping.remove(key)
+            model.dropping.remove("title.\(list.column.rawValue)")
+        }
     }
 
     private func reveal(_ scroller: ScrollViewProxy) {
@@ -456,7 +459,7 @@ struct ProjectHeader: View {
             }
             Spacer(minLength: 0)
         }
-        .foregroundStyle(project.project == nil ? Palette.muted : Palette.pullInk(scheme))
+        .foregroundStyle(project.zone.isNull ? Palette.muted : Palette.pullInk(scheme))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         .padding(.leading, CardMetrics.leading)
         .padding(.trailing, 4)

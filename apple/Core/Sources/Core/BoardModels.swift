@@ -448,6 +448,8 @@ public struct MenuProject: Decodable, Hashable, Sendable {
     public let options: [MenuProjectOption]
     /// No project, last: checked when no task has one.
     public let none: Bool
+    /// The No project row's words.
+    public let noneLabel: String
     /// What the row shows beside «Project»; empty when the tasks' projects differ.
     public let value: String
     public let disabled: Bool

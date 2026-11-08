@@ -20,7 +20,8 @@ final class AppServices: Sendable {
         vault = Vault(bookmarks: UserDefaultsBookmarks(), rule: rules)
         sync = ReminderSync(vault: vault, rules: rules, notifications: UserNotifications(), alarms: Alarms(), cards: Cards(), calendar: PhoneCalendarExport(rules: rules))
         tasks = TaskCapture(vault: vault, rules: rules)
-        projects = VaultProjects(folder: vault, core: rules, remembered: UserDefaultsText(key: "projectNotes"))
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        projects = VaultProjects(folder: vault, core: Self.rules(), remembered: UserDefaultsText(key: "projectNotes"), rememberedTags: FileText(caches.appendingPathComponent("projectNoteTags.json")))
         board = TaskBoard(core: rules, vault: vault, pure: Self.rules(), grouping: UserDefaultsText(key: "projectGrouping"), projects: projects)
     }
 

@@ -144,26 +144,41 @@ public final class Vault: TasksVault, NoteFolder, @unchecked Sendable {
         }
     }
 
-    /// Every markdown note of the vault outside its hidden folders (`.obsidian`, `.trash`), in one pass of the folder; a
-    /// note iCloud keeps only in the cloud is left out.
+    /// Every markdown note of the vault outside its hidden folders (`.obsidian`, `.trash`), in one pass of the folder with
+    /// the values the walk prefetches. The text of a note `wanted` names is read coordinated, as every read of the vault; a
+    /// note iCloud keeps only in the cloud is never read (nor downloaded): it is listed by its path alone, which still
+    /// counts for the names of the others.
     public func scanNotes(wanted: (String, Date) -> Bool) throws -> [ScannedNote] {
         try withFolder { folder in
-            let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]
-            guard let walk = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return [] }
+            let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey, .isDirectoryKey, .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey]
+            guard let walk = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: keys, options: [.skipsPackageDescendants]) else { return [] }
             let root = folder.standardizedFileURL.path
             var notes: [ScannedNote] = []
-            for case let file as URL in walk where file.pathExtension.lowercased() == "md" {
+            for case let file as URL in walk {
+                let name = file.lastPathComponent
                 let values = try? file.resourceValues(forKeys: Set(keys))
-                guard values?.isRegularFile == true else { continue }
-                let full = file.standardizedFileURL.path
-                guard full.hasPrefix(root + "/") else { continue }
-                let path = String(full.dropFirst(root.count + 1))
+                if name.hasPrefix(".") {
+                    if values?.isDirectory == true { walk.skipDescendants() }
+                    // An older iCloud keeps a note not downloaded as `.Name.md.icloud` beside where it will be.
+                    else if name.lowercased().hasSuffix(".md.icloud"), let placeholder = Self.relative(file, to: root) {
+                        let path = ((placeholder as NSString).deletingLastPathComponent as NSString).appendingPathComponent(String(name.dropFirst().dropLast(7)))
+                        notes.append(ScannedNote(path: path, modified: .distantPast, text: nil))
+                    }
+                    continue
+                }
+                guard file.pathExtension.lowercased() == "md", values?.isRegularFile == true, let path = Self.relative(file, to: root) else { continue }
                 let modified = values?.contentModificationDate ?? .distantPast
-                let text = wanted(path, modified) ? try? String(contentsOf: file, encoding: .utf8) : nil
+                let local = values?.isUbiquitousItem != true || values?.ubiquitousItemDownloadingStatus == .current
+                let text = local && wanted(path, modified) ? try? coordinatedRead(file) : nil
                 notes.append(ScannedNote(path: path, modified: modified, text: text))
             }
             return notes
         }
+    }
+
+    private static func relative(_ file: URL, to root: String) -> String? {
+        let full = file.standardizedFileURL.path
+        return full.hasPrefix(root + "/") ? String(full.dropFirst(root.count + 1)) : nil
     }
 
     /// Tells `changed` whenever the tasks file is written through file coordination (iCloud, a reminder's button, another

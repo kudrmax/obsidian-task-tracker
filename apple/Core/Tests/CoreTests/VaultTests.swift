@@ -35,6 +35,19 @@ struct SettingsElsewhere: TasksFileRule {
         return vault
     }
 
+    @Test func aScanListsTheNotesOutsideTheDotFoldersAndReadsOnlyThoseWanted() throws {
+        try put("#project", "Projects/Plan.md")
+        try put("plain", "Plan.md")
+        try put("hidden", ".obsidian/Notes.md")
+        try put("trash", ".trash/Old.md")
+        try put("", "Cloud/.Plan.md.icloud")
+        try put("not a note", "image.png")
+        let notes = try vault().scanNotes(wanted: { path, _ in path == "Projects/Plan.md" })
+        #expect(Set(notes.map(\.path)) == ["Projects/Plan.md", "Plan.md", "Cloud/Plan.md"])
+        #expect(notes.first { $0.path == "Projects/Plan.md" }?.text == "#project")
+        #expect(notes.filter { $0.text != nil }.count == 1)
+    }
+
     @Test func readsTheTasksFileNamedInThePluginSettings() throws {
         let settings = #"{"tasksFile":"tasks/My.md"}"#
         try put(settings, ".obsidian/plugins/task-calendar/data.json")

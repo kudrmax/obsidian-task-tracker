@@ -383,8 +383,8 @@ extension TaskBoard {
             let corner = column == .day ? JSONValue.string(day) : .null
             let ungrouped = screen.offer["ungrouped"].string ?? ""
             let titleDrop = screen.titleDrops[column.rawValue]
-            // Only Soon and Backlog group by project: the day column of a later day shows Soon's sections, never its groups.
-            let grouping = column == .soon || column == .backlog ? screen.projects[column.rawValue] : nil
+            // The grouping the core gives the column's own list (`ScreenView.projects`): none for the day column.
+            let grouping = screen.projects[column.rawValue]
             if let grouping, grouping.on {
                 var groups: [BoardGroup] = []
                 var parts: [BoardPart] = []
@@ -398,7 +398,7 @@ extension TaskBoard {
                                 cards: try cards(section.rows, corner: corner, zone: project.zone, painter: &painter),
                                 empty: section.empty,
                                 menu: section.menu,
-                                reorder: false,
+                                reorder: section.reorder ?? false,
                                 zone: project.zone))
                         }
                     }
@@ -406,7 +406,9 @@ extension TaskBoard {
                     if project.titled { parts.append(.project(head)) }
                     parts += (first..<groups.count).map(BoardPart.section)
                 }
-                return BoardList(column: column, title: title, groups: groups, showsHeaders: true, sectioned: sections != nil, sectionsOf: sections?.list, canGroup: grouping.canGroup, grouped: true, parts: parts, titleDrop: titleDrop)
+                // As the plugin draws it: headers once any group's title or a section's header shows.
+                let headers = parts.contains { if case .project = $0 { true } else { false } } || groups.contains { $0.header != nil }
+                return BoardList(column: column, title: title, groups: groups, showsHeaders: headers, sectioned: sections != nil, sectionsOf: sections?.list, canGroup: grouping.canGroup, grouped: true, parts: parts, titleDrop: titleDrop)
             }
             let listSections = sections.flatMap { screen.sections[$0.list] } ?? []
             let view: ListView = try readRule("rules.listView", [.array(items.map(\.json)), .bool(sections != nil), try .encoding(listSections)])

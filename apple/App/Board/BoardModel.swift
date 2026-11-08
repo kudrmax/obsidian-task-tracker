@@ -90,6 +90,7 @@ final class BoardModel {
 
     /// A screen the quick entry read after its write, drawn in the same step as the entry's state for it.
     func draw(_ read: BoardSnapshot) {
+        forgetGone(read)
         snapshot = read
         problem = nil
     }
@@ -214,6 +215,7 @@ final class BoardModel {
     /// The screen drawn from `read`; the read after a drop's write in one step with the end of its carry, so the card
     /// stands in its place at once. Any other read leaves a carry as it is.
     private func show(_ read: BoardSnapshot, animated: Bool, serial: Int) {
+        forgetGone(read)
         if animated {
             withAnimation(.snappy) {
                 snapshot = read
@@ -247,10 +249,23 @@ final class BoardModel {
         if files.tasks != snapshot?.tasksText || files.settingsJSON != snapshot?.settingsJSON { await reload(animated: true) }
     }
 
+    /// The vault's project notes changed: the screen reads again, once a carry or the quick entry's writes let it.
+    func projectsChanged() async {
+        guard carried == nil, !entry.writing else {
+            readAfterCarry = true
+            projectsAsked = true
+            return
+        }
+        await reload(animated: true)
+    }
+
+    /// The project notes changed while a carry or the quick entry held the read: it reads again whatever the file did.
+    @ObservationIgnored private var projectsAsked = false
+
     /// The tasks file watched while the screen shows: a coordinated write elsewhere (iCloud, a reminder's button) reads again.
     func watchFile() {
         AppServices.shared.projects.changed = { [weak self] in
-            Task { @MainActor in await self?.reload(animated: true) }
+            Task { @MainActor in await self?.projectsChanged() }
         }
         guard watch == nil else { return }
         watch = AppServices.shared.vault.watchTasksFile { [weak self] in
@@ -385,6 +400,7 @@ final class BoardModel {
         guard let turn = dayTurn else { return }
         var instant = Transaction()
         instant.disablesAnimations = true
+        forgetGone(turn.peek)
         withTransaction(instant) {
             snapshot = turn.peek
             entry.screenChanged()
@@ -743,7 +759,12 @@ final class BoardModel {
     func readIfAsked() {
         guard readAfterCarry, carried == nil, !entry.writing else { return }
         readAfterCarry = false
-        Task { await reloadIfChanged() }
+        if projectsAsked {
+            projectsAsked = false
+            Task { await reload(animated: true) }
+        } else {
+            Task { await reloadIfChanged() }
+        }
     }
 
     /// The drag session ended, whatever came of it: a carry still standing ends now, unless its drop is still being
@@ -788,6 +809,19 @@ final class BoardModel {
     @ObservationIgnored private var geometry: [BoardColumn: ListGeometry] = [:]
     /// The last point a carry was read at over a list, so a finger standing still asks nothing.
     @ObservationIgnored private var hovered: (column: BoardColumn, point: CGPoint)?
+
+    /// The frames of cards and headers the new drawing no longer shows (a group folded, a section gone) are dropped, so a
+    /// carry never reads a header from an earlier drawing.
+    private func forgetGone(_ read: BoardSnapshot) {
+        for (column, list) in read.lists {
+            guard var shape = geometry[column] else { continue }
+            let cards = Set(list.cards.map(\.id))
+            let heads = Set(list.groups.map(\.id) + list.projects.map(\.id))
+            shape.cards = shape.cards.filter { cards.contains($0.key) }
+            shape.heads = shape.heads.filter { heads.contains($0.key) }
+            geometry[column] = shape
+        }
+    }
 
     /// A card's or a header's frame as the list lays it out; kept only while no gap is open in the list.
     func rest(_ column: BoardColumn, card id: String, _ frame: CGRect) {
