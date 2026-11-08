@@ -4,6 +4,7 @@ import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, DURATION, PROPERTY } from "./design";
+import { RenamedTexts } from "./RenamedTexts";
 import { type Box, boxOf, type DurationToken, Motion } from "./motion/Motion";
 import { clear, el, px } from "./dom";
 import { Grips } from "./kit/Grips";
@@ -34,8 +35,6 @@ export interface TimelineDeps {
 	onResize?(): void;
 	/** A block drawn, anew or again: its listeners hang on `signal`, which the next drawing aborts. */
 	onBlock?(block: HTMLElement, item: TaskItem, signal: AbortSignal): void;
-	/** Renames entered and not yet written: a block of one of these tasks shows its new text until the write is drawn. */
-	renamed?(): readonly { readonly id: string; readonly text: string }[];
 	onEvent?(block: HTMLElement, event: CalendarEvent, signal: AbortSignal): void;
 	/** A dot of the selected card taken: the stretch begins. */
 	onGrip?(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void;
@@ -682,7 +681,7 @@ export class Timeline {
 		const card = el(block, "div", "tc-block-card");
 		markColours(card, item);
 		showProgressDot(card, item);
-		fillTitle(el(card, "div", "tc-card-title"), this.deps.renamed?.().find((rename) => rename.id === item.id)?.text ?? item.text);
+		fillTitle(el(card, "div", "tc-card-title"), RenamedTexts.shown(item).text);
 		renderProjectMark(card, item);
 		renderMeta(card, item);
 		const meta = el(card, "span", "tc-block-meta is-hidden");

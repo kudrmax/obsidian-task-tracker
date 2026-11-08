@@ -46,8 +46,6 @@ export interface TaskListDeps {
 	 * the branches pass it by.
 	 */
 	renaming?(): TaskKey | null;
-	/** Renames entered and not yet written: a card of one of these tasks shows its new text until the write is drawn. */
-	renamed?(): readonly { readonly id: string; readonly text: string; readonly title: string }[];
 	/** `subtree` gives the cards of the task's subtasks at every depth: they go wherever the task goes. */
 	onCard?(card: HTMLElement, item: TaskItem, subtree: readonly HTMLElement[], signal: AbortSignal): void;
 	onHeader?(head: HTMLElement, group: ListGroup, signal: AbortSignal): void;
@@ -294,8 +292,7 @@ export class TaskList {
 		const heir = this.heirOf(item);
 		const { node, fresh, signal } = drawing.take(`task:${item.id}`, () => el(null, "div", "tc-card"), heir);
 		if (!fresh) node.replaceChildren();
-		const renamed = this.deps.renamed?.().find((rename) => rename.id === item.id);
-		fillCard(node, renamed ? { ...item, text: renamed.text, title: renamed.title } : item, { day });
+		fillCard(node, item, { day });
 		signals.set(node, signal);
 		return node;
 	}

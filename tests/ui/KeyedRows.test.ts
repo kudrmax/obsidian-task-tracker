@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { TaskItem } from "../../core/application/contracts";
 import { KeyedRows } from "../../obsidian/ui/motion/KeyedRows";
 import { TaskList } from "../../obsidian/ui/TaskList";
+import { RenamedTexts } from "../../obsidian/ui/RenamedTexts";
+import { renderTaskCard } from "../../obsidian/ui/TaskCard";
 import { Timeline } from "../../obsidian/ui/Timeline";
 import { DayBoundary } from "../../core/application/contracts";
 import { onDay } from "../fakes/itemOnDay";
@@ -72,15 +74,20 @@ describe("a list's rows live as long as their tasks", () => {
 		expect(cards[0]).not.toBe(typed);
 	});
 
-	it("draws a rename entered and not yet written under its new text, on the same card", () => {
+	it("draws a rename entered and not yet written under its new text, on the same card, and every card of the task anywhere", () => {
 		let renamed: { id: string; text: string; title: string }[] = [];
-		const list = new TaskList(document.body.appendChild(document.createElement("div")), { items: () => [task("Old name", "3")], day: () => null, renamed: () => renamed });
+		const stop = RenamedTexts.add(() => renamed);
+		const list = new TaskList(document.body.appendChild(document.createElement("div")), { items: () => [task("Old name", "3")], day: () => null });
 		list.render();
 		const card = list.cards[0].card;
 		renamed = [{ id: "3", text: "New name", title: "New name" }];
 		list.render();
 		expect(list.cards[0].card).toBe(card);
 		expect(card.textContent).toBe("New name");
+		expect(renderTaskCard(null, task("Old name", "3"), { day: null }).textContent).toBe("New name");
+		stop();
+		renamed = [];
+		expect(renderTaskCard(null, task("Old name", "3"), { day: null }).textContent).toBe("Old name");
 	});
 
 	it("keeps a section's header through a rename", () => {

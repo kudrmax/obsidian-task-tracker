@@ -45,3 +45,22 @@ describe("a glide ends exactly once, and says how", () => {
 		expect(ends).toEqual(["interrupted", "finger", "stopped"]);
 	});
 });
+
+describe("the plugin's one smooth scroll", () => {
+	afterEach(() => vi.useRealTimers());
+
+	it("calls off only its own glide: a stop kept from a glide that ended leaves the next one running", async () => {
+		vi.useFakeTimers();
+		const { scrollSmoothly } = await import("../../obsidian/ui/motion/SmoothScroll");
+		const el = scroller(1000);
+		Object.defineProperty(el, "scrollHeight", { configurable: true, get: () => 2000 });
+		Object.defineProperty(el, "clientHeight", { configurable: true, get: () => 500 });
+		el.style.setProperty("--tc-duration-collapse", "150ms");
+		const ends: string[] = [];
+		const stopFirst = scrollSmoothly(el, 200, (how) => ends.push(`first ${how}`));
+		scrollSmoothly(el, 400, (how) => ends.push(`second ${how}`));
+		stopFirst();
+		vi.advanceTimersByTime(1000);
+		expect(ends).toEqual(["first interrupted", "second arrived"]);
+	});
+});

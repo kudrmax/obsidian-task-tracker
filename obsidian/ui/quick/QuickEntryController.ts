@@ -13,6 +13,7 @@ import type { TaskMenu } from "../menu/TaskMenu";
 import type { ListEntryInput, TaskList } from "../TaskList";
 import type { Timeline } from "../Timeline";
 import type { LocalDate, Slot } from "../types";
+import { RenamedTexts } from "../RenamedTexts";
 import { PlusButton } from "./PlusButton";
 import { PlusRing } from "./PlusRing";
 import { QuickBar } from "./QuickBar";
@@ -23,13 +24,6 @@ import { WriteQueue } from "./WriteQueue";
 
 /** A list as a place to drop, and the column it is. */
 export type ColumnDrop = DropTarget & { readonly column: ListColumn };
-
-/** A rename entered and not yet written, as the entry tells it: the task's id and the text its card shows meanwhile. */
-export interface RenamedText {
-	readonly id: string;
-	readonly text: string;
-	readonly title: string;
-}
 
 /** The list columns a field types in. */
 const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox", "backlog"];
@@ -130,6 +124,8 @@ export class QuickEntryController {
 	private revealing = false;
 	/** The list riding the keyboard as it slides. */
 	private readonly glide = new ScrollGlide();
+	/** The renames typed here, told to every card drawn (`RenamedTexts`) until they are written; this ends the telling. */
+	private readonly renames: () => void;
 	private readonly scrolled = (e: Event) => {
 		const state = this.state;
 		if (!state) return;
@@ -168,6 +164,7 @@ export class QuickEntryController {
 			},
 			new WriteQueue((error) => deps.onError(error)),
 		);
+		this.renames = RenamedTexts.add(() => this.entry.renamed);
 		this.plus = new PlusButton(deps.root, { onTap: () => this.openFromPress(), onDrag: (e, source) => this.dragFromPlus(e, source), arbiter: deps.arbiter });
 		this.ring = new PlusRing(deps.root);
 		this.bar = new QuickBar(deps.root, {
@@ -295,11 +292,6 @@ export class QuickEntryController {
 		return entry ? { at: entry.at, level: entry.place.level, pending: entry.pending, section: entry.section, newSection: entry.newSection, field: (row) => this.fieldIn(row) } : null;
 	}
 
-	/** The renames entered and not yet written: each task's card shows its new text until the write is drawn (decision 46). */
-	renamed(): readonly RenamedText[] {
-		return this.entry.renamed;
-	}
-
 	/** The task being renamed, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
 	renaming(): TaskKey | null {
 		return this.entry.renaming;
@@ -368,6 +360,7 @@ export class QuickEntryController {
 		this.deps.root.removeEventListener("scroll", this.scrolled, true);
 		this.deps.root.removeEventListener("transitionend", this.settled, true);
 		this.sizeWatch.disconnect();
+		this.renames();
 		this.glide.stop();
 		this.revealing = false;
 		this.pass.cancel();

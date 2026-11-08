@@ -275,7 +275,6 @@ export class CalendarScreen extends Component {
 			pending: () => this.namingIn("day"),
 			entry: (drawing) => this.quick?.entryIn("day", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
-			renamed: () => this.quick?.renamed() ?? [],
 			onHeader: (head, group, signal) => this.groupDrag.attach(head, this.sectionsOf("day")?.list ?? "now", this.list!, group, signal),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "day", subtree, signal),
@@ -301,7 +300,6 @@ export class CalendarScreen extends Component {
 			pending: () => this.namingIn("inbox"),
 			entry: (drawing) => this.quick?.entryIn("inbox", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
-			renamed: () => this.quick?.renamed() ?? [],
 			onHeader: (head, group, signal) => this.groupDrag.attach(head, "inbox", this.inboxList!, group, signal),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "inbox", subtree, signal),
@@ -323,7 +321,6 @@ export class CalendarScreen extends Component {
 			pending: () => this.namingIn("backlog"),
 			entry: (drawing) => this.quick?.entryIn("backlog", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
-			renamed: () => this.quick?.renamed() ?? [],
 			onHeader: (head, group, signal) => this.groupDrag.attach(head, "backlog", this.backlogList!, group, signal),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "backlog", subtree, signal),
@@ -341,7 +338,6 @@ export class CalendarScreen extends Component {
 			pending: () => this.namingIn("soon"),
 			entry: (drawing) => this.quick?.entryIn("soon", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
-			renamed: () => this.quick?.renamed() ?? [],
 			onHeader: (head, group, signal) => this.groupDrag.attach(head, "soon", this.soonList!, group, signal),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "soon", subtree, signal),
@@ -373,7 +369,6 @@ export class CalendarScreen extends Component {
 			isPast: (event) => this.deps.calendars.isPast(event),
 			now: () => this.deps.clock.now(),
 			onResize: () => this.fitWholeDay(),
-			renamed: () => this.quick?.renamed() ?? [],
 			onBlock: (block, item, signal) => {
 				this.found.attach(block, item);
 				this.arriving.attach(block, item);

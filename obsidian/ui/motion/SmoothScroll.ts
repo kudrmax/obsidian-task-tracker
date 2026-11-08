@@ -23,13 +23,15 @@ export function scrollSmoothly(scroller: HTMLElement, top: number, done: (how: G
 		done(Math.abs(scroller.scrollTop - top) < 1 ? "arrived" : "blocked");
 		return () => undefined;
 	}
+	/** This glide is the scroller's own until it ends, however it ends: calling it off after that touches no later glide. */
+	let running = true;
 	const finger = () => glide.stop("finger");
 	for (const type of FINGER) scroller.addEventListener(type, finger, { passive: true });
 	glide.start(scroller, to, { ms, ease: easingOf(getComputedStyle(scroller).getPropertyValue(EASING.out)), rise: 0 }, () => undefined, (how) => {
+		running = false;
 		for (const type of FINGER) scroller.removeEventListener(type, finger);
 		done(how === "arrived" && Math.abs(to - top) >= 1 ? "blocked" : how);
 	});
-	let running = true;
 	return () => {
 		if (!running) return;
 		running = false;
