@@ -144,6 +144,14 @@ final class QuickEntryHost {
     }
 
     /// The bar's sheet went: the field takes the keyboard again.
+    /// The row a field opened in stands open: the field takes the keyboard.
+    private func standsOpen() {
+        guard keyboardWhenOpen else { return }
+        keyboardWhenOpen = false
+        if isOpen { field.begin() }
+    }
+    @ObservationIgnored private var keyboardWhenOpen = false
+
     func resume() {
         paused = false
         if isOpen { field.begin() }
@@ -348,7 +356,7 @@ final class QuickEntryHost {
     private func call(_ method: String, _ arguments: [JSONValue], animated: Bool = true) -> JSONValue? {
         guard let reply = answer(method, arguments) else { return nil }
         if animated {
-            withAnimation(.snappy) { apply(reply) }
+            withAnimation(.snappy, completionCriteria: .logicallyComplete) { apply(reply) } completion: { [weak self] in self?.standsOpen() }
         } else {
             var instant = Transaction()
             instant.disablesAnimations = true
@@ -360,7 +368,7 @@ final class QuickEntryHost {
     /// A call for its answer; `keep` draws the session it leaves too.
     private func value(_ method: String, _ arguments: [JSONValue], keep: Bool = false) -> JSONValue? {
         guard let reply = answer(method, arguments) else { return nil }
-        if keep { withAnimation(.snappy) { apply(reply) } }
+        if keep { withAnimation(.snappy, completionCriteria: .logicallyComplete) { apply(reply) } completion: { [weak self] in self?.standsOpen() } }
         return reply["value"]
     }
 
@@ -386,7 +394,9 @@ final class QuickEntryHost {
         field.placeholder = next.namesSection ? "Section name" : nil
         placeField(over: snapshot)
         if before == nil || before?.spot != next.spot || before?.pending.count != next.pending.count || before?.section != next.section { moved += 1 }
-        field.begin()
+        // A field just opened takes the keyboard once it stands open: taking it holds the screen's frames (the keyboard's
+        // views reload), which would swallow the row opening and leave the plus's copy faded over nothing.
+        if before == nil { keyboardWhenOpen = true } else { field.begin() }
     }
 
     /// Where the field stands in each list, and on the calendar, for the screen as it is about to be drawn.
@@ -628,14 +638,22 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
         frame = parking.bounds
     }
 
-    /// The keyboard taken; while a drop or a menu still holds the screen the system refuses it, and it is asked again a
-    /// moment later.
+    /// The keyboard taken once the frame that shows the field is on the screen: taking it reloads the keyboard's views
+    /// and holds the commit it is made in, so taken in the drawing that opens the field it held that frame for a third of
+    /// a second. While a drop or a menu still holds the screen the system refuses it, and it is asked again a moment later.
     private func take(tries: Int = 12) {
-        guard wanted, !isFirstResponder else { return }
-        if window != nil, becomeFirstResponder() { return }
-        guard tries > 0 else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.take(tries: tries - 1) }
+        guard wanted, !isFirstResponder, !taking else { return }
+        taking = true
+        NextFrame.run { [weak self] in
+            guard let self else { return }
+            self.taking = false
+            guard self.wanted, !self.isFirstResponder else { return }
+            if self.window != nil, self.becomeFirstResponder() { return }
+            guard tries > 0 else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.take(tries: tries - 1) }
+        }
     }
+    private var taking = false
 
     func end() {
         wanted = false
@@ -1035,5 +1053,31 @@ struct EntryDateSheet: View {
             let chosen = host.state?.places.first { $0["kind"].string == "date" }?["date"].string
             date = chosen.flatMap(LocalDay.date) ?? Date()
         }
+    }
+}
+
+/// Runs once the frame being drawn now is on the screen: at the next refresh of the display, after the commit.
+@MainActor
+final class NextFrame: NSObject {
+    private var body: (() -> Void)?
+    private var link: CADisplayLink?
+    private static var waiting: Set<NextFrame> = []
+
+    static func run(_ body: @escaping @MainActor () -> Void) {
+        let next = NextFrame()
+        next.body = body
+        let link = CADisplayLink(target: next, selector: #selector(tick))
+        next.link = link
+        waiting.insert(next)
+        link.add(to: .main, forMode: .common)
+    }
+
+    @objc private func tick() {
+        link?.invalidate()
+        link = nil
+        Self.waiting.remove(self)
+        let body = self.body
+        self.body = nil
+        body?()
     }
 }

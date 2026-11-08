@@ -7,7 +7,6 @@ import SwiftUI
 struct TimelineColumn: View {
     let timeline: BoardTimeline
     @Bindable var model: BoardModel
-    @Binding var question: MenuQuestion?
     @State private var position: ScrollPosition
     @State private var opened: Bool
     @State private var pinch: Pinch?
@@ -20,10 +19,9 @@ struct TimelineColumn: View {
     private var visible: CGFloat { zoom.visible }
     private var range: [Double] { zoom.range }
 
-    init(timeline: BoardTimeline, model: BoardModel, question: Binding<MenuQuestion?>) {
+    init(timeline: BoardTimeline, model: BoardModel) {
         self.timeline = timeline
         self.model = model
-        _question = question
         // A day slid in opens where the core says from its first frame, at the zoom shown: no frame at the top first.
         let top = model.zoom.openingTop(timeline)
         _position = State(initialValue: ScrollPosition(y: top ?? 0))
@@ -227,7 +225,7 @@ struct TimelineColumn: View {
         // One card in and out of Select Tasks: the calendar's cannot be picked, so they dim and take no touch.
         return CardButton(
             card: slot.card,
-            menu: { later in selecting ? nil : model.cardMenu(slot.card.item, ask: { question = $0 }, later: later) },
+            menu: { later in selecting ? nil : model.cardMenu(slot.card.item, later: later) },
             ringed: model.found == slot.id,
             height: tall,
             draggable: !selecting,

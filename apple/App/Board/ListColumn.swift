@@ -9,7 +9,6 @@ struct ListColumn: View {
     let list: BoardList
     @Bindable var model: BoardModel
     var dayArrows = false
-    @Binding var question: MenuQuestion?
 
     private static let space = "list"
     /// Room after the last row, so the last card scrolls over the keyboard.
@@ -46,7 +45,7 @@ struct ListColumn: View {
                                     EmptyPlate(hot: gap?.group == group.name && gap?.line == nil) { model.entry.openIn(column, group.name) }
                                         .transition(.identity)
                                 case .card(let card):
-                                    CardRow(card: card, column: column, model: model, question: $question)
+                                    CardRow(card: card, column: column, model: model)
                                         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, card: card.id, $0) }
                                         .transition(.identity)
                                 case .gap:
@@ -470,7 +469,6 @@ struct CardRow: View {
     let card: BoardCard
     let column: BoardColumn
     @Bindable var model: BoardModel
-    @Binding var question: MenuQuestion?
 
     var body: some View {
         let waiting = model.isWaiting(card)
@@ -487,7 +485,7 @@ struct CardRow: View {
             // One card in and out of Select Tasks: the circle slides in beside it and it makes room, never a new card.
             CardButton(
                 card: card,
-                menu: { later in selecting ? nil : model.cardMenu(card.item, ask: { question = $0 }, later: later) },
+                menu: { later in selecting ? nil : model.cardMenu(card.item, later: later) },
                 ringed: model.found == card.id,
                 draggable: !selecting,
                 carried: folded || model.isHidden(card),
