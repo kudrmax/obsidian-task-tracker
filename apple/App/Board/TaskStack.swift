@@ -12,6 +12,8 @@ struct TaskStack: View {
     let cards: [String: BoardCard]
     /// Under the task's own card (the calendar's stack): the subtasks one level in, branching from it.
     var underCard = false
+    /// The full screen's subtasks: a circle before each ticks it done in place, and again opens it.
+    var ticks = false
     let menu: (TaskItem, _ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?
 
     var body: some View {
@@ -89,10 +91,41 @@ struct TaskStack: View {
     private func subtask(_ row: FullRow, level: Int, branch: Branch?) -> some View {
         let drawn = cards[row.item.id]
         let card = BoardCard(item: row.item, level: level, branch: level > 0 ? branch : nil, due: drawn?.due, repeats: drawn?.repeats ?? row.item.repeats, paint: drawn?.paint, parts: drawn?.parts)
-        return CardButton(card: card, menu: { later in menu(row.item, later) }, draggable: false, onLink: { model.openLink($0) }, onProject: model.projectOpener(row.item))
-            .frame(height: CardMetrics.height)
-            .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
-            .padding(.leading, CGFloat(level) * CardMetrics.indent)
+        return HStack(spacing: Self.tickGap) {
+            if ticks { TickCircle(item: row.item) { Task { await model.write("tasks.toggleDone", [row.item.key.json]) } } }
+            CardButton(card: card, menu: { later in menu(row.item, later) }, draggable: false, onLink: { model.openLink($0) }, onProject: model.projectOpener(row.item))
+                .frame(height: CardMetrics.height)
+        }
+        .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
+        .padding(.leading, CGFloat(level) * CardMetrics.indent)
+    }
+}
+
+extension TaskStack {
+    static let tickGap: CGFloat = 8
+}
+
+/// The full screen's circle before a subtask, as the plugin's: empty while it is open; filled with a check once done, with
+/// a cross once dropped, the card crossed out and left in its place. A tap ticks it done or opens it again.
+struct TickCircle: View {
+    let item: TaskItem
+    let toggle: () -> Void
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Button {
+            UISelectionFeedbackGenerator().selectionChanged()
+            toggle()
+        } label: {
+            Image(systemName: item.open ? "circle" : item.status == "done" ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(item.open ? Color(.tertiaryLabel) : Palette.accent(scheme))
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 24, height: CardMetrics.height)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.open ? "Mark as done" : "Open again")
     }
 }
 

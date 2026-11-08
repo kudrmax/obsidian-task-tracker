@@ -1,16 +1,18 @@
 import Core
 import SwiftUI
 
-/// Search, the plugin's: fuzzy, over titles and descriptions, in every list. The field stands at the bottom as iOS 26
-/// puts it; a find is shown in its list's group, the matching letters bold in the accent, and a tap takes the ribbon to it.
+/// Search, the plugin's: fuzzy, over titles and descriptions and the projects' names, in every list. The field stands at
+/// the bottom as iOS 26 puts it; a find is its card, as the plugin's search draws it (colours, date, counter, marks), the
+/// found pieces picked out, the project's name or the description's line under the title where the query was found
+/// there. A tap takes the ribbon to the task, ringed and scrolled into sight.
 struct SearchScreen: View {
     @Bindable var model: BoardModel
     @State private var query = ""
     @State private var groups: [SearchGroup] = []
+    @State private var cards: [String: BoardCard] = [:]
     @State private var names: [String: String] = [:]
     @State private var focused = true
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         NavigationStack {
@@ -21,7 +23,7 @@ struct SearchScreen: View {
                             Button { Task { await model.reveal(hit.item); dismiss() } } label: { row(hit) }
                                 .buttonStyle(.plain)
                                 .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 1, leading: 16, bottom: 1, trailing: 16))
+                                .listRowInsets(EdgeInsets(top: CardMetrics.gap / 2, leading: Layout.margin, bottom: CardMetrics.gap / 2, trailing: Layout.margin))
                         }
                     }
                 }
@@ -37,7 +39,11 @@ struct SearchScreen: View {
             .onChange(of: focused) { if !focused, query.isEmpty { dismiss() } }
             .task(id: query) {
                 try? await Task.sleep(for: .milliseconds(150))
-                groups = (try? await model.read("tasks.search", [.string(query)] + (model.projectLink.map { [JSONValue.string($0)] } ?? []))) ?? []
+                let found: [SearchGroup] = (try? await model.read("tasks.search", [.string(query)] + (model.projectLink.map { [JSONValue.string($0)] } ?? []))) ?? []
+                let drawn = await model.cards(found.flatMap(\.hits).map { ListRow(item: $0.item, level: 0) })
+                guard !Task.isCancelled else { return }
+                cards = Dictionary(drawn.map { ($0.item.id, $0) }, uniquingKeysWith: { first, _ in first })
+                groups = found
                 for group in groups where names[group.list] == nil {
                     names[group.list] = try? await model.read("tasks.listName", [.string(group.list)])
                 }
@@ -46,28 +52,7 @@ struct SearchScreen: View {
     }
 
     private func row(_ hit: SearchHit) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            parts(hit.title.isEmpty ? [FoundPart(text: hit.item.text, match: false)] : hit.title)
-                .font(.system(size: CardMetrics.title))
-                .lineLimit(1)
-            if let description = hit.description {
-                HStack(spacing: 6) {
-                    Image(systemName: "text.alignleft").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
-                    parts(description).font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(1)
-                }
-            }
-        }
-        .padding(.leading, CardMetrics.leading)
-        .padding(.trailing, CardMetrics.trailing)
-        .padding(.vertical, hit.description == nil ? 0 : 6)
-        .frame(maxWidth: .infinity, minHeight: CardMetrics.height, alignment: .leading)
-        .background(Palette.card(scheme), in: .rect(cornerRadius: CardMetrics.radius))
-    }
-
-    private func parts(_ parts: [FoundPart]) -> Text {
-        parts.reduce(Text("")) { text, part in
-            text + (part.match ? Text(part.text).bold().foregroundColor(Palette.accent(scheme)) : Text(part.text))
-        }
+        TaskCapsule(card: cards[hit.item.id] ?? BoardCard(item: hit.item, level: 0, branch: nil, due: nil, repeats: hit.item.repeats, paint: nil), found: hit)
     }
 }
 

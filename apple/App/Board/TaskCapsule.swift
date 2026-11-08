@@ -19,12 +19,17 @@ struct TaskCapsule: View {
     var onLinks: (([CardLink]) -> Void)?
     /// Where the project's folder mark is drawn: a tap there opens the project's note.
     var onFolder: ((CGRect) -> Void)?
+    /// A search's find: the found pieces picked out of the title, and the project's name or the description's line under
+    /// it where the query was found there, as the plugin's search draws its cards.
+    var found: SearchHit?
 
     @Environment(\.colorScheme) private var scheme
 
     private static let space = "capsule"
     /// On the timeline the card's content stands at its top, the corner beside the title's first line.
     private var onTimeline: Bool { card.corner != nil || height != CardMetrics.height }
+    /// The line a find shows under the title: the project's name when the query was found there, else the description's.
+    private var snippet: [FoundPart]? { found.flatMap { $0.project ?? $0.description } }
 
     var body: some View {
         HStack(alignment: onTimeline || whole ? .top : .center, spacing: 6) {
@@ -34,6 +39,8 @@ struct TaskCapsule: View {
                 title
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, alignment: .leading)
+            } else if let found {
+                foundTitle(found)
             } else {
                 // The title never widens the card: it runs on past the room and fades out over its last points.
                 Color.clear
@@ -54,10 +61,10 @@ struct TaskCapsule: View {
         }
         .padding(.leading, CardMetrics.leading)
         .padding(.trailing, CardMetrics.trailing)
-        .padding(.top, onTimeline || whole ? (CardMetrics.height - CardMetrics.titleLine) / 2 : 0)
-        .padding(.bottom, whole ? (CardMetrics.height - CardMetrics.titleLine) / 2 : 0)
-        .frame(maxWidth: .infinity, minHeight: max(height, CardMetrics.height), maxHeight: onTimeline || whole ? .infinity : CardMetrics.height, alignment: onTimeline || whole ? .top : .center)
-        .frame(height: whole ? nil : max(height, CardMetrics.height), alignment: .top)
+        .padding(.top, onTimeline || whole ? (CardMetrics.height - CardMetrics.titleLine) / 2 : snippet == nil ? 0 : Self.snippetPad)
+        .padding(.bottom, whole ? (CardMetrics.height - CardMetrics.titleLine) / 2 : snippet == nil ? 0 : Self.snippetPad)
+        .frame(maxWidth: .infinity, minHeight: max(height, CardMetrics.height), maxHeight: onTimeline || whole || snippet != nil ? .infinity : CardMetrics.height, alignment: onTimeline || whole ? .top : .center)
+        .frame(height: whole || snippet != nil ? nil : max(height, CardMetrics.height), alignment: .top)
         .background(alignment: .topLeading) {
             if card.item.inProgress, !selecting {
                 Circle().fill(metaInk(shades)).frame(width: 4, height: 4)
@@ -85,6 +92,53 @@ struct TaskCapsule: View {
         .contentShape(.rect(cornerRadius: CardMetrics.radius))
         .coordinateSpace(.named(Self.space))
     }
+
+    /// A find's title: the found pieces picked out as the plugin's search marks them (the selection's ground, semibold),
+    /// fading at the end; under it the project's name or the description's line it was found in, small and muted.
+    private func foundTitle(_ hit: SearchHit) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Color.clear
+                .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, maxHeight: CardMetrics.titleLine)
+                .overlay(alignment: .leading) {
+                    marked(hit.title.isEmpty ? [FoundPart(text: card.item.title, match: false)] : hit.title, size: CardMetrics.title)
+                        .font(.system(size: CardMetrics.title))
+                        .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
+                        .strikethrough(card.item.closed, color: Palette.muted)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+                .mask(fadeMask)
+            if let snippet {
+                Color.clear
+                    .frame(maxWidth: .infinity, minHeight: Self.snippetLine, maxHeight: Self.snippetLine)
+                    .overlay(alignment: .leading) {
+                        marked(snippet, size: Self.snippetFont).font(.system(size: Self.snippetFont)).foregroundStyle(Palette.muted).lineLimit(1).fixedSize()
+                    }
+                    .mask(fadeMask)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Found pieces in a line: the found ones on the selection's ground, semibold (`mark.tc-hit`).
+    private func marked(_ parts: [FoundPart], size: CGFloat) -> Text {
+        var text = AttributedString()
+        for part in parts {
+            var piece = AttributedString(part.text)
+            if part.match {
+                piece.backgroundColor = Palette.selection(scheme)
+                piece.font = .system(size: size, weight: .semibold)
+            }
+            text += piece
+        }
+        return Text(text)
+    }
+
+    /// The snippet's type and line (`--tc-font-block`, `--tc-leading-block`), and the room over and under a card that
+    /// has one (`--tc-space-6`).
+    private static let snippetFont: CGFloat = 12
+    private static let snippetLine: CGFloat = 15
+    private static let snippetPad: CGFloat = 6
 
     /// The title as the plugin's card writes it: the text as typed, each link by its word in the accent.
     private var title: Text {

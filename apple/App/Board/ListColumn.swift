@@ -91,9 +91,15 @@ struct ListColumn: View {
                     width = $0
                     model.rest(column, width: $0)
                 }
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(key, visible: $0) }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    model.dropping.move(key, visible: $0)
+                    shown = $0
+                }
                 // The field stays in sight: when it opens or moves, and when the keyboard takes the bottom of the list.
                 .onChange(of: model.entry.moved) { reveal(scroller) }
+                // The card the search led to is scrolled into sight, and nothing more, as the plugin's `FoundCard`.
+                // Once the list has laid the card out: a group the find unfolded draws it in this same pass.
+                .onChange(of: model.found) { showFound(tries: 10) }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { _ in reveal(scroller) }
             }
         }
@@ -103,6 +109,24 @@ struct ListColumn: View {
             model.dropping.scrolls(key) { dy in spot.scroll(by: dy, trailing: ListColumn.trailingRoom) { position.wrappedValue.scrollTo(y: $0) } }
         }
         .onDisappear { model.dropping.remove(key) }
+    }
+
+    /// Where the list shows on the screen.
+    @State private var shown: CGRect = .zero
+
+    /// The card the search led to is scrolled into sight, and nothing more, as the plugin's `FoundCard`: a card already
+    /// whole between the list's soft top and the tab bar stays; another comes to the middle of what shows.
+    private func showFound(tries: Int) {
+        guard let found = model.found, list.cards.contains(where: { $0.id == found }) else { return }
+        guard tries < 10, let frame = model.restFrame(list.column, card: found) else {
+            if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { showFound(tries: tries - 1) } }
+            return
+        }
+        let room = min(shown.maxY, model.dropping.floor ?? .infinity) - shown.minY
+        let top = frame.minY - scroll.reach.offset
+        guard top < SoftEdges.fade || top + frame.height > room - SoftEdges.fade else { return }
+        let y = min(max(0, frame.midY - room / 2), scroll.reach.most)
+        withAnimation(.snappy) { position.scrollTo(y: y) }
     }
 
     private func reveal(_ scroller: ScrollViewProxy) {
@@ -787,7 +811,7 @@ struct SelectionCircle: View {
 /// plugin's lists do; a list at its top shows no fade there. iOS's own soft scroll edge shows only under the system's bars,
 /// and these columns scroll under their own titles: a mask of the same kind. `trailing` is room at the end of the content
 /// that holds nothing (a list's space to scroll its last card over the keyboard): no fade for it.
-private struct SoftEdges: ViewModifier {
+struct SoftEdges: ViewModifier {
     var trailing: CGFloat = 0
     @State private var edges = Edges()
     static var fade: CGFloat { CardMetrics.height / 2 }

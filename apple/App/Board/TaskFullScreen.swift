@@ -2,20 +2,25 @@ import Core
 import SwiftUI
 import UIKit
 
-/// One task on the whole screen: where it lies, its title, every subtask as the same capsules, and its description,
-/// typed straight in and saved by itself. A navigation page: back by the glass arrow or a swipe from the edge.
+/// One task on the whole screen, as the plugin's: over a subtask's title the task it belongs to (a tap goes one level up),
+/// its title, every subtask as the same capsules with the circle that ticks it done in place, and its description, drawn
+/// as it reads (links tappable) and typed straight in, saved by itself. Close goes back to the main screen from any depth;
+/// a task gone from its place (done, moved, deleted, here or elsewhere) gives way to the one under it, or closes.
 struct TaskFullScreen: View {
     let item: TaskItem
     @Bindable var model: BoardModel
     @State private var current: TaskItem?
     @Environment(\.colorScheme) private var scheme
     @State private var tree: FullTree?
-    @State private var listName = ""
     @State private var text = ""
     @State private var draft: JSONValue = .null
     @State private var saving: Task<Void, Never>?
     @State private var question: MenuQuestion?
     @FocusState private var typing: Bool
+    /// The description is being typed: the editor shows in place of the drawn text.
+    @State private var editing = false
+    /// The page has finished coming in.
+    @State private var settled = false
     /// The text last put in the editor from the file: a change to anything else is typing.
     @State private var placed = ""
 
@@ -25,31 +30,39 @@ struct TaskFullScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(listName).font(.subheadline).foregroundStyle(.secondary)
+                    if let parent = task.parentText { parentLine(parent) }
                     if renamesTitle {
                         EntryCapsule(host: model.entry, style: .title)
                     } else {
-                        Text(task.text).font(.title2.bold()).strikethrough(task.closed)
+                        TitleText(parts: model.ruleNow("rules.textParts", [.string(task.text)]) ?? [TextPart(text: task.text)])
+                            .font(.title2.bold())
+                            .strikethrough(task.closed)
                     }
                 }
-                TaskStack(task: task, model: model, tree: tree, cards: cards) { item, later in menu(for: item, later: later) }
-                TextEditor(text: $text)
-                    .focused($typing)
-                    .font(.body)
-                    .scrollDisabled(true)
-                    .frame(minHeight: 200)
-                    .scrollContentBackground(.hidden)
-                    .onChange(of: text) { if text != placed { typed() } }
+                TaskStack(task: task, model: model, tree: tree, cards: cards, ticks: true) { item, later in menu(for: item, later: later) }
+                description
             }
             .padding(.horizontal, Layout.margin)
         }
+        .navigationBarBackButtonHidden(true)
         .toolbar {
-            if model.entry.isOpen {
-                // While a task is typed the page's buttons give way to the check that ends typing, as on the main screen.
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Close", systemImage: "xmark") { close() }
+                    .tint(.primary)
+            }
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Undo", systemImage: "arrow.uturn.backward") { Task { await model.undo() } }
+                    .disabled(model.snapshot?.canUndo != true)
+                    .tint(.primary)
+            }
+            if model.entry.isOpen || editing {
+                // While a task or the description is typed the page's buttons give way to the check that ends typing.
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done", systemImage: "checkmark") { model.entry.blur() }
-                        .buttonStyle(.glassProminent)
-                        .tint(Palette.accent(scheme))
+                    Button("Done", systemImage: "checkmark") {
+                        if editing { typing = false } else { model.entry.blur() }
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(Palette.accent(scheme))
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -67,12 +80,22 @@ struct TaskFullScreen: View {
             }
         }
         .animation(.snappy, value: model.entry.isOpen)
+        .animation(.snappy, value: editing)
+        .onChange(of: typing) { if !typing { editing = false } }
         .overlay(alignment: .bottom) { NoteSuggestions(host: model.entry) }
         // A page of its own: no columns, no tab bar, no calendar, as the design has it.
         .toolbar(.hidden, for: .tabBar)
         .menuQuestions($question, model: model)
         .task { await open() }
-        .onAppear { follow() }
+        .onAppear {
+            follow()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { settled = true }
+            // Description (Add description) opens the page with the caret in the description.
+            if model.describing == item.id {
+                model.describing = nil
+                editing = true
+            }
+        }
         .onChange(of: model.snapshot?.tasksText) { Task { await refresh() } }
         .onDisappear {
             // Back is a tap elsewhere: what was typed in the stack is written.
@@ -117,8 +140,13 @@ struct TaskFullScreen: View {
 
     /// The task as the file now has it, its subtasks and menu; a change made elsewhere reaches the editor unless it is in use.
     private func refresh() async {
-        await readStack()()
-        listName = (try? await model.read("tasks.listName", [.string(task.list)])) ?? ""
+        // Gone from its place: the page gives way to the one under it, or the screen closes. A read that failed leaves it.
+        let found: TaskItem?? = try? await model.read("tasks.find", [task.key.json, .string(task.text)]) as TaskItem?
+        if case .some(.none) = found { return leave() }
+        let stack = await TaskStack.read(task, model: model)
+        if let found = stack.task { current = found }
+        tree = stack.tree
+        cards = stack.cards
         menuModel = await model.menu(for: task, from: "full")
         var menus: [String: TaskMenuModel] = [:]
         for row in tree?.rows ?? [] { menus[row.item.id] = await model.menu(for: row.item, from: "full") }
@@ -143,7 +171,72 @@ struct TaskFullScreen: View {
 
     /// The caret goes into the description, as the plugin's Description on its own page.
     private func describeLater() {
-        typing = true
+        editing = true
+    }
+
+    /// The page's place in the screens over the board.
+    private var depth: Int? { model.fullScreen.lastIndex(of: item) }
+
+    /// Back to the main screen, however deep, as the plugin's Close.
+    private func close() {
+        typing = false
+        editing = false
+        model.fullScreen.removeAll()
+    }
+
+    /// The task is gone: this page and every one over it give way to the one under it; none, and the screen closes.
+    private func leave() {
+        guard let depth else { return }
+        model.fullScreen.removeSubrange(depth...)
+    }
+
+    /// One level up: back to the page it was opened from, or its task read where it stands.
+    private func up() async {
+        guard let depth else { return }
+        if depth > 0 {
+            model.fullScreen.removeSubrange(depth...)
+            return
+        }
+        guard let parentKey = task.parentKey, let parentText = task.parentText,
+              let parent: TaskItem = try? await model.read("tasks.find", [parentKey.json, .string(parentText)]) else { return }
+        model.fullScreen = [parent]
+    }
+
+    /// Over a subtask's title: the task it lies in, its title as a card writes it; a tap goes one level up.
+    private func parentLine(_ parent: String) -> some View {
+        Button { Task { await up() } } label: {
+            Label {
+                TitleText(parts: model.ruleNow("rules.textParts", [.string(parent)]) ?? [TextPart(text: parent)])
+                    .lineLimit(1)
+            } icon: {
+                Image(systemName: "arrow.turn.left.up")
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Goes to the task this one belongs to")
+    }
+
+    /// The description: drawn as it reads, links tappable, until a tap in it puts the caret there; typed, it saves itself.
+    @ViewBuilder private var description: some View {
+        if editing {
+            TextEditor(text: $text)
+                .focused($typing)
+                .font(.body)
+                .scrollDisabled(true)
+                .frame(minHeight: 200, alignment: .topLeading)
+                .scrollContentBackground(.hidden)
+                .onChange(of: text) { if text != placed { typed() } }
+                // The caret goes in once the editor stands: after the page's push when it opened typing.
+                .task {
+                    try? await Task.sleep(for: .milliseconds(settled ? 50 : 600))
+                    typing = true
+                }
+        } else {
+            DescriptionText(markdown: text, open: { model.openLink($0) }) { editing = true }
+                .frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
+        }
     }
 
     private func place(_ new: String) {

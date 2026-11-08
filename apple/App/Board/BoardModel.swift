@@ -173,6 +173,14 @@ final class BoardModel {
     var repeatFor: TaskItem?
     var newSection: TaskItem?
     var fullScreen: [TaskItem] = []
+    /// The full screen opened by Description (Add description): its page opens with the caret in the description.
+    var describing: String?
+
+    /// Description in a menu: the task on the whole screen, typing its description, as the plugin's Add description.
+    func describe(_ item: TaskItem) {
+        describing = item.id
+        fullScreen.append(item)
+    }
 
     /// A read asked for while one runs: it runs again once that one ends, so the screen always ends on the latest ask.
     private var readAgain = false
@@ -515,6 +523,8 @@ final class BoardModel {
     func openDone() async {
         await readDone()
         withAnimation(.snappy) { doneShown = true }
+        // The tab bar names the nearest place: Inbox, beside the Done column.
+        place = .inbox
         asked = PlaceAsk(place: .inbox, done: true)
     }
 
@@ -1020,6 +1030,11 @@ final class BoardModel {
     func rest(_ column: BoardColumn, card id: String, _ frame: CGRect) {
         guard settling?.column != column else { return }
         geometry[column, default: ListGeometry()].cards[id] = frame
+    }
+
+    /// A card's frame as its list last laid it out, in the list's content space.
+    func restFrame(_ column: BoardColumn, card id: String) -> CGRect? {
+        geometry[column]?.cards[id]
     }
 
     func rest(_ column: BoardColumn, head id: String, _ frame: CGRect) {

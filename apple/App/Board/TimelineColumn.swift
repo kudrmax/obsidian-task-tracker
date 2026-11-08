@@ -72,6 +72,7 @@ struct TimelineColumn: View {
                     reveal(hour)
                 }
                 .onChange(of: model.entry.moved) { reveal(hour) }
+                .onChange(of: model.found) { showFound(hour) }
                 .onChange(of: model.dayMoved) {
                     opened = false
                     open()
@@ -195,6 +196,18 @@ struct TimelineColumn: View {
             withAnimation(.snappy) { position.scrollTo(y: bottom - visible) }
         } else if top < scroll.y {
             withAnimation(.snappy) { position.scrollTo(y: max(0, top - 16)) }
+        }
+    }
+
+    /// The card the search led to is scrolled into sight, and nothing more, as the plugin's `FoundCard`.
+    private func showFound(_ hour: CGFloat) {
+        guard let found = model.found, visible > 0, let slot = model.stacked(timeline, hour: hour).first(where: { $0.id == found }) else { return }
+        let top = y(0, hour) + CGFloat(slot.box.top)
+        let bottom = top + max(CardMetrics.height, CGFloat(slot.box.height))
+        if top < scroll.y {
+            withAnimation(.snappy) { position.scrollTo(y: max(0, top - SoftEdges.fade)) }
+        } else if bottom > scroll.y + visible {
+            withAnimation(.snappy) { position.scrollTo(y: min(top - SoftEdges.fade, bottom - visible + SoftEdges.fade)) }
         }
     }
 

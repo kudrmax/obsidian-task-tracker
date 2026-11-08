@@ -29,7 +29,7 @@ struct BoardScreen: View {
                     if model.selecting { selectionBar } else if let project = model.project { projectBar(project) } else { mainBar }
                 }
                 .navigationBarTitleDisplayMode(.inline)
-                .navigationDestination(for: TaskItem.self) { item in TaskFullScreen(item: item, model: model) }
+                .navigationDestination(for: TaskItem.self) { item in TaskFullScreen(item: item, model: model).id(item.id) }
         }
         .overlay {
             // The tab bar hides while a task is typed, as in every app.

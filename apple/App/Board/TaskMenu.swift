@@ -106,7 +106,7 @@ struct TaskMenu {
                     .action(title: ReminderWords.title(reminder.kind), symbol: nil, checked: reminder.checked) { Task { await model.setReminder(item, reminder.kind) } }
                 }))
             case "description" where single:
-                rows.append(.action(title: "Description", symbol: "text.alignleft", opens: true) { if let describe { describe() } else { model.fullScreen.append(item) } })
+                rows.append(.action(title: "Description", symbol: "text.alignleft", opens: true) { if let describe { describe() } else { model.describe(item) } })
             case "repeat" where single:
                 rows.append(.action(title: "Repeat…", symbol: "repeat", opens: true, subtitle: repeatValue) { model.repeatFor = item })
             case "section":
