@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../core/application/contracts";
 import { FoundCard } from "../../obsidian/ui/FoundCard";
 
-const task = (raw: string, index = 0) => ({ key: { section: "soon", index, path: [], raw } }) as unknown as TaskItem;
+const task = (raw: string, index = 0) => ({ id: raw.slice(6), key: { section: "soon", index, path: [], raw } }) as unknown as TaskItem;
 
 describe("FoundCard", () => {
 	it("rings the found task's card, and its new card after a redraw", () => {

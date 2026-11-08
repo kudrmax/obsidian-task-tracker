@@ -15,6 +15,13 @@ function open() {
 }
 
 describe("GroupMenu", () => {
+	it("opens in the window of the header it belongs to, a popout's too", () => {
+		const popout = document.implementation.createHTMLDocument("popout");
+		const head = popout.body.appendChild(popout.createElement("div"));
+		GroupMenu.open(head, { name: "Экскурсия", onRename: () => {} });
+		expect(popout.querySelector(".tc-backdrop")).not.toBeNull();
+	});
+
 	it("two rows, Rename and Remove section, in that order", () => {
 		expect(open().rows.map((r) => r.querySelector(".tc-menu-label")?.textContent)).toEqual(["Rename", "Remove section"]);
 	});

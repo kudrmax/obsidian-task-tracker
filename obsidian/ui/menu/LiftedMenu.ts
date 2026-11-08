@@ -4,6 +4,9 @@ import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel, Picks } from "../kit/Panel";
 import { grownStart, roomWidth, type Size, windowRoom } from "../wholeCard";
 import { type CloseHow, Overlay } from "./Overlay";
+
+/** How a window takes over the sheet of the one it replaces: its own close handed in, the overlay it now owns handed back. */
+export type Sheet = (onClose: (how: CloseHow) => void) => Overlay;
 import { scrollIntoColumn, shownPart, topInside } from "./inView";
 import { menuRoom, placePanel } from "./MenuPanel";
 
@@ -18,7 +21,9 @@ export type ShowWhole = (copy: HTMLElement, size: Size, widest: number) => Size;
 export abstract class LiftedMenu {
 	protected readonly overlay: Overlay;
 	/** Every window of the menu picks through these: one pick closes the menu, then acts. */
-	protected readonly picks = new Picks(() => this.close());
+	protected get picks(): Picks {
+		return this.overlay.picks;
+	}
 	private readonly liftedCopy: LiftedCopy;
 	/** Where the copy stands before it is raised. */
 	protected copy = new DOMRect();
@@ -28,8 +33,9 @@ export abstract class LiftedMenu {
 	private gone = false;
 	private stopScroll: () => void = () => undefined;
 
-	protected constructor() {
-		this.overlay = new Overlay((how) => this.close(how));
+	/** `sheet`: the sheet of the menu this one replaces (a subtask's menu over its task's), taken over as it stands. */
+	protected constructor(source: HTMLElement, sheet?: Sheet) {
+		this.overlay = sheet ? sheet((how) => this.close(how)) : new Overlay((how) => this.close(how), source);
 		this.liftedCopy = LiftedCopy.over(this.overlay, el(null, "div", "tc-lifted"), true);
 	}
 
@@ -45,14 +51,25 @@ export abstract class LiftedMenu {
 	/**
 	 * The menu opens over `source` once it stands in view: its column scrolls to it first, with its own smooth scroll, and
 	 * `build` lays out the copy and the panel when the column stands still. A pressed thing that went meanwhile closes it.
+	 * Under a finger still held down (`scroll` false) nothing scrolls: the menu opens over what the column shows of it.
+	 * A finger that takes the column while it scrolls closes the menu, which never stood: the overlay never waits without it.
 	 */
-	protected openOver(source: HTMLElement, build: () => void): void {
-		this.stopScroll = scrollIntoColumn(source, () => {
-			if (this.gone) return;
-			if (!source.isConnected) return this.close();
+	protected openOver(source: HTMLElement, build: () => void, scroll = true): void {
+		if (!scroll) {
 			build();
 			this.overlay.show();
-		});
+			return;
+		}
+		this.stopScroll = scrollIntoColumn(
+			source,
+			() => {
+				if (this.gone) return;
+				if (!source.isConnected) return this.close();
+				build();
+				this.overlay.show();
+			},
+			() => this.close(),
+		);
 	}
 
 	/**
@@ -94,11 +111,18 @@ export abstract class LiftedMenu {
 		return this.picks.pick(action);
 	}
 
+	/** A row that opens a field: the menu closes and the field opens in the same tap. */
+	protected pickNow(action: () => void | Promise<void>): () => void {
+		return this.picks.pickNow(action);
+	}
+
 	/** `how`: Escape, or anything else that closed it. */
 	close(how: CloseHow = "away"): void {
 		this.gone = true;
 		this.stopScroll();
-		if (this.overlay.close()) this.closed(how);
+		if (this.overlay.isClosed) return;
+		void this.overlay.close();
+		this.closed(how);
 	}
 
 	/** Hears that the menu closed, and how. */

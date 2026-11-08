@@ -5,10 +5,11 @@ import { repeatDay } from "../domain/RepeatDraft";
 import type { GroupedList } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
 import { samePlacement } from "../domain/operations";
-import type { DraftMarks, DropColumn, DropTo, NewTaskPlace, ProjectZone, TaskItem, TaskKey, TaskService } from "./contracts";
+import type { CreatedTask, DraftMarks, DropColumn, DropTo, NewTaskPlace, ProjectZone, TaskItem, TaskKey, TaskService } from "./contracts";
 import { fitLevel, type GapPlace, gapOfPlace, type Header, type LevelCard, type ListCard, type ListPlace, placeOfGap, shiftLevel } from "./nesting";
 import { sameLine, samePlace } from "./taskKeys";
 import { fullTree } from "./fullTree";
+import { plainText } from "../domain/TaskText";
 
 /** Where the field stands: a gap of a list, a slot on the calendar, or the end of a task's subtasks in the calendar menu. */
 export type EntrySpot =
@@ -160,6 +161,19 @@ export interface EntryState {
 	readonly repeatable: boolean;
 	/** The day a new rule starts from: the field's own day, else today. */
 	readonly repeatDay: LocalDate;
+	/** The renames entered and not yet written (`QuickEntry.renamed`). */
+	readonly renamed: readonly PendingRename[];
+}
+
+/**
+ * A rename entered and not yet written: the task (`TaskItem.id`, and its key as read at the open), and the text its card
+ * shows until the write is drawn, as `TaskItem.text` and `TaskItem.title` will read.
+ */
+export interface PendingRename {
+	readonly id: string;
+	readonly key: TaskKey;
+	readonly text: string;
+	readonly title: string;
 }
 
 /** A place chosen in the bar: the column the field now stands at the end of, and the day the day column must open, if another. */
@@ -315,7 +329,13 @@ export class QuickEntry {
 			places: placeChoices(place),
 			repeatable: task && run.spot.kind !== "slot",
 			repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today()),
+			renamed: this.renamed,
 		};
+	}
+
+	/** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */
+	get renamed(): readonly PendingRename[] {
+		return this.session.jobs.flatMap((job) => (job.kind === "rename" ? [{ id: job.item.id, key: job.item.key, text: job.draft.text, title: plainText(job.draft.text) }] : []));
 	}
 
 	/** The renamed task, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
@@ -386,14 +406,15 @@ export class QuickEntry {
 	}
 
 	/**
-	 * Where `item` is renamed: right before its card in the list that shows it; else, opened from a menu's stack, there; else
+	 * Where `item` is renamed: right before its card in the list that shows it, in its card's section of its project's part
+	 * where the list is grouped by project; else, opened from a menu's stack, there; else
 	 * over its card on the timeline; null when it shows nowhere the field can stand.
 	 */
 	renameSpot(item: TaskItem, inStack: boolean): EntrySpot | null {
 		const found = this.find(item.key);
 		if (found) {
 			const card = this.look.cards(found.column)[found.index];
-			return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group } };
+			return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group, ...(card.project !== undefined && { project: card.project }) } };
 		}
 		if (inStack) return { kind: "stack", parent: item.key };
 		return item.slot ? { kind: "slot", slot: item.slot } : null;
@@ -575,7 +596,8 @@ export class QuickEntry {
 	 * leaves the queue, and the places at or past its card move down, in the very drawing that shows its card: where the
 	 * lists draw the task the file holds (`created`, the key the write gave), which its rules may have put elsewhere.
 	 */
-	shown(id: string, created: TaskKey | null, coming: (column: DropColumn) => readonly ListCard[]): void {
+	/** `created`: the task the write made, its key, or with its id (`createWithId`), which finds its card whatever wrote since. */
+	shown(id: string, created: TaskKey | CreatedTask | null, coming: (column: DropColumn) => readonly ListCard[]): void {
 		const job = this.job(id);
 		if (job.kind !== "create") return;
 		const held = this.session.field?.run ?? null;
@@ -788,8 +810,10 @@ export class QuickEntry {
 	 * because another write or a sync landed between the create and this read finds no card: the field then stays where it
 	 * is, as for a task put elsewhere.
 	 */
-	private landed(column: DropColumn, created: TaskKey, cards: readonly ListCard[]): void {
-		const index = cards.findIndex((card) => samePlace(card.key, created) && sameLine(card.key, created));
+	private landed(column: DropColumn, created: TaskKey | CreatedTask, cards: readonly ListCard[]): void {
+		const made = "id" in created ? created : null;
+		const key = made ? made.key : (created as TaskKey);
+		const index = cards.findIndex((card) => (made && card.id !== undefined ? card.id === made.id : samePlace(card.key, key) && sameLine(card.key, key)));
 		if (index < 0) return;
 		for (const run of Object.values(this.session.runs)) {
 			const list = listSpot(run.spot);

@@ -12,7 +12,7 @@ export interface SwipeTarget {
 	follow(dx: number): void;
 	/** Let go: on to the next screen `shift`'s way, or back where it stood (null); resolves once it stands. */
 	settle(shift: Shift | null): Promise<void>;
-	/** It stands at once where it was going. */
+	/** A finger came down while it ran to its place: the finger is free of it from now on. */
 	stand(): void;
 }
 
@@ -241,8 +241,8 @@ export class Swipe {
 	}
 
 	/**
-	 * A finger that comes down while the screen still runs to its place stands it there at once and frees the screen
-	 * before anything under the finger asks for it: the divider, a card.
+	 * A finger that comes down while the screen still runs to its place frees the screen before anything under the finger
+	 * asks for it (the divider, a card); the screen runs on to its place from where it is.
 	 */
 	private interrupt(): void {
 		if (this.holds === 0 || this.press?.swiping || this.stream?.following) return;

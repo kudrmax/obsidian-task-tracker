@@ -10,7 +10,7 @@ import type { Timeline } from "../Timeline";
 import type { TimelineDrop } from "./TimelineDrop";
 import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
-import type { DropResult, DropTarget, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
+import type { DropResult, DropTarget, HeldOut, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
 import { FloatingCard } from "./FloatingCard";
 import { PlusFloat } from "./PlusFloat";
 import { LongPress } from "./LongPress";
@@ -45,13 +45,13 @@ export interface DragControllerDeps {
 	/** A card is lifted or settled: the plus hides while it is carried. */
 	onDragging(active: boolean): void;
 	/** Writes the drop and draws it: gives the dropped task's card as drawn now, null when none shows. */
-	onResult(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | null>;
+	onResult(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | HeldOut | null>;
 	/** The card of `item` while its `edge` dot is held at `minute` of the shown day. */
 	stretch(item: TaskItem, edge: ResizeEdge, minute: number): StretchSpan;
 	/** The `edge` dot let go at `minute`, a card being `minDurationMin` tall: true once the new time is written, false when nothing changes. */
 	onResize(item: TaskItem, edge: ResizeEdge, minute: number, minDurationMin: number): Promise<boolean>;
 	/** Opens the task menu over `source`; `lifted` dresses the copy of the card that stays over the blur. */
-	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): OpenMenu;
+	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, held?: boolean): OpenMenu;
 	/** A card or block double-clicked: its title is renamed in place, no menu. */
 	onRename(item: TaskItem): void;
 	/** A long tap on an empty place of the timeline, let go: the field of a new task in the slot the target showed. */
@@ -80,15 +80,20 @@ export class DragController {
 	constructor(private readonly deps: DragControllerDeps) {}
 
 	/** `subtree`: the cards of the task's subtasks, which gather under it while it is dragged. */
-	attachCard(card: HTMLElement, item: TaskItem, from: TaskOrigin, subtree: readonly HTMLElement[] = []): void {
-		card.addEventListener("contextmenu", (e) => {
-			e.preventDefault();
-			if (!this.deps.pick?.(item, card, e, "menu")) this.deps.onMenu(item, card);
-		});
+	attachCard(card: HTMLElement, item: TaskItem, from: TaskOrigin, subtree: readonly HTMLElement[] = [], signal?: AbortSignal): void {
+		card.addEventListener(
+			"contextmenu",
+			(e) => {
+				e.preventDefault();
+				if (!this.deps.pick?.(item, card, e, "menu")) this.deps.onMenu(item, card);
+			},
+			{ signal },
+		);
 		/** Where the press began: the card captures the pointer, so the release names the card itself. */
 		let pressed: EventTarget | null = null;
-		card.addEventListener("pointerdown", (e) => (pressed = e.target));
+		card.addEventListener("pointerdown", (e) => (pressed = e.target), { signal });
 		new LongPress(card, {
+			signal,
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => {
@@ -103,14 +108,19 @@ export class DragController {
 		});
 	}
 
-	attachBlock(block: HTMLElement, item: TaskItem): void {
-		block.addEventListener("contextmenu", (e) => {
-			e.preventDefault();
-			this.selectWithMenu(block, item);
-		});
+	attachBlock(block: HTMLElement, item: TaskItem, signal?: AbortSignal): void {
+		block.addEventListener(
+			"contextmenu",
+			(e) => {
+				e.preventDefault();
+				this.selectWithMenu(block, item);
+			},
+			{ signal },
+		);
 		let pressed: EventTarget | null = null;
-		block.addEventListener("pointerdown", (e) => (pressed = e.target));
+		block.addEventListener("pointerdown", (e) => (pressed = e.target), { signal });
 		new LongPress(block, {
+			signal,
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => (e.pointerType === "mouse" ? this.begin(block, this.payload(block, item, "timeline", e), e) : this.hold(block, item, e)),
@@ -122,12 +132,17 @@ export class DragController {
 	}
 
 	/** An event can't be moved: a tap, a held finger, a long click or a right click open its menu. */
-	attachEvent(block: HTMLElement, onMenu: () => void): void {
-		block.addEventListener("contextmenu", (e) => {
-			e.preventDefault();
-			onMenu();
-		});
+	attachEvent(block: HTMLElement, onMenu: () => void, signal?: AbortSignal): void {
+		block.addEventListener(
+			"contextmenu",
+			(e) => {
+				e.preventDefault();
+				onMenu();
+			},
+			{ signal },
+		);
 		new LongPress(block, {
+			signal,
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => {
@@ -150,9 +165,9 @@ export class DragController {
 	}
 
 	/** Selects the card and opens its menu; the dots on the copy over the blur stretch the card as its own do. */
-	private selectWithMenu(block: HTMLElement, item: TaskItem): OpenMenu {
+	private selectWithMenu(block: HTMLElement, item: TaskItem, held = false): OpenMenu {
 		this.deps.timeline()?.select(item);
-		return this.deps.onMenu(item, block, (copy, close) => this.gripsOn(copy, block, item, close));
+		return this.deps.onMenu(item, block, (copy, close) => this.gripsOn(copy, block, item, close), held);
 	}
 
 	/** A dot of the selected card taken. */
@@ -169,7 +184,7 @@ export class DragController {
 		});
 		if (!held) return;
 		this.deps.haptics.tap();
-		const menu = this.selectWithMenu(block, item);
+		const menu = this.selectWithMenu(block, item, true);
 	}
 
 	/**
@@ -268,7 +283,7 @@ export class DragController {
 	private lift(source: HTMLElement, payload: TaskDragPayload, e: PointerEvent, subtree: readonly HTMLElement[] = [], carried: readonly PickedCard[] = []): void {
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
-		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day(), 1 + carried.length);
+		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day(), 1 + carried.length, origin.width);
 		float.moveTo(e.clientX, e.clientY);
 		const timeline = payload.from === "timeline" ? this.deps.timeline() : null;
 		const waiting = [source, ...carried.map((c) => c.card)];
@@ -277,12 +292,12 @@ export class DragController {
 		for (const card of lifted) card.classList.add("is-lifted");
 		for (const card of waiting) card.classList.add(WAITING);
 		for (const card of folded) card.classList.add(FOLDED);
-		timeline?.layoutTasks();
+		timeline?.layoutTasks(true);
 		capturePointer(source, e.pointerId);
 		this.deps.onDragging(true);
 		const reopen = () => {
 			for (const card of lifted) card.classList.remove("is-lifted", WAITING, FOLDED);
-			timeline?.layoutTasks();
+			timeline?.layoutTasks(true);
 		};
 		this.follow(
 			source,
@@ -292,16 +307,14 @@ export class DragController {
 					payload,
 					targets: this.deps.targets(payload),
 					float,
-					origin,
+					origin: () => (source.isConnected ? source.getBoundingClientRect() : origin),
 					onReturn: reopen,
 					onEnd: async (result) => {
 						detach();
 						this.deps.arbiter.release(DRAG);
 						if (!result) return null;
 						this.deps.haptics.tap();
-						const card = await this.deps.onResult(payload, result);
-						reopen();
-						return card;
+						return this.deps.onResult(payload, result);
 					},
 				}),
 			() => this.deps.onDragging(false),
@@ -312,7 +325,7 @@ export class DragController {
 	 * The plus taken: the plus itself follows the finger over the same targets as a task, but no card is lifted. Let go
 	 * off every target, or cancelled, the plus flies back to `source` and `onDrop` hears null; let go on one, `onDrop` hears where once it has landed. False when another gesture holds the screen: nothing starts.
 	 */
-	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => void): boolean {
+	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => HTMLElement | null | void): boolean {
 		if (!this.deps.arbiter.claim(DRAG)) return false;
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
@@ -329,8 +342,9 @@ export class DragController {
 					payload,
 					targets,
 					float,
-					origin,
-					// Placed, the task opens as the finger lifts, its line giving way to the field; the plus shrinks meanwhile.
+					landsOnTarget: true,
+					origin: () => origin,
+					// Placed, the task's field opens as the finger lifts, in its place; the plus lands in the field and fades.
 					onEnd: async (result) => {
 						detach();
 						if (!result) return;
@@ -338,7 +352,7 @@ export class DragController {
 						this.deps.arbiter.release(DRAG);
 						for (const target of targets) target.clear();
 						this.deps.haptics.tap();
-						onDrop(result);
+						return onDrop(result) ?? null;
 					},
 				}),
 			() => {

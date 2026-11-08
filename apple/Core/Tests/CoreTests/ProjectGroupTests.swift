@@ -199,6 +199,37 @@ final class FakeFolder: NoteFolder, @unchecked Sendable {
         #expect(vault.text.contains("- [ ] Exchange \(Self.field)"))
     }
 
+    @Test func aDropBeforeAPartsFirstCardFliesThereWhenAnotherProjectStandsAboveInTheFile() throws {
+        let file = Self.file.replacingOccurrences(of: "## Backlog\n\n", with: "## Backlog\n\n- [ ] Run 🗂️ [[Health]]\n")
+        let board = board(FakeVault(file))
+        let snapshot = try snapshot(board)
+        let backlog = try #require(snapshot.lists[.backlog])
+        let free = try #require(backlog.cards.first { $0.item.title == "Free" })
+        let friends = try #require(backlog.projects.first { $0.title == Self.friends })
+        let others = backlog.cards.filter { $0.id != free.id }
+        let club = try #require(others.firstIndex { $0.item.title == "Club" })
+        let cards = JSONValue.array(others.map(Self.listCard))
+        let gap: JSONValue = try board.rule("rules.gapAt", [cards, .number(Double(club)), 0, [friends.head], true])
+        let place: JSONValue = try board.rule("rules.placeOfDrop", [cards, gap, .null])
+        let tasks: JSONValue = [["key": free.item.key.json, "from": "backlog"]]
+        let landed = try #require(try board.landing(tasks, to: ["kind": "place", "column": "backlog", "place": place], over: snapshot).first)
+        #expect(landed.part?.zone == .string(Self.friends) && landed.part?.index == 0)
+        #expect(landed.gap(in: .backlog, among: others) == LandingGap(at: club, level: 0, group: others[club].item.group, zone: .string(Self.friends)))
+    }
+
+    @Test func aDropIntoAFoldedPartLandsUnderItsHeaderWithNoRoom() throws {
+        let board = board(FakeVault(Self.file))
+        try board.group("tasks.toggleFold", ["backlog", .string(Self.friends.lowercased())])
+        let snapshot = try snapshot(board)
+        let exchange = try #require(snapshot.lists[.soon]?.cards.first { $0.item.title == "Exchange" })
+        let backlog = try #require(snapshot.lists[.backlog])
+        let friends = try #require(backlog.projects.first { $0.title == Self.friends })
+        let title = try #require(backlog.titleDrop)
+        let landed = try #require(try board.landing([["key": exchange.item.key.json, "from": "soon"]], to: title, over: snapshot).first)
+        #expect(landed.part?.folded == true && landed.part?.key == friends.key)
+        #expect(landed.gap(in: .backlog, among: backlog.cards) == nil)
+    }
+
     @Test func aDropIntoNoProjectTakesTheFieldOff() throws {
         let vault = FakeVault(Self.file)
         let board = board(vault)

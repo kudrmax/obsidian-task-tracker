@@ -34,18 +34,17 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     /// On the timeline, the corner's two lines (`stackCorner`): the start a stacked card is put on, or the duration of one
     /// shorter than it; nil for neither, and on a list's card.
     public let corner: [String]?
-    /// The card's identity on the screen: its line as the file has it, so a card moved or ticked keeps it and the lists
-    /// animate it to its new place instead of drawing a new card.
-    public let id: String
+    /// The card's identity on the screen: its task's id, the core's, so a card changed, moved or ticked stays the same
+    /// card and the lists move it to its new place instead of drawing a new one.
+    public var id: String { item.id }
     /// In a list grouped by project, the project's part it is drawn in (`ListCard.project`: the link, null for No
     /// project); nil in a plain list.
     public let zone: JSONValue?
 
-    /// The card goes by `id`: its own, or its task's.
-    public func names(_ id: String) -> Bool { self.id == id || item.id == id }
+    /// The card shows the task `id`.
+    public func names(_ id: String) -> Bool { item.id == id }
 
-    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, corner: [String]? = nil, id: String? = nil, zone: JSONValue? = nil) {
-        self.id = id ?? item.id
+    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, corner: [String]? = nil, zone: JSONValue? = .none) {
         self.zone = zone
         self.corner = corner
         self.item = item
@@ -58,6 +57,8 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
 }
 
 public struct BoardGroup: Sendable, Hashable, Identifiable {
+    /// Who the section is, the core's: its header stays the same header through a rename.
+    public let id: String
     public let name: String?
     /// The header's words: the section's name, or the No section name when the column shows headers.
     public let header: String?
@@ -68,9 +69,9 @@ public struct BoardGroup: Sendable, Hashable, Identifiable {
     public let reorder: Bool
     /// In a list grouped by project, the project's part it stands in; nil in a plain list.
     public let zone: JSONValue?
-    public var id: String { BoardGroup.id(name, zone) }
 
-    public init(name: String?, header: String?, cards: [BoardCard], empty: Bool, menu: GroupMenu?, reorder: Bool, zone: JSONValue? = nil) {
+    public init(id: String, name: String?, header: String?, cards: [BoardCard], empty: Bool, menu: GroupMenu?, reorder: Bool, zone: JSONValue? = .none) {
+        self.id = id
         self.name = name
         self.header = header
         self.cards = cards
@@ -80,8 +81,8 @@ public struct BoardGroup: Sendable, Hashable, Identifiable {
         self.zone = zone
     }
 
-    static func id(_ name: String?, _ zone: JSONValue?) -> String {
-        let section = name ?? "\u{0}"
+    /// The core's section id within a project's part: one section (one id) can stand in several parts, «none» in every one.
+    static func id(_ section: String, _ zone: JSONValue?) -> String {
         guard let zone else { return section }
         return "\u{1}\(zone.string ?? "")\u{1}\(section)"
     }
@@ -146,7 +147,7 @@ public struct BoardList: Sendable, Hashable {
     /// Every card of the list in drawing order, as a drop reads the gaps between them.
     public var cards: [BoardCard] { groups.flatMap(\.cards) }
 
-    public init(column: BoardColumn, title: String, groups: [BoardGroup], showsHeaders: Bool, sectioned: Bool, sectionsOf: String?, canGroup: Bool = false, grouped: Bool = false, parts: [BoardPart]? = nil, titleDrop: JSONValue? = nil) {
+    public init(column: BoardColumn, title: String, groups: [BoardGroup], showsHeaders: Bool, sectioned: Bool, sectionsOf: String?, canGroup: Bool = false, grouped: Bool = false, parts: [BoardPart]? = nil, titleDrop: JSONValue? = .none) {
         self.column = column
         self.title = title
         self.groups = groups
@@ -265,7 +266,7 @@ public struct PlacedCard: Sendable {
     public let top: Double
     public let height: Double
 
-    public init(level: Int, group: String?, zone: JSONValue? = nil, top: Double, height: Double) {
+    public init(level: Int, group: String?, zone: JSONValue? = .none, top: Double, height: Double) {
         self.level = level
         self.group = group
         self.zone = zone
@@ -393,6 +394,7 @@ extension TaskBoard {
                     if !project.folded {
                         for section in project.sections {
                             groups.append(BoardGroup(
+                                id: BoardGroup.id(section.id, project.zone),
                                 name: section.name,
                                 header: section.header == false ? nil : (section.name ?? ungrouped),
                                 cards: try cards(section.rows, corner: corner, zone: project.zone, painter: &painter),
@@ -414,6 +416,7 @@ extension TaskBoard {
             let view: ListView = try readRule("rules.listView", [.array(items.map(\.json)), .bool(sections != nil), try .encoding(listSections)])
             let groups = try view.groups.map { group in
                 BoardGroup(
+                    id: group.id,
                     name: group.name,
                     header: view.showsHeaders ? (group.name ?? ungrouped) : nil,
                     cards: try cards(group.rows, corner: corner, painter: &painter),
@@ -456,7 +459,7 @@ extension TaskBoard {
             settingsJSON: files.settingsJSON)
     }
 
-    private func cards(_ rows: [ListRow], corner: JSONValue, zone: JSONValue? = nil, painter: inout Painter) throws -> [BoardCard] {
+    private func cards(_ rows: [ListRow], corner: JSONValue, zone: JSONValue? = .none, painter: inout Painter) throws -> [BoardCard] {
         let levels = JSONValue.array(rows.map { .number(Double($0.level)) })
         return try rows.enumerated().map { index, row in
             let due: CardDue? = try readRule("rules.cardDue", [row.item.json, corner])
@@ -467,7 +470,6 @@ extension TaskBoard {
                 due: try due?.date.map { try painter.due($0) },
                 repeats: due?.repeats ?? false,
                 shades: try row.item.colors.first.map { try painter.shades($0) },
-                id: painter.identity(row.item),
                 zone: zone)
         }
     }
@@ -494,7 +496,7 @@ extension TaskBoard {
         let slots = try zip(shown, boxes).map { pair, box -> BoardSlot in
             let start = pair.0.slot?.start ?? pair.1.start
             let corner = try self.corner(box, start: start, pair.1.start, pair.1.end)
-            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, shades: try pair.0.colors.first.map { try painter.shades($0) }, corner: corner, id: painter.identity(pair.0))
+            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, shades: try pair.0.colors.first.map { try painter.shades($0) }, corner: corner)
             return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, slotStart: start, box: box)
         }
         let now: Int? = day == today ? try read("boundary.offsetOf", [.string(day), .number((files.now.timeIntervalSince1970 * 1000).rounded())], over: files) : nil
@@ -506,21 +508,25 @@ extension TaskBoard {
         return BoardTimeline(hours: hours, events: placed, allDay: allDay, slots: slots, now: now, opening: opening.minute, pastPaint: past, zoomLevels: zoom.map(\.hourPx))
     }
 
-    private func corner(_ box: StackBox, start: Int, _ shownStart: Int, _ shownEnd: Int?) throws -> [String]? {
+    private func corner(_ box: StackBox, start: Int, _ shownStart: Int, _ shownEnd: Int?, pure: Bool = false) throws -> [String]? {
         let span: JSONValue = ["start": .number(Double(shownStart)), "end": shownEnd.map { .number(Double($0)) } ?? .null]
         let flags: JSONValue = ["stacked": .bool(box.stacked), "hiddenDuration": .bool(box.hiddenDuration)]
-        return try readRule("rules.stackCorner", [flags, .number(Double(start)), span])
+        let arguments: [JSONValue] = [flags, .number(Double(start)), span]
+        return try pure ? rule("rules.stackCorner", arguments) : readRule("rules.stackCorner", arguments)
     }
 
     /// The timeline's task cards stacked anew at another hour's height (a pinch), each with its corner as it then stands.
-    public func stack(_ timeline: BoardTimeline, measures: TimelineMeasures) throws -> [BoardSlot] {
+    /// `pure`: on the pure rules' context, for the main thread, which must never wait for a read made meanwhile on the
+    /// reading core; a read's own thread lays out on that core.
+    public func stack(_ timeline: BoardTimeline, measures: TimelineMeasures, pure: Bool = false) throws -> [BoardSlot] {
         guard !timeline.slots.isEmpty else { return [] }
         let taskSpans = JSONValue.array(timeline.slots.map { ["start": .number(Double($0.start)), "end": $0.end.map { .number(Double($0)) } ?? .null] })
         let eventSpans = JSONValue.array(timeline.events.map { ["start": .number(Double($0.start)), "end": .number(Double($0.end)), "level": .number(Double($0.level))] })
-        let boxes: [StackBox] = try readRule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
+        let arguments: [JSONValue] = [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets]
+        let boxes: [StackBox] = try pure ? rule("rules.stackTasks", arguments) : readRule("rules.stackTasks", arguments)
         return try zip(timeline.slots, boxes).map { slot, box in
             let old = slot.card
-            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, shades: old.shades, corner: try corner(box, start: slot.slotStart, slot.start, slot.end), id: old.id)
+            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, shades: old.shades, corner: try corner(box, start: slot.slotStart, slot.start, slot.end, pure: pure))
             return BoardSlot(card: card, start: slot.start, end: slot.end, slotStart: slot.slotStart, box: box)
         }
     }
@@ -588,15 +594,6 @@ struct Painter {
     let board: TaskBoard
     private var shadesByColor: [String: Themed<Shades>] = [:]
     private var dueByDate: [String: DueLabel] = [:]
-    private var seen: [String: Int] = [:]
-
-    /// A card's identity: its line, and which of the same lines it is when the file has two alike.
-    mutating func identity(_ item: TaskItem) -> String {
-        let line = "\(item.list)|\(item.key.raw)"
-        let count = seen[line, default: 0]
-        seen[line] = count + 1
-        return count == 0 ? line : "\(line)#\(count)"
-    }
 
     init(board: TaskBoard) {
         self.board = board

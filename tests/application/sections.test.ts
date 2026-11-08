@@ -1047,7 +1047,7 @@ describe("listView", () => {
 	});
 
 	it("no header when the only group is ungrouped", () => {
-		expect(listView([item("A", null)], true)).toEqual({ showsHeaders: false, groups: [{ name: null, items: [expect.objectContaining({ text: "A" })], rows: [{ item: expect.objectContaining({ text: "A" }), level: 0 }], empty: false, menu: NO_MENU, header: false, reorder: false }] });
+		expect(listView([item("A", null)], true)).toEqual({ showsHeaders: false, groups: [{ id: "none", name: null, items: [expect.objectContaining({ text: "A" })], rows: [{ item: expect.objectContaining({ text: "A" }), level: 0 }], empty: false, menu: NO_MENU, header: false, reorder: false }] });
 	});
 
 	it("a header when the only group is a section", () => {
@@ -1055,14 +1055,14 @@ describe("listView", () => {
 	});
 
 	it("a list that shows no sections: all its tasks outside any, without headers, an empty one too", () => {
-		expect(listView([item("A", null), item("B", "X")], false)).toEqual({ showsHeaders: false, groups: [{ name: null, items: [expect.objectContaining({ text: "A" }), expect.objectContaining({ text: "B" })], rows: [{ item: expect.objectContaining({ text: "A" }), level: 0 }, { item: expect.objectContaining({ text: "B" }), level: 0 }], empty: false, menu: NO_MENU, header: false, reorder: false }] });
-		expect(listView([], false)).toEqual({ showsHeaders: false, groups: [{ name: null, items: [], rows: [], empty: false, menu: NO_MENU, header: false, reorder: false }] });
+		expect(listView([item("A", null), item("B", "X")], false)).toEqual({ showsHeaders: false, groups: [{ id: "none", name: null, items: [expect.objectContaining({ text: "A" }), expect.objectContaining({ text: "B" })], rows: [{ item: expect.objectContaining({ text: "A" }), level: 0 }, { item: expect.objectContaining({ text: "B" }), level: 0 }], empty: false, menu: NO_MENU, header: false, reorder: false }] });
+		expect(listView([], false)).toEqual({ showsHeaders: false, groups: [{ id: "none", name: null, items: [], rows: [], empty: false, menu: NO_MENU, header: false, reorder: false }] });
 		expect(listView([], true)).toEqual({ showsHeaders: false, groups: [] });
 	});
 });
 
 describe("listView with empty sections", () => {
-	const sections = (...names: [GroupName, boolean][]) => names.map(([name, empty]) => ({ name, empty }));
+	const sections = (...names: [GroupName, boolean][]) => names.map(([name, empty]) => ({ id: name ?? "none", name, empty }));
 	const names = (view: { groups: readonly { name: GroupName; items: readonly TaskItem[] }[] }) => view.groups.map((g) => [g.name, g.items.length]);
 
 	it("puts an empty section where it stands in the file, after the group drawn above it", () => {
@@ -1081,6 +1081,6 @@ describe("listView with empty sections", () => {
 	});
 
 	it("a list that shows no sections draws no empty one", () => {
-		expect(listView([item("A", null)], false, sections(["Morning", true], [null, false]))).toEqual({ showsHeaders: false, groups: [{ name: null, items: [expect.objectContaining({ text: "A" })], rows: [{ item: expect.objectContaining({ text: "A" }), level: 0 }], empty: false, menu: NO_MENU, header: false, reorder: false }] });
+		expect(listView([item("A", null)], false, sections(["Morning", true], [null, false]))).toEqual({ showsHeaders: false, groups: [{ id: "none", name: null, items: [expect.objectContaining({ text: "A" })], rows: [{ item: expect.objectContaining({ text: "A" }), level: 0 }], empty: false, menu: NO_MENU, header: false, reorder: false }] });
 	});
 });

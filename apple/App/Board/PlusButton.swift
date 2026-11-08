@@ -116,11 +116,12 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
         glassEffect.isInteractive = false
         if !cancelling { glassEffect.tintColor = accent }
         let image = UIImage(systemName: cancelling ? "xmark" : "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: cancelling ? 21 : 24, weight: .semibold))
-        UIView.animate(springDuration: 0.35, bounce: 0.2, options: [.beginFromCurrentState, .allowUserInteraction]) {
+        // One motion per thing: the symbol by the system's own replace, the rest on the system's default spring.
+        if let image, symbol.image != nil { symbol.setSymbolImage(image, contentTransition: .replace) } else { symbol.image = image }
+        UIView.animate(springDuration: 0.35, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
             glass.effect = glassEffect
             solid.backgroundColor = .label
             solid.alpha = held ? 1 : 0
-            symbol.image = image
             symbol.tintColor = held ? .systemBackground : (cancelling ? .label : .white)
             transform = held ? CGAffineTransform(scaleX: 1.18, y: 1.18) : .identity
         }
@@ -198,20 +199,26 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
             let point = pan.location(in: space)
             let trembled = !wandered && hypot(point.x - start.x, point.y - start.y) < Self.tapReach
             let onTarget = convert(bounds, to: space).contains(point)
-            // Taken by a place, the field opens there and the plus goes back to its slot under the bar all the same.
-            if trembled || onTarget || drop?.letGo() != true {
-                drop?.carryOff()
-                onCancel()
+            // Taken by a place, the field opens there and the copy becomes its place; otherwise it flies home, and the
+            // carry ends once it is there.
+            if !trembled, !onTarget, case .taken(let field) = drop?.letGo() ?? .missed {
+                if let field {
+                    become(field)
+                    onEnd()
+                } else {
+                    flyHome()
+                }
+                return
             }
+            drop?.carryOff()
+            onCancel()
             flyHome()
-            onEnd()
             if trembled { open() }
         default:
             guard lifted != nil else { return }
             drop?.carryOff()
             onCancel()
             flyHome()
-            onEnd()
         }
     }
 
@@ -226,17 +233,40 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
     }
 
     /// Let go: the plus flies back into its slot as one piece and stands there again, as the system returns a cancelled
-    /// drag; a finger that comes down on the plus before it lands takes it again from where it flies.
+    /// drag; the carry ends once it is there (the slot turns from the cancel target back into the plus then, not while the
+    /// copy flies). A finger that comes down on the plus before it lands takes it again from where it flies.
     private func flyHome() {
-        guard let lifted else { return }
+        guard let lifted else { return onEnd() }
         self.lifted = nil
-        guard let space = lifted.superview, window != nil else { return settle(lifted) }
+        guard let space = lifted.superview, window != nil else {
+            settle(lifted)
+            return onEnd()
+        }
         homing = lifted
         UIView.animate(springDuration: 0.4, bounce: 0.15, options: [.allowUserInteraction]) {
             lifted.center = self.convert(CGPoint(x: self.bounds.midX, y: self.bounds.midY), to: space)
         } completion: { _ in
             guard self.homing === lifted else { return }
             self.settle(lifted)
+            self.onEnd()
+        }
+    }
+
+    /// Taken by a place: the copy grows into the field's place there (`field`, in the window) and gives way to the field
+    /// that opens in it, never flying back over the bar.
+    private func become(_ field: CGRect) {
+        guard let lifted else { return }
+        self.lifted = nil
+        guard let space = lifted.superview else { return settle(lifted) }
+        let target = space.convert(field, from: nil)
+        UIView.animate(springDuration: 0.35, bounce: 0, options: [.allowUserInteraction]) {
+            lifted.bounds = CGRect(origin: .zero, size: target.size)
+            lifted.center = CGPoint(x: target.midX, y: target.midY)
+            lifted.layer.cornerRadius = CardMetrics.radius
+            lifted.layer.shadowOpacity = 0
+            lifted.alpha = 0
+        } completion: { _ in
+            lifted.removeFromSuperview()
         }
     }
 
@@ -250,6 +280,10 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
     override func didMoveToWindow() {
         super.didMoveToWindow()
         guard window == nil else { return }
+        if lifted == nil, homing != nil {
+            let onEnd = onEnd
+            DispatchQueue.main.async { onEnd() }
+        }
         if lifted != nil {
             let (drop, onCancel, onEnd) = (drop, onCancel, onEnd)
             // Out of the screen's update that took the plus away.

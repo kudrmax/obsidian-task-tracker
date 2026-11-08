@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../core/application/contracts";
-import { DragSession, type DragPayload, type DropResult, type DropTarget, type Float, type NewTaskPayload } from "../../obsidian/ui/drag/DragSession";
+import { DragSession, type DragPayload, type DropResult, type DropTarget, type Float, type HeldOut, type NewTaskPayload } from "../../obsidian/ui/drag/DragSession";
 import { onDay } from "../fakes/itemOnDay";
 
 const item: TaskItem = onDay({ key: { section: "now", index: 1, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-11-01");
@@ -46,6 +46,9 @@ class FakeFloat implements Float {
 	async flyTo(to: DOMRect): Promise<void> {
 		this.log.push(`fly ${to.x},${to.y}`);
 	}
+	async sink(to: DOMRect): Promise<void> {
+		this.log.push(`sink ${to.x},${to.y}`);
+	}
 	async vanish(): Promise<void> {
 		this.log.push("vanish");
 	}
@@ -54,12 +57,13 @@ class FakeFloat implements Float {
 	}
 }
 
-function session(targets: DropTarget[], float: FakeFloat, ended: unknown[], carried: DragPayload = payload, drawn: HTMLElement | null = null) {
+function session(targets: DropTarget[], float: FakeFloat, ended: unknown[], carried: DragPayload = payload, drawn: HTMLElement | HeldOut | null = null) {
 	return new DragSession({
 		payload: carried,
 		targets,
 		float,
-		origin: rect(5, 500),
+		landsOnTarget: carried.from === "new",
+		origin: () => rect(5, 500),
 		onEnd: async (result) => {
 			ended.push(result);
 			return drawn;
@@ -114,6 +118,15 @@ describe("DragSession", () => {
 		expect(ended).toEqual([slot]);
 	});
 
+	it("goes into the header of the folded group its task went into, as no card of it is drawn", async () => {
+		const a = new FakeTarget("a", 0, 100, { kind: "clearSlot" });
+		const float = new FakeFloat();
+		const s = session([a], float, [], payload, { behind: drawnCard(120) });
+		s.move(50, 10);
+		await s.release(50, 10);
+		expect(float.log).toEqual(["move 50,10", "sink 30,120", "remove"]);
+	});
+
 	it("lands only once the drop is written and drawn", async () => {
 		const order: string[] = [];
 		const float = new FakeFloat();
@@ -122,7 +135,7 @@ describe("DragSession", () => {
 			payload,
 			targets: [new FakeTarget("a", 0, 100, { kind: "clearSlot" })],
 			float,
-			origin: rect(5, 500),
+			origin: () => rect(5, 500),
 			onEnd: async () => {
 				await Promise.resolve();
 				order.push("written");
@@ -184,14 +197,37 @@ describe("DragSession", () => {
 		expect(b.log).toEqual(["preview 150,10", "drop", "clear"]);
 	});
 
-	it("opens the lifted card's place again before the targets let go, as the card flies back", async () => {
+	it("shows the lifted card on its place only once the copy has flown back there: the task is never seen twice", async () => {
 		const order: string[] = [];
 		const a = new FakeTarget("a", 0, 100, null);
 		a.clear = () => void order.push("clear");
-		const s = new DragSession({ payload, targets: [a], float: new FakeFloat(), origin: rect(5, 500), onReturn: () => order.push("return"), onEnd: async () => {} });
+		const float = new FakeFloat();
+		float.flyTo = async () => void order.push("fly");
+		float.remove = () => void order.push("remove");
+		const s = new DragSession({ payload, targets: [a], float, origin: () => rect(5, 500), onReturn: () => order.push("return"), onEnd: async () => {} });
 		s.move(50, 10);
 		await s.cancel();
-		expect(order).toEqual(["return", "clear"]);
+		expect(order).toEqual(["clear", "fly", "return", "remove"]);
+	});
+
+	it("releases the dropped card's place only once the copy has landed on it", async () => {
+		const order: string[] = [];
+		const float = new FakeFloat();
+		float.land = async () => void order.push("land");
+		const s = new DragSession({
+			payload,
+			targets: [new FakeTarget("a", 0, 100, { kind: "clearSlot" })],
+			float,
+			origin: () => rect(5, 500),
+			onReturn: () => order.push("return"),
+			onEnd: async () => {
+				order.push("written");
+				return drawnCard(0);
+			},
+		});
+		s.move(50, 10);
+		await s.release(50, 10);
+		expect(order).toEqual(["written", "land", "return"]);
 	});
 
 	describe("carrying a new task", () => {

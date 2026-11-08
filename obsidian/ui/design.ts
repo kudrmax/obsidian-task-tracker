@@ -48,6 +48,8 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
 export const PROPERTY = {
 	listWidth: "--tc-list-width",
+	/** Room a scrolled list keeps under its last row while its rows fold away, so it stays where it was scrolled. */
+	listHold: "--tc-list-hold",
 	/** The card's height and the gap between cards, from the settings: set on the body, where the tokens built on them live. */
 	cardHeight: "--tc-card-h",
 	cardGap: "--tc-card-gap",
@@ -90,6 +92,9 @@ export const PROPERTY = {
 /** The durations the code animates with, read from styles.css so the sheet stays the one source. */
 export const DURATION = {
 	collapse: "--tc-duration-collapse",
+	/** An overlay opens: its sheet, its windows, the copies over it. It closes in `collapse`. */
+	menu: "--tc-duration-menu",
+	snap: "--tc-duration-snap",
 	fly: "--tc-duration-fly",
 	fade: "--tc-duration-fade",
 	slide: "--tc-duration-slide",
@@ -98,6 +103,8 @@ export const DURATION = {
 
 /** The easings the code animates with, read from styles.css as the durations are. */
 export const EASING = {
+	/** The one curve a list's rows and every part of an overlay move on. */
+	out: "--tc-ease-out",
 	keyboard: "--tc-ease-keyboard",
 } as const;
 
@@ -126,8 +133,6 @@ export const LAYOUT = {
 	dragStartDistance: 4,
 	/** A second click this soon after the first is a double click: the first waits it out before it counts as a click. */
 	doubleClickMs: 250,
-	/** A column that has gone this long without a scroll step has stopped: what its scroll brought into view opens its menu. */
-	scrollIdleMs: 120,
 	/** The divider holds to the middle of the window while dragged this close to it. */
 	dividerSnapDistance: 8,
 	/**

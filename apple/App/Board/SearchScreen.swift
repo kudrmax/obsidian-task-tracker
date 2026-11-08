@@ -37,9 +37,18 @@ struct SearchScreen: View {
             .onChange(of: focused) { if !focused, query.isEmpty { dismiss() } }
             .task(id: query) {
                 try? await Task.sleep(for: .milliseconds(150))
-                groups = (try? await model.read("tasks.search", [.string(query)])) ?? []
-                for group in groups where names[group.list] == nil {
-                    names[group.list] = try? await model.read("tasks.listName", [.string(group.list)])
+                guard !Task.isCancelled else { return }
+                let found: [SearchGroup] = (try? await model.read("tasks.search", [.string(query)])) ?? []
+                var named = names
+                for group in found where named[group.list] == nil {
+                    named[group.list] = try? await model.read("tasks.listName", [.string(group.list)])
+                }
+                guard !Task.isCancelled else { return }
+                // The hits change by their tasks' ids: one that stays slides, one that goes or comes fades, in one step
+                // with the groups' names.
+                withAnimation(.snappy) {
+                    names = named
+                    groups = found
                 }
             }
         }

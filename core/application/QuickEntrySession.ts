@@ -3,12 +3,12 @@ import type { RepeatRule } from "../domain/Repeat";
 import type { Placement } from "../domain/Placement";
 import type { DropColumn, DropTo, NewTaskPlace, ProjectZone, TaskItem, TaskKey, TaskService } from "./contracts";
 import type { ListCard, ListPlace } from "./nesting";
-import { type EntryDrawing, type EntryJob, type EntryLook, type EntrySpot, type EntryState, type EntryTasks, type ListEntry, type PlaceMove, QuickEntry, type StackEntry } from "./QuickEntry";
+import { type EntryDrawing, type EntryJob, type EntryLook, type EntrySpot, type EntryState, type EntryTasks, type ListEntry, type PendingRename, type PlaceMove, QuickEntry, type StackEntry } from "./QuickEntry";
 
-export { ENTRY_PLACES, type EntryAt, type EntryDrawing, type EntrySpot, type EntryState, type ListEntry, type PendingText, type PlaceChoice, type PlaceMove, type StackAt, type StackEntry } from "./QuickEntry";
+export { ENTRY_PLACES, type EntryAt, type EntryDrawing, type EntrySpot, type EntryState, type ListEntry, type PendingRename, type PendingText, type PlaceChoice, type PlaceMove, type StackAt, type StackEntry } from "./QuickEntry";
 
 /** What the session reads from the service: the marks, the places and the writes. */
-export type QuickEntryTasks = EntryTasks & Pick<TaskService, "createInPlace" | "createSection" | "edit">;
+export type QuickEntryTasks = EntryTasks & Pick<TaskService, "createWithId" | "createSection" | "edit">;
 
 /** What the session reads from the screen, and tells it. */
 export interface QuickEntryView extends EntryLook {
@@ -54,6 +54,10 @@ export class QuickEntrySession {
 
 	get renaming(): TaskKey | null {
 		return this.entry.renaming;
+	}
+
+	get renamed(): readonly PendingRename[] {
+		return this.entry.renamed;
 	}
 
 	/** What `column`'s list draws for the field, among what it is about to draw (`drawn`); none when the field stands elsewhere. */
@@ -179,7 +183,7 @@ export class QuickEntrySession {
 		if (!call) return void (job.kind === "section" && (await this.view.fresh()));
 		switch (call.method) {
 			case "createInPlace": {
-				const created = await this.tasks.createInPlace(...call.args);
+				const created = await this.tasks.createWithId(...call.args);
 				return this.view.fresh((coming) => this.entry.shown(job.id, created, coming));
 			}
 			case "edit": {

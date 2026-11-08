@@ -6,7 +6,7 @@ import { linkAt, type TaskLink } from "../TaskTitle";
 import { showWhole } from "../wholeCard";
 import type { LocalDate } from "../types";
 import type { CloseHow } from "./Overlay";
-import { LiftedMenu } from "./LiftedMenu";
+import { LiftedMenu, type Sheet } from "./LiftedMenu";
 import { moveTiles } from "./quickMoves";
 import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
 import type { IconName } from "../kit/icons";
@@ -14,6 +14,8 @@ import { datePage } from "./DatePage";
 import { projectChooser, sectionChooser } from "./SectionChooser";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import { DescriptionPeek } from "./DescriptionPeek";
+import { PanelPages } from "./PanelPages";
+import { Motion } from "../motion/Motion";
 import { repeatPanel } from "../repeat/RepeatPanel";
 import { repeatValue } from "../repeat/repeatLabel";
 
@@ -160,9 +162,13 @@ export interface TaskMenuContext {
 	/** Dresses the copy over the blur: a selected timeline card gives its copy the dots that stretch it. */
 	readonly lifted?: (copy: HTMLElement, close: () => void) => void;
 	/** A timeline card's subtasks stand between its copy and the panel; a tap on one opens its own menu instead. */
-	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement) => void;
+	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement, sheet: Sheet) => void;
+	/** The sheet of the menu this one replaces, taken over as it stands: a subtask's menu opened from its task's stack. */
+	readonly sheet?: Sheet;
 	/** Draws the start of the task's description over its copy; without it the menu shows none. */
 	readonly markdown?: MarkdownSurface;
+	/** Opened by a finger still held on the card: its column stays still under it. */
+	readonly held?: boolean;
 }
 
 /**
@@ -182,6 +188,8 @@ export class TaskMenu extends LiftedMenu {
 	/** Whoever types in the menu hears when it closes, and how. */
 	private fieldClosed: ((how: CloseHow) => void) | null = null;
 	private peek: DescriptionPeek | null = null;
+	/** The panel's pages: a change of page grows or shrinks it in place, and each keeps its scroll. */
+	private readonly pages = new PanelPages(() => [this.panel, this.upper]);
 	/** What the menu asks about now, if anything; Enter confirms it, as its button does. */
 	private asking: Asking | null = null;
 	/** The repeat page shown, which writes what it holds as the menu closes. */
@@ -204,8 +212,8 @@ export class TaskMenu extends LiftedMenu {
 	private labelling = false;
 
 	private constructor(private context: TaskMenuContext) {
-		super();
-		this.openOver(context.source, () => this.build());
+		super(context.source, context.sheet);
+		this.openOver(context.source, () => this.build(), context.held !== true);
 	}
 
 	/** The copy over the blur, a timeline card's subtasks under it, and the panel. */
@@ -276,13 +284,17 @@ export class TaskMenu extends LiftedMenu {
 		this.giveToField();
 		this.fieldClosed = onClose;
 		const stack = (this.stack ??= this.stackUnder(this.copy));
-		return (this.stackRow ??= el(stack, "div", "tc-quick-row"));
+		if (this.stackRow) return this.stackRow;
+		const row = (this.stackRow = el(stack, "div", "tc-quick-row"));
+		/** The field is put in the row once this returns: the row grows in with it, in the same task. */
+		queueMicrotask(() => Motion.enter(row));
+		return row;
 	}
 
 	/** Typing in the menu: the panel and the start of the description go, the field and its bar take their place. */
 	private giveToField(): void {
-		this.panel.hidden = true;
-		this.upper.hidden = true;
+		this.overlay.retire(this.panel);
+		this.overlay.retire(this.upper);
 		this.peek?.hide();
 	}
 
@@ -319,7 +331,10 @@ export class TaskMenu extends LiftedMenu {
 		for (const subtask of subtasks) {
 			const card = renderTaskCard(null, subtask, { day });
 			stack.insertBefore(card, this.stackRow);
-			card.addEventListener("click", this.pick(() => onSubtask?.(subtask, card)));
+			card.addEventListener(
+				"click",
+				this.picks.handOff(() => onSubtask?.(subtask, card, (onClose) => this.overlay.handOver(onClose))),
+			);
 		}
 	}
 
@@ -340,65 +355,67 @@ export class TaskMenu extends LiftedMenu {
 	}
 
 	private showMenu(keepAbove?: number): void {
-		clear(this.panel);
-		clear(this.upper);
-		this.panel.classList.remove("is-picker", "is-repeat", "has-remove");
-		const { item, actions } = this.context;
-		const model = this.context.menu(item);
-		const edits: Record<EditRowId, () => void> = {
-			rename: this.inStack ? () => actions.rename(this) : this.pick(() => actions.rename(this)),
-			reminder: () => this.showReminders(),
-			description: this.pick(() => actions.openDescription(true)),
-			repeat: () => this.showRepeat(),
-			section: () => this.showSections(),
-			subtask: this.stacks ? () => actions.addSubtask(this) : this.pick(() => actions.addSubtask(this)),
-		};
-		const draw: Record<MenuGroupId, () => void> = {
-			statuses: () => {
-				const tiles = statusTiles(model);
-				const asked = this.asking;
-				if (asked !== null && asked !== "delete") this.askGroup(asked);
-				else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: tile.confirm ? () => this.askFor(tile.id) : this.pick(() => actions.pickStatus(tile.id)) }))]);
-			},
-			levels: () => {
-				const levelTiles = priorityTiles(model).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: model.levels.disabled, onPick: this.pick(() => actions.togglePriority(tile.prefix)) }));
-				if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
-			},
-			labels: () => {
-				const tagTiles = labelTiles(model).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: model.labels.disabled, onPick: () => void this.toggleLabel(tile.name) }));
-				if (tagTiles.length > 0) tileGroup(this.panel, "is-labels", tileRows(tagTiles));
-			},
-			moves: () => {
-				const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({
-					label,
-					icon,
-					onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)),
-				}));
-				if (moves.length > 0) tileGroup(this.panel, "is-move", [moves]);
-			},
-			edits: () => {
-				const rows = editRows(item, model);
-				const specs = rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] }));
-				const project = projectRow(model);
-				specs.splice(projectRowAt(rows), 0, { ...project, onPick: () => this.showProjects() });
-				menuGroup(this.panel, specs);
-			},
-			opens: () => {
-				const openFull = actions.openFull;
-				menuGroup(this.panel, [
-					...(openFull ? [{ label: "Open full screen", icon: "fullScreen", onPick: this.pick(() => openFull()) } as const] : []),
-					{ label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) },
-				]);
-			},
-			remove: () => {
-				const remove = model.remove;
-				if (this.asking === "delete") this.askGroup("delete");
-				else if (remove) menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
-			},
-		};
-		for (const group of model.groups) draw[group]();
-		this.place(keepAbove);
-		this.panel.querySelector(".tc-menu-ask")?.scrollIntoView({ block: "nearest" });
+		this.pages.show("menu", () => {
+			clear(this.panel);
+			clear(this.upper);
+			this.panel.classList.remove("is-picker", "is-repeat", "has-remove");
+			const { item, actions } = this.context;
+			const model = this.context.menu(item);
+			const edits: Record<EditRowId, () => void> = {
+				rename: this.inStack ? () => actions.rename(this) : this.pickNow(() => actions.rename(this)),
+				reminder: () => this.showReminders(),
+				description: this.pickNow(() => actions.openDescription(true)),
+				repeat: () => this.showRepeat(),
+				section: () => this.showSections(),
+				subtask: this.stacks ? () => actions.addSubtask(this) : this.pickNow(() => actions.addSubtask(this)),
+			};
+			const draw: Record<MenuGroupId, () => void> = {
+				statuses: () => {
+					const tiles = statusTiles(model);
+					const asked = this.asking;
+					if (asked !== null && asked !== "delete") this.askGroup(asked);
+					else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: tile.confirm ? () => this.askFor(tile.id) : this.pick(() => actions.pickStatus(tile.id)) }))]);
+				},
+				levels: () => {
+					const levelTiles = priorityTiles(model).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: model.levels.disabled, onPick: this.pick(() => actions.togglePriority(tile.prefix)) }));
+					if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
+				},
+				labels: () => {
+					const tagTiles = labelTiles(model).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: model.labels.disabled, onPick: () => void this.toggleLabel(tile.name) }));
+					if (tagTiles.length > 0) tileGroup(this.panel, "is-labels", tileRows(tagTiles));
+				},
+				moves: () => {
+					const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({
+						label,
+						icon,
+						onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)),
+					}));
+					if (moves.length > 0) tileGroup(this.panel, "is-move", [moves]);
+				},
+				edits: () => {
+					const rows = editRows(item, model);
+					const specs = rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] }));
+					const project = projectRow(model);
+					specs.splice(projectRowAt(rows), 0, { ...project, onPick: () => this.showProjects() });
+					menuGroup(this.panel, specs);
+				},
+				opens: () => {
+					const openFull = actions.openFull;
+					menuGroup(this.panel, [
+						...(openFull ? [{ label: "Open full screen", icon: "fullScreen", onPick: this.pick(() => openFull()) } as const] : []),
+						{ label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) },
+					]);
+				},
+				remove: () => {
+					const remove = model.remove;
+					if (this.asking === "delete") this.askGroup("delete");
+					else if (remove) menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
+				},
+			};
+			for (const group of model.groups) draw[group]();
+			this.place(keepAbove);
+			this.panel.querySelector(".tc-menu-ask")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+		});
 	}
 
 	/**
@@ -456,44 +473,50 @@ export class TaskMenu extends LiftedMenu {
 	private showSections(): void {
 		const sections = this.context.menu(this.context.item).sections;
 		if (!sections) return;
-		this.askFor(null, false);
-		clear(this.panel);
-		clear(this.upper);
-		const { actions } = this.context;
-		sectionChooser(this.panel, {
-			sections,
-			onBack: () => this.showMenu(),
-			onPick: (name) => this.pick(() => actions.toSection(name))(),
-			onNew: this.pick(() => actions.newSection()),
+		this.pages.show("sections", () => {
+			this.askFor(null, false);
+			clear(this.panel);
+			clear(this.upper);
+			const { actions } = this.context;
+			sectionChooser(this.panel, {
+				sections,
+				onBack: () => this.showMenu(),
+				onPick: (name) => this.pick(() => actions.toSection(name))(),
+				onNew: this.pickNow(() => actions.newSection()),
+			});
+			this.place();
 		});
-		this.place();
 	}
 
 	/** The Project page in place of the menu, as Section's: the project notes by name, No project last, the current one checked. */
 	private showProjects(): void {
-		this.askFor(null, false);
-		clear(this.panel);
-		clear(this.upper);
-		const { item, actions } = this.context;
-		projectChooser(this.panel, {
-			project: this.context.menu(item).project,
-			onBack: () => this.showMenu(),
-			onPick: (link) => this.pick(() => actions.setProject(link))(),
+		this.pages.show("projects", () => {
+			this.askFor(null, false);
+			clear(this.panel);
+			clear(this.upper);
+			const { item, actions } = this.context;
+			projectChooser(this.panel, {
+				project: this.context.menu(item).project,
+				onBack: () => this.showMenu(),
+				onPick: (link) => this.pick(() => actions.setProject(link))(),
+			});
+			this.place();
 		});
-		this.place();
 	}
 
 	/** The Reminder submenu in place of the menu: the way back, the kinds, the task's own checked, Off last; a pick sets it and closes. */
 	private showReminders(): void {
-		this.askFor(null, false);
-		clear(this.panel);
-		clear(this.upper);
-		const { item, actions } = this.context;
-		backRow(this.panel, "Reminder", () => this.showMenu());
-		const group = menuGroup(this.panel, []);
-		for (const { kind, checked } of this.context.menu(item).reminders)
-			menuRow(group, { label: REMINDER_NAMES[kind], icon: checked ? "check" : undefined, choice: true, quiet: kind === "none", onPick: this.pick(() => actions.setReminder(kind)) });
-		this.place();
+		this.pages.show("reminders", () => {
+			this.askFor(null, false);
+			clear(this.panel);
+			clear(this.upper);
+			const { item, actions } = this.context;
+			backRow(this.panel, "Reminder", () => this.showMenu());
+			const group = menuGroup(this.panel, []);
+			for (const { kind, checked } of this.context.menu(item).reminders)
+				menuRow(group, { label: REMINDER_NAMES[kind], icon: checked ? "check" : undefined, choice: true, quiet: kind === "none", onPick: this.pick(() => actions.setReminder(kind)) });
+			this.place();
+		});
 	}
 
 	/**
@@ -501,39 +524,43 @@ export class TaskMenu extends LiftedMenu {
 	 * the menu closes; Remove repeat, for a task that repeats, is a pick that takes the rule off and closes.
 	 */
 	private showRepeat(): void {
-		this.askFor(null, false);
-		clear(this.panel);
-		clear(this.upper);
-		const { item, actions } = this.context;
-		const page = (this.repeatPage ??= new RepeatPage(item, (rule) => void actions.setRepeat(rule)));
-		const close = this.pick(() => undefined);
-		repeatPanel(this.panel, {
-			draft: page.draft,
-			onChange: (rule) => {
-				page.change(rule);
-				this.place();
-			},
-			onRemove: () => {
-				page.remove();
-				close();
-			},
+		this.pages.show("repeat", () => {
+			this.askFor(null, false);
+			clear(this.panel);
+			clear(this.upper);
+			const { item, actions } = this.context;
+			const page = (this.repeatPage ??= new RepeatPage(item, (rule) => void actions.setRepeat(rule)));
+			const close = this.pick(() => undefined);
+			repeatPanel(this.panel, {
+				draft: page.draft,
+				onChange: (rule) => {
+					page.change(rule);
+					this.pages.show("repeat", () => this.place());
+				},
+				onRemove: () => {
+					page.remove();
+					close();
+				},
+			});
+			this.place();
 		});
-		this.place();
 	}
 
 	private showPicker(): void {
-		this.askFor(null, false);
-		clear(this.panel);
-		clear(this.upper);
-		const { item, actions, today } = this.context;
-		const model = this.context.menu(item);
-		datePage(this.panel, {
-			today,
-			selected: model.dueDate,
-			onPick: (date) => this.pick(() => actions.postpone(date))(),
-			onRemove: model.removeDue ? this.pick(() => actions.removeDue()) : undefined,
+		this.pages.show("picker", () => {
+			this.askFor(null, false);
+			clear(this.panel);
+			clear(this.upper);
+			const { item, actions, today } = this.context;
+			const model = this.context.menu(item);
+			datePage(this.panel, {
+				today,
+				selected: model.dueDate,
+				onPick: (date) => this.pick(() => actions.postpone(date))(),
+				onRemove: model.removeDue ? this.pick(() => actions.removeDue()) : undefined,
+			});
+			this.place();
 		});
-		this.place();
 	}
 
 	/**
@@ -560,7 +587,9 @@ export class TaskMenu extends LiftedMenu {
 
 	protected override closed(how: CloseHow): void {
 		this.keysDoc.removeEventListener("keydown", this.onEnter, true);
-		this.repeatPage?.close();
+		const page = this.repeatPage;
+		/** What the repeat page holds is written as every pick is, once the menu has gone. */
+		if (page) this.overlay.afterClose(() => page.close());
 		this.fieldClosed?.(how);
 	}
 }

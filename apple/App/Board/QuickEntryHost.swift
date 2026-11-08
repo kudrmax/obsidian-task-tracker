@@ -96,8 +96,22 @@ final class QuickEntryHost {
     private(set) var lists: [BoardColumn: ListEntryView] = [:]
     /// The field's minute from the day's start, when it stands on the calendar.
     private(set) var slotMinute: Int?
+    /// The renames entered and not yet written (`PendingRename`), each task's new text by its id: its card shows that
+    /// text from the Enter until the drawing of the write, never its old name in between.
+    private(set) var renamedTexts: [String: String] = [:]
     /// Bumped whenever the field opens or moves: what holds it scrolls it into sight.
     private(set) var moved = 0
+    /// The rows of each list's typed lines and, last, its field, by keys that never repeat: Enter turns the field's row
+    /// into the line typed in it and opens a new row for the field under it; a line written leaves its row to its card.
+    private(set) var lineKeys: [BoardColumn: [String]] = [:]
+    /// A card made from a typed line keeps that line's row (its key): the text becomes the card in place, never one copy
+    /// going as another comes.
+    private(set) var heirs: [String: String] = [:]
+    @ObservationIgnored private var serial = 0
+    /// Counts the placings of the field: a placing put off to the next turn is dropped when a later one came first.
+    @ObservationIgnored private var placed = 0
+    /// The id of the task a job just made, until its line leaves the list's rows.
+    @ObservationIgnored private var heirComing: String?
     /// A sheet of the bar is up (repeat, date): the field gives the keyboard up for it without ending the entry.
     var paused = false
     /// The sheet the bar asked for; the screen presents it.
@@ -150,7 +164,7 @@ final class QuickEntryHost {
     }
 
     /// A tap on a «No tasks» plate: the field of a new task in that section.
-    func openIn(_ column: BoardColumn, _ group: String?, _ zone: JSONValue? = nil) {
+    func openIn(_ column: BoardColumn, _ group: String?, _ zone: JSONValue? = .none) {
         opening { call("openIn", [.string(column.rawValue), group.json] + (zone.map { [$0] } ?? [])) }
     }
 
@@ -158,8 +172,14 @@ final class QuickEntryHost {
     /// screen, the field last in the stack of its subtasks there.
     func addSubtask(_ parent: TaskItem) {
         guard let spot = value("subtaskSpot", [parent.key.json]) else { return }
-        if spot["kind"].string == "stack", model?.fullScreen.last?.id != parent.id { model?.fullScreen.append(parent) }
-        opening { call("open", [spot]) }
+        guard spot["kind"].string == "stack", let model, model.fullScreen.last?.id != parent.id else {
+            return opening { call("open", [spot]) }
+        }
+        // The page is read before it is pushed, then the field opens in it.
+        Task {
+            await model.openFullScreen(parent)
+            opening { call("open", [spot]) }
+        }
     }
 
     /// Rename: the card gives its place to the field with its text.
@@ -180,9 +200,14 @@ final class QuickEntryHost {
         opening { call("open", [spot, item.json]) }
     }
 
+    /// The field takes the keyboard in the gesture that opens it, before the drawing that opens its row: taking it
+    /// reloads the keyboard's views and holds the main thread, which inside the drawing swallowed the row's opening.
+    /// Focused first, whatever is typed goes into the field, and the row opens on a free main thread.
     private func opening(_ open: () -> Void) {
         opened += 1
+        field.focusNow()
         open()
+        if !isOpen { field.end() }
     }
 
     // MARK: Typing
@@ -190,7 +215,9 @@ final class QuickEntryHost {
     func typed(_ text: String) { call("type", [.string(text)], animated: false) }
     /// Enter: the text stands where it was typed and the next field is right under it in the same frame, as a line break
     /// in a text; nothing slides.
-    func enter() { call("enter", [], animated: false) }
+    /// Enter: the text stays in its row, now a line waiting to be written; the next field opens under it and the rows
+    /// below slide down, as any row that comes.
+    func enter() { call("enter", []) }
     func indent(_ delta: Int) { call("indent", [.number(Double(delta))]) }
     func toggleSection() { call("toggleSection", []) }
     func togglePriority(_ prefix: String) { call("togglePriority", [.string(prefix)]) }
@@ -351,6 +378,8 @@ final class QuickEntryHost {
 
     private func apply(_ reply: JSONValue, over snapshot: BoardSnapshot? = nil) {
         session = reply["session"]
+        let renames = Self.renames(reply["renamed"])
+        if renames != renamedTexts { renamedTexts = renames }
         show(reply["state"], over: snapshot)
         if case .array(let jobs) = session["jobs"], !jobs.isEmpty { pump() }
     }
@@ -363,13 +392,32 @@ final class QuickEntryHost {
         if field.text != (next?.text ?? "") { field.text = next?.text ?? "" }
         guard let next else {
             lists = [:]
+            lineKeys = [:]
             slotMinute = nil
             field.end()
             return
         }
         field.placeholder = next.namesSection ? "Section name" : nil
-        placeField(over: snapshot)
-        if before == nil || before?.spot != next.spot || before?.pending.count != next.pending.count || before?.section != next.section { moved += 1 }
+        let shift = before == nil || before?.spot != next.spot || before?.pending.count != next.pending.count || before?.section != next.section
+        // A new field's row opens with the keyboard's own rise, as a new row in Reminders does: the keyboard the field takes
+        // reloads its views on a later turn and holds the main thread meanwhile, which froze a row opened before it (its
+        // first frames came late, half open, or stood still midway). The session and the keyboard are the field's at
+        // once, so nothing typed meanwhile is lost; a renamed card's row is the field's at once.
+        if before == nil, next.renaming == nil {
+            placed += 1
+            let mine = placed
+            KeyboardRise.shared.next { [weak self] in
+                guard let self, self.placed == mine, self.state != nil else { return }
+                withAnimation(.snappy) {
+                    self.placeField(over: snapshot)
+                    self.moved += 1
+                }
+            }
+        } else {
+            placed += 1
+            placeField(over: snapshot)
+            if shift { moved += 1 }
+        }
         field.begin()
     }
 
@@ -385,6 +433,7 @@ final class QuickEntryHost {
                 }
             }
         }
+        keepKeys(found, of: snapshot)
         lists = found
         if state.spotKind == "slot" {
             let slot = state.spot["slot"]
@@ -392,6 +441,40 @@ final class QuickEntryHost {
         } else {
             slotMinute = nil
         }
+    }
+
+    private static func renames(_ raw: JSONValue) -> [String: String] {
+        guard case .array(let all) = raw else { return [:] }
+        return Dictionary(all.compactMap { rename in rename["id"].string.flatMap { id in rename["text"].string.map { (id, $0) } } }, uniquingKeysWith: { $1 })
+    }
+
+    /// Each list's row keys for the lines and the field it now draws: lines written leave from the front (the first to the
+    /// card just made), lines typed take the field's row and the field a new one; a card gone from the lists frees its key.
+    private func keepKeys(_ found: [BoardColumn: ListEntryView], of snapshot: BoardSnapshot) {
+        var keys: [BoardColumn: [String]] = [:]
+        for (column, entry) in found {
+            let lines = entry.pending.count
+            var kept = lineKeys[column] ?? []
+            if kept.isEmpty {
+                kept = (0...lines).map { _ in newKey() }
+            } else if lines < kept.count - 1 {
+                let written = kept.count - 1 - lines
+                if let id = heirComing, let first = kept.first { heirs[id] = first }
+                heirComing = nil
+                kept.removeFirst(written)
+            } else if lines > kept.count - 1 {
+                kept += (0..<(lines - (kept.count - 1))).map { _ in newKey() }
+            }
+            keys[column] = kept
+        }
+        lineKeys = keys
+        let drawn = Set(snapshot.lists.values.flatMap { $0.cards.map(\.id) })
+        if heirs.keys.contains(where: { !drawn.contains($0) }) { heirs = heirs.filter { drawn.contains($0.key) } }
+    }
+
+    private func newKey() -> String {
+        serial += 1
+        return "\u{0}line/\(serial)"
     }
 
     /// Where `task`'s full screen draws the field, nil when it stands elsewhere.
@@ -403,6 +486,7 @@ final class QuickEntryHost {
     /// The screen was read anew (a write elsewhere, another day): the field keeps its place among the cards as drawn.
     func screenChanged() {
         guard state != nil else { return }
+        placed += 1
         placeField()
     }
 
@@ -440,20 +524,21 @@ final class QuickEntryHost {
     private func run(_ id: String) async -> Bool {
         guard let model else { return false }
         guard let call = answer("call", [.string(id)]) else {
-            drawInstantly { if let reply = answer("unshown", [.string(id)]) { apply(reply) } }
-            return finish(id)
+            return finish(id) { if let reply = answer("unshown", [.string(id)]) { apply(reply) } }
         }
         session = call["session"]
         let job = call["value"]
         guard let method = job["method"].string, case .array(let args) = job["args"] else {
             // Nothing to write: a line waiting for it stops waiting.
-            drawInstantly { if let reply = answer("unshown", [.string(id)]) { apply(reply) } }
-            return finish(id)
+            return finish(id) { if let reply = answer("unshown", [.string(id)]) { apply(reply) } }
         }
         let board = board
         let day = model.shownDay
+        // A task typed is made by `createWithId`: its card is found in the next drawing by its id, whatever else wrote to
+        // the file between the write and that read (a key names only the place right after the write).
+        let door = method == "createInPlace" ? "createWithId" : method
         let written: Result<JSONValue, Error> = await Task.detached {
-            Result { try board.write("tasks." + method, args) }
+            Result { try board.write("tasks." + door, args) }
         }.value
         if case .failure(let error) = written { model.problem(error) }
         let read: BoardSnapshot?
@@ -464,14 +549,21 @@ final class QuickEntryHost {
             read = nil
         }
         if method == "edit", case .success(let answer) = written, let item = try? answer.decode(TaskItem.self) { renamed?(item) }
-        let created: JSONValue? = if method == "createInPlace", case .success(let key) = written, read != nil { key } else { nil }
+        let created: JSONValue? = if method == "createInPlace", case .success(let made) = written, !made.isNull, read != nil { made } else { nil }
         let stack = created != nil && state?.spotKind == "stack" ? await stackRead?() : nil
-        drawInstantly {
+        // Written but not read: the screen reads again once this job is done, so the task shows.
+        if read == nil, case .success = written { Task { await model.reload() } }
+        // The screen, the field's line and the job's end in one transaction: the field never shows empty before the card
+        // that ends its line, and the rows below move once.
+        // The job's drawing moves as it differs from the screen (a line written elsewhere in the list slides the rows).
+        let motion = read.map { $0.motion(from: model.snapshot) } ?? .still
+        return finish(id, motion: motion) {
             if method == "createInPlace" {
                 var reply: JSONValue?
                 if let created, let read {
                     let coming = JSONValue.object(Dictionary(uniqueKeysWithValues: read.lists.map { ($0.key.rawValue, Self.listCards($0.value.cards)) }))
                     reply = answer("shown", [.string(id), created, coming], over: read)
+                    heirComing = reply == nil ? nil : created["id"].string
                 }
                 if reply == nil { reply = answer("unshown", [.string(id)], over: read) }
                 if let read { model.draw(read) }
@@ -482,23 +574,21 @@ final class QuickEntryHost {
                 placeField(over: read)
             }
         }
-        // Written but not read: the screen reads again once this job is done, so the task shows.
-        if read == nil, case .success = written { Task { await model.reload() } }
-        return finish(id)
     }
 
-    private func drawInstantly(_ draw: () -> Void) {
-        var instant = Transaction()
-        instant.disablesAnimations = true
-        withTransaction(instant, draw)
-    }
-
-    /// The job ends; false when the door refused to end it, and it stays started so it is never run again.
-    private func finish(_ id: String) -> Bool {
-        guard let reply = answer("done", [.string(id)]) else { return false }
-        apply(reply)
-        started.remove(id)
-        return true
+    /// The job ends, drawn in one transaction with `draw`, what the job showed, moving as the screen's drawing differs;
+    /// false when the door refused to end it, and it stays started so it is never run again.
+    private func finish(_ id: String, motion: BoardMotion = .still, drawing draw: () -> Void) -> Bool {
+        var ended = false
+        guard let model else { return false }
+        model.draw(motion: motion) {
+            draw()
+            guard let reply = answer("done", [.string(id)]) else { return }
+            apply(reply)
+            ended = true
+        }
+        if ended { started.remove(id) }
+        return ended
     }
 
     /// Resolves once every write the session queued is made.
@@ -583,6 +673,15 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
         if window != nil, becomeFirstResponder() { return }
         guard tries > 0 else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.take(tries: tries - 1) }
+    }
+
+    /// The keyboard taken now, from wherever the field waits: parked in the window when no box holds it yet.
+    func focusNow() {
+        wanted = true
+        if window == nil, let window = UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first {
+            park(in: window)
+        }
+        take()
     }
 
     func end() {
@@ -983,5 +1082,157 @@ struct EntryDateSheet: View {
             let chosen = host.state?.places.first { $0["kind"].string == "date" }?["date"].string
             date = chosen.flatMap(LocalDay.date) ?? Date()
         }
+    }
+}
+
+
+/// The keyboard: where its top stands on the screen (the bar over it included), frame by frame as it moves, and its next
+/// rise, for what waits for it. What waits runs as the keyboard starts to move (its views
+/// reloaded, the main thread free), or at once while it stands; a field taken while the keyboard goes down waits for its
+/// rise back, which UIKit announces when the field takes it. Nothing is guessed by time.
+@MainActor
+@Observable
+final class KeyboardRise {
+    static let shared = KeyboardRise()
+
+    private enum Stand { case down, rising, up, falling }
+
+    /// The keyboard's top on the screen as it is drawn now, frame by frame while it moves. It is read from a probe the
+    /// window's keyboard layout guide holds, which UIKit moves in the keyboard's own animation: the notices' duration and
+    /// curve are not trusted, since a keyboard sent down by a field giving it up is announced with a duration of 0 and
+    /// still slides.
+    private(set) var top: CGFloat = .infinity
+    @ObservationIgnored private let probe = UIView()
+    @ObservationIgnored private var follow: CADisplayLink?
+    /// Frames the probe has stood still since it last moved: the following stops after a few.
+    @ObservationIgnored private var still = 0
+    /// The keyboard stands down: nothing of the screen is under it.
+    private(set) var isDown = true
+    @ObservationIgnored private var waiting: [() -> Void] = []
+    @ObservationIgnored private var stand = Stand.down
+
+    private init() {
+        let center = NotificationCenter.default
+        // Will-show is posted from inside the keyboard's setting up of its views, which holds the main thread a while
+        // longer: what waits runs on the next turn, once that has returned and the keyboard's own animation is running.
+        observe(center, UIResponder.keyboardWillShowNotification) { rise in
+            rise.stand = .rising
+            rise.isDown = false
+            DispatchQueue.main.async {
+                guard rise.stand == .rising else { return }
+                rise.stand = .up
+                rise.run()
+            }
+        }
+        observe(center, UIResponder.keyboardDidShowNotification) { rise in
+            rise.stand = .up
+            rise.run()
+        }
+        observe(center, UIResponder.keyboardWillHideNotification) { rise in rise.stand = .falling }
+        observe(center, UIResponder.keyboardDidHideNotification) { rise in
+            rise.stand = .down
+            rise.isDown = true
+        }
+        // Every move of the keyboard, up, down or a new height, is announced here: its top is followed from now.
+        observe(center, UIResponder.keyboardWillChangeFrameNotification) { rise in rise.startFollowing() }
+    }
+
+    /// The keyboard is about to move: its top is read from the probe every frame until the probe stands still.
+    private func startFollowing() {
+        if probe.window == nil, let host = UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow?.rootViewController?.view }).first {
+            probe.isHidden = true
+            probe.isUserInteractionEnabled = false
+            probe.translatesAutoresizingMaskIntoConstraints = false
+            host.addSubview(probe)
+            host.keyboardLayoutGuide.usesBottomSafeArea = false
+            NSLayoutConstraint.activate([
+                probe.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+                probe.widthAnchor.constraint(equalToConstant: 1),
+                probe.heightAnchor.constraint(equalToConstant: 1),
+                probe.bottomAnchor.constraint(equalTo: host.keyboardLayoutGuide.topAnchor),
+            ])
+            // Put in place at once, outside the keyboard's animation it is often added in: never seen moving into place.
+            UIView.performWithoutAnimation { host.layoutIfNeeded() }
+            probe.layer.removeAllAnimations()
+        }
+        still = 0
+        guard follow == nil, probe.window != nil else { return }
+        let link = CADisplayLink(target: Follower(self), selector: #selector(Follower.tick))
+        link.add(to: .main, forMode: .common)
+        follow = link
+    }
+
+    fileprivate func tick() {
+        guard let host = probe.superview else { return }
+        let now = host.convert((probe.layer.presentation() ?? probe.layer).frame, to: nil).maxY
+        if top != now {
+            top = now
+            still = 0
+        } else if probe.layer.animationKeys()?.isEmpty ?? true {
+            still += 1
+            if still > 30 { stopFollowing() }
+        }
+    }
+
+    private func stopFollowing() {
+        follow?.invalidate()
+        follow = nil
+    }
+
+    /// The display link holds its target strongly: a small one that holds the keyboard's state weakly.
+    private final class Follower: NSObject {
+        weak var rise: KeyboardRise?
+        init(_ rise: KeyboardRise) { self.rise = rise }
+        @MainActor @objc func tick() { rise?.tick() }
+    }
+
+    private func observe(_ center: NotificationCenter, _ name: Notification.Name, _ body: @escaping (KeyboardRise) -> Void) {
+        center.addObserver(forName: name, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { body(KeyboardRise.shared) }
+        }
+    }
+
+    func next(_ body: @escaping () -> Void) {
+        if stand == .up { return body() }
+        waiting.append(body)
+    }
+
+    private func run() {
+        let all = waiting
+        waiting = []
+        for body in all { body() }
+    }
+}
+
+extension View {
+    /// A scroll view that stands under the keyboard instead of shrinking above it: the keyboard slides over its rows, and
+    /// the part it covers is only room to scroll the last rows above it, opened and closed frame by frame with the keyboard.
+    func keyboardRoom() -> some View {
+        modifier(KeyboardRoom())
+    }
+}
+
+private struct KeyboardRoom: ViewModifier {
+    /// The scroll view's top and bottom on the screen as laid out with the keyboard down: the room it gives never changes
+    /// what it is measured from (a scroll view is never shorter than its margins, and a list stacked under another would
+    /// grow by them).
+    @State private var span: ClosedRange<CGFloat>?
+    @State private var room: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        let rise = KeyboardRise.shared
+        content
+            .contentMargins(.bottom, room, for: .scrollContent)
+            .onGeometryChange(for: ClosedRange<CGFloat>.self) { $0.frame(in: .global).minY...$0.frame(in: .global).maxY } action: { laid in
+                if rise.isDown { span = laid }
+            }
+            .onChange(of: rise.top) { room = covered(by: rise.top) }
+            .onChange(of: span) { room = covered(by: rise.top) }
+    }
+
+    /// The part of the scroll view the keyboard's top at `top` covers, at most all of it.
+    private func covered(by top: CGFloat) -> CGFloat {
+        guard let span else { return 0 }
+        return min(span.upperBound - span.lowerBound, max(0, span.upperBound - max(span.lowerBound, top)))
     }
 }

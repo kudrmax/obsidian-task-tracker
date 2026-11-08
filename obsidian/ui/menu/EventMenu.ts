@@ -16,7 +16,7 @@ export class EventMenu extends LiftedMenu {
 	}
 
 	private constructor(context: EventMenuContext) {
-		super();
+		super(context.source);
 		this.openOver(context.source, () => this.build(context));
 	}
 

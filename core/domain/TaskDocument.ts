@@ -1,6 +1,7 @@
 import { descriptionIndent, descriptionMarkdown, markdownLines } from "./description";
 import { DEFAULT_REMINDER, STATUS_CHARS, type GroupName, type SectionKey, type Task } from "./Task";
-import { formatTaskLine, parseTaskLine, type Markers } from "./TaskLine";
+import { formatTaskLine, isTaskLine, parseTaskLine, type Markers } from "./TaskLine";
+import { matchLines } from "./LineMatch";
 
 export interface SectionNamesOf {
 	/** Left out by a reader Inbox means nothing to: the phone's reminders, Inbox tasks having no slot. */
@@ -15,6 +16,11 @@ export interface SectionNamesOf {
 }
 
 export interface TaskEntry {
+	/**
+	 * Who the task is: its line's tag. A line keeps its tag through every change of the document, wherever it moves and
+	 * however it is rewritten; a line made anew gets a fresh one. `parse` takes the tags of a text's lines from `LineIds`.
+	 */
+	readonly id: string;
 	readonly section: SectionKey;
 	/** Among the tasks of the section: the task's own index, or that of the task a subtask belongs to. */
 	readonly index: number;
@@ -38,6 +44,8 @@ export interface TaskGroup {
 	readonly index: number;
 	readonly name: GroupName;
 	readonly heading: boolean;
+	/** Who the section is: its heading line's tag, kept through a rename and a move; null without a heading. */
+	readonly id: string | null;
 	readonly entries: readonly TaskEntry[];
 	/** Nothing under the heading but blank lines. */
 	readonly blank: boolean;
@@ -53,6 +61,50 @@ export type InsertPosition = number | "start" | "end" | { readonly endOf: number
 export function ungroupedIndex(groups: readonly TaskGroup[]): number {
 	for (let i = groups.length - 1; i > 0; i--) if (groups[i].name === null) return i;
 	return 0;
+}
+
+/**
+ * What `retagged` makes of a document's tags: `t<n>` becomes `known`'s id for `n` when it has one, else `t` and `next`
+ * plus `n`. A parse tags each line by its line, from `t0`, and the lines a change makes after it on from there; so a
+ * document read from a text is retagged by the ids of that text's lines, wherever its changes moved them.
+ */
+export interface LineIds {
+	readonly known: ReadonlyMap<number, string>;
+	readonly next: number;
+}
+
+/** A heading or a task line of a document, where it stands, with its tag's number. */
+export interface OutlineLine {
+	readonly line: number;
+	readonly raw: string;
+	readonly task: boolean;
+	readonly tag: number;
+}
+
+/** The lines of a text as `TaskDocument.parse` splits it. */
+function linesOfText(text: string): string[] {
+	const eol = text.includes("\r\n") ? "\r\n" : "\n";
+	const body = text.endsWith(eol) ? text.slice(0, -eol.length) : text;
+	return body === "" && text === "" ? [] : body.split(eol);
+}
+
+/** A line of the document and its tag. */
+interface Row {
+	readonly line: string;
+	readonly tag: string;
+}
+
+/** The tags a change gives the lines it makes: each a fresh one, on from where the document's left off. */
+class Mint {
+	constructor(public next: number) {}
+
+	rows(lines: readonly string[]): Row[] {
+		return lines.map((line) => ({ line, tag: `t${this.next++}` }));
+	}
+}
+
+function linesOfRows(rows: readonly Row[]): string[] {
+	return rows.map((row) => row.line);
 }
 
 interface Span {
@@ -111,40 +163,9 @@ function sameTask(a: Task, b: Task): boolean {
 	);
 }
 
-/**
- * The lines of `after` an ordered diff from `before` finds inserted (a longest common subsequence of the two), each
- * moved up past the identical lines right above it.
- */
-function insertedLines(before: readonly string[], after: readonly string[]): Set<number> {
-	let start = 0;
-	while (start < before.length && start < after.length && before[start] === after[start]) start++;
-	let end = 0;
-	while (end < before.length - start && end < after.length - start && before[before.length - 1 - end] === after[after.length - 1 - end]) end++;
-	const a = before.slice(start, before.length - end);
-	const b = after.slice(start, after.length - end);
-	const width = b.length + 1;
-	const common = new Int32Array((a.length + 1) * width);
-	for (let i = a.length - 1; i >= 0; i--) {
-		for (let j = b.length - 1; j >= 0; j--) {
-			common[i * width + j] = a[i] === b[j] ? common[(i + 1) * width + j + 1] + 1 : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
-		}
-	}
-	const inserted = new Set<number>();
-	for (let i = 0, j = 0; j < b.length; ) {
-		if (i < a.length && a[i] === b[j] && common[i * width + j] === common[(i + 1) * width + j + 1] + 1) {
-			i++;
-			j++;
-		} else if (i < a.length && common[(i + 1) * width + j] === common[i * width + j]) i++;
-		else inserted.add(start + j++);
-	}
-	for (const line of [...inserted].sort((x, y) => x - y)) {
-		let at = line;
-		while (at > 0 && !inserted.has(at - 1) && after[at - 1] === after[at]) {
-			inserted.delete(at);
-			inserted.add(--at);
-		}
-	}
-	return inserted;
+/** A tag's number: the order lines were tagged in. */
+function tagNumber(tag: string): number {
+	return Number(tag.slice(1));
 }
 
 /** Every task and subtask, each before its own subtasks. */
@@ -161,12 +182,13 @@ function contains(entry: TaskEntry, other: TaskEntry): boolean {
 }
 
 /** The lines of an entry under another indent: its own line and the deeper ones keep their depth below it. */
-function reindented(lines: readonly string[], from: string, to: string): string[] {
-	if (from === to) return [...lines];
-	return lines.map((line) => (line.startsWith(from) ? to + line.slice(from.length) : line));
+function reindented(rows: readonly Row[], from: string, to: string): Row[] {
+	if (from === to) return [...rows];
+	return rows.map((row) => (row.line.startsWith(from) ? { line: to + row.line.slice(from.length), tag: row.tag } : row));
 }
 
 export class TaskDocument {
+	private readonly lines: readonly string[];
 	private readonly sections: ReadonlyMap<SectionKey, Section>;
 	private readonly entries: ReadonlyMap<SectionKey, readonly TaskEntry[]>;
 	private readonly spans: ReadonlyMap<TaskEntry, Span>;
@@ -174,12 +196,14 @@ export class TaskDocument {
 	private readonly blockLists: ReadonlyMap<SectionKey, readonly Block[]>;
 
 	private constructor(
-		private readonly lines: readonly string[],
+		private readonly rows: readonly Row[],
 		private readonly eol: string,
 		private readonly trailingEol: boolean,
 		private readonly names: SectionNamesOf,
 		private readonly markers: Markers,
+		private readonly next: number,
 	) {
+		this.lines = linesOfRows(rows);
 		this.sections = this.findSections();
 		const entries = new Map<SectionKey, TaskEntry[]>();
 		const spans = new Map<TaskEntry, Span>();
@@ -198,12 +222,30 @@ export class TaskDocument {
 		this.blockLists = blocks;
 	}
 
+	/** Each line tagged by its line, `t0` on. */
 	static parse(text: string, sections: SectionNamesOf, markers: Markers): TaskDocument {
 		const eol = text.includes("\r\n") ? "\r\n" : "\n";
 		const trailingEol = text.endsWith(eol);
-		const body = trailingEol ? text.slice(0, -eol.length) : text;
-		const lines = body === "" && text === "" ? [] : body.split(eol);
-		return new TaskDocument(lines, eol, trailingEol, sections, markers);
+		const lines = linesOfText(text);
+		const rows = lines.map((line, i) => ({ line, tag: `t${i}` }));
+		return new TaskDocument(rows, eol, trailingEol, sections, markers, lines.length);
+	}
+
+	/** The document with every tag renamed by `ids`; the tags its changes make go on past every new one. */
+	retagged(ids: LineIds): TaskDocument {
+		const rows = this.rows.map((row) => {
+			const n = tagNumber(row.tag);
+			return { line: row.line, tag: ids.known.get(n) ?? `t${ids.next + n}` };
+		});
+		return new TaskDocument(rows, this.eol, this.trailingEol, this.names, this.markers, ids.next + this.next);
+	}
+
+	/** The headings and the task lines, in file order, each with its tag's number. */
+	outline(): readonly OutlineLine[] {
+		return this.rows.flatMap((row, line): OutlineLine[] => {
+			const task = isTaskLine(row.line);
+			return task || SECTION_HEADING_RE.test(row.line) || GROUP_HEADING_RE.test(row.line) ? [{ line, raw: row.line, task, tag: tagNumber(row.tag) }] : [];
+		});
 	}
 
 	static empty(all: readonly string[]): string {
@@ -250,44 +292,43 @@ export class TaskDocument {
 		return SECTION_KEYS.flatMap((key) => this.tasks(key));
 	}
 
-	/**
-	 * The task a change inserted into `before`, wherever the rules then moved it: the task line an ordered diff of the
-	 * two documents finds only here. The headings keep a twin in another section apart; of identical lines side by side
-	 * it gives the first.
-	 */
-	insertedSince(before: TaskDocument): TaskEntry | undefined {
-		const inserted = insertedLines(before.lines, this.lines);
-		return flatten(this.allTasks()).find((entry) => inserted.has(this.lineOf(entry)));
+	/** Where the tags of the lines a change makes after this document begin: past every tag it has. */
+	nextTag(): number {
+		return this.next;
+	}
+
+	/** The tag of each heading and task line, by its line, from 0. */
+	outlineTags(): ReadonlyMap<number, string> {
+		return new Map(this.outline().map((o) => [o.line, this.rows[o.line].tag]));
 	}
 
 	/**
-	 * Where each of `moved`, tasks of `before`, stands after a change moved them: the task line an ordered diff finds only
-	 * here with its text, as a line the move rewrote is; else its very line, when this document has it once. Undefined when
-	 * neither finds it.
+	 * The task a change made since `before`, wherever the rules then moved it: the first one it made, as its tag tells; the
+	 * rules may make others after it (a repeating task's next copy).
 	 */
-	movedSince(before: TaskDocument, moved: readonly TaskEntry[]): (TaskEntry | undefined)[] {
-		const inserted = insertedLines(before.lines, this.lines);
-		const all = flatten(this.allTasks());
-		const fresh = all.filter((entry) => inserted.has(this.lineOf(entry)));
-		const taken = new Set<TaskEntry>();
-		const take = (entry: TaskEntry | undefined) => (entry && taken.add(entry), entry);
-		return moved.map((entry) => {
-			const rewritten = fresh.find((candidate) => !taken.has(candidate) && candidate.task.text === entry.task.text);
-			if (rewritten) return take(rewritten);
-			const same = all.filter((candidate) => !taken.has(candidate) && candidate.raw === entry.raw);
-			return take(same.length === 1 ? same[0] : undefined);
-		});
+	insertedSince(before: TaskDocument): TaskEntry | undefined {
+		const old = new Set(flatten(before.allTasks()).map((entry) => entry.id));
+		const made = flatten(this.allTasks()).filter((entry) => !old.has(entry.id));
+		return made.sort((a, b) => tagNumber(a.id) - tagNumber(b.id))[0];
+	}
+
+	/** Where each of `moved`, tasks of `before`, stands after a change moved them, by its tag; undefined when it is gone. */
+	movedSince(_before: TaskDocument, moved: readonly TaskEntry[]): (TaskEntry | undefined)[] {
+		const all = new Map(flatten(this.allTasks()).map((entry) => [entry.id, entry]));
+		return moved.map((entry) => all.get(entry.id));
 	}
 
 	insert(section: SectionKey, position: InsertPosition, task: Task): TaskDocument {
 		const line = this.insertionLine(section, position);
-		return this.withLines(this.splice(line, 0, this.linesOf("", "-", task)));
+		const mint = this.mint();
+		return this.withRows(this.splice(line, 0, mint.rows(this.linesOf("", "-", task))), mint);
 	}
 
 	replace(entry: TaskEntry, task: Task): TaskDocument {
 		const span = this.spanOf(entry);
 		if (sameTask(entry.task, task)) return this;
-		return this.withLines(this.splice(span.line, span.lineCount, this.linesOf(entry.indent, entry.bullet, task)));
+		const mint = this.mint();
+		return this.withRows(this.splice(span.line, span.lineCount, this.rewritten(span, this.linesOf(entry.indent, entry.bullet, task), mint)), mint);
 	}
 
 	/**
@@ -295,33 +336,34 @@ export class TaskDocument {
 	 * own line changes unless its description and subtasks do; those rewritten lines may not hold another change.
 	 */
 	replaceAll(changes: readonly (readonly [TaskEntry, Task])[]): TaskDocument {
-		const edits: { line: number; count: number; lines: string[] }[] = [];
+		const edits: { line: number; count: number; rows: Row[] }[] = [];
+		const mint = this.mint();
 		for (const [entry, task] of changes) {
 			const span = this.spanOf(entry);
 			if (sameTask(entry.task, task)) continue;
 			const own = sameLines(entry.task.children, task.children);
 			edits.push(
 				own
-					? { line: span.line, count: 1, lines: [formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task }, this.markers)] }
-					: { line: span.line, count: span.lineCount, lines: this.linesOf(entry.indent, entry.bullet, task) },
+					? { line: span.line, count: 1, rows: this.rewritten({ line: span.line, lineCount: 1 }, [formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task }, this.markers)], mint) }
+					: { line: span.line, count: span.lineCount, rows: this.rewritten(span, this.linesOf(entry.indent, entry.bullet, task), mint) },
 			);
 		}
 		if (edits.length === 0) return this;
 		edits.sort((a, b) => b.line - a.line);
-		const lines = [...this.lines];
-		let below = lines.length;
+		const rows = [...this.rows];
+		let below = rows.length;
 		for (const edit of edits) {
 			if (edit.line + edit.count > below) throw new Error(`Changes overlap at line ${edit.line + 1}`);
-			lines.splice(edit.line, edit.count, ...edit.lines);
+			rows.splice(edit.line, edit.count, ...edit.rows);
 			below = edit.line;
 		}
-		return this.withLines(lines);
+		return this.withRows(rows, mint);
 	}
 
 	/** The last task taken out of a section takes the section away, unless something but blank lines is left under it. */
 	removeEntry(entry: TaskEntry): TaskDocument {
 		const span = this.spanOf(entry);
-		return this.leftBy(entry, this.withLines(this.splice(span.line, span.lineCount, [])));
+		return this.leftBy(entry, this.withRows(this.splice(span.line, span.lineCount, [])));
 	}
 
 	/**
@@ -330,16 +372,17 @@ export class TaskDocument {
 	 */
 	moveEntry(entry: TaskEntry, section: SectionKey, position: InsertPosition, project?: string | null): TaskDocument {
 		const span = this.spanOf(entry);
-		const moved = this.ownLines(entry, span, "", project !== undefined ? project : entry.path.length > 0 ? entry.project : entry.task.project);
-		const without = this.withLines(this.splice(span.line, span.lineCount, []));
+		const moved = this.ownRows(entry, span, "", project !== undefined ? project : entry.path.length > 0 ? entry.project : entry.task.project);
+		const without = this.withRows(this.splice(span.line, span.lineCount, []));
 		const target = without.insertionLine(section, this.positionAfterRemoval(entry, section, position));
-		return this.leftBy(entry, without.withLines(without.splice(target, 0, moved)));
+		return this.leftBy(entry, without.withRows(without.splice(target, 0, moved)));
 	}
 
 	/** An empty `### name` before group `before`; `before` equal to the number of groups puts it last. */
 	addGroup(section: SectionKey, name: string, before: number): TaskDocument {
 		if (before < 1) throw new Error("No group goes above the tasks outside any section");
-		return this.withLines(this.splice(this.groupStartLine(section, before), 0, [`### ${name}`]));
+		const mint = this.mint();
+		return this.withRows(this.splice(this.groupStartLine(section, before), 0, mint.rows([`### ${name}`])), mint);
 	}
 
 	/**
@@ -354,10 +397,11 @@ export class TaskDocument {
 		let at = block.end;
 		while (at > block.start && (this.lines[at - 1].trim() === "" || inMoved(at - 1))) at--;
 		if (at === block.start) at = Math.min(...spans.map((span) => span.line));
-		const lines = moved.flatMap((entry, i) => reindented(this.lines.slice(spans[i].line, spans[i].line + spans[i].lineCount), entry.indent, ""));
-		const kept = this.lines.filter((_, line) => !inMoved(line));
-		kept.splice(at - spans.filter((span) => span.line < at).reduce((sum, span) => sum + span.lineCount, 0), 0, `### ${name}`, ...lines);
-		return this.withLines(kept);
+		const rows = moved.flatMap((entry, i) => reindented(this.rows.slice(spans[i].line, spans[i].line + spans[i].lineCount), entry.indent, ""));
+		const kept = this.rows.filter((_, line) => !inMoved(line));
+		const mint = this.mint();
+		kept.splice(at - spans.filter((span) => span.line < at).reduce((sum, span) => sum + span.lineCount, 0), 0, ...mint.rows([`### ${name}`]), ...rows);
+		return this.withRows(kept, mint);
 	}
 
 	/** Group `from` goes before group `before`. The top block moved down gets the heading of the tasks outside any section. */
@@ -366,27 +410,28 @@ export class TaskDocument {
 		if (before === from || before === from + 1) return this;
 		const block = this.blockOf(section, from);
 		const content = this.contentOf(block);
-		const core = this.lines.slice(block.headingLine ?? content.first, content.last);
-		if (block.headingLine === null) core.unshift(`### ${this.ungroupedName()}`);
+		const mint = this.mint();
+		const core = this.rows.slice(block.headingLine ?? content.first, content.last);
+		if (block.headingLine === null) core.unshift(...mint.rows([`### ${this.ungroupedName()}`]));
 		const cut = this.cutOf(section, from);
-		const apart = Array<string>(cut.to - cut.from - (content.last - (block.headingLine ?? content.first))).fill("");
+		const apart = mint.rows(Array<string>(cut.to - cut.from - (content.last - (block.headingLine ?? content.first))).fill(""));
 		const last = before === this.blockLists.get(section)!.length;
 		const moved = last ? [...apart, ...core] : [...core, ...apart];
-		return this.withLines(this.cutAndInsert(cut, this.groupStartLine(section, before), moved));
+		return this.withRows(this.cutAndInsert(cut, this.groupStartLine(section, before), moved), mint);
 	}
 
 	renameGroup(section: SectionKey, index: number, name: string): TaskDocument {
 		const line = this.blockOf(section, index).headingLine;
 		if (line === null) throw new Error("The tasks outside any section have no heading");
-		return this.withLines(this.splice(line, 1, [`### ${name}`]));
+		return this.withRows(this.splice(line, 1, [{ line: `### ${name}`, tag: this.rows[line].tag }]));
 	}
 
 	/** What group `from` holds goes to the start or the end of the tasks of group `into`; the heading of `from` goes. */
 	mergeGroup(section: SectionKey, from: number, into: number, at: "start" | "end"): TaskDocument {
 		if (from === into) throw new Error("A group merges into another one");
 		const content = this.contentOf(this.blockOf(section, from));
-		const moved = this.lines.slice(content.first, content.last);
-		return this.withLines(this.cutAndInsert(this.cutOf(section, from), this.groupInsertionLine(section, into, at), moved));
+		const moved = this.rows.slice(content.first, content.last);
+		return this.withRows(this.cutAndInsert(this.cutOf(section, from), this.groupInsertionLine(section, into, at), moved));
 	}
 
 	/** A group with nothing but blank lines goes, its blank lines with it unless they part the list from the next one. */
@@ -395,7 +440,7 @@ export class TaskDocument {
 		const block = this.blockOf(section, index);
 		if (!group?.blank || block.headingLine === null) throw new Error("Only an empty section is deleted");
 		const cut = this.cutOf(section, index);
-		return this.withLines(this.splice(cut.from, cut.to - cut.from, []));
+		return this.withRows(this.splice(cut.from, cut.to - cut.from, []));
 	}
 
 	/** Puts the entry with its subtasks among `parent`'s subtasks, right before `before` (one of them) or last. */
@@ -403,10 +448,10 @@ export class TaskDocument {
 		if (contains(entry, parent)) throw new Error(`A task cannot go under itself: ${entry.raw}`);
 		const span = this.spanOf(entry);
 		const target = before ? this.spanOf(before).line : this.endOf(parent);
-		const moved = this.ownLines(entry, span, this.childIndent(parent), null);
+		const moved = this.ownRows(entry, span, this.childIndent(parent), null);
 		const without = this.splice(span.line, span.lineCount, []);
 		without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved);
-		return this.leftBy(entry, this.withLines(without));
+		return this.leftBy(entry, this.withRows(without));
 	}
 
 	/**
@@ -440,34 +485,37 @@ export class TaskDocument {
 	/** A new subtask of `parent`, right before its subtask `before` or last. */
 	insertUnder(parent: TaskEntry, task: Task, before: TaskEntry | null = null): TaskDocument {
 		const line = before ? this.spanOf(before).line : this.endOf(parent);
-		return this.withLines(this.splice(line, 0, this.linesOf(this.childIndent(parent), parent.bullet, task)));
+		const mint = this.mint();
+		return this.withRows(this.splice(line, 0, mint.rows(this.linesOf(this.childIndent(parent), parent.bullet, task))), mint);
 	}
 
 	ensureSections(all: readonly string[]): TaskDocument {
 		const present = new Set(this.headingNames());
 		const missing = all.filter((name) => !present.has(name));
 		if (missing.length === 0) return this;
-		const lines = [...this.lines];
+		const rows = [...this.rows];
+		const mint = this.mint();
 		for (const name of missing) {
-			if (lines.length > 0 && lines[lines.length - 1] !== "") lines.push("");
-			lines.push(`## ${name}`);
+			if (rows.length > 0 && rows[rows.length - 1].line !== "") rows.push(...mint.rows([""]));
+			rows.push(...mint.rows([`## ${name}`]));
 		}
-		return new TaskDocument(lines, this.eol, true, this.names, this.markers);
+		return new TaskDocument(rows, this.eol, true, this.names, this.markers, mint.next);
 	}
 
 	/** Under each list's heading one blank line, then what is under it; a heading with nothing below it stays as it is. */
 	spacedHeadings(): TaskDocument {
 		const headings = [...this.sections.values()].map((s) => s.headingLine).sort((a, b) => b - a);
-		let lines: string[] | null = null;
+		let rows: Row[] | null = null;
+		const mint = this.mint();
 		for (const heading of headings) {
-			const current: readonly string[] = lines ?? this.lines;
+			const current: readonly Row[] = rows ?? this.rows;
 			let filled = heading + 1;
-			while (filled < current.length && current[filled].trim() === "") filled++;
-			if (filled === current.length || (filled === heading + 2 && current[heading + 1] === "")) continue;
-			lines ??= [...this.lines];
-			lines.splice(heading + 1, filled - heading - 1, "");
+			while (filled < current.length && current[filled].line.trim() === "") filled++;
+			if (filled === current.length || (filled === heading + 2 && current[heading + 1].line === "")) continue;
+			rows ??= [...this.rows];
+			rows.splice(heading + 1, filled - heading - 1, ...mint.rows([""]));
 		}
-		return lines ? this.withLines(lines) : this;
+		return rows ? this.withRows(rows, mint) : this;
 	}
 
 	/**
@@ -486,20 +534,37 @@ export class TaskDocument {
 	 * The entry's lines under another indent, its own line written with `project` as its project: a subtask that becomes a
 	 * task takes the one it had through its parent, a task put under another one needs none.
 	 */
-	private ownLines(entry: TaskEntry, span: Span, indent: string, project: string | null): string[] {
-		const lines = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, indent);
-		if (entry.task.project !== project) lines[0] = formatTaskLine({ indent, bullet: entry.bullet, task: { ...entry.task, project } }, this.markers);
-		return lines;
+	private ownRows(entry: TaskEntry, span: Span, indent: string, project: string | null): Row[] {
+		const rows = reindented(this.rows.slice(span.line, span.line + span.lineCount), entry.indent, indent);
+		if (entry.task.project !== project) rows[0] = { line: formatTaskLine({ indent, bullet: entry.bullet, task: { ...entry.task, project } }, this.markers), tag: rows[0].tag };
+		return rows;
 	}
 
-	private withLines(lines: readonly string[]): TaskDocument {
-		return new TaskDocument(lines, this.eol, this.trailingEol, this.names, this.markers);
+	/**
+	 * `lines` in place of the span's: its first line keeps the tag of the span's first, as a rewritten task keeps who it
+	 * is; the lines under it keep theirs where they stay or are edited in place, a task line for a task line.
+	 */
+	private rewritten(span: Span, lines: readonly string[], mint: Mint): Row[] {
+		const old = this.rows.slice(span.line + 1, span.line + span.lineCount);
+		const fresh = lines.slice(1);
+		const isTask = (line: string) => parseTaskLine(line, this.markers) !== null;
+		const kept = new Map(matchLines(linesOfRows(old), fresh, (b, a) => isTask(old[b].line) === isTask(fresh[a])).map(([b, a]) => [a, old[b].tag]));
+		const rows = fresh.map((line, i) => ({ line, tag: kept.get(i) ?? mint.rows([line])[0].tag }));
+		return [{ line: lines[0], tag: this.rows[span.line].tag }, ...rows];
 	}
 
-	private splice(start: number, deleteCount: number, insert: readonly string[]): string[] {
-		const lines = [...this.lines];
-		lines.splice(start, deleteCount, ...insert);
-		return lines;
+	private mint(): Mint {
+		return new Mint(this.next);
+	}
+
+	private withRows(rows: readonly Row[], mint: Mint | null = null): TaskDocument {
+		return new TaskDocument(rows, this.eol, this.trailingEol, this.names, this.markers, mint?.next ?? this.next);
+	}
+
+	private splice(start: number, deleteCount: number, insert: readonly Row[]): Row[] {
+		const rows = [...this.rows];
+		rows.splice(start, deleteCount, ...insert);
+		return rows;
 	}
 
 	private linesOf(indent: string, bullet: string, task: Task): string[] {
@@ -620,11 +685,11 @@ export class TaskDocument {
 	}
 
 	/** Removes the cut and puts `moved` in at `target`, a line of the document before the cut. */
-	private cutAndInsert(cut: { from: number; to: number }, target: number, moved: readonly string[]): string[] {
+	private cutAndInsert(cut: { from: number; to: number }, target: number, moved: readonly Row[]): Row[] {
 		const size = cut.to - cut.from;
-		const lines = this.splice(cut.from, size, []);
-		lines.splice(target >= cut.to ? target - size : Math.min(target, cut.from), 0, ...moved);
-		return lines;
+		const rows = this.splice(cut.from, size, []);
+		rows.splice(target >= cut.to ? target - size : Math.min(target, cut.from), 0, ...moved);
+		return rows;
 	}
 
 	/** The first line under the block's heading that is not blank; its end when there is none. */
@@ -700,7 +765,7 @@ export class TaskDocument {
 		const blank = this.lines.slice(block.start, block.end).every((line) => line.trim() === "");
 		const own = this.readLevel(key, block.start, block.end, null, block.name, entries.length, spans, null);
 		entries.push(...own);
-		return { index, name: block.name, heading: block.headingLine !== null, entries: own, blank };
+		return { index, name: block.name, heading: block.headingLine !== null, id: block.headingLine === null ? null : this.rows[block.headingLine].tag, entries: own, blank };
 	}
 
 	/** The task lines from `from` to `end` that no task line above them in that range holds, each with its own subtasks. */
@@ -718,7 +783,7 @@ export class TaskDocument {
 			const place: Place = parent ? { index: parent.index, path: [...parent.path, entries.length] } : { index: firstIndex + entries.length, path: [] };
 			const project = parent ? parentProject : parsed.task.project;
 			const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, group, 0, spans, project);
-			const entry: TaskEntry = { section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, project, subtasks };
+			const entry: TaskEntry = { id: this.rows[i].tag, section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, project, subtasks };
 			entries.push(entry);
 			spans.set(entry, { line: i, lineCount: 1 + children.length });
 			i += 1 + children.length;

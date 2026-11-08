@@ -615,6 +615,9 @@
   }
   var readLines = /* @__PURE__ */ new WeakMap();
   var KEPT_LINES = 2e4;
+  function isTaskLine(line) {
+    return LINE_RE.test(line);
+  }
   function parseTaskLine(line, markers) {
     let kept = readLines.get(markers);
     if (!kept) readLines.set(markers, kept = /* @__PURE__ */ new Map());
@@ -653,10 +656,242 @@
     return line;
   }
 
+  // core/domain/TextPatch.ts
+  var CONTEXT = 2;
+  var TextPatch = class _TextPatch {
+    constructor(changes) {
+      this.changes = changes;
+    }
+    /** `ids`, who the tasks are on each side: each changed block keeps its lines' (`Hunk.removedIds`, `addedIds`). */
+    static between(before, after, ids) {
+      const hunks = hunksOf(before.split("\n"), after.split("\n"));
+      if (!ids) return new _TextPatch(hunks);
+      const of = (map, from, count) => Array.from({ length: count }, (_, k) => map.get(from + k) ?? null);
+      return new _TextPatch(hunks.map((h) => ({ ...h, removedIds: of(ids.before, h.before, h.removed.length), addedIds: of(ids.after, h.after, h.added.length) })));
+    }
+    /** The patch as plain data, for a host that keeps the steps itself; `TextPatch.of` reads it back. */
+    get hunks() {
+      return this.changes;
+    }
+    static of(hunks) {
+      return new _TextPatch(hunks);
+    }
+    get empty() {
+      return this.changes.length === 0;
+    }
+    /** `current` with the change taken back, or null when a changed block is no longer to be found. */
+    revert(current) {
+      return this.reverted(current)?.text ?? null;
+    }
+    /** `current` with the change made again, or null when a block it changes is no longer to be found. */
+    apply(current) {
+      return this.applied(current)?.text ?? null;
+    }
+    /** `revert`, with where each line came from and who the lines it gave back were. */
+    reverted(current) {
+      return this.swap(current, "added", "removed");
+    }
+    /** `apply`, with where each line came from and who the lines it made again were. */
+    applied(current) {
+      return this.swap(current, "removed", "added");
+    }
+    swap(current, from, to) {
+      const lines = current.split("\n");
+      const shift = (hunk) => from === "added" ? hunk.after : hunk.before;
+      const places = this.changes.map((hunk) => find(lines, hunk, hunk[from], shift(hunk)));
+      if (places.some((place, i) => place === null || i > 0 && place <= places[i - 1] + this.changes[i - 1][from].length - 1)) return null;
+      const rows = lines.map((line, origin) => ({ line, origin, id: null }));
+      for (let i = this.changes.length - 1; i >= 0; i--) {
+        const hunk = this.changes[i];
+        const ids2 = to === "removed" ? hunk.removedIds : hunk.addedIds;
+        rows.splice(places[i], hunk[from].length, ...hunk[to].map((line, k) => ({ line, origin: null, id: ids2?.[k] ?? null })));
+      }
+      const ids = /* @__PURE__ */ new Map();
+      rows.forEach((row, i) => row.id !== null && ids.set(i, row.id));
+      return { text: rows.map((row) => row.line).join("\n"), origins: rows.map((row) => row.origin), ids };
+    }
+  };
+  function find(text, hunk, lines, near) {
+    const block = [...hunk.above, ...lines, ...hunk.below];
+    let best = null;
+    for (let start = 0; start + block.length <= text.length; start++) {
+      if (hunk.atStart && start !== 0) break;
+      if (hunk.atEnd && start + block.length !== text.length) continue;
+      if (!block.every((line, i) => text[start + i] === line)) continue;
+      const at = start + hunk.above.length;
+      if (best === null || Math.abs(at - near) < Math.abs(best - near)) best = at;
+    }
+    return best;
+  }
+  function hunksOf(before, after) {
+    const hunks = [];
+    for (const [b0, b1, a0, a1] of mergedBlocks(changedBlocks(before, after))) {
+      const above = Math.max(0, b0 - CONTEXT);
+      const below = Math.min(before.length, b1 + CONTEXT);
+      hunks.push({
+        before: b0,
+        after: a0,
+        removed: before.slice(b0, b1),
+        added: after.slice(a0, a1),
+        above: before.slice(above, b0),
+        below: before.slice(b1, below),
+        atStart: b0 < CONTEXT,
+        atEnd: before.length - b1 < CONTEXT
+      });
+    }
+    return hunks;
+  }
+  function mergedBlocks(blocks) {
+    const merged = [];
+    for (const block of blocks) {
+      const last = merged[merged.length - 1];
+      if (last && block[0] - last[1] <= 2 * CONTEXT) {
+        last[1] = block[1];
+        last[3] = block[3];
+      } else merged.push([...block]);
+    }
+    return merged;
+  }
+  function changedBlocks(before, after) {
+    let head = 0;
+    while (head < before.length && head < after.length && before[head] === after[head]) head++;
+    let tail = 0;
+    while (tail < before.length - head && tail < after.length - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
+    const b = before.slice(head, before.length - tail);
+    const a = after.slice(head, after.length - tail);
+    const same = sharedLines(b, a);
+    const blocks = [];
+    let i = 0;
+    let j = 0;
+    let open = null;
+    const close = () => {
+      if (open) blocks.push([head + open[0], head + i, head + open[1], head + j]);
+      open = null;
+    };
+    for (const [x, y] of [...same, [b.length, a.length]]) {
+      if (i < x || j < y) {
+        open ??= [i, j];
+        i = x;
+        j = y;
+      }
+      if (x === b.length && y === a.length) break;
+      close();
+      i++;
+      j++;
+    }
+    close();
+    return blocks;
+  }
+  var TABLE_CELLS = 1e6;
+  function sharedLines(b, a) {
+    return (b.length + 1) * (a.length + 1) <= TABLE_CELLS ? tableLines(b, a) : myersLines(b, a);
+  }
+  function tableLines(b, a) {
+    const width = a.length + 1;
+    const common = new Uint16Array((b.length + 1) * width);
+    for (let i2 = b.length - 1; i2 >= 0; i2--) {
+      for (let j2 = a.length - 1; j2 >= 0; j2--) {
+        common[i2 * width + j2] = b[i2] === a[j2] ? common[(i2 + 1) * width + j2 + 1] + 1 : Math.max(common[(i2 + 1) * width + j2], common[i2 * width + j2 + 1]);
+      }
+    }
+    const pairs = [];
+    let i = 0;
+    let j = 0;
+    while (i < b.length || j < a.length) {
+      if (i < b.length && j < a.length && b[i] === a[j]) pairs.push([i++, j++]);
+      else if (j < a.length && (i === b.length || common[i * width + j + 1] >= common[(i + 1) * width + j])) j++;
+      else i++;
+    }
+    return pairs;
+  }
+  function myersLines(b, a) {
+    const n = b.length;
+    const m = a.length;
+    const offset = n + m + 1;
+    const v = new Int32Array(2 * offset + 1);
+    const trace = [];
+    const down = (k, d, at) => k === -d || k !== d && at(k - 1) < at(k + 1);
+    let found = n === 0 && m === 0 ? 0 : -1;
+    for (let d = 0; found < 0; d++) {
+      trace.push(v.slice(offset - d, offset + d + 1));
+      for (let k = -d; k <= d; k += 2) {
+        let x2 = down(k, d, (i) => v[offset + i]) ? v[offset + k + 1] : v[offset + k - 1] + 1;
+        let y2 = x2 - k;
+        while (x2 < n && y2 < m && b[x2] === a[y2]) {
+          x2++;
+          y2++;
+        }
+        v[offset + k] = x2;
+        if (x2 >= n && y2 >= m) {
+          found = d;
+          break;
+        }
+      }
+    }
+    const pairs = [];
+    let x = n;
+    let y = m;
+    for (let d = found; d > 0; d--) {
+      const before = trace[d];
+      const at = (k2) => before[k2 + d];
+      const k = x - y;
+      const prevK = down(k, d, at) ? k + 1 : k - 1;
+      const prevX = at(prevK);
+      const prevY = prevX - prevK;
+      const startX = prevK === k + 1 ? prevX : prevX + 1;
+      while (x > startX) pairs.push([--x, --y]);
+      x = prevX;
+      y = prevY;
+    }
+    while (x > 0) pairs.push([--x, --y]);
+    return pairs.reverse();
+  }
+
+  // core/domain/LineMatch.ts
+  function matchLines(before, after, alike) {
+    let head = 0;
+    while (head < before.length && head < after.length && before[head] === after[head]) head++;
+    let tail = 0;
+    while (tail < before.length - head && tail < after.length - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
+    const shared = sharedLines(before.slice(head, before.length - tail), after.slice(head, after.length - tail)).map(([b2, a2]) => [b2 + head, a2 + head]);
+    const anchors = [...Array.from({ length: head }, (_, i) => [i, i]), ...shared, ...Array.from({ length: tail }, (_, i) => [before.length - tail + i, after.length - tail + i])];
+    const pairs = [];
+    let b = 0;
+    let a = 0;
+    for (const anchor of [...anchors, [before.length, after.length]]) {
+      pairs.push(...inPlace(b, anchor[0], a, anchor[1], alike));
+      if (anchor[0] < before.length) pairs.push(anchor);
+      b = anchor[0] + 1;
+      a = anchor[1] + 1;
+    }
+    return pairs;
+  }
+  function inPlace(b0, b1, a0, a1, alike) {
+    if (b1 - b0 !== a1 - a0 || b1 === b0) return [];
+    const pairs = Array.from({ length: b1 - b0 }, (_, k) => [b0 + k, a0 + k]);
+    return pairs.every(([x, y]) => alike(x, y)) ? pairs : [];
+  }
+
   // core/domain/TaskDocument.ts
   function ungroupedIndex(groups) {
     for (let i = groups.length - 1; i > 0; i--) if (groups[i].name === null) return i;
     return 0;
+  }
+  function linesOfText(text) {
+    const eol = text.includes("\r\n") ? "\r\n" : "\n";
+    const body = text.endsWith(eol) ? text.slice(0, -eol.length) : text;
+    return body === "" && text === "" ? [] : body.split(eol);
+  }
+  var Mint = class {
+    constructor(next) {
+      this.next = next;
+    }
+    rows(lines) {
+      return lines.map((line) => ({ line, tag: `t${this.next++}` }));
+    }
+  };
+  function linesOfRows(rows) {
+    return rows.map((row) => row.line);
   }
   var SECTION_KEYS = ["inbox", "backlog", "now", "soon", "done"];
   var LIST_END_RE = /^#{1,2}(\s|$)/;
@@ -670,36 +905,8 @@
   function sameTask(a, b) {
     return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && a.collapsed === b.collapsed && a.project === b.project && sameLines(a.children, b.children);
   }
-  function insertedLines(before, after) {
-    let start = 0;
-    while (start < before.length && start < after.length && before[start] === after[start]) start++;
-    let end = 0;
-    while (end < before.length - start && end < after.length - start && before[before.length - 1 - end] === after[after.length - 1 - end]) end++;
-    const a = before.slice(start, before.length - end);
-    const b = after.slice(start, after.length - end);
-    const width = b.length + 1;
-    const common = new Int32Array((a.length + 1) * width);
-    for (let i = a.length - 1; i >= 0; i--) {
-      for (let j = b.length - 1; j >= 0; j--) {
-        common[i * width + j] = a[i] === b[j] ? common[(i + 1) * width + j + 1] + 1 : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
-      }
-    }
-    const inserted = /* @__PURE__ */ new Set();
-    for (let i = 0, j = 0; j < b.length; ) {
-      if (i < a.length && a[i] === b[j] && common[i * width + j] === common[(i + 1) * width + j + 1] + 1) {
-        i++;
-        j++;
-      } else if (i < a.length && common[(i + 1) * width + j] === common[i * width + j]) i++;
-      else inserted.add(start + j++);
-    }
-    for (const line of [...inserted].sort((x, y) => x - y)) {
-      let at = line;
-      while (at > 0 && !inserted.has(at - 1) && after[at - 1] === after[at]) {
-        inserted.delete(at);
-        inserted.add(--at);
-      }
-    }
-    return inserted;
+  function tagNumber(tag) {
+    return Number(tag.slice(1));
   }
   function flatten(entries) {
     return entries.flatMap((entry) => [entry, ...flatten(entry.subtasks)]);
@@ -710,17 +917,19 @@
   function contains(entry, other) {
     return entry.section === other.section && entry.index === other.index && entry.path.every((i, k) => other.path[k] === i) && other.path.length >= entry.path.length;
   }
-  function reindented(lines, from, to) {
-    if (from === to) return [...lines];
-    return lines.map((line) => line.startsWith(from) ? to + line.slice(from.length) : line);
+  function reindented(rows, from, to) {
+    if (from === to) return [...rows];
+    return rows.map((row) => row.line.startsWith(from) ? { line: to + row.line.slice(from.length), tag: row.tag } : row);
   }
   var TaskDocument = class _TaskDocument {
-    constructor(lines, eol, trailingEol, names, markers) {
-      this.lines = lines;
+    constructor(rows, eol, trailingEol, names, markers, next) {
+      this.rows = rows;
       this.eol = eol;
       this.trailingEol = trailingEol;
       this.names = names;
       this.markers = markers;
+      this.next = next;
+      this.lines = linesOfRows(rows);
       this.sections = this.findSections();
       const entries = /* @__PURE__ */ new Map();
       const spans = /* @__PURE__ */ new Map();
@@ -738,12 +947,28 @@
       this.groupLists = groups;
       this.blockLists = blocks;
     }
+    /** Each line tagged by its line, `t0` on. */
     static parse(text, sections, markers) {
       const eol = text.includes("\r\n") ? "\r\n" : "\n";
       const trailingEol = text.endsWith(eol);
-      const body = trailingEol ? text.slice(0, -eol.length) : text;
-      const lines = body === "" && text === "" ? [] : body.split(eol);
-      return new _TaskDocument(lines, eol, trailingEol, sections, markers);
+      const lines = linesOfText(text);
+      const rows = lines.map((line, i) => ({ line, tag: `t${i}` }));
+      return new _TaskDocument(rows, eol, trailingEol, sections, markers, lines.length);
+    }
+    /** The document with every tag renamed by `ids`; the tags its changes make go on past every new one. */
+    retagged(ids) {
+      const rows = this.rows.map((row) => {
+        const n = tagNumber(row.tag);
+        return { line: row.line, tag: ids.known.get(n) ?? `t${ids.next + n}` };
+      });
+      return new _TaskDocument(rows, this.eol, this.trailingEol, this.names, this.markers, ids.next + this.next);
+    }
+    /** The headings and the task lines, in file order, each with its tag's number. */
+    outline() {
+      return this.rows.flatMap((row, line) => {
+        const task = isTaskLine(row.line);
+        return task || SECTION_HEADING_RE.test(row.line) || GROUP_HEADING_RE.test(row.line) ? [{ line, raw: row.line, task, tag: tagNumber(row.tag) }] : [];
+      });
     }
     static empty(all) {
       return _TaskDocument.parse("", { inbox: "", now: "", soon: "", done: "" }, { dueDate: "", slot: "" }).ensureSections(all).serialize();
@@ -778,41 +1003,38 @@
     allTasks() {
       return SECTION_KEYS.flatMap((key) => this.tasks(key));
     }
-    /**
-     * The task a change inserted into `before`, wherever the rules then moved it: the task line an ordered diff of the
-     * two documents finds only here. The headings keep a twin in another section apart; of identical lines side by side
-     * it gives the first.
-     */
-    insertedSince(before) {
-      const inserted = insertedLines(before.lines, this.lines);
-      return flatten(this.allTasks()).find((entry) => inserted.has(this.lineOf(entry)));
+    /** Where the tags of the lines a change makes after this document begin: past every tag it has. */
+    nextTag() {
+      return this.next;
+    }
+    /** The tag of each heading and task line, by its line, from 0. */
+    outlineTags() {
+      return new Map(this.outline().map((o) => [o.line, this.rows[o.line].tag]));
     }
     /**
-     * Where each of `moved`, tasks of `before`, stands after a change moved them: the task line an ordered diff finds only
-     * here with its text, as a line the move rewrote is; else its very line, when this document has it once. Undefined when
-     * neither finds it.
+     * The task a change made since `before`, wherever the rules then moved it: the first one it made, as its tag tells; the
+     * rules may make others after it (a repeating task's next copy).
      */
-    movedSince(before, moved2) {
-      const inserted = insertedLines(before.lines, this.lines);
-      const all = flatten(this.allTasks());
-      const fresh = all.filter((entry) => inserted.has(this.lineOf(entry)));
-      const taken = /* @__PURE__ */ new Set();
-      const take = (entry) => (entry && taken.add(entry), entry);
-      return moved2.map((entry) => {
-        const rewritten = fresh.find((candidate) => !taken.has(candidate) && candidate.task.text === entry.task.text);
-        if (rewritten) return take(rewritten);
-        const same = all.filter((candidate) => !taken.has(candidate) && candidate.raw === entry.raw);
-        return take(same.length === 1 ? same[0] : void 0);
-      });
+    insertedSince(before) {
+      const old = new Set(flatten(before.allTasks()).map((entry) => entry.id));
+      const made = flatten(this.allTasks()).filter((entry) => !old.has(entry.id));
+      return made.sort((a, b) => tagNumber(a.id) - tagNumber(b.id))[0];
+    }
+    /** Where each of `moved`, tasks of `before`, stands after a change moved them, by its tag; undefined when it is gone. */
+    movedSince(_before, moved2) {
+      const all = new Map(flatten(this.allTasks()).map((entry) => [entry.id, entry]));
+      return moved2.map((entry) => all.get(entry.id));
     }
     insert(section, position, task) {
       const line = this.insertionLine(section, position);
-      return this.withLines(this.splice(line, 0, this.linesOf("", "-", task)));
+      const mint = this.mint();
+      return this.withRows(this.splice(line, 0, mint.rows(this.linesOf("", "-", task))), mint);
     }
     replace(entry, task) {
       const span = this.spanOf(entry);
       if (sameTask(entry.task, task)) return this;
-      return this.withLines(this.splice(span.line, span.lineCount, this.linesOf(entry.indent, entry.bullet, task)));
+      const mint = this.mint();
+      return this.withRows(this.splice(span.line, span.lineCount, this.rewritten(span, this.linesOf(entry.indent, entry.bullet, task), mint)), mint);
     }
     /**
      * Each entry of this document becomes its task, as `replace` one after another would, in one rewrite. Only the task's
@@ -820,29 +1042,30 @@
      */
     replaceAll(changes) {
       const edits = [];
+      const mint = this.mint();
       for (const [entry, task] of changes) {
         const span = this.spanOf(entry);
         if (sameTask(entry.task, task)) continue;
         const own = sameLines(entry.task.children, task.children);
         edits.push(
-          own ? { line: span.line, count: 1, lines: [formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task }, this.markers)] } : { line: span.line, count: span.lineCount, lines: this.linesOf(entry.indent, entry.bullet, task) }
+          own ? { line: span.line, count: 1, rows: this.rewritten({ line: span.line, lineCount: 1 }, [formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task }, this.markers)], mint) } : { line: span.line, count: span.lineCount, rows: this.rewritten(span, this.linesOf(entry.indent, entry.bullet, task), mint) }
         );
       }
       if (edits.length === 0) return this;
       edits.sort((a, b) => b.line - a.line);
-      const lines = [...this.lines];
-      let below = lines.length;
+      const rows = [...this.rows];
+      let below = rows.length;
       for (const edit of edits) {
         if (edit.line + edit.count > below) throw new Error(`Changes overlap at line ${edit.line + 1}`);
-        lines.splice(edit.line, edit.count, ...edit.lines);
+        rows.splice(edit.line, edit.count, ...edit.rows);
         below = edit.line;
       }
-      return this.withLines(lines);
+      return this.withRows(rows, mint);
     }
     /** The last task taken out of a section takes the section away, unless something but blank lines is left under it. */
     removeEntry(entry) {
       const span = this.spanOf(entry);
-      return this.leftBy(entry, this.withLines(this.splice(span.line, span.lineCount, [])));
+      return this.leftBy(entry, this.withRows(this.splice(span.line, span.lineCount, [])));
     }
     /**
      * A subtask moved here leaves its task and becomes a task of `section`, with the project it had through it; `project`
@@ -850,15 +1073,16 @@
      */
     moveEntry(entry, section, position, project) {
       const span = this.spanOf(entry);
-      const moved2 = this.ownLines(entry, span, "", project !== void 0 ? project : entry.path.length > 0 ? entry.project : entry.task.project);
-      const without = this.withLines(this.splice(span.line, span.lineCount, []));
+      const moved2 = this.ownRows(entry, span, "", project !== void 0 ? project : entry.path.length > 0 ? entry.project : entry.task.project);
+      const without = this.withRows(this.splice(span.line, span.lineCount, []));
       const target = without.insertionLine(section, this.positionAfterRemoval(entry, section, position));
-      return this.leftBy(entry, without.withLines(without.splice(target, 0, moved2)));
+      return this.leftBy(entry, without.withRows(without.splice(target, 0, moved2)));
     }
     /** An empty `### name` before group `before`; `before` equal to the number of groups puts it last. */
     addGroup(section, name, before) {
       if (before < 1) throw new Error("No group goes above the tasks outside any section");
-      return this.withLines(this.splice(this.groupStartLine(section, before), 0, [`### ${name}`]));
+      const mint = this.mint();
+      return this.withRows(this.splice(this.groupStartLine(section, before), 0, mint.rows([`### ${name}`])), mint);
     }
     /**
      * The `moved` tasks of group `index`, with their subtasks and in their order, go under a new `### name` right after the
@@ -872,10 +1096,11 @@
       let at = block.end;
       while (at > block.start && (this.lines[at - 1].trim() === "" || inMoved(at - 1))) at--;
       if (at === block.start) at = Math.min(...spans.map((span) => span.line));
-      const lines = moved2.flatMap((entry, i) => reindented(this.lines.slice(spans[i].line, spans[i].line + spans[i].lineCount), entry.indent, ""));
-      const kept = this.lines.filter((_, line) => !inMoved(line));
-      kept.splice(at - spans.filter((span) => span.line < at).reduce((sum, span) => sum + span.lineCount, 0), 0, `### ${name}`, ...lines);
-      return this.withLines(kept);
+      const rows = moved2.flatMap((entry, i) => reindented(this.rows.slice(spans[i].line, spans[i].line + spans[i].lineCount), entry.indent, ""));
+      const kept = this.rows.filter((_, line) => !inMoved(line));
+      const mint = this.mint();
+      kept.splice(at - spans.filter((span) => span.line < at).reduce((sum, span) => sum + span.lineCount, 0), 0, ...mint.rows([`### ${name}`]), ...rows);
+      return this.withRows(kept, mint);
     }
     /** Group `from` goes before group `before`. The top block moved down gets the heading of the tasks outside any section. */
     moveGroup(section, from, before) {
@@ -883,25 +1108,26 @@
       if (before === from || before === from + 1) return this;
       const block = this.blockOf(section, from);
       const content = this.contentOf(block);
-      const core = this.lines.slice(block.headingLine ?? content.first, content.last);
-      if (block.headingLine === null) core.unshift(`### ${this.ungroupedName()}`);
+      const mint = this.mint();
+      const core = this.rows.slice(block.headingLine ?? content.first, content.last);
+      if (block.headingLine === null) core.unshift(...mint.rows([`### ${this.ungroupedName()}`]));
       const cut = this.cutOf(section, from);
-      const apart2 = Array(cut.to - cut.from - (content.last - (block.headingLine ?? content.first))).fill("");
+      const apart2 = mint.rows(Array(cut.to - cut.from - (content.last - (block.headingLine ?? content.first))).fill(""));
       const last = before === this.blockLists.get(section).length;
       const moved2 = last ? [...apart2, ...core] : [...core, ...apart2];
-      return this.withLines(this.cutAndInsert(cut, this.groupStartLine(section, before), moved2));
+      return this.withRows(this.cutAndInsert(cut, this.groupStartLine(section, before), moved2), mint);
     }
     renameGroup(section, index, name) {
       const line = this.blockOf(section, index).headingLine;
       if (line === null) throw new Error("The tasks outside any section have no heading");
-      return this.withLines(this.splice(line, 1, [`### ${name}`]));
+      return this.withRows(this.splice(line, 1, [{ line: `### ${name}`, tag: this.rows[line].tag }]));
     }
     /** What group `from` holds goes to the start or the end of the tasks of group `into`; the heading of `from` goes. */
     mergeGroup(section, from, into, at) {
       if (from === into) throw new Error("A group merges into another one");
       const content = this.contentOf(this.blockOf(section, from));
-      const moved2 = this.lines.slice(content.first, content.last);
-      return this.withLines(this.cutAndInsert(this.cutOf(section, from), this.groupInsertionLine(section, into, at), moved2));
+      const moved2 = this.rows.slice(content.first, content.last);
+      return this.withRows(this.cutAndInsert(this.cutOf(section, from), this.groupInsertionLine(section, into, at), moved2));
     }
     /** A group with nothing but blank lines goes, its blank lines with it unless they part the list from the next one. */
     deleteGroup(section, index) {
@@ -909,17 +1135,17 @@
       const block = this.blockOf(section, index);
       if (!group?.blank || block.headingLine === null) throw new Error("Only an empty section is deleted");
       const cut = this.cutOf(section, index);
-      return this.withLines(this.splice(cut.from, cut.to - cut.from, []));
+      return this.withRows(this.splice(cut.from, cut.to - cut.from, []));
     }
     /** Puts the entry with its subtasks among `parent`'s subtasks, right before `before` (one of them) or last. */
     nestEntry(entry, parent, before) {
       if (contains(entry, parent)) throw new Error(`A task cannot go under itself: ${entry.raw}`);
       const span = this.spanOf(entry);
       const target = before ? this.spanOf(before).line : this.endOf(parent);
-      const moved2 = this.ownLines(entry, span, this.childIndent(parent), null);
+      const moved2 = this.ownRows(entry, span, this.childIndent(parent), null);
       const without = this.splice(span.line, span.lineCount, []);
       without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved2);
-      return this.leftBy(entry, this.withLines(without));
+      return this.leftBy(entry, this.withRows(without));
     }
     /**
      * The task's description from Markdown, as one block right under its line and before its subtasks, at the indent its
@@ -950,32 +1176,35 @@
     /** A new subtask of `parent`, right before its subtask `before` or last. */
     insertUnder(parent, task, before = null) {
       const line = before ? this.spanOf(before).line : this.endOf(parent);
-      return this.withLines(this.splice(line, 0, this.linesOf(this.childIndent(parent), parent.bullet, task)));
+      const mint = this.mint();
+      return this.withRows(this.splice(line, 0, mint.rows(this.linesOf(this.childIndent(parent), parent.bullet, task))), mint);
     }
     ensureSections(all) {
       const present = new Set(this.headingNames());
       const missing = all.filter((name) => !present.has(name));
       if (missing.length === 0) return this;
-      const lines = [...this.lines];
+      const rows = [...this.rows];
+      const mint = this.mint();
       for (const name of missing) {
-        if (lines.length > 0 && lines[lines.length - 1] !== "") lines.push("");
-        lines.push(`## ${name}`);
+        if (rows.length > 0 && rows[rows.length - 1].line !== "") rows.push(...mint.rows([""]));
+        rows.push(...mint.rows([`## ${name}`]));
       }
-      return new _TaskDocument(lines, this.eol, true, this.names, this.markers);
+      return new _TaskDocument(rows, this.eol, true, this.names, this.markers, mint.next);
     }
     /** Under each list's heading one blank line, then what is under it; a heading with nothing below it stays as it is. */
     spacedHeadings() {
       const headings = [...this.sections.values()].map((s) => s.headingLine).sort((a, b) => b - a);
-      let lines = null;
+      let rows = null;
+      const mint = this.mint();
       for (const heading of headings) {
-        const current = lines ?? this.lines;
+        const current = rows ?? this.rows;
         let filled = heading + 1;
-        while (filled < current.length && current[filled].trim() === "") filled++;
-        if (filled === current.length || filled === heading + 2 && current[heading + 1] === "") continue;
-        lines ??= [...this.lines];
-        lines.splice(heading + 1, filled - heading - 1, "");
+        while (filled < current.length && current[filled].line.trim() === "") filled++;
+        if (filled === current.length || filled === heading + 2 && current[heading + 1].line === "") continue;
+        rows ??= [...this.rows];
+        rows.splice(heading + 1, filled - heading - 1, ...mint.rows([""]));
       }
-      return lines ? this.withLines(lines) : this;
+      return rows ? this.withRows(rows, mint) : this;
     }
     /**
      * `after`, this document once `entry` was taken from its place (and put elsewhere): without the section it was the
@@ -992,18 +1221,33 @@
      * The entry's lines under another indent, its own line written with `project` as its project: a subtask that becomes a
      * task takes the one it had through its parent, a task put under another one needs none.
      */
-    ownLines(entry, span, indent, project) {
-      const lines = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, indent);
-      if (entry.task.project !== project) lines[0] = formatTaskLine({ indent, bullet: entry.bullet, task: { ...entry.task, project } }, this.markers);
-      return lines;
+    ownRows(entry, span, indent, project) {
+      const rows = reindented(this.rows.slice(span.line, span.line + span.lineCount), entry.indent, indent);
+      if (entry.task.project !== project) rows[0] = { line: formatTaskLine({ indent, bullet: entry.bullet, task: { ...entry.task, project } }, this.markers), tag: rows[0].tag };
+      return rows;
     }
-    withLines(lines) {
-      return new _TaskDocument(lines, this.eol, this.trailingEol, this.names, this.markers);
+    /**
+     * `lines` in place of the span's: its first line keeps the tag of the span's first, as a rewritten task keeps who it
+     * is; the lines under it keep theirs where they stay or are edited in place, a task line for a task line.
+     */
+    rewritten(span, lines, mint) {
+      const old = this.rows.slice(span.line + 1, span.line + span.lineCount);
+      const fresh = lines.slice(1);
+      const isTask = (line) => parseTaskLine(line, this.markers) !== null;
+      const kept = new Map(matchLines(linesOfRows(old), fresh, (b, a) => isTask(old[b].line) === isTask(fresh[a])).map(([b, a]) => [a, old[b].tag]));
+      const rows = fresh.map((line, i) => ({ line, tag: kept.get(i) ?? mint.rows([line])[0].tag }));
+      return [{ line: lines[0], tag: this.rows[span.line].tag }, ...rows];
+    }
+    mint() {
+      return new Mint(this.next);
+    }
+    withRows(rows, mint = null) {
+      return new _TaskDocument(rows, this.eol, this.trailingEol, this.names, this.markers, mint?.next ?? this.next);
     }
     splice(start, deleteCount, insert) {
-      const lines = [...this.lines];
-      lines.splice(start, deleteCount, ...insert);
-      return lines;
+      const rows = [...this.rows];
+      rows.splice(start, deleteCount, ...insert);
+      return rows;
     }
     linesOf(indent, bullet, task) {
       return [formatTaskLine({ indent, bullet, task }, this.markers), ...task.children];
@@ -1112,9 +1356,9 @@
     /** Removes the cut and puts `moved` in at `target`, a line of the document before the cut. */
     cutAndInsert(cut, target, moved2) {
       const size = cut.to - cut.from;
-      const lines = this.splice(cut.from, size, []);
-      lines.splice(target >= cut.to ? target - size : Math.min(target, cut.from), 0, ...moved2);
-      return lines;
+      const rows = this.splice(cut.from, size, []);
+      rows.splice(target >= cut.to ? target - size : Math.min(target, cut.from), 0, ...moved2);
+      return rows;
     }
     /** The first line under the block's heading that is not blank; its end when there is none. */
     firstFilled(block) {
@@ -1181,7 +1425,7 @@
       const blank = this.lines.slice(block.start, block.end).every((line) => line.trim() === "");
       const own = this.readLevel(key, block.start, block.end, null, block.name, entries.length, spans, null);
       entries.push(...own);
-      return { index, name: block.name, heading: block.headingLine !== null, entries: own, blank };
+      return { index, name: block.name, heading: block.headingLine !== null, id: block.headingLine === null ? null : this.rows[block.headingLine].tag, entries: own, blank };
     }
     /** The task lines from `from` to `end` that no task line above them in that range holds, each with its own subtasks. */
     readLevel(section, from, end, parent, group, firstIndex, spans, parentProject) {
@@ -1198,7 +1442,7 @@
         const place = parent ? { index: parent.index, path: [...parent.path, entries.length] } : { index: firstIndex + entries.length, path: [] };
         const project = parent ? parentProject : parsed.task.project;
         const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, group, 0, spans, project);
-        const entry = { section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, project, subtasks };
+        const entry = { id: this.rows[i].tag, section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, project, subtasks };
         entries.push(entry);
         spans.set(entry, { line: i, lineCount: 1 + children.length });
         i += 1 + children.length;
@@ -2878,8 +3122,13 @@ ${key.title}`.toLowerCase();
         place,
         places: placeChoices(place),
         repeatable: task && run.spot.kind !== "slot",
-        repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today())
+        repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today()),
+        renamed: this.renamed
       };
+    }
+    /** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */
+    get renamed() {
+      return this.session.jobs.flatMap((job) => job.kind === "rename" ? [{ id: job.item.id, key: job.item.key, text: job.draft.text, title: plainText(job.draft.text) }] : []);
     }
     /** The renamed task, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
     get renaming() {
@@ -2939,14 +3188,15 @@ ${key.title}`.toLowerCase();
       return { kind: "list", column: found.column, place: gapOfPlace(this.look.cards(found.column), { kind: "subtask", parent, before: null }) };
     }
     /**
-     * Where `item` is renamed: right before its card in the list that shows it; else, opened from a menu's stack, there; else
+     * Where `item` is renamed: right before its card in the list that shows it, in its card's section of its project's part
+     * where the list is grouped by project; else, opened from a menu's stack, there; else
      * over its card on the timeline; null when it shows nowhere the field can stand.
      */
     renameSpot(item, inStack) {
       const found = this.find(item.key);
       if (found) {
         const card = this.look.cards(found.column)[found.index];
-        return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group } };
+        return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group, ...card.project !== void 0 && { project: card.project } } };
       }
       if (inStack) return { kind: "stack", parent: item.key };
       return item.slot ? { kind: "slot", slot: item.slot } : null;
@@ -3109,6 +3359,7 @@ ${key.title}`.toLowerCase();
      * leaves the queue, and the places at or past its card move down, in the very drawing that shows its card: where the
      * lists draw the task the file holds (`created`, the key the write gave), which its rules may have put elsewhere.
      */
+    /** `created`: the task the write made, its key, or with its id (`createWithId`), which finds its card whatever wrote since. */
     shown(id, created, coming) {
       const job = this.job(id);
       if (job.kind !== "create") return;
@@ -3296,7 +3547,9 @@ ${key.title}`.toLowerCase();
      * is, as for a task put elsewhere.
      */
     landed(column, created, cards) {
-      const index = cards.findIndex((card) => samePlace2(card.key, created) && sameLine(card.key, created));
+      const made = "id" in created ? created : null;
+      const key = made ? made.key : created;
+      const index = cards.findIndex((card) => made && card.id !== void 0 ? card.id === made.id : samePlace2(card.key, key) && sameLine(card.key, key));
       if (index < 0) return;
       for (const run of Object.values(this.session.runs)) {
         const list = listSpot(run.spot);
@@ -3394,28 +3647,33 @@ ${key.title}`.toLowerCase();
   function rowsOf2(items, level = 0) {
     return items.flatMap((item) => [{ item, level }, ...item.collapsed ? [] : rowsOf2(item.subtasks, level + 1)]);
   }
-  function groupOf(name, items, header = true) {
-    const section = name !== null;
-    return { name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: section };
+  var NO_SECTION_ID = "none";
+  function sectionId(name, sections) {
+    if (name === null) return NO_SECTION_ID;
+    return sections.find((s) => s.name === name)?.id ?? `section:${name}`;
   }
-  function projectSection(name, items, project) {
-    const plain = groupOf(name, items, name !== null);
+  function groupOf(name, items, header = true, id = sectionId(name, [])) {
+    const section = name !== null;
+    return { id, name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: section };
+  }
+  function projectSection(name, items, project, id = sectionId(name, [])) {
+    const plain = groupOf(name, items, name !== null, id);
     return { ...plain, menu: plain.menu && { ...plain.menu, project }, reorder: false };
   }
   function listView(items, sections, listSections = []) {
     if (!sections) return { showsHeaders: false, groups: [groupOf(null, items, false)] };
-    const groups = withEmptySections(byGroup(items), listSections);
+    const groups = withEmptySections(byGroup(items, listSections), listSections);
     const showsHeaders = groups.some((g) => g.name !== null);
     return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders })) };
   }
-  function byGroup(items) {
+  function byGroup(items, sections) {
     const groups = [];
     for (const item of items) {
       const group = groups.find((g) => g.name === item.group);
       if (group) group.items.push(item);
       else groups.push({ name: item.group, items: [item] });
     }
-    return groups.map((g) => groupOf(g.name, g.items));
+    return groups.map((g) => groupOf(g.name, g.items, true, sectionId(g.name, sections)));
   }
   function withEmptySections(groups, sections) {
     const drawn = [...groups];
@@ -3426,7 +3684,7 @@ ${key.title}`.toLowerCase();
       drawn.forEach((g, j) => {
         if (above.has(g.name)) at = j + 1;
       });
-      drawn.splice(at, 0, groupOf(section.name, []));
+      drawn.splice(at, 0, groupOf(section.name, [], true, section.id));
     });
     return drawn;
   }
@@ -3901,9 +4159,9 @@ ${key.title}`.toLowerCase();
     const names = [null, ...order.filter((name) => name !== null)];
     const filled = names.flatMap((name) => {
       const own = items.filter((item) => item.group === name);
-      return own.length > 0 ? [projectSection(name, own, zone)] : [];
+      return own.length > 0 ? [projectSection(name, own, zone, sectionId(name, sections))] : [];
     });
-    const drawn = withEmpty ? withEmptySections(filled, sections).map((g) => g.items.length === 0 ? projectSection(g.name, [], zone) : g) : filled;
+    const drawn = withEmpty ? withEmptySections(filled, sections).map((g) => g.items.length === 0 ? projectSection(g.name, [], zone, g.id) : g) : filled;
     return projectGroup(key, project, items, zone, drawn, isFolded(state, list, key), true);
   }
   function emptyPart(zone) {
@@ -4243,6 +4501,7 @@ ${key.title}`.toLowerCase();
     const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary));
     const description = descriptionMarkdown(entry);
     return {
+      id: entry.id,
       key: keyOf(entry),
       text: entry.task.text,
       title: plainText(entry.task.text),
@@ -4338,7 +4597,7 @@ ${key.title}`.toLowerCase();
   var NO_PROJECT_SOURCE = { notes: () => [], grouping: () => ({}) };
   var NO_GROUPING = { canGroup: false, on: false, groups: [] };
   function sectionsOf(doc, list) {
-    return doc.groups(list).filter((g) => g.heading || g.entries.length > 0).map((g) => ({ name: g.name, empty: g.name !== null && g.entries.length === 0 }));
+    return doc.groups(list).filter((g) => g.heading || g.entries.length > 0).map((g) => ({ id: g.name === null || g.id === null ? NO_SECTION_ID : g.id, name: g.name, empty: g.name !== null && g.entries.length === 0 }));
   }
   var SEARCH_ORDER = ["inbox", "backlog", "soon", "now", "done"];
   function byQuality(a, b) {
@@ -4720,9 +4979,10 @@ ${key.title}`.toLowerCase();
     return name.trim() === "";
   }
   var TaskRules = class {
-    constructor(settings, clock) {
+    constructor(settings, clock, identity = null) {
       this.settings = settings;
       this.clock = clock;
+      this.identity = identity;
     }
     moment() {
       const settings = this.settings.get();
@@ -4746,12 +5006,13 @@ ${key.title}`.toLowerCase();
       const whole = parsed.ensureSections(sectionNames(settings));
       const doc = normalize(whole, today, boundary, presets);
       const changed2 = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
-      return { doc, changed: changed2 };
+      return { doc: this.identified(text, doc, () => doc), changed: changed2 };
     }
     /** The text after `operation` on the document read and normalized; the result is normalized again. */
     change(text, operation, at = this.moment()) {
       const { settings, today, boundary } = at;
-      return this.written(readDocument(text, settings, today, boundary), operation, at);
+      const doc = readDocument(text, settings, today, boundary);
+      return this.written(this.identified(text, doc, () => doc), operation, at);
     }
     /**
      * The text after `operation` on the file as it is, before today's normalizing: for a task that normalizing would change,
@@ -4762,15 +5023,38 @@ ${key.title}`.toLowerCase();
     }
     /** The document as the file has it, with every section, not normalized. */
     asRead(text, at = this.moment()) {
-      return parseText(text, at.settings).ensureSections(sectionNames(at.settings));
+      const whole = parseText(text, at.settings).ensureSections(sectionNames(at.settings));
+      return this.identified(text, whole, () => this.tidied(whole, at));
     }
     /** The text as the file has it, unnormalized and without the sections it lacks: where a line stands in it. */
     parse(text) {
-      return parseText(text, this.settings.get());
+      const at = this.moment();
+      const parsed = parseText(text, at.settings);
+      return this.identified(text, parsed, () => this.tidied(parsed.ensureSections(sectionNames(at.settings)), at));
+    }
+    /** Who the tasks and headings of `text` are, by its lines: every id of its tidied reading the rules keep. */
+    idsOf(text) {
+      return this.idsFor(text)?.known ?? /* @__PURE__ */ new Map();
+    }
+    /** `doc`, read from `text` with each line tagged by its line, tagged by who its lines are; `reading`, the text tidied for today. */
+    identified(text, doc, reading) {
+      const ids = this.identity?.of(text, reading);
+      return ids ? doc.retagged(ids) : doc;
+    }
+    idsFor(text) {
+      return this.identity?.of(text, () => this.tidied(parseText(text, this.settings.get()).ensureSections(sectionNames(this.settings.get())), this.moment()));
+    }
+    /** A document as today's tidying leaves it. */
+    tidied(doc, at) {
+      return normalize(doc, at.today, at.boundary, usablePresets(at.settings.groups.presets));
     }
     /** The document after `operation` on `doc`, already read and normalized at `at`, normalized again. */
     changeOf(doc, operation, at = this.moment()) {
       return this.written(doc, operation, at);
+    }
+    /** What `changeOf` writes, without it being written: a trial, which the tasks' identity does not take as a write. */
+    trial(doc, operation, at = this.moment()) {
+      return this.written(doc, operation, at, false);
     }
     emptyFile() {
       return TaskDocument.empty(sectionNames(this.settings.get()));
@@ -5074,10 +5358,12 @@ ${key.title}`.toLowerCase();
           return place;
       }
     }
-    written(doc, operation, at) {
+    written(doc, operation, at, writes = true) {
       const { settings, today, boundary } = at;
       const after = normalize(operation(doc, today, settings, boundary), today, boundary, usablePresets(settings.groups.presets));
-      return { text: after.serialize(), before: doc, after };
+      const text = after.serialize();
+      if (writes) this.identity?.wrote(text, after);
+      return { text, before: doc, after };
     }
   };
 
@@ -5133,6 +5419,51 @@ ${key.title}`.toLowerCase();
     }
   };
 
+  // core/application/landing.ts
+  function landingOf(screen, id, day, timeline) {
+    const span = (item) => timeline.shown({ slot: item.slot, open: item.open }, day);
+    const block = screen.day.slotted.find((item) => item.id === id);
+    if (block) {
+      const own = timeline.shown({ slot: block.slot, open: false }, day);
+      const shown = span(block);
+      return { kind: "timeline", id, item: block, span: shown, ridesNow: shown.start !== own.start, slotted: screen.day.slotted.map((item) => ({ id: item.id, span: span(item) })) };
+    }
+    const columns = [["day", screen.day.list], ["soon", screen.soon], ["inbox", screen.inbox], ["backlog", screen.backlog], ["done", screen.done]];
+    for (const [column, items] of columns) {
+      const card = items.find((item) => item.id === id);
+      if (card) {
+        const part = partOf(screen, column, id);
+        return { kind: "list", id, item: card, column, group: card.group, index: items.filter((item) => item.group === card.group).indexOf(card), ...part && { part } };
+      }
+      for (const top of items) {
+        const under = subtaskOf(top, id);
+        if (under) return under;
+      }
+    }
+    return { kind: "away", id, item: null };
+  }
+  function partOf(screen, column, id) {
+    if (column === "done") return null;
+    const list = column === "day" ? "now" : column;
+    const grouping = screen.projects[list];
+    if (!grouping.on) return null;
+    for (const group of grouping.groups)
+      for (const section of group.sections) {
+        const index = section.items.findIndex((item) => item.id === id);
+        if (index >= 0) return { key: group.key, zone: group.zone, section: section.name, index, folded: group.folded };
+      }
+    return null;
+  }
+  function subtaskOf(parent, id) {
+    const index = parent.subtasks.findIndex((sub) => sub.id === id);
+    if (index >= 0) return { kind: "subtask", id, item: parent.subtasks[index], parent: parent.id, index };
+    for (const sub of parent.subtasks) {
+      const deeper = subtaskOf(sub, id);
+      if (deeper) return deeper;
+    }
+    return null;
+  }
+
   // core/application/TaskWrites.ts
   var nothing = (operation) => ({ operation, answer: () => void 0 });
   var TaskWrites = class {
@@ -5150,11 +5481,15 @@ ${key.title}`.toLowerCase();
       return nothing(this.rules.createAtTime(date, start, text));
     }
     createInPlace(text, priority, place, repeat, labels = []) {
+      const write = this.createWithId(text, priority, place, repeat, labels);
+      return { operation: write.operation, answer: (change) => write.answer(change)?.key ?? null };
+    }
+    createWithId(text, priority, place, repeat, labels = []) {
       return {
         operation: this.rules.createInPlace(text, priority, place, repeat, labels),
         answer: (change) => {
           const created = change?.after.insertedSince(change.before);
-          return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
+          return created ? { key: { section: created.section, index: created.index, path: created.path, raw: created.raw }, id: created.id } : null;
         }
       };
     }
@@ -5377,6 +5712,24 @@ ${key.title}`.toLowerCase();
         }
       };
     }
+    /**
+     * Where `drop` would leave the tasks, writing nothing: its operation tried over the file as read, and the screen of
+     * `day` read over the result by the same code as the screen.
+     */
+    landing(tasks, to, day, project) {
+      const drop = this.drop(tasks, to, day);
+      return {
+        reads: true,
+        answer: (s) => {
+          const ids = tasks.map((task) => this.rules.entryOf(s.doc, task.key).id);
+          const write = drop.answer(s);
+          const after = write.operation ? this.rules.trial(s.doc, write.operation).after : s.doc;
+          const screen = this.reads.screen({ text: after.serialize(), doc: after, today: s.today, boundary: s.boundary }, day, project);
+          const timeline = this.reads.timeline();
+          return ids.map((id) => landingOf(screen, id, day, timeline));
+        }
+      };
+    }
     /** The dropped tasks where `write` left them. */
     landed(tasks, write) {
       return {
@@ -5410,181 +5763,6 @@ ${key.title}`.toLowerCase();
     }
   };
 
-  // core/domain/TextPatch.ts
-  var CONTEXT = 2;
-  var TextPatch = class _TextPatch {
-    constructor(changes) {
-      this.changes = changes;
-    }
-    static between(before, after) {
-      return new _TextPatch(hunksOf(before.split("\n"), after.split("\n")));
-    }
-    /** The patch as plain data, for a host that keeps the steps itself; `TextPatch.of` reads it back. */
-    get hunks() {
-      return this.changes;
-    }
-    static of(hunks) {
-      return new _TextPatch(hunks);
-    }
-    get empty() {
-      return this.changes.length === 0;
-    }
-    /** `current` with the change taken back, or null when a changed block is no longer to be found. */
-    revert(current) {
-      return this.swap(current, "added", "removed");
-    }
-    /** `current` with the change made again, or null when a block it changes is no longer to be found. */
-    apply(current) {
-      return this.swap(current, "removed", "added");
-    }
-    swap(current, from, to) {
-      const lines = current.split("\n");
-      const shift = (hunk) => from === "added" ? hunk.after : hunk.before;
-      const places = this.changes.map((hunk) => find(lines, hunk, hunk[from], shift(hunk)));
-      if (places.some((place, i) => place === null || i > 0 && place <= places[i - 1] + this.changes[i - 1][from].length - 1)) return null;
-      for (let i = this.changes.length - 1; i >= 0; i--) {
-        const hunk = this.changes[i];
-        lines.splice(places[i], hunk[from].length, ...hunk[to]);
-      }
-      return lines.join("\n");
-    }
-  };
-  function find(text, hunk, lines, near) {
-    const block = [...hunk.above, ...lines, ...hunk.below];
-    let best = null;
-    for (let start = 0; start + block.length <= text.length; start++) {
-      if (hunk.atStart && start !== 0) break;
-      if (hunk.atEnd && start + block.length !== text.length) continue;
-      if (!block.every((line, i) => text[start + i] === line)) continue;
-      const at = start + hunk.above.length;
-      if (best === null || Math.abs(at - near) < Math.abs(best - near)) best = at;
-    }
-    return best;
-  }
-  function hunksOf(before, after) {
-    const hunks = [];
-    for (const [b0, b1, a0, a1] of mergedBlocks(changedBlocks(before, after))) {
-      const above = Math.max(0, b0 - CONTEXT);
-      const below = Math.min(before.length, b1 + CONTEXT);
-      hunks.push({
-        before: b0,
-        after: a0,
-        removed: before.slice(b0, b1),
-        added: after.slice(a0, a1),
-        above: before.slice(above, b0),
-        below: before.slice(b1, below),
-        atStart: b0 < CONTEXT,
-        atEnd: before.length - b1 < CONTEXT
-      });
-    }
-    return hunks;
-  }
-  function mergedBlocks(blocks) {
-    const merged = [];
-    for (const block of blocks) {
-      const last = merged[merged.length - 1];
-      if (last && block[0] - last[1] <= 2 * CONTEXT) {
-        last[1] = block[1];
-        last[3] = block[3];
-      } else merged.push([...block]);
-    }
-    return merged;
-  }
-  function changedBlocks(before, after) {
-    let head = 0;
-    while (head < before.length && head < after.length && before[head] === after[head]) head++;
-    let tail = 0;
-    while (tail < before.length - head && tail < after.length - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
-    const b = before.slice(head, before.length - tail);
-    const a = after.slice(head, after.length - tail);
-    const same = sharedLines(b, a);
-    const blocks = [];
-    let i = 0;
-    let j = 0;
-    let open = null;
-    const close = () => {
-      if (open) blocks.push([head + open[0], head + i, head + open[1], head + j]);
-      open = null;
-    };
-    for (const [x, y] of [...same, [b.length, a.length]]) {
-      if (i < x || j < y) {
-        open ??= [i, j];
-        i = x;
-        j = y;
-      }
-      if (x === b.length && y === a.length) break;
-      close();
-      i++;
-      j++;
-    }
-    close();
-    return blocks;
-  }
-  var TABLE_CELLS = 1e6;
-  function sharedLines(b, a) {
-    return (b.length + 1) * (a.length + 1) <= TABLE_CELLS ? tableLines(b, a) : myersLines(b, a);
-  }
-  function tableLines(b, a) {
-    const width = a.length + 1;
-    const common = new Uint16Array((b.length + 1) * width);
-    for (let i2 = b.length - 1; i2 >= 0; i2--) {
-      for (let j2 = a.length - 1; j2 >= 0; j2--) {
-        common[i2 * width + j2] = b[i2] === a[j2] ? common[(i2 + 1) * width + j2 + 1] + 1 : Math.max(common[(i2 + 1) * width + j2], common[i2 * width + j2 + 1]);
-      }
-    }
-    const pairs = [];
-    let i = 0;
-    let j = 0;
-    while (i < b.length || j < a.length) {
-      if (i < b.length && j < a.length && b[i] === a[j]) pairs.push([i++, j++]);
-      else if (j < a.length && (i === b.length || common[i * width + j + 1] >= common[(i + 1) * width + j])) j++;
-      else i++;
-    }
-    return pairs;
-  }
-  function myersLines(b, a) {
-    const n = b.length;
-    const m = a.length;
-    const offset = n + m + 1;
-    const v = new Int32Array(2 * offset + 1);
-    const trace = [];
-    const down = (k, d, at) => k === -d || k !== d && at(k - 1) < at(k + 1);
-    let found = n === 0 && m === 0 ? 0 : -1;
-    for (let d = 0; found < 0; d++) {
-      trace.push(v.slice(offset - d, offset + d + 1));
-      for (let k = -d; k <= d; k += 2) {
-        let x2 = down(k, d, (i) => v[offset + i]) ? v[offset + k + 1] : v[offset + k - 1] + 1;
-        let y2 = x2 - k;
-        while (x2 < n && y2 < m && b[x2] === a[y2]) {
-          x2++;
-          y2++;
-        }
-        v[offset + k] = x2;
-        if (x2 >= n && y2 >= m) {
-          found = d;
-          break;
-        }
-      }
-    }
-    const pairs = [];
-    let x = n;
-    let y = m;
-    for (let d = found; d > 0; d--) {
-      const before = trace[d];
-      const at = (k2) => before[k2 + d];
-      const k = x - y;
-      const prevK = down(k, d, at) ? k + 1 : k - 1;
-      const prevX = at(prevK);
-      const prevY = prevX - prevK;
-      const startX = prevK === k + 1 ? prevX : prevX + 1;
-      while (x > startX) pairs.push([--x, --y]);
-      x = prevX;
-      y = prevY;
-    }
-    while (x > 0) pairs.push([--x, --y]);
-    return pairs.reverse();
-  }
-
   // core/application/UndoSteps.ts
   var DEPTH = 100;
   var UndoSteps = class _UndoSteps {
@@ -5596,8 +5774,8 @@ ${key.title}`.toLowerCase();
       return { done: this.done.map((p) => p.hunks), undone: this.undone.map((p) => p.hunks) };
     }
     /** A change just made: a new step, and nothing left to do again. False when it changed no line. */
-    record(before, after) {
-      const patch2 = TextPatch.between(before, after);
+    record(before, after, ids) {
+      const patch2 = TextPatch.between(before, after, ids);
       if (patch2.empty) return false;
       this.done.push(patch2);
       if (this.done.length > DEPTH) this.done.shift();
@@ -5616,22 +5794,104 @@ ${key.title}`.toLowerCase();
     }
     /** `text` with the step taken back or done again; null when its lines were edited since. */
     static make(way, patch2, text) {
-      return way === "undo" ? patch2.revert(text) : patch2.apply(text);
+      return way === "undo" ? patch2.reverted(text) : patch2.applied(text);
     }
     /** A step made: it can be made the other way now. A step that could not be made is dropped. */
     made(way, patch2) {
       (way === "undo" ? this.undone : this.done).push(patch2);
     }
-    /** A whole step over `text`, at once: the outcome and the text it leaves. */
+    /** A whole step over `text`, at once: the outcome and the text it leaves; for a step made, how its lines were carried. */
     step(way, text) {
       const patch2 = this.take(way);
       if (!patch2) return { outcome: "nothing", text };
       const next = _UndoSteps.make(way, patch2, text);
       if (next === null) return { outcome: "conflict", text };
       this.made(way, patch2);
-      return { outcome: "done", text: next };
+      return { outcome: "done", text: next.text, carried: { origins: next.origins, ids: next.ids } };
     }
   };
+
+  // core/application/TaskIdentity.ts
+  var NO_TASK_IDS = { next: 0, lines: [] };
+  var TaskIdentity = class {
+    constructor(state = NO_TASK_IDS) {
+      this.last = null;
+      /** The ids an undo step gave the lines of its text, by line, until that text is read. */
+      this.pending = null;
+      this.current = state;
+    }
+    get state() {
+      return this.current;
+    }
+    /**
+     * What `text`'s reading is retagged by (`TaskDocument.retagged`): `read` gives it parsed and tidied, each line tagged by
+     * its line. Kept, with the ids of the reading's lines, until another text is read.
+     */
+    of(text, read) {
+      if (this.last?.text === text) return this.last.ids;
+      const doc = read();
+      const outline = doc.outline();
+      const next = this.current.next;
+      const known = this.pending?.text === text ? this.given(outline, this.pending.ids) : sameOutline(this.current.lines, outline) ? this.inOrder(outline) : this.matched(outline);
+      this.pending = null;
+      const fresh = outline.some((o) => !known.has(o.tag));
+      for (const o of outline) if (!known.has(o.tag)) known.set(o.tag, `t${next + o.tag}`);
+      const settled = !fresh && sameOutline(this.current.lines, outline) && outline.every((o, i) => known.get(o.tag) === this.current.lines[i].id);
+      if (!settled) this.current = { next: next + doc.nextTag(), lines: outline.map((o) => ({ raw: o.raw, task: o.task, id: known.get(o.tag) })) };
+      const ids = { known, next };
+      this.last = { text, ids };
+      return ids;
+    }
+    /** A write left `text`, the document `after`: its tasks and headings are who its lines' tags say. */
+    wrote(text, after) {
+      const tags = after.outlineTags();
+      this.current = { next: after.nextTag(), lines: after.outline().map((o) => ({ raw: o.raw, task: o.task, id: tags.get(o.line) })) };
+      this.pending = null;
+      this.last = { text, ids: { known: new Map([...tags].map(([line, tag]) => [line, tag])), next: this.current.next } };
+    }
+    /**
+     * An undo step made `after` of `before`: a line it gave back is who it was, a line it left is who it was. Known once
+     * `after` is read (`of`).
+     */
+    carried(before, after, step) {
+      const was = this.last?.text === before ? this.last.ids.known : this.pending?.text === before ? this.pending.ids : /* @__PURE__ */ new Map();
+      const given = new Set(step.ids.values());
+      const ids = /* @__PURE__ */ new Map();
+      step.origins.forEach((origin, line) => {
+        const own = step.ids.get(line) ?? (origin === null ? void 0 : was.get(origin));
+        if (own !== void 0 && (step.ids.has(line) || !given.has(own))) ids.set(line, own);
+      });
+      this.pending = { text: after, ids };
+      this.last = null;
+    }
+    /** The ids of the reading's lines that an undo step gave its text's lines. */
+    given(outline, ids) {
+      const known = /* @__PURE__ */ new Map();
+      for (const o of outline) {
+        const id = ids.get(o.tag);
+        if (id !== void 0) known.set(o.tag, id);
+      }
+      return known;
+    }
+    inOrder(outline) {
+      return new Map(outline.map((o, i) => [o.tag, this.current.lines[i].id]));
+    }
+    /** The ids of the reading the state is for, carried to this reading's lines by place and line. */
+    matched(outline) {
+      const old = this.current.lines;
+      const pairs = matchLines(
+        old.map((l) => l.raw),
+        outline.map((o) => o.raw),
+        (b, a) => old[b].task === outline[a].task
+      );
+      const known = /* @__PURE__ */ new Map();
+      for (const [b, a] of pairs) if (old[b].task === outline[a].task) known.set(outline[a].tag, old[b].id);
+      return known;
+    }
+  };
+  function sameOutline(lines, outline) {
+    return lines.length === outline.length && lines.every((line, i) => line.raw === outline[i].raw && line.task === outline[i].task);
+  }
 
   // core/application/snapGrid.ts
   var MINUTES_PER_HOUR3 = 60;
@@ -5664,7 +5924,7 @@ ${key.title}`.toLowerCase();
       this.context = context;
       /** What the call changed of the settings, every key it wrote. */
       this.changed = {};
-      this.effects = {};
+      this.kept = {};
       this.settingsText = context.settings ?? "";
       this.current = settingsOf(this.settingsText);
       const clock = { now: () => new Date(context.nowMs) };
@@ -5675,10 +5935,16 @@ ${key.title}`.toLowerCase();
         onChange: () => () => void 0
       };
       this.store = store;
-      this.rules = new TaskRules(store, clock);
+      this.identity = new TaskIdentity(context.ids);
+      this.rules = new TaskRules(store, clock, this.identity);
       this.reads = new TaskReads(this.rules, store, clock, { notes: () => context.projects ?? [], grouping: () => this.grouping });
       this.writes = new TaskWrites(this.rules, this.reads);
       this.text = context.tasks ?? null;
+    }
+    /** What the call ended with besides its result: the identity of the tasks when it changed. */
+    get effects() {
+      const ids = this.identity.state;
+      return ids === (this.context.ids ?? NO_TASK_IDS) ? this.kept : Object.assign(this.kept, { ids });
     }
     /** The device's grouping as this call has it: handed in, with what the call changed. */
     get grouping() {
@@ -5719,23 +5985,37 @@ ${key.title}`.toLowerCase();
       if (this.text === null || !this.rules.read(this.text).changed) return;
       this.setText(this.rules.change(this.text, (d) => d).text, false);
     }
-    /** A text the call wrote as one action: a step of the history. */
-    write(text) {
-      this.setText(text, true);
+    /**
+     * A text the call writes as one action, made of the text it has by the rules: a step of the history, which keeps who
+     * the tasks were on each side. False when `make` writes nothing (null).
+     */
+    write(make) {
+      const before = this.tasks();
+      const was = this.rules.idsOf(before);
+      const text = make(before);
+      if (text === null) return false;
+      this.setText(text, true, { before: was, after: this.rules.idsOf(text) });
+      return true;
     }
     /** A write as one action: its operation over the text, the new text a step of the history. */
     run(write) {
-      if (!write.operation) return write.answer(null);
-      const before = this.tasks();
-      const change = this.rules.change(before, write.operation);
-      this.setText(change.text, true);
+      const operation = write.operation;
+      if (!operation) return write.answer(null);
+      let change = null;
+      this.write((text) => (change = this.rules.change(text, operation)).text);
       return write.answer({ before: change.before, after: change.after });
     }
-    /** The tasks text a step back or forward leaves. */
+    /** The tasks text a step back or forward leaves; its tasks keep who they were: read before the step, and after it for the answer's ids. */
     undo(way) {
       const steps = new UndoSteps(this.context.history);
-      const { outcome, text } = steps.step(way, this.tasks());
+      const before = this.tasks();
+      this.rules.idsOf(before);
+      const { outcome, text, carried } = steps.step(way, before);
       this.effects.history = steps.state;
+      if (carried) {
+        this.identity.carried(before, text, carried);
+        this.rules.idsOf(text);
+      }
       if (text !== this.text) this.setText(text, false);
       return outcome;
     }
@@ -5746,14 +6026,14 @@ ${key.title}`.toLowerCase();
       const raw = this.settingsText.trim() === "" ? {} : JSON.parse(this.settingsText);
       this.effects.settings = JSON.stringify({ ...raw, ...this.changed }, null, 2);
     }
-    setText(text, step) {
+    setText(text, step, ids) {
       const before = this.text;
       if (text === before) return;
       this.text = text;
       this.effects.tasks = text;
       if (!step) return;
       const steps = new UndoSteps(this.effects.history ?? this.context.history);
-      if (before !== null && steps.record(before, text)) {
+      if (before !== null && steps.record(before, text, ids)) {
         this.effects.step = true;
         this.effects.history = steps.state;
       }
@@ -5790,6 +6070,7 @@ ${key.title}`.toLowerCase();
     createInSoon: (c, [text]) => c.run(c.writes.createInSoon(text)),
     createAtTime: (c, [date, start, text]) => c.run(c.writes.createAtTime(date, start, text)),
     createInPlace: (c, [text, priority, place, repeat, labels]) => c.run(c.writes.createInPlace(text, priority ?? null, place, repeat ?? null, labels ?? [])),
+    createWithId: (c, [text, priority, place, repeat, labels]) => c.run(c.writes.createWithId(text, priority ?? null, place, repeat ?? null, labels ?? [])),
     create: (c, [draft, slot]) => c.run(c.writes.create(draft, slot ?? void 0)),
     createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent, draft)),
     edit: (c, [key, draft]) => c.run(c.writes.edit(key, draft)),
@@ -5853,6 +6134,7 @@ ${key.title}`.toLowerCase();
     createSection: (c, [name, place]) => c.run(c.writes.createSection(name, place)),
     applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps)),
     drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks, to, day))),
+    landing: (c, [tasks, to, day, project]) => c.ask(c.writes.landing(tasks, to, day, project ?? void 0)),
     normalize: (c) => c.normalize(),
     createFile: (c) => {
       if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -5989,9 +6271,7 @@ ${key.title}`.toLowerCase();
     return end === null ? minutesToHHMM(start) : `${minutesToHHMM(start)}–${minutesToHHMM(end % MINUTES_PER_DAY)}`;
   }
   function onReminder(c, id, action) {
-    const text = new TaskReminders(c.rules, c.clock).act(c.tasks(), id, action);
-    if (text === null) throw new DoorError("staleTask", `no reminding task ${id}`);
-    c.write(text);
+    if (!c.write((text) => new TaskReminders(c.rules, c.clock).act(text, id, action))) throw new DoorError("staleTask", `no reminding task ${id}`);
   }
   var REMINDERS = {
     list: (c) => new TaskReminders(c.rules, c.clock).ringing(c.tasks()).map(
@@ -6015,7 +6295,7 @@ ${key.title}`.toLowerCase();
     add: (c, [list, typed2, recording, tag]) => {
       const title = captureTitle({ typed: typed2, recording: recording ?? null, tag: tag ?? "" });
       if (title === "") throw new DoorError("blank", "the task has no title");
-      c.write(c.rules.change(c.tasks(), c.rules.placeNew(title, null, { kind: "list", list, group: null, before: null })).text);
+      c.write((text) => c.rules.change(text, c.rules.placeNew(title, null, { kind: "list", list, group: null, before: null })).text);
     },
     lists: (c) => CAPTURE_LISTS.map((list) => ({ list, name: c.settings.sections[list] }))
   };
@@ -6150,7 +6430,7 @@ ${key.title}`.toLowerCase();
         const [id, created, coming] = args;
         entry.shown(id, created ?? null, (column) => coming?.[column] ?? []);
       } else value = entry[name](...args);
-      return { session: entry.session, state: entry.state, changes, jobs, value: value === void 0 ? null : value };
+      return { session: entry.session, state: entry.state, changes, jobs, value: value === void 0 ? null : value, renamed: entry.renamed };
     };
   }
   var ENTRY = Object.fromEntries([...ENTRY_METHODS, "state", "renaming", "shown"].map((name) => [name, entryCall(name)]));

@@ -127,6 +127,11 @@ export type SectionPlace = Extract<NewTaskPlace, { readonly kind: "list" } | { r
 
 /** A group of a list where it stands in the file: a section (`name`) or No section (null). */
 export interface ListSection {
+	/**
+	 * Who the section is, as `TaskItem.id` is who a task is: the same through a rename, a move and every write to its
+	 * tasks; a section made gets a new one. No section's is `NO_SECTION_ID`. What a view keys its header by.
+	 */
+	readonly id: string;
 	readonly name: GroupName;
 	/** A section with no task under its heading: a column of its list shows its heading and the No tasks plate. */
 	readonly empty: boolean;
@@ -161,6 +166,13 @@ export interface ProjectNote {
 }
 
 export interface TaskItem {
+	/**
+	 * Who the task is for the life of the service: the same through every write the service makes to it (whatever changes
+	 * in its line, wherever it moves), through a re-read of the file and an edit elsewhere that leaves its line in place,
+	 * and through undo. A task made gets a new one; a task removed takes its away. What a view keys its card by; `key` is
+	 * the task as read, what an action names.
+	 */
+	readonly id: string;
 	readonly key: TaskKey;
 	readonly text: string;
 	/** `text` with each link's word in its place: for where a link can't be shown, such as a question about the task. */
@@ -376,6 +388,51 @@ export interface DroppedTask {
 	readonly key: TaskKey;
 	readonly from: DropFrom;
 }
+
+/** A task a write made: its key as the file stands right after the write, and its id (`TaskItem.id`). */
+export interface CreatedTask {
+	readonly key: TaskKey;
+	readonly id: string;
+}
+
+/** A column of the screen a task can stand in after a drop. */
+export type LandingColumn = "day" | "soon" | "inbox" | "backlog" | "done";
+
+/**
+ * Where a card lands in a list drawn in project parts (`ListGrouping.on`: grouped by project, or a project's own view): the
+ * part as the screen draws it (`ProjectGroup.key` and its `zone`), the section in it, and `index` among that section's
+ * cards there. `DropLanding.list` carries it only for such a list; its own `group` and `index` count the list in file order.
+ */
+export interface LandingPart {
+	readonly key: string;
+	readonly zone: ProjectZone;
+	readonly section: GroupName;
+	readonly index: number;
+	/** The part is folded (`ProjectGroup.folded`): its cards are not drawn, so the card lands on the part's header. */
+	readonly folded: boolean;
+}
+
+/** A slotted task of the day's timeline after a drop: its id and its minutes from the start of the day as shown. */
+export interface LandingSpan {
+	readonly id: string;
+	readonly span: DaySpan;
+}
+
+/**
+ * Where a dropped task stands once the drop is written, on the screen of the day it was dropped on (`TaskService.landing`).
+ * `id` is the task's (`TaskItem.id`), `item` the task as the screen will read it (null for `away`).
+ * - `timeline`: a block of the day's timeline, at `span` (minutes from the start of the day, as `shownSpan` gives them);
+ *   `ridesNow`: its own start has passed today, so it rides the now line. `slotted`: every block of the day after the
+ *   drop in the screen's order, for the frontend's stack (`stackTasks`) to say where the card sits among them.
+ * - `list`: a card of `column`, in section `group`, `index` among the cards of that section there.
+ * - `subtask`: under the task `parent` (its id), `index` among its open subtasks.
+ * - `away`: not on this screen (another day, out of this project's view).
+ */
+export type DropLanding =
+	| { readonly kind: "timeline"; readonly id: string; readonly item: TaskItem; readonly span: DaySpan; readonly ridesNow: boolean; readonly slotted: readonly LandingSpan[] }
+	| { readonly kind: "list"; readonly id: string; readonly item: TaskItem; readonly column: LandingColumn; readonly group: GroupName; readonly index: number; readonly part?: LandingPart }
+	| { readonly kind: "subtask"; readonly id: string; readonly item: TaskItem; readonly parent: string; readonly index: number }
+	| { readonly kind: "away"; readonly id: string; readonly item: null };
 
 /** Whether a target takes the tasks carried from these places, and whether a list shows where in it a task goes or puts it at its end. */
 export { acceptsDrop, placesInGap } from "./drops";
@@ -695,6 +752,11 @@ export interface TaskService {
 	 */
 	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[]): Promise<TaskKey | null>;
 	/**
+	 * `createInPlace`, answering the new task's id with its key: the key names it as the file stands right after this write,
+	 * the id for as long as the service runs, whatever writes come before the screen draws it. Null when nothing was created.
+	 */
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[]): Promise<CreatedTask | null>;
+	/**
 	 * The marks `createInPlace`, `create` or `edit` writes for a title typed as `text` with `priority` (a level's prefix or
 	 * null) and `labels` chosen: the chosen priority, else the level the text's first word is; the labels only without one.
 	 */
@@ -931,6 +993,13 @@ export interface TaskService {
 	 * order, so the screen settles the card on the task where it stands; one not found again is left out.
 	 */
 	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly TaskKey[]>;
+	/**
+	 * Where `drop` with the same arguments would leave each task, in their order, writing nothing: the drop's own
+	 * operation run over the file as read, and the screen of `day` (a project's view with `project`) read over the result
+	 * by the same code as `screen`. So a copy flies to the very place the write gives, a past time on today included (the
+	 * card rides the now line). Rejects as `drop` would.
+	 */
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Promise<readonly DropLanding[]>;
 
 	/** Applies the normalization rules (spec §4.4). Writes only when something changed. */
 	normalize(): Promise<void>;

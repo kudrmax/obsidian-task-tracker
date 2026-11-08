@@ -124,12 +124,12 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	controller = new QuickEntryController({
 		root,
 		tasks: {
-			createInPlace: async (text, priority, place, repeat) => {
+			createWithId: async (text, priority, place, repeat) => {
 				created.push({ text, priority, place, ...(repeat ? { repeat } : {}) });
 				if (drawsOnFresh !== "grows") return null;
 				const added = item(text, key("now", (items.day ?? []).length));
 				(items.day ??= []).push(added);
-				return added.key;
+				return { key: added.key, id: added.id };
 			},
 			createSection: async () => null,
 			edit: async (k, draft) => {
@@ -800,6 +800,22 @@ describe("QuickEntryController", () => {
 		await vi.waitFor(() => expect(edits).toEqual([{ key: a.key, draft: { text: "A2", placement: { kind: "now" }, priority: null } }]));
 	});
 
+	it("the next field a rename's Enter opens is drawn empty, so it grows in at its own height", async () => {
+		const a = item("A", key("now", 0));
+		const { controller, lists, field, type, press } = setUp({ items: { day: [a, item("B", key("now", 1))] } });
+		controller.rename(a);
+		type("A2 with a title long enough to wrap");
+		const draw = lists.day.render.bind(lists.day);
+		const drawn: (string | undefined)[] = [];
+		lists.day.render = () => {
+			draw();
+			drawn.push(field()?.value);
+		};
+		press("Enter");
+		expect(drawn[0]).toBe("");
+		press("Escape");
+	});
+
 	it("keeps the dot of a task in progress on the field that renames it, and none on the field of a new task", () => {
 		const a: TaskItem = { ...item("A", key("now", 0)), status: "inProgress" };
 		const { controller, lists } = setUp({ items: { day: [a, item("B", key("now", 1))] } });
@@ -1133,7 +1149,7 @@ describe("QuickEntryController", () => {
 				const task = onTimeline("Report", 0, [item("A1", key("now", 0, [0]))]);
 				const { controller } = setUp({ slotted: [task] });
 				controller.addSubtask(task, openMenu(task));
-				expect(document.querySelector<HTMLElement>(".tc-panel.is-task")!.hidden).toBe(true);
+				expect(document.querySelector<HTMLElement>(".tc-panel.is-task")!.classList.contains("is-closing")).toBe(true);
 				expect(stack()).toEqual(["A1", "field"]);
 				expect(document.activeElement).toBe(document.querySelector(".tc-menu-subtasks textarea.tc-quick-field"));
 				const quickBar = document.querySelector<HTMLElement>(".tc-quick-bar")!;

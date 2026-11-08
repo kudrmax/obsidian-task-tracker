@@ -1,4 +1,4 @@
-import { LAYOUT } from "../design";
+import { scrollSmoothly } from "../motion/SmoothScroll";
 
 /** A stretch of the screen from top to bottom, in window pixels. */
 export interface Band {
@@ -48,34 +48,20 @@ export function shownPart(el: HTMLElement): { readonly rect: DOMRect; readonly b
 }
 
 /**
- * `el` comes into view in its column with the column's own smooth scroll, whole or from its top when it is taller;
- * `then` runs once the column stands still, at once when it needs no scroll. Answers how to call it off.
+ * `el` comes into view in its column with the plugin's one smooth scroll, whole or from its top when it is taller.
+ * Exactly one of the two runs, once: `then` when the column stands still (it got there, its content ended short, or
+ * another scroll took over), `yielded` when a finger took the column. Neither runs once it is called off (the answer).
  */
-export function scrollIntoColumn(el: HTMLElement, then: () => void, idleMs: number = LAYOUT.scrollIdleMs): () => void {
+export function scrollIntoColumn(el: HTMLElement, then: () => void, yielded: () => void = () => undefined): () => void {
 	const box = shownBoxOf(el);
 	const by = box ? scrollToShow(el.getBoundingClientRect(), box) : 0;
 	if (!box || Math.abs(by) < 1) {
 		then();
 		return () => undefined;
 	}
-	const scroller = box.scroller;
-	let timer = 0;
-	const stop = () => {
-		window.clearTimeout(timer);
-		scroller.removeEventListener("scroll", wait);
-		scroller.removeEventListener("scrollend", finish);
-	};
-	const finish = () => {
-		stop();
-		then();
-	};
-	const wait = () => {
-		window.clearTimeout(timer);
-		timer = window.setTimeout(finish, idleMs);
-	};
-	scroller.addEventListener("scroll", wait);
-	scroller.addEventListener("scrollend", finish);
-	wait();
-	scroller.scrollBy({ top: by, behavior: "smooth" });
-	return stop;
+	return scrollSmoothly(box.scroller, box.scroller.scrollTop + by, (how) => {
+		if (how === "stopped") return;
+		if (how === "finger") yielded();
+		else then();
+	});
 }

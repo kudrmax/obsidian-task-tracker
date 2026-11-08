@@ -1,5 +1,6 @@
 import Core
 import SwiftUI
+import UIKit
 
 /// A list's column: its title (with the day's arrows over the day list), its sections and cards. A long press on a card
 /// shows its menu, and moving on lifts it to carry: its rows close up, and the rows part where it would land, the gap
@@ -8,7 +9,6 @@ struct ListColumn: View {
     let list: BoardList
     @Bindable var model: BoardModel
     var dayArrows = false
-    @Binding var question: MenuQuestion?
 
     private static let space = "list"
     /// Room after the last row, so the last card scrolls over the keyboard.
@@ -38,43 +38,62 @@ struct ListColumn: View {
 
     private func content(width columnWidth: CGFloat) -> some View {
         let column = list.column
-        let drawn = rows
+        let drawn = rows.map { KeyedRow(row: $0, heirs: model.entry.heirs, carried: [model.carry?.id, model.placedByDrop]) }
         return VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
             ColumnTitle(title: title, dayArrows: dayArrows, model: model, list: list)
             ScrollViewReader { scroller in
                 ScrollView {
                     DayLane(model: model, width: width, slides: column == .day, shown: VStack(alignment: .leading, spacing: CardMetrics.gap) {
-                        ForEach(drawn) { row in
-                            switch row {
-                            case .header(let group, let header):
-                                SectionHeader(title: header, group: group, column: column, model: model)
-                                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, head: group.id, $0) }
-                                    // As the plugin's header: room above it but at the list's top, its bottom on the first card.
-                                    .padding(.top, row.id == drawn.first?.id ? 0 : ColumnMetrics.sectionGap)
-                                    .padding(.bottom, -CardMetrics.gap)
-                            case .project(let project):
-                                ProjectHeader(project: project, column: column, model: model)
-                                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, head: project.id, $0) }
-                                    .padding(.top, row.id == drawn.first?.id ? 0 : ColumnMetrics.sectionGap)
-                                    .padding(.bottom, -CardMetrics.gap)
-                            case .newHead(let name):
-                                SectionTitle(title: name, muted: false)
-                                    .padding(.top, row.id == drawn.first?.id ? 0 : ColumnMetrics.sectionGap)
-                                    .padding(.bottom, -CardMetrics.gap)
-                            case .plate(let group):
-                                EmptyPlate(hot: gap.map { group.holds(group: $0.group, zone: $0.zone) && $0.line == nil } ?? false) { model.entry.openIn(column, group.name, group.zone) }
-                            case .card(let card):
-                                CardRow(card: card, column: column, model: model, question: $question)
-                                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, card: card.id, $0) }
-                            case .gap:
-                                GapSpace()
-                            case .mark(let first):
-                                SectionMark().padding(.top, first ? 0 : ColumnMetrics.sectionGap)
-                            case .pending(_, let text, let level, let branch):
-                                EntryRow(level: level, branch: branch) { PendingCapsule(text: text) }
-                            case .field(let level, let branch, let section):
-                                EntryRow(level: level, branch: branch) { EntryCapsule(host: model.entry, section: section) }
+                        ForEach(drawn, id: \.key) { keyed in
+                            let row = keyed.row
+                            // A row comes or goes by folding; what one row holds changing (a card and its rename
+                            // field, which takes the card's id) changes in place, in the same frame.
+                            VStack(alignment: .leading, spacing: 0) {
+                                switch row {
+                                case .header(let group, let header):
+                                    SectionHeader(title: header, group: group, column: column, model: model)
+                                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, head: group.id, $0) }
+                                        // As the plugin's header: room above it but at the list's top, its bottom on the first card.
+                                        .padding(.top, row.id == drawn.first?.row.id ? 0 : ColumnMetrics.sectionGap)
+                                        .padding(.bottom, -CardMetrics.gap)
+                                        .transition(.identity)
+                                case .project(let project):
+                                    ProjectHeader(project: project, column: column, model: model)
+                                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, head: project.id, $0) }
+                                        .padding(.top, row.id == drawn.first?.row.id ? 0 : ColumnMetrics.sectionGap)
+                                        .padding(.bottom, -CardMetrics.gap)
+                                        .transition(.identity)
+                                case .newHead(let name):
+                                    SectionTitle(title: name, muted: false)
+                                        .padding(.top, row.id == drawn.first?.row.id ? 0 : ColumnMetrics.sectionGap)
+                                        .padding(.bottom, -CardMetrics.gap)
+                                        .transition(.identity)
+                                case .plate(let group):
+                                    EmptyPlate(hot: gap.map { group.holds(group: $0.group, zone: $0.zone) && $0.line == nil } ?? false) { model.entry.openIn(column, group.name, group.zone) }
+                                        .transition(.identity)
+                                case .card(let card):
+                                    CardRow(card: card, column: column, model: model)
+                                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, card: card.id, $0) }
+                                        .transition(.identity)
+                                case .gap:
+                                    GapSpace()
+                                        .transition(.identity)
+                                case .mark(let first):
+                                    SectionMark()
+                                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, mark: $0) }
+                                        .padding(.top, first ? 0 : ColumnMetrics.sectionGap)
+                                        .transition(.identity)
+                                case .pending(_, let text, let level, let branch):
+                                    EntryRow(level: level, branch: branch) { PendingCapsule(text: text) }
+                                        .transition(.identity)
+                                case .field(_, let level, let branch, let section):
+                                    EntryRow(level: level, branch: branch) { EntryCapsule(host: model.entry, section: section) }
+                                        .transition(.identity)
+                                }
                             }
+                            // The carried card's row goes to its new place at once: the carried copy flies there.
+                            .transaction { if keyed.carried { $0.animation = nil } }
+                            .transition(FoldAway())
                         }
                         Color.clear.frame(height: Self.trailingRoom)
                     }
@@ -91,15 +110,16 @@ struct ListColumn: View {
                     }
                 }
                 .scrollIndicators(.hidden)
+                .keyboardRoom()
                 .softEdges(trailing: ListColumn.trailingRoom)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
                     width = $0
                     model.rest(column, width: $0)
                 }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(key, visible: $0) }
-                // The field stays in sight: when it opens or moves, and when the keyboard takes the bottom of the list.
+                // The field stays in sight: when it opens or moves, and when the keyboard comes over the bottom of the list.
                 .onChange(of: model.entry.moved) { reveal(scroller) }
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { _ in reveal(scroller) }
+                .onChange(of: KeyboardRise.shared.top) { reveal(scroller) }
             }
         }
         .onAppear { model.registerList(column) }
@@ -111,7 +131,9 @@ struct ListColumn: View {
 
     private func reveal(_ scroller: ScrollViewProxy) {
         guard model.entry.lists[list.column] != nil else { return }
-        withAnimation(.snappy) { scroller.scrollTo(ListRowView.fieldID) }
+        let renaming = model.entry.state?.renaming?.id
+        guard let field = renaming ?? model.entry.lineKeys[list.column]?.last else { return }
+        withAnimation(.snappy) { scroller.scrollTo(field) }
     }
 
     /// The list as drawn: each section's header, its No tasks plate, its cards with the carry's gap among them, and the
@@ -122,8 +144,10 @@ struct ListColumn: View {
         let renaming = model.entry.state?.renaming?.id
         var typed: [ListRowView] = []
         if let entry {
-            typed = entry.pending.enumerated().map { .pending(index: $0.offset, text: $0.element.text, level: $0.element.level, branch: nil) }
-            typed.append(.field(level: entry.section ? 0 : entry.place.level, branch: nil, section: entry.section))
+            let keys = model.entry.lineKeys[list.column] ?? []
+            typed = entry.pending.enumerated().map { .pending(key: keys[safe: $0.offset] ?? "\u{0}line", text: $0.element.text, level: $0.element.level, branch: nil) }
+            // A card renamed gives its row to the field: the same row, its content now typed in, so nothing comes or goes.
+            typed.append(.field(id: renaming ?? keys.last ?? "\u{0}field", level: entry.section ? 0 : entry.place.level, branch: nil, section: entry.section))
             if let name = entry.newSection { typed.insert(.newHead(name), at: 0) }
         }
         var rows: [ListRowView] = []
@@ -154,7 +178,7 @@ struct ListColumn: View {
         if let slot, slot >= list.groups.count { rows.append(.mark(first: rows.isEmpty)) }
         if entry?.at.kind == "end" { rows += typed }
         // The card carried keeps its row, a dashed place; its subtasks fold away under it.
-        let carried = Set(list.cards.filter { model.isCarried($0) && !model.isWaiting($0) }.map(\.id))
+        let carried = Set(list.cards.filter { model.isFolded($0) }.map(\.id))
         return entry == nil && settling == nil && carried.isEmpty ? rows : Self.branched(rows, carried: carried, model: model)
     }
 
@@ -171,10 +195,10 @@ struct ListColumn: View {
             let branch = level > 0 ? branches[safe: at] ?? nil : nil
             switch row {
             case .card(let card) where card.branch != branch:
-                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, shades: card.shades, corner: card.corner, id: card.id, zone: card.zone))
+                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, shades: card.shades, corner: card.corner, zone: card.zone))
             case .gap: return .gap(level: level, branch: branch)
-            case .pending(let index, let text, _, _): return .pending(index: index, text: text, level: level, branch: branch)
-            case .field(_, _, let section): return .field(level: level, branch: branch, section: section)
+            case .pending(let key, let text, _, _): return .pending(key: key, text: text, level: level, branch: branch)
+            case .field(let id, _, _, let section): return .field(id: id, level: level, branch: branch, section: section)
             default: return row
             }
         }
@@ -192,6 +216,21 @@ struct ListColumn: View {
     }
 }
 
+/// A row as the list keys it: a card made from a typed line keeps that line's key (`QuickEntryHost.heirs`), so the text
+/// becomes the card in its row.
+private struct KeyedRow {
+    let row: ListRowView
+    let key: String
+    /// The row of the card being carried, or just put in its place by a drop.
+    let carried: Bool
+
+    init(row: ListRowView, heirs: [String: String], carried: [String?]) {
+        self.row = row
+        if case .card(let card) = row, let heir = heirs[card.id] { key = heir } else { key = row.id }
+        if case .card(let card) = row { self.carried = carried.contains(card.id) } else { self.carried = false }
+    }
+}
+
 /// A row of a list as drawn: a section's header or its No tasks plate, a card, the gap a carry would land in, a text
 /// typed and not written yet, or the field it is typed in.
 private enum ListRowView: Identifiable {
@@ -202,12 +241,11 @@ private enum ListRowView: Identifiable {
     case plate(BoardGroup)
     case card(BoardCard)
     case gap(level: Int, branch: Branch?)
-    case pending(index: Int, text: String, level: Int, branch: Branch?)
-    case field(level: Int, branch: Branch?, section: Bool)
+    case pending(key: String, text: String, level: Int, branch: Branch?)
+    /// The field, in the row of the card it renames (by that card's id) or a row of its own.
+    case field(id: String, level: Int, branch: Branch?, section: Bool)
     /// Where a carried section would land, before a header or at the list's end.
     case mark(first: Bool)
-
-    static let fieldID = "\u{0}entry"
 
     var id: String {
         switch self {
@@ -217,8 +255,8 @@ private enum ListRowView: Identifiable {
         case .plate(let group): "\u{0}plate/\(group.id)"
         case .card(let card): card.id
         case .gap: "\u{0}gap"
-        case .pending(let index, _, _, _): "\u{0}pending/\(index)"
-        case .field: Self.fieldID
+        case .pending(let key, _, _, _): key
+        case .field(let id, _, _, _): id
         case .mark: "\u{0}mark"
         }
     }
@@ -231,7 +269,7 @@ private enum ListRowView: Identifiable {
     var level: Int? {
         switch self {
         case .card(let card): card.level
-        case .gap(let level, _), .pending(_, _, let level, _), .field(let level, _, _): level
+        case .gap(let level, _), .pending(_, _, let level, _), .field(_, let level, _, _): level
         case .header, .plate, .mark, .project, .newHead: nil
         }
     }
@@ -450,11 +488,17 @@ struct ProjectHeader: View {
                 .lineLimit(1)
                 .frame(height: ColumnMetrics.groupLeading)
             if project.folded {
-                Text(verbatim: "\(project.count)")
-                    .font(.system(size: 12, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(Palette.muted)
-                    .frame(height: ColumnMetrics.groupLeading)
+                // A card dropped into the folded part: the old number fades out and the new one in (decision 56).
+                ZStack {
+                    Text(verbatim: "\(project.count)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(Palette.muted)
+                        .id(project.count)
+                        .transition(.opacity)
+                }
+                .frame(height: ColumnMetrics.groupLeading)
+                .animation(.easeInOut(duration: 0.25), value: project.count)
             }
             if project.canOpenNote, let ref = project.project {
                 Button { Task { await model.openNote(ref) } } label: {
@@ -490,19 +534,34 @@ struct SectionHeader: View {
     @Bindable var model: BoardModel
     @State private var renaming = false
     @State private var name = ""
+    @State private var spot = MenuSpot.Anchor()
     @Environment(\.colorScheme) private var scheme
+
+    /// Rename and Remove Section, as the core offers them for the section.
+    private var headerMenu: UIMenu? {
+        guard let menu = group.menu else { return nil }
+        var actions: [UIMenuElement] = []
+        if menu.rename {
+            actions.append(UIAction(title: String(localized: "Rename"), image: UIImage(systemName: "pencil")) { _ in
+                name = menu.section
+                renaming = true
+            })
+        }
+        if menu.remove {
+            actions.append(UIAction(title: String(localized: "Remove Section"), image: UIImage(systemName: "trash"), attributes: .destructive) { _ in
+                Task { await model.removeSection(column, menu) }
+            })
+        }
+        return actions.isEmpty ? nil : UIMenu(children: actions)
+    }
 
     var body: some View {
         SectionTitle(title: title, muted: group.name == nil)
+            // As a card's: a tap opens its menu once the finger is up, a long press lifts it; no context menu, so the lift
+            // never flashes one.
+            .background { MenuSpot(spot: spot) }
+            .onTapGesture { point in spot.present(headerMenu, at: point) }
             .modifier(SectionLift(group: group, column: column, model: model))
-            .contextMenu {
-                if let menu = group.menu {
-                    if menu.rename { Button("Rename", systemImage: "pencil") { name = menu.section; renaming = true } }
-                    if menu.remove {
-                        Button("Remove Section", systemImage: "trash", role: .destructive) { Task { await model.removeSection(column, menu) } }
-                    }
-                }
-            }
             .alert("Rename Section", isPresented: $renaming) {
                 TextField("Name", text: $name)
                 Button("Cancel", role: .cancel) {}
@@ -522,7 +581,7 @@ private struct SectionLift: ViewModifier {
         if group.reorder {
             content.onDrag {
                 model.startSectionCarry(column, group)
-                return NSItemProvider(object: "section" as NSString)
+                return Carried.provider("section")
             } preview: {
                 SectionFloat(name: group.header ?? "", count: group.cards.filter { $0.level == 0 }.count)
             }
@@ -615,52 +674,50 @@ struct CardRow: View {
     let card: BoardCard
     let column: BoardColumn
     @Bindable var model: BoardModel
-    @Binding var question: MenuQuestion?
 
     var body: some View {
         let waiting = model.isWaiting(card)
         // Its subtasks go with a carried card: they fold away under its dashed place.
-        let carried = model.isCarried(card) && !waiting
+        let folded = model.isFolded(card)
+        let selecting = model.selecting
         HStack(spacing: 10) {
-            if model.selecting {
+            if selecting {
                 SelectionCircle(on: model.picked.contains(card.id))
+                    .contentShape(.rect)
+                    .onTapGesture { pick() }
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
-            capsule(carried: carried || waiting)
-                // Behind the card from the lift on, with no fade: the card hides over it once the carried copy leaves.
-                .background { if waiting { WaitingPlace().transition(.identity) } }
-                .overlay(alignment: .topLeading) { if let branch = card.branch, !carried, !waiting { BranchLine(branch: branch) } }
-                .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
-        }
-        .contentShape(.rect)
-        .onTapGesture {
-            guard model.selecting else { return }
-            UISelectionFeedbackGenerator().selectionChanged()
-            withAnimation(.snappy(duration: 0.2)) { model.togglePick(card.id) }
-        }
-        .frame(height: carried ? 0 : CardMetrics.height, alignment: .top)
-        .padding(.bottom, carried ? -CardMetrics.gap : 0)
-        .accessibilityHidden(carried)
-    }
-
-    @ViewBuilder
-    private func capsule(carried: Bool) -> some View {
-        if model.selecting {
-            TaskCapsule(card: card)
-        } else {
+            // One card in and out of Select Tasks: the circle slides in beside it and it makes room, never a new card.
             CardButton(
                 card: card,
-                menu: { later in model.cardMenu(card.item, ask: { question = $0 }, later: later) },
+                renamedText: model.entry.renamedTexts[card.id],
+                menu: { later in selecting ? nil : model.cardMenu(card.item, later: later) },
                 ringed: model.found == card.id,
-                carried: carried,
+                draggable: !selecting,
+                carried: folded || model.isHidden(card),
+                arrival: model.arrival?.id == card.id ? model.arrival?.from : nil,
                 onTouch: { model.found = nil },
+                onPick: selecting ? { pick() } : nil,
                 onCarry: { model.startCarry(card, from: column.rawValue, grab: $0) },
                 onCancel: { model.cancelCarry() },
                 onEnd: { model.carryEnded() },
-                onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item) } } : nil,
+                onDropped: { model.carryDropped() },
+                onFold: card.item.can.fold && !selecting ? { Task { await model.toggleCollapsed(card.item) } } : nil,
                 onProject: { model.openProject(of: card.item) })
                 .frame(height: CardMetrics.height)
+                // Behind the card from the lift on, with no fade: the card hides over it once the carried copy leaves.
+                .background { if waiting { WaitingPlace().transition(.identity) } }
+                .overlay(alignment: .topLeading) { if let branch = card.branch, !folded, !waiting { BranchLine(branch: branch) } }
+                .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
         }
+        .frame(height: folded ? 0 : CardMetrics.height, alignment: .top)
+        .padding(.bottom, folded ? -CardMetrics.gap : 0)
+        .accessibilityHidden(folded)
+    }
+
+    private func pick() {
+        UISelectionFeedbackGenerator().selectionChanged()
+        withAnimation(.snappy(duration: 0.2)) { model.togglePick(card.id) }
     }
 }
 
@@ -729,4 +786,79 @@ extension View {
 /// How far a calendar's top fade reaches at a scroll offset: an event cut by the top edge keeps its title under it.
 enum SoftEdge {
     static func top(at offset: CGFloat) -> CGFloat { min(SoftEdges.fade, max(0, offset)) }
+}
+
+/// A row that comes or goes in a list folds open or shut from its top while the rows below slide to make or close its
+/// room: its visible part shrinks as fast as the gap closes, so the row below never draws over it, and it fades.
+/// The clip is a shape, not a mask's view builder: SwiftUI renders a running transition off the main thread, where a
+/// main-actor closure traps.
+struct FoldAway: Transition {
+    func body(content: Content, phase: TransitionPhase) -> some View {
+        let share: CGFloat = phase.isIdentity ? 1 : 0
+        // The row's own height folds, so the rows below move by exactly what shows of it, one row or a whole block; the
+        // list's gap after it folds with it (a margin down to minus the gap), never left standing until the row is gone.
+        FoldedHeight(share: share) {
+            content.clipShape(TopPart(share: share))
+        }
+        .padding(.bottom, -CardMetrics.gap * (1 - share))
+        .opacity(share)
+    }
+}
+
+/// Its content at the top `share` of its height: the height it takes in the list.
+private struct FoldedHeight: SwiftUI.Layout {
+    var share: CGFloat
+
+    var animatableData: CGFloat {
+        get { share }
+        set { share = newValue }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let content = subviews.first else { return .zero }
+        let size = content.sizeThatFits(proposal)
+        return CGSize(width: size.width, height: size.height * share)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let content = subviews.first else { return }
+        let size = content.sizeThatFits(proposal)
+        content.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, height: size.height))
+    }
+}
+
+/// The top `share` of a row, cut only at its bottom: what the row draws beyond its other edges, and beyond the bottom
+/// while it stands whole (a card's menu preview flying home inside it), is not cut.
+private struct TopPart: Shape {
+    var share: CGFloat
+
+    var animatableData: CGFloat {
+        get { share }
+        set { share = newValue }
+    }
+
+    nonisolated func path(in rect: CGRect) -> Path {
+        let reach = max(rect.width, rect.height) * 4
+        let bottom = share >= 1 ? rect.maxY + reach : rect.minY + rect.height * share
+        return Path(CGRect(x: rect.minX - reach, y: rect.minY - reach, width: rect.width + reach * 2, height: bottom - rect.minY + reach))
+    }
+}
+
+/// Where a SwiftUI view opens a UIKit menu at a tap's point, as a card's does (`MenuOpener`): it takes no touches, so a
+/// long press on the view stays its own (a lift, a drag).
+struct MenuSpot: UIViewRepresentable {
+    let spot: Anchor
+
+    @MainActor
+    final class Anchor {
+        let opener = MenuOpener { _ in }
+
+        func present(_ menu: UIMenu?, at point: CGPoint) {
+            guard let menu else { return }
+            opener.present(menu, at: point) { nil }
+        }
+    }
+
+    func makeUIView(context: Context) -> MenuOpener { spot.opener }
+    func updateUIView(_ view: MenuOpener, context: Context) {}
 }

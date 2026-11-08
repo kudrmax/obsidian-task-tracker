@@ -52,11 +52,12 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 | `history` | the undo steps as the last answer gave them; left out before the first |
 | `projects` | the notes with the project tag, `ProjectNote` `{ name, path, link }`; left out for none: a task's project then comes from its own `🗂️` field alone (its name, no note to open) |
 | `grouping` | `GroupingState`, how this device groups its lists by project, as the last answer gave it; left out for the defaults (Backlog grouped, Soon not) |
+| `ids` | `TaskIdState`, who the tasks and sections are, as the last answer gave it; left out before the first (every task and section then gets a new id) |
 
 **Answer** (`DoorAnswer`):
 
 ```
-{ "ok": true, "result": …, "tasks"?: "<new text>", "step"?: true, "history"?: {…}, "settings"?: "<new data.json>", "grouping"?: {…} }
+{ "ok": true, "result": …, "tasks"?: "<new text>", "step"?: true, "history"?: {…}, "settings"?: "<new data.json>", "grouping"?: {…}, "ids"?: {…} }
 { "ok": false, "error": { "code": "staleTask" | "tasksFileMissing" | "blank" | "unknownMethod" | "badArguments" | "failed", "message": "…" } }
 ```
 
@@ -72,6 +73,11 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
   over, once). The host writes this text as `data.json`; every key it does not know is kept.
 - `grouping`: the call changed how this device groups its lists (`tasks.setGrouping`, `tasks.toggleFold`, `tasks.reveal`
   of a task in a folded group). The host keeps it on the device, never synced, and hands it in again.
+- `ids`: who the tasks and sections are after the call (`TaskIdState` in `core/application/TaskIdentity.ts`: the
+  headings and task lines of the file as read, tidied for today, with their ids, and where new ids go on from). The ids
+  are the same whether the host hands in the file as the door tidied it or as it still is on disk. It comes whenever it changed: after a write, an
+  undo or redo, and a read of a text other than the one it was for. The host keeps it as it is, in memory (never synced,
+  never parsed), and hands it in as `ids` with the next call; a host that leaves it out still gets ids, new ones each call.
 - `staleTask`: a task or section the call names is no longer there as read: read again (`tasks.screen`) and redraw.
   `tasksFileMissing`: the call needs the tasks file; `tasks.createFile` answers the text of a new one. `blank`: a task to
   write has no title (`capture.add`).
@@ -88,6 +94,11 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
 - Reads take a `TaskItem`, a `TaskKey` and the like as the door gave them; a key names a task as read.
 - `tasks.screen(date)` with no tasks file answers the empty screen with `missing: true`.
 - `tasks.createFile()` answers the new file's text in `tasks`; with a file already there it fails.
+- `tasks.createWithId(text, priority, place, repeat?, labels?)`: `tasks.createInPlace`, answering `CreatedTask`
+  `{ key, id }` (null when nothing was created) instead of the key alone. The key names the new task as the file stands
+  right after this write; the id names it whatever is written before the screen draws it. `tasks.createInPlace` answers
+  the key as before. `entry.shown(session, look, job, created, coming)` takes either: with a `CreatedTask`, and the
+  `coming` cards (`ListCard`) carrying `id`, the typed task's card is found by its id.
 - `tasks.drop(tasks, to, day)` answers the dropped tasks' keys as the file now has them: the screen settles the card on
   its task where it stands. A drop in a list column is `{ kind: "place", column, place }`: the `ListPlace` its gap means
   (`rules.placeOfDrop`), or `null` at the end of a column that places nothing in a gap (`rules.placesInGap`). The door
@@ -96,6 +107,23 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   `{ kind: "title", list, date, byProject }` puts each task at the end of the list's part without a section, its
   project kept (where the list groups by project, `byProject`, at the end of its own project's part there), e.g.
   `tasks.drop([{ key, from: "soon" }], screen.titleDrops.backlog, day)`.
+- `tasks.landing(tasks, to, day, project?)`: where `tasks.drop` with the same arguments would leave each task, in
+  their order, writing nothing (no `tasks` in the answer): the drop's own operation tried over the file, the screen of
+  `day` read over the result by the screen's own code. Ask it at the moment of the drop, before `tasks.drop`, and fly
+  the copy there. Each answer is a `DropLanding` with the task's `id` and `item` (the task as the next screen reads it):
+  - `{ kind: "timeline", span, ridesNow, slotted }`: a block of the day's timeline at `span` (minutes from the start of
+    the day, as `tasks.shownSpan` gives them); `ridesNow`, a past time of today: the block rides the now line; `slotted`,
+    every block of the day after the drop (`{ id, span }`, in the screen's order) to lay the stack out with
+    `rules.stackTasks` and find the card's box.
+  - `{ kind: "list", column, group, index, part? }`: a card of `column` (`day`, `soon`, `inbox`, `backlog`, `done`), in
+    section `group`, `index` among that section's cards there in the file's order. In a list the screen draws in project
+    parts (`screen.projects[list].on`: grouped by project, or a project's own view), `part` (`LandingPart`
+    `{ key, zone, section, index }`) says where it is drawn: the part (`ProjectGroup.key`, its `zone`), the section in
+    it, and `index` among that section's cards in the part, and `folded`: the part is folded, its cards not drawn, so
+    fly to the part's header. Fly to `part` when it is there.
+  - `{ kind: "subtask", parent, index }`: under the task `parent` (its id), `index` among its open subtasks.
+  - `{ kind: "away" }`: not on this screen (another day, out of this project's view).
+  It needs the tasks file, so it is a `tasks.*` method; `rules.*` are the rules that need no file.
 - `tasks.toggleCollapsed(key)`: a tap on a card's subtask counter (offered while `item.can.fold`).
 - `tasks.snap(minute, hourPx, tolerancePx)`: the minute a drag, a drop or a stretch on the timeline stands at, the
   timeline drawn `hourPx` points an hour: the finest of 5, 15, 30 and 60 minutes a finger moves at least `tolerancePx`
@@ -134,6 +162,23 @@ parent's. Every write keeps it, and no title (`TaskItem.title`, `text`, a remind
 - A menu's `project.value` is the row's value, ready: the shared project's name, «No project», or empty when they differ.
 - `NewTaskPlace` `list`/`day` take `project` and `section` (a section named in a project's group is born with its first
   task), `slot` takes `project`. `capture.add` writes no project.
+
+#### Ids: who a task or a section is
+
+- `TaskItem.id` (every task and subtask, wherever it is shown: `tasks.screen`'s lists, the timeline, `tasks.search`'s
+  hits, a found task, the items a write answers such as `tasks.rename`, `tasks.edit`, `tasks.setLabels`): the same for
+  the same task across calls while the host hands `ids` back, through every write the door makes to it (status,
+  priority, labels, date, time, repeat, rename, fold, description, a move to another list, section, project or parent,
+  the timeline and back, several at once), through `history.undo`/`redo`, and through an edit elsewhere that leaves its
+  line in place (or edits that one line in place). A task made gets a new id; a removed task's id is gone; a task added
+  elsewhere gets a new one. A view keys its card by `id`; `key` stays what an action names (the task as read).
+- `ListSection.id` (`tasks.screen`'s `sections`, `tasks.listSections`) and `ListGroup.id` (a column's groups, each
+  `ProjectGroup.sections`): who a section is, the same through `tasks.renameGroup`, `tasks.moveGroup`, the writes to its
+  tasks and undo; a section made gets a new one; No section's is `"none"` in every list. A section shown in several
+  project groups has its one id in each. A header is keyed by it, never by its name.
+- `ProjectGroup.key` (the project's name, `""` for No project) already names a project's group; no write of the door
+  renames a project (that is a rename of its note, elsewhere).
+- Twins (two identical lines) are two tasks with two ids: the door knows which line a write made of which.
 
 ### `days.*`: `DayService`
 
@@ -242,9 +287,13 @@ Typing tasks in place, every rule of it (`core/application/QuickEntry.ts`). Each
   are `sectioned`, the `day` the day list shows, and `shown`: the lists on screen in their order (a task is looked for
   there first; the plus opens in the day list while it shows, else in Inbox). The layout is the frontend's.
 
-The answer's `result` is `{ session, state, changes, jobs, value }`: the session to hand in next; the field's
+The answer's `result` is `{ session, state, changes, jobs, value, renamed }`: the session to hand in next; the field's
 `EntryState` (null: closed); each change on the way (`{ state, drawnNext }`); the jobs this call queued; the method's own
-answer (`choosePlace`'s `PlaceMove`, `openAtDrop`'s boolean, …).
+answer (`choosePlace`'s `PlaceMove`, `openAtDrop`'s boolean, …); and `renamed`, every rename entered and not yet
+written (`PendingRename` `{ id, key, text, title }`: the task's `TaskItem.id`, its key as read at the open, and the
+`text` and `title` its card shows until the write is drawn), the field open or closed. `EntryState.renamed` holds the
+same while the field is open. A card whose `id` is in `renamed` draws `title` in place of its own; the entry drops it
+once its job is `done`.
 
 Methods: `openAtEnd(column)`, `openFromPlus()`, `openIn(column, group)`, `openSlot(slot)`, `openAtDrop(column,
 dropTo)`, `subtaskSpot(parent)`, `renameSpot(item, inStack)`, `stackSpot(parent)`, `open(spot, renaming?)`, `type(text)`,

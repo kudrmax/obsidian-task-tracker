@@ -5,6 +5,7 @@ import { dayOfMonth, monthAbbreviation } from "./dates";
 import { el } from "./dom";
 import { icon } from "./kit/icons";
 import { fillTitle } from "./TaskTitle";
+import { RenamedTexts } from "./RenamedTexts";
 
 export interface TaskCardOptions {
 	/** The day the card is shown on: a due date on that day goes without saying. */
@@ -21,8 +22,15 @@ export function renderTaskCard(parent: HTMLElement | null, item: TaskItem, opts:
 /** A text typed and not yet written, drawn as a plain card with its title alone until the file has the task. */
 export function renderUnwrittenCard(parent: HTMLElement | null, text: string): HTMLElement {
 	const card = el(parent, "div", "tc-card");
-	fillTitle(el(card, "div", "tc-card-title"), text);
+	fillUnwrittenCard(card, text);
 	return card;
+}
+
+/** A card filled as a text typed and not yet written: its title alone. */
+export function fillUnwrittenCard(card: HTMLElement, text: string): void {
+	markColours(card, { colors: [] });
+	card.classList.remove("is-collapsed");
+	fillTitle(el(card, "div", "tc-card-title"), text);
 }
 
 /** The dot of a task in progress in `parent`'s left padding, once; none for a task not in progress. */
@@ -32,7 +40,9 @@ export function showProgressDot(parent: HTMLElement, item: TaskItem): void {
 	else if (!dot) el(parent, "span", "tc-progress-dot");
 }
 
-export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOptions): void {
+/** A task's card filled as the task stands, under its new text while a rename of it waits to be written (`RenamedTexts`). */
+export function fillCard(card: HTMLElement, task: TaskItem, opts: TaskCardOptions): void {
+	const item = RenamedTexts.shown(task);
 	markColours(card, item);
 	card.classList.toggle("is-collapsed", item.collapsed);
 	showProgressDot(card, item);

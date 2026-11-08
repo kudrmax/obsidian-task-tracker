@@ -121,6 +121,11 @@ export class DayData {
 		return this.state.done;
 	}
 
+	/** The tasks have been read at least once: before that the lists stand empty, and their first cards are drawn in place, not moved in. */
+	get read(): boolean {
+		return this.state.date !== null;
+	}
+
 	get missing(): boolean {
 		return this.state.missing;
 	}

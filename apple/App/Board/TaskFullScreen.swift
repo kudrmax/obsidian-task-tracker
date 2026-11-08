@@ -14,12 +14,31 @@ struct TaskFullScreen: View {
     @State private var text = ""
     @State private var draft: JSONValue = .null
     @State private var saving: Task<Void, Never>?
-    @State private var question: MenuQuestion?
     @FocusState private var typing: Bool
     /// The text last put in the editor from the file: a change to anything else is typing.
     @State private var placed = ""
 
     private var task: TaskItem { current ?? item }
+
+    /// The page's first frame is drawn from what was read before the push.
+    init(item: TaskItem, model: BoardModel) {
+        self.item = item
+        self.model = model
+        let page = model.pages[item.id]
+        _current = State(initialValue: page?.task)
+        _tree = State(initialValue: page?.tree)
+        _listName = State(initialValue: page?.listName ?? "")
+        _menuModel = State(initialValue: page?.menu)
+        _subtaskMenus = State(initialValue: page?.subtaskMenus ?? [:])
+        let text = page?.opened["text"].string ?? ""
+        _draft = State(initialValue: page?.opened["state"] ?? .null)
+        _text = State(initialValue: text)
+        _placed = State(initialValue: text)
+        _preread = State(initialValue: page != nil)
+    }
+
+    /// The description was opened before the push.
+    @State private var preread = false
 
     var body: some View {
         ScrollView {
@@ -71,17 +90,15 @@ struct TaskFullScreen: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     if let menu = menuModel {
                         Menu("More", systemImage: "ellipsis") {
-                            MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, ask: { question = $0 }, inStack: true, ownPage: true).nodes)
+                            MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, inStack: true, ownPage: true).nodes)
                         }
                         .tint(.primary)
                     }
                 }
             }
         }
-        .animation(.snappy, value: model.entry.isOpen)
         // A page of its own: no columns, no tab bar, no calendar, as the design has it.
         .toolbar(.hidden, for: .tabBar)
-        .menuQuestions($question, model: model)
         .task { await open() }
         .onAppear { follow() }
         .onChange(of: model.snapshot?.tasksText) { Task { await refresh() } }
@@ -101,7 +118,7 @@ struct TaskFullScreen: View {
         let shown = task
         model.entry.stackRead = { await readStack() }
         model.entry.renamed = { item in
-            if item.key.section == shown.key.section, item.key.index == shown.key.index, item.key.path == shown.key.path { current = item }
+            if item.id == shown.id { current = item }
         }
     }
 
@@ -158,7 +175,7 @@ struct TaskFullScreen: View {
     /// A subtask as the same capsule as on the main screen, at its depth; a long press shows its own menu.
     private func subtask(_ row: FullRow, branch: Branch?) -> some View {
         let card = BoardCard(item: row.item, level: row.level, branch: row.level > 0 ? branch : nil, due: nil, repeats: row.item.repeats, shades: nil)
-        return CardButton(card: card, menu: { later in menu(for: row.item, later: later) }, draggable: false, onProject: { model.openProject(of: row.item) })
+        return CardButton(card: card, renamedText: model.entry.renamedTexts[card.id], menu: { later in menu(for: row.item, later: later) }, draggable: false, onProject: { model.openProject(of: row.item) })
             .frame(height: CardMetrics.height)
             .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
             .padding(.leading, CGFloat(row.level) * CardMetrics.indent)
@@ -167,24 +184,28 @@ struct TaskFullScreen: View {
     private func menu(for item: TaskItem, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         guard let menu = subtaskMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model, ask: { question = $0 }, inStack: true).nodes, later: later) { model.ink($0, dark: dark) }
+        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model, inStack: true).nodes, later: later) { model.ink($0, dark: dark) }
     }
 
     private func open() async {
-        let opened: [String: JSONValue]? = try? await model.rule("description.open", [task.description.json])
-        draft = opened?["state"] ?? .null
-        place(opened?["text"]?.string ?? "")
+        if !preread {
+            let opened: [String: JSONValue]? = try? await model.rule("description.open", [task.description.json])
+            draft = opened?["state"] ?? .null
+            place(opened?["text"]?.string ?? "")
+        }
         await refresh()
     }
 
     /// The task as the file now has it, its subtasks and menu; a change made elsewhere reaches the editor unless it is in use.
     private func refresh() async {
-        await readStack()()
-        listName = (try? await model.read("tasks.listName", [.string(task.list)])) ?? ""
-        menuModel = await model.menu(for: task, from: "full")
-        var menus: [String: TaskMenuModel] = [:]
-        for row in tree?.rows ?? [] { menus[row.item.id] = await model.menu(for: row.item, from: "full") }
-        subtaskMenus = menus
+        guard let page = await model.page(task) else { return }
+        withAnimation(.snappy) {
+            current = page.task
+            tree = page.tree
+            listName = page.listName
+            menuModel = page.menu
+            subtaskMenus = page.subtaskMenus
+        }
         let read: [String: JSONValue]? = try? await model.rule("description.read", [draft, task.description.json, ["focused": .bool(typing), "pending": .bool(saving != nil)]])
         if let read {
             draft = read["state"] ?? draft

@@ -17,6 +17,17 @@ public struct DoorHistory: Equatable, Sendable {
     }
 }
 
+/// Who the tasks and sections are as the door last answered it (`TaskIdState`): the host keeps it, never parsed, and hands
+/// it in again (`docs/door.md`, `ids`), so a task keeps its `id` from one call to the next.
+public struct DoorIds: Equatable, Sendable {
+    /// The door's `ids` as JSON text.
+    public let json: String
+
+    public init(json: String) {
+        self.json = json
+    }
+}
+
 /// What a door call is made over: the files' texts, the settings, the moment and the undo steps.
 public struct DoorContext: Sendable {
     public let tasks: String?
@@ -30,10 +41,12 @@ public struct DoorContext: Sendable {
     public let history: DoorHistory?
     /// How this device groups its lists by project (`GroupingState`) as JSON text; `nil` for the door's defaults.
     public let groupingJSON: String?
+    /// Who the tasks and sections are, as the last answer gave it; `nil` before the first (every task gets a new id).
+    public let ids: DoorIds?
     /// The notes with the project tag (`ProjectNote`s) as JSON text; `nil` for none.
     public let projectsJSON: String?
 
-    public init(tasks: String?, settingsJSON: String = "", now: Date, calendars: [String: String] = [:], fetched: [String]? = nil, history: DoorHistory? = nil, groupingJSON: String? = nil, projectsJSON: String? = nil) {
+    public init(tasks: String?, settingsJSON: String = "", now: Date, calendars: [String: String] = [:], fetched: [String]? = nil, history: DoorHistory? = nil, groupingJSON: String? = nil, projectsJSON: String? = nil, ids: DoorIds? = nil) {
         self.tasks = tasks
         self.settingsJSON = settingsJSON
         self.now = now
@@ -41,6 +54,7 @@ public struct DoorContext: Sendable {
         self.fetched = fetched
         self.history = history
         self.groupingJSON = groupingJSON
+        self.ids = ids
         self.projectsJSON = projectsJSON
     }
 }
@@ -56,6 +70,8 @@ public struct DoorReply: @unchecked Sendable {
     public let history: DoorHistory?
     /// The new `data.json`, when the call changed the settings.
     public let settingsJSON: String?
+    /// Who the tasks and sections are after this call, when it changed: to hand in with the next.
+    public let ids: DoorIds?
     /// The device's grouping by project after the call (`GroupingState` as JSON text), when the call changed it.
     public var groupingJSON: String? = nil
 }
@@ -104,6 +120,7 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
             step: reply["step"] as? Bool ?? false,
             history: try reply["history"].flatMap { $0 is NSNull ? nil : $0 }.map { DoorHistory(json: try Self.json($0)) },
             settingsJSON: reply["settings"] as? String,
+            ids: try reply["ids"].flatMap { $0 is NSNull ? nil : $0 }.map { DoorIds(json: try Self.json($0)) },
             groupingJSON: try reply["grouping"].flatMap { $0 is NSNull ? nil : $0 }.map { try Self.json($0) })
     }
 
@@ -226,6 +243,7 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
         var wire: [String: Any] = ["tasks": context.tasks ?? NSNull(), "settings": context.settingsJSON, "nowMs": ms(context.now), "calendars": context.calendars]
         if let fetched = context.fetched { wire["fetched"] = fetched }
         if let history = context.history { wire["history"] = try JSONSerialization.jsonObject(with: Data(history.json.utf8)) }
+        if let ids = context.ids { wire["ids"] = try JSONSerialization.jsonObject(with: Data(ids.json.utf8)) }
         if let grouping = context.groupingJSON { wire["grouping"] = try JSONSerialization.jsonObject(with: Data(grouping.utf8)) }
         if let projects = context.projectsJSON { wire["projects"] = try JSONSerialization.jsonObject(with: Data(projects.utf8)) }
         return wire

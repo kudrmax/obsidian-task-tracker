@@ -6,6 +6,7 @@ import type { EventFeed, EventFile } from "./EventSource";
 import type { Clock, GroupingStore, Projects, SettingsStore, TaskFileStore, Ticker, Timers } from "./ports";
 import { TaskServiceImpl } from "./TaskServiceImpl";
 import { UndoHistory } from "./UndoHistory";
+import { TaskIdentity } from "./TaskIdentity";
 
 /** What a host gives the core: its files, its settings, its time. */
 export interface CorePorts {
@@ -38,8 +39,9 @@ export interface Core {
 
 /** The services over a host's ports: the one place they are put together, the calendars in the order they are read. */
 export function composeCore(ports: CorePorts): Core {
-	const undo = new UndoHistory(ports.tasksFile);
-	const tasks = new TaskServiceImpl(ports.tasksFile, ports.settings, ports.clock, undo, ports.projects, ports.grouping);
+	const identity = new TaskIdentity();
+	const undo = new UndoHistory(ports.tasksFile, identity);
+	const tasks = new TaskServiceImpl(ports.tasksFile, ports.settings, ports.clock, undo, ports.projects, ports.grouping, identity);
 	const files = CALENDAR_SOURCES.map((source) => ports.calendarFiles[source]);
 	return {
 		tasks,

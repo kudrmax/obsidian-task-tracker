@@ -1,7 +1,8 @@
 import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, placeShowing, type ProjectZone, QuickEntrySession, type QuickEntryTasks, SHOWN_LISTS, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
 import type { RightMode } from "../viewSettings";
 import type { EntryPart } from "./EntryPart";
-import { LAYOUT } from "../design";
+import { DURATION, EASING, LAYOUT, tokenMs } from "../design";
+import { easingOf } from "../easing";
 import { FramePass } from "../FramePass";
 import type { Glide } from "../Keyboard";
 import type { DragController } from "../drag/DragController";
@@ -12,6 +13,7 @@ import type { TaskMenu } from "../menu/TaskMenu";
 import type { ListEntryInput, TaskList } from "../TaskList";
 import type { Timeline } from "../Timeline";
 import type { LocalDate, Slot } from "../types";
+import { RenamedTexts } from "../RenamedTexts";
 import { PlusButton } from "./PlusButton";
 import { PlusRing } from "./PlusRing";
 import { QuickBar } from "./QuickBar";
@@ -22,6 +24,9 @@ import { WriteQueue } from "./WriteQueue";
 
 /** A list as a place to drop, and the column it is. */
 export type ColumnDrop = DropTarget & { readonly column: ListColumn };
+
+/** The list columns a field types in. */
+const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox", "backlog"];
 
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
@@ -119,6 +124,8 @@ export class QuickEntryController {
 	private revealing = false;
 	/** The list riding the keyboard as it slides. */
 	private readonly glide = new ScrollGlide();
+	/** The renames typed here, told to every card drawn (`RenamedTexts`) until they are written; this ends the telling. */
+	private readonly renames: () => void;
 	private readonly scrolled = (e: Event) => {
 		const state = this.state;
 		if (!state) return;
@@ -143,7 +150,7 @@ export class QuickEntryController {
 
 	constructor(private readonly deps: QuickEntryControllerDeps) {
 		this.entry = new QuickEntrySession(
-			deps.tasks,
+			this.telling(deps.tasks),
 			{
 				cards: (column) => this.cards(column),
 				sections: (column) => deps.list(column)?.sections ?? [],
@@ -157,6 +164,7 @@ export class QuickEntryController {
 			},
 			new WriteQueue((error) => deps.onError(error)),
 		);
+		this.renames = RenamedTexts.add(() => this.entry.renamed);
 		this.plus = new PlusButton(deps.root, { onTap: () => this.openFromPress(), onDrag: (e, source) => this.dragFromPlus(e, source), arbiter: deps.arbiter });
 		this.ring = new PlusRing(deps.root);
 		this.bar = new QuickBar(deps.root, {
@@ -352,6 +360,7 @@ export class QuickEntryController {
 		this.deps.root.removeEventListener("scroll", this.scrolled, true);
 		this.deps.root.removeEventListener("transitionend", this.settled, true);
 		this.sizeWatch.disconnect();
+		this.renames();
 		this.glide.stop();
 		this.revealing = false;
 		this.pass.cancel();
@@ -384,11 +393,37 @@ export class QuickEntryController {
 	}
 
 	/** The plus came to rest: the field opens where it landed, in a list or in a slot of the timeline. */
-	private dropped(result: DropResult | null): void {
+	/** The service as the session writes through it, each task the field writes told to the lists by the id the write answers: its card takes the typed text's row. */
+	private telling(tasks: QuickEntryTasks): QuickEntryTasks {
+		return {
+			placementOf: (...a) => tasks.placementOf(...a),
+			placementOfDay: (...a) => tasks.placementOfDay(...a),
+			dayOfPlacement: (...a) => tasks.dayOfPlacement(...a),
+			parseTitle: (...a) => tasks.parseTitle(...a),
+			isBlank: (...a) => tasks.isBlank(...a),
+			withPriority: (...a) => tasks.withPriority(...a),
+			draftMarks: (...a) => tasks.draftMarks(...a),
+			newSlot: (...a) => tasks.newSlot(...a),
+			createSection: (...a) => tasks.createSection(...a),
+			edit: (...a) => tasks.edit(...a),
+			createWithId: async (...a) => {
+				const created = await tasks.createWithId(...a);
+				if (created) for (const column of COLUMNS) this.deps.list(column)?.adopt(created.id);
+				return created;
+			},
+		};
+	}
+
+	/** The plus let go: on a place the field opens there in the same tap, and the plus lands in it (this gives the field). */
+	private dropped(result: DropResult | null): HTMLElement | null {
 		this.carrying = false;
 		this.ring.hide();
 		this.dropField();
-		if (!this.entry.openAtDrop(this.droppedOn, result)) this.showPlus();
+		if (!this.entry.openAtDrop(this.droppedOn, result)) {
+			this.showPlus();
+			return null;
+		}
+		return this.field?.el.isConnected ? this.field.el : null;
 	}
 
 	/** The menu stays over the screen, its panel gone, and the field stands last in its stack of subtasks. */
@@ -487,8 +522,9 @@ export class QuickEntryController {
 		if (!scroller) return false;
 		const top = box.top;
 		const by = rect.bottom > limit ? rect.bottom - limit : rect.top < top ? rect.top - top : 0;
-		if (glide && by !== 0) {
-			this.glide.start(scroller, scroller.scrollTop + by, glide, (at) => this.revealedAt.set(scroller, at));
+		const smooth = glide ?? this.smoothScroll();
+		if (smooth && by !== 0) {
+			this.glide.start(scroller, scroller.scrollTop + by, smooth, (at) => this.revealedAt.set(scroller, at));
 			return true;
 		}
 		if (by !== 0) this.glide.stop();
@@ -496,6 +532,13 @@ export class QuickEntryController {
 		if (by !== 0) scroller.scrollTop += by;
 		this.revealedAt.set(scroller, scroller.scrollTop);
 		return by !== 0;
+	}
+
+	/** Every scroll the plugin makes for the field is one smooth scroll, in the list's motion tokens; none where nothing moves (a test). */
+	private smoothScroll(): Glide | null {
+		const root = this.deps.root;
+		const ms = tokenMs(root, DURATION.collapse);
+		return ms > 0 ? { ms, ease: easingOf(getComputedStyle(root).getPropertyValue(EASING.out)), rise: 0 } : null;
 	}
 
 	/** The bar stands by the field: over a menu's blur above it; on the desktop next to the field, inside what shows of its column. */
@@ -537,6 +580,7 @@ export class QuickEntryController {
 		const before = this.state;
 		this.state = state;
 		if (!state) {
+			for (const column of COLUMNS) this.deps.list(column)?.forgetTyped();
 			this.glide.stop();
 			this.revealing = false;
 			this.pass.cancel();
@@ -556,10 +600,15 @@ export class QuickEntryController {
 
 	/** The field and the bar show the state: its text, the marks it is written with, what the field may do. */
 	private sync(state: EntryState): void {
-		if (this.field && this.field.text !== state.text) this.field.setValue(state.text);
-		this.field?.setSection(state.section === true);
-		this.field?.setTint(state.marks.tint);
+		if (this.field) this.dress(this.field, state);
 		this.bar.show(state);
+	}
+
+	/** The field shows the state's text, as a section's or a task's, in its tint. */
+	private dress(field: QuickFieldHandle, state: EntryState): void {
+		if (field.text !== state.text) field.setValue(state.text);
+		field.setSection(state.section === true);
+		field.setTint(state.marks.tint);
 	}
 
 	/**
@@ -584,6 +633,8 @@ export class QuickEntryController {
 
 	private fieldIn(row: HTMLElement): HTMLElement {
 		const field = (this.field ??= this.openField(row));
+		const state = this.entry.state;
+		if (state) this.dress(field, state);
 		for (const child of [...row.children]) if (child !== field.el) child.remove();
 		if (field.el.parentElement !== row) row.appendChild(field.el);
 		return field.el;
