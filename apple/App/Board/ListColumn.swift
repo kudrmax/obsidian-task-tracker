@@ -21,6 +21,9 @@ struct ListColumn: View {
     private var key: String { "list.\(list.column.rawValue)" }
     /// The list's own width: another day slides through it.
     @State private var width: CGFloat = 0
+    /// Where the list stands scrolled, for a carry held at its edge to scroll it on.
+    @State private var position = ScrollPosition(y: 0)
+    @State private var scroll = ScrollSpot()
     /// The header names the day that stands nearer while another comes in.
     private var title: String {
         guard list.column == .day else { return list.title }
@@ -31,9 +34,12 @@ struct ListColumn: View {
         let column = list.column
         let drawn = rows
         VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
-            ColumnTitle(title: title, dayArrows: dayArrows, grouping: list.canGroup ? list.grouped : nil, model: model) { on in
+            ColumnTitle(title: title, dayArrows: dayArrows, grouping: list.canGroup ? list.grouped : nil, lit: model.titleLit == column, model: model) { on in
                 Task { await model.setGrouping(list.column, on: on) }
             }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move("title.\(column.rawValue)", visible: $0) }
+            .onAppear { model.registerTitle(column) }
+            .onDisappear { model.dropping.remove("title.\(column.rawValue)") }
             ScrollViewReader { scroller in
                 ScrollView {
                     DayLane(model: model, width: width, slides: column == .day, shown: VStack(alignment: .leading, spacing: CardMetrics.gap) {
@@ -78,6 +84,8 @@ struct ListColumn: View {
                     }
                 }
                 .scrollIndicators(.hidden)
+                .scrollPosition($position)
+                .onScrollGeometryChange(for: ScrollSpot.Reach.self) { ScrollSpot.Reach($0) } action: { _, reach in scroll.reach = reach }
                 .softEdges(trailing: ListColumn.trailingRoom)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
                     width = $0
@@ -89,7 +97,11 @@ struct ListColumn: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { _ in reveal(scroller) }
             }
         }
-        .onAppear { model.registerList(column) }
+        .onAppear {
+            model.registerList(column)
+            let spot = scroll, position = $position
+            model.dropping.scrolls(key) { dy in spot.scroll(by: dy, trailing: ListColumn.trailingRoom) { position.wrappedValue.scrollTo(y: $0) } }
+        }
         .onDisappear { model.dropping.remove(key) }
     }
 
@@ -324,8 +336,11 @@ struct ColumnTitle: View {
     var dayArrows = false
     /// The list may group by project: whether it does; nil for a list that never groups.
     var grouping: Bool? = nil
+    /// A carried card would land on it: lit in the accent, as an empty section's plate.
+    var lit = false
     @Bindable var model: BoardModel
     var setGrouping: (Bool) -> Void = { _ in }
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         HStack(spacing: 4) {
@@ -356,6 +371,14 @@ struct ColumnTitle: View {
         .fontWeight(.semibold)
         .frame(height: ColumnMetrics.titleRow)
         .padding(.horizontal, dayArrows ? 0 : 16)
+        .foregroundStyle(lit ? Palette.accent(scheme) : Color.primary)
+        .background {
+            if lit {
+                RoundedRectangle(cornerRadius: CardMetrics.radius)
+                    .fill(Palette.dropBg(scheme))
+                    .strokeBorder(Palette.accent(scheme), lineWidth: 1)
+            }
+        }
     }
 
     /// A day arrow: the whole 32-point square takes the tap, not only the chevron's strokes, which a plain button's label
@@ -632,7 +655,7 @@ struct CardRow: View {
         // Its subtasks go with a carried card: they fold away under its dashed place.
         let carried = model.isCarried(card) && !waiting
         HStack(spacing: 10) {
-            if model.selecting {
+            if model.selecting, !carried {
                 SelectionCircle(on: model.picked.contains(card.id))
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
@@ -656,7 +679,20 @@ struct CardRow: View {
     @ViewBuilder
     private func capsule(carried: Bool) -> some View {
         if model.selecting {
-            TaskCapsule(card: card)
+            // A picked card lifted carries every picked task as a stack, as the plugin's.
+            CardButton(
+                card: card,
+                menu: { _ in nil },
+                carried: carried,
+                onCarry: { _ in model.startGroupCarry(card, from: column.rawValue) },
+                onCancel: { model.cancelCarry() },
+                onEnd: { model.carryEnded() },
+                picking: CardButton.Picking(picked: model.picked.contains(card.id), count: model.picked.count) {
+                    withAnimation(.snappy(duration: 0.2)) { model.togglePick(card.id) }
+                })
+                .frame(height: CardMetrics.height)
+                // The other picked tasks go with the lifted one: their rows close up with nothing left showing.
+                .opacity(model.isCarried(card) && !model.isWaiting(card) ? 0 : 1)
         } else {
             CardButton(
                 card: card,
@@ -672,6 +708,50 @@ struct CardRow: View {
                 onProject: model.projectOpener(card.item))
                 .frame(height: CardMetrics.height)
         }
+    }
+}
+
+/// The picked tasks carried as one (`.tc-drag-stack`): the lifted card on two layers of cards, the number carried on it.
+struct StackFloat: View {
+    let card: BoardCard
+    let count: Int
+    let width: CGFloat
+    @Environment(\.colorScheme) private var scheme
+    static let step = CGSize(width: 7, height: 6)
+
+    var body: some View {
+        let dark = scheme == .dark
+        ZStack(alignment: .topLeading) {
+            if count > 1 {
+                layer(Color(hex: dark ? "#1C1C1E" : "#EFEFF2"), depth: 2)
+                layer(Color(hex: dark ? "#242426" : "#F7F7F9"), depth: 1)
+            }
+            TaskCapsule(card: card)
+                .frame(width: width, height: CardMetrics.height)
+                .overlay(alignment: .topTrailing) {
+                    if count > 1 {
+                        Text(verbatim: "\(count)")
+                            .font(.system(size: 12, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .frame(minWidth: 20, minHeight: 20)
+                            .background(Palette.accent(scheme), in: .capsule)
+                            .offset(x: 6, y: -6)
+                    }
+                }
+        }
+        .frame(width: width, height: CardMetrics.height + 2 * Self.step.height, alignment: .top)
+        .padding(Self.room)
+    }
+
+    /// Room round the stack for the number on its corner.
+    static let room: CGFloat = 8
+
+    private func layer(_ fill: Color, depth: CGFloat) -> some View {
+        Capsule().fill(fill)
+            .frame(width: width - 2 * Self.step.width * depth, height: CardMetrics.height)
+            .offset(x: Self.step.width * depth, y: Self.step.height * depth)
     }
 }
 

@@ -137,7 +137,8 @@ enum LocalDay {
     }
 }
 
-/// Repeat: what the core's repeat page offers, with system controls. The check saves, the cross closes untouched.
+/// Repeat: what the core's repeat page offers, with system controls and the core's words (`REPEAT_WORDS`). As the
+/// plugin's page, it writes once as it closes, however it closes (Done or a swipe down): there is no discard.
 struct RepeatSheet: View {
     /// The day a new rule starts from, the rule as it stands, and what writing a rule does.
     let day: String
@@ -160,18 +161,21 @@ struct RepeatSheet: View {
         self.model = model
     }
 
-    @State private var draft: RepeatDraft?
-    @State private var touched = false
-    @State private var editing: Task<Void, Never>?
+    /// The draft and its edits, held by reference: the write as the page goes reads them after the view has left.
+    @State private var page = RepeatPage()
+    private var draft: RepeatDraft? { page.draft }
+    @State private var words: RepeatWords?
+    /// The page has written (Done, Remove Repeat): its going away writes nothing more.
+    @State private var ended = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             Form {
-                if let draft {
+                if let draft, let words {
                     Section {
                         Picker("Repeat", selection: Binding(get: { draft.kind }, set: { edit(["what": "kind", "to": .string($0)]) })) {
-                            ForEach(draft.kinds, id: \.self) { kind in Text(kind == "afterDone" ? "After Done" : "Schedule").tag(kind) }
+                            ForEach(draft.kinds, id: \.self) { kind in Text(Self.titled(words.kinds[kind] ?? kind)).tag(kind) }
                         }
                         .pickerStyle(.segmented)
                         .listRowBackground(Color.clear)
@@ -180,7 +184,7 @@ struct RepeatSheet: View {
                     Section {
                         Stepper {
                             HStack {
-                                Text("Every")
+                                Text(words.every)
                                 Spacer()
                                 Text(verbatim: "\(draft.every)").monospacedDigit()
                             }
@@ -190,17 +194,17 @@ struct RepeatSheet: View {
                             if draft.can.fewer { edit(["what": "every", "by": -1]) }
                         }
                         Picker("Unit", selection: Binding(get: { draft.unit }, set: { edit(["what": "unit", "to": .string($0)]) })) {
-                            ForEach(draft.units, id: \.self) { unit in Text(Self.unit(unit, every: draft.every)).tag(unit) }
+                            ForEach(draft.units, id: \.self) { unit in Text(Self.titled(words.units[unit] ?? unit)).tag(unit) }
                         }
                         .pickerStyle(.menu)
                     }
                     if draft.detail == "weekdays" {
                         Section("On") {
                             HStack(spacing: 0) {
-                                ForEach(0..<7, id: \.self) { day in
+                                ForEach(Array(words.weekdays.enumerated()), id: \.offset) { day, weekday in
                                     let on = draft.days.contains(day)
                                     Button { edit(["what": "weekday", "day": .number(Double(day))]) } label: {
-                                        Text(Self.weekdays[day])
+                                        Text(weekday.letter)
                                             .font(.body.weight(on ? .semibold : .regular))
                                             .foregroundStyle(on ? Color.white : Color.primary)
                                             .frame(width: 38, height: 38)
@@ -208,7 +212,7 @@ struct RepeatSheet: View {
                                     }
                                     .buttonStyle(.plain)
                                     .frame(maxWidth: .infinity)
-                                    .accessibilityLabel(Self.weekdayNames[day])
+                                    .accessibilityLabel(weekday.name)
                                     .accessibilityAddTraits(on ? .isSelected : [])
                                 }
                             }
@@ -218,7 +222,10 @@ struct RepeatSheet: View {
                     }
                     if draft.removable {
                         Section {
-                            Button("Remove Repeat", role: .destructive) { Task { await write(.null); dismiss() } }
+                            Button(Self.titled(words.remove), role: .destructive) {
+                                ended = true
+                                Task { await write(.null); dismiss() }
+                            }
                         }
                     }
                 }
@@ -226,34 +233,48 @@ struct RepeatSheet: View {
             .navigationTitle("Repeat")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.tint(.primary) }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", systemImage: "checkmark") { Task { await editing?.value; await save(); dismiss() } }
+                    Button("Done", systemImage: "checkmark") { dismiss() }
                         .buttonStyle(.glassProminent)
                 }
             }
         }
         .presentationDetents([.medium, .large])
-        .task { draft = await ask("rules.repeatDraft", [.string(day), own]) }
+        .task {
+            words = try? AppServices.shared.board.repeatWords()
+            page.draft = await ask("rules.repeatDraft", [.string(day), own])
+        }
+        // However the page goes, it writes as it closes, as the plugin's does when its menu closes.
+        .onDisappear {
+            guard !ended else { return }
+            ended = true
+            let page = page
+            Task { await page.editing?.value; await save(page) }
+        }
+    }
+
+    /// The core's words in the app's title case: «After done» reads «After Done».
+    static func titled(_ words: String) -> String {
+        words.split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
     }
 
     /// Each change is made over the draft the one before it left: quick taps add up.
     private func edit(_ change: JSONValue) {
-        let before = editing
-        editing = Task {
+        let before = page.editing, page = page
+        page.editing = Task {
             await before?.value
-            guard let current = draft else { return }
+            guard let current = page.draft else { return }
             if let next: RepeatDraft = await ask("rules.editRepeat", [current.json, change]) {
-                draft = next
-                touched = true
+                page.draft = next
+                page.touched = true
             }
         }
     }
 
     /// The page writes once, as it closes: `repeatPage.end` says whether, and what.
-    private func save() async {
-        guard let draft else { return }
-        let held: JSONValue = touched ? ["rule": draft.rule] : .null
+    private func save(_ page: RepeatPage) async {
+        guard let draft = page.draft else { return }
+        let held: JSONValue = page.touched ? ["rule": draft.rule] : .null
         guard let end: [String: JSONValue] = await ask("repeatPage.end", [own, held]), let rule = end["rule"] else { return }
         await write(rule)
     }
@@ -269,17 +290,13 @@ struct RepeatSheet: View {
     }
 
     private static let log = Logger(subsystem: "com.kudrmax.taskcalendar", category: "repeat")
+}
 
-    static let weekdays = ["M", "T", "W", "T", "F", "S", "S"]
-    static let weekdayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
-    static func unit(_ unit: String, every: Int) -> String {
-        let one = every == 1
-        switch unit {
-        case "day": return one ? "Day" : "Days"
-        case "week": return one ? "Week" : "Weeks"
-        case "month": return one ? "Month" : "Months"
-        default: return unit
-        }
-    }
+/// The repeat page's draft, the edits made to it, and the edit still running.
+@MainActor
+@Observable
+final class RepeatPage {
+    var draft: RepeatDraft?
+    @ObservationIgnored var touched = false
+    @ObservationIgnored var editing: Task<Void, Never>?
 }

@@ -40,15 +40,15 @@ KNOWN = already named by the lead.
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
 | 2.1 KNOWN | Project row in every menu (single and bulk): projects A–Z, No project, check on current; subtask row disabled; value on the right (tasks.md «Меню задачи» 4; core `menu.project`). | absent (A/TaskMenu.swift:88-107 has no `project`; MenuProject not decoded). | MISSING | CORE (project notes in context) + SWIFT; core: done — `TaskMenuModel.project` over `context.projects`; write `tasks.setProject`; app: done — Project › after Section (or before Add Subtask), options A–Z, No project, value on the right, disabled for subtasks; writes `tasks.setProject`; also in the bulk menu |
-| 2.2 | Labels: menu stays open after a label tap, card re-colours live, to set another. | Label rows not `keepsOpen` → menu closes each time (A/TaskMenu.swift:59-61). Same in bulk «More» (MenuNodes). | WRONG | SWIFT |
-| 2.3 | Description start shown over the card in the menu; tap opens full screen, tap on a link opens it (tasks.md, P/menu/DescriptionPeek.ts). | absent | MISSING | SWIFT (markdown rendering) |
-| 2.4 | Timeline card with subtasks: its open subtasks between card and menu; tap a subtask → its menu (tasks.md). | absent | MISSING | SWIFT |
-| 2.5 | Add subtask on a timeline card: stack under the lifted copy, field there (P/menu/TaskMenu.ts:272). | Opens the full screen instead (A/QuickEntryHost.swift:155-161; app.md documents it). | WRONG | SWIFT (or a spec decision) |
-| 2.6 | Repeat row shows the current rule on the right ("Every 3 days", weekday letters). | «Repeat…» without value (A/TaskMenu.swift:99). | LOOK/MISSING info | CORE (words are built in P/repeat/repeatLabel.ts — move to core) + SWIFT; core: done — `TaskMenuModel.repeat` `{ value, days }`, `rules.repeatValue` |
-| 2.7 | Repeat page writes once when the menu closes; there is no discard. | Sheet: ✕ discards, only ✓ writes (A/BoardSheets.swift:181-185). | WRONG | SWIFT (core `repeatPage.end` already) |
+| 2.2 | Labels: menu stays open after a label tap, card re-colours live, to set another. | Label rows not `keepsOpen` → menu closes each time (A/TaskMenu.swift:59-61). Same in bulk «More» (MenuNodes). | WRONG | SWIFT; app: done — label rows keep the menu open (`keepsMenuPresented`); the open menu follows the task by its key and is drawn anew in place (`updateVisibleMenu`), the copy over it re-coloured; the bulk «⋯» re-reads after each write and keeps open |
+| 2.3 | Description start shown over the card in the menu; tap opens full screen, tap on a link opens it (tasks.md, P/menu/DescriptionPeek.ts). | absent | MISSING | SWIFT (markdown rendering); app: done — the description's start is the menu's first row (Decisions 7), a tap opens the full screen; a row per link of it opens the link |
+| 2.4 | Timeline card with subtasks: its open subtasks between card and menu; tap a subtask → its menu (tasks.md). | absent | MISSING | SWIFT; app: done — a calendar card's menu opens with its open subtasks between the card and the core's rows, each opening its own menu (`from: stack`) |
+| 2.5 | Add subtask on a timeline card: stack under the lifted copy, field there (P/menu/TaskMenu.ts:272). | Opens the full screen instead (A/QuickEntryHost.swift:155-161; app.md documents it). | WRONG | SWIFT (or a spec decision); app: done — the card is lifted over a dimmed screen where it stood, its subtasks stacked under it with branches and the field last (`TimelineStack`, the full screen's `TaskStack`); the full screen only when no card of it shows |
+| 2.6 | Repeat row shows the current rule on the right ("Every 3 days", weekday letters). | «Repeat…» without value (A/TaskMenu.swift:99). | LOOK/MISSING info | CORE (words are built in P/repeat/repeatLabel.ts — move to core) + SWIFT; core: done — `TaskMenuModel.repeat` `{ value, days }`, `rules.repeatValue`; app: done — the Repeat row's subtitle is `menu.repeat.value`, a weekly schedule's days as the week's letters (`REPEAT_WORDS`) with a dash for the others (Decisions 8) |
+| 2.7 | Repeat page writes once when the menu closes; there is no discard. | Sheet: ✕ discards, only ✓ writes (A/BoardSheets.swift:181-185). | WRONG | SWIFT (core `repeatPage.end` already); app: done — the sheet writes once as it closes, by its check or a swipe down (`repeatPage.end`); no discard; its words from `REPEAT_WORDS` |
 | 2.8 | Pick a date page marks today/the due date; Remove due date at the bottom. | In parity (DateSheet). See bug 0.5. | — | — |
 | 2.9 | Section page lists in a project group the group's sections. | Grouping forced off, so always the whole list's (C/TaskBoard.swift:167-169). | WRONG (follows 5.x) | CORE context + SWIFT; core: done — grouping no longer forced off: `TaskBoard(grouping:)` keeps the door's `grouping`; app: done — the board keeps the device's grouping, so a grouped card's Section page is its group's (seen on Backlog cards) |
-| 2.10 | Rename / New section inline. | Alerts with a text field (A/BoardSheets.swift:22; A/ListColumn.swift:382). | LOOK | — |
+| 2.10 | Rename / New section inline. | Alerts with a text field (A/BoardSheets.swift:22; A/ListColumn.swift:382). | LOOK | —; app: left — LOOK only: New Section and Rename stay the system alert with a field; the behaviour is the plugin's (the task goes into the new section, the core's `toSection`) |
 | — | In parity: groups order from core, statuses (Done, In progress/Stop progress, Won't do, Stop), confirmations, priorities, moves, Reminder page, Add subtask (lists), Open full screen, Open in Obsidian, Delete. | | | |
 
 ## 3. Lists & sections
@@ -79,31 +79,31 @@ KNOWN = already named by the lead.
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 5.1 | Drop on a column title (Inbox, Soon, Backlog, day header): end of its part without a section, project kept; title lights up (tasks.md table; core `screen.titleDrops`). | absent: only `list.*` and `timeline` places (A/BoardModel.swift:759-763,904); `titleDrops` not decoded. | MISSING | SWIFT |
-| 5.2 | Auto-scroll of a list or the timeline when the finger nears its edge. | absent (A/BoardDrop.swift has no scrolling). | MISSING | SWIFT |
-| 5.3 | Stretch a timeline task by its two dots (resize, `item.can.resize`, `tasks.snap`). | absent (app.md «Пока не умеет»). | MISSING | SWIFT |
-| 5.4 | Select mode: long press on a picked card carries all picked as a stack (core `tasks.carried`). | absent: picked cards are plain capsules, no drag (A/ListColumn.swift:524-526). | MISSING | SWIFT |
-| 5.5 | Long press delay from Settings (250 ms default). | System drag delay; calendar press hard-coded 0.25 s (A/TimelineColumn.swift:439); `longPressMs` decoded but unused. | WRONG | SWIFT; core: done (already) — `screenSettings.get().longPressMs` (`ScreenSettings.longPressMs`) |
+| 5.1 | Drop on a column title (Inbox, Soon, Backlog, day header): end of its part without a section, project kept; title lights up (tasks.md table; core `screen.titleDrops`). | absent: only `list.*` and `timeline` places (A/BoardModel.swift:759-763,904); `titleDrops` not decoded. | MISSING | SWIFT; app: done — each list's title is a drop place (`title.<column>`), lit as an empty section's plate while a card is over it; the drop writes `tasks.drop(…, screen.titleDrops[column], day)`; the plus never lands there |
+| 5.2 | Auto-scroll of a list or the timeline when the finger nears its edge. | absent (A/BoardDrop.swift has no scrolling). | MISSING | SWIFT; app: done — a carry (card or plus) held within 48 pt of a list's or the timeline's top or of the tab bar scrolls it, faster nearer the edge (`BoardDrop` edge scroll) |
+| 5.3 | Stretch a timeline task by its two dots (resize, `item.can.resize`, `tasks.snap`). | absent (app.md «Пока не умеет»). | MISSING | SWIFT; app: done — a tapped calendar card is selected (ringed, two dots) until a touch elsewhere after its menu has gone (Decisions 9); a dot drags the edge on the grid (`tasks.snap`, `tasks.stretch`), let go writes `tasks.resize` |
+| 5.4 | Select mode: long press on a picked card carries all picked as a stack (core `tasks.carried`). | absent: picked cards are plain capsules, no drag (A/ListColumn.swift:524-526). | MISSING | SWIFT; app: done — in Select Tasks a picked card's long press carries the stack (`tasks.carried`), the lifted one first; all go in one `tasks.drop`; the mode ends |
+| 5.5 | Long press delay from Settings (250 ms default). | System drag delay; calendar press hard-coded 0.25 s (A/TimelineColumn.swift:439); `longPressMs` decoded but unused. | WRONG | SWIFT; core: done (already) — `screenSettings.get().longPressMs` (`ScreenSettings.longPressMs`); app: done — the drag interaction's lift and the calendar's long press wait `longPressMs` |
 | — | In parity: list gaps/levels/heads via core, drop line, waiting place, cancel target, list→calendar, calendar→calendar, calendar→list, plus drop in a gap / on the calendar, long press on empty calendar, section lift. | | | |
 
 ## 6. Quick entry / capture
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 6.1 | Tap on the plus: field at the end of the day column (Inbox–Soon position: end of Inbox). | Opens the capture sheet (text/voice, default Inbox) (A/BoardScreen.swift:75, CaptureRouter.openTyping). In Today a tap therefore lands in Inbox, not Now. | WRONG | SWIFT (or spec decision) |
-| 6.2 | `[[` opens note search in the field. | absent (plain UITextField). | MISSING | CORE (note list) + SWIFT; core: done — `notes.linkQuery`, `notes.suggest`, `notes.insert` (`TaskBoard.linkQuery`/`suggestNotes`/`insertLink`) |
-| 6.3 | Plus into a project group / in a project view writes the project. | absent (no groups). | MISSING | SWIFT |
-| 6.4 | Place button shows a picked day as «5 Nov» (core date words). | Formatted by Swift in the device locale (A/QuickEntryHost.swift:949): «Nov 5» on an en-US phone. | LOOK (decision in UI) | CORE words or reuse `rules.dueLabel`; core: done — `tasks.placementTitle(placement)` |
+| 6.1 | Tap on the plus: field at the end of the day column (Inbox–Soon position: end of Inbox). | Opens the capture sheet (text/voice, default Inbox) (A/BoardScreen.swift:75, CaptureRouter.openTyping). In Today a tap therefore lands in Inbox, not Now. | WRONG | SWIFT (or spec decision); app: kept by Max's ask — the plus opens the capture sheet with the keyboard up; every other way the plugin opens a field (plus drag, calendar long press, plate tap, Add Subtask, Rename, full screen) is the inline field |
+| 6.2 | `[[` opens note search in the field. | absent (plain UITextField). | MISSING | CORE (note list) + SWIFT; core: done — `notes.linkQuery`, `notes.suggest`, `notes.insert` (`TaskBoard.linkQuery`/`suggestNotes`/`insertLink`); app: done — in every inline field (lists, calendar, stack, full screen) the notes list shows over the bar while the caret stands in a `[[`; a tap or Enter puts the link (`notes.insert`) |
+| 6.3 | Plus into a project group / in a project view writes the project. | absent (no groups). | MISSING | SWIFT; app: done (4.3) — the plus and a plate in a project's group, and every field of the project's view, write the project |
+| 6.4 | Place button shows a picked day as «5 Nov» (core date words). | Formatted by Swift in the device locale (A/QuickEntryHost.swift:949): «Nov 5» on an en-US phone. | LOOK (decision in UI) | CORE words or reuse `rules.dueLabel`; core: done — `tasks.placementTitle(placement)`; app: done — the place button reads `tasks.placementTitle` |
 | — | In parity: Enter/next field, empty Enter outdents/ends, tap elsewhere saves, `p1 ` prefix, section button, indent/outdent, flag with levels and labels (labels keep the menu open here), repeat, place, Date…, subtask/calendar forms of the bar, Rename in place, Add subtask in place, plate tap. | | | |
 
 ## 7. Timeline & calendars
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 7.1 | Tap on an event → menu «Open in Calendar» (calendars.md «Меню события»). | Events take no taps (A/TimelineColumn.swift:145-154). | MISSING | SWIFT |
-| 7.2 | Now line moves every minute; an unfinished overdue task rides it. | Static between reads (see 0.3). | WRONG | SWIFT |
-| 7.3 | Sources window shows a source's error text (not logged in, file missing, no answer in N s, failure). | `problem` decoded and never shown (A/CalendarsView.swift:21-35). | MISSING | SWIFT (better: CORE gives the words — both frontends build them, P/sources/sourceText.ts and CalendarsView.words); core: done — each status's `words` `{ name, short, sub, time }` in `calendars.events` |
-| 7.4 | Calendars shown grouped by account under headers. | Flat list, account as a footnote. | LOOK | — |
+| 7.1 | Tap on an event → menu «Open in Calendar» (calendars.md «Меню события»). | Events take no taps (A/TimelineColumn.swift:145-154). | MISSING | SWIFT; app: done — a tap on an event (timed or all day) opens its menu, Open in Calendar (`calshow:` at its start) |
+| 7.2 | Now line moves every minute; an unfinished overdue task rides it. | Static between reads (see 0.3). | WRONG | SWIFT; app: done (0.3) — seen on screen: the now line moved minute by minute while the app stayed open |
+| 7.3 | Sources window shows a source's error text (not logged in, file missing, no answer in N s, failure). | `problem` decoded and never shown (A/CalendarsView.swift:21-35). | MISSING | SWIFT (better: CORE gives the words — both frontends build them, P/sources/sourceText.ts and CalendarsView.words); core: done — each status's `words` `{ name, short, sub, time }` in `calendars.events`; app: done — each source's row is `words` (`name`, `sub`, `time`), a problem in red, the time orange when stale |
+| 7.4 | Calendars shown grouped by account under headers. | Flat list, account as a footnote. | LOOK | —; app: done — the shown calendars stand under their account's header, as the plugin's settings |
 | 7.5 | Google Calendar API fetched by the plugin; Google settings (login, client id/secret, refresh interval). | App only reads `google.json` (`fetched: []`, C/TaskBoard.swift:156). | by design (calendars.md) — list only | — |
 | — | In parity: hours from Day starts at, grid labels by zoom, events with overlap levels, past events grey, all-day rows, task stack and corner, pinch zoom with levels and memory, snap step, open on now / scroll-to hour, orange stale mark, Refresh now, shown/hidden calendars. | | | |
 
@@ -111,7 +111,7 @@ KNOWN = already named by the lead.
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 8.1 | The day turns over on its own at Day starts at. | No (0.3). | WRONG | SWIFT |
+| 8.1 | The day turns over on its own at Day starts at. | No (0.3). | WRONG | SWIFT; app: done (0.3) — seen on screen: with Day starts at moved the screen turned the day at the minute's read |
 | — | In parity (merged today): arrows, title tap to Today, swipe past Today by `days.stepScreen`, header and hours stand, day slides. | | | |
 
 ## 9. Search
@@ -128,9 +128,9 @@ KNOWN = already named by the lead.
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 10.1 | Long press carries all picked. | absent (5.4). | MISSING | SWIFT |
+| 10.1 | Long press carries all picked. | absent (5.4). | MISSING | SWIFT; app: done (5.4) |
 | 10.2 | Bulk Project row. | absent (2.1). | MISSING | SWIFT |
-| 10.3 | Bulk labels keep the menu and selection for the next label. | Selection kept, menu closes (2.2). | WRONG | SWIFT |
+| 10.3 | Bulk labels keep the menu and selection for the next label. | Selection kept, menu closes (2.2). | WRONG | SWIFT; app: done (2.2) |
 | — | In parity: circles, calendar cards not pickable, statuses, priorities, labels, moves, Remove due date, Section, Delete N without asking, any action ends the mode. | | | |
 
 ## 11. Full screen
@@ -199,4 +199,10 @@ Nothing missing on the app side: the plugin only writes the markers and the Remi
 4. **Group by Project** is the title menu's one row, as a system menu toggle with a folder icon and the check while on; the words in the app's title case.
 5. **A note link in a title opens in Obsidian** (`obsidian://open?vault=…&file=<path>`, the path `notes.open` resolves); an address opens in the system browser.
 6. **The Done column closes** when the ribbon comes to rest anywhere off it (a swipe or a tab), as the plugin's «уводят с неё на Inbox».
+7. **What the plugin shows between a card and its menu is the menu's first rows** (2.3, 2.4). iOS draws nothing over a menu's preview that takes a tap, and the menu at the tap's point may cover the card. So the description's start is the menu's first row (its first lines as they read, links by their words, no markup), a tap opening the full screen, with a row under it for each link of the description, a tap opening that link; and a calendar card's open subtasks are the next rows, each opening its own menu as a submenu.
+8. **A weekly schedule on the Repeat row** (2.6): a system row's value is plain text, so the week's seven letters can't be lit; the row shows the week's letters for the rule's days and a dash for the others (`M – W – F – –`), the seven places reading as the week.
+9. **The stretch dots stay after the menu** (5.3). In the plugin the dots ride the copy over the menu and a dot taken closes it; iOS lets nothing under an open menu be dragged. A tapped calendar card stays selected (ringed, its two dots) once its menu has gone, until a touch elsewhere; its dots then stretch it as the plugin's do.
+10. **Add Subtask on a calendar card lifts it over a dimmed screen** (2.5): the copy stands where the card stood (kept above the keyboard), its subtasks one level in under it with their branches and the field last, as the plugin's stack under the lifted copy; it goes when typing ends.
+11. **A column's title as a drop place lights as an empty section's plate** (5.1): the accent's outline and fill round the title; only cards land there, never the plus.
+12. **The Repeat sheet has a check, no cross** (2.7): it writes as it closes however it closes (the check or a swipe down), as the plugin's page writes when its menu closes.
 

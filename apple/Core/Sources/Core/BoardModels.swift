@@ -620,3 +620,17 @@ public struct ScreenSettings: Decodable, Hashable, Sendable {
     public let longPressMs: Int
     public let scrollToHour: Int
 }
+
+/// `StretchSpan`: a calendar card while one of its dots is held, minutes from the day's start (`tasks.stretch`).
+public struct StretchSpan: Decodable, Hashable, Sendable {
+    public let start: Int
+    public let end: Int
+
+    enum CodingKeys: String, CodingKey { case start, end }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        start = Int(try c.decode(Double.self, forKey: .start).rounded())
+        end = Int(try c.decode(Double.self, forKey: .end).rounded())
+    }
+}

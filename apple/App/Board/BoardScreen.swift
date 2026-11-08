@@ -40,7 +40,12 @@ struct BoardScreen: View {
         .animation(.snappy, value: model.selecting)
         .animation(.snappy, value: model.entry.isOpen)
         .background { DropAnchor(drop: model.dropping) }
-        .background { TouchWatch { if model.found != nil { model.found = nil } } }
+        .background {
+            TouchWatch { point in
+                if model.found != nil { model.found = nil }
+                model.touched(at: point)
+            }
+        }
         .notSyncedAlert(sync)
         // Obsidian hands the phone back after Sync: the board reads the file again.
         .onChange(of: sync.returns) { Task { await model.reload() } }
@@ -86,7 +91,10 @@ struct BoardScreen: View {
     /// carried while the bar keeps the system's layout.
     private var bottomBar: some View {
         ZStack(alignment: .topLeading) {
-            PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: { plusSlot = $0 })
+            PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: {
+                plusSlot = $0
+                model.dropping.floor = $0.minY
+            })
             if let slot = plusSlot {
                 PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.carrying, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
                     .frame(width: slot.width, height: slot.height)
@@ -101,6 +109,11 @@ struct BoardScreen: View {
         if let snapshot = model.snapshot, !snapshot.screen.missing {
             Ribbon(snapshot: snapshot, model: model, question: $question)
                 .overlay(alignment: .top) { problem }
+                .overlay { if let stack = model.stackShown { TimelineStack(shown: stack, model: model) } }
+                .overlay(alignment: .bottom) { NoteSuggestions(host: model.entry) }
+                .animation(.snappy, value: model.entry.notes)
+                .animation(.snappy, value: model.stackShown != nil)
+                .onChange(of: model.entry.isOpen) { if !model.entry.isOpen { model.stackShown = nil } }
         } else if let problem = model.problem {
             ContentUnavailableView {
                 Label("Can’t Read Your Tasks", systemImage: "exclamationmark.triangle")
@@ -459,11 +472,17 @@ struct BulkActions: View {
         }
         .tint(.primary)
         .disabled(items.isEmpty)
-        .task(id: model.picked) { menu = items.isEmpty ? nil : await model.bulkMenu() }
+        .task(id: BulkRead(picked: model.picked, file: model.snapshot?.tasksText)) { menu = items.isEmpty ? nil : await model.bulkMenu() }
         Button("Delete", systemImage: "trash", role: .destructive) { Task { await model.remove(items) } }
             .tint(.red)
             .disabled(items.isEmpty || menu?.remove == nil)
     }
+}
+
+/// The bulk menu is read again for other picks and after each write: a label set keeps the menu open, ticked anew.
+private struct BulkRead: Equatable {
+    let picked: Set<String>
+    let file: String?
 }
 
 /// The ribbon's own scroll view, reached from inside it: SwiftUI keeps no switch for these.

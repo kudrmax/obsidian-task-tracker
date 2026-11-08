@@ -22,6 +22,8 @@ indirect enum MenuNode {
     case submenu(title: String, symbol: String, subtitle: String?, children: [MenuNode])
     /// A group between separators; `row` draws it as the row of icons over their titles on top of a menu.
     case group(row: Bool, children: [MenuNode])
+    /// A row whose page is read when it opens: a subtask's own menu.
+    case deferred(title: String, symbol: String, subtitle: String?, load: @MainActor () async -> [MenuNode])
 }
 
 /// The task's menu as iOS 26 draws a menu, in the plugin's order as the core gives it: the statuses, the priorities and
@@ -59,7 +61,7 @@ struct TaskMenu {
             }
         case "labels":
             children = menu.labels.tiles.map { tile in
-                .action(title: model.labelTitle(tile.mark.title), symbol: "tag.fill", tint: tile.mark.color, checked: tile.on, disabled: menu.labels.disabled) { Task { await model.toggleLabel(items, tile.mark.title) } }
+                .action(title: model.labelTitle(tile.mark.title), symbol: "tag.fill", tint: tile.mark.color, checked: tile.on, keepsOpen: true, disabled: menu.labels.disabled) { Task { await model.toggleLabel(items, tile.mark.title) } }
             }
         case "moves":
             children = menu.moves.map { move in
@@ -101,7 +103,7 @@ struct TaskMenu {
             case "description" where single:
                 rows.append(.action(title: "Description", symbol: "text.alignleft", opens: true) { if let describe { describe() } else { model.fullScreen.append(item) } })
             case "repeat" where single:
-                rows.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item })
+                rows.append(.action(title: "Repeat…", symbol: "repeat", opens: true, subtitle: repeatValue) { model.repeatFor = item })
             case "section":
                 if let section = sectionPage { rows.append(section) }
             case "subtask" where single:
@@ -113,6 +115,14 @@ struct TaskMenu {
         let at = ids.firstIndex(of: "section").map { $0 + 1 } ?? ids.firstIndex(of: "subtask") ?? rows.count
         rows.insert(projectRow, at: at)
         return rows
+    }
+
+    /// The Repeat row's value, the core's (`menu.repeat`): the rule in words, or a weekly schedule's days by their letters
+    /// in the week's order.
+    private var repeatValue: String? {
+        let row = menu.repeat
+        if let days = row.days, !days.isEmpty { return model.weekLetters(days) }
+        return row.value.isEmpty ? nil : row.value
     }
 
     /// The Project row and its page: the project notes by name, No Project last, the current one checked; for subtasks
@@ -171,12 +181,12 @@ struct TaskMenu {
 extension MenuNode {
     /// `later`: a row that opens a sheet, an alert or a page runs once the menu has gone, as the menu's own end tells.
     @MainActor
-    static func uiMenu(_ nodes: [MenuNode], later: @escaping (@escaping @MainActor () -> Void) -> Void, palette: (String) -> UIColor?) -> UIMenu {
+    static func uiMenu(_ nodes: [MenuNode], later: @escaping (@escaping @MainActor () -> Void) -> Void, palette: @escaping (String) -> UIColor?) -> UIMenu {
         UIMenu(children: nodes.map { $0.element(later, palette) })
     }
 
     @MainActor
-    private func element(_ later: @escaping (@escaping @MainActor () -> Void) -> Void, _ palette: (String) -> UIColor?) -> UIMenuElement {
+    private func element(_ later: @escaping (@escaping @MainActor () -> Void) -> Void, _ palette: @escaping (String) -> UIColor?) -> UIMenuElement {
         switch self {
         case .action(let title, let symbol, let tint, let destructive, let checked, let keepsOpen, let opens, let disabled, let subtitle, let run):
             var image = symbol.flatMap { UIImage(systemName: $0) }
@@ -196,6 +206,13 @@ extension MenuNode {
         case .group(let row, let children):
             let menu = UIMenu(options: .displayInline, children: children.map { $0.element(later, palette) })
             if row { menu.preferredElementSize = children.count > 3 ? .small : .medium }
+            return menu
+        case .deferred(let title, let symbol, let subtitle, let load):
+            let rows = UIDeferredMenuElement.uncached { completion in
+                Task { @MainActor in completion(await load().map { $0.element(later, palette) }) }
+            }
+            let menu = UIMenu(title: title, image: UIImage(systemName: symbol), children: [rows])
+            menu.subtitle = subtitle
             return menu
         }
     }
@@ -229,8 +246,29 @@ struct MenuNodes: View {
                 } else {
                     Section { MenuNodes(nodes: children) }
                 }
+            case .deferred(let title, let symbol, let subtitle, let load):
+                DeferredMenu(title: title, symbol: symbol, subtitle: subtitle, load: load)
             }
         }
+    }
+}
+
+/// A row whose page is read as the menu shows it.
+private struct DeferredMenu: View {
+    let title: String
+    let symbol: String
+    let subtitle: String?
+    let load: @MainActor () async -> [MenuNode]
+    @State private var nodes: [MenuNode] = []
+
+    var body: some View {
+        Menu {
+            MenuNodes(nodes: nodes)
+        } label: {
+            Label(title, systemImage: symbol)
+            if let subtitle { Text(subtitle) }
+        }
+        .task { nodes = await load() }
     }
 }
 

@@ -689,6 +689,12 @@ final class BoardModel {
         await reload(animated: true)
     }
 
+    /// Apple's Calendar at an event, as the plugin opens it on the iPhone (`calshow:`, seconds from 2001): at its start.
+    func openInCalendar(_ event: WireEvent) {
+        let start = Date(timeIntervalSince1970: event.startMs / 1000)
+        if let url = URL(string: "calshow:\(Int(start.timeIntervalSinceReferenceDate))") { UIApplication.shared.open(url) }
+    }
+
     /// A project's note, opened in Obsidian: the group's arrow and a card's folder mark.
     func openNote(_ path: String) {
         guard let vault = UserDefaults.standard.string(forKey: "vaultFolderName") else { return }
@@ -716,6 +722,15 @@ final class BoardModel {
     struct ShownProject: Identifiable {
         let project: ProjectRef
         var id: String { project.link }
+    }
+
+    /// A card on the calendar lifted with its subtasks while a subtask is typed under it (Add Subtask there).
+    var stackShown: ShownStack?
+
+    struct ShownStack {
+        let card: BoardCard
+        /// Where the card stands, on the screen.
+        let frame: CGRect
     }
 
     func openProject(_ project: ProjectRef) {
@@ -788,6 +803,15 @@ final class BoardModel {
         let grab: CGFloat
         /// A section lifted by its header, carried among its list's sections.
         var section: SectionCarry? = nil
+        /// Select Tasks: every picked task the lift carries (`tasks.carried`), each with the column it is drawn in; empty
+        /// for a card carried alone.
+        var group: [(item: TaskItem, from: String)] = []
+
+        /// What `tasks.drop` takes: each carried task's key and where it was drawn.
+        var dropped: JSONValue {
+            let carried = group.isEmpty ? item.map { [($0, from)] } ?? [] : group
+            return .array(carried.map { ["key": $0.0.key.json, "from": .string($0.1)] })
+        }
     }
 
     /// A section carried by its header, as the plugin's (`GroupDrag`): its list, its index among the list's groups, and
@@ -821,6 +845,26 @@ final class BoardModel {
     func startCarry(_ card: BoardCard, from column: String, grab: CGFloat) {
         found = nil
         withAnimation(.snappy(duration: 0.25)) { carry = Carry(id: card.id, item: card.item, from: column, grab: grab) }
+    }
+
+    /// Select Tasks: a picked card lifted carries every picked task as a stack, as the plugin's. The core says which go
+    /// along with it (`tasks.carried`: the rest of the picked, but a subtask whose task is picked goes with that task).
+    func startGroupCarry(_ card: BoardCard, from column: String) {
+        guard let snapshot else { return }
+        found = nil
+        let picked = pickedItems
+        let froms = Dictionary(picked.map { ($0.id, snapshot.column(of: $0.id) ?? column) }, uniquingKeysWith: { first, _ in first })
+        let all = picked.map { (item: $0, from: froms[$0.id] ?? column) }
+        withAnimation(.snappy(duration: 0.25)) { carry = Carry(id: card.id, item: card.item, from: column, grab: CardMetrics.height / 2, group: all) }
+        let board = board
+        let arguments: [JSONValue] = [card.item.key.json, keys(picked)]
+        Task {
+            guard let kept: [TaskKey] = try? await Task.detached(operation: { try board.read("tasks.carried", arguments, over: try board.files()) }).value,
+                  carry?.id == card.id else { return }
+            // The core names the ones that go along with the lifted one, which leads.
+            let going = kept.compactMap { key in all.first { $0.item.key.section == key.section && $0.item.key.index == key.index && $0.item.key.path == key.path } }
+            carry?.group = [(item: card.item, from: column)] + going
+        }
     }
 
     /// A section's header lifted: its header and tasks fold away and the list closes over them, as the plugin's.
@@ -926,14 +970,15 @@ final class BoardModel {
         sectionSlot = nil
         landing = nil
         hovered = nil
+        titleLit = nil
     }
 
     /// Whether a card stands in the carry: the card itself or one of its subtasks, which go with it.
     func isCarried(_ card: BoardCard) -> Bool {
         guard let carry else { return false }
         if card.id == carry.id { return true }
-        guard let lifted = carry.item else { return false }
-        return Self.contains(lifted, card.item)
+        let lifted = carry.group.isEmpty ? carry.item.map { [$0] } ?? [] : carry.group.map(\.item)
+        return lifted.contains { $0.id == card.item.id || Self.contains($0, card.item) }
     }
 
     /// The cards a carry over `column` moves between: the column's, without the carried ones.
@@ -1111,13 +1156,103 @@ final class BoardModel {
             if carry.id == Carried.plus {
                 cancelCarry()
                 entry.openAtDrop(column, ["kind": "place", "column": .string(column.rawValue), "place": place])
-            } else if !place.isNull, let item = carry.item {
-                await drop(item, from: carry.from, to: ["kind": "place", "column": .string(column.rawValue), "place": place])
+            } else if !place.isNull, carry.item != nil {
+                await drop(carry, to: ["kind": "place", "column": .string(column.rawValue), "place": place])
                 DropTiming.report(since: dropAt)
             }
         } catch {
             problem = Self.words(error)
         }
+    }
+
+    // MARK: Stretching a calendar card
+
+    /// The calendar card tapped, as the plugin selects it: ringed, with the two dots that stretch it, until a touch
+    /// elsewhere once its menu has gone.
+    private(set) var selectedSlot: String?
+    /// Where the selected card stands, in the window: a touch there keeps it selected (its dots lie on its edges).
+    @ObservationIgnored var selectedFrame: CGRect = .null
+    /// The selected card while a dot is held: the span it shows, minutes from the day's start.
+    private(set) var stretched: (id: String, start: Int, end: Int)?
+
+    func select(_ slot: BoardSlot) {
+        selectedSlot = slot.card.item.can.resize ? slot.id : nil
+    }
+
+    /// A touch anywhere: one outside the selected card and its dots lets it go, but not the touch that closes its menu.
+    func touched(at point: CGPoint) {
+        guard selectedSlot != nil, stretched == nil, !CardControl.menuShowing else { return }
+        if !selectedFrame.insetBy(dx: -Self.gripReach, dy: -Self.gripReach).contains(point) { selectedSlot = nil }
+    }
+
+    private static let gripReach: CGFloat = 24
+
+    /// A dot held at `minute` of the grid: the card shows the span the core gives (`tasks.stretch`).
+    func stretch(_ slot: BoardSlot, edge: String, minute: Int) {
+        guard let day = snapshot?.day,
+              let span: StretchSpan = try? board.read("tasks.stretch", [slot.card.item.json, .string(day), .string(edge), .number(Double(minute))], over: board.settingsOnly())
+        else { return }
+        guard stretched?.start != span.start || stretched?.end != span.end || stretched?.id != slot.id else { return }
+        if stretched != nil { UISelectionFeedbackGenerator().selectionChanged() }
+        stretched = (slot.id, span.start, span.end)
+    }
+
+    /// The dot let go at `minute`: the new time written as the core says (`tasks.resize`); a card no longer than its
+    /// least height (`least` minutes) loses its duration.
+    func endStretch(_ slot: BoardSlot, edge: String, minute: Int, least: Double) async {
+        guard let day = snapshot?.day else { return }
+        let board = board
+        let arguments: [JSONValue] = [slot.card.item.key.json, .string(day), .string(edge), .number(Double(minute)), .number(least)]
+        do {
+            let changed = try await Task.detached { try board.write("tasks.resize", arguments).bool ?? false }.value
+            if changed { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+        } catch {
+            problem = Self.words(error)
+        }
+        dropReadFrom = nil
+        await reload(animated: false)
+        stretched = nil
+    }
+
+    // MARK: A column's title as a place to drop on
+
+    /// The column whose title a carried card would land on: lit as an empty section's plate.
+    private(set) var titleLit: BoardColumn?
+
+    /// A column's title takes a card as the core says (`screen.titleDrops`): the end of its part without a section, its
+    /// project kept. Never the plus or a section.
+    func registerTitle(_ column: BoardColumn) {
+        dropping.register("title.\(column.rawValue)", DropPlace(
+            hover: { [weak self] _ in self?.hoverTitle(column) },
+            leave: { [weak self] in self?.leaveTitle(column) },
+            land: { [weak self] in self?.landTitle(column) },
+            takesPlus: false))
+    }
+
+    private func hoverTitle(_ column: BoardColumn) {
+        guard let carry, carry.item != nil, carry.section == nil, snapshot?.screen.titleDrops[column.rawValue] != nil else { return leaveTitle(column) }
+        hovered = nil
+        landing = nil
+        if gap != nil { withAnimation(.snappy(duration: 0.12)) { gap = nil } }
+        guard titleLit != column else { return }
+        UISelectionFeedbackGenerator().selectionChanged()
+        withAnimation(.snappy(duration: 0.15)) { titleLit = column }
+    }
+
+    private func leaveTitle(_ column: BoardColumn) {
+        guard titleLit == column else { return }
+        withAnimation(.snappy(duration: 0.15)) { titleLit = nil }
+    }
+
+    private func landTitle(_ column: BoardColumn) -> CGRect? {
+        guard titleLit == column, let carry, carry.item != nil, let to = snapshot?.screen.titleDrops[column.rawValue] else { return nil }
+        titleLit = nil
+        writingDrop = true
+        Task {
+            await drop(carry, to: to)
+            finishDrop()
+        }
+        return nil
     }
 
     // MARK: The calendar as a place to drop on
@@ -1179,8 +1314,8 @@ final class BoardModel {
             if carry.id == Carried.plus {
                 cancelCarry()
                 entry.openAtDrop(nil, ["kind": "time", "start": .number(Double(minute))])
-            } else if let item = carry.item {
-                await drop(item, from: carry.from, to: ["kind": "time", "start": .number(Double(minute))])
+            } else if carry.item != nil {
+                await drop(carry, to: ["kind": "time", "start": .number(Double(minute))])
                 DropTiming.report(since: dropAt)
             }
             finishDrop()
@@ -1209,10 +1344,12 @@ final class BoardModel {
     /// The grid's minute for each whole minute a carry has passed over at each zoom: a drag asks on every move.
     @ObservationIgnored private var snapped: [SnapKey: Int] = [:]
 
-    private func drop(_ item: TaskItem, from: String, to: JSONValue) async {
+    /// The carried tasks written where they were let go; a carry of picked tasks ends Select Tasks, as any action does.
+    private func drop(_ carry: Carry, to: JSONValue) async {
         guard let day = snapshot?.day else { return }
         let board = board
-        let arguments: [JSONValue] = [[["key": item.key.json, "from": .string(from)]], to, .string(day)]
+        let arguments: [JSONValue] = [carry.dropped, to, .string(day)]
+        if !carry.group.isEmpty { endSelection() }
         do {
             try await Task.detached { try board.write("tasks.drop", arguments) }.value
         } catch {
@@ -1224,6 +1361,7 @@ final class BoardModel {
 
     /// Where a card carried alone was lifted from in its own list: let go there at its level, nothing is written.
     private func homeGap(_ id: String, in column: BoardColumn) -> JSONValue? {
+        guard carry?.group.isEmpty != false else { return nil }
         guard let cards = snapshot?.lists[column]?.cards, let index = cards.firstIndex(where: { $0.names(id) }) else { return nil }
         let card = cards[index]
         var gap: [String: JSONValue] = ["kind": "gap", "index": .number(Double(index)), "level": .number(Double(card.level)), "group": card.item.group.json]
@@ -1254,6 +1392,15 @@ final class BoardModel {
         ruleNow("rules.labelTitle", [.string(name)]) ?? name
     }
 
+    /// A weekly schedule's days as the Repeat row tells them: the week's letters (`REPEAT_WORDS`), the days off it as a
+    /// dash, so the seven places read as the week.
+    func weekLetters(_ days: [Int]) -> String {
+        guard let words = repeatWords else { return "" }
+        return words.weekdays.enumerated().map { days.contains($0.offset) ? $0.element.letter : "–" }.joined(separator: " ")
+    }
+
+    @ObservationIgnored private lazy var repeatWords: RepeatWords? = try? board.repeatWords()
+
     /// A level's or a label's colour as a menu's flag draws it, in either theme.
     func ink(_ color: String, dark: Bool) -> UIColor? {
         guard let hex: String = try? board.rule("rules.inkOf", [.string(color), .string(dark ? "dark" : "light")]) else { return nil }
@@ -1261,11 +1408,52 @@ final class BoardModel {
     }
 
     /// The card's menu as UIKit draws it, read from the screen as it stands. `later` holds a row that opens a sheet or a
-    /// page until the menu has gone.
-    func cardMenu(_ item: TaskItem, ask: @escaping (MenuQuestion) -> Void, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
+    /// page until the menu has gone. Over the core's rows, as the plugin shows them over its menu: the start of the task's
+    /// description, and, for a card on the calendar (`from: "timeline"`), its open subtasks, each opening its own menu.
+    func cardMenu(_ item: TaskItem, from: String = "list", ask: @escaping (MenuQuestion) -> Void, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: self, ask: ask).nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
+        let nodes = lead(item, from: from, ask: ask) + TaskMenu(items: [item], menu: menu, model: self, ask: ask).nodes
+        return MenuNode.uiMenu(nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
+    }
+
+    /// What the plugin shows between a card and its menu, as the menu's first groups.
+    private func lead(_ item: TaskItem, from: String, ask: @escaping (MenuQuestion) -> Void) -> [MenuNode] {
+        var lead: [MenuNode] = []
+        if let peek = descriptionPeek(item) { lead.append(.group(row: false, children: peek)) }
+        if from == "timeline", !item.subtasks.isEmpty {
+            lead.append(.group(row: false, children: item.subtasks.map { subtask in
+                .deferred(title: subtask.title, symbol: subtask.closed ? "checkmark.circle" : "circle", subtitle: nil) { [weak self] in
+                    guard let self, let menu = await self.menu(for: subtask, from: "stack") else { return [] }
+                    return TaskMenu(items: [subtask], menu: menu, model: self, ask: ask).nodes
+                }
+            }))
+        }
+        return lead
+    }
+
+    /// The start of a task's description: its first lines as they read (links by their words, no markup), a tap opening
+    /// the task on the whole screen; under it each link of it, a tap opening the link.
+    private func descriptionPeek(_ item: TaskItem) -> [MenuNode]? {
+        guard let description = item.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty else { return nil }
+        let start = description.split(separator: "\n", omittingEmptySubsequences: true).prefix(Self.peekLines).joined(separator: "\n")
+        let parts = ruleNow("rules.textParts", [.string(start)]) ?? [TextPart(text: start)]
+        let shown = parts.map { $0.isLink ? $0.shown : Self.readable($0.text ?? "") }.joined()
+        var rows: [MenuNode] = [.action(title: shown, symbol: "text.alignleft", opens: true) { [weak self] in self?.fullScreen.append(item) }]
+        var seen: Set<String> = []
+        for link in parts where link.isLink {
+            guard let target = link.target, seen.insert(target).inserted else { continue }
+            rows.append(.action(title: link.shown, symbol: link.kind == "url" ? "safari" : "doc.text") { [weak self] in self?.openLink(link) }) 
+        }
+        return rows
+    }
+
+    private static let peekLines = 3
+
+    /// Markdown's inline marks read as text, as Obsidian draws them: `**intro**` reads «intro».
+    private static func readable(_ markdown: String) -> String {
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        return (try? AttributedString(markdown: markdown, options: options)).map { String($0.characters) } ?? markdown
     }
 
     // MARK: The timeline's zoom

@@ -48,11 +48,14 @@ enum CardMetrics {
     nonisolated(unsafe) private(set) static var height: CGFloat = 35
     static var radius: CGFloat { height / 2 }
     nonisolated(unsafe) private(set) static var gap: CGFloat = 2
+    /// When a touch becomes a carry, on a card and on the empty calendar alike (Settings → Long press delay), seconds.
+    nonisolated(unsafe) private(set) static var press: TimeInterval = 0.25
 
     /// The shared settings' size of a card, read with the screen: true when it changed.
     @discardableResult
     static func follow(_ look: ScreenSettings) -> Bool {
         let changed = height != CGFloat(look.cardHeight) || gap != CGFloat(look.cardGap)
+        press = TimeInterval(look.longPressMs) / 1000
         height = CGFloat(look.cardHeight)
         gap = CGFloat(look.cardGap)
         return changed

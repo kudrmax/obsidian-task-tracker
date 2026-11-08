@@ -35,6 +35,15 @@ struct CardButton: UIViewRepresentable {
     var onLink: ((TextPart) -> Void)?
     /// A tap on the project's folder mark, when its note can open: the note opens, in place of the menu.
     var onProject: (() -> Void)?
+    /// Select Tasks: a tap picks the card or lets it go, and a picked card lifted carries every picked task as a stack.
+    var picking: Picking?
+
+    struct Picking {
+        let picked: Bool
+        /// How many tasks are picked: the stack a lift carries.
+        let count: Int
+        let toggle: () -> Void
+    }
 
     func makeUIView(context: Context) -> CardControl {
         let control = CardControl(content: configuration(control: nil).makeContentView())
@@ -65,11 +74,12 @@ struct CardButton: UIViewRepresentable {
     private func update(_ control: CardControl) {
         control.id = card.id
         let look = CardControl.Look(card: card, ringed: ringed, height: height)
+        control.menuMaker = menu
         if control.look != look {
             control.look = look
             control.content.configuration = configuration(control: control)
         }
-        control.menuMaker = menu
+        CardControl.follow(card: card, look: look, menu: menu, from: control)
         control.onTouch = onTouch
         control.onCarry = onCarry
         control.onCancel = onCancel
@@ -77,8 +87,10 @@ struct CardButton: UIViewRepresentable {
         control.onFold = onFold
         control.onLink = onLink
         control.onProject = onProject
-        control.draggable = draggable
+        control.picking = picking
+        control.draggable = picking.map(\.picked) ?? draggable
         control.carried = carried
+        control.liftDelay = CardMetrics.press
         control.accessibilityLabel = card.item.title
     }
 }
@@ -95,11 +107,23 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     }
     var onLink: ((TextPart) -> Void)?
     var onProject: (() -> Void)?
+    var picking: CardButton.Picking?
     /// Where the title's links are drawn, and the project's folder mark.
     var links: [CardLink] = []
     var folderFrame: CGRect?
     var draggable = true {
         didSet { drag.isEnabled = draggable }
+    }
+    /// How long a press waits before it lifts the card: the shared settings' long press, as the plugin's.
+    var liftDelay: TimeInterval = CardMetrics.press {
+        didSet { if liftDelay != oldValue { holdLift() } }
+    }
+
+    /// The drag interaction lifts by its own long press: it waits the settings' delay, not the system's.
+    private func holdLift() {
+        for press in gestureRecognizers ?? [] where press is UILongPressGestureRecognizer {
+            (press as? UILongPressGestureRecognizer)?.minimumPressDuration = liftDelay
+        }
     }
     /// Gone from its place while carried, once the carried card has left it; back in it once the system has flown a
     /// cancelled carry home.
@@ -177,6 +201,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         drag = UIDragInteraction(delegate: self)
         drag.isEnabled = true
         addInteraction(drag)
+        holdLift()
         isAccessibilityElement = true
         accessibilityTraits = .button
     }
@@ -214,8 +239,46 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     // MARK: The menu
 
+    /// The card whose menu is up. A write from it that keeps it open (a label) draws the task as a new card, the line
+    /// being another: the menu follows the task by its place in the file.
+    private static weak var menuOwner: CardControl?
+    /// A card's menu is up.
+    static var menuShowing: Bool { menuOwner?.opener.showing == true }
+    /// The card whose menu opened last and where it stood on the screen: Add Subtask on a calendar card lifts it there.
+    static private(set) var lastLifted: (card: BoardCard, frame: CGRect)?
+
+    /// A card drawn: when it is the task whose menu shows, the menu and the copy over it take the new drawing.
+    static func follow(card: BoardCard, look: Look, menu: @escaping (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?, from control: CardControl) {
+        guard let owner = menuOwner, owner.opener.showing, let shown = owner.look else { return }
+        let same = shown.card.item.key.section == card.item.key.section && shown.card.item.key.index == card.item.key.index && shown.card.item.key.path == card.item.key.path
+        guard same, shown != look || owner === control else { return }
+        owner.menuMaker = menu
+        owner.redrawn(look)
+    }
+
+    /// The card drawn anew while its menu shows (a label set from the menu, which stays open): the menu ticks it, and the
+    /// copy over it takes the new colours, as the plugin's card over its menu does.
+    private func redrawn(_ look: Look) {
+        if self.look != look {
+            self.look = look
+            content.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, ringed: look.ringed, height: look.height) }.margins(.all, 0)
+        }
+        if let copy = wholeCopy {
+            copy.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, height: look.height, whole: true) }.margins(.all, 0)
+        }
+        if let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) { opener.refresh(menu) }
+    }
+
+    /// The grown copy the open menu lifts, while it shows.
+    private var wholeCopy: (UIView & UIContentView)?
+
     @objc private func tapped(_ tap: UITapGestureRecognizer) {
         onTouch()
+        if let picking {
+            UISelectionFeedbackGenerator().selectionChanged()
+            picking.toggle()
+            return
+        }
         let point = tap.location(in: self)
         // A link opens and the folder mark opens the project's note, as the plugin's card: only within the title's room,
         // where the link is seen.
@@ -232,8 +295,11 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     private func openMenu(at point: CGPoint) {
         guard let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return }
+        Self.menuOwner = self
+        if let look, let window { Self.lastLifted = (look.card, convert(bounds, to: window)) }
         opener.present(menu, at: point) { [weak self] in
-            guard let self else { return nil }
+            // A card drawn anew while its menu showed has left the screen: the menu goes without a preview.
+            guard let self, self.window != nil else { return nil }
             if let whole = self.wholePreview() {
                 // The grown copy stands in for the card: the card itself is not seen beside it under the backdrop.
                 self.content.alpha = 0
@@ -263,6 +329,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         copy.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
         let height = max(bounds.height, copy.systemLayoutSizeFitting(CGSize(width: width, height: UIView.layoutFittingCompressedSize.height), withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height.rounded(.up))
         copy.frame = CGRect(x: 0, y: 0, width: width, height: height)
+        wholeCopy = copy
         let card = convert(bounds, to: window)
         guard let left = try? board.grownStart(Double(card.minX), size: Double(card.width), grown: grown.width, room: Double(window.bounds.width), margin: margin),
               let top = try? board.grownStart(Double(card.minY), size: Double(card.height), grown: Double(height), room: Double(window.bounds.height), margin: margin)
@@ -275,6 +342,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     /// A row that opens a sheet or a page runs once the menu has gone.
     private func menuEnded(_ animator: (any UIContextMenuInteractionAnimating)?) {
+        wholeCopy = nil
         if let animator { animator.addCompletion { [weak self] in self?.content.alpha = 1 } } else { content.alpha = 1 }
         guard let run = afterMenu else { return }
         afterMenu = nil
@@ -296,12 +364,29 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// The capsule itself is lifted: from an open menu the system turns the menu's preview, this capsule, into the carried
     /// card, and only a lift of the same view lets the menu give way to the drag.
     func dragInteraction(_ interaction: UIDragInteraction, previewForLifting item: UIDragItem, session: UIDragSession) -> UITargetedDragPreview? {
+        if let stack = stackPreview() { return stack }
         // Lifted from a menu that showed a grown copy instead: the capsule shows again to be carried.
         content.alpha = 1
         let parameters = UIDragPreviewParameters()
         parameters.visiblePath = UIBezierPath(roundedRect: content.bounds, cornerRadius: CardMetrics.radius)
         parameters.backgroundColor = .clear
         return UITargetedDragPreview(view: content, parameters: parameters)
+    }
+
+    /// Several picked tasks lifted: the card on two layers with their number, as the plugin's carried stack.
+    private func stackPreview() -> UITargetedDragPreview? {
+        guard let picking, picking.count > 1, let look, let window else { return nil }
+        let stack = UIHostingConfiguration { StackFloat(card: look.card, count: picking.count, width: bounds.width) }.margins(.all, 0).makeContentView()
+        stack.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
+        stack.backgroundColor = .clear
+        let size = stack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
+        stack.frame = CGRect(origin: .zero, size: size)
+        let parameters = UIDragPreviewParameters()
+        parameters.backgroundColor = .clear
+        parameters.visiblePath = UIBezierPath(rect: stack.bounds)
+        let origin = convert(CGPoint(x: -StackFloat.room, y: -StackFloat.room), to: window)
+        let center = CGPoint(x: origin.x + size.width / 2, y: origin.y + size.height / 2)
+        return UITargetedDragPreview(view: stack, parameters: parameters, target: UIDragPreviewTarget(container: window, center: center))
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionDidMove session: UIDragSession) {
@@ -358,6 +443,8 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
     private let ended: ((any UIContextMenuInteractionAnimating)?) -> Void
     private var menu: UIMenu?
+    /// The menu is up.
+    private(set) var showing = false
     private var preview: (() -> UITargetedPreview?)?
     private lazy var interaction = UIContextMenuInteraction(delegate: self)
 
@@ -375,10 +462,17 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
     func present(_ menu: UIMenu, at point: CGPoint, preview: @escaping () -> UITargetedPreview?) {
         self.menu = menu
         self.preview = preview
+        showing = true
         let selector = NSSelectorFromString("_presentMenuAtLocation:")
         guard interaction.responds(to: selector), let method = interaction.method(for: selector) else { return }
         typealias Present = @convention(c) (AnyObject, Selector, CGPoint) -> Void
         unsafeBitCast(method, to: Present.self)(interaction, selector, point)
+    }
+
+    /// The open menu drawn from `menu`, in place: its rows ticked anew without closing it.
+    func refresh(_ menu: UIMenu) {
+        self.menu = menu
+        interaction.updateVisibleMenu { _ in menu }
     }
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
@@ -395,6 +489,7 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
     }
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
+        showing = false
         ended(animator)
     }
 }

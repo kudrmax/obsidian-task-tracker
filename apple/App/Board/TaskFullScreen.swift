@@ -32,19 +32,7 @@ struct TaskFullScreen: View {
                         Text(task.text).font(.title2.bold()).strikethrough(task.closed)
                     }
                 }
-                let rows = stackRows
-                if !rows.isEmpty {
-                    VStack(alignment: .leading, spacing: CardMetrics.gap) {
-                        ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                            let branch = row.level > 0 ? model.branch(levels: rows.map(\.level), index: index) : nil
-                            switch row {
-                            case .row(let full): subtask(full, branch: branch)
-                            case .pending(_, let text, let level): typed(level: level, branch: branch) { PendingCapsule(text: text) }
-                            case .field(let level): typed(level: level, branch: branch) { EntryCapsule(host: model.entry) }
-                            }
-                        }
-                    }
-                }
+                TaskStack(task: task, model: model, tree: tree, cards: cards) { item, later in menu(for: item, later: later) }
                 TextEditor(text: $text)
                     .focused($typing)
                     .font(.body)
@@ -79,6 +67,7 @@ struct TaskFullScreen: View {
             }
         }
         .animation(.snappy, value: model.entry.isOpen)
+        .overlay(alignment: .bottom) { NoteSuggestions(host: model.entry) }
         // A page of its own: no columns, no tab bar, no calendar, as the design has it.
         .toolbar(.hidden, for: .tabBar)
         .menuQuestions($question, model: model)
@@ -109,63 +98,9 @@ struct TaskFullScreen: View {
         model.entry.stackEntry(task)?.at.kind == "title"
     }
 
-    /// The subtasks as drawn, with the field and the texts waiting before it where the core puts them.
-    private var stackRows: [StackRow] {
-        var rows = (tree?.rows ?? []).map(StackRow.row)
-        guard let entry = model.entry.stackEntry(task), let index = entry.at.index, let level = entry.at.level else { return rows }
-        switch entry.at.kind {
-        case "row" where rows.indices.contains(index):
-            rows[index] = .field(level: level)
-        case "new" where index <= rows.count:
-            let typed = entry.pending.enumerated().map { StackRow.pending(index: $0.offset, text: $0.element.text, level: $0.element.level) }
-            rows.insert(contentsOf: typed + [.field(level: level)], at: index)
-        default:
-            break
-        }
-        return rows
-    }
-
-    private enum StackRow: Identifiable {
-        case row(FullRow)
-        case pending(index: Int, text: String, level: Int)
-        case field(level: Int)
-
-        var id: String {
-            switch self {
-            case .row(let row): row.item.id
-            case .pending(let index, _, _): "\u{0}pending/\(index)"
-            case .field: "\u{0}entry"
-            }
-        }
-
-
-        var level: Int {
-            switch self {
-            case .row(let row): row.level
-            case .pending(_, _, let level), .field(let level): level
-            }
-        }
-    }
-
-    private func typed(level: Int, branch: Branch?, @ViewBuilder _ content: () -> some View) -> some View {
-        content()
-            .overlay(alignment: .topLeading) { if let branch { BranchLine(branch: branch) } }
-            .padding(.leading, CGFloat(level) * CardMetrics.indent)
-    }
-
     @State private var subtaskMenus: [String: TaskMenuModel] = [:]
     /// The subtasks' cards as a list draws them: their colours, dates and title pieces.
     @State private var cards: [String: BoardCard] = [:]
-
-    /// A subtask as the same capsule as on the main screen, at its depth; a long press shows its own menu.
-    private func subtask(_ row: FullRow, branch: Branch?) -> some View {
-        let drawn = cards[row.item.id]
-        let card = BoardCard(item: row.item, level: row.level, branch: row.level > 0 ? branch : nil, due: drawn?.due, repeats: drawn?.repeats ?? row.item.repeats, paint: drawn?.paint, parts: drawn?.parts)
-        return CardButton(card: card, menu: { later in menu(for: row.item, later: later) }, draggable: false, onLink: { model.openLink($0) }, onProject: model.projectOpener(row.item))
-            .frame(height: CardMetrics.height)
-            .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
-            .padding(.leading, CGFloat(row.level) * CardMetrics.indent)
-    }
 
     private func menu(for item: TaskItem, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         guard let menu = subtaskMenus[item.id] else { return nil }
@@ -198,13 +133,11 @@ struct TaskFullScreen: View {
     /// The task and its subtasks as the file has them, handed back as their drawing: the quick entry draws a written
     /// subtask in the same step as the line it ends.
     private func readStack() async -> () -> Void {
-        let found: TaskItem? = try? await model.read("tasks.find", [task.key.json, .string(task.text)])
-        let read: FullTree? = try? await model.rule("tasks.fullTree", [(found ?? task).json])
-        let drawn = await model.cards((read?.rows ?? []).map { ListRow(item: $0.item, level: $0.level) })
+        let read = await TaskStack.read(task, model: model)
         return {
-            if let found { current = found }
-            tree = read
-            cards = Dictionary(drawn.map { ($0.item.id, $0) }, uniquingKeysWith: { first, _ in first })
+            if let found = read.task { current = found }
+            tree = read.tree
+            cards = read.cards
         }
     }
 

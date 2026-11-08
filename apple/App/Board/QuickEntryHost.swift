@@ -153,11 +153,18 @@ final class QuickEntryHost {
         opening { call("openIn", [.string(column.rawValue), group.json] + (zone.map { [$0] } ?? [])) }
     }
 
-    /// Add Subtask: the field last among the task's subtasks in its list; a task only on the calendar opens full
-    /// screen, the field last in the stack of its subtasks there.
+    /// Add Subtask: the field last among the task's subtasks in its list; a task only on the calendar is lifted where it
+    /// stands with its subtasks stacked under it, the field last among them, as the plugin's. From a page that shows no
+    /// card of it, its full screen opens with the field there.
     func addSubtask(_ parent: TaskItem) {
         guard let spot = value("subtaskSpot", [parent.key.json]) else { return }
-        if spot["kind"].string == "stack", model?.fullScreen.last?.id != parent.id { model?.fullScreen.append(parent) }
+        if spot["kind"].string == "stack", let model, model.fullScreen.last?.id != parent.id {
+            if model.fullScreen.isEmpty, let lifted = CardControl.lastLifted, lifted.card.item.id == parent.id {
+                model.stackShown = BoardModel.ShownStack(card: lifted.card, frame: lifted.frame)
+            } else {
+                model.fullScreen.append(parent)
+            }
+        }
         opening { call("open", [spot]) }
     }
 
@@ -187,6 +194,36 @@ final class QuickEntryHost {
     // MARK: Typing
 
     func typed(_ text: String) { call("type", [.string(text)], animated: false) }
+
+    // MARK: Note links
+
+    /// The `[[` the caret stands in, as the core reads it (`notes.linkQuery`), and the notes it offers, best first.
+    private(set) var linking: LinkQuery?
+    private(set) var notes: [NoteLink] = []
+
+    /// The field's text or caret changed: the note search opens while the caret stands in a `[[`, as in an Obsidian note.
+    func findLinks() {
+        let text = field.text ?? ""
+        let caret = field.selectedTextRange.map { field.offset(from: field.beginningOfDocument, to: $0.start) } ?? (text as NSString).length
+        let query = isOpen ? (try? board.linkQuery(in: text, caret: caret)) ?? nil : nil
+        linking = query
+        notes = query.map { (try? board.suggestNotes($0.query)) ?? [] }.map { Array($0.prefix(Self.notesShown)) } ?? []
+    }
+
+    private static let notesShown = 6
+
+    /// A note picked: its link takes the `[[` typed, the caret after it, and typing goes on.
+    func pickNote(_ note: NoteLink) {
+        let text = field.text ?? ""
+        guard let query = linking, let insert = try? board.insertLink(note, in: text, at: query) else { return }
+        // The tap on the list is no tap elsewhere: the field stays open.
+        opened += 1
+        field.text = insert.text
+        if let at = field.position(from: field.beginningOfDocument, offset: insert.caret) { field.selectedTextRange = field.textRange(from: at, to: at) }
+        linking = nil
+        notes = []
+        typed(insert.text)
+    }
     /// Enter: the text stands where it was typed and the next field is right under it in the same frame, as a line break
     /// in a text; nothing slides.
     func enter() { call("enter", [], animated: false) }
@@ -270,6 +307,21 @@ final class QuickEntryHost {
     }
 
     @ObservationIgnored private var namesSettings: String?
+
+    /// The place button's words for `placement` (`tasks.placementTitle`), asked once per place and settings.
+    func placementTitle(_ placement: JSONValue) -> String {
+        if model?.snapshot?.settingsJSON != placesSettings {
+            places = [:]
+            placesSettings = model?.snapshot?.settingsJSON
+        }
+        if let known = places[placement] { return known }
+        let found = (try? board.read("tasks.placementTitle", [placement], over: board.settingsOnly()))?.string ?? ""
+        places[placement] = found
+        return found
+    }
+
+    @ObservationIgnored private var places: [JSONValue: String] = [:]
+    @ObservationIgnored private var placesSettings: String?
 
     /// A day picked in the bar's date sheet: today is the Now list, as the plugin's picker gives it, so the field stays
     /// where it is when it already stands there.
@@ -363,9 +415,12 @@ final class QuickEntryHost {
         let before = state
         state = next
         if field.text != (next?.text ?? "") { field.text = next?.text ?? "" }
+        if linking != nil { findLinks() }
         guard let next else {
             lists = [:]
             slotMinute = nil
+            linking = nil
+            notes = []
             field.end()
             return
         }
@@ -549,6 +604,7 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
         addAction(UIAction { [weak self] _ in
             guard let self else { return }
             self.host?.typed(self.text ?? "")
+            self.host?.findLinks()
         }, for: .editingChanged)
     }
 
@@ -620,8 +676,17 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        // Enter in a `[[` picks the first note offered, as in an Obsidian note.
+        if let host, let first = host.notes.first {
+            host.pickNote(first)
+            return false
+        }
         host?.enter()
         return false
+    }
+
+    func textFieldDidChangeSelection(_ textField: UITextField) {
+        host?.findLinks()
     }
 
     /// The keyboard went to something else (another field, a page's editor): the entry ends as by a tap elsewhere, unless
@@ -801,6 +866,48 @@ struct PendingCapsule: View {
 /// The bar over the keyboard (board «5 — Новая задача», `KeyBar.dc.html`): on the left the section button and the
 /// outdent–indent pair, on the right the priority flag, the repeat and the place menu in one group, iOS 26 glass over a
 /// fade into the ground. Each shows and allows what the entry's state says.
+/// The notes a `[[` typed in the field offers, as Obsidian's suggestion list: over the bar, the best first; a tap puts
+/// the note's link in place of the `[[` typed.
+struct NoteSuggestions: View {
+    let host: QuickEntryHost
+
+    var body: some View {
+        if !host.notes.isEmpty {
+            VStack(spacing: 0) {
+                ForEach(Array(host.notes.enumerated()), id: \.element.path) { index, note in
+                    Button { host.pickNote(note) } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "doc.text").foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(note.name).lineLimit(1)
+                                if let folder = Self.folder(note.path) {
+                                    Text(folder).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 44)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    if index < host.notes.count - 1 { Divider().padding(.leading, 44) }
+                }
+            }
+            .glassEffect(.regular, in: .rect(cornerRadius: 22))
+            .padding(.horizontal, Layout.margin)
+            .padding(.bottom, 8)
+            .transition(.opacity.combined(with: .move(edge: .bottom)))
+        }
+    }
+
+    /// The folder a note lies in, as the suggestion's second line; none for a note at the vault's root.
+    private static func folder(_ path: String) -> String? {
+        let parts = path.split(separator: "/")
+        return parts.count > 1 ? parts.dropLast().joined(separator: "/") : nil
+    }
+}
+
 struct KeyBar: View {
     let host: QuickEntryHost?
     @Environment(\.colorScheme) private var scheme
@@ -949,10 +1056,10 @@ struct KeyBar: View {
         .accessibilityLabel("Place")
     }
 
+    /// The place's words as the core gives them (`tasks.placementTitle`): a list as the settings head it, a day as «5 Nov».
     private func title(_ host: QuickEntryHost, _ place: JSONValue?) -> String {
-        guard let place, let kind = place["kind"].string else { return "" }
-        if kind == "date", let day = place["date"].string, let date = LocalDay.date(day) { return date.formatted(.dateTime.day().month(.abbreviated)) }
-        return host.name(kind)
+        guard let place, !place.isNull else { return "" }
+        return host.placementTitle(place)
     }
 }
 

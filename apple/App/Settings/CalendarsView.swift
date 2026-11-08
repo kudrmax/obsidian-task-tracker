@@ -18,17 +18,22 @@ struct CalendarsView: View {
     var body: some View {
         Form {
             Section("Sources") {
+                // Each calendar file's row as the core words it (`SourceStatus.words`), the same as the plugin's window:
+                // the source, how it was updated or its problem, and the time, orange once out of date.
                 ForEach(statuses, id: \.source) { status in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(Self.name(status.source))
-                            Text(Self.words(status))
+                            Text(status.words.name)
+                            Text(status.words.sub)
                                 .font(.footnote)
-                                .foregroundStyle(status.stale ? Color.orange : Color.secondary)
+                                .foregroundStyle(status.problem.isNull ? Color.secondary : Color.red)
                         }
                         Spacer()
-                        if let device = status.detail {
-                            Text(device).font(.footnote).foregroundStyle(.secondary)
+                        if !status.words.time.isEmpty {
+                            Text(status.words.time)
+                                .font(.footnote)
+                                .monospacedDigit()
+                                .foregroundStyle(status.stale ? Color.orange : Color.secondary)
                         }
                         if status.stale {
                             Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange).accessibilityLabel("Out of date")
@@ -46,23 +51,23 @@ struct CalendarsView: View {
                     await refresh()
                 }
             }
-            Section {
-                ForEach(calendars) { calendar in
-                    Toggle(isOn: Binding(get: { calendar.shown }, set: { shown in Task { await show(calendar, shown) } })) {
-                        HStack(spacing: 12) {
-                            Circle().fill(calendar.color.map(Color.init(hex:)) ?? .blue).frame(width: 12, height: 12)
-                            VStack(alignment: .leading) {
+            // Every calendar under its account, as the plugin's settings list them.
+            ForEach(Array(accounts.enumerated()), id: \.offset) { index, account in
+                Section {
+                    ForEach(account.calendars) { calendar in
+                        Toggle(isOn: Binding(get: { calendar.shown }, set: { shown in Task { await show(calendar, shown) } })) {
+                            HStack(spacing: 12) {
+                                Circle().fill(calendar.color.map(Color.init(hex:)) ?? .blue).frame(width: 12, height: 12)
                                 Text(calendar.name)
-                                Text(calendar.accountName).font(.footnote).foregroundStyle(.secondary)
                             }
                         }
+                        .tint(Color(.systemGreen))
                     }
-                    .tint(Color(.systemGreen))
+                } header: {
+                    Text(account.name)
+                } footer: {
+                    if index == accounts.count - 1 { Text("The timeline shows the events of the calendars switched on.") }
                 }
-            } header: {
-                Text("Shown")
-            } footer: {
-                Text("The timeline shows the events of these calendars.")
             }
         }
         .navigationTitle("Calendars")
@@ -72,6 +77,15 @@ struct CalendarsView: View {
             }
         }
         .task { await load() }
+    }
+
+    /// The calendars by account, in the order the core lists them.
+    private var accounts: [(name: String, calendars: [ShownCalendar])] {
+        var grouped: [(name: String, calendars: [ShownCalendar])] = []
+        for calendar in calendars {
+            if grouped.last?.name == calendar.accountName { grouped[grouped.count - 1].calendars.append(calendar) } else { grouped.append((calendar.accountName, [calendar])) }
+        }
+        return grouped
     }
 
     private func load() async {
@@ -100,24 +114,5 @@ struct CalendarsView: View {
         }.value
         await load()
         await model?.reload()
-    }
-
-    static func name(_ source: String) -> String {
-        switch source {
-        case "google": "Google Calendar"
-        case "iphone": "iPhone Calendars"
-        case "work": "Work Calendar"
-        default: source
-        }
-    }
-
-    static func words(_ status: SourceStatus) -> String {
-        guard let at = status.updatedAtMs else { return "No file yet" }
-        let date = Date(timeIntervalSince1970: at / 1000)
-        let verb = status.kind == "exported" ? "Exported" : "Updated"
-        let when = status.updatedDay == "today"
-            ? date.formatted(date: .omitted, time: .shortened)
-            : date.formatted(.relative(presentation: .named))
-        return "\(verb) \(when)"
     }
 }
