@@ -128,9 +128,10 @@ struct TaskMenu {
         return asking(single ? "\(title) “\(items.first?.title ?? "")”?" : "\(title) \(items.count) Tasks?", title: title, symbol: symbol, answer: title, destructive: false, run: pick)
     }
 
-    /// A row whose answer the menu asks for first, on its own page.
+    /// A row whose answer the menu asks for first, on its own page; red, row and answer, only when it removes (Delete),
+    /// as the plugin's.
     private func asking(_ question: String, title: String, symbol: String, answer: String, destructive: Bool, run: @escaping @MainActor () -> Void) -> MenuNode {
-        .submenu(title: title, symbol: symbol, subtitle: nil, destructive: destructive, children: [.question(question, children: [.action(title: answer, symbol: nil, destructive: true, run: run)])])
+        .submenu(title: title, symbol: symbol, subtitle: nil, destructive: destructive, children: [.question(question, children: [.action(title: answer, symbol: nil, destructive: destructive, run: run)])])
     }
 
     private var remove: MenuNode? {

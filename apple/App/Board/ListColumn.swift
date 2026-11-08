@@ -376,7 +376,7 @@ private struct SectionLift: ViewModifier {
         if group.reorder {
             content.onDrag {
                 model.startSectionCarry(column, group)
-                return NSItemProvider(object: "section" as NSString)
+                return Carried.provider("section")
             } preview: {
                 SectionFloat(name: group.header ?? "", count: group.cards.filter { $0.level == 0 }.count)
             }
@@ -496,6 +496,7 @@ struct CardRow: View {
                 onCarry: { model.startCarry(card, from: column.rawValue, grab: $0) },
                 onCancel: { model.cancelCarry() },
                 onEnd: { model.carryEnded() },
+                onDropped: { model.carryDropped() },
                 onFold: card.item.can.fold && !selecting ? { Task { await model.toggleCollapsed(card.item) } } : nil)
                 .frame(height: CardMetrics.height)
                 // Behind the card from the lift on, with no fade: the card hides over it once the carried copy leaves.
@@ -588,10 +589,12 @@ enum SoftEdge {
 struct FoldAway: Transition {
     func body(content: Content, phase: TransitionPhase) -> some View {
         let share: CGFloat = phase.isIdentity ? 1 : 0
-        // The row's own height folds, so the rows below move by exactly what shows of it, one row or a whole block.
+        // The row's own height folds, so the rows below move by exactly what shows of it, one row or a whole block; the
+        // list's gap after it folds with it (a margin down to minus the gap), never left standing until the row is gone.
         FoldedHeight(share: share) {
             content.clipShape(TopPart(share: share))
         }
+        .padding(.bottom, -CardMetrics.gap * (1 - share))
         .opacity(share)
     }
 }
