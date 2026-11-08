@@ -132,7 +132,9 @@ final class BoardModel {
         self.place = place
         asked = PlaceAsk(place: place)
     }
-    private(set) var snapshot: BoardSnapshot?
+    private(set) var snapshot: BoardSnapshot? {
+        didSet { if let timeline = snapshot?.timeline, timeline != oldValue?.timeline { layOutNow(timeline) } }
+    }
     private(set) var problem: String?
     private(set) var shownDay: String?
 
@@ -1137,6 +1139,20 @@ final class BoardModel {
     @ObservationIgnored private var laying = false
     @ObservationIgnored private var wanted: (timeline: BoardTimeline, hour: CGFloat)?
 
+    /// A reading drawn at a zoom other than its own: the core lays its stack out before the drawing, in its transaction,
+    /// so no frame shows the scaled guess (a block a frame taller). A pinch asks on every frame and keeps to `layOut`.
+    private func layOutNow(_ timeline: BoardTimeline) {
+        guard let hour = zoom.hour, abs(Double(hour) - CardMetrics.timeline.hour) >= 0.5 else { return }
+        if let slots = try? board.stack(timeline, measures: Self.measures(hour)) {
+            laidOut = Laid(timeline: timeline, hour: hour, slots: slots)
+        }
+    }
+
+    private static func measures(_ hour: CGFloat) -> TimelineMeasures {
+        let m = CardMetrics.timeline
+        return TimelineMeasures(hour: Double(hour), cardHeight: m.cardHeight, cardGap: m.cardGap, itemInset: m.itemInset, itemGap: m.itemGap, overlayInset: m.overlayInset)
+    }
+
     private func layOut(_ timeline: BoardTimeline, hour: CGFloat) {
         wanted = (timeline, hour)
         guard !laying else { return }
@@ -1145,8 +1161,7 @@ final class BoardModel {
             while let next = wanted {
                 wanted = nil
                 let board = board
-                let m = CardMetrics.timeline
-                let measures = TimelineMeasures(hour: Double(next.hour), cardHeight: m.cardHeight, cardGap: m.cardGap, itemInset: m.itemInset, itemGap: m.itemGap, overlayInset: m.overlayInset)
+                let measures = Self.measures(next.hour)
                 let timeline = next.timeline
                 if let slots = try? await Task.detached(operation: { try board.stack(timeline, measures: measures) }).value {
                     // The core's stack replaces the scaled guess by sliding there, never in one frame.

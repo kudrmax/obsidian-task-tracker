@@ -376,6 +376,9 @@ every condition that changes the layout is animated by the transaction that chan
 44. **iPhone, R11: a pinch's minute is held until the content has its zoom's height**, the zoom the core settles on is
     drawn as the fingers lift, and the timeline keeps the offset it scrolled to itself: scrolled during a change of the
     content's height, the scroll view reports the offset from before it.
+45. **iPhone, R11: a reading's stack at the zoom shown is the core's from its first frame.** A reading drawn at another
+    zoom than its own (any write, Sync, a day turned) has its blocks laid out by the core in the drawing's own
+    transaction; the scaled guess, which drew a block a frame taller, is left to the pinch, which asks on every frame.
 
 ## Done when
 
