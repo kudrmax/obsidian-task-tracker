@@ -226,14 +226,12 @@ iPhone app (projects in full, replacing 12 and the stopgap part of 11):
     `ListGroup.header`, `menu.project`, `TaskMenuModel.project`, `SearchHit.project`, `ScreenView.projects`/`titleDrops`
     and `projectTag`; the keys it still does not draw stay skipped (11).
 37. **The project notes on the phone**: the app has no metadata cache, so it reads the vault folder by its bookmark: every
-    markdown note outside the dot folders, its tags read as Obsidian's cache reads them (properties `tags` or `tag`, a
-    list or one line; the `#tags` of the text outside code), each note once and then only the notes changed since (by
-    modification date), at most every 3 s and off the screen's thread; the list last found is kept on the device, so the
-    first screen shows the groups at once, and a list that changed redraws the screen. A note's link is its name, or its
-    path without `.md` when another note has that name. A note iCloud keeps only in the cloud is not read. The tag comes
-    from `settings.form().projectTag`. The tag test itself (exactly the tag, case aside, no nested child) repeats the
-    core's `hasProjectTag` in Swift (`VaultProjects.projects`) until the door offers it (`rules.projectNotesOf`): asked of
-    the backend.
+    markdown note outside the dot folders; a note's tags come from the door (`rules.noteTags(text)`, Obsidian's reading),
+    each note once and then only the notes changed since (cached by path and modification date), at most every 3 s and
+    off the screen's thread; the list is one `rules.projectNotes(notes, tag)` over every path with its cached tags (the
+    core's exact tag, by name, the link by path on a name clash). The list last found is kept on the device, so the first
+    screen shows the groups at once, and a list that changed redraws the screen. A note iCloud keeps only in the cloud is
+    not read. The tag comes from `settings.form().projectTag`. No tag rule is written in Swift.
 38. **Group by Project** is a stock iOS menu on Backlog's and Soon's titles (`canGroup`), one toggle row with the folder
     symbol and the system's check; a pick switches and closes the menu (19). Title case, as every row of the app's menus.
 39. **A project group's header** is the app's section header (26 pt row, 13 pt semibold) with the SF `chevron.right` 6 pt

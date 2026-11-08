@@ -79,86 +79,14 @@ public protocol NoteFolder: Sendable {
     func scanNotes(wanted: (String, Date) -> Bool) throws -> [ScannedNote]
 }
 
-/// A note's tags as Obsidian's metadata cache reads them (`getAllTags`): its properties' `tags` (or `tag`), then the
-/// `#tags` of its text outside code.
-public enum NoteTags {
-    public static func of(_ text: String) -> [String] {
-        let (properties, body) = split(text)
-        return (properties.map(propertyTags) ?? []) + bodyTags(body)
-    }
-
-    /// The front matter between the first two `---` lines, and the text after it.
-    private static func split(_ text: String) -> (properties: String?, body: String) {
-        let lines = text.components(separatedBy: "\n").map { $0.hasSuffix("\r") ? String($0.dropLast()) : $0 }
-        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---",
-              let end = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "---" }) else { return (nil, text) }
-        return (lines[1..<end].joined(separator: "\n"), lines[(end + 1)...].joined(separator: "\n"))
-    }
-
-    private static func propertyTags(_ yaml: String) -> [String] {
-        let lines = yaml.components(separatedBy: "\n")
-        var found: [String] = []
-        var index = 0
-        while index < lines.count {
-            let line = lines[index]
-            index += 1
-            guard let colon = line.firstIndex(of: ":"), !line.hasPrefix(" "), !line.hasPrefix("\t") else { continue }
-            let key = line[..<colon].trimmingCharacters(in: .whitespaces).lowercased()
-            guard key == "tags" || key == "tag" else { continue }
-            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
-            if value.isEmpty {
-                while index < lines.count {
-                    let item = lines[index].trimmingCharacters(in: .whitespaces)
-                    guard item.hasPrefix("-") else { break }
-                    found.append(String(item.dropFirst()))
-                    index += 1
-                }
-            } else {
-                let inner = value.hasPrefix("[") && value.hasSuffix("]") ? String(value.dropFirst().dropLast()) : value
-                found += inner.split(whereSeparator: { $0 == "," || $0 == " " }).map(String.init)
-            }
-        }
-        return found.map(clean).filter { !$0.isEmpty }.map { "#" + $0 }
-    }
-
-    private static func clean(_ raw: String) -> String {
-        raw.trimmingCharacters(in: .whitespaces)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
-            .trimmingCharacters(in: .whitespaces)
-            .replacingOccurrences(of: "^#", with: "", options: .regularExpression)
-    }
-
-    private static let tagPattern = try! NSRegularExpression(pattern: ##"(?<=^|\s)#([^\s!"#$%&'()*+,.:;<=>?@^`{|}~\[\]\\]+)"##, options: [.anchorsMatchLines])
-
-    private static func bodyTags(_ body: String) -> [String] {
-        var text = ""
-        var fenced = false
-        for line in body.components(separatedBy: "\n") {
-            if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") || line.trimmingCharacters(in: .whitespaces).hasPrefix("~~~") {
-                fenced.toggle()
-                continue
-            }
-            if !fenced { text += withoutInlineCode(line) + "\n" }
-        }
-        let range = NSRange(text.startIndex..., in: text)
-        return tagPattern.matches(in: text, range: range).compactMap { match in
-            guard let found = Range(match.range(at: 1), in: text) else { return nil }
-            let tag = String(text[found])
-            return tag.allSatisfy(\.isNumber) ? nil : "#" + tag
-        }
-    }
-
-    private static func withoutInlineCode(_ line: String) -> String {
-        line.replacingOccurrences(of: "`[^`]*`", with: " ", options: .regularExpression)
-    }
-}
-
 /// The vault's project notes, as the plugin's `VaultProjects` keeps them over Obsidian's metadata cache: every note's tags
-/// read once and then note by note, only those changed since; the list kept on the device, so the first screen shows the
+/// read once through the door (`rules.noteTags`) and then note by note, only those changed since, the list the door's
+/// `rules.projectNotes` makes of them; the list kept on the device, so the first screen shows the
 /// groups it showed last. A read hands the list as last found and looks again in the background at most every few
 /// seconds; `changed` is told when the list itself changes.
 public final class VaultProjects: ProjectSource, @unchecked Sendable {
     private let folder: NoteFolder
+    private let core: PhoneCore
     private let remembered: DeviceText
     private let background: Bool
     private let every: TimeInterval
@@ -172,8 +100,9 @@ public final class VaultProjects: ProjectSource, @unchecked Sendable {
     public var changed: (@Sendable () -> Void)?
 
     /// `background`: a read looks again off its own thread (the app); false looks again at once (the tests).
-    public init(folder: NoteFolder, remembered: DeviceText = MemoryText(), background: Bool = true, every: TimeInterval = 3) {
+    public init(folder: NoteFolder, core: PhoneCore, remembered: DeviceText = MemoryText(), background: Bool = true, every: TimeInterval = 3) {
         self.folder = folder
+        self.core = core
         self.remembered = remembered
         self.background = background
         self.every = every
@@ -208,19 +137,26 @@ public final class VaultProjects: ProjectSource, @unchecked Sendable {
         let before = foundFor == tag ? found : rememberedNotes(tag)
         lock.unlock()
         let scanned = try? folder.scanNotes(wanted: { path, modified in known[path]?.modified != modified })
+        var next: [String: (modified: Date, tags: [String])] = [:]
+        for note in scanned ?? [] {
+            if let text = note.text, let read: [String] = try? rule("rules.noteTags", [.string(text)]) {
+                next[note.path] = (note.modified, read)
+            } else if let kept = known[note.path] {
+                next[note.path] = kept
+            }
+        }
+        let all = JSONValue.array((scanned ?? []).map { note in
+            next[note.path].map { ["path": .string(note.path), "tags": .array($0.tags.map(JSONValue.string))] } ?? ["path": .string(note.path)]
+        })
+        let notes: [ProjectNote]? = scanned == nil ? nil : try? rule("rules.projectNotes", [all, .string(tag)])
         lock.lock()
         defer {
             scanning = false
             lastScan = Date()
             lock.unlock()
         }
-        guard let scanned else { return false }
-        var next: [String: (modified: Date, tags: [String])] = [:]
-        for note in scanned {
-            if let text = note.text { next[note.path] = (note.modified, NoteTags.of(text)) } else if let kept = known[note.path] { next[note.path] = kept }
-        }
+        guard let notes else { return false }
         tags = next
-        let notes = Self.projects(next.map { ($0.key, $0.value.tags) }, all: scanned.map(\.path), tag: tag)
         found = notes
         foundFor = tag
         if let text = try? String(decoding: JSONEncoder().encode(Remembered(tag: tag, notes: notes)), as: UTF8.self) { remembered.save(text) }
@@ -237,28 +173,7 @@ public final class VaultProjects: ProjectSource, @unchecked Sendable {
         return kept.notes
     }
 
-    /// The notes with exactly the project tag (no nested child), by name, each with the shortest link Obsidian writes: its
-    /// name when no other note has it, else its path.
-    static func projects(_ notes: [(path: String, tags: [String])], all: [String], tag: String) -> [ProjectNote] {
-        let wanted = bare(tag)
-        guard !wanted.isEmpty else { return [] }
-        var names: [String: Int] = [:]
-        for path in all { names[name(path).lowercased(), default: 0] += 1 }
-        return notes
-            .filter { $0.tags.contains { bare($0) == wanted } }
-            .map { note in
-                let name = name(note.path)
-                let link = names[name.lowercased(), default: 0] > 1 ? String(note.path.dropLast(3)) : name
-                return ProjectNote(name: name, path: note.path, link: link)
-            }
-            .sorted { ($0.name.lowercased(), $0.path) < ($1.name.lowercased(), $1.path) }
-    }
-
-    private static func bare(_ tag: String) -> String {
-        tag.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "^#", with: "", options: .regularExpression).lowercased()
-    }
-
-    private static func name(_ path: String) -> String {
-        ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+    private func rule<T: Decodable>(_ method: String, _ arguments: [JSONValue]) throws -> T {
+        try JSONValue(any: core.call(method, arguments.map(\.any), context: DoorContext(tasks: nil, now: Date())).result).decode(T.self)
     }
 }

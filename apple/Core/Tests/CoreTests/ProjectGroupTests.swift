@@ -56,7 +56,7 @@ final class FakeFolder: NoteFolder, @unchecked Sendable {
     let at = Fixtures.date(7, 9)
 
     func board(_ vault: FakeVault, grouping: DeviceText = MemoryText()) -> TaskBoard {
-        TaskBoard(core: core, vault: vault, grouping: grouping, projects: VaultProjects(folder: FakeFolder(Self.notes), background: false))
+        TaskBoard(core: core, vault: vault, grouping: grouping, projects: VaultProjects(folder: FakeFolder(Self.notes), core: core, background: false))
     }
 
     func snapshot(_ board: TaskBoard) throws -> BoardSnapshot {
@@ -66,7 +66,7 @@ final class FakeFolder: NoteFolder, @unchecked Sendable {
     // MARK: The project notes
 
     @Test func aNoteIsAProjectByItsExactTagInPropertiesOrText() throws {
-        let found = VaultProjects(folder: FakeFolder(Self.notes), background: false).notes(tag: "#project")
+        let found = VaultProjects(folder: FakeFolder(Self.notes), core: core, background: false).notes(tag: "#project")
         #expect(found.map(\.name) == ["Health", "Nested", "Окружение в новой стране"])
         #expect(found.map(\.path) == ["Health.md", "Nested.md", "Projects/Окружение в новой стране.md"])
         #expect(found.map(\.link) == ["Health", "Nested", "Окружение в новой стране"])
@@ -74,13 +74,13 @@ final class FakeFolder: NoteFolder, @unchecked Sendable {
 
     @Test func aNoteWhoseNameAnotherHasIsLinkedByItsPath() throws {
         let folder = FakeFolder(["A/Health.md": "#project", "B/Health.md": "plain"])
-        let found = VaultProjects(folder: folder, background: false).notes(tag: "project")
+        let found = VaultProjects(folder: folder, core: core, background: false).notes(tag: "project")
         #expect(found == [ProjectNote(name: "Health", path: "A/Health.md", link: "A/Health")])
     }
 
     @Test func aScanReadsOnlyTheNotesChangedSinceAndTellsAChangedList() throws {
         let folder = FakeFolder(Self.notes)
-        let projects = VaultProjects(folder: folder, background: false, every: 0)
+        let projects = VaultProjects(folder: folder, core: core, background: false, every: 0)
         _ = projects.notes(tag: "#project")
         #expect(folder.reads.count == Self.notes.count)
         folder.notes["Free.md"] = ("#project", Date(timeIntervalSince1970: 2))
@@ -91,8 +91,8 @@ final class FakeFolder: NoteFolder, @unchecked Sendable {
 
     @Test func theListFoundLastIsKeptOnTheDevice() throws {
         let kept = MemoryText()
-        _ = VaultProjects(folder: FakeFolder(Self.notes), remembered: kept, background: false).notes(tag: "#project")
-        let later = VaultProjects(folder: FakeFolder([:]), remembered: kept, background: true, every: 1000)
+        _ = VaultProjects(folder: FakeFolder(Self.notes), core: core, remembered: kept, background: false).notes(tag: "#project")
+        let later = VaultProjects(folder: FakeFolder([:]), core: core, remembered: kept, background: true, every: 1000)
         #expect(later.notes(tag: "#project").count == 3)
     }
 
