@@ -1,4 +1,5 @@
 import type { GroupedList } from "../domain/Lists";
+import { noteTags } from "../domain/NoteTags";
 import { projectKey, projectName, type ProjectZone } from "../domain/Project";
 import type { GroupName } from "../domain/Task";
 import type { GroupingState, ListGrouping, ListSection, ProjectGroup, ProjectNote, ProjectRef, TaskItem } from "./contracts";
@@ -33,6 +34,34 @@ export function hasProjectTag(tags: readonly string[], tag: string): boolean {
 /** The notes with the project tag, by name: what a host's `Projects` port gives, from its notes' tags. */
 export function projectNotesOf(notes: readonly NoteTags[], tag: string): readonly ProjectNote[] {
 	return byName(notes.filter((note) => hasProjectTag(note.tags, tag)).map(({ name, path, link }) => ({ name, path, link })));
+}
+
+/** A note as a host without Obsidian's metadata reads it: its path in the vault, and its text or the tags read from it before. */
+export interface NoteText {
+	readonly path: string;
+	readonly text?: string;
+	readonly tags?: readonly string[];
+}
+
+/**
+ * The project notes of a vault read as texts: the notes with the tag (`noteTags` of each text, or its tags kept), by
+ * name, each linked as Obsidian writes it: by its name, by its path without `.md` when another note of `notes` has that name.
+ */
+export function projectNotesOfTexts(notes: readonly NoteText[], tag: string): readonly ProjectNote[] {
+	const names = new Map<string, number>();
+	for (const note of notes) names.set(projectKey(nameOfPath(note.path)), (names.get(projectKey(nameOfPath(note.path))) ?? 0) + 1);
+	const read = [...notes]
+		.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+		.map((note): NoteTags => {
+			const name = nameOfPath(note.path);
+			const link = (names.get(projectKey(name)) ?? 0) > 1 ? note.path.replace(/\.md$/i, "") : name;
+			return { name, path: note.path, link, tags: note.tags ?? noteTags(note.text ?? "") };
+		});
+	return projectNotesOf(read, tag);
+}
+
+function nameOfPath(path: string): string {
+	return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
 }
 
 function byName<T extends { readonly name: string }>(list: readonly T[]): T[] {

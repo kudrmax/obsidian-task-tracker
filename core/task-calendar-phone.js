@@ -1577,14 +1577,14 @@
     const index = groupIndex(doc, list, group);
     const twin = groupIndex(doc, list, trimmed) >= 0;
     if (twin && below.length === 0) return doc;
-    let split = doc.splitGroup(list, index, trimmed, own);
-    if (twin) split = split.mergeGroup(list, index + 1, split.groups(list).findIndex((g) => g.index > 0 && g.index !== index + 1 && g.name === trimmed), "end");
+    let split2 = doc.splitGroup(list, index, trimmed, own);
+    if (twin) split2 = split2.mergeGroup(list, index + 1, split2.groups(list).findIndex((g) => g.index > 0 && g.index !== index + 1 && g.name === trimmed), "end");
     const date = column.kind === "day" ? column.date : null;
     return below.filter((e) => e.section !== list).reduce((current, entry, i) => {
       const target = current.groups(list)[groupIndex(current, list, trimmed)].entries;
       const first = own.length > 0 ? target[target.length - own.length] : null;
       return moveToGroup(current, current.tasks(entry.section)[entry.index - i], list, trimmed, first, today, date);
-    }, split);
+    }, split2);
   }
   function moveGroupTo(doc, list, group, place) {
     const from = groupIndex(doc, list, group);
@@ -3760,9 +3760,82 @@ ${key.title}`.toLowerCase();
     return items;
   }
 
+  // core/domain/NoteTags.ts
+  function noteTags(text) {
+    const { properties, body } = split(text);
+    return [...properties === null ? [] : propertyTags(properties), ...bodyTags(body)];
+  }
+  var FENCE = /^\s*(```|~~~)/;
+  var INLINE_CODE = /`[^`]*`/g;
+  var BODY_TAG = /(?<=^|\s)#([^\s!"#$%&'()*+,.:;<=>?@^`{|}~[\]\\]+)/gm;
+  function split(text) {
+    const lines = text.split("\n").map((line) => line.replace(/\r$/, ""));
+    if (lines[0]?.trim() !== "---") return { properties: null, body: text };
+    const end = lines.findIndex((line, i) => i > 0 && line.trim() === "---");
+    if (end < 0) return { properties: null, body: text };
+    return { properties: lines.slice(1, end).join("\n"), body: lines.slice(end + 1).join("\n") };
+  }
+  function propertyTags(yaml) {
+    const lines = yaml.split("\n");
+    const found = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const colon = line.indexOf(":");
+      if (colon < 0 || /^\s/.test(line)) continue;
+      const key = line.slice(0, colon).trim().toLowerCase();
+      if (key !== "tags" && key !== "tag") continue;
+      const value = line.slice(colon + 1).trim();
+      if (value === "") {
+        while (i + 1 < lines.length && lines[i + 1].trim().startsWith("-")) found.push(lines[++i].trim().slice(1));
+      } else {
+        const inner = value.startsWith("[") && value.endsWith("]") ? value.slice(1, -1) : value;
+        found.push(...inner.split(/[,\s]+/));
+      }
+    }
+    return found.map(cleanTag).filter((tag) => tag !== "").map((tag) => `#${tag}`);
+  }
+  function cleanTag(raw) {
+    return raw.trim().replace(/^["']+|["']+$/g, "").trim().replace(/^#/, "");
+  }
+  function bodyTags(body) {
+    let fenced = false;
+    const kept = [];
+    for (const line of body.split("\n")) {
+      if (FENCE.test(line)) {
+        fenced = !fenced;
+        continue;
+      }
+      if (!fenced) kept.push(line.replace(/\r$/, "").replace(INLINE_CODE, " "));
+    }
+    return [...kept.join("\n").matchAll(BODY_TAG)].map((m) => m[1]).filter((tag) => !/^\d+$/.test(tag)).map((tag) => `#${tag}`);
+  }
+
   // core/application/projects.ts
   var NO_PROJECT = "No project";
   var GROUPING_DEFAULTS = { backlog: true, soon: false, inbox: null, now: null };
+  function bareTag(tag) {
+    return tag.trim().replace(/^#/, "").toLowerCase();
+  }
+  function hasProjectTag(tags, tag) {
+    const wanted = bareTag(tag);
+    return wanted !== "" && tags.some((t) => bareTag(t) === wanted);
+  }
+  function projectNotesOf(notes, tag) {
+    return byName(notes.filter((note) => hasProjectTag(note.tags, tag)).map(({ name, path, link }) => ({ name, path, link })));
+  }
+  function projectNotesOfTexts(notes, tag) {
+    const names = /* @__PURE__ */ new Map();
+    for (const note of notes) names.set(projectKey(nameOfPath(note.path)), (names.get(projectKey(nameOfPath(note.path))) ?? 0) + 1);
+    const read = [...notes].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0).map((note) => {
+      const name = nameOfPath(note.path);
+      const link = (names.get(projectKey(name)) ?? 0) > 1 ? note.path.replace(/\.md$/i, "") : name;
+      return { name, path: note.path, link, tags: note.tags ?? noteTags(note.text ?? "") };
+    });
+    return projectNotesOf(read, tag);
+  }
+  function nameOfPath(path) {
+    return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
+  }
   function byName(list) {
     return [...list].sort((a, b) => {
       const x = projectKey(a.name);
@@ -5984,6 +6057,8 @@ ${key.title}`.toLowerCase();
     usableColor,
     acceptsDrop,
     placesInGap,
+    noteTags,
+    projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
     shadesOf,
     inkOf,
     contrast,

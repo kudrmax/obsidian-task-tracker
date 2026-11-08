@@ -166,3 +166,31 @@ describe("the iPhone app's actions on a project's task", () => {
 		expect(backlog.trim().split("\n").filter(Boolean)).toEqual(["## Backlog", `- [ ] Someday ${FIELD}`, `- [ ] Later ${FIELD}`]);
 	});
 });
+
+describe("the vault's project notes through the door", () => {
+	it("rules.projectNotes: the notes with exactly the tag, by name, linked by name or by path on a clash", () => {
+		const answer = ok(
+			callDoor(
+				"rules.projectNotes",
+				[
+					[
+						{ path: "Work/Plan.md", text: "---\ntags: [project]\n---\n" },
+						{ path: "Home/Plan.md", text: "#home" },
+						{ path: "Окружение.md", text: "Notes #Project" },
+						{ path: "Child.md", text: "#project/sub" },
+					],
+					"#project",
+				],
+				context(FILE),
+			),
+		);
+		expect(answer.result).toEqual([
+			{ name: "Plan", path: "Work/Plan.md", link: "Work/Plan" },
+			{ name: "Окружение", path: "Окружение.md", link: "Окружение" },
+		]);
+	});
+
+	it("rules.noteTags: a note's tags from its text, for a host that keeps them between scans", () => {
+		expect(ok(callDoor("rules.noteTags", ["---\ntag: a\n---\n#b `#c`"], context(FILE))).result).toEqual(["#a", "#b"]);
+	});
+});
