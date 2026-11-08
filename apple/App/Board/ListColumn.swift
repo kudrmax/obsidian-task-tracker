@@ -485,6 +485,7 @@ struct CardRow: View {
             // One card in and out of Select Tasks: the circle slides in beside it and it makes room, never a new card.
             CardButton(
                 card: card,
+                renamedText: model.entry.renamedTexts[card.id],
                 menu: { later in selecting ? nil : model.cardMenu(card.item, later: later) },
                 ringed: model.found == card.id,
                 draggable: !selecting,

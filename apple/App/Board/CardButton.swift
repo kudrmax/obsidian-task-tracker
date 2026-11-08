@@ -15,6 +15,8 @@ enum Carried {
 /// A tap only highlights it; the subtask counter is its own button, which folds.
 struct CardButton: UIViewRepresentable {
     let card: BoardCard
+    /// The task's new text while its rename is written: drawn instead of the text as read.
+    var renamedText: String?
     /// The card's menu; `later` holds a row that opens a sheet or a page until the menu has gone.
     let menu: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?
     var ringed = false
@@ -44,7 +46,7 @@ struct CardButton: UIViewRepresentable {
 
     private func configuration(control: CardControl?) -> UIHostingConfiguration<TaskCapsule, EmptyView> {
         UIHostingConfiguration {
-            TaskCapsule(card: card, ringed: ringed, height: height) { [weak control] in control?.counterFrame = $0 }
+            TaskCapsule(card: card, text: renamedText, ringed: ringed, height: height) { [weak control] in control?.counterFrame = $0 }
         }
         .margins(.all, 0)
     }
@@ -59,7 +61,7 @@ struct CardButton: UIViewRepresentable {
 
     private func update(_ control: CardControl) {
         control.id = card.id
-        let look = CardControl.Look(card: card, ringed: ringed, height: height)
+        let look = CardControl.Look(card: card, text: renamedText, ringed: ringed, height: height)
         if control.look != look {
             control.look = look
             control.content.configuration = configuration(control: control)
@@ -111,6 +113,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// What the card is drawn from: it is drawn anew only when this changes, not on every pass of the screen.
     struct Look: Equatable {
         let card: BoardCard
+        let text: String?
         let ringed: Bool
         let height: CGFloat
     }

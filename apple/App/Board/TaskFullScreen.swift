@@ -175,7 +175,7 @@ struct TaskFullScreen: View {
     /// A subtask as the same capsule as on the main screen, at its depth; a long press shows its own menu.
     private func subtask(_ row: FullRow, branch: Branch?) -> some View {
         let card = BoardCard(item: row.item, level: row.level, branch: row.level > 0 ? branch : nil, due: nil, repeats: row.item.repeats, shades: nil)
-        return CardButton(card: card, menu: { later in menu(for: row.item, later: later) }, draggable: false)
+        return CardButton(card: card, renamedText: model.entry.renamedTexts[card.id], menu: { later in menu(for: row.item, later: later) }, draggable: false)
             .frame(height: CardMetrics.height)
             .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
             .padding(.leading, CGFloat(row.level) * CardMetrics.indent)

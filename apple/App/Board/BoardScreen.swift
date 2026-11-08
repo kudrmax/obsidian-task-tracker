@@ -74,7 +74,7 @@ struct BoardScreen: View {
         ZStack(alignment: .topLeading) {
             PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: { plusSlot = $0 })
             if let slot = plusSlot {
-                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.carrying, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
+                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }

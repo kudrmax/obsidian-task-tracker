@@ -225,6 +225,7 @@ struct TimelineColumn: View {
         // One card in and out of Select Tasks: the calendar's cannot be picked, so they dim and take no touch.
         return CardButton(
             card: slot.card,
+            renamedText: model.entry.renamedTexts[slot.card.id],
             menu: { later in selecting ? nil : model.cardMenu(slot.card.item, later: later) },
             ringed: model.found == slot.id,
             height: tall,

@@ -94,6 +94,9 @@ final class QuickEntryHost {
     private(set) var lists: [BoardColumn: ListEntryView] = [:]
     /// The field's minute from the day's start, when it stands on the calendar.
     private(set) var slotMinute: Int?
+    /// The renames entered and not yet written (`PendingRename`), each task's new text by its id: its card shows that
+    /// text from the Enter until the drawing of the write, never its old name in between.
+    private(set) var renamedTexts: [String: String] = [:]
     /// Bumped whenever the field opens or moves: what holds it scrolls it into sight.
     private(set) var moved = 0
     /// The rows of each list's typed lines and, last, its field, by keys that never repeat: Enter turns the field's row
@@ -374,6 +377,8 @@ final class QuickEntryHost {
 
     private func apply(_ reply: JSONValue, over snapshot: BoardSnapshot? = nil) {
         session = reply["session"]
+        let renames = Self.renames(reply["renamed"])
+        if renames != renamedTexts { renamedTexts = renames }
         show(reply["state"], over: snapshot)
         if case .array(let jobs) = session["jobs"], !jobs.isEmpty { pump() }
     }
@@ -419,6 +424,11 @@ final class QuickEntryHost {
         } else {
             slotMinute = nil
         }
+    }
+
+    private static func renames(_ raw: JSONValue) -> [String: String] {
+        guard case .array(let all) = raw else { return [:] }
+        return Dictionary(all.compactMap { rename in rename["id"].string.flatMap { id in rename["text"].string.map { (id, $0) } } }, uniquingKeysWith: { $1 })
     }
 
     /// Each list's row keys for the lines and the field it now draws: lines written leave from the front (the first to the
