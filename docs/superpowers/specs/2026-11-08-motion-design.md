@@ -219,6 +219,58 @@ every condition that changes the layout is animated by the transaction that chan
    read and reads the screen of `day` over the result with the screen's own code, so it is the write's answer by
    construction; a test checks it against the place after the real drop for every drop case of `drops.test.ts`. It is a
    `tasks.*` method, not `rules.*`, because it needs the tasks file.
+20. **Obsidian, R2: one renderer by key** (`obsidian/ui/motion/KeyedRows.ts`, `Motion.ts`). A list's rows are keyed
+   `task:<TaskItem.id>`, `head:[zone, ListGroup.id]`, `project:<ProjectGroup.key>`, `plate:[zone, ListGroup.id]`, the
+   field's row `entry`, a text typed and not written `unwritten:<n>`. A kept row is filled anew in place; a new row grows
+   from no height (`--tc-duration-collapse`); a gone row fades, then folds (twice that); a moved row slides from where it
+   stood and takes its new width (a new level) on the way; one curve, `--tc-ease-out`. A row's listeners hang on an
+   `AbortSignal` the next drawing aborts. A row holding the focus never moves in the page; anything else in the column (the
+   drop line, a section's mark) stays where it stands. The first drawing after the tasks are read and another day are
+   drawn at once. The timeline's blocks and events are kept the same way by id; a block moves by its top, left and height,
+   a new one fades in, a gone one fades out. A project's chevron is kept, so it turns.
+21. **Obsidian, R2: a written text stays its card.** In the drawing where texts typed leave the field's pending list,
+   the first new task cards take over their rows (an heir key), so the text becomes the task without a blink.
+22. **Obsidian, R3: a scrolled list holds its place** (`ScrollHold`, `--tc-list-hold` under the last row): while rows
+   fold away at its end it keeps a screen of room for twice the collapse time, then only what its scroll needs, and gives
+   it back as the finger scrolls up. Without it the content under the finger was pulled down by the shrinking end.
+23. **Obsidian, R4: a pick that opens a field acts inside the tap** (`Picks.pickNow`: Rename, Add description, Add
+   subtask, New section, a section's Rename, ⋯ → Search): iOS raises the keyboard only for a field focused by the tap
+   itself. Every other pick waits for `Overlay.closed`.
+24. **Obsidian, R6: the overlay's motion.** Every part opens on `--tc-duration-menu` and closes on
+   `--tc-duration-collapse`, curve `--tc-ease-out`: sheet, panel, popover, peek, lifted copy, menu stack, the capsule and
+   wheel copies, the field row over the blur, and the level's shadow, which fades in from `--tc-level-shadow-off`. ⋯ →
+   Search hands its sheet over (`Overlay.handOver`). On the phone the search covers the view itself, so it stands in the
+   view (`Overlay.addIn`) and lets the handed sheet fade away under it (`dropSheet`) as it fades in with a rise.
+25. **Obsidian, R5: a menu's pages** (`PanelPages`): another page, or the same changed, morphs the panel and the part
+   split over the card from their old boxes to the new ones on `--tc-duration-menu`; each page (menu, sections, projects,
+   reminders, repeat, picker) keeps its scroll; Delete's question scrolls into view smoothly. The description's peek
+   fades away and back (`is-away`). The bulk menu and the column menus use the same pages.
+26. **Obsidian, R7: one end of a drag** (`DragSession`): the drop is written and drawn, the copy flies to the card the
+   task stands on now (found by id, `ArrivingCard.dropping` from before the write; where a moving card will rest is read
+   without stopping it, `restingRect`), and only then is the place released (`onReturn` after landing). Dropped in its
+   own list, the card is the same node: its dashed place slides to the new place and the copy lands in it. A cancel flies
+   back to the dashed place first and shows the card after. The plugin writes before it flies (a few ms) rather than
+   asking `tasks.landing` first: the place it flies to is the real one by construction, as decision 11's.
+27. **Obsidian, R7: a section lands as a card does**: the copy flies to the mark (or back to its header), the move is
+   written and drawn, then the mark folds as the section unfolds there. The mark opens and closes between the sections
+   as the finger moves. Tap opens the menu, a long press only lifts (as decision 12).
+28. **Obsidian, R7: the plus let go on a place lands in the field opened there**, scaled to the field's height, and
+   fades (as decision 13); let go on nothing it fades where it is.
+29. **Obsidian, R8: Rename's field row stands in for the card** in the same frame both ways (as decision 14): it does not
+   grow in, it goes at once when the card comes back, and a list's field row keeps a card's height when its field goes.
+30. **Obsidian, R8: modes slide.** Select mode's circle opens from no width at the card's start and the title slides over
+   with the padding; the foot's controls (plus, Undo + ⋯, the select capsule and button, the switch while typing) fade
+   and shrink to `--tc-menu-scale` instead of `display: none`; the desktop's quick bar and section capsule fade in and
+   out; the quick bar's panels fade out; a stack's new field row grows in.
+31. **Obsidian, R9: snaps glide.** The column's padding and gap slide with the strip (`--tc-slide-flip` is gone); the
+   divider's magnet glides in and out on `--tc-duration-snap` (`SnapGlide`); a stretched block glides by grid steps on
+   the same token, as the drop line; the lifted copy takes its width from the card's in a card's flight; a settings row
+   follows the finger, the others slide aside on the snap token and it is written once it has landed.
+32. **Obsidian, R9: a tap during a swipe's settle lets the screen run on** to its place from where it is; the tap goes to
+   what it hit. A new swipe still starts from the screen put in place.
+33. **Obsidian, R3: a held block opens its menu without scrolling** its column under the finger (over what shows of it).
+34. **Obsidian, R12: a list's edge for scrolling itself is the top of the switch's row**, not the list's box, which runs
+   under the foot and Obsidian's bar.
 
 ## Done when
 
