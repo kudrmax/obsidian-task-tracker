@@ -1,5 +1,5 @@
 import { ScrollEdges } from "./ScrollEdges";
-import { branchOf, type EntryAt, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListGrouping, type ListRow, type ListSection, type ListView, keyId, listView, type PendingText, type ProjectGroup, type ProjectZone, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import { branchOf, type EntryAt, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListGrouping, type ListRow, type ListSection, type ListView, listView, type PendingText, type ProjectGroup, type ProjectZone, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
 import { icon } from "./kit/icons";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
@@ -116,7 +116,7 @@ export const PLATE = "tc-group-empty";
 function drawingOf(shape: ListShape): EntryDrawing {
 	const sections = sectionsOf(shape);
 	return {
-		cards: sections.flatMap((section) => section.group.rows.map(({ item, level }) => ({ key: item.key, level, group: section.group.name, ...(section.project !== undefined && { project: section.project }) }))),
+		cards: sections.flatMap((section) => section.group.rows.map(({ item, level }) => ({ key: item.key, id: item.id, level, group: section.group.name, ...(section.project !== undefined && { project: section.project }) }))),
 		sections: sections.map(headerOf),
 	};
 }
@@ -144,10 +144,10 @@ export class TaskList {
 	private readonly keyed: KeyedRows;
 	private readonly hold: ScrollHold;
 	/**
-	 * The tasks the field has written, by the key each write answered (`TaskService.createInPlace`), oldest first: the card
+	 * The tasks the field has written, by the id each write answered (`TaskService.createWithId`), oldest first: the card
 	 * drawn for one takes over the row of the text it was typed as, so a written text stays the same card on the screen.
 	 */
-	private created: TaskKey[] = [];
+	private created: string[] = [];
 	/** A card was renamed in place last time, and is now: its field's row comes and goes with the card's in the same frame. */
 	private renamedDrawn = false;
 	private renamingNow = false;
@@ -329,15 +329,15 @@ export class TaskList {
 
 	/** A task the field has just written takes over the row of the text it was typed as; it stops being awaited then. */
 	private heirOf(item: TaskItem): string | undefined {
-		const at = this.created.findIndex((key) => keyId(key) === keyId(item.key));
+		const at = this.created.indexOf(item.id);
 		if (at < 0 || this.keyed.nodeOf(`task:${item.id}`)) return undefined;
 		this.created.splice(at, 1);
 		return `${UNWRITTEN}${this.written++}`;
 	}
 
-	/** The field wrote a task where it was typed (`key`, as the write answered): its card takes the typed text's row when drawn. */
-	adopt(key: TaskKey): void {
-		this.created.push(key);
+	/** The field wrote a task where it was typed (`id`, as the write answered): its card takes the typed text's row when drawn. */
+	adopt(id: string): void {
+		this.created.push(id);
 	}
 
 	/** The field closed: no text typed is awaited any more. */
@@ -377,7 +377,7 @@ export class TaskList {
 
 	/** A card as places in the list see it: in the section, and the project's part, it is drawn in. */
 	listCard(entry: ListEntry): ListCard {
-		return { key: entry.item.key, level: entry.level, group: entry.group, ...(entry.project !== undefined && { project: entry.project }) };
+		return { key: entry.item.key, id: entry.item.id, level: entry.level, group: entry.group, ...(entry.project !== undefined && { project: entry.project }) };
 	}
 
 	/** The sections as drawn; one ungrouped run when the list shows none. */

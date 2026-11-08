@@ -279,10 +279,10 @@ every condition that changes the layout is animated by the transaction that chan
    drop line, a section's mark) stays where it stands. The first drawing after the tasks are read and another day are
    drawn at once. The timeline's blocks and events are kept the same way by id; a block moves by its top, left and height,
    a new one fades in, a gone one fades out. A project's chevron is kept, so it turns.
-21. **Obsidian, R2: a written text stays its card.** The key `createInPlace` answers for each text the field writes is
-   handed to the lists (`TaskList.adopt`); the card drawn for the task at exactly that line (`keyId`) takes over the
-   typed text's row (an heir key), so the text becomes the task without a blink. No counting: a task that comes from
-   Sync meanwhile never takes the row.
+21. **Obsidian, R2: a written text stays its card.** The id `createWithId` answers for each text the field writes is
+   handed to the lists (`TaskList.adopt`); the card drawn for the task of that id takes over the typed text's row (an
+   heir key), so the text becomes the task without a blink, whatever was written since. No counting, no keys: a task that
+   comes from Sync meanwhile never takes the row.
 22. **Obsidian, R3: a scrolled list holds its place** (`ScrollHold`, `--tc-list-hold` under the last row): while rows
    fold away at its end it keeps a screen of room for twice the collapse time, then only what its scroll needs, and gives
    it back as the finger scrolls up. Without it the content under the finger was pulled down by the shrinking end.
@@ -308,9 +308,11 @@ every condition that changes the layout is animated by the transaction that chan
    back to the dashed place first and shows the card after. The plugin writes before it flies (a few ms) rather than
    asking `tasks.landing` first: the place it flies to is the real one by construction, as decision 11's.
 27. **Obsidian, R7: a section lands as a card does**, through the same `DragSession` (the slots between the sections are
-   its one target): the move is written and drawn, the mark is put right after the folded section, so the section's
-   header stands where it will open, the copy lands on that header (`restingRect`), and only then does the section
-   unfold as the mark folds. A cancel flies back to the header first. The mark opens and closes between the sections
+   its one target). The landing place is a row the list draws (`TaskList.showLanding`, ordered by `KeyedRows` like every
+   row): over the slot's header while the finger moves, right after the section once the move is written and the list
+   drawn, so the section's header stands where it will open. The copy lands on that header, found by the section's name
+   in the list as drawn (`moveGroup` answers nothing, so it is not the lifted node), and only then does the section unfold
+   as the place folds; the screen stays the drag's until then. A cancel flies back to the header first. The mark opens and closes between the sections
    as the finger moves. Tap opens the menu, a long press only lifts (as decision 12).
 28. **Obsidian, R7: the plus let go on a place lands in the field opened there**, scaled to the field's height, and
    fades (as decision 13); let go on nothing, or cancelled, it flies home to the plus, as a cancelled card does.
@@ -327,6 +329,10 @@ every condition that changes the layout is animated by the transaction that chan
 32. **Obsidian, R9: a tap during a swipe's settle lets the screen run on** to its place from where it is; the tap goes to
    what it hit. A new swipe still starts from the screen put in place.
 33. **Obsidian, R3: a held block opens its menu without scrolling** its column under the finger (over what shows of it).
+   Every scroll the plugin makes is one (`scrollSmoothly`, on `ScrollGlide`) and ends exactly once, saying how: it got
+   there, its content ended short, another scroll took over, it was called off, or a finger or a wheel took the scroller
+   (it yields at once). A menu waiting for its column opens on every end but a finger's, which closes it; a sheet not yet
+   shown, or closing, takes no tap.
 34. **Obsidian, R12: a list's edge for scrolling itself is the top of the switch's row**, not the list's box, which runs
    under the foot and Obsidian's bar.
 35. **Backend, R1 fix: ids are kept for the file as read, tidied for today.** A host may keep a file the door tidied only

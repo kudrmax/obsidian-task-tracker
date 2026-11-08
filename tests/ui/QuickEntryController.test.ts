@@ -124,12 +124,12 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	controller = new QuickEntryController({
 		root,
 		tasks: {
-			createInPlace: async (text, priority, place, repeat) => {
+			createWithId: async (text, priority, place, repeat) => {
 				created.push({ text, priority, place, ...(repeat ? { repeat } : {}) });
 				if (drawsOnFresh !== "grows") return null;
 				const added = item(text, key("now", (items.day ?? []).length));
 				(items.day ??= []).push(added);
-				return added.key;
+				return { key: added.key, id: added.id };
 			},
 			createSection: async () => null,
 			edit: async (k, draft) => {
