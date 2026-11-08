@@ -233,7 +233,9 @@ iPhone app (projects in full, replacing 12 and the stopgap part of 11):
     at every start. The list is one `rules.projectNotes(notes, tag)` over every path with its kept tags, made again only
     when a note was read, a path came or went, or the tag changed. A scan runs at most every 3 s, off the screen's thread,
     on a core of its own. A note iCloud keeps only in the cloud (`ubiquitousItemDownloadingStatus` not current, or an
-    `.icloud` placeholder) is never read nor downloaded: its path alone still counts for the name-clash links. Reads are
+    `.icloud` placeholder) is never read nor downloaded: its path alone still counts for the name-clash links. A note's
+    path goes to the door in NFC, as Obsidian names files and the tasks file's links spell them (the file system hands
+    names decomposed, which made «Окружение в новой стране» two projects). Reads are
     coordinated, as every read of the vault. The list last found is kept on the device, so the first screen shows the
     groups at once; a list that changed redraws the screen through the same wait as a file changed elsewhere (a carry or
     the quick entry's writes first). The tag comes from `settings.form().projectTag`. No tag rule is written in Swift.
@@ -242,7 +244,9 @@ iPhone app (projects in full, replacing 12 and the stopgap part of 11):
 39. **A project group's header** is the app's section header (26 pt row, 13 pt semibold) with the SF `chevron.right` 6 pt
     into the left padding, turned down while open; a tap anywhere on the header but the arrow folds; folded, the count
     (12 pt semibold, muted); the arrow is `arrow.up.forward.app`, the symbol of Open in Obsidian, its own button. A title
-    the header cuts fades at its end (18). No project's group (zone null) is muted and has no arrow (`canOpenNote`).
+    the header cuts ends in the system's ellipsis, the count and the arrow right after it (iOS truncation, not the
+    plugin's fade, 18). Every list takes exactly its column's width (Inbox and Backlog each the left column's), its rows
+    laid out at that width: no header or row can widen a list or push it out of its column. No project's group (zone null) is muted and has no arrow (`canOpenNote`).
 40. **The arrow and the folder mark open the note** through Advanced URI (`obsidian://advanced-uri?vault=…&filepath=<the
     note's path>`), as the app's Open in Obsidian does. The mark's tap target is its 24 pt plus 3 pt each side, the card's
     height; a mark of a project with no note (`canOpenNote` false) has no target: a tap there opens the menu, as the rest

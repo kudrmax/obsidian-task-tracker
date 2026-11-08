@@ -27,10 +27,19 @@ struct ListColumn: View {
         return model.titleSnapshot?.lists[.day]?.title ?? list.title
     }
 
+    /// The list takes exactly the room its column gives it: the reader never grows with what it holds, and the rows are
+    /// laid out at its width, so a long name or a wide row can never widen the list or push it out of its column.
     var body: some View {
+        GeometryReader { box in
+            content(width: box.size.width)
+                .frame(width: box.size.width, height: box.size.height, alignment: .topLeading)
+        }
+    }
+
+    private func content(width columnWidth: CGFloat) -> some View {
         let column = list.column
         let drawn = rows
-        VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
+        return VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
             ColumnTitle(title: title, dayArrows: dayArrows, model: model, list: list)
             ScrollViewReader { scroller in
                 ScrollView {
@@ -70,6 +79,8 @@ struct ListColumn: View {
                         Color.clear.frame(height: Self.trailingRoom)
                     }
                     .padding(.horizontal, CardMetrics.columnInset)
+                    // The rows are exactly as wide as the column: no row, however long its words, widens the list.
+                    .frame(width: columnWidth, alignment: .leading)
                     .overlay(alignment: .topLeading) {
                         if let line = gap?.line { DropLine(from: line) }
                     }
@@ -434,11 +445,10 @@ struct ProjectHeader: View {
                 .rotationEffect(.degrees(project.folded ? 0 : 90))
                 .frame(width: 16, height: ColumnMetrics.groupLeading)
                 .padding(.leading, -6)
-            ViewThatFits(in: .horizontal) {
-                name
-                name.frame(maxWidth: .infinity, alignment: .leading).mask(fade)
-            }
-            .layoutPriority(-1)
+            Text(project.title)
+                .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
+                .lineLimit(1)
+                .frame(height: ColumnMetrics.groupLeading)
             if project.folded {
                 Text(verbatim: "\(project.count)")
                     .font(.system(size: 12, weight: .semibold))
@@ -469,21 +479,6 @@ struct ProjectHeader: View {
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isButton)
         .accessibilityValue(project.folded ? "Collapsed, \(project.count) tasks" : "Expanded")
-    }
-
-    private var name: some View {
-        Text(project.title)
-            .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
-            .lineLimit(1)
-            .fixedSize()
-            .frame(height: ColumnMetrics.groupLeading)
-    }
-
-    private var fade: some View {
-        HStack(spacing: 0) {
-            Rectangle()
-            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: CardMetrics.fade)
-        }
     }
 }
 

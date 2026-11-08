@@ -176,9 +176,11 @@ public final class Vault: TasksVault, NoteFolder, @unchecked Sendable {
         }
     }
 
+    /// A note's path from the vault's folder in NFC, as Obsidian names files and the tasks file's links spell them: the
+    /// file system hands names decomposed («й» as «и» and a breve), which would make a project note's name another name.
     private static func relative(_ file: URL, to root: String) -> String? {
         let full = file.standardizedFileURL.path
-        return full.hasPrefix(root + "/") ? String(full.dropFirst(root.count + 1)) : nil
+        return full.hasPrefix(root + "/") ? String(full.dropFirst(root.count + 1)).precomposedStringWithCanonicalMapping : nil
     }
 
     /// Tells `changed` whenever the tasks file is written through file coordination (iCloud, a reminder's button, another

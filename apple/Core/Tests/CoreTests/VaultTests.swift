@@ -48,6 +48,14 @@ struct SettingsElsewhere: TasksFileRule {
         #expect(notes.filter { $0.text != nil }.count == 1)
     }
 
+    @Test func aNotesPathIsInNFCAsTheLinksSpellIt() throws {
+        let name = "Окружение в новой стране"
+        try put("#project", name.decomposedStringWithCanonicalMapping + ".md")
+        let notes = try vault().scanNotes(wanted: { _, _ in true })
+        #expect(notes.map(\.path) == [name + ".md"])
+        #expect(notes.first.map { Array($0.path.unicodeScalars) } == Array((name + ".md").unicodeScalars))
+    }
+
     @Test func readsTheTasksFileNamedInThePluginSettings() throws {
         let settings = #"{"tasksFile":"tasks/My.md"}"#
         try put(settings, ".obsidian/plugins/task-calendar/data.json")
