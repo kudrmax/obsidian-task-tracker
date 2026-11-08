@@ -48,6 +48,8 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
 export const PROPERTY = {
 	listWidth: "--tc-list-width",
+	/** Room a scrolled list keeps under its last row while its rows fold away, so it stays where it was scrolled. */
+	listHold: "--tc-list-hold",
 	/** The card's height and the gap between cards, from the settings: set on the body, where the tokens built on them live. */
 	cardHeight: "--tc-card-h",
 	cardGap: "--tc-card-gap",

@@ -117,7 +117,11 @@ export class RowsDrawing {
 		return taken;
 	}
 
-	/** The rows stand in the page in the order taken; the new ones grow in, the moved ones slide, the rest leave. */
+	/**
+	 * The rows stand in the page in the order taken; the new ones grow in, the moved ones slide, the rest leave. The new
+	 * ones start growing first, from nothing: a moved row slides to where it stands with them at that height, and their
+	 * growth carries it on.
+	 */
 	finish(): void {
 		const host = this.rows.host;
 		const old = [...host.children] as HTMLElement[];
@@ -126,12 +130,12 @@ export class RowsDrawing {
 		const stays = old.filter((node) => node.isConnected && node.parentElement === host && !wanted.has(node));
 		arrange(host, withStays(this.order, old, stays));
 		if (!this.moving) return;
+		for (const node of this.fresh) Motion.enter(node);
 		for (const node of this.order) {
 			if (this.fresh.has(node)) continue;
 			const from = this.before.get(node);
 			if (from) Motion.slide(node, from);
 		}
-		for (const node of this.fresh) Motion.enter(node);
 	}
 }
 

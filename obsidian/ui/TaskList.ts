@@ -6,6 +6,7 @@ import type { LocalDate } from "./types";
 import { el } from "./dom";
 import { fillCard, fillUnwrittenCard, showProgressDot } from "./TaskCard";
 import { KeyedRows, type RowsDrawing } from "./motion/KeyedRows";
+import { ScrollHold } from "./motion/ScrollHold";
 
 /** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
 export interface ListEntryInput {
@@ -133,6 +134,7 @@ export class TaskList {
 	private slot: HTMLElement | null = null;
 	/** The rows by key: a card by its task's id, a header by its section's, so a row lives as long as what it shows. */
 	private readonly keyed: KeyedRows;
+	private readonly hold: ScrollHold;
 	/**
 	 * How many texts typed here were drawn as plain cards last time, and how many of them the file has written since:
 	 * the first new cards drawn now take over their rows (`heirs`), so a written text stays the same card on the screen.
@@ -154,6 +156,7 @@ export class TaskList {
 	) {
 		el.classList.add("tc-list");
 		this.keyed = new KeyedRows(el);
+		this.hold = new ScrollHold(el);
 		this.edges = new ScrollEdges(el);
 		this.sizes = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => this.fadeCutTitles());
 		this.sizes?.observe(el);
@@ -185,7 +188,9 @@ export class TaskList {
 		const shape = this.shapeOf(items);
 		const entry = this.deps.entry?.(drawingOf(shape)) ?? null;
 		const renaming = this.deps.renaming?.() ?? null;
-		const drawing = this.keyed.begin(moving && this.drawnDay === day);
+		const moves = moving && this.drawnDay === day;
+		if (moves) this.hold.keep();
+		const drawing = this.keyed.begin(moves);
 		this.drawnDay = day;
 		const typed = entry?.pending.length ?? 0;
 		this.written = Math.max(0, this.typedDrawn - typed);
@@ -382,17 +387,20 @@ export class TaskList {
 
 	/**
 	 * A project group's header: the section header with a chevron before its title, turned down while the group is open,
-	 * the count of its tasks while folded, and the arrow that opens the note. A drop on it lands in the group: among its
+	 * the count of its tasks while folded, and the arrow that opens the note. The chevron is kept from drawing to drawing,
+	 * so it turns as the group folds or opens. A drop on it lands in the group: among its
 	 * tasks without a section, or at its end while it is folded.
 	 */
 	private projectHeader(drawing: RowsDrawing, group: ProjectGroup): HTMLElement {
 		const { node: head, signal } = drawing.take(`project:${group.key}`, () => el(null, "div", "tc-group-head is-project"));
-		head.replaceChildren();
+		const chevron = head.querySelector(":scope > .tc-group-chevron") ?? el(null, "span", "tc-group-chevron");
+		if (!chevron.firstChild) chevron.appendChild(icon("chevronRight"));
+		for (const child of [...head.childNodes]) if (child !== chevron) child.remove();
+		if (chevron.parentElement !== head) head.prepend(chevron);
 		head.classList.toggle("is-ungrouped", group.project === null);
 		head.classList.toggle("is-shut", group.folded);
 		head.setAttribute("role", "button");
 		head.setAttribute("aria-expanded", String(!group.folded));
-		el(head, "span", "tc-group-chevron").appendChild(icon("chevronRight"));
 		el(head, "span", "tc-group-name", group.title);
 		if (group.folded) el(head, "span", "tc-group-count", String(group.count));
 		if (group.canOpenNote) {

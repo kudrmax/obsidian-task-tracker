@@ -1,4 +1,4 @@
-import { Motion } from "../motion/Motion";
+import { restingRect } from "../motion/Motion";
 import type { DragPayload, DropResult, DropTarget, Float } from "./DropTarget";
 
 export type { DragOrigin, DragPayload, DropResult, DropTarget, Float, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
@@ -42,8 +42,7 @@ export class DragSession {
 		if (!target || !result) return this.settleBack();
 		const line = target.landing();
 		const card = await this.opts.onEnd(result);
-		if (card) Motion.settle(card);
-		const landing = card ? card.getBoundingClientRect() : this.opts.payload.from === "new" ? line : null;
+		const landing = card ? restingRect(card) : this.opts.payload.from === "new" ? line : null;
 		await (landing ? this.opts.float.land(landing) : this.opts.float.vanish());
 		this.opts.onReturn?.();
 		this.clearAll();

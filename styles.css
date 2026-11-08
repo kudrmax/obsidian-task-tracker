@@ -868,6 +868,9 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 /* The room at a list's end, so its last card can rise to where the fade starts; while a task is typed, at least the room over the bar. */
 .tc-list::after { content: ""; flex-shrink: 0; height: var(--tc-foot-fade-day); }
 .task-calendar.is-entering .tc-list::after { height: max(var(--tc-foot-fade-day), var(--tc-entry-room)); }
+/* A scrolled list whose rows fold away keeps room under them for as long as its scroll needs it (obsidian/ui/motion/ScrollHold.ts). */
+.tc-list.is-holding::after { height: calc(var(--tc-foot-fade-day) + var(--tc-list-hold)); }
+.task-calendar.is-entering .tc-list.is-holding::after { height: calc(max(var(--tc-foot-fade-day), var(--tc-entry-room)) + var(--tc-list-hold)); }
 .tc-list::-webkit-scrollbar { display: none; }
 /* Content scrolled under a list's or the calendar's edge fades out there instead of being cut by a line. Each fade is as deep as the content under its edge, up to its full height, so it grows in and out with the scroll and never appears in a step; a list at rest at an edge shows none there. */
 :is(.tc-list, .tc-timeline):is(.is-under-top, .is-under-bottom) { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); }
@@ -1136,6 +1139,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-panel.is-more { width: var(--tc-popover-w); }
 .tc-card.is-lifted.is-waiting { visibility: visible; background: none; border: var(--tc-hairline) dashed var(--tc-dash); box-shadow: none; }
 .tc-card.is-waiting > * { visibility: hidden; }
+/* Dropped, the lifted card is the task's card at its new place: hidden there until the copy lands on it. */
+.tc-card.is-lifted.is-waiting.is-arriving { visibility: hidden; }
 .tc-float-count { min-width: var(--tc-float-count-size); height: var(--tc-float-count-size); box-sizing: border-box; margin: calc(-1 * var(--tc-float-count-out)) 0 0 calc(var(--tc-float-count-out) - var(--tc-float-count-size)); padding: 0 var(--tc-space-6); border-radius: var(--tc-radius-float-count); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: 0 0 0 var(--tc-float-count-ring) var(--tc-bg); font-family: var(--tc-font-ui); font-size: var(--tc-font-count); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; transition: opacity var(--tc-duration-fly) var(--tc-ease-out); }
 .tc-float-count.is-gone { opacity: 0; }
 body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancelling .tc-float-count { opacity: var(--tc-float-cancel-opacity); }

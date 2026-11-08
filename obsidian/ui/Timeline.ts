@@ -328,7 +328,7 @@ export class Timeline {
 			.map(({ event, span, box }) => this.placeEvent(this.take(drawn, `event:${event.id}`), event, span, box.left, box.level));
 		this.tasks = this.deps.tasks().map((task) => this.placeTask(this.take(drawn, `task:${task.id}`), task));
 		for (const [key, block] of this.blocks) {
-			if (drawn.get(key) === block) continue;
+			if (drawn.get(key)?.el === block.el) continue;
 			block.listening.abort();
 			if (moves) Motion.disappear(block.el, () => block.el.remove());
 			else block.el.remove();

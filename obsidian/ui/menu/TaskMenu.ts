@@ -15,6 +15,7 @@ import { projectChooser, sectionChooser } from "./SectionChooser";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import { DescriptionPeek } from "./DescriptionPeek";
 import { PanelPages } from "./PanelPages";
+import { Motion } from "../motion/Motion";
 import { repeatPanel } from "../repeat/RepeatPanel";
 import { repeatValue } from "../repeat/repeatLabel";
 
@@ -281,7 +282,11 @@ export class TaskMenu extends LiftedMenu {
 		this.giveToField();
 		this.fieldClosed = onClose;
 		const stack = (this.stack ??= this.stackUnder(this.copy));
-		return (this.stackRow ??= el(stack, "div", "tc-quick-row"));
+		if (this.stackRow) return this.stackRow;
+		const row = (this.stackRow = el(stack, "div", "tc-quick-row"));
+		/** The field is put in the row once this returns: the row grows in with it, in the same task. */
+		queueMicrotask(() => Motion.enter(row));
+		return row;
 	}
 
 	/** Typing in the menu: the panel and the start of the description go, the field and its bar take their place. */

@@ -24,11 +24,21 @@ function shiftOf(el: Element): { readonly x: number; readonly y: number } {
 	return values[1] ? { x: parts[12] || 0, y: parts[13] || 0 } : { x: parts[4] || 0, y: parts[5] || 0 };
 }
 
-/** Where `el` stands once the slide running on it has ended: its box less the shift the slide still draws. */
-export function restingRect(el: Element): DOMRect {
+/**
+ * Where `el` will stand once what moves it now has ended: its box less the shift a slide still draws, at the height it
+ * grows to, at the place and size it is reshaped to. Read without stopping any of it, so nothing on the screen jumps.
+ */
+export function restingRect(el: HTMLElement): DOMRect {
 	const rect = el.getBoundingClientRect();
 	const shift = shiftOf(el);
-	return new DOMRect(rect.left - shift.x, rect.top - shift.y, rect.width, rect.height);
+	const growing = GROWN.get(el);
+	const reshaped = RESHAPED.get(el);
+	if (reshaped && SLIDES.get(el)?.playState === "running") {
+		const now = boxOf(el);
+		return new DOMRect(rect.left + reshaped.left - now.left, rect.top + reshaped.top - now.top, rect.width, reshaped.height);
+	}
+	const height = growing !== undefined && GROWTHS.get(el)?.playState === "running" ? growing : rect.height;
+	return new DOMRect(rect.left - shift.x, rect.top - shift.y, rect.width, height);
 }
 
 /** The row gap of the flex column `el` stands in: a row folded to nothing gives it back with a negative margin. */
@@ -39,6 +49,9 @@ function gapOf(el: HTMLElement): number {
 
 const SLIDES = new WeakMap<Element, Animation>();
 const GROWTHS = new WeakMap<Element, Animation>();
+/** The height a growing row grows to, and the box a reshaped one goes to. */
+const GROWN = new WeakMap<Element, number>();
+const RESHAPED = new WeakMap<Element, Box>();
 
 /**
  * The moves a row of a list makes, and anything that floats over the screen: it grows in from nothing, fades and then
@@ -56,6 +69,7 @@ export const Motion = {
 		row.style.overflow = "hidden";
 		const growth = row.animate([{ height: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" }, to], timing);
 		GROWTHS.set(row, growth);
+		GROWN.set(row, parseFloat(style.height) || 0);
 		const done = () => {
 			if (GROWTHS.get(row) === growth) row.style.overflow = overflow;
 		};
@@ -128,6 +142,7 @@ export const Motion = {
 		const to = boxOf(node);
 		if (Math.abs(to.top - from.top) < 0.5 && Math.abs(to.left - from.left) < 0.5 && Math.abs(to.height - from.height) < 0.5) return;
 		SLIDES.get(node)?.cancel();
+		RESHAPED.set(node, to);
 		SLIDES.set(node, node.animate([{ top: px(from.top), left: px(from.left), height: px(from.height) }, { top: px(to.top), left: px(to.left), height: px(to.height) }], timing));
 	},
 
