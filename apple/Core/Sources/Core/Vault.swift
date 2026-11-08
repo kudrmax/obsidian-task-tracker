@@ -46,7 +46,7 @@ public protocol TasksVault: Sendable {
 }
 
 /// The Obsidian vault folder the app was given once, read and written through file coordination.
-public final class Vault: TasksVault, @unchecked Sendable {
+public final class Vault: TasksVault, NoteFolder, @unchecked Sendable {
     private let bookmarks: BookmarkStore
     private let rule: TasksFileRule
     /// A file changed this recently may still be being written: wait this long and read it again.
@@ -141,6 +141,28 @@ public final class Vault: TasksVault, @unchecked Sendable {
             }
             if let error = coordination ?? failure { throw error }
             if path == (try? tasksFile(settings(in: folder))) { own.text = text }
+        }
+    }
+
+    /// Every markdown note of the vault outside its hidden folders (`.obsidian`, `.trash`), in one pass of the folder; a
+    /// note iCloud keeps only in the cloud is left out.
+    public func scanNotes(wanted: (String, Date) -> Bool) throws -> [ScannedNote] {
+        try withFolder { folder in
+            let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]
+            guard let walk = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return [] }
+            let root = folder.standardizedFileURL.path
+            var notes: [ScannedNote] = []
+            for case let file as URL in walk where file.pathExtension.lowercased() == "md" {
+                let values = try? file.resourceValues(forKeys: Set(keys))
+                guard values?.isRegularFile == true else { continue }
+                let full = file.standardizedFileURL.path
+                guard full.hasPrefix(root + "/") else { continue }
+                let path = String(full.dropFirst(root.count + 1))
+                let modified = values?.contentModificationDate ?? .distantPast
+                let text = wanted(path, modified) ? try? String(contentsOf: file, encoding: .utf8) : nil
+                notes.append(ScannedNote(path: path, modified: modified, text: text))
+            }
+            return notes
         }
     }
 
