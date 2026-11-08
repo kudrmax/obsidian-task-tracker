@@ -36,13 +36,19 @@ struct CaptureView: View {
                     .padding(Layout.margin)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .card()
+                    // «Added to …» stands in the empty field's own bottom, fading in and out: the field keeps its height.
+                    .overlay(alignment: .bottomLeading) {
+                        if let added {
+                            Label("Added to \(added.name)", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .padding(Layout.margin)
+                                .allowsHitTesting(false)
+                                .transition(.opacity)
+                        }
+                    }
                     .contentShape(.rect)
                     .onTapGesture { typing = true }
 
-                if let added {
-                    Label("Added to \(added.name)", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                }
                 if let failure {
                     Label(failure, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
@@ -74,7 +80,7 @@ struct CaptureView: View {
                     .disabled(!canSend || sending || list == nil)
             }
         }
-        .onChange(of: text) { if !text.isEmpty { added = nil } }
+        .onChange(of: text) { if !text.isEmpty, added != nil { withAnimation(.smooth) { added = nil } } }
         .task { readLists() }
         .onChange(of: scene) { if scene == .active { readLists() } }
         .sensoryFeedback(.success, trigger: added) { _, new in new != nil }
@@ -111,12 +117,14 @@ struct CaptureView: View {
         let outcome = await Task.detached { AppServices.shared.capture(list: target, text: typed, recording: recording, tag: tag) }.value
         switch outcome {
         case .saved:
-            clear()
-            added = target
+            withAnimation(.smooth) {
+                clear()
+                added = target
+            }
         case .blank:
-            failure = nil
+            withAnimation(.smooth) { failure = nil }
         case .failed(let reason):
-            failure = reason
+            withAnimation(.smooth) { failure = reason }
         }
     }
 }

@@ -1,0 +1,132 @@
+import Foundation
+
+/// How the screen moves from one drawing to the next: chosen by what differs between the two, never by who asked for the
+/// read (a drop, Sync, a return to the app, Undo all move the same change the same way).
+public enum BoardMotion: Equatable, Sendable {
+    /// Nothing the screen draws differs, or there was nothing drawn before: drawn as it is.
+    case still
+    /// Another day: the day list and the calendar slide in from the side of the day's direction.
+    case turn(forward: Bool)
+    /// Cards came, went, moved or changed: each by its id slides, folds away or unfolds in one transaction.
+    case change
+}
+
+extension BoardSnapshot {
+    /// The motion from `old`, the drawing on the screen, to this one.
+    public func motion(from old: BoardSnapshot?) -> BoardMotion {
+        guard let old else { return .still }
+        if old.day != day { return .turn(forward: day > old.day) }
+        return old.lists == lists && old.timeline == timeline ? .still : .change
+    }
+}
+
+/// The end of a carry, one owner for every way it ends: the carried copy must have landed (a drop's flight, a cancel's
+/// flight home, or none at all) and, when the drop wrote, the screen must show the write. Only then is the place in the
+/// list released and the card shown where the screen draws it.
+public struct CarryEnd: Equatable, Sendable {
+    public private(set) var landed = false
+    public private(set) var drawn: Bool
+
+    /// `writes`: the drop is written, so its end waits for the screen to draw the write too.
+    public init(writes: Bool) {
+        drawn = !writes
+    }
+
+    public var done: Bool { landed && drawn }
+
+    /// The copy is in its place (or there was none to fly): true when the carry may end now.
+    public mutating func land() -> Bool {
+        landed = true
+        return done
+    }
+
+    /// The screen shows the write (or the write failed and shows nothing): true when the carry may end now.
+    public mutating func draw() -> Bool {
+        drawn = true
+        return done
+    }
+}
+
+/// `LandingSpan`: a block of the day's timeline after a drop, by its task's id.
+public struct LandingSpan: Decodable, Sendable, Hashable {
+    public let id: String
+    public let span: DaySpan
+}
+
+/// `DropLanding` (`tasks.landing`): where the core will leave a dropped task, asked at the drop before its write, so the
+/// carried copy flies straight there.
+public struct DropLanding: Decodable, Sendable {
+    public let kind: String
+    public let id: String
+    public let item: TaskItem?
+    /// A block of the day's timeline: its span as shown (on the now line when `ridesNow`), and every block of the day.
+    public let span: DaySpan?
+    public let ridesNow: Bool?
+    public let slotted: [LandingSpan]?
+    /// A card of a column: its section and its index among that section's tasks there.
+    public let column: String?
+    public let group: String?
+    public let index: Int?
+    /// A subtask: its parent's id, and its index among the parent's open subtasks.
+    public let parent: String?
+}
+
+/// Where a landed card stands among a column's cards without the carried ones: before card `at`, at `level`, in `group`.
+public struct LandingGap: Equatable, Sendable {
+    public let at: Int
+    public let level: Int
+    public let group: String?
+
+    public init(at: Int, level: Int, group: String?) {
+        self.at = at
+        self.level = level
+        self.group = group
+    }
+}
+
+extension DropLanding {
+    /// The room the landed card takes in `column`, among `others` (the column's cards without the carried ones, in their
+    /// drawing order); nil when it lands elsewhere.
+    public func gap(in column: BoardColumn, among others: [BoardCard]) -> LandingGap? {
+        switch kind {
+        case "list":
+            guard self.column == column.rawValue, let index else { return nil }
+            let tops = others.indices.filter { others[$0].level == 0 && others[$0].item.group == group }
+            if let at = tops[safe: index] { return LandingGap(at: at, level: 0, group: group) }
+            let end = others.indices.last { others[$0].item.group == group }.map { $0 + 1 } ?? others.count
+            return LandingGap(at: end, level: 0, group: group)
+        case "subtask":
+            guard let parent, let index, let at = others.firstIndex(where: { $0.id == parent }) else { return nil }
+            let level = others[at].level + 1
+            var end = at + 1
+            var children: [Int] = []
+            while end < others.count, others[end].level >= level {
+                if others[end].level == level { children.append(end) }
+                end += 1
+            }
+            return LandingGap(at: children[safe: index] ?? end, level: level, group: others[at].item.group)
+        default:
+            return nil
+        }
+    }
+}
+
+extension TaskBoard {
+    /// Where `tasks.drop` with the same arguments will leave each task, over the file as it is now; nothing is written.
+    public func landing(_ tasks: JSONValue, to: JSONValue, day: String, now: Date = Date()) throws -> [DropLanding] {
+        try read("tasks.landing", [tasks, to, .string(day)], over: try files(now: now))
+    }
+
+    /// The box a timeline landing's card takes in the stack the core lays out with the day's blocks after the drop.
+    public func box(of landing: DropLanding, events: [BoardEvent], measures: TimelineMeasures) throws -> StackBox? {
+        guard landing.kind == "timeline", let slotted = landing.slotted, let at = slotted.firstIndex(where: { $0.id == landing.id }) else { return nil }
+        let taskSpans = JSONValue.array(slotted.map { ["start": .number(Double($0.span.start)), "end": $0.span.end.map { .number(Double($0)) } ?? .null] })
+        let eventSpans = JSONValue.array(events.map { ["start": .number(Double($0.start)), "end": .number(Double($0.end)), "level": .number(Double($0.level))] })
+        let boxes: [StackBox] = try rule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
+        return boxes[safe: at]
+    }
+}
+
+extension Array {
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
+}

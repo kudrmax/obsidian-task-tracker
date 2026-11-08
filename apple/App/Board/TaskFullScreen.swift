@@ -21,6 +21,26 @@ struct TaskFullScreen: View {
 
     private var task: TaskItem { current ?? item }
 
+    /// The page's first frame is drawn from what was read before the push.
+    init(item: TaskItem, model: BoardModel) {
+        self.item = item
+        self.model = model
+        let page = model.pages[item.id]
+        _current = State(initialValue: page?.task)
+        _tree = State(initialValue: page?.tree)
+        _listName = State(initialValue: page?.listName ?? "")
+        _menuModel = State(initialValue: page?.menu)
+        _subtaskMenus = State(initialValue: page?.subtaskMenus ?? [:])
+        let text = page?.opened?["text"]?.string ?? ""
+        _draft = State(initialValue: page?.opened?["state"] ?? .null)
+        _text = State(initialValue: text)
+        _placed = State(initialValue: text)
+        _preread = State(initialValue: page?.opened != nil)
+    }
+
+    /// The description was opened before the push.
+    @State private var preread = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -78,7 +98,6 @@ struct TaskFullScreen: View {
                 }
             }
         }
-        .animation(.snappy, value: model.entry.isOpen)
         // A page of its own: no columns, no tab bar, no calendar, as the design has it.
         .toolbar(.hidden, for: .tabBar)
         .menuQuestions($question, model: model)
@@ -101,7 +120,7 @@ struct TaskFullScreen: View {
         let shown = task
         model.entry.stackRead = { await readStack() }
         model.entry.renamed = { item in
-            if item.key.section == shown.key.section, item.key.index == shown.key.index, item.key.path == shown.key.path { current = item }
+            if item.id == shown.id { current = item }
         }
     }
 
@@ -171,20 +190,24 @@ struct TaskFullScreen: View {
     }
 
     private func open() async {
-        let opened: [String: JSONValue]? = try? await model.rule("description.open", [task.description.json])
-        draft = opened?["state"] ?? .null
-        place(opened?["text"]?.string ?? "")
+        if !preread {
+            let opened: [String: JSONValue]? = try? await model.rule("description.open", [task.description.json])
+            draft = opened?["state"] ?? .null
+            place(opened?["text"]?.string ?? "")
+        }
         await refresh()
     }
 
     /// The task as the file now has it, its subtasks and menu; a change made elsewhere reaches the editor unless it is in use.
     private func refresh() async {
-        await readStack()()
-        listName = (try? await model.read("tasks.listName", [.string(task.list)])) ?? ""
-        menuModel = await model.menu(for: task, from: "full")
-        var menus: [String: TaskMenuModel] = [:]
-        for row in tree?.rows ?? [] { menus[row.item.id] = await model.menu(for: row.item, from: "full") }
-        subtaskMenus = menus
+        let page = await model.page(task)
+        withAnimation(.snappy) {
+            current = page.task
+            tree = page.tree
+            listName = page.listName
+            menuModel = page.menu
+            subtaskMenus = page.subtaskMenus
+        }
         let read: [String: JSONValue]? = try? await model.rule("description.read", [draft, task.description.json, ["focused": .bool(typing), "pending": .bool(saving != nil)]])
         if let read {
             draft = read["state"] ?? draft

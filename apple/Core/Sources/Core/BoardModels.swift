@@ -55,6 +55,10 @@ public struct TaskAbilities: Codable, Hashable, Sendable {
 }
 
 public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
+    /// Who the task is, as the core names it (`TaskItem.id`, `docs/door.md` «Ids»): the same through every write, move,
+    /// re-read and undo while the board hands the door's `ids` back. What a view keys its card by; `key` is the task as
+    /// read, what an action names.
+    public let id: String
     public let key: TaskKey
     public let text: String
     public let title: String
@@ -83,19 +87,19 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
     public let parentKey: TaskKey?
     public let json: JSONValue
 
-    public var id: String { "\(key.section)/\(key.index)/\(key.path.map(String.init).joined(separator: "."))/\(key.raw)" }
     public var repeats: Bool { !repeatRule.isNull }
     public var inProgress: Bool { status == "inProgress" }
     public var closed: Bool { !open }
 
     enum CodingKeys: String, CodingKey {
-        case key, text, title, status, dueDate, slot, durationMin, reminder, open, repeatable, priority, labels, colors, group, list
+        case id, key, text, title, status, dueDate, slot, durationMin, reminder, open, repeatable, priority, labels, colors, group, list
         case isSubtask, day, repeatDay, can, subtasks, allSubtasks, progress, collapsed, description, parentKey
         case repeatRule = "repeat"
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
         key = try c.decode(TaskKey.self, forKey: .key)
         text = try c.decode(String.self, forKey: .text)
         title = try c.decode(String.self, forKey: .title)
@@ -130,6 +134,8 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
 }
 
 public struct ListSection: Codable, Hashable, Sendable {
+    /// Who the section is (`ListSection.id`): the same through a rename and a move; `"none"` for No section.
+    public let id: String
     public let name: String?
     public let empty: Bool
 }
@@ -165,6 +171,8 @@ public struct GroupMenu: Decodable, Hashable, Sendable {
 }
 
 public struct ListGroup: Decodable, Sendable {
+    /// Its section's id: who the header is through a rename.
+    public let id: String
     public let name: String?
     public let rows: [ListRow]
     public let empty: Bool

@@ -22,7 +22,11 @@ struct CardButton: UIViewRepresentable {
     var draggable = true
     /// The card stands in a carry: it hides once the carried copy has left it, until the carry ends.
     var carried = false
+    /// Where the carried copy came down, in the window, when this card's carry ended: it glides from there to its place.
+    var arrival: CGRect?
     var onTouch: () -> Void = {}
+    /// Select Tasks: a tap picks the card instead of opening its menu.
+    var onPick: (() -> Void)?
     /// The card was lifted to carry, the finger this far below its top.
     var onCarry: (CGFloat) -> Void = { _ in }
     /// The carry ended with no drop: on the cancel target, or over no place.
@@ -66,7 +70,9 @@ struct CardButton: UIViewRepresentable {
         control.onCancel = onCancel
         control.onEnd = onEnd
         control.onFold = onFold
+        control.onPick = onPick
         control.draggable = draggable
+        control.arrival = arrival
         control.carried = carried
         control.accessibilityLabel = card.item.title
     }
@@ -79,20 +85,26 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     var onCarry: (CGFloat) -> Void = { _ in }
     var onCancel: () -> Void = {}
     var onEnd: () -> Void = {}
+    var onPick: (() -> Void)?
     var onFold: (() -> Void)? {
         didSet { fold.isHidden = onFold == nil }
     }
+    var arrival: CGRect?
     var draggable = true {
         didSet { drag.isEnabled = draggable }
     }
     /// Gone from its place while carried, once the carried card has left it; back in it once the system has flown a
-    /// cancelled carry home.
+    /// cancelled carry home. A card the screen draws anew for the carried task (its new place) hides from the start.
     var carried = false {
         didSet {
             guard carried != oldValue else { return }
-            // The carry is over (its drop drawn, or cancelled): the next carry starts from the card in its place.
-            if !carried { left = false }
-            guard !returning else { return }
+            // The carry is over (its copy landed and its drop drawn): the next carry starts from the card in its place.
+            if !carried {
+                left = false
+                lifting = false
+                home = false
+                if let arrival { glide(from: arrival) }
+            }
             showsInPlace()
         }
     }
@@ -117,14 +129,19 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// A menu row that opens a sheet or a page, run once the menu has begun to go.
     private var afterMenu: (@MainActor () -> Void)?
     /// Where the card stood when it was lifted, in the window: a cancelled carry flies back there.
-    private var home: CGPoint?
+    private var origin: CGPoint?
     /// The carried card has moved off its place: only then does the card hide, so the lift (from a long press or from the
     /// open menu) always has the capsule itself to lift, and no frame shows neither.
     private var left = false
     /// How far below the card's top the finger held it as the drag began.
     private var grab: CGFloat = 0
-    /// A cancelled carry is flying home: the card shows again once it lands.
-    private var returning = false
+    /// This card was lifted: it shows until the carried copy leaves it.
+    private var lifting = false
+    /// A cancelled carry's copy has flown home into this card: it shows again.
+    private var home = false
+    /// A cancel's flight home is under way: the session's end waits for it.
+    private var flyingHome = false
+    private var endAfterFlight = false
 
     init(content: UIView & UIContentView) {
         self.content = content
@@ -197,6 +214,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     // MARK: The menu
 
     @objc private func tapped(_ tap: UITapGestureRecognizer) {
+        if let onPick { return onPick() }
         onTouch()
         openMenu(at: tap.location(in: opener))
     }
@@ -223,6 +241,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         // Where the finger holds the card, read while the touch still stands on it: once the lift (or the menu's) has
         // begun, the session reports the point against the lifted preview, which is no longer where the card stands.
         grab = session.location(in: self).y
+        lifting = true
         let item = UIDragItem(itemProvider: Carried.provider(id))
         item.localObject = id
         return [item]
@@ -248,40 +267,63 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     func dragInteraction(_ interaction: UIDragInteraction, sessionAllowsMoveOperation session: UIDragSession) -> Bool { true }
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
-        home = window.map { convert(CGPoint(x: bounds.midX, y: bounds.midY), to: $0) }
+        origin = window.map { convert(CGPoint(x: bounds.midX, y: bounds.midY), to: $0) }
         onCarry(grab)
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, willEndWith operation: UIDropOperation) {
         guard operation == .cancel else { return }
-        // The row takes its place back at once; the card itself shows when the system's preview has flown into it.
-        returning = true
+        // The line and the marks go now; the card's place is released once the copy is home.
         onCancel()
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, previewForCancelling item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-        guard let window, let home else { return defaultPreview }
-        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: home))
+        guard let window, let origin else { return defaultPreview }
+        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: origin))
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, item: UIDragItem, willAnimateCancelWith animator: any UIDragAnimating) {
-        animator.addCompletion { [weak self] _ in self?.landed() }
+        flyingHome = true
+        animator.addCompletion { [weak self] _ in self?.cameHome() }
     }
 
-    /// A drop keeps the card hidden while its write is drawn: it shows again only where the screen then draws it.
+    /// The session's end: the carry ends once anything still flying has landed. A drop keeps the card hidden until the
+    /// screen draws it where it was dropped.
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) {
-        if !carried { left = false }
-        if returning { landed() } else { showsInPlace() }
+        guard !flyingHome else {
+            endAfterFlight = true
+            return
+        }
+        showsInPlace()
         onEnd()
     }
 
     private func showsInPlace() {
-        alpha = carried && left ? 0 : 1
+        alpha = carried && !home && (left || !lifting) ? 0 : 1
     }
 
-    private func landed() {
-        returning = false
+    /// The cancelled copy is home: the card shows in the same frame the copy goes, then the carry ends.
+    private func cameHome() {
+        flyingHome = false
+        home = true
         showsInPlace()
+        onEnd()
+        endAfterFlight = false
+    }
+
+    /// The copy came down elsewhere than the screen drew the card (a stack, the past under now): the card glides from
+    /// there to its place with the system's spring.
+    private func glide(from rect: CGRect) {
+        arrival = nil
+        guard let window else { return }
+        let here = convert(bounds, to: window)
+        let dx = rect.midX - here.midX
+        let dy = rect.midY - here.midY
+        guard hypot(dx, dy) > 2 else { return }
+        transform = CGAffineTransform(translationX: dx, y: dy)
+        UIView.animate(springDuration: 0.35, bounce: 0, options: [.allowUserInteraction]) {
+            self.transform = .identity
+        }
     }
 }
 
