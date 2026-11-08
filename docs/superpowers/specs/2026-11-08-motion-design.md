@@ -379,6 +379,12 @@ every condition that changes the layout is animated by the transaction that chan
 45. **iPhone, R11: a reading's stack at the zoom shown is the core's from its first frame.** A reading drawn at another
     zoom than its own (any write, Sync, a day turned) has its blocks laid out by the core in the drawing's own
     transaction; the scaled guess, which drew a block a frame taller, is left to the pinch, which asks on every frame.
+46. **Backend, R8: a rename entered shows its new text before the write is drawn.** The entry tells every rename entered
+    and not yet written, as it tells a new task's text (`pending`): `PendingRename` `{ id, key, text, title }` (the task's
+    `TaskItem.id`, its key as read at the open, its new `text` and `title` as the item will read), in
+    `QuickEntry.renamed` (`QuickEntrySession.renamed`), in `EntryState.renamed` while the field is open, and through the
+    door in every `entry.*` answer's `renamed`, the field open or closed. A frontend draws the card with that id under
+    `title` until the job is `done`. Added only: nothing existing changed.
 
 ## Done when
 

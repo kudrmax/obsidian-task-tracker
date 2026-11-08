@@ -9,6 +9,7 @@ import type { CreatedTask, DraftMarks, DropColumn, DropTo, NewTaskPlace, Project
 import { fitLevel, type GapPlace, gapOfPlace, type Header, type LevelCard, type ListCard, type ListPlace, placeOfGap, shiftLevel } from "./nesting";
 import { sameLine, samePlace } from "./taskKeys";
 import { fullTree } from "./fullTree";
+import { plainText } from "../domain/TaskText";
 
 /** Where the field stands: a gap of a list, a slot on the calendar, or the end of a task's subtasks in the calendar menu. */
 export type EntrySpot =
@@ -160,6 +161,19 @@ export interface EntryState {
 	readonly repeatable: boolean;
 	/** The day a new rule starts from: the field's own day, else today. */
 	readonly repeatDay: LocalDate;
+	/** The renames entered and not yet written (`QuickEntry.renamed`). */
+	readonly renamed: readonly PendingRename[];
+}
+
+/**
+ * A rename entered and not yet written: the task (`TaskItem.id`, and its key as read at the open), and the text its card
+ * shows until the write is drawn, as `TaskItem.text` and `TaskItem.title` will read.
+ */
+export interface PendingRename {
+	readonly id: string;
+	readonly key: TaskKey;
+	readonly text: string;
+	readonly title: string;
 }
 
 /** A place chosen in the bar: the column the field now stands at the end of, and the day the day column must open, if another. */
@@ -315,7 +329,13 @@ export class QuickEntry {
 			places: placeChoices(place),
 			repeatable: task && run.spot.kind !== "slot",
 			repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today()),
+			renamed: this.renamed,
 		};
+	}
+
+	/** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */
+	get renamed(): readonly PendingRename[] {
+		return this.session.jobs.flatMap((job) => (job.kind === "rename" ? [{ id: job.item.id, key: job.item.key, text: job.draft.text, title: plainText(job.draft.text) }] : []));
 	}
 
 	/** The renamed task, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
