@@ -353,6 +353,29 @@ every condition that changes the layout is animated by the transaction that chan
 37. **iPhone, decision 36 applied: a task typed is made by `tasks.createWithId`** (the quick entry's `createInPlace` job),
     and `entry.shown` gets its `{ key, id }` with the drawn cards carrying their ids, so the field's line becomes the
     card found by id even when another write (Sync, a reminder's button, a drop) moved its key before the drawing.
+38. **iPhone, R10: a row folds by its own height** (`FoldAway`): the row's layout height goes to and from nothing with its
+    content cut at the bottom, so the rows below move by exactly what shows of it, one row or a block (a section unfolding
+    after its drop, subtasks folding). At rest nothing of a row is cut. The cut is a shape, never a view builder: SwiftUI
+    runs a transition off the main thread, where a main-actor closure traps (Done on a subtask crashed the app).
+39. **iPhone, R10: what one row holds changes in place.** A list's row folds when it comes or goes; its content changing
+    (a card and the rename field that takes its id, decision 14) is drawn in the same frame, as the plugin's decision 29.
+40. **iPhone, R1/R8: the quick entry's rows keep their keys** (`QuickEntryHost.lineKeys`, `heirs`). Enter makes the
+    field's row the typed line's and opens a new row for the field under it, the rows below sliding (no longer a line
+    break in one frame); the card made from a typed line takes that line's row by the id `createWithId` answered, as the
+    plugin's decision 21, so the text becomes the card with no second copy.
+41. **iPhone, R7: a card's menu preview flies home inside the card, over its neighbours.** The card's wrapper is raised
+    over the cards after it from the menu's opening until the dismissal's animator completes; the preview stays the
+    card's own, so it follows the card wherever the pick moves it.
+42. **iPhone, R7: the drop's end belongs to the drop.** The card's own drag session ends a carry only when cancelled
+    (its copy is home); the screen's drop session ends one only when a place took the drop, or for a section, whose lift
+    has no end of its own. The drawing that writes a drop puts the dropped card in its new place without a slide
+    (`placedByDrop`): its copy flies there.
+43. **iPhone, R7: a section's copy folds shut onto the room it opens** as it lands (the drop preview's target scales it
+    to a line): the system keeps a drop's copy on screen until its animator ends, and a section's copy does not look like
+    its header.
+44. **iPhone, R11: a pinch's minute is held until the content has its zoom's height**, the zoom the core settles on is
+    drawn as the fingers lift, and the timeline keeps the offset it scrolled to itself: scrolled during a change of the
+    content's height, the scroll view reports the offset from before it.
 
 ## Done when
 
