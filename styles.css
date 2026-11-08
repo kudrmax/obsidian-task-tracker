@@ -1139,8 +1139,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-panel.is-more { width: var(--tc-popover-w); }
 .tc-card.is-lifted.is-waiting { visibility: visible; background: none; border: var(--tc-hairline) dashed var(--tc-dash); box-shadow: none; }
 .tc-card.is-waiting > * { visibility: hidden; }
-/* Dropped, the lifted card is the task's card at its new place: hidden there until the copy lands on it. */
-.tc-card.is-lifted.is-waiting.is-arriving { visibility: hidden; }
+/* Dropped in its own list, the dashed place is the task's card: it slides to the task's new place and the copy lands in it. */
 .tc-float-count { min-width: var(--tc-float-count-size); height: var(--tc-float-count-size); box-sizing: border-box; margin: calc(-1 * var(--tc-float-count-out)) 0 0 calc(var(--tc-float-count-out) - var(--tc-float-count-size)); padding: 0 var(--tc-space-6); border-radius: var(--tc-radius-float-count); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: 0 0 0 var(--tc-float-count-ring) var(--tc-bg); font-family: var(--tc-font-ui); font-size: var(--tc-font-count); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; transition: opacity var(--tc-duration-fly) var(--tc-ease-out); }
 .tc-float-count.is-gone { opacity: 0; }
 body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancelling .tc-float-count { opacity: var(--tc-float-cancel-opacity); }

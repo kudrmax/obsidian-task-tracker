@@ -117,7 +117,7 @@ export const Motion = {
 		row.style.overflow = "";
 	},
 
-	/** A row moved: it is drawn where it stood (`from`, read before the move) and slides to where it stands now. */
+	/** A row moved: it is drawn where it stood (`from`, read before the move) and slides to where it stands now, taking its new width (a new level) on the way. */
 	slide(row: HTMLElement, from: DOMRect, duration: DurationToken = DURATION.collapse): void {
 		const timing = timingOf(row, duration);
 		if (!timing) return;
@@ -125,8 +125,10 @@ export const Motion = {
 		const to = row.getBoundingClientRect();
 		const dx = from.left - to.left;
 		const dy = from.top - to.top;
-		if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-		SLIDES.set(row, row.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], timing));
+		const resized = Math.abs(from.width - to.width) >= 0.5;
+		if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && !resized) return;
+		const width = resized ? [{ width: px(from.width) }, { width: px(to.width) }] : [{}, {}];
+		SLIDES.set(row, row.animate([{ transform: `translate(${dx}px, ${dy}px)`, ...width[0] }, { transform: "none", ...width[1] }], timing));
 	},
 
 	/** Whatever slides on `row` stops where it would have ended: its box can be read where it stands. */
