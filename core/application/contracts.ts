@@ -398,6 +398,18 @@ export interface CreatedTask {
 /** A column of the screen a task can stand in after a drop. */
 export type LandingColumn = "day" | "soon" | "inbox" | "backlog" | "done";
 
+/**
+ * Where a card lands in a list drawn in project parts (`ListGrouping.on`: grouped by project, or a project's own view): the
+ * part as the screen draws it (`ProjectGroup.key` and its `zone`), the section in it, and `index` among that section's
+ * cards there. `DropLanding.list` carries it only for such a list; its own `group` and `index` count the list in file order.
+ */
+export interface LandingPart {
+	readonly key: string;
+	readonly zone: ProjectZone;
+	readonly section: GroupName;
+	readonly index: number;
+}
+
 /** A slotted task of the day's timeline after a drop: its id and its minutes from the start of the day as shown. */
 export interface LandingSpan {
 	readonly id: string;
@@ -416,7 +428,7 @@ export interface LandingSpan {
  */
 export type DropLanding =
 	| { readonly kind: "timeline"; readonly id: string; readonly item: TaskItem; readonly span: DaySpan; readonly ridesNow: boolean; readonly slotted: readonly LandingSpan[] }
-	| { readonly kind: "list"; readonly id: string; readonly item: TaskItem; readonly column: LandingColumn; readonly group: GroupName; readonly index: number }
+	| { readonly kind: "list"; readonly id: string; readonly item: TaskItem; readonly column: LandingColumn; readonly group: GroupName; readonly index: number; readonly part?: LandingPart }
 	| { readonly kind: "subtask"; readonly id: string; readonly item: TaskItem; readonly parent: string; readonly index: number }
 	| { readonly kind: "away"; readonly id: string; readonly item: null };
 

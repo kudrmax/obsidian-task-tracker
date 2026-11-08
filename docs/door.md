@@ -115,8 +115,11 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
     the day, as `tasks.shownSpan` gives them); `ridesNow`, a past time of today: the block rides the now line; `slotted`,
     every block of the day after the drop (`{ id, span }`, in the screen's order) to lay the stack out with
     `rules.stackTasks` and find the card's box.
-  - `{ kind: "list", column, group, index }`: a card of `column` (`day`, `soon`, `inbox`, `backlog`, `done`), in section
-    `group`, `index` among that section's cards there.
+  - `{ kind: "list", column, group, index, part? }`: a card of `column` (`day`, `soon`, `inbox`, `backlog`, `done`), in
+    section `group`, `index` among that section's cards there in the file's order. In a list the screen draws in project
+    parts (`screen.projects[list].on`: grouped by project, or a project's own view), `part` (`LandingPart`
+    `{ key, zone, section, index }`) says where it is drawn: the part (`ProjectGroup.key`, its `zone`), the section in
+    it, and `index` among that section's cards in the part. Fly to `part` when it is there.
   - `{ kind: "subtask", parent, index }`: under the task `parent` (its id), `index` among its open subtasks.
   - `{ kind: "away" }`: not on this screen (another day, out of this project's view).
   It needs the tasks file, so it is a `tasks.*` method; `rules.*` are the rules that need no file.

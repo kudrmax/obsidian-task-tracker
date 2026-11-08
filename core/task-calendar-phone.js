@@ -5430,13 +5430,28 @@ ${key.title}`.toLowerCase();
     const columns = [["day", screen.day.list], ["soon", screen.soon], ["inbox", screen.inbox], ["backlog", screen.backlog], ["done", screen.done]];
     for (const [column, items] of columns) {
       const card = items.find((item) => item.id === id);
-      if (card) return { kind: "list", id, item: card, column, group: card.group, index: items.filter((item) => item.group === card.group).indexOf(card) };
+      if (card) {
+        const part = partOf(screen, column, id);
+        return { kind: "list", id, item: card, column, group: card.group, index: items.filter((item) => item.group === card.group).indexOf(card), ...part && { part } };
+      }
       for (const top of items) {
         const under = subtaskOf(top, id);
         if (under) return under;
       }
     }
     return { kind: "away", id, item: null };
+  }
+  function partOf(screen, column, id) {
+    if (column === "done") return null;
+    const list = column === "day" ? "now" : column;
+    const grouping = screen.projects[list];
+    if (!grouping.on) return null;
+    for (const group of grouping.groups)
+      for (const section of group.sections) {
+        const index = section.items.findIndex((item) => item.id === id);
+        if (index >= 0) return { key: group.key, zone: group.zone, section: section.name, index };
+      }
+    return null;
   }
   function subtaskOf(parent, id) {
     const index = parent.subtasks.findIndex((sub) => sub.id === id);
