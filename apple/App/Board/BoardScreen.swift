@@ -221,10 +221,11 @@ struct Ribbon: View {
             let list = half + (listWidth(width) - half) * toToday
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
+                    // One column, Inbox over Backlog, each exactly the column's width.
                     column(.inbox, half) {
-                        VStack(spacing: ColumnMetrics.headGap) {
-                            lists(.inbox)
-                            lists(.backlog)
+                        VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
+                            lists(.inbox).frame(width: half)
+                            lists(.backlog).frame(width: half)
                         }
                     }
                     column(.soon, half) { lists(.soon) }
@@ -331,7 +332,7 @@ struct Ribbon: View {
 
     private func column(_ place: RibbonPlace, _ width: CGFloat, @ViewBuilder content: () -> some View) -> some View {
         content()
-            .frame(width: width)
+            .frame(width: width, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .top)
             .id(place)
     }

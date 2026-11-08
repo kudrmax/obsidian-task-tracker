@@ -18,7 +18,7 @@ enum MenuQuestion: Identifiable {
 /// One row of a menu, drawn the same by UIKit (a card's menu) and SwiftUI (a bar's menu).
 indirect enum MenuNode {
     /// `opens`: it opens a sheet, an alert or a page, which UIKit shows only once the menu has gone.
-    case action(title: String, symbol: String?, tint: String? = nil, destructive: Bool = false, checked: Bool = false, keepsOpen: Bool = false, opens: Bool = false, disabled: Bool = false, run: @MainActor () -> Void)
+    case action(title: String, symbol: String?, subtitle: String? = nil, tint: String? = nil, destructive: Bool = false, checked: Bool = false, keepsOpen: Bool = false, opens: Bool = false, disabled: Bool = false, run: @MainActor () -> Void)
     case submenu(title: String, symbol: String, subtitle: String?, children: [MenuNode])
     /// A group between separators; `row` draws it as the row of icons over their titles on top of a menu.
     case group(row: Bool, children: [MenuNode])
@@ -85,7 +85,13 @@ struct TaskMenu {
         let items = items, model = model, inStack = inStack
         guard let item = items.first else { return [] }
         var rows: [MenuNode] = []
+        // The Project row stands right after Section, or where Section would stand: before Add Subtask, else last.
+        var project = projectPage
         for edit in menu.edits {
+            if edit == "subtask", let row = project {
+                rows.append(row)
+                project = nil
+            }
             switch edit {
             case "rename" where single:
                 rows.append(.action(title: "Rename", symbol: "pencil", opens: true) { if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } })
@@ -99,12 +105,34 @@ struct TaskMenu {
                 rows.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item })
             case "section":
                 if let section = sectionPage { rows.append(section) }
+                if let row = project {
+                    rows.append(row)
+                    project = nil
+                }
             case "subtask" where single:
                 rows.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } })
             default: break
             }
         }
+        if let project { rows.append(project) }
         return rows
+    }
+
+    /// The Project row and its page (board Proj3Flow): the notes with the project tag by name, No Project last, the tasks'
+    /// own checked; a subtask's row shows its parent's project and can't be pressed.
+    private var projectPage: MenuNode? {
+        guard let page = menu.project else { return nil }
+        let items = items, model = model
+        let subtitle = page.value.isEmpty ? nil : page.value
+        guard !page.disabled else {
+            return .action(title: "Project", symbol: "folder", subtitle: subtitle, disabled: true) {}
+        }
+        var rows: [MenuNode] = page.options.map { option in
+            .action(title: option.project.name, symbol: nil, checked: option.checked) { Task { await model.setProject(items, option.project.link) } }
+        }
+        let none: MenuNode = .action(title: page.noneLabel, symbol: nil, checked: page.none) { Task { await model.setProject(items, nil) } }
+        rows = rows.isEmpty ? [none] : [.group(row: false, children: rows), .group(row: false, children: [none])]
+        return .submenu(title: "Project", symbol: "folder", subtitle: subtitle, children: rows)
     }
 
     private var sectionPage: MenuNode? {
@@ -157,15 +185,17 @@ extension MenuNode {
     @MainActor
     private func element(_ later: @escaping (@escaping @MainActor () -> Void) -> Void, _ palette: (String) -> UIColor?) -> UIMenuElement {
         switch self {
-        case .action(let title, let symbol, let tint, let destructive, let checked, let keepsOpen, let opens, let disabled, let run):
+        case .action(let title, let symbol, let subtitle, let tint, let destructive, let checked, let keepsOpen, let opens, let disabled, let run):
             var image = symbol.flatMap { UIImage(systemName: $0) }
             if let tint, let color = palette(tint) { image = image?.withTintColor(color, renderingMode: .alwaysOriginal) }
             var attributes: UIMenuElement.Attributes = destructive ? [.destructive] : []
             if keepsOpen { attributes.insert(.keepsMenuPresented) }
             if disabled { attributes.insert(.disabled) }
-            return UIAction(title: title, image: image, attributes: attributes, state: checked ? .on : .off) { _ in
+            let action = UIAction(title: title, image: image, attributes: attributes, state: checked ? .on : .off) { _ in
                 if opens { later { run() } } else { run() }
             }
+            action.subtitle = subtitle
+            return action
         case .submenu(let title, let symbol, let subtitle, let children):
             let menu = UIMenu(title: title, image: UIImage(systemName: symbol), children: children.map { $0.element(later, palette) })
             menu.subtitle = subtitle
@@ -187,9 +217,10 @@ struct MenuNodes: View {
     var body: some View {
         ForEach(Array(nodes.enumerated()), id: \.offset) { _, node in
             switch node {
-            case .action(let title, let symbol, _, let destructive, let checked, let keepsOpen, _, let disabled, let run):
+            case .action(let title, let symbol, let subtitle, _, let destructive, let checked, let keepsOpen, _, let disabled, let run):
                 let button = Button(role: destructive ? .destructive : nil) { run() } label: {
                     if let symbol { Label(title, systemImage: checked ? "checkmark" : symbol) } else if checked { Label(title, systemImage: "checkmark") } else { Text(title) }
+                    if let subtitle { Text(subtitle) }
                 }
                 if keepsOpen { button.menuActionDismissBehavior(.disabled).disabled(disabled) } else { button.disabled(disabled) }
             case .submenu(let title, let symbol, let subtitle, let children):

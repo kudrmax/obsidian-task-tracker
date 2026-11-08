@@ -46,7 +46,7 @@ public protocol TasksVault: Sendable {
 }
 
 /// The Obsidian vault folder the app was given once, read and written through file coordination.
-public final class Vault: TasksVault, @unchecked Sendable {
+public final class Vault: TasksVault, NoteFolder, @unchecked Sendable {
     private let bookmarks: BookmarkStore
     private let rule: TasksFileRule
     /// A file changed this recently may still be being written: wait this long and read it again.
@@ -142,6 +142,45 @@ public final class Vault: TasksVault, @unchecked Sendable {
             if let error = coordination ?? failure { throw error }
             if path == (try? tasksFile(settings(in: folder))) { own.text = text }
         }
+    }
+
+    /// Every markdown note of the vault outside its hidden folders (`.obsidian`, `.trash`), in one pass of the folder with
+    /// the values the walk prefetches. The text of a note `wanted` names is read coordinated, as every read of the vault; a
+    /// note iCloud keeps only in the cloud is never read (nor downloaded): it is listed by its path alone, which still
+    /// counts for the names of the others.
+    public func scanNotes(wanted: (String, Date) -> Bool) throws -> [ScannedNote] {
+        try withFolder { folder in
+            let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey, .isDirectoryKey, .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey]
+            guard let walk = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: keys, options: [.skipsPackageDescendants]) else { return [] }
+            let root = folder.standardizedFileURL.path
+            var notes: [ScannedNote] = []
+            for case let file as URL in walk {
+                let name = file.lastPathComponent
+                let values = try? file.resourceValues(forKeys: Set(keys))
+                if name.hasPrefix(".") {
+                    if values?.isDirectory == true { walk.skipDescendants() }
+                    // An older iCloud keeps a note not downloaded as `.Name.md.icloud` beside where it will be.
+                    else if name.lowercased().hasSuffix(".md.icloud"), let placeholder = Self.relative(file, to: root) {
+                        let path = ((placeholder as NSString).deletingLastPathComponent as NSString).appendingPathComponent(String(name.dropFirst().dropLast(7)))
+                        notes.append(ScannedNote(path: path, modified: .distantPast, text: nil))
+                    }
+                    continue
+                }
+                guard file.pathExtension.lowercased() == "md", values?.isRegularFile == true, let path = Self.relative(file, to: root) else { continue }
+                let modified = values?.contentModificationDate ?? .distantPast
+                let local = values?.isUbiquitousItem != true || values?.ubiquitousItemDownloadingStatus == .current
+                let text = local && wanted(path, modified) ? try? coordinatedRead(file) : nil
+                notes.append(ScannedNote(path: path, modified: modified, text: text))
+            }
+            return notes
+        }
+    }
+
+    /// A note's path from the vault's folder in NFC, as Obsidian names files and the tasks file's links spell them: the
+    /// file system hands names decomposed («й» as «и» and a breve), which would make a project note's name another name.
+    private static func relative(_ file: URL, to root: String) -> String? {
+        let full = file.standardizedFileURL.path
+        return full.hasPrefix(root + "/") ? String(full.dropFirst(root.count + 1)).precomposedStringWithCanonicalMapping : nil
     }
 
     /// Tells `changed` whenever the tasks file is written through file coordination (iCloud, a reminder's button, another

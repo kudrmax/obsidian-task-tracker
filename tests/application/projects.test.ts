@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Clock } from "../../core/application/ports";
 import { memoryGrouping } from "../../core/application/ports";
-import { hasProjectTag, NO_PROJECT, projectNotesOf } from "../../core/application/projects";
+import { hasProjectTag, NO_PROJECT, projectNotesOf, projectNotesOfTexts } from "../../core/application/projects";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
 import type { ProjectNote } from "../../core/application/contracts";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
@@ -124,10 +124,10 @@ describe("the Project page", () => {
 			["Старый", true],
 		]);
 		expect(old.none).toBe(false);
-		expect(svc.menu(screen.backlog[1], "backlog", at).project).toMatchObject({ current: null, none: true, disabled: false });
+		expect(svc.menu(screen.backlog[1], "backlog", at).project).toMatchObject({ current: null, none: true, noneLabel: NO_PROJECT, disabled: false });
 		expect(svc.menu(screen.backlog[0].allSubtasks[0], "stack", at).project).toMatchObject({ current: { name: "Окружение" }, disabled: true });
 		const bulk = svc.bulkMenu([{ item: screen.backlog[0], from: "backlog" }, { item: screen.backlog[1], from: "backlog" }], at).project;
-		expect(bulk).toMatchObject({ current: null, none: false, disabled: false });
+		expect(bulk).toMatchObject({ current: null, none: false, noneLabel: "No project", disabled: false });
 	});
 
 	it("setProject writes the field on each task, in one write; a subtask follows its parent", async () => {
@@ -264,5 +264,45 @@ describe("a grouped list's group, ready to draw", () => {
 		expect(svc.menu(screen.backlog[0], "backlog", at).project.value).toBe("Окружение");
 		expect(svc.menu(screen.backlog[1], "backlog", at).project.value).toBe("No project");
 		expect(svc.bulkMenu([{ item: screen.backlog[0], from: "backlog" }, { item: screen.backlog[1], from: "backlog" }], at).project.value).toBe("");
+	});
+});
+
+describe("the project notes of a vault read as texts", () => {
+	it("a note with the tag in its properties, in a bracket list or in its text, case aside", () => {
+		const notes = projectNotesOfTexts(
+			[
+				{ path: "List.md", text: "---\ntags:\n  - project\n---\n" },
+				{ path: "Inline.md", text: "---\ntags: [Project]\n---\n" },
+				{ path: "Body.md", text: "Some text #PROJECT" },
+				{ path: "Nested.md", text: "#project/sub" },
+				{ path: "Code.md", text: "```\n#project\n```\nand `#project`" },
+				{ path: "Other.md", text: "#work" },
+			],
+			"#project",
+		);
+		expect(notes.map((n) => n.name)).toEqual(["Body", "Inline", "List"]);
+	});
+
+	it("links a note by its name, by its path when another note has its name", () => {
+		const notes = projectNotesOfTexts(
+			[
+				{ path: "Work/Plan.md", text: "#project" },
+				{ path: "Home/plan.md", text: "" },
+				{ path: "Trips/Japan.md", text: "#project" },
+			],
+			"project",
+		);
+		expect(notes).toEqual([
+			{ name: "Japan", path: "Trips/Japan.md", link: "Japan" },
+			{ name: "Plan", path: "Work/Plan.md", link: "Work/Plan" },
+		]);
+	});
+
+	it("takes a note's tags read before instead of its text", () => {
+		expect(projectNotesOfTexts([{ path: "A.md", tags: ["#project"] }, { path: "B.md" }], "#project")).toEqual([{ name: "A", path: "A.md", link: "A" }]);
+	});
+
+	it("no tag set, no projects", () => {
+		expect(projectNotesOfTexts([{ path: "A.md", text: "#project" }], " ")).toEqual([]);
 	});
 });
