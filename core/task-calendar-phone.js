@@ -4190,6 +4190,7 @@ ${key.title}`.toLowerCase();
       current: shared ? first : null,
       options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
       none,
+      noneLabel: NO_PROJECT,
       disabled: items.every((item) => !item.can.setProject)
     };
   }
