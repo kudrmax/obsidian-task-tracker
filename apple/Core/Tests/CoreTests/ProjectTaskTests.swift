@@ -38,10 +38,10 @@ import Testing
         #expect(snapshot.timeline.slots.map(\.card.item.title) == ["Позвонить"])
     }
 
-    /// The core groups Backlog by project unless told otherwise; the app draws no groups yet, so it asks for every list
-    /// ungrouped: Backlog keeps its sections, and a card's Section menu offers the whole list's sections.
-    @Test func backlogLooksAsBeforeProjects() throws {
-        let snapshot = try snapshot(FakeVault(Self.file))
+    /// A device that switched Group by project off: Backlog keeps its sections, and a card's Section menu offers the whole
+    /// list's sections.
+    @Test func backlogUngroupedLooksAsBeforeProjects() throws {
+        let snapshot = try TaskBoard(core: core, vault: FakeVault(Self.file), grouping: MemoryGrouping(#"{"on":{"backlog":false}}"#)).snapshot(day: Self.day, measures: Self.measures, now: at)
         let backlog = try #require(snapshot.lists[.backlog])
         #expect(backlog.groups.map(\.header) == ["No section", "Дальний"])
         #expect(backlog.groups.map { $0.cards.map(\.item.title) } == [["Someday", "Free"], ["Far"]])
@@ -49,6 +49,20 @@ import Testing
         let someday = try item("Someday", in: snapshot)
         let menu = try #require(snapshot.menus[someday.id])
         #expect(menu.sections?.choice.names.contains("Дальний") == true)
+    }
+
+    /// By the door's defaults the board groups Backlog by project, as the plugin does: its groups come with the screen, and
+    /// a card's Section menu offers its project's sections.
+    @Test func byDefaultBacklogIsGroupedByProject() throws {
+        let snapshot = try snapshot(FakeVault(Self.file))
+        let backlog = try #require(snapshot.screen.projects["backlog"])
+        #expect(backlog.canGroup && backlog.on)
+        #expect(backlog.groups.map(\.title) == [Self.project, "No project"])
+        #expect(backlog.groups[0].zone == Self.project)
+        #expect(backlog.groups[0].sections.flatMap { $0.rows.map(\.item.title) } == ["Someday"])
+        #expect(snapshot.screen.projects["soon"]?.on == false)
+        let someday = try item("Someday", in: snapshot)
+        #expect(snapshot.menus[someday.id]?.sections?.choice.names.contains("Дальний") == false)
     }
 
     @Test func withTheDoorsDefaultsBacklogWouldBeGroupedAndItsMenuCutToTheProject() throws {

@@ -52,6 +52,20 @@ public struct TaskAbilities: Codable, Hashable, Sendable {
     public let addDescription: Bool
     public let fold: Bool
     public let resize: Bool
+    /// Put into a project or taken out: a task; a subtask's is its parent's.
+    public let setProject: Bool
+}
+
+/// `ProjectRef`: a task's project as the screens show it.
+public struct ProjectRef: Decodable, Hashable, Sendable {
+    public let name: String
+    /// What a place's zone and `tasks.setProject` take.
+    public let link: String
+    /// The note's path from the vault folder, which the folder icon and a group's arrow open; `nil` without a note.
+    public let note: String?
+    public let canOpenNote: Bool
+    /// The card shows the folder icon.
+    public let mark: Bool
 }
 
 public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
@@ -81,6 +95,10 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
     public let collapsed: Bool
     public let description: String?
     public let parentKey: TaskKey?
+    /// The task's project; a subtask's is its parent's. `nil` for none.
+    public let project: ProjectRef?
+    /// The title of the task a subtask belongs to; `nil` for a task.
+    public let parentText: String?
     public let json: JSONValue
 
     public var id: String { "\(key.section)/\(key.index)/\(key.path.map(String.init).joined(separator: "."))/\(key.raw)" }
@@ -90,7 +108,7 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case key, text, title, status, dueDate, slot, durationMin, reminder, open, repeatable, priority, labels, colors, group, list
-        case isSubtask, day, repeatDay, can, subtasks, allSubtasks, progress, collapsed, description, parentKey
+        case isSubtask, day, repeatDay, can, subtasks, allSubtasks, progress, collapsed, description, parentKey, project, parentText
         case repeatRule = "repeat"
     }
 
@@ -122,6 +140,8 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
         collapsed = try c.decode(Bool.self, forKey: .collapsed)
         description = try c.decodeIfPresent(String.self, forKey: .description)
         parentKey = try c.decodeIfPresent(TaskKey.self, forKey: .parentKey)
+        project = try c.decodeIfPresent(ProjectRef.self, forKey: .project)
+        parentText = try c.decodeIfPresent(String.self, forKey: .parentText)
         json = try JSONValue(from: decoder)
     }
 
@@ -151,6 +171,12 @@ public struct ScreenView: Decodable, Sendable {
     public let offer: JSONValue
     public let missing: Bool
     public let calendars: Bool
+    /// Each list's grouping by project, by list (`now`, `soon`, `inbox`, `backlog`).
+    public let projects: [String: ListGrouping]
+    /// The project whose view this is; `nil` for the main screen.
+    public let project: ProjectRef?
+    /// What a drop on each column's title means (`day`, `soon`, `inbox`, `backlog`), handed back to `tasks.drop` as it is.
+    public let titleDrops: [String: JSONValue]
 }
 
 public struct ListRow: Decodable, Sendable {
@@ -162,6 +188,19 @@ public struct GroupMenu: Decodable, Hashable, Sendable {
     public let section: String
     public let rename: Bool
     public let remove: Bool
+    /// Inside a project's group, its zone (`.string(link)`, `.null` for No project), which `tasks.renameGroup` and
+    /// `tasks.removeGroup` take as their last argument; `nil` outside any group.
+    public let project: JSONValue?
+
+    enum CodingKeys: String, CodingKey { case section, rename, remove, project }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        section = try c.decode(String.self, forKey: .section)
+        rename = try c.decode(Bool.self, forKey: .rename)
+        remove = try c.decode(Bool.self, forKey: .remove)
+        project = c.contains(.project) ? try c.decode(JSONValue.self, forKey: .project) : nil
+    }
 }
 
 public struct ListGroup: Decodable, Sendable {
@@ -170,6 +209,39 @@ public struct ListGroup: Decodable, Sendable {
     public let empty: Bool
     public let menu: GroupMenu?
     public let reorder: Bool?
+    /// It draws a header: never the tasks without a section inside a project's group.
+    public let header: Bool?
+}
+
+/// `ProjectGroup`: a project's group of a list grouped by project, or No project, last.
+public struct ProjectGroup: Decodable, Sendable {
+    /// What `tasks.toggleFold` takes: the project's name, "" for No project.
+    public let key: String
+    public let project: ProjectRef?
+    public let title: String
+    public let folded: Bool
+    /// Its open tasks, the count a folded group shows.
+    public let count: Int
+    /// The arrow beside the title opens `project.note`.
+    public let canOpenNote: Bool
+    /// What its cards, headers, plates and places carry: the project's link, `nil` for No project.
+    public let zone: String?
+    /// It draws its own header (chevron, title, count, arrow).
+    public let titled: Bool
+    /// What it draws while unfolded: its part without a section, then its sections; never none.
+    public let sections: [ListGroup]
+    /// Where a drop on its title puts a task, handed back as it is.
+    public let end: JSONValue
+    /// What a drop on its header means, as a header passed (`{ group, project }`).
+    public let head: JSONValue
+}
+
+/// `ListGrouping`: whether a list groups its tasks by project, and its groups while it does.
+public struct ListGrouping: Decodable, Sendable {
+    /// Backlog and Soon: the column's title opens a menu with Group by project, checked while `on`.
+    public let canGroup: Bool
+    public let on: Bool
+    public let groups: [ProjectGroup]
 }
 
 /// `ListView`: a list in its sections, and whether it shows their headers.
@@ -253,6 +325,19 @@ public struct SourceStatus: Decodable, Hashable, Sendable {
     public let detail: String?
     public let stale: Bool
     public let updatedAtMs: Double?
+    /// Its row in the sources window, worded.
+    public let words: SourceWords
+}
+
+/// `SourceWords`: a calendar source's row in the sources window, worded by the core.
+public struct SourceWords: Decodable, Hashable, Sendable {
+    /// `Google Calendar`, `iPhone calendars`, `Work calendar`.
+    public let name: String
+    public let short: String
+    /// `Updated today`, `Exported from iPhone`, `Not updated yet`, or the problem: `file missing`, `no answer in 15 s`, …
+    public let sub: String
+    /// `14:19`, `Yesterday 08:02`, `3 Oct 08:02`; empty with no update.
+    public let time: String
 }
 
 /// `WireDayEvents`: the day's events and how fresh each calendar's file is.
@@ -350,6 +435,29 @@ public struct Removal: Decodable, Hashable, Sendable {
     public let confirm: Bool
 }
 
+public struct MenuProjectOption: Decodable, Hashable, Sendable {
+    public let project: ProjectRef
+    public let checked: Bool
+}
+
+/// `MenuProject`: the Project row and its page; a pick writes `tasks.setProject` with its `link`, No project with null.
+public struct MenuProject: Decodable, Hashable, Sendable {
+    public let current: ProjectRef?
+    public let options: [MenuProjectOption]
+    /// No project, last: checked.
+    public let none: Bool
+    /// The row's value: the shared project's name, «No project», or empty when they differ.
+    public let value: String
+    /// Only subtasks: the row can't be pressed.
+    public let disabled: Bool
+}
+
+/// `RepeatRow`: the Repeat row's value on the right, or the weekdays (0 Monday) lit among the week's letters.
+public struct RepeatRow: Decodable, Hashable, Sendable {
+    public let value: String
+    public let days: [Int]?
+}
+
 /// `TaskMenuModel`: what a task's menu, or the bulk menu, offers.
 public struct TaskMenuModel: Decodable, Hashable, Sendable {
     /// The order the groups are drawn in, top to bottom: the core's, the same as the plugin's.
@@ -364,6 +472,10 @@ public struct TaskMenuModel: Decodable, Hashable, Sendable {
     public let edits: [String]
     public let reminders: [MenuReminder]
     public let remove: Removal?
+    /// The Project row, in every menu.
+    public let project: MenuProject
+    /// The Repeat row's value.
+    public let `repeat`: RepeatRow
 }
 
 // MARK: Repeat
@@ -379,7 +491,8 @@ public struct RepeatDraft: Decodable, Hashable, Sendable {
     public let removable: Bool
     public let kinds: [String]
     public let units: [String]
-    public let detail: String
+    /// `weekdays`, `monthDay`, or `nil` for a rule with nothing under its unit (days, after done).
+    public let detail: String?
     public let can: Fewer
     public let rule: JSONValue
     public let json: JSONValue
@@ -401,7 +514,7 @@ public struct RepeatDraft: Decodable, Hashable, Sendable {
         removable = try c.decode(Bool.self, forKey: .removable)
         kinds = try c.decode([String].self, forKey: .kinds)
         units = try c.decode([String].self, forKey: .units)
-        detail = try c.decode(String.self, forKey: .detail)
+        detail = try c.decodeIfPresent(String.self, forKey: .detail)
         can = try c.decode(Fewer.self, forKey: .can)
         rule = try c.decode(JSONValue.self, forKey: .rule)
         json = try JSONValue(from: decoder)
@@ -426,6 +539,8 @@ public struct FoundPart: Decodable, Hashable, Sendable {
 public struct SearchHit: Decodable, Hashable, Sendable {
     public let item: TaskItem
     public let title: [FoundPart]
+    /// The task's project's name in pieces, when the search found the query there.
+    public let project: [FoundPart]?
     public let description: [FoundPart]?
 }
 
@@ -469,4 +584,34 @@ public struct SettingsForm: Decodable, Sendable {
     public let staleAfterMinutes: Int
     public let workCalendarFile: String
     public let dayStartHours: [Int]
+    /// Several labels: the paint saved, and the paints offered in order.
+    public let labelPaint: String
+    public let labelPaints: [String]
+    /// Cards: the sizes saved (points) and the bounds the sliders move within; `settings.setCardHeight`, `setCardGap`.
+    public let cardHeight: Int
+    public let cardGap: Int
+    public let cardHeights: SizeBounds
+    public let cardGaps: SizeBounds
+    public let projectTag: String
+}
+
+public struct SizeBounds: Decodable, Hashable, Sendable {
+    public let min: Int
+    public let max: Int
+}
+
+/// `ScreenSettings`: what every frontend's screen reads of the shared settings (`screenSettings.get`).
+public struct ScreenSettings: Decodable, Hashable, Sendable {
+    public let tasksFile: String
+    public let sections: [String: String]
+    public let ungrouped: String
+    public let priorities: [Mark]
+    public let labels: [Mark]
+    public let labelPaint: String
+    /// A card's height and the gap between two cards, points.
+    public let cardHeight: Double
+    public let cardGap: Double
+    /// When a touch becomes a drag, on a card and on the empty timeline alike.
+    public let longPressMs: Int
+    public let scrollToHour: Int
 }

@@ -481,3 +481,14 @@ JavaScriptCore of its own set to that zone (`osascript -l JavaScript`: a process
 - The Repeat row's and the repeat page's words (`BoardSheets.unit`, the weekday letters): the menu's `repeat` and
   `REPEAT_WORDS`; the sources' words (`CalendarsView.name`, `words`): each status's `words`; the place button's date
   formatted in the device's locale: `tasks.placementTitle`; «calendar cards cannot be picked»: `rules.canPick`.
+
+### The bridge in `apple/Core`
+
+`TaskBoard` hands in with every call the device's grouping (`GroupingStore`: `UserDefaultsGrouping` in the app, kept as
+each answer's `grouping` gives it) and the vault's projects (`notes.projects` over `Vault.vaultFiles()`, the tags read
+once per file and again only for a file changed; `refreshNotes()` lists the vault again). Its own calls: `projectNotes()`,
+`setGrouping(list, on:)`, `toggleFold(list, key:)`, `titleParts(text)`, `noteToOpen(target)`, `linkQuery(in:caret:)`,
+`suggestNotes(query)`, `insertLink(note, in:at:)`, `screenSettings()`, `listWidths(share:viewWidth:dividerWidth:)`,
+`repeatWords()`. The answers decode as `ProjectRef`, `ProjectGroup`, `ListGrouping`, `MenuProject`, `RepeatRow`,
+`SourceWords`, `ScreenSettings`, `SizeBounds`, `TextPart`, `NoteLink`, `LinkQuery`, `LinkInsert`, `ListWidths`,
+`RepeatWords` (`BoardModels.swift`, `NoteModels.swift`).

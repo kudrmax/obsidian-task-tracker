@@ -30,8 +30,10 @@ public struct DoorContext: Sendable {
     public let history: DoorHistory?
     /// How this device groups its lists by project (`GroupingState`) as JSON text; `nil` for the door's defaults.
     public let groupingJSON: String?
+    /// The vault's project notes (`ProjectNote` list, as `notes.projects` answers it) as JSON text; `nil` for none.
+    public let projectsJSON: String?
 
-    public init(tasks: String?, settingsJSON: String = "", now: Date, calendars: [String: String] = [:], fetched: [String]? = nil, history: DoorHistory? = nil, groupingJSON: String? = nil) {
+    public init(tasks: String?, settingsJSON: String = "", now: Date, calendars: [String: String] = [:], fetched: [String]? = nil, history: DoorHistory? = nil, groupingJSON: String? = nil, projectsJSON: String? = nil) {
         self.tasks = tasks
         self.settingsJSON = settingsJSON
         self.now = now
@@ -39,6 +41,7 @@ public struct DoorContext: Sendable {
         self.fetched = fetched
         self.history = history
         self.groupingJSON = groupingJSON
+        self.projectsJSON = projectsJSON
     }
 }
 
@@ -53,6 +56,8 @@ public struct DoorReply: @unchecked Sendable {
     public let history: DoorHistory?
     /// The new `data.json`, when the call changed the settings.
     public let settingsJSON: String?
+    /// The device's grouping by project after this call (`GroupingState` as JSON text), when the call changed it.
+    public var groupingJSON: String? = nil
 }
 
 /// Runs the core's phone module (`core/task-calendar-phone.js`) in JavaScriptCore: every rule of the tasks
@@ -98,7 +103,8 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
             tasks: reply["tasks"] as? String,
             step: reply["step"] as? Bool ?? false,
             history: try reply["history"].flatMap { $0 is NSNull ? nil : $0 }.map { DoorHistory(json: try Self.json($0)) },
-            settingsJSON: reply["settings"] as? String)
+            settingsJSON: reply["settings"] as? String,
+            groupingJSON: try reply["grouping"].flatMap { $0 is NSNull ? nil : $0 }.map { try Self.json($0) })
     }
 
     public func tasksFile(settingsJSON: String) throws -> String? {
@@ -221,6 +227,7 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
         if let fetched = context.fetched { wire["fetched"] = fetched }
         if let history = context.history { wire["history"] = try JSONSerialization.jsonObject(with: Data(history.json.utf8)) }
         if let grouping = context.groupingJSON { wire["grouping"] = try JSONSerialization.jsonObject(with: Data(grouping.utf8)) }
+        if let projects = context.projectsJSON { wire["projects"] = try JSONSerialization.jsonObject(with: Data(projects.utf8)) }
         return wire
     }
 

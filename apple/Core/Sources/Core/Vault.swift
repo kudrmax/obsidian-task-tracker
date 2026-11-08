@@ -28,6 +28,17 @@ public enum VaultError: Error, Equatable {
 }
 
 /// Where the tasks file and the plugin's settings come from.
+/// A file of the vault by its path from the vault folder, and when it last changed.
+public struct VaultFile: Sendable, Hashable {
+    public let path: String
+    public let modified: Date
+
+    public init(path: String, modified: Date) {
+        self.path = path
+        self.modified = modified
+    }
+}
+
 public protocol TasksVault: Sendable {
     func read() throws -> (tasks: String, settingsJSON: String)
     /// Writes `tasks` only if the file still holds `old`; false when it changed in between.
@@ -43,6 +54,13 @@ public protocol TasksVault: Sendable {
     /// A new file in `folder` (by path from the vault folder, made if missing), never over another: a taken name gets
     /// a number, as Obsidian numbers it. Returns the name written.
     func save(_ data: Data, in folder: String, named name: String) throws -> String
+    /// Every file of the vault but Obsidian's own folder and the trash (hidden ones), by path from its folder.
+    func vaultFiles() -> [VaultFile]
+}
+
+public extension TasksVault {
+    /// None where the vault cannot list its files.
+    func vaultFiles() -> [VaultFile] { [] }
 }
 
 /// The Obsidian vault folder the app was given once, read and written through file coordination.
@@ -124,6 +142,22 @@ public final class Vault: TasksVault, @unchecked Sendable {
             if let error = coordination ?? failure { throw error }
             return free
         }
+    }
+
+    public func vaultFiles() -> [VaultFile] {
+        (try? withFolder { folder -> [VaultFile] in
+            let keys: [URLResourceKey] = [.isRegularFileKey, .contentModificationDateKey]
+            guard let walk = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return [] }
+            let base = folder.standardizedFileURL.path
+            var found: [VaultFile] = []
+            for case let url as URL in walk {
+                guard let values = try? url.resourceValues(forKeys: Set(keys)), values.isRegularFile == true else { continue }
+                let full = url.standardizedFileURL.path
+                guard full.hasPrefix(base + "/") else { continue }
+                found.append(VaultFile(path: String(full.dropFirst(base.count + 1)), modified: values.contentModificationDate ?? .distantPast))
+            }
+            return found
+        }) ?? []
     }
 
     public func read(path: String) -> String? {
