@@ -60,16 +60,17 @@ export type DragPayload = TaskDragPayload | NewTaskPayload;
 export type DropResult = DropTo;
 
 /** Somewhere a dragged task may land: it previews while the pointer is over it and says what the drop means. */
-export interface DropTarget {
-	hitTest(x: number, y: number, drag: DragPayload): boolean;
-	preview(x: number, y: number, drag: DragPayload): void;
+/** A place to drop on: a list, the timeline, the plus's cancel ring; or the slots among a list's sections for a lifted section (`P`, `R`). */
+export interface DropTarget<P = DragPayload, R = DropResult> {
+	hitTest(x: number, y: number, drag: P): boolean;
+	preview(x: number, y: number, drag: P): void;
 	/** Where a new task carried on the plus comes to rest, in client pixels, while a preview shows. A task's card lands on its card as drawn after the drop. */
 	landing(): DOMRect | null;
 	/** The finger has gone elsewhere, the drag goes on. */
 	leave(): void;
 	/** The drag is over. */
 	clear(): void;
-	drop(x: number, y: number, drag: DragPayload): DropResult | null;
+	drop(x: number, y: number, drag: P): R | null;
 }
 
 /** The card under the finger. */

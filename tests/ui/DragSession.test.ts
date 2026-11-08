@@ -59,6 +59,7 @@ function session(targets: DropTarget[], float: FakeFloat, ended: unknown[], carr
 		payload: carried,
 		targets,
 		float,
+		landsOnTarget: carried.from === "new",
 		origin: () => rect(5, 500),
 		onEnd: async (result) => {
 			ended.push(result);

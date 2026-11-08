@@ -342,6 +342,7 @@ export class DragController {
 					payload,
 					targets,
 					float,
+					landsOnTarget: true,
 					origin: () => origin,
 					// Placed, the task's field opens as the finger lifts, in its place; the plus lands in the field and fades.
 					onEnd: async (result) => {
