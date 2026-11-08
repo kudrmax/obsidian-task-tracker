@@ -1,5 +1,6 @@
 import { clear, el } from "../dom";
 import type { Overlay } from "../menu/Overlay";
+import { PanelPages } from "../menu/PanelPages";
 
 /** What a window is drawn as: a menu's panel, the sources window, the start of a description. */
 export type PanelRoot = "tc-panel" | "tc-popover" | "tc-desc-peek";
@@ -70,8 +71,11 @@ export class Panel {
 		return el(null, "div", spec.cls ? `${spec.root} ${spec.cls}` : spec.root);
 	}
 
+	private readonly pages: PanelPages;
+
 	private constructor(element: HTMLElement, private readonly spec: PanelSpec) {
 		this.el = element;
+		this.pages = new PanelPages(() => [element]);
 	}
 
 	/** Grows in: laid out shrunk first, so the growth starts there. A window over an overlay is shown by it instead. */
@@ -92,10 +96,15 @@ export class Panel {
 		return this.spec.picks.pickNow(then);
 	}
 
-	/** Another page of the window in its place: what it showed goes, `build` lays out the new one, and it is placed again. */
-	replace(build: (panel: HTMLElement) => void): void {
-		clear(this.el);
-		build(this.el);
-		this.place();
+	/**
+	 * Another page of the window in its place: what it showed goes, `build` lays out the new one, and it is placed again;
+	 * the window grows or shrinks to it and the page `name` keeps its own scroll.
+	 */
+	replace(build: (panel: HTMLElement) => void, name = "page"): void {
+		this.pages.show(name, () => {
+			clear(this.el);
+			build(this.el);
+			this.place();
+		});
 	}
 }

@@ -112,7 +112,7 @@ export class BulkMenu {
 
 	private showMenu(): void {
 		this.panel.el.classList.remove("is-picker");
-		this.panel.replace((panel) => this.buildMenu(panel));
+		this.panel.replace((panel) => this.buildMenu(panel), "menu");
 	}
 
 	private buildMenu(panel: HTMLElement): void {
@@ -186,6 +186,7 @@ export class BulkMenu {
 				onBack: () => this.showMenu(),
 				onPick: (name) => this.pick(() => actions.toSection(name))(),
 			}),
+			"sections",
 		);
 	}
 
@@ -199,6 +200,7 @@ export class BulkMenu {
 				onBack: () => this.showMenu(),
 				onPick: (link) => this.pick(() => actions.setProject(link))(),
 			}),
+			"projects",
 		);
 	}
 
@@ -213,6 +215,7 @@ export class BulkMenu {
 				onPick: (date) => this.pick(() => actions.postpone(date))(),
 				onRemove: model.removeDue ? this.pick(() => actions.removeDue()) : undefined,
 			}),
+			"picker",
 		);
 	}
 

@@ -59,7 +59,7 @@ function session(targets: DropTarget[], float: FakeFloat, ended: unknown[], carr
 		payload: carried,
 		targets,
 		float,
-		origin: rect(5, 500),
+		origin: () => rect(5, 500),
 		onEnd: async (result) => {
 			ended.push(result);
 			return drawn;
@@ -122,7 +122,7 @@ describe("DragSession", () => {
 			payload,
 			targets: [new FakeTarget("a", 0, 100, { kind: "clearSlot" })],
 			float,
-			origin: rect(5, 500),
+			origin: () => rect(5, 500),
 			onEnd: async () => {
 				await Promise.resolve();
 				order.push("written");
@@ -184,14 +184,37 @@ describe("DragSession", () => {
 		expect(b.log).toEqual(["preview 150,10", "drop", "clear"]);
 	});
 
-	it("opens the lifted card's place again before the targets let go, as the card flies back", async () => {
+	it("shows the lifted card on its place only once the copy has flown back there: the task is never seen twice", async () => {
 		const order: string[] = [];
 		const a = new FakeTarget("a", 0, 100, null);
 		a.clear = () => void order.push("clear");
-		const s = new DragSession({ payload, targets: [a], float: new FakeFloat(), origin: rect(5, 500), onReturn: () => order.push("return"), onEnd: async () => {} });
+		const float = new FakeFloat();
+		float.flyTo = async () => void order.push("fly");
+		float.remove = () => void order.push("remove");
+		const s = new DragSession({ payload, targets: [a], float, origin: () => rect(5, 500), onReturn: () => order.push("return"), onEnd: async () => {} });
 		s.move(50, 10);
 		await s.cancel();
-		expect(order).toEqual(["return", "clear"]);
+		expect(order).toEqual(["clear", "fly", "return", "remove"]);
+	});
+
+	it("releases the dropped card's place only once the copy has landed on it", async () => {
+		const order: string[] = [];
+		const float = new FakeFloat();
+		float.land = async () => void order.push("land");
+		const s = new DragSession({
+			payload,
+			targets: [new FakeTarget("a", 0, 100, { kind: "clearSlot" })],
+			float,
+			origin: () => rect(5, 500),
+			onReturn: () => order.push("return"),
+			onEnd: async () => {
+				order.push("written");
+				return drawnCard(0);
+			},
+		});
+		s.move(50, 10);
+		await s.release(50, 10);
+		expect(order).toEqual(["written", "land", "return"]);
 	});
 
 	describe("carrying a new task", () => {

@@ -307,16 +307,14 @@ export class DragController {
 					payload,
 					targets: this.deps.targets(payload),
 					float,
-					origin,
+					origin: () => (source.isConnected ? source.getBoundingClientRect() : origin),
 					onReturn: reopen,
 					onEnd: async (result) => {
 						detach();
 						this.deps.arbiter.release(DRAG);
 						if (!result) return null;
 						this.deps.haptics.tap();
-						const card = await this.deps.onResult(payload, result);
-						reopen();
-						return card;
+						return this.deps.onResult(payload, result);
 					},
 				}),
 			() => this.deps.onDragging(false),
@@ -344,7 +342,7 @@ export class DragController {
 					payload,
 					targets,
 					float,
-					origin,
+					origin: () => origin,
 					// Placed, the task opens as the finger lifts, its line giving way to the field; the plus shrinks meanwhile.
 					onEnd: async (result) => {
 						detach();

@@ -1,3 +1,4 @@
+import { Motion } from "../motion/Motion";
 import type { DragPayload, DropResult, DropTarget, Float } from "./DropTarget";
 
 export type { DragOrigin, DragPayload, DropResult, DropTarget, Float, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
@@ -6,9 +7,9 @@ export interface DragSessionOptions {
 	readonly payload: DragPayload;
 	readonly targets: readonly DropTarget[];
 	readonly float: Float;
-	/** Where the card came from, so a cancelled drag flies back. */
-	readonly origin: DOMRect;
-	/** The card is about to fly back: its place in the list opens again. */
+	/** Where the card's place stands now, so a cancelled drag flies back to it. */
+	origin(): DOMRect;
+	/** The copy has landed, on the task's new place or back on its old one: the place is released and the card shows. */
 	onReturn?(): void;
 	/** The drop, or null for a cancelled drag. A task's drop gives its card once written and drawn: the float lands on it. */
 	onEnd(result: DropResult | null): Promise<HTMLElement | null | void>;
@@ -41,8 +42,10 @@ export class DragSession {
 		if (!target || !result) return this.settleBack();
 		const line = target.landing();
 		const card = await this.opts.onEnd(result);
+		if (card) Motion.settle(card);
 		const landing = card ? card.getBoundingClientRect() : this.opts.payload.from === "new" ? line : null;
 		await (landing ? this.opts.float.land(landing) : this.opts.float.vanish());
+		this.opts.onReturn?.();
 		this.clearAll();
 		this.opts.float.remove();
 	}
@@ -62,10 +65,11 @@ export class DragSession {
 		await this.settleBack();
 	}
 
+	/** A cancelled drag: the copy flies back to the card's place first, and only then does the card show there, so the task is never seen twice. */
 	private async settleBack(): Promise<void> {
-		this.opts.onReturn?.();
 		this.clearAll();
-		await this.opts.float.flyTo(this.opts.origin);
+		await this.opts.float.flyTo(this.opts.origin());
+		this.opts.onReturn?.();
 		this.opts.float.remove();
 		await this.opts.onEnd(null);
 	}
