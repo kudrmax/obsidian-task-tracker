@@ -145,7 +145,8 @@ struct ListColumn: View {
         }
         rows += (heads[list.groups.count] ?? []).map(ListRowView.project)
         if let slot, slot >= list.groups.count { rows.append(.mark(first: rows.isEmpty)) }
-        if entry?.at.kind == "end" { rows += typed }
+        // At the end, or in a section the list doesn't draw (a day with no task yet has none): the field stands last.
+        if entry?.at.kind == "end" || entry?.at.kind == "in" && !list.groups.indices.contains(entry?.at.section ?? 0) { rows += typed }
         // The card carried keeps its row, a dashed place; its subtasks fold away under it.
         let carried = Set(list.cards.filter { model.isCarried($0) && !model.isWaiting($0) }.map(\.id))
         return entry == nil && settling == nil && carried.isEmpty ? rows : Self.branched(rows, carried: carried, model: model)

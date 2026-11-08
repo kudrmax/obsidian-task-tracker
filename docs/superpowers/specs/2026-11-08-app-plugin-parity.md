@@ -130,7 +130,7 @@ KNOWN = already named by the lead.
 |---|---|---|---|---|
 | 10.1 | Long press carries all picked. | absent (5.4). | MISSING | SWIFT; app: done (5.4) |
 | 10.2 | Bulk Project row. | absent (2.1). | MISSING | SWIFT |
-| 10.3 | Bulk labels keep the menu and selection for the next label. | Selection kept, menu closes (2.2). | WRONG | SWIFT; app: done (2.2) |
+| 10.3 | Bulk labels keep the menu and selection for the next label. | Selection kept, menu closes (2.2). | WRONG | SWIFT; app: done — the bulk «⋯» keeps open on a label (the label row's group is `menuActionDismissBehavior(.disabled)`), re-read after each write, and the picked tasks stay picked under their new cards (picked again by their place in the file in the drawing that shows the write) |
 | — | In parity: circles, calendar cards not pickable, statuses, priorities, labels, moves, Remove due date, Section, Delete N without asking, any action ends the mode. | | | |
 
 ## 11. Full screen
@@ -205,4 +205,5 @@ Nothing missing on the app side: the plugin only writes the markers and the Remi
 10. **Add Subtask on a calendar card lifts it over a dimmed screen** (2.5): the copy stands where the card stood (kept above the keyboard), its subtasks one level in under it with their branches and the field last, as the plugin's stack under the lifted copy; it goes when typing ends.
 11. **A column's title as a drop place lights as an empty section's plate** (5.1): the accent's outline and fill round the title; only cards land there, never the plus.
 12. **The Repeat sheet has a check, no cross** (2.7): it writes as it closes however it closes (the check or a swipe down), as the plugin's page writes when its menu closes.
+13. **Picked cards are the same card control as everywhere** (5.4): in Select Tasks a tap on a card picks it (no menu), and a picked card's long press lifts the stack: the card on two layers with the number carried on its corner, as the plugin's floating stack.
 

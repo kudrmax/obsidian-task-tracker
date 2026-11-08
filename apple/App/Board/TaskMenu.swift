@@ -24,6 +24,11 @@ indirect enum MenuNode {
     case group(row: Bool, children: [MenuNode])
     /// A row whose page is read when it opens: a subtask's own menu.
     case deferred(title: String, symbol: String, subtitle: String?, load: @MainActor () async -> [MenuNode])
+
+    var keepsOpen: Bool {
+        if case .action(_, _, _, _, _, let keepsOpen, _, _, _, _) = self { return keepsOpen }
+        return false
+    }
 }
 
 /// The task's menu as iOS 26 draws a menu, in the plugin's order as the core gives it: the statuses, the priorities and
@@ -242,7 +247,11 @@ struct MenuNodes: View {
                 }
             case .group(let row, let children):
                 if row {
-                    ControlGroup { MenuNodes(nodes: children) }.controlGroupStyle(.menu)
+                    // A row whose tiles keep the menu open (the labels) keeps it open as a whole: SwiftUI reads the
+                    // behaviour from the group, not from its buttons.
+                    ControlGroup { MenuNodes(nodes: children) }
+                        .controlGroupStyle(.menu)
+                        .menuActionDismissBehavior(children.contains(where: \.keepsOpen) ? .disabled : .automatic)
                 } else {
                     Section { MenuNodes(nodes: children) }
                 }

@@ -250,6 +250,7 @@ final class BoardModel {
         if animated {
             withAnimation(.snappy) {
                 snapshot = read
+                repick(in: read)
                 entry.screenChanged()
             }
         } else {
@@ -257,6 +258,7 @@ final class BoardModel {
             instant.disablesAnimations = true
             withTransaction(instant) {
                 snapshot = read
+                repick(in: read)
                 entry.screenChanged()
                 if let from = dropReadFrom, serial >= from {
                     dropReadFrom = nil
@@ -611,8 +613,23 @@ final class BoardModel {
         endSelection()
     }
 
+    /// The menu and the picks stay for the next label: the picked tasks are picked again as the file now has them.
     func toggleLabel(_ items: [TaskItem], _ name: String) async {
+        if selecting { repicking = Set(items.map(Self.place)) }
         await write("tasks.toggleLabel", [keys(items), .string(name)])
+    }
+
+    /// A write that keeps Select Tasks on redraws the picked cards under new ids (a card is named by its line): the same
+    /// tasks, found by their place in the file, are picked again in the drawing that shows them.
+    @ObservationIgnored private var repicking: Set<String>?
+
+    private static func place(_ item: TaskItem) -> String { "\(item.key.section)/\(item.key.index)/\(item.key.path)" }
+
+    private func repick(in read: BoardSnapshot) {
+        guard let places = repicking else { return }
+        repicking = nil
+        guard selecting else { return }
+        picked = Set(read.lists.values.flatMap(\.cards).filter { places.contains(Self.place($0.item)) }.map(\.id))
     }
 
     func postpone(_ items: [TaskItem], to date: String) async {
