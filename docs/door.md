@@ -119,7 +119,8 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
     section `group`, `index` among that section's cards there in the file's order. In a list the screen draws in project
     parts (`screen.projects[list].on`: grouped by project, or a project's own view), `part` (`LandingPart`
     `{ key, zone, section, index }`) says where it is drawn: the part (`ProjectGroup.key`, its `zone`), the section in
-    it, and `index` among that section's cards in the part. Fly to `part` when it is there.
+    it, and `index` among that section's cards in the part, and `folded`: the part is folded, its cards not drawn, so
+    fly to the part's header. Fly to `part` when it is there.
   - `{ kind: "subtask", parent, index }`: under the task `parent` (its id), `index` among its open subtasks.
   - `{ kind: "away" }`: not on this screen (another day, out of this project's view).
   It needs the tasks file, so it is a `tasks.*` method; `rules.*` are the rules that need no file.

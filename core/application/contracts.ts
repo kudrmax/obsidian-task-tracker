@@ -408,6 +408,8 @@ export interface LandingPart {
 	readonly zone: ProjectZone;
 	readonly section: GroupName;
 	readonly index: number;
+	/** The part is folded (`ProjectGroup.folded`): its cards are not drawn, so the card lands on the part's header. */
+	readonly folded: boolean;
 }
 
 /** A slotted task of the day's timeline after a drop: its id and its minutes from the start of the day as shown. */

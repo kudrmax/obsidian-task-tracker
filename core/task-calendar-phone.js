@@ -5450,7 +5450,7 @@ ${key.title}`.toLowerCase();
     for (const group of grouping.groups)
       for (const section of group.sections) {
         const index = section.items.findIndex((item) => item.id === id);
-        if (index >= 0) return { key: group.key, zone: group.zone, section: section.name, index };
+        if (index >= 0) return { key: group.key, zone: group.zone, section: section.name, index, folded: group.folded };
       }
     return null;
   }

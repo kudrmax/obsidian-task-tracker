@@ -445,6 +445,11 @@ every condition that changes the layout is animated by the transaction that chan
     plus at a drop, Add Subtask and an empty section's plate; the last part's section for the plus and a double click;
     a level's shift and a rename's next field keep it). The plugin takes the same path
     (`QuickEntryController.rename` → `renameSpot`), so it is fixed there too. Nothing in the contract changed.
+55. **Backend, R7: a landing in a folded part says so.** `LandingPart` gains `folded` (`ProjectGroup.folded` of the part the
+    task lands in): true, its cards are not drawn, so the copy flies to the part's header (`ProjectGroup.key`). The same for
+    a drop between cards, on a part's header and on a column's title that puts the task into a folded part. The folded
+    part's `sections` still hold its cards on the screen, so `section` and `index` are its place once it is unfolded.
+    Added only.
 
 
 ## Done when

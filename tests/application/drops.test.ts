@@ -299,7 +299,7 @@ function partOf(screen: ScreenView, column: string, id: string): { part?: unknow
 	for (const group of grouping.groups)
 		for (const section of group.sections) {
 			const index = section.items.findIndex((i) => i.id === id);
-			if (index >= 0) return { part: { key: group.key, zone: group.zone, section: section.name, index } };
+			if (index >= 0) return { part: { key: group.key, zone: group.zone, section: section.name, index, folded: group.folded } };
 		}
 	return {};
 }
@@ -453,6 +453,37 @@ describe("landing in a list grouped by project: the part the screen draws, and t
 			expect(place).toEqual(await placeAfter(svc, task.id, T));
 		});
 	}
+
+	for (const [name, column, text, from, to] of [
+		["Soon's folded part X, at its header", "soon", "E", "inbox", (s: ScreenView) => ({ kind: "place", column: "soon", place: { kind: "task", group: null, before: null, project: "X" } }) as DropTo],
+		["Soon's title, the task's own part X folded", "soon", "E", "inbox", (s: ScreenView) => s.titleDrops.soon],
+		["Backlog's title, the task's own part X folded", "backlog", "E", "inbox", (s: ScreenView) => s.titleDrops.backlog],
+	] as const) {
+		it(`names a folded part, its card not drawn: ${name}`, async () => {
+			const { store, svc } = await grouped();
+			await svc.toggleFold(column, "x");
+			const screen = await svc.screen(T);
+			const group = screen.projects[column].groups.find((g) => g.key === "x")!;
+			expect(group.folded).toBe(true);
+			const task = [...screen.inbox, ...screen.soon, ...screen.backlog].find((i) => i.text === text)!;
+			const before = store.text;
+			const [landing] = await svc.landing([{ key: task.key, from }], to(screen), T);
+			expect(store.text).toBe(before);
+			expect(landing).toMatchObject({ kind: "list", column, part: { key: "x", zone: "X", folded: true } });
+			await svc.drop([{ key: task.key, from }], to(screen), T);
+			const after = (await svc.screen(T)).projects[column].groups.find((g) => g.key === "x")!;
+			expect(after.folded).toBe(true);
+			expect(after.sections.some((sec) => sec.items.some((i) => i.id === task.id))).toBe(true);
+		});
+	}
+
+	it("says an open part is not folded", async () => {
+		const { svc } = await grouped();
+		const screen = await svc.screen(T);
+		const task = screen.inbox.find((i) => i.text === "E")!;
+		const [landing] = await svc.landing([{ key: task.key, from: "inbox" }], screen.titleDrops.soon, T);
+		expect(landing).toMatchObject({ kind: "list", part: { key: "x", folded: false } });
+	});
 
 	it("gives no part in a list not grouped", async () => {
 		const { svc } = setup();
