@@ -507,6 +507,8 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.usableColor", "#12AB34"),
 		plain("rules.acceptsDrop", "inbox", ["soon"]),
 		plain("rules.placesInGap", "soon", "day", false),
+		plain("rules.noteTags", "---\ntags: [project]\n---\n#more"),
+		plain("rules.projectNotes", [{ path: "A.md", text: "#project" }, { path: "B.md", tags: ["#project"] }], "#project"),
 		plain("rules.shadesOf", "red", "dark"),
 		plain("rules.inkOf", "#12AB34", "light"),
 		plain("rules.contrast", "#FFFFFF", "#000000"),

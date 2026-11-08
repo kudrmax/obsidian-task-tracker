@@ -76,11 +76,14 @@ public struct LandingGap: Equatable, Sendable {
     public let at: Int
     public let level: Int
     public let group: String?
+    /// The project's part it opens in, in a list grouped by project; nil in a plain list.
+    public let zone: JSONValue?
 
-    public init(at: Int, level: Int, group: String?) {
+    public init(at: Int, level: Int, group: String?, zone: JSONValue? = .none) {
         self.at = at
         self.level = level
         self.group = group
+        self.zone = zone
     }
 }
 
@@ -91,10 +94,15 @@ extension DropLanding {
         switch kind {
         case "list":
             guard self.column == column.rawValue, let index else { return nil }
-            let tops = others.indices.filter { others[$0].level == 0 && others[$0].item.group == group }
-            if let at = tops[safe: index] { return LandingGap(at: at, level: 0, group: group) }
-            let end = others.indices.last { others[$0].item.group == group }.map { $0 + 1 } ?? others.count
-            return LandingGap(at: end, level: 0, group: group)
+            // In a list grouped by project a section stands once in each project's part: the part is the task's project.
+            let zone: JSONValue = item?.project.map { .string($0.link) } ?? .null
+            let here = { (card: BoardCard) in card.item.group == group && card.zone.map { $0 == zone } ?? true }
+            let tops = others.indices.filter { others[$0].level == 0 && here(others[$0]) }
+            let grouped = others.contains { card in if case .some = card.zone { true } else { false } }
+            let part: JSONValue? = grouped ? .some(zone) : .none
+            if let at = tops[safe: index] { return LandingGap(at: at, level: 0, group: group, zone: part) }
+            let end = others.indices.last { here(others[$0]) }.map { $0 + 1 } ?? others.count
+            return LandingGap(at: end, level: 0, group: group, zone: part)
         case "subtask":
             guard let parent, let index, let at = others.firstIndex(where: { $0.id == parent }) else { return nil }
             let level = others[at].level + 1
@@ -104,7 +112,8 @@ extension DropLanding {
                 if others[end].level == level { children.append(end) }
                 end += 1
             }
-            return LandingGap(at: children[safe: index] ?? end, level: level, group: others[at].item.group)
+            let part: JSONValue? = if case .some(let zone) = others[at].zone { .some(zone) } else { .none }
+            return LandingGap(at: children[safe: index] ?? end, level: level, group: others[at].item.group, zone: part)
         default:
             return nil
         }

@@ -54,6 +54,8 @@ struct ListGap: Equatable {
     let at: Int
     let level: Int
     let group: String?
+    /// In a list grouped by project, the project's part it stands in; nil in a plain list.
+    var zone: JSONValue? = .none
     let place: JSONValue
     /// The drop line as the plugin draws it (`DropLine`), in the list's content space: from `line.x`, the left edge of
     /// the gap's level, to the list's right edge, through `line.y`, the middle of the gap; nil where the drop changes
@@ -92,6 +94,7 @@ final class BoardModel {
 
     /// A screen the quick entry read after its write, drawn in the transaction the entry draws its own state in.
     func draw(_ read: BoardSnapshot) {
+        forgetGone(read)
         snapshot = read
         problem = nil
     }
@@ -223,6 +226,7 @@ final class BoardModel {
     /// The screen drawn from `read` in one transaction, its motion chosen by what differs from the drawing on the screen;
     /// the first read after a drop's write puts the dropped card in its new place, hidden until its copy lands there.
     private func show(_ read: BoardSnapshot, serial: Int) {
+        forgetGone(read)
         let landsDrop = dropReadFrom.map { serial >= $0 } ?? false
         if landsDrop { dropReadFrom = nil }
         draw(motion: read.motion(from: snapshot)) {
@@ -261,8 +265,24 @@ final class BoardModel {
         if files.tasks != snapshot?.tasksText || files.settingsJSON != snapshot?.settingsJSON { await reload() }
     }
 
+    /// The vault's project notes changed: the screen reads again, once a carry or the quick entry's writes let it.
+    func projectsChanged() async {
+        guard carried == nil, !entry.writing else {
+            readAfterCarry = true
+            projectsAsked = true
+            return
+        }
+        await reload()
+    }
+
+    /// The project notes changed while a carry or the quick entry held the read: it reads again whatever the file did.
+    @ObservationIgnored private var projectsAsked = false
+
     /// The tasks file watched while the screen shows: a coordinated write elsewhere (iCloud, a reminder's button) reads again.
     func watchFile() {
+        AppServices.shared.projects.changed = { [weak self] in
+            Task { @MainActor in await self?.projectsChanged() }
+        }
         guard watch == nil else { return }
         watch = AppServices.shared.vault.watchTasksFile { [weak self] in
             Task { @MainActor in await self?.reloadIfChanged() }
@@ -396,6 +416,7 @@ final class BoardModel {
         guard let turn = dayTurn else { return }
         var instant = Transaction()
         instant.disablesAnimations = true
+        forgetGone(turn.peek)
         withTransaction(instant) {
             snapshot = turn.peek
             entry.screenChanged()
@@ -564,14 +585,57 @@ final class BoardModel {
         await write("tasks.setRepeat", [item.key.json, rule])
     }
 
-    func renameSection(_ column: BoardColumn, _ section: String, to name: String) async {
+    /// A section's header menu: inside a project's group (`menu.project`) only that project's tasks move.
+    func renameSection(_ column: BoardColumn, _ menu: GroupMenu, to name: String) async {
         guard let list = sectionList(column) else { return }
-        await write("tasks.renameGroup", [.string(list), .string(section), .string(name)])
+        await write("tasks.renameGroup", [.string(list), .string(menu.section), .string(name)] + (menu.project.map { [$0] } ?? []))
     }
 
-    func removeSection(_ column: BoardColumn, _ section: String) async {
+    func removeSection(_ column: BoardColumn, _ menu: GroupMenu) async {
         guard let list = sectionList(column) else { return }
-        await write("tasks.removeGroup", [.string(list), .string(section)])
+        await write("tasks.removeGroup", [.string(list), .string(menu.section)] + (menu.project.map { [$0] } ?? []))
+    }
+
+    // MARK: Projects
+
+    /// The title's menu: the list groups its tasks by project, or stops.
+    func setGrouping(_ column: BoardColumn, _ on: Bool) async {
+        await group("tasks.setGrouping", [.string(column.rawValue), .bool(on)])
+    }
+
+    /// A project group's header tapped: it folds, or opens again.
+    func toggleFold(_ column: BoardColumn, _ key: String) async {
+        UISelectionFeedbackGenerator().selectionChanged()
+        await group("tasks.toggleFold", [.string(column.rawValue), .string(key)])
+    }
+
+    private func group(_ method: String, _ arguments: [JSONValue]) async {
+        let board = board
+        do {
+            try await Task.detached { try board.group(method, arguments) }.value
+        } catch {
+            problem = Self.words(error)
+        }
+        await reload()
+    }
+
+    /// The Project page's pick: the tasks get the project (its link), or none.
+    func setProject(_ items: [TaskItem], _ link: String?) async {
+        await write("tasks.setProject", [keys(items), link.json])
+        endSelection()
+    }
+
+    func openProject(of item: TaskItem) {
+        guard let project = item.project else { return }
+        Task { await openNote(project) }
+    }
+
+    /// The project's note in Obsidian: the folder mark's tap and the group's arrow.
+    func openNote(_ project: ProjectRef) async {
+        guard project.canOpenNote, let note = project.note, let vault = UserDefaults.standard.string(forKey: "vaultFolderName") else { return }
+        var link = URLComponents(string: "obsidian://advanced-uri")!
+        link.queryItems = [URLQueryItem(name: "vault", value: vault), URLQueryItem(name: "filepath", value: note)]
+        if let url = link.url { await UIApplication.shared.open(url) }
     }
 
     /// Whose sections a column shows, as the core names the list.
@@ -835,7 +899,12 @@ final class BoardModel {
     func readIfAsked() {
         guard readAfterCarry, carried == nil, !entry.writing else { return }
         readAfterCarry = false
-        Task { await reloadIfChanged() }
+        if projectsAsked {
+            projectsAsked = false
+            Task { await reload() }
+        } else {
+            Task { await reloadIfChanged() }
+        }
     }
 
     /// The drag session ended, whatever came of it: anything still flying has landed. A drop still being written ends
@@ -868,6 +937,7 @@ final class BoardModel {
         sectionSlot = nil
         landing = nil
         hovered = nil
+        litTitle = nil
     }
 
     /// Whether a card stands in the carry: the card itself or one of its subtasks, which go with it. A drop reads the gaps
@@ -899,6 +969,19 @@ final class BoardModel {
     /// The last point a carry was read at over a list, so a finger standing still asks nothing.
     @ObservationIgnored private var hovered: (column: BoardColumn, point: CGPoint)?
 
+    /// The frames of cards and headers the new drawing no longer shows (a group folded, a section gone) are dropped, so a
+    /// carry never reads a header from an earlier drawing.
+    private func forgetGone(_ read: BoardSnapshot) {
+        for (column, list) in read.lists {
+            guard var shape = geometry[column] else { continue }
+            let cards = Set(list.cards.map(\.id))
+            let heads = Set(list.groups.map(\.id) + list.projects.map(\.id))
+            shape.cards = shape.cards.filter { cards.contains($0.key) }
+            shape.heads = shape.heads.filter { heads.contains($0.key) }
+            geometry[column] = shape
+        }
+    }
+
     /// A card's or a header's frame as the list lays it out; kept only while no gap is open in the list.
     func rest(_ column: BoardColumn, card id: String, _ frame: CGRect) {
         guard settling?.column != column else { return }
@@ -924,6 +1007,65 @@ final class BoardModel {
             hover: { [weak self] in self?.hover(column, at: $0) },
             leave: { [weak self] in self?.leave(column) },
             land: { [weak self] in self?.land(column) }))
+        dropping.register("title.\(column.rawValue)", DropPlace(
+            hover: { [weak self] in self?.hoverTitle(column, at: $0) },
+            leave: { [weak self] in self?.leaveTitle(column) },
+            land: { [weak self] in self?.landOnTitle(column) }))
+        if let frame = titleFrames[column] { dropping.move("title.\(column.rawValue)", visible: frame, origin: frame.origin) }
+    }
+
+    // MARK: A list's title as a place to drop on
+
+    /// The title a carried card would land on: it lights as a drop target.
+    private(set) var litTitle: BoardColumn?
+    @ObservationIgnored private var titleFrames: [BoardColumn: CGRect] = [:]
+
+    /// The title's row across its column, in the window.
+    func titleMoved(_ column: BoardColumn, _ frame: CGRect) {
+        titleFrames[column] = frame
+        dropping.move("title.\(column.rawValue)", visible: frame, origin: frame.origin)
+    }
+
+    /// A card over the title lights it; the plus keeps the place at the list's top, as before.
+    private func hoverTitle(_ column: BoardColumn, at point: CGPoint) {
+        guard let carry, carry.section == nil else { return }
+        guard carry.id != Carried.plus, snapshot?.lists[column]?.titleDrop != nil else { return hover(column, at: CGPoint(x: point.x, y: 0)) }
+        if gap != nil { withAnimation(.snappy(duration: 0.12)) { gap = nil } }
+        landing = nil
+        guard litTitle != column else { return }
+        UISelectionFeedbackGenerator().selectionChanged()
+        withAnimation(.snappy(duration: 0.12)) { litTitle = column }
+    }
+
+    private func leaveTitle(_ column: BoardColumn) {
+        leave(column)
+        guard litTitle == column else { return }
+        withAnimation(.snappy(duration: 0.2)) { litTitle = nil }
+    }
+
+    /// Let go on the title: the task goes where the core's drop on it means (`ScreenView.titleDrops`), its project kept.
+    private func landOnTitle(_ column: BoardColumn) -> CGRect? {
+        guard let carry, carry.section == nil else { return nil }
+        guard carry.id != Carried.plus else { return land(column) }
+        guard let to = snapshot?.lists[column]?.titleDrop, let item = carry.item else {
+            letGo(writes: false)
+            return nil
+        }
+        // As any drop: written, and the copy flies to where the core will leave the task (`tasks.landing`), the room
+        // opened there; the carry ends once the copy has landed and the write is drawn.
+        letGo(writes: true)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let others = others(in: column)
+        let landed = landing(item, from: carry.from, to: to)
+        let room = landed?.gap(in: column, among: others)
+        if let room {
+            withAnimation(.snappy(duration: 0.25)) { settling = ListGap(column: column, at: room.at, level: room.level, group: room.group, zone: room.zone, place: .null, line: nil) }
+        }
+        Task { await drop(item, from: carry.from, to: to) }
+        // The room is the list's, in its content's space; the drop came down on the title, whose space it is given in.
+        guard let rect = room.flatMap({ gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: .null, line: nil)) }),
+              let list = dropping.origin(of: "list.\(column.rawValue)"), let title = dropping.origin(of: "title.\(column.rawValue)") else { return nil }
+        return rect.offsetBy(dx: list.x - title.x, dy: list.y - title.y)
     }
 
     /// The carry held over `column` at `point`: the gap the core places under the finger, its level from the finger's
@@ -936,16 +1078,23 @@ final class BoardModel {
         let others = others(in: column)
         let placed = others.map { card in
             let frame = shape.cards[card.id] ?? .zero
-            return PlacedCard(level: card.level, group: card.item.group, top: Double(frame.minY), height: Double(frame.height))
+            return PlacedCard(level: card.level, group: card.item.group, zone: card.zone, top: Double(frame.minY), height: Double(frame.height))
         }
-        let order = Dictionary(list.groups.enumerated().map { ($0.element.name ?? "\u{0}", $0.offset) }, uniquingKeysWith: { first, _ in first })
-        let orderOf = { (name: String?) in order[name ?? "\u{0}"] ?? 0 }
         var heads: [PlacedHead] = []
-        for group in list.groups where group.header != nil {
-            guard let frame = shape.heads[group.id] else { continue }
-            let mine = orderOf(group.name)
-            let first = others.firstIndex { orderOf($0.item.group) >= mine } ?? others.count
-            heads.append(PlacedHead(group: group.name, firstCard: first, top: Double(frame.minY), height: Double(frame.height)))
+        var before = 0
+        for part in list.parts {
+            switch part {
+            case .project(let project):
+                if let frame = shape.heads[project.id] {
+                    heads.append(PlacedHead(group: project.head, opens: true, firstCard: before, top: Double(frame.minY), height: Double(frame.height)))
+                }
+            case .section(let index):
+                let group = list.groups[index]
+                if group.header != nil, let frame = shape.heads[group.id] {
+                    heads.append(PlacedHead(group: group.place, firstCard: before, top: Double(frame.minY), height: Double(frame.height)))
+                }
+                before += group.cards.filter { !isCarried($0) }.count
+            }
         }
         let inset = Double(CardMetrics.columnInset)
         let y = carry.id == Carried.plus ? Double(point.y) : (try? board.carriedMiddle(y: Double(point.y), grab: Double(carry.grab), cardHeight: Double(CardMetrics.height))) ?? Double(point.y)
@@ -956,14 +1105,16 @@ final class BoardModel {
         guard let place = try? board.placeAt(placed, y: y, level: level, shift: 0, room: .null, heads: heads, held: held, hysteresis: 6),
               let at = place["index"].number, let fitted = place["level"].number else { return }
         let group = place["group"].string
+        let zone = place.field("project")
         // The card back where it was lifted from, at its level, changes nothing: the core's null, which comes back as no value.
         let stays = home.map { home in
             let drop: JSONValue? = ruleNow("rules.placeOfDrop", [Self.listCards(others), place, home])
             return drop == nil || drop == .null
         } ?? false
-        let lights = list.groups.contains { $0.name == group && $0.empty }
-        let shown = stays || lights ? nil : lineAt(column, at: Int(at), level: Int(fitted), group: group, home: home)
-        let next = ListGap(column: column, at: Int(at), level: Int(fitted), group: group, place: place, line: shown)
+        let lights = list.groups.contains { $0.holds(group: group, zone: zone) && $0.empty }
+        let shown = stays || lights ? nil : lineAt(column, at: Int(at), level: Int(fitted), group: group, zone: zone, home: home)
+        let next = ListGap(column: column, at: Int(at), level: Int(fitted), group: group, zone: zone, place: place, line: shown)
+        if litTitle != nil { withAnimation(.snappy(duration: 0.12)) { litTitle = nil } }
         guard next != gap else { return }
         if next.place != gap?.place { UISelectionFeedbackGenerator().selectionChanged() }
         landing = nil
@@ -1003,16 +1154,17 @@ final class BoardModel {
         }
         let to: JSONValue = ["kind": "place", "column": .string(column.rawValue), "place": place]
         letGo(writes: true)
-        let room = landing(item, from: carry.from, to: to)?.gap(in: column, among: others)
+        let landed = landing(item, from: carry.from, to: to)
+        let room = landed?.gap(in: column, among: others)
         if let room {
-            withAnimation(.snappy(duration: 0.25)) { settling = ListGap(column: column, at: room.at, level: room.level, group: room.group, place: place, line: nil) }
+            withAnimation(.snappy(duration: 0.25)) { settling = ListGap(column: column, at: room.at, level: room.level, group: room.group, zone: room.zone, place: place, line: nil) }
         }
         Task {
             let dropAt = ContinuousClock.now
             await drop(item, from: carry.from, to: to)
             DropTiming.report(since: dropAt)
         }
-        return room.flatMap { gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, place: place, line: nil)) }
+        return room.flatMap { gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: place, line: nil)) }
     }
 
     /// Where the core will leave `item` dropped `to`, asked before the write over the text the screen is drawn from, on
@@ -1039,10 +1191,10 @@ final class BoardModel {
 
     /// The drop line of a gap: through the middle of the room above the card it parts from, or above the dashed place
     /// when the card goes back where it was lifted from at another level, from the left edge of its level.
-    private func lineAt(_ column: BoardColumn, at: Int, level: Int, group: String?, home: JSONValue?) -> CGPoint? {
-        let probe = ListGap(column: column, at: at, level: level, group: group, place: .null, line: nil)
+    private func lineAt(_ column: BoardColumn, at: Int, level: Int, group: String?, zone: JSONValue?, home: JSONValue?) -> CGPoint? {
+        let probe = ListGap(column: column, at: at, level: level, group: group, zone: zone, place: .null, line: nil)
         guard let rect = gapRect(column, probe) else { return nil }
-        if let home, let carry, home["index"].number.map(Int.init) == at, home["group"].string == group, let waiting = geometry[column]?.cards[carry.id] {
+        if let home, let carry, home["index"].number.map(Int.init) == at, home["group"].string == group, home.field("project") == zone, let waiting = geometry[column]?.cards[carry.id] {
             return CGPoint(x: rect.minX, y: waiting.minY - CardMetrics.gap / 2)
         }
         return CGPoint(x: rect.minX, y: rect.minY - CardMetrics.gap / 2)
@@ -1055,11 +1207,15 @@ final class BoardModel {
         let indent = CGFloat(gap.level) * CardMetrics.indent
         let x = CardMetrics.columnInset + indent
         let w = shape.width - CardMetrics.columnInset * 2 - indent
-        if let next = others[safe: gap.at], next.item.group == gap.group, let frame = shape.cards[next.id] {
+        let inPart = { (card: BoardCard) in card.item.group == gap.group && card.zone == gap.zone }
+        if let next = others[safe: gap.at], inPart(next), let frame = shape.cards[next.id] {
             return CGRect(x: x, y: frame.minY, width: w, height: CardMetrics.height)
         }
-        let above = others.prefix(gap.at).last { $0.item.group == gap.group }
-        guard let frame = above.flatMap({ shape.cards[$0.id] }) ?? list.groups.first(where: { $0.name == gap.group }).flatMap({ shape.heads[$0.id] }) else { return nil }
+        let above = others.prefix(gap.at).last(where: inPart)
+        let header = list.groups.first { $0.holds(group: gap.group, zone: gap.zone) }.flatMap { shape.heads[$0.id] }
+        // A project's part without a section stands under the project's header.
+        let projectHead = gap.zone.flatMap { zone in list.projects.first { $0.zone == zone } }.flatMap { shape.heads[$0.id] }
+        guard let frame = above.flatMap({ shape.cards[$0.id] }) ?? header ?? projectHead else { return nil }
         return CGRect(x: x, y: frame.maxY + CardMetrics.gap, width: w, height: CardMetrics.height)
     }
 
@@ -1191,11 +1347,18 @@ final class BoardModel {
     private func homeGap(_ id: String, in column: BoardColumn) -> JSONValue? {
         guard let cards = snapshot?.lists[column]?.cards, let index = cards.firstIndex(where: { $0.names(id) }) else { return nil }
         let card = cards[index]
-        return ["kind": "gap", "index": .number(Double(index)), "level": .number(Double(card.level)), "group": card.item.group.json]
+        var gap: [String: JSONValue] = ["kind": "gap", "index": .number(Double(index)), "level": .number(Double(card.level)), "group": card.item.group.json]
+        if let zone = card.zone { gap["project"] = zone }
+        return .object(gap)
     }
 
-    private static func listCards(_ cards: [BoardCard]) -> JSONValue {
-        .array(cards.map { ["key": $0.item.key.json, "level": .number(Double($0.level)), "group": $0.item.group.json] })
+    /// The cards as places in a list see them (`ListCard`): each in its section, and its project's part in a grouped list.
+    static func listCards(_ cards: [BoardCard]) -> JSONValue {
+        .array(cards.map { card in
+            var json: [String: JSONValue] = ["id": .string(card.id), "key": card.item.key.json, "level": .number(Double(card.level)), "group": card.item.group.json]
+            if let zone = card.zone { json["project"] = zone }
+            return .object(json)
+        })
     }
 
     private static func contains(_ tree: TaskItem, _ item: TaskItem) -> Bool {

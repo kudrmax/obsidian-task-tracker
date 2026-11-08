@@ -64,6 +64,8 @@ struct ListEntryView: Decodable, Equatable {
     let place: Place
     let pending: [EntryView.Pending]
     let section: Bool
+    /// The section named for the task being typed in a project's group, drawn as its header over the field.
+    let newSection: String?
     let at: At
 }
 
@@ -162,8 +164,8 @@ final class QuickEntryHost {
     }
 
     /// A tap on a «No tasks» plate: the field of a new task in that section.
-    func openIn(_ column: BoardColumn, _ group: String?) {
-        opening { call("openIn", [.string(column.rawValue), group.json]) }
+    func openIn(_ column: BoardColumn, _ group: String?, _ zone: JSONValue? = .none) {
+        opening { call("openIn", [.string(column.rawValue), group.json] + (zone.map { [$0] } ?? [])) }
     }
 
     /// Add Subtask: the field last among the task's subtasks in its list; a task only on the calendar opens full
@@ -332,7 +334,7 @@ final class QuickEntryHost {
         var sectioned: [String: JSONValue] = [:]
         for (column, list) in snapshot.lists {
             cards[column.rawValue] = Self.listCards(list.cards)
-            sections[column.rawValue] = .array(list.groups.map(\.name.json))
+            sections[column.rawValue] = list.places
             sectioned[column.rawValue] = .bool(list.sectioned)
         }
         let shown = shown(at: model?.place ?? .today)
@@ -340,7 +342,7 @@ final class QuickEntryHost {
     }
 
     private static func listCards(_ cards: [BoardCard]) -> JSONValue {
-        .array(cards.map { ["id": .string($0.id), "key": $0.item.key.json, "level": .number(Double($0.level)), "group": $0.item.group.json] })
+        BoardModel.listCards(cards)
     }
 
     private func answer(_ method: String, _ arguments: [JSONValue], over snapshot: BoardSnapshot? = nil) -> JSONValue? {
@@ -425,7 +427,7 @@ final class QuickEntryHost {
         var found: [BoardColumn: ListEntryView] = [:]
         if state.spotKind == "list" {
             for (column, list) in snapshot.lists {
-                let drawn: JSONValue = ["cards": Self.listCards(list.cards), "sections": .array(list.groups.map(\.name.json))]
+                let drawn: JSONValue = ["cards": Self.listCards(list.cards), "sections": list.places]
                 if let entry = answer("listEntry", [.string(column.rawValue), drawn], over: snapshot)?["value"], !entry.isNull {
                     found[column] = try? entry.decode(ListEntryView.self)
                 }

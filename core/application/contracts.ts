@@ -513,6 +513,8 @@ export interface MenuProject {
 	readonly options: readonly MenuProjectOption[];
 	/** No project, last: checked when no task has one. */
 	readonly none: boolean;
+	/** The No project option's label: «No project». */
+	readonly noneLabel: string;
 	/** What the row shows beside «Project»: the shared project's name, «No project» when none has one, nothing when they differ. */
 	readonly value: string;
 	/** The row can't be pressed: only subtasks, whose project is their parent's. */

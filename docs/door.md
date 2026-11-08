@@ -387,6 +387,14 @@ without the lifted ones, `shift` how far the open gap `room` pushes the cards af
 to leave it; `room`, `held` may be `null`, `heads` `[]`, `hysteresis` `0`); the branch lines: `branchOf(levels, index)`
 (the row's `{ last, through }`: `last` its line bends in, `through[k]` the line of level `k + 1` goes on past it; `null`
 for a task) and `gapBranch(cards, gap)` (the same for an open gap, as a row of its level before `cards[gap.index]`);
+the vault's project notes for a host without Obsidian's metadata: `noteTags(text)` (a note's tags as Obsidian reads them,
+each with its `#`: the properties' `tags` or `tag`, as a list, `[a, b]` or bare words, then the text's `#tags` outside
+fenced and inline code; `"---\ntags: [project]\n---\n#more"` → `["#project", "#more"]`) and `projectNotes(notes, tag)`
+(`notes` every markdown note of the vault `[{ path, text }]`, or `{ path, tags }` with tags `noteTags` gave before, or
+`{ path }` alone for a note only counted for its name; `tag` the settings' project tag; answers `ProjectNote[]`
+`{ name, path, link }` of the notes with exactly that tag, case aside, a nested child tag not it, by name; `link` the name,
+the path without `.md` when another note has that name: `[{ path: "Work/Plan.md", text: "#project" }, { path:
+"Home/Plan.md" }]` → `[{ name: "Plan", path: "Work/Plan.md", link: "Work/Plan" }]`; the context's `projects`);
 the screen's places: `placeShowing(column, place)` (the place a list is shown from: `place` itself when it shows
 `column`, else the nearest place that does; `placeShowing("day", "inbox")` → `"soon"`; a place is `"inbox"`, `"soon"`
 or `"calendar"`, the app's Today);
@@ -442,6 +450,7 @@ JavaScriptCore of its own set to that zone (`osascript -l JavaScript`: a process
 - `CalendarExport.path`, `CalendarExport.text(...)` and `CalendarExport.adds`: `iphoneCalendarFile()`,
   `iphoneCalendarText(...)` and `iphoneCalendarAdds(...)`.
 - `Vault.settingsPath`: `settingsFile()`.
+- `NoteTags.of(text)` and `VaultProjects.projects(...)`: `rules.noteTags(text)` and `rules.projectNotes(notes, tag)`.
 - The task's title from the words, the recording and the tag, and what is blank: `capture.add`.
 - The old functions: the app calls `reminders.*`, `capture.add`, `calendars.sources`, `calendars.meetings` through
   `call`, by their error codes (`staleTask`, `blank`).

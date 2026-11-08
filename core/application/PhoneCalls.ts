@@ -45,7 +45,8 @@ import { sectionNameEnd } from "./SectionNameEntry";
 import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
-import { revealedGrouping, withFoldToggled, withGrouping } from "./projects";
+import { projectNotesOfTexts, revealedGrouping, withFoldToggled, withGrouping } from "./projects";
+import { noteTags } from "../domain/NoteTags";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
 import { type Operation, TaskRules } from "./TaskRules";
@@ -701,6 +702,8 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	usableColor,
 	acceptsDrop,
 	placesInGap,
+	noteTags,
+	projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
 	shadesOf,
 	inkOf,
 	contrast,

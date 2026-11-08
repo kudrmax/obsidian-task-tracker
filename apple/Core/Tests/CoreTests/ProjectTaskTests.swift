@@ -27,6 +27,10 @@ import Testing
 
     let core = try! PhoneCore(script: Fixtures.phoneScript)
     let at = Fixtures.date(7, 9)
+    /// This device shows every list ungrouped: the lists as they were before projects, each action seen in plain sections.
+    static let plain = #"{"on":{"backlog":false,"soon":false}}"#
+
+    func board(_ vault: FakeVault) -> TaskBoard { TaskBoard(core: core, vault: vault, grouping: MemoryText(Self.plain)) }
 
     // MARK: Reading
 
@@ -38,9 +42,8 @@ import Testing
         #expect(snapshot.timeline.slots.map(\.card.item.title) == ["Позвонить"])
     }
 
-    /// The core groups Backlog by project unless told otherwise; the app draws no groups yet, so it asks for every list
-    /// ungrouped: Backlog keeps its sections, and a card's Section menu offers the whole list's sections.
-    @Test func backlogLooksAsBeforeProjects() throws {
+    /// A device that turned grouping off: Backlog keeps its sections, and a card's Section menu offers the whole list's sections.
+    @Test func backlogUngroupedLooksAsBeforeProjects() throws {
         let snapshot = try snapshot(FakeVault(Self.file))
         let backlog = try #require(snapshot.lists[.backlog])
         #expect(backlog.groups.map(\.header) == ["No section", "Дальний"])
@@ -58,7 +61,7 @@ import Testing
     }
 
     @Test func searchFullScreenAndFindShowTheTitleAlone() throws {
-        let board = TaskBoard(core: core, vault: FakeVault(Self.file))
+        let board = board(FakeVault(Self.file))
         let files = try board.files(now: at)
         let groups: [SearchGroup] = try board.read("tasks.search", ["языковой"], over: files)
         let hit = try #require(groups.flatMap(\.hits).first)
@@ -76,7 +79,7 @@ import Testing
 
     @Test func aDragIntoAnotherSectionKeepsTheField() throws {
         let vault = FakeVault(Self.file)
-        let board = TaskBoard(core: core, vault: vault)
+        let board = board(vault)
         try drag("Someday", in: .backlog, before: 3, passed: ["Дальний"], vault: vault, board: board)
         try keeps(vault, "Someday")
         let backlog = try #require(try snapshot(vault).lists[.backlog])
@@ -85,7 +88,7 @@ import Testing
 
     @Test func aDragBetweenColumnsKeepsTheField() throws {
         let vault = FakeVault(Self.file)
-        let board = TaskBoard(core: core, vault: vault)
+        let board = board(vault)
         try drag("Someday", in: .day, before: 0, passed: [], vault: vault, board: board)
         try keeps(vault, "Someday")
         try drag(Self.exchange, in: .backlog, before: 0, passed: [], vault: vault, board: board)
@@ -94,7 +97,7 @@ import Testing
 
     @Test func ontoTheTimelineAndOffItKeepsTheField() throws {
         let vault = FakeVault(Self.file)
-        let board = TaskBoard(core: core, vault: vault)
+        let board = board(vault)
         let someday = try item("Someday", in: snapshot(vault))
         try board.write("tasks.drop", [[["key": someday.key.json, "from": "backlog"]], ["kind": "time", "start": 600], .string(Self.day)])
         try keeps(vault, "Someday")
@@ -107,7 +110,7 @@ import Testing
 
     @Test func renameAndASubtaskKeepTheField() throws {
         let vault = FakeVault(Self.file)
-        let board = TaskBoard(core: core, vault: vault)
+        let board = board(vault)
         try board.write("tasks.rename", [try item(Self.exchange, in: snapshot(vault)).key.json, "Сходить на обмен снова"])
         try keeps(vault, "Сходить на обмен снова")
         let parent = try item("Сходить на обмен снова", in: snapshot(vault))
@@ -120,7 +123,7 @@ import Testing
 
     @Test func theBulkMenusActionsKeepTheField() throws {
         let vault = FakeVault(Self.file)
-        let board = TaskBoard(core: core, vault: vault)
+        let board = board(vault)
         let snapshot = try snapshot(vault)
         let picked = try ["Someday", "Free"].map { title -> JSONValue in ["item": try item(title, in: snapshot).json, "from": "backlog"] }
         let screen: JSONValue = ["today": .string(snapshot.today), "day": .string(snapshot.day), "offer": snapshot.screen.offer]
@@ -142,7 +145,7 @@ import Testing
 
     @Test func aSectionRenamedOrRemovedKeepsItsProjectTasksField() throws {
         let vault = FakeVault(Self.file.replacingOccurrences(of: "- [ ] Far", with: "- [ ] Far \(Self.field)"))
-        let board = TaskBoard(core: core, vault: vault)
+        let board = board(vault)
         let section = try #require(try snapshot(vault).lists[.backlog]?.groups.last?.menu)
         #expect(section.section == "Дальний")
         try board.write("tasks.renameGroup", ["backlog", "Дальний", "Ближний"])
@@ -155,7 +158,7 @@ import Testing
 
     @Test func doneAndUndoKeepTheField() throws {
         let vault = FakeVault(Self.file)
-        let board = TaskBoard(core: core, vault: vault)
+        let board = board(vault)
         try board.write("tasks.pickStatus", [.array([try item(Self.exchange, in: snapshot(vault)).key.json]), "done"])
         #expect(vault.text.contains("- [x] \(Self.exchange) \(Self.field)"))
         try board.write("history.undo")
@@ -184,7 +187,7 @@ import Testing
     // MARK: Helpers
 
     private func snapshot(_ vault: FakeVault, day: String = Self.day) throws -> BoardSnapshot {
-        try TaskBoard(core: core, vault: vault).snapshot(day: day, measures: Self.measures, now: at)
+        try board(vault).snapshot(day: day, measures: Self.measures, now: at)
     }
 
     private func item(_ title: String, in snapshot: BoardSnapshot) throws -> TaskItem {

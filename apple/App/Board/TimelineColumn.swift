@@ -274,7 +274,8 @@ struct TimelineColumn: View {
             onCarry: { model.startCarry(slot.card, from: "timeline", grab: $0) },
             onCancel: { model.cancelCarry() },
             onEnd: { model.carryEnded() },
-            onDropped: { model.carryDropped() })
+            onDropped: { model.carryDropped() },
+            onProject: { model.openProject(of: slot.card.item) })
             .frame(height: max(tall, CardMetrics.height))
             .opacity(selecting ? 0.5 : 1)
             .allowsHitTesting(!selecting)

@@ -56,13 +56,17 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
         if let origin { places[key]?.origin = origin }
     }
 
+    /// Where a place's content origin stands, in the window.
+    func origin(of key: String) -> CGPoint? { places[key]?.origin }
+
     func remove(_ key: String) {
         if current == key { leave() }
         places[key] = nil
     }
 
     private func place(at point: CGPoint) -> String? {
-        places.first { $0.value.visible.contains(point) }?.key
+        // By key, so a point two places share always goes to the same one.
+        places.keys.sorted().first { places[$0]?.visible.contains(point) == true }
     }
 
     private func leave() {
