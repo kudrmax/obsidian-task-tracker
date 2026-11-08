@@ -4919,6 +4919,10 @@ ${key.title}`.toLowerCase();
     changeOf(doc, operation, at = this.moment()) {
       return this.written(doc, operation, at);
     }
+    /** What `changeOf` writes, without it being written: a trial, which the tasks' identity does not take as a write. */
+    trial(doc, operation, at = this.moment()) {
+      return this.written(doc, operation, at, false);
+    }
     emptyFile() {
       return TaskDocument.empty(sectionNames(this.settings.get()));
     }
@@ -5221,11 +5225,11 @@ ${key.title}`.toLowerCase();
           return place;
       }
     }
-    written(doc, operation, at) {
+    written(doc, operation, at, writes = true) {
       const { settings, today, boundary } = at;
       const after = normalize(operation(doc, today, settings, boundary), today, boundary, usablePresets(settings.groups.presets));
       const text = after.serialize();
-      this.identity?.wrote(text, after);
+      if (writes) this.identity?.wrote(text, after);
       return { text, before: doc, after };
     }
   };
@@ -5281,6 +5285,36 @@ ${key.title}`.toLowerCase();
       };
     }
   };
+
+  // core/application/landing.ts
+  function landingOf(screen, id, day, timeline) {
+    const span = (item) => timeline.shown({ slot: item.slot, open: item.open }, day);
+    const block = screen.day.slotted.find((item) => item.id === id);
+    if (block) {
+      const own = timeline.shown({ slot: block.slot, open: false }, day);
+      const shown = span(block);
+      return { kind: "timeline", id, item: block, span: shown, ridesNow: shown.start !== own.start, slotted: screen.day.slotted.map((item) => ({ id: item.id, span: span(item) })) };
+    }
+    const columns = [["day", screen.day.list], ["soon", screen.soon], ["inbox", screen.inbox], ["backlog", screen.backlog], ["done", screen.done]];
+    for (const [column, items] of columns) {
+      const card = items.find((item) => item.id === id);
+      if (card) return { kind: "list", id, item: card, column, group: card.group, index: items.filter((item) => item.group === card.group).indexOf(card) };
+      for (const top of items) {
+        const under = subtaskOf(top, id);
+        if (under) return under;
+      }
+    }
+    return { kind: "away", id, item: null };
+  }
+  function subtaskOf(parent, id) {
+    const index = parent.subtasks.findIndex((sub) => sub.id === id);
+    if (index >= 0) return { kind: "subtask", id, item: parent.subtasks[index], parent: parent.id, index };
+    for (const sub of parent.subtasks) {
+      const deeper = subtaskOf(sub, id);
+      if (deeper) return deeper;
+    }
+    return null;
+  }
 
   // core/application/TaskWrites.ts
   var nothing = (operation) => ({ operation, answer: () => void 0 });
@@ -5521,6 +5555,24 @@ ${key.title}`.toLowerCase();
       return {
         reads: moves.kind === "one" && moves.move.kind === "toTime",
         answer: (s) => this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps))
+      };
+    }
+    /**
+     * Where `drop` would leave the tasks, writing nothing: its operation tried over the file as read, and the screen of
+     * `day` read over the result by the same code as the screen.
+     */
+    landing(tasks, to, day, project) {
+      const drop = this.drop(tasks, to, day);
+      return {
+        reads: true,
+        answer: (s) => {
+          const ids = tasks.map((task) => this.rules.entryOf(s.doc, task.key).id);
+          const write = drop.answer(s);
+          const after = write.operation ? this.rules.trial(s.doc, write.operation).after : s.doc;
+          const screen = this.reads.screen({ text: after.serialize(), doc: after, today: s.today, boundary: s.boundary }, day, project);
+          const timeline = this.reads.timeline();
+          return ids.map((id) => landingOf(screen, id, day, timeline));
+        }
       };
     }
     /** The dropped tasks where `write` left them. */
@@ -5910,6 +5962,7 @@ ${key.title}`.toLowerCase();
     createSection: (c, [name, place]) => c.run(c.writes.createSection(name, place)),
     applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps)),
     drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks, to, day))),
+    landing: (c, [tasks, to, day, project]) => c.ask(c.writes.landing(tasks, to, day, project ?? void 0)),
     normalize: (c) => c.normalize(),
     createFile: (c) => {
       if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");

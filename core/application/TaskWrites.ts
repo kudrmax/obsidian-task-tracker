@@ -3,6 +3,7 @@ import type { TaskDocument } from "../domain/TaskDocument";
 import type {
 	DroppedTask,
 	DropFrom,
+	DropLanding,
 	DropTo,
 	EndList,
 	GroupedList,
@@ -23,6 +24,7 @@ import { tileStatus, toggledLabels, toggledPriority } from "./menus";
 import type { Read, Snapshot, TaskReads } from "./TaskReads";
 import type { Operation, TaskRules } from "./TaskRules";
 import { droppedSpan } from "./TimelineSpans";
+import { landingOf } from "./landing";
 
 /** The document as normalized before and after an operation ran. */
 export interface DocChange {
@@ -330,6 +332,25 @@ export class TaskWrites {
 		return {
 			reads: moves.kind === "one" && moves.move.kind === "toTime",
 			answer: (s) => this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps)),
+		};
+	}
+
+	/**
+	 * Where `drop` would leave the tasks, writing nothing: its operation tried over the file as read, and the screen of
+	 * `day` read over the result by the same code as the screen.
+	 */
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Read<readonly DropLanding[]> {
+		const drop = this.drop(tasks, to, day);
+		return {
+			reads: true,
+			answer: (s) => {
+				const ids = tasks.map((task) => this.rules.entryOf(s!.doc, task.key).id);
+				const write = drop.answer(s);
+				const after = write.operation ? this.rules.trial(s!.doc, write.operation).after : s!.doc;
+				const screen = this.reads.screen({ text: after.serialize(), doc: after, today: s!.today, boundary: s!.boundary }, day, project);
+				const timeline = this.reads.timeline();
+				return ids.map((id) => landingOf(screen, id, day, timeline));
+			},
 		};
 	}
 

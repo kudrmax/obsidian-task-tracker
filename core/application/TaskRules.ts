@@ -161,6 +161,11 @@ export class TaskRules {
 		return this.written(doc, operation, at);
 	}
 
+	/** What `changeOf` writes, without it being written: a trial, which the tasks' identity does not take as a write. */
+	trial(doc: TaskDocument, operation: Operation, at: Moment = this.moment()): TextChange {
+		return this.written(doc, operation, at, false);
+	}
+
 	emptyFile(): string {
 		return TaskDocument.empty(sectionNames(this.settings.get()));
 	}
@@ -512,11 +517,11 @@ export class TaskRules {
 		}
 	}
 
-	private written(doc: TaskDocument, operation: Operation, at: Moment): TextChange {
+	private written(doc: TaskDocument, operation: Operation, at: Moment, writes = true): TextChange {
 		const { settings, today, boundary } = at;
 		const after = normalize(operation(doc, today, settings, boundary), today, boundary, ops.usablePresets(settings.groups.presets));
 		const text = after.serialize();
-		this.identity?.wrote(text, after);
+		if (writes) this.identity?.wrote(text, after);
 		return { text, before: doc, after };
 	}
 }

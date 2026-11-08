@@ -212,6 +212,13 @@ every condition that changes the layout is animated by the transaction that chan
    a task's: `ListSection.id` and `ListGroup.id`, the same through rename, move, writes to its tasks and undo; No section
    is `"none"` in every list. `ProjectGroup.key` (the project's name) already names a project's group; no write renames
    a project, so it needs no other key.
+8. **Backend, R7: where a drop lands, asked before the write.** `TaskService.landing(tasks, to, day, project?)`
+   (`tasks.landing` through the door) answers a `DropLanding` per task: a timeline block at its shown `span` (with
+   `ridesNow` for a past time of today and every block of the day for the stack), a card of a column with its section
+   and index, a subtask under its parent, or away. It writes nothing: it tries the drop's own operation over the file as
+   read and reads the screen of `day` over the result with the screen's own code, so it is the write's answer by
+   construction; a test checks it against the place after the real drop for every drop case of `drops.test.ts`. It is a
+   `tasks.*` method, not `rules.*`, because it needs the tasks file.
 
 ## Done when
 
