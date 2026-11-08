@@ -107,12 +107,14 @@ final class BoardModel {
     /// Another day by its date, from wherever it is asked (the bar's Date…, a found task): it slides in as the arrows
     /// bring it, from the side it lies on.
     private func go(toDay day: String) async {
-        guard let shown = snapshot?.day, day != shown else {
-            shownDay = day
-            return await reload()
+        await afterTurns { [self] in
+            guard let shown = snapshot?.day, day != shown else {
+                shownDay = day
+                return await reload()
+            }
+            await turn(to: day, motion: day > shown ? 1 : -1)
+            if day == snapshot?.today { shownDay = nil }
         }
-        await turn(to: day, motion: day > shown ? 1 : -1)
-        if day == snapshot?.today { shownDay = nil }
     }
 
     func problem(_ error: Error) {
@@ -331,7 +333,7 @@ final class BoardModel {
     /// a swipe never pages the ribbon where the core leads to a day; the day comes in under the finger as the arrows bring
     /// it, the one read ahead, or read now when it is not yet.
     func beginDaySwipe(_ shift: Int) -> Bool {
-        guard dayTurn == nil, carry == nil, let snapshot else { return false }
+        guard dayTurn == nil, turnsAhead == 0, carry == nil, let snapshot else { return false }
         let from: JSONValue = ["mode": "calendar", "date": .string(snapshot.day)]
         guard let at = try? board.read("days.stepScreen", [from, .number(Double(shift))], over: board.settingsOnly()).decode(ScreenAt.self),
               at.mode == "calendar" else { return false }
@@ -355,6 +357,10 @@ final class BoardModel {
 
     /// Let go: the day runs on to the next one or back to where it stood, as the plugin's pager settles.
     func endDaySwipe(arrive: Bool) async {
+        await afterTurns { [self] in await settleDaySwipe(arrive: arrive) }
+    }
+
+    private func settleDaySwipe(arrive: Bool) async {
         guard let turn = dayTurn else { return }
         let reached = await daySlide.run(from: dayShare, to: arrive ? 1 : 0) { [weak self] share in self?.dayShare = share }
         guard reached, dayTurn?.peek.day == turn.peek.day else { return }
@@ -372,22 +378,45 @@ final class BoardModel {
     var isToday: Bool { snapshot.map { $0.day == $0.today } ?? true }
 
     func step(_ days: Int) async {
-        await entry.settle()
-        guard let day = snapshot?.day else { return }
-        let target: String
-        if let neighbours, snapshot?.day == day {
-            target = days < 0 ? neighbours.previous : neighbours.next
-        } else {
-            target = (try? await read("days.step", [.string(day), .number(Double(days))])) ?? day
+        await afterTurns { [self] in
+            await entry.settle()
+            guard let day = snapshot?.day else { return }
+            let target: String
+            if let neighbours, snapshot?.day == day {
+                target = days < 0 ? neighbours.previous : neighbours.next
+            } else {
+                target = (try? await read("days.step", [.string(day), .number(Double(days))])) ?? day
+            }
+            await turn(to: target, motion: days < 0 ? -1 : 1)
         }
-        await turn(to: target, motion: days < 0 ? -1 : 1)
     }
 
     func showToday() async {
-        await entry.settle()
-        guard let snapshot, snapshot.day != snapshot.today else { return }
-        await turn(to: snapshot.today, motion: snapshot.day < snapshot.today ? 1 : -1)
-        shownDay = nil
+        await afterTurns { [self] in
+            await entry.settle()
+            guard let snapshot, snapshot.day != snapshot.today else { return }
+            await turn(to: snapshot.today, motion: snapshot.day < snapshot.today ? 1 : -1)
+            shownDay = nil
+        }
+    }
+
+    /// The turns asked for and not yet landed, the one under way among them.
+    @ObservationIgnored private var turnsAhead = 0
+    /// The last turn asked for: the next one starts when it has landed and the screen has drawn its day.
+    @ObservationIgnored private var lastTurn: Task<Void, Never>?
+
+    /// A turn waits for the one under way, as the plugin's (decision 51): that one runs on from where it is to its day,
+    /// never set down in one frame, and this one starts from the day it brought in.
+    private func afterTurns(_ work: @escaping @MainActor () async -> Void) async {
+        let before = lastTurn
+        turnsAhead += 1
+        let mine = Task { @MainActor in
+            await before?.value
+            await work()
+            turnsAhead -= 1
+        }
+        lastTurn = mine
+        await mine.value
     }
 
     /// Another day, as the plugin turns it: the header and the hours stand still while in each column the day slides out

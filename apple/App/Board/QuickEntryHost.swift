@@ -1087,33 +1087,46 @@ struct EntryDateSheet: View {
 
 
 /// The keyboard's next rise: what waits for it runs as the keyboard starts to move (its views reloaded, the main thread
-/// free), at once when it already stands, and after a moment at most when it does not move at all.
+/// free), or at once while it stands. A field taken while the keyboard goes down waits for its rise back, which UIKit
+/// announces when the field takes it; the state follows the keyboard's four notices, so nothing is guessed by time.
 @MainActor
 final class KeyboardRise {
     static let shared = KeyboardRise()
+
+    private enum Stand { case down, rising, up, falling }
+
     private var waiting: [() -> Void] = []
-    private var up = false
-    private static let longest: TimeInterval = 0.4
+    private var stand = Stand.down
 
     private init() {
         let center = NotificationCenter.default
-        // Posted from inside the keyboard's setting up of its views, which holds the main thread a while longer: what
-        // waits runs on the next turn, once that has returned and the keyboard's own animation is running.
-        center.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { _ in
-            MainActor.assumeIsolated {
-                KeyboardRise.shared.up = true
-                DispatchQueue.main.async { KeyboardRise.shared.run() }
+        // Will-show is posted from inside the keyboard's setting up of its views, which holds the main thread a while
+        // longer: what waits runs on the next turn, once that has returned and the keyboard's own animation is running.
+        observe(center, UIResponder.keyboardWillShowNotification) { rise in
+            rise.stand = .rising
+            DispatchQueue.main.async {
+                guard rise.stand == .rising else { return }
+                rise.stand = .up
+                rise.run()
             }
         }
-        center.addObserver(forName: UIResponder.keyboardDidHideNotification, object: nil, queue: .main) { _ in
-            MainActor.assumeIsolated { KeyboardRise.shared.up = false }
+        observe(center, UIResponder.keyboardDidShowNotification) { rise in
+            rise.stand = .up
+            rise.run()
+        }
+        observe(center, UIResponder.keyboardWillHideNotification) { $0.stand = .falling }
+        observe(center, UIResponder.keyboardDidHideNotification) { $0.stand = .down }
+    }
+
+    private func observe(_ center: NotificationCenter, _ name: Notification.Name, _ body: @escaping (KeyboardRise) -> Void) {
+        center.addObserver(forName: name, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { body(KeyboardRise.shared) }
         }
     }
 
     func next(_ body: @escaping () -> Void) {
-        if up { return body() }
+        if stand == .up { return body() }
         waiting.append(body)
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.longest) { [weak self] in self?.run() }
     }
 
     private func run() {
