@@ -1,5 +1,5 @@
 import { ScrollEdges } from "./ScrollEdges";
-import { branchOf, type EntryAt, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListGrouping, type ListRow, type ListSection, type ListView, keyId, listView, type PendingText, type ProjectGroup, type ProjectZone, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import { branchOf, type EntryAt, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListGrouping, type ListRow, type ListSection, type ListView, listView, type PendingText, type ProjectGroup, type ProjectZone, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
 import { icon } from "./kit/icons";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
@@ -105,13 +105,18 @@ const QUICK_ROW = "tc-quick-row";
 /** The key of the field's row, and of the cards of the texts typed and not yet written, by their order. */
 const ENTRY = "entry";
 const UNWRITTEN = "unwritten:";
+/** The key of the dashed place a lifted section lands on. */
+const LANDING = "landing";
+
+/** Where a lifted section's landing place stands: over the `before`-th header drawn, or right after the section of id `after` (`ListGroup.id`). */
+export type Landing = { readonly before: number } | { readonly after: string };
 export const PLATE = "tc-group-empty";
 
 /** What a list about to draw `shape` shows the field among. */
 function drawingOf(shape: ListShape): EntryDrawing {
 	const sections = sectionsOf(shape);
 	return {
-		cards: sections.flatMap((section) => section.group.rows.map(({ item, level }) => ({ key: item.key, level, group: section.group.name, ...(section.project !== undefined && { project: section.project }) }))),
+		cards: sections.flatMap((section) => section.group.rows.map(({ item, level }) => ({ key: item.key, id: item.id, level, group: section.group.name, ...(section.project !== undefined && { project: section.project }) }))),
 		sections: sections.map(headerOf),
 	};
 }
@@ -126,6 +131,9 @@ export class TaskList {
 	private nodes: HTMLElement[] = [];
 	/** Each header drawn, as the places see it: a section's, or a project group's (its part without a section, or its end while folded). */
 	private heads = new Map<HTMLElement, Header>();
+	/** Where a lifted section will land, shown as a dashed place among the sections; none while no section is carried. */
+	private landing: Landing | null = null;
+	private headsById = new Map<string, HTMLElement>();
 	/** Each empty section's No tasks plate drawn, by its name and its project's part. */
 	private plates = new Map<string, HTMLElement>();
 	/** Each section's cards as drawn, its subtasks' among them. */
@@ -136,10 +144,10 @@ export class TaskList {
 	private readonly keyed: KeyedRows;
 	private readonly hold: ScrollHold;
 	/**
-	 * The tasks the field has written, by the key each write answered (`TaskService.createInPlace`), oldest first: the card
+	 * The tasks the field has written, by the id each write answered (`TaskService.createWithId`), oldest first: the card
 	 * drawn for one takes over the row of the text it was typed as, so a written text stays the same card on the screen.
 	 */
-	private created: TaskKey[] = [];
+	private created: string[] = [];
 	/** A card was renamed in place last time, and is now: its field's row comes and goes with the card's in the same frame. */
 	private renamedDrawn = false;
 	private renamingNow = false;
@@ -202,6 +210,7 @@ export class TaskList {
 		this.entries = [];
 		this.nodes = [];
 		this.heads = new Map();
+		this.headsById = new Map();
 		this.plates = new Map();
 		this.sectionCards = new Map();
 		this.rendered = sectionsOf(shape);
@@ -241,6 +250,9 @@ export class TaskList {
 		};
 		if (at?.kind === "top") enter();
 		let i = -1;
+		let headsDrawn = 0;
+		const landing = this.landing;
+		const mark = () => drawing.takeMark(LANDING, () => el(null, "div", "tc-group-drop"));
 		for (const part of shape.drawn) {
 			if (part.kind === "project") {
 				this.nodes.push(this.projectHeader(drawing, part.group));
@@ -248,7 +260,11 @@ export class TaskList {
 			}
 			section = ++i;
 			const { group, project } = part;
-			if (this.withHeaders && group.header) this.nodes.push(this.header(drawing, group, project));
+			if (this.withHeaders && group.header) {
+				if (landing && "before" in landing && landing.before === headsDrawn) mark();
+				headsDrawn++;
+				this.nodes.push(this.header(drawing, group, project));
+			}
 			const platesField = at?.kind === "in" && at.section === i && !at.keepsPlate;
 			if (group.empty && !platesField) this.nodes.push(this.plate(drawing, group, project));
 			const groupStart = this.entries.length;
@@ -256,7 +272,9 @@ export class TaskList {
 			this.sectionCards.set(group, this.entries.slice(groupStart).map((e) => e.card));
 			subtrees(groupStart);
 			enterAtCard();
+			if (landing && "after" in landing && landing.after === group.id) mark();
 		}
+		if (landing && "before" in landing && landing.before >= headsDrawn) mark();
 		enter();
 		if (entryRow) this.markRenamed(entryRow, renaming);
 		rows.forEach((row, i) => {
@@ -311,15 +329,15 @@ export class TaskList {
 
 	/** A task the field has just written takes over the row of the text it was typed as; it stops being awaited then. */
 	private heirOf(item: TaskItem): string | undefined {
-		const at = this.created.findIndex((key) => keyId(key) === keyId(item.key));
+		const at = this.created.indexOf(item.id);
 		if (at < 0 || this.keyed.nodeOf(`task:${item.id}`)) return undefined;
 		this.created.splice(at, 1);
 		return `${UNWRITTEN}${this.written++}`;
 	}
 
-	/** The field wrote a task where it was typed (`key`, as the write answered): its card takes the typed text's row when drawn. */
-	adopt(key: TaskKey): void {
-		this.created.push(key);
+	/** The field wrote a task where it was typed (`id`, as the write answered): its card takes the typed text's row when drawn. */
+	adopt(id: string): void {
+		this.created.push(id);
 	}
 
 	/** The field closed: no text typed is awaited any more. */
@@ -359,7 +377,7 @@ export class TaskList {
 
 	/** A card as places in the list see it: in the section, and the project's part, it is drawn in. */
 	listCard(entry: ListEntry): ListCard {
-		return { key: entry.item.key, level: entry.level, group: entry.group, ...(entry.project !== undefined && { project: entry.project }) };
+		return { key: entry.item.key, id: entry.item.id, level: entry.level, group: entry.group, ...(entry.project !== undefined && { project: entry.project }) };
 	}
 
 	/** The sections as drawn; one ungrouped run when the list shows none. */
@@ -379,6 +397,21 @@ export class TaskList {
 
 	get headers(): boolean {
 		return this.withHeaders;
+	}
+
+	/**
+	 * The place a lifted section lands, drawn as a row of the list (`before`: the header it stands over, counted among the
+	 * headers drawn, past the last for the end; `after`: right after the section of that id, once the move is drawn);
+	 * null takes it away, folding. The list draws itself again.
+	 */
+	showLanding(at: Landing | null): void {
+		this.landing = at;
+		this.render();
+	}
+
+	/** The header drawn for the section of id `id` (`ListGroup.id`, the same through a move or a rename), if one is. */
+	headOf(id: string): HTMLElement | null {
+		return this.headsById.get(id) ?? null;
 	}
 
 	/** The No tasks plate of empty section `name` (of the project's part `project`); null when none is drawn. */
@@ -403,6 +436,7 @@ export class TaskList {
 		head.classList.toggle("is-in-project", project !== undefined);
 		el(head, "span", "tc-group-name", group.name ?? this.deps.ungroupedName?.() ?? "");
 		this.heads.set(head, headerOf({ group, project }));
+		if (project === undefined) this.headsById.set(group.id, head);
 		this.deps.onHeader?.(head, group, signal);
 		return head;
 	}

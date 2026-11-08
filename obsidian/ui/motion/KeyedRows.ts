@@ -29,6 +29,8 @@ interface Leaving {
 export class KeyedRows {
 	private rows = new Map<string, Row>();
 	private readonly leaving = new Map<string, Leaving>();
+	/** Keys of rows that only mark a place (where a lifted section lands): they fold away without fading first. */
+	readonly marks = new Set<string>();
 
 	constructor(readonly host: HTMLElement) {}
 
@@ -84,9 +86,13 @@ export class KeyedRows {
 				continue;
 			}
 			gone.push(row.node);
-			const animation = Motion.leave(row.node, () => {
-				if (this.leaving.get(key)?.node === row.node) this.leaving.delete(key);
-			});
+			const animation = Motion.leave(
+				row.node,
+				() => {
+					if (this.leaving.get(key)?.node === row.node) this.leaving.delete(key);
+				},
+				!this.marks.has(key),
+			);
 			if (row.node.isConnected) this.leaving.set(key, { node: row.node, animation });
 		}
 		if (!moving)
@@ -129,6 +135,12 @@ export class RowsDrawing {
 	/** The row of `key` goes at once, measured where it stood: the row it stood in for takes its place in this frame. */
 	forget(key: string): void {
 		this.rows.forget(key);
+	}
+
+	/** A row that only marks a place: it grows in, slides between places, and folds away without fading first. */
+	takeMark(key: string, make: () => HTMLElement): TakenRow {
+		this.rows.marks.add(key);
+		return this.take(key, make);
 	}
 
 	/** A new row that stands in for one of the same height in the same frame (a renamed card's field): it does not grow in. */

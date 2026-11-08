@@ -5,6 +5,10 @@ import { SHOWN_LISTS as SHOWN } from "../../core/application/contracts";
 import { onDay } from "../fakes/itemOnDay";
 import { toItem } from "../../core/application/taskItems";
 import { TaskDocument } from "../../core/domain/TaskDocument";
+import { keyId } from "../../core/application/contracts";
+
+/** What `createWithId` answers for a task made at `key`: the key and the id the task is then read with. */
+const withId = (key: TaskKey | null) => key && { key, id: keyId(key) };
 
 const key = (name: string): TaskKey => ({ section: "now", index: 0, path: [], raw: name });
 const card = (name: string, level = 0): ListCard => ({ key: key(name), level, group: null });
@@ -126,12 +130,12 @@ class FakeTasks {
 		return new QuickEntrySession(
 			{
 				...titles,
-				createInPlace: async (text, priority, place, repeat) => {
+				createWithId: async (text, priority, place, repeat) => {
 					if (this.failing.has(text)) throw new Error(`no ${text}`);
 					this.created.push({ text, priority, place });
 					// A schedule gives the task its first day: it leaves a column of tasks without one.
-					if (this.elsewhere || (this.undated && repeat?.kind === "schedule")) return { section: "soon", index: 0, path: [], raw: text };
-					return this.land(text, place);
+					if (this.elsewhere || (this.undated && repeat?.kind === "schedule")) return withId({ section: "soon", index: 0, path: [], raw: text });
+					return withId(this.land(text, place));
 				},
 				createSection: async (name, place) => {
 					this.sectionsMade.push({ name, place });

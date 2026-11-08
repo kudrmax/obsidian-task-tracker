@@ -48,20 +48,20 @@ export function shownPart(el: HTMLElement): { readonly rect: DOMRect; readonly b
 }
 
 /**
- * `el` comes into view in its column with the plugin's one smooth scroll, whole or from its top when it is taller;
- * `then` runs once the column stands still, at once when it needs no scroll. Answers how to call it off.
+ * `el` comes into view in its column with the plugin's one smooth scroll, whole or from its top when it is taller.
+ * Exactly one of the two runs, once: `then` when the column stands still (it got there, its content ended short, or
+ * another scroll took over), `yielded` when a finger took the column. Neither runs once it is called off (the answer).
  */
-export function scrollIntoColumn(el: HTMLElement, then: () => void): () => void {
+export function scrollIntoColumn(el: HTMLElement, then: () => void, yielded: () => void = () => undefined): () => void {
 	const box = shownBoxOf(el);
 	const by = box ? scrollToShow(el.getBoundingClientRect(), box) : 0;
 	if (!box || Math.abs(by) < 1) {
 		then();
 		return () => undefined;
 	}
-	let called = false;
-	return scrollSmoothly(box.scroller, box.scroller.scrollTop + by, () => {
-		if (called) return;
-		called = true;
-		then();
+	return scrollSmoothly(box.scroller, box.scroller.scrollTop + by, (how) => {
+		if (how === "stopped") return;
+		if (how === "finger") yielded();
+		else then();
 	});
 }

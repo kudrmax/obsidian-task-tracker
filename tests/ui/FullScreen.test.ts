@@ -62,7 +62,7 @@ function setup(item = morning()) {
 		fullTree,
 		setDescription: vi.fn(async () => undefined),
 		edit: vi.fn(async (): Promise<TaskItem | null> => null),
-		createInPlace: vi.fn(async () => null),
+		createWithId: vi.fn(async () => null),
 		createSection: vi.fn(async () => null),
 		placementOf: () => ({ kind: "now" }) as const,
 		placementOfDay: () => ({ kind: "now" }) as const,
@@ -183,7 +183,7 @@ describe("FullScreen", () => {
 		field.dispatchEvent(new InputEvent("input"));
 		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
 		await vi.runAllTimersAsync();
-		expect(tasks.createInPlace).toHaveBeenCalledWith(" Выпить витамины ", null, { kind: "subtask", parent: expect.objectContaining({ path: [] }), before: null }, null, []);
+		expect(tasks.createWithId).toHaveBeenCalledWith(" Выпить витамины ", null, { kind: "subtask", parent: expect.objectContaining({ path: [] }), before: null }, null, []);
 		expect(screen.el.querySelector<HTMLTextAreaElement>(".tc-full-list textarea")?.value).toBe("");
 	});
 
@@ -199,7 +199,7 @@ describe("FullScreen", () => {
 		field()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
 		expect(field()).toBeNull();
 		await vi.runAllTimersAsync();
-		expect(tasks.createInPlace).not.toHaveBeenCalled();
+		expect(tasks.createWithId).not.toHaveBeenCalled();
 	});
 
 	it("a tap elsewhere writes the new subtask and ends the entry", async () => {
@@ -211,7 +211,7 @@ describe("FullScreen", () => {
 		field.blur();
 		field.dispatchEvent(new FocusEvent("blur"));
 		await vi.runAllTimersAsync();
-		expect(tasks.createInPlace).toHaveBeenCalledWith("Зонт", null, expect.objectContaining({ kind: "subtask" }), null, []);
+		expect(tasks.createWithId).toHaveBeenCalledWith("Зонт", null, expect.objectContaining({ kind: "subtask" }), null, []);
 		expect(screen.el.querySelector(".tc-full-list textarea")).toBeNull();
 	});
 

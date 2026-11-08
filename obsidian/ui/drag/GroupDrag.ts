@@ -66,7 +66,7 @@ export class GroupDrag {
 		const plate = taskList.plateOf(group.name);
 		const section = [head, ...taskList.cardsOf(group), ...(plate ? [plate] : [])];
 		for (const node of section) node.classList.add(FOLDED);
-		const slots = new SectionSlots(taskList, heads, places, names, lifted);
+		const slots = new SectionSlots(taskList, places, names, lifted);
 		let released = false;
 		const release = () => {
 			if (released) return;
@@ -84,13 +84,17 @@ export class GroupDrag {
 					node.classList.remove(FOLDED);
 				}
 			},
+			/**
+			 * The move is written and the list drawn as the file now has it, its landing place right after the section; the
+			 * copy lands on the section's header as drawn there, found by the section's id. The screen stays the drag's
+			 * until the copy has landed.
+			 */
 			onEnd: async (place) => {
-				if (!place) return release();
+				if (!place) return null;
 				this.deps.haptics.tap();
 				await this.deps.onMove(list, group.name, place).catch((error: unknown) => console.error("Task Calendar: section move", error));
-				release();
-				slots.standAfter(section);
-				return head.isConnected ? head : null;
+				taskList.showLanding({ after: group.id });
+				return taskList.headOf(group.id);
 			},
 		});
 		session.move(e.clientX, e.clientY);
@@ -135,14 +139,12 @@ interface SectionPayload {
  * dashed place that opens there and closes behind it; let go, the move is the slot's place, none for the section's own.
  */
 class SectionSlots implements DropTarget<SectionPayload, GroupPlace> {
-	private mark: HTMLElement | null = null;
 	private nearest: number;
 	/** The slot the mark was last put at: the finger moving within one slot leaves it be. */
 	private marked: number | null = null;
 
 	constructor(
 		private readonly list: TaskList,
-		private readonly heads: readonly HTMLElement[],
 		private readonly places: readonly number[],
 		private readonly names: readonly GroupName[],
 		private readonly lifted: number,
@@ -154,16 +156,12 @@ class SectionSlots implements DropTarget<SectionPayload, GroupPlace> {
 		return true;
 	}
 
+	/** The list draws the landing place over the slot's header, or takes it away on the section's own slot. */
 	preview(_x: number, y: number): void {
 		this.nearest = nearestSlot(this.places, y);
 		if (this.nearest === this.marked) return;
 		this.marked = this.nearest;
-		this.fold();
-		if (groupPlaceOf(this.names, this.lifted, this.nearest) === null) return;
-		const mark = (this.mark = el(null, "div", "tc-group-drop"));
-		if (this.nearest < this.heads.length) this.heads[this.nearest].before(mark);
-		else this.list.el.appendChild(mark);
-		Motion.enter(mark);
+		this.list.showLanding(groupPlaceOf(this.names, this.lifted, this.nearest) === null ? null : { before: this.nearest });
 	}
 
 	drop(): GroupPlace | null {
@@ -177,27 +175,10 @@ class SectionSlots implements DropTarget<SectionPayload, GroupPlace> {
 
 	leave(): void {}
 
-	/** The drag is over: the mark closes as the section opens in its place. */
+	/** The drag is over: the landing place closes as the section opens. */
 	clear(): void {
-		this.fold();
 		this.marked = null;
-	}
-
-	/**
-	 * The move is drawn: the mark stands right after the section, still folded, so the section's header stands where it
-	 * will open, and the copy lands there; nothing on the screen moves by it.
-	 */
-	standAfter(section: readonly HTMLElement[]): void {
-		const last = section[section.length - 1];
-		const mark = this.mark;
-		if (!mark || !last.isConnected || last.nextElementSibling === mark) return;
-		/** The folded section moves, never the mark: a mark kept in the page eases into its gap, one moved would step. */
-		mark.before(...section);
-	}
-
-	private fold(): void {
-		if (this.mark) Motion.leave(this.mark, () => undefined, false);
-		this.mark = null;
+		this.list.showLanding(null);
 	}
 }
 

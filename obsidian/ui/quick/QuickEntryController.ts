@@ -388,20 +388,25 @@ export class QuickEntryController {
 	}
 
 	/** The plus came to rest: the field opens where it landed, in a list or in a slot of the timeline. */
-	/** The tasks the session writes through: each task the field writes is told to the lists by the key the write answers, so its card takes the typed text's row. */
+	/** The service as the session writes through it, each task the field writes told to the lists by the id the write answers: its card takes the typed text's row. */
 	private telling(tasks: QuickEntryTasks): QuickEntryTasks {
-		const createInPlace: QuickEntryTasks["createInPlace"] = async (...args) => {
-			const key = await tasks.createInPlace(...args);
-			if (key) for (const column of COLUMNS) this.deps.list(column)?.adopt(key);
-			return key;
-		};
-		return new Proxy(tasks, {
-			get: (target, name) => {
-				if (name === "createInPlace") return createInPlace;
-				const value: unknown = Reflect.get(target, name, target);
-				return typeof value === "function" ? value.bind(target) : value;
+		return {
+			placementOf: (...a) => tasks.placementOf(...a),
+			placementOfDay: (...a) => tasks.placementOfDay(...a),
+			dayOfPlacement: (...a) => tasks.dayOfPlacement(...a),
+			parseTitle: (...a) => tasks.parseTitle(...a),
+			isBlank: (...a) => tasks.isBlank(...a),
+			withPriority: (...a) => tasks.withPriority(...a),
+			draftMarks: (...a) => tasks.draftMarks(...a),
+			newSlot: (...a) => tasks.newSlot(...a),
+			createSection: (...a) => tasks.createSection(...a),
+			edit: (...a) => tasks.edit(...a),
+			createWithId: async (...a) => {
+				const created = await tasks.createWithId(...a);
+				if (created) for (const column of COLUMNS) this.deps.list(column)?.adopt(created.id);
+				return created;
 			},
-		});
+		};
 	}
 
 	/** The plus let go: on a place the field opens there in the same tap, and the plus lands in it (this gives the field). */
