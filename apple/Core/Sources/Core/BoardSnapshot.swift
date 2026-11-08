@@ -257,6 +257,12 @@ public struct BoardTimeline: Sendable, Hashable {
     public let zoomLevels: [Double]
 }
 
+/// How today changed between two reads (`DayChange`).
+public enum DayChange: Sendable, Equatable {
+    case passed
+    case moved
+}
+
 /// Everything the main screen draws for a day, read at one moment through the door.
 public struct BoardSnapshot: Sendable {
     public let today: String
@@ -274,6 +280,34 @@ public struct BoardSnapshot: Sendable {
     public let tasksText: String?
     /// The plugin's settings (`data.json`) it was read over: what is named by them is asked again when they change.
     public let settingsJSON: String
+    /// Each calendar file's text it was read over, by source: a file Sync brings redraws the timeline.
+    public let calendarTexts: [String: String]
+    /// The moment it was read at: the now line and an overdue task riding it stand where they were then.
+    public let readAt: Date
+    /// The hour the day starts at, as the core read it (`days.boundary`).
+    public let startHour: Int
+
+    /// The files as they are now say what this snapshot was read from: no file, no setting, no calendar changed.
+    public func readFrom(_ files: BoardFiles) -> Bool {
+        files.tasks == tasksText && files.settingsJSON == settingsJSON && files.calendars == calendarTexts
+    }
+
+    /// Read from the same files on the same day: a snapshot of another day can stand beside it in a day's turn.
+    public func readAlike(_ other: BoardSnapshot) -> Bool {
+        other.tasksText == tasksText && other.settingsJSON == settingsJSON && other.calendarTexts == calendarTexts && other.today == today
+    }
+
+    /// Still true at `now`: read within the same minute, so the now line stands where it should.
+    public func current(at now: Date, calendar: Calendar = .current) -> Bool {
+        calendar.isDate(readAt, equalTo: now, toGranularity: .minute)
+    }
+
+    /// How the day changed from `before` to this read, as the plugin's `DayService` tells it: `moved` when the day's start
+    /// hour changed (the screen opens today afresh), `passed` when today is another day by the clock.
+    public func dayChange(since before: BoardSnapshot) -> DayChange? {
+        if before.startHour != startHour { return .moved }
+        return before.today == today ? nil : .passed
+    }
 
     /// The task the screen shows under `id`, a card's (`BoardCard.id`) or its task's (`TaskItem.id`), anywhere.
     public func item(_ id: String) -> TaskItem? {
@@ -286,6 +320,10 @@ public struct BoardSnapshot: Sendable {
         for (column, list) in lists where list.cards.contains(where: { $0.names(id) }) { return column.rawValue }
         return timeline.slots.contains { $0.card.names(id) } ? "timeline" : nil
     }
+}
+
+private struct DayStart: Decodable {
+    let startHour: Int
 }
 
 extension TaskBoard {
@@ -352,7 +390,10 @@ extension TaskBoard {
             canUndo: canUndo,
             menus: menus,
             tasksText: files.tasks,
-            settingsJSON: files.settingsJSON)
+            settingsJSON: files.settingsJSON,
+            calendarTexts: files.calendars,
+            readAt: files.now,
+            startHour: try read("days.boundary", over: files, as: DayStart.self).startHour)
     }
 
     private func cards(_ rows: [ListRow], corner: JSONValue, painter: inout Painter) throws -> [BoardCard] {

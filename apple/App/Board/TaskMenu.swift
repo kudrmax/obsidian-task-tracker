@@ -36,6 +36,8 @@ struct TaskMenu {
     var inStack = false
     /// The menu of the task its own full screen shows: no Open Full Screen.
     var ownPage = false
+    /// On the task's own full screen, Description puts the caret in its description instead of opening the page again.
+    var describe: (@MainActor () -> Void)?
 
     private var single: Bool { items.count == 1 }
 
@@ -82,7 +84,7 @@ struct TaskMenu {
 
     /// The edit rows in the core's order (`menu.edits`).
     private var editRows: [MenuNode] {
-        let items = items, model = model, inStack = inStack
+        let items = items, model = model, inStack = inStack, describe = describe
         guard let item = items.first else { return [] }
         var rows: [MenuNode] = []
         for edit in menu.edits {
@@ -94,7 +96,7 @@ struct TaskMenu {
                     .action(title: ReminderWords.title(reminder.kind), symbol: nil, checked: reminder.checked) { Task { await model.setReminder(item, reminder.kind) } }
                 }))
             case "description" where single:
-                rows.append(.action(title: "Description", symbol: "text.alignleft", opens: true) { model.fullScreen.append(item) })
+                rows.append(.action(title: "Description", symbol: "text.alignleft", opens: true) { if let describe { describe() } else { model.fullScreen.append(item) } })
             case "repeat" where single:
                 rows.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item })
             case "section":

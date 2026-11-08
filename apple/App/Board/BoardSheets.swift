@@ -1,5 +1,6 @@
 import Core
 import SwiftUI
+import os
 
 extension View {
     /// What a task's menu opens: Pick a Date, Repeat, Rename and Add Subtask as sheets, New Section as an alert with a field,
@@ -32,22 +33,27 @@ private struct BoardSheets: ViewModifier {
     }
 }
 
-/// Pick a Date: the system calendar; a tap on a day moves the tasks there and closes. Remove Due Date when the core offers it.
+/// Pick a Date: the system calendar; a tap on a day moves the tasks there and closes. A task without a date opens with no
+/// day picked, so today is a tap like any other. Remove Due Date when the core offers it.
 struct DateSheet: View {
     let items: [TaskItem]
     @Bindable var model: BoardModel
-    @State private var picked = Date()
     @State private var menu: TaskMenuModel?
-    /// The day shown as the sheet opens, the tasks' own: only another day tapped moves them.
-    @State private var opened: Date?
+    /// The tasks' own day, picked as the sheet opens; nil for tasks without one.
+    @State private var due: DateComponents?
+    @State private var ready = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                DatePicker("Date", selection: $picked, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
+                if ready {
+                    DayCalendar(picked: due) { day in
+                        guard let day else { return dismiss() }
+                        Task { await model.postpone(items, to: day); dismiss() }
+                    }
                     .tint(.accentColor)
+                }
                 if menu?.removeDue == true {
                     Button("Remove Due Date", role: .destructive) {
                         Task { await model.removeDue(items); dismiss() }
@@ -65,13 +71,50 @@ struct DateSheet: View {
         .presentationDetents([.medium, .large])
         .task {
             menu = items.count == 1 ? model.snapshot?.menus[items[0].id] : await model.bulkMenu()
-            let shown = menu?.dueDate.flatMap(LocalDay.date) ?? picked
-            opened = shown
-            picked = shown
+            due = menu?.dueDate.flatMap(LocalDay.components)
+            ready = true
         }
-        .onChange(of: picked) { _, new in
-            guard let opened, !Calendar.current.isDate(opened, inSameDayAs: new) else { return }
-            Task { await model.postpone(items, to: LocalDay.string(new)); dismiss() }
+    }
+}
+
+/// The system's calendar of one picked day (`UICalendarView`), which, unlike the graphical date picker, can open with no
+/// day picked. `chose` hears the day tapped as the core writes it, or nil when the day already picked was tapped.
+private struct DayCalendar: UIViewRepresentable {
+    let picked: DateComponents?
+    let chose: (String?) -> Void
+
+    func makeUIView(context: Context) -> UICalendarView {
+        let view = UICalendarView()
+        view.calendar = .current
+        view.locale = .current
+        view.fontDesign = .default
+        let selection = UICalendarSelectionSingleDate(delegate: context.coordinator)
+        selection.selectedDate = picked
+        view.selectionBehavior = selection
+        if let picked { view.visibleDateComponents = picked }
+        view.setContentHuggingPriority(.required, for: .vertical)
+        return view
+    }
+
+    func updateUIView(_ view: UICalendarView, context: Context) {
+        context.coordinator.chose = chose
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(picked: picked, chose: chose) }
+
+    final class Coordinator: NSObject, UICalendarSelectionSingleDateDelegate {
+        let picked: DateComponents?
+        var chose: (String?) -> Void
+
+        init(picked: DateComponents?, chose: @escaping (String?) -> Void) {
+            self.picked = picked
+            self.chose = chose
+        }
+
+        func dateSelection(_ selection: UICalendarSelectionSingleDate, didSelectDate day: DateComponents?) {
+            guard let day, let date = Calendar.current.date(from: day) else { return chose(nil) }
+            if let picked, Calendar.current.date(from: picked).map({ Calendar.current.isDate($0, inSameDayAs: date) }) == true { return chose(nil) }
+            chose(LocalDay.string(date))
         }
     }
 }
@@ -84,9 +127,13 @@ enum LocalDay {
     }
 
     static func date(_ text: String) -> Date? {
+        components(text).flatMap { Calendar.current.date(from: $0) }
+    }
+
+    static func components(_ text: String) -> DateComponents? {
         let parts = text.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
-        return Calendar.current.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+        return DateComponents(calendar: .current, year: parts[0], month: parts[1], day: parts[2])
     }
 }
 
@@ -166,7 +213,7 @@ struct RepeatSheet: View {
                                 }
                             }
                         }
-                    } else if draft.detail == "dayOfMonth", let day = draft.dayOfMonth {
+                    } else if draft.detail == "monthDay", let day = draft.dayOfMonth {
                         Section { LabeledContent("On Day", value: "\(day)") }
                     }
                     if draft.removable {
@@ -187,7 +234,7 @@ struct RepeatSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .task { draft = try? await model.rule("rules.repeatDraft", [.string(day), own]) }
+        .task { draft = await ask("rules.repeatDraft", [.string(day), own]) }
     }
 
     /// Each change is made over the draft the one before it left: quick taps add up.
@@ -196,7 +243,7 @@ struct RepeatSheet: View {
         editing = Task {
             await before?.value
             guard let current = draft else { return }
-            if let next: RepeatDraft = try? await model.rule("rules.editRepeat", [current.json, change]) {
+            if let next: RepeatDraft = await ask("rules.editRepeat", [current.json, change]) {
                 draft = next
                 touched = true
             }
@@ -207,9 +254,21 @@ struct RepeatSheet: View {
     private func save() async {
         guard let draft else { return }
         let held: JSONValue = touched ? ["rule": draft.rule] : .null
-        guard let end: [String: JSONValue] = try? await model.rule("repeatPage.end", [own, held]), let rule = end["rule"] else { return }
+        guard let end: [String: JSONValue] = await ask("repeatPage.end", [own, held]), let rule = end["rule"] else { return }
         await write(rule)
     }
+
+    /// The core's answer, or nothing with the reason in the log: an answer the app can't read leaves the page as it was.
+    private func ask<T: Decodable & Sendable>(_ method: String, _ arguments: [JSONValue]) async -> T? {
+        do {
+            return try await model.rule(method, arguments)
+        } catch {
+            Self.log.error("\(method, privacy: .public) failed: \(String(describing: error), privacy: .public)")
+            return nil
+        }
+    }
+
+    private static let log = Logger(subsystem: "com.kudrmax.taskcalendar", category: "repeat")
 
     static let weekdays = ["M", "T", "W", "T", "F", "S", "S"]
     static let weekdayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
