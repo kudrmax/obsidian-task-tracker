@@ -94,6 +94,9 @@ final class QuickEntryHost {
     private(set) var lists: [BoardColumn: ListEntryView] = [:]
     /// The field's minute from the day's start, when it stands on the calendar.
     private(set) var slotMinute: Int?
+    /// The renames entered and not yet written (`PendingRename`), each task's new text by its id: its card shows that
+    /// text from the Enter until the drawing of the write, never its old name in between.
+    private(set) var renamedTexts: [String: String] = [:]
     /// Bumped whenever the field opens or moves: what holds it scrolls it into sight.
     private(set) var moved = 0
     /// The rows of each list's typed lines and, last, its field, by keys that never repeat: Enter turns the field's row
@@ -193,9 +196,14 @@ final class QuickEntryHost {
         opening { call("open", [spot, item.json]) }
     }
 
+    /// The field takes the keyboard in the gesture that opens it, before the drawing that opens its row: taking it
+    /// reloads the keyboard's views and holds the main thread, which inside the drawing swallowed the row's opening.
+    /// Focused first, whatever is typed goes into the field, and the row opens on a free main thread.
     private func opening(_ open: () -> Void) {
         opened += 1
+        field.focusNow()
         open()
+        if !isOpen { field.end() }
     }
 
     // MARK: Typing
@@ -366,6 +374,8 @@ final class QuickEntryHost {
 
     private func apply(_ reply: JSONValue, over snapshot: BoardSnapshot? = nil) {
         session = reply["session"]
+        let renames = Self.renames(reply["renamed"])
+        if renames != renamedTexts { renamedTexts = renames }
         show(reply["state"], over: snapshot)
         if case .array(let jobs) = session["jobs"], !jobs.isEmpty { pump() }
     }
@@ -409,6 +419,11 @@ final class QuickEntryHost {
         } else {
             slotMinute = nil
         }
+    }
+
+    private static func renames(_ raw: JSONValue) -> [String: String] {
+        guard case .array(let all) = raw else { return [:] }
+        return Dictionary(all.compactMap { rename in rename["id"].string.flatMap { id in rename["text"].string.map { (id, $0) } } }, uniquingKeysWith: { $1 })
     }
 
     /// Each list's row keys for the lines and the field it now draws: lines written leave from the front (the first to the
@@ -635,6 +650,15 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
         if window != nil, becomeFirstResponder() { return }
         guard tries > 0 else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.take(tries: tries - 1) }
+    }
+
+    /// The keyboard taken now, from wherever the field waits: parked in the window when no box holds it yet.
+    func focusNow() {
+        wanted = true
+        if window == nil, let window = UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first {
+            park(in: window)
+        }
+        take()
     }
 
     func end() {
@@ -1037,3 +1061,4 @@ struct EntryDateSheet: View {
         }
     }
 }
+

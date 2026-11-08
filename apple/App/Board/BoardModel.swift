@@ -561,6 +561,11 @@ final class BoardModel {
     /// over the list (its copy flies there). Until the next drawing.
     private(set) var placedByDrop: String?
     var carrying: Bool { carry != nil }
+    /// The finger let the carry go: what it carries is still on its way to its place.
+    private(set) var released = false
+    /// The plus's slot is the cancel target while a finger holds a carry, and while the plus's own copy flies home into
+    /// it; a card's copy flies to the card's place, so the slot is the plus again from the moment it is let go.
+    var showsCancelTarget: Bool { carry.map { $0.id == Carried.plus || !released } ?? false }
     /// The screen's drop interaction, which every list and the calendar register with.
     @ObservationIgnored let dropping = BoardDrop()
     /// How the carry ends, once it was let go: the one owner of its end (`CarryEnd`), nil while the finger holds it.
@@ -580,6 +585,7 @@ final class BoardModel {
         found = nil
         arrival = nil
         ending = nil
+        released = false
         touchdown = nil
         withAnimation(.snappy(duration: 0.25)) { carry = Carry(id: card.id, item: card.item, from: column, grab: grab) }
     }
@@ -598,6 +604,7 @@ final class BoardModel {
         let places = all.enumerated().map { $0.offset > lifted ? $0.element - height : $0.element }
         found = nil
         ending = nil
+        released = false
         touchdown = nil
         let section = SectionCarry(column: column, list: name, names: list.groups.map(\.name), lifted: lifted, places: places)
         withAnimation(.snappy(duration: 0.25)) {
@@ -671,6 +678,7 @@ final class BoardModel {
 
     func startCarryingPlus() {
         ending = nil
+        released = false
         touchdown = nil
         carry = Carry(id: Carried.plus, item: nil, from: "new", grab: 0)
     }
@@ -679,6 +687,7 @@ final class BoardModel {
     private func letGo(writes: Bool) {
         guard carry != nil, ending == nil else { return }
         ending = CarryEnd(writes: writes)
+        released = true
     }
 
     /// The carry let go with no drop (on the cancel target, or over no place): the line and the marks go now, the place
@@ -751,6 +760,7 @@ final class BoardModel {
 
     private func endCarry() {
         carry = nil
+        released = false
         gap = nil
         settling = nil
         sectionSlot = nil
@@ -1108,10 +1118,10 @@ final class BoardModel {
 
     /// The card's menu as UIKit draws it, read from the screen as it stands. `later` holds a row that opens a sheet or a
     /// page until the menu has gone.
-    func cardMenu(_ item: TaskItem, ask: @escaping (MenuQuestion) -> Void, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
+    func cardMenu(_ item: TaskItem, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         guard let menu = snapshot?.menus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: self, ask: ask).nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
+        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: self).nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
     }
 
     // MARK: The timeline's zoom

@@ -5,6 +5,8 @@ import SwiftUI
 /// in a column on the right, the in-progress dot in the left padding, the colour of its priority or first label.
 struct TaskCapsule: View {
     let card: BoardCard
+    /// Drawn instead of the task's text: its new text while its rename is written.
+    var text: String?
     var selecting = false
     var picked = false
     var ringed = false
@@ -25,7 +27,7 @@ struct TaskCapsule: View {
             Color.clear
                 .frame(maxWidth: .infinity, minHeight: 18, maxHeight: 18)
                 .overlay(alignment: .leading) {
-                    Text(card.item.text)
+                    Text(text ?? card.item.text)
                         .font(.system(size: CardMetrics.title))
                         .lineLimit(1)
                         .fixedSize()

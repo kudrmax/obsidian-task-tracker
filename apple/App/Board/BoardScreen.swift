@@ -74,7 +74,7 @@ struct BoardScreen: View {
         ZStack(alignment: .topLeading) {
             PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: { plusSlot = $0 })
             if let slot = plusSlot {
-                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.carrying, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
+                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }
@@ -85,7 +85,7 @@ struct BoardScreen: View {
     @ViewBuilder
     private var content: some View {
         if let snapshot = model.snapshot, !snapshot.screen.missing {
-            Ribbon(snapshot: snapshot, model: model, question: $question)
+            Ribbon(snapshot: snapshot, model: model)
                 .overlay(alignment: .top) { problem }
         } else if let problem = model.problem {
             ContentUnavailableView {
@@ -202,7 +202,6 @@ enum BoardSheet: String, Identifiable {
 struct Ribbon: View {
     let snapshot: BoardSnapshot
     @Bindable var model: BoardModel
-    @Binding var question: MenuQuestion?
     @State private var position = ScrollPosition(idType: RibbonPlace.self)
     /// How far the ribbon has come from Soon to Today, 0 to 1: the divider's handle shows at Today.
     @State private var toToday: CGFloat = 0
@@ -235,7 +234,7 @@ struct Ribbon: View {
                             lists(.day, dayArrows: true)
                                 .frame(width: list)
                                 .frame(maxHeight: .infinity, alignment: .top)
-                            TimelineColumn(timeline: snapshot.timeline, model: model, question: $question)
+                            TimelineColumn(timeline: snapshot.timeline, model: model)
                                 .frame(width: width - list)
                                 .frame(maxHeight: .infinity, alignment: .top)
                         }
@@ -349,7 +348,7 @@ struct Ribbon: View {
     @ViewBuilder
     private func lists(_ column: BoardColumn, dayArrows: Bool = false) -> some View {
         if let list = snapshot.lists[column] {
-            ListColumn(list: list, model: model, dayArrows: dayArrows, question: $question)
+            ListColumn(list: list, model: model, dayArrows: dayArrows)
         }
     }
 }
@@ -391,7 +390,7 @@ struct BulkActions: View {
             }
             .disabled(menu?.moves.isEmpty ?? true)
             Menu("More", systemImage: "ellipsis.circle") {
-                if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model) { question = $0 }.nodes) }
+                if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model).nodes) }
             }
         }
         .tint(.primary)

@@ -14,7 +14,6 @@ struct TaskFullScreen: View {
     @State private var text = ""
     @State private var draft: JSONValue = .null
     @State private var saving: Task<Void, Never>?
-    @State private var question: MenuQuestion?
     @FocusState private var typing: Bool
     /// The text last put in the editor from the file: a change to anything else is typing.
     @State private var placed = ""
@@ -91,7 +90,7 @@ struct TaskFullScreen: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     if let menu = menuModel {
                         Menu("More", systemImage: "ellipsis") {
-                            MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, ask: { question = $0 }, inStack: true, ownPage: true).nodes)
+                            MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, inStack: true, ownPage: true).nodes)
                         }
                         .tint(.primary)
                     }
@@ -100,7 +99,6 @@ struct TaskFullScreen: View {
         }
         // A page of its own: no columns, no tab bar, no calendar, as the design has it.
         .toolbar(.hidden, for: .tabBar)
-        .menuQuestions($question, model: model)
         .task { await open() }
         .onAppear { follow() }
         .onChange(of: model.snapshot?.tasksText) { Task { await refresh() } }
@@ -177,7 +175,7 @@ struct TaskFullScreen: View {
     /// A subtask as the same capsule as on the main screen, at its depth; a long press shows its own menu.
     private func subtask(_ row: FullRow, branch: Branch?) -> some View {
         let card = BoardCard(item: row.item, level: row.level, branch: row.level > 0 ? branch : nil, due: nil, repeats: row.item.repeats, shades: nil)
-        return CardButton(card: card, menu: { later in menu(for: row.item, later: later) }, draggable: false)
+        return CardButton(card: card, renamedText: model.entry.renamedTexts[card.id], menu: { later in menu(for: row.item, later: later) }, draggable: false)
             .frame(height: CardMetrics.height)
             .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
             .padding(.leading, CGFloat(row.level) * CardMetrics.indent)
@@ -186,7 +184,7 @@ struct TaskFullScreen: View {
     private func menu(for item: TaskItem, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         guard let menu = subtaskMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model, ask: { question = $0 }, inStack: true).nodes, later: later) { model.ink($0, dark: dark) }
+        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model, inStack: true).nodes, later: later) { model.ink($0, dark: dark) }
     }
 
     private func open() async {

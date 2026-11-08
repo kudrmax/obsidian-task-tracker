@@ -2,15 +2,13 @@ import Core
 import SwiftUI
 import UIKit
 
-/// What a task's menu, or the bulk menu, asks before it writes: the core marks which statuses and Delete ask first.
+/// What the bulk bar's Done asks before it writes, when the core marks it to ask first (a menu asks on its own page).
 enum MenuQuestion: Identifiable {
     case status([TaskItem], String)
-    case remove([TaskItem])
 
     var id: String {
         switch self {
         case .status(let items, let status): "status/\(status)/\(items.map(\.id))"
-        case .remove(let items): "remove/\(items.map(\.id))"
         }
     }
 }
@@ -19,9 +17,12 @@ enum MenuQuestion: Identifiable {
 indirect enum MenuNode {
     /// `opens`: it opens a sheet, an alert or a page, which UIKit shows only once the menu has gone.
     case action(title: String, symbol: String?, tint: String? = nil, destructive: Bool = false, checked: Bool = false, keepsOpen: Bool = false, opens: Bool = false, disabled: Bool = false, run: @MainActor () -> Void)
-    case submenu(title: String, symbol: String, subtitle: String?, children: [MenuNode])
+    /// `destructive`: drawn in red, as a row whose answer removes or closes the task.
+    case submenu(title: String, symbol: String, subtitle: String?, destructive: Bool = false, children: [MenuNode])
     /// A group between separators; `row` draws it as the row of icons over their titles on top of a menu.
     case group(row: Bool, children: [MenuNode])
+    /// A question over its answers, on a page of the menu: the menu asks in place, as the plugin's does.
+    case question(String, children: [MenuNode])
 }
 
 /// The task's menu as iOS 26 draws a menu, in the plugin's order as the core gives it: the statuses, the priorities and
@@ -31,7 +32,6 @@ struct TaskMenu {
     let items: [TaskItem]
     let menu: TaskMenuModel
     let model: BoardModel
-    let ask: (MenuQuestion) -> Void
     /// Drawn on the full screen: Rename and Add Subtask type in its stack.
     var inStack = false
     /// The menu of the task its own full screen shows: no Open Full Screen.
@@ -121,18 +121,24 @@ struct TaskMenu {
     }
 
     private func status(_ status: MenuStatus) -> MenuNode {
-        let items = items, model = model, ask = ask
-        return .action(title: StatusWords.title(status.id), symbol: StatusWords.symbol(status.id), opens: status.confirm) {
-            if status.confirm { ask(.status(items, status.id)) } else { Task { await model.pickStatus(items, status.id) } }
-        }
+        let items = items, model = model
+        let title = StatusWords.title(status.id), symbol = StatusWords.symbol(status.id)
+        let pick: @MainActor () -> Void = { Task { await model.pickStatus(items, status.id) } }
+        guard status.confirm else { return .action(title: title, symbol: symbol, run: pick) }
+        return asking(single ? "\(title) “\(items.first?.title ?? "")”?" : "\(title) \(items.count) Tasks?", title: title, symbol: symbol, answer: title, destructive: false, run: pick)
+    }
+
+    /// A row whose answer the menu asks for first, on its own page.
+    private func asking(_ question: String, title: String, symbol: String, answer: String, destructive: Bool, run: @escaping @MainActor () -> Void) -> MenuNode {
+        .submenu(title: title, symbol: symbol, subtitle: nil, destructive: destructive, children: [.question(question, children: [.action(title: answer, symbol: nil, destructive: true, run: run)])])
     }
 
     private var remove: MenuNode? {
         guard let remove = menu.remove else { return nil }
-        let items = items, model = model, ask = ask, single = single
-        return .action(title: single ? "Delete" : "Delete \(items.count) Tasks", symbol: "trash", destructive: true, opens: remove.confirm && single) {
-            if remove.confirm && single { ask(.remove(items)) } else { Task { await model.remove(items) } }
-        }
+        let items = items, model = model, single = single
+        let delete: @MainActor () -> Void = { Task { await model.remove(items) } }
+        guard remove.confirm && single else { return .action(title: single ? "Delete" : "Delete \(items.count) Tasks", symbol: "trash", destructive: true, run: delete) }
+        return asking("Delete “\(items.first?.title ?? "")”?", title: "Delete", symbol: "trash", answer: "Delete", destructive: true, run: delete)
     }
 
     /// The pages a task opens: its repeat, its full screen, its line in Obsidian.
@@ -166,14 +172,16 @@ extension MenuNode {
             return UIAction(title: title, image: image, attributes: attributes, state: checked ? .on : .off) { _ in
                 if opens { later { run() } } else { run() }
             }
-        case .submenu(let title, let symbol, let subtitle, let children):
-            let menu = UIMenu(title: title, image: UIImage(systemName: symbol), children: children.map { $0.element(later, palette) })
+        case .submenu(let title, let symbol, let subtitle, let destructive, let children):
+            let menu = UIMenu(title: title, image: UIImage(systemName: symbol), options: destructive ? .destructive : [], children: children.map { $0.element(later, palette) })
             menu.subtitle = subtitle
             return menu
         case .group(let row, let children):
             let menu = UIMenu(options: .displayInline, children: children.map { $0.element(later, palette) })
             if row { menu.preferredElementSize = children.count > 3 ? .small : .medium }
             return menu
+        case .question(let question, let children):
+            return UIMenu(title: question, options: .displayInline, children: children.map { $0.element(later, palette) })
         }
     }
 }
@@ -192,19 +200,22 @@ struct MenuNodes: View {
                     if let symbol { Label(title, systemImage: checked ? "checkmark" : symbol) } else if checked { Label(title, systemImage: "checkmark") } else { Text(title) }
                 }
                 if keepsOpen { button.menuActionDismissBehavior(.disabled).disabled(disabled) } else { button.disabled(disabled) }
-            case .submenu(let title, let symbol, let subtitle, let children):
+            case .submenu(let title, let symbol, let subtitle, let destructive, let children):
                 Menu {
                     MenuNodes(nodes: children)
                 } label: {
                     Label(title, systemImage: symbol)
                     if let subtitle { Text(subtitle) }
                 }
+                .foregroundStyle(destructive ? .red : .primary)
             case .group(let row, let children):
                 if row {
                     ControlGroup { MenuNodes(nodes: children) }.controlGroupStyle(.menu)
                 } else {
                     Section { MenuNodes(nodes: children) }
                 }
+            case .question(let question, let children):
+                Section(question) { MenuNodes(nodes: children) }
             }
         }
     }
@@ -222,8 +233,6 @@ extension View {
             switch asked {
             case .status(let items, let status):
                 Button(StatusWords.title(status), role: .destructive) { Task { await model.pickStatus(items, status) } }
-            case .remove(let items):
-                Button("Delete", role: .destructive) { Task { await model.remove(items) } }
             }
         }
     }
@@ -231,7 +240,6 @@ extension View {
     private static func title(_ question: MenuQuestion) -> String {
         switch question {
         case .status(let items, let status): "\(StatusWords.title(status)): \(items.first?.title ?? "")"
-        case .remove(let items): "Delete “\(items.first?.title ?? "")”?"
         }
     }
 }
