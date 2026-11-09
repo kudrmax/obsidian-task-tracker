@@ -165,6 +165,20 @@ final class FakeFolder: NoteFolder, @unchecked Sendable {
         #expect(snapshot.lists[.backlog]?.cards.contains { $0.item.title == "Club" } == false)
     }
 
+    /// Max, 11-10: a project folded or opened waited for the whole vault to be read again. It is drawn again over the
+    /// files already read: the same screen a full read gives.
+    @Test func aFoldIsDrawnOverTheFilesAlreadyReadAsAFullReadDrawsIt() throws {
+        let board = board(FakeVault(Self.file), grouping: MemoryText())
+        let shown = try snapshot(board)
+        try board.group("tasks.toggleFold", ["backlog", .string(Self.friends.lowercased())])
+        let redrawn = try board.redraw(shown, measures: Self.measures, now: at)
+        let read = try snapshot(board)
+        let friends = try #require(redrawn.lists[.backlog]?.projects.first { $0.title == Self.friends })
+        #expect(friends.folded)
+        #expect(redrawn.lists[.backlog]?.cards.map(\.id) == read.lists[.backlog]?.cards.map(\.id))
+        #expect(redrawn.lists[.backlog]?.projects.map(\.folded) == read.lists[.backlog]?.projects.map(\.folded))
+    }
+
     // MARK: Moves
 
     @Test func aDropIntoAnotherProjectsGroupChangesTheProject() throws {
