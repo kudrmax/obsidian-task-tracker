@@ -147,6 +147,8 @@ final class CardControl: UIControl {
     private let mark = UIButton(type: .custom)
     /// Shows the menu, anchored to the card, when a tap has ended.
     private lazy var opener = MenuOpener(ended: { [weak self] in self?.menuEnded($0) })
+    /// A view nothing shows, animated within the menu's going so its end is heard when the preview is home.
+    private let ticker = UIView()
     /// The card's own long press, on the calendar: it lifts the card into the board's drag.
     private let press = UILongPressGestureRecognizer()
     /// A menu row that opens a sheet or a page, run once the menu has begun to go.
@@ -178,6 +180,9 @@ final class CardControl: UIControl {
             self?.onFold?()
         }, for: .touchUpInside)
         addSubview(fold)
+        ticker.isUserInteractionEnabled = false
+        ticker.alpha = 0
+        addSubview(ticker)
         mark.isHidden = true
         mark.accessibilityLabel = "Project"
         mark.accessibilityHint = "Opens the project's note"
@@ -323,7 +328,25 @@ final class CardControl: UIControl {
     /// row that opens a sheet or a page runs as the menu starts to go.
     private func menuEnded(_ animator: (any UIContextMenuInteractionAnimating)?) {
         MenuHold.begin()
-        if let animator { animator.addCompletion { MenuHold.end() } } else { MenuHold.end() }
+        var home = false
+        let landed = {
+            guard !home else { return }
+            home = true
+            MenuHold.end()
+        }
+        if let animator {
+            // The animator tells of its end most of a second after the preview is home: the flight's own end is heard from
+            // an animation of the app's run inside it, as long as it.
+            let mark = ticker
+            animator.addAnimations {
+                UIView.animate(withDuration: UIView.inheritedAnimationDuration, delay: 0, options: [.overrideInheritedDuration, .overrideInheritedCurve, .allowUserInteraction]) {
+                    mark.alpha = mark.alpha == 0 ? 0.01 : 0
+                } completion: { _ in landed() }
+            }
+            animator.addCompletion(landed)
+        } else {
+            landed()
+        }
         guard let run = afterMenu else { return }
         afterMenu = nil
         DispatchQueue.main.async { run() }

@@ -292,6 +292,19 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
 
     /// Each header drawn shows, but the one of a carried section, whose floating copy stands for it until it is down: set
     /// on the row itself, so it shows in the very frame the copy goes.
+    /// The rows on the screen drawn anew at once, in place, from the model as it stands now.
+    func redrawShown() {
+        let shown = collection.indexPathsForVisibleItems.compactMap { source.itemIdentifier(for: $0) }
+        if !shown.isEmpty {
+            var snapshot = source.snapshot()
+            snapshot.reconfigureItems(shown)
+            source.apply(snapshot, animatingDifferences: false)
+            collection.layoutIfNeeded()
+        }
+        // Rows the carry folded away (a card's subtasks, a section's tasks) come back in their own motion.
+        update()
+    }
+
     /// `all`: the carry's copy is down, every header shows now.
     func showHeaders(all: Bool = false) {
         for cell in collection.visibleCells { shows(cell, at: collection.indexPath(for: cell), all: all) }

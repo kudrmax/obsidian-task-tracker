@@ -76,7 +76,8 @@ final class DragController {
         return flow.phase == .idle
     }
 
-    /// The copy and line flight's motion: the list's own time for rows moving (`ListController.unfold`).
+    /// The copy's flight, and the rows' and blocks' motion with it: a spring with no bounce, fitted to this time, so the
+    /// flight's end (when the card takes over from the copy) is where the motion ends, not a settling tail after it.
     static let flight: TimeInterval = 0.35
 
     // MARK: Lift
@@ -148,7 +149,7 @@ final class DragController {
         }
         var landing: CarryLanding?
         // One animation: the place's rows open and close as its screen is drawn, and the copy flies into it.
-        UIView.animate(springDuration: Self.flight, bounce: 0, options: [.allowUserInteraction]) {
+        UIView.animate(withDuration: Self.flight, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 0, options: [.allowUserInteraction]) {
             landing = self.route.letGo(carrying: live.payload)
             self.hideLine()
             if let landing { live.copy.land(on: landing, look: self.arrival(for: landing)) }
@@ -173,7 +174,7 @@ final class DragController {
     /// is down, and its place closes then.
     private func flyHome(_ live: Live) {
         guard let home = live.home() else { return landed(live) }
-        UIView.animate(springDuration: Self.flight, bounce: 0, options: [.allowUserInteraction]) {
+        UIView.animate(withDuration: Self.flight, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 0, options: [.allowUserInteraction]) {
             live.copy.land(on: CarryLanding(rect: home), look: nil)
         } completion: { _ in
             self.landed(live)
@@ -183,11 +184,13 @@ final class DragController {
     /// The copy is down: the card it flew into shows in this same frame, the copy goes, the carry ends.
     private func landed(_ live: Live) {
         guard flow.landed(live.carry) else { return }
+        self.live = nil
+        // The carry's end drawn in this same frame as the copy goes: the card, its branch, a section's header.
         model?.revealLanding()
+        model?.endCarry(live.token)
+        model?.redrawLists()
         live.copy.removeFromSuperview()
         layer.clear()
-        self.live = nil
-        model?.endCarry(live.token)
     }
 
     /// What the copy turns into as it lands where it is a size other than its own: the card as drawn there, or a

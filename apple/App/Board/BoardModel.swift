@@ -1120,6 +1120,11 @@ final class BoardModel {
     }
 
     /// The copy is down: the cards and the header it lands as show in this frame, before the carry's end is drawn.
+    /// The lists' rows on the screen drawn again now, in this frame, from the model as it stands.
+    func redrawLists() {
+        for list in lists.values { list.controller?.redrawShown() }
+    }
+
     func revealLanding() {
         CardControl.reveal(landingIds)
         for list in lists.values { list.controller?.showHeaders(all: true) }
@@ -1328,7 +1333,7 @@ final class BoardModel {
     private func showPreview(_ next: BoardSnapshot, landed: Bool = false) {
         dropReads.previewDrawn()
         // In the copy's own motion: the calendar's blocks move to their new stack as the lists' rows do.
-        withAnimation(.spring(duration: DragController.flight, bounce: 0)) {
+        withAnimation(.interpolatingSpring(duration: DragController.flight, bounce: 0)) {
             if landed { carry?.landed = true }
             hover = nil
             landing = nil

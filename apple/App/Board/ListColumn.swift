@@ -409,6 +409,11 @@ struct CardRow: View {
     @Bindable var model: BoardModel
     @Environment(\.colorScheme) private var scheme
 
+    /// A branch coming in: once its row has all but come to rest, as fast as a glance; going, at once.
+    static let branchComes = AnyTransition.asymmetric(
+        insertion: .opacity.animation(.easeOut(duration: 0.12).delay(DragController.flight * 0.6)),
+        removal: .identity)
+
     /// The room the selection circle takes before the card.
     static let circleRoom: CGFloat = 32
 
@@ -440,8 +445,9 @@ struct CardRow: View {
                 .frame(height: CardMetrics.height)
                 // Carried, the card's row is its dashed place, as the plugin keeps it (`is-waiting`), until the carry ends.
                 .background { if model.isWaiting(card) { DashedPlace().transition(.identity) } }
-                // The branch shows with its card: a row moving under a copy still flying there carries no branch of its own.
-                .overlay(alignment: .topLeading) { if let branch = card.branch, !model.isHidden(card) { BranchLine(branch: branch).transition(.identity) } }
+                // The branch comes with the card's place (the drop's screen drawn), fading in as the row and the copy flying
+                // into it come to rest, so it never travels with a row moving there.
+                .overlay(alignment: .topLeading) { if let branch = card.branch, !model.isWaiting(card) { BranchLine(branch: branch).transition(Self.branchComes) } }
                 .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
         }
         .frame(height: CardMetrics.height, alignment: .top)
