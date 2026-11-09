@@ -479,8 +479,10 @@ final class BoardModel {
 
     /// Let go: the day runs on to the next one or back to where it stood, as the plugin's pager settles: a flick goes
     /// the way it was flicked (`onward`: the swipe's own way), else the day goes where more than half of it stands.
-    func endDaySwipe(flicked: Bool, onward: Bool) async {
-        let arrive = flicked ? onward == (swipeSign > 0) : dayShare * 2 >= 1
+    /// The finger let go going `speed` points per millisecond the way it started: the day arrives where the core's
+    /// `swipeLanding` takes it.
+    func endDaySwipe(speed: CGFloat) async {
+        let arrive = swipeLanding(moved: dayShare, distance: 1, speed: speed * CGFloat(swipeSign)) == 1
         await afterTurns { [self] in await settleDaySwipe(arrive: arrive) }
     }
 
@@ -948,6 +950,12 @@ final class BoardModel {
     /// near the middle it holds to it (`rules.dividerAt`).
     func dividerAt(_ wanted: CGFloat, widths: ListWidths, speed: Double) -> DividerStop? {
         try? board.dividerAt(Double(wanted), widths: widths, speed: speed)
+    }
+
+    /// Where a screen let go after a swipe lands, never further than the next one (`rules.swipeLanding`): 1 on, -1 back,
+    /// 0 where it stood.
+    func swipeLanding(moved: CGFloat, distance: CGFloat, speed: CGFloat) -> Int {
+        (try? board.swipeLanding(moved: Double(moved), distance: Double(distance), speed: Double(speed))) ?? 0
     }
 
     /// The share a divider let go at `width` saves (`rules.listShareOf`).

@@ -1,4 +1,4 @@
-import { type DropColumn, placeShowing, SCREEN_PLACES, type ScreenPlace } from "../../core/application/contracts";
+import { type CalendarAlert, type DropColumn, placeShowing, SCREEN_PLACES, type ScreenPlace } from "../../core/application/contracts";
 import type { RightMode } from "./viewSettings";
 import { CarefulPace } from "./CarefulPace";
 import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
@@ -6,13 +6,14 @@ import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { icon } from "./kit/icons";
 import { type Place, placeIndex } from "./screens";
+import { labelMark } from "./sources/labelMark";
 
 export interface ColumnSwitchOptions {
 	/** Where the screen stands; Done, which the wheel has no icon for, puts the window a step left of Inbox. */
 	value(): Place;
 	onChange(mode: RightMode): void;
-	/** A calendar source is stale or failing: the orange dot on the calendar icon. */
-	dot(): boolean;
+	/** The dot on the calendar icon: orange for a source in use gone old, red for one whose refresh failed too. */
+	dot(): { readonly alert: CalendarAlert; readonly words: string };
 	/** The switch held while the calendar shows: the sources window. */
 	onSources(): void;
 	longPressMs(): number;
@@ -218,6 +219,11 @@ export class ColumnSwitch {
 
 	render(): void {
 		if (!this.press?.dragging) this.turn(placeOf(this.opts.value()));
-		for (const dot of this.dots) dot.classList.toggle("is-shown", this.opts.dot());
+		const { alert, words } = this.opts.dot();
+		for (const dot of this.dots) {
+			dot.classList.toggle("is-shown", alert !== "none");
+			dot.classList.toggle("is-broken", alert === "broken");
+			labelMark(dot, words);
+		}
 	}
 }

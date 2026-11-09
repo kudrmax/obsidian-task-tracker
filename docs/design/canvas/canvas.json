@@ -1492,15 +1492,23 @@
   "ScreenSourcesDot.dc.html": {
    "h": 844,
    "page": "prod",
-   "title": "Источники: календарь устарел",
+   "title": "Источники: файл в ходу устарел — оранжевая точка",
    "w": 390,
    "x": 6110,
+   "y": 0
+  },
+  "ScreenSourcesDotRed.dc.html": {
+   "h": 844,
+   "page": "prod",
+   "title": "Источники: Refresh now не помог — красная точка",
+   "w": 390,
+   "x": 7520,
    "y": 0
   },
   "ScreenSourcesPopover.dc.html": {
    "h": 844,
    "page": "prod",
-   "title": "Источники: тап по иконке календаря",
+   "title": "Источники: долгое нажатие на колёсико — в ходу, «Not in use», запасной",
    "w": 390,
    "x": 6580,
    "y": 0
@@ -2833,6 +2841,7 @@
   "ScreenSheetPicker.dc.html",
   "ScreenSheetLong.dc.html",
   "ScreenSourcesDot.dc.html",
+  "ScreenSourcesDotRed.dc.html",
   "ScreenSourcesPopover.dc.html",
   "ScreenSourcesPull.dc.html",
   "Main.dc.html",

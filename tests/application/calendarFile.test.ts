@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calendarFileText, iphoneCalendarAdds, phoneCalendarText, readCalendarFile } from "../../core/application/calendarFile";
+import { SourceProblemError } from "../../core/application/EventSource";
 
 const event = (title: string, calendar: string, extra: object = {}) => ({
 	id: title,
@@ -86,5 +87,41 @@ describe("iphoneCalendarAdds", () => {
 		expect(iphoneCalendarAdds(at(1), null, now(1))).toBe(true);
 		expect(iphoneCalendarAdds(at(1), "kept", now(1))).toBe(true);
 		expect(iphoneCalendarAdds(at(1), JSON.stringify({ device: "iPhone" }), now(1))).toBe(true);
+	});
+});
+
+describe("readCalendarFile, a file that is no calendar file", () => {
+	const problem = (text: string) => {
+		try {
+			readCalendarFile(text, "work");
+		} catch (e) {
+			return e instanceof SourceProblemError ? e.problem : `not a SourceProblemError: ${String(e)}`;
+		}
+		return "read";
+	};
+	const at = "2026-11-05T09:00:00.000Z";
+
+	it("is unreadable when it is not JSON: cut off, empty, plain text", () => {
+		expect(problem('{"exportedAt": "2026-11-05')).toEqual({ kind: "unreadable" });
+		expect(problem("")).toEqual({ kind: "unreadable" });
+		expect(problem("hello")).toEqual({ kind: "unreadable" });
+	});
+
+	it("is unreadable when its JSON has not the file's shape", () => {
+		expect(problem("[]")).toEqual({ kind: "unreadable" });
+		expect(problem("null")).toEqual({ kind: "unreadable" });
+		expect(problem("42")).toEqual({ kind: "unreadable" });
+		expect(problem(JSON.stringify({ events: [] }))).toEqual({ kind: "unreadable" });
+		expect(problem(JSON.stringify({ exportedAt: "yesterday", events: [] }))).toEqual({ kind: "unreadable" });
+		expect(problem(JSON.stringify({ exportedAt: at, events: {} }))).toEqual({ kind: "unreadable" });
+		expect(problem(JSON.stringify({ exportedAt: at, events: [null] }))).toEqual({ kind: "unreadable" });
+		expect(problem(JSON.stringify({ exportedAt: at, events: [{ id: "a", title: "A", calendar: "Work" }] }))).toEqual({ kind: "unreadable" });
+		expect(problem(JSON.stringify({ exportedAt: at, calendars: "Work" }))).toEqual({ kind: "unreadable" });
+		expect(problem(JSON.stringify({ exportedAt: at, calendars: [{ title: "Work" }] }))).toEqual({ kind: "unreadable" });
+	});
+
+	it("reads a file with no events or calendars as an empty one", () => {
+		expect(problem(JSON.stringify({ exportedAt: at }))).toBe("read");
+		expect(problem(JSON.stringify({ exportedAt: at, events: [event("A", "Work")] }))).toBe("read");
 	});
 });

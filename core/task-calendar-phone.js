@@ -2184,6 +2184,15 @@
     return zone.startsWith("-") ? -minutes : minutes;
   }
 
+  // core/application/EventSource.ts
+  var SourceProblemError = class extends Error {
+    constructor(problem, message) {
+      super(message);
+      this.problem = problem;
+      this.name = "SourceProblemError";
+    }
+  };
+
   // core/application/calendarFile.ts
   var GOOGLE_CALENDAR_FILE = "calendar/google.json";
   var IPHONE_CALENDAR_FILE = "calendar/iphone.json";
@@ -2195,7 +2204,7 @@
   }
   var dateOrNull = (text) => text ? isoMoment(text) : null;
   function readCalendarFile(text, source) {
-    const content = JSON.parse(text);
+    const content = fileContent(text);
     const events = (content.events ?? []).map((e) => ({
       id: e.id,
       title: e.title,
@@ -2218,6 +2227,28 @@
       to: dateOrNull(content.to),
       validUntil: dateOrNull(content.validUntil)
     };
+  }
+  function fileContent(text) {
+    let value;
+    try {
+      value = JSON.parse(text);
+    } catch {
+      throw unreadable("not JSON");
+    }
+    if (!isObject(value)) throw unreadable("not an object");
+    if (typeof value.exportedAt !== "string" || Number.isNaN(isoMoment(value.exportedAt).getTime())) throw unreadable("no exportedAt");
+    if (!listOf(value.events, (e) => typeof e.start === "string" && typeof e.end === "string" && typeof e.calendar === "string")) throw unreadable("events");
+    if (!listOf(value.calendars, (c) => typeof c.calendar === "string")) throw unreadable("calendars");
+    return value;
+  }
+  function unreadable(why) {
+    return new SourceProblemError({ kind: "unreadable" }, `calendar file unreadable: ${why}`);
+  }
+  function isObject(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  function listOf(value, row) {
+    return value === void 0 || value === null || Array.isArray(value) && value.every((r) => isObject(r) && row(r));
   }
   function eventCalendars(events) {
     const seen = /* @__PURE__ */ new Map();
@@ -2445,6 +2476,14 @@ ${e.calendar}`;
   }
 
   // core/application/sourceWords.ts
+  function alertText(tone) {
+    if (tone === "old") return "Out of date";
+    if (tone === "broken") return "Refresh failed";
+    return "";
+  }
+  function dayWords(alert) {
+    return { alert: alertText(alert), notInUse: "Not in use", notInUseNote: "The timeline takes a calendar from these only when the files above go out of date." };
+  }
   var NAMES = { google: { name: "Google Calendar", short: "Google" }, iphone: { name: "iPhone calendars", short: "iPhone" }, work: { name: "Work calendar", short: "Work" } };
   function problemText(problem) {
     switch (problem.kind) {
@@ -2452,11 +2491,19 @@ ${e.calendar}`;
         return "not logged in";
       case "fileMissing":
         return "file missing";
+      case "unreadable":
+        return "file unreadable";
       case "noAnswer":
         return `no answer in ${problem.seconds} s`;
       case "failed":
-        return problem.detail;
+        return shortFailure(problem.detail);
     }
+  }
+  var FAILURE_CHARS = 40;
+  function shortFailure(detail) {
+    const head = detail.replace(/:\s*[{[<][\s\S]*$/, "").trim();
+    const line = head.split(/\r?\n/)[0].trim();
+    return line.length <= FAILURE_CHARS ? line : `${line.slice(0, FAILURE_CHARS - 1)}…`;
   }
   function sourceWords(status) {
     const names = NAMES[status.source];
@@ -2466,7 +2513,7 @@ ${e.calendar}`;
     const clock = at ? minutesToHHMM(at.getHours() * 60 + at.getMinutes()) : "";
     const time = !at ? "" : status.updatedDay === "today" ? clock : status.updatedDay === "yesterday" ? `Yesterday ${clock}` : `${date} ${clock}`;
     const sub = status.problem ? problemText(status.problem) : status.kind === "exported" ? `Exported from ${status.detail ?? "file"}` : at ? `Updated ${relative}` : "Not updated yet";
-    return { name: names.name, short: names.short, sub, time };
+    return { name: names.name, short: names.short, sub, time, alert: alertText(status.tone) };
   }
 
   // core/application/calendarChoice.ts
@@ -2506,17 +2553,19 @@ ${key.title}`.toLowerCase();
     }
     day(start, end) {
       const events = [];
+      const used = /* @__PURE__ */ new Set();
       let stale = false;
       for (const calendar of this.known()) {
         if (this.hidden.has(keyText(calendar.key))) continue;
         const source = this.sourceFor(calendar, start);
         if (source === null) continue;
         const file = this.files.get(source);
+        used.add(source);
         if (!this.fresh(file)) stale = true;
         const text = keyText(calendar.key);
         events.push(...file.events.filter((e) => keyText(this.keyOf(source, calendarOf(e))) === text && e.start < end && e.end > start));
       }
-      return { events: events.sort((a, b) => a.start.getTime() - b.start.getTime()), stale };
+      return { events: events.sort((a, b) => a.start.getTime() - b.start.getTime()), used, stale };
     }
     sourceFor(calendar, day) {
       const text = keyText(calendar.key);
@@ -2637,7 +2686,7 @@ ${key.title}`.toLowerCase();
     day(date) {
       const span = new DayWindow(date, this.boundary);
       const chosen = this.choice.day(span.fetchStart, span.fetchEnd);
-      return { events: chosen.events.filter((e) => span.shows(e)), stale: chosen.stale };
+      return { ...chosen, events: chosen.events.filter((e) => span.shows(e)) };
     }
     /** The timed events that overlap `from`–`to`, each as the day showing it has it, once each, by start. */
     timedBetween(from, to) {
@@ -2699,6 +2748,12 @@ ${key.title}`.toLowerCase();
   var KINDS2 = { google: "synced", iphone: "exported", work: "exported" };
   var MINUTE_MS4 = 6e4;
   var LOGGED_OUT = { kind: "loggedOut" };
+  var WINDOW_ORDER = ["google", "iphone", "work"];
+  var NO_DAY_EVENTS = { events: [], allDay: [], timed: [], statuses: [], stale: false, alert: "none", words: dayWords("none") };
+  var ALERTS = ["none", "old", "broken"];
+  function alertOf(tone) {
+    return tone === "old" || tone === "broken" ? tone : "none";
+  }
   var CalendarDay = class {
     constructor(reading, settings, now) {
       this.reading = reading;
@@ -2710,12 +2765,17 @@ ${key.title}`.toLowerCase();
       const chosen = this.shown().days().day(date);
       const events = chosen.events;
       const shown = (name) => events.filter((e) => e.source === name).length;
+      const statuses = [...this.reading.sources].sort((a, b) => WINDOW_ORDER.indexOf(a) - WINDOW_ORDER.indexOf(b)).map((source) => this.status(source, shown(source), chosen.used.has(source)));
+      const inUse = statuses.filter((s) => s.used);
+      const alert = inUse.map((s) => alertOf(s.tone)).reduce((worst, a) => ALERTS.indexOf(a) > ALERTS.indexOf(worst) ? a : worst, "none");
       return {
         events,
         allDay: events.filter((e) => e.allDay),
         timed: events.filter((e) => !e.allDay),
-        statuses: this.reading.sources.map((source) => this.status(source, shown(source))),
-        stale: chosen.stale
+        statuses: [...inUse, ...statuses.filter((s) => !s.used)],
+        stale: chosen.stale,
+        alert,
+        words: dayWords(alert)
       };
     }
     /** The timed events of the calendars shown that overlap `from`–`to`: the phone's meetings. */
@@ -2749,10 +2809,12 @@ ${key.title}`.toLowerCase();
     shown() {
       return new ShownCalendars(this.reading.files, this.settings, this.now);
     }
-    status(source, shown) {
+    status(source, shown, used) {
       const problem = this.problem(source);
       const file = this.reading.files.get(source);
       const updatedAt = file?.exportedAt ?? null;
+      const old = this.isOld(updatedAt);
+      const tone = toneOf(used, old, problem !== null);
       const facts = {
         source,
         kind: KINDS2[source],
@@ -2760,9 +2822,10 @@ ${key.title}`.toLowerCase();
         updatedAt,
         updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
         updatedDate: updatedAt === null ? null : localDateOf(updatedAt),
-        detail: this.reading.fed(source) ? null : file?.device ?? null
+        detail: this.reading.fed(source) ? null : file?.device ?? null,
+        tone
       };
-      return { ...facts, events: shown, stale: problem !== null || this.isOld(updatedAt), words: sourceWords(facts) };
+      return { ...facts, events: shown, stale: problem !== null || old, used, words: sourceWords(facts) };
     }
     /** Google logged out says so, whatever its file: there is none to fetch, or what is left of an old login. */
     problem(source) {
@@ -2778,6 +2841,11 @@ ${key.title}`.toLowerCase();
       return this.now.getTime() - updatedAt.getTime() > this.settings.staleAfterMinutes * MINUTE_MS4;
     }
   };
+  function toneOf(used, old, problem) {
+    if (!used) return "spare";
+    if (!old) return "plain";
+    return problem ? "broken" : "old";
+  }
 
   // core/application/captureTitle.ts
   function captureTitle({ typed: typed2, recording, tag }) {
@@ -2969,6 +3037,13 @@ ${key.title}`.toLowerCase();
     if (from.mode === "calendar" && (shift > 0 || from.date !== today)) return { mode: "calendar", date: addDays(from.date, shift) };
     const place = spotIndex(from.mode) + shift;
     return place >= 0 && place < SCREEN_PLACES.length ? { mode: SCREEN_PLACES[place], date: from.date } : null;
+  }
+  var SWIPE_FLICK_SPEED = 0.3;
+  function swipeLanding(moved2, distance, speed) {
+    if (moved2 === 0) return 0;
+    const shift = moved2 > 0 ? 1 : -1;
+    if (Math.abs(speed) >= SWIPE_FLICK_SPEED) return Math.sign(speed) === shift ? shift : 0;
+    return Math.abs(moved2) * 2 >= distance ? shift : 0;
   }
 
   // core/application/timelineZoom.ts
@@ -3777,7 +3852,7 @@ ${key.title}`.toLowerCase();
   }
   function groupOf(name, items, header = true, id = sectionId(name, [])) {
     const section = name !== null;
-    return { id, name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: section };
+    return { id, name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: header };
   }
   function projectSection(name, items, project, id = sectionId(name, [])) {
     const plain = groupOf(name, items, name !== null, id);
@@ -3787,7 +3862,7 @@ ${key.title}`.toLowerCase();
     if (!sections) return { showsHeaders: false, groups: [groupOf(null, items, false)] };
     const groups = withEmptySections(byGroup(items, listSections), listSections);
     const showsHeaders = groups.some((g) => g.name !== null);
-    return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders })) };
+    return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders, reorder: showsHeaders })) };
   }
   function byGroup(items, sections) {
     const groups = [];
@@ -6499,7 +6574,9 @@ ${key.title}`.toLowerCase();
       allDay: wire(day.allDay),
       timed: wire(day.timed),
       statuses: day.statuses.map(({ updatedAt, ...rest }) => ({ ...rest, updatedAtMs: updatedAt === null ? null : updatedAt.getTime() })),
-      stale: day.stale
+      stale: day.stale,
+      alert: day.alert,
+      words: day.words
     };
   }
   var FETCHED_BY_DEFAULT = ["google"];
@@ -6515,7 +6592,7 @@ ${key.title}`.toLowerCase();
       try {
         files.set(source, readCalendarFile(text, source));
       } catch (e) {
-        problems.set(source, { kind: "failed", detail: e instanceof Error ? e.message : String(e) });
+        problems.set(source, e instanceof SourceProblemError ? e.problem : { kind: "failed", detail: e instanceof Error ? e.message : String(e) });
       }
     }
     const fetched = c.context.fetched ?? FETCHED_BY_DEFAULT;
@@ -6698,6 +6775,7 @@ ${key.title}`.toLowerCase();
     branchOf,
     gapBranch,
     placeShowing,
+    swipeLanding,
     wholeWidth,
     grownStart,
     listWidths,
@@ -6707,7 +6785,7 @@ ${key.title}`.toLowerCase();
     onTheDay,
     canPick
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };

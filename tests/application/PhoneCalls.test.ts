@@ -443,6 +443,14 @@ describe("the door's calendars", () => {
 		expect(detail([])).toEqual({ google: "Mac", iphone: null, work: "iPhone" });
 	});
 
+	it("call a file that is no calendar file unreadable, and one left out missing", () => {
+		const door = callDoor("calendars.events", [T], context(FILE, { calendars: { google: JSON.stringify({ exportedAt: iso(4, 8), events: [] }), work: '{"exportedAt": "2026' } })) as Extract<DoorAnswer, { ok: true }>;
+		const statuses = (door.result as { statuses: { source: string; problem: unknown; words: { sub: string } }[] }).statuses;
+		const of = (source: string) => statuses.find((st) => st.source === source)!;
+		expect([of("work").problem, of("work").words.sub]).toEqual([{ kind: "unreadable" }, "file unreadable"]);
+		expect([of("iphone").problem, of("iphone").words.sub]).toEqual([{ kind: "fileMissing" }, "file missing"]);
+	});
+
 	it("grey an event as CalendarDay does: over once its end has come", () => {
 		const past = (endMs: number) => (callDoor("calendars.isPast", [{ endMs }], context()) as Extract<DoorAnswer, { ok: true }>).result;
 		expect([past(NOW.getTime() - 1), past(NOW.getTime()), past(NOW.getTime() + 1)]).toEqual([true, true, false]);
@@ -567,6 +575,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.branchOf", [0, 1, 1], 1),
 		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
 		plain("rules.placeShowing", "day", "inbox"),
+		plain("rules.swipeLanding", 120, 200, 0.1),
 		plain("rules.listWidths", 0.5, 390, 16),
 		plain("rules.listShareOf", 187, 390, 16),
 		plain("rules.dividerAt", 190, { width: 187, min: 110, max: 280, center: 187 }, 0.01),

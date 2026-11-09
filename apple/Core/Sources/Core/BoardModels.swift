@@ -346,8 +346,23 @@ public struct SourceStatus: Decodable, Hashable, Sendable {
     public let detail: String?
     public let stale: Bool
     public let updatedAtMs: Double?
+    /// A calendar shown on the day is taken from its file.
+    public let used: Bool
+    /// The row's code, drawn as it comes.
+    public let tone: SourceTone
     /// Its row in the sources window, worded.
     public let words: SourceWords
+}
+
+/// `SourceTone`: how a source's row is drawn. Only a source in use is coloured: `old` its time orange, `broken` its
+/// problem line red too; `spare` stands under «Not in use», grey whatever its age or error.
+public enum SourceTone: String, Decodable, Hashable, Sendable {
+    case plain, old, broken, spare
+}
+
+/// `CalendarAlert`: the badge on «⋯» → Calendars, the worst tone of the sources in use.
+public enum CalendarAlert: String, Decodable, Hashable, Sendable {
+    case none, old, broken
 }
 
 /// `SourceWords`: a calendar source's row in the sources window, worded by the core.
@@ -359,23 +374,27 @@ public struct SourceWords: Decodable, Hashable, Sendable {
     public let sub: String
     /// `14:19`, `Yesterday 08:02`, `3 Oct 08:02`; empty with no update.
     public let time: String
+    /// What its mark says: `Out of date`, `Refresh failed`; empty with no mark.
+    public let alert: String
+}
+
+/// `DayWords`: the calendars' words for the day: the badge's, and the heading and note of the files not in use.
+public struct DayWords: Decodable, Hashable, Sendable {
+    /// What the badge says: `Out of date`, `Refresh failed`; empty with no badge.
+    public let alert: String
+    public let notInUse: String
+    public let notInUseNote: String
 }
 
 /// `WireDayEvents`: the day's events and how fresh each calendar's file is.
 public struct DayEvents: Decodable, Sendable {
     public let allDay: [WireEvent]
     public let timed: [WireEvent]
+    /// In the window's order: in use first, then spare.
     public let statuses: [SourceStatus]
     public let stale: Bool
-
-    public static let none = DayEvents(allDay: [], timed: [], statuses: [], stale: false)
-
-    public init(allDay: [WireEvent], timed: [WireEvent], statuses: [SourceStatus], stale: Bool) {
-        self.allDay = allDay
-        self.timed = timed
-        self.statuses = statuses
-        self.stale = stale
-    }
+    public let alert: CalendarAlert
+    public let words: DayWords
 }
 
 public struct ShownCalendar: Decodable, Hashable, Sendable, Identifiable {

@@ -42,6 +42,14 @@ import Testing
         #expect(try board.dividerAt(widths.center + 5, widths: widths, speed: 1).snapped == false)
     }
 
+    @Test func aSwipeGoesNoFurtherThanTheNextPlace() throws {
+        let board = TaskBoard(core: core, vault: FakeVault(Self.file))
+        #expect(try board.swipeLanding(moved: 600, distance: 200, speed: 5) == 1)
+        #expect(try board.swipeLanding(moved: -600, distance: 200, speed: -5) == -1)
+        #expect(try board.swipeLanding(moved: 60, distance: 200, speed: 0.05) == 0)
+        #expect(try board.swipeLanding(moved: 20, distance: 200, speed: 0.5) == 1)
+    }
+
     @Test func theSettingsSayWhetherGoogleIsLoggedIn() throws {
         let vault = FakeVault(Self.file)
         let board = TaskBoard(core: core, vault: vault)

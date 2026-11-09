@@ -1042,6 +1042,11 @@ describe("listView", () => {
 		expect(groups.map((g) => [g.name, g.items.map((i) => i.text)])).toEqual([[null, ["N", "A", "B"]], ["Morning", ["M"]]]);
 	});
 
+	it("a long press lifts every header a list draws, No section's too", () => {
+		const groups = listView([item("A", null), item("M", "Morning")], true).groups;
+		expect(groups.map((g) => [g.name, g.header, g.reorder])).toEqual([[null, true, true], ["Morning", true, true]]);
+	});
+
 	it("no headers without a named group", () => {
 		expect(listView([item("A", null), item("B", null)], true).showsHeaders).toBe(false);
 		expect(listView([], true).showsHeaders).toBe(false);

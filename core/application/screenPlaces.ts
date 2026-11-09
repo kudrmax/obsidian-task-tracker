@@ -44,3 +44,19 @@ export function stepScreen(from: ScreenAt, shift: -1 | 1, today: LocalDate): Scr
 	const place = spotIndex(from.mode) + shift;
 	return place >= 0 && place < SCREEN_PLACES.length ? { mode: SCREEN_PLACES[place], date: from.date } : null;
 }
+
+/** A finger let go this fast, px per ms, sends the screen the way it went, however little of the way it was drawn. */
+export const SWIPE_FLICK_SPEED = 0.3;
+
+/**
+ * Where a screen let go after a swipe lands: a step on (1), back (-1) or none (0), never further than the next screen.
+ * `moved` is how far the finger drew it towards the next screen on (negative: back), `distance` how far that screen
+ * stands, `speed` the finger's speed as it let go, px per ms, the same way round. A flick the way it was drawn arrives and
+ * one against it springs back; a slower finger arrives once the screen has come half the way.
+ */
+export function swipeLanding(moved: number, distance: number, speed: number): -1 | 0 | 1 {
+	if (moved === 0) return 0;
+	const shift = moved > 0 ? 1 : -1;
+	if (Math.abs(speed) >= SWIPE_FLICK_SPEED) return Math.sign(speed) === shift ? shift : 0;
+	return Math.abs(moved) * 2 >= distance ? shift : 0;
+}

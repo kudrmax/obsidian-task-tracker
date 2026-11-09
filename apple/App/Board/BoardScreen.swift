@@ -224,15 +224,19 @@ struct BoardScreen: View {
         }
     }
 
+    /// A menu badge has one colour in iOS: orange and red alike.
+    private var calendarsAlerted: Bool { (model.snapshot?.calendarsAlert ?? CalendarAlert.none) != CalendarAlert.none }
+
     private var more: some View {
             Menu("More", systemImage: "ellipsis") {
                 Button("Search", systemImage: "magnifyingglass") { sheet = .search }
                 Button("Select Tasks", systemImage: "checkmark.circle") { model.startSelection() }
                 Divider()
-                Button("Calendars", systemImage: model.snapshot?.calendarsStale == true ? "calendar.badge.exclamationmark" : "calendar") { sheet = .calendars }
+                Button("Calendars", systemImage: calendarsAlerted ? "calendar.badge.exclamationmark" : "calendar") { sheet = .calendars }
+                    .accessibilityValue(model.snapshot?.calendarWords.alert ?? "")
                 Button("Settings", systemImage: "gear") { sheet = .settings }
             }
-            .badge(model.snapshot?.calendarsStale == true ? 1 : 0)
+            .badge(calendarsAlerted ? 1 : 0)
             .tint(.primary)
     }
 
@@ -290,6 +294,8 @@ struct Ribbon: View {
     @State private var rested: RibbonPlace?
     /// How far the ribbon stands from Inbox now.
     @State private var offset: CGFloat = 0
+    /// The finger's swipe of the ribbon: where it took the ribbon from, and the scroll view it lets go.
+    @State private var swipe = RibbonSwipe()
 
     var body: some View {
         GeometryReader { box in
@@ -300,6 +306,7 @@ struct Ribbon: View {
             // The Done column, while the search has opened it, stands left of Inbox, as wide as Inbox: every place moves
             // right by it.
             let lead = model.doneShown ? list : 0
+            let stops: [CGFloat] = (lead > 0 ? [0] : []) + [lead, lead + list, lead + width]
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
                     if model.doneShown {
@@ -332,15 +339,18 @@ struct Ribbon: View {
                     .id(RibbonPlace.today)
                 }
                 .scrollTargetLayout()
-                .background { RibbonHooks(model: model, distance: width - list) }
+                .background { RibbonHooks(model: model, swipe: swipe, distance: width - list) }
                 }
-            .scrollTargetBehavior(NearestPlace(stops: (lead > 0 ? [0] : []) + [lead, lead + list, lead + width]))
+            .scrollTargetBehavior(OnePlacePerSwipe(stops: stops, swipe: swipe, model: model))
             .scrollPosition($position, anchor: .leading)
             .scrollIndicators(.hidden)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 geometry.contentOffset.x
             } action: { _, x in
                 offset = x
+                // At rest (a tab's scroll, the size changing) the ribbon stands where the next swipe starts; under the
+                // finger it goes no further than the next place either way, as the plugin's screen.
+                swipe.moved(within: stops)
                 let from = x - lead
                 toToday = min(1, max(0, (from - list) / max(1, width - list)))
                 // The selection moves along with a swipe; a tab's own scroll leaves it on the tab chosen.
@@ -363,10 +373,11 @@ struct Ribbon: View {
                     }
                     // A touch that stops a tab's scroll on its way leaves the ribbon between two places: it goes on to the
                     // nearer one, as a swipe would.
+                    // At rest the tab bar names where the ribbon stands, whatever moved it there.
                     let near = nearest(offset - lead, soon: list, width: width)
                     let stop: CGFloat = switch near { case .inbox: 0; case .soon: list; case .today: width }
+                    if lead == 0, model.place != near { model.place = near }
                     if lead == 0, abs(offset - stop) > 0.5 {
-                        model.place = near
                         withAnimation(.smooth) { position.scrollTo(id: near, anchor: .leading) }
                         return
                     }
@@ -487,10 +498,11 @@ private struct BulkRead: Equatable {
 ///   runs on or springs back. Any other swipe is the ribbon's own paging, which waits for this one to decline.
 private struct RibbonHooks: UIViewRepresentable {
     let model: BoardModel
+    let swipe: RibbonSwipe
     /// How far the finger carries a whole day: the calendar's width, the column under the finger (the plugin's lead lane).
     let distance: CGFloat
 
-    func makeUIView(context: Context) -> Probe { Probe(swipe: context.coordinator) }
+    func makeUIView(context: Context) -> Probe { Probe(swipe: context.coordinator, ribbon: swipe) }
 
     func updateUIView(_ probe: Probe, context: Context) {
         context.coordinator.model = model
@@ -501,9 +513,11 @@ private struct RibbonHooks: UIViewRepresentable {
 
     final class Probe: UIView {
         let swipe: DaySwipe
+        let ribbon: RibbonSwipe
 
-        init(swipe: DaySwipe) {
+        init(swipe: DaySwipe, ribbon: RibbonSwipe) {
             self.swipe = swipe
+            self.ribbon = ribbon
             super.init(frame: .zero)
             isUserInteractionEnabled = false
         }
@@ -517,6 +531,7 @@ private struct RibbonHooks: UIViewRepresentable {
             while let next = view, !(next is UIScrollView) { view = next.superview }
             guard let ribbon = view as? UIScrollView else { return }
             ribbon.bounces = false
+            self.ribbon.scroll = ribbon
             swipe.attach(to: ribbon)
         }
     }
@@ -530,8 +545,6 @@ final class DaySwipe: NSObject, UIGestureRecognizerDelegate {
     var distance: CGFloat = 1
     private weak var ribbon: UIScrollView?
     private var shift = 0
-    /// The plugin's flick speed (`swipeFlickSpeed`, 0.3 px per ms).
-    private static let flick: CGFloat = 300
 
     func attach(to ribbon: UIScrollView) {
         guard self.ribbon !== ribbon else { return }
@@ -566,27 +579,71 @@ final class DaySwipe: NSObject, UIGestureRecognizerDelegate {
         case .changed:
             model.followDaySwipe(share)
         case .ended:
-            let speed = -CGFloat(shift) * pan.velocity(in: ribbon).x
-            Task { await model.endDaySwipe(flicked: abs(speed) >= Self.flick, onward: speed > 0) }
+            let speed = -CGFloat(shift) * pan.velocity(in: ribbon).x / 1000
+            Task { await model.endDaySwipe(speed: speed) }
         case .cancelled, .failed:
-            Task { await model.endDaySwipe(flicked: false, onward: false) }
+            Task { await model.endDaySwipe(speed: 0) }
         default:
             break
         }
     }
 }
 
-/// The ribbon follows the finger and, let go, settles on the place nearest where its glide would end, as the plugin's
-/// screen swipe: a long or quick swipe may pass a place.
-private struct NearestPlace: ScrollTargetBehavior {
-    /// Where each place's left edge stands in the ribbon, left to right.
-    let stops: [CGFloat]
+/// The finger's swipe of the ribbon, kept by reference so the scroll's target, asked as the finger lets go, reads it then.
+@MainActor
+final class RibbonSwipe {
+    /// The ribbon's own scroll view.
+    weak var scroll: UIScrollView?
+    /// The place a swipe starts from: where the ribbon rests, or where the last swipe sent it while it still glides there.
+    var place: CGFloat?
 
-    func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
-        target.rect.origin.x = nearest(target.rect.minX)
+    /// The place's index among `stops`.
+    func from(_ stops: [CGFloat]) -> Int? {
+        guard let place else { return nil }
+        return stops.indices.min { abs(stops[$0] - place) < abs(stops[$1] - place) }
     }
 
-    private func nearest(_ x: CGFloat) -> CGFloat {
-        stops.min { abs($0 - x) < abs($1 - x) } ?? x
+    /// The ribbon moved. Under the finger it goes no further than the place next to the one the swipe started from, either
+    /// way; with neither the finger nor a glide on it (a tab's scroll, the size changing) it stands where the next starts.
+    func moved(within stops: [CGFloat]) {
+        guard let scroll else { return }
+        guard scroll.isDragging else {
+            if !scroll.isDecelerating { place = scroll.contentOffset.x }
+            return
+        }
+        guard let from = from(stops) else { return }
+        let low = stops[max(0, from - 1)]
+        let high = stops[min(stops.count - 1, from + 1)]
+        let x = scroll.contentOffset.x
+        if x < low || x > high { scroll.contentOffset.x = min(high, max(low, x)) }
+    }
+}
+
+/// The ribbon follows the finger and, let go, goes on to the next place or back to the one it was taken from, as the
+/// plugin's screen swipe: the core's `swipeLanding` decides, never further than the next place. A scroll with no finger
+/// (a tab, the size changing) settles on the nearest place.
+private struct OnePlacePerSwipe: ScrollTargetBehavior {
+    /// Where each place's left edge stands in the ribbon, left to right.
+    let stops: [CGFloat]
+    let swipe: RibbonSwipe
+    let model: BoardModel
+
+    func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
+        let proposed = target.rect.minX
+        target.rect.origin.x = MainActor.assumeIsolated { landing(proposed) }
+    }
+
+    @MainActor
+    private func landing(_ proposed: CGFloat) -> CGFloat {
+        guard let scroll = swipe.scroll, scroll.panGestureRecognizer.state != .possible, let from = swipe.from(stops) else {
+            return stops.min { abs($0 - proposed) < abs($1 - proposed) } ?? proposed
+        }
+        let moved = scroll.contentOffset.x - stops[from]
+        let next = moved > 0 ? from + 1 : from - 1
+        guard stops.indices.contains(next) else { return stops[from] }
+        let speed = -scroll.panGestureRecognizer.velocity(in: scroll).x / 1000
+        let shift = model.swipeLanding(moved: moved, distance: abs(stops[next] - stops[from]), speed: speed)
+        swipe.place = stops[from + shift]
+        return stops[from + shift]
     }
 }

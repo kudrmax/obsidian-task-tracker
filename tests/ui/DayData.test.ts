@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { dayWords } from "../../core/application/sourceWords";
 import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, type DayEventsAsk, type EventsReason, type ScreenView, type TaskService } from "../../core/application/contracts";
 import { DayData, type DayPart } from "../../obsidian/ui/DayData";
 import type { LocalDate } from "../../obsidian/ui/types";
@@ -58,7 +59,7 @@ class SlowCalendars implements CalendarService {
 	private fetch(date: LocalDate): Promise<DayEvents> {
 		return new Promise((resolve) =>
 			this.waiting.push(() => {
-				const day = { events: [event(`on ${date}`)], allDay: [], timed: [event(`on ${date}`)], statuses: [], stale: false };
+				const day: DayEvents = { events: [event(`on ${date}`)], allDay: [], timed: [event(`on ${date}`)], statuses: [], stale: false, alert: "none", words: dayWords("none") };
 				this.last.set(date, day);
 				resolve(day);
 			}),
@@ -205,17 +206,30 @@ describe("DayData", () => {
 		expect(updates()).toBe(shown + 1);
 	});
 
-	it("the dot is the day's stale, not every source's", async () => {
+	it("the dot is the day's alert, not every source's", async () => {
 		const { data, calendars } = setup();
-		const fine = { source: "iphone" as const, kind: "exported" as const, problem: null, events: 0, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: true, words: { name: "iPhone calendars" as const, short: "iPhone" as const, sub: "Exported from file", time: "" } };
-		calendars.last.set(TODAY, { events: [event("kept")], allDay: [], timed: [event("kept")], statuses: [fine], stale: false });
+		const fine = { source: "iphone" as const, kind: "exported" as const, problem: null, events: 0, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: true, used: false, tone: "spare" as const, words: { name: "iPhone calendars" as const, short: "iPhone" as const, sub: "Exported from file", time: "", alert: "" } };
+		calendars.last.set(TODAY, { events: [event("kept")], allDay: [], timed: [event("kept")], statuses: [fine], stale: false, alert: "none", words: dayWords("none") });
 		void data.load();
-		expect(data.stale).toBe(false);
+		expect(data.alert).toBe("none");
+	});
+
+	it("tells the events changed when only the dot turns from orange to red", async () => {
+		const { data, calendars, parts } = setup();
+		const work = (tone: "old" | "broken") => ({ events: [event("same")], allDay: [], timed: [event("same")], statuses: [{ source: "work" as const, kind: "exported" as const, problem: tone === "broken" ? { kind: "fileMissing" as const } : null, events: 1, updatedAt: new Date(0), updatedDay: "other" as const, updatedDate: "2026-11-01", detail: null, stale: true, used: true, tone, words: { name: "Work calendar" as const, short: "Work" as const, sub: "Exported from iPhone", time: "1 Nov 00:00", alert: "" } }], stale: true, alert: tone, words: dayWords(tone) });
+		let tone: "old" | "broken" = "old";
+		calendars.eventsOn = async () => work(tone);
+		await data.calendars();
+		expect(data.alert).toBe("old");
+		tone = "broken";
+		await data.calendars();
+		expect(data.alert).toBe("broken");
+		expect(parts).toEqual(["events", "events"]);
 	});
 
 	it("opens with the events last fetched for the day and swaps in the fresh ones when they come", async () => {
 		const { data, calendars } = setup();
-		calendars.last.set(TODAY, { events: [event("kept")], allDay: [], timed: [event("kept")], statuses: [], stale: false });
+		calendars.last.set(TODAY, { events: [event("kept")], allDay: [], timed: [event("kept")], statuses: [], stale: false, alert: "none", words: dayWords("none") });
 		const opened = data.load();
 		expect(titles(data)).toEqual(["kept"]);
 		calendars.answer();
@@ -225,7 +239,7 @@ describe("DayData", () => {
 
 	it("opens without waiting for the network: the tasks and the events last fetched at once, the fresh events later", async () => {
 		const { data, calendars, updates } = setup();
-		calendars.last.set(TODAY, { events: [event("kept")], allDay: [], timed: [event("kept")], statuses: [], stale: false });
+		calendars.last.set(TODAY, { events: [event("kept")], allDay: [], timed: [event("kept")], statuses: [], stale: false, alert: "none", words: dayWords("none") });
 		await data.load();
 		expect(data.day!.date).toBe(TODAY);
 		expect(titles(data)).toEqual(["kept"]);
@@ -302,7 +316,7 @@ describe("DayData", () => {
 
 	it("stays silent when a poll brings the same events only fetched later", async () => {
 		const { data, calendars, parts } = setup();
-		const later = (at: number) => ({ events: [event("same")], allDay: [], timed: [event("same")], statuses: [{ source: "google" as const, kind: "synced" as const, problem: null, events: 1, updatedAt: new Date(at), updatedDay: "other" as const, updatedDate: "2026-11-01", detail: null, stale: false, words: { name: "Google Calendar" as const, short: "Google" as const, sub: "Updated 1 Nov", time: `1 Nov 00:00:0${at}` } }], stale: false });
+		const later = (at: number) => ({ events: [event("same")], allDay: [], timed: [event("same")], statuses: [{ source: "google" as const, kind: "synced" as const, problem: null, events: 1, updatedAt: new Date(at), updatedDay: "other" as const, updatedDate: "2026-11-01", detail: null, stale: false, used: true, tone: "plain" as const, words: { name: "Google Calendar" as const, short: "Google" as const, sub: "Updated 1 Nov", time: `1 Nov 00:00:0${at}`, alert: "" } }], stale: false, alert: "none" as const, words: dayWords("none") });
 		let at = 0;
 		calendars.eventsOn = async () => later(at++);
 		await data.calendars();

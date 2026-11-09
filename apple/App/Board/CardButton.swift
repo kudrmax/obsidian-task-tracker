@@ -21,7 +21,8 @@ enum Carried {
 /// A card as the design has it, behaving as Files and Podcasts' rows do: a long press lifts it and shows its menu, and
 /// moving the finger while it is lifted turns the lift into the drag the lists and the calendar take. Both are UIKit's
 /// own interactions on the card, so the lift, the haptics, the menu's growth and the drop's animations are the system's.
-/// A tap only highlights it; the subtask counter is its own button, which folds.
+/// A touch draws nothing of its own, as the plugin's card: a tap opens the menu, a long press lifts the card. The subtask
+/// counter is its own button, which folds.
 struct CardButton: UIViewRepresentable {
     let card: BoardCard
     /// The task's new text while its rename is written: drawn instead of the text as read.
@@ -172,9 +173,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     }
     var look: Look?
     let content: UIView & UIContentView
-    /// What a carry hides of the card: the content's holder. The content's own alpha is the menu's and the system lift's,
-    /// which set it and give it back on their own schedule; a carry hiding the same property was overwritten by them
-    /// (a card lifted again while its first drop settled stayed invisible).
+    /// What hides the card, for a carry or for the menu's grown copy: the content's holder, decided in `showsInPlace` alone.
+    /// The content's own alpha is the system's (its lift, its menu), which set it and give it back on their own schedule:
+    /// hiding the card through the same property was overwritten by them, or overwrote them.
     private let shown = UIView()
     /// Where the capsule draws its subtask counter: the fold button lies there.
     var counterFrame: CGRect? {
@@ -190,8 +191,6 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     private let mark = UIButton(type: .custom)
     /// Shows the menu, anchored to the card, when a tap has ended.
     private lazy var opener = MenuOpener { [weak self] in self?.menuEnded($0) }
-    /// The press's highlight over the capsule, as a button's: outside the content, so a lifted preview never carries it.
-    private let press = UIView()
     private var drag: UIDragInteraction!
     /// While its menu is open and its preview flies home inside it, the card draws over the cards after it in the list:
     /// SwiftUI stacks the wrappers of the cards' views in the order of the list and keeps no `zIndex` for them, so the
@@ -247,12 +246,6 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
             content.topAnchor.constraint(equalTo: shown.topAnchor),
             content.bottomAnchor.constraint(equalTo: shown.bottomAnchor),
         ])
-        press.isUserInteractionEnabled = false
-        press.backgroundColor = .label.withAlphaComponent(0.12)
-        press.alpha = 0
-        press.layer.cornerRadius = CardMetrics.radius
-        press.layer.cornerCurve = .continuous
-        addSubview(press)
         fold.isHidden = true
         fold.accessibilityLabel = "Subtasks"
         fold.accessibilityHint = "Folds the subtasks away or shows them again"
@@ -283,7 +276,6 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        press.frame = bounds
         opener.frame = bounds
         // The counter's own button, as tall as the card and a little wider than the digits, as the plugin's hit area.
         if let counter = counterFrame {
@@ -295,15 +287,6 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     }
 
     private static let foldReach: CGFloat = 6
-
-    override var isHighlighted: Bool {
-        didSet {
-            guard isHighlighted != oldValue else { return }
-            UIView.animate(withDuration: isHighlighted ? 0 : 0.25, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
-                self.press.alpha = self.isHighlighted ? 1 : 0
-            }
-        }
-    }
 
     private var capsule: UIPreviewParameters {
         let parameters = UIPreviewParameters()
@@ -345,6 +328,12 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     /// The grown copy the open menu lifts, while it shows.
     private var wholeCopy: (UIView & UIContentView)?
+    /// Counts the menus opened from this card: a menu's end that comes after the next menu opened is no longer its.
+    private var menuRound = 0
+    /// The menu's grown copy stands in for the card: the card is hidden until that menu's copy has flown home.
+    private var menuCopied = false {
+        didSet { if menuCopied != oldValue { showsInPlace() } }
+    }
 
     @objc private func tapped(_ tap: UITapGestureRecognizer) {
         onTouch()
@@ -365,6 +354,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     private func openMenu(at point: CGPoint) {
         guard let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return }
+        menuRound += 1
         Self.menuOwner = self
         if let look, let window { Self.lastLifted = (look.card, convert(bounds, to: window)) }
         raised = true
@@ -373,7 +363,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
             guard let self, self.window != nil else { return nil }
             if let whole = self.wholePreview() {
                 // The grown copy stands in for the card: the card itself is not seen beside it under the backdrop.
-                self.content.alpha = 0
+                self.menuCopied = true
                 return whole
             }
             let home = UIPreviewTarget(container: self, center: CGPoint(x: self.bounds.midX, y: self.bounds.midY))
@@ -436,15 +426,14 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// preview, which flies home inside the card, has landed.
     private func menuEnded(_ animator: (any UIContextMenuInteractionAnimating)?) {
         wholeCopy = nil
-        if let animator {
-            animator.addCompletion { [weak self] in
-                self?.content.alpha = 1
-                self?.raised = false
-            }
-        } else {
-            content.alpha = 1
-            raised = false
+        let round = menuRound
+        let landed = { [weak self] in
+            // The card was tapped again while this copy flew home: the new menu owns the card now.
+            guard let self, self.menuRound == round else { return }
+            self.menuCopied = false
+            self.raised = false
         }
+        if let animator { animator.addCompletion(landed) } else { landed() }
         guard let run = afterMenu else { return }
         afterMenu = nil
         // As the menu starts to go, not when its animation ends: the animator completes about a second later.
@@ -473,9 +462,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// The capsule itself is lifted: from an open menu the system turns the menu's preview, this capsule, into the carried
     /// card, and only a lift of the same view lets the menu give way to the drag.
     func dragInteraction(_ interaction: UIDragInteraction, previewForLifting item: UIDragItem, session: UIDragSession) -> UITargetedDragPreview? {
-        if let stack = stackPreview() { return stack }
         // Lifted from a menu that showed a grown copy instead: the capsule shows again to be carried.
-        content.alpha = 1
+        menuCopied = false
+        if let stack = stackPreview() { return stack }
         let parameters = UIDragPreviewParameters()
         parameters.visiblePath = UIBezierPath(roundedRect: content.bounds, cornerRadius: CardMetrics.radius)
         parameters.backgroundColor = .clear
@@ -506,7 +495,6 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     func dragInteraction(_ interaction: UIDragInteraction, sessionAllowsMoveOperation session: UIDragSession) -> Bool { true }
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
-        content.alpha = 1
         origin = window.map { convert(CGPoint(x: bounds.midX, y: bounds.midY), to: $0) }
         token = onCarry(grab)
     }
@@ -549,7 +537,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// Only what the card draws hides, never the card: a hidden card still takes the finger, so it can be lifted again the
     /// moment it shows, whatever the system's drop still animates over it (a view at alpha 0 takes no touches).
     private func showsInPlace() {
-        shown.alpha = carried && !home && (left || !lifting) ? 0 : 1
+        shown.alpha = menuCopied || (carried && !home && (left || !lifting)) ? 0 : 1
     }
 
     /// The cancelled copy is home: the card shows in the same frame the copy goes, then the carry ends.

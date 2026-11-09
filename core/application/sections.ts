@@ -26,7 +26,7 @@ export interface ListGroup {
 	readonly menu: { readonly section: string; readonly rename: boolean; readonly remove: boolean; readonly project?: ProjectZone } | null;
 	/** It draws a header: a section of a list that shows them; never the tasks without a section inside a project's group. */
 	readonly header: boolean;
-	/** A long press lifts its header to move it among the list's sections: a section, while the list is not grouped by project. */
+	/** A long press lifts its header to move it among the list's sections, No section too: any header, while the list is not grouped by project. */
 	readonly reorder: boolean;
 }
 
@@ -45,7 +45,7 @@ export function sectionId(name: GroupName, sections: readonly ListSection[]): st
 
 function groupOf(name: GroupName, items: readonly TaskItem[], header = true, id = sectionId(name, [])): ListGroup {
 	const section = name !== null;
-	return { id, name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: section };
+	return { id, name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: header };
 }
 
 /** A section of a project's group: its header unless it is the part without a section; its menu touches only that project's tasks; it does not lift. */
@@ -74,7 +74,7 @@ export function listView(items: readonly TaskItem[], sections: boolean, listSect
 	if (!sections) return { showsHeaders: false, groups: [groupOf(null, items, false)] };
 	const groups = withEmptySections(byGroup(items, listSections), listSections);
 	const showsHeaders = groups.some((g) => g.name !== null);
-	return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders })) };
+	return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders, reorder: showsHeaders })) };
 }
 
 function byGroup(items: readonly TaskItem[], sections: readonly ListSection[]): ListGroup[] {
