@@ -66,12 +66,12 @@ describe("writing", () => {
 		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] B\n\n## Soon\n\n## Done\n\n- [x] A\n\n## Backlog\n");
 	});
 
-	it("rejects a stale key and leaves the file alone", async () => {
+	it("acts on a task edited elsewhere in place; rejects a key whose task is gone and leaves the file alone", async () => {
 		const { store, svc } = setup("## Now\n\n- [ ] A\n- [ ] B\n");
 		const view = await svc.dayView(T);
 		store.text = "## Now\n\n- [ ] Changed\n- [ ] B\n";
-		await expect(svc.setStatus(view.list[0].key, "done")).rejects.toBeInstanceOf(StaleTaskError);
-		expect(store.text).toBe("## Now\n\n- [ ] Changed\n- [ ] B\n");
+		await svc.setStatus(view.list[0].key, "inProgress");
+		expect(store.text).toContain("## Now\n\n- [/] Changed\n- [ ] B\n");
 		store.text = "## Now\n";
 		await expect(svc.remove(view.list[1].key)).rejects.toBeInstanceOf(StaleTaskError);
 		expect(store.text).toBe("## Now\n");
@@ -147,11 +147,14 @@ describe("writing", () => {
 		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B\n\n## Soon\n\n## Backlog\n\n## Done\n");
 	});
 
-	it("rejects a description for a task that changed in the file", async () => {
+	it("gives a task edited elsewhere in place its description; rejects one for a task gone from the file", async () => {
 		const { store, svc } = setup("## Now\n\n- [ ] A\n");
 		const view = await svc.dayView(T);
 		store.text = "## Now\n\n- [ ] Changed\n";
-		await expect(svc.setDescription(view.list[0].key, "- x")).rejects.toBeInstanceOf(StaleTaskError);
+		await svc.setDescription(view.list[0].key, "x");
+		expect(store.text).toContain("- [ ] Changed\n\tx\n");
+		store.text = "## Now\n";
+		await expect(svc.setDescription(view.list[0].key, "y")).rejects.toBeInstanceOf(StaleTaskError);
 	});
 
 	it("createAtTime puts the task at the time, without a duration", async () => {
@@ -725,10 +728,10 @@ describe("createInPlace", () => {
 		expect(store.text).toBe(TEXT);
 	});
 
-	it("list with a stale before rejects with StaleTaskError and writes nothing", async () => {
+	it("list before a task gone from the file rejects with StaleTaskError and writes nothing", async () => {
 		const { store, svc } = setup(TEXT);
 		const [a] = (await svc.dayView(T)).list;
-		store.text = TEXT.replace("A\n", "Changed\n");
+		store.text = TEXT.replace("- [ ] A\n", "");
 		const changed = store.text;
 		await expect(svc.createInPlace("N", null, { kind: "list", list: "now", group: null, before: a.key })).rejects.toBeInstanceOf(StaleTaskError);
 		expect(store.text).toBe(changed);
@@ -838,7 +841,7 @@ describe("subtasks", () => {
 		expect(trip.subtasks.map((s) => s.key)).toEqual([{ section: "now", index: 0, path: [1], raw: "\t- [ ] Pay", id: trip.subtasks[0].id }]);
 	});
 
-	it("acts on a subtask by its key, its key good after a write changed its line, and rejects one changed elsewhere", async () => {
+	it("acts on a subtask by its key after a write or an edit elsewhere changed its line, and rejects one whose subtask is gone", async () => {
 		const { store, svc } = setup(TRIP);
 		const pay = (await svc.dayView(T)).list[0].subtasks[0];
 		await svc.rename(pay.key, "Pay all");
@@ -846,7 +849,10 @@ describe("subtasks", () => {
 		await svc.setStatus(pay.key, "inProgress");
 		expect(store.text).toContain("\t- [/] Pay all\n");
 		store.text = store.text!.replace("\t- [/] Pay all\n", "\t- [/] Pay half\n");
-		await expect(svc.setStatus(pay.key, "done")).rejects.toBeInstanceOf(StaleTaskError);
+		await svc.setStatus(pay.key, "done");
+		expect(store.text).toContain("\t- [x] Pay half\n");
+		store.text = store.text!.replace("\t- [x] Pay half\n", "");
+		await expect(svc.setStatus(pay.key, "todo")).rejects.toBeInstanceOf(StaleTaskError);
 	});
 
 	it("adds a subtask last under its task and nests a task under another", async () => {
@@ -1002,12 +1008,15 @@ describe("applyAll", () => {
 		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] P\n\t- [ ] A\n\t- [ ] B\n\n## Soon\n\n## Done\n\n## Backlog\n");
 	});
 
-	it("rejects a stale key and writes nothing", async () => {
-		const { store, svc } = setup("## Now\n\n- [ ] A\n- [ ] B\n");
-		const [a, b] = (await svc.dayView(T)).list;
-		store.text = "## Now\n\n- [ ] A\n- [ ] Changed\n";
-		await expect(svc.applyAll([a, b].map((item) => ({ key: item.key, change: { kind: "remove" } as const })))).rejects.toBeInstanceOf(StaleTaskError);
-		expect(store.text).toBe("## Now\n\n- [ ] A\n- [ ] Changed\n");
+	it("acts on a task edited elsewhere in place, and rejects a key whose task is gone, writing nothing", async () => {
+		const { store, svc } = setup("## Now\n\n- [ ] A\n- [ ] B\n- [ ] C\n");
+		const [a, b, c] = (await svc.dayView(T)).list;
+		store.text = "## Now\n\n- [ ] A\n- [ ] B changed\n- [ ] C\n";
+		await svc.applyAll([b].map((item) => ({ key: item.key, change: { kind: "priority", priority: "p1" } as const })));
+		expect(store.text).toContain("## Now\n\n- [ ] A\n- [ ] p1 B changed\n- [ ] C\n");
+		store.text = "## Now\n\n- [ ] A\n- [ ] p1 B changed\n";
+		await expect(svc.applyAll([a, c].map((item) => ({ key: item.key, change: { kind: "remove" } as const })))).rejects.toBeInstanceOf(StaleTaskError);
+		expect(store.text).toBe("## Now\n\n- [ ] A\n- [ ] p1 B changed\n");
 	});
 });
 
@@ -1539,11 +1548,14 @@ describe("the timeline's cards", () => {
 		expect(store.writes).toBe(0);
 	});
 
-	it("rejects a key whose line changed", async () => {
+	it("resizes a task edited elsewhere in place; rejects a key whose task is gone", async () => {
 		const { store, svc } = setup(LATE);
 		const late = (await svc.dayView(T)).slotted[0];
 		store.text = store.text!.replace("- [ ] A", "- [ ] A2");
-		await expect(svc.resize(late.key, T, "end", 710, CARD_MIN)).rejects.toBeInstanceOf(StaleTaskError);
+		await svc.resize(late.key, T, "end", 710, CARD_MIN);
+		expect(store.text).toMatch(/- \[ \] A2 📌 2026-10-30 10:00-(?!11:00)\d\d:\d\d\n/);
+		store.text = store.text!.replace(/- \[ \] A2.*\n/, "");
+		await expect(svc.resize(late.key, T, "end", 720, CARD_MIN)).rejects.toBeInstanceOf(StaleTaskError);
 	});
 
 	it("gives a slotted task's duration, none without one", async () => {

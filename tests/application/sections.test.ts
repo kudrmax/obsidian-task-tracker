@@ -907,10 +907,10 @@ describe("to a section", () => {
 		expect(await written(T, ["N1"], " Work ")).toBe(await written(T, ["N1"], "Work"));
 	});
 
-	it("a task changed in the file since it was read: rejected, nothing written", async () => {
+	it("a task gone from the file since it was read: rejected, nothing written", async () => {
 		const { store, svc } = setup();
 		const read = byText(await screen(svc, T));
-		const changed = store.text!.replace("- [ ] N1\n", "- [ ] N1 changed\n");
+		const changed = store.text!.replace("- [ ] N1\n", "");
 		store.text = changed;
 		await expect(svc.toSection([read.get("N1")!.key], "Work")).rejects.toBeInstanceOf(StaleTaskError);
 		await expect(svc.toSection([read.get("N1")!.key, read.get("N4")!.key], "Work")).rejects.toBeInstanceOf(StaleTaskError);

@@ -93,10 +93,10 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
 
 - Reads take a `TaskItem`, a `TaskKey` and the like as the door gave them; a key names a task as read. Every key the door
   gives carries `id`, its task's `TaskItem.id`: while the host hands `ids` back, a call finds the task by it wherever
-  writes since moved it (a Done just before, a task added above), and answers `staleTask` only when no task has that id
-  any more (removed, or its line changed outside the door: that is a new task). A key without `id`, one handed in
-  without `ids`, or one another reading gave (its line neither the task's nor one the door's own writes rewrote it
-  from, kept in `ids.held`) is found by its place and line.
+  writes since moved it (a Done just before, a task added above) or its line was edited elsewhere in place, and acts on
+  its line as it is now; it answers `staleTask` only when no task has that id any more (removed, or replaced elsewhere
+  by other lines). A key without `id`, one handed in without `ids`, or one another reading gave (its line neither the
+  task's nor one it had while these ids knew it, kept in `ids.held`) is found by its place and line.
 - What counts as the same task is the core's: `TaskItem.id` (below, «Ids»), the same through every write while the host
   hands `ids` back, so a task whose line a write changed is found again by it. A host compares ids, never a key's
   fields. Keys a call answers alone (`tasks.carried`) are the keys of the items handed in, as read: a host finds each

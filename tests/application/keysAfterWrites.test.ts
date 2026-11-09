@@ -134,7 +134,18 @@ describe("a key given before another write moved the lines", () => {
 		await expect(svc.rename(read.B.key, "X")).rejects.toBeInstanceOf(StaleTaskError);
 	});
 
-	it("is refused when its line was changed elsewhere into another task", async () => {
+	it("acts on its task when its line was edited elsewhere in place, and after a write moved it too", async () => {
+		const { store, svc } = setup();
+		const read = await byTitle(svc);
+		store.text = store.text!.replace("- [ ] B\n", "- [ ] B edited on the Mac\n");
+		await svc.setStatus(read.A.key, "done");
+		await svc.setPriority(read.B.key, "p1");
+		await svc.setStatus(read.B.key, "inProgress");
+		expect(store.text).toContain("- [/] p1 B edited on the Mac\n");
+		expect((await byTitle(svc))["B edited on the Mac"].id).toBe(read.B.id);
+	});
+
+	it("is refused when its line was replaced elsewhere by other tasks, which are new ones", async () => {
 		const { store, svc } = setup();
 		const read = await byTitle(svc);
 		store.text = store.text!.replace("- [ ] B\n", "- [ ] Typed elsewhere\n- [ ] Another\n");
@@ -221,6 +232,24 @@ describe("through the door", () => {
 		app.call("tasks.setStatus", read.A.key, "done");
 		expect(app.call("tasks.setStatus", read.B.key, "inProgress")).toMatchObject({ ok: true });
 		expect(app.titles().B).toMatchObject({ status: "inProgress", priority: { prefix: "p1" } });
+	});
+
+	it("acts on a task by a key read before its line was edited elsewhere in place", () => {
+		const app = new App();
+		const read = app.titles();
+		app.tasks = app.tasks.replace("- [ ] B\n", "- [ ] B synced from the Mac\n");
+		app.titles();
+		app.call("tasks.setStatus", read.A.key, "done");
+		expect(app.call("tasks.setStatus", read.B.key, "inProgress")).toMatchObject({ ok: true });
+		expect(app.titles()["B synced from the Mac"]).toMatchObject({ id: read.B.id, status: "inProgress" });
+	});
+
+	it("acts the same when the edit elsewhere comes in with the call itself, unread before", () => {
+		const app = new App();
+		const read = app.titles();
+		app.tasks = app.tasks.replace("- [ ] B\n", "- [ ] B synced from the Mac\n");
+		expect(app.call("tasks.setStatus", read.B.key, "inProgress")).toMatchObject({ ok: true });
+		expect(app.titles()["B synced from the Mac"]).toMatchObject({ id: read.B.id, status: "inProgress" });
 	});
 
 	it("refuses a key whose task is gone", () => {

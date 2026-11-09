@@ -18,8 +18,8 @@ export interface TaskIdState {
 	readonly next: number;
 	readonly lines: readonly TaskIdLine[];
 	/**
-	 * The lines a task had before this identity's own writes rewrote them, the latest first, by id: a key read before such
-	 * a write still names its task. Left out: none.
+	 * The lines a task had before, the latest first, by id: rewritten by this identity's writes or edited in place
+	 * elsewhere, a key read before still names its task. Left out: none.
 	 */
 	readonly held?: Readonly<Record<string, readonly string[]>>;
 }
@@ -41,8 +41,7 @@ export interface CarriedLines {
  * A text is matched by its own reading: parsed, each line tagged by its line, and tidied, which carries the tags of the
  * lines it moves; so a file a host keeps untidied reads with the same ids every time. A write carries the ids by the
  * lines it made of which (`wrote`), an undo step by the lines it gave back (`carried`); a text changed elsewhere keeps
- * the id of every heading and task line it left in place, and of a heading renamed in place, by an ordered diff of its
- * reading: a task line changed elsewhere is a new task.
+ * the id of every heading and task line it left in place, or edited in place, by an ordered diff of its reading.
  */
 export class TaskIdentity {
 	private current: TaskIdState;
@@ -102,7 +101,7 @@ export class TaskIdentity {
 		this.last = null;
 	}
 
-	/** Whether `raw` is a line the task `id` has, or had before this identity's own writes rewrote it. */
+	/** Whether `raw` is a line the task `id` has, or had while this identity knew it. */
 	held(id: string, raw: string): boolean {
 		return this.current.lines.some((line) => line.id === id && line.raw === raw) || (this.current.held?.[id]?.includes(raw) ?? false);
 	}
@@ -136,16 +135,13 @@ export class TaskIdentity {
 	}
 
 	/** The ids of the reading the state is for, carried to this reading's lines by place and line. */
-	/**
-	 * The ids of the reading the state is for, carried to this reading's lines by place and line. A task line changed
-	 * elsewhere is another task, so a key given for it is refused; a heading renamed in place stays its section.
-	 */
+	/** The ids of the reading the state is for, carried to this reading's lines by place and line. */
 	private matched(outline: readonly OutlineLine[]): Map<number, string> {
 		const old = this.current.lines;
 		const pairs = matchLines(
 			old.map((l) => l.raw),
 			outline.map((o) => o.raw),
-			(b, a) => !old[b].task && !outline[a].task,
+			(b, a) => old[b].task === outline[a].task,
 		);
 		const known = new Map<number, string>();
 		for (const [b, a] of pairs) if (old[b].task === outline[a].task) known.set(outline[a].tag, old[b].id);

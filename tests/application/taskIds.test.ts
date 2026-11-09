@@ -261,13 +261,13 @@ describe("two identical lines", () => {
 });
 
 describe("an edit from elsewhere", () => {
-	it("keeps the id of every line it leaves in place; a task line it changed is a new task", async () => {
+	it("keeps the id of every line it leaves in place, and of a line edited in place", async () => {
 		const { store, svc } = setup();
 		const before = await ids(svc);
 		store.text = store.text!.replace("- [ ] Later", "- [ ] Later\n- [ ] Typed elsewhere").replace("- [ ] Shop", "- [ ] Shop for food");
 		store.emitChange();
 		const after = await ids(svc);
-		expect(Object.values(before)).not.toContain(after["Shop for food"]);
+		expect(after["Shop for food"]).toBe(before.Shop);
 		for (const [name, id] of Object.entries(before)) if (name !== "Shop") expect(after[name]).toBe(id);
 		expect(Object.values(before)).not.toContain(after["Typed elsewhere"]);
 	});
@@ -298,7 +298,7 @@ describe("an edit from elsewhere", () => {
 		store.text = store.text!.replace("- [ ] Later", "- [ ] Later edited");
 		await svc.setStatus((await item(svc, "A")).key, "inProgress");
 		const after = await ids(svc);
-		expect(after.Someday).toBe(before.Someday);
+		expect(after["Later edited"]).toBe(before.Later);
 		expect(after.A).toBe(before.A);
 	});
 });

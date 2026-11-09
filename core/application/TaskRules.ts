@@ -214,9 +214,10 @@ export class TaskRules {
 	}
 
 	/**
-	 * The task a key names by its id, when the rules find keys by id: the task with that id whose line is the key's, or one
-	 * this identity's own writes gave it since; else the key is another reading's, whose ids mean nothing here, and is
-	 * found at its place with its line. Null when it is not found that way either; undefined when keys are found by place.
+	 * The task a key names by its id, when the rules find keys by id: the task with that id, whatever its line is now, when
+	 * the key's line is one it has or had while this identity knew it; else the key is another reading's, whose ids mean
+	 * nothing here, and is found at its place with its line. Null when it is not found that way either; undefined when
+	 * keys are found by place.
 	 */
 	named(doc: TaskDocument, key: TaskKey): TaskEntry | null | undefined {
 		if (!this.keysById || key.id === undefined) return undefined;

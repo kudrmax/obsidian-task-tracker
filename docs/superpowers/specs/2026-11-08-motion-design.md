@@ -457,17 +457,17 @@ every condition that changes the layout is animated by the transaction that chan
 62. **Backend: a key stays good while its task is there.** Max acts in the middle of a motion: Done, then at once a drag of
     another task, whose key was read before Done moved the lines. Every key the core gives now carries its task's id
     (`TaskKey.id`, added), and `TaskRules.entryOf`, through which every write and every read by key finds its task, finds
-    it by that id wherever writes since took it (`applyAll` first takes each key and the keys its changes name to the
-    task's key now). A key is refused (`StaleTaskError`, the door's `staleTask`) only when no task has its id: it was
-    removed, or its line was changed elsewhere, which now makes it a new task with a new id (a task line changed outside
-    the core is never paired with the old one; a section's heading renamed in place still is). A key without an id (one a
-    host builds) is found by place and line, as before. A key is found by its id only where that id is this identity's:
-    its task's line is the key's, or one of the lines this identity's own writes rewrote it from (`TaskIdState.held`,
-    added, the last 8 by id); a key another reading gave (another `TaskBoard` over the same file, whose ids collide with
-    these by design) is found by its place and line instead. The door finds keys by id only while the host hands back
-    `ids`. The frontends pass `item.key` as they did; the iPhone app keeps each key's JSON as the door gave it and hands
-    `ids` back, so it changes nothing (its tests that read through a second board pass as before).
-
+    it by that id wherever writes since took it, and acts on its line as it is now (`applyAll` first takes each key and
+    the keys its changes name to the task's key now). A line edited elsewhere in place (in Obsidian's editor, or by
+    Sync from the Mac) keeps its task's id, as R1 promises, so a key read before such an edit acts on the edited task. A
+    key is refused (`StaleTaskError`, the door's `staleTask`) only when no task has its id any more: removed, or replaced
+    elsewhere by other lines. A key without an id (one a host builds) is found by place and line, as before. A key is
+    found by its id only where that id is this identity's: its task's line now is the key's, or one the task had while
+    this identity knew it (rewritten by its writes or edited elsewhere in place; `TaskIdState.held`, added, the last 8 by
+    id); a key another reading gave (another `TaskBoard` over the same file, whose ids collide with these by design) is
+    found by its place and line instead. The door finds keys by id only while the host hands back `ids`. The frontends
+    pass `item.key` as they did; the iPhone app keeps each key's JSON as the door gave it and hands `ids` back, so it
+    changes nothing.
 
 ## Done when
 

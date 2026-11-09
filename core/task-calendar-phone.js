@@ -5342,9 +5342,10 @@ ${key.title}`.toLowerCase();
       return entry;
     }
     /**
-     * The task a key names by its id, when the rules find keys by id: the task with that id whose line is the key's, or one
-     * this identity's own writes gave it since; else the key is another reading's, whose ids mean nothing here, and is
-     * found at its place with its line. Null when it is not found that way either; undefined when keys are found by place.
+     * The task a key names by its id, when the rules find keys by id: the task with that id, whatever its line is now, when
+     * the key's line is one it has or had while this identity knew it; else the key is another reading's, whose ids mean
+     * nothing here, and is found at its place with its line. Null when it is not found that way either; undefined when
+     * keys are found by place.
      */
     named(doc, key) {
       if (!this.keysById || key.id === void 0) return void 0;
@@ -6160,7 +6161,7 @@ ${key.title}`.toLowerCase();
       this.pending = { text: after, ids };
       this.last = null;
     }
-    /** Whether `raw` is a line the task `id` has, or had before this identity's own writes rewrote it. */
+    /** Whether `raw` is a line the task `id` has, or had while this identity knew it. */
     held(id, raw) {
       return this.current.lines.some((line) => line.id === id && line.raw === raw) || (this.current.held?.[id]?.includes(raw) ?? false);
     }
@@ -6190,16 +6191,13 @@ ${key.title}`.toLowerCase();
       return new Map(outline.map((o, i) => [o.tag, this.current.lines[i].id]));
     }
     /** The ids of the reading the state is for, carried to this reading's lines by place and line. */
-    /**
-     * The ids of the reading the state is for, carried to this reading's lines by place and line. A task line changed
-     * elsewhere is another task, so a key given for it is refused; a heading renamed in place stays its section.
-     */
+    /** The ids of the reading the state is for, carried to this reading's lines by place and line. */
     matched(outline) {
       const old = this.current.lines;
       const pairs = matchLines(
         old.map((l) => l.raw),
         outline.map((o) => o.raw),
-        (b, a) => !old[b].task && !outline[a].task
+        (b, a) => old[b].task === outline[a].task
       );
       const known = /* @__PURE__ */ new Map();
       for (const [b, a] of pairs) if (old[b].task === outline[a].task) known.set(outline[a].tag, old[b].id);
