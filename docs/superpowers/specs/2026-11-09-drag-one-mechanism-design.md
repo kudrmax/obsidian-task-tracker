@@ -114,30 +114,31 @@ what a drop writes.
 
 ## Decisions
 
-1. **Lead, changed 11-09: the target is the system's gap**, rows parting where the task will go, as in Reminders:
-   Max asked for the standard iOS behaviour; the purple line and «no row moves while the finger does» are the plugin's
-   and stay there.
-2. **Lead: the home place is the gap where the card was lifted from**, so the target is never «nothing».
+1. **Lead, changed again 11-09 (Max rejected the system's gap): the target is the plugin's purple drop line.** The
+   system's drag session carries the card, but no row moves under the finger (the drop proposal asks no gap): the line
+   with its dot stands at the left edge of the level the place picks, drawn over everything, the carried copy too.
+   The place is the core's `rules.placeAt` over the rows as they stand, the level `rules.levelAt` from the finger's `x`.
+2. **Lead, changed 11-09: the home place is the carried card's dashed place** where it was lifted from (`is-waiting`);
+   held over its own place, the line stands at it, and a drop there writes nothing.
 3. **Lead, changed 11-09 (was «no target over the bars»): over the bars the target is the nearest place of the column
    under the finger.** Where no list or calendar takes the drop (the top bar, the tab bar, the divider's handle, the gaps
    round them), one board-level drop interaction routes it, through the same routing as the plus, to the column under
    the finger's `x`: above a list its first place, over the tab bar its last place in sight (the end of a short list), on
    the calendar the minute at its visible top or bottom edge; the list opens the room there and the drop lands there.
-4. **frontend-swift: a subtask's place lights its parent.** The system's gap has no indent: when the finger's `x` makes
-   the place a subtask, the card it will go under gets the accent ring; an empty section's plate lights as before.
+4. **Lead, changed 11-09 (Max rejected the ring): a subtask's place is the same line one level in.** No task lights,
+   rings or takes a drop «onto» it; only an empty section's plate and a column's title light, as before.
 5. **frontend-swift: the calendar's line marks the carried card's top edge** (the minute is read where the card's top
    stands, the finger's hold on the card known from the lift), so the line shows at the card's edge, not under it.
 6. **frontend-swift: the day arrows are spring-loaded.** A card held over ‹ or › turns the day (the system's spring
    loading, as Files' folders); the carry goes on and lands in the day now shown.
 7. **frontend-swift: cards and section headers lift after the system's long press.** The settings' Long Press Delay is
    kept for the calendar's empty-space press only (the system's list drag has no public delay).
-8. **frontend-swift: a card carried out of its list leaves no room there** until it comes back over that list, where
-   its own row is the gap again (the system's own behaviour for a drag between collections).
-9. **frontend-swift: a section carried moves its header with the system's gap**, its tasks hidden. The system asks no
-   reorder snapping of a drop delegate (checked: `targetIndexPathForMoveOfItemFromOriginalIndexPath` is never called),
-   so let go it goes before the section header nearest the gap, or to the list's end; that one slot is both what is
-   written (`tasks.moveGroup`) and what is drawn at once (the section moved among the drawn groups) until the read
-   after the write, which draws the same order.
+8. **frontend-swift, changed 11-09: a card carried out of its list keeps its dashed place there** until the carry
+   ends, as the plugin's; the picked tasks carried with it fold away under it.
+9. **frontend-swift, changed 11-09: a section carried shows its room**, a dashed card's room before the header it would
+   go before (`.tc-group-drop`), its own header and tasks not drawn while its floating copy is carried. Let go it goes
+   there (`tasks.moveGroup`), drawn at once where it was let go until the read after the write; let go where it can't
+   land, the copy flies home and the section's tasks show again once it is down.
 10. **frontend-swift: a press that starts during the system's drop animation (about 0.4 s) is not taken by iOS**; a
     card lifts at once once the dropped one has landed.
 11. **frontend-swift: a card let go on the all-day strip over the calendar goes to the day with no time**: the core has
@@ -147,3 +148,11 @@ what a drop writes.
     list, or its place on the calendar), never the system's default fade.
 13. **frontend-swift: the calendar scrolls at its top and visible bottom edge under a carry**, as the lists do under the
     system's drag, faster the nearer the edge; the minute is read anew as the grid passes under the finger.
+14. **frontend-swift (motion-polish): the drop lands in one drawing.** The core's `dropPreview` screen, the carried
+    tasks in their new rows (all the picked ones), is drawn in the same pass the copy is let go; Select Tasks ends after
+    it. A carry ends once its copy is down (the drag side's end, or the system's flight time after the drop side's).
+15. **frontend-swift (motion-polish): a card's menu grows from the card and lands back in it as one view**: one copy
+    over the card, grown with the menu to the whole title (`rules.wholeWidth`, `rules.grownStart`) and shrunk back,
+    then faded into the row; a row the menu's choice removes closes once the copy is home.
+16. **frontend-swift (motion-polish): list rows come and go as a folder's**: a row coming slides out from under the
+    row above, a row going slides back under it; nothing fades in place under moving rows.
