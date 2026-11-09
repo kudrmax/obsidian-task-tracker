@@ -345,7 +345,7 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-        drop?.preview(defaultPreview)
+        drop?.preview(defaultPreview, item: item)
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {

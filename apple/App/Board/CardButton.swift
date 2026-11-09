@@ -5,12 +5,14 @@ import UIKit
 /// What a dragged card or the plus carries: a card by its id, or the plus, a task not written yet.
 enum Carried {
     static let plus = "\u{0}plus"
+    /// The type the carried thing is offered as, to this app's process only.
+    static let type = "com.kudrmax.taskcalendar.carried"
 
     /// The carried thing for the system's drag: of a type only this app's process knows, so no field or other app takes
     /// it as text; the board's own drop reads what is carried from the carry, not from here.
     static func provider(_ id: String) -> NSItemProvider {
         let provider = NSItemProvider()
-        provider.registerDataRepresentation(forTypeIdentifier: "com.kudrmax.taskcalendar.carried", visibility: .ownProcess) { done in
+        provider.registerDataRepresentation(forTypeIdentifier: type, visibility: .ownProcess) { done in
             done(Data(id.utf8), nil)
             return nil
         }

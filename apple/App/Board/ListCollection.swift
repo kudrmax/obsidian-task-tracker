@@ -711,7 +711,9 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
             guard payload.from == column.rawValue else { return home() }
             // Drawn where it was let go (the model's section move), the header lands in its row there.
             let letGoRect = letGo(carrying: payload)
-            return letGoRect.map { coordinator.drop(item.dragItem, to: target($0)) } ?? home()
+            // Into its header's own row: the floating section turns into the header the row draws.
+            _ = letGoRect
+            return indexPath(of: DrawnRow.header(group, "").id).map { coordinator.drop(item.dragItem, toItemAt: $0) } ?? home()
         case .card:
             switch drop(carrying: payload, at: coordinator.session.location(in: collection)) {
             case .landed(let landed):
@@ -937,7 +939,9 @@ final class FoldingListLayout: UICollectionViewCompositionalLayout {
         }
         unfolding[path.item] = over.frame.maxY - shown.frame.maxY
         shown.zIndex = anchor - path.item
-        shown.alpha = 1
+        // Fading in as it slides out: where the row above is narrower (a subtask's), what of it shows beside that row
+        // comes in softly rather than sliding in whole.
+        shown.alpha = 0
         return shown
     }
 
@@ -955,7 +959,9 @@ final class FoldingListLayout: UICollectionViewCompositionalLayout {
         }
         gone.frame.origin.y = over.maxY - stood.height
         gone.zIndex = anchor - path.item
-        gone.alpha = 1
+        // Fading as it slides under: where the row above is narrower (a subtask's), what of it shows beside that row
+        // goes softly rather than sliding past it.
+        gone.alpha = 0
         return gone
     }
 }
@@ -1031,5 +1037,21 @@ enum DropLog {
         let text = words()
         log.notice("DROP target \(text, privacy: .public)")
         #endif
+    }
+}
+
+extension DropLanding {
+    /// What a carried section's copy lands as on its header at `rect` (in the window): the header itself, drawn as the
+    /// list draws it, so the floating section turns into its header as it lands and what the system leaves on the screen
+    /// a moment after the landing is the header over the header, never the floating card over it.
+    @MainActor
+    static func header(of payload: DragPayload, at rect: CGRect) -> UITargetedDragPreview? {
+        guard case .section(let group) = payload.kind, let window = UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else { return nil }
+        let title = SectionTitle(title: group.header ?? "", muted: group.name == nil).frame(width: rect.width, height: rect.height)
+        guard let view = FloatImage.view(title, like: window, in: window) else { return nil }
+        let parameters = UIDragPreviewParameters()
+        parameters.backgroundColor = .clear
+        parameters.visiblePath = UIBezierPath(rect: view.bounds)
+        return UITargetedDragPreview(view: view, parameters: parameters, target: UIDragPreviewTarget(container: window, center: CGPoint(x: rect.midX, y: rect.midY)))
     }
 }

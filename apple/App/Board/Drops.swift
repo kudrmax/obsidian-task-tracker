@@ -134,13 +134,14 @@ final class BoardRoute: NSObject, UIDropInteractionDelegate {
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-        preview(defaultPreview)
+        preview(defaultPreview, item: item)
     }
 
     /// The copy flies to where the drop landed, or home.
-    func preview(_ defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
+    func preview(_ defaultPreview: UITargetedDragPreview, item: UIDragItem? = nil) -> UITargetedDragPreview? {
         guard let landing, let window = interaction.view?.window ?? UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else { return nil }
         self.landing = nil
+        if let payload = item?.localObject as? DragPayload, let header = DropLanding.header(of: payload, at: landing) { return header }
         return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: CGPoint(x: landing.midX, y: landing.midY)))
     }
 

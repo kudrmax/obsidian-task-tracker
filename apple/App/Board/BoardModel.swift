@@ -1073,6 +1073,8 @@ final class BoardModel {
 
     /// The carry's session ended, whatever came of it: once, and only the carry under way.
     func endCarry(_ token: Int) {
+        // A drop's copy still flies: its landing ends the carry, not the session's end heard before it.
+        guard !flying.contains(token) else { return }
         guard carries.end(token) else { return }
         withAnimation(DropMotion.carry) {
             carry = nil
@@ -1136,6 +1138,11 @@ final class BoardModel {
 
     /// The carry of `session` is let go as a drop: its copy flies, and the carry ends when it is down.
     func dropping(_ session: any UIDropSession) {
+        // The drop takes what the carry holds: a drop that loads nothing keeps its copy on the screen until the system
+        // gives up waiting, most of a second after it has landed.
+        for item in session.items where item.itemProvider.hasItemConformingToTypeIdentifier(Carried.type) {
+            _ = item.itemProvider.loadDataRepresentation(forTypeIdentifier: Carried.type) { _, _ in }
+        }
         lastLanded = nil
         if let token = DragPayload.of(session)?.token { flying.insert(token) }
     }
@@ -1145,8 +1152,10 @@ final class BoardModel {
     func landing(_ item: UIDragItem, _ animator: (any UIDragAnimating)?) {
         guard let payload = item.localObject as? DragPayload else { return }
         let ids = landingIds(payload)
+        var landed = false
         let land = { [weak self] in
-            guard let self else { return }
+            guard let self, !landed else { return }
+            landed = true
             self.arriving.subtract(ids)
             if let token = payload.token {
                 self.flying.remove(token)
@@ -1155,8 +1164,34 @@ final class BoardModel {
         }
         guard let animator else { return land() }
         arriving.formUnion(ids)
+        if landingMark.window == nil, let window = UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first {
+            landingMark.isUserInteractionEnabled = false
+            landingMark.frame = CGRect(x: 0, y: 0, width: 1, height: 1)
+            landingMark.backgroundColor = .clear
+            window.addSubview(landingMark)
+        }
+        // The flight's own animation ends when the copy is down: its transaction's end is the landing. The animator
+        // itself tells of its end most of a second later.
+        // The system runs these animations once for each part of the flight (the copy's move, its last settling): the
+        // copy is down when the last of them ends.
+        var flights = 0
+        animator.addAnimations {
+            // Inside the flight's own animation: an animation of the app's that runs as long as that part of the flight.
+            let mark = self.landingMark
+            flights += 1
+            UIView.animate(withDuration: UIView.inheritedAnimationDuration, delay: 0, options: [.overrideInheritedDuration, .overrideInheritedCurve, .allowUserInteraction]) {
+                mark.transform = mark.transform.isIdentity ? CGAffineTransform(translationX: 1, y: 0) : .identity
+            } completion: { _ in
+                flights -= 1
+                if flights == 0 { land() }
+            }
+        }
         animator.addCompletion { _ in land() }
     }
+
+    /// A view nothing shows, animated with a drop's flight so its transaction has an animation of the app's to end with.
+    @ObservationIgnored private let landingMark = UIView()
+
 
     /// The cards a drop's copy flies into: the carried card, and the card it is in the screen after the drop.
     private func landingIds(_ payload: DragPayload) -> Set<String> {
