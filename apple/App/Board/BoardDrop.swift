@@ -40,6 +40,8 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
         var performed = false
         /// Where the card let go will stand, in the window.
         var landing: CGRect?
+        /// The place that took it.
+        var place: String?
         /// The copy is flying: the session's end waits for it.
         var flying = false
         var endAfterFlight = false
@@ -65,6 +67,11 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     /// part flies into the part's header (decision 56).
     var fadesOnDrop: () -> Bool = { false }
     private var places: [String: DropPlace] = [:]
+    /// Each place's view inside the day it shows (`DropSpace`), by its key.
+    private var spaces: [String: WeakView] = [:]
+    private struct WeakView { weak var view: UIView? }
+
+    func space(_ key: String, _ view: UIView) { spaces[key] = WeakView(view: view) }
     /// How each place that scrolls is scrolled by a carry held at its edge: by `dy` points, true when it moved.
     private var scrolls: [String: (CGFloat) -> Bool] = [:]
     /// Where the carry is held, in the window: the edge scroll reads it on every frame, the finger still or not.
@@ -230,6 +237,7 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
         flights[key]?.performed = true
         for item in session.items { sessionOf[ObjectIdentifier(item)] = key }
         guard let current, let place = places[current] else { return }
+        flights[key]?.place = current
         flights[key]?.landing = place.land().map { $0.offsetBy(dx: place.origin.x, dy: place.origin.y) }
         self.current = nil
     }
@@ -249,7 +257,12 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
 
     /// The carried card settles into its place: into the gap, or onto the line's time.
     func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-        guard let key = sessionOf[ObjectIdentifier(item)], let landing = flights[key]?.landing, let view = interaction.view else { return nil }
+        guard let key = sessionOf[ObjectIdentifier(item)], let inWindow = flights[key]?.landing, let window = interaction.view else { return nil }
+        // The copy comes down in the space of the day it was dropped into (its place's `DropSpace`, sliding with the day),
+        // the target given there; the window when the place has none (the title, the plus's slot).
+        let space = flights[key]?.place.flatMap { spaces[$0]?.view }.flatMap { $0.window === window ? $0 : nil }
+        let view = space ?? window
+        let landing = view === window ? inWindow : view.convert(inWindow, from: window)
         let target = UIDragPreviewTarget(container: view, center: CGPoint(x: landing.midX, y: landing.midY))
         let center = CGPoint(x: landing.midX, y: landing.minY)
         if foldsOnDrop() {
@@ -292,6 +305,41 @@ extension BoardDrop {
 }
 
 /// Puts the screen's drop interaction on its window.
+/// A place's own space inside the day it shows, one view per day: a drop's copy comes down in it, so when the day slides
+/// away before the copy is down, the copy goes with the day and leaves with its view, never left over the day that comes
+/// in.
+struct DropSpace: UIViewRepresentable {
+    let key: String
+    let drop: BoardDrop
+
+    func makeUIView(context: Context) -> SpaceView {
+        let view = SpaceView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: SpaceView, context: Context) {
+        view.key = key
+        view.drop = drop
+        view.claim()
+    }
+
+    final class SpaceView: UIView {
+        var key = ""
+        weak var drop: BoardDrop?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            claim()
+        }
+
+        func claim() {
+            guard window != nil else { return }
+            drop?.space(key, self)
+        }
+    }
+}
+
 struct DropAnchor: UIViewRepresentable {
     let drop: BoardDrop
 

@@ -499,8 +499,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, previewForCancelling item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-        guard let window, let origin else { return defaultPreview }
-        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: origin))
+        // Home is the card's own place: in the card's space, so the copy goes with the card if its day slides meanwhile.
+        guard window != nil else { return defaultPreview }
+        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: self, center: CGPoint(x: bounds.midX, y: bounds.midY)))
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, item: UIDragItem, willAnimateCancelWith animator: any UIDragAnimating) {

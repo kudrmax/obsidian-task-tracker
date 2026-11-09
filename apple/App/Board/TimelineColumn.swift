@@ -152,7 +152,8 @@ struct TimelineColumn: View {
                         .offset(y: top)
                         .zIndex(model.selectedSlot == slot.id ? 1 : 0)
                 }
-            }) { peek in
+            }
+            .background { DropSpace(key: Self.key, drop: model.dropping).id(model.snapshot?.day) }) { peek in
                 ZStack(alignment: .topLeading) {
                     events(peek.timeline, hour: hour)
                     ForEach(model.slidingSlots(peek.timeline, hour: hour)) { slot in

@@ -101,6 +101,8 @@ struct ListColumn: View {
                         Color.clear.frame(height: Self.trailingRoom)
                     }
                     .padding(.horizontal, CardMetrics.columnInset)
+                    // The day's own space: a drop's copy comes down in it and goes with the day if it turns meanwhile.
+                    .background { DropSpace(key: key, drop: model.dropping).id(model.snapshot?.day) }
                     // The rows are exactly as wide as the column: no row, however long its words, widens the list.
                     .frame(width: columnWidth, alignment: .leading)
                     .overlay(alignment: .topLeading) {
@@ -320,19 +322,20 @@ struct DayLane<Shown: View, Next: View>: View {
     let shown: Shown
     @ViewBuilder let next: (BoardSnapshot) -> Next
 
+    /// The day drawn stays the same view while it slides out (one structure in and out of a turn), so what lives in it,
+    /// a drop's copy coming down into it among them, goes with it.
     var body: some View {
-        if slides, let turn = model.dayTurn {
-            let shift = CGFloat(turn.shift)
-            let share = model.dayShare
-            ZStack(alignment: .topLeading) {
-                shown.offset(x: -shift * share * width)
+        let turn = slides ? model.dayTurn : nil
+        let shift = CGFloat(turn?.shift ?? 0)
+        let share = turn == nil ? 0 : model.dayShare
+        ZStack(alignment: .topLeading) {
+            shown.offset(x: -shift * share * width)
+            if let turn {
                 next(turn.peek)
                     .offset(x: shift * (1 - share) * width)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
-        } else {
-            shown
         }
     }
 }
