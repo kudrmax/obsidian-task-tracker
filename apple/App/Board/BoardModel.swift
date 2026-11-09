@@ -808,8 +808,18 @@ final class BoardModel {
             try await Task.detached { try board.group(method, arguments) }.value
         } catch {
             problem = Self.words(error)
+            return await reload()
         }
-        await reload()
+        // A fold or a grouping changes only the screen's own state: drawn again over the files already read, at once.
+        guard let shown = snapshot else { return await reload() }
+        let link = projectLink
+        readsStarted += 1
+        let serial = readsStarted
+        if let drawn = try? await Task.detached(operation: { try board.redraw(shown, measures: CardMetrics.timeline, project: link) }).value {
+            show(drawn, serial: serial)
+        } else {
+            await reload()
+        }
     }
 
     /// The Project page's pick: the tasks get the project (its link), or none.

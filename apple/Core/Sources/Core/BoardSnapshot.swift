@@ -450,6 +450,15 @@ extension TaskBoard {
         return try draw(screen, day: day, today: today, files: files, measures: asked, lane: .reading, canUndo: canUndo)
     }
 
+    /// The screen drawn again over the files it was read from, nothing read from disk: what changed is the screen's own
+    /// state the board keeps (a project group folded or opened, a list grouped by project), not the vault, so a tap
+    /// redraws at once instead of waiting for every note and calendar to be read again.
+    public func redraw(_ shown: BoardSnapshot, measures asked: TimelineMeasures, project: String? = nil, now: Date = Date()) throws -> BoardSnapshot {
+        let files = BoardFiles(tasks: shown.tasksText, settingsJSON: shown.settingsJSON, calendars: shown.calendarTexts, now: now)
+        let screen: ScreenView = try read("tasks.screen", [.string(shown.day)] + (project.map { [JSONValue.string($0)] } ?? []), over: files)
+        return try draw(screen, day: shown.day, today: shown.today, files: files, measures: asked, lane: .reading, canUndo: shown.canUndo)
+    }
+
     /// The screen a drop will leave, asked at the moment of the drop before anything is written (`tasks.dropPreview`):
     /// everything `snapshot` reads, read over the text the drop leaves, on the pure rules' context, so the main thread
     /// never waits for a read and no id or undo step of it is kept. The read after the drop's write draws the same.

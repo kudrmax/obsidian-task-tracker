@@ -183,6 +183,9 @@ struct TaskMenu {
 
 extension MenuNode {
     /// `later`: a row that opens a sheet, an alert or a page runs once the menu has gone, as the menu's own end tells.
+    /// The most medium tiles UIKit lays out side by side with their captions.
+    private static let tilesInRow = 3
+
     @MainActor
     static func uiMenu(_ nodes: [MenuNode], later: @escaping (@escaping @MainActor () -> Void) -> Void, palette: @escaping (String) -> UIColor?) -> UIMenu {
         UIMenu(children: nodes.map { $0.element(later, palette) })
@@ -209,9 +212,16 @@ extension MenuNode {
             menu.subtitle = subtitle
             return menu
         case .group(let row, let children):
-            let menu = UIMenu(options: .displayInline, children: children.map { $0.element(later, palette) })
-            if row { menu.preferredElementSize = children.count > 3 ? .small : .medium }
-            return menu
+            let elements = children.map { $0.element(later, palette) }
+            guard row else { return UIMenu(options: .displayInline, children: elements) }
+            // Tiles keep their captions (a label's name, a level's): rows of at most three medium tiles, never the
+            // caption-less small ones however many labels the settings hold.
+            let rows = stride(from: 0, to: elements.count, by: Self.tilesInRow).map { start in
+                let tiles = UIMenu(options: .displayInline, children: Array(elements[start..<min(start + Self.tilesInRow, elements.count)]))
+                tiles.preferredElementSize = .medium
+                return tiles
+            }
+            return rows.count == 1 ? rows[0] : UIMenu(options: .displayInline, children: rows)
         case .question(let question, let children):
             return UIMenu(title: question, options: .displayInline, children: children.map { $0.element(later, palette) })
         case .deferred(let title, let symbol, let subtitle, let load):
