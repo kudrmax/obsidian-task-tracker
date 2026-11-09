@@ -13,6 +13,9 @@ struct TaskCapsule: View {
     var height: CGFloat = CardMetrics.height
     /// The copy over a menu: the title wraps instead of fading, and the card grows down to hold its lines.
     var whole = false
+    /// The whole copy Select Text lifts: its title is text to select, all of it selected; Copy hears `onCopied`.
+    var selectable = false
+    var onCopied: () -> Void = {}
     /// Where the subtask counter is drawn, in the capsule's own space: the card lays its fold button there.
     var onCounter: ((CGRect) -> Void)?
     /// Where the title's room is, in the capsule's own space: the menu's copy grows by what the title lacks of it.
@@ -38,9 +41,14 @@ struct TaskCapsule: View {
             if selecting { pickCircle }
             if whole {
                 // The copy over a menu shows the whole title, on as many lines as the width it was given needs.
-                title
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, alignment: .leading)
+                Group {
+                    if selectable {
+                        SelectableTitle(parts: parts, closed: card.item.closed, onCopied: onCopied)
+                    } else {
+                        title.fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, alignment: .leading)
             } else if let found {
                 foundTitle(found)
             } else {

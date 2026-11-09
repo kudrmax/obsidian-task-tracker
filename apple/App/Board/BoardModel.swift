@@ -1864,7 +1864,7 @@ final class BoardModel {
     func cardMenu(_ item: TaskItem, from: String = "list", later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        let nodes = lead(item, from: from) + TaskMenu(items: [item], menu: menu, model: self).nodes
+        let nodes = lead(item, from: from) + TaskMenu(items: [item], menu: menu, model: self, selectsText: true).nodes
         return MenuNode.uiMenu(nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
     }
 

@@ -34,6 +34,8 @@ struct TaskMenu {
     var ownPage = false
     /// On the task's own full screen, Description puts the caret in its description instead of opening the page again.
     var describe: (@MainActor () -> Void)?
+    /// Opened by a card: Select Text lifts that card with its whole title selected.
+    var selectsText = false
 
     private var single: Bool { items.count == 1 }
 
@@ -80,13 +82,14 @@ struct TaskMenu {
 
     /// The edit rows in the core's order (`menu.edits`).
     private var editRows: [MenuNode] {
-        let items = items, model = model, inStack = inStack, describe = describe
+        let items = items, model = model, inStack = inStack, describe = describe, selectsText = selectsText
         guard let item = items.first else { return [] }
         var rows: [MenuNode] = []
         for edit in menu.edits {
             switch edit {
             case "rename" where single:
                 rows.append(.action(title: "Rename", symbol: "pencil", opens: true) { if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } })
+                if selectsText { rows.append(.action(title: "Select Text", symbol: "selection.pin.in.out", opens: true) { CardControl.selectMenuTitle() }) }
             case "reminder" where single && !menu.reminders.isEmpty:
                 rows.append(.submenu(title: "Reminder", symbol: "bell", subtitle: menu.reminders.first(where: \.checked).map { ReminderWords.title($0.kind) }, children: menu.reminders.map { reminder in
                     .action(title: ReminderWords.title(reminder.kind), symbol: nil, checked: reminder.checked) { Task { await model.setReminder(item, reminder.kind) } }

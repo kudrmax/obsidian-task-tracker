@@ -145,7 +145,7 @@ struct TaskFullScreen: View {
     private func menu(for item: TaskItem, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         guard let menu = subtaskMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model, inStack: true).nodes, later: later) { model.ink($0, dark: dark) }
+        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model, inStack: true, selectsText: true).nodes, later: later) { model.ink($0, dark: dark) }
     }
 
     private func open() async {
