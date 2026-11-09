@@ -3038,6 +3038,13 @@ ${key.title}`.toLowerCase();
     const place = spotIndex(from.mode) + shift;
     return place >= 0 && place < SCREEN_PLACES.length ? { mode: SCREEN_PLACES[place], date: from.date } : null;
   }
+  var SWIPE_FLICK_SPEED = 0.3;
+  function swipeLanding(moved2, distance, speed) {
+    if (moved2 === 0) return 0;
+    const shift = moved2 > 0 ? 1 : -1;
+    if (Math.abs(speed) >= SWIPE_FLICK_SPEED) return Math.sign(speed) === shift ? shift : 0;
+    return Math.abs(moved2) * 2 >= distance ? shift : 0;
+  }
 
   // core/application/timelineZoom.ts
   var DEFAULT_ZOOM_HOUR = 56;
@@ -3845,7 +3852,7 @@ ${key.title}`.toLowerCase();
   }
   function groupOf(name, items, header = true, id = sectionId(name, [])) {
     const section = name !== null;
-    return { id, name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: section };
+    return { id, name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: header };
   }
   function projectSection(name, items, project, id = sectionId(name, [])) {
     const plain = groupOf(name, items, name !== null, id);
@@ -3855,7 +3862,7 @@ ${key.title}`.toLowerCase();
     if (!sections) return { showsHeaders: false, groups: [groupOf(null, items, false)] };
     const groups = withEmptySections(byGroup(items, listSections), listSections);
     const showsHeaders = groups.some((g) => g.name !== null);
-    return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders })) };
+    return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders, reorder: showsHeaders })) };
   }
   function byGroup(items, sections) {
     const groups = [];
@@ -6768,6 +6775,7 @@ ${key.title}`.toLowerCase();
     branchOf,
     gapBranch,
     placeShowing,
+    swipeLanding,
     wholeWidth,
     grownStart,
     listWidths,
@@ -6777,7 +6785,7 @@ ${key.title}`.toLowerCase();
     onTheDay,
     canPick
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };

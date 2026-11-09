@@ -575,6 +575,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.branchOf", [0, 1, 1], 1),
 		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
 		plain("rules.placeShowing", "day", "inbox"),
+		plain("rules.swipeLanding", 120, 200, 0.1),
 		plain("rules.listWidths", 0.5, 390, 16),
 		plain("rules.listShareOf", 187, 390, 16),
 		plain("rules.dividerAt", 190, { width: 187, min: 110, max: 280, center: 187 }, 0.01),

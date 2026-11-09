@@ -307,6 +307,12 @@ public final class TaskBoard: @unchecked Sendable {
         try rule("rules.constants", as: JSONValue.self)["NO_DAY_EVENTS"].decode(DayEvents.self)
     }
 
+    /// Where a screen let go after a swipe lands (`rules.swipeLanding`): 1 the next screen on, -1 back, 0 where it stood;
+    /// `moved` and `speed` (points per millisecond) count onward as positive, `distance` is how far the next screen stands.
+    public func swipeLanding(moved: Double, distance: Double, speed: Double) throws -> Int {
+        try rule("rules.swipeLanding", [.number(moved), .number(distance), .number(speed)])
+    }
+
     /// The repeat page's words.
     public func repeatWords() throws -> RepeatWords {
         try rule("rules.constants", as: JSONValue.self)["REPEAT_WORDS"].decode(RepeatWords.self)

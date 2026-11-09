@@ -1,3 +1,4 @@
+import { swipeLanding } from "../../core/application/contracts";
 import { LAYOUT } from "./design";
 import { capturePointer, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
@@ -139,8 +140,7 @@ export class Swipe {
 		if (distance !== null && Math.abs(stream.dx) >= distance) return this.stepStream(stream, e, going, shift);
 		if (stream.shrinking < GLIDE_SHRINKS) return;
 		const span = Math.max(1, e.timeStamp - stream.recent[0].time);
-		const fling = Math.abs(sweep) / span >= LAYOUT.swipeFlickSpeed ? going : 0;
-		this.stepStream(stream, e, going, this.landing(stream.dx, fling));
+		this.stepStream(stream, e, going, this.landing(stream.dx, -sweep / span));
 	}
 
 	/** The screen is let go: on to `shift`'s screen or back; the glide that follows, going `going`'s way, is passed by. */
@@ -205,19 +205,16 @@ export class Swipe {
 		releasePointer(this.el, press.pointerId);
 		const dx = this.within(e.clientX - press.from);
 		this.opts.target.follow(dx);
-		const velocity = press.speed.velocity;
-		const fling: Shift | 0 = Math.abs(velocity) < LAYOUT.swipeFlickSpeed ? 0 : velocity < 0 ? 1 : -1;
-		this.settle(released ? this.landing(dx, fling) : null);
+		this.settle(released ? this.landing(dx, press.speed.velocity) : null);
 	}
 
-	/** Where the screen stands once let go: the next screen when it is the nearer one, or when a flick sends it there. */
-	private landing(dx: number, fling: Shift | 0): Shift | null {
+	/** Where the screen stands once let go, drawn `dx` and going `velocity` px per ms: the core's `swipeLanding`. */
+	private landing(dx: number, velocity: number): Shift | null {
 		if (dx === 0) return null;
-		const shift: Shift = dx < 0 ? 1 : -1;
-		const distance = this.opts.target.distance(shift);
+		const distance = this.opts.target.distance(dx < 0 ? 1 : -1);
 		if (distance === null) return null;
-		if (fling !== 0) return fling === shift ? shift : null;
-		return Math.abs(dx) * 2 >= distance ? shift : null;
+		const shift = swipeLanding(-dx, distance, -velocity);
+		return shift === 0 ? null : shift;
 	}
 
 	/** The screen goes no further than the next one; a finger that has gone neither way yet asks for no screen. */
