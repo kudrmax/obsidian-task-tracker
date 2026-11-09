@@ -3,6 +3,8 @@ import { StaleTaskError, type TaskItem, type TaskKey } from "../../core/applicat
 import { callDoor, type DoorAnswer, type DoorContext } from "../../core/application/PhoneCalls";
 import type { Clock } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
+import { UndoHistory } from "../../core/application/UndoHistory";
+import { TaskIdentity } from "../../core/application/TaskIdentity";
 import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
@@ -134,15 +136,50 @@ describe("a key given before another write moved the lines", () => {
 		await expect(svc.rename(read.B.key, "X")).rejects.toBeInstanceOf(StaleTaskError);
 	});
 
-	it("acts on its task when its line was edited elsewhere in place, and after a write moved it too", async () => {
+	it("is refused once its line was edited elsewhere, the task keeping its id; the key read after acts", async () => {
 		const { store, svc } = setup();
 		const read = await byTitle(svc);
 		store.text = store.text!.replace("- [ ] B\n", "- [ ] B edited on the Mac\n");
+		const now = await byTitle(svc);
+		expect(now["B edited on the Mac"].id).toBe(read.B.id);
+		await expect(svc.setStatus(read.B.key, "inProgress")).rejects.toBeInstanceOf(StaleTaskError);
+		await expect(svc.remove(read.B.key)).rejects.toBeInstanceOf(StaleTaskError);
 		await svc.setStatus(read.A.key, "done");
+		await svc.setStatus(now["B edited on the Mac"].key, "inProgress");
+		expect(store.text).toContain("- [/] B edited on the Mac\n");
+	});
+
+	it("is refused when its line was replaced elsewhere by another task, whatever id that one took", async () => {
+		const { store, svc } = setup();
+		const read = await byTitle(svc);
+		store.text = store.text!.replace("- [ ] B\n", "- [ ] Call mom\n");
+		await byTitle(svc);
+		await expect(svc.remove(read.B.key)).rejects.toBeInstanceOf(StaleTaskError);
+		expect(store.text).toContain("- [ ] Call mom\n");
+	});
+
+	it("stays good through the core's own rewrites of its line, and through undo", async () => {
+		const store = new InMemoryTaskFileStore(FILE);
+		const settings = new FakeSettingsStore();
+		const identity = new TaskIdentity();
+		const history = new UndoHistory(store, identity);
+		const svc = new TaskServiceImpl(store, settings, clock, history, undefined, undefined, identity);
+		const read = await byTitle(svc);
 		await svc.setPriority(read.B.key, "p1");
+		await svc.rename(read.B.key, "B renamed");
+		await svc.setStatus(read.A.key, "done");
 		await svc.setStatus(read.B.key, "inProgress");
-		expect(store.text).toContain("- [/] p1 B edited on the Mac\n");
-		expect((await byTitle(svc))["B edited on the Mac"].id).toBe(read.B.id);
+		expect(store.text).toContain("- [/] p1 B renamed\n");
+		await history.undo();
+		await history.undo();
+		expect(store.text).toContain("- [ ] p1 B renamed\n");
+		await svc.setStatus(read.B.key, "inProgress");
+		expect(store.text).toContain("- [/] p1 B renamed\n");
+		await history.undo();
+		await history.undo();
+		await history.undo();
+		await svc.toggleDone(read.B.key);
+		expect(store.text).toContain("- [x] B\n");
 	});
 
 	it("is refused when its line was replaced elsewhere by other tasks, which are new ones", async () => {
@@ -234,22 +271,38 @@ describe("through the door", () => {
 		expect(app.titles().B).toMatchObject({ status: "inProgress", priority: { prefix: "p1" } });
 	});
 
-	it("acts on a task by a key read before its line was edited elsewhere in place", () => {
+	it("refuses a key once its line was edited elsewhere, the card keeping its id; the fresh key acts", () => {
 		const app = new App();
 		const read = app.titles();
 		app.tasks = app.tasks.replace("- [ ] B\n", "- [ ] B synced from the Mac\n");
-		app.titles();
-		app.call("tasks.setStatus", read.A.key, "done");
-		expect(app.call("tasks.setStatus", read.B.key, "inProgress")).toMatchObject({ ok: true });
-		expect(app.titles()["B synced from the Mac"]).toMatchObject({ id: read.B.id, status: "inProgress" });
+		const now = app.titles();
+		expect(now["B synced from the Mac"].id).toBe(read.B.id);
+		expect(app.call("tasks.setStatus", read.B.key, "inProgress")).toMatchObject({ ok: false, error: { code: "staleTask" } });
+		expect(app.call("tasks.setStatus", now["B synced from the Mac"].key, "inProgress")).toMatchObject({ ok: true });
 	});
 
-	it("acts the same when the edit elsewhere comes in with the call itself, unread before", () => {
+	it("refuses to remove by a key whose line was replaced elsewhere by another task", () => {
 		const app = new App();
 		const read = app.titles();
-		app.tasks = app.tasks.replace("- [ ] B\n", "- [ ] B synced from the Mac\n");
+		app.tasks = app.tasks.replace("- [ ] B\n", "- [ ] Call mom\n");
+		app.titles();
+		expect(app.call("tasks.remove", read.B.key)).toMatchObject({ ok: false, error: { code: "staleTask" } });
+		expect(app.tasks).toContain("- [ ] Call mom\n");
+		const fresh = new App();
+		fresh.tasks = app.tasks;
+		expect(fresh.call("tasks.remove", read.B.key)).toMatchObject({ ok: false, error: { code: "staleTask" } });
+	});
+
+	it("takes a key read before Done on another task and before its own rewrite and undo", () => {
+		const app = new App();
+		const read = app.titles();
+		app.call("tasks.setStatus", read.A.key, "done");
+		app.call("tasks.setPriority", read.B.key, "p1");
 		expect(app.call("tasks.setStatus", read.B.key, "inProgress")).toMatchObject({ ok: true });
-		expect(app.titles()["B synced from the Mac"]).toMatchObject({ id: read.B.id, status: "inProgress" });
+		app.call("history.undo");
+		app.call("history.undo");
+		expect(app.call("tasks.toggleDone", read.B.key)).toMatchObject({ ok: true });
+		expect(app.titles().B.status).toBe("done");
 	});
 
 	it("refuses a key whose task is gone", () => {
