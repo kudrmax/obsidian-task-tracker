@@ -74,16 +74,6 @@ enum DrawnRow: Hashable {
         }
     }
 
-    /// As a drop reads it.
-    var drop: DropRow {
-        switch self {
-        case .card(let card): .card(level: card.level, group: card.item.group, zone: card.zone)
-        case .header(let group, _): .head(group: group.place, opens: false)
-        case .project(let project): .head(group: project.head, opens: true)
-        default: .other
-        }
-    }
-
     /// The room above the row: the cards' gap after a card, a section's gap more over a header, nothing under a header,
     /// as the plugin's list stands.
     static func top(of row: DrawnRow, after previous: DrawnRow?) -> CGFloat {
@@ -226,7 +216,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         collection.delegate = self
         press.addTarget(self, action: #selector(pressed(_:)))
         press.delegate = self
-        press.minimumPressDuration = DragController.liftDelay
+        press.minimumPressDuration = CarryMotion.liftDelay
         collection.addGestureRecognizer(press)
         model.register(self)
     }
@@ -238,8 +228,9 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     func update(force: Bool = false) {
         guard let model else { return }
         // A card's menu going: the list draws the new screen once the card is back in its row; a card renamed from it
-        // turns into its field at once, in its own row, the preview landing on it.
-        guard !MenuHold.holding || model.entry.state?.renaming != nil else {
+        // turns into its field at once, in its own row, the preview landing on it. A carry lifted meanwhile is drawn at
+        // once: its drop lands on the rows as they are, never on the screen the menu holds.
+        guard !MenuHold.holding || model.entry.state?.renaming != nil || model.carry != nil else {
             MenuHold.after(self) { [weak self] in self?.update(force: force) }
             return
         }
@@ -288,14 +279,17 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         snapshot.appendItems(ids)
         snapshot.reconfigureItems(changed)
         source.apply(snapshot, animatingDifferences: animated)
+        rowsVersion += 1
         showHeaders()
     }
 
-    /// Each header drawn shows, but the one of a carried section, whose floating copy stands for it until it is down: set
-    /// on the row itself, so it shows in the very frame the copy goes.
-    /// The rows on the screen drawn anew at once, in place, from the model as it stands now.
-    func redrawShown() {
-        let shown = collection.indexPathsForVisibleItems.compactMap { source.itemIdentifier(for: $0) }
+    /// The rows of the cards `ids` on the screen drawn anew at once, in place, from the model as it stands now (the carry
+    /// ended: a dashed place goes, a card the copy landed as shows); no other row is touched.
+    func redraw(_ ids: Set<String>) {
+        let shown = collection.indexPathsForVisibleItems.compactMap { path -> String? in
+            guard let row = rows[safe: path.item], case .card(let card) = row, ids.contains(card.id) else { return nil }
+            return source.itemIdentifier(for: path)
+        }
         if !shown.isEmpty {
             var snapshot = source.snapshot()
             snapshot.reconfigureItems(shown)
@@ -306,7 +300,8 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         update()
     }
 
-    /// `all`: the carry's copy is down, every header shows now.
+    /// Each header drawn shows, but the one of a carried section, whose floating copy stands for it until it is down: set
+    /// on the row itself, so it shows in the very frame the copy goes. `all`: the carry's copy is down, every header shows.
     func showHeaders(all: Bool = false) {
         for cell in collection.visibleCells { shows(cell, at: collection.indexPath(for: cell), all: all) }
     }
@@ -456,12 +451,11 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         shows(cell, at: path)
         guard let layout = collectionView.collectionViewLayout as? FoldingListLayout, let rise = layout.takeUnfolding(path.item) else { return }
         // The cell's own frame and transform are the layout's, set again as it is laid out: its content is carried
-        // instead, by an animation of its own that no layout pass resets.
-        let unfold = CASpringAnimation(perceptualDuration: Self.unfold, bounce: 0)
-        unfold.keyPath = "transform.translation.y"
+        // instead, by an animation of its own that no layout pass resets, on the drop's one spring, so a row coming in
+        // with a drop comes to rest with the copy.
+        let unfold = CarryMotion.layerSpring("transform.translation.y")
         unfold.fromValue = rise
         unfold.toValue = 0
-        unfold.duration = unfold.settlingDuration
         unfold.fillMode = .backwards
         cell.contentView.layer.add(unfold, forKey: "unfold")
         // Beneath the rows round it while it unfolds, the one it comes from above all.
@@ -472,9 +466,6 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         cell.layer.add(beneath, forKey: "beneath")
     }
 
-    /// The collection's own time for rows moving in a change.
-    static let unfold: TimeInterval = 0.35
-
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         host.edges()
     }
@@ -484,20 +475,20 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     /// The long press that lifts a card or a section's header, after the settings' Long Press Delay.
     private let press = UILongPressGestureRecognizer()
 
-    /// A press lifts only what may be lifted, and only while nothing else is carried or still landing.
+    /// A press lifts only what may be lifted now: the board's one rule (`BoardModel.mayLift`), the calendar's too.
     func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
-        guard recognizer === press, let model, model.drag.idle, model.entry.state == nil,
-              let path = collection.indexPathForItem(at: press.location(in: collection)), let row = rows[safe: path.item] else { return recognizer !== press }
+        guard recognizer === press else { return true }
+        guard let model, let path = collection.indexPathForItem(at: press.location(in: collection)), let row = rows[safe: path.item] else { return false }
         switch row {
-        case .card(let card): return model.canLift(card, from: column.rawValue)
-        case .header(let group, _): return model.canLift(group, in: column)
+        case .card(let card): return model.mayLift(card, from: column.rawValue)
+        case .header(let group, _): return model.mayLift(group, in: column)
         default: return false
         }
     }
 
     @objc private func pressed(_ press: UILongPressGestureRecognizer) {
         guard let model else { return }
-        let point = press.location(in: nil)
+        let point = press.firstFinger
         switch press.state {
         case .began:
             guard let window = host.window, let path = collection.indexPathForItem(at: press.location(in: collection)), let lift = lift(at: path, finger: point, in: window) else { return }
@@ -596,15 +587,19 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
 
     // A carry over the list, as the plugin's (approved, `docs/design/README.md`): no row moves under the finger; the
     // purple drop line stands where the task would go, from a dot at the left edge of the level it picks; a subtask's
-    // place is the same line one level in; an empty section's plate lights instead. The carried card's own row stays as its
-    // dashed place. Let go, the copy flies into its place and the rows open and close as the core's screen after the drop
-    // says, in one animation. A section carried shows its room, a dashed card's room before the header it would go before.
+    // place is the same line one level in; an empty section's plate lights instead; over the card's own place no line, its
+    // dashed place shows it. A list that places nothing in a gap (`rules.placesInGap`) shows its end. Let go, the copy
+    // flies into its place and the rows open and close as the core's screen after the drop says, in one animation. A
+    // section carried shows its room, a dashed card's room before the header it would go before.
 
-    /// The place a carry over the list points at, and where its line stands in the collection: nil where an empty
-    /// section's plate lights instead.
+    /// The place a carry over the list points at, what it shows and writes, and where its line stands in the collection:
+    /// nil at the card's own place or where an empty section's plate lights.
     private struct Aim {
         let place: JSONValue
         let line: CGPoint?
+        let shown: BoardModel.Aim
+        /// What the rows were read over.
+        let over: StandingKey
     }
 
     /// The place shown under the carry now.
@@ -614,8 +609,30 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         if case .card(let card) = payload?.kind { card.id } else { nil }
     }
 
-    /// The cards and headers a carry is placed among, where each stands in the collection now: the carried ones aside.
-    private func standing(_ carried: String?) -> (cards: [(card: BoardCard, rect: CGRect)], heads: [(head: PlacedHead, part: (group: String?, zone: JSONValue?), rect: CGRect)]) {
+    /// The cards and headers a carry is placed among, where each stands in the collection, the carried ones aside: read
+    /// once for a layout of the rows, not on every move of the finger.
+    private struct Standing {
+        let key: StandingKey
+        let cards: [(card: BoardCard, rect: CGRect)]
+        let heads: [(head: PlacedHead, part: (group: String?, zone: JSONValue?), rect: CGRect)]
+        let placed: [PlacedCard]
+    }
+
+    private struct StandingKey: Equatable {
+        let layout: Int
+        let rows: Int
+        let carried: String?
+        let along: Int
+    }
+
+    private var standingRead: Standing?
+    /// Counts the rows drawn: the standing read before is stale after.
+    private var rowsVersion = 0
+
+    private func standing(_ carried: String?) -> Standing {
+        collection.layoutIfNeeded()
+        let key = StandingKey(layout: (collection.collectionViewLayout as? FoldingListLayout)?.generation ?? 0, rows: rowsVersion, carried: carried, along: model?.carry?.group.count ?? 0)
+        if let standingRead, standingRead.key == key { return standingRead }
         var cards: [(card: BoardCard, rect: CGRect)] = []
         var heads: [(head: PlacedHead, part: (group: String?, zone: JSONValue?), rect: CGRect)] = []
         let listed = model?.snapshot?.lists[column]?.cards ?? []
@@ -638,48 +655,68 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
                 break
             }
         }
-        return (cards, heads)
+        let placed = cards.map { PlacedCard(level: $0.card.level, group: $0.card.item.group, zone: $0.card.zone, top: Double($0.rect.minY), height: Double($0.rect.height)) }
+        let read = Standing(key: key, cards: cards, heads: heads, placed: placed)
+        standingRead = read
+        return read
     }
 
-    /// Where a carry at `point` (in the collection) points, the rows standing still: the core's place, and its line.
+    /// Where a carry at `point` (in the collection) points, the rows standing still: the core's place, and its line. A list
+    /// that places nothing in a gap takes the carry at its end, wherever the finger is in it, as the plugin's.
     private func aim(at point: CGPoint, carrying payload: DragPayload?) -> Aim? {
         guard let model else { return nil }
         let carried = Self.carried(payload)
-        let (cards, heads) = standing(carried)
-        let placed = cards.map { PlacedCard(level: $0.card.level, group: $0.card.item.group, zone: $0.card.zone, top: Double($0.rect.minY), height: Double($0.rect.height)) }
-        guard let place = model.placeUnder(column, cards: placed, heads: heads.map(\.head), at: point, grab: payload.map(\.grab), width: collection.bounds.width, held: aimed?.place) else { return nil }
-        let shown = model.hoverList(column, place: place)
-        guard !shown.plate else { return Aim(place: place, line: nil) }
+        let standing = standing(carried)
+        let anywhere = model.placesInGap(column, carrying: payload)
+        let place: JSONValue
+        if anywhere {
+            guard let under = model.placeUnder(column, cards: standing.placed, heads: standing.heads.map(\.head), at: point, grab: payload.map(\.grab), width: collection.bounds.width, held: aimed?.place) else { return nil }
+            place = under
+        } else {
+            place = ["kind": "gap", "index": .number(Double(standing.cards.count)), "level": 0, "group": .null]
+        }
+        // The same place over the same rows: what it shows was asked already.
+        if let aimed, aimed.place == place, aimed.over == standing.key { return aimed }
+        let shown = model.hoverList(column, place: place, anywhere: anywhere)
+        return Aim(place: place, line: line(at: place, shown: shown, among: standing, carried: carried), shown: shown, over: standing.key)
+    }
+
+    /// The drop line of `place`: through the middle of the gap, from the left edge of its level; none at the card's own
+    /// place or over a lit plate. A card moved to another level where it stood has it in the gap over its dashed place.
+    private func line(at place: JSONValue, shown: BoardModel.Aim, among standing: Standing, carried: String?) -> CGPoint? {
+        guard let model, !shown.plate, !shown.stays else { return nil }
         let level = CGFloat(place["level"].number ?? 0)
         let x = CardMetrics.columnInset + level * CardMetrics.indent
-        // The card's own place: the line at its dashed place's top.
-        if shown.stays, let carried, let home = indexPath(of: carried), let frame = collection.layoutAttributesForItem(at: home)?.frame {
+        if let carried, model.isLiftedGap(column, place), let home = indexPath(of: carried), let frame = collection.layoutAttributesForItem(at: home)?.frame {
             let top = frame.minY + (drawn[keys[carried] ?? carried]?.top ?? 0)
-            return Aim(place: place, line: CGPoint(x: x, y: top - CardMetrics.gap / 2))
+            return CGPoint(x: x, y: top - CardMetrics.gap / 2)
         }
         let at = Int(place["index"].number ?? 0)
         let group = place["group"].string, zone = place.field("project")
         let inPart = { (card: BoardCard) in card.stands(in: group, zone: zone) }
+        let cards = standing.cards, heads = standing.heads
         if let next = cards[safe: at], inPart(next.card) {
-            return Aim(place: place, line: CGPoint(x: x, y: next.rect.minY - CardMetrics.gap / 2))
+            return CGPoint(x: x, y: next.rect.minY - CardMetrics.gap / 2)
         }
         let above = cards.prefix(at).last { inPart($0.card) }?.rect
         let head = heads.last { $0.head.firstCard <= at && $0.part.group == group && $0.part.zone == zone }?.rect
             ?? heads.last { $0.head.firstCard <= at && $0.head.opens && $0.part.zone == zone }?.rect
-        guard let over = above ?? head else { return Aim(place: place, line: nil) }
-        return Aim(place: place, line: CGPoint(x: x, y: over.maxY + CardMetrics.gap / 2))
+        if let over = above ?? head { return CGPoint(x: x, y: over.maxY + CardMetrics.gap / 2) }
+        // No card or header of its part drawn (an empty list): the line at the list's top, as the plugin's.
+        return CGPoint(x: x, y: (heads.first?.rect.minY ?? cards.last?.rect.maxY ?? 0) - CardMetrics.gap / 2)
     }
 
     /// The carry held at `point` (in the collection): the place under it, its line drawn over everything, the carried copy
     /// too.
     private func hold(at point: CGPoint, carrying payload: DragPayload?) {
         guard let next = aim(at: point, carrying: payload) else { return clearAim() }
+        let moved = aimed?.place != next.place
         aimed = next
         guard let line = next.line, let window = collection.window else { return model?.drag.hideLine() ?? () }
         let start = collection.convert(line, to: window)
         let end = collection.convert(CGPoint(x: collection.bounds.width - CardMetrics.columnInset, y: line.y), to: window).x
         model?.drag.showLine(from: start, to: end)
-        DropLog.target("list \(column.rawValue) \(next.place)")
+        if moved { DropLog.target("list \(column.rawValue) \(next.place)") }
     }
 
     private func clearAim() {
@@ -687,10 +724,6 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         model?.drag.hideLine()
         model?.leaveList(column)
     }
-
-    /// A copy landing in a folded project part shrinks to this share of its size into the part's header: nothing of the
-    /// part is drawn to land in, so it goes into the header as into a folder (decision 56).
-    static let foldedLanding: CGFloat = 0.3
 
     // MARK: A carry routed here by the board (the plus, or a card over the bars)
 
@@ -768,7 +801,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
                 .map { CarryLanding(rect: collection.convert($0, to: nil), opens: true) }
         }
         clearAim()
-        switch model.dropOnList(column, place: shown.place) {
+        switch model.dropOnList(shown.shown) {
         case .landed(let landed):
             return landed.flatMap { landing(of: $0) }
         case .stays, .refused:
@@ -787,11 +820,14 @@ final class FoldingListLayout: UICollectionViewCompositionalLayout {
     var covers: (before: Set<Int>, after: Set<Int>) = ([], [])
     private var inserted: Set<Int> = []
     private var deleted: Set<Int> = []
+    /// Counts the layouts made: what a carry read of the rows' frames holds for.
+    private(set) var generation = 0
     /// Where the rows stood before the change, by their index then.
     private var before: [Int: CGRect] = [:]
 
     override func prepare() {
         // The layout as it stood, read before it is laid out anew: a row going folds under the row that stood before it.
+        generation += 1
         if let view = collectionView, !view.bounds.isEmpty {
             let shown = layoutAttributesForElements(in: view.bounds.insetBy(dx: 0, dy: -view.bounds.height)) ?? []
             before = Dictionary(shown.filter { $0.representedElementCategory == .cell }.map { ($0.indexPath.item, $0.frame) }, uniquingKeysWith: { first, _ in first })

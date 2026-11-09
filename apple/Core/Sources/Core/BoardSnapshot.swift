@@ -479,7 +479,7 @@ extension TaskBoard {
             pure ? try answerPure(method, arguments, over: files).decode(T.self) : try self.read(method, arguments, over: files)
         }
         func readRule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], as type: T.Type = T.self) throws -> T {
-            pure ? try rule(method, arguments) : try self.readRule(method, arguments)
+            pure ? try previewRule(method, arguments) : try self.readRule(method, arguments)
         }
         let look: ScreenSettings = try read("screenSettings.get", over: files)
         let measures = TimelineMeasures(hour: asked.hour, cardHeight: look.cardHeight, cardGap: look.cardGap, itemInset: asked.itemInset, itemGap: asked.itemGap, overlayInset: asked.overlayInset)
@@ -695,6 +695,13 @@ extension TaskBoard {
         try rule("rules.levelAt", [.number(x), ["left": .number(left), "width": .number(width)], .number(indent)])
     }
 
+    /// Whether a list places a task carried from `from` in the gap under the finger, or only at its end
+    /// (`rules.placesInGap`): a list that shows sections takes a task from anywhere in a gap, any list a new task (`new`),
+    /// another only a task of its own.
+    public func placesInGap(column: String, from: String, grouped: Bool) throws -> Bool {
+        try rule("rules.placesInGap", [.string(column), .string(from), .bool(grouped)])
+    }
+
     public func carriedMiddle(y: Double, grab: Double, cardHeight: Double) throws -> Double {
         try rule("rules.carriedMiddle", [.number(y), .number(grab), .number(cardHeight)])
     }
@@ -775,7 +782,7 @@ public struct DropPreview: Sendable {
 struct Painter {
     let board: TaskBoard
     let blend: Bool
-    /// Asks the pure rules' core: a drop's preview, drawn on the main thread.
+    /// Asks the previews' core: a drop's preview, worked out before the drop.
     let pure: Bool
     private var shadesByColor: [String: Themed<Shades>] = [:]
     private var dueByDate: [String: DueLabel] = [:]
@@ -788,7 +795,7 @@ struct Painter {
     }
 
     func rule<T: Decodable>(_ method: String, _ arguments: [JSONValue]) throws -> T {
-        pure ? try board.rule(method, arguments) : try board.readRule(method, arguments)
+        pure ? try board.previewRule(method, arguments) : try board.readRule(method, arguments)
     }
 
     /// A task's card colours: none without a priority or a label.

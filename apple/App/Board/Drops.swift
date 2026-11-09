@@ -40,6 +40,8 @@ final class BoardRoute {
     private weak var current: (any BoardTarget)?
     /// The top of the tab bar, in the window: what stands under it is not seen.
     var floor: CGFloat = .infinity
+    /// The window the carry is in, set as it lifts: looked up once per carry, not on every move.
+    weak var window: UIWindow?
 
     func add(_ target: any BoardTarget) {
         targets.removeAll { $0.target == nil || $0.target === target }
@@ -49,8 +51,8 @@ final class BoardRoute {
     /// The target for `point` and the point brought into what shows of it. A section goes only to its own list.
     private func route(_ point: CGPoint, carrying payload: DragPayload?) -> (target: any BoardTarget, point: CGPoint)? {
         let shown = targets.compactMap { weak -> (any BoardTarget, CGRect)? in
-            guard let target = weak.target, target.takes(payload), let area = target.area, let window = UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else { return nil }
-            let visible = area.intersection(window.bounds)
+            guard let target = weak.target, target.takes(payload), let area = target.area else { return nil }
+            let visible = window.map { area.intersection($0.bounds) } ?? area
             return visible.isNull || visible.isEmpty ? nil : (target, visible)
         }.sorted { $0.0.priority > $1.0.priority }
         let seen = { (area: CGRect) in CGRect(x: area.minX, y: area.minY, width: area.width, height: max(1, min(area.maxY, self.floor) - area.minY)) }
@@ -196,7 +198,8 @@ struct SpringLoaded: UIViewRepresentable {
 
 /// The calendar as a place: a card held over it shows the line at the minute it would start, on the grid's step; let
 /// go, the copy flies to the block the core makes. The plus is routed here too. The content's probe finds the scroll view
-/// and reads minutes from where the content stands.
+/// and reads minutes from where the content stands; the press that lifts a block lives on that scroll view, as a list's
+/// lives on its collection, so a carry outlives the day its block was lifted from (a day arrow turning the day under it).
 struct CanvasProbe: UIViewRepresentable {
     let model: BoardModel
 
@@ -221,15 +224,63 @@ struct CanvasProbe: UIViewRepresentable {
             super.didMoveToWindow()
             var view = superview
             while let next = view, !(next is UIScrollView) { view = next.superview }
-            target.scroll = view as? UIScrollView
+            target.attach(to: view as? UIScrollView)
         }
     }
 }
 
 @MainActor
-final class CalendarDrop: BoardTarget {
+final class CalendarDrop: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     weak var model: BoardModel?
-    weak var scroll: UIScrollView?
+    private(set) weak var scroll: UIScrollView?
+    /// The long press that lifts a block, on the calendar's scroll view.
+    private let press = UILongPressGestureRecognizer()
+    /// The block the press is on, found as it began.
+    private weak var pressed: CardControl?
+
+    override init() {
+        super.init()
+        press.addTarget(self, action: #selector(pressed(_:)))
+        press.delegate = self
+        press.minimumPressDuration = CarryMotion.liftDelay
+    }
+
+    func attach(to scroll: UIScrollView?) {
+        guard scroll !== self.scroll else { return }
+        self.scroll?.removeGestureRecognizer(press)
+        self.scroll = scroll
+        scroll?.addGestureRecognizer(press)
+    }
+
+    /// The block under the finger, when it may lift now (the board's one rule, `BoardModel.mayLift`).
+    func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+        guard recognizer === press else { return true }
+        pressed = nil
+        guard let scroll, let model else { return false }
+        var view = scroll.hitTest(press.location(in: scroll), with: nil)
+        while let next = view, !(next is CardControl), next !== scroll { view = next.superview }
+        guard let control = view as? CardControl, control.draggable, let card = control.look?.card, model.mayLift(card, from: control.from) else { return false }
+        pressed = control
+        return true
+    }
+
+    @objc private func pressed(_ press: UILongPressGestureRecognizer) {
+        guard let drag = model?.drag else { return }
+        let point = press.firstFinger
+        switch press.state {
+        case .began:
+            guard let control = pressed, let window = scroll?.window, let lift = control.lift(finger: point, in: window) else { return }
+            drag.lift(lift, at: point, in: window)
+        case .changed:
+            drag.move(to: point)
+        case .ended:
+            drag.letGo(at: point)
+        case .cancelled, .failed:
+            drag.cancel()
+        default:
+            break
+        }
+    }
 
     /// The minute of the grid under a point of the window, `grab` points above it: the carried card's top edge, where the
     /// line shows above the card rather than under it.

@@ -35,6 +35,9 @@ public final class TaskBoard: @unchecked Sendable {
     private let core: PhoneCore
     /// The pure rules' own JavaScript context: a gap or a snap asked while a finger moves never waits for a read.
     private let pure: PhoneCore
+    /// The drops' previews' own context: a preview worked out while a carry is held never holds up the pure rules every
+    /// move of the finger asks.
+    private let previewing: PhoneCore
     private let vault: TasksVault
     private let lock = NSLock()
     /// One write at a time: each is made over the file and the undo steps the one before it left.
@@ -60,10 +63,12 @@ public final class TaskBoard: @unchecked Sendable {
     private let fileList = VaultFileList()
 
     /// `pure`: a second core for the pure rules a screen asks in the same frame; the reading core when none is given.
+    /// `preview`: a third for the drops' previews, worked out off the main thread; the pure one when none is given.
     /// `grouping`: where the device keeps how it groups its lists by project; `projects`: who finds the project notes.
-    public init(core: PhoneCore, vault: TasksVault, pure: PhoneCore? = nil, grouping: DeviceText = MemoryText(), projects: ProjectSource? = nil) {
+    public init(core: PhoneCore, vault: TasksVault, pure: PhoneCore? = nil, preview: PhoneCore? = nil, grouping: DeviceText = MemoryText(), projects: ProjectSource? = nil) {
         self.core = core
         self.pure = pure ?? core
+        self.previewing = preview ?? pure ?? core
         self.vault = vault
         self.grouping = grouping
         self.projects = projects
@@ -116,6 +121,11 @@ public final class TaskBoard: @unchecked Sendable {
     /// A pure rule (`rules.*`) on its own context: made over no file, never waiting for a read on another thread.
     public func rule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], as type: T.Type = T.self) throws -> T {
         try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: Date()), on: pure).result.decode(T.self)
+    }
+
+    /// A pure rule asked while a drop's preview is drawn, on the previews' context.
+    func previewRule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = []) throws -> T {
+        try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: Date()), on: previewing).result.decode(T.self)
     }
 
     /// A quick entry's call (`entry.*`), on the pure rules' context over the settings as last read: it reads no file, so a
@@ -209,10 +219,10 @@ public final class TaskBoard: @unchecked Sendable {
         try answer(method, arguments, BoardFiles(tasks: tasks, settingsJSON: settingsJSON, calendars: [:], now: now), on: pure).result
     }
 
-    /// A call over `files` on the pure rules' context, keeping neither the ids nor the undo steps it answers: what a screen
+    /// A call over `files` on the previews' context, keeping neither the ids nor the undo steps it answers: what a screen
     /// not yet written (a drop's preview) is read from.
     func answerPure(_ method: String, _ arguments: [JSONValue], over files: BoardFiles) throws -> JSONValue {
-        try answer(method, arguments, files, on: pure).result
+        try answer(method, arguments, files, on: previewing).result
     }
 
     private func answer(_ method: String, _ arguments: [JSONValue], _ files: BoardFiles, on lane: PhoneCore? = nil) throws -> Answer {

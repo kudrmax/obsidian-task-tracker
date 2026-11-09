@@ -304,7 +304,6 @@ struct TimelineColumn: View {
                 model.found = nil
                 model.select(slot)
             },
-            drag: model.drag,
             onCarry: { model.startCarry(slot.card, from: "timeline") },
             onLink: { model.openLink($0) },
             onProject: model.projectOpener(slot.card.item))

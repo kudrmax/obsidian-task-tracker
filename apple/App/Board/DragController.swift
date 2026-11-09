@@ -1,6 +1,7 @@
 import Core
 import SwiftUI
 import UIKit
+import os
 
 /// What a carry lifts: where its copy starts on the screen, the copy itself, and how to begin the model's carry.
 @MainActor
@@ -70,22 +71,8 @@ final class DragController {
         self.route = route
     }
 
-    /// A press may lift now: nothing is carried. A copy still settling into its place (a press is recognized only after
-    /// the long press's delay, by when the copy has all but landed) is set down at once, so the next card lifts the moment
-    /// the finger asks.
-    var idle: Bool {
-        if case .landing = flow.phase, let live { landed(live) }
-        return flow.phase == .idle
-    }
-
-    /// How long a card, a calendar block or a section header is pressed before it lifts: the system's drag lift as the app
-    /// had it (measured on iOS 26.3: the lift began 0.326 s after the touch). The settings' Long Press Delay stays the
-    /// calendar's empty-space press's, as it was.
-    static let liftDelay: TimeInterval = 0.33
-
-    /// The copy's flight, and the rows' and blocks' motion with it: a spring with no bounce, fitted to this time, so the
-    /// flight's end (when the card takes over from the copy) is where the motion ends, not a settling tail after it.
-    static let flight: TimeInterval = 0.35
+    /// Nothing is carried: a press may lift (a copy still settling is set down by the lift itself, never by asking).
+    var mayLift: Bool { flow.mayLift }
 
     // MARK: Lift
 
@@ -93,24 +80,35 @@ final class DragController {
     /// begins. False while another carry still lands.
     @discardableResult
     func lift(_ lift: Lift, at point: CGPoint, in window: UIWindow) -> Bool {
+        // A press is recognized only after the long press's delay, by when the last copy has all but landed: it is set
+        // down at once, so the next card lifts the moment the finger asks.
+        if flow.settling != nil, let live { landed(live) }
         guard let carry = flow.lift() else { return false }
         let token = lift.begin()
         let copy = CarryCopy(content: lift.copy, frame: lift.frame, style: window.traitCollection.userInterfaceStyle, card: lift.card)
+        timing.begin()
+        route.window = window
         layer.attach(to: window)
         layer.carry(copy)
+        // While carried, no other touch reaches the board: no menu, no tab, no day arrow, no pick.
+        layer.blocksTouches = true
         live = Live(token: token, carry: carry, payload: lift.payload, copy: copy, grip: CGPoint(x: point.x - lift.frame.midX, y: point.y - lift.frame.midY), home: lift.home, point: point)
         if lift.rises {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            UIView.animate(springDuration: 0.25, bounce: 0, options: [.allowUserInteraction, .beginFromCurrentState]) { copy.rise() }
+            UIView.animate(springDuration: CarryMotion.rise, bounce: 0, options: [.allowUserInteraction, .beginFromCurrentState]) { copy.rise() }
         }
         return true
     }
 
     // MARK: Carry
 
-    /// The finger moved to `point` (window): the copy follows it; the place under it shows its line, the cancel target fills
+    /// The finger moved to `point` (window; the first finger's, never the middle of two): the copy follows it; the place under it shows its line, the cancel target fills
     /// under it; held at an edge the list or calendar scrolls, over a day arrow the day turns.
     func move(to point: CGPoint) {
+        timing.measure { carry(to: point) }
+    }
+
+    private func carry(to point: CGPoint) {
         guard var live, flow.move(live.carry) else { return }
         live.point = point
         live.copy.center = CGPoint(x: point.x - live.grip.x, y: point.y - live.grip.y)
@@ -145,59 +143,62 @@ final class DragController {
     /// Let go at `point`: on the cancel target the copy flies home; elsewhere the place under the finger takes it, the
     /// screen after the drop drawn in the same animation the copy flies to the card's frame in it.
     func letGo(at point: CGPoint) {
+        timing.step("let go") { release(at: point) }
+    }
+
+    private func release(at point: CGPoint) {
         guard let live, flow.letGo(live.carry) else { return }
-        edges.stop()
-        springs.leave()
-        cancelTarget?.hold(false)
+        ended()
         guard !live.cancelling else {
             route.carryOff()
             hideLine()
             return flyHome(live)
         }
+        // One spring: the place's rows open and close as its screen is drawn, and the copy flies into it, both starting in
+        // this frame. The look the copy turns into is drawn before the flight starts, not inside its animation.
         var landing: CarryLanding?
-        // One animation: the place's rows open and close as its screen is drawn, and the copy flies into it.
-        UIView.animate(withDuration: Self.flight, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 0, options: [.allowUserInteraction]) {
-            landing = self.route.letGo(carrying: live.payload)
-            self.hideLine()
-            if let landing { live.copy.land(on: landing, look: self.arrival(for: landing)) }
-        } completion: { _ in
-            if landing != nil { self.landed(live) }
-        }
-        if landing == nil { flyHome(live) }
+        CarryMotion.animate { landing = self.route.letGo(carrying: live.payload) }
+        hideLine()
+        guard let landing else { return flyHome(live) }
+        let look = arrival(for: landing)
+        CarryMotion.animate({ live.copy.land(on: landing, look: look) }) { _ in self.landed(live) }
     }
 
     /// The touch was taken away (the screen went, a call came): the copy flies home.
     func cancel() {
         guard let live, flow.letGo(live.carry) else { return }
-        edges.stop()
-        springs.leave()
-        cancelTarget?.hold(false)
+        ended()
         route.carryOff()
         hideLine()
         flyHome(live)
+    }
+
+    /// The finger is up: the edges stop scrolling, the arrows stop counting, the board takes touches again.
+    private func ended() {
+        edges.stop()
+        springs.leave()
+        cancelTarget?.hold(false)
+        layer.blocksTouches = false
     }
 
     /// The copy flies back where the thing was lifted from, as the system returns a cancelled drag; the carry ends once it
     /// is down, and its place closes then.
     private func flyHome(_ live: Live) {
         guard let home = live.home() else { return landed(live) }
-        UIView.animate(withDuration: Self.flight, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 0, options: [.allowUserInteraction]) {
-            live.copy.land(on: CarryLanding(rect: home), look: nil)
-        } completion: { _ in
-            self.landed(live)
-        }
+        CarryMotion.animate({ live.copy.land(on: CarryLanding(rect: home), look: nil) }) { _ in self.landed(live) }
     }
 
     /// The copy is down: the card it flew into shows in this same frame, the copy goes, the carry ends.
     private func landed(_ live: Live) {
         guard flow.landed(live.carry) else { return }
         self.live = nil
-        // The carry's end drawn in this same frame as the copy goes: the card, its branch, a section's header.
-        model?.revealLanding()
-        model?.endCarry(live.token)
-        model?.redrawLists()
-        live.copy.removeFromSuperview()
-        layer.clear()
+        timing.step("landed") {
+            // The carry's end drawn in this same frame as the copy goes: the card, its branch, a section's header.
+            model?.finishCarry(live.token)
+            live.copy.removeFromSuperview()
+            layer.clear()
+        }
+        timing.end()
     }
 
     /// What the copy turns into as it lands where it is a size other than its own: the card as drawn there, or a
@@ -230,6 +231,7 @@ final class DragController {
     // MARK: Edges and day arrows
 
     private let edges = EdgeScroll()
+    let timing = CarryTiming()
     let springs = SpringZones()
 }
 
@@ -239,8 +241,12 @@ final class CarryLayer: UIView {
     private let copies = UIView()
     private let dot = UIView()
     private let bar = UIView()
-    static let dot: CGFloat = 8
-    static let thickness: CGFloat = 2
+
+    /// While a carry is live the layer takes every new touch, so a second finger reaches nothing on the board; the finger
+    /// that carries was taken by its gesture before and keeps going.
+    var blocksTouches = false {
+        didSet { isUserInteractionEnabled = blocksTouches }
+    }
 
     init() {
         super.init(frame: .zero)
@@ -252,7 +258,7 @@ final class CarryLayer: UIView {
             view.alpha = 0
             addSubview(view)
         }
-        dot.layer.cornerRadius = Self.dot / 2
+        dot.layer.cornerRadius = CardMetrics.dropDot / 2
     }
 
     @available(*, unavailable)
@@ -284,12 +290,13 @@ final class CarryLayer: UIView {
         bar.backgroundColor = accent
         let first = dot.alpha == 0
         let place = {
-            self.dot.frame = CGRect(x: start.x, y: start.y - Self.dot / 2, width: Self.dot, height: Self.dot)
-            self.bar.frame = CGRect(x: start.x + Self.dot / 2, y: start.y - Self.thickness / 2, width: max(0, end - start.x - Self.dot / 2), height: Self.thickness)
+            let dot = CardMetrics.dropDot, line = CardMetrics.dropLine
+            self.dot.frame = CGRect(x: start.x, y: start.y - dot / 2, width: dot, height: dot)
+            self.bar.frame = CGRect(x: start.x + dot / 2, y: start.y - line / 2, width: max(0, end - start.x - dot / 2), height: line)
             self.dot.alpha = 1
             self.bar.alpha = 1
         }
-        if first { UIView.performWithoutAnimation(place) } else { UIView.animate(springDuration: 0.12, bounce: 0, options: [.beginFromCurrentState], animations: place) }
+        if first { UIView.performWithoutAnimation(place) } else { UIView.animate(springDuration: CarryMotion.lineStep, bounce: 0, options: [.beginFromCurrentState], animations: place) }
     }
 
     func hideLine() {
@@ -310,7 +317,6 @@ final class CarryCopy: UIView {
     private let content: UIView
     private var arrival: UIView?
     private let card: Bool
-    static let rise: CGFloat = 1.04
 
     init(content: UIView, frame: CGRect, style: UIUserInterfaceStyle, card: Bool) {
         self.content = content
@@ -351,7 +357,7 @@ final class CarryCopy: UIView {
     }
 
     func rise() {
-        transform = CGAffineTransform(scaleX: Self.rise, y: Self.rise)
+        transform = CGAffineTransform(scaleX: CarryMotion.riseScale, y: CarryMotion.riseScale)
         layer.shadowOpacity = dark ? 0.55 : 0.16
     }
 
@@ -370,7 +376,7 @@ final class CarryCopy: UIView {
         layer.shadowOpacity = 0
         let rect = landing.rect
         if landing.folds {
-            let scale = ListController.foldedLanding
+            let scale = CarryMotion.foldedLanding
             bounds = CGRect(origin: .zero, size: CGSize(width: bounds.width * scale, height: bounds.height * scale))
             center = CGPoint(x: rect.midX, y: rect.midY)
             alpha = 0
@@ -389,7 +395,8 @@ final class CarryCopy: UIView {
 
 /// A list or the calendar under a carry held near its top or its visible bottom (the tab bar's edge) scrolls on, faster
 /// the nearer, as a list does under the system's drag, and the place under the still finger is read anew as rows pass
-/// under it. One display link, running only while the finger is at an edge.
+/// under it. One display link, running only while the finger is at an edge and the scroll can still go that way; its
+/// speed is by the second (`EdgeScrollStep`), whatever the screen's frame rate.
 @MainActor
 final class EdgeScroll {
     private weak var scroll: UIScrollView?
@@ -397,46 +404,44 @@ final class EdgeScroll {
     private var floor: CGFloat = .infinity
     private var moved: () -> Void = {}
     private var link: CADisplayLink?
-    static let band: CGFloat = 48
-    static let speed: CGFloat = 9
+    private var last: CFTimeInterval?
 
     func follow(_ point: CGPoint, in scroll: UIScrollView?, floor: CGFloat, moved: @escaping () -> Void) {
         self.scroll = scroll
         self.point = point
         self.floor = floor
         self.moved = moved
-        guard step() != 0 else { return stop() }
+        guard let scroll, next(scroll, elapsed: 0) != nil else { return stop() }
         guard link == nil else { return }
-        let made = CADisplayLink(target: Ticker(self), selector: #selector(Ticker.tick))
+        let made = CADisplayLink(target: Ticker(self), selector: #selector(Ticker.tick(_:)))
         made.add(to: .main, forMode: .common)
         link = made
+        last = nil
     }
 
     func stop() {
         link?.invalidate()
         link = nil
+        last = nil
     }
 
-    /// How far to scroll this frame: up at the top band, down at the bottom one (the visible bottom: the tab bar's top).
-    private func step() -> CGFloat {
-        guard let scroll, let window = scroll.window else { return 0 }
+    /// The offset after `elapsed` seconds: up at the top band, down at the bottom one (the visible bottom: the tab bar's
+    /// top); nil between the bands or where the scroll can go no further that way.
+    private func next(_ scroll: UIScrollView, elapsed: Double) -> CGFloat? {
+        guard let window = scroll.window else { return nil }
         let area = scroll.convert(scroll.bounds, to: window)
-        let top = area.minY, bottom = min(area.maxY, floor)
-        guard point.x >= area.minX, point.x < area.maxX else { return 0 }
-        let fromTop = point.y - top, fromBottom = bottom - point.y
-        if fromTop < Self.band, fromTop > -Self.band { return -Self.speed * min(1, 1 - fromTop / Self.band) }
-        if fromBottom < Self.band { return Self.speed * min(1, 1 - fromBottom / Self.band) }
-        return 0
+        guard point.x >= area.minX, point.x < area.maxX else { return nil }
+        let velocity = CarryMotion.edges.velocity(fromTop: Double(point.y - area.minY), fromBottom: Double(min(area.maxY, floor) - point.y))
+        let least = -scroll.adjustedContentInset.top
+        let most = scroll.contentSize.height + scroll.adjustedContentInset.bottom - scroll.bounds.height
+        return EdgeScrollStep.next(offset: Double(scroll.contentOffset.y), velocity: velocity, elapsed: elapsed, least: Double(least), most: Double(most)).map { CGFloat($0) }
     }
 
-    fileprivate func tick() {
-        guard let scroll else { return stop() }
-        let dy = step()
-        guard dy != 0 else { return stop() }
-        let most = max(-scroll.adjustedContentInset.top, scroll.contentSize.height + scroll.adjustedContentInset.bottom - scroll.bounds.height)
-        let next = min(max(-scroll.adjustedContentInset.top, scroll.contentOffset.y + dy), most)
-        guard abs(next - scroll.contentOffset.y) >= 0.5 else { return }
-        scroll.contentOffset.y = next
+    fileprivate func tick(_ link: CADisplayLink) {
+        let elapsed = last.map { link.timestamp - $0 } ?? link.targetTimestamp - link.timestamp
+        last = link.timestamp
+        guard let scroll, let offset = next(scroll, elapsed: elapsed) else { return stop() }
+        scroll.contentOffset.y = offset
         moved()
     }
 
@@ -445,7 +450,7 @@ final class EdgeScroll {
     private final class Ticker: NSObject {
         weak var owner: EdgeScroll?
         init(_ owner: EdgeScroll) { self.owner = owner }
-        @objc func tick() { owner?.tick() }
+        @objc func tick(_ link: CADisplayLink) { owner?.tick(link) }
     }
 }
 
@@ -461,9 +466,6 @@ final class SpringZones {
     private var zones: [Zone] = []
     private weak var over: UIView?
     private var dwell: Timer?
-    /// How long a carry stays over an arrow before it turns the day: the system's spring loading as the app had it on
-    /// the system's drag (measured on iOS 26.3: 1.25 s from the card reaching the arrow).
-    static let delay: TimeInterval = 1.25
 
     func add(_ view: UIView, activate: @escaping () -> Void) {
         zones.removeAll { $0.view == nil || $0.view === view }
@@ -480,7 +482,7 @@ final class SpringZones {
         guard let zone, let view = zone.view else { return }
         over = view
         let activate = zone.activate
-        dwell = Timer.scheduledTimer(withTimeInterval: Self.delay, repeats: false) { [weak self, weak view] _ in
+        dwell = Timer.scheduledTimer(withTimeInterval: CarryMotion.springLoad, repeats: false) { [weak self, weak view] _ in
             MainActor.assumeIsolated {
                 guard let self, let view, self.over === view else { return }
                 self.dwell = nil
@@ -494,5 +496,93 @@ final class SpringZones {
         dwell?.invalidate()
         dwell = nil
         over = nil
+    }
+}
+
+/// A DEBUG build's measure of a carry, told to the log (`category: drop`) as it lands: how long each move of the finger
+/// took the main thread, and the frames that came late while it was carried and while it landed.
+@MainActor
+final class CarryTiming {
+    private static let log = Logger(subsystem: "com.kudrmax.taskcalendar", category: "drop")
+    private var moves: [Double] = []
+    private var frames: [Double] = []
+    /// Each late frame and each step, by when it came after the lift (ms).
+    private var marks: [String] = []
+    private var started: CFTimeInterval = 0
+    private var link: CADisplayLink?
+    private var last: CFTimeInterval = 0
+    private var steps: [(String, Double)] = []
+
+    func begin() {
+        #if DEBUG
+        moves = []
+        frames = []
+        steps = []
+        marks = []
+        started = CACurrentMediaTime()
+        last = 0
+        let made = CADisplayLink(target: Ticker(self), selector: #selector(Ticker.tick(_:)))
+        made.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+        made.add(to: .main, forMode: .common)
+        link = made
+        #endif
+    }
+
+    func measure(_ work: () -> Void) {
+        #if DEBUG
+        let start = CACurrentMediaTime()
+        work()
+        moves.append((CACurrentMediaTime() - start) * 1000)
+        #else
+        work()
+        #endif
+    }
+
+    func step(_ name: String, _ work: () -> Void) {
+        #if DEBUG
+        let start = CACurrentMediaTime()
+        work()
+        steps.append((name, (CACurrentMediaTime() - start) * 1000))
+        marks.append("\(name)@\(Int((start - started) * 1000))")
+        #else
+        work()
+        #endif
+    }
+
+    func end() {
+        #if DEBUG
+        link?.invalidate()
+        link = nil
+        guard !moves.isEmpty else { return }
+        let sorted = moves.sorted()
+        let mean = moves.reduce(0, +) / Double(moves.count)
+        let p95 = sorted[min(sorted.count - 1, Int(Double(sorted.count) * 0.95))]
+        let late = frames.filter { $0 > 1000.0 / 60 * 1.5 }.count
+        let worst = frames.max() ?? 0
+        Self.log.notice("CARRY moves \(self.moves.count) mean \(mean, format: .fixed(precision: 2)) ms p95 \(p95, format: .fixed(precision: 2)) ms max \(sorted.last ?? 0, format: .fixed(precision: 2)) ms; frames \(self.frames.count) late \(late) worst \(worst, format: .fixed(precision: 1)) ms; \(self.steps.map { "\($0.0) \(String(format: "%.2f", $0.1)) ms" }.joined(separator: ", "), privacy: .public); \(self.marks.joined(separator: " "), privacy: .public)")
+        #endif
+    }
+
+    fileprivate func tick(_ link: CADisplayLink) {
+        if last > 0 {
+            let interval = (link.timestamp - last) * 1000
+            frames.append(interval)
+            if interval > 1000.0 / 60 * 1.5 { marks.append("late \(Int(interval))@\(Int((link.timestamp - started) * 1000))") }
+        }
+        last = link.timestamp
+    }
+
+    @MainActor
+    private final class Ticker: NSObject {
+        weak var owner: CarryTiming?
+        init(_ owner: CarryTiming) { self.owner = owner }
+        @objc func tick(_ link: CADisplayLink) { owner?.tick(link) }
+    }
+}
+
+extension UIGestureRecognizer {
+    /// Where the finger that began the gesture is, in the window: never the middle of two fingers.
+    var firstFinger: CGPoint {
+        numberOfTouches > 0 ? location(ofTouch: 0, in: nil) : location(in: nil)
     }
 }

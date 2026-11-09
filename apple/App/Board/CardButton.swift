@@ -8,8 +8,8 @@ enum Carried {
 }
 
 /// A card as the design has it: a tap opens its menu, as the plugin's card; the subtask counter is its own button, which
-/// folds. In a list the list's own long press lifts it; on the calendar, where no list holds it, the card's own long press
-/// does (`draggable`), into the same board drag.
+/// folds. In a list the list's own long press lifts it; on the calendar the calendar's own long press does (`draggable`,
+/// `CalendarDrop`), into the same board drag: a press on the scroll view outlives the day the block is drawn in.
 struct CardButton: UIViewRepresentable {
     let card: BoardCard
     /// The task's new text while its rename is written: drawn instead of the text as read.
@@ -22,11 +22,9 @@ struct CardButton: UIViewRepresentable {
     /// The card is carried: its place is the gap it was lifted from, until the carry ends.
     var carried = false
     var onTouch: () -> Void = {}
-    /// The board's drag the card's own long press lifts it into.
-    var drag: DragController?
     /// The card lifted: the carry begins, its token returned.
     var onCarry: () -> Int = { 0 }
-    /// Where the card's own drag lifts it from.
+    /// Where the calendar's press lifts it from.
     var from = "timeline"
     /// A tap on the subtask counter, when the card offers it: its subtasks fold away or show again.
     var onFold: (() -> Void)?
@@ -81,7 +79,6 @@ struct CardButton: UIViewRepresentable {
         CardControl.follow(card: card, look: look, menu: menu, from: control)
         control.onTouch = onTouch
         control.onCarry = onCarry
-        control.drag = drag
         control.from = from
         control.onFold = onFold
         control.onLink = onLink
@@ -101,7 +98,6 @@ final class CardControl: UIControl {
     var menuMaker: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? = { _ in nil }
     var onTouch: () -> Void = {}
     var onCarry: () -> Int = { 0 }
-    weak var drag: DragController?
     var from = "timeline"
     var onFold: (() -> Void)? {
         didSet { fold.isHidden = onFold == nil }
@@ -113,10 +109,9 @@ final class CardControl: UIControl {
     var picking: CardButton.Picking?
     /// Where the title's links are drawn.
     var links: [CardLink] = []
-    var draggable = false {
-        didSet { press.isEnabled = draggable }
-    }
-    /// Gone from its place while carried: the system's copy is the card until the carry ends.
+    /// The calendar's press may lift it.
+    var draggable = false
+    /// Gone from its place while carried: the board's copy is the card until the carry ends.
     var carried = false {
         didSet { if carried != oldValue { showsInPlace() } }
     }
@@ -137,7 +132,7 @@ final class CardControl: UIControl {
     var counterFrame: CGRect? {
         didSet { setNeedsLayout() }
     }
-    /// Where the capsule's title has its room: the menu's copy grows by what the title lacks of it.
+    /// Where the capsule's title has its room: what the core measures a cut title against (`rules.wholeWidth`).
     var titleFrame: CGRect?
     /// Where the capsule draws the project's folder mark: its button lies there.
     var markFrame: CGRect? {
@@ -149,8 +144,6 @@ final class CardControl: UIControl {
     private lazy var opener = MenuOpener(ended: { [weak self] in self?.menuEnded($0) })
     /// A view nothing shows, animated within the menu's going so its end is heard when the preview is home.
     private let ticker = UIView()
-    /// The card's own long press, on the calendar: it lifts the card into the board's drag.
-    private let press = UILongPressGestureRecognizer()
     /// A menu row that opens a sheet or a page, run once the menu has begun to go.
     private var afterMenu: (@MainActor () -> Void)?
     init(content: UIView & UIContentView) {
@@ -192,10 +185,6 @@ final class CardControl: UIControl {
         // A tap opens the menu once the finger is up, as the plugin's tap does; a long press lifts the card for the drag.
         addSubview(opener)
         addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
-        press.addTarget(self, action: #selector(pressed(_:)))
-        press.minimumPressDuration = DragController.liftDelay
-        press.isEnabled = false
-        addGestureRecognizer(press)
         isAccessibilityElement = true
         accessibilityTraits = .button
     }
@@ -392,38 +381,25 @@ final class CardControl: UIControl {
         DispatchQueue.main.async { run() }
     }
 
-    // MARK: The card's own drag (on the calendar)
+    // MARK: Lifted from the calendar
 
-    override func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
-        guard recognizer === press else { return super.gestureRecognizerShouldBegin(recognizer) }
-        return drag?.idle == true && look != nil
+    /// What the calendar's press lifts from this card, the finger at `point` of `window`: the card as it is drawn. Its home
+    /// is the card drawn for the task now (after a day's turn, wherever the screen draws it, else where it stood).
+    func lift(finger point: CGPoint, in window: UIWindow) -> Lift? {
+        guard let card = look?.card, self.window === window else { return nil }
+        let payload = DragPayload(.card(card), from: from)
+        let frame = convert(bounds, to: window)
+        payload.grab = point.y - frame.minY
+        payload.home = frame
+        let copy = ListController.image(of: content, in: content.bounds)
+        return Lift(payload: payload, copy: copy, frame: frame, card: true, begin: onCarry) {
+            Self.drawn(card.id).map { $0.convert($0.bounds, to: nil) } ?? payload.home
+        }
     }
 
-    @objc private func pressed(_ press: UILongPressGestureRecognizer) {
-        guard let drag else { return }
-        let point = press.location(in: nil)
-        switch press.state {
-        case .began:
-            guard let card = look?.card, let window else { return }
-            let payload = DragPayload(.card(card), from: from)
-            let frame = convert(bounds, to: window)
-            payload.grab = point.y - frame.minY
-            payload.home = frame
-            let copy = ListController.image(of: content, in: content.bounds)
-            let lift = Lift(payload: payload, copy: copy, frame: frame, card: true, begin: onCarry) { [weak self] in
-                guard let self, self.window != nil, self.id == card.id else { return payload.home }
-                return self.convert(self.bounds, to: nil)
-            }
-            drag.lift(lift, at: point, in: window)
-        case .changed:
-            drag.move(to: point)
-        case .ended:
-            drag.letGo(at: point)
-        case .cancelled, .failed:
-            drag.cancel()
-        default:
-            break
-        }
+    /// The card of task `id` on the screen now.
+    private static func drawn(_ id: String) -> CardControl? {
+        live.allObjects.first { $0.id == id && $0.window != nil && $0.draggable }
     }
 
     /// Only what the card draws hides, never the card: a hidden card still takes the finger.
@@ -496,9 +472,9 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
         self.menu = menu
         self.whole = whole
         self.preview = preview
-        showing = true
         let selector = NSSelectorFromString("_presentMenuAtLocation:")
         guard interaction.responds(to: selector), let method = interaction.method(for: selector) else { return }
+        showing = true
         typealias Present = @convention(c) (AnyObject, Selector, CGPoint) -> Void
         unsafeBitCast(method, to: Present.self)(interaction, selector, point)
     }

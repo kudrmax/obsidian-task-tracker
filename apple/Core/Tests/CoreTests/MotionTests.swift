@@ -239,6 +239,122 @@ import Testing
     }
 }
 
+/// A press reads whether it may lift without changing anything: a refused press never sets the landing copy down.
+@Suite struct CarryFlowLiftTests {
+    @Test func aPressMayLiftWhileACopySettlesAndAskingChangesNothing() {
+        var flow = CarryFlow()
+        let first = flow.lift()!
+        #expect(!flow.mayLift)
+        _ = flow.letGo(first)
+        #expect(flow.mayLift)
+        #expect(flow.mayLift)
+        #expect(flow.phase == .landing(first))
+        #expect(flow.settling == first)
+    }
+
+    @Test func nothingMayLiftWhileCarried() {
+        var flow = CarryFlow()
+        let token = flow.lift()!
+        _ = flow.move(token)
+        #expect(!flow.mayLift)
+        #expect(flow.settling == nil)
+    }
+}
+
+@Suite struct EdgeScrollStepTests {
+    let step = EdgeScrollStep(band: 48, speed: 540)
+
+    @Test func itScrollsFasterTheNearerTheEdgeAndNotBetweenTheBands() {
+        #expect(step.velocity(fromTop: 0, fromBottom: 500) == -540)
+        #expect(step.velocity(fromTop: 24, fromBottom: 500) == -270)
+        #expect(step.velocity(fromTop: 300, fromBottom: 300) == 0)
+        #expect(step.velocity(fromTop: 500, fromBottom: 12) == 405)
+        #expect(step.velocity(fromTop: 500, fromBottom: -10) == 540)
+    }
+
+    /// By the second: two 120 Hz frames go as far as one 60 Hz frame.
+    @Test func itGoesAsFarInASecondAtAnyFrameRate() {
+        let sixty = EdgeScrollStep.next(offset: 100, velocity: 540, elapsed: 1.0 / 60, least: 0, most: 1000)!
+        let half = EdgeScrollStep.next(offset: 100, velocity: 540, elapsed: 1.0 / 120, least: 0, most: 1000)!
+        let twice = EdgeScrollStep.next(offset: half, velocity: 540, elapsed: 1.0 / 120, least: 0, most: 1000)!
+        #expect(abs(sixty - twice) < 0.0001)
+        #expect(abs(sixty - 109) < 0.0001)
+    }
+
+    /// At its end the scroll stops asking for frames.
+    @Test func itStopsWhereItCanGoNoFurther() {
+        #expect(EdgeScrollStep.next(offset: 0, velocity: -300, elapsed: 0.016, least: 0, most: 1000) == nil)
+        #expect(EdgeScrollStep.next(offset: 1000, velocity: 300, elapsed: 0.016, least: 0, most: 1000) == nil)
+        #expect(EdgeScrollStep.next(offset: 995, velocity: 540, elapsed: 0.1, least: 0, most: 1000) == 1000)
+        #expect(EdgeScrollStep.next(offset: 10, velocity: 0, elapsed: 0.016, least: 0, most: 1000) == nil)
+        // A list shorter than its box can't scroll either way.
+        #expect(EdgeScrollStep.next(offset: 0, velocity: 300, elapsed: 0.016, least: 0, most: -20) == nil)
+    }
+}
+
+@Suite struct PrefetchTests {
+    /// The let-go on the place worked out finds it ready; on another place it is worked out by the caller.
+    @Test func aPlaceWorkedOutIsReadyAndAnotherIsNot() {
+        let prefetch = Prefetch<String, Int>(label: "test")
+        prefetch.want("a") { 1 }
+        #expect(prefetch.take("a") == 1)
+        #expect(prefetch.take("b") == nil)
+    }
+
+    /// A let-go on the place under way waits for its rest, never works it out twice.
+    @Test func aTakeWaitsForThePieceUnderWay() {
+        let prefetch = Prefetch<String, Int>(label: "test")
+        let gate = DispatchSemaphore(value: 0)
+        prefetch.want("a") {
+            gate.wait()
+            return 7
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) { gate.signal() }
+        #expect(prefetch.take("a") == 7)
+    }
+
+    /// The places a carry passes over while one is worked out are never worked out: only the latest waits.
+    @Test func onlyTheLatestWaitingPlaceIsWorkedOut() {
+        let prefetch = Prefetch<String, Int>(label: "test")
+        let gate = DispatchSemaphore(value: 0)
+        let counter = Counter()
+        prefetch.want("a") {
+            gate.wait()
+            return 1
+        }
+        prefetch.want("b") { counter.add(); return 2 }
+        prefetch.want("c") { counter.add(); return 3 }
+        gate.signal()
+        #expect(prefetch.take("a") == 1)
+        var waited = 0
+        while prefetch.take("c") == nil, waited < 200 {
+            Thread.sleep(forTimeInterval: 0.005)
+            waited += 1
+        }
+        #expect(prefetch.take("c") == 3)
+        #expect(prefetch.take("b") == nil)
+        #expect(counter.count == 1)
+    }
+
+    @Test func clearedItHoldsNothing() {
+        let prefetch = Prefetch<String, Int>(label: "test")
+        prefetch.want("a") { 1 }
+        _ = prefetch.take("a")
+        prefetch.clear()
+        #expect(prefetch.take("a") == nil)
+    }
+
+    private final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private(set) var count = 0
+        func add() {
+            lock.lock()
+            count += 1
+            lock.unlock()
+        }
+    }
+}
+
 @Suite struct DropReadsTests {
     /// Drops' writes run in order, but a write that finished later with a lower count never lowers the floor.
     @Test func aWriteFinishedOutOfOrderNeverLetsAnOlderReadDraw() {

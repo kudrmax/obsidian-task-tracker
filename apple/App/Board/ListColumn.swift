@@ -228,7 +228,7 @@ struct ProjectHeader: View {
         }
         // The fold in the rows' own time, not in one frame: the chevron turns, the count fades in or out and the arrow
         // slides beside it as the rows fold.
-        .animation(.snappy(duration: ListController.unfold), value: project.folded)
+        .animation(CarryMotion.dropAnimation, value: project.folded)
         .foregroundStyle(project.zone.isNull ? Palette.muted : Palette.pullInk(scheme))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         .padding(.leading, CardMetrics.leading)
@@ -392,7 +392,7 @@ struct EmptyPlate: View {
             .background(hot ? Palette.dropBg(scheme) : .clear, in: .rect(cornerRadius: CardMetrics.radius))
             .overlay {
                 RoundedRectangle(cornerRadius: CardMetrics.radius)
-                    .strokeBorder(hot ? Palette.accent(scheme) : Palette.muted.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: hot ? [] : [4, 3]))
+                    .strokeBorder(hot ? Palette.accent(scheme) : Palette.muted.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: hot ? [] : CardMetrics.dash))
             }
             .contentShape(.rect(cornerRadius: CardMetrics.radius))
             .onTapGesture { open?() }
@@ -409,9 +409,9 @@ struct CardRow: View {
     @Bindable var model: BoardModel
     @Environment(\.colorScheme) private var scheme
 
-    /// A branch coming in: once its row has all but come to rest, as fast as a glance; going, at once.
+    /// A branch coming in: its fade ends as the rows' spring comes to rest, as fast as a glance; going, at once.
     static let branchComes = AnyTransition.asymmetric(
-        insertion: .opacity.animation(.easeOut(duration: 0.12).delay(DragController.flight * 0.6)),
+        insertion: .opacity.animation(.easeOut(duration: CarryMotion.branchFade).delay(CarryMotion.settles - CarryMotion.branchFade)),
         removal: .identity)
 
     /// The room the selection circle takes before the card.
@@ -447,7 +447,7 @@ struct CardRow: View {
                 .background { if model.isWaiting(card) { DashedPlace().transition(.identity) } }
                 // The branch comes with the card's place (the drop's screen drawn), fading in as the row and the copy flying
                 // into it come to rest, so it never travels with a row moving there.
-                .overlay(alignment: .topLeading) { if let branch = card.branch, !model.isWaiting(card) { BranchLine(branch: branch).transition(Self.branchComes) } }
+                .overlay(alignment: .topLeading) { if let branch = card.branch, !model.isWaiting(card) { ComingBranch(branch: branch, flying: model.dropFlies).transition(Self.branchComes) } }
                 .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
         }
         .frame(height: CardMetrics.height, alignment: .top)
@@ -462,6 +462,30 @@ struct CardRow: View {
     }
 }
 
+/// A subtask's branch that comes with a drop: it waits while the drop's copy flies and fades in once the copy is down
+/// (the carry's end, heard from the flight's own completion), so it never travels with a row moving under the copy.
+struct ComingBranch: View {
+    let branch: Branch
+    /// A drop's copy is flying now.
+    let flying: Bool
+    @State private var shown: Bool
+
+    init(branch: Branch, flying: Bool) {
+        self.branch = branch
+        self.flying = flying
+        _shown = State(initialValue: !flying)
+    }
+
+    var body: some View {
+        BranchLine(branch: branch)
+            .opacity(shown ? 1 : 0)
+            .onChange(of: flying) { _, now in
+                guard !now, !shown else { return }
+                withAnimation(.easeOut(duration: CarryMotion.branchFade)) { shown = true }
+            }
+    }
+}
+
 /// Where a carried card was lifted from, as the plugin keeps it (`is-waiting`), and where a carried section would go
 /// (`.tc-group-drop`): a dashed outline of a card.
 struct DashedPlace: View {
@@ -469,7 +493,7 @@ struct DashedPlace: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: CardMetrics.radius)
-            .strokeBorder(Palette.dash(scheme), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            .strokeBorder(Palette.dash(scheme), style: StrokeStyle(lineWidth: 1, dash: CardMetrics.dash))
             .accessibilityHidden(true)
     }
 }

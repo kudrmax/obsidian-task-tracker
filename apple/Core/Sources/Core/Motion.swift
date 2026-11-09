@@ -70,6 +70,20 @@ public struct CarryFlow: Equatable, Sendable {
         }
     }
 
+    /// A press may lift now: nothing is carried, or the last copy is only settling (it is set down as the new carry lifts).
+    /// Read only: asking changes nothing, so a press that is then refused leaves the landing copy as it was.
+    public var mayLift: Bool {
+        switch phase {
+        case .idle, .landing: true
+        case .lifted, .carrying: false
+        }
+    }
+
+    /// The carry whose copy is still settling, if any.
+    public var settling: Int? {
+        if case .landing(let token) = phase { token } else { nil }
+    }
+
     /// A lift: a new carry's token, or nil while another carry is under way (a press during a landing lifts nothing).
     public mutating func lift() -> Int? {
         guard phase == .idle else { return nil }
@@ -105,6 +119,99 @@ public struct CarryFlow: Equatable, Sendable {
         guard phase == .landing(token) else { return false }
         phase = .idle
         return true
+    }
+}
+
+/// How a list or the calendar scrolls under a carry held at its edge: faster the nearer the edge, by the second (so a
+/// 120 Hz screen scrolls as far in a second as a 60 Hz one), and not at all where it can go no further that way.
+public struct EdgeScrollStep: Equatable, Sendable {
+    /// How deep the band at each edge is, in points.
+    public let band: Double
+    /// The most it scrolls in a second, at the very edge.
+    public let speed: Double
+
+    public init(band: Double, speed: Double) {
+        self.band = band
+        self.speed = speed
+    }
+
+    /// Points a second, up (negative) at the top band or down at the bottom one, for a finger `fromTop` below the area's
+    /// top and `fromBottom` above its visible bottom; zero between the bands.
+    public func velocity(fromTop: Double, fromBottom: Double) -> Double {
+        if fromTop < band, fromTop > -band { return -speed * min(1, 1 - fromTop / band) }
+        if fromBottom < band { return speed * min(1, 1 - fromBottom / band) }
+        return 0
+    }
+
+    /// The offset after `elapsed` seconds at `velocity`, kept within `least`…`most`; nil where it can't move that way (the
+    /// scroll has reached its end), so the display link stops.
+    public static func next(offset: Double, velocity: Double, elapsed: Double, least: Double, most: Double) -> Double? {
+        guard velocity != 0 else { return nil }
+        let top = max(least, most)
+        if velocity < 0, offset <= least + 0.5 { return nil }
+        if velocity > 0, offset >= top - 0.5 { return nil }
+        return min(max(least, offset + velocity * max(0, elapsed)), top)
+    }
+}
+
+/// The screen a drop would leave, worked out off the main thread while the carry is held over a place, so the let-go
+/// finds it ready instead of asking the core in the frame the finger lifts. One piece of work at a time, the latest asked
+/// waiting after it (a carry passes many places; the ones passed over are never worked out); a let-go on the place under
+/// way waits only for its rest.
+public final class Prefetch<Key: Hashable & Sendable, Value: Sendable>: @unchecked Sendable {
+    private let lock = NSCondition()
+    private let queue: DispatchQueue
+    private var running: Key?
+    private var next: (key: Key, work: @Sendable () -> Value?)?
+    /// The last pieces worked out, the newest last: a finger back over a place it passed finds it ready.
+    private var done: [(key: Key, value: Value?)] = []
+    private static var kept: Int { 4 }
+
+    public init(label: String) {
+        queue = DispatchQueue(label: label, qos: .userInitiated)
+    }
+
+    /// `key`'s value is wanted: worked out now, or after the piece under way, replacing any other waiting.
+    public func want(_ key: Key, _ work: @escaping @Sendable () -> Value?) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard running != key, !done.contains(where: { $0.key == key }), next?.key != key else { return }
+        next = (key, work)
+        guard running == nil else { return }
+        startNext()
+    }
+
+    /// `key`'s value: ready, or waited for when it is the piece under way; nil when it was never asked or went by (the
+    /// caller works it out itself).
+    public func take(_ key: Key) -> Value? {
+        lock.lock()
+        defer { lock.unlock() }
+        while running == key { lock.wait() }
+        return done.last { $0.key == key }?.value ?? nil
+    }
+
+    /// Nothing wanted any more (the carry ended): what is waiting is dropped, what is ready forgotten.
+    public func clear() {
+        lock.lock()
+        next = nil
+        done = []
+        lock.unlock()
+    }
+
+    private func startNext() {
+        guard let (key, work) = next else { return }
+        next = nil
+        running = key
+        queue.async { [self] in
+            let value = work()
+            lock.lock()
+            done.append((key, value))
+            if done.count > Self.kept { done.removeFirst(done.count - Self.kept) }
+            running = nil
+            lock.broadcast()
+            startNext()
+            lock.unlock()
+        }
     }
 }
 

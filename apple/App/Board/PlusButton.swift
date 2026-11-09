@@ -192,10 +192,10 @@ final class PlusControl: UIControl, CancelTarget {
     /// becomes it; on the cancel target, over no place or as a trembled tap, the copy flies home (a tap opens a new task).
     @objc private func carry(_ pan: UIPanGestureRecognizer) {
         guard let drag else { return }
-        let point = pan.location(in: nil)
+        let point = pan.firstFinger
         switch pan.state {
         case .began:
-            guard let window, drag.idle else { return }
+            guard let window, drag.mayLift else { return }
             let moved = pan.translation(in: nil)
             start = CGPoint(x: point.x - moved.x, y: point.y - moved.y)
             wandered = false

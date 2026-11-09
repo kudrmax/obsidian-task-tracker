@@ -49,7 +49,8 @@ another. This spec replaces the patched pieces with one mechanism, the industry'
    nearest valid place; there is no position over the board with nothing shown. Over the bars (the top buttons, the tab
    bar) the target is the nearest place of the column under the finger, never nothing.
 2. The purple line is always visible: drawn above the carried card, from its level's left edge across the column.
-3. A task carried back over its own place shows the line at its dashed place, not nothing.
+3. A task carried back over its own place shows its dashed place and no line, as the plugin's: a drop there changes
+   nothing.
 4. On let-go the rows open the room where the task will be, sections and headers appear or disappear at that same
    moment in the same animation, and the copy flies into the room. When the file is written nothing else moves.
 5. Paging days while carrying: the target follows the day now shown, the copy stays under the finger, a drop lands in the
@@ -118,8 +119,10 @@ what a drop writes.
    board's own drag carries the card (decision 17), and no row moves under the finger: the line
    with its dot stands at the left edge of the level the place picks, drawn over everything, the carried copy too.
    The place is the core's `rules.placeAt` over the rows as they stand, the level `rules.levelAt` from the finger's `x`.
-2. **Lead, changed 11-09: the home place is the carried card's dashed place** where it was lifted from (`is-waiting`);
-   held over its own place, the line stands at it, and a drop there writes nothing.
+2. **Lead, changed 11-09 (review): the home place is the carried card's dashed place** where it was lifted from
+   (`is-waiting`); held over its own place no line shows, only the dashed place, as the plugin's (`ListDrop.isHome`), and
+   a drop there writes nothing. Held over the same gap at another level, the line stands in the gap over the dashed place
+   at that level.
 3. **Lead, changed 11-09 (was «no target over the bars»): over the bars the target is the nearest place of the column
    under the finger.** Where no list or calendar takes the drop (the top bar, the tab bar, the divider's handle, the gaps
    round them), one board-level drop interaction routes it, through the same routing as the plus, to the column under
@@ -133,11 +136,14 @@ what a drop writes.
    turns the day after 1.25 s, as the system's spring loading did on master (measured there: 1.25 s from the card
    reaching the arrow), with the selection tick (`SpringZones`, the one dwell of the drag); once per stay over the
    arrow, as on master; the carry goes on and lands in the day now shown, the place under the still finger read anew as
-   the day lands.
+   the day lands, whichever way it came (an arrow, a swipe let go). A calendar block carried over the arrow goes on too:
+   the press that lifts a block lives on the calendar's scroll view, as a list's lives on its collection, so it outlives
+   the block's day (it lived on the block, and the day's turn took it off the screen and cancelled the carry).
 7. **frontend-swift, kept as on master (lead: don't change what Max is used to): cards, calendar blocks and section
    headers lift after the system drag's own time, 0.33 s** (measured on master: the lift began 0.326 s after the touch,
    whatever the setting); the settings' Long Press Delay stays the calendar's empty-space press's. The plus lifts at
-   once, as before.
+   once, as before. One rule says whether a press may lift, in a list and on the calendar alike (`BoardModel.mayLift`):
+   nothing else carried, no text being typed, the card liftable at all (in Select Tasks only a picked one).
 8. **frontend-swift, changed 11-09: a card carried out of its list keeps its dashed place there** until the carry
    ends, as the plugin's; the picked tasks carried with it fold away under it.
 9. **frontend-swift, changed 11-09: a section carried shows its room**, a dashed card's room before the header it would
@@ -152,17 +158,23 @@ what a drop writes.
     end of the day's part without a section, its project kept. The day's title lights while the card is over the strip.
 12. **frontend-swift: a refused or unchanged drop flies the copy back to where the card was lifted** (its row in its own
     list, or its place on the calendar), never the system's default fade.
-13. **frontend-swift, changed 11-09 (own drag): a list or the calendar scrolls at its top and visible bottom edge (the
-    tab bar's top) under a carry**, faster the nearer the edge, 48 pt deep, up to 9 pt a frame; the place or minute is
-    read anew as the rows pass under the still finger. One display link (`EdgeScroll`), running only while the finger is
-    at an edge: a still finger gives no move to drive the scroll.
+13. **frontend-swift, changed 11-09 (own drag, review): a list or the calendar scrolls at its top and visible bottom edge
+    (the tab bar's top) under a carry**, faster the nearer the edge, 48 pt deep, up to 540 pt a second (9 pt a frame at
+    60 Hz, the same on a 120 Hz screen); the place or minute is read anew as the rows pass under the still finger. One
+    display link (`EdgeScroll`, its step `EdgeScrollStep`), running only while the finger is at an edge and the list can
+    still scroll that way: a still finger gives no move to drive the scroll.
 14. **frontend-swift, changed 11-09 (own drag): the drop lands in one animation, and the carry ends when its copy is
     down.** Every let-go is a drop: into its place, or home where nothing takes it (the bars, the cancel target), so the
     copy always flies. The core's `dropPreview` screen is applied to every list and to the calendar inside the copy's own
-    flight (a spring with no bounce fitted to 0.35 s): the rows open and close and the calendar's blocks move as the copy
-    flies, and the copy's target is the card's frame in that new layout (on the calendar, the block of the stack the
-    calendar draws). The card the copy lands as is hidden until then; in the flight's completion it shows (set on the view
-    itself), the carry ends and the copy goes, in one frame. Select Tasks ends after the drop.
+    flight: one spring (`CarryMotion.drop`, no bounce, settled in 0.35 s) for the copy, the rows that open and close, the
+    rows that come in and the calendar's blocks, so nothing moves on after the copy is gone. The copy's target is the
+    card's frame in that new layout (on the calendar, the block of the stack the calendar draws); the look it turns into is
+    drawn before the flight starts. The card the copy lands as is hidden until then; in the flight's completion it shows
+    (set on the view itself), the carry ends and the copy goes, in one frame, and only the rows the carry drew otherwise
+    are drawn anew. Select Tasks ends after the drop. Review, 11-09: the preview is worked out off the main thread while
+    the carry is held over a place (its own JavaScript context, `TaskBoard`'s `preview`), so the let-go draws at once
+    (it asked the core for ~90 ms in the let-go's frame); the read after the drop's write is made once the copy is down,
+    never redrawing the board under the flight.
 15. **frontend-swift, changed 11-09 (lead: the system's standard preview): a card's menu.** A card that shows its whole
     title is lifted itself. A cut title: the menu's preview (`UIContextMenuConfiguration(previewProvider:)`) is the card
     laid out with its whole title at the width the core gives (`rules.wholeWidth`), drawn as on the board (inside the
@@ -192,12 +204,13 @@ what a drop writes.
 18. **frontend-swift: a card's copy landing at another width or height (a subtask's level, the calendar, a block into a
     list) keeps its text still**: the copy is clipped to the card's shape, its look and the look of the card where it
     lands both drawn from the top-left corner, the one fading into the other; nothing is stretched or doubled.
-19. **frontend-swift: a dropped subtask's branch comes with its place and fades in (0.12 s) as its row comes to rest**,
-    never travelling with a row that moves there under the copy.
+19. **frontend-swift, changed 11-09 (review): a dropped subtask's branch comes with its place and fades in (0.12 s) once
+    the copy is down** (the carry's end, heard from the flight's own completion), never travelling with a row that moves
+    there under the copy; a branch coming with any other change fades in as the rows' spring comes to rest.
 20. **frontend-swift: on the calendar a block lying over another's body is drawn over it**, the deeper the higher, the
     selected one over all: a block dropped onto a long task's time was hidden whole under it (the core lists the blocks
     in its own order). In a narrow calendar a deep block is narrow (its left is the core's overlay inset per level) but
-    seen. For the Obsidian frontend too (the plugin's blocks follow the DOM's order).
+    seen. iPhone only: the plugin's own order of blocks is its frontend's matter, not carried over by this decision.
 21. **frontend-swift: picked tasks carried as a stack land as the lead card's copy; the others come in with the rows** in
     the drop's motion.
 22. **frontend-swift, changed 11-09 (was decision 9's «shown once it is down»): a section let go where it lands comes in
@@ -210,4 +223,9 @@ what a drop writes.
     priority carries no labels, one with labels no priority): its coloured icon at the plugin's
     `--tc-tile-off-opacity` (0.35), its title greyed by the system, and a tap on it does nothing, as the plugin's
     disabled tile.
-
+25. **frontend-swift, review 11-09: while a card is carried no other touch reaches the board** (the layer that holds the
+    copy and the line takes every new touch until the finger is up): a second finger opens no menu, taps no tab or arrow
+    and picks nothing, and the copy follows the finger that carries it, never the middle of two.
+26. **frontend-swift, review 11-09: a list that places nothing in a gap (`rules.placesInGap`, a past day's list for a card
+    from another column) shows the line at its end, wherever the finger is in it, and the drop goes to its end** (the
+    drop names no place), as the plugin's; a list with no card shows the line at its top.

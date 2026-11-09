@@ -188,9 +188,6 @@ extension MenuNode {
         UIMenu(children: nodes.map { $0.element(later, palette) })
     }
 
-    /// How strongly a tile that can't be pressed shows: the plugin's `--tc-tile-off-opacity`.
-    static let offOpacity: CGFloat = 0.35
-
     @MainActor
     private func element(_ later: @escaping (@escaping @MainActor () -> Void) -> Void, _ palette: @escaping (String) -> UIColor?) -> UIMenuElement {
         switch self {
@@ -198,7 +195,7 @@ extension MenuNode {
             var image = symbol.flatMap { UIImage(systemName: $0) }
             // A tile shown but not pressed (a label's while the task has a priority, a level's while it has labels) is
             // dimmed as the plugin dims it (`--tc-tile-off-opacity`): its colour drawn as is would read as pressable.
-            if let tint, let color = palette(tint) { image = image?.withTintColor(disabled ? color.withAlphaComponent(Self.offOpacity) : color, renderingMode: .alwaysOriginal) }
+            if let tint, let color = palette(tint) { image = image?.withTintColor(disabled ? color.withAlphaComponent(CardMetrics.tileOffOpacity) : color, renderingMode: .alwaysOriginal) }
             var attributes: UIMenuElement.Attributes = destructive ? [.destructive] : []
             if keepsOpen { attributes.insert(.keepsMenuPresented) }
             if disabled { attributes.insert(.disabled) }
