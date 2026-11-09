@@ -27,9 +27,11 @@ export const PHONE_ACCOUNT = "iPhone";
 /** The key of Scriptable's calendar whose title two calendars of the other files share: set apart from both. */
 const apart = (title: string): string => `${PHONE_ACCOUNT} · ${title}`;
 
-/** A day's events of the calendars shown, and whether any of them came from a file no longer fresh. */
+/** A day's events of the calendars shown, the files they come from, and whether any of those is no longer fresh. */
 export interface ChosenDay {
 	readonly events: readonly CalendarEvent[];
+	/** The sources some calendar shown on the day is taken from, whether or not it has events that day. */
+	readonly used: ReadonlySet<CalendarSource>;
 	readonly stale: boolean;
 }
 
@@ -86,17 +88,19 @@ export class CalendarChoice {
 
 	day(start: Date, end: Date): ChosenDay {
 		const events: CalendarEvent[] = [];
+		const used = new Set<CalendarSource>();
 		let stale = false;
 		for (const calendar of this.known()) {
 			if (this.hidden.has(keyText(calendar.key))) continue;
 			const source = this.sourceFor(calendar, start);
 			if (source === null) continue;
 			const file = this.files.get(source)!;
+			used.add(source);
 			if (!this.fresh(file)) stale = true;
 			const text = keyText(calendar.key);
 			events.push(...file.events.filter((e) => keyText(this.keyOf(source, calendarOf(e))) === text && e.start < end && e.end > start));
 		}
-		return { events: events.sort((a, b) => a.start.getTime() - b.start.getTime()), stale };
+		return { events: events.sort((a, b) => a.start.getTime() - b.start.getTime()), used, stale };
 	}
 
 	private sourceFor(calendar: KnownCalendar, day: Date): CalendarSource | null {

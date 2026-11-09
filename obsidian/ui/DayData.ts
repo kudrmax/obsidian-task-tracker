@@ -48,7 +48,7 @@ const NO_SECTIONS: ListSections = { inbox: [], backlog: [], soon: [], now: [] };
 /** No sections to offer: nothing read yet. */
 const NO_OFFER: SectionOffer = { lists: { now: [], soon: [], inbox: [], backlog: [] }, ungrouped: "" };
 
-const NO_EVENTS: DayEvents = { events: [], allDay: [], timed: [], statuses: [], stale: false };
+const NO_EVENTS: DayEvents = { events: [], allDay: [], timed: [], statuses: [], stale: false, alert: "none" };
 
 /**
  * What the screen shows for the selected day, in two parts that load on their own: the tasks, read from the file after

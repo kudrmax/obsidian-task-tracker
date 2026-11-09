@@ -56,7 +56,7 @@ export class CalendarDays {
 	day(date: LocalDate): ChosenDay {
 		const span = new DayWindow(date, this.boundary);
 		const chosen = this.choice.day(span.fetchStart, span.fetchEnd);
-		return { events: chosen.events.filter((e) => span.shows(e)), stale: chosen.stale };
+		return { ...chosen, events: chosen.events.filter((e) => span.shows(e)) };
 	}
 
 	/** The timed events that overlap `from`–`to`, each as the day showing it has it, once each, by start. */

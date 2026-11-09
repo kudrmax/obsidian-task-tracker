@@ -218,7 +218,7 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 
 - `events(date)`: the day's events from the files in `context.calendars`, as `WireDayEvents`: `events`, `allDay`,
   `timed` (each event with `startMs`, `endMs` and `past`, over at the call's moment), `statuses` (each with
-  `updatedAtMs`), `stale`. A file left out is `fileMissing`, a broken one `failed`. "Cached" and "fresh" are two calls
+  `updatedAtMs`, `used` and `tone`), `stale`, `alert`. A file left out is `fileMissing`, a broken one `failed`. "Cached" and "fresh" are two calls
   of it: the host calls it with the files it has, and again once it has fetched or read them anew. Fetching and
   polling (`keepFresh`) are the host's.
 - `known()`: every calendar the files list, and whether it is shown.
@@ -234,8 +234,14 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 - Each status's `words` (`SourceWords`) is its row in the sources window, worded: `name` (`Google Calendar`, `iPhone
   calendars`, `Work calendar`), `short`, `sub` (`Updated today`, `Exported from iPhone`, `Not updated yet`, or the
   problem: `not logged in`, `file missing`, `no answer in 15 s`, a failure's own text) and `time` (`14:19`, `Yesterday
-  08:02`, `3 Oct 08:02`, empty with no update); the orange mark is `stale`. Google's problem is `loggedOut` (`not
+  08:02`, `3 Oct 08:02`, empty with no update). Google's problem is `loggedOut` (`not
   logged in`) whenever the shared settings keep no Google token, whatever its file: there is no file to miss then.
+- A status's `used`: a calendar shown on the day is taken from its file. Its `tone` is the row's code, drawn as it
+  comes: `plain` (in use and fresh, a failed last try too), `old` (in use, older than Stale after: time orange),
+  `broken` (old and its last try failed: the problem line red), `spare` (nothing on the day comes from it, whatever its
+  age or error: under «Not in use», grey). `statuses` come in the window's order: in use first, then spare, each in
+  Google, iPhone, Work order. The day's `alert` is the badge: `none`, `old` (orange) or `broken` (red), the worst
+  `tone` in use. `stale` (the day's, equal to `alert != "none"`, and each status's) stays for older callers.
 - An event's `color` is `null` when its calendar's file gives none: the frontend draws the source's own colour.
 
 ### `reminders.*`: the phone's reminders

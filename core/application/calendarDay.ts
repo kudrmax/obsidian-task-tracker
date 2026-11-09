@@ -5,7 +5,7 @@ import type { LocalDate } from "../domain/Task";
 import type { TaskCalendarSettings } from "../settings";
 import { type CalendarKey, keyText } from "./calendarChoice";
 import type { CalendarFile } from "./calendarFile";
-import type { CalendarEvent, CalendarSource, DayEvents, ShownCalendar, SourceKind, SourceProblem, SourceStatus } from "./contracts";
+import type { CalendarAlert, CalendarEvent, CalendarSource, DayEvents, ShownCalendar, SourceKind, SourceProblem, SourceStatus, SourceTone } from "./contracts";
 import { ShownCalendars } from "./shownCalendars";
 import { googleLoggedIn } from "./googleLogin";
 
@@ -15,6 +15,16 @@ const KINDS: Readonly<Record<CalendarSource, SourceKind>> = { google: "synced", 
 const MINUTE_MS = 60_000;
 
 const LOGGED_OUT: SourceProblem = { kind: "loggedOut" };
+
+/** The sources window's order within the rows in use and within the spare ones. */
+const WINDOW_ORDER: readonly CalendarSource[] = ["google", "iphone", "work"];
+
+/** Each tone the dot shows, worst last. */
+const ALERTS: readonly CalendarAlert[] = ["none", "old", "broken"];
+
+function alertOf(tone: SourceTone): CalendarAlert {
+	return tone === "old" || tone === "broken" ? tone : "none";
+}
 
 /** The calendars' files as last read, and why a source has nothing fresh: what a day's events are read from. */
 export interface CalendarReading {
@@ -43,12 +53,18 @@ export class CalendarDay {
 		const chosen = this.shown().days().day(date);
 		const events = chosen.events;
 		const shown = (name: CalendarSource) => events.filter((e) => e.source === name).length;
+		const statuses = [...this.reading.sources]
+			.sort((a, b) => WINDOW_ORDER.indexOf(a) - WINDOW_ORDER.indexOf(b))
+			.map((source) => this.status(source, shown(source), chosen.used.has(source)));
+		const inUse = statuses.filter((s) => s.used);
+		const alert = inUse.map((s) => alertOf(s.tone)).reduce((worst, a) => (ALERTS.indexOf(a) > ALERTS.indexOf(worst) ? a : worst), "none" as CalendarAlert);
 		return {
 			events,
 			allDay: events.filter((e) => e.allDay),
 			timed: events.filter((e) => !e.allDay),
-			statuses: this.reading.sources.map((source) => this.status(source, shown(source))),
+			statuses: [...inUse, ...statuses.filter((s) => !s.used)],
 			stale: chosen.stale,
+			alert,
 		};
 	}
 
@@ -92,7 +108,7 @@ export class CalendarDay {
 		return new ShownCalendars(this.reading.files, this.settings, this.now);
 	}
 
-	private status(source: CalendarSource, shown: number): SourceStatus {
+	private status(source: CalendarSource, shown: number, used: boolean): SourceStatus {
 		const problem = this.problem(source);
 		const file = this.reading.files.get(source);
 		const updatedAt = file?.exportedAt ?? null;
@@ -105,7 +121,8 @@ export class CalendarDay {
 			updatedDate: updatedAt === null ? null : localDateOf(updatedAt),
 			detail: this.reading.fed(source) ? null : (file?.device ?? null),
 		};
-		return { ...facts, events: shown, stale: problem !== null || this.isOld(updatedAt), words: sourceWords(facts) };
+		const old = this.isOld(updatedAt);
+		return { ...facts, events: shown, stale: problem !== null || old, used, tone: toneOf(used, old, problem !== null), words: sourceWords(facts) };
 	}
 
 	/** Google logged out says so, whatever its file: there is none to fetch, or what is left of an old login. */
@@ -123,4 +140,11 @@ export class CalendarDay {
 		if (updatedAt === null) return true;
 		return this.now.getTime() - updatedAt.getTime() > this.settings.staleAfterMinutes * MINUTE_MS;
 	}
+}
+
+/** A row's code: only a source in use is coloured, and a failed try only matters once its file is old. */
+function toneOf(used: boolean, old: boolean, problem: boolean): SourceTone {
+	if (!used) return "spare";
+	if (!old) return "plain";
+	return problem ? "broken" : "old";
 }

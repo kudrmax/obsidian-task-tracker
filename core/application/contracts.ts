@@ -1119,6 +1119,16 @@ export type SourceProblem =
 	| { readonly kind: "noAnswer"; readonly seconds: number }
 	| { readonly kind: "failed"; readonly detail: string };
 
+/**
+ * A source's row: `plain` in use and fresh (a failed last try too, its file still fresh); `old` in use and older than
+ * `settings.staleAfterMinutes`; `broken` old and its last try failed; `spare` nothing shown on the day comes from it,
+ * whatever its age or error.
+ */
+export type SourceTone = "plain" | "old" | "broken" | "spare";
+
+/** The dot on the calendar button: the worst tone of the sources in use, `none` when none is old. */
+export type CalendarAlert = "none" | "old" | "broken";
+
 export interface SourceStatus {
 	readonly source: CalendarSource;
 	readonly kind: SourceKind;
@@ -1134,8 +1144,12 @@ export interface SourceStatus {
 	readonly updatedDate: LocalDate | null;
 	/** The work file's `device` ("iPhone"); nothing for Google. */
 	readonly detail: string | null;
-	/** `updatedAt` older than `settings.staleAfterMinutes`, or a problem: the orange dot. */
+	/** `updatedAt` older than `settings.staleAfterMinutes`, or a problem. Older callers' flag: the frontends draw `tone`. */
 	readonly stale: boolean;
+	/** A calendar shown on the day is taken from this source's file. */
+	readonly used: boolean;
+	/** The row's code in the sources window, ready: the frontends never combine `used`, `problem` and the age. */
+	readonly tone: SourceTone;
 	/** The sources window's words for it, ready. */
 	readonly words: SourceWords;
 }
@@ -1150,9 +1164,12 @@ export interface DayEvents {
 	readonly allDay: readonly CalendarEvent[];
 	/** Of `events`, those on a time: the timeline. */
 	readonly timed: readonly CalendarEvent[];
+	/** In the sources window's order: those in use first, then the spare ones, each in Google, iPhone, Work order. */
 	readonly statuses: readonly SourceStatus[];
-	/** A calendar shown on the day comes from a file no longer fresh: the orange dot, Refresh now would help. */
+	/** A calendar shown on the day comes from a file no longer fresh; always `alert !== "none"`. Older callers' flag. */
 	readonly stale: boolean;
+	/** The dot: the worst `tone` of the sources in use. */
+	readonly alert: CalendarAlert;
 }
 
 /** A calendar some writer's file lists, by account and title, and whether the plugin shows it. */

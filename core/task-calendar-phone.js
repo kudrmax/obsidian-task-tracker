@@ -2506,17 +2506,19 @@ ${key.title}`.toLowerCase();
     }
     day(start, end) {
       const events = [];
+      const used = /* @__PURE__ */ new Set();
       let stale = false;
       for (const calendar of this.known()) {
         if (this.hidden.has(keyText(calendar.key))) continue;
         const source = this.sourceFor(calendar, start);
         if (source === null) continue;
         const file = this.files.get(source);
+        used.add(source);
         if (!this.fresh(file)) stale = true;
         const text = keyText(calendar.key);
         events.push(...file.events.filter((e) => keyText(this.keyOf(source, calendarOf(e))) === text && e.start < end && e.end > start));
       }
-      return { events: events.sort((a, b) => a.start.getTime() - b.start.getTime()), stale };
+      return { events: events.sort((a, b) => a.start.getTime() - b.start.getTime()), used, stale };
     }
     sourceFor(calendar, day) {
       const text = keyText(calendar.key);
@@ -2637,7 +2639,7 @@ ${key.title}`.toLowerCase();
     day(date) {
       const span = new DayWindow(date, this.boundary);
       const chosen = this.choice.day(span.fetchStart, span.fetchEnd);
-      return { events: chosen.events.filter((e) => span.shows(e)), stale: chosen.stale };
+      return { ...chosen, events: chosen.events.filter((e) => span.shows(e)) };
     }
     /** The timed events that overlap `from`–`to`, each as the day showing it has it, once each, by start. */
     timedBetween(from, to) {
@@ -2699,6 +2701,11 @@ ${key.title}`.toLowerCase();
   var KINDS2 = { google: "synced", iphone: "exported", work: "exported" };
   var MINUTE_MS4 = 6e4;
   var LOGGED_OUT = { kind: "loggedOut" };
+  var WINDOW_ORDER = ["google", "iphone", "work"];
+  var ALERTS = ["none", "old", "broken"];
+  function alertOf(tone) {
+    return tone === "old" || tone === "broken" ? tone : "none";
+  }
   var CalendarDay = class {
     constructor(reading, settings, now) {
       this.reading = reading;
@@ -2710,12 +2717,16 @@ ${key.title}`.toLowerCase();
       const chosen = this.shown().days().day(date);
       const events = chosen.events;
       const shown = (name) => events.filter((e) => e.source === name).length;
+      const statuses = [...this.reading.sources].sort((a, b) => WINDOW_ORDER.indexOf(a) - WINDOW_ORDER.indexOf(b)).map((source) => this.status(source, shown(source), chosen.used.has(source)));
+      const inUse = statuses.filter((s) => s.used);
+      const alert = inUse.map((s) => alertOf(s.tone)).reduce((worst, a) => ALERTS.indexOf(a) > ALERTS.indexOf(worst) ? a : worst, "none");
       return {
         events,
         allDay: events.filter((e) => e.allDay),
         timed: events.filter((e) => !e.allDay),
-        statuses: this.reading.sources.map((source) => this.status(source, shown(source))),
-        stale: chosen.stale
+        statuses: [...inUse, ...statuses.filter((s) => !s.used)],
+        stale: chosen.stale,
+        alert
       };
     }
     /** The timed events of the calendars shown that overlap `from`–`to`: the phone's meetings. */
@@ -2749,7 +2760,7 @@ ${key.title}`.toLowerCase();
     shown() {
       return new ShownCalendars(this.reading.files, this.settings, this.now);
     }
-    status(source, shown) {
+    status(source, shown, used) {
       const problem = this.problem(source);
       const file = this.reading.files.get(source);
       const updatedAt = file?.exportedAt ?? null;
@@ -2762,7 +2773,8 @@ ${key.title}`.toLowerCase();
         updatedDate: updatedAt === null ? null : localDateOf(updatedAt),
         detail: this.reading.fed(source) ? null : file?.device ?? null
       };
-      return { ...facts, events: shown, stale: problem !== null || this.isOld(updatedAt), words: sourceWords(facts) };
+      const old = this.isOld(updatedAt);
+      return { ...facts, events: shown, stale: problem !== null || old, used, tone: toneOf(used, old, problem !== null), words: sourceWords(facts) };
     }
     /** Google logged out says so, whatever its file: there is none to fetch, or what is left of an old login. */
     problem(source) {
@@ -2778,6 +2790,11 @@ ${key.title}`.toLowerCase();
       return this.now.getTime() - updatedAt.getTime() > this.settings.staleAfterMinutes * MINUTE_MS4;
     }
   };
+  function toneOf(used, old, problem) {
+    if (!used) return "spare";
+    if (!old) return "plain";
+    return problem ? "broken" : "old";
+  }
 
   // core/application/captureTitle.ts
   function captureTitle({ typed: typed2, recording, tag }) {
@@ -6499,7 +6516,8 @@ ${key.title}`.toLowerCase();
       allDay: wire(day.allDay),
       timed: wire(day.timed),
       statuses: day.statuses.map(({ updatedAt, ...rest }) => ({ ...rest, updatedAtMs: updatedAt === null ? null : updatedAt.getTime() })),
-      stale: day.stale
+      stale: day.stale,
+      alert: day.alert
     };
   }
   var FETCHED_BY_DEFAULT = ["google"];

@@ -25,6 +25,7 @@ import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridM
 import {
 	type CalendarEvent,
 	type CalendarSource,
+	type CalendarAlert,
 	type DayEvents,
 	type DropColumn,
 	type GroupedList,
@@ -154,6 +155,7 @@ export interface WireDayEvents {
 	readonly timed: readonly WireEvent[];
 	readonly statuses: readonly WireStatus[];
 	readonly stale: boolean;
+	readonly alert: CalendarAlert;
 }
 
 /** The screen as a quick entry reads it, on the wire: each list's cards and sections, and which lists show. */
@@ -500,6 +502,7 @@ function wireDay(day: DayEvents, calendar: CalendarDay): WireDayEvents {
 		timed: wire(day.timed),
 		statuses: day.statuses.map(({ updatedAt, ...rest }) => ({ ...rest, updatedAtMs: updatedAt === null ? null : updatedAt.getTime() })),
 		stale: day.stale,
+		alert: day.alert,
 	};
 }
 

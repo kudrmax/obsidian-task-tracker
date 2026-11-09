@@ -61,3 +61,10 @@ Three codes, the same in the plugin's sources window and the app's Calendars scr
 ## Decisions
 
 (Filled by the agents as they find gaps.)
+
+- Backend: «in use» is exactly the choice `CalendarChoice.day` makes: a source a shown calendar is taken from for the
+  day, even when that calendar has no events that day. A calendar is chosen only from a file that covers the day, so a
+  file whose window ends before the day is not in use.
+- Backend: Google logged out with a file left from an old login that still gives a shown calendar is in use (its
+  events are on screen): `old`/`broken` by its age like any other. With no file, as usual, it is spare.
+- Backend: `statuses` are ordered Google, iPhone, Work by a fixed order, not by the order the host hands the files in.

@@ -204,7 +204,7 @@ describe("CalendarChoice", () => {
 			DAY.start,
 			DAY.end,
 		);
-		expect(day).toEqual({ events: [], stale: false });
+		expect(day).toEqual({ events: [], used: new Set(), stale: false });
 	});
 });
 
