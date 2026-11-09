@@ -2970,6 +2970,13 @@ ${key.title}`.toLowerCase();
     const place = spotIndex(from.mode) + shift;
     return place >= 0 && place < SCREEN_PLACES.length ? { mode: SCREEN_PLACES[place], date: from.date } : null;
   }
+  var SWIPE_FLICK_SPEED = 0.3;
+  function swipeLanding(moved2, distance, speed) {
+    if (moved2 === 0) return 0;
+    const shift = moved2 > 0 ? 1 : -1;
+    if (Math.abs(speed) >= SWIPE_FLICK_SPEED) return Math.sign(speed) === shift ? shift : 0;
+    return Math.abs(moved2) * 2 >= distance ? shift : 0;
+  }
 
   // core/application/timelineZoom.ts
   var DEFAULT_ZOOM_HOUR = 56;
@@ -6698,6 +6705,7 @@ ${key.title}`.toLowerCase();
     branchOf,
     gapBranch,
     placeShowing,
+    swipeLanding,
     wholeWidth,
     grownStart,
     listWidths,
@@ -6707,7 +6715,7 @@ ${key.title}`.toLowerCase();
     onTheDay,
     canPick
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };

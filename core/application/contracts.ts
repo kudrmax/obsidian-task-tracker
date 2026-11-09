@@ -53,7 +53,7 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
 export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
-export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
 /**
  * The copy of a pressed card that shows its whole title: `wholeWidth(card, room)` how wide it grows (null: the card shows
  * its title whole and is lifted itself), `grownStart(start, size, grown, room, margin)` where it starts on one axis.
