@@ -172,8 +172,8 @@ import Testing
         #expect(day.groups.map(\.header) == ["No section", "Errands"])
         #expect(day.groups[0].cards.map(\.level) == [0, 1])
         #expect(day.groups[0].cards[1].branch == Branch(last: true, through: []))
-        // A section lifts to move among its list's sections, No section does not; the list is the core's name for it.
-        #expect(day.groups.map(\.reorder) == [false, true])
+        // Every header lifts to move among its list's sections, No section's too; the list is the core's name for it.
+        #expect(day.groups.map(\.reorder) == [true, true])
         #expect(day.sectionsOf == "now")
         #expect(snapshot.lists[.inbox]?.title == "Inbox")
         let run = try #require(snapshot.timeline.slots.first)
