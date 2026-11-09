@@ -205,12 +205,25 @@ describe("DayData", () => {
 		expect(updates()).toBe(shown + 1);
 	});
 
-	it("the dot is the day's stale, not every source's", async () => {
+	it("the dot is the day's alert, not every source's", async () => {
 		const { data, calendars } = setup();
 		const fine = { source: "iphone" as const, kind: "exported" as const, problem: null, events: 0, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: true, used: false, tone: "spare" as const, words: { name: "iPhone calendars" as const, short: "iPhone" as const, sub: "Exported from file", time: "" } };
 		calendars.last.set(TODAY, { events: [event("kept")], allDay: [], timed: [event("kept")], statuses: [fine], stale: false, alert: "none" });
 		void data.load();
-		expect(data.stale).toBe(false);
+		expect(data.alert).toBe("none");
+	});
+
+	it("tells the events changed when only the dot turns from orange to red", async () => {
+		const { data, calendars, parts } = setup();
+		const work = (tone: "old" | "broken") => ({ events: [event("same")], allDay: [], timed: [event("same")], statuses: [{ source: "work" as const, kind: "exported" as const, problem: tone === "broken" ? { kind: "fileMissing" as const } : null, events: 1, updatedAt: new Date(0), updatedDay: "other" as const, updatedDate: "2026-11-01", detail: null, stale: true, used: true, tone, words: { name: "Work calendar" as const, short: "Work" as const, sub: "Exported from iPhone", time: "1 Nov 00:00" } }], stale: true, alert: tone });
+		let tone: "old" | "broken" = "old";
+		calendars.eventsOn = async () => work(tone);
+		await data.calendars();
+		expect(data.alert).toBe("old");
+		tone = "broken";
+		await data.calendars();
+		expect(data.alert).toBe("broken");
+		expect(parts).toEqual(["events", "events"]);
 	});
 
 	it("opens with the events last fetched for the day and swaps in the fresh ones when they come", async () => {

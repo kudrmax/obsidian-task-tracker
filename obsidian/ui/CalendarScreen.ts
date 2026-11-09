@@ -412,7 +412,7 @@ export class CalendarScreen extends Component {
 		const switcher = new ColumnSwitch(root, {
 			value: () => this.place(),
 			onChange: (mode) => void this.afterEntry(() => this.leaveDone(mode)),
-			dot: () => this.data.stale,
+			dot: () => this.data.alert,
 			onSources: () => this.showSources(switcher.el),
 			longPressMs: () => this.settings.longPressMs,
 			arbiter: this.arbiter,

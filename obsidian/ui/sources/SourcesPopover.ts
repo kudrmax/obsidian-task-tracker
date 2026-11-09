@@ -14,7 +14,10 @@ export interface SourcesPopoverOptions {
 	onRefresh(): Promise<void>;
 }
 
-/** The sources window: each calendar with when it was last brought up to date, and Refresh now. */
+/**
+ * The sources window: each calendar with when it was last brought up to date, and Refresh now. Each row is drawn by its
+ * tone, ready from the core: the rows the screen takes calendars from first, then under «Not in use» the spare ones, muted.
+ */
 export class SourcesPopover {
 	private readonly overlay: Overlay;
 
@@ -30,7 +33,13 @@ export class SourcesPopover {
 		copy.pin(rect);
 		const panel = Panel.over(this.overlay, { root: "tc-popover", place: (p) => SourcesPopover.over(p, rect) }, false);
 		panel.replace((p) => {
-			for (const status of opts.statuses) SourcesPopover.row(p, status);
+			let captioned = false;
+			for (const status of opts.statuses) {
+				const spare = status.tone === "spare";
+				if (spare && !captioned) el(p, "div", "tc-source-caption", "Not in use");
+				captioned ||= spare;
+				SourcesPopover.row(p, status);
+			}
 			menuRow(p, { label: "Refresh now", icon: "refresh", root: "tc-source-refresh", iconSide: "start", onPick: panel.pick(() => opts.onRefresh()) });
 		});
 		this.overlay.show();
@@ -44,13 +53,12 @@ export class SourcesPopover {
 
 	private static row(panel: HTMLElement, status: SourceStatus): void {
 		const text = status.words;
-		const row = el(panel, "div", "tc-source-row");
+		const row = el(panel, "div", `tc-source-row is-${status.tone}`);
 		row.appendChild(icon(status.source));
 		const lines = el(row, "div", "tc-source-lines");
 		el(lines, "span", "tc-source-name", text.name);
 		el(lines, "span", "tc-source-sub", text.sub);
-		const time = el(row, "span", "tc-source-time", text.time);
-		time.classList.toggle("is-stale", status.stale);
+		el(row, "span", "tc-source-time", text.time);
 	}
 
 	close(): void {

@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarService, DayEvents, DayView, DropColumn, DropTo, GroupedList, ListGrouping, ListSection, ProjectRef, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
+import type { CalendarAlert, CalendarEvent, CalendarService, DayEvents, DayView, DropColumn, DropTo, GroupedList, ListGrouping, ListSection, ProjectRef, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
 import { Reload } from "./Reload";
 import type { LocalDate } from "./types";
 
@@ -148,9 +148,9 @@ export class DayData {
 		return this.state.calendars ? this.dayEvents.statuses : [];
 	}
 
-	/** A calendar shown on the day comes from a file no longer fresh: the switch's dot. */
-	get stale(): boolean {
-		return this.state.calendars && this.dayEvents.stale;
+	/** The switch's dot: the worst tone of the sources a calendar shown on the day comes from. */
+	get alert(): CalendarAlert {
+		return this.state.calendars ? this.dayEvents.alert : "none";
 	}
 
 	/**
@@ -179,7 +179,7 @@ export class DayData {
 
 	/** Another day is selected: its tasks, the events last fetched for it until the fresh ones come. */
 	selectDay(): Promise<void> {
-		this.showCached({ ...NO_EVENTS, statuses: this.dayEvents.statuses, stale: this.dayEvents.stale });
+		this.showCached({ ...NO_EVENTS, statuses: this.dayEvents.statuses, stale: this.dayEvents.stale, alert: this.dayEvents.alert });
 		return this.fetchBoth();
 	}
 
@@ -219,6 +219,6 @@ export class DayData {
 	/** What the screen draws of a part: the events and the sources' dot, not when each source was last fetched; none while the calendars are not shown. */
 	private drawnOf(part: DayPart): string {
 		if (part === "tasks") return JSON.stringify(this.state);
-		return JSON.stringify([this.state.calendars, this.dayEvents.events, this.dayEvents.statuses.map((status) => status.stale), this.dayEvents.stale]);
+		return JSON.stringify([this.state.calendars, this.dayEvents.events, this.dayEvents.statuses.map((status) => status.tone), this.dayEvents.alert]);
 	}
 }
