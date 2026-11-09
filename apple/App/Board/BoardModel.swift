@@ -1121,25 +1121,53 @@ final class BoardModel {
     /// drop keeps its row.
     private(set) var arriving: Set<String> = []
 
-    /// The card a drop's copy flies into stays hidden until the copy is down, then shows in the same frame it goes.
-    func hideUntilLanded(_ item: UIDragItem, _ animator: any UIDragAnimating) {
-        guard let payload = item.localObject as? DragPayload, case .card(let card) = payload.kind else { return }
-        arriving.insert(card.id)
-        animator.addCompletion { [weak self] _ in self?.arriving.remove(card.id) }
-    }
 
-    /// The drop side's end of a carry's session. The drop side hears of it as the finger lets go, before the copy has
-    /// flown home or landed, and the drag side most of a second after the copy is down: the carry ends once the copy
-    /// is down, the system's flight's time after the finger let go, so a section let go where it can't land shows its
-    /// tasks again only once its copy is home, and nothing waits after it. The drag side's own end, when it comes
-    /// sooner, ends it then.
+    /// The drop side's end of a carry's session, heard as the finger lets go. Every let-go is a drop (into its place,
+    /// or home when nothing takes it), and a dropped carry ends when its copy is down (`landing`). A session that ended
+    /// with no drop (torn down mid-carry, a day turned away) ends here; the drag side's own end comes most of a second
+    /// after its copy is down.
     func endCarry(of session: any UIDropSession) {
-        guard let token = DragPayload.of(session)?.token else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.carryFallback) { [weak self] in self?.endCarry(token) }
+        guard let token = DragPayload.of(session)?.token, !flying.contains(token) else { return }
+        endCarry(token)
     }
 
-    /// The system's flight of a let-go copy home or into its place.
-    private static let carryFallback: TimeInterval = 0.4
+    /// The carries whose copy flies into its place or home now: each ends as its copy is down.
+    @ObservationIgnored private var flying: Set<Int> = []
+
+    /// The carry of `session` is let go as a drop: its copy flies, and the carry ends when it is down.
+    func dropping(_ session: any UIDropSession) {
+        lastLanded = nil
+        if let token = DragPayload.of(session)?.token { flying.insert(token) }
+    }
+
+    /// A drop's copy flies with `animator`: the card it flies into stays hidden until it is down, and the carry ends then,
+    /// however long the flight.
+    func landing(_ item: UIDragItem, _ animator: (any UIDragAnimating)?) {
+        guard let payload = item.localObject as? DragPayload else { return }
+        let ids = landingIds(payload)
+        let land = { [weak self] in
+            guard let self else { return }
+            self.arriving.subtract(ids)
+            if let token = payload.token {
+                self.flying.remove(token)
+                self.endCarry(token)
+            }
+        }
+        guard let animator else { return land() }
+        arriving.formUnion(ids)
+        animator.addCompletion { _ in land() }
+    }
+
+    /// The cards a drop's copy flies into: the carried card, and the card it is in the screen after the drop.
+    private func landingIds(_ payload: DragPayload) -> Set<String> {
+        var ids: Set<String> = []
+        if case .card(let card) = payload.kind { ids.insert(card.id) }
+        if let landed = lastLanded { ids.insert(landed) }
+        return ids
+    }
+
+    /// The card the last drop landed as, in the screen it leaves.
+    @ObservationIgnored private var lastLanded: String?
 
     /// A subtask of the carried card, or another picked task carried with it: folded away while it is carried.
     func isFolded(_ card: BoardCard) -> Bool {
@@ -1274,6 +1302,7 @@ final class BoardModel {
         }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         // The screen after the drop in one drawing: the carried tasks in their new rows, the selection ended after it.
+        lastLanded = preview.landings.first?.id
         showPreview(preview.snapshot, landed: true)
         if !carry.group.isEmpty { endSelection() }
         writeDrop("tasks.drop", [carry.dropped, to, .string(snapshot.day)])

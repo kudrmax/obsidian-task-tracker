@@ -335,11 +335,27 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnter session: any UIDropSession) { held = true }
 
+    /// Let go on the cancel target, the carry is a drop that flies its copy home: it ends when the copy is down.
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: any UIDropSession) -> UIDropProposal {
-        UIDropProposal(operation: .cancel)
+        UIDropProposal(operation: .move)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
+        drop?.sendHome(session)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
+        drop?.preview(defaultPreview)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {
+        drop?.model?.landing(item, animator)
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: any UIDropSession) { held = false }
 
-    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) { held = false }
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) {
+        held = false
+        drop?.model?.endCarry(of: session)
+    }
 }

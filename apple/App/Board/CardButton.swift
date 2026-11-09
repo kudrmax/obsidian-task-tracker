@@ -293,9 +293,8 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         opener.present(menu, at: point) { [weak made] in made?.preview }
     }
 
-    /// How long the menu's copy takes to fly home as the menu goes.
-    private static let menuLanding: TimeInterval = 0.3
-    private static let menuShrink: TimeInterval = 0.2
+    /// The menu's copy shrinking back into the card as the menu flies it home.
+    private static let menuShrink: TimeInterval = 0.32
     private static let menuFade: TimeInterval = 0.2
 
     /// The menu shows: its copy grows from the card with it, in the menu's own motion.
@@ -350,15 +349,11 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         if let copy {
             self.copy = nil
             MenuHold.begin()
-            var landed = false
-            // Once, when the copy is home: the card shows in its place and the lists go on. The menu's animator tells of
-            // its end most of a second after the copy has visibly landed, so the landing is also timed by the motion.
+            // The copy shrinks back to the card's size on its own spring while the menu flies it home, and lands when
+            // that spring is done: the card shows in its place, the copy fades into the row, the lists go on. The menu's
+            // animator tells of its end most of a second after the copy has visibly landed.
             let land = { [weak self] in
-                guard !landed else { return }
-                landed = true
                 self?.copied = false
-                // Landed over its row, it fades into what the row now shows: the card itself, drawn alike, or what the
-                // menu's choice made of the row (Rename's field, scrolled to its caret).
                 UIView.animate(withDuration: Self.menuFade, delay: 0, options: [.allowUserInteraction]) {
                     copy.alpha = 0
                 } completion: { _ in
@@ -366,15 +361,10 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
                     MenuHold.end()
                 }
             }
-            if let animator {
-                // Its own, quicker spring: the menu lands its view a moment after it starts to go, and the copy is
-                // the card's size by then.
-                UIView.animate(springDuration: Self.menuShrink, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) { copy.shrink() }
-                animator.addCompletion(land)
-                DispatchQueue.main.asyncAfter(deadline: .now() + Self.menuLanding, execute: land)
-            } else {
-                land()
-            }
+            guard animator != nil else { return land() }
+            UIView.animate(springDuration: Self.menuShrink, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+                copy.shrink()
+            } completion: { _ in land() }
         }
         guard let run = afterMenu else { return }
         afterMenu = nil

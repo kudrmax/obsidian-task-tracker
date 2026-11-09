@@ -102,9 +102,12 @@ final class BoardRoute: NSObject, UIDropInteractionDelegate {
         DragPayload.of(session) != nil
     }
 
+    /// Held where no place takes it, the carry is still a drop: let go there, its copy flies home (`performDrop`), so its
+    /// end is the copy's landing, never the system's cancel heard long after the copy is back.
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: any UIDropSession) -> UIDropProposal {
-        guard let window = interaction.view else { return UIDropProposal(operation: .cancel) }
-        return hold(session.location(in: window), carrying: DragPayload.of(session)) ? UIDropProposal(operation: .move) : UIDropProposal(operation: .cancel)
+        guard let window = interaction.view else { return UIDropProposal(operation: .move) }
+        if !hold(session.location(in: window), carrying: DragPayload.of(session)) { carryOff() }
+        return UIDropProposal(operation: .move)
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: any UIDropSession) { carryOff() }
@@ -117,19 +120,32 @@ final class BoardRoute: NSObject, UIDropInteractionDelegate {
     weak var model: BoardModel?
 
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
+        model?.dropping(session)
         let payload = DragPayload.of(session)
         landing = current?.letGo(carrying: payload) ?? payload?.home
         current = nil
     }
 
+    /// Let go on the cancel target: a drop that flies the copy home.
+    func sendHome(_ session: any UIDropSession) {
+        model?.dropping(session)
+        carryOff()
+        landing = DragPayload.of(session)?.home
+    }
+
     func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-        guard let landing, let window = interaction.view else { return nil }
+        preview(defaultPreview)
+    }
+
+    /// The copy flies to where the drop landed, or home.
+    func preview(_ defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
+        guard let landing, let window = interaction.view?.window ?? UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else { return nil }
         self.landing = nil
         return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: CGPoint(x: landing.midX, y: landing.midY)))
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {
-        model?.hideUntilLanded(item, animator)
+        model?.landing(item, animator)
     }
 }
 
@@ -214,7 +230,8 @@ struct TitleDrop<Title: View>: UIViewRepresentable {
         }
 
         func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: any UIDropSession) -> UIDropProposal {
-            guard model?.hoverTitle(column) == true else { return UIDropProposal(operation: .forbidden) }
+            // A title that takes no drop still takes the let-go: the copy flies home from it.
+            guard model?.hoverTitle(column) == true else { return UIDropProposal(operation: .move) }
             DropLog.target("title \(column.rawValue)")
             return UIDropProposal(operation: .move)
         }
@@ -227,17 +244,26 @@ struct TitleDrop<Title: View>: UIViewRepresentable {
         }
 
         func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {
-            model?.hideUntilLanded(item, animator)
+            model?.landing(item, animator)
         }
 
+        private var home: CGRect?
+
         func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
+            model?.dropping(session)
             landing = nil
-            if case .landed(let landed) = model?.dropOnTitle(column) { landing = landed }
+            home = nil
+            if case .landed(let landed) = model?.dropOnTitle(column) { landing = landed } else { home = DragPayload.of(session)?.home }
         }
 
         /// The copy flies into the card's row where the list now draws it.
         func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-            guard let window = interaction.view?.window, let id = landing?.id, let list = model?.listController(column) else { return nil }
+            guard let window = interaction.view?.window else { return nil }
+            if let home {
+                self.home = nil
+                return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: CGPoint(x: home.midX, y: home.midY)))
+            }
+            guard let id = landing?.id, let list = model?.listController(column) else { return nil }
             list.collection.layoutIfNeeded()
             guard let frame = list.capsule(of: id) else { return nil }
             return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: CGPoint(x: frame.midX, y: frame.midY)))
@@ -330,7 +356,7 @@ final class CalendarDrop: NSObject, UIDropInteractionDelegate, BoardTarget {
         let grab = DragPayload.of(session)?.grab ?? 0
         guard let view = interaction.view, let window = view.window else { return UIDropProposal(operation: .cancel) }
         let point = view.convert(session.location(in: view), to: window)
-        guard let minute = minute(at: point, grab: grab) else { return UIDropProposal(operation: .cancel) }
+        guard let minute = minute(at: point, grab: grab) else { return UIDropProposal(operation: .move) }
         model?.hoverCalendar(minute: minute)
         hold(point, grab: grab)
         return UIDropProposal(operation: .move)
@@ -388,15 +414,24 @@ final class CalendarDrop: NSObject, UIDropInteractionDelegate, BoardTarget {
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {
-        model?.hideUntilLanded(item, animator)
+        model?.landing(item, animator)
     }
+
+    /// Where a let-go that writes nothing flies: home.
+    private var home: CGRect?
 
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
         stopEdges()
+        model?.dropping(session)
         spot = model?.dropOnCalendar()
+        home = spot == nil ? DragPayload.of(session)?.home : nil
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
+        if let home, let window = interaction.view?.window {
+            self.home = nil
+            return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: CGPoint(x: home.midX, y: home.midY)))
+        }
         guard let spot, let canvas = model?.calendarCanvas, canvas.window != nil else { return nil }
         let size = defaultPreview.size
         let scale = size.width > 0 && size.height > 0 ? CGAffineTransform(scaleX: spot.width / size.width, y: spot.height / size.height) : .identity

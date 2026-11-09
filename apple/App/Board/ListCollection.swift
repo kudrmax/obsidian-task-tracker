@@ -673,8 +673,8 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         let point = session.location(in: collection)
         if case .section(let group) = payload.kind {
             // A section moves only among its own list's sections.
-            guard payload.from == column.rawValue else { return UICollectionViewDropProposal(operation: .forbidden) }
-            hoverSection(group, at: point)
+            // Over another list it is still a drop: let go there, its copy flies home.
+            if payload.from == column.rawValue { hoverSection(group, at: point) }
         } else {
             hold(at: point, carrying: payload)
         }
@@ -694,24 +694,38 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
 
     func collectionView(_ collectionView: UICollectionView, performDropWith coordinator: any UICollectionViewDropCoordinator) {
         guard let item = coordinator.items.first, let payload = item.dragItem.localObject as? DragPayload else { return }
+        model?.dropping(coordinator.session)
+        // The carry ends as the copy is down, whatever its flight.
+        model?.landing(item.dragItem, flight(item, payload, coordinator))
+    }
+
+    /// The drop written and its copy sent flying: into its row, or home when nothing is written.
+    private func flight(_ item: any UICollectionViewDropItem, _ payload: DragPayload, _ coordinator: any UICollectionViewDropCoordinator) -> (any UIDragAnimating)? {
+        let home = { () -> (any UIDragAnimating)? in
+            let carried = Self.carried(payload)
+            guard let home = carried.flatMap({ self.capsule(of: $0) }) ?? payload.home else { return nil }
+            return coordinator.drop(item.dragItem, to: self.target(home))
+        }
         switch payload.kind {
         case .section(let group):
+            guard payload.from == column.rawValue else { return home() }
             // Drawn where it was let go (the model's section move), the header lands in its row there.
-            _ = letGo(carrying: payload)
-            if let path = indexPath(of: DrawnRow.header(group, "").id) { coordinator.drop(item.dragItem, toItemAt: path) }
+            let letGoRect = letGo(carrying: payload)
+            return letGoRect.map { coordinator.drop(item.dragItem, to: target($0)) } ?? home()
         case .card:
             switch drop(carrying: payload, at: coordinator.session.location(in: collection)) {
             case .landed(let landed):
-                land(item.dragItem, landed, coordinator: coordinator)
+                return land(item.dragItem, landed, coordinator: coordinator)
             case .stays, .refused:
-                // Nothing written: the copy flies back where the card was lifted from.
-                if let home = item.sourceIndexPath {
-                    coordinator.drop(item.dragItem, toItemAt: home)
-                } else if let home = payload.home, let window = collection.window {
-                    coordinator.drop(item.dragItem, to: UIDragPreviewTarget(container: window, center: CGPoint(x: home.midX, y: home.midY)))
-                }
+                return home()
             }
         }
+    }
+
+    /// Where a copy flies to land on `rect` (in the window): the copy flies there and is gone as it lands, the card itself
+    /// showing in that frame (`BoardModel.landing`), rather than fading into a row the system keeps hidden meanwhile.
+    private func target(_ rect: CGRect) -> UIDragPreviewTarget {
+        UIDragPreviewTarget(container: collection.window ?? collection, center: CGPoint(x: rect.midX, y: rect.midY))
     }
 
     /// A copy landing in a folded project part shrinks to this share of its size into the part's header: nothing of the
@@ -720,16 +734,17 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
 
     /// The copy flies into the card's row as the screen after the drop draws it; into a folded project part, onto its
     /// header, shrinking into it (decision 56).
-    private func land(_ item: UIDragItem, _ landed: DropLanding?, coordinator: any UICollectionViewDropCoordinator) {
-        guard let landed else { return }
-        if let path = indexPath(of: landed.id) {
-            coordinator.drop(item, toItemAt: path)
+    private func land(_ item: UIDragItem, _ landed: DropLanding?, coordinator: any UICollectionViewDropCoordinator) -> (any UIDragAnimating)? {
+        guard let landed else { return nil }
+        if let capsule = capsule(of: landed.id) {
+            return coordinator.drop(item, to: target(capsule))
         } else if let header = model?.foldedHeader(landed, in: column).flatMap({ indexPath(of: DrawnRow.project($0).id) }),
                   let frame = collection.layoutAttributesForItem(at: header)?.frame {
             let scale = Self.foldedLanding
             let target = UIDragPreviewTarget(container: collection, center: CGPoint(x: frame.midX, y: frame.minY + ColumnMetrics.groupHead / 2), transform: CGAffineTransform(scaleX: scale, y: scale))
-            coordinator.drop(item, to: target)
+            return coordinator.drop(item, to: target)
         }
+        return nil
     }
 
     // MARK: A carry routed here by the board (the plus, or a card over the bars)
