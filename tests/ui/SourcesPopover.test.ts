@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
-import type { SourceStatus, SourceTone } from "../../core/application/contracts";
+import { NO_DAY_EVENTS, type SourceStatus, type SourceTone } from "../../core/application/contracts";
 import { SourcesPopover } from "../../obsidian/ui/sources/SourcesPopover";
 
 const NAMES = { google: "Google Calendar", iphone: "iPhone calendars", work: "Work calendar" } as const;
 const SHORT = { google: "Google", iphone: "iPhone", work: "Work" } as const;
+/** The core's words for a coloured time, as it hands them in. */
+const ALERT: Record<SourceTone, string> = { plain: "", old: "Out of date", broken: "Refresh failed", spare: "" };
 
 function status(source: SourceStatus["source"], tone: SourceTone): SourceStatus {
 	return {
@@ -19,13 +21,13 @@ function status(source: SourceStatus["source"], tone: SourceTone): SourceStatus 
 		stale: tone === "old" || tone === "broken",
 		used: tone !== "spare",
 		tone,
-		words: { name: NAMES[source], short: SHORT[source], sub: "Exported from iPhone", time: "5 Nov 20:21", alert: "" },
+		words: { name: NAMES[source], short: SHORT[source], sub: "Exported from iPhone", time: "5 Nov 20:21", alert: ALERT[tone] },
 	};
 }
 
 function open(statuses: readonly SourceStatus[]): HTMLElement {
 	const anchor = document.body.appendChild(document.createElement("div"));
-	SourcesPopover.open({ anchor, statuses, onRefresh: async () => {} });
+	SourcesPopover.open({ anchor, statuses, words: { ...NO_DAY_EVENTS.words, notInUse: "Not in use" }, onRefresh: async () => {} });
 	return document.querySelector<HTMLElement>(".tc-popover")!;
 }
 

@@ -1,5 +1,5 @@
 import { NO_DAY_EVENTS } from "../../core/application/contracts";
-import type { CalendarAlert, CalendarEvent, CalendarService, DayEvents, DayView, DropColumn, DropTo, GroupedList, ListGrouping, ListSection, ProjectRef, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
+import type { CalendarAlert, CalendarEvent, DayWords, CalendarService, DayEvents, DayView, DropColumn, DropTo, GroupedList, ListGrouping, ListSection, ProjectRef, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
 import { Reload } from "./Reload";
 import type { LocalDate } from "./types";
 
@@ -150,6 +150,11 @@ export class DayData {
 	/** The switch's dot: the worst tone of the sources a calendar shown on the day comes from. */
 	get alert(): CalendarAlert {
 		return this.state.calendars ? this.dayEvents.alert : "none";
+	}
+
+	/** The dot's words and the heading of the rows not in use. */
+	get words(): DayWords {
+		return this.state.calendars ? this.dayEvents.words : NO_DAY_EVENTS.words;
 	}
 
 	/**

@@ -1,4 +1,4 @@
-import type { SourceStatus } from "../../../core/application/contracts";
+import type { DayWords, SourceStatus } from "../../../core/application/contracts";
 import { PROPERTY } from "../design";
 import { el, px } from "../dom";
 import { icon } from "../kit/icons";
@@ -6,12 +6,14 @@ import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel } from "../kit/Panel";
 import { menuRow } from "../menu/MenuPanel";
 import { Overlay } from "../menu/Overlay";
-import { labelMark } from "./alertWords";
+import { labelMark } from "./labelMark";
 
 export interface SourcesPopoverOptions {
 	/** The switch at the bottom; a copy of it stays over the backdrop, and the panel stands over it, centred on it. */
 	readonly anchor: HTMLElement;
 	readonly statuses: readonly SourceStatus[];
+	/** The day's words: the heading over the rows not in use. */
+	readonly words: DayWords;
 	onRefresh(): Promise<void>;
 }
 
@@ -37,7 +39,7 @@ export class SourcesPopover {
 			let captioned = false;
 			for (const status of opts.statuses) {
 				const spare = status.tone === "spare";
-				if (spare && !captioned) el(p, "div", "tc-source-caption", "Not in use");
+				if (spare && !captioned) el(p, "div", "tc-source-caption", opts.words.notInUse);
 				captioned ||= spare;
 				SourcesPopover.row(p, status);
 			}
@@ -59,7 +61,7 @@ export class SourcesPopover {
 		const lines = el(row, "div", "tc-source-lines");
 		el(lines, "span", "tc-source-name", text.name);
 		el(lines, "span", "tc-source-sub", text.sub);
-		labelMark(el(row, "span", "tc-source-time", text.time), status.tone, text.time);
+		labelMark(el(row, "span", "tc-source-time", text.time), text.alert, text.time);
 	}
 
 	close(): void {

@@ -412,7 +412,7 @@ export class CalendarScreen extends Component {
 		const switcher = new ColumnSwitch(root, {
 			value: () => this.place(),
 			onChange: (mode) => void this.afterEntry(() => this.leaveDone(mode)),
-			dot: () => this.data.alert,
+			dot: () => ({ alert: this.data.alert, words: this.data.words.alert }),
 			onSources: () => this.showSources(switcher.el),
 			longPressMs: () => this.settings.longPressMs,
 			arbiter: this.arbiter,
@@ -1121,7 +1121,7 @@ export class CalendarScreen extends Component {
 	}
 
 	private showSources(anchor: HTMLElement): void {
-		SourcesPopover.open({ anchor, statuses: this.data.statuses, onRefresh: () => this.refreshNow() });
+		SourcesPopover.open({ anchor, statuses: this.data.statuses, words: this.data.words, onRefresh: () => this.refreshNow() });
 	}
 
 	private refreshNow(): Promise<void> {

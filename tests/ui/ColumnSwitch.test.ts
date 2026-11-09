@@ -7,6 +7,8 @@ import { GestureArbiter } from "../../obsidian/ui/gestures";
 import type { CalendarAlert } from "../../core/application/contracts";
 
 const LONG_PRESS = 250;
+/** The core's words for the dot, as it hands them in. */
+const DOT_WORDS: Record<CalendarAlert, string> = { none: "", old: "Out of date", broken: "Refresh failed" };
 const STEP = 38;
 
 function pointer(type: string, clientX: number, time = 0): PointerEvent {
@@ -30,7 +32,7 @@ function setUp(initial: Place, dot: CalendarAlert = "none", arbiter = new Gestur
 			mode = next;
 			control.render();
 		},
-		dot: () => dot,
+		dot: () => ({ alert: dot, words: DOT_WORDS[dot] }),
 		onSources: () => sources++,
 		longPressMs: () => LONG_PRESS,
 		arbiter,
