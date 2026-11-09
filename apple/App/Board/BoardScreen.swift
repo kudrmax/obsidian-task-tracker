@@ -341,7 +341,8 @@ struct Ribbon: View {
                 .scrollTargetLayout()
                 .background { RibbonHooks(model: model, swipe: swipe, distance: width - list) }
                 }
-            .scrollTargetBehavior(OnePlacePerSwipe(stops: stops, swipe: swipe, model: model))
+            .scrollTargetBehavior(OnePlacePerSwipe(swipe: swipe, model: model))
+            .onChange(of: stops, initial: true) { _, stops in swipe.use(stops) }
             .scrollPosition($position, anchor: .leading)
             .scrollIndicators(.hidden)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
@@ -531,7 +532,7 @@ private struct RibbonHooks: UIViewRepresentable {
             while let next = view, !(next is UIScrollView) { view = next.superview }
             guard let ribbon = view as? UIScrollView else { return }
             ribbon.bounces = false
-            self.ribbon.scroll = ribbon
+            self.ribbon.attach(to: ribbon)
             swipe.attach(to: ribbon)
         }
     }
@@ -590,32 +591,56 @@ final class DaySwipe: NSObject, UIGestureRecognizerDelegate {
 }
 
 /// The finger's swipe of the ribbon, kept by reference so the scroll's target, asked as the finger lets go, reads it then.
+/// The place a swipe starts from is fixed the moment the finger touches the ribbon (`began`), never left to an earlier
+/// scroll: right after launch nothing has scrolled yet, and a swipe then once ran on past Soon (`RibbonPaging`).
 @MainActor
-final class RibbonSwipe {
+final class RibbonSwipe: NSObject {
     /// The ribbon's own scroll view.
-    weak var scroll: UIScrollView?
-    /// The place a swipe starts from: where the ribbon rests, or where the last swipe sent it while it still glides there.
-    var place: CGFloat?
+    private(set) weak var scroll: UIScrollView?
+    private(set) var paging = RibbonPaging(stops: [0])
+    /// The place the swipe under the finger started from.
+    private(set) var from: Int?
+    /// The place the last swipe sent the ribbon to, while it still glides there.
+    private var headedTo: Int?
 
-    /// The place's index among `stops`.
-    func from(_ stops: [CGFloat]) -> Int? {
-        guard let place else { return nil }
-        return stops.indices.min { abs(stops[$0] - place) < abs(stops[$1] - place) }
+    func attach(to scroll: UIScrollView) {
+        guard self.scroll !== scroll else { return }
+        self.scroll = scroll
+        scroll.panGestureRecognizer.addTarget(self, action: #selector(panned(_:)))
     }
 
-    /// The ribbon moved. Under the finger it goes no further than the place next to the one the swipe started from, either
-    /// way; with neither the finger nor a glide on it (a tab's scroll, the size changing) it stands where the next starts.
+    @objc private func panned(_ pan: UIPanGestureRecognizer) {
+        guard pan.state == .began, let scroll else { return }
+        from = paging.start(at: Double(scroll.contentOffset.x), gliding: scroll.isDecelerating ? headedTo : nil)
+    }
+
+    /// Where the places stand, from the ribbon's first layout on, so a swipe right after launch knows them.
+    func use(_ stops: [CGFloat]) {
+        let paging = RibbonPaging(stops: stops.map(Double.init))
+        if paging != self.paging { self.paging = paging }
+    }
+
+    /// The ribbon moved within `stops`. Under the finger it goes no further than the places next to where the swipe
+    /// started, either way.
     func moved(within stops: [CGFloat]) {
-        guard let scroll else { return }
-        guard scroll.isDragging else {
-            if !scroll.isDecelerating { place = scroll.contentOffset.x }
-            return
+        use(stops)
+        guard let scroll, scroll.isDragging, let from, paging.stops.indices.contains(from) else { return }
+        let x = Double(scroll.contentOffset.x)
+        let held = paging.clamp(x, from: from)
+        if held != x { scroll.contentOffset.x = CGFloat(held) }
+    }
+
+    /// Where the ribbon let go at `proposed` lands: one place at most from where the finger took it, as the core's
+    /// `swipeLanding` says; a scroll with no finger on it (a tab, the size changing) settles on the nearest place.
+    func landing(_ proposed: CGFloat, rule: (Double, Double, Double) -> Int) -> CGFloat {
+        guard let scroll, scroll.panGestureRecognizer.state != .possible, let from, paging.stops.indices.contains(from) else {
+            return CGFloat(paging.stops[paging.nearest(Double(proposed))])
         }
-        guard let from = from(stops) else { return }
-        let low = stops[max(0, from - 1)]
-        let high = stops[min(stops.count - 1, from + 1)]
-        let x = scroll.contentOffset.x
-        if x < low || x > high { scroll.contentOffset.x = min(high, max(low, x)) }
+        let speed = -Double(scroll.panGestureRecognizer.velocity(in: scroll).x) / 1000
+        let landed = paging.landing(from: from, offset: Double(scroll.contentOffset.x), speed: speed, rule: rule)
+        headedTo = landed
+        self.from = nil
+        return CGFloat(paging.stops[landed])
     }
 }
 
@@ -623,27 +648,15 @@ final class RibbonSwipe {
 /// plugin's screen swipe: the core's `swipeLanding` decides, never further than the next place. A scroll with no finger
 /// (a tab, the size changing) settles on the nearest place.
 private struct OnePlacePerSwipe: ScrollTargetBehavior {
-    /// Where each place's left edge stands in the ribbon, left to right.
-    let stops: [CGFloat]
     let swipe: RibbonSwipe
     let model: BoardModel
 
     func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
         let proposed = target.rect.minX
-        target.rect.origin.x = MainActor.assumeIsolated { landing(proposed) }
-    }
-
-    @MainActor
-    private func landing(_ proposed: CGFloat) -> CGFloat {
-        guard let scroll = swipe.scroll, scroll.panGestureRecognizer.state != .possible, let from = swipe.from(stops) else {
-            return stops.min { abs($0 - proposed) < abs($1 - proposed) } ?? proposed
+        target.rect.origin.x = MainActor.assumeIsolated {
+            swipe.landing(proposed) { moved, distance, speed in
+                model.swipeLanding(moved: CGFloat(moved), distance: CGFloat(distance), speed: CGFloat(speed))
+            }
         }
-        let moved = scroll.contentOffset.x - stops[from]
-        let next = moved > 0 ? from + 1 : from - 1
-        guard stops.indices.contains(next) else { return stops[from] }
-        let speed = -scroll.panGestureRecognizer.velocity(in: scroll).x / 1000
-        let shift = model.swipeLanding(moved: moved, distance: abs(stops[next] - stops[from]), speed: speed)
-        swipe.place = stops[from + shift]
-        return stops[from + shift]
     }
 }
