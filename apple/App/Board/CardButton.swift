@@ -408,6 +408,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         let item = UIDragItem(itemProvider: Carried.provider(id))
         let payload = DragPayload(.card(card), from: from)
         payload.grab = session.location(in: self).y
+        payload.home = window.map { convert(bounds, to: $0) }
         item.localObject = payload
         return [item]
     }

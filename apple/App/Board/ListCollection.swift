@@ -17,6 +17,8 @@ final class DragPayload {
     var token: Int?
     /// How far below the card's top the finger holds it: the calendar reads the minute at the carried card's top edge.
     var grab: CGFloat = 0
+    /// Where the card stood when it was lifted, in the window: a drop that writes nothing flies it back there.
+    var home: CGRect?
 
     init(_ kind: Kind, from: String) {
         self.kind = kind
@@ -244,7 +246,13 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
             tops[keys[row.id] ?? row.id] = (row, DrawnRow.top(of: row, after: previous))
             previous = row
         }
-        let ids = next.map { keys[$0.id] ?? $0.id }
+        var ids = next.map { keys[$0.id] ?? $0.id }
+        // A key twice in one list would stop the collection: a second one is told apart by its place.
+        if Set(ids).count != ids.count {
+            var seen: Set<String> = []
+            ids = ids.enumerated().map { index, id in seen.insert(id).inserted ? id : "\(id)\u{0}\(index)" }
+            for (row, id) in zip(next, ids) where tops[id] == nil { tops[id] = (row, tops[keys[row.id] ?? row.id]?.top ?? 0) }
+        }
         let changed = ids.filter { id in
             guard let old = drawn[id], let new = tops[id] else { return false }
             return old.row != new.row || old.top != new.top
@@ -281,14 +289,14 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         var typed: [DrawnRow] = []
         if let entry {
             let keys = model.entry.lineKeys[column] ?? []
-            typed = entry.pending.enumerated().map { .pending(key: keys[safe: $0.offset] ?? "\u{0}line", text: $0.element.text, level: $0.element.level, branch: nil) }
+            typed = entry.pending.enumerated().map { .pending(key: keys[safe: $0.offset] ?? "\u{0}line/\($0.offset)", text: $0.element.text, level: $0.element.level, branch: nil) }
             // A card renamed gives its row to the field: the same row, its content now typed in, so nothing comes or goes.
             typed.append(.field(id: renaming ?? keys.last ?? "\u{0}field", level: entry.section ? 0 : entry.place.level, branch: nil, section: entry.section))
             if let name = entry.newSection { typed.insert(.newHead(name), at: 0) }
         }
         var rows: [DrawnRow] = []
         if entry?.at.kind == "top" { rows += typed }
-        for part in list.parts {
+        for part in moved(list.parts, of: list, column: column, model: model) {
             guard case .section(let index) = part else {
                 if case .project(let project) = part { rows.append(.project(project)) }
                 continue
@@ -314,6 +322,15 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         if let plusRoom { rows.insert(.plusRoom, at: min(max(0, plusRoom), rows.count)) }
         let folded = list.cards.contains { model.isFolded($0) }
         return entry == nil && plusRoom == nil && !folded ? rows : branched(rows, model: model)
+    }
+
+    /// The list's parts with a section let go moved where it was let go, until the read after its write draws it there.
+    private static func moved(_ parts: [BoardPart], of list: BoardList, column: BoardColumn, model: BoardModel) -> [BoardPart] {
+        guard let move = model.sectionMove, move.column == column, let index = list.groups.firstIndex(where: { $0.id == move.group }) else { return parts }
+        var parts = parts.filter { $0 != .section(index) }
+        let before = move.before.flatMap { id in list.groups.firstIndex { $0.id == id } }.flatMap { parts.firstIndex(of: .section($0)) }
+        parts.insert(.section(index), at: before ?? parts.count)
+        return parts
     }
 
     /// The branch lines of every row while the field or the plus's room stands in the list, or a carry folds rows away, as
@@ -351,7 +368,8 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         if found != foundSeen {
             foundSeen = found
             if let found, let path = indexPath(of: found) {
-                DispatchQueue.main.async { [weak self] in self?.reveal(path, centred: true) }
+                collection.layoutIfNeeded()
+                reveal(path, centred: true)
             }
         }
         if moved != movedSeen {
@@ -365,7 +383,8 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         let renaming = model.entry.state?.renaming?.id
         guard let id = renaming ?? model.entry.lineKeys[column]?.last ?? rows.first(where: { if case .field = $0 { true } else { false } })?.id,
               let path = indexPath(of: id) else { return }
-        DispatchQueue.main.async { [weak self] in self?.reveal(path, centred: false) }
+        collection.layoutIfNeeded()
+        reveal(path, centred: false)
     }
 
     /// A row whole between the list's soft top and the room the keyboard leaves stays; another comes into sight.
@@ -404,7 +423,9 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
             return []
         }
         if let cell = collection.cellForItem(at: indexPath) {
-            payload.grab = session.location(in: cell).y - capsule(of: row, in: cell.bounds).minY
+            let capsule = capsule(of: row, in: cell.bounds)
+            payload.grab = session.location(in: cell).y - capsule.minY
+            payload.home = cell.convert(capsule, to: nil)
         }
         let item = UIDragItem(itemProvider: Carried.provider(row.id))
         item.localObject = payload
@@ -454,7 +475,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         let parameters = UIDragPreviewParameters()
         parameters.backgroundColor = .clear
         let shape = capsule(of: row, in: cell.bounds)
-        parameters.visiblePath = UIBezierPath(roundedRect: shape, cornerRadius: row.heads ? 8 : CardMetrics.radius)
+        parameters.visiblePath = UIBezierPath(roundedRect: shape, cornerRadius: row.heads ? ColumnMetrics.headRadius : CardMetrics.radius)
         return parameters
     }
 
@@ -514,15 +535,23 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
     private func gap(_ destination: IndexPath?, _ session: any UIDropSession, among others: [DrawnRow]) -> Int {
         if let payload = DragPayload.of(session), let home = indexPath(of: Self.movingRow(payload)),
            let holder = collection.layoutAttributesForItem(at: home)?.frame {
-            return others.filter { row in
-                guard let path = indexPath(of: row.id), let frame = collection.layoutAttributesForItem(at: path)?.frame else { return false }
-                return frame.midY < holder.midY
-            }.count
+            let middles = others.compactMap { row in indexPath(of: row.id).flatMap { collection.layoutAttributesForItem(at: $0)?.frame.midY } }
+            return ListTarget.gap(holding: Double(holder.midY), among: middles.map(Double.init))
         }
         if let destination { return min(destination.item, others.count) }
         let y = session.location(in: collection).y
         let first = collection.layoutAttributesForItem(at: IndexPath(item: 0, section: 0))?.frame.minY ?? 0
         return y < first ? 0 : others.count
+    }
+
+    /// Where a section let go at the gap before row `gap` of `others` goes: before the section whose header stands nearest
+    /// the gap, or at the list's end (nil). The system's drop gives a section's gap among cards too (its reorder snapping
+    /// is asked only of interactive moves): the nearest boundary between sections is where it lands.
+    static func sectionSlot(_ gap: Int, among others: [DrawnRow], groups: [BoardGroup]) -> Int? {
+        let boundaries = others.indices.filter { others[$0].heads } + [others.count]
+        guard let nearest = boundaries.min(by: { abs($0 - gap) < abs($1 - gap) }), nearest < others.count,
+              case .header(let next, _) = others[nearest] else { return nil }
+        return groups.firstIndex { $0.id == next.id }
     }
 
     /// The row a carry moves in the list it was lifted from.
@@ -535,7 +564,14 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
 
     /// The core's place for the gap before row `gap` of `others`, at the level the finger's `x` asks for.
     private func place(_ gap: Int, among others: [DrawnRow], x: CGFloat) -> JSONValue? {
-        model?.listPlace(column, rows: others.map(\.drop), gap: gap, x: x, width: collection.bounds.width)
+        guard let model else { return nil }
+        // A card being renamed stands in the list as its field: to the core's places it is still that card.
+        let cards = model.snapshot?.lists[column]?.cards ?? []
+        let drops = others.map { row -> DropRow in
+            if case .field(let id, _, _, _) = row, let card = cards.first(where: { $0.id == id }) { return DrawnRow.card(card).drop }
+            return row.drop
+        }
+        return model.listPlace(column, rows: drops, gap: gap, x: x, width: collection.bounds.width)
     }
 
     func collectionView(_ collectionView: UICollectionView, dropSessionDidUpdate session: any UIDropSession, withDestinationIndexPath destination: IndexPath?) -> UICollectionViewDropProposal {
@@ -557,17 +593,6 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         return UICollectionViewDropProposal(operation: .move, intent: .insertAtDestinationIndexPath)
     }
 
-    /// A section is carried among its list's sections only: the gap the system opens for it stands before a header or at
-    /// the list's end, never among a section's cards.
-    func collectionView(_ collectionView: UICollectionView, targetIndexPathForMoveOfItemFromOriginalIndexPath original: IndexPath, atCurrentIndexPath current: IndexPath, toProposedIndexPath proposed: IndexPath) -> IndexPath {
-        guard let row = rows[safe: original.item], case .header(let lifted, _) = row else { return proposed }
-        let others = rows.filter { $0.id != row.id }
-        let slots = others.indices.filter { others[$0].heads } + [others.count]
-        _ = lifted
-        let nearest = slots.min { abs($0 - proposed.item) < abs($1 - proposed.item) } ?? proposed.item
-        return IndexPath(item: nearest, section: proposed.section)
-    }
-
     /// The gap the list last showed under the carry: the drop lands where the rows parted, read while they stood so.
     private var shownGap: Int?
 
@@ -579,6 +604,8 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
     func collectionView(_ collectionView: UICollectionView, dropSessionDidEnd session: any UIDropSession) {
         shownGap = nil
         model?.leaveList(column)
+        // The carry ends from the drop side too: a drag source torn down mid-carry (a day turned away) never says it ended.
+        model?.endCarry(of: session)
     }
 
     func collectionView(_ collectionView: UICollectionView, performDropWith coordinator: any UICollectionViewDropCoordinator) {
@@ -588,34 +615,29 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         shownGap = nil
         switch payload.kind {
         case .section(let group):
-            let slot = others[at...].first { $0.heads }.flatMap { row -> Int? in
-                guard case .header(let next, _) = row else { return nil }
-                return model.snapshot?.lists[column]?.groups.firstIndex { $0.id == next.id }
-            }
+            let slot = Self.sectionSlot(at, among: others, groups: model.snapshot?.lists[column]?.groups ?? [])
+            // Drawn where it was let go (the model's section move), the header lands in its row there.
             model.dropSection(column, group, slot: slot)
-            // The header stands where the system carried it until the screen read after the move draws its section there.
-            var snapshot = source.snapshot()
-            let id = DrawnRow.header(group, "").id
-            let target = others[safe: at].map { keys[$0.id] ?? $0.id }
-            if snapshot.itemIdentifiers.contains(id), let target, target != id {
-                snapshot.moveItem(id, beforeItem: target)
-            } else if snapshot.itemIdentifiers.contains(id), target == nil, let last = snapshot.itemIdentifiers.last, last != id {
-                snapshot.moveItem(id, afterItem: last)
-            }
-            source.apply(snapshot, animatingDifferences: false)
-            if let path = indexPath(of: id) { coordinator.drop(item.dragItem, toItemAt: path) }
+            if let path = indexPath(of: DrawnRow.header(group, "").id) { coordinator.drop(item.dragItem, toItemAt: path) }
         case .card:
-            guard let place = place(at, among: others, x: coordinator.session.location(in: collection).x) else { return }
-            switch model.dropOnList(column, place: place) {
-            case .stays:
-                if let home = item.sourceIndexPath { coordinator.drop(item.dragItem, toItemAt: home) }
+            let dropped = place(at, among: others, x: coordinator.session.location(in: collection).x).map { model.dropOnList(column, place: $0) } ?? .refused
+            switch dropped {
             case .landed(let landed):
                 land(item.dragItem, landed, coordinator: coordinator)
-            case .refused:
-                break
+            case .stays, .refused:
+                // Nothing written: the copy flies back where the card was lifted from.
+                if let home = item.sourceIndexPath {
+                    coordinator.drop(item.dragItem, toItemAt: home)
+                } else if let home = payload.home, let window = collection.window {
+                    coordinator.drop(item.dragItem, to: UIDragPreviewTarget(container: window, center: CGPoint(x: home.midX, y: home.midY)))
+                }
             }
         }
     }
+
+    /// A copy landing in a folded project part shrinks to this share of its size into the part's header: nothing of the
+    /// part is drawn to land in, so it goes into the header as into a folder (decision 56).
+    static let foldedLanding: CGFloat = 0.3
 
     /// The copy flies into the card's row as the screen after the drop draws it; into a folded project part, onto its
     /// header, shrinking into it (decision 56).
@@ -625,7 +647,8 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
             coordinator.drop(item, toItemAt: path)
         } else if let header = model?.foldedHeader(landed, in: column).flatMap({ indexPath(of: DrawnRow.project($0).id) }),
                   let frame = collection.layoutAttributesForItem(at: header)?.frame {
-            let target = UIDragPreviewTarget(container: collection, center: CGPoint(x: frame.midX, y: frame.minY + ColumnMetrics.groupHead / 2), transform: CGAffineTransform(scaleX: 0.3, y: 0.3))
+            let scale = Self.foldedLanding
+            let target = UIDragPreviewTarget(container: collection, center: CGPoint(x: frame.midX, y: frame.minY + ColumnMetrics.groupHead / 2), transform: CGAffineTransform(scaleX: scale, y: scale))
             coordinator.drop(item, to: target)
         }
     }
@@ -636,6 +659,11 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
     /// carried card: the plus, or a card held over the bars, where the list itself takes no drop.
     private var plusRoom: Int?
     private var plusX: CGFloat = 0
+
+    func takes(_ payload: DragPayload?) -> Bool {
+        guard let payload, payload.isSection else { return true }
+        return payload.from == column.rawValue
+    }
 
     var area: CGRect? {
         guard let window = host.window else { return nil }
@@ -658,6 +686,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
 
     func hover(at point: CGPoint, carrying payload: DragPayload?) {
         let local = collection.convert(point, from: nil)
+        if let payload, case .section(let group) = payload.kind { return hoverSection(group, at: local) }
         let gap = standing(Self.carried(payload)).filter { $0.frame.midY < local.y }.count
         plusX = local.x
         if payload != nil, let model {
@@ -675,13 +704,43 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
 
     func leave() {
         model?.leaveList(column)
+        sectionSlot = nil
         guard plusRoom != nil else { return }
         plusRoom = nil
         update()
     }
 
+    /// A section routed here over the bars: its slot is the header nearest the finger, or the list's end; the header it
+    /// would go before shows the room.
+    private var sectionSlot: Int?
+
+    private func hoverSection(_ group: BoardGroup, at local: CGPoint) {
+        let heads = rows.enumerated().compactMap { index, row -> (row: Int, group: Int?, y: CGFloat)? in
+            guard case .header(let other, _) = row, other.id != group.id, let frame = collection.layoutAttributesForItem(at: IndexPath(item: index, section: 0))?.frame else { return nil }
+            return (index, model?.snapshot?.lists[column]?.groups.firstIndex { $0.id == other.id }, frame.minY)
+        }
+        let before = heads.first { $0.y > local.y }
+        let slot = before?.group ?? model?.snapshot?.lists[column]?.groups.count
+        guard slot != sectionSlot else { return }
+        sectionSlot = slot
+        UISelectionFeedbackGenerator().selectionChanged()
+        let gap = before.map { head in standing(DrawnRow.header(group, "").id).filter { $0.frame.minY < head.y }.count } ?? standing(DrawnRow.header(group, "").id).count
+        plusRoom = gap
+        update()
+        DropLog.target("routed section \(column.rawValue) slot \(slot ?? -1)")
+    }
+
     /// Let go: the plus opens its field where the room stood; a card is dropped there. Where it lands, in the window.
     func letGo(carrying payload: DragPayload?) -> CGRect? {
+        if let payload, case .section(let group) = payload.kind {
+            let slot = sectionSlot
+            sectionSlot = nil
+            plusRoom = nil
+            model?.dropSection(column, group, slot: slot.flatMap { $0 < (model?.snapshot?.lists[column]?.groups.count ?? 0) ? $0 : nil })
+            update()
+            collection.layoutIfNeeded()
+            return indexPath(of: DrawnRow.header(group, "").id).flatMap { collection.layoutAttributesForItem(at: $0)?.frame }.map { collection.convert($0, to: nil) }
+        }
         guard let model, let gap = plusRoom else { return nil }
         let room = indexPath(of: DrawnRow.plusRoom.id).flatMap { collection.layoutAttributesForItem(at: $0)?.frame }
         let others = rows.filter { $0 != .plusRoom && $0.id != Self.carried(payload) }

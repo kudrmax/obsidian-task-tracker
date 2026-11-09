@@ -55,3 +55,13 @@ public struct ListTarget: Sendable {
         try board.placeAt(cards, y: y(at: gap), level: level, shift: 0, room: .null, heads: heads, held: .null, hysteresis: 0)
     }
 }
+
+extension ListTarget {
+    /// The gap a row carried within its own list stands in: the rows (`others`, by their middles as the list lays them out
+    /// now) whose middle is above the carried row's middle. Over its own row the system names the row's place in the data,
+    /// not where it now stands; where the list lays it out says it.
+    public static func gap(holding middle: Double, among others: [Double]) -> Int {
+        others.filter { $0 < middle }.count
+    }
+}
+

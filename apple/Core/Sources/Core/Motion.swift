@@ -60,7 +60,7 @@ public struct DropReads: Equatable, Sendable {
     /// The drop's write is made (or failed) when `started` reads had begun: only a read begun after it may draw.
     public mutating func written(readsStarted started: Int) {
         writing = max(0, writing - 1)
-        floor = started + 1
+        floor = max(floor, started + 1)
     }
 
     /// The read numbered `serial` (counted as each begins) may draw.

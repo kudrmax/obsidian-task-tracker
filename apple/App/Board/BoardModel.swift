@@ -61,6 +61,13 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
     }
 }
 
+/// How the board moves under a carry, one place for all of it: what lights for a target, and a carry's rows folding away
+/// and back.
+enum DropMotion {
+    static let hover = Animation.snappy(duration: 0.15)
+    static let carry = Animation.snappy(duration: 0.25)
+}
+
 /// How long a drop takes to show the card in its new place, told to the log (`Drop landed in … ms`).
 enum DropTiming {
     private static let log = Logger(subsystem: "com.kudrmax.taskcalendar", category: "drop")
@@ -255,6 +262,7 @@ final class BoardModel {
         defer { if reopen, read.day == read.today, !readAgain { reopen = false; dayMoved += 1 } }
         draw(motion: read.motion(from: snapshot)) {
             snapshot = read
+            sectionMove = nil
             entry.screenChanged()
         }
     }
@@ -992,7 +1000,11 @@ final class BoardModel {
     @ObservationIgnored private var dropReads = DropReads()
     /// The lists on the screen, which a drop's preview is drawn into at once.
     @ObservationIgnored private var lists: [BoardColumn: WeakList] = [:]
-    @ObservationIgnored let plus = BoardRoute()
+    @ObservationIgnored lazy var plus: BoardRoute = {
+        let route = BoardRoute()
+        route.model = self
+        return route
+    }()
 
     private struct WeakList {
         weak var controller: ListController?
@@ -1017,13 +1029,13 @@ final class BoardModel {
     func startCarry(_ card: BoardCard, from column: String) -> Int {
         let token = begin()
         guard selecting, picked.contains(card.id), let snapshot else {
-            withAnimation(.snappy(duration: 0.25)) { carry = Carry(token: token, id: card.id, item: card.item, from: column) }
+            withAnimation(DropMotion.carry) { carry = Carry(token: token, id: card.id, item: card.item, from: column) }
             return token
         }
         let picked = pickedItems
         let froms = Dictionary(picked.map { ($0.id, snapshot.column(of: $0.id) ?? column) }, uniquingKeysWith: { first, _ in first })
         let all = picked.map { (item: $0, from: froms[$0.id] ?? column) }
-        withAnimation(.snappy(duration: 0.25)) { carry = Carry(token: token, id: card.id, item: card.item, from: column, group: all) }
+        withAnimation(DropMotion.carry) { carry = Carry(token: token, id: card.id, item: card.item, from: column, group: all) }
         let board = board
         let arguments: [JSONValue] = [card.item.key.json, keys(picked)]
         Task {
@@ -1044,7 +1056,7 @@ final class BoardModel {
         guard let list = snapshot?.lists[column], let name = list.sectionsOf, let lifted = list.groups.firstIndex(where: { $0.id == group.id }) else { return nil }
         let token = begin()
         let section = SectionCarry(column: column, list: name, names: list.groups.map(\.name), lifted: lifted)
-        withAnimation(.snappy(duration: 0.25)) {
+        withAnimation(DropMotion.carry) {
             carry = Carry(token: token, id: "\u{0}section/\(group.id)", item: nil, from: column.rawValue, section: section)
         }
         return token
@@ -1060,7 +1072,7 @@ final class BoardModel {
     /// The carry's session ended, whatever came of it: once, and only the carry under way.
     func endCarry(_ token: Int) {
         guard carries.end(token) else { return }
-        withAnimation(.snappy(duration: 0.25)) {
+        withAnimation(DropMotion.carry) {
             carry = nil
             hover = nil
             landing = nil
@@ -1097,7 +1109,23 @@ final class BoardModel {
     }
 
     /// The carried card itself, wherever the screen draws it: its row is the gap it was lifted from.
-    func isHidden(_ card: BoardCard) -> Bool { card.id == carry?.id }
+    func isHidden(_ card: BoardCard) -> Bool { card.id == carry?.id || arriving.contains(card.id) }
+
+    /// The cards a drop's copy is still flying into: their place stands empty until it lands, as the system's own list
+    /// drop keeps its row.
+    private(set) var arriving: Set<String> = []
+
+    /// The card a drop's copy flies into stays hidden until the copy is down, then shows in the same frame it goes.
+    func hideUntilLanded(_ item: UIDragItem, _ animator: any UIDragAnimating) {
+        guard let payload = item.localObject as? DragPayload, case .card(let card) = payload.kind else { return }
+        arriving.insert(card.id)
+        animator.addCompletion { [weak self] _ in self?.arriving.remove(card.id) }
+    }
+
+    /// The drop side's end of a carry's session: the carry ends, if the drag side has not ended it already.
+    func endCarry(of session: any UIDropSession) {
+        if let token = DragPayload.of(session)?.token { endCarry(token) }
+    }
 
     /// A subtask of the carried card, or another picked task carried with it: folded away while it is carried.
     func isFolded(_ card: BoardCard) -> Bool {
@@ -1138,13 +1166,11 @@ final class BoardModel {
     func hoverList(_ column: BoardColumn, place: JSONValue) {
         guard let list = snapshot?.lists[column] else { return }
         let others = others(in: column)
-        let level = Int(place["level"].number ?? 0)
-        let index = Int(place["index"].number ?? 0)
-        var parent: String?
-        if level > 0 {
-            var at = index - 1
-            while at >= 0, others[safe: at].map({ $0.level != level - 1 }) == true { at -= 1 }
-            parent = others[safe: at]?.id
+        // What the place means, the core's: a subtask names its parent, which lights.
+        let home: JSONValue = carry.flatMap { homeGap($0.id, in: column) } ?? .null
+        let meant: JSONValue? = ruleNow("rules.placeOfDrop", [Self.listCards(others), place, home])
+        let parent = meant.flatMap { $0["kind"].string == "subtask" ? $0.field("parent") : nil }.flatMap { key in
+            others.first { $0.item.key.json == key }?.id
         }
         let zone = place.field("project")
         let plate = list.groups.first { $0.empty && $0.holds(group: place["group"].string, zone: zone) }?.id
@@ -1154,12 +1180,12 @@ final class BoardModel {
             UISelectionFeedbackGenerator().selectionChanged()
         }
         landing = nil
-        withAnimation(.snappy(duration: 0.15)) { hover = next }
+        withAnimation(DropMotion.hover) { hover = next }
     }
 
     func leaveList(_ column: BoardColumn) {
         guard case .list(column, _, _, _) = hover else { return }
-        withAnimation(.snappy(duration: 0.15)) { hover = nil }
+        withAnimation(DropMotion.hover) { hover = nil }
     }
 
     /// The card a carry would become a subtask of: it lights.
@@ -1197,13 +1223,13 @@ final class BoardModel {
         guard hover != .title(column) else { return true }
         UISelectionFeedbackGenerator().selectionChanged()
         landing = nil
-        withAnimation(.snappy(duration: 0.12)) { hover = .title(column) }
+        withAnimation(DropMotion.hover) { hover = .title(column) }
         return true
     }
 
     func leaveTitle(_ column: BoardColumn) {
         guard hover == .title(column) else { return }
-        withAnimation(.snappy(duration: 0.2)) { hover = nil }
+        withAnimation(DropMotion.hover) { hover = nil }
     }
 
     func isTitleLit(_ column: BoardColumn) -> Bool { hover == .title(column) }
@@ -1229,12 +1255,22 @@ final class BoardModel {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         if !carry.group.isEmpty { endSelection() }
         showPreview(preview.snapshot)
-        let arguments: [JSONValue] = [carry.dropped, to, .string(snapshot.day)]
+        writeDrop("tasks.drop", [carry.dropped, to, .string(snapshot.day)])
+        return .landed(preview.landings.first)
+    }
+
+    /// The last drop's write: the next one waits for it, so drops are written in the order they were let go.
+    @ObservationIgnored private var lastDrop: Task<Void, Never>?
+
+    /// A drop's write after its screen was drawn: in drop order; a read begun before it never draws, the one after it does.
+    private func writeDrop(_ method: String, _ arguments: [JSONValue]) {
+        let before = lastDrop
         let board = board
-        Task {
+        lastDrop = Task {
+            await before?.value
             let dropAt = ContinuousClock.now
             do {
-                _ = try await Task.detached { try board.write("tasks.drop", arguments) }.value
+                _ = try await Task.detached { try board.write(method, arguments) }.value
             } catch {
                 problem = Self.words(error)
             }
@@ -1242,7 +1278,6 @@ final class BoardModel {
             DropTiming.report(since: dropAt)
             await reload()
         }
-        return .landed(preview.landings.first)
     }
 
     /// The screen a drop leaves, drawn now: every list in this same frame, in one animation.
@@ -1261,15 +1296,31 @@ final class BoardModel {
 
     /// A section let go before the section at `slot` (nil: at the list's end): moved there (`tasks.moveGroup`), unless
     /// that is its own place.
-    func dropSection(_ column: BoardColumn, _ group: BoardGroup, slot: Int?) {
-        guard let section = carry?.section, section.column == column else { return }
+    @discardableResult
+    func dropSection(_ column: BoardColumn, _ group: BoardGroup, slot: Int?) -> Bool {
+        guard let section = carry?.section, section.column == column, let list = snapshot?.lists[column] else { return false }
         let at = slot ?? section.names.count
         guard let place: JSONValue = ruleNow("rules.groupPlaceOf", [.array(section.names.map(\.json)), .number(Double(section.lifted)), .number(Double(at))]),
-              !place.isNull else { return }
+              !place.isNull else { return false }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        let arguments: [JSONValue] = [.string(section.list), section.names[section.lifted].json, place]
-        Task { await write("tasks.moveGroup", arguments) }
+        // The section stands where it was let go, header and tasks, until the read after its write draws it there: the
+        // core has no preview of a section's move, so its group moves among the drawn groups, nothing else.
+        dropReads.previewDrawn()
+        sectionMove = SectionMove(column: column, group: group.id, before: list.groups[safe: at]?.id)
+        for list in lists.values { list.controller?.update() }
+        writeDrop("tasks.moveGroup", [.string(section.list), section.names[section.lifted].json, place])
+        return true
     }
+
+    /// A section let go and written, drawn where it was let go until the read after its write.
+    struct SectionMove: Equatable {
+        let column: BoardColumn
+        let group: String
+        /// The group it goes before; nil: the list's end.
+        let before: String?
+    }
+
+    private(set) var sectionMove: SectionMove?
 
     /// The project part a card landed in folded, in `column`: the card is not drawn, its copy goes into the part's header.
     func foldedHeader(_ landed: DropLanding, in column: BoardColumn) -> BoardProject? {
@@ -1343,16 +1394,16 @@ final class BoardModel {
     func hoverCalendar(minute: Double) {
         guard carry?.section == nil else { return }
         let snapped = snap(minute, hourHeight: calendarHour)
-        if hover != nil { withAnimation(.snappy(duration: 0.15)) { hover = nil } }
+        if hover != nil { withAnimation(DropMotion.hover) { hover = nil } }
         guard snapped != landing else { return }
         if landing != nil { UISelectionFeedbackGenerator().selectionChanged() }
-        withAnimation(.snappy(duration: 0.15)) { landing = snapped }
+        withAnimation(DropMotion.hover) { landing = snapped }
         DropLog.target("calendar \(snapped)")
     }
 
     func leaveCalendar() {
         guard landing != nil else { return }
-        withAnimation(.snappy(duration: 0.15)) { landing = nil }
+        withAnimation(DropMotion.hover) { landing = nil }
     }
 
     /// A long press on the calendar's empty space, held at `minute` of the grid: the line shows where a new task will
@@ -1379,9 +1430,8 @@ final class BoardModel {
         guard let carry, carry.section == nil, carry.item != nil, let minute = landing, let snapshot else { return nil }
         let to: JSONValue = ["kind": "time", "start": .number(Double(minute))]
         let events = snapshot.timeline.events
-        let spot = (try? board.landing(carry.dropped, to: to, over: snapshot).first).flatMap { blockRect($0, events: events) }
-        guard case .landed = land(carry, to: to) else { return nil }
-        return spot
+        guard case .landed(let landed) = land(carry, to: to) else { return nil }
+        return landed.flatMap { blockRect($0, events: events) }
     }
 
     /// The plus let go on the calendar: the field opens at the line's time; its place in the calendar's content.

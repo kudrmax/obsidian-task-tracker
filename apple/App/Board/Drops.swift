@@ -15,6 +15,12 @@ protocol BoardTarget: AnyObject {
     func leave()
     /// Let go: where the field opens or the card lands, in the window.
     func letGo(carrying payload: DragPayload?) -> CGRect?
+    /// It takes this carry: a section only in its own list.
+    func takes(_ payload: DragPayload?) -> Bool
+}
+
+extension BoardTarget {
+    func takes(_ payload: DragPayload?) -> Bool { payload?.isSection != true }
 }
 
 /// The one routing of the board's own carries: the target the point is in, else the nearest target of the column under
@@ -37,10 +43,10 @@ final class BoardRoute: NSObject, UIDropInteractionDelegate {
         targets.append(Weak(target: target))
     }
 
-    /// The target for `point` and the point brought into what shows of it.
-    private func route(_ point: CGPoint) -> (target: any BoardTarget, point: CGPoint)? {
+    /// The target for `point` and the point brought into what shows of it. A section goes only to its own list.
+    private func route(_ point: CGPoint, carrying payload: DragPayload?) -> (target: any BoardTarget, point: CGPoint)? {
         let shown = targets.compactMap { weak -> (any BoardTarget, CGRect)? in
-            guard let target = weak.target, let area = target.area, let window = interaction.view?.window ?? UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else { return nil }
+            guard let target = weak.target, target.takes(payload), let area = target.area, let window = interaction.view?.window ?? UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else { return nil }
             let visible = area.intersection(window.bounds)
             return visible.isNull || visible.isEmpty ? nil : (target, visible)
         }
@@ -57,7 +63,7 @@ final class BoardRoute: NSObject, UIDropInteractionDelegate {
     }
 
     private func hold(_ point: CGPoint, carrying payload: DragPayload?) -> Bool {
-        let routed = route(point)
+        let routed = route(point, carrying: payload)
         if routed?.target !== current { current?.leave() }
         current = routed?.target
         guard let routed else { return false }
@@ -93,8 +99,7 @@ final class BoardRoute: NSObject, UIDropInteractionDelegate {
     private var landing: CGRect?
 
     func dropInteraction(_ interaction: UIDropInteraction, canHandle session: any UIDropSession) -> Bool {
-        guard let payload = DragPayload.of(session) else { return false }
-        return !payload.isSection
+        DragPayload.of(session) != nil
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: any UIDropSession) -> UIDropProposal {
@@ -104,10 +109,16 @@ final class BoardRoute: NSObject, UIDropInteractionDelegate {
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: any UIDropSession) { carryOff() }
 
-    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) { carryOff() }
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) {
+        carryOff()
+        model?.endCarry(of: session)
+    }
+
+    weak var model: BoardModel?
 
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
-        landing = current?.letGo(carrying: DragPayload.of(session))
+        let payload = DragPayload.of(session)
+        landing = current?.letGo(carrying: payload) ?? payload?.home
         current = nil
     }
 
@@ -115,6 +126,10 @@ final class BoardRoute: NSObject, UIDropInteractionDelegate {
         guard let landing, let window = interaction.view else { return nil }
         self.landing = nil
         return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: CGPoint(x: landing.midX, y: landing.midY)))
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {
+        model?.hideUntilLanded(item, animator)
     }
 }
 
@@ -176,7 +191,7 @@ struct TitleDrop<Title: View>: UIViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIView, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? 200, height: top + ColumnMetrics.titleRow + ColumnMetrics.headGap)
+        CGSize(width: proposal.width ?? uiView.bounds.width, height: top + ColumnMetrics.titleRow + ColumnMetrics.headGap)
     }
 
     func makeCoordinator() -> Delegate { Delegate(column: column, model: model) }
@@ -206,7 +221,14 @@ struct TitleDrop<Title: View>: UIViewRepresentable {
 
         func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: any UIDropSession) { model?.leaveTitle(column) }
 
-        func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) { model?.leaveTitle(column) }
+        func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) {
+            model?.leaveTitle(column)
+            model?.endCarry(of: session)
+        }
+
+        func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {
+            model?.hideUntilLanded(item, animator)
+        }
 
         func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
             landing = nil
@@ -313,7 +335,14 @@ final class CalendarDrop: NSObject, UIDropInteractionDelegate, BoardTarget {
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: any UIDropSession) { model?.leaveCalendar() }
 
-    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) { model?.leaveCalendar() }
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) {
+        model?.leaveCalendar()
+        model?.endCarry(of: session)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {
+        model?.hideUntilLanded(item, animator)
+    }
 
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
         spot = model?.dropOnCalendar()

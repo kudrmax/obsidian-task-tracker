@@ -41,6 +41,8 @@ enum ColumnMetrics {
     static let groupName: CGFloat = 13
     static let groupLeading: CGFloat = 20
     static let sectionGap: CGFloat = 10
+    /// The corner of a section header's lifted and landing shape.
+    static let headRadius: CGFloat = 8
 }
 
 /// The shared settings' size of a card, observed: every view that reads it while it draws is drawn again when it

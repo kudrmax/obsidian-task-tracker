@@ -152,6 +152,20 @@ import Testing
         #expect(turns.current == nil)
     }
 
+    /// The drop side and the drag side both end a carry; whichever comes first ends it, the other changes nothing.
+    @Test func bothSidesEndingACarryEndItOnce() {
+        var turns = CarryTurns()
+        let token = turns.begin()
+        let dropSide = turns.end(token)
+        let dragSide = turns.end(token)
+        #expect(dropSide)
+        #expect(!dragSide)
+        let next = turns.begin()
+        let late = turns.end(token)
+        #expect(!late)
+        #expect(turns.current == next)
+    }
+
     /// The next card lifted while the last one's copy still settles: the last session's end ends nothing of the new carry.
     @Test func anEarlierSessionsEndNeverEndsTheNextCarry() {
         var turns = CarryTurns()
@@ -166,6 +180,27 @@ import Testing
 }
 
 @Suite struct DropReadsTests {
+    /// Drops' writes run in order, but a write that finished later with a lower count never lowers the floor.
+    @Test func aWriteFinishedOutOfOrderNeverLetsAnOlderReadDraw() {
+        var reads = DropReads()
+        reads.previewDrawn()
+        reads.previewDrawn()
+        reads.written(readsStarted: 10)
+        reads.written(readsStarted: 5)
+        #expect(!reads.mayDraw(6))
+        #expect(!reads.mayDraw(10))
+        #expect(reads.mayDraw(11))
+    }
+
+    @Test func aWriteMoreThanPreviewsNeverGoesBelowNone() {
+        var reads = DropReads()
+        reads.written(readsStarted: 1)
+        reads.previewDrawn()
+        #expect(!reads.mayDraw(5))
+        reads.written(readsStarted: 5)
+        #expect(reads.mayDraw(6))
+    }
+
     @Test func aReadBegunBeforeTheWriteNeverDrawsOverThePreview() {
         var reads = DropReads()
         #expect(reads.mayDraw(1))

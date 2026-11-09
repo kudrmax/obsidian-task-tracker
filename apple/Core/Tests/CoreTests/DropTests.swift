@@ -54,6 +54,13 @@ import Testing
         #expect(try place(3, level: 2) == (2, 0, "Evening"))
     }
 
+    /// A card carried within its own list: the gap is where the list lays its row out among the others.
+    @Test func theGapOfARowCarriedInItsOwnListIsWhereItStands() {
+        #expect(ListTarget.gap(holding: 150, among: [20, 60, 100, 200, 240]) == 3)
+        #expect(ListTarget.gap(holding: 0, among: [20, 60]) == 0)
+        #expect(ListTarget.gap(holding: 500, among: [20, 60]) == 2)
+    }
+
     @Test func theCardsOwnGapAtItsLevelChangesNothing() throws {
         let cards: JSONValue = [
             ["key": ["line": 1, "text": "A"], "level": 0, "group": .null],
@@ -136,3 +143,18 @@ import Testing
         #expect(preview.snapshot.lists == before.lists)
     }
 }
+
+/// Max, 2026-11-09: a section dragged before Evening showed above No section after the read, though the file had it
+/// below. No section is handed back to the core with its null name, so an empty section stands where the file has it.
+@Suite struct SectionOrderTests {
+    @Test func anEmptySectionAfterTheTasksOutsideAnySectionIsDrawnAfterThem() throws {
+        let file = [
+            "## Inbox", "", "## Now", "", "- [ ] Morning run", "### Errands", "### Evening", "- [ ] Cook dinner", "### Work", "- [ ] Email Bob", "",
+            "## Soon", "", "## Backlog", "", "## Done", "",
+        ].joined(separator: "\n")
+        let board = TaskBoard(core: try PhoneCore(script: Fixtures.phoneScript), vault: FakeVault(file))
+        let screen = try board.snapshot(day: nil, measures: DropPreviewTests.measures)
+        #expect(screen.lists[.day]?.groups.map(\.name) == [nil, "Errands", "Evening", "Work"])
+    }
+}
+
