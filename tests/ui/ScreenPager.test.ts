@@ -137,6 +137,47 @@ describe("ScreenPager", () => {
 		expect(tracks.get(1)?.shown).toEqual([-20]);
 	});
 
+	it("a finger catches the screen where it is seen as it runs, and draws it on from there on the same way", () => {
+		const { pager, tracks, made } = setUp();
+		pager.follow(-200);
+		void pager.settle(1);
+		vi.advanceTimersByTime(SLIDE_MS / 3);
+		const track = tracks.get(1)!;
+		const seen = last(track.shown)!;
+		expect(seen).toBeLessThan(-200);
+		expect(seen).toBeGreaterThan(-WIDTH);
+		expect(pager.catch()).toBe(seen);
+		vi.advanceTimersByTime(SLIDE_MS);
+		expect(last(track.shown)).toBe(seen);
+		pager.follow(seen + 30);
+		expect(track.landed).toEqual([]);
+		expect(made).toEqual([1]);
+		expect(last(track.shown)).toBe(seen + 30);
+	});
+
+	it("an arrow's turn caught by a finger stops where it is seen, and the turns waiting for it are dropped", async () => {
+		const { pager } = setUp();
+		const first = fakeTrack(WIDTH);
+		const waiting = vi.fn(() => fakeTrack(WIDTH));
+		void pager.run(1, () => first);
+		vi.advanceTimersByTime(SLIDE_MS / 4);
+		void pager.run(1, waiting);
+		const seen = pager.catch();
+		expect(seen).toBe(last(first.shown));
+		await Promise.resolve();
+		await Promise.resolve();
+		vi.advanceTimersByTime(SLIDE_MS * 2);
+		expect(waiting).not.toHaveBeenCalled();
+		expect(first.landed).toEqual([]);
+		expect(pager.caught).toBe(1);
+	});
+
+	it("a finger on a screen that stands catches nothing", () => {
+		const { pager } = setUp();
+		expect(pager.catch()).toBe(0);
+		expect(pager.caught).toBe(0);
+	});
+
 	it("stands once its time is up even when no frame comes, as on a page out of sight", async () => {
 		vi.useRealTimers();
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });

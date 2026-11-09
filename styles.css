@@ -911,7 +911,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 [data-priority] .tc-project-mark { color: var(--tc-priority-meta); }
 /* A section lifted: its tasks fold away with its header. A task lifted waits as a dashed place where it stood, its subtasks folded away under it; no other card moves, the drop line shows the place. */
 .tc-card.is-folded { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); opacity: 0; }
-.tc-card.is-lifted, .tc-card.is-arriving { visibility: hidden; }
+.tc-card.is-lifted { visibility: hidden; }
 .tc-list > .tc-card, .tc-list > .tc-quick-row { margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); overflow: visible; clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 0 calc(-1 * var(--tc-level) * var(--tc-subtask-indent))); }
 /* A subtask's branch from its task: on down past it to the next subtask, bending in at the last; the lines of the tasks further up that go on past it. */
 .tc-branch, .tc-branch-pass { position: absolute; top: calc(-1 * var(--tc-branch-rise)); height: calc(100% + var(--tc-branch-rise)); box-sizing: border-box; border-left: var(--tc-branch-w) solid var(--tc-branch); pointer-events: none; }
@@ -1029,7 +1029,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 /* The now line: the time in a pill, the line to the right edge. */
 /* A task on the timeline is the card of the list: 40 px at a time, its duration's length when it has one; selected, it is ringed and gets the two dots that stretch it. */
 .tc-block { position: absolute; top: var(--tc-y); height: var(--tc-len); left: var(--tc-x); right: var(--tc-item-inset); z-index: var(--tc-layer-block); touch-action: pan-y; cursor: pointer; }
-.tc-block.is-lifted, .tc-block.is-arriving { visibility: hidden; }
+/* A carried task's block, and a dropped task's block under its flying copy, wait unseen yet stay under the finger: either can be taken again before the copy lands. */
+.tc-block.is-lifted > *, .tc-block.is-arriving > * { visibility: hidden; }
 .tc-block-card { position: absolute; inset: 0; box-sizing: border-box; overflow: hidden; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); padding: var(--tc-block-pad-top) var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: flex-start; gap: var(--tc-space-6); color: var(--tc-text); }
 .tc-block-card .tc-card-title { font-size: var(--tc-font-body); line-height: var(--tc-leading-card); }
 .tc-block.is-selected .tc-block-card { box-shadow: var(--tc-ring-selected); }
@@ -1149,6 +1150,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 /* The menu over the count grows out of it, from its right edge; «⋯»'s grows out of the capsule. */
 .tc-panel.is-bulk.is-over.is-above { transform-origin: 100% 100%; }
 .tc-panel.is-more { width: var(--tc-popover-w); }
+.tc-list > .tc-card.is-arriving { background: none; box-shadow: none; }
+.tc-card.is-arriving > * { visibility: hidden; }
 .tc-card.is-lifted.is-waiting { visibility: visible; background: none; border: var(--tc-hairline) dashed var(--tc-dash); box-shadow: none; }
 .tc-card.is-waiting > * { visibility: hidden; }
 /* Dropped in its own list, the dashed place is the task's card: it slides to the task's new place and the copy lands in it. */

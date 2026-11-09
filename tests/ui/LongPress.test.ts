@@ -42,6 +42,34 @@ describe("LongPress", () => {
 		expect(log).toEqual([]);
 	});
 
+	it("a finger held through a redraw of its card goes on, and starts with what the card is now", async () => {
+		const el = document.body.appendChild(document.createElement("div"));
+		const log: Log = [];
+		const before = new AbortController();
+		LongPress.attach(el, { signal: before.signal, delayMs: () => 250, busy: () => false, onStart: () => log.push("old") });
+		el.dispatchEvent(pointer("pointerdown", 10, 10));
+		vi.advanceTimersByTime(100);
+		before.abort();
+		LongPress.attach(el, { signal: new AbortController().signal, delayMs: () => 250, busy: () => false, onStart: () => log.push("new") });
+		await Promise.resolve();
+		vi.advanceTimersByTime(150);
+		expect(log).toEqual(["new"]);
+	});
+
+	it("a card whose gestures are called off and not given again hears no more", async () => {
+		const el = document.body.appendChild(document.createElement("div"));
+		const log: Log = [];
+		const gestures = new AbortController();
+		LongPress.attach(el, { signal: gestures.signal, delayMs: () => 250, busy: () => false, onStart: () => log.push("start") });
+		el.dispatchEvent(pointer("pointerdown", 10, 10));
+		gestures.abort();
+		await Promise.resolve();
+		vi.advanceTimersByTime(250);
+		el.dispatchEvent(pointer("pointerdown", 10, 10));
+		vi.advanceTimersByTime(250);
+		expect(log).toEqual([]);
+	});
+
 	it("starts a drag after the delay when a finger holds still", () => {
 		const el = document.body.appendChild(document.createElement("div"));
 		const log: Log = [];

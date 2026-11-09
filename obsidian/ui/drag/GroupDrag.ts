@@ -43,7 +43,7 @@ export class GroupDrag {
 	constructor(private readonly deps: GroupDragDeps) {}
 
 	attach(head: HTMLElement, list: GroupedList, taskList: TaskList, group: ListGroup, signal?: AbortSignal): void {
-		new LongPress(head, {
+		LongPress.attach(head, {
 			signal,
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
@@ -56,6 +56,7 @@ export class GroupDrag {
 
 	private lift(head: HTMLElement, list: GroupedList, taskList: TaskList, group: ListGroup, e: PointerEvent): void {
 		if (!this.deps.arbiter.claim(DRAG)) return;
+		DragSession.landNow();
 		this.deps.haptics.tap();
 		const names = taskList.groups.map((g) => g.name);
 		const lifted = names.indexOf(group.name);
@@ -67,17 +68,12 @@ export class GroupDrag {
 		const section = [head, ...taskList.cardsOf(group), ...(plate ? [plate] : [])];
 		for (const node of section) node.classList.add(FOLDED);
 		const slots = new SectionSlots(taskList, places, names, lifted);
-		let released = false;
-		const release = () => {
-			if (released) return;
-			released = true;
-			this.deps.arbiter.release(DRAG);
-		};
 		const session = new DragSession<SectionPayload, GroupPlace>({
 			payload: { section: group.name },
 			targets: [slots],
 			float,
 			origin: () => head.getBoundingClientRect(),
+			letGo: () => this.deps.arbiter.release(DRAG),
 			onReturn: () => {
 				for (const node of section) {
 					Motion.settle(node);
@@ -86,13 +82,14 @@ export class GroupDrag {
 			},
 			/**
 			 * The move is written and the list drawn as the file now has it, its landing place right after the section; the
-			 * copy lands on the section's header as drawn there, found by the section's id. The screen stays the drag's
-			 * until the copy has landed.
+			 * copy lands on the section's header as drawn there, found by the section's id. The screen is free from the
+			 * moment the finger lets go; a drag begun before the copy lands takes the list as it is, with no landing place.
 			 */
 			onEnd: async (place) => {
 				if (!place) return null;
 				this.deps.haptics.tap();
 				await this.deps.onMove(list, group.name, place).catch((error: unknown) => console.error("Task Calendar: section move", error));
+				if (session.interrupted) return taskList.headOf(group.id);
 				taskList.showLanding({ after: group.id });
 				return taskList.headOf(group.id);
 			},
@@ -106,7 +103,7 @@ export class GroupDrag {
 			doc.removeEventListener("pointerup", up);
 			doc.removeEventListener("pointercancel", cancel);
 			releasePointer(head, e.pointerId);
-			void (apply ? session.release(ev.clientX, ev.clientY) : session.cancel()).finally(release);
+			void (apply ? session.release(ev.clientX, ev.clientY) : session.cancel());
 		};
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId === e.pointerId) session.move(ev.clientX, ev.clientY);
