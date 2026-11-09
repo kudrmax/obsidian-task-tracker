@@ -420,7 +420,8 @@ struct CardRow: View {
     var body: some View {
         let selecting = model.selecting
         let picks = self.picks
-        let hidden = model.isHidden(card)
+        let mark = model.mark(card.id)
+        let hidden = mark.hidden
         HStack(spacing: 10) {
             if picks, !hidden {
                 SelectionCircle(on: model.picked.contains(card.id))
@@ -436,7 +437,7 @@ struct CardRow: View {
                 menu: { later in selecting ? nil : model.cardMenu(card.item, later: later) },
                 ringed: model.found == card.id,
                 draggable: false,
-                carried: model.isHidden(card),
+                carried: hidden,
                 onTouch: { model.found = nil },
                 onFold: card.item.can.fold && !selecting ? { Task { await model.toggleCollapsed(card.item) } } : nil,
                 onLink: selecting ? nil : { model.openLink($0) },
@@ -444,10 +445,10 @@ struct CardRow: View {
                 picking: picks ? CardButton.Picking(picked: model.picked.contains(card.id), count: model.picked.count) { pick() } : nil)
                 .frame(height: CardMetrics.height)
                 // Carried, the card's row is its dashed place, as the plugin keeps it (`is-waiting`), until the carry ends.
-                .background { if model.isWaiting(card) { DashedPlace().transition(.identity) } }
+                .background { if mark.waiting { DashedPlace().transition(.identity) } }
                 // The branch comes with the card's place (the drop's screen drawn), fading in as the row and the copy flying
                 // into it come to rest, so it never travels with a row moving there.
-                .overlay(alignment: .topLeading) { if let branch = card.branch, !model.isWaiting(card) { ComingBranch(branch: branch, flying: model.dropFlies).transition(Self.branchComes) } }
+                .overlay(alignment: .topLeading) { if let branch = card.branch, !mark.waiting { ComingBranch(branch: branch, model: model).transition(Self.branchComes) } }
                 .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
         }
         .frame(height: CardMetrics.height, alignment: .top)
@@ -466,20 +467,20 @@ struct CardRow: View {
 /// (the carry's end, heard from the flight's own completion), so it never travels with a row moving under the copy.
 struct ComingBranch: View {
     let branch: Branch
-    /// A drop's copy is flying now.
-    let flying: Bool
+    /// Read here, not by the row: only the branches follow the drop's flight.
+    let model: BoardModel
     @State private var shown: Bool
 
-    init(branch: Branch, flying: Bool) {
+    init(branch: Branch, model: BoardModel) {
         self.branch = branch
-        self.flying = flying
-        _shown = State(initialValue: !flying)
+        self.model = model
+        _shown = State(initialValue: !model.dropFlies)
     }
 
     var body: some View {
         BranchLine(branch: branch)
             .opacity(shown ? 1 : 0)
-            .onChange(of: flying) { _, now in
+            .onChange(of: model.dropFlies) { _, now in
                 guard !now, !shown else { return }
                 withAnimation(.easeOut(duration: CarryMotion.branchFade)) { shown = true }
             }
@@ -628,3 +629,10 @@ enum SoftEdge {
     static func top(at offset: CGFloat) -> CGFloat { min(SoftEdges.fade, max(0, offset)) }
 }
 
+
+/// A list's column drawn again only when its list changed: its rows are the collection's, which follows the board itself.
+extension ListColumn: Equatable {
+    nonisolated static func == (a: ListColumn, b: ListColumn) -> Bool {
+        MainActor.assumeIsolated { a.list == b.list && a.dayArrows == b.dayArrows && a.model === b.model }
+    }
+}

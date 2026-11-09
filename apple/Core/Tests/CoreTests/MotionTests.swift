@@ -355,6 +355,36 @@ import Testing
     }
 }
 
+/// Lead, 11-09: a timed block dropped on a past day's list went to Soon, off the screen, and its copy flew back to its old
+/// spot and vanished. The copy goes where the card now is when that shows, else it fades where it was let go.
+@Suite struct LandingPickTests {
+    let screen = CGRect(x: 0, y: 0, width: 400, height: 800)
+
+    @Test func theCardsOwnListFirstWhenItShows() {
+        let pick = LandingPick.first([("day", CGRect(x: 10, y: 100, width: 180, height: 35), screen), ("soon", CGRect(x: 210, y: 100, width: 180, height: 35), screen)])
+        #expect(pick == "day")
+    }
+
+    /// Soon partly on the screen: the copy flies there.
+    @Test func anotherListThatShowsTakesIt() {
+        let pick = LandingPick.first([("day", CGRect(x: 10, y: 900, width: 180, height: 35), screen), ("soon", CGRect(x: 380, y: 100, width: 180, height: 35), screen)])
+        #expect(pick == "soon")
+    }
+
+    /// Off the screen everywhere (a column scrolled away, a list that ends above it): no place, the copy fades.
+    @Test func nothingOnTheScreenIsNoPlace() {
+        let pick = LandingPick.first([("soon", CGRect(x: 420, y: 100, width: 180, height: 35), screen), ("inbox", CGRect(x: -300, y: 100, width: 180, height: 35), screen)])
+        #expect(pick == nil)
+    }
+
+    /// A list's rows scrolled out of its own box do not show, though the box is on the screen.
+    @Test func aRowScrolledOutOfItsListDoesNotShow() {
+        let list = CGRect(x: 0, y: 150, width: 200, height: 300)
+        let pick = LandingPick.first([("day", CGRect(x: 10, y: 600, width: 180, height: 35), list)])
+        #expect(pick == nil)
+    }
+}
+
 @Suite struct DropReadsTests {
     /// Drops' writes run in order, but a write that finished later with a lower count never lowers the floor.
     @Test func aWriteFinishedOutOfOrderNeverLetsAnOlderReadDraw() {

@@ -60,3 +60,25 @@ enum CarryMotion {
     /// second (9 points a frame at 60 Hz, as before).
     static let edges = EdgeScrollStep(band: 48, speed: 540)
 }
+
+/// The carry's haptics, each generator made once and kept ready: one made at the moment of a lift or a drop costs that
+/// frame its start.
+@MainActor
+enum CarryFeel {
+    private static let lifted = UIImpactFeedbackGenerator(style: .medium)
+    private static let dropped = UIImpactFeedbackGenerator(style: .light)
+    private static let ticked = UISelectionFeedbackGenerator()
+
+    static func lift() {
+        lifted.impactOccurred()
+        dropped.prepare()
+    }
+
+    static func drop() { dropped.impactOccurred() }
+
+    /// The place under the carry changed.
+    static func tick() {
+        ticked.selectionChanged()
+        ticked.prepare()
+    }
+}

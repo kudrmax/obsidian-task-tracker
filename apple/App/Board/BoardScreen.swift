@@ -98,7 +98,7 @@ struct BoardScreen: View {
                 model.route.floor = $0.minY
             })
             if let slot = plusSlot {
-                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drag: model.drag, onCarry: { model.startCarryingPlus() })
+                CarriedPlus(model: model, accent: Palette.accent(scheme)) { router.openTyping() }
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }
@@ -327,6 +327,7 @@ struct Ribbon: View {
                     // calendar keeps the divider's width and slides with the list's edge, so it never reflows.
                     ZStack(alignment: .topLeading) {
                         TimelineColumn(timeline: snapshot.timeline, model: model)
+                            .equatable()
                             .frame(width: width - list)
                             .frame(maxHeight: .infinity, alignment: .top)
                             .offset(x: dayList)
@@ -460,6 +461,7 @@ struct Ribbon: View {
     private func lists(_ column: BoardColumn, dayArrows: Bool = false) -> some View {
         if let list = snapshot.lists[column] {
             ListColumn(list: list, model: model, dayArrows: dayArrows)
+                .equatable()
         }
     }
 }
@@ -659,5 +661,17 @@ private struct OnePlacePerSwipe: ScrollTargetBehavior {
                 model.swipeLanding(moved: CGFloat(moved), distance: CGFloat(distance), speed: CGFloat(speed))
             }
         }
+    }
+}
+
+/// The plus, the cancel target while a carry is under way: it alone reads whether one is, so a carry lifted or landing
+/// redraws the plus, not the board.
+private struct CarriedPlus: View {
+    let model: BoardModel
+    let accent: Color
+    let open: () -> Void
+
+    var body: some View {
+        PlusButton(open: open, accent: accent, cancelling: model.showsCancelTarget, drag: model.drag, onCarry: { model.startCarryingPlus() })
     }
 }

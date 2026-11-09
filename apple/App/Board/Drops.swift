@@ -172,8 +172,8 @@ final class TitleTarget: UIView, BoardTarget {
     /// The copy flies into the card's row where the list now draws it.
     func letGo(carrying payload: DragPayload?) -> CarryLanding? {
         model?.leaveTitle(column)
-        guard let model, case .landed(let landed) = model.dropOnTitle(column), let landed, let list = model.listController(column) else { return nil }
-        return list.landing(of: landed)
+        guard let model, case .landed(let landed) = model.dropOnTitle(column) else { return nil }
+        return model.landingOnScreen(landed, from: column)
     }
 }
 
@@ -290,7 +290,7 @@ final class CalendarDrop: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         return Double(max(0, local.y - grab - TimelineGeometry.labelLift) / model.calendarHour * 60)
     }
 
-    var area: CGRect? { scroll.flatMap { view in view.window.map { view.convert(view.bounds, to: $0) } } }
+    var area: CGRect? { scroll.flatMap { view in view.window.map { view.convert(view.bounds, to: $0).intersection($0.bounds) } } }
 
     var scrolls: UIScrollView? { scroll }
 
@@ -357,8 +357,8 @@ struct AllDayDrop: UIViewRepresentable {
             guard let model else { return nil }
             guard payload != nil else { return model.listController(.day)?.letGo(carrying: nil) }
             model.leaveTitle(.day)
-            guard case .landed(let landed) = model.dropOnTitle(.day), let landed, let list = model.listController(.day) else { return nil }
-            return list.landing(of: landed)
+            guard case .landed(let landed) = model.dropOnTitle(.day) else { return nil }
+            return model.landingOnScreen(landed, from: .day)
         }
     }
 }

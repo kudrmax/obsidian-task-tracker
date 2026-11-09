@@ -31,6 +31,11 @@ struct CarryLanding {
     var opens = false
     /// On the calendar: the card lands as a block of its stack.
     var onCalendar = false
+    /// Written, but the card it lands as shows nowhere on the screen: the copy fades where it was let go.
+    var vanishes = false
+
+    /// The copy fades where it is.
+    static let away = CarryLanding(rect: .null, vanishes: true)
 }
 
 /// The place a carry let go on the cancel target: the plus's slot while anything is carried.
@@ -94,7 +99,7 @@ final class DragController {
         layer.blocksTouches = true
         live = Live(token: token, carry: carry, payload: lift.payload, copy: copy, grip: CGPoint(x: point.x - lift.frame.midX, y: point.y - lift.frame.midY), home: lift.home, point: point)
         if lift.rises {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            CarryFeel.lift()
             UIView.animate(springDuration: CarryMotion.rise, bounce: 0, options: [.allowUserInteraction, .beginFromCurrentState]) { copy.rise() }
         }
         return true
@@ -204,7 +209,7 @@ final class DragController {
     /// What the copy turns into as it lands where it is a size other than its own: the card as drawn there, or a
     /// section's header.
     private func arrival(for landing: CarryLanding) -> UIView? {
-        guard !landing.opens, !landing.folds, let live, let model, let window = live.copy.window else { return nil }
+        guard !landing.opens, !landing.folds, !landing.vanishes, let live, let model, let window = live.copy.window else { return nil }
         let size = live.copy.bounds.size
         guard abs(size.width - landing.rect.width) > 1 || abs(size.height - landing.rect.height) > 1 else { return nil }
         let rect = landing.rect
@@ -374,6 +379,10 @@ final class CarryCopy: UIView {
         }
         transform = .identity
         layer.shadowOpacity = 0
+        if landing.vanishes {
+            alpha = 0
+            return
+        }
         let rect = landing.rect
         if landing.folds {
             let scale = CarryMotion.foldedLanding
@@ -486,7 +495,7 @@ final class SpringZones {
             MainActor.assumeIsolated {
                 guard let self, let view, self.over === view else { return }
                 self.dwell = nil
-                UISelectionFeedbackGenerator().selectionChanged()
+                CarryFeel.tick()
                 activate()
             }
         }
@@ -514,7 +523,7 @@ final class CarryTiming {
     private var steps: [(String, Double)] = []
 
     func begin() {
-        #if DEBUG
+        #if DEBUG || CARRY_TIMING
         moves = []
         frames = []
         steps = []
@@ -529,7 +538,7 @@ final class CarryTiming {
     }
 
     func measure(_ work: () -> Void) {
-        #if DEBUG
+        #if DEBUG || CARRY_TIMING
         let start = CACurrentMediaTime()
         work()
         moves.append((CACurrentMediaTime() - start) * 1000)
@@ -539,7 +548,7 @@ final class CarryTiming {
     }
 
     func step(_ name: String, _ work: () -> Void) {
-        #if DEBUG
+        #if DEBUG || CARRY_TIMING
         let start = CACurrentMediaTime()
         work()
         steps.append((name, (CACurrentMediaTime() - start) * 1000))
@@ -550,7 +559,7 @@ final class CarryTiming {
     }
 
     func end() {
-        #if DEBUG
+        #if DEBUG || CARRY_TIMING
         link?.invalidate()
         link = nil
         guard !moves.isEmpty else { return }
@@ -584,5 +593,30 @@ extension UIGestureRecognizer {
     /// Where the finger that began the gesture is, in the window: never the middle of two fingers.
     var firstFinger: CGPoint {
         numberOfTouches > 0 ? location(ofTouch: 0, in: nil) : location(in: nil)
+    }
+}
+
+/// Work run at the next frame of the screen, not later in this one: what a frame need not draw at once waits one frame.
+@MainActor
+enum NextFrame {
+    static func run(_ work: @escaping @MainActor () -> Void) {
+        let link = CADisplayLink(target: Once(work), selector: #selector(Once.fire(_:)))
+        link.add(to: .main, forMode: .common)
+    }
+
+    @MainActor
+    private final class Once: NSObject {
+        let work: @MainActor () -> Void
+        var fired = false
+        /// When it was asked: a tick of the frame being drawn now (its vsync came before) is not the next frame.
+        let asked = CACurrentMediaTime()
+        init(_ work: @escaping @MainActor () -> Void) { self.work = work }
+        @objc func fire(_ link: CADisplayLink) {
+            guard link.timestamp >= asked else { return }
+            link.invalidate()
+            guard !fired else { return }
+            fired = true
+            work()
+        }
     }
 }

@@ -174,7 +174,11 @@ what a drop writes.
     are drawn anew. Select Tasks ends after the drop. Review, 11-09: the preview is worked out off the main thread while
     the carry is held over a place (its own JavaScript context, `TaskBoard`'s `preview`), so the let-go draws at once
     (it asked the core for ~90 ms in the let-go's frame); the read after the drop's write is made once the copy is down,
-    never redrawing the board under the flight.
+    never redrawing the board under the flight. Lead, 11-10: a let-go redraws only what changes: the lists' rows move in
+    the let-go's frame (rows of a known height laid out without measuring their content; rows only drawn anew, a card's
+    line in the file, in the next frame), the rest of the board (the calendar's blocks, in the same spring, and the titles)
+    one frame on; each card observes only its own carry marks (hidden, dashed place), the calendar and a list's column are
+    drawn again only when their day or list changed, and the line under a carry over the calendar is a view of its own.
 15. **frontend-swift, changed 11-09 (lead: the system's standard preview): a card's menu.** A card that shows its whole
     title is lifted itself. A cut title: the menu's preview (`UIContextMenuConfiguration(previewProvider:)`) is the card
     laid out with its whole title at the width the core gives (`rules.wholeWidth`), drawn as on the board (inside the
@@ -229,3 +233,7 @@ what a drop writes.
 26. **frontend-swift, review 11-09: a list that places nothing in a gap (`rules.placesInGap`, a past day's list for a card
     from another column) shows the line at its end, wherever the finger is in it, and the drop goes to its end** (the
     drop names no place), as the plugin's; a list with no card shows the line at its top.
+27. **frontend-swift, lead 11-10: a drop's copy goes where the card now is, if that shows on the screen; else it fades
+    where it was let go**, as the plugin's (`DragSession.release`: the card drawn, else `vanish`): its own list first,
+    then any other list (a row, or a folded part's header), then the calendar. Never back to where it was lifted from: a
+    timed block let go on a past day's list goes to Soon (the core's), and with Soon off the screen the copy fades there.

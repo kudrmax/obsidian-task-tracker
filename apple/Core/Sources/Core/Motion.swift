@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// How the screen moves from one drawing to the next: chosen by what differs between the two, never by who asked for the
@@ -212,6 +213,20 @@ public final class Prefetch<Key: Hashable & Sendable, Value: Sendable>: @uncheck
             startNext()
             lock.unlock()
         }
+    }
+}
+
+/// Where a drop's copy goes once the drop is written, as the plugin's (`DragSession.release`): the first place the task's
+/// card is drawn that shows on the screen (its own list first, then any other, then the calendar), else nowhere, and the
+/// copy fades where it was let go. Never back to where it was lifted from: the task is no longer there.
+public enum LandingPick {
+    /// The first of `places` (each where the card is drawn and the part of the screen its view shows) that shows; nil
+    /// when none does.
+    public static func first<Place>(_ places: [(place: Place, rect: CGRect, shown: CGRect)]) -> Place? {
+        places.first { candidate in
+            let seen = candidate.rect.intersection(candidate.shown)
+            return !seen.isNull && seen.width > 0.5 && seen.height > 0.5
+        }?.place
     }
 }
 

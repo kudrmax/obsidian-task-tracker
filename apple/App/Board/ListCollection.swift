@@ -74,6 +74,16 @@ enum DrawnRow: Hashable {
         }
     }
 
+    /// The row's own height, as its content draws it: fixed for everything but a text being typed, which grows with its
+    /// lines. The list lays a fixed row out at this height without measuring its content.
+    var height: CGFloat? {
+        switch self {
+        case .header, .project, .newHead: ColumnMetrics.groupHead
+        case .plate, .card, .plusRoom: CardMetrics.height
+        case .pending, .field: nil
+        }
+    }
+
     /// The room above the row: the cards' gap after a card, a section's gap more over a header, nothing under a header,
     /// as the plugin's list stands.
     static func top(of row: DrawnRow, after previous: DrawnRow?) -> CGFloat {
@@ -97,17 +107,43 @@ struct ListCollection: UIViewRepresentable {
 
     func updateUIView(_ host: ListHostView, context: Context) {
         let controller = context.coordinator
-        // Read here so the list follows them: the screen, the entry's rows, a carry folding rows away, the keyboard.
+        // Read here so the list follows them: the screen, the entry's rows, the keyboard. A carry's rows folding away and
+        // back are drawn by the model as the carry changes (`BoardModel.markCards`), never through the board's own
+        // drawing, so a carry lifted or let go redraws the lists alone.
         _ = model.snapshot?.lists[column]
         _ = model.entry.lists[column]
         _ = model.entry.lineKeys[column]
         _ = model.entry.state?.renaming?.id
-        _ = model.carry?.token
-        _ = model.carry?.group.count
         _ = model.entry.heirs
         controller.update()
         controller.keyboard(KeyboardRise.shared.top)
         controller.follow(found: model.found, moved: model.entry.moved)
+    }
+}
+
+/// A list's cell: a row of a known height is laid out at it, its content never measured, so a change of the list (a drop,
+/// a carry folding rows away) lays out only what moved; a row that grows with its text is measured as the system does.
+final class RowCell: UICollectionViewCell {
+    var height: CGFloat?
+
+    override func preferredLayoutAttributesFitting(_ attributes: UICollectionViewLayoutAttributes) -> UICollectionViewLayoutAttributes {
+        guard let height else { return super.preferredLayoutAttributesFitting(attributes) }
+        #if DEBUG
+        let measured = super.preferredLayoutAttributesFitting(attributes.copy() as! UICollectionViewLayoutAttributes).size.height
+        if abs(measured - height) > 0.5 { ListHeights.mismatch(measured: measured, known: height) }
+        #endif
+        let fitted = attributes.copy() as! UICollectionViewLayoutAttributes
+        fitted.size.height = height
+        return fitted
+    }
+}
+
+/// A DEBUG build's check that a row's known height is what its content draws, told to the log (`category: drop`).
+enum ListHeights {
+    private static let log = Logger(subsystem: "com.kudrmax.taskcalendar", category: "drop")
+
+    static func mismatch(measured: CGFloat, known: CGFloat) {
+        log.fault("ROW HEIGHT measured \(measured) known \(known)")
     }
 }
 
@@ -200,9 +236,10 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         collection.keyboardDismissMode = .none
         host = ListHostView(collection: collection)
         super.init()
-        let cell = UICollectionView.CellRegistration<UICollectionViewCell, String> { [weak self] cell, _, id in
+        let cell = UICollectionView.CellRegistration<RowCell, String> { [weak self] cell, _, id in
             guard let self, let model = self.model, let drawn = self.drawn[id] else { return }
             let column = self.column
+            cell.height = drawn.row.height.map { $0 + drawn.top }
             cell.contentConfiguration = UIHostingConfiguration {
                 ListRowContent(row: drawn.row, top: drawn.top, column: column, model: model)
             }
@@ -255,7 +292,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
             guard let old = drawn[id], let new = tops[id] else { return false }
             return old.row != new.row || old.top != new.top
         }
-        let shownDay = model.snapshot?.day
+        let shownDay = model.drawing?.day
         guard force || ids != shownIds || !changed.isEmpty else { return }
         let gone = Set(shownIds).subtracting(ids)
         // Only rows drawn anew in place (a card turning into its field, a title written): drawn at once, never cross-faded.
@@ -277,8 +314,21 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
         snapshot.appendSections([0])
         snapshot.appendItems(ids)
-        snapshot.reconfigureItems(changed)
+        // Rows moving now are moved now; the rows only drawn anew (a card's line in the file, its branch) are drawn in the
+        // next frame, so a drop's frame lays the rows out without drawing them all again.
+        let later = animated ? changed : []
+        snapshot.reconfigureItems(animated ? [] : changed)
         source.apply(snapshot, animatingDifferences: animated)
+        if !later.isEmpty {
+            NextFrame.run { [weak self] in
+                guard let self else { return }
+                var next = self.source.snapshot()
+                let still = later.filter { next.indexOfItem($0) != nil }
+                guard !still.isEmpty else { return }
+                next.reconfigureItems(still)
+                self.source.apply(next, animatingDifferences: false)
+            }
+        }
         rowsVersion += 1
         showHeaders()
     }
@@ -325,7 +375,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     /// typed before it where the core's `listEntry` puts them. The card being renamed gives its place to the field; the
     /// cards a carry takes along (a card's subtasks, the other picked tasks) and a lifted section's cards are not drawn.
     static func rows(column: BoardColumn, model: BoardModel, plusRoom: Int?) -> [DrawnRow] {
-        guard let list = model.snapshot?.lists[column] else { return [] }
+        guard let list = model.drawing?.lists[column] else { return [] }
         let entry = model.entry.lists[column]
         let renaming = model.entry.state?.renaming?.id
         var typed: [DrawnRow] = []
@@ -576,6 +626,12 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
 
     /// Where a dropped card lands in this list as it is laid out now: its row, or the header of the folded project part it
     /// went into (decision 56).
+    /// What of the screen the list shows, in the window: a row outside it is not seen.
+    var shown: CGRect? {
+        guard let window = host.window else { return nil }
+        return host.convert(host.bounds, to: window).intersection(window.bounds)
+    }
+
     func landing(of landed: DropLanding) -> CarryLanding? {
         collection.layoutIfNeeded()
         if let capsule = capsule(of: landed.id) { return CarryLanding(rect: capsule) }
@@ -635,7 +691,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         if let standingRead, standingRead.key == key { return standingRead }
         var cards: [(card: BoardCard, rect: CGRect)] = []
         var heads: [(head: PlacedHead, part: (group: String?, zone: JSONValue?), rect: CGRect)] = []
-        let listed = model?.snapshot?.lists[column]?.cards ?? []
+        let listed = model?.drawing?.lists[column]?.cards ?? []
         for (index, row) in rows.enumerated() {
             guard let frame = collection.layoutAttributesForItem(at: IndexPath(item: index, section: 0))?.frame else { continue }
             let top = frame.minY + (drawn[keys[row.id] ?? row.id]?.top ?? 0)
@@ -764,13 +820,13 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     private func hoverSection(_ group: BoardGroup, at local: CGPoint) {
         let heads = rows.enumerated().compactMap { index, row -> (row: Int, group: Int?, y: CGFloat)? in
             guard case .header(let other, _) = row, other.id != group.id, let frame = collection.layoutAttributesForItem(at: IndexPath(item: index, section: 0))?.frame else { return nil }
-            return (index, model?.snapshot?.lists[column]?.groups.firstIndex { $0.id == other.id }, frame.midY)
+            return (index, model?.drawing?.lists[column]?.groups.firstIndex { $0.id == other.id }, frame.midY)
         }
         let before = heads.first { $0.y > local.y }
-        let slot = before?.group ?? model?.snapshot?.lists[column]?.groups.count
+        let slot = before?.group ?? model?.drawing?.lists[column]?.groups.count
         guard slot != sectionSlot else { return }
         sectionSlot = slot
-        UISelectionFeedbackGenerator().selectionChanged()
+        CarryFeel.tick()
         let lifted = DrawnRow.header(group, "").id
         let shown = rows.filter { $0 != .plusRoom && $0.id != lifted }
         let gap = before.flatMap { head in rows[safe: head.row].flatMap { row in shown.firstIndex(of: row) } } ?? shown.count
@@ -786,7 +842,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
             let slot = sectionSlot
             sectionSlot = nil
             plusRoom = nil
-            model?.dropSection(column, group, slot: slot.flatMap { $0 < (model?.snapshot?.lists[column]?.groups.count ?? 0) ? $0 : nil })
+            model?.dropSection(column, group, slot: slot.flatMap { $0 < (model?.drawing?.lists[column]?.groups.count ?? 0) ? $0 : nil })
             update()
             collection.layoutIfNeeded()
             return headerFrame(group).map { CarryLanding(rect: $0) }
@@ -803,7 +859,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         clearAim()
         switch model.dropOnList(shown.shown) {
         case .landed(let landed):
-            return landed.flatMap { landing(of: $0) }
+            return model.landingOnScreen(landed, from: column)
         case .stays, .refused:
             return nil
         }
@@ -969,3 +1025,4 @@ enum DropLog {
         #endif
     }
 }
+

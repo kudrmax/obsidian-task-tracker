@@ -174,7 +174,8 @@ struct TimelineColumn: View {
                     .padding(.trailing, Measure.itemsRight + Measure.itemInset)
                     .offset(y: y(minute, hour) + Measure.itemInset)
             }
-            if let minute = model.landing { landingLine(minute, hour: hour) }
+            // Read by its own view: the line moving under a carry redraws the line, not the calendar.
+            LandingMark(model: model) { minute in landingLine(minute, hour: hour) }
         }
         .frame(width: width, height: height, alignment: .topLeading)
         .coordinateSpace(.named(Self.canvasSpace))
@@ -632,5 +633,24 @@ struct CalendarPress: UIGestureRecognizerRepresentable {
         default:
             break
         }
+    }
+}
+
+/// Where a carried card would land on the calendar, drawn by a view of its own: it alone reads the minute, which changes
+/// on every step of a carry over the calendar.
+private struct LandingMark<Line: View>: View {
+    let model: BoardModel
+    @ViewBuilder let line: (Int) -> Line
+
+    var body: some View {
+        if let minute = model.landing { line(minute) }
+    }
+}
+
+/// The calendar drawn again only when the day it shows changed: a drop that leaves the calendar as it was, or a new read
+/// of the same day, never redraws it; what it reads of the board (the zoom, the line under a carry) it follows itself.
+extension TimelineColumn: Equatable {
+    nonisolated static func == (a: TimelineColumn, b: TimelineColumn) -> Bool {
+        MainActor.assumeIsolated { a.timeline == b.timeline && a.model === b.model }
     }
 }
