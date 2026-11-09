@@ -197,7 +197,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         var list = UICollectionLayoutListConfiguration(appearance: .plain)
         list.showsSeparators = false
         list.backgroundColor = .clear
-        let layout = UICollectionViewCompositionalLayout { _, environment in
+        let layout = FoldingListLayout { _, environment in
             let section = NSCollectionLayoutSection.list(using: list, layoutEnvironment: environment)
             section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: CardMetrics.columnInset, bottom: ListCollection.trailingRoom, trailing: CardMetrics.columnInset)
             return section
@@ -236,6 +236,11 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
     /// changed is drawn again in place. Another day comes in still: it slid in through the day's own motion.
     func update(force: Bool = false) {
         guard let model else { return }
+        // A card's menu going: the list draws the new screen once the card's copy has landed in its row.
+        guard !MenuHold.holding else {
+            MenuHold.after(self) { [weak self] in self?.update(force: force) }
+            return
+        }
         let next = Self.rows(column: column, model: model, plusRoom: plusRoom)
         // A card made from a typed line keeps that line's key, so the text becomes the card in its row.
         let heirs = model.entry.heirs
@@ -270,6 +275,9 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
                   let field = cell.contentView.firstResponderInside as? EntryTextField else { continue }
             field.park(in: window)
         }
+        if let layout = collection.collectionViewLayout as? FoldingListLayout {
+            layout.covers = (before: Self.covering(rows), after: Self.covering(next))
+        }
         rows = next
         drawn = tops
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
@@ -277,6 +285,16 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         snapshot.appendItems(ids)
         snapshot.reconfigureItems(changed)
         source.apply(snapshot, animatingDifferences: animated)
+    }
+
+    /// The rows whose capsule hides a row folding in or out under it: the cards and the texts typed.
+    private static func covering(_ rows: [DrawnRow]) -> Set<Int> {
+        Set(rows.indices.filter { index in
+            switch rows[index] {
+            case .card, .pending, .field: true
+            default: false
+            }
+        })
     }
 
     /// The list's rows: each section's header, its No tasks plate, its cards, and the quick entry's field with the texts
@@ -402,6 +420,30 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         let covered = min(frame.height, max(0, frame.maxY - max(frame.minY, top)))
         if collection.contentInset.bottom != covered { collection.contentInset.bottom = covered }
     }
+
+    /// A row coming in unfolds from under the row before it, its own view carried down from there with the rows moving
+    /// to make its room (`FoldingListLayout`).
+    func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt path: IndexPath) {
+        guard let layout = collectionView.collectionViewLayout as? FoldingListLayout, let rise = layout.takeUnfolding(path.item) else { return }
+        // The cell's own frame and transform are the layout's, set again as it is laid out: its content is carried
+        // instead, by an animation of its own that no layout pass resets.
+        let unfold = CASpringAnimation(perceptualDuration: Self.unfold, bounce: 0)
+        unfold.keyPath = "transform.translation.y"
+        unfold.fromValue = rise
+        unfold.toValue = 0
+        unfold.duration = unfold.settlingDuration
+        unfold.fillMode = .backwards
+        cell.contentView.layer.add(unfold, forKey: "unfold")
+        // Beneath the rows round it while it unfolds, the one it comes from above all.
+        let beneath = CABasicAnimation(keyPath: "zPosition")
+        beneath.fromValue = -1 - CGFloat(path.item) / 10_000
+        beneath.toValue = beneath.fromValue
+        beneath.duration = unfold.duration
+        cell.layer.add(beneath, forKey: "beneath")
+    }
+
+    /// The collection's own time for rows moving in a change.
+    static let unfold: TimeInterval = 0.35
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         host.edges()
@@ -769,6 +811,85 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
             update()
             return nil
         }
+    }
+}
+
+/// The list's layout, whose rows come and go as a folder's do: a row that comes slides out from under the row before it
+/// (a subtask from its parent, a task from the one above) while the rows after it move down to make its room, and a row
+/// that goes slides back under the row before it while the rows after it close over it. Nothing fades in place under rows
+/// sliding past it, and no two rows cross: the ones coming and going stay beneath the rest, each under the one before.
+/// A row under no card (the first, or one after a header) fades instead, where it stands.
+final class FoldingListLayout: UICollectionViewCompositionalLayout {
+    /// The rows, before and after the change, that cover a row folding under them (`ListController.covering`).
+    var covers: (before: Set<Int>, after: Set<Int>) = ([], [])
+    private var inserted: Set<Int> = []
+    private var deleted: Set<Int> = []
+    /// Where the rows stood before the change, by their index then.
+    private var before: [Int: CGRect] = [:]
+
+    override func prepare() {
+        // The layout as it stood, read before it is laid out anew: a row going folds under the row that stood before it.
+        if let view = collectionView, !view.bounds.isEmpty {
+            let shown = layoutAttributesForElements(in: view.bounds.insetBy(dx: 0, dy: -view.bounds.height)) ?? []
+            before = Dictionary(shown.filter { $0.representedElementCategory == .cell }.map { ($0.indexPath.item, $0.frame) }, uniquingKeysWith: { first, _ in first })
+        }
+        super.prepare()
+    }
+
+    override func prepare(forCollectionViewUpdates updateItems: [UICollectionViewUpdateItem]) {
+        super.prepare(forCollectionViewUpdates: updateItems)
+        inserted = Set(updateItems.compactMap { $0.updateAction == .insert ? $0.indexPathAfterUpdate?.item : nil })
+        deleted = Set(updateItems.compactMap { $0.updateAction == .delete ? $0.indexPathBeforeUpdate?.item : nil })
+    }
+
+    override func finalizeCollectionViewUpdates() {
+        super.finalizeCollectionViewUpdates()
+        unfolding = [:]
+        inserted = []
+        deleted = []
+    }
+
+    /// How far above its place each row coming in starts, hidden under the row before it, by its index: the collection
+    /// lays a list's coming row out at its own measured size, so the row's own view carries this start
+    /// (`ListController.willDisplay`) rather than the layout's first frame, which its measuring overrides.
+    private(set) var unfolding: [Int: CGFloat] = [:]
+
+    func takeUnfolding(_ item: Int) -> CGFloat? {
+        unfolding.removeValue(forKey: item)
+    }
+
+    override func initialLayoutAttributesForAppearingItem(at path: IndexPath) -> UICollectionViewLayoutAttributes? {
+        guard inserted.contains(path.item), let shown = layoutAttributesForItem(at: path)?.copy() as? UICollectionViewLayoutAttributes else {
+            return super.initialLayoutAttributesForAppearingItem(at: path)
+        }
+        var anchor = path.item - 1
+        while anchor >= 0, inserted.contains(anchor) { anchor -= 1 }
+        guard anchor >= 0, covers.after.contains(anchor), let over = layoutAttributesForItem(at: IndexPath(item: anchor, section: path.section)) else {
+            shown.alpha = 0
+            return shown
+        }
+        unfolding[path.item] = over.frame.maxY - shown.frame.maxY
+        shown.zIndex = anchor - path.item
+        shown.alpha = 1
+        return shown
+    }
+
+    override func finalLayoutAttributesForDisappearingItem(at path: IndexPath) -> UICollectionViewLayoutAttributes? {
+        guard deleted.contains(path.item), let gone = super.finalLayoutAttributesForDisappearingItem(at: path)?.copy() as? UICollectionViewLayoutAttributes,
+              let stood = before[path.item] else {
+            return super.finalLayoutAttributesForDisappearingItem(at: path)
+        }
+        gone.frame = stood
+        var anchor = path.item - 1
+        while anchor >= 0, deleted.contains(anchor) { anchor -= 1 }
+        guard anchor >= 0, covers.before.contains(anchor), let over = before[anchor] else {
+            gone.alpha = 0
+            return gone
+        }
+        gone.frame.origin.y = over.maxY - stood.height
+        gone.zIndex = anchor - path.item
+        gone.alpha = 1
+        return gone
     }
 }
 

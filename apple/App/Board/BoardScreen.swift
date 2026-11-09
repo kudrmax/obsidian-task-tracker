@@ -111,7 +111,7 @@ struct BoardScreen: View {
     @ViewBuilder
     private var content: some View {
         if let snapshot = model.snapshot, !snapshot.screen.missing {
-            Ribbon(snapshot: snapshot, model: model)
+            Ribbon(snapshot: snapshot, model: model, barTop: plusSlot?.minY)
                 .overlay(alignment: .top) { problem }
                 .overlay { if let stack = model.stackShown { TimelineStack(shown: stack, model: model) } }
                 .overlay(alignment: .bottom) { NoteSuggestions(host: model.entry) }
@@ -270,6 +270,33 @@ struct BoardScreen: View {
     }
 }
 
+/// Inbox over Backlog, as the plugin's first column: half and half of what the screen's foot (the tab bar) leaves, the foot
+/// itself Backlog's, so both lists show as much; Backlog's title stands under a hairline, so where Inbox's rows go on
+/// past its half reads as a list scrolling under its edge, not as a row cut.
+private struct InboxOverBacklog<Inbox: View, Backlog: View>: View {
+    let barTop: CGFloat?
+    @ViewBuilder let inbox: Inbox
+    @ViewBuilder let backlog: Backlog
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.displayScale) private var scale
+
+    var body: some View {
+        GeometryReader { box in
+            let frame = box.frame(in: .global)
+            let foot = barTop.map { max(0, min(frame.height, frame.maxY - $0)) } ?? 0
+            VStack(alignment: .leading, spacing: 0) {
+                inbox.frame(height: max(0, (frame.height - foot) / 2), alignment: .top)
+                backlog
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .overlay(alignment: .top) {
+                        Rectangle().fill(Palette.line(scheme)).frame(height: 1 / scale)
+                            .padding(.horizontal, CardMetrics.columnInset)
+                    }
+            }
+        }
+    }
+}
+
 enum BoardSheet: String, Identifiable {
     case search, settings, calendars
     var id: String { rawValue }
@@ -282,6 +309,8 @@ enum BoardSheet: String, Identifiable {
 struct Ribbon: View {
     let snapshot: BoardSnapshot
     @Bindable var model: BoardModel
+    /// The tab bar's top on the screen: the part of the column under it is the screen's foot, Backlog's.
+    var barTop: CGFloat?
     @State private var position = ScrollPosition(idType: RibbonPlace.self)
     /// How far the ribbon has come from Soon to Today, 0 to 1: the divider's handle shows at Today.
     @State private var toToday: CGFloat = 0
@@ -319,8 +348,9 @@ struct Ribbon: View {
                     }
                     // One column, Inbox over Backlog, each exactly the column's width.
                     column(.inbox, half) {
-                        VStack(alignment: .leading, spacing: 0) {
+                        InboxOverBacklog(barTop: barTop) {
                             lists(.inbox).frame(width: half)
+                        } backlog: {
                             lists(.backlog).frame(width: half)
                         }
                     }
