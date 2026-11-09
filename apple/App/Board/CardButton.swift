@@ -193,6 +193,7 @@ final class CardControl: UIControl {
         addSubview(opener)
         addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
         press.addTarget(self, action: #selector(pressed(_:)))
+        press.minimumPressDuration = DragController.liftDelay
         press.isEnabled = false
         addGestureRecognizer(press)
         isAccessibilityElement = true
@@ -242,6 +243,7 @@ final class CardControl: UIControl {
             content.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, ringed: look.ringed, height: look.height) }.margins(.all, 0)
         }
         if let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) { opener.refresh(menu) }
+        if let shownWhole, let image = wholeTitle(look)?.image { shownWhole.show(image) }
     }
 
     @objc private func tapped(_ tap: UITapGestureRecognizer) {
@@ -267,13 +269,31 @@ final class CardControl: UIControl {
         guard let look, let window, let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return }
         Self.menuOwner = self
         Self.lastLifted = (look.card, convert(bounds, to: window))
+        shownWhole = nil
+        previewFrame = nil
         // Drawn as on the board: inside the menu the system's grounds are its raised level's, lighter, and the card took
         // the menu's own white.
-        let whole = grownCopy(selectable: false, always: false).flatMap { _, frame in
-            FloatImage.view(TaskCapsule(card: look.card, text: look.text, height: look.height, whole: true).frame(width: frame.width, height: frame.height), like: self, in: window)
-        }.map { image in { WholeTitle(copy: image, size: image.bounds.size) as UIViewController } }
+        let whole = wholeTitle(look).map { image in
+            { [weak self] () -> UIViewController in
+                let preview = WholeTitle(copy: image, size: image.bounds.size)
+                self?.shownWhole = preview
+                return preview
+            }
+        }
         opener.present(menu, at: point, whole: whole) { [weak self] in self?.inPlace }
     }
+
+    /// The card with its whole title as the menu's preview shows it, drawn as on the board; nil for a card that shows its
+    /// whole title (the menu lifts the card itself).
+    private func wholeTitle(_ look: Look) -> UIImageView? {
+        guard let window, let (_, frame) = grownCopy(selectable: false, always: false) else { return nil }
+        return FloatImage.view(TaskCapsule(card: look.card, text: look.text, height: look.height, whole: true).frame(width: frame.width, height: frame.height), like: self, in: window)
+    }
+
+    /// The menu's whole-title preview while it shows: a label set from the menu redraws it.
+    private weak var shownWhole: WholeTitle?
+    /// Where that preview stood as the menu began to go, in the window: Select Text lifts the title there.
+    private var previewFrame: CGRect?
 
     /// The card itself where it stands: what the menu lifts and lands.
     private var inPlace: UITargetedPreview? {
@@ -320,13 +340,16 @@ final class CardControl: UIControl {
         let selection = TitleSelection(in: window) { [weak owner] in owner?.content.isHidden = false }
         guard let (copy, frame) = owner.grownCopy(selectable: true, always: true, onCopied: { [weak selection] in selection?.close() }) else { return selection.close() }
         owner.content.isHidden = true
-        selection.show(copy, at: frame)
+        // Where the menu's whole-title preview stood, as iOS placed it: the selection takes the title from there.
+        let shown = owner.previewFrame.map { CGRect(x: $0.minX, y: $0.minY, width: frame.width, height: frame.height) }
+        selection.show(copy, at: shown ?? frame)
     }
 
     /// The menu goes: the system flies its preview back into the card; the lists keep the screen they show until it is
     /// home (`MenuHold`), so a row the menu's choice removes (Done, Won't Do, Delete) closes only once the card is back. A
     /// row that opens a sheet or a page runs as the menu starts to go.
     private func menuEnded(_ animator: (any UIContextMenuInteractionAnimating)?) {
+        previewFrame = shownWhole?.viewIfLoaded.flatMap { view in view.window.map { view.convert(view.bounds, to: $0) } }
         MenuHold.begin()
         var home = false
         let landed = {
@@ -402,9 +425,9 @@ final class CardControl: UIControl {
 
 /// The whole title as the menu's preview: the card's copy laid out with its whole title, the size the core gives it.
 final class WholeTitle: UIViewController {
-    private let copy: UIView
+    private let copy: UIImageView
 
-    init(copy: UIView, size: CGSize) {
+    init(copy: UIImageView, size: CGSize) {
         self.copy = copy
         super.init(nibName: nil, bundle: nil)
         preferredContentSize = size
@@ -412,6 +435,11 @@ final class WholeTitle: UIViewController {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not from a storyboard") }
+
+    /// The card drawn anew (a label set from the open menu): the preview takes its new look in place, at its size.
+    func show(_ image: UIImage) {
+        UIView.transition(with: copy, duration: 0.2, options: [.transitionCrossDissolve, .allowUserInteraction]) { self.copy.image = image }
+    }
 
     override func loadView() {
         let view = UIView(frame: CGRect(origin: .zero, size: preferredContentSize))

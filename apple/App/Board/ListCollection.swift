@@ -226,7 +226,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         collection.delegate = self
         press.addTarget(self, action: #selector(pressed(_:)))
         press.delegate = self
-        press.minimumPressDuration = CardMetrics.press
+        press.minimumPressDuration = DragController.liftDelay
         collection.addGestureRecognizer(press)
         model.register(self)
     }
@@ -237,7 +237,6 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     /// changed is drawn again in place. Another day comes in still: it slid in through the day's own motion.
     func update(force: Bool = false) {
         guard let model else { return }
-        press.minimumPressDuration = CardMetrics.press
         // A card's menu going: the list draws the new screen once the card is back in its row.
         guard !MenuHold.holding else {
             MenuHold.after(self) { [weak self] in self?.update(force: force) }

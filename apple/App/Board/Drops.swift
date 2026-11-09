@@ -256,7 +256,7 @@ final class CalendarDrop: BoardTarget {
     func letGo(carrying payload: DragPayload?) -> CarryLanding? {
         guard let canvas = model?.calendarCanvas else { return nil }
         guard let rect = payload == nil ? model?.plusOnCalendar() : model?.dropOnCalendar() else { return nil }
-        return CarryLanding(rect: canvas.convert(rect, to: nil), opens: payload == nil)
+        return CarryLanding(rect: canvas.convert(rect, to: nil), opens: payload == nil, onCalendar: true)
     }
 }
 

@@ -28,6 +28,8 @@ struct CarryLanding {
     var folds = false
     /// The plus taken by a place: the copy becomes the field that opens there.
     var opens = false
+    /// On the calendar: the card lands as a block of its stack.
+    var onCalendar = false
 }
 
 /// The place a carry let go on the cancel target: the plus's slot while anything is carried.
@@ -75,6 +77,11 @@ final class DragController {
         if case .landing = flow.phase, let live { landed(live) }
         return flow.phase == .idle
     }
+
+    /// How long a card, a calendar block or a section header is pressed before it lifts: the system's drag lift as the app
+    /// had it (measured on iOS 26.3: the lift began 0.326 s after the touch). The settings' Long Press Delay stays the
+    /// calendar's empty-space press's, as it was.
+    static let liftDelay: TimeInterval = 0.33
 
     /// The copy's flight, and the rows' and blocks' motion with it: a spring with no bounce, fitted to this time, so the
     /// flight's end (when the card takes over from the copy) is where the motion ends, not a settling tail after it.
@@ -202,7 +209,7 @@ final class DragController {
         let rect = landing.rect
         switch live.payload?.kind {
         case .card:
-            guard let id = model.landedId, let card = model.drawnCard(id) else { return nil }
+            guard let id = model.landedId, let card = model.drawnCard(id, onCalendar: landing.onCalendar) else { return nil }
             return FloatImage.view(TaskCapsule(card: card, height: rect.height).frame(width: rect.width, height: rect.height), like: live.copy, in: window)
         case .section(let group):
             return FloatImage.view(SectionTitle(title: group.header ?? "", muted: group.name == nil).frame(width: rect.width, height: rect.height), like: live.copy, in: window)
@@ -454,8 +461,9 @@ final class SpringZones {
     private var zones: [Zone] = []
     private weak var over: UIView?
     private var dwell: Timer?
-    /// How long a carry stays over an arrow before it turns the day, as the system's spring loading.
-    static let delay: TimeInterval = 0.5
+    /// How long a carry stays over an arrow before it turns the day: the system's spring loading as the app had it on
+    /// the system's drag (measured on iOS 26.3: 1.25 s from the card reaching the arrow).
+    static let delay: TimeInterval = 1.25
 
     func add(_ view: UIView, activate: @escaping () -> Void) {
         zones.removeAll { $0.view == nil || $0.view === view }

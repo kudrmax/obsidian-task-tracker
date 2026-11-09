@@ -129,12 +129,14 @@ what a drop writes.
    rings or takes a drop «onto» it; only an empty section's plate and a column's title light, as before.
 5. **frontend-swift: the calendar's line marks the carried card's top edge** (the minute is read where the card's top
    stands, the finger's hold on the card known from the lift), so the line shows at the card's edge, not under it.
-6. **frontend-swift, changed 11-09 (own drag): the day arrows are spring-loaded.** A card held over ‹ or › for half a
-   second turns the day, with the selection tick, as the system's spring loading does Files' folders (`SpringZones`,
-   the one dwell of the drag); once per stay over the arrow; the carry goes on and lands in the day now shown, the place
-   under the still finger read anew as the day lands.
-7. **frontend-swift, changed 11-09 (own drag): cards, calendar blocks and section headers lift after the settings' Long
-   Press Delay**, as the calendar's empty-space press does: the lift is the app's own long press now. The plus lifts at
+6. **frontend-swift, changed 11-09 (own drag, timing kept): the day arrows are spring-loaded.** A card held over ‹ or ›
+   turns the day after 1.25 s, as the system's spring loading did on master (measured there: 1.25 s from the card
+   reaching the arrow), with the selection tick (`SpringZones`, the one dwell of the drag); once per stay over the
+   arrow, as on master; the carry goes on and lands in the day now shown, the place under the still finger read anew as
+   the day lands.
+7. **frontend-swift, kept as on master (lead: don't change what Max is used to): cards, calendar blocks and section
+   headers lift after the system drag's own time, 0.33 s** (measured on master: the lift began 0.326 s after the touch,
+   whatever the setting); the settings' Long Press Delay stays the calendar's empty-space press's. The plus lifts at
    once, as before.
 8. **frontend-swift, changed 11-09: a card carried out of its list keeps its dashed place there** until the carry
    ends, as the plugin's; the picked tasks carried with it fold away under it.
@@ -166,8 +168,9 @@ what a drop writes.
     laid out with its whole title at the width the core gives (`rules.wholeWidth`), drawn as on the board (inside the
     menu the system's grounds are its raised level's: the card took the menu's white); the highlight and dismissal
     previews are the card itself, so the system morphs the card into the whole title and back, no app copies. The system
-    places the preview (no longer `rules.grownStart`). A label set from the open menu redraws the card and the menu's rows;
-    the preview keeps the look it opened with. A row the menu's choice removes (Done, Won't Do, Delete) closes once the
+    places the preview (no longer `rules.grownStart`). A label set from the open menu redraws the card, the menu's rows
+    and the preview in place (the whole-title one cross-fades to the new look); Select Text lifts the title exactly where
+    the preview stood. A row the menu's choice removes (Done, Won't Do, Delete) closes once the
     preview is home, heard from an animation of the app's run inside the menu's going (the animator's own completion
     comes most of a second later). The private trigger that opens the menu on a tap (`_presentMenuAtLocation:`) stays: it
     presents this configuration with the standard morph.

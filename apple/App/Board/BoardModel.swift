@@ -1153,11 +1153,13 @@ final class BoardModel {
     /// The card the last drop landed as, in the screen it leaves.
     private(set) var landedId: String?
 
-    /// The card `id` as the screen draws it now, in a list or on the calendar.
-    func drawnCard(_ id: String) -> BoardCard? {
+    /// The card `id` as the screen draws it now: in a list, or on the calendar as the stack at the zoom shown draws it (its
+    /// corner is that stack's: the read's own stack is laid out at the default zoom).
+    func drawnCard(_ id: String, onCalendar: Bool) -> BoardCard? {
         guard let snapshot else { return nil }
+        if onCalendar { return stacked(snapshot.timeline, hour: calendarHour).first { $0.id == id }?.card }
         for list in snapshot.lists.values { if let card = list.cards.first(where: { $0.id == id }) { return card } }
-        return snapshot.timeline.slots.first { $0.id == id }?.card
+        return nil
     }
 
     /// A drop on the column's title means something: a card carried, the list taking it there.
