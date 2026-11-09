@@ -140,7 +140,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     }
     var look: Look?
     let content: UIView & UIContentView
-    /// What hides the card while it is carried or its menu's copy stands for it: the content's holder, decided in `showsInPlace` alone. The content's own
+    /// What hides the card while it is carried: the content's holder, decided in `showsInPlace` alone. The content's own
     /// alpha is the system's (its lift), which sets it and gives it back on its own schedule: hiding the card through the
     /// same property was overwritten by it, or overwrote it.
     private let shown = UIView()
@@ -254,11 +254,8 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     /// The card as its open menu shows it, from the menu's first frame to its last (`MenuCopy`).
     private var copy: MenuCopy?
-    /// The menu's copy stands for the card, from its lift to its landing: the card is not drawn beside it, where the
-    /// menu's lift moves the copy a little off the card.
-    private var copied = false {
-        didSet { if copied != oldValue { showsInPlace() } }
-    }
+    /// The menu has lifted its twin of the copy; what it asks for next is where to land.
+    private var liftedOnce = false
 
     @objc private func tapped(_ tap: UITapGestureRecognizer) {
         onTouch()
@@ -284,26 +281,44 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         guard let look, let window, let menu = menuMaker({ [weak self] run in self?.afterMenu = run }),
               let (whole, grown) = grownCopy(selectable: false, always: true) else { return }
         let card = convert(bounds, to: window)
-        let made = MenuCopy(look: look, style: traitCollection.userInterfaceStyle, card: card, whole: whole, grown: grown)
-        // In the window, over the card and its own look: the menu lifts it from there and lands it back there, as it
-        // lifts and lands any view of the screen.
+        let style = traitCollection.userInterfaceStyle
+        let made = MenuCopy(look: look, style: style, card: card, whole: whole, grown: grown)
+        // In the window, over the card: it grows there from the card into the whole copy, opaque, on the screen itself;
+        // then the menu lifts it where it stands, as it lifts any view in place, and lands it back there. A preview the
+        // menu brings in from elsewhere, or one that changes size inside the menu, the menu fades in: the rows under it
+        // showed through it as it came.
         window.addSubview(made)
         copy = made
-        copied = true
+        liftedOnce = false
         Self.menuOwner = self
         Self.lastLifted = (look.card, card)
-        opener.present(menu, at: point) { [weak made] in made?.preview }
+        let present = { [weak self, weak made] in
+            guard let self, let made, made.window != nil else { return }
+            // The menu lifts a twin of the copy, at the copy's place: the copy itself stays drawn under the twin while the
+            // menu fades the twin in and out, so the rows under it never show through.
+            // It lands back on the copy itself, which then shrinks back into the card in the menu's own flight.
+            self.opener.present(menu, at: point) { [weak self, weak made] in
+                guard let self, let made, let window = made.window else { return nil }
+                if self.liftedOnce { return made.inPlace }
+                guard let (whole, _) = self.grownCopy(selectable: false, always: true) else { return nil }
+                self.liftedOnce = true
+                return made.twin(look: look, style: style, whole: whole, in: window, card: card)
+            }
+        }
+        guard made.grows else { return present() }
+        // A curve that ends when it is seen to end: a spring's completion came most of a second after it had settled.
+        UIView.animate(withDuration: Self.menuGrow, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
+            made.grow()
+        } completion: { _ in present() }
     }
 
     /// The menu's copy shrinking back into the card as the menu flies it home.
-    private static let menuShrink: TimeInterval = 0.32
-    private static let menuFade: TimeInterval = 0.2
+    private static let menuShrink: TimeInterval = 0.25
+    /// The copy growing from the card before its menu shows.
+    private static let menuGrow: TimeInterval = 0.18
 
-    /// The menu shows: its copy grows from the card with it, in the menu's own motion.
-    private func menuShown(_ animator: (any UIContextMenuInteractionAnimating)?) {
-        guard let copy else { return }
-        if let animator { animator.addAnimations { copy.grow() } } else { copy.grow() }
-    }
+    /// The menu shows over the copy grown in place.
+    private func menuShown(_ animator: (any UIContextMenuInteractionAnimating)?) {}
 
     /// The card's copy with its whole title, sized and placed in the window as the menu lifts it. `always`: a card that
     /// shows its whole title gets a copy too, at its own width, where the menu lifts the card itself.
@@ -351,22 +366,18 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         if let copy {
             self.copy = nil
             MenuHold.begin()
-            // The copy shrinks back to the card's size on its own spring while the menu flies it home, and lands when
-            // that spring is done: the card shows in its place, the copy fades into the row, the lists go on. The menu's
-            // animator tells of its end most of a second after the copy has visibly landed.
-            let land = { [weak self] in
-                self?.copied = false
-                UIView.animate(withDuration: Self.menuFade, delay: 0, options: [.allowUserInteraction]) {
-                    copy.alpha = 0
+            // The menu flies the copy home in place at the size it was lifted at, so nothing of it is scaled on the way;
+            // once it is seen down where it stands, it shrinks back into the card on the screen and goes, the card drawn
+            // alike under it. The menu's animator tells of its end most of a second after the copy is down.
+            let shrink = {
+                UIView.animate(withDuration: Self.menuShrink, delay: 0, options: [.curveEaseInOut, .allowUserInteraction]) {
+                    copy.shrink()
                 } completion: { _ in
                     copy.removeFromSuperview()
                     MenuHold.end()
                 }
             }
-            guard animator != nil else { return land() }
-            UIView.animate(springDuration: Self.menuShrink, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
-                copy.shrink()
-            } completion: { _ in land() }
+            if animator == nil { shrink() } else { LandingWatch.watch(copy, landed: shrink) }
         }
         guard let run = afterMenu else { return }
         afterMenu = nil
@@ -419,7 +430,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     /// Only what the card draws hides, never the card: a hidden card still takes the finger.
     private func showsInPlace() {
-        shown.alpha = carried || copied ? 0 : 1
+        shown.alpha = carried ? 0 : 1
     }
 }
 
@@ -495,16 +506,22 @@ final class MenuCopy: UIView {
     private let shape = UIView()
     private let own: UIView & UIContentView
     private let whole: UIView & UIContentView
-    /// The card, in this view's space.
-    private let card: CGRect
-    private let grows: Bool
+    /// The card's size, and the whole copy's size and how far its middle stands from the card's.
+    private let card: CGSize
+    private let grown: CGSize
+    private let shift: CGVector
+    let grows: Bool
 
+    /// It starts as exactly the card, where the card stands: the menu lifts it as it lifts a card in place, with no fade
+    /// from one view into another. As the menu shows, it grows in place to the whole copy.
     init(look: CardControl.Look, style: UIUserInterfaceStyle, card: CGRect, whole: UIView & UIContentView, grown: CGRect) {
         own = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, height: look.height) }.margins(.all, 0).makeContentView()
         self.whole = whole
-        self.card = CGRect(origin: CGPoint(x: card.minX - grown.minX, y: card.minY - grown.minY), size: card.size)
+        self.card = card.size
+        self.grown = grown.size
+        shift = CGVector(dx: grown.midX - card.midX, dy: grown.midY - card.midY)
         grows = grown.size != card.size
-        super.init(frame: grown)
+        super.init(frame: card)
         overrideUserInterfaceStyle = style
         isUserInteractionEnabled = false
         shape.clipsToBounds = true
@@ -513,28 +530,39 @@ final class MenuCopy: UIView {
         addSubview(shape)
         whole.frame = CGRect(origin: .zero, size: grown.size)
         own.frame = CGRect(origin: .zero, size: card.size)
+        // The whole copy beneath, opaque the whole time and revealed by the card's shape as it grows; the card's own look
+        // over it, fading out. Nothing of the copy is ever half transparent, so nothing under it shows through.
         shape.addSubview(whole)
         shape.addSubview(own)
-        shrink()
+        shape.frame = bounds
+        ticker.alpha = 0
+        addSubview(ticker)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not from a storyboard") }
 
-    /// The whole copy, as the open menu shows it.
+    /// The whole copy, as the open menu shows it: grown from the card where it stands, in whatever holds it now.
     func grow() {
+        guard grows, bounds.size != grown else { return }
+        center = CGPoint(x: center.x + shift.dx, y: center.y + shift.dy)
+        bounds = CGRect(origin: .zero, size: grown)
         shape.frame = bounds
-        guard grows else { return }
         own.alpha = 0
-        whole.alpha = 1
     }
 
     /// The card, where it stands.
     func shrink() {
-        shape.frame = card
+        guard grows, bounds.size != card else { return }
+        center = CGPoint(x: center.x - shift.dx, y: center.y - shift.dy)
+        bounds = CGRect(origin: .zero, size: card)
+        shape.frame = bounds
         own.alpha = 1
-        whole.alpha = 0
     }
+
+    /// A change nothing shows, for an animation that only times another.
+    private let ticker = UIView()
+    func mark() { ticker.alpha = ticker.alpha == 0 ? 0.01 : 0 }
 
     /// The card drawn anew while its menu shows (a label set from it): both looks take the new colours.
     func restyle(_ look: CardControl.Look) {
@@ -542,15 +570,26 @@ final class MenuCopy: UIView {
         whole.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, height: look.height, whole: true) }.margins(.all, 0)
     }
 
-    /// What the menu lifts and lands: this view where it stands, with nothing of its own round it. Its rect has no ground
-    /// and no shadow; the card's shape inside it draws the card.
-    var preview: UITargetedPreview? {
-        guard window != nil else { return nil }
+    /// Where the menu lands: this copy itself, where it stands.
+    var inPlace: UITargetedPreview {
         let parameters = UIPreviewParameters()
-        parameters.visiblePath = UIBezierPath(rect: bounds)
+        parameters.visiblePath = UIBezierPath(roundedRect: bounds, cornerRadius: CardMetrics.radius)
+        parameters.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: CardMetrics.radius)
         parameters.backgroundColor = .clear
-        parameters.shadowPath = UIBezierPath()
         return UITargetedPreview(view: self, parameters: parameters)
+    }
+
+    /// What the menu lifts: a twin of this copy as it stands now, put at its place in `window`, with nothing of
+    /// its own round it.
+    func twin(look: CardControl.Look, style: UIUserInterfaceStyle, whole: UIView & UIContentView, in window: UIWindow, card: CGRect) -> UITargetedPreview {
+        let frame = convert(bounds, to: window)
+        let twin = MenuCopy(look: look, style: style, card: card, whole: whole, grown: frame)
+        if grows { twin.grow() }
+        let parameters = UIPreviewParameters()
+        parameters.visiblePath = UIBezierPath(roundedRect: twin.bounds, cornerRadius: CardMetrics.radius)
+        parameters.shadowPath = UIBezierPath(roundedRect: twin.bounds, cornerRadius: CardMetrics.radius)
+        parameters.backgroundColor = .clear
+        return UITargetedPreview(view: twin, parameters: parameters, target: UIPreviewTarget(container: window, center: CGPoint(x: frame.midX, y: frame.midY)))
     }
 }
 
@@ -576,5 +615,61 @@ enum MenuHold {
     /// `work` runs once the hold ends: one waiting work per owner, the last asked.
     static func after(_ owner: AnyObject, _ work: @escaping () -> Void) {
         waiting[ObjectIdentifier(owner)] = work
+    }
+}
+
+/// Tells when a view the system flies (a menu's preview going home) is seen down where it stands: its presented frame on
+/// the screen meets its own frame and stays there. Read each frame of the display, never guessed by a time.
+@MainActor
+final class LandingWatch: NSObject {
+    private let view: UIView
+    private let landed: () -> Void
+    private var link: CADisplayLink?
+    private var still = 0
+    private var frames = 0
+    private static var watching: Set<LandingWatch> = []
+
+    private init(_ view: UIView, landed: @escaping () -> Void) {
+        self.view = view
+        self.landed = landed
+    }
+
+    static func watch(_ view: UIView, landed: @escaping () -> Void) {
+        let watch = LandingWatch(view, landed: landed)
+        watching.insert(watch)
+        let link = CADisplayLink(target: watch, selector: #selector(tick))
+        link.add(to: .main, forMode: .common)
+        watch.link = link
+    }
+
+    /// Where the view shows on the screen now, and where it stands.
+    private var shown: (now: CGRect, home: CGRect)? {
+        guard let presented = view.layer.presentation(), let root = rootLayer(of: view.layer)?.presentation() else { return nil }
+        let home = view.layer.convert(view.layer.bounds, to: rootLayer(of: view.layer))
+        return (presented.convert(presented.bounds, to: root), home)
+    }
+
+    private func rootLayer(of layer: CALayer) -> CALayer? {
+        var top = layer
+        while let next = top.superlayer { top = next }
+        return top === layer ? nil : top
+    }
+
+    @objc private func tick() {
+        frames += 1
+        guard let shown else { return finish() }
+        let near = abs(shown.now.minX - shown.home.minX) < 0.5 && abs(shown.now.minY - shown.home.minY) < 0.5
+            && abs(shown.now.width - shown.home.width) < 0.5 && abs(shown.now.height - shown.home.height) < 0.5
+        still = near ? still + 1 : 0
+        // Down once it has stood still where it belongs for two frames of the display (the flight itself starts away
+        // from there); a view torn away first ends the watch at once.
+        if still >= 2 && frames > 3 { finish() }
+    }
+
+    private func finish() {
+        link?.invalidate()
+        link = nil
+        Self.watching.remove(self)
+        landed()
     }
 }
