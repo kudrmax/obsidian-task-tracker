@@ -104,6 +104,34 @@ describe("sections in the list", () => {
 	});
 });
 
+describe("No section moved below a section", () => {
+	/** The header Ideas and its task I, then No section's header and its task A: No section is drawn second. */
+	const IDEAS_FIRST: Card[] = [
+		{ key: key(0), level: 0, top: 26, height: H, group: "Ideas" },
+		{ key: key(1), level: 0, top: 26 + STEP + 26, height: H, group: null },
+	];
+	const HEADS = [
+		{ group: "Ideas", firstCard: 0, top: 0, height: 26 },
+		{ group: null, firstCard: 1, top: 26 + STEP, height: 26 },
+	];
+	const ideasTop = { kind: "gap", index: 0, level: 0, group: "Ideas" } as const;
+
+	it("the gap above the first header is that header's section, where the screen draws it", () => {
+		const place = placeAt(IDEAS_FIRST, -10, 0, STEP, null, HEADS);
+		expect(place).toEqual(ideasTop);
+		expect(placeOfGap(IDEAS_FIRST, place)).toEqual({ kind: "task", group: "Ideas", before: key(0) });
+	});
+
+	it("over the first header's top half too, with the gap open there", () => {
+		expect(placeAt(IDEAS_FIRST, 5, 0, STEP, ideasTop, HEADS)).toEqual(ideasTop);
+		expect(placeAt(IDEAS_FIRST, 20, 0, STEP, { kind: "gap", index: 2, level: 0, group: null }, HEADS)).toEqual(ideasTop);
+	});
+
+	it("No section is still reached under its own header", () => {
+		expect(placeAt(IDEAS_FIRST, 26 + STEP + 20, 0, STEP, null, HEADS)).toEqual({ kind: "gap", index: 1, level: 0, group: null });
+	});
+});
+
 describe("leaving a section when no task is outside any", () => {
 	const ONLY_X: Card[] = [{ key: key(1), level: 0, top: 26, height: H, group: "X" }];
 	const HEAD_X = [{ group: "X", firstCard: 0, top: 0, height: 26 }];
