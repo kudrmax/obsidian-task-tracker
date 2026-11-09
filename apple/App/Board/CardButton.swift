@@ -330,7 +330,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     private var wholeCopy: (UIView & UIContentView)?
     /// Counts the menus opened from this card: a menu's end that comes after the next menu opened is no longer its.
     private var menuRound = 0
-    /// The menu's grown copy stands in for the card: the card is hidden until that menu's copy has flown home.
+    /// The menu's grown copy stands in for the card: the card is hidden while that menu shows, until it starts to go.
     private var menuCopied = false {
         didSet { if menuCopied != oldValue { showsInPlace() } }
     }
@@ -366,9 +366,19 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
                 self.menuCopied = true
                 return whole
             }
-            let home = UIPreviewTarget(container: self, center: CGPoint(x: self.bounds.midX, y: self.bounds.midY))
-            return UITargetedPreview(view: self.content, parameters: self.capsule, target: home)
+            return self.inPlace()
+        } home: { [weak self] in
+            // The menu's copy flies home into the card as it stands, its title cut again on the way: once it lands it is
+            // the card, and nothing of the grown copy stays over the list while the menu's animation runs out.
+            guard let self, self.window != nil else { return nil }
+            return self.inPlace()
         }
+    }
+
+    /// The card itself, where it stands.
+    private func inPlace() -> UITargetedPreview {
+        let home = UIPreviewTarget(container: self, center: CGPoint(x: bounds.midX, y: bounds.midY))
+        return UITargetedPreview(view: content, parameters: capsule, target: home)
     }
 
     /// The copy the menu lifts when the card cuts its title, as the plugin's: as wide as the core says (`rules.wholeWidth`),
@@ -422,15 +432,15 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         selection.show(copy, at: frame)
     }
 
-    /// A row that opens a sheet or a page runs once the menu has gone. The card stays over its neighbours until its
-    /// preview, which flies home inside the card, has landed.
+    /// A row that opens a sheet or a page runs once the menu has gone. The card flies home as itself (`home`), so it is
+    /// no longer hidden for a copy; it stays over its neighbours until it has landed.
     private func menuEnded(_ animator: (any UIContextMenuInteractionAnimating)?) {
         wholeCopy = nil
+        menuCopied = false
         let round = menuRound
         let landed = { [weak self] in
-            // The card was tapped again while this copy flew home: the new menu owns the card now.
+            // The card was tapped again while it flew home: the new menu owns the card now.
             guard let self, self.menuRound == round else { return }
-            self.menuCopied = false
             self.raised = false
         }
         if let animator { animator.addCompletion(landed) } else { landed() }
@@ -573,6 +583,8 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
     /// The menu is up.
     private(set) var showing = false
     private var preview: (() -> UITargetedPreview?)?
+    /// What the menu's preview flies home into as the menu goes; the preview itself when none is given.
+    private var home: (() -> UITargetedPreview?)?
     private lazy var interaction = UIContextMenuInteraction(delegate: self)
 
     init(ended: @escaping ((any UIContextMenuInteractionAnimating)?) -> Void) {
@@ -586,9 +598,10 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool { false }
 
-    func present(_ menu: UIMenu, at point: CGPoint, preview: @escaping () -> UITargetedPreview?) {
+    func present(_ menu: UIMenu, at point: CGPoint, preview: @escaping () -> UITargetedPreview?, home: (() -> UITargetedPreview?)? = nil) {
         self.menu = menu
         self.preview = preview
+        self.home = home
         showing = true
         let selector = NSSelectorFromString("_presentMenuAtLocation:")
         guard interaction.responds(to: selector), let method = interaction.method(for: selector) else { return }
@@ -612,7 +625,7 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
     }
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, dismissalPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
-        preview?()
+        (home ?? preview)?()
     }
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
