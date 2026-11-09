@@ -68,3 +68,15 @@ Three codes, the same in the plugin's sources window and the app's Calendars scr
 - Backend: Google logged out with a file left from an old login that still gives a shown calendar is in use (its
   events are on screen): `old`/`broken` by its age like any other. With no file, as usual, it is spare.
 - Backend: `statuses` are ordered Google, iPhone, Work by a fixed order, not by the order the host hands the files in.
+- Obsidian: the «Not in use» caption is 33 px tall by its padding (`8px 16px`, the rows' padding, no token of its
+  own), text 13 px `--tc-muted`, left-aligned with the names' icons (16 px in), no capitals. The row above it keeps
+  its separator, so the caption sits between two hairlines like a row.
+- Obsidian: a spare row greys its line too (`Exported from iPhone`, `not logged in`, `file missing`, a problem's
+  text) — `--tc-muted`, the same as a plain row's line; only a `broken` row's line is red.
+- Obsidian: the screen redraws when only a row's tone or the dot's colour changes (old → broken), not only when
+  the dot appears; a window already open is not redrawn under the finger (as before: it shows what it opened on).
+- Design board: `Sources.dc.html` now draws the window as it is in production (above the wheel at the bottom,
+  centred on it, Refresh now 44 px) instead of the old top-right window; the window board shows Max's case of
+  2026-11-09 (Google and iPhone in use, Work under «Not in use», 5 Nov 20:21 grey) with no dot, and a new board
+  `ScreenSourcesDotRed.dc.html` shows the red dot. The `Screen` board's wheel now draws the dot on the calendar
+  icon inside the selected pill too, as production does (it was missing there).
