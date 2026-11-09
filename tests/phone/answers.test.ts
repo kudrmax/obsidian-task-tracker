@@ -244,7 +244,10 @@ function calendarCases(): Record<string, unknown> {
 	return out;
 }
 
-describe("TaskCalendarPhone's answers", () => {
+/** The corpus runs the whole bundle thousands of times: seconds of work, more on a busy machine than vitest's 5 s. */
+const CORPUS_MS = 60_000;
+
+describe("TaskCalendarPhone's answers", { timeout: CORPUS_MS }, () => {
 	it("to reminders and their actions stay as they were", () => {
 		expect(reminderCases()).toMatchSnapshot();
 	});

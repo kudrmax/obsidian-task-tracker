@@ -380,7 +380,9 @@ public struct BoardSnapshot: Sendable {
     public let lists: [BoardColumn: BoardList]
     public let timeline: BoardTimeline
     public let statuses: [SourceStatus]
-    public let calendarsStale: Bool
+    /// The badge on «⋯» → Calendars, and what it says.
+    public let calendarsAlert: CalendarAlert
+    public let calendarWords: DayWords
     public let canUndo: Bool
     /// Each card's menu by its task's id (`TaskItem.id`), as opened from where the card stands.
     public let menus: [String: TaskMenuModel]
@@ -507,7 +509,7 @@ extension TaskBoard {
             .inbox: try list(.inbox, screen.inbox, title: name("inbox")),
             .backlog: try list(.backlog, screen.backlog, title: name("backlog")),
         ]
-        let events: DayEvents = screen.calendars ? try read("calendars.events", [.string(day)], over: files) : .none
+        let events: DayEvents = screen.calendars ? try read("calendars.events", [.string(day)], over: files) : try noDayEvents()
         let timeline = try timeline(day: day, today: today, screen: screen, events: events, files: files, measures: measures, painter: &painter)
         let menuScreen: JSONValue = ["today": .string(today), "day": .string(day), "offer": screen.offer]
         // A menu reads no file: asked over the settings alone, it costs nothing per card.
@@ -525,7 +527,8 @@ extension TaskBoard {
             lists: lists,
             timeline: timeline,
             statuses: events.statuses,
-            calendarsStale: events.stale,
+            calendarsAlert: events.alert,
+            calendarWords: events.words,
             canUndo: canUndo,
             menus: menus,
             look: look,

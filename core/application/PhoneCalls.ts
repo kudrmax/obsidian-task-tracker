@@ -12,7 +12,7 @@ import { textParts } from "../domain/TaskText";
 import { oneLine } from "../domain/TaskTitle";
 import { samePlacement } from "../domain/operations";
 import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_CARD_SIZE, sameLevels, settingsFrom, type TaskCalendarSettings } from "../settings";
-import { CalendarDay, type CalendarReading } from "./calendarDay";
+import { CalendarDay, type CalendarReading, NO_DAY_EVENTS } from "./calendarDay";
 import { CALENDAR_SOURCES, type CalendarFile, calendarPath, readCalendarFile } from "./calendarFile";
 import { captureTitle } from "./captureTitle";
 import { cardDue } from "./cardDue";
@@ -25,7 +25,9 @@ import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridM
 import {
 	type CalendarEvent,
 	type CalendarSource,
+	type CalendarAlert,
 	type DayEvents,
+	type DayWords,
 	type DropColumn,
 	type GroupedList,
 	type GroupingState,
@@ -37,6 +39,7 @@ import {
 	TasksFileMissingError,
 } from "./contracts";
 import { acceptsDrop, placesInGap } from "./drops";
+import { SourceProblemError } from "./EventSource";
 import { branchOf, carriedMiddle, gapBranch, levelAt, placeAt } from "./listDrop";
 import { grownStart, wholeWidth } from "./wholeCard";
 import { onTheDay, REPEAT_WORDS, repeatValue } from "./repeatWords";
@@ -154,6 +157,8 @@ export interface WireDayEvents {
 	readonly timed: readonly WireEvent[];
 	readonly statuses: readonly WireStatus[];
 	readonly stale: boolean;
+	readonly alert: CalendarAlert;
+	readonly words: DayWords;
 }
 
 /** The screen as a quick entry reads it, on the wire: each list's cards and sections, and which lists show. */
@@ -500,13 +505,15 @@ function wireDay(day: DayEvents, calendar: CalendarDay): WireDayEvents {
 		timed: wire(day.timed),
 		statuses: day.statuses.map(({ updatedAt, ...rest }) => ({ ...rest, updatedAtMs: updatedAt === null ? null : updatedAt.getTime() })),
 		stale: day.stale,
+		alert: day.alert,
+		words: day.words,
 	};
 }
 
 /** The sources the plugin fetches itself when the host does not say. */
 const FETCHED_BY_DEFAULT: readonly CalendarSource[] = ["google"];
 
-/** The calendars' files as handed in: a missing file is `fileMissing`, a broken one `failed`. */
+/** The calendars' files as handed in: a missing file is `fileMissing`, one that is no calendar file `unreadable`. */
 function readingOf(c: Call): CalendarReading {
 	const files = new Map<CalendarSource, CalendarFile>();
 	const problems = new Map<CalendarSource, SourceProblem>();
@@ -519,7 +526,7 @@ function readingOf(c: Call): CalendarReading {
 		try {
 			files.set(source, readCalendarFile(text, source));
 		} catch (e) {
-			problems.set(source, { kind: "failed", detail: e instanceof Error ? e.message : String(e) });
+			problems.set(source, e instanceof SourceProblemError ? e.problem : { kind: "failed", detail: e instanceof Error ? e.message : String(e) });
 		}
 	}
 	const fetched = c.context.fetched ?? FETCHED_BY_DEFAULT;
@@ -758,7 +765,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS };
+const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {

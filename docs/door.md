@@ -218,7 +218,7 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 
 - `events(date)`: the day's events from the files in `context.calendars`, as `WireDayEvents`: `events`, `allDay`,
   `timed` (each event with `startMs`, `endMs` and `past`, over at the call's moment), `statuses` (each with
-  `updatedAtMs`), `stale`. A file left out is `fileMissing`, a broken one `failed`. "Cached" and "fresh" are two calls
+  `updatedAtMs`, `used` and `tone`), `stale`, `alert`, `words`. A file left out is `fileMissing`; one that is not JSON or not a calendar file's shape `unreadable`. "Cached" and "fresh" are two calls
   of it: the host calls it with the files it has, and again once it has fetched or read them anew. Fetching and
   polling (`keepFresh`) are the host's.
 - `known()`: every calendar the files list, and whether it is shown.
@@ -233,9 +233,20 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 - `isPast(event)`: by `event.endMs`, as CalendarDay greys an event (over once its end has come); `past` on each event is the same.
 - Each status's `words` (`SourceWords`) is its row in the sources window, worded: `name` (`Google Calendar`, `iPhone
   calendars`, `Work calendar`), `short`, `sub` (`Updated today`, `Exported from iPhone`, `Not updated yet`, or the
-  problem: `not logged in`, `file missing`, `no answer in 15 s`, a failure's own text) and `time` (`14:19`, `Yesterday
-  08:02`, `3 Oct 08:02`, empty with no update); the orange mark is `stale`. Google's problem is `loggedOut` (`not
+  problem: `not logged in`, `file missing`, `file unreadable`, `no answer in 15 s`, a failure's own text on one
+  line of at most 40 characters, a server's answer quoted after it left out: `Google API 500`) and `time` (`14:19`, `Yesterday
+  08:02`, `3 Oct 08:02`, empty with no update). Google's problem is `loggedOut` (`not
   logged in`) whenever the shared settings keep no Google token, whatever its file: there is no file to miss then.
+- A status's `used`: a calendar shown on the day is taken from its file. Its `tone` is the row's code, drawn as it
+  comes: `plain` (in use and fresh, a failed last try too), `old` (in use, older than Stale after: time orange),
+  `broken` (old and its last try failed: the problem line red), `spare` (nothing on the day comes from it, whatever its
+  age or error: under «Not in use», grey). `statuses` come in the window's order: in use first, then spare, each in
+  Google, iPhone, Work order. The day's `alert` is the badge: `none`, `old` (orange) or `broken` (red), the worst
+  `tone` in use. `stale` (the day's, equal to `alert != "none"`, and each status's) stays for older callers.
+- The marks' words are ready, never typed by the app: each status's `words.alert` (`Out of date` for `old`, `Refresh
+  failed` for `broken`, empty otherwise: what its mark says to VoiceOver), and the day's `words`: `alert` (the badge's,
+  by the same rule from `alert`), `notInUse` (`Not in use`, the heading of the spare rows) and `notInUseNote` (`The
+  timeline takes a calendar from these only when the files above go out of date.`, their section's footer).
 - An event's `color` is `null` when its calendar's file gives none: the frontend draws the source's own colour.
 
 ### `reminders.*`: the phone's reminders
@@ -496,6 +507,7 @@ far as it takes to end inside the margin, or at the card's own end if that is fu
 max: 280 }`), `DIVIDER_SNAP` (`{ distance: 8, slowSpeed: 0.08 }`), `MOST_CARD_COLORS` (4), `REPEAT_WORDS` (the repeat page's words: `kinds` `{ schedule: "Schedule", afterDone: "After done" }`,
 `every` `"Every"`, `units` `{ day: "days", week: "weeks", month: "months" }`, `weekdays` Monday first `{ short: "Mon",
 name: "Monday", letter: "M" }`, `remove` `"Remove repeat"`),
+`NO_DAY_EVENTS` (a day before any calendar file was read, as `calendars.events` answers it: no events, no statuses, `alert` `"none"`, its `words`),
 `SCREEN_PLACES` (`["inbox", "soon", "calendar"]`, left to right) and `SHOWN_LISTS` (the lists each place shows, in its
 order: `{ inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] }`; the quick entry's
 `look.shown`). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime

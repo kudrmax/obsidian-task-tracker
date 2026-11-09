@@ -4,8 +4,11 @@ import type { RightMode } from "../../obsidian/ui/viewSettings";
 import type { Place } from "../../obsidian/ui/screens";
 import { ColumnSwitch } from "../../obsidian/ui/ColumnSwitch";
 import { GestureArbiter } from "../../obsidian/ui/gestures";
+import type { CalendarAlert } from "../../core/application/contracts";
 
 const LONG_PRESS = 250;
+/** The core's words for the dot, as it hands them in. */
+const DOT_WORDS: Record<CalendarAlert, string> = { none: "", old: "Out of date", broken: "Refresh failed" };
 const STEP = 38;
 
 function pointer(type: string, clientX: number, time = 0): PointerEvent {
@@ -18,7 +21,7 @@ function pointer(type: string, clientX: number, time = 0): PointerEvent {
 const CREEP = Array.from({ length: 7 }, (_, i) => ({ dx: i + 1, t: (i + 1) * 20 }));
 
 /** happy-dom lays nothing out: the icon's width and the pill's place are what the stylesheet would give. */
-function setUp(initial: Place, dot = false, arbiter = new GestureArbiter()) {
+function setUp(initial: Place, dot: CalendarAlert = "none", arbiter = new GestureArbiter()) {
 	let mode = initial;
 	const changes: RightMode[] = [];
 	let sources = 0;
@@ -29,7 +32,7 @@ function setUp(initial: Place, dot = false, arbiter = new GestureArbiter()) {
 			mode = next;
 			control.render();
 		},
-		dot: () => dot,
+		dot: () => ({ alert: dot, words: DOT_WORDS[dot] }),
 		onSources: () => sources++,
 		longPressMs: () => LONG_PRESS,
 		arbiter,
@@ -201,7 +204,7 @@ describe("ColumnSwitch", () => {
 
 	it("holds the screen while the wheel is turned, and waits while another gesture holds it", () => {
 		const arbiter = new GestureArbiter();
-		const s = setUp("calendar", false, arbiter);
+		const s = setUp("calendar", "none", arbiter);
 		s.control.el.dispatchEvent(pointer("pointerdown", 100));
 		s.control.el.dispatchEvent(pointer("pointermove", 115));
 		expect(arbiter.busy).toBe(true);
@@ -239,9 +242,13 @@ describe("ColumnSwitch", () => {
 		expect(lists.sources()).toBe(0);
 	});
 
-	it("puts the dot of a stale source on the calendar, under the window too", () => {
-		expect(setUp("soon", true).control.el.querySelectorAll(".tc-dot.is-shown").length).toBe(2);
-		expect(setUp("soon").control.el.querySelector(".tc-dot.is-shown")).toBeNull();
+	it("puts the dot of an old source on the calendar, under the window too, red once its refresh failed", () => {
+		const shown = (alert: CalendarAlert) => [...setUp("soon", alert).control.el.querySelectorAll(".tc-dot.is-shown")].map((dot) => dot.classList.contains("is-broken"));
+		expect(shown("old")).toEqual([false, false]);
+		expect(shown("broken")).toEqual([true, true]);
+		expect(shown("none")).toEqual([]);
+		const said = (alert: CalendarAlert) => setUp("soon", alert).control.el.querySelector(".tc-dot")!.getAttribute("aria-label");
+		expect([said("old"), said("broken"), said("none")]).toEqual(["Out of date", "Refresh failed", null]);
 	});
 
 	it("stands a step left of Inbox at Done, which it has no icon for, and turns on to Inbox and Soon from there", () => {

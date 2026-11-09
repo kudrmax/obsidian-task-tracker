@@ -443,6 +443,14 @@ describe("the door's calendars", () => {
 		expect(detail([])).toEqual({ google: "Mac", iphone: null, work: "iPhone" });
 	});
 
+	it("call a file that is no calendar file unreadable, and one left out missing", () => {
+		const door = callDoor("calendars.events", [T], context(FILE, { calendars: { google: JSON.stringify({ exportedAt: iso(4, 8), events: [] }), work: '{"exportedAt": "2026' } })) as Extract<DoorAnswer, { ok: true }>;
+		const statuses = (door.result as { statuses: { source: string; problem: unknown; words: { sub: string } }[] }).statuses;
+		const of = (source: string) => statuses.find((st) => st.source === source)!;
+		expect([of("work").problem, of("work").words.sub]).toEqual([{ kind: "unreadable" }, "file unreadable"]);
+		expect([of("iphone").problem, of("iphone").words.sub]).toEqual([{ kind: "fileMissing" }, "file missing"]);
+	});
+
 	it("grey an event as CalendarDay does: over once its end has come", () => {
 		const past = (endMs: number) => (callDoor("calendars.isPast", [{ endMs }], context()) as Extract<DoorAnswer, { ok: true }>).result;
 		expect([past(NOW.getTime() - 1), past(NOW.getTime()), past(NOW.getTime() + 1)]).toEqual([true, true, false]);

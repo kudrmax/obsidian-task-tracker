@@ -225,6 +225,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	groupPlaceOf: "./nesting",
 	placeOfDrop: "./nesting",
 	sameGap: "./nesting",
+	NO_DAY_EVENTS: "./calendarDay",
 	QuickEntrySession: "./QuickEntrySession",
 	SectionNameEntry: "./SectionNameEntry",
 	RepeatPage: "./RepeatPage",
@@ -306,6 +307,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 const DOOR_OF_RUNTIME: Readonly<Record<string, string>> = {
 	...Object.fromEntries(Object.keys(CONTRACT_RUNTIME).map((name) => [name, `rules.${name}`])),
 	REMINDER_KINDS: "rules.constants",
+	NO_DAY_EVENTS: "rules.constants",
 	MINUTES_PER_DAY: "rules.constants",
 	DESCRIPTION_TEMPLATE: "rules.constants",
 	PRIORITY_COLORS: "rules.constants",

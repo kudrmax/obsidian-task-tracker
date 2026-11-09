@@ -302,6 +302,11 @@ public final class TaskBoard: @unchecked Sendable {
         try rule("rules.dividerAt", [.number(wanted), widths.json, .number(speed)])
     }
 
+    /// A day before any calendar file was read: no events, no statuses, no alert.
+    public func noDayEvents() throws -> DayEvents {
+        try rule("rules.constants", as: JSONValue.self)["NO_DAY_EVENTS"].decode(DayEvents.self)
+    }
+
     /// Where a screen let go after a swipe lands (`rules.swipeLanding`): 1 the next screen on, -1 back, 0 where it stood;
     /// `moved` and `speed` (points per millisecond) count onward as positive, `distance` is how far the next screen stands.
     public func swipeLanding(moved: Double, distance: Double, speed: Double) throws -> Int {

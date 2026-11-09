@@ -1,5 +1,6 @@
 import { isoMoment } from "../domain/IsoMoment";
 import type { CalendarEvent, CalendarSource } from "./contracts";
+import { SourceProblemError } from "./EventSource";
 import type { TaskCalendarSettings } from "../settings";
 
 /** Where the Google events live in the vault: the plugin writes them there from the Calendar API. */
@@ -78,7 +79,7 @@ const dateOrNull = (text: string | null | undefined): Date | null => (text ? iso
  * it sees; which calendar comes from which file, and which are shown, is decided when reading (`calendarChoice`).
  */
 export function readCalendarFile(text: string, source: CalendarSource): CalendarFile {
-	const content = JSON.parse(text) as FileContent;
+	const content = fileContent(text);
 	const events = (content.events ?? []).map((e) => ({
 		id: e.id,
 		title: e.title,
@@ -101,6 +102,34 @@ export function readCalendarFile(text: string, source: CalendarSource): Calendar
 		to: dateOrNull(content.to),
 		validUntil: dateOrNull(content.validUntil),
 	};
+}
+
+/** The file's JSON, when it has the shape every writer writes; else the file is `unreadable`, whatever the parser said. */
+function fileContent(text: string): FileContent {
+	let value: unknown;
+	try {
+		value = JSON.parse(text);
+	} catch {
+		throw unreadable("not JSON");
+	}
+	if (!isObject(value)) throw unreadable("not an object");
+	if (typeof value.exportedAt !== "string" || Number.isNaN(isoMoment(value.exportedAt).getTime())) throw unreadable("no exportedAt");
+	if (!listOf(value.events, (e) => typeof e.start === "string" && typeof e.end === "string" && typeof e.calendar === "string")) throw unreadable("events");
+	if (!listOf(value.calendars, (c) => typeof c.calendar === "string")) throw unreadable("calendars");
+	return value as unknown as FileContent;
+}
+
+function unreadable(why: string): SourceProblemError {
+	return new SourceProblemError({ kind: "unreadable" }, `calendar file unreadable: ${why}`);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Absent, or a list whose every row is an object that passes. */
+function listOf(value: unknown, row: (r: Record<string, unknown>) => boolean): boolean {
+	return value === undefined || value === null || (Array.isArray(value) && value.every((r) => isObject(r) && row(r)));
 }
 
 /** A file from before the calendars were listed: the calendars of its events, each once. */
