@@ -1122,10 +1122,18 @@ final class BoardModel {
         animator.addCompletion { [weak self] _ in self?.arriving.remove(card.id) }
     }
 
-    /// The drop side's end of a carry's session: the carry ends, if the drag side has not ended it already.
+    /// The drop side's end of a carry's session. The drop side hears of it as the finger lets go, before the copy has
+    /// flown home or landed, and the drag side most of a second after the copy is down: the carry ends once the copy
+    /// is down, the system's flight's time after the finger let go, so a section let go where it can't land shows its
+    /// tasks again only once its copy is home, and nothing waits after it. The drag side's own end, when it comes
+    /// sooner, ends it then.
     func endCarry(of session: any UIDropSession) {
-        if let token = DragPayload.of(session)?.token { endCarry(token) }
+        guard let token = DragPayload.of(session)?.token else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.carryFallback) { [weak self] in self?.endCarry(token) }
     }
+
+    /// The system's flight of a let-go copy home or into its place.
+    private static let carryFallback: TimeInterval = 0.4
 
     /// A subtask of the carried card, or another picked task carried with it: folded away while it is carried.
     func isFolded(_ card: BoardCard) -> Bool {

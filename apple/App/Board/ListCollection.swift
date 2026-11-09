@@ -910,7 +910,9 @@ struct ListRowContent: View {
     private var content: some View {
         switch row {
         case .header(let group, let header):
+            // Lifted, the section is its floating copy: its header keeps its place but is not drawn twice.
             SectionHeader(title: header, group: group, column: column, model: model)
+                .opacity(model.isLifted(group, in: column) ? 0 : 1)
         case .project(let project):
             ProjectHeader(project: project, column: column, model: model)
         case .newHead(let name):
