@@ -213,7 +213,7 @@ final class BoardModel {
     @ObservationIgnored private var readsStarted = 0
     /// A drop's write is made: the first read started after it (`from`) draws it, and ends its carry, the carry `token`
     /// lifting card `id` (one started before shows the file without it).
-    @ObservationIgnored private var dropRead: (from: Int, token: Int, id: String)?
+    @ObservationIgnored private var dropReads: [Int: (from: Int, id: String)] = [:]
     /// The day before and after the shown one, read ahead so the arrows show them in the same frame.
     @ObservationIgnored private var ahead: [String: BoardSnapshot] = [:]
     @ObservationIgnored private var neighbours: (previous: String, next: String)?
@@ -279,20 +279,22 @@ final class BoardModel {
         if let before = snapshot { follow(read.dayChange(since: before), from: before) }
         defer { if reopen, read.day == read.today, !readAgain { reopen = false; dayMoved += 1 } }
         forgetGone(read)
-        let lands = dropRead.flatMap { serial >= $0.from ? $0 : nil }
-        if lands != nil { dropRead = nil }
+        // Every drop whose write this read shows, by its carry: a second drop let go before the first one's read was drawn
+        // lands in the same drawing, each card in its place at once.
+        let lands = dropReads.filter { serial >= $0.value.from }
+        for token in lands.keys { dropReads[token] = nil }
         draw(motion: read.motion(from: snapshot)) {
             snapshot = read
             entry.screenChanged()
-            if let lands { carryWritten(lands.token, id: lands.id) }
+            for (token, drop) in lands { carryWritten(token, id: drop.id) }
         }
-        if let lands { carryDrawn(lands.token) }
+        for token in lands.keys.sorted() { carryDrawn(token) }
     }
 
     /// One transaction for one drawing: still, or the cards moved (each by its id slides, folds away or unfolds with the
     /// system's spring). Another day is drawn still: it came in through the day's own slide (`turn(to:)`).
     func draw(motion: BoardMotion, _ change: () -> Void) {
-        if placedByDrop != nil { placedByDrop = nil }
+        if !placedByDrop.isEmpty { placedByDrop = [] }
         switch motion {
         case .still, .turn:
             var still = Transaction()
@@ -1017,9 +1019,9 @@ final class BoardModel {
     /// Told the moment a carry starts (a card, a section or the plus lifted): a gesture still waiting on the touch the
     /// drag took gives way, so the ribbon's own pan, which waits for the day swipe to fail, stops waiting.
     @ObservationIgnored var carryBegins: (() -> Void)?
-    /// The card the drawing of a drop's write put in its new place: it goes there at once, hidden or not, never sliding
-    /// over the list (its copy flies there). Until the next drawing.
-    private(set) var placedByDrop: String?
+    /// The cards the drawing of drops' writes put in their new places: each goes there at once, hidden or not, never
+    /// sliding over the list (its copy flies there). Until the next drawing.
+    private(set) var placedByDrop: Set<String> = []
     var carrying: Bool { carry != nil }
     /// The finger let the carry go: what it carries is still on its way to its place.
     private(set) var released = false
@@ -1160,7 +1162,7 @@ final class BoardModel {
             } catch {
                 problem = Self.words(error)
             }
-            dropRead = (readsStarted + 1, token, id)
+            dropReads[token] = (readsStarted + 1, id)
             await reload()
             carryDrawn(token)
         }
@@ -1247,7 +1249,7 @@ final class BoardModel {
     /// The first drawing of the drop's write: the card takes its new place (still hidden), the room it flew into and the
     /// marks go, in the drawing's own transaction.
     private func carryWritten(_ token: Int, id: String) {
-        placedByDrop = id
+        placedByDrop.insert(id)
         // A carry that ended before its write was drawn: its card only takes its new place, at once.
         guard isCurrent(token) else { return }
         carry?.written = true
@@ -1290,15 +1292,28 @@ final class BoardModel {
     /// let go on no place: every carry ends exactly once.
     func carryDropped(_ token: Int) {
         guard isCurrent(token), ending == nil else { return }
+        // The board saw this carry's session: UIKit may still hand it the drop (a drop let go right after an earlier one's
+        // session ended comes to the board after the card's end), so the board's session end decides.
+        if dropping.knows(carry: token) {
+            droppedOffBoard.insert(token)
+            return
+        }
         letGo(writes: false)
         carryLanded(token: token)
     }
 
+    /// Carries whose card said its drop was taken while the board's session for them had not ended yet.
+    @ObservationIgnored private var droppedOffBoard: Set<Int> = []
+
     /// The screen's drop session ended. Not dropped, a card's copy is still flying home: its card ends the carry once it
     /// is there. A section's lift has no end of its own, so its carry ends here.
     private func dropSessionEnded(performed: Bool, token: Int?) {
-        guard let token, isCurrent(token) else { return }
-        if !performed, carry?.section == nil { return }
+        guard let token else { return }
+        let dropped = droppedOffBoard.remove(token) != nil
+        guard isCurrent(token) else { return }
+        // Not performed and not dropped elsewhere: a cancel, whose card ends the carry once its copy is home.
+        if !performed, !dropped, carry?.section == nil { return }
+        if !performed { letGo(writes: false) }
         carryEnded(token)
     }
 
@@ -1655,7 +1670,6 @@ final class BoardModel {
         } catch {
             problem = Self.words(error)
         }
-        dropRead = nil
         await reload()
         stretched = nil
     }
@@ -1781,7 +1795,7 @@ final class BoardModel {
         } catch {
             problem = Self.words(error)
         }
-        dropRead = (readsStarted + 1, token, id)
+        dropReads[token] = (readsStarted + 1, id)
         await reload()
         // Drawn by the read, or nothing to draw when the write or the read failed: the carry waits no longer.
         carryDrawn(token)

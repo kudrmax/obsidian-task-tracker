@@ -50,6 +50,9 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     /// The session each dropped item belongs to.
     private var sessionOf: [ObjectIdentifier: ObjectIdentifier] = [:]
 
+    /// A session of carry `carry` is still the board's: its end, performed or not, is still to come.
+    func knows(carry: Int) -> Bool { flights.values.contains { $0.carry == carry } }
+
     private func flight(_ session: any UIDropSession) -> ObjectIdentifier {
         let key = ObjectIdentifier(session)
         if flights[key] == nil { flights[key] = Flight(carry: carrying()) }
