@@ -141,140 +141,50 @@ import Testing
     }
 }
 
-@Suite struct CarryEndTests {
-    @Test func aCancelEndsOnceTheCopyIsHome() {
-        var end = CarryEnd(writes: false)
-        #expect(!end.done)
-        let ends = end.land()
-        #expect(ends)
+@Suite struct CarryTurnsTests {
+    @Test func aCarryEndsOnceWithItsSession() {
+        var turns = CarryTurns()
+        let first = turns.begin()
+        let ended1 = turns.end(first)
+        #expect(ended1)
+        let ended2 = turns.end(first)
+        #expect(!ended2)
+        #expect(turns.current == nil)
     }
 
-    @Test func aDropEndsOnlyOnceItLandedAndItsWriteIsDrawn() {
-        var drawnFirst = CarryEnd(writes: true)
-        let afterDraw = drawnFirst.draw()
-        let afterLanding = drawnFirst.land()
-        #expect(!afterDraw && afterLanding)
-        var landedFirst = CarryEnd(writes: true)
-        let landed = landedFirst.land()
-        let drawn = landedFirst.draw()
-        #expect(!landed && drawn)
+    /// The next card lifted while the last one's copy still settles: the last session's end ends nothing of the new carry.
+    @Test func anEarlierSessionsEndNeverEndsTheNextCarry() {
+        var turns = CarryTurns()
+        let first = turns.begin()
+        let second = turns.begin()
+        let ended3 = turns.end(first)
+        #expect(!ended3)
+        #expect(turns.current == second)
+        let ended4 = turns.end(second)
+        #expect(ended4)
     }
 }
 
-/// Every order a carry's signals come in ends it exactly once, and only when its copy is down and its write drawn.
-@Suite struct CarryLifeTests {
-    enum Signal: CaseIterable { case letGoWrites, letGoNone, landed, drawn, cardDropped, boardPerformed, boardNotPerformed }
-
-    /// Plays `signals` and counts the endings; `boardOpen` is whether the board still has a session when the card speaks.
-    private func play(_ signals: [Signal], kind: CarryLife.Kind = .card, boardOpen: Bool = true) -> (ends: Int, life: CarryLife) {
-        var life = CarryLife(kind: kind)
-        var ends = 0
-        var open = boardOpen
-        for signal in signals {
-            let ended: Bool
-            switch signal {
-            case .letGoWrites: life.letGo(writes: true); ended = false
-            case .letGoNone: life.letGo(writes: false); ended = false
-            case .landed: ended = life.landed()
-            case .drawn: ended = life.drawn()
-            case .cardDropped: ended = life.cardDropped(boardOpen: open)
-            case .boardPerformed: ended = life.boardEnded(performed: true); open = false
-            case .boardNotPerformed: ended = life.boardEnded(performed: false); open = false
-            }
-            if ended { ends += 1 }
-        }
-        return (ends, life)
+@Suite struct DropReadsTests {
+    @Test func aReadBegunBeforeTheWriteNeverDrawsOverThePreview() {
+        var reads = DropReads()
+        #expect(reads.mayDraw(1))
+        reads.previewDrawn()
+        #expect(!reads.mayDraw(2))
+        reads.written(readsStarted: 2)
+        #expect(!reads.mayDraw(2))
+        #expect(reads.mayDraw(3))
     }
 
-    @Test func aBoardDropEndsOnceLandedAndDrawnInEitherOrder() {
-        // The board's perform lets it go writing; its copy's landing, the card's end, the session end and the drawing come
-        // in any order.
-        let tails: [[Signal]] = [
-            [.cardDropped, .landed, .boardPerformed, .drawn],
-            [.cardDropped, .drawn, .landed, .boardPerformed],
-            [.drawn, .cardDropped, .boardPerformed, .landed],
-            [.landed, .cardDropped, .drawn, .boardPerformed],
-            [.boardPerformed, .drawn, .cardDropped, .landed],
-        ]
-        for tail in tails {
-            let (ends, life) = play([Signal.letGoWrites] + tail)
-            #expect(ends == 1, "\(tail)")
-            #expect(life.finished)
-        }
-    }
-
-    @Test func aWritingDropNeverEndsBeforeItsWriteIsDrawn() {
-        let (ends, life) = play([.letGoWrites, .cardDropped, .landed, .boardPerformed])
-        #expect(ends == 0 && !life.finished)
-        var drawn = life
-        let ends2 = drawn.drawn()
-        #expect(ends2)
-    }
-
-    @Test func theCardSpeakingBeforeTheBoardWaitsForTheBoard() {
-        // UIKit ends the card's session with a drop before the board's perform comes: nothing ends yet, the board's drop
-        // still lets it go writing, and it ends once landed and drawn.
-        let (ends, life) = play([.cardDropped, .letGoWrites, .landed, .boardPerformed, .drawn])
-        #expect(ends == 1 && life.finished)
-        let (early, waiting) = play([.cardDropped])
-        #expect(early == 0 && !waiting.released)
-    }
-
-    @Test func aDropTakenByAnotherReceiverEndsOnce() {
-        // The board never had a session: the card's end ends it at once, nothing written here.
-        let (alone, life) = play([.cardDropped, .landed, .drawn], boardOpen: false)
-        #expect(alone == 1 && life.finished)
-        // The board had a session (the finger passed over it) but did not perform: its end ends it.
-        let (passed, _) = play([.cardDropped, .boardNotPerformed, .landed])
-        #expect(passed == 1)
-        let (boardFirst, _) = play([.boardNotPerformed, .cardDropped], boardOpen: false)
-        #expect(boardFirst == 1)
-    }
-
-    @Test func aCancelEndsWhenItsCopyIsHomeNotWhenTheBoardEnds() {
-        let (ends, _) = play([.letGoNone, .boardNotPerformed])
-        #expect(ends == 0)
-        let (home, life) = play([.letGoNone, .boardNotPerformed, .landed])
-        #expect(home == 1 && life.finished)
-    }
-
-    @Test func aSectionEndsWithTheBoardsSession() {
-        let (none, _) = play([.boardNotPerformed], kind: .section)
-        #expect(none == 1)
-        let (moved, _) = play([.letGoWrites, .boardPerformed, .drawn], kind: .section)
-        #expect(moved == 1)
-    }
-
-    @Test func anEndedCarryEndsNoMoreAndAFinishCountsOnce() {
-        for signal in Signal.allCases {
-            let (ends, life) = play([.letGoNone, .landed, signal, signal])
-            #expect(ends == 1 && life.finished, "\(signal)")
-        }
-        var life = CarryLife(kind: .card)
-        let first = life.finish()
-        let second = life.finish()
-        let landed = life.landed()
-        #expect(first && !second && !landed)
-    }
-
-    @Test func everyOrderOfACardsSignalsEndsAtMostOnceAndAWritingOneOnlyAfterItsWrite() {
-        // All orders of the four signals that follow a drop the board took.
-        func orders(_ items: [Signal]) -> [[Signal]] {
-            guard items.count > 1 else { return [items] }
-            return items.indices.flatMap { i -> [[Signal]] in
-                var rest = items
-                let head = rest.remove(at: i)
-                return orders(rest).map { [head] + $0 }
-            }
-        }
-        for order in orders([.cardDropped, .landed, .boardPerformed, .drawn]) {
-            let (ends, life) = play([Signal.letGoWrites] + order)
-            #expect(ends == 1 && life.finished, "\(order)")
-        }
-        for order in orders([.cardDropped, .landed, .boardNotPerformed]) {
-            let (ends, _) = play(order)
-            #expect(ends == 1, "\(order)")
-        }
+    @Test func twoDropsLetReadsDrawOnlyOnceBothAreWritten() {
+        var reads = DropReads()
+        reads.previewDrawn()
+        reads.previewDrawn()
+        reads.written(readsStarted: 4)
+        #expect(!reads.mayDraw(5))
+        reads.written(readsStarted: 6)
+        #expect(!reads.mayDraw(6))
+        #expect(reads.mayDraw(7))
     }
 }
 
@@ -301,22 +211,6 @@ import Testing
         let slot = try #require(after.timeline.slots.first { $0.id == idea.id })
         #expect(slot.start == landed.span?.start)
         #expect(slot.box == box)
-    }
-
-    @Test func aListLandingIsTheRoomBeforeItsIndexInItsSection() throws {
-        let board = TaskBoard(core: core, vault: FakeVault(IdentityTests.file))
-        let screen = try board.snapshot(day: "2026-11-06", measures: IdentityTests.measures, now: Fixtures.date(6, 10))
-        let cards = try #require(screen.lists[.day]?.cards)
-        let shop = try #require(cards.firstIndex { $0.item.title == "Shop" })
-        let parent = try #require(cards.first { $0.item.title == "Parent" })
-        let child = try #require(cards.firstIndex { $0.item.title == "Child" })
-        let list: DropLanding = try JSONValue.object(["kind": "list", "id": "x", "item": .null, "column": "day", "group": "Errands", "index": 0]).decode()
-        #expect(list.gap(in: .day, among: cards) == LandingGap(at: shop, level: 0, group: "Errands"))
-        let last: DropLanding = try JSONValue.object(["kind": "list", "id": "x", "item": .null, "column": "day", "group": "Errands", "index": 1]).decode()
-        #expect(last.gap(in: .day, among: cards) == LandingGap(at: shop + 1, level: 0, group: "Errands"))
-        #expect(list.gap(in: .soon, among: cards) == nil)
-        let sub: DropLanding = try JSONValue.object(["kind": "subtask", "id": "x", "item": .null, "parent": .string(parent.id), "index": 0]).decode()
-        #expect(sub.gap(in: .day, among: cards) == LandingGap(at: child, level: 1, group: parent.item.group))
     }
 }
 

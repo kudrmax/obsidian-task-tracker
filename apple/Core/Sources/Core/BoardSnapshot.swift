@@ -444,14 +444,48 @@ extension TaskBoard {
     /// timeline's stack laid out at them whatever `measures` say.
     public func snapshot(day wanted: String?, measures asked: TimelineMeasures, now: Date = Date(), project: String? = nil) throws -> BoardSnapshot {
         let files = try files(now: now)
-        let look: ScreenSettings = try read("screenSettings.get", over: files)
-        let measures = TimelineMeasures(hour: asked.hour, cardHeight: look.cardHeight, cardGap: look.cardGap, itemInset: asked.itemInset, itemGap: asked.itemGap, overlayInset: asked.overlayInset)
         let today: String = try read("days.today", over: files)
         let day = wanted ?? today
         let screen: ScreenView = try read("tasks.screen", [.string(day)] + (project.map { [JSONValue.string($0)] } ?? []), over: files)
+        return try draw(screen, day: day, today: today, files: files, measures: asked, lane: .reading, canUndo: canUndo)
+    }
+
+    /// The screen a drop will leave, asked at the moment of the drop before anything is written (`tasks.dropPreview`):
+    /// everything `snapshot` reads, read over the text the drop leaves, on the pure rules' context, so the main thread
+    /// never waits for a read and no id or undo step of it is kept. The read after the drop's write draws the same.
+    public func dropPreview(_ tasks: JSONValue, to: JSONValue, over shown: BoardSnapshot, measures asked: TimelineMeasures, project: String? = nil, now: Date = Date()) throws -> DropPreview {
+        let before = BoardFiles(tasks: shown.tasksText, settingsJSON: shown.settingsJSON, calendars: shown.calendarTexts, now: now)
+        let arguments: [JSONValue] = [tasks, to, .string(shown.day)] + (project.map { [JSONValue.string($0)] } ?? [])
+        let answer = try answerPure("tasks.dropPreview", arguments, over: before)
+        let landings = try answer["landings"].decode([DropLanding].self)
+        let screen = try answer["screen"].decode(ScreenView.self)
+        let text = answer["tasks"].string ?? shown.tasksText
+        let after = BoardFiles(tasks: text, settingsJSON: shown.settingsJSON, calendars: shown.calendarTexts, now: now)
+        let drawn = try draw(screen, day: shown.day, today: shown.today, files: after, measures: asked, lane: .preview(shown), canUndo: shown.canUndo || text != shown.tasksText)
+        return DropPreview(landings: landings, snapshot: drawn)
+    }
+
+    /// Which core a drawing asks: the reading one, keeping the ids its answers give, or the pure rules' one over a text no
+    /// file holds yet, keeping nothing, the menus already drawn reused for every task the drop leaves as it was.
+    enum Lane {
+        case reading
+        case preview(BoardSnapshot)
+    }
+
+    private func draw(_ screen: ScreenView, day: String, today: String, files: BoardFiles, measures asked: TimelineMeasures, lane: Lane, canUndo: Bool) throws -> BoardSnapshot {
+        let pure: Bool
+        if case .preview = lane { pure = true } else { pure = false }
+        func read<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], over files: BoardFiles, as type: T.Type = T.self) throws -> T {
+            pure ? try answerPure(method, arguments, over: files).decode(T.self) : try self.read(method, arguments, over: files)
+        }
+        func readRule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], as type: T.Type = T.self) throws -> T {
+            pure ? try rule(method, arguments) : try self.readRule(method, arguments)
+        }
+        let look: ScreenSettings = try read("screenSettings.get", over: files)
+        let measures = TimelineMeasures(hour: asked.hour, cardHeight: look.cardHeight, cardGap: look.cardGap, itemInset: asked.itemInset, itemGap: asked.itemGap, overlayInset: asked.overlayInset)
         let relation: String = try read("days.relation", [.string(day)], over: files)
         let dayTitle: String = try readRule("rules.dayTitle", [.string(day), .string(relation), .string(today)])
-        var painter = Painter(board: self, blend: look.labelPaint == "blend")
+        var painter = Painter(board: self, blend: look.labelPaint == "blend", pure: pure)
 
         func list(_ column: BoardColumn, _ items: [TaskItem], title: String) throws -> BoardList {
             let sections: ColumnSections? = try read("tasks.columnSections", [.string(column.rawValue), .string(day)], over: files)
@@ -502,7 +536,7 @@ extension TaskBoard {
             return BoardList(column: column, title: title, groups: groups, showsHeaders: view.showsHeaders, sectioned: sections != nil, sectionsOf: sections?.list, canGroup: grouping?.canGroup ?? false, titleDrop: titleDrop)
         }
 
-        let name: (String) throws -> String = { try self.read("tasks.listName", [.string($0)], over: files) }
+        let name: (String) throws -> String = { try read("tasks.listName", [.string($0)], over: files) }
         let lists: [BoardColumn: BoardList] = [
             .day: try list(.day, screen.day.list, title: dayTitle),
             .soon: try list(.soon, screen.soon, title: name("soon")),
@@ -510,15 +544,23 @@ extension TaskBoard {
             .backlog: try list(.backlog, screen.backlog, title: name("backlog")),
         ]
         let events: DayEvents = screen.calendars ? try read("calendars.events", [.string(day)], over: files) : try noDayEvents()
-        let timeline = try timeline(day: day, today: today, screen: screen, events: events, files: files, measures: measures, painter: &painter)
+        let timeline = try timeline(
+            day: day, today: today, screen: screen, events: events, files: files, measures: measures, painter: &painter,
+            ask: { try read($0, $1, over: $2) as JSONValue }, askRule: { try readRule($0, $1) as JSONValue })
         let menuScreen: JSONValue = ["today": .string(today), "day": .string(day), "offer": screen.offer]
         // A menu reads no file: asked over the settings alone, it costs nothing per card.
         let settingsOnly = BoardFiles(tasks: nil, settingsJSON: files.settingsJSON, calendars: [:], now: files.now)
         var menus: [String: TaskMenuModel] = [:]
-        for (column, list) in lists {
-            for card in list.cards { menus[card.item.id] = try read("tasks.menu", [card.item.json, .string(column.rawValue), menuScreen], over: settingsOnly) }
+        var shown: BoardSnapshot?
+        if case .preview(let before) = lane { shown = before }
+        func menu(_ item: TaskItem, _ from: String) throws -> TaskMenuModel {
+            if let shown, let kept = shown.menus[item.id], shown.item(item.id) == item, shown.column(of: item.id) == from { return kept }
+            return try read("tasks.menu", [item.json, .string(from), menuScreen], over: settingsOnly)
         }
-        for slot in timeline.slots { menus[slot.card.item.id] = try read("tasks.menu", [slot.card.item.json, "timeline", menuScreen], over: settingsOnly) }
+        for (column, list) in lists {
+            for card in list.cards { menus[card.item.id] = try menu(card.item, column.rawValue) }
+        }
+        for slot in timeline.slots { menus[slot.card.item.id] = try menu(slot.card.item, "timeline") }
         return BoardSnapshot(
             today: today,
             day: day,
@@ -550,11 +592,11 @@ extension TaskBoard {
     private func cards(_ rows: [ListRow], corner: JSONValue, zone: JSONValue?, painter: inout Painter) throws -> [BoardCard] {
         let levels = JSONValue.array(rows.map { .number(Double($0.level)) })
         return try rows.enumerated().map { index, row in
-            let due: CardDue? = try readRule("rules.cardDue", [row.item.json, corner])
+            let due: CardDue? = try painter.rule("rules.cardDue", [row.item.json, corner])
             return BoardCard(
                 item: row.item,
                 level: row.level,
-                branch: try readRule("rules.branchOf", [levels, .number(Double(index))]),
+                branch: try painter.rule("rules.branchOf", [levels, .number(Double(index))]),
                 due: try due?.date.map { try painter.due($0) },
                 repeats: due?.repeats ?? false,
                 paint: try painter.paint(row.item),
@@ -563,7 +605,16 @@ extension TaskBoard {
         }
     }
 
-    private func timeline(day: String, today: String, screen: ScreenView, events: DayEvents, files: BoardFiles, measures: TimelineMeasures, painter: inout Painter) throws -> BoardTimeline {
+    private func timeline(
+        day: String, today: String, screen: ScreenView, events: DayEvents, files: BoardFiles, measures: TimelineMeasures, painter: inout Painter,
+        ask: (String, [JSONValue], BoardFiles) throws -> JSONValue, askRule: (String, [JSONValue]) throws -> JSONValue
+    ) throws -> BoardTimeline {
+        func read<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], over files: BoardFiles, as type: T.Type = T.self) throws -> T {
+            try ask(method, arguments, files).decode(T.self)
+        }
+        func readRule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], as type: T.Type = T.self) throws -> T {
+            try askRule(method, arguments).decode(T.self)
+        }
         let hours = try (0...24).map { index in
             let hour: Int = try read("boundary.hourAt", [.number(Double(index))], over: files)
             return BoardHour(minute: index * 60, label: String(format: "%02d", hour))
@@ -584,7 +635,7 @@ extension TaskBoard {
         let boxes: [StackBox] = try readRule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
         let slots = try zip(shown, boxes).map { pair, box -> BoardSlot in
             let start = pair.0.slot?.start ?? pair.1.start
-            let corner = try self.corner(box, start: start, pair.1.start, pair.1.end)
+            let corner = try self.corner(box, start: start, pair.1.start, pair.1.end, pure: painter.pure)
             let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, paint: try painter.paint(pair.0), corner: corner, parts: try painter.parts(pair.0))
             return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, slotStart: start, box: box)
         }
@@ -713,17 +764,31 @@ public struct GrownWidth: Decodable, Sendable, Hashable {
     public let cut: Bool
 }
 
+/// What a drop leaves (`tasks.dropPreview`): where each dropped task lands and the whole screen after it, drawn before the
+/// write.
+public struct DropPreview: Sendable {
+    public let landings: [DropLanding]
+    public let snapshot: BoardSnapshot
+}
+
 /// The core's paints, each asked for once per drawing.
 struct Painter {
     let board: TaskBoard
     let blend: Bool
+    /// Asks the pure rules' core: a drop's preview, drawn on the main thread.
+    let pure: Bool
     private var shadesByColor: [String: Themed<Shades>] = [:]
     private var dueByDate: [String: DueLabel] = [:]
     private var partsByText: [String: [TextPart]] = [:]
 
-    init(board: TaskBoard, blend: Bool) {
+    init(board: TaskBoard, blend: Bool, pure: Bool = false) {
         self.board = board
         self.blend = blend
+        self.pure = pure
+    }
+
+    func rule<T: Decodable>(_ method: String, _ arguments: [JSONValue]) throws -> T {
+        pure ? try board.rule(method, arguments) : try board.readRule(method, arguments)
     }
 
     /// A task's card colours: none without a priority or a label.
@@ -734,8 +799,8 @@ struct Painter {
     mutating func shades(_ color: String) throws -> Themed<Shades> {
         if let known = shadesByColor[color] { return known }
         let shades = Themed<Shades>(
-            dark: try board.readRule("rules.shadesOf", [.string(color), "dark"]),
-            light: try board.readRule("rules.shadesOf", [.string(color), "light"]))
+            dark: try rule("rules.shadesOf", [.string(color), "dark"]),
+            light: try rule("rules.shadesOf", [.string(color), "light"]))
         shadesByColor[color] = shades
         return shades
     }
@@ -743,24 +808,24 @@ struct Painter {
     /// A title's pieces, asked once per title.
     mutating func parts(_ item: TaskItem) throws -> [TextPart] {
         if let known = partsByText[item.text] { return known }
-        let parts: [TextPart] = try board.readRule("rules.textParts", [.string(item.text)])
+        let parts: [TextPart] = try rule("rules.textParts", [.string(item.text)])
         partsByText[item.text] = parts
         return parts
     }
 
     mutating func due(_ date: String) throws -> DueLabel {
         if let known = dueByDate[date] { return known }
-        let label: DueLabel = try board.readRule("rules.dueLabel", [.string(date)])
+        let label: DueLabel = try rule("rules.dueLabel", [.string(date)])
         dueByDate[date] = label
         return label
     }
 
     func event(_ event: WireEvent) throws -> Themed<EventPaint> {
-        let hex: String = try board.readRule("rules.eventHex", [event.json])
-        let alpha: Double = try board.readRule("rules.bgAlphaFor", [.string(event.source)])
+        let hex: String = try rule("rules.eventHex", [event.json])
+        let alpha: Double = try rule("rules.bgAlphaFor", [.string(event.source)])
         return Themed(
-            dark: try board.readRule("rules.eventColors", [.string(hex), .number(alpha), "dark"]),
-            light: try board.readRule("rules.eventColors", [.string(hex), .number(alpha), "light"]))
+            dark: try rule("rules.eventColors", [.string(hex), .number(alpha), "dark"]),
+            light: try rule("rules.eventColors", [.string(hex), .number(alpha), "light"]))
     }
 }
 

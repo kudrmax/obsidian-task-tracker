@@ -112,19 +112,14 @@ struct TimelineColumn: View {
                     open()
                 }
                 .simultaneousGesture(pinchGesture)
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(Self.key, visible: $0) }
             }
         }
         .overlay(alignment: .leading) {
             Rectangle().fill(Color(.separator)).frame(width: 1).padding(.top, -8)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { columnWidth = $0 }
-        .onAppear {
-            model.registerCalendar()
-            let spot = scroll, position = $position
-            model.dropping.scrolls(Self.key) { dy in spot.scroll(by: dy) { position.wrappedValue.scrollTo(y: $0) } }
-        }
-        .onDisappear { model.dropping.remove(Self.key) }
+        // The whole column takes a carried card, the all-day strip too: its minute is read where the content stands.
+        .background { TimelineDrop(model: model) }
     }
 
     private func canvas(hour: CGFloat, width: CGFloat) -> some View {
@@ -152,8 +147,7 @@ struct TimelineColumn: View {
                         .offset(y: top)
                         .zIndex(model.selectedSlot == slot.id ? 1 : 0)
                 }
-            }
-            .background { DropSpace(key: Self.key, drop: model.dropping).id(model.snapshot?.day) }) { peek in
+            }) { peek in
                 ZStack(alignment: .topLeading) {
                     events(peek.timeline, hour: hour)
                     ForEach(model.slidingSlots(peek.timeline, hour: hour)) { slot in
@@ -181,12 +175,10 @@ struct TimelineColumn: View {
         }
         .frame(width: width, height: height, alignment: .topLeading)
         .coordinateSpace(.named(Self.canvasSpace))
-        .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { model.dropping.move(Self.key, origin: $0) }
+        .background(alignment: .topLeading) { CanvasProbe(model: model).frame(width: width, height: height) }
         .onChange(of: hour, initial: true) { model.calendarHour = hour }
         .onChange(of: width, initial: true) { model.calendarWidth = width }
     }
-
-    private static let key = "timeline"
 
     private func allDay(_ timeline: BoardTimeline) -> some View {
         VStack(alignment: .leading, spacing: Measure.allDayGap) {
@@ -305,15 +297,12 @@ struct TimelineColumn: View {
             height: tall,
             draggable: !dimmed,
             carried: model.isHidden(slot.card),
-            arrival: model.arrival?.id == slot.id ? model.arrival?.from : nil,
             onTouch: {
                 model.found = nil
                 model.select(slot)
             },
-            onCarry: { model.startCarry(slot.card, from: "timeline", grab: $0) },
-            onCancel: { model.cancelCarry($0) },
-            onEnd: { model.carryEnded($0) },
-            onDropped: { model.carryDropped($0) },
+            onCarry: { model.startCarry(slot.card, from: "timeline") },
+            onEnd: { model.endCarry($0) },
             onLink: { model.openLink($0) },
             onProject: model.projectOpener(slot.card.item))
             .frame(height: max(tall, CardMetrics.height))

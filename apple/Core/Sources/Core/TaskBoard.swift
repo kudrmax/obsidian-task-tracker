@@ -209,6 +209,12 @@ public final class TaskBoard: @unchecked Sendable {
         try answer(method, arguments, BoardFiles(tasks: tasks, settingsJSON: settingsJSON, calendars: [:], now: now), on: pure).result
     }
 
+    /// A call over `files` on the pure rules' context, keeping neither the ids nor the undo steps it answers: what a screen
+    /// not yet written (a drop's preview) is read from.
+    func answerPure(_ method: String, _ arguments: [JSONValue], over files: BoardFiles) throws -> JSONValue {
+        try answer(method, arguments, files, on: pure).result
+    }
+
     private func answer(_ method: String, _ arguments: [JSONValue], _ files: BoardFiles, on lane: PhoneCore? = nil) throws -> Answer {
         // Ids name the lines of a file: a call made over none (a menu, a pure rule) neither takes them nor gives them back.
         let ids = files.tasks == nil ? nil : keptIds()

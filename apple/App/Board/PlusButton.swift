@@ -11,9 +11,8 @@ struct PlusButton: UIViewRepresentable {
     /// Something is carried: the plus stands as the cancel target.
     let cancelling: Bool
     /// The places a carried plus is let go on.
-    var drop: BoardDrop?
+    var drop: PlusRoute?
     var onCarry: () -> Int = { 0 }
-    var onCancel: (Int) -> Void = { _ in }
     var onEnd: (Int) -> Void = { _ in }
 
     /// The design's size of the round button beside the tab bar, and its gap to the screen's edges.
@@ -31,7 +30,6 @@ struct PlusButton: UIViewRepresentable {
         control.open = open
         control.accent = UIColor(accent)
         control.onCarry = onCarry
-        control.onCancel = onCancel
         control.onEnd = onEnd
         control.drop = drop
         control.cancelling = cancelling
@@ -40,9 +38,8 @@ struct PlusButton: UIViewRepresentable {
 
 final class PlusControl: UIControl, UIDropInteractionDelegate {
     var open: () -> Void = {}
-    weak var drop: BoardDrop?
+    weak var drop: PlusRoute?
     var onCarry: () -> Int = { 0 }
-    var onCancel: (Int) -> Void = { _ in }
     var onEnd: (Int) -> Void = { _ in }
     /// The carry the plus's copy is: what its end names.
     private var token = 0
@@ -213,13 +210,11 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
                 return
             }
             drop?.carryOff()
-            onCancel(token)
             flyHome()
             if trembled { open() }
         default:
             guard lifted != nil else { return }
             drop?.carryOff()
-            onCancel(token)
             flyHome()
         }
     }
@@ -287,11 +282,10 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
             DispatchQueue.main.async { onEnd(token) }
         }
         if lifted != nil {
-            let (drop, onCancel, onEnd, token) = (drop, onCancel, onEnd, token)
+            let (drop, onEnd, token) = (drop, onEnd, token)
             // Out of the screen's update that took the plus away.
             DispatchQueue.main.async {
                 drop?.carryOff()
-                onCancel(token)
                 onEnd(token)
             }
         }

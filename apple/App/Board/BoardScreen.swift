@@ -41,7 +41,6 @@ struct BoardScreen: View {
             }
             .animation(.snappy, value: barShown)
         }
-        .background { DropAnchor(drop: model.dropping) }
         .background {
             TouchWatch { point in
                 if model.found != nil { model.found = nil }
@@ -94,12 +93,9 @@ struct BoardScreen: View {
     /// carried while the bar keeps the system's layout.
     private var bottomBar: some View {
         ZStack(alignment: .topLeading) {
-            PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: {
-                plusSlot = $0
-                model.dropping.floor = $0.minY
-            })
+            PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: { plusSlot = $0 })
             if let slot = plusSlot {
-                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry($0) }, onEnd: { model.carryEnded($0) })
+                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drop: model.plus, onCarry: { model.startCarryingPlus() }, onEnd: { model.endCarry($0) })
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }
