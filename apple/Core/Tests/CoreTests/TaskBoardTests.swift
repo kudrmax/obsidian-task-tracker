@@ -136,6 +136,21 @@ import Testing
         }
     }
 
+    @Test func aTaskEditedElsewhereInPlaceIsStaleAndKeepsItsId() throws {
+        let vault = FakeVault(Self.file)
+        let board = board(vault)
+        let screen: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files())
+        let before = screen.inbox[0]
+        // The line edited in Obsidian: the key read before it no longer names what the line says (decision 62).
+        vault.text = Self.file.replacingOccurrences(of: "- [ ] Idea", with: "- [ ] Idea, edited")
+        #expect(throws: BoardError.refused(code: "staleTask", message: "stale task")) {
+            try board.write("tasks.setStatus", [before.key.json, "done"])
+        }
+        #expect(vault.text.contains("- [ ] Idea, edited"))
+        let after: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files())
+        #expect(after.inbox[0].id == before.id)
+    }
+
     @Test func paintsAreTheCoresInEitherTheme() throws {
         let board = board(FakeVault(Self.file))
         let files = try board.files()
