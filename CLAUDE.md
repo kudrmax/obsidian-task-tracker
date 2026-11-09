@@ -77,6 +77,15 @@ The feature is done only when every entry of «Decisions» is in both frontends'
 
 `apple/` is an XcodeGen project (`project.yml`; the `.xcodeproj`, the Info.plists and the signing team `App/Config/Team.xcconfig` are not in git). `apple/Core` is a Swift package with the bridge to the core and what only Swift can do (files by bookmark, the repeat plan, the reminder sync); `swift test --package-path apple/Core` (`npm run test:apple`) runs its tests on the Mac against the committed `core/task-calendar-phone.js`, and the release runs them too. Everything the app shows is English, controls are stock iOS 26; Apple's guides and UI kits to design from are in `docs/design/apple.md`. Simulator builds take Xcode 26.3 (`DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer`) and one of the four simulators from `~/.claude/CLAUDE.md`, taken with `~/.claude/bin/ios-sim take` and given back with `ios-sim release` (one simulator, one agent; all busy — `ios-sim wait`, never a new one).
 
+### Behaviours Max had to ask for twice
+
+A behaviour Max reported broken a second time is guarded by a test that names him in its doc comment, and its rule lives in a tested type, not in a view. Never change such a test or route around its type (an audit, a parity pass, a «fix» that reads the design otherwise): ask Max first. Today:
+
+- One swipe of the lists moves them one place, never two, from the very first swipe after launch: `RibbonPaging` (`apple/Core`) with `RibbonPagingTests`, the core's `rules.swipeLanding` with `tests/application/swipeLanding.test.ts`. Broken on 11-08 by a parity audit that read the plugin as gliding on, and on 11-09 by a ribbon that knew where a swipe started only after its first scroll.
+- At Inbox and at Soon the two columns split the screen in half; the divider sets the day list against the calendar at Today only: `RibbonColumns` (`apple/Core`) with `RibbonColumnsTests`, as `docs/plugin/screen.md` says for the plugin. Broken three times by «no column may change its width while the ribbon moves», which made Inbox and Soon take the divider's widths.
+
+A fix reaches Max only through the installer below; after merging anything for the app, run it, and before reading a recording of Max's, check which master his phone runs.
+
 ### Installing on the iPhone
 
 `~/Applications/Install TaskCalendar.app` (Launchpad: «Install TaskCalendar») builds `origin/master` of this repository in Release (the project in `apple/`) and installs it on Max's iPhone over Wi-Fi or a cable, renewing the free 7-day signature. Max starts it with a click; Claude runs it whenever a build should reach the phone:
