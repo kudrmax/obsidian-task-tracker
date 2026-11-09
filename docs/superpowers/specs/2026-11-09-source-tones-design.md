@@ -96,3 +96,8 @@ Three codes, the same in the plugin's sources window and the app's Calendars scr
   «Refresh failed» for `broken`, empty otherwise) and `DayEvents.words: DayWords` (`alert`, the dot's words by the same
   rule; `notInUse` «Not in use»; `notInUseNote`, the app's footer). The empty day before any read is the core's too:
   `NO_DAY_EVENTS` (contracts, and `rules.constants()` on the door).
+- Obsidian: the time on the right is at most 92 px wide (`--tc-source-time-max`, «30 Oct 08:02» fits); a longer one
+  («Yesterday 12:14») breaks onto two lines, right-aligned, so the line under the name keeps 104 px and «file
+  unreadable» or «no answer in 15 s» reads on one line. «Exported from iPhone» next to a long time still wraps, grey.
+  The dot, a coloured time and the caption take the core's words (`DayEvents.words`, `SourceWords.alert`); the plugin
+  shows no footer under «Not in use», so `notInUseNote` is the app's.

@@ -434,6 +434,7 @@ body {
 	--tc-popover-gap: var(--tc-space-12);
 	--tc-source-row: 56px;
 	--tc-source-icon: var(--tc-icon-l);
+	--tc-source-time-max: 92px;
 
 	/* Sizes: a task over the whole view */
 	--tc-sheet-bar: 44px;
@@ -808,7 +809,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-source-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tc-space-2); }
 .tc-source-name { font-size: var(--tc-font-menu); }
 .tc-source-sub { font-size: var(--tc-font-sub); color: var(--tc-muted); }
-.tc-source-time { font-size: var(--tc-font-value); color: var(--tc-muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tc-source-time { flex-shrink: 0; max-width: var(--tc-source-time-max); font-size: var(--tc-font-value); color: var(--tc-muted); text-align: right; font-variant-numeric: tabular-nums; }
 .tc-source-row:is(.is-old, .is-broken) .tc-source-time { color: var(--tc-stale); }
 .tc-source-row.is-broken .tc-source-sub { color: var(--tc-danger); }
 .tc-source-row.is-spare :is(svg, .tc-source-name) { color: var(--tc-muted); }
