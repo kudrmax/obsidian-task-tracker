@@ -435,9 +435,9 @@ final class BoardModel {
     /// it, the one read ahead, or read now when it is not yet.
     func beginDaySwipe(_ shift: Int) -> Bool {
         // A carry still ending (its copy settling) ends now; a carry the finger holds takes no swipe.
-        if carry != nil {
+        if let token = carry?.token {
             guard released else { return false }
-            finishCarry()
+            endNow(token)
         }
         // A day still sliding (an arrow's turn, a swipe let go) is taken by the finger where it shows now, as a scroll
         // view's deceleration is: the turns asked after it give way to the finger.
@@ -1060,7 +1060,7 @@ final class BoardModel {
     /// names it and changes nothing.
     private func nextCarry() -> Int {
         carryBegins?()
-        if carry != nil { finishCarry() }
+        if let token = carry?.token { endNow(token) }
         carryTokens += 1
         return carryTokens
     }
@@ -1163,6 +1163,8 @@ final class BoardModel {
             }
             dropReads[token] = (readsStarted + 1, id)
             await reload()
+            // A read that failed drew nothing: the mark goes with it, and the carry waits no longer.
+            dropReads[token] = nil
             carryDrawn(token)
         }
         return geometry[column]?.mark
@@ -1208,12 +1210,17 @@ final class BoardModel {
     }
 
     /// A signal of carry `token`, given to its life (`CarryLife`), which says whether it ends now: it ends then, once.
-    private func signal(_ token: Int, _ body: (inout CarryLife) -> Bool) {
+    private func signal(_ token: Int, ending: (() -> Void)? = nil, _ body: (inout CarryLife) -> Bool) {
         guard isCurrent(token), var life = carry?.life else { return }
         let ends = body(&life)
         carry?.life = life
         if life.released, !released { released = true }
-        if ends { finishCarry() }
+        if ends { (ending ?? finishCarry)() }
+    }
+
+    /// The carry `token` ends now from outside (a new lift, a swipe), through its life as every end does: once.
+    private func endNow(_ token: Int) {
+        signal(token) { $0.finish() }
     }
 
     /// The carried card let go where it writes, until the write is drawn: its dashed place has closed.
@@ -1577,11 +1584,14 @@ final class BoardModel {
 
     /// The plus let go on a place: its carry ends at once, the field opening where it came down.
     private func endPlus() {
-        _ = carry?.life.finish()
-        touchdown = nil
-        var still = Transaction()
-        still.disablesAnimations = true
-        withTransaction(still) { endCarry() }
+        guard let token = carry?.token else { return }
+        // Its own end, through its life: no glide, the field takes its place at once.
+        signal(token, ending: { [self] in
+            touchdown = nil
+            var still = Transaction()
+            still.disablesAnimations = true
+            withTransaction(still) { endCarry() }
+        }) { $0.finish() }
     }
 
     /// The drop line of a gap: through the middle of the room above the card it parts from, or above the dashed place
@@ -1785,7 +1795,9 @@ final class BoardModel {
         }
         dropReads[token] = (readsStarted + 1, id)
         await reload()
-        // Drawn by the read, or nothing to draw when the write or the read failed: the carry waits no longer.
+        // Drawn by the read, or nothing to draw when the write or the read failed: the mark goes and the carry waits no
+        // longer.
+        dropReads[token] = nil
         carryDrawn(token)
     }
 
