@@ -22,7 +22,7 @@ final class AppServices: Sendable {
         tasks = TaskCapture(vault: vault, rules: rules)
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         projects = VaultProjects(folder: vault, core: Self.rules(), remembered: UserDefaultsText(key: "projectNotes"), rememberedTags: FileText(caches.appendingPathComponent("projectNoteTags.json")))
-        board = TaskBoard(core: rules, vault: vault, pure: Self.rules(), grouping: UserDefaultsText(key: "projectGrouping"), projects: projects)
+        board = TaskBoard(core: rules, vault: vault, pure: Self.rules(), preview: Self.rules(), grouping: UserDefaultsText(key: "projectGrouping"), projects: projects)
     }
 
     /// The lists a new task goes into, by their headings' names, in the order the screen offers them: the first is where Siri's goes.

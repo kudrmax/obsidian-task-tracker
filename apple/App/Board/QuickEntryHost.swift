@@ -192,6 +192,13 @@ final class QuickEntryHost {
     func rename(_ item: TaskItem) {
         guard let spot = value("renameSpot", [item.json, .bool(false)]), !spot.isNull else { return }
         opening { call("open", [spot, item.json]) }
+        // Chosen from the card's menu, whose preview lands and fades on the field: the field shows its text from the start,
+        // as the card and the preview do, so the two never show different parts of the title at once; the caret goes to
+        // the end once the menu is gone for good, or at once on the first keystroke.
+        guard CardControl.menuShowing else { return }
+        field.holdsStart = true
+        let field = field
+        CardControl.afterMenuGone { field.caretToEnd() }
     }
 
     /// The full screen's Add Subtask, or a subtask's there: the field last in the stack of `parent`'s subtasks.
@@ -740,6 +747,34 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
         take()
     }
 
+    /// The text shown from its start, the caret before it, however the field is given its text or the keyboard, until
+    /// `caretToEnd`.
+    var holdsStart = false {
+        didSet { if holdsStart { showStart() } }
+    }
+
+    private func showStart() {
+        selectedTextRange = textRange(from: beginningOfDocument, to: beginningOfDocument)
+    }
+
+    override var text: String? {
+        didSet { if holdsStart { showStart() } }
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let took = super.becomeFirstResponder()
+        if holdsStart { showStart() }
+        return took
+    }
+
+    /// The caret after the text, where a rename types on.
+    func caretToEnd() {
+        guard holdsStart else { return }
+        holdsStart = false
+        guard isFirstResponder else { return }
+        selectedTextRange = textRange(from: endOfDocument, to: endOfDocument)
+    }
+
     func end() {
         wanted = false
         if isFirstResponder { resignFirstResponder() }
@@ -769,6 +804,14 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
     /// if it comes to rest on another place.
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRequireFailureOf other: UIGestureRecognizer) -> Bool {
         other is UIPanGestureRecognizer
+    }
+
+    /// The first keystroke of a rename whose text still shows from its start: it types at the end, as a rename does.
+    func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+        guard holdsStart else { return true }
+        caretToEnd()
+        if string.isEmpty { deleteBackward() } else { insertText(string) }
+        return false
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
@@ -872,6 +915,14 @@ final class EntryFieldBox: UIView {
 
     private func claim() {
         guard field.superview !== self else { return }
+        // A row that turns into the field (a card renamed) passes from what it showed to the field, scrolled to its caret,
+        // in a short fade: the card's title from its start, the field's at its end, never one replacing the other at once.
+        if let row = sequence(first: self as UIView, next: { $0.superview }).lazy.compactMap({ $0 as? UICollectionViewCell }).first {
+            let fade = CATransition()
+            fade.type = .fade
+            fade.duration = Self.fade
+            row.contentView.layer.add(fade, forKey: "field")
+        }
         // Moved, not removed first: from one view in the window to another it stays the first responder.
         field.translatesAutoresizingMaskIntoConstraints = false
         addSubview(field)
@@ -883,6 +934,10 @@ final class EntryFieldBox: UIView {
         ])
         field.placed()
     }
+}
+
+extension EntryFieldBox {
+    static let fade: TimeInterval = 0.2
 }
 
 /// The capsule a task is typed in, at its place: a card with no frame, the accent cursor, tinted by the priority or the

@@ -106,7 +106,7 @@ struct ColumnTitle: View {
             if dayArrows {
                 Button { Task { await model.step(-1) } } label: { arrow("chevron.left") }
                     // A card held over an arrow turns the day, as a folder opens under a carried file in Files.
-                    .background { SpringLoaded { Task { await model.step(-1) } } }
+                    .background { SpringLoaded(model: model) { Task { await model.step(-1) } } }
                     .accessibilityLabel("Previous Day")
             }
             if dayArrows {
@@ -126,7 +126,7 @@ struct ColumnTitle: View {
             }
             if dayArrows {
                 Button { Task { await model.step(1) } } label: { arrow("chevron.right") }
-                    .background { SpringLoaded { Task { await model.step(1) } } }
+                    .background { SpringLoaded(model: model) { Task { await model.step(1) } } }
                     .accessibilityLabel("Next Day")
             }
         }
@@ -226,6 +226,9 @@ struct ProjectHeader: View {
             }
             Spacer(minLength: 0)
         }
+        // The fold in the rows' own time, not in one frame: the chevron turns, the count fades in or out and the arrow
+        // slides beside it as the rows fold.
+        .animation(CarryMotion.dropAnimation, value: project.folded)
         .foregroundStyle(project.zone.isNull ? Palette.muted : Palette.pullInk(scheme))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         .padding(.leading, CardMetrics.leading)
@@ -389,7 +392,7 @@ struct EmptyPlate: View {
             .background(hot ? Palette.dropBg(scheme) : .clear, in: .rect(cornerRadius: CardMetrics.radius))
             .overlay {
                 RoundedRectangle(cornerRadius: CardMetrics.radius)
-                    .strokeBorder(hot ? Palette.accent(scheme) : Palette.muted.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: hot ? [] : [4, 3]))
+                    .strokeBorder(hot ? Palette.accent(scheme) : Palette.muted.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: hot ? [] : CardMetrics.dash))
             }
             .contentShape(.rect(cornerRadius: CardMetrics.radius))
             .onTapGesture { open?() }
@@ -398,13 +401,18 @@ struct EmptyPlate: View {
 }
 
 /// One card in a list: at its depth, with its branch. A tap opens its menu; a long press lifts it, the list's own drag.
-/// Select Tasks puts the system's selection circle before it, as Mail and Reminders do. Carried, its row is the gap it
-/// was lifted from; a subtask lights while a card carried under it would become its subtask.
+/// Select Tasks puts the system's selection circle before it, as Mail and Reminders do. Carried, its row is its dashed
+/// place, as the plugin's.
 struct CardRow: View {
     let card: BoardCard
     let column: BoardColumn
     @Bindable var model: BoardModel
     @Environment(\.colorScheme) private var scheme
+
+    /// A branch coming in: its fade ends as the rows' spring comes to rest, as fast as a glance; going, at once.
+    static let branchComes = AnyTransition.asymmetric(
+        insertion: .opacity.animation(.easeOut(duration: CarryMotion.branchFade).delay(CarryMotion.settles - CarryMotion.branchFade)),
+        removal: .identity)
 
     /// The room the selection circle takes before the card.
     static let circleRoom: CGFloat = 32
@@ -412,8 +420,8 @@ struct CardRow: View {
     var body: some View {
         let selecting = model.selecting
         let picks = self.picks
-        let lit = model.isParentLit(card, in: column)
-        let hidden = model.isHidden(card)
+        let mark = model.mark(card.id)
+        let hidden = mark.hidden
         HStack(spacing: 10) {
             if picks, !hidden {
                 SelectionCircle(on: model.picked.contains(card.id))
@@ -429,22 +437,18 @@ struct CardRow: View {
                 menu: { later in selecting ? nil : model.cardMenu(card.item, later: later) },
                 ringed: model.found == card.id,
                 draggable: false,
-                carried: model.isHidden(card),
+                carried: hidden,
                 onTouch: { model.found = nil },
                 onFold: card.item.can.fold && !selecting ? { Task { await model.toggleCollapsed(card.item) } } : nil,
                 onLink: selecting ? nil : { model.openLink($0) },
                 onProject: model.projectOpener(card.item),
                 picking: picks ? CardButton.Picking(picked: model.picked.contains(card.id), count: model.picked.count) { pick() } : nil)
                 .frame(height: CardMetrics.height)
-                // A card carried here would become its subtask: it lights as the place it goes under.
-                .overlay {
-                    RoundedRectangle(cornerRadius: CardMetrics.radius)
-                        .strokeBorder(Palette.accent(scheme), lineWidth: 2)
-                        .opacity(lit ? 1 : 0)
-                        .allowsHitTesting(false)
-                }
-                .animation(.snappy(duration: 0.15), value: lit)
-                .overlay(alignment: .topLeading) { if let branch = card.branch, !model.isHidden(card) { BranchLine(branch: branch) } }
+                // Carried, the card's row is its dashed place, as the plugin keeps it (`is-waiting`), until the carry ends.
+                .background { if mark.waiting { DashedPlace().transition(.identity) } }
+                // The branch comes with the card's place (the drop's screen drawn), fading in as the row and the copy flying
+                // into it come to rest, so it never travels with a row moving there.
+                .overlay(alignment: .topLeading) { if let branch = card.branch, !mark.waiting { ComingBranch(branch: branch, model: model).transition(Self.branchComes) } }
                 .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
         }
         .frame(height: CardMetrics.height, alignment: .top)
@@ -456,6 +460,42 @@ struct CardRow: View {
     private func pick() {
         UISelectionFeedbackGenerator().selectionChanged()
         withAnimation(.snappy(duration: 0.2)) { model.togglePick(card.id) }
+    }
+}
+
+/// A subtask's branch that comes with a drop: it waits while the drop's copy flies and fades in once the copy is down
+/// (the carry's end, heard from the flight's own completion), so it never travels with a row moving under the copy.
+struct ComingBranch: View {
+    let branch: Branch
+    /// Read here, not by the row: only the branches follow the drop's flight.
+    let model: BoardModel
+    @State private var shown: Bool
+
+    init(branch: Branch, model: BoardModel) {
+        self.branch = branch
+        self.model = model
+        _shown = State(initialValue: !model.dropFlies)
+    }
+
+    var body: some View {
+        BranchLine(branch: branch)
+            .opacity(shown ? 1 : 0)
+            .onChange(of: model.dropFlies) { _, now in
+                guard !now, !shown else { return }
+                withAnimation(.easeOut(duration: CarryMotion.branchFade)) { shown = true }
+            }
+    }
+}
+
+/// Where a carried card was lifted from, as the plugin keeps it (`is-waiting`), and where a carried section would go
+/// (`.tc-group-drop`): a dashed outline of a card.
+struct DashedPlace: View {
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: CardMetrics.radius)
+            .strokeBorder(Palette.dash(scheme), style: StrokeStyle(lineWidth: 1, dash: CardMetrics.dash))
+            .accessibilityHidden(true)
     }
 }
 
@@ -519,14 +559,15 @@ struct StackFloat: View {
     }
 }
 
-/// A floating copy drawn for UIKit's drag preview: an image of the view at its own size, in the screen's look. A hosting
+/// A floating copy (the carried stack or section, the menu's whole title): an image of the view at its own size, in the screen's look. A hosting
 /// view made for a preview has had no layout yet and drew the copy cut, or blank, on a plate.
 enum FloatImage {
     @MainActor
     static func view(_ content: some View, like host: UIView, in window: UIWindow) -> UIImageView? {
         let renderer = ImageRenderer(content: content.environment(\.colorScheme, host.traitCollection.userInterfaceStyle == .dark ? .dark : .light))
         renderer.scale = window.screen.scale
-        guard let image = renderer.uiImage else { return nil }
+        guard let drawn = renderer.cgImage else { return nil }
+        let image = UIImage(cgImage: drawn, scale: renderer.scale, orientation: .up)
         let view = UIImageView(image: image)
         view.frame = CGRect(origin: .zero, size: image.size)
         return view
@@ -588,3 +629,10 @@ enum SoftEdge {
     static func top(at offset: CGFloat) -> CGFloat { min(SoftEdges.fade, max(0, offset)) }
 }
 
+
+/// A list's column drawn again only when its list changed: its rows are the collection's, which follows the board itself.
+extension ListColumn: Equatable {
+    nonisolated static func == (a: ListColumn, b: ListColumn) -> Bool {
+        MainActor.assumeIsolated { a.list == b.list && a.dayArrows == b.dayArrows && a.model === b.model }
+    }
+}

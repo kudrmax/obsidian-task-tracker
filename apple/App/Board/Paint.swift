@@ -86,6 +86,15 @@ enum CardMetrics {
     /// What a copy grown over a menu keeps from the window's edges (`--tc-whole-margin`).
     static let wholeMargin: CGFloat = 10
     static let indent: CGFloat = 20
+    /// The drop line's dot (`--tc-drop-dot`) and its line.
+    static let dropDot: CGFloat = 8
+    static let dropLine: CGFloat = 2
+    /// The dashed edge of a place (the lifted card's, an empty section's plate): its dash and gap.
+    static let dash: [CGFloat] = [4, 3]
+    /// How far past the place shown the finger goes before another is shown (`LAYOUT.dropHysteresis`).
+    static let dropHysteresis: Double = 6
+    /// How strongly a menu tile that can't be pressed shows (`--tc-tile-off-opacity`).
+    static let tileOffOpacity: CGFloat = 0.35
     static let branchWidth: CGFloat = 1.5
     static let columnInset: CGFloat = 10
     /// The hour's height the screen is read at; the timeline stacks its cards anew at the zoom it shows.

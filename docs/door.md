@@ -485,7 +485,8 @@ carried card's middle stands: a card is placed by it, a new task by the finger's
 room, heads, held, hysteresis)` (the `GapPlace` under the finger: `cards` `[{ level, group, top, height }]` as they stand
 without the lifted ones, `shift` how far the open gap `room` pushes the cards after it, `heads` the section headers
 `[{ group, firstCard, top, height }]`, `held` the place shown now and `hysteresis` how far past its edge the finger must go
-to leave it; `room`, `held` may be `null`, `heads` `[]`, `hysteresis` `0`); the branch lines: `branchOf(levels, index)`
+to leave it; `room`, `held` may be `null`, `heads` `[]`, `hysteresis` `0`; above the first header the place is in No
+section, unless No section's header stands lower: then it is the first header's section, where the screen draws it); the branch lines: `branchOf(levels, index)`
 (the row's `{ last, through }`: `last` its line bends in, `through[k]` the line of level `k + 1` goes on past it; `null`
 for a task) and `gapBranch(cards, gap)` (the same for an open gap, as a row of its level before `cards[gap.index]`);
 the vault's project notes for a host without Obsidian's metadata: `noteTags(text)` (a note's tags as Obsidian reads them,

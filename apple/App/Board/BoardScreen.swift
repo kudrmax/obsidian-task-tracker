@@ -41,8 +41,6 @@ struct BoardScreen: View {
             }
             .animation(.snappy, value: barShown)
         }
-        // A card held where no list or calendar takes it (the bars, the divider) is routed to the nearest place.
-        .background { BoardRouteAnchor(route: model.plus) }
         .background {
             TouchWatch { point in
                 if model.found != nil { model.found = nil }
@@ -97,10 +95,10 @@ struct BoardScreen: View {
         ZStack(alignment: .topLeading) {
             PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: {
                 plusSlot = $0
-                model.plus.floor = $0.minY
+                model.route.floor = $0.minY
             })
             if let slot = plusSlot {
-                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drop: model.plus, onCarry: { model.startCarryingPlus() }, onEnd: { model.endCarry($0) })
+                CarriedPlus(model: model, accent: Palette.accent(scheme)) { router.openTyping() }
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }
@@ -329,6 +327,7 @@ struct Ribbon: View {
                     // calendar keeps the divider's width and slides with the list's edge, so it never reflows.
                     ZStack(alignment: .topLeading) {
                         TimelineColumn(timeline: snapshot.timeline, model: model)
+                            .equatable()
                             .frame(width: width - list)
                             .frame(maxHeight: .infinity, alignment: .top)
                             .offset(x: dayList)
@@ -462,6 +461,7 @@ struct Ribbon: View {
     private func lists(_ column: BoardColumn, dayArrows: Bool = false) -> some View {
         if let list = snapshot.lists[column] {
             ListColumn(list: list, model: model, dayArrows: dayArrows)
+                .equatable()
         }
     }
 }
@@ -661,5 +661,17 @@ private struct OnePlacePerSwipe: ScrollTargetBehavior {
                 model.swipeLanding(moved: CGFloat(moved), distance: CGFloat(distance), speed: CGFloat(speed))
             }
         }
+    }
+}
+
+/// The plus, the cancel target while a carry is under way: it alone reads whether one is, so a carry lifted or landing
+/// redraws the plus, not the board.
+private struct CarriedPlus: View {
+    let model: BoardModel
+    let accent: Color
+    let open: () -> Void
+
+    var body: some View {
+        PlusButton(open: open, accent: accent, cancelling: model.showsCancelTarget, drag: model.drag, onCarry: { model.startCarryingPlus() })
     }
 }

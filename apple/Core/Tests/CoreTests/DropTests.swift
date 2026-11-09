@@ -2,78 +2,27 @@ import Foundation
 import Testing
 @testable import Core
 
-/// The drop the app makes with the system's drag: the gap the system opens read as the core's place over the rows laid
-/// out evenly (every gap a place), and the screen the drop leaves, drawn before the write, equal to the read after it.
-@Suite struct ListTargetTests {
-    let core = try! PhoneCore(script: Fixtures.phoneScript)
-    var board: TaskBoard { TaskBoard(core: core, vault: FakeVault("")) }
+/// Where a carry over a list may be placed, as the plugin asks it (`ListDrop.placesAnywhere`): the core decides.
+@Suite struct PlacesInGapTests {
+    let board = TaskBoard(core: try! PhoneCore(script: Fixtures.phoneScript), vault: FakeVault(""))
 
-    /// A day list with tasks outside any section, two sections, a subtask and an empty section with its plate.
-    let rows: [DropRow] = [
-        .card(level: 0, group: nil, zone: nil),
-        .card(level: 1, group: nil, zone: nil),
-        .head(group: "Evening", opens: false),
-        .card(level: 0, group: "Evening", zone: nil),
-        .card(level: 0, group: "Evening", zone: nil),
-        .head(group: "Errands", opens: false),
-        .other,
-    ]
-
-    private func place(_ gap: Int, level: Double = 0) throws -> (index: Int, level: Int, group: String?) {
-        let place = try ListTarget(rows: rows).place(at: gap, level: level, board: board)
-        #expect(place["kind"].string == "gap")
-        return (Int(try #require(place["index"].number)), Int(try #require(place["level"].number)), place["group"].string)
+    /// A list that shows no sections (a past day's) takes a card from another column only at its end: no line mid-list.
+    @Test func aListWithNoSectionsTakesAnotherColumnsCardAtItsEnd() throws {
+        #expect(try board.placesInGap(column: "day", from: "inbox", grouped: false) == false)
+        #expect(try board.placesInGap(column: "day", from: "timeline", grouped: false) == false)
     }
 
-    @Test func everyGapOfTheListIsAPlace() throws {
-        for gap in 0...rows.count {
-            for level in stride(from: -2.0, through: 3.0, by: 0.5) {
-                _ = try place(gap, level: level)
-            }
-        }
+    @Test func itsOwnCardsAndANewTaskGoInAGap() throws {
+        #expect(try board.placesInGap(column: "day", from: "day", grouped: false))
+        #expect(try board.placesInGap(column: "day", from: "new", grouped: false))
     }
 
-    @Test func aGapUnderAHeaderIsInItsSectionAndOverOneEndsTheSectionBefore() throws {
-        #expect(try place(3) == (2, 0, "Evening"))
-        #expect(try place(2) == (2, 0, nil))
-        #expect(try place(5) == (4, 0, "Evening"))
-    }
-
-    @Test func anEmptySectionTakesTheGapOverAndUnderItsPlate() throws {
-        #expect(try place(6) == (4, 0, "Errands"))
-        #expect(try place(7) == (4, 0, "Errands"))
-    }
-
-    @Test func theFingersXPicksTheLevelTheNeighboursAllow() throws {
-        #expect(try place(1, level: 1.2) == (1, 1, nil))
-        #expect(try place(1, level: 0.3) == (1, 1, nil))
-        #expect(try place(2, level: 0.3) == (2, 0, nil))
-        #expect(try place(2, level: 3) == (2, 2, nil))
-        #expect(try place(4, level: 1) == (3, 1, "Evening"))
-        // A header breaks nesting: the first card under it is a task.
-        #expect(try place(3, level: 2) == (2, 0, "Evening"))
-    }
-
-    /// A card carried within its own list: the gap is where the list lays its row out among the others.
-    @Test func theGapOfARowCarriedInItsOwnListIsWhereItStands() {
-        #expect(ListTarget.gap(holding: 150, among: [20, 60, 100, 200, 240]) == 3)
-        #expect(ListTarget.gap(holding: 0, among: [20, 60]) == 0)
-        #expect(ListTarget.gap(holding: 500, among: [20, 60]) == 2)
-    }
-
-    @Test func theCardsOwnGapAtItsLevelChangesNothing() throws {
-        let cards: JSONValue = [
-            ["key": ["line": 1, "text": "A"], "level": 0, "group": .null],
-            ["key": ["line": 2, "text": "B"], "level": 0, "group": "Evening"],
-        ]
-        let home: JSONValue = ["kind": "gap", "index": 1, "level": 0, "group": "Evening"]
-        let lifted = ListTarget(rows: [.card(level: 0, group: nil, zone: nil), .head(group: "Evening", opens: false), .card(level: 0, group: "Evening", zone: nil)])
-        let there = try lifted.place(at: 2, level: 0, board: board)
-        let stays: JSONValue? = try board.rule("rules.placeOfDrop", [cards, there, home])
-        #expect(stays == nil || stays == .null)
+    @Test func aListThatShowsSectionsTakesACardFromAnywhereInAGap() throws {
+        #expect(try board.placesInGap(column: "inbox", from: "soon", grouped: true))
     }
 }
 
+/// The screen a drop leaves, drawn before the write, equal to the read after it.
 @Suite struct DropPreviewTests {
     static let file = [
         "## Inbox", "", "- [ ] Idea", "- [ ] Other", "",
@@ -93,8 +42,9 @@ import Testing
     }
 
     /// The preview of a drop, then the drop written and read: the same screen, every card with the same id.
+    /// The app's board: the previews worked out on their own core, apart from the reads' and the pure rules'.
     private func check(_ title: String, to: (BoardSnapshot) throws -> JSONValue) throws {
-        let board = TaskBoard(core: core, vault: FakeVault(Self.file))
+        let board = TaskBoard(core: core, vault: FakeVault(Self.file), pure: try PhoneCore(script: Fixtures.phoneScript), preview: try PhoneCore(script: Fixtures.phoneScript))
         let before = try board.snapshot(day: nil, measures: Self.measures)
         let (lifted, column) = try card(before, title)
         let tasks: JSONValue = [["key": lifted.item.key.json, "from": .string(column.rawValue)]]

@@ -3941,8 +3941,11 @@ ${key.title}`.toLowerCase();
   function orderOf(heads, group) {
     return heads.findIndex((h) => sameGap(gapUnder(h.group), gapUnder(group)));
   }
-  function opensList(head, i) {
-    return i === 0 && head.opens === true;
+  function noSectionBelow(heads) {
+    return heads.some((head, i) => i > 0 && head.group === null);
+  }
+  function opensList(head, i, heads) {
+    return i === 0 && (head.opens === true || noSectionBelow(heads));
   }
   function placeAt(cards, y, level, shift, room, heads = [], held = null, hysteresis = 0) {
     const at = (finger) => rawPlaceAt(cards, finger, level, shift, room, heads);
@@ -3956,7 +3959,7 @@ ${key.title}`.toLowerCase();
     const headAfterGap = (h) => gap !== null && (h.firstCard > gap.index || h.firstCard === gap.index && orderOf(heads, h.group) > orderOf(heads, headerOfPlace(gap)));
     const headEdge = (h, i) => h.top + (headAfterGap(h) ? shift : 0) + (i === 0 && h.group !== null ? h.height : h.height / 2);
     const index = cards.filter((c, i) => y > top(i) + c.height / 2).length;
-    const passed = heads.filter((head, i) => head.firstCard === index && (opensList(head, i) || y > headEdge(head, i))).map((head) => head.group);
+    const passed = heads.filter((head, i) => head.firstCard === index && (opensList(head, i, heads) || y > headEdge(head, i))).map((head) => head.group);
     return gapAt(cards, index, level, passed, heads.length > 0);
   }
   function branchOf(levels, index) {
