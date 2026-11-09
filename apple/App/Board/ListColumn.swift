@@ -103,6 +103,8 @@ struct ColumnTitle: View {
         HStack(spacing: 4) {
             if dayArrows {
                 Button { Task { await model.step(-1) } } label: { arrow("chevron.left") }
+                    // A card held over an arrow turns the day, as a folder opens under a carried file in Files.
+                    .background { SpringLoaded { Task { await model.step(-1) } } }
                     .accessibilityLabel("Previous Day")
             }
             if dayArrows {
@@ -122,6 +124,7 @@ struct ColumnTitle: View {
             }
             if dayArrows {
                 Button { Task { await model.step(1) } } label: { arrow("chevron.right") }
+                    .background { SpringLoaded { Task { await model.step(1) } } }
                     .accessibilityLabel("Next Day")
             }
         }

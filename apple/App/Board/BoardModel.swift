@@ -1006,6 +1006,7 @@ final class BoardModel {
     func listController(_ column: BoardColumn) -> ListController? { lists[column]?.controller }
 
     private func begin() -> Int {
+        DropLog.target("carry begins")
         carryBegins?()
         found = nil
         return carries.begin()

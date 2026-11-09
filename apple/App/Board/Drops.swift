@@ -140,6 +140,32 @@ struct TitleDrop<Title: View>: UIViewRepresentable {
     }
 }
 
+/// A place a carried card held over for a moment activates, the system's spring loading (Files' folders, Mail's
+/// mailboxes): the day arrows turn the day under a carry, and the carry goes on in the day that came in.
+struct SpringLoaded: UIViewRepresentable {
+    let activate: () -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        let coordinator = context.coordinator
+        view.addInteraction(UISpringLoadedInteraction { _, _ in coordinator.activate() })
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        context.coordinator.activate = activate
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(activate: activate) }
+
+    @MainActor
+    final class Coordinator {
+        var activate: () -> Void
+        init(activate: @escaping () -> Void) { self.activate = activate }
+    }
+}
+
 /// The calendar as a drop target, its own scroll view holding the drop interaction: a card held over it shows the line at
 /// the minute it would start, on the grid's step; let go, the copy flies to the block the core makes. The plus is routed
 /// here too. The content's probe finds the scroll view and reads minutes from where the content stands.

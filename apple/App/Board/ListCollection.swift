@@ -251,9 +251,17 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         }
         let shownDay = model.snapshot?.day
         guard force || ids != shownIds || !changed.isEmpty else { return }
+        let gone = Set(shownIds).subtracting(ids)
         shownIds = ids
         let animated = day == shownDay && host.window != nil
         day = shownDay
+        // The quick entry's one field keeps the keyboard from row to row: a row going away hands it to the window's holder
+        // first, as any box that stops showing it does, so the collection never deletes the first responder's row.
+        for id in gone {
+            guard let path = source.indexPath(for: id), let cell = collection.cellForItem(at: path), let window = host.window,
+                  let field = cell.contentView.firstResponderInside as? EntryTextField else { continue }
+            field.park(in: window)
+        }
         rows = next
         drawn = tops
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
@@ -384,6 +392,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
 
     func collectionView(_ collectionView: UICollectionView, itemsForBeginning session: any UIDragSession, at indexPath: IndexPath) -> [UIDragItem] {
         guard let model, let row = rows[safe: indexPath.item] else { return [] }
+        DropLog.target("lift asked \(column.rawValue) \(indexPath.item)")
         let payload: DragPayload
         switch row {
         case .card(let card):
@@ -475,6 +484,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
 
     func collectionView(_ collectionView: UICollectionView, dragSessionDidEnd session: any UIDragSession) {
         guard let payload = DragPayload.of(session), let token = payload.token else { return }
+        DropLog.target("session ended \(token)")
         model?.endCarry(token)
     }
 
@@ -710,6 +720,15 @@ struct ListRowContent: View {
         case .plusRoom:
             Color.clear.frame(height: CardMetrics.height).accessibilityHidden(true)
         }
+    }
+}
+
+extension UIView {
+    /// The first responder, when it is this view or one inside it.
+    var firstResponderInside: UIView? {
+        if isFirstResponder { return self }
+        for view in subviews { if let found = view.firstResponderInside { return found } }
+        return nil
     }
 }
 
