@@ -454,6 +454,20 @@ every condition that changes the layout is animated by the transaction that chan
     copy flies into the part's header, takes its size on the way and fades as it arrives; the group's count fades to its
     new number. A card's copy always lands at the full size of its place (the plugin reads a growing row's resting
     height before its grow starts). Plugin: `Float.sink`, `TaskList.foldedHeadOf`; iPhone: `DropLanding.part.folded`.
+62. **Backend: a key stays good while its task is there.** Max acts in the middle of a motion: Done, then at once a drag of
+    another task, whose key was read before Done moved the lines. Every key the core gives now carries its task's id
+    (`TaskKey.id`, added), and `TaskRules.entryOf`, through which every write and every read by key finds its task, finds
+    it by that id wherever writes since took it (`applyAll` first takes each key and the keys its changes name to the
+    task's key now). A key is refused (`StaleTaskError`, the door's `staleTask`) only when no task has its id: it was
+    removed, or its line was changed elsewhere, which now makes it a new task with a new id (a task line changed outside
+    the core is never paired with the old one; a section's heading renamed in place still is). A key without an id (one a
+    host builds) is found by place and line, as before. A key is found by its id only where that id is this identity's:
+    its task's line is the key's, or one of the lines this identity's own writes rewrote it from (`TaskIdState.held`,
+    added, the last 8 by id); a key another reading gave (another `TaskBoard` over the same file, whose ids collide with
+    these by design) is found by its place and line instead. The door finds keys by id only while the host hands back
+    `ids`. The frontends pass `item.key` as they did; the iPhone app keeps each key's JSON as the door gave it and hands
+    `ids` back, so it changes nothing (its tests that read through a second board pass as before).
+
 
 ## Done when
 

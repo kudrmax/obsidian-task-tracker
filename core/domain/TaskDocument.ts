@@ -276,6 +276,11 @@ export class TaskDocument {
 		return this.groupLists.get(section) ?? [];
 	}
 
+	/** The task or subtask whose tag is `id`, wherever it stands; undefined when none has it. */
+	byId(id: string): TaskEntry | undefined {
+		return flatten(this.allTasks()).find((entry) => entry.id === id);
+	}
+
 	/** The task or subtask at that place, if there is one. */
 	find(section: SectionKey, index: number, path: readonly number[]): TaskEntry | undefined {
 		let entry: TaskEntry | undefined = this.tasks(section)[index];

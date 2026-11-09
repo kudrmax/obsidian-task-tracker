@@ -909,11 +909,12 @@ describe("to a section", () => {
 
 	it("a task changed in the file since it was read: rejected, nothing written", async () => {
 		const { store, svc } = setup();
-		const n1 = byText(await screen(svc, T)).get("N1")!;
-		const stale = { ...n1.key, raw: "- [ ] N1 before" };
-		await expect(svc.toSection([stale], "Work")).rejects.toBeInstanceOf(StaleTaskError);
-		await expect(svc.toSection([stale, byText(await screen(svc, T)).get("N4")!.key], "Work")).rejects.toBeInstanceOf(StaleTaskError);
-		expect(store.text).toBe(FILE);
+		const read = byText(await screen(svc, T));
+		const changed = store.text!.replace("- [ ] N1\n", "- [ ] N1 changed\n");
+		store.text = changed;
+		await expect(svc.toSection([read.get("N1")!.key], "Work")).rejects.toBeInstanceOf(StaleTaskError);
+		await expect(svc.toSection([read.get("N1")!.key, read.get("N4")!.key], "Work")).rejects.toBeInstanceOf(StaleTaskError);
+		expect(store.text).toBe(changed);
 	});
 
 	it("several into a preset the list lacks, and into a new name", async () => {

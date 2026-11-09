@@ -27,7 +27,7 @@ import {
 import { boundaryOf, parseText, readDocument, readingKey, sectionNames } from "./documentText";
 import type { Clock, SettingsStore } from "./ports";
 import type { TaskIdentity } from "./TaskIdentity";
-import { isUnder, sameLine, samePlace } from "./taskKeys";
+import { isUnder, keyOf, sameLine, samePlace } from "./taskKeys";
 
 /** An action's change of the document read at `today`; it throws `StaleTaskError` when a task or section it names is gone. */
 export type Operation = (doc: TaskDocument, today: LocalDate, settings: TaskCalendarSettings, boundary: DayBoundary) => TaskDocument;
@@ -64,6 +64,13 @@ function refsOf(change: TaskChange): readonly (TaskKey | null)[] {
 	return [];
 }
 
+/** The change with the tasks it names keyed as the document now has them. */
+function freshChange(change: TaskChange, fresh: (key: TaskKey | null) => TaskKey | null): TaskChange {
+	if (change.kind === "moveBefore" || change.kind === "moveToGroup") return { ...change, before: fresh(change.before) };
+	if (change.kind === "nest") return { ...change, parent: fresh(change.parent)!, before: fresh(change.before) };
+	return change;
+}
+
 /** The same task as read: its place and its line. */
 function sameKey(a: TaskKey, b: TaskKey): boolean {
 	return samePlace(a, b) && sameLine(a, b);
@@ -92,10 +99,16 @@ function blankName(name: string): boolean {
  * hands it. An action is an operation, or null when there is nothing to do (a blank title).
  */
 export class TaskRules {
+	/**
+	 * `keysById`: the ids in the keys the UI hands back are those of this identity, kept since they were given (the
+	 * service's; the door's when the host hands its ids back), so a key's task is found by its id. Otherwise an id means
+	 * nothing here and a key names its task by place and line alone.
+	 */
 	constructor(
 		private readonly settings: SettingsStore,
 		private readonly clock: Clock,
 		private readonly identity: TaskIdentity | null = null,
+		private readonly keysById = identity !== null,
 	) {}
 
 	moment(): Moment {
@@ -189,10 +202,37 @@ export class TaskRules {
 		return TaskDocument.empty(sectionNames(this.settings.get()));
 	}
 
+	/**
+	 * The task a key names in `doc`: by its id wherever writes since moved it, when the key has one the rules keep; else at
+	 * its place with its line. Throws StaleTaskError when it is gone, or no longer the task it was.
+	 */
 	entryOf(doc: TaskDocument, key: TaskKey): TaskEntry {
-		const entry = doc.find(key.section, key.index, key.path);
-		if (!entry || entry.raw !== key.raw) throw new StaleTaskError();
+		const byId = this.named(doc, key);
+		const entry = byId === undefined ? this.atPlace(doc, key) : byId;
+		if (!entry) throw new StaleTaskError();
 		return entry;
+	}
+
+	/**
+	 * The task a key names by its id, when the rules find keys by id: the task with that id whose line is the key's, or one
+	 * this identity's own writes gave it since; else the key is another reading's, whose ids mean nothing here, and is
+	 * found at its place with its line. Null when it is not found that way either; undefined when keys are found by place.
+	 */
+	named(doc: TaskDocument, key: TaskKey): TaskEntry | null | undefined {
+		if (!this.keysById || key.id === undefined) return undefined;
+		const entry = doc.byId(key.id);
+		if (entry && (entry.raw === key.raw || this.identity?.held(key.id, key.raw))) return entry;
+		return this.atPlace(doc, key) ?? null;
+	}
+
+	/** The key of the task a key names, as `doc` has it now: what keys handed in earlier are compared by. */
+	freshKey(doc: TaskDocument, key: TaskKey): TaskKey {
+		return keyOf(this.entryOf(doc, key));
+	}
+
+	private atPlace(doc: TaskDocument, key: TaskKey): TaskEntry | undefined {
+		const entry = doc.find(key.section, key.index, key.path);
+		return entry?.raw === key.raw ? entry : undefined;
 	}
 
 	/** A section the UI names must still be in the file, as a task must. */
@@ -459,14 +499,16 @@ export class TaskRules {
 	applyAll(steps: readonly TaskStep[]): Operation | null {
 		if (steps.length === 0) return null;
 		return (doc, today, settings, boundary) => {
+			const fresh = (key: TaskKey | null) => (key === null ? null : this.freshKey(doc, key));
+			const now = steps.map((step) => ({ key: fresh(step.key)!, change: freshChange(step.change, fresh) }));
 			const named: TaskKey[] = [];
 			const tagOf = (key: TaskKey): number => {
 				const at = named.findIndex((k) => sameKey(k, key));
 				return at >= 0 ? at : named.push(key) - 1;
 			};
 			const lineOf = (key: TaskKey) => doc.lineOf(this.entryOf(doc, key));
-			const plan = steps
-				.filter((step) => !(MOVES.has(step.change.kind) && steps.some((other) => MOVES.has(other.change.kind) && isUnder(step.key, other.key))))
+			const plan = now
+				.filter((step) => !(MOVES.has(step.change.kind) && now.some((other) => MOVES.has(other.change.kind) && isUnder(step.key, other.key))))
 				.sort((a, b) => lineOf(a.key) - lineOf(b.key))
 				.map((step) => ({ change: step.change, own: tagOf(step.key), refs: refsOf(step.change).map((ref) => (ref === null ? null : tagOf(ref))) }));
 			const { doc: tagged, tags } = EntryTags.tag(doc, named.map((key) => this.entryOf(doc, key)));

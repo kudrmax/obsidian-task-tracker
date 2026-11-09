@@ -33,7 +33,7 @@ describe("toItem", () => {
 	it("carries the key and the fields the UI shows", () => {
 		expect(toItem(queried.tasks("now")[1], T)).toEqual({
 			id: queried.tasks("now")[1].id,
-			key: { section: "now", index: 1, path: [], raw: "- [/] Slotted today ⏰ 2026-10-30 10:00-11:00" },
+			key: { section: "now", index: 1, path: [], raw: "- [/] Slotted today ⏰ 2026-10-30 10:00-11:00", id: queried.tasks("now")[1].id },
 			text: "Slotted today",
 			title: "Slotted today",
 			status: "inProgress",

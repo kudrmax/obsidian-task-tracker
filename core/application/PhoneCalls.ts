@@ -223,7 +223,7 @@ class Call {
 		};
 		this.store = store;
 		this.identity = new TaskIdentity(context.ids);
-		this.rules = new TaskRules(store, clock, this.identity);
+		this.rules = new TaskRules(store, clock, this.identity, context.ids !== undefined);
 		this.reads = new TaskReads(this.rules, store, clock, { notes: () => context.projects ?? [], grouping: () => this.grouping });
 		this.writes = new TaskWrites(this.rules, this.reads);
 		this.text = context.tasks ?? null;

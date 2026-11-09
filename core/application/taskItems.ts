@@ -11,7 +11,8 @@ import { canRemind, isOpen, type LocalDate } from "../domain/Task";
 import type { TaskEntry } from "../domain/TaskDocument";
 import { plainText } from "../domain/TaskText";
 import { markColors } from "./marks";
-import type { ProjectRef, SubtaskProgress, TaskItem, TaskKey } from "./contracts";
+import type { ProjectRef, SubtaskProgress, TaskItem } from "./contracts";
+import { keyOf } from "./taskKeys";
 
 /** Of the task's own subtasks, the done ones out of all but those given up. */
 function progressOf(entry: TaskEntry): SubtaskProgress | null {
@@ -20,9 +21,6 @@ function progressOf(entry: TaskEntry): SubtaskProgress | null {
 	return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
 }
 
-function keyOf(entry: TaskEntry): TaskKey {
-	return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw };
-}
 
 /** How the items read the settings: the level of a prefix, the labels of names in the settings' order. */
 export interface ItemLevels {
