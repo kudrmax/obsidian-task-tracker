@@ -224,6 +224,18 @@ final class CardControl: UIControl {
     private static weak var menuOwner: CardControl?
     /// A card's menu is up.
     static var menuShowing: Bool { menuOwner?.opener.showing == true }
+
+    /// Work waiting for the menu to be gone for good: its preview down and faded, nothing of it left on the screen.
+    private static var whenGone: [@MainActor () -> Void] = []
+
+    /// `work` runs once the open menu is gone for good.
+    static func afterMenuGone(_ work: @escaping @MainActor () -> Void) { whenGone.append(work) }
+
+    private static func gone() {
+        let run = whenGone
+        whenGone = []
+        for work in run { work() }
+    }
     /// The card whose menu opened last and where it stood on the screen: Add Subtask on a calendar card lifts it there.
     static private(set) var lastLifted: (card: BoardCard, frame: CGRect)?
 
@@ -367,9 +379,13 @@ final class CardControl: UIControl {
                     mark.alpha = mark.alpha == 0 ? 0.01 : 0
                 } completion: { _ in landed() }
             }
-            animator.addCompletion(landed)
+            animator.addCompletion {
+                landed()
+                Self.gone()
+            }
         } else {
             landed()
+            Self.gone()
         }
         guard let run = afterMenu else { return }
         afterMenu = nil

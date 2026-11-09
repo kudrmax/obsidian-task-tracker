@@ -172,7 +172,10 @@ what a drop writes.
     and the preview in place (the whole-title one cross-fades to the new look); Select Text lifts the title exactly where
     the preview stood. The whole-title preview is laid out by its title, as a card (a tall calendar block's too, not a tall
     box). Rename runs as it is chosen: the card turns into its field in its own row as the preview lands on it (the list
-    draws a row turning into its field at once, never cross-faded, and no hold waits for the preview). A row the menu's choice removes (Done, Won't Do, Delete) closes once the
+    draws a row turning into its field at once, never cross-faded, and no hold waits for the preview); the field shows its
+    text from the start, as the card and the preview do, until the menu is gone for good (then the caret goes to the end)
+    or the first keystroke (typed at the end), so the landing preview and the field never show different parts of the
+    title. A row the menu's choice removes (Done, Won't Do, Delete) closes once the
     preview is home, heard from an animation of the app's run inside the menu's going (the animator's own completion
     comes most of a second later). The private trigger that opens the menu on a tap (`_presentMenuAtLocation:`) stays: it
     presents this configuration with the standard morph.
