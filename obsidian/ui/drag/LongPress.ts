@@ -13,7 +13,10 @@ export interface LongPressOptions {
 	onLongTap?(e: PointerEvent): void;
 	/** Whether this press is for this element at all: a press that starts on a child with gestures of its own is not. */
 	accepts?(e: PointerEvent): boolean;
-	/** The element is drawn again: its press ends and it hears no more. */
+	/**
+	 * The element is drawn again or leaves: it hears no more from these options. Drawn again, the same element takes the
+	 * new ones through `attach` and a press already under way goes on with them, so a redraw never drops a finger.
+	 */
 	readonly signal?: AbortSignal;
 }
 
@@ -31,25 +34,56 @@ interface Press {
  * A second finger anywhere makes the press part of a pinch: it is forgotten, so lifting it is no tap.
  */
 export class LongPress {
+	private static readonly attached = new WeakMap<HTMLElement, LongPress>();
+
+	/**
+	 * The press of `el` with `opts`: the one it already has, now with these options, when the element was drawn again
+	 * (a row kept from drawing to drawing); a press under way goes on through the redraw.
+	 */
+	static attach(el: HTMLElement, opts: LongPressOptions): LongPress {
+		const kept = LongPress.attached.get(el);
+		if (!kept) return new LongPress(el, opts);
+		kept.listen(opts);
+		return kept;
+	}
+
 	private press: Press | null = null;
 	private readonly otherFinger = (e: PointerEvent) => {
 		if (this.press && e.pointerId !== this.press.pointerId) this.end();
 	};
 
+	private opts!: LongPressOptions;
+
 	constructor(
 		private readonly el: HTMLElement,
-		private readonly opts: LongPressOptions,
+		opts: LongPressOptions,
 	) {
+		LongPress.attached.set(el, this);
+		el.addEventListener("pointerdown", (e) => this.down(e));
+		el.addEventListener("pointermove", (e) => this.move(e));
+		el.addEventListener("pointerup", (e) => this.up(e));
+		el.addEventListener("pointercancel", (e) => this.cancel(e));
+		this.listen(opts);
+	}
+
+	/** Hears with `opts` until their signal ends them; ended and not taken up again in the same drawing, the press ends. */
+	private listen(opts: LongPressOptions): void {
+		this.opts = opts;
 		const signal = opts.signal;
-		el.addEventListener("pointerdown", (e) => this.down(e), { signal });
-		el.addEventListener("pointermove", (e) => this.move(e), { signal });
-		el.addEventListener("pointerup", (e) => this.up(e), { signal });
-		el.addEventListener("pointercancel", (e) => this.cancel(e), { signal });
-		signal?.addEventListener("abort", () => this.end());
+		signal?.addEventListener("abort", () =>
+			queueMicrotask(() => {
+				if (this.opts === opts) this.end();
+			}),
+		);
+	}
+
+	/** Its options were called off and none came after: the element left, or its gestures were taken away. */
+	private get deaf(): boolean {
+		return this.opts.signal?.aborted === true;
 	}
 
 	private down(e: PointerEvent): void {
-		if (!e.isPrimary || e.button !== 0 || this.press || this.opts.busy()) return;
+		if (this.deaf || !e.isPrimary || e.button !== 0 || this.press || this.opts.busy()) return;
 		if (this.opts.accepts && !this.opts.accepts(e)) return;
 		const press: Press = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, mouse: e.pointerType === "mouse", timer: null, last: e };
 		press.timer = window.setTimeout(() => this.fire(press), this.opts.delayMs());
@@ -64,7 +98,7 @@ export class LongPress {
 	}
 
 	private move(e: PointerEvent): void {
-		if (!this.press || e.pointerId !== this.press.pointerId) return;
+		if (this.deaf || !this.press || e.pointerId !== this.press.pointerId) return;
 		this.press.last = e;
 		const distance = this.distance(e);
 		if (this.press.mouse) {

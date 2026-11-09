@@ -147,10 +147,12 @@ export class Overlay {
 		this.backdrop.removeEventListener("pointerdown", this.onSheet);
 	}
 
+	/** The parts fade out under the finger, taking no press: what stands under them is pressed through them at once. */
 	private fadeOut(parts: readonly HTMLElement[]): Promise<void> {
 		for (const part of parts) {
 			part.classList.add(CLOSING);
 			part.classList.remove(SHOWN);
+			part.style.pointerEvents = "none";
 		}
 		const leave = () => {
 			parts.forEach((part) => part.remove());
