@@ -392,7 +392,6 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
 
     func collectionView(_ collectionView: UICollectionView, itemsForBeginning session: any UIDragSession, at indexPath: IndexPath) -> [UIDragItem] {
         guard let model, let row = rows[safe: indexPath.item] else { return [] }
-        DropLog.target("lift asked \(column.rawValue) \(indexPath.item)")
         let payload: DragPayload
         switch row {
         case .card(let card):
@@ -484,7 +483,6 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
 
     func collectionView(_ collectionView: UICollectionView, dragSessionDidEnd session: any UIDragSession) {
         guard let payload = DragPayload.of(session), let token = payload.token else { return }
-        DropLog.target("session ended \(token)")
         model?.endCarry(token)
     }
 

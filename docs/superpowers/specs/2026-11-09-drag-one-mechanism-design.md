@@ -118,3 +118,22 @@ what a drop writes.
    Max asked for the standard iOS behaviour; the purple line and «no row moves while the finger does» are the plugin's
    and stay there.
 2. **Lead: the home place is the gap where the card was lifted from**, so the target is never «nothing».
+3. **frontend-swift: over the system bars there is no target.** The top bar, the tab bar and the divider's handle are
+   the system's or no list's; a card let go there flies home, as over the cancel target, as in Reminders and Files.
+   Every list (its title, the gap under the title, Backlog's gap under Inbox, its rows and the room after them) and the
+   calendar's scroll view take the carry.
+4. **frontend-swift: a subtask's place lights its parent.** The system's gap has no indent: when the finger's `x` makes
+   the place a subtask, the card it will go under gets the accent ring; an empty section's plate lights as before.
+5. **frontend-swift: the calendar's line marks the carried card's top edge** (the minute is read where the card's top
+   stands, the finger's hold on the card known from the lift), so the line shows at the card's edge, not under it.
+6. **frontend-swift: the day arrows are spring-loaded.** A card held over ‹ or › turns the day (the system's spring
+   loading, as Files' folders); the carry goes on and lands in the day now shown.
+7. **frontend-swift: cards and section headers lift after the system's long press.** The settings' Long Press Delay is
+   kept for the calendar's empty-space press only (the system's list drag has no public delay).
+8. **frontend-swift: a card carried out of its list leaves no room there** until it comes back over that list, where
+   its own row is the gap again (the system's own behaviour for a drag between collections).
+9. **frontend-swift: a section carried moves its header among the headers** (the system's gap, snapped to section
+   boundaries), its tasks hidden; at the drop the header stays where the gap was until the read after
+   `tasks.moveGroup` draws the section there (the core has no preview of a section's move).
+10. **frontend-swift: a press that starts during the system's drop animation (about 0.4 s) is not taken by iOS**; a
+    card lifts at once once the dropped one has landed.

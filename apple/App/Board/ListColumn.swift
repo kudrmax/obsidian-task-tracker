@@ -20,8 +20,10 @@ struct ListColumn: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // A card carried onto the title goes into the list keeping its project; the title's drop reaches down to the list.
-            TitleDrop(column: list.column, model: model) {
+            // Backlog stands under Inbox: the gap between them is its title's too, so a carry there lands somewhere.
+            TitleDrop(column: list.column, model: model, top: list.column == .backlog ? ColumnMetrics.headGap : 0) {
                 ColumnTitle(title: title, dayArrows: dayArrows, model: model, list: list)
+                    .padding(.top, list.column == .backlog ? ColumnMetrics.headGap : 0)
                     .padding(.bottom, ColumnMetrics.headGap)
             }
             DayLane(model: model, width: width, slides: list.column == .day, shown: ListCollection(column: list.column, model: model)) { peek in
@@ -411,8 +413,9 @@ struct CardRow: View {
         let selecting = model.selecting
         let picks = self.picks
         let lit = model.isParentLit(card, in: column)
+        let hidden = model.isHidden(card)
         HStack(spacing: 10) {
-            if picks {
+            if picks, !hidden {
                 SelectionCircle(on: model.picked.contains(card.id))
                     .frame(width: Self.circleRoom - 10)
                     .contentShape(.rect)

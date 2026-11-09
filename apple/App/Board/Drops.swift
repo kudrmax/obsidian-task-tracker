@@ -67,6 +67,8 @@ final class PlusRoute {
 struct TitleDrop<Title: View>: UIViewRepresentable {
     let column: BoardColumn
     let model: BoardModel
+    /// Room over the title that takes a carry too.
+    var top: CGFloat = 0
     @ViewBuilder let title: () -> Title
 
     func makeUIView(context: Context) -> UIView {
@@ -93,7 +95,7 @@ struct TitleDrop<Title: View>: UIViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIView, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? 200, height: ColumnMetrics.titleRow + ColumnMetrics.headGap)
+        CGSize(width: proposal.width ?? 200, height: top + ColumnMetrics.titleRow + ColumnMetrics.headGap)
     }
 
     func makeCoordinator() -> Delegate { Delegate(column: column, model: model) }

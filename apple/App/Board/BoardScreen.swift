@@ -314,7 +314,7 @@ struct Ribbon: View {
                     }
                     // One column, Inbox over Backlog, each exactly the column's width.
                     column(.inbox, half) {
-                        VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
+                        VStack(alignment: .leading, spacing: 0) {
                             lists(.inbox).frame(width: half)
                             lists(.backlog).frame(width: half)
                         }
