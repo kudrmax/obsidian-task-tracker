@@ -312,17 +312,14 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
                 return made.twin(look: look, style: style, whole: whole, in: window, card: card)
             }
         }
-        guard made.grows else { return present() }
-        // A curve that ends when it is seen to end: a spring's completion came most of a second after it had settled.
-        UIView.animate(withDuration: Self.menuGrow, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
-            made.grow()
-        } completion: { _ in present() }
+        // The menu rises at once with its twin of the copy grown; the copy under it takes the same size in that frame, so
+        // the twin lands back on it at the size it was lifted at, never scaled.
+        made.grow()
+        present()
     }
 
     /// The menu's copy shrinking back into the card as the menu flies it home.
     private static let menuShrink: TimeInterval = 0.25
-    /// The copy growing from the card before its menu shows.
-    private static let menuGrow: TimeInterval = 0.18
 
     /// The menu shows over the copy grown in place, which stays opaque under the menu's twin while it fades in.
     private func menuShown(_ animator: (any UIContextMenuInteractionAnimating)?) {}
