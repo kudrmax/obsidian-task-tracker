@@ -41,6 +41,8 @@ struct BoardScreen: View {
             }
             .animation(.snappy, value: barShown)
         }
+        // A card held where no list or calendar takes it (the bars, the divider) is routed to the nearest place.
+        .background { BoardRouteAnchor(route: model.plus) }
         .background {
             TouchWatch { point in
                 if model.found != nil { model.found = nil }
@@ -93,7 +95,10 @@ struct BoardScreen: View {
     /// carried while the bar keeps the system's layout.
     private var bottomBar: some View {
         ZStack(alignment: .topLeading) {
-            PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: { plusSlot = $0 })
+            PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: {
+                plusSlot = $0
+                model.plus.floor = $0.minY
+            })
             if let slot = plusSlot {
                 PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drop: model.plus, onCarry: { model.startCarryingPlus() }, onEnd: { model.endCarry($0) })
                     .frame(width: slot.width, height: slot.height)

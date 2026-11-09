@@ -2,53 +2,81 @@ import Core
 import SwiftUI
 import UIKit
 
-/// A place the plus carried by the finger may be let go on: a list, or the calendar. The plus starts its carry at once,
-/// with no hold, as the plugin's; the system's drag only lifts after a long press, so the plus is routed by hand to the
-/// view under it, read from where the views stand now.
+/// A place of the board a carry the board routes may be let go on: a list, the calendar, the all-day strip. The board
+/// routes two carries itself: the plus, which moves at once with no hold, as the plugin's, and the system's drag of a card
+/// where no list or calendar takes it (the top bar, the tab bar, the divider): there the place is the nearest one of the
+/// column under the finger, so a carry always has a target.
 @MainActor
-protocol PlusTarget: AnyObject {
-    /// Where it takes the plus, in the window; nil while it is off the screen.
-    var plusArea: CGRect? { get }
-    func plusHover(at point: CGPoint)
-    func plusLeave()
-    /// Let go: where the field opens, in the window; nil when it opens nowhere.
-    func plusLetGo() -> CGRect?
+protocol BoardTarget: AnyObject {
+    /// Where it stands, in the window; nil while it is off the screen.
+    var area: CGRect? { get }
+    /// A carry held at `point` of the window, inside the area: the plus (nil) or a card.
+    func hover(at point: CGPoint, carrying payload: DragPayload?)
+    func leave()
+    /// Let go: where the field opens or the card lands, in the window.
+    func letGo(carrying payload: DragPayload?) -> CGRect?
 }
 
-/// The plus carried over the board: the target under the finger shows where the new task would stand.
+/// The one routing of the board's own carries: the target the point is in, else the nearest target of the column under
+/// the finger's `x`, with the point brought into its visible part (above it: its top; over the tab bar: its last visible
+/// place).
 @MainActor
-final class PlusRoute {
+final class BoardRoute: NSObject, UIDropInteractionDelegate {
     private struct Weak {
-        weak var target: (any PlusTarget)?
+        weak var target: (any BoardTarget)?
     }
 
     private var targets: [Weak] = []
-    private weak var current: (any PlusTarget)?
+    private weak var current: (any BoardTarget)?
+    /// The top of the tab bar, in the window: what stands under it is not seen.
+    var floor: CGFloat = .infinity
+    private(set) lazy var interaction = UIDropInteraction(delegate: self)
 
-    func add(_ target: any PlusTarget) {
+    func add(_ target: any BoardTarget) {
         targets.removeAll { $0.target == nil || $0.target === target }
         targets.append(Weak(target: target))
     }
 
-    private func target(at point: CGPoint) -> (any PlusTarget)? {
-        targets.compactMap(\.target).first { $0.plusArea?.contains(point) == true }
+    /// The target for `point` and the point brought into what shows of it.
+    private func route(_ point: CGPoint) -> (target: any BoardTarget, point: CGPoint)? {
+        let shown = targets.compactMap { weak -> (any BoardTarget, CGRect)? in
+            guard let target = weak.target, let area = target.area, let window = interaction.view?.window ?? UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else { return nil }
+            let visible = area.intersection(window.bounds)
+            return visible.isNull || visible.isEmpty ? nil : (target, visible)
+        }
+        let seen = { (area: CGRect) in CGRect(x: area.minX, y: area.minY, width: area.width, height: max(1, min(area.maxY, self.floor) - area.minY)) }
+        if let inside = shown.first(where: { seen($0.1).contains(point) }) { return (inside.0, point) }
+        let column = shown.filter { $0.1.minX <= point.x && point.x < $0.1.maxX }
+        guard let nearest = column.min(by: { distance(point.y, seen($0.1)) < distance(point.y, seen($1.1)) }) else { return nil }
+        let area = seen(nearest.1)
+        return (nearest.0, CGPoint(x: point.x, y: min(max(point.y, area.minY + 1), area.maxY - 1)))
     }
 
-    /// The plus held at `point` of the window.
+    private func distance(_ y: CGFloat, _ area: CGRect) -> CGFloat {
+        y < area.minY ? area.minY - y : y > area.maxY ? y - area.maxY : 0
+    }
+
+    private func hold(_ point: CGPoint, carrying payload: DragPayload?) -> Bool {
+        let routed = route(point)
+        if routed?.target !== current { current?.leave() }
+        current = routed?.target
+        guard let routed else { return false }
+        routed.target.hover(at: routed.point, carrying: payload)
+        return true
+    }
+
+    // MARK: The plus, carried by the finger itself
+
     func carry(at point: CGPoint) {
-        let next = target(at: point)
-        if next !== current { current?.plusLeave() }
-        current = next
-        next?.plusHover(at: point)
+        _ = hold(point, carrying: nil)
     }
 
-    /// The plus held over no place (the cancel target, the bars).
+    /// The plus held over no place (its own cancel target).
     func carryOff() {
-        current?.plusLeave()
+        current?.leave()
         current = nil
     }
 
-    /// What came of the plus let go: no place under it, or a place took it, with where its field opens in the window.
     enum LetGo {
         case missed
         case taken(CGRect?)
@@ -57,7 +85,60 @@ final class PlusRoute {
     func letGo() -> LetGo {
         guard let current else { return .missed }
         self.current = nil
-        return .taken(current.plusLetGo())
+        return .taken(current.letGo(carrying: nil))
+    }
+
+    // MARK: A card where no list or calendar takes it
+
+    private var landing: CGRect?
+
+    func dropInteraction(_ interaction: UIDropInteraction, canHandle session: any UIDropSession) -> Bool {
+        guard let payload = DragPayload.of(session) else { return false }
+        return !payload.isSection
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: any UIDropSession) -> UIDropProposal {
+        guard let window = interaction.view else { return UIDropProposal(operation: .cancel) }
+        return hold(session.location(in: window), carrying: DragPayload.of(session)) ? UIDropProposal(operation: .move) : UIDropProposal(operation: .cancel)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: any UIDropSession) { carryOff() }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) { carryOff() }
+
+    func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
+        landing = current?.letGo(carrying: DragPayload.of(session))
+        current = nil
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
+        guard let landing, let window = interaction.view else { return nil }
+        self.landing = nil
+        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: CGPoint(x: landing.midX, y: landing.midY)))
+    }
+}
+
+/// Puts the board's route on the window: a card held where nothing else takes it is routed there.
+struct BoardRouteAnchor: UIViewRepresentable {
+    let route: BoardRoute
+
+    func makeUIView(context: Context) -> Anchor {
+        let view = Anchor()
+        view.route = route
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: Anchor, context: Context) {}
+
+    final class Anchor: UIView {
+        var route: BoardRoute?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            guard let route, let window, route.interaction.view !== window else { return }
+            window.addInteraction(route.interaction)
+        }
     }
 }
 
@@ -205,7 +286,7 @@ struct CanvasProbe: UIViewRepresentable {
 }
 
 @MainActor
-final class CalendarDrop: NSObject, UIDropInteractionDelegate, PlusTarget {
+final class CalendarDrop: NSObject, UIDropInteractionDelegate, BoardTarget {
     weak var model: BoardModel?
     weak var scroll: UIView?
     private var spot: CGRect?
@@ -245,19 +326,71 @@ final class CalendarDrop: NSObject, UIDropInteractionDelegate, PlusTarget {
         return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: canvas, center: CGPoint(x: spot.midX, y: spot.midY), transform: scale))
     }
 
-    // MARK: The plus
+    // MARK: A carry the board routes here
 
-    var plusArea: CGRect? { scroll.flatMap { view in view.window.map { view.convert(view.bounds, to: $0) } } }
+    var area: CGRect? { scroll.flatMap { view in view.window.map { view.convert(view.bounds, to: $0) } } }
 
-    func plusHover(at point: CGPoint) {
-        if let minute = minute(at: point) { model?.hoverCalendar(minute: minute) }
+    func hover(at point: CGPoint, carrying payload: DragPayload?) {
+        if let minute = minute(at: point, grab: payload?.grab ?? 0) { model?.hoverCalendar(minute: minute) }
     }
 
-    func plusLeave() { model?.leaveCalendar() }
+    func leave() { model?.leaveCalendar() }
 
-    func plusLetGo() -> CGRect? {
-        guard let canvas = model?.calendarCanvas, let rect = model?.plusOnCalendar() else { return nil }
-        return canvas.convert(rect, to: nil)
+    func letGo(carrying payload: DragPayload?) -> CGRect? {
+        guard let canvas = model?.calendarCanvas else { return nil }
+        let rect = payload == nil ? model?.plusOnCalendar() : model?.dropOnCalendar()
+        return rect.map { canvas.convert($0, to: nil) }
+    }
+}
+
+/// The all-day strip over the calendar as a place: a card let go there goes to the day itself with no time, as on the day
+/// list's title (`ScreenView.titleDrops.day`), which lights for it; the plus opens its field at the top of the day list.
+struct AllDayDrop: UIViewRepresentable {
+    let model: BoardModel
+
+    func makeUIView(context: Context) -> Probe {
+        let view = Probe()
+        view.isUserInteractionEnabled = false
+        view.model = model
+        model.plus.add(view)
+        return view
+    }
+
+    func updateUIView(_ view: Probe, context: Context) {
+        view.model = model
+    }
+
+    @MainActor
+    final class Probe: UIView, BoardTarget {
+        weak var model: BoardModel?
+
+        var area: CGRect? {
+            guard let window, bounds.height > 0 else { return nil }
+            return convert(bounds, to: window)
+        }
+
+        func hover(at point: CGPoint, carrying payload: DragPayload?) {
+            guard let model else { return }
+            if payload == nil {
+                model.listController(.day)?.hover(at: model.listController(.day)?.area.map { CGPoint(x: $0.midX, y: $0.minY + 1) } ?? point, carrying: nil)
+            } else {
+                _ = model.hoverTitle(.day)
+                DropLog.target("all-day: the day's title")
+            }
+        }
+
+        func leave() {
+            model?.leaveTitle(.day)
+            model?.listController(.day)?.leave()
+        }
+
+        func letGo(carrying payload: DragPayload?) -> CGRect? {
+            guard let model else { return nil }
+            guard payload != nil else { return model.listController(.day)?.letGo(carrying: nil) }
+            guard case .landed(let landed) = model.dropOnTitle(.day), let id = landed?.id, let list = model.listController(.day) else { return nil }
+            list.collection.layoutIfNeeded()
+            return list.capsule(of: id)
+        }
     }
 }
 

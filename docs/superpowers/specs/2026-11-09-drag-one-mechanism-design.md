@@ -118,10 +118,11 @@ what a drop writes.
    Max asked for the standard iOS behaviour; the purple line and «no row moves while the finger does» are the plugin's
    and stay there.
 2. **Lead: the home place is the gap where the card was lifted from**, so the target is never «nothing».
-3. **frontend-swift: over the system bars there is no target.** The top bar, the tab bar and the divider's handle are
-   the system's or no list's; a card let go there flies home, as over the cancel target, as in Reminders and Files.
-   Every list (its title, the gap under the title, Backlog's gap under Inbox, its rows and the room after them) and the
-   calendar's scroll view take the carry.
+3. **Lead, changed 11-09 (was «no target over the bars»): over the bars the target is the nearest place of the column
+   under the finger.** Where no list or calendar takes the drop (the top bar, the tab bar, the divider's handle, the gaps
+   round them), one board-level drop interaction routes it, through the same routing as the plus, to the column under
+   the finger's `x`: above a list its first place, over the tab bar its last place in sight (the end of a short list), on
+   the calendar the minute at its visible top or bottom edge; the list opens the room there and the drop lands there.
 4. **frontend-swift: a subtask's place lights its parent.** The system's gap has no indent: when the finger's `x` makes
    the place a subtask, the card it will go under gets the accent ring; an empty section's plate lights as before.
 5. **frontend-swift: the calendar's line marks the carried card's top edge** (the minute is read where the card's top
@@ -137,3 +138,6 @@ what a drop writes.
    `tasks.moveGroup` draws the section there (the core has no preview of a section's move).
 10. **frontend-swift: a press that starts during the system's drop animation (about 0.4 s) is not taken by iOS**; a
     card lifts at once once the dropped one has landed.
+11. **frontend-swift: a card let go on the all-day strip over the calendar goes to the day with no time**: the core has
+    no `DropTo` for a day without a time, so it is the drop on the day list's title (`ScreenView.titleDrops.day`): the
+    end of the day's part without a section, its project kept. The day's title lights while the card is over the strip.

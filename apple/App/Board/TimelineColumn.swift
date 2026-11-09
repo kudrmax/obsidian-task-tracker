@@ -82,6 +82,8 @@ struct TimelineColumn: View {
         VStack(alignment: .leading, spacing: Measure.allDayGap) {
             DayLane(model: model, width: columnWidth, shown: allDay(timeline)) { peek in allDay(peek.timeline) }
                 .clipped()
+                // A card let go on the all-day strip goes to the day with no time.
+                .background { AllDayDrop(model: model) }
             GeometryReader { box in
                 let hour = hour ?? CGFloat(timeline.zoomLevels.first ?? 56)
                 ScrollView {

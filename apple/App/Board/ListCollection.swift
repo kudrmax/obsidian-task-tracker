@@ -176,7 +176,7 @@ extension ListCollection {
 }
 
 @MainActor
-final class ListController: NSObject, UICollectionViewDelegate, UICollectionViewDragDelegate, UICollectionViewDropDelegate, PlusTarget {
+final class ListController: NSObject, UICollectionViewDelegate, UICollectionViewDragDelegate, UICollectionViewDropDelegate, BoardTarget {
     let column: BoardColumn
     private weak var model: BoardModel?
     let collection: UICollectionView
@@ -630,57 +630,85 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         }
     }
 
-    // MARK: The plus carried over the list
+    // MARK: A carry routed here by the board (the plus, or a card over the bars)
 
-    /// The room the plus held over the list opens, before row `plusRoom` of the list as drawn without it.
+    /// The room a carry routed by the board opens, before row `plusRoom` of the list as drawn without it and without the
+    /// carried card: the plus, or a card held over the bars, where the list itself takes no drop.
     private var plusRoom: Int?
+    private var plusX: CGFloat = 0
 
-    var plusArea: CGRect? {
+    var area: CGRect? {
         guard let window = host.window else { return nil }
-        // The title over the list takes the plus too: it opens the field at the list's top.
+        // The title over the list takes the carry too: it is the list's first place.
         let frame = host.convert(host.bounds, to: window)
         return CGRect(x: frame.minX, y: frame.minY - ColumnMetrics.titleRow - ColumnMetrics.headGap, width: frame.width, height: frame.height + ColumnMetrics.titleRow + ColumnMetrics.headGap)
     }
 
-    /// The rows drawn, the plus's room aside, with where each stands in the collection now.
-    private var standing: [(row: DrawnRow, frame: CGRect)] {
+    /// The rows a routed carry moves among, where each stands in the collection now: the room and the carried card aside.
+    private func standing(_ carried: String?) -> [(row: DrawnRow, frame: CGRect)] {
         rows.enumerated().compactMap { index, row in
-            guard row != .plusRoom, let frame = collection.layoutAttributesForItem(at: IndexPath(item: index, section: 0))?.frame else { return nil }
+            guard row != .plusRoom, row.id != carried, let frame = collection.layoutAttributesForItem(at: IndexPath(item: index, section: 0))?.frame else { return nil }
             return (row, frame)
         }
     }
 
-    func plusHover(at point: CGPoint) {
+    private static func carried(_ payload: DragPayload?) -> String? {
+        if case .card(let card) = payload?.kind { card.id } else { nil }
+    }
+
+    func hover(at point: CGPoint, carrying payload: DragPayload?) {
         let local = collection.convert(point, from: nil)
-        let gap = standing.filter { $0.frame.midY < local.y }.count
+        let gap = standing(Self.carried(payload)).filter { $0.frame.midY < local.y }.count
         plusX = local.x
+        if payload != nil, let model {
+            let others = rows.filter { $0 != .plusRoom && $0.id != Self.carried(payload) }
+            if let place = place(gap, among: others, x: plusX) {
+                model.hoverList(column, place: place)
+                DropLog.target("routed list \(column.rawValue) gap \(gap) \(place)")
+            }
+        }
         guard gap != plusRoom else { return }
         if plusRoom != nil { UISelectionFeedbackGenerator().selectionChanged() }
         plusRoom = gap
         update()
     }
 
-    private var plusX: CGFloat = 0
-
-    func plusLeave() {
+    func leave() {
+        model?.leaveList(column)
         guard plusRoom != nil else { return }
         plusRoom = nil
         update()
     }
 
-    /// Let go: the field opens where the room stood, at the level the finger asked for; its place in the window.
-    func plusLetGo() -> CGRect? {
+    /// Let go: the plus opens its field where the room stood; a card is dropped there. Where it lands, in the window.
+    func letGo(carrying payload: DragPayload?) -> CGRect? {
         guard let model, let gap = plusRoom else { return nil }
         let room = indexPath(of: DrawnRow.plusRoom.id).flatMap { collection.layoutAttributesForItem(at: $0)?.frame }
-        let others = rows.filter { $0 != .plusRoom }
+        let others = rows.filter { $0 != .plusRoom && $0.id != Self.carried(payload) }
         let place = place(gap, among: others, x: plusX)
+        guard let payload else {
+            plusRoom = nil
+            update()
+            guard let place else { return nil }
+            model.openPlus(column, place: place)
+            return room.map { collection.convert($0, to: nil) }.map { frame in
+                let top = DrawnRow.top(of: .plusRoom, after: gap > 0 ? others[gap - 1] : nil)
+                return CGRect(x: frame.minX, y: frame.minY + top, width: frame.width, height: CardMetrics.height)
+            }
+        }
         plusRoom = nil
-        update()
-        guard let place else { return nil }
-        model.openPlus(column, place: place)
-        return room.map { collection.convert($0, to: nil) }.map { frame in
-            let top = DrawnRow.top(of: .plusRoom, after: gap > 0 ? others[gap - 1] : nil)
-            return CGRect(x: frame.minX, y: frame.minY + top, width: frame.width, height: CardMetrics.height)
+        guard let place else { update(); return nil }
+        switch model.dropOnList(column, place: place) {
+        case .landed(let landed):
+            collection.layoutIfNeeded()
+            return landed.flatMap { capsule(of: $0.id) }
+        case .stays:
+            update()
+            collection.layoutIfNeeded()
+            return Self.carried(payload).flatMap { capsule(of: $0) }
+        case .refused:
+            update()
+            return nil
         }
     }
 }

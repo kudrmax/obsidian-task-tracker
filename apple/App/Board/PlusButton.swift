@@ -11,7 +11,7 @@ struct PlusButton: UIViewRepresentable {
     /// Something is carried: the plus stands as the cancel target.
     let cancelling: Bool
     /// The places a carried plus is let go on.
-    var drop: PlusRoute?
+    var drop: BoardRoute?
     var onCarry: () -> Int = { 0 }
     var onEnd: (Int) -> Void = { _ in }
 
@@ -38,7 +38,7 @@ struct PlusButton: UIViewRepresentable {
 
 final class PlusControl: UIControl, UIDropInteractionDelegate {
     var open: () -> Void = {}
-    weak var drop: PlusRoute?
+    weak var drop: BoardRoute?
     var onCarry: () -> Int = { 0 }
     var onEnd: (Int) -> Void = { _ in }
     /// The carry the plus's copy is: what its end names.

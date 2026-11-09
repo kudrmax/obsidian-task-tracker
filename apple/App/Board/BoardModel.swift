@@ -992,7 +992,7 @@ final class BoardModel {
     @ObservationIgnored private var dropReads = DropReads()
     /// The lists on the screen, which a drop's preview is drawn into at once.
     @ObservationIgnored private var lists: [BoardColumn: WeakList] = [:]
-    @ObservationIgnored let plus = PlusRoute()
+    @ObservationIgnored let plus = BoardRoute()
 
     private struct WeakList {
         weak var controller: ListController?
