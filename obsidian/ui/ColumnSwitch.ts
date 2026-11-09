@@ -6,6 +6,7 @@ import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { icon } from "./kit/icons";
 import { type Place, placeIndex } from "./screens";
+import { labelMark } from "./sources/alertWords";
 
 export interface ColumnSwitchOptions {
 	/** Where the screen stands; Done, which the wheel has no icon for, puts the window a step left of Inbox. */
@@ -222,6 +223,7 @@ export class ColumnSwitch {
 		for (const dot of this.dots) {
 			dot.classList.toggle("is-shown", alert !== "none");
 			dot.classList.toggle("is-broken", alert === "broken");
+			labelMark(dot, alert);
 		}
 	}
 }

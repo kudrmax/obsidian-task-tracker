@@ -80,3 +80,7 @@ Three codes, the same in the plugin's sources window and the app's Calendars scr
   2026-11-09 (Google and iPhone in use, Work under «Not in use», 5 Nov 20:21 grey) with no dot, and a new board
   `ScreenSourcesDotRed.dc.html` shows the red dot. The `Screen` board's wheel now draws the dot on the calendar
   icon inside the selected pill too, as production does (it was missing there).
+- Obsidian, from the Swift frontend's decision: the dot and a coloured time say «Out of date» (orange) and «Refresh
+  failed» (red) to a screen reader and on hover (`aria-label`, `title`); the time is read as «5 Nov 20:21, Out of
+  date». A grey time and no dot say nothing more. The window reads the statuses of the day the screen shows, the same
+  `DayEvents` the dot comes from.

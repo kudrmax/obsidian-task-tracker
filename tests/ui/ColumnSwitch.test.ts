@@ -245,6 +245,8 @@ describe("ColumnSwitch", () => {
 		expect(shown("old")).toEqual([false, false]);
 		expect(shown("broken")).toEqual([true, true]);
 		expect(shown("none")).toEqual([]);
+		const said = (alert: CalendarAlert) => setUp("soon", alert).control.el.querySelector(".tc-dot")!.getAttribute("aria-label");
+		expect([said("old"), said("broken"), said("none")]).toEqual(["Out of date", "Refresh failed", null]);
 	});
 
 	it("stands a step left of Inbox at Done, which it has no icon for, and turns on to Inbox and Soon from there", () => {

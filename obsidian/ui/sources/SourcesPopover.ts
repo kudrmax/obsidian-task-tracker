@@ -6,6 +6,7 @@ import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel } from "../kit/Panel";
 import { menuRow } from "../menu/MenuPanel";
 import { Overlay } from "../menu/Overlay";
+import { labelMark } from "./alertWords";
 
 export interface SourcesPopoverOptions {
 	/** The switch at the bottom; a copy of it stays over the backdrop, and the panel stands over it, centred on it. */
@@ -58,7 +59,7 @@ export class SourcesPopover {
 		const lines = el(row, "div", "tc-source-lines");
 		el(lines, "span", "tc-source-name", text.name);
 		el(lines, "span", "tc-source-sub", text.sub);
-		el(row, "span", "tc-source-time", text.time);
+		labelMark(el(row, "span", "tc-source-time", text.time), status.tone, text.time);
 	}
 
 	close(): void {

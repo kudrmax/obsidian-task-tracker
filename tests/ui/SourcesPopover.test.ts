@@ -55,6 +55,12 @@ describe("SourcesPopover", () => {
 		expect(lines(popover)).toEqual(["Not in use", "Google Calendar:is-spare", "Work calendar:is-spare"]);
 	});
 
+	it("says an orange time is out of date and a red one's refresh failed, and nothing of a grey one", () => {
+		const popover = open([status("google", "old"), status("iphone", "broken"), status("work", "spare")]);
+		const said = [...popover.querySelectorAll(".tc-source-time")].map((time) => time.getAttribute("aria-label"));
+		expect(said).toEqual(["5 Nov 20:21, Out of date", "5 Nov 20:21, Refresh failed", null]);
+	});
+
 	it("keeps Refresh now last", () => {
 		const popover = open([status("iphone", "plain"), status("work", "spare")]);
 		expect(popover.lastElementChild?.classList.contains("tc-source-refresh")).toBe(true);
