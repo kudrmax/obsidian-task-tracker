@@ -302,6 +302,11 @@ public final class TaskBoard: @unchecked Sendable {
         try rule("rules.dividerAt", [.number(wanted), widths.json, .number(speed)])
     }
 
+    /// A day before any calendar file was read: no events, no statuses, no alert.
+    public func noDayEvents() throws -> DayEvents {
+        try rule("rules.constants", as: JSONValue.self)["NO_DAY_EVENTS"].decode(DayEvents.self)
+    }
+
     /// The repeat page's words.
     public func repeatWords() throws -> RepeatWords {
         try rule("rules.constants", as: JSONValue.self)["REPEAT_WORDS"].decode(RepeatWords.self)

@@ -9,6 +9,7 @@ struct CalendarsView: View {
     /// The main screen's, when opened from «⋯»: it reads the screen again once a calendar is shown or hidden.
     let model: BoardModel?
     @State private var statuses: [SourceStatus] = []
+    @State private var words: DayWords?
     @State private var calendars: [ShownCalendar] = []
     @State private var refreshing = false
     @State private var access = EKEventStore.authorizationStatus(for: .event)
@@ -35,13 +36,13 @@ struct CalendarsView: View {
                 }
             }
             let spare = statuses.filter { $0.tone == .spare }
-            if !spare.isEmpty {
+            if !spare.isEmpty, let words {
                 Section {
                     ForEach(spare, id: \.source) { SourceRow(status: $0) }
                 } header: {
-                    Text("Not in use")
+                    Text(words.notInUse)
                 } footer: {
-                    Text("The timeline takes a calendar from these only when the files above go out of date.")
+                    Text(words.notInUseNote)
                 }
             }
             // Every calendar under its account, as the plugin's settings list them.
@@ -120,6 +121,7 @@ struct CalendarsView: View {
             return (try board.read("calendars.events", [.string(day)], over: files), try board.read("calendars.known", over: files))
         }.value
         statuses = read?.0.statuses ?? []
+        words = read?.0.words
         calendars = read?.1 ?? []
     }
 
@@ -164,7 +166,7 @@ private struct SourceRow: View {
             if alerted {
                 Image(systemName: "exclamationmark.circle.fill")
                     .foregroundStyle(status.tone == .broken ? Color.red : Color.orange)
-                    .accessibilityLabel(status.tone == .broken ? "Refresh failed" : "Out of date")
+                    .accessibilityLabel(status.words.alert)
             }
         }
     }

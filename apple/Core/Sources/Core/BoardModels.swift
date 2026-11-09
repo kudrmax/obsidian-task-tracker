@@ -374,6 +374,16 @@ public struct SourceWords: Decodable, Hashable, Sendable {
     public let sub: String
     /// `14:19`, `Yesterday 08:02`, `3 Oct 08:02`; empty with no update.
     public let time: String
+    /// What its mark says: `Out of date`, `Refresh failed`; empty with no mark.
+    public let alert: String
+}
+
+/// `DayWords`: the calendars' words for the day: the badge's, and the heading and note of the files not in use.
+public struct DayWords: Decodable, Hashable, Sendable {
+    /// What the badge says: `Out of date`, `Refresh failed`; empty with no badge.
+    public let alert: String
+    public let notInUse: String
+    public let notInUseNote: String
 }
 
 /// `WireDayEvents`: the day's events and how fresh each calendar's file is.
@@ -384,16 +394,7 @@ public struct DayEvents: Decodable, Sendable {
     public let statuses: [SourceStatus]
     public let stale: Bool
     public let alert: CalendarAlert
-
-    public static let none = DayEvents(allDay: [], timed: [], statuses: [], stale: false, alert: .none)
-
-    public init(allDay: [WireEvent], timed: [WireEvent], statuses: [SourceStatus], stale: Bool, alert: CalendarAlert) {
-        self.allDay = allDay
-        self.timed = timed
-        self.statuses = statuses
-        self.stale = stale
-        self.alert = alert
-    }
+    public let words: DayWords
 }
 
 public struct ShownCalendar: Decodable, Hashable, Sendable, Identifiable {
