@@ -454,6 +454,27 @@ every condition that changes the layout is animated by the transaction that chan
     copy flies into the part's header, takes its size on the way and fades as it arrives; the group's count fades to its
     new number. A card's copy always lands at the full size of its place (the plugin reads a growing row's resting
     height before its grow starts). Plugin: `Float.sink`, `TaskList.foldedHeadOf`; iPhone: `DropLanding.part.folded`.
+57. **Obsidian, interrupt: a press lives through its card's redraw** (`LongPress.attach`). Every write redraws the lists,
+    and a press under way used to end with the redraw, so a finger held on a card while Done, Undo, Enter or a drop was
+    drawn lifted nothing. A card kept from drawing to drawing keeps its one press; the redraw hands it the new options
+    and the finger goes on with them. Only a card that leaves, or whose gestures are taken off and not given again, ends
+    its press. The iPhone's pair: 63.
+58. **Obsidian, interrupt: a drag frees the screen as the finger lets go, and a new one lands the old at once**
+    (`DragSession.letGo`, `DragSession.landNow`). The gestures are free the moment the finger lifts, the drop written and
+    the copy flying after (before, a cancelled drag and a section's held them until the copy landed). A lift, a section's
+    or the plus's, first lands every drag still landing with its one outcome: its place is given back and its targets
+    let go now, its copy flying on to its place; the copy of the task taken again goes at once. A late end of the old
+    drag changes nothing of the new one. The iPhone's pairs: 63 and 64.
+59. **Obsidian, interrupt: a card hidden for a drag hides only what it draws.** The card under its flying copy
+    (`is-arriving`) and a carried block (`is-lifted`) keep their box under the finger, so they are taken or tapped the
+    moment the finger comes down. The iPhone's pair: 65.
+60. **Obsidian, interrupt: a closing overlay takes no press** (`Overlay.fadeOut`). From the moment it starts to close, its
+    sheet, panel and copies let the finger through to what stands under them, so a card pressed right after Done or a
+    tap on the blur is taken. The iPhone's pair: 64.
+61. **Obsidian, day turn: a finger catches a sliding day** (`ScreenPager.catch`). A swipe, or a trackpad's stroke, while
+    the day slides (an arrow's turn, a swipe let go) takes it where it shows and draws it on from there; the turns asked
+    before it are dropped (`ScreenPager.caught`), and let go the day goes on or back as any swipe does. A tap still lets
+    the slide run on (32, 51). The iPhone's pair: 67.
 62. **Backend: a key stays good while its task is there.** Max acts in the middle of a motion: Done, then at once a drag of
     another task, whose key was read before Done moved the lines. Every key the core gives now carries its task's id
     (`TaskKey.id`, added), and `TaskRules.entryOf`, through which every write and every read by key finds its task, finds
@@ -483,7 +504,7 @@ every condition that changes the layout is animated by the transaction that chan
     while the copy comes down a row too low and then glide up.
 67. **iPhone, day turn: a finger catches a sliding day.** A swipe on the calendar while the day slides (an arrow's turn,
     a swipe let go) takes the day where it shows, as a scroll catches its deceleration; the turns asked before it are
-    dropped, and let go the day goes on or back as any swipe does. For the plugin to follow.
+    dropped, and let go the day goes on or back as any swipe does.
 
 ## Done when
 
