@@ -54,14 +54,32 @@ import Testing
 
     @Test func theDoorsCodesDecode() throws {
         let json = #"""
-        {"allDay":[],"timed":[],"stale":true,"alert":"broken","statuses":[
+        {"allDay":[],"timed":[],"stale":true,"alert":"broken","words":{"alert":"Refresh failed","notInUse":"Not in use","notInUseNote":"Note"},"statuses":[
           {"source":"work","kind":"scriptable","problem":null,"events":0,"updatedDay":"other","updatedDate":"2026-11-02","detail":null,
-           "stale":true,"updatedAtMs":1,"used":true,"tone":"old","words":{"name":"Work calendar","short":"Work","sub":"Updated","time":"2 Nov 08:00"}}
+           "stale":true,"updatedAtMs":1,"used":true,"tone":"old","words":{"name":"Work calendar","short":"Work","sub":"Updated","time":"2 Nov 08:00","alert":"Out of date"}}
         ]}
         """#
         let events = try JSONDecoder().decode(DayEvents.self, from: Data(json.utf8))
         #expect(events.alert == .broken)
         #expect(events.statuses.first?.tone == .old)
         #expect(events.statuses.first?.used == true)
+        #expect(events.statuses.first?.words.alert == "Out of date")
+        #expect(events.words.alert == "Refresh failed")
+    }
+
+    @Test func theMarksAreWordedByTheCore() throws {
+        let day = try snapshot(["calendar/google.json": Self.file("Google", hoursAgo: 96), "calendar/work.json": Self.file("Work", hoursAgo: 96), "calendar/iphone.json": "not a calendar"])
+        #expect(day.statuses.map(\.words.alert) == ["Refresh failed", "Out of date", ""])
+        #expect(day.statuses.last?.words.sub == "file unreadable")
+        #expect(day.calendarWords.alert == "Refresh failed")
+        #expect(day.calendarWords.notInUse == "Not in use")
+        #expect(!day.calendarWords.notInUseNote.isEmpty)
+    }
+
+    @Test func aDayWithoutCalendarsIsTheCoresEmptyDay() throws {
+        let none = try TaskBoard(core: core, vault: FakeVault(Self.tasks)).noDayEvents()
+        #expect(none.statuses.isEmpty)
+        #expect(none.alert == .none)
+        #expect(none.words.alert.isEmpty)
     }
 }

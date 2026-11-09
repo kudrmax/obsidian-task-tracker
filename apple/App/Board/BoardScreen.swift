@@ -233,6 +233,7 @@ struct BoardScreen: View {
                 Button("Select Tasks", systemImage: "checkmark.circle") { model.startSelection() }
                 Divider()
                 Button("Calendars", systemImage: calendarsAlerted ? "calendar.badge.exclamationmark" : "calendar") { sheet = .calendars }
+                    .accessibilityValue(model.snapshot?.calendarWords.alert ?? "")
                 Button("Settings", systemImage: "gear") { sheet = .settings }
             }
             .badge(calendarsAlerted ? 1 : 0)
