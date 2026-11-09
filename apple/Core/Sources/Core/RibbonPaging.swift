@@ -39,3 +39,41 @@ public struct RibbonPaging: Sendable, Equatable {
         return min(stops.count - 1, max(0, onward))
     }
 }
+
+/// The widths of the ribbon's columns, as the plugin's screen: at Inbox and at Soon the two columns shown split the
+/// screen in half; only at Today the divider sets the day list's width (`list`) against the calendar. Between Soon and
+/// Today the day list's edge glides from the half to the divider with the ribbon (`toToday`); the calendar keeps its
+/// width and slides along, so it never reflows.
+public struct RibbonColumns: Sendable, Equatable {
+    /// The screen's width.
+    public let width: Double
+    /// The day list's width at Today, the divider's.
+    public let list: Double
+    /// Whether the Done column the search opens stands left of Inbox.
+    public let done: Bool
+
+    public init(width: Double, list: Double, done: Bool) {
+        self.width = width
+        self.list = list
+        self.done = done
+    }
+
+    /// Inbox's, Soon's and Done's width: half the screen, whatever the divider.
+    public var half: Double { width / 2 }
+    /// How far every place stands right of the ribbon's start: the Done column's width while it is shown.
+    public var lead: Double { done ? half : 0 }
+    /// Where each place's left edge stands: Done (while shown), Inbox, Soon, Today.
+    public var stops: [Double] { (done ? [0] : []) + [lead, lead + half, lead + width] }
+    /// The calendar's width: the screen less the divider's list.
+    public var calendar: Double { width - list }
+
+    /// How far the ribbon at `offset` has come from Soon to Today, 0 to 1.
+    public func toToday(at offset: Double) -> Double {
+        min(1, max(0, (offset - lead - half) / max(1, width - half)))
+    }
+
+    /// The day list's width with the ribbon `toToday` of the way from Soon to Today.
+    public func dayList(toToday: Double) -> Double {
+        half + (list - half) * min(1, max(0, toToday))
+    }
+}
