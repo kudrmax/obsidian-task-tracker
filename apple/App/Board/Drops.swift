@@ -328,16 +328,63 @@ final class CalendarDrop: NSObject, UIDropInteractionDelegate, BoardTarget {
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: any UIDropSession) -> UIDropProposal {
         let grab = DragPayload.of(session)?.grab ?? 0
-        guard let view = interaction.view, let window = view.window, let minute = minute(at: view.convert(session.location(in: view), to: window), grab: grab) else { return UIDropProposal(operation: .cancel) }
+        guard let view = interaction.view, let window = view.window else { return UIDropProposal(operation: .cancel) }
+        let point = view.convert(session.location(in: view), to: window)
+        guard let minute = minute(at: point, grab: grab) else { return UIDropProposal(operation: .cancel) }
         model?.hoverCalendar(minute: minute)
+        hold(point, grab: grab)
         return UIDropProposal(operation: .move)
     }
 
-    func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: any UIDropSession) { model?.leaveCalendar() }
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: any UIDropSession) {
+        stopEdges()
+        model?.leaveCalendar()
+    }
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) {
+        stopEdges()
         model?.leaveCalendar()
         model?.endCarry(of: session)
+    }
+
+    // MARK: Scrolling at the edges
+
+    /// Where a carry is held over the calendar, in the window, and its card's grab: held near the calendar's top or its
+    /// visible bottom (over the tab bar's edge), the calendar scrolls on, faster the nearer, as a list does under the
+    /// system's drag; the minute is read anew as the grid passes under the still finger.
+    private var held: (point: CGPoint, grab: CGFloat)?
+    private var edgeLink: CADisplayLink?
+    private static let edgeBand: CGFloat = 48
+    private static let edgeSpeed: CGFloat = 9
+
+    private func hold(_ point: CGPoint, grab: CGFloat) {
+        held = (point, grab)
+        guard edgeLink == nil else { return }
+        let link = CADisplayLink(target: self, selector: #selector(edgeTick))
+        link.add(to: .main, forMode: .common)
+        edgeLink = link
+    }
+
+    private func stopEdges() {
+        held = nil
+        edgeLink?.invalidate()
+        edgeLink = nil
+    }
+
+    @objc private func edgeTick() {
+        guard let held, let scroll = scroll as? UIScrollView, let area = area else { return stopEdges() }
+        let bottom = min(area.maxY, model?.plus.floor ?? .infinity)
+        let fromTop = held.point.y - area.minY
+        let fromBottom = bottom - held.point.y
+        var dy: CGFloat = 0
+        if fromTop < Self.edgeBand { dy = -Self.edgeSpeed * (1 - max(0, fromTop) / Self.edgeBand) }
+        else if fromBottom < Self.edgeBand { dy = Self.edgeSpeed * (1 - max(0, fromBottom) / Self.edgeBand) }
+        guard dy != 0 else { return }
+        let most = max(0, scroll.contentSize.height + scroll.adjustedContentInset.bottom - scroll.bounds.height)
+        let next = min(max(-scroll.adjustedContentInset.top, scroll.contentOffset.y + dy), most)
+        guard abs(next - scroll.contentOffset.y) >= 0.5 else { return }
+        scroll.contentOffset.y = next
+        if let minute = minute(at: held.point, grab: held.grab) { model?.hoverCalendar(minute: minute) }
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {
@@ -345,6 +392,7 @@ final class CalendarDrop: NSObject, UIDropInteractionDelegate, BoardTarget {
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
+        stopEdges()
         spot = model?.dropOnCalendar()
     }
 
@@ -360,12 +408,18 @@ final class CalendarDrop: NSObject, UIDropInteractionDelegate, BoardTarget {
     var area: CGRect? { scroll.flatMap { view in view.window.map { view.convert(view.bounds, to: $0) } } }
 
     func hover(at point: CGPoint, carrying payload: DragPayload?) {
-        if let minute = minute(at: point, grab: payload?.grab ?? 0) { model?.hoverCalendar(minute: minute) }
+        guard let minute = minute(at: point, grab: payload?.grab ?? 0) else { return }
+        model?.hoverCalendar(minute: minute)
+        hold(point, grab: payload?.grab ?? 0)
     }
 
-    func leave() { model?.leaveCalendar() }
+    func leave() {
+        stopEdges()
+        model?.leaveCalendar()
+    }
 
     func letGo(carrying payload: DragPayload?) -> CGRect? {
+        stopEdges()
         guard let canvas = model?.calendarCanvas else { return nil }
         let rect = payload == nil ? model?.plusOnCalendar() : model?.dropOnCalendar()
         return rect.map { canvas.convert($0, to: nil) }
