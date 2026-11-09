@@ -872,6 +872,14 @@ final class EntryFieldBox: UIView {
 
     private func claim() {
         guard field.superview !== self else { return }
+        // A row that turns into the field (a card renamed) passes from what it showed to the field, scrolled to its caret,
+        // in a short fade: the card's title from its start, the field's at its end, never one replacing the other at once.
+        if let row = sequence(first: self as UIView, next: { $0.superview }).lazy.compactMap({ $0 as? UICollectionViewCell }).first {
+            let fade = CATransition()
+            fade.type = .fade
+            fade.duration = Self.fade
+            row.contentView.layer.add(fade, forKey: "field")
+        }
         // Moved, not removed first: from one view in the window to another it stays the first responder.
         field.translatesAutoresizingMaskIntoConstraints = false
         addSubview(field)
@@ -883,6 +891,10 @@ final class EntryFieldBox: UIView {
         ])
         field.placed()
     }
+}
+
+extension EntryFieldBox {
+    static let fade: TimeInterval = 0.2
 }
 
 /// The capsule a task is typed in, at its place: a card with no frame, the accent cursor, tinted by the priority or the

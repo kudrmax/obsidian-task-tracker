@@ -44,7 +44,7 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
     /// The carry the plus's copy is: what its end names.
     private var token = 0
     var accent = UIColor.tintColor {
-        didSet { if accent != oldValue { look() } }
+        didSet { if accent != oldValue { tinted.effect = Self.glass(tint: accent) } }
     }
     var cancelling = false {
         didSet {
@@ -62,13 +62,17 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
         }
     }
 
-    private let glass = UIVisualEffectView(effect: nil)
+    /// The cancel target's glass, and over it the plus's, tinted in the accent: each glass is made once and never
+    /// changed, the plus's shown or not by its opacity. A glass whose effect a spring changed and the next change cut
+    /// off kept the untinted look whatever effect it was given next: the plus stayed grey after a drop and a new lift.
+    private let glass = UIVisualEffectView(effect: PlusControl.glass(tint: nil))
+    private let tinted = UIVisualEffectView(effect: nil)
     private let solid = UIView()
     private let symbol = UIImageView()
 
     init() {
         super.init(frame: CGRect(x: 0, y: 0, width: PlusButton.side, height: PlusButton.side))
-        for view in [glass, solid, symbol] as [UIView] {
+        for view in [glass, tinted, solid, symbol] as [UIView] {
             view.isUserInteractionEnabled = false
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
@@ -76,12 +80,17 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
         NSLayoutConstraint.activate([
             glass.leadingAnchor.constraint(equalTo: leadingAnchor), glass.trailingAnchor.constraint(equalTo: trailingAnchor),
             glass.topAnchor.constraint(equalTo: topAnchor), glass.bottomAnchor.constraint(equalTo: bottomAnchor),
+            tinted.leadingAnchor.constraint(equalTo: leadingAnchor), tinted.trailingAnchor.constraint(equalTo: trailingAnchor),
+            tinted.topAnchor.constraint(equalTo: topAnchor), tinted.bottomAnchor.constraint(equalTo: bottomAnchor),
             solid.leadingAnchor.constraint(equalTo: leadingAnchor), solid.trailingAnchor.constraint(equalTo: trailingAnchor),
             solid.topAnchor.constraint(equalTo: topAnchor), solid.bottomAnchor.constraint(equalTo: bottomAnchor),
             symbol.centerXAnchor.constraint(equalTo: centerXAnchor), symbol.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
-        glass.cornerConfiguration = .capsule()
-        glass.clipsToBounds = true
+        for view in [glass, tinted] {
+            view.cornerConfiguration = .capsule()
+            view.clipsToBounds = true
+        }
+        tinted.effect = Self.glass(tint: accent)
         solid.layer.cornerRadius = PlusButton.side / 2
         symbol.contentMode = .center
         accessibilityLabel = "New Task"
@@ -108,23 +117,48 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
 
     override var intrinsicContentSize: CGSize { CGSize(width: PlusButton.side, height: PlusButton.side) }
 
-    /// The plus, the cancel target, or the cancel target held: each change one system spring.
+    /// What the plus shows: a function of its state alone.
+    private struct Look: Equatable {
+        let cancelling: Bool
+        let held: Bool
+    }
+
+    /// The look last asked for.
+    private var shown: Look?
+
+    /// The plus, the cancel target, or the cancel target held: each change one system spring. The look is a function of
+    /// the state, applied again whole once each spring settles: a spring the next change cut off (a drop, then at once a
+    /// new lift) never leaves the glass at a look between the two, the plus grey and untinted.
     private func look() {
-        let glassEffect = UIGlassEffect(style: .regular)
-        // Not the interactive glass: it would stretch after the finger while the plus itself is carried.
-        glassEffect.isInteractive = false
-        if !cancelling { glassEffect.tintColor = accent }
-        let image = UIImage(systemName: cancelling ? "xmark" : "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: cancelling ? 21 : 24, weight: .semibold))
+        let look = Look(cancelling: cancelling, held: held)
+        guard look != shown else { return }
+        shown = look
+        let image = UIImage(systemName: look.cancelling ? "xmark" : "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: look.cancelling ? 21 : 24, weight: .semibold))
         // One motion per thing: the symbol by the system's own replace, the rest on the system's default spring.
         if let image, symbol.image != nil { symbol.setSymbolImage(image, contentTransition: .replace) } else { symbol.image = image }
         UIView.animate(springDuration: 0.35, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
-            glass.effect = glassEffect
-            solid.backgroundColor = .label
-            solid.alpha = held ? 1 : 0
-            symbol.tintColor = held ? .systemBackground : (cancelling ? .label : .white)
-            transform = held ? CGAffineTransform(scaleX: 1.18, y: 1.18) : .identity
+            self.apply(look)
+        } completion: { [weak self] _ in
+            guard let self, self.shown == look else { return }
+            UIView.performWithoutAnimation { self.apply(look) }
         }
-        accessibilityLabel = cancelling ? "Cancel" : "New Task"
+        accessibilityLabel = look.cancelling ? "Cancel" : "New Task"
+    }
+
+    private static func glass(tint: UIColor?) -> UIGlassEffect {
+        let glass = UIGlassEffect(style: .regular)
+        // Not the interactive glass: it would stretch after the finger while the plus itself is carried.
+        glass.isInteractive = false
+        glass.tintColor = tint
+        return glass
+    }
+
+    private func apply(_ look: Look) {
+        tinted.alpha = look.cancelling ? 0 : 1
+        solid.backgroundColor = .label
+        solid.alpha = look.held ? 1 : 0
+        symbol.tintColor = look.held ? .systemBackground : (look.cancelling ? .label : .white)
+        transform = look.held ? CGAffineTransform(scaleX: 1.18, y: 1.18) : .identity
     }
 
     // MARK: The plus carried
