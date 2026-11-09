@@ -256,6 +256,10 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     private var copy: MenuCopy?
     /// The menu has lifted its twin of the copy; what it asks for next is where to land.
     private var liftedOnce = false
+    /// The menu's twin stands for the card: the card is not drawn in its place until the copy is home.
+    private var copied = false {
+        didSet { if copied != oldValue { showsInPlace() } }
+    }
 
     @objc private func tapped(_ tap: UITapGestureRecognizer) {
         onTouch()
@@ -321,8 +325,17 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// The menu's copy shrinking back into the card as the menu flies it home.
     private static let menuShrink: TimeInterval = 0.25
 
-    /// The menu shows over the copy grown in place, which stays opaque under the menu's twin while it fades in.
-    private func menuShown(_ animator: (any UIContextMenuInteractionAnimating)?) {}
+    /// The menu shows: its twin comes in over the copy, and the copy and the card leave their place in the same motion,
+    /// so where the menu moves the twin (to make room for itself) the place shows empty, as the system leaves a lifted
+    /// view's place, never the card twice.
+    private func menuShown(_ animator: (any UIContextMenuInteractionAnimating)?) {
+        guard let copy else { return }
+        let leave = { [weak self] in
+            copy.alpha = 0
+            self?.copied = true
+        }
+        if let animator { animator.addAnimations(leave) } else { leave() }
+    }
 
     /// The card itself where it stands, for a menu that lifts it in place.
     private var inPlace: UITargetedPreview? {
@@ -385,17 +398,30 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
             self.copy = nil
             MenuHold.begin()
             // The menu flies the copy home in place at the size it was lifted at, so nothing of it is scaled on the way;
-            // once it is seen down where it stands, it shrinks back into the card on the screen and goes, the card drawn
-            // alike under it. The menu's animator tells of its end most of a second after the copy is down.
+            // once down it shrinks back into the card on the screen and goes, the card drawn alike under it. The menu's
+            // animator tells of its end most of a second after the copy is down: the flight's end is heard from an
+            // animation of the app's run inside it, as long as it.
+            copy.alpha = 1
             let shrink = { [weak self] in
                 UIView.animate(withDuration: Self.menuShrink, delay: 0, options: [.curveEaseInOut, .allowUserInteraction]) {
                     copy.shrink()
                 } completion: { _ in
+                    self?.copied = false
                     copy.removeFromSuperview()
                     MenuHold.end()
                 }
             }
-            if animator == nil { shrink() } else { LandingWatch.watch(copy, landed: shrink) }
+            guard let animator else { return shrink() }
+            var shrunk = false
+            animator.addAnimations {
+                UIView.animate(withDuration: UIView.inheritedAnimationDuration, delay: 0, options: [.overrideInheritedDuration, .overrideInheritedCurve, .allowUserInteraction]) {
+                    copy.mark()
+                } completion: { _ in
+                    guard !shrunk else { return }
+                    shrunk = true
+                    shrink()
+                }
+            }
         }
         guard let run = afterMenu else { return }
         afterMenu = nil
@@ -448,7 +474,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     /// Only what the card draws hides, never the card: a hidden card still takes the finger.
     private func showsInPlace() {
-        shown.alpha = carried ? 0 : 1
+        shown.alpha = carried || copied ? 0 : 1
     }
 }
 
@@ -636,59 +662,4 @@ enum MenuHold {
     }
 }
 
-/// Tells when a view the system flies (a menu's preview going home) is seen down where it stands: its presented frame on
-/// the screen meets its own frame and stays there. Read each frame of the display, never guessed by a time.
-@MainActor
-final class LandingWatch: NSObject {
-    private let view: UIView
-    private let landed: () -> Void
-    private var link: CADisplayLink?
-    private var still = 0
-    private var frames = 0
-    private static var watching: Set<LandingWatch> = []
-
-    private init(_ view: UIView, landed: @escaping () -> Void) {
-        self.view = view
-        self.landed = landed
-    }
-
-    static func watch(_ view: UIView, landed: @escaping () -> Void) {
-        let watch = LandingWatch(view, landed: landed)
-        watching.insert(watch)
-        let link = CADisplayLink(target: watch, selector: #selector(tick))
-        link.add(to: .main, forMode: .common)
-        watch.link = link
-    }
-
-    /// Where the view shows on the screen now, and where it stands.
-    private var shown: (now: CGRect, home: CGRect)? {
-        guard let presented = view.layer.presentation(), let root = rootLayer(of: view.layer)?.presentation() else { return nil }
-        let home = view.layer.convert(view.layer.bounds, to: rootLayer(of: view.layer))
-        return (presented.convert(presented.bounds, to: root), home)
-    }
-
-    private func rootLayer(of layer: CALayer) -> CALayer? {
-        var top = layer
-        while let next = top.superlayer { top = next }
-        return top === layer ? nil : top
-    }
-
-    @objc private func tick() {
-        frames += 1
-        guard let shown else { return finish() }
-        let near = abs(shown.now.minX - shown.home.minX) < 0.5 && abs(shown.now.minY - shown.home.minY) < 0.5
-            && abs(shown.now.width - shown.home.width) < 0.5 && abs(shown.now.height - shown.home.height) < 0.5
-        still = near ? still + 1 : 0
-        // Down once it has stood still where it belongs for two frames of the display (the flight itself starts away
-        // from there); a view torn away first ends the watch at once.
-        if still >= 2 && frames > 3 { finish() }
-    }
-
-    private func finish() {
-        link?.invalidate()
-        link = nil
-        Self.watching.remove(self)
-        landed()
-    }
-}
 

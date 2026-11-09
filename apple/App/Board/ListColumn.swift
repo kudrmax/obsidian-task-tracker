@@ -437,7 +437,8 @@ struct CardRow: View {
                 .frame(height: CardMetrics.height)
                 // Carried, the card's row is its dashed place, as the plugin keeps it (`is-waiting`), until the carry ends.
                 .background { if model.isWaiting(card) { DashedPlace().transition(.identity) } }
-                .overlay(alignment: .topLeading) { if let branch = card.branch, !model.isHidden(card) { BranchLine(branch: branch) } }
+                // The branch shows as soon as the card has its place (the drop's screen drawn), while its copy still flies in.
+                .overlay(alignment: .topLeading) { if let branch = card.branch, !model.isWaiting(card) { BranchLine(branch: branch) } }
                 .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
         }
         .frame(height: CardMetrics.height, alignment: .top)

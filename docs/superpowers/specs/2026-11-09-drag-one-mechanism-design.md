@@ -148,11 +148,18 @@ what a drop writes.
     list, or its place on the calendar), never the system's default fade.
 13. **frontend-swift: the calendar scrolls at its top and visible bottom edge under a carry**, as the lists do under the
     system's drag, faster the nearer the edge; the minute is read anew as the grid passes under the finger.
-14. **frontend-swift (motion-polish): the drop lands in one drawing.** The core's `dropPreview` screen, the carried
-    tasks in their new rows (all the picked ones), is drawn in the same pass the copy is let go; Select Tasks ends after
-    it. A carry ends once its copy is down (the drag side's end, or the system's flight time after the drop side's).
-15. **frontend-swift (motion-polish): a card's menu grows from the card and lands back in it as one view**: one copy
-    over the card, grown with the menu to the whole title (`rules.wholeWidth`, `rules.grownStart`) and shrunk back,
-    then faded into the row; a row the menu's choice removes closes once the copy is home.
+14. **frontend-swift (motion-polish): the drop lands in one drawing, and the carry ends when its copy is down.** Every
+    let-go is a drop: into its place, or home where nothing takes it (the bars, the cancel target, a title or the calendar
+    that takes nothing there), so the copy always flies. The core's `dropPreview` screen, the carried tasks in their new
+    rows (all the picked ones), is drawn in the same pass the copy is let go, Select Tasks ending after it; a subtask's
+    branch shows at once beside its row. The carry ends when the flight's own animation ends, heard from an animation of
+    the app's run inside each part of the flight for its length; no timer. A list's own rows open and close once the
+    system's flight there is done (UIKit holds a collection's updates during its drop animation).
+15. **frontend-swift (motion-polish): a card's menu.** A card that shows its whole title is lifted itself, as the system
+    lifts any view in place. A cut title: one copy stands over the card, already at the whole-title size the core gives
+    (`rules.wholeWidth`, `rules.grownStart`), and the menu rises at once with a twin of it; as the menu shows, the copy
+    and the card leave their place (the system's empty lifted place, never the card twice). As the menu goes, it lands
+    its twin on the copy at that size (nothing scaled on the way), and, once down (heard as in 14), the copy shrinks into
+    the card and gives way to it; a row the menu's choice removes closes after that.
 16. **frontend-swift (motion-polish): list rows come and go as a folder's**: a row coming slides out from under the
     row above, a row going slides back under it; nothing fades in place under moving rows.
