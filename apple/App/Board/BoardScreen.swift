@@ -300,41 +300,43 @@ struct Ribbon: View {
     var body: some View {
         GeometryReader { box in
             let width = box.size.width
-            // Every column keeps its width the whole time, so nothing reflows under a swipe: the day list and Inbox over
-            // Backlog are the divider's width, Soon and the calendar the rest; each place shows two that fill the screen.
-            let list = listWidth(width)
-            // The Done column, while the search has opened it, stands left of Inbox, as wide as Inbox: every place moves
-            // right by it.
-            let lead = model.doneShown ? list : 0
-            let stops: [CGFloat] = (lead > 0 ? [0] : []) + [lead, lead + list, lead + width]
+            // As the plugin's screen: Inbox and Soon split the screen in half wherever the divider stands; at Today the
+            // divider sets the day list against the calendar, the list's edge gliding there from the half on the way
+            // from Soon (`RibbonColumns`, tested: Max asked for this three times).
+            let columns = RibbonColumns(width: Double(width), list: Double(listWidth(width)), done: model.doneShown)
+            let half = CGFloat(columns.half)
+            let list = CGFloat(columns.list)
+            let dayList = CGFloat(columns.dayList(toToday: Double(toToday)))
+            let lead = CGFloat(columns.lead)
+            let stops = columns.stops.map { CGFloat($0) }
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
                     if model.doneShown {
                         DoneColumn(model: model)
-                            .frame(width: list)
+                            .frame(width: half)
                             .frame(maxHeight: .infinity, alignment: .top)
                     }
                     // One column, Inbox over Backlog, each exactly the column's width.
-                    column(.inbox, list) {
+                    column(.inbox, half) {
                         VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
-                            lists(.inbox).frame(width: list)
-                            lists(.backlog).frame(width: list)
+                            lists(.inbox).frame(width: half)
+                            lists(.backlog).frame(width: half)
                         }
                     }
-                    column(.soon, width - list) { lists(.soon) }
-                    // The day list and the calendar show one day; when it changes, each slides it within itself.
-                    Group {
-                        HStack(spacing: 0) {
-                            lists(.day, dayArrows: true)
-                                .frame(width: list)
-                                .frame(maxHeight: .infinity, alignment: .top)
-                            TimelineColumn(timeline: snapshot.timeline, model: model)
-                                .frame(width: width - list)
-                                .frame(maxHeight: .infinity, alignment: .top)
-                        }
+                    column(.soon, half) { lists(.soon) }
+                    // The day list and the calendar show one day; when it changes, each slides it within itself. The
+                    // calendar keeps the divider's width and slides with the list's edge, so it never reflows.
+                    ZStack(alignment: .topLeading) {
+                        TimelineColumn(timeline: snapshot.timeline, model: model)
+                            .frame(width: width - list)
+                            .frame(maxHeight: .infinity, alignment: .top)
+                            .offset(x: dayList)
+                        lists(.day, dayArrows: true)
+                            .frame(width: dayList)
+                            .frame(maxHeight: .infinity, alignment: .top)
                     }
-                    .overlay(alignment: .leading) { divider(width).offset(x: list) }
-                    .frame(width: width)
+                    .overlay(alignment: .leading) { divider(width).offset(x: dayList) }
+                    .frame(width: width, alignment: .leading)
                     .frame(maxHeight: .infinity, alignment: .top)
                     .id(RibbonPlace.today)
                 }
@@ -353,10 +355,10 @@ struct Ribbon: View {
                 // finger it goes no further than the next place either way, as the plugin's screen.
                 swipe.moved(within: stops)
                 let from = x - lead
-                toToday = min(1, max(0, (from - list) / max(1, width - list)))
+                toToday = CGFloat(columns.toToday(at: Double(x)))
                 // The selection moves along with a swipe; a tab's own scroll leaves it on the tab chosen.
                 guard phase == .interacting || phase == .decelerating else { return }
-                let near = nearest(from, soon: list, width: width)
+                let near = nearest(from, soon: half, width: width)
                 if near != model.place { model.place = near }
             }
             .onScrollPhaseChange { _, new in
@@ -375,8 +377,8 @@ struct Ribbon: View {
                     // A touch that stops a tab's scroll on its way leaves the ribbon between two places: it goes on to the
                     // nearer one, as a swipe would.
                     // At rest the tab bar names where the ribbon stands, whatever moved it there.
-                    let near = nearest(offset - lead, soon: list, width: width)
-                    let stop: CGFloat = switch near { case .inbox: 0; case .soon: list; case .today: width }
+                    let near = nearest(offset - lead, soon: half, width: width)
+                    let stop: CGFloat = switch near { case .inbox: 0; case .soon: half; case .today: width }
                     if lead == 0, model.place != near { model.place = near }
                     if lead == 0, abs(offset - stop) > 0.5 {
                         withAnimation(.smooth) { position.scrollTo(id: near, anchor: .leading) }

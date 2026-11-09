@@ -82,6 +82,7 @@ The feature is done only when every entry of «Decisions» is in both frontends'
 A behaviour Max reported broken a second time is guarded by a test that names him in its doc comment, and its rule lives in a tested type, not in a view. Never change such a test or route around its type (an audit, a parity pass, a «fix» that reads the design otherwise): ask Max first. Today:
 
 - One swipe of the lists moves them one place, never two, from the very first swipe after launch: `RibbonPaging` (`apple/Core`) with `RibbonPagingTests`, the core's `rules.swipeLanding` with `tests/application/swipeLanding.test.ts`. Broken on 11-08 by a parity audit that read the plugin as gliding on, and on 11-09 by a ribbon that knew where a swipe started only after its first scroll.
+- At Inbox and at Soon the two columns split the screen in half; the divider sets the day list against the calendar at Today only: `RibbonColumns` (`apple/Core`) with `RibbonColumnsTests`, as `docs/plugin/screen.md` says for the plugin. Broken three times by «no column may change its width while the ribbon moves», which made Inbox and Soon take the divider's widths.
 
 A fix reaches Max only through the installer below; after merging anything for the app, run it, and before reading a recording of Max's, check which master his phone runs.
 

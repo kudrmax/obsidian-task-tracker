@@ -60,3 +60,37 @@ import Testing
         #expect(Self.ribbon.landing(from: 1, offset: 205, speed: 0.001, rule: rule) == 1)
     }
 }
+
+/// Max, three times: the divider sets the day list against the calendar at Today only; Inbox and Soon split the screen in
+/// half, as the plugin's screen (`docs/plugin/screen.md`).
+@Suite struct RibbonColumnsTests {
+    @Test func inboxAndSoonAreHalfTheScreenWhateverTheDivider() {
+        for list in [120.0, 201, 300] {
+            let columns = RibbonColumns(width: 402, list: list, done: false)
+            #expect(columns.half == 201)
+            #expect(columns.stops == [0, 201, 402])
+            #expect(columns.dayList(toToday: 0) == 201)
+        }
+    }
+
+    @Test func atTodayTheDividerSetsTheDayList() {
+        let columns = RibbonColumns(width: 402, list: 300, done: false)
+        #expect(columns.toToday(at: 402) == 1)
+        #expect(columns.dayList(toToday: 1) == 300)
+        #expect(columns.calendar == 102)
+    }
+
+    @Test func betweenSoonAndTodayTheEdgeGlides() {
+        let columns = RibbonColumns(width: 400, list: 300, done: false)
+        #expect(columns.toToday(at: 200) == 0)
+        #expect(columns.toToday(at: 300) == 0.5)
+        #expect(columns.dayList(toToday: 0.5) == 250)
+        #expect(columns.toToday(at: 0) == 0)
+    }
+
+    @Test func theDoneColumnMovesEveryPlaceByHalf() {
+        let columns = RibbonColumns(width: 400, list: 120, done: true)
+        #expect(columns.stops == [0, 200, 400, 600])
+        #expect(columns.toToday(at: 600) == 1)
+    }
+}
