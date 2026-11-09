@@ -1273,9 +1273,9 @@ final class BoardModel {
             return .refused
         }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        // The screen after the drop in one drawing: the carried tasks in their new rows, the selection ended after it.
+        showPreview(preview.snapshot, landed: true)
         if !carry.group.isEmpty { endSelection() }
-        self.carry?.landed = true
-        showPreview(preview.snapshot)
         writeDrop("tasks.drop", [carry.dropped, to, .string(snapshot.day)])
         return .landed(preview.landings.first)
     }
@@ -1302,11 +1302,12 @@ final class BoardModel {
     }
 
     /// The screen a drop leaves, drawn now: every list in this same frame, in one animation.
-    private func showPreview(_ next: BoardSnapshot) {
+    private func showPreview(_ next: BoardSnapshot, landed: Bool = false) {
         dropReads.previewDrawn()
         var still = Transaction()
         still.disablesAnimations = true
         withTransaction(still) {
+            if landed { carry?.landed = true }
             hover = nil
             landing = nil
             snapshot = next

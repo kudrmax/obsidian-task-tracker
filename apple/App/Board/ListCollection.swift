@@ -145,7 +145,14 @@ final class ListHostView: UIView {
         ])
         fade.colors = [UIColor.clear.cgColor, UIColor.black.cgColor, UIColor.black.cgColor, UIColor.clear.cgColor]
         layer.mask = fade
+        // The rows' height changes after the list is laid out: the soft edges follow what is now above and below, or a
+        // list that came to run on past its bottom faded nothing there and its last row read as cut.
+        sized = collection.observe(\.contentSize, options: [.new]) { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.edges() }
+        }
     }
+
+    private var sized: NSKeyValueObservation?
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not from a storyboard") }
