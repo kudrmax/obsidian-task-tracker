@@ -793,16 +793,16 @@ final class BoardModel {
 
     /// The title's menu: the list groups its tasks by project, or stops.
     func setGrouping(_ column: BoardColumn, _ on: Bool) async {
-        await group("tasks.setGrouping", [.string(column.rawValue), .bool(on)])
+        await group("tasks.setGrouping", [.string(column.rawValue), .bool(on)], column)
     }
 
     /// A project group's header tapped: it folds, or opens again.
     func toggleFold(_ column: BoardColumn, _ key: String) async {
         UISelectionFeedbackGenerator().selectionChanged()
-        await group("tasks.toggleFold", [.string(column.rawValue), .string(key)])
+        await group("tasks.toggleFold", [.string(column.rawValue), .string(key)], column)
     }
 
-    private func group(_ method: String, _ arguments: [JSONValue]) async {
+    private func group(_ method: String, _ arguments: [JSONValue], _ column: BoardColumn) async {
         let board = board
         do {
             try await Task.detached { try board.group(method, arguments) }.value
@@ -815,7 +815,7 @@ final class BoardModel {
         let link = projectLink
         readsStarted += 1
         let serial = readsStarted
-        if let drawn = try? await Task.detached(operation: { try board.redraw(shown, measures: CardMetrics.timeline, project: link) }).value {
+        if let drawn = try? await Task.detached(operation: { try board.redraw(shown, changing: column, measures: CardMetrics.timeline, project: link) }).value {
             show(drawn, serial: serial)
         } else {
             await reload()
@@ -1956,3 +1956,4 @@ final class BoardModel {
 extension Array {
     subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
+
