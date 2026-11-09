@@ -398,8 +398,8 @@ struct EmptyPlate: View {
 }
 
 /// One card in a list: at its depth, with its branch. A tap opens its menu; a long press lifts it, the list's own drag.
-/// Select Tasks puts the system's selection circle before it, as Mail and Reminders do. Carried, its row is the gap it
-/// was lifted from; a subtask lights while a card carried under it would become its subtask.
+/// Select Tasks puts the system's selection circle before it, as Mail and Reminders do. Carried, its row is its dashed
+/// place, as the plugin's.
 struct CardRow: View {
     let card: BoardCard
     let column: BoardColumn
@@ -412,7 +412,6 @@ struct CardRow: View {
     var body: some View {
         let selecting = model.selecting
         let picks = self.picks
-        let lit = model.isParentLit(card, in: column)
         let hidden = model.isHidden(card)
         HStack(spacing: 10) {
             if picks, !hidden {
@@ -436,14 +435,8 @@ struct CardRow: View {
                 onProject: model.projectOpener(card.item),
                 picking: picks ? CardButton.Picking(picked: model.picked.contains(card.id), count: model.picked.count) { pick() } : nil)
                 .frame(height: CardMetrics.height)
-                // A card carried here would become its subtask: it lights as the place it goes under.
-                .overlay {
-                    RoundedRectangle(cornerRadius: CardMetrics.radius)
-                        .strokeBorder(Palette.accent(scheme), lineWidth: 2)
-                        .opacity(lit ? 1 : 0)
-                        .allowsHitTesting(false)
-                }
-                .animation(.snappy(duration: 0.15), value: lit)
+                // Carried, the card's row is its dashed place, as the plugin keeps it (`is-waiting`), until the carry ends.
+                .background { if model.isWaiting(card) { DashedPlace().transition(.identity) } }
                 .overlay(alignment: .topLeading) { if let branch = card.branch, !model.isHidden(card) { BranchLine(branch: branch) } }
                 .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
         }
@@ -456,6 +449,18 @@ struct CardRow: View {
     private func pick() {
         UISelectionFeedbackGenerator().selectionChanged()
         withAnimation(.snappy(duration: 0.2)) { model.togglePick(card.id) }
+    }
+}
+
+/// Where a carried card was lifted from, as the plugin keeps it (`is-waiting`), and where a carried section would go
+/// (`.tc-group-drop`): a dashed outline of a card.
+struct DashedPlace: View {
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: CardMetrics.radius)
+            .strokeBorder(Palette.dash(scheme), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            .accessibilityHidden(true)
     }
 }
 

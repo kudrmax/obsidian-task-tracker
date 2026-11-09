@@ -960,6 +960,8 @@ final class BoardModel {
         /// Select Tasks: every picked task the lift carries (`tasks.carried`), each with the column it is drawn in; empty
         /// for a card carried alone.
         var group: [(item: TaskItem, from: String)] = []
+        /// Let go where it writes: the screen after the drop stands, the cards in their new places, while the copy lands.
+        var landed = false
 
         /// What `tasks.drop` takes: each carried task's key and where it was drawn.
         var dropped: JSONValue {
@@ -989,7 +991,7 @@ final class BoardModel {
     /// What lights for a carry held over a list or a title: the card a subtask would go under, an empty section's plate,
     /// the title. The target itself is the gap the system opens.
     enum DropHover: Equatable {
-        case list(BoardColumn, place: JSONValue, parent: String?, plate: String?)
+        case list(BoardColumn, place: JSONValue, plate: String?)
         case title(BoardColumn)
     }
 
@@ -1108,8 +1110,12 @@ final class BoardModel {
         return section.names.indices.contains(section.lifted) && section.names[section.lifted] == group.name
     }
 
-    /// The carried card itself, wherever the screen draws it: its row is the gap it was lifted from.
+    /// The carried card itself, wherever the screen draws it: its copy stands for it until the carry ends, once the copy
+    /// is down (let go where it writes, in its new row).
     func isHidden(_ card: BoardCard) -> Bool { card.id == carry?.id || arriving.contains(card.id) }
+
+    /// The carried card's own row is its dashed place, until the carry lands or ends.
+    func isWaiting(_ card: BoardCard) -> Bool { card.id == carry?.id && carry?.landed != true }
 
     /// The cards a drop's copy is still flying into: their place stands empty until it lands, as the system's own list
     /// drop keeps its row.
@@ -1137,7 +1143,7 @@ final class BoardModel {
 
     /// A subtask of the carried card, or another picked task carried with it: folded away while it is carried.
     func isFolded(_ card: BoardCard) -> Bool {
-        guard let carry, carry.section == nil, card.id != carry.id else { return false }
+        guard let carry, carry.section == nil, !carry.landed, card.id != carry.id else { return false }
         return isCarried(card)
     }
 
@@ -1156,55 +1162,61 @@ final class BoardModel {
 
     // MARK: A list as a place to drop on
 
-    /// The core's place for the gap the system opened before row `gap` of `rows` (the list's rows without the carried
-    /// ones), at the level the finger's `x` asks for across the list's `width`.
-    func listPlace(_ column: BoardColumn, rows: [DropRow], gap: Int, x: CGFloat, width: CGFloat) -> JSONValue? {
+    /// The place a carry over `column` points at, the rows standing still under it, as the plugin's (`rules.placeAt`):
+    /// `cards` and `heads` where they stand in the list without the carried ones, the finger at `point`. A card is placed
+    /// by its middle (`rules.carriedMiddle`, the finger's hold on it known from the lift), the plus by the finger; the level
+    /// by the finger's `x` (`rules.levelAt`); the place shown holds until the finger is well past it.
+    func placeUnder(_ column: BoardColumn, cards: [PlacedCard], heads: [PlacedHead], at point: CGPoint, grab: CGFloat?, width: CGFloat, held: JSONValue?) -> JSONValue? {
         let inset = Double(CardMetrics.columnInset)
-        let level = (try? board.levelAt(x: Double(x), left: inset, width: Double(width) - 2 * inset, indent: Double(CardMetrics.indent))) ?? 0
+        let y = grab.flatMap { try? board.carriedMiddle(y: Double(point.y), grab: Double($0), cardHeight: Double(CardMetrics.height)) } ?? Double(point.y)
         do {
-            return try ListTarget(rows: rows).place(at: gap, level: level, board: board)
+            let level = try board.levelAt(x: Double(point.x), left: inset, width: Double(width) - 2 * inset, indent: Double(CardMetrics.indent))
+            let hold = held ?? carry.flatMap { homeGap($0.id, in: column) } ?? .null
+            return try board.placeAt(cards, y: y, level: level, shift: 0, room: .null, heads: heads, held: hold, hysteresis: Self.placeHold)
         } catch {
             problem = Self.words(error)
             return nil
         }
     }
 
-    /// The carry held over a list at `place`: the card it would go under lights (a subtask's place), or the empty section's
-    /// plate it would go into.
-    func hoverList(_ column: BoardColumn, place: JSONValue) {
-        guard let list = snapshot?.lists[column] else { return }
+    /// How far past the place shown the finger goes before another is shown.
+    private static let placeHold: Double = 6
+
+    /// What a carry held over a list at `place` shows: the drop line, or an empty section's lit plate; at the card's own
+    /// place (`stays`, a drop there writes nothing) the line stands at its dashed place.
+    struct Aim {
+        let stays: Bool
+        let plate: Bool
+    }
+
+    /// The carry held over a list at `place`: an empty section's plate lights, as the plugin's; no card lights.
+    @discardableResult
+    func hoverList(_ column: BoardColumn, place: JSONValue) -> Aim {
+        guard let list = snapshot?.lists[column] else { return Aim(stays: false, plate: false) }
         let others = others(in: column)
-        // What the place means, the core's: a subtask names its parent, which lights.
         let home: JSONValue = carry.flatMap { homeGap($0.id, in: column) } ?? .null
-        let meant: JSONValue? = ruleNow("rules.placeOfDrop", [Self.listCards(others), place, home])
-        let parent = meant.flatMap { $0["kind"].string == "subtask" ? $0.field("parent") : nil }.flatMap { key in
-            others.first { $0.item.key.json == key }?.id
-        }
+        let meant: JSONValue? = carry?.item == nil ? place : ruleNow("rules.placeOfDrop", [Self.listCards(others), place, home])
         let zone = place.field("project")
         let plate = list.groups.first { $0.empty && $0.holds(group: place["group"].string, zone: zone) }?.id
-        let next = DropHover.list(column, place: place, parent: parent, plate: plate)
-        guard next != hover else { return }
-        if case .list(_, let shown, _, _) = hover, shown["index"] != place["index"] || shown["level"] != place["level"] || shown["group"] != place["group"] {
-            UISelectionFeedbackGenerator().selectionChanged()
+        let next = DropHover.list(column, place: place, plate: plate)
+        if next != hover {
+            if case .list(_, let shown, _) = hover, shown["index"] != place["index"] || shown["level"] != place["level"] || shown["group"] != place["group"] {
+                UISelectionFeedbackGenerator().selectionChanged()
+            }
+            landing = nil
+            withAnimation(DropMotion.hover) { hover = next }
         }
-        landing = nil
-        withAnimation(DropMotion.hover) { hover = next }
+        return Aim(stays: meant == nil || meant == .null, plate: plate != nil)
     }
 
     func leaveList(_ column: BoardColumn) {
-        guard case .list(column, _, _, _) = hover else { return }
+        guard case .list(column, _, _) = hover else { return }
         withAnimation(DropMotion.hover) { hover = nil }
-    }
-
-    /// The card a carry would become a subtask of: it lights.
-    func isParentLit(_ card: BoardCard, in column: BoardColumn) -> Bool {
-        if case .list(column, _, let parent, _) = hover { return parent == card.id }
-        return false
     }
 
     /// The empty section a carry would land in: its plate lights, as the plugin's (`is-hot`).
     func platesLit(_ column: BoardColumn, _ group: BoardGroup) -> Bool {
-        if case .list(column, _, _, let plate) = hover { return plate == group.id }
+        if case .list(column, _, let plate) = hover { return plate == group.id }
         return false
     }
 
@@ -1262,6 +1274,7 @@ final class BoardModel {
         }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         if !carry.group.isEmpty { endSelection() }
+        self.carry?.landed = true
         showPreview(preview.snapshot)
         writeDrop("tasks.drop", [carry.dropped, to, .string(snapshot.day)])
         return .landed(preview.landings.first)

@@ -25,8 +25,6 @@ enum Palette {
     /// A drop's lit plate (`--tc-drop-bg`) and a waiting place's dashes (`--tc-dash`).
     static func dropBg(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#251F3D" : "#F1ECFE") }
     static func dash(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#3A3A3C" : "#C7C7CC") }
-    /// The line between Inbox and Backlog (`--tc-line`).
-    static func line(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#2C2C2E" : "#E5E5EA") }
     /// A search's found piece (`--tc-selection`).
     static func selection(_ scheme: ColorScheme) -> Color { scheme == .dark ? Color(.sRGB, red: 149 / 255, green: 128 / 255, blue: 1, opacity: 0.38) : Color(.sRGB, red: 138 / 255, green: 92 / 255, blue: 245 / 255, opacity: 0.28) }
     /// A plain card: the ground lifted towards the text.
