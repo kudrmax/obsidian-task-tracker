@@ -454,20 +454,21 @@ every condition that changes the layout is animated by the transaction that chan
     copy flies into the part's header, takes its size on the way and fades as it arrives; the group's count fades to its
     new number. A card's copy always lands at the full size of its place (the plugin reads a growing row's resting
     height before its grow starts). Plugin: `Float.sink`, `TaskList.foldedHeadOf`; iPhone: `DropLanding.part.folded`.
-62. **Backend: a key stays good while its task is there.** Max acts in the middle of a motion: Done, then at once a drag of
-    another task, whose key was read before Done moved the lines. Every key the core gives now carries its task's id
-    (`TaskKey.id`, added), and `TaskRules.entryOf`, through which every write and every read by key finds its task, finds
-    it by that id wherever writes since took it, and acts on its line as it is now (`applyAll` first takes each key and
-    the keys its changes name to the task's key now). A line edited elsewhere in place (in Obsidian's editor, or by
-    Sync from the Mac) keeps its task's id, as R1 promises, so a key read before such an edit acts on the edited task. A
-    key is refused (`StaleTaskError`, the door's `staleTask`) only when no task has its id any more: removed, or replaced
-    elsewhere by other lines. A key without an id (one a host builds) is found by place and line, as before. A key is
-    found by its id only where that id is this identity's: its task's line now is the key's, or one the task had while
-    this identity knew it (rewritten by its writes or edited elsewhere in place; `TaskIdState.held`, added, the last 8 by
-    id); a key another reading gave (another `TaskBoard` over the same file, whose ids collide with these by design) is
-    found by its place and line instead. The door finds keys by id only while the host hands back `ids`. The frontends
+62. **Backend: a key stays good while its task is there, and its line is the key's.** Max acts in the middle of a
+    motion: Done, then at once a drag of another task, whose key was read before Done moved the lines. Every key the
+    core gives carries its task's id (`TaskKey.id`, added), and `TaskRules.entryOf`, through which every write and
+    every read by key finds its task, finds it by that id wherever writes since took it (`applyAll` first takes each
+    key and the keys its changes name to the task's key now), when the task's line is the key's or one this identity's
+    own writes or undo steps rewrote it into (`TaskIdState.held`, added: the lines its own writes rewrote, the last 8 by
+    id). A line changed elsewhere keeps its task's id, so its card changes in place, but a key read before is refused
+    (`StaleTaskError`, the door's `staleTask`): the diff cannot tell an edit in place from another task put in its place
+    (`Buy milk` replaced by `Call mom` takes its id), and a write must never land on the other task. The frontend gets
+    the fresh key with the redraw. A key whose task is gone is refused too. A key without an id (one a host builds), or
+    one another reading gave (another `TaskBoard` over the same file, whose ids collide with these by design), is found
+    by its place and line, as before. The door finds keys by id only while the host hands back `ids`. The frontends
     pass `item.key` as they did; the iPhone app keeps each key's JSON as the door gave it and hands `ids` back, so it
     changes nothing.
+
 63. **iPhone, interrupt: every carry has its own number, and an end closes only its own carry.** A drop's copy settles
     for about a second after the screen stands still, and its session's end, its landing and its write's drawing come
     in that order or another. Each carry gets a token when it starts; every end (the card's session, the board's drop
