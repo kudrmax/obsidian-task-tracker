@@ -92,7 +92,7 @@ export class DragController {
 		/** Where the press began: the card captures the pointer, so the release names the card itself. */
 		let pressed: EventTarget | null = null;
 		card.addEventListener("pointerdown", (e) => (pressed = e.target), { signal });
-		new LongPress(card, {
+		LongPress.attach(card, {
 			signal,
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
@@ -119,7 +119,7 @@ export class DragController {
 		);
 		let pressed: EventTarget | null = null;
 		block.addEventListener("pointerdown", (e) => (pressed = e.target), { signal });
-		new LongPress(block, {
+		LongPress.attach(block, {
 			signal,
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
@@ -141,7 +141,7 @@ export class DragController {
 			},
 			{ signal },
 		);
-		new LongPress(block, {
+		LongPress.attach(block, {
 			signal,
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
@@ -234,7 +234,7 @@ export class DragController {
 	/** The timeline's empty places: a long tap shows the target for a new task, moving slides it, lifting opens the field there. */
 	attachCanvas(canvas: HTMLElement): void {
 		const onEmpty = (e: PointerEvent) => this.beginNewSlot(canvas, e);
-		new LongPress(canvas, {
+		LongPress.attach(canvas, {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			accepts: (e) => !(e.target as Element | null)?.closest(".tc-block, .tc-event, .tc-drop"),
@@ -281,6 +281,7 @@ export class DragController {
 
 	/** The card leaves its place and follows the finger; the screen is already the drag's. */
 	private lift(source: HTMLElement, payload: TaskDragPayload, e: PointerEvent, subtree: readonly HTMLElement[] = [], carried: readonly PickedCard[] = []): void {
+		DragSession.landNow(payload.item.id);
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
 		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day(), 1 + carried.length, origin.width);
@@ -308,16 +309,21 @@ export class DragController {
 					targets: this.deps.targets(payload),
 					float,
 					origin: () => (source.isConnected ? source.getBoundingClientRect() : origin),
-					onReturn: reopen,
-					onEnd: async (result) => {
+					carries: payload.item.id,
+					letGo: () => {
 						detach();
 						this.deps.arbiter.release(DRAG);
+					},
+					onReturn: () => {
+						reopen();
+						this.deps.onDragging(false);
+					},
+					onEnd: async (result) => {
 						if (!result) return null;
 						this.deps.haptics.tap();
 						return this.deps.onResult(payload, result);
 					},
 				}),
-			() => this.deps.onDragging(false),
 		);
 	}
 
@@ -327,13 +333,13 @@ export class DragController {
 	 */
 	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => HTMLElement | null | void): boolean {
 		if (!this.deps.arbiter.claim(DRAG)) return false;
+		DragSession.landNow();
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
 		const float = new PlusFloat({ dx: e.clientX - origin.left, dy: e.clientY - origin.top });
 		float.moveTo(e.clientX, e.clientY);
 		capturePointer(source, e.pointerId);
 		const payload: NewTaskPayload = { from: "new", item: null, grabPx: e.clientY - origin.top };
-		let placed = false;
 		this.follow(
 			source,
 			e,
@@ -344,31 +350,30 @@ export class DragController {
 					float,
 					landsOnTarget: true,
 					origin: () => origin,
+					letGo: () => {
+						detach();
+						this.deps.arbiter.release(DRAG);
+					},
 					// Placed, the task's field opens as the finger lifts, in its place; the plus lands in the field and fades.
 					onEnd: async (result) => {
-						detach();
-						if (!result) return;
-						placed = true;
-						this.deps.arbiter.release(DRAG);
+						if (!result) {
+							onDrop(null);
+							return;
+						}
 						for (const target of targets) target.clear();
 						this.deps.haptics.tap();
 						return onDrop(result) ?? null;
 					},
 				}),
-			() => {
-				if (placed) return;
-				this.deps.arbiter.release(DRAG);
-				onDrop(null);
-			},
 		);
 		return true;
 	}
 
 	/**
-	 * Routes the pointer of `e` to the session until it ends; `settled` runs once the card has come to rest. The session
-	 * sees the finger where it lifted the card at once: a card lifted from a list keeps its place there open from the start.
+	 * Routes the pointer of `e` to the session until the finger lets go. The session sees the finger where it lifted the
+	 * card at once: a card lifted from a list keeps its place there open from the start.
 	 */
-	private follow(source: HTMLElement, e: PointerEvent, makeSession: (detach: () => void) => DragSession, settled: () => void): void {
+	private follow(source: HTMLElement, e: PointerEvent, makeSession: (detach: () => void) => DragSession): void {
 		const doc = source.ownerDocument;
 		const session = makeSession(() => detach());
 		session.move(e.clientX, e.clientY);
@@ -380,7 +385,7 @@ export class DragController {
 			if (ended) return;
 			ended = true;
 			doc.removeEventListener("keydown", escape, true);
-			void settling().then(settled);
+			void settling();
 		};
 		const up = (ev: PointerEvent) => {
 			if (ev.pointerId === e.pointerId) end(() => session.release(ev.clientX, ev.clientY));

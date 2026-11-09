@@ -811,9 +811,12 @@ export class QuickEntry {
 	 * is, as for a task put elsewhere.
 	 */
 	private landed(column: DropColumn, created: TaskKey | CreatedTask, cards: readonly ListCard[]): void {
-		const made = "id" in created ? created : null;
-		const key = made ? made.key : (created as TaskKey);
-		const index = cards.findIndex((card) => (made && card.id !== undefined ? card.id === made.id : samePlace(card.key, key) && sameLine(card.key, key)));
+		const key = "key" in created ? created.key : created;
+		const id = "key" in created ? created.id : created.id;
+		const index = cards.findIndex((card) => {
+			const own = card.id ?? card.key.id;
+			return id !== undefined && own !== undefined ? own === id : samePlace(card.key, key) && sameLine(card.key, key);
+		});
 		if (index < 0) return;
 		for (const run of Object.values(this.session.runs)) {
 			const list = listSpot(run.spot);

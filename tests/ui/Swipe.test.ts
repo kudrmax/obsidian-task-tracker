@@ -41,6 +41,7 @@ function setUp(arbiter = new GestureArbiter(), ends: readonly Shift[] = []) {
 			stood++;
 			stand();
 		},
+		catch: () => 0,
 	};
 	new Swipe(root, { arbiter, accepts: (target) => target !== sheet, target });
 	const swipe = (from: HTMLElement, ...points: [number, number][]) => {
@@ -78,13 +79,27 @@ describe("Swipe", () => {
 		new Swipe(root, {
 			arbiter: new GestureArbiter(),
 			accepts: () => true,
-			target: { distance: (shift) => (asked.push(shift), WIDTH), follow: () => undefined, settle: () => Promise.resolve(), stand: () => undefined },
+			target: { distance: (shift) => (asked.push(shift), WIDTH), follow: () => undefined, settle: () => Promise.resolve(), stand: () => undefined, catch: () => 0 },
 		});
 		root.dispatchEvent(pointer("pointerdown", 277));
 		root.dispatchEvent(pointer("pointermove", 266));
 		root.dispatchEvent(pointer("pointermove", 266));
 		root.dispatchEvent(pointer("pointermove", 254));
 		expect(asked).toEqual([1]);
+	});
+
+	it("a finger drawn sideways while the screen runs draws it on from where it is seen", () => {
+		const root = document.createElement("div");
+		const follows: number[] = [];
+		new Swipe(root, {
+			arbiter: new GestureArbiter(),
+			accepts: () => true,
+			target: { distance: () => WIDTH, follow: (dx) => follows.push(dx), settle: () => Promise.resolve(), stand: () => undefined, catch: () => -150 },
+		});
+		root.dispatchEvent(pointer("pointerdown", 300));
+		root.dispatchEvent(pointer("pointermove", 280));
+		root.dispatchEvent(pointer("pointermove", 260));
+		expect(follows).toEqual([-170]);
 	});
 
 	it("lands on whichever screen stands nearer when let go", () => {

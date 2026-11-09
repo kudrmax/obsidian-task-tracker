@@ -66,7 +66,7 @@ describe("writing", () => {
 		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] B\n\n## Soon\n\n## Done\n\n- [x] A\n\n## Backlog\n");
 	});
 
-	it("rejects a stale key and leaves the file alone", async () => {
+	it("rejects a key whose line changed elsewhere, or whose task is gone, and leaves the file alone", async () => {
 		const { store, svc } = setup("## Now\n\n- [ ] A\n- [ ] B\n");
 		const view = await svc.dayView(T);
 		store.text = "## Now\n\n- [ ] Changed\n- [ ] B\n";
@@ -80,7 +80,7 @@ describe("writing", () => {
 	it("keys refer to the normalized file even before it was written", async () => {
 		const { store, svc } = setup("## Now\n\n- [x] Old\n- [ ] A\n\n## Done\n");
 		const view = await svc.dayView(T);
-		expect(view.list[0].key).toEqual({ section: "now", index: 0, path: [], raw: "- [ ] A" });
+		expect(view.list[0].key).toEqual({ section: "now", index: 0, path: [], raw: "- [ ] A", id: view.list[0].id });
 		await svc.rename(view.list[0].key, "A2");
 		expect(store.text).toBe("## Now\n\n- [ ] A2\n\n## Done\n\n- [x] Old\n\n## Inbox\n\n## Soon\n\n## Backlog\n");
 	});
@@ -260,9 +260,9 @@ describe("the task sheet", () => {
 		const { svc } = setup(FULL);
 		const view = await svc.dayView(T);
 		const renamed = await svc.edit(view.list[0].key, { text: "  A2 ", placement: { kind: "now" }, priority: null });
-		expect([renamed?.text, renamed?.key]).toEqual(["A2", { section: "now", index: 0, path: [], raw: "- [ ] A2" }]);
+		expect([renamed?.text, renamed?.key]).toEqual(["A2", { section: "now", index: 0, path: [], raw: "- [ ] A2", id: renamed?.id }]);
 		const moved = await svc.edit(renamed!.key, { text: "A3", placement: { kind: "soon" }, priority: null });
-		expect([moved?.text, moved?.key]).toEqual(["A3", { section: "soon", index: 1, path: [], raw: "- [ ] A3" }]);
+		expect([moved?.text, moved?.key]).toEqual(["A3", { section: "soon", index: 1, path: [], raw: "- [ ] A3", id: renamed?.id }]);
 		expect(await svc.edit(moved!.key, { text: "A3", placement: { kind: "soon" }, priority: null })).toBeNull();
 	});
 
@@ -427,7 +427,7 @@ describe("Inbox", () => {
 		const { svc } = setup("## Inbox\n\n- [ ] I\n- [/] J\n\n## Now\n\n- [ ] A\n\n## Soon\n\n- [ ] C\n");
 		const inbox = await svc.inboxView();
 		expect(inbox.map((i) => i.text)).toEqual(["I", "J"]);
-		expect(inbox[1].key).toEqual({ section: "inbox", index: 1, path: [], raw: "- [/] J" });
+		expect(inbox[1].key).toEqual({ section: "inbox", index: 1, path: [], raw: "- [/] J", id: inbox[1].id });
 		expect(svc.placementOf(inbox[0])).toEqual({ kind: "inbox" });
 		expect((await svc.dayView(T)).list.map((i) => i.text)).toEqual(["A"]);
 	});
@@ -466,7 +466,7 @@ describe("Backlog", () => {
 		const { svc } = setup("## Inbox\n\n- [ ] I\n\n## Now\n\n- [ ] A\n\n## Soon\n\n## Backlog\n\n- [ ] L\n### Дом\n- [ ] M\n\n## Done\n");
 		const backlog = await svc.backlogView();
 		expect(backlog.map((i) => [i.text, i.group])).toEqual([["L", null], ["M", "Дом"]]);
-		expect(backlog[1].key).toEqual({ section: "backlog", index: 1, path: [], raw: "- [ ] M" });
+		expect(backlog[1].key).toEqual({ section: "backlog", index: 1, path: [], raw: "- [ ] M", id: backlog[1].id });
 		expect(svc.placementOf(backlog[0])).toEqual({ kind: "backlog" });
 	});
 
@@ -725,10 +725,10 @@ describe("createInPlace", () => {
 		expect(store.text).toBe(TEXT);
 	});
 
-	it("list with a stale before rejects with StaleTaskError and writes nothing", async () => {
+	it("list before a task gone from the file rejects with StaleTaskError and writes nothing", async () => {
 		const { store, svc } = setup(TEXT);
 		const [a] = (await svc.dayView(T)).list;
-		store.text = TEXT.replace("A\n", "Changed\n");
+		store.text = TEXT.replace("- [ ] A\n", "");
 		const changed = store.text;
 		await expect(svc.createInPlace("N", null, { kind: "list", list: "now", group: null, before: a.key })).rejects.toBeInstanceOf(StaleTaskError);
 		expect(store.text).toBe(changed);
@@ -835,15 +835,19 @@ describe("subtasks", () => {
 		const { svc } = setup(TRIP);
 		const [trip] = (await svc.dayView(T)).list;
 		expect(trip.progress).toEqual({ done: 1, total: 2 });
-		expect(trip.subtasks.map((s) => s.key)).toEqual([{ section: "now", index: 0, path: [1], raw: "\t- [ ] Pay" }]);
+		expect(trip.subtasks.map((s) => s.key)).toEqual([{ section: "now", index: 0, path: [1], raw: "\t- [ ] Pay", id: trip.subtasks[0].id }]);
 	});
 
-	it("acts on a subtask by its key and rejects a stale one", async () => {
+	it("acts on a subtask by its key after the core's own write changed its line, and rejects it once its line changed elsewhere", async () => {
 		const { store, svc } = setup(TRIP);
 		const pay = (await svc.dayView(T)).list[0].subtasks[0];
 		await svc.rename(pay.key, "Pay all");
 		expect(store.text).toContain("\t- [ ] Pay all\n");
+		await svc.setStatus(pay.key, "inProgress");
+		expect(store.text).toContain("\t- [/] Pay all\n");
+		store.text = store.text!.replace("\t- [/] Pay all\n", "\t- [/] Pay half\n");
 		await expect(svc.setStatus(pay.key, "done")).rejects.toBeInstanceOf(StaleTaskError);
+		expect(store.text).toContain("\t- [/] Pay half\n");
 	});
 
 	it("adds a subtask last under its task and nests a task under another", async () => {
@@ -888,7 +892,8 @@ describe("lineOf", () => {
 	it("rejects with StaleTaskError when the line changed", async () => {
 		const { svc } = setup(FULL);
 		const a = (await svc.dayView(T)).list[0];
-		await expect(svc.lineOf({ ...a.key, raw: "- [ ] Other" })).rejects.toBeInstanceOf(StaleTaskError);
+		const { id: _id, ...asBuilt } = a.key;
+		await expect(svc.lineOf({ ...asBuilt, raw: "- [ ] Other" })).rejects.toBeInstanceOf(StaleTaskError);
 	});
 });
 
@@ -919,12 +924,14 @@ describe("find", () => {
 		expect((await svc.find(b.key, "Bee"))?.text).toBe("Bee");
 	});
 
-	it("gives null once the task is gone from its place and its line from the file", async () => {
+	it("finds a task by its key wherever a write took it, and gives null once it is gone from the file", async () => {
 		const { svc } = setup(TREE);
 		const [a, b] = (await svc.dayView(T)).list;
 		await svc.setStatus(a.key, "done");
-		expect(await svc.find(a.key, a.text)).toBeNull();
+		expect(await svc.find(a.key, a.text)).toMatchObject({ id: a.id, status: "done", list: "done" });
 		expect((await svc.find(b.key, b.text))?.text).toBe("B");
+		await svc.remove(b.key);
+		expect(await svc.find(b.key, b.text)).toBeNull();
 	});
 });
 
@@ -996,7 +1003,7 @@ describe("applyAll", () => {
 		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] P\n\t- [ ] A\n\t- [ ] B\n\n## Soon\n\n## Done\n\n## Backlog\n");
 	});
 
-	it("rejects a stale key and writes nothing", async () => {
+	it("rejects a key whose line changed elsewhere and writes nothing", async () => {
 		const { store, svc } = setup("## Now\n\n- [ ] A\n- [ ] B\n");
 		const [a, b] = (await svc.dayView(T)).list;
 		store.text = "## Now\n\n- [ ] A\n- [ ] Changed\n";
@@ -1248,7 +1255,8 @@ describe("empty sections", () => {
 		const [a, b] = (await svc.dayView(T)).list;
 		await expect(svc.createSection("Z", { kind: "day", date: T, group: "Y", before: null })).rejects.toBeInstanceOf(StaleTaskError);
 		await expect(svc.createSection("Z", { kind: "day", date: T, group: "X", before: a.key })).rejects.toBeInstanceOf(StaleTaskError);
-		await expect(svc.createSection("Z", { kind: "day", date: T, group: "X", before: { ...b.key, raw: "- [ ] gone" } })).rejects.toBeInstanceOf(StaleTaskError);
+		const { id: _id, ...asBuilt } = b.key;
+		await expect(svc.createSection("Z", { kind: "day", date: T, group: "X", before: { ...asBuilt, raw: "- [ ] gone" } })).rejects.toBeInstanceOf(StaleTaskError);
 		expect(store.text).toBe(FILE);
 	});
 
@@ -1636,6 +1644,8 @@ describe("where a task shows, and a task by its key", () => {
 		const sub = items[0].subtasks[0];
 		expect(svc.findIn(items, sub.key)?.text).toBe("Sub");
 		expect(svc.findIn(items, items[0].key)?.text).toBe("Later");
-		expect(svc.findIn(items, { ...sub.key, index: 9 })).toBeNull();
+		const { id: _id, ...asBuilt } = sub.key;
+		expect(svc.findIn(items, { ...asBuilt, index: 9 })).toBeNull();
+		expect(svc.findIn(items, { ...sub.key, index: 9 })?.text).toBe("Sub");
 	});
 });

@@ -204,7 +204,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "normalize", args: () => [] },
 	{ method: "normalize", args: () => [], text: "## Now\n\n- [ ] Old ⏰ 2026-10-01 10:00\n" },
 	{ method: "createFile", args: () => [], text: null },
-	{ method: "setStatus", args: (s) => [{ ...key(s, "Idea"), raw: "- [ ] Gone" }, "done"] },
+	{ method: "setStatus", args: (s) => [{ ...key(s, "Idea"), raw: "- [ ] Gone", id: undefined }, "done"] },
 ];
 
 /** What the service answers, and the text it leaves; an error by its code. */

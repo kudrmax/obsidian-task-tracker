@@ -1011,6 +1011,10 @@
     groups(section) {
       return this.groupLists.get(section) ?? [];
     }
+    /** The task or subtask whose tag is `id`, wherever it stands; undefined when none has it. */
+    byId(id) {
+      return flatten(this.allTasks()).find((entry) => entry.id === id);
+    }
     /** The task or subtask at that place, if there is one. */
     find(section, index, path) {
       let entry = this.tasks(section)[index];
@@ -3021,6 +3025,9 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/taskKeys.ts
+  function keyOf(entry) {
+    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
+  }
   function samePlace2(a, b) {
     return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
   }
@@ -3647,9 +3654,12 @@ ${key.title}`.toLowerCase();
      * is, as for a task put elsewhere.
      */
     landed(column, created, cards) {
-      const made = "id" in created ? created : null;
-      const key = made ? made.key : created;
-      const index = cards.findIndex((card) => made && card.id !== void 0 ? card.id === made.id : samePlace2(card.key, key) && sameLine(card.key, key));
+      const key = "key" in created ? created.key : created;
+      const id = "key" in created ? created.id : created.id;
+      const index = cards.findIndex((card) => {
+        const own = card.id ?? card.key.id;
+        return id !== void 0 && own !== void 0 ? own === id : samePlace2(card.key, key) && sameLine(card.key, key);
+      });
       if (index < 0) return;
       for (const run of Object.values(this.session.runs)) {
         const list = listSpot(run.spot);
@@ -4731,9 +4741,6 @@ ${key.title}`.toLowerCase();
     const counted = entry.subtasks.filter((s) => s.task.status !== "cancelled");
     return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
   }
-  function keyOf(entry) {
-    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw };
-  }
   var NO_LEVELS = { levelOf: () => null, labelsOf: () => [], projectOf: () => null };
   function itemLevels(levels, labels, projectOf = () => null) {
     return {
@@ -5047,13 +5054,15 @@ ${key.title}`.toLowerCase();
     }
     findIn(items, key) {
       for (const item of items) {
-        if (samePlace2(item.key, key)) return item;
+        if (key.id !== void 0 && item.id !== void 0 ? item.id === key.id : samePlace2(item.key, key)) return item;
         const inner = this.findIn(item.subtasks, key);
         if (inner) return inner;
       }
       return null;
     }
     find({ doc, today }, key, text) {
+      const named = this.rules.named(doc, key);
+      if (named !== void 0) return named ? this.itemAt(doc, named, today) : null;
       const atPlace = doc.find(key.section, key.index, key.path);
       const alike = flatten(doc.allTasks()).filter((entry2) => entry2.raw === key.raw);
       const entry = atPlace?.raw === key.raw ? atPlace : alike.length === 1 ? alike[0] : atPlace?.task.text === text ? atPlace : void 0;
@@ -5215,6 +5224,11 @@ ${key.title}`.toLowerCase();
     if (change.kind === "nest") return [change.parent, change.before];
     return [];
   }
+  function freshChange(change, fresh) {
+    if (change.kind === "moveBefore" || change.kind === "moveToGroup") return { ...change, before: fresh(change.before) };
+    if (change.kind === "nest") return { ...change, parent: fresh(change.parent), before: fresh(change.before) };
+    return change;
+  }
   function sameKey(a, b) {
     return samePlace2(a, b) && sameLine(a, b);
   }
@@ -5231,10 +5245,16 @@ ${key.title}`.toLowerCase();
     return name.trim() === "";
   }
   var TaskRules = class {
-    constructor(settings, clock, identity = null) {
+    /**
+     * `keysById`: the ids in the keys the UI hands back are those of this identity, kept since they were given (the
+     * service's; the door's when the host hands its ids back), so a key's task is found by its id. Otherwise an id means
+     * nothing here and a key names its task by place and line alone.
+     */
+    constructor(settings, clock, identity = null, keysById = identity !== null) {
       this.settings = settings;
       this.clock = clock;
       this.identity = identity;
+      this.keysById = keysById;
     }
     moment() {
       const settings = this.settings.get();
@@ -5311,10 +5331,35 @@ ${key.title}`.toLowerCase();
     emptyFile() {
       return TaskDocument.empty(sectionNames(this.settings.get()));
     }
+    /**
+     * The task a key names in `doc`: by its id wherever writes since moved it, when the key has one the rules keep; else at
+     * its place with its line. Throws StaleTaskError when it is gone, or no longer the task it was.
+     */
     entryOf(doc, key) {
-      const entry = doc.find(key.section, key.index, key.path);
-      if (!entry || entry.raw !== key.raw) throw new StaleTaskError();
+      const byId = this.named(doc, key);
+      const entry = byId === void 0 ? this.atPlace(doc, key) : byId;
+      if (!entry) throw new StaleTaskError();
       return entry;
+    }
+    /**
+     * The task a key names by its id, when the rules find keys by id: the task with that id wherever writes took it, when its
+     * line is the key's or one this identity's own writes rewrote the key's into. Else the key is stale (its line changed
+     * elsewhere: a fresh key comes with the redraw) or another reading's, whose ids mean nothing here, and is found at its
+     * place with its line. Null when it is not found that way either; undefined when keys are found by place.
+     */
+    named(doc, key) {
+      if (!this.keysById || key.id === void 0) return void 0;
+      const entry = doc.byId(key.id);
+      if (entry && (entry.raw === key.raw || this.identity?.held(key.id, key.raw))) return entry;
+      return this.atPlace(doc, key) ?? null;
+    }
+    /** The key of the task a key names, as `doc` has it now: what keys handed in earlier are compared by. */
+    freshKey(doc, key) {
+      return keyOf(this.entryOf(doc, key));
+    }
+    atPlace(doc, key) {
+      const entry = doc.find(key.section, key.index, key.path);
+      return entry?.raw === key.raw ? entry : void 0;
     }
     /** A section the UI names must still be in the file, as a task must. */
     groupOf(doc, list, group) {
@@ -5539,13 +5584,15 @@ ${key.title}`.toLowerCase();
     applyAll(steps) {
       if (steps.length === 0) return null;
       return (doc, today, settings, boundary) => {
+        const fresh = (key) => key === null ? null : this.freshKey(doc, key);
+        const now = steps.map((step) => ({ key: fresh(step.key), change: freshChange(step.change, fresh) }));
         const named = [];
         const tagOf = (key) => {
           const at = named.findIndex((k) => sameKey(k, key));
           return at >= 0 ? at : named.push(key) - 1;
         };
         const lineOf = (key) => doc.lineOf(this.entryOf(doc, key));
-        const plan = steps.filter((step) => !(MOVES.has(step.change.kind) && steps.some((other) => MOVES.has(other.change.kind) && isUnder(step.key, other.key)))).sort((a, b) => lineOf(a.key) - lineOf(b.key)).map((step) => ({ change: step.change, own: tagOf(step.key), refs: refsOf(step.change).map((ref) => ref === null ? null : tagOf(ref)) }));
+        const plan = now.filter((step) => !(MOVES.has(step.change.kind) && now.some((other) => MOVES.has(other.change.kind) && isUnder(step.key, other.key)))).sort((a, b) => lineOf(a.key) - lineOf(b.key)).map((step) => ({ change: step.change, own: tagOf(step.key), refs: refsOf(step.change).map((ref) => ref === null ? null : tagOf(ref)) }));
         const { doc: tagged, tags } = EntryTags.tag(doc, named.map((key) => this.entryOf(doc, key)));
         let current = tagged;
         for (const { change, own, refs } of plan) {
@@ -5625,9 +5672,6 @@ ${key.title}`.toLowerCase();
     const [year, month, day] = date.split("-").map(Number);
     return new Date(year, month - 1, day, 0, minutes);
   }
-  function keyOf2(entry) {
-    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw };
-  }
   var TaskReminders = class {
     constructor(rules, clock) {
       this.rules = rules;
@@ -5654,12 +5698,12 @@ ${key.title}`.toLowerCase();
     }
     find(doc, line) {
       const entry = openSlotted(doc).find((e) => e.raw === line);
-      return entry ? keyOf2(entry) : null;
+      return entry ? keyOf(entry) : null;
     }
     reminder(entry, slot, at) {
       const nextDay = addDays(at.boundary.dayOfSlot(slot), 1);
       return {
-        key: keyOf2(entry),
+        key: keyOf(entry),
         title: plainText(entry.task.text),
         startMinute: slot.start,
         endMinute: slot.end,
@@ -5741,7 +5785,7 @@ ${key.title}`.toLowerCase();
         operation: this.rules.createInPlace(text, priority, place, repeat, labels),
         answer: (change) => {
           const created = change?.after.insertedSince(change.before);
-          return created ? { key: { section: created.section, index: created.index, path: created.path, raw: created.raw }, id: created.id } : null;
+          return created ? { key: keyOf(created), id: created.id } : null;
         }
       };
     }
@@ -5989,7 +6033,7 @@ ${key.title}`.toLowerCase();
         answer: (change) => {
           if (!change) return tasks.map((task) => task.key);
           const moved2 = tasks.map((task) => this.rules.entryOf(change.before, task.key));
-          return change.after.movedSince(change.before, moved2).flatMap((entry) => entry ? [{ section: entry.section, index: entry.index, path: entry.path, raw: entry.raw }] : []);
+          return change.after.movedSince(change.before, moved2).flatMap((entry) => entry ? [keyOf(entry)] : []);
         }
       };
     }
@@ -6064,6 +6108,7 @@ ${key.title}`.toLowerCase();
   };
 
   // core/application/TaskIdentity.ts
+  var HELD = 8;
   var NO_TASK_IDS = { next: 0, lines: [] };
   var TaskIdentity = class {
     constructor(state = NO_TASK_IDS) {
@@ -6084,12 +6129,13 @@ ${key.title}`.toLowerCase();
       const doc = read();
       const outline = doc.outline();
       const next = this.current.next;
-      const known = this.pending?.text === text ? this.given(outline, this.pending.ids) : sameOutline(this.current.lines, outline) ? this.inOrder(outline) : this.matched(outline);
+      const own = this.pending?.text === text;
+      const known = own ? this.given(outline, this.pending.ids) : sameOutline(this.current.lines, outline) ? this.inOrder(outline) : this.matched(outline);
       this.pending = null;
       const fresh = outline.some((o) => !known.has(o.tag));
       for (const o of outline) if (!known.has(o.tag)) known.set(o.tag, `t${next + o.tag}`);
       const settled = !fresh && sameOutline(this.current.lines, outline) && outline.every((o, i) => known.get(o.tag) === this.current.lines[i].id);
-      if (!settled) this.current = { next: next + doc.nextTag(), lines: outline.map((o) => ({ raw: o.raw, task: o.task, id: known.get(o.tag) })) };
+      if (!settled) this.settle(next + doc.nextTag(), outline.map((o) => ({ raw: o.raw, task: o.task, id: known.get(o.tag) })), own);
       const ids = { known, next };
       this.last = { text, ids };
       return ids;
@@ -6097,7 +6143,7 @@ ${key.title}`.toLowerCase();
     /** A write left `text`, the document `after`: its tasks and headings are who its lines' tags say. */
     wrote(text, after) {
       const tags = after.outlineTags();
-      this.current = { next: after.nextTag(), lines: after.outline().map((o) => ({ raw: o.raw, task: o.task, id: tags.get(o.line) })) };
+      this.settle(after.nextTag(), after.outline().map((o) => ({ raw: o.raw, task: o.task, id: tags.get(o.line) })), true);
       this.pending = null;
       this.last = { text, ids: { known: new Map([...tags].map(([line, tag]) => [line, tag])), next: this.current.next } };
     }
@@ -6116,6 +6162,29 @@ ${key.title}`.toLowerCase();
       this.pending = { text: after, ids };
       this.last = null;
     }
+    /** Whether `raw` is a line the task `id` has, or had before this identity's own writes rewrote it into the line it has. */
+    held(id, raw) {
+      return this.current.lines.some((line) => line.id === id && line.raw === raw) || (this.current.held?.[id]?.includes(raw) ?? false);
+    }
+    /**
+     * The state for `lines`. `own`: this identity's write or undo step made them, so a task whose line changed holds the
+     * line it had (a key read before still names it); otherwise the text was changed elsewhere, and a task whose line
+     * changed there holds nothing: a key read before is stale, the task keeping its id.
+     */
+    settle(next, lines, own) {
+      const was = new Map(this.current.lines.filter((line) => line.task).map((line) => [line.id, line.raw]));
+      const held = {};
+      for (const line of lines) {
+        if (!line.task) continue;
+        const before = was.get(line.id);
+        const changed2 = before !== void 0 && before !== line.raw;
+        if (changed2 && !own) continue;
+        const kept = this.current.held?.[line.id] ?? [];
+        const all = changed2 ? [before, ...kept.filter((raw) => raw !== before)] : kept;
+        if (all.length > 0) held[line.id] = all.slice(0, HELD);
+      }
+      this.current = { next, lines, ...Object.keys(held).length > 0 && { held } };
+    }
     /** The ids of the reading's lines that an undo step gave its text's lines. */
     given(outline, ids) {
       const known = /* @__PURE__ */ new Map();
@@ -6128,6 +6197,7 @@ ${key.title}`.toLowerCase();
     inOrder(outline) {
       return new Map(outline.map((o, i) => [o.tag, this.current.lines[i].id]));
     }
+    /** The ids of the reading the state is for, carried to this reading's lines by place and line. */
     /** The ids of the reading the state is for, carried to this reading's lines by place and line. */
     matched(outline) {
       const old = this.current.lines;
@@ -6188,7 +6258,7 @@ ${key.title}`.toLowerCase();
       };
       this.store = store;
       this.identity = new TaskIdentity(context.ids);
-      this.rules = new TaskRules(store, clock, this.identity);
+      this.rules = new TaskRules(store, clock, this.identity, context.ids !== void 0);
       this.reads = new TaskReads(this.rules, store, clock, { notes: () => context.projects ?? [], grouping: () => this.grouping });
       this.writes = new TaskWrites(this.rules, this.reads);
       this.text = context.tasks ?? null;

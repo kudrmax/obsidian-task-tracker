@@ -26,23 +26,52 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     private(set) lazy var interaction = UIDropInteraction(delegate: self)
     /// Told when a carry's drag session ends, whatever came of it, once its drop has flown, and whether a place took the
     /// drop: the screen's way to end a carry whose card is gone.
-    var ended: (_ performed: Bool) -> Void = { _ in }
+    /// Each names the carry its session was (`carrying`), so a session still ending never ends a carry begun after it.
+    var ended: (_ performed: Bool, _ carry: Int?) -> Void = { _, _ in }
     /// Told when a drop's copy has come down, with where it came down in the window (nil: the system's own place).
-    var landed: (CGRect?) -> Void = { _ in }
-    /// A drop's copy is flying: the session's end waits for it.
-    private var flying = false
-    private var endAfterFlight = false
-    /// A place took the session's drop.
-    private var performed = false
+    var landed: (CGRect?, _ carry: Int?) -> Void = { _, _ in }
+    /// The carry under way, which a session over the board belongs to.
+    var carrying: () -> Int? = { nil }
+    /// Each drop session over the board, by itself: the system may still be ending one (its copy settling) when the
+    /// finger has lifted the next card.
+    private struct Flight {
+        let carry: Int?
+        /// A place took the drop.
+        var performed = false
+        /// Where the card let go will stand, in the window.
+        var landing: CGRect?
+        /// The place that took it.
+        var place: String?
+        /// The copy is flying: the session's end waits for it.
+        var flying = false
+        var endAfterFlight = false
+        /// The copy the system flies, kept to fade it.
+        weak var flown: UIView?
+    }
+    private var flights: [ObjectIdentifier: Flight] = [:]
+    /// The session each dropped item belongs to.
+    private var sessionOf: [ObjectIdentifier: ObjectIdentifier] = [:]
+
+    /// A session of carry `carry` is still the board's: its end, performed or not, is still to come.
+    func knows(carry: Int) -> Bool { flights.values.contains { $0.carry == carry } }
+
+    private func flight(_ session: any UIDropSession) -> ObjectIdentifier {
+        let key = ObjectIdentifier(session)
+        if flights[key] == nil { flights[key] = Flight(carry: carrying()) }
+        return key
+    }
     /// The carry's copy folds shut onto the top of its place as it flies there (a section's, which lands on the room the
     /// section opens rather than on a card that looks like it): nothing of it is left while the system keeps it there.
     var foldsOnDrop: () -> Bool = { false }
     /// The carry's copy takes the size of where it lands and fades out on the way: a card dropped into a folded project
     /// part flies into the part's header (decision 56).
     var fadesOnDrop: () -> Bool = { false }
-    /// The copy the system flies, kept to fade it.
-    private weak var flown: UIView?
     private var places: [String: DropPlace] = [:]
+    /// Each place's view inside the day it shows (`DropSpace`), by its key.
+    private var spaces: [String: WeakView] = [:]
+    private struct WeakView { weak var view: UIView? }
+
+    func space(_ key: String, _ view: UIView) { spaces[key] = WeakView(view: view) }
     /// How each place that scrolls is scrolled by a carry held at its edge: by `dy` points, true when it moved.
     private var scrolls: [String: (CGFloat) -> Bool] = [:]
     /// Where the carry is held, in the window: the edge scroll reads it on every frame, the finger still or not.
@@ -52,8 +81,6 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     /// where it stops showing, not where it ends under the bar.
     var floor: CGFloat?
     private var current: String?
-    /// Where the card let go will stand, in the window, kept for the drop's preview.
-    private var landing: CGRect?
 
     /// Where each place last told it stands, kept apart from the places themselves: SwiftUI reports a view's geometry
     /// before its `onAppear` registers it, and a ribbon that opens where it last stood never moves again to report anew.
@@ -172,6 +199,7 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: any UIDropSession) -> UIDropProposal {
         guard let view = interaction.view else { return UIDropProposal(operation: .cancel) }
+        _ = flight(session)
         let point = session.location(in: view)
         let key = place(at: point)
         if key != current { leave() }
@@ -185,46 +213,56 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: any UIDropSession) { leave() }
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) {
-        current = nil
-        stopEdges()
-        guard !flying else {
-            endAfterFlight = true
+        let key = flight(session)
+        if flights[key]?.carry == carrying() {
+            current = nil
+            stopEdges()
+        }
+        guard flights[key]?.flying != true else {
+            flights[key]?.endAfterFlight = true
             return
         }
-        landing = nil
-        ended(performed)
-        performed = false
+        finish(key)
+    }
+
+    private func finish(_ key: ObjectIdentifier) {
+        guard let done = flights.removeValue(forKey: key) else { return }
+        sessionOf = sessionOf.filter { $0.value != key }
+        ended(done.performed, done.carry)
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
         stopEdges()
-        performed = true
+        let key = flight(session)
+        flights[key]?.performed = true
+        for item in session.items { sessionOf[ObjectIdentifier(item)] = key }
         guard let current, let place = places[current] else { return }
-        landing = place.land().map { $0.offsetBy(dx: place.origin.x, dy: place.origin.y) }
+        flights[key]?.place = current
+        flights[key]?.landing = place.land().map { $0.offsetBy(dx: place.origin.x, dy: place.origin.y) }
         self.current = nil
     }
 
     /// The drop's own animation: the carry ends once it is done, never while the copy is still in the air.
     func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {
-        flying = true
-        let target = landing
-        if fadesOnDrop(), let flown { animator.addAnimations { flown.alpha = 0 } }
+        guard let key = sessionOf[ObjectIdentifier(item)], let flight = flights[key] else { return }
+        flights[key]?.flying = true
+        if fadesOnDrop(), let flown = flight.flown { animator.addAnimations { flown.alpha = 0 } }
         animator.addCompletion { [weak self] _ in
             guard let self else { return }
-            self.flying = false
-            self.landed(target)
-            if self.endAfterFlight {
-                self.endAfterFlight = false
-                self.landing = nil
-                self.ended(self.performed)
-                self.performed = false
-            }
+            self.flights[key]?.flying = false
+            self.landed(flight.landing, flight.carry)
+            if self.flights[key]?.endAfterFlight == true { self.finish(key) }
         }
     }
 
     /// The carried card settles into its place: into the gap, or onto the line's time.
     func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-        guard let landing, let view = interaction.view else { return nil }
+        guard let key = sessionOf[ObjectIdentifier(item)], let inWindow = flights[key]?.landing, let window = interaction.view else { return nil }
+        // The copy comes down in the space of the day it was dropped into (its place's `DropSpace`, sliding with the day),
+        // the target given there; the window when the place has none (the title, the plus's slot).
+        let space = flights[key]?.place.flatMap { spaces[$0]?.view }.flatMap { $0.window === window ? $0 : nil }
+        let view = space ?? window
+        let landing = view === window ? inWindow : view.convert(inWindow, from: window)
         let target = UIDragPreviewTarget(container: view, center: CGPoint(x: landing.midX, y: landing.midY))
         let center = CGPoint(x: landing.midX, y: landing.minY)
         if foldsOnDrop() {
@@ -239,19 +277,19 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
         // never comes down at its old size and jumps when its place is drawn.
         let size = defaultPreview.size
         guard size.width > 0, size.height > 0, abs(size.width - landing.width) > 0.5 || abs(size.height - landing.height) > 0.5 else {
-            flown = defaultPreview.view
+            flights[key]?.flown = defaultPreview.view
             return defaultPreview.retargetedPreview(with: target)
         }
         let sized = UIDragPreviewTarget(container: view, center: target.center, transform: CGAffineTransform(scaleX: landing.width / size.width, y: landing.height / size.height))
         guard fadesOnDrop(), let copy = Self.picture(of: defaultPreview.view, size: size) else {
-            flown = defaultPreview.view
+            flights[key]?.flown = defaultPreview.view
             return defaultPreview.retargetedPreview(with: sized)
         }
         // A copy of its own the system flies, so the fade reaches what is drawn; no shadow is left on the header.
         let parameters = UIDragPreviewParameters()
         parameters.backgroundColor = .clear
         parameters.shadowPath = UIBezierPath()
-        flown = copy
+        flights[key]?.flown = copy
         return UITargetedDragPreview(view: copy, parameters: parameters, target: sized)
     }
 }
@@ -267,6 +305,41 @@ extension BoardDrop {
 }
 
 /// Puts the screen's drop interaction on its window.
+/// A place's own space inside the day it shows, one view per day: a drop's copy comes down in it, so when the day slides
+/// away before the copy is down, the copy goes with the day and leaves with its view, never left over the day that comes
+/// in.
+struct DropSpace: UIViewRepresentable {
+    let key: String
+    let drop: BoardDrop
+
+    func makeUIView(context: Context) -> SpaceView {
+        let view = SpaceView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: SpaceView, context: Context) {
+        view.key = key
+        view.drop = drop
+        view.claim()
+    }
+
+    final class SpaceView: UIView {
+        var key = ""
+        weak var drop: BoardDrop?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            claim()
+        }
+
+        func claim() {
+            guard window != nil else { return }
+            drop?.space(key, self)
+        }
+    }
+}
+
 struct DropAnchor: UIViewRepresentable {
     let drop: BoardDrop
 

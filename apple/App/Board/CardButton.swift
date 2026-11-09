@@ -36,14 +36,14 @@ struct CardButton: UIViewRepresentable {
     /// Where the carried copy came down, in the window, when this card's carry ended: it glides from there to its place.
     var arrival: CGRect?
     var onTouch: () -> Void = {}
-    /// The card was lifted to carry, the finger this far below its top.
-    var onCarry: (CGFloat) -> Void = { _ in }
+    /// The card was lifted to carry, the finger this far below its top: the carry's token, which its end names.
+    var onCarry: (CGFloat) -> Int = { _ in 0 }
     /// The carry ended with no drop: on the cancel target, or over no place.
-    var onCancel: () -> Void = {}
+    var onCancel: (Int) -> Void = { _ in }
     /// The drag session ended, whatever came of it.
-    var onEnd: () -> Void = {}
+    var onEnd: (Int) -> Void = { _ in }
     /// The drag session ended with a drop: the board's drop ends the carry, or, if nothing of the board took it, the board.
-    var onDropped: () -> Void = {}
+    var onDropped: (Int) -> Void = { _ in }
     /// A tap on the subtask counter, when the card offers it: its subtasks fold away or show again.
     var onFold: (() -> Void)?
     /// A tap on a link of the title: it opens, in place of the menu.
@@ -117,10 +117,12 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     var id = ""
     var menuMaker: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? = { _ in nil }
     var onTouch: () -> Void = {}
-    var onCarry: (CGFloat) -> Void = { _ in }
-    var onCancel: () -> Void = {}
-    var onEnd: () -> Void = {}
-    var onDropped: () -> Void = {}
+    var onCarry: (CGFloat) -> Int = { _ in 0 }
+    var onCancel: (Int) -> Void = { _ in }
+    var onEnd: (Int) -> Void = { _ in }
+    var onDropped: (Int) -> Void = { _ in }
+    /// The carry this card's drag session is: what its end names.
+    private var token = 0
     var onFold: (() -> Void)? {
         didSet { fold.isHidden = onFold == nil }
     }
@@ -170,6 +172,10 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     }
     var look: Look?
     let content: UIView & UIContentView
+    /// What a carry hides of the card: the content's holder. The content's own alpha is the menu's and the system lift's,
+    /// which set it and give it back on their own schedule; a carry hiding the same property was overwritten by them
+    /// (a card lifted again while its first drop settled stayed invisible).
+    private let shown = UIView()
     /// Where the capsule draws its subtask counter: the fold button lies there.
     var counterFrame: CGRect? {
         didSet { setNeedsLayout() }
@@ -227,12 +233,19 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         super.init(frame: .zero)
         content.isUserInteractionEnabled = false
         content.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(content)
+        shown.isUserInteractionEnabled = false
+        shown.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(shown)
+        shown.addSubview(content)
         NSLayoutConstraint.activate([
-            content.leadingAnchor.constraint(equalTo: leadingAnchor),
-            content.trailingAnchor.constraint(equalTo: trailingAnchor),
-            content.topAnchor.constraint(equalTo: topAnchor),
-            content.bottomAnchor.constraint(equalTo: bottomAnchor),
+            shown.leadingAnchor.constraint(equalTo: leadingAnchor),
+            shown.trailingAnchor.constraint(equalTo: trailingAnchor),
+            shown.topAnchor.constraint(equalTo: topAnchor),
+            shown.bottomAnchor.constraint(equalTo: bottomAnchor),
+            content.leadingAnchor.constraint(equalTo: shown.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: shown.trailingAnchor),
+            content.topAnchor.constraint(equalTo: shown.topAnchor),
+            content.bottomAnchor.constraint(equalTo: shown.bottomAnchor),
         ])
         press.isUserInteractionEnabled = false
         press.backgroundColor = .label.withAlphaComponent(0.12)
@@ -425,7 +438,14 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         // Where the finger holds the card, read while the touch still stands on it: once the lift (or the menu's) has
         // begun, the session reports the point against the lifted preview, which is no longer where the card stands.
         grab = session.location(in: self).y
+        // A new lift, whatever an earlier carry of this card still waits for (its copy settling, its flight home): this
+        // session starts from the card as it stands, shown.
+        left = false
+        home = false
+        flyingHome = false
+        endAfterFlight = false
         lifting = true
+        showsInPlace()
         let item = UIDragItem(itemProvider: Carried.provider(id))
         item.localObject = id
         return [item]
@@ -469,23 +489,29 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
         content.alpha = 1
         origin = window.map { convert(CGPoint(x: bounds.midX, y: bounds.midY), to: $0) }
-        onCarry(grab)
+        token = onCarry(grab)
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, willEndWith operation: UIDropOperation) {
         guard operation == .cancel else { return }
         // The line and the marks go now; the card's place is released once the copy is home.
-        onCancel()
+        onCancel(token)
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, previewForCancelling item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-        guard let window, let origin else { return defaultPreview }
-        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: origin))
+        // Home is the card's own place: in the card's space, so the copy goes with the card if its day slides meanwhile.
+        guard window != nil else { return defaultPreview }
+        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: self, center: CGPoint(x: bounds.midX, y: bounds.midY)))
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, item: UIDragItem, willAnimateCancelWith animator: any UIDragAnimating) {
         flyingHome = true
-        animator.addCompletion { [weak self] _ in self?.cameHome() }
+        let mine = token
+        animator.addCompletion { [weak self] _ in
+            // A later lift of this card took over meanwhile: this flight's end is only its carry's.
+            guard let self, self.token == mine else { return }
+            self.cameHome()
+        }
     }
 
     /// The session's end: the carry ends once anything still flying has landed. A drop keeps the card hidden until the
@@ -497,12 +523,14 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         }
         showsInPlace()
         // A drop's copy is still in the air when the session ends here: the drop's own animation ends the carry.
-        guard operation == .cancel || operation == .forbidden else { return onDropped() }
-        onEnd()
+        guard operation == .cancel || operation == .forbidden else { return onDropped(token) }
+        onEnd(token)
     }
 
+    /// Only what the card draws hides, never the card: a hidden card still takes the finger, so it can be lifted again the
+    /// moment it shows, whatever the system's drop still animates over it (a view at alpha 0 takes no touches).
     private func showsInPlace() {
-        alpha = carried && !home && (left || !lifting) ? 0 : 1
+        shown.alpha = carried && !home && (left || !lifting) ? 0 : 1
     }
 
     /// The cancelled copy is home: the card shows in the same frame the copy goes, then the carry ends.
@@ -510,7 +538,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         flyingHome = false
         home = true
         showsInPlace()
-        onEnd()
+        onEnd(token)
         endAfterFlight = false
     }
 

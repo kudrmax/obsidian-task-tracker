@@ -47,6 +47,83 @@ public struct CarryEnd: Equatable, Sendable {
     }
 }
 
+/// Who ends a carry, whatever order its signals come in: the card's drag session ("dropped", or home after a cancel),
+/// the board's drop session (performed or not, ended), the copy landing and the write drawn. Every method answers whether
+/// the carry ends now, and a carry ends exactly once: after `true` every signal answers `false`. A section is carried by
+/// the board's session alone; a card's cancel is ended by its own copy coming home (`landed`).
+public struct CarryLife: Equatable, Sendable {
+    public enum Kind: Sendable { case card, section, plus }
+
+    public let kind: Kind
+    /// How it ends once let go: the copy's landing and, when it writes, the write drawn.
+    public private(set) var end: CarryEnd?
+    public private(set) var finished = false
+    /// The card said its drop was taken while the board's session for it was still open: the board's end decides.
+    private var droppedWhileBoardOpen = false
+
+    public init(kind: Kind) {
+        self.kind = kind
+    }
+
+    /// Let go: the first one says how it ends (a drop that writes, or none); later ones change nothing. True when this
+    /// call let it go.
+    @discardableResult
+    public mutating func letGo(writes: Bool) -> Bool {
+        guard !finished, end == nil else { return false }
+        end = CarryEnd(writes: writes)
+        return true
+    }
+
+    public var released: Bool { end != nil }
+
+    /// The copy came down (a drop's flight, a cancel's flight home, or a session that ended with nothing flying).
+    public mutating func landed() -> Bool {
+        letGo(writes: false)
+        guard var current = end else { return false }
+        let done = current.land()
+        end = current
+        return ending(done)
+    }
+
+    /// The drop's write is drawn, or failed and draws nothing.
+    public mutating func drawn() -> Bool {
+        guard var current = end else { return false }
+        let done = current.draw()
+        end = current
+        return ending(done)
+    }
+
+    /// The card's drag session ended with a drop. A drop the board took already let it go: its landing ends it. While the
+    /// board still has a session for it (UIKit may hand the board the drop after the card's end), the board's end
+    /// decides. Otherwise another receiver took it (a field, another app): it ends now, nothing written here.
+    public mutating func cardDropped(boardOpen: Bool) -> Bool {
+        guard !finished, end == nil else { return false }
+        if boardOpen {
+            droppedWhileBoardOpen = true
+            return false
+        }
+        return landed()
+    }
+
+    /// The board's drop session for it ended. Performed: its drop let it go, the landing ends it. Not performed: a cancel,
+    /// whose card ends it once its copy is home, unless the card said it was dropped elsewhere or it is a section, which
+    /// has no end of its own.
+    public mutating func boardEnded(performed: Bool) -> Bool {
+        guard !finished else { return false }
+        if !performed, !droppedWhileBoardOpen, kind == .card { return false }
+        return landed()
+    }
+
+    /// Ended at once from outside (a new lift, the plus become a field): true unless it had ended already.
+    public mutating func finish() -> Bool { ending(true) }
+
+    private mutating func ending(_ done: Bool) -> Bool {
+        guard done, !finished else { return false }
+        finished = true
+        return true
+    }
+}
+
 /// `LandingSpan`: a block of the day's timeline after a drop, by its task's id.
 public struct LandingSpan: Decodable, Sendable, Hashable {
     public let id: String

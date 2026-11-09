@@ -41,7 +41,7 @@ const easeOut = (t: number): number => 1 - (1 - t) ** 3;
 
 /**
  * The screen under the finger: it follows the finger either way, one way's track at a time, and once let go it runs
- * on to the next screen or back to where it stood. A new swipe while it runs puts it where it was going at once.
+ * on to the next screen or back to where it stood. A finger that draws it while it runs catches it where it is seen.
  */
 export class ScreenPager implements SwipeTarget {
 	private way: { readonly shift: Shift; readonly track: ScreenTrack } | null = null;
@@ -50,6 +50,8 @@ export class ScreenPager implements SwipeTarget {
 	private settling: Settling | null = null;
 	/** Resolves once the screen stands after the settle under way. */
 	private ending: Promise<void> = Promise.resolve();
+	/** How many times a finger caught the screen as it ran: a turn asked for before the last catch is dropped. */
+	private catches = 0;
 
 	constructor(private readonly deps: ScreenPagerDeps) {}
 
@@ -88,13 +90,36 @@ export class ScreenPager implements SwipeTarget {
 	/** A tap while the screen runs to its place: it runs on from where it is, never put there in one frame; the tap is free to go to what it hit. */
 	stand(): void {}
 
+	/** Counts the catches: a turn asked for when it was lower than now is dropped (`run`). */
+	get caught(): number {
+		return this.catches;
+	}
+
+	/**
+	 * A finger draws the screen while it runs (a swipe let go, or an arrow's turn): it stops where it is seen, on the way
+	 * it was going, and the finger draws it on from there, as a scroll catches its glide; turns waiting for it are dropped.
+	 */
+	catch(): number {
+		const settling = this.settling;
+		if (!settling) return this.dx;
+		this.catches++;
+		this.settling = null;
+		cancelAnimationFrame(settling.frame);
+		window.clearTimeout(settling.timer);
+		settling.resolve();
+		return this.dx;
+	}
+
 	/**
 	 * With no finger, as an arrow turns it: the screen runs the whole way to the next one `shift`'s way along the track
 	 * `make` draws, as one let go at its start would. What was running (a swipe let go) runs on to its place first, never
 	 * put there in one frame (decisions 32 and 51).
 	 */
 	run(shift: Shift, make: () => ScreenTrack): Promise<void> {
-		if (this.settling) return this.ending.then(() => this.run(shift, make));
+		if (this.settling) {
+			const caught = this.catches;
+			return this.ending.then(() => (caught === this.catches ? this.run(shift, make) : undefined));
+		}
 		this.reset();
 		const track = make();
 		this.way = { shift, track };

@@ -118,6 +118,11 @@ export interface TaskKey {
 	/** Indexes among the subtasks, from the task down to this one; empty for a task. */
 	readonly path: readonly number[];
 	readonly raw: string;
+	/**
+	 * Its task's id (`TaskItem.id`), on every key the core gives: an action finds the task by it wherever writes since
+	 * moved it, as long as the task is there. A key without one is found by its place and line.
+	 */
+	readonly id?: string;
 }
 
 /**

@@ -41,7 +41,7 @@ struct ListColumn: View {
 
     private func content(width columnWidth: CGFloat) -> some View {
         let column = list.column
-        let drawn = rows.map { KeyedRow(row: $0, heirs: model.entry.heirs, carried: [model.carry?.id, model.placedByDrop]) }
+        let drawn = rows.map { KeyedRow(row: $0, heirs: model.entry.heirs, carried: [model.carry?.id] + model.placedByDrop.map { Optional($0) }) }
         return VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
             ColumnTitle(title: title, dayArrows: dayArrows, model: model, list: list)
             ScrollViewReader { scroller in
@@ -101,6 +101,8 @@ struct ListColumn: View {
                         Color.clear.frame(height: Self.trailingRoom)
                     }
                     .padding(.horizontal, CardMetrics.columnInset)
+                    // The day's own space: a drop's copy comes down in it and goes with the day if it turns meanwhile.
+                    .background { DropSpace(key: key, drop: model.dropping).id(model.snapshot?.day) }
                     // The rows are exactly as wide as the column: no row, however long its words, widens the list.
                     .frame(width: columnWidth, alignment: .leading)
                     .overlay(alignment: .topLeading) {
@@ -320,19 +322,20 @@ struct DayLane<Shown: View, Next: View>: View {
     let shown: Shown
     @ViewBuilder let next: (BoardSnapshot) -> Next
 
+    /// The day drawn stays the same view while it slides out (one structure in and out of a turn), so what lives in it,
+    /// a drop's copy coming down into it among them, goes with it.
     var body: some View {
-        if slides, let turn = model.dayTurn {
-            let shift = CGFloat(turn.shift)
-            let share = model.dayShare
-            ZStack(alignment: .topLeading) {
-                shown.offset(x: -shift * share * width)
+        let turn = slides ? model.dayTurn : nil
+        let shift = CGFloat(turn?.shift ?? 0)
+        let share = turn == nil ? 0 : model.dayShare
+        ZStack(alignment: .topLeading) {
+            shown.offset(x: -shift * share * width)
+            if let turn {
                 next(turn.peek)
                     .offset(x: shift * (1 - share) * width)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
-        } else {
-            shown
         }
     }
 }
@@ -741,8 +744,9 @@ struct CardRow: View {
     var body: some View {
         let waiting = model.isWaiting(card)
         // Its subtasks go with a carried card, and the other picked tasks with a picked one: they fold away under its
-        // dashed place.
-        let folded = model.isFolded(card)
+        // dashed place; the place itself closes once the card is let go where it writes, its view kept, for the system
+        // still ends its drag from it.
+        let folded = model.isFolded(card) || model.isLeaving(card)
         let selecting = model.selecting
         let picks = self.picks
         HStack(spacing: 10) {
@@ -760,15 +764,15 @@ struct CardRow: View {
                 menu: { later in selecting ? nil : model.cardMenu(card.item, later: later) },
                 ringed: model.found == card.id,
                 draggable: !selecting,
-                carried: folded || model.isHidden(card),
+                carried: model.isFolded(card) || model.isHidden(card),
                 arrival: model.arrival?.id == card.id ? model.arrival?.from : nil,
                 onTouch: { model.found = nil },
                 onCarry: { grab in
-                    if picks { model.startGroupCarry(card, from: column.rawValue) } else { model.startCarry(card, from: column.rawValue, grab: grab) }
+                    picks ? model.startGroupCarry(card, from: column.rawValue) : model.startCarry(card, from: column.rawValue, grab: grab)
                 },
-                onCancel: { model.cancelCarry() },
-                onEnd: { model.carryEnded() },
-                onDropped: { model.carryDropped() },
+                onCancel: { model.cancelCarry($0) },
+                onEnd: { model.carryEnded($0) },
+                onDropped: { model.carryDropped($0) },
                 onFold: card.item.can.fold && !selecting ? { Task { await model.toggleCollapsed(card.item) } } : nil,
                 onLink: selecting ? nil : { model.openLink($0) },
                 onProject: model.projectOpener(card.item),
@@ -936,10 +940,10 @@ enum SoftEdge {
 
 /// A row that comes or goes in a list folds open or shut from its top while the rows below slide to make or close its
 /// room: its visible part shrinks as fast as the gap closes, so the row below never draws over it, and it fades.
-/// The clip is a shape, not a mask's view builder: SwiftUI renders a running transition off the main thread, where a
-/// main-actor closure traps.
+/// SwiftUI renders a running transition off the main thread (`renderAsync`): the body is nonisolated, so neither it nor
+/// the layout's content closure is a main-actor closure, which traps there; the clip is a shape for the same reason.
 struct FoldAway: Transition {
-    func body(content: Content, phase: TransitionPhase) -> some View {
+    nonisolated func body(content: Content, phase: TransitionPhase) -> some View {
         let share: CGFloat = phase.isIdentity ? 1 : 0
         // The row's own height folds, so the rows below move by exactly what shows of it, one row or a whole block; the
         // list's gap after it folds with it (a margin down to minus the gap), never left standing until the row is gone.

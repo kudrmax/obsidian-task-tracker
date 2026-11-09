@@ -35,7 +35,7 @@ struct SectionHeaderControl<Label: View>: UIViewRepresentable {
         control.liftDelay = CardMetrics.press
         control.float = { SectionFloat(name: group.header ?? "", count: group.cards.filter { $0.level == 0 }.count) }
         control.onLift = { model.startSectionCarry(column, group) }
-        control.onEnd = { model.carryEnded() }
+        control.onEnd = { model.carryEnded($0) }
         control.accessibilityLabel = group.header
     }
 }
@@ -44,8 +44,10 @@ final class HeaderControl: UIView, UIDragInteractionDelegate {
     let content: UIView & UIContentView
     var menuRows: () -> [UIMenuElement] = { [] }
     var float: () -> SectionFloat = { SectionFloat(name: "", count: 0) }
-    var onLift: () -> Void = {}
-    var onEnd: () -> Void = {}
+    /// The section lifted: the carry's token, which its end names (none when the lift was refused).
+    var onLift: () -> Int? = { nil }
+    var onEnd: (Int) -> Void = { _ in }
+    private var token: Int?
     var liftable = false {
         didSet { drag.isEnabled = liftable }
     }
@@ -123,11 +125,11 @@ final class HeaderControl: UIView, UIDragInteractionDelegate {
     func dragInteraction(_ interaction: UIDragInteraction, sessionAllowsMoveOperation session: UIDragSession) -> Bool { true }
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
-        onLift()
+        token = onLift()
     }
 
     /// The carry ends with the session, whatever came of it: a drop is written first, anything else lets the section go.
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) {
-        onEnd()
+        if let token { onEnd(token) }
     }
 }

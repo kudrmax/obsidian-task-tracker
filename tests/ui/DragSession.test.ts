@@ -127,6 +127,77 @@ describe("DragSession", () => {
 		expect(float.log).toEqual(["move 50,10", "sink 30,120", "remove"]);
 	});
 
+	it("frees the screen as the finger lets go, before the drop is written or the copy flies", async () => {
+		const order: string[] = [];
+		const float = new FakeFloat();
+		float.land = async () => void order.push("land");
+		const s = new DragSession({
+			payload,
+			targets: [new FakeTarget("a", 0, 100, { kind: "clearSlot" })],
+			float,
+			origin: () => rect(5, 500),
+			letGo: () => order.push("free"),
+			onEnd: async () => {
+				order.push("written");
+				return drawnCard(0);
+			},
+		});
+		s.move(50, 10);
+		await s.release(50, 10);
+		expect(order).toEqual(["free", "written", "land"]);
+	});
+
+	it("frees the screen at once when cancelled, while the copy still flies back", async () => {
+		const order: string[] = [];
+		const float = new FakeFloat();
+		float.flyTo = async () => void order.push("fly");
+		const s = new DragSession({ payload, targets: [], float, origin: () => rect(5, 500), letGo: () => order.push("free"), onEnd: async () => {} });
+		await s.cancel();
+		expect(order).toEqual(["free", "fly"]);
+	});
+
+	it("a new drag taken while a copy still lands gives the old one's place back now; only the copy of the task taken again goes", async () => {
+		const order: string[] = [];
+		let landing!: () => void;
+		const flying = (name: string) => {
+			const float = new FakeFloat();
+			float.land = () => new Promise<void>((done) => (landing = done));
+			float.remove = () => void order.push(`remove ${name}`);
+			return float;
+		};
+		const target = new FakeTarget("a", 0, 100, { kind: "clearSlot" });
+		target.clear = () => void order.push("clear");
+		const make = (name: string, carries: string) =>
+			new DragSession({ payload, targets: [target], float: flying(name), carries, origin: () => rect(5, 500), onReturn: () => order.push(`return ${name}`), onEnd: async () => drawnCard(0) });
+		const first = make("first", "t1");
+		first.move(50, 10);
+		const released = first.release(50, 10);
+		await Promise.resolve();
+		await Promise.resolve();
+		DragSession.landNow("t2");
+		expect(order).toEqual(["return first", "clear"]);
+		expect(first.interrupted).toBe(true);
+		DragSession.landNow("t1");
+		expect(order).toEqual(["return first", "clear"]);
+		landing();
+		await released;
+		expect(order).toEqual(["return first", "clear", "remove first"]);
+	});
+
+	it("the copy of the task taken again before it lands goes at once", async () => {
+		const order: string[] = [];
+		const float = new FakeFloat();
+		float.land = () => new Promise<void>(() => undefined);
+		float.remove = () => void order.push("remove");
+		const s = new DragSession({ payload, targets: [new FakeTarget("a", 0, 100, { kind: "clearSlot" })], float, carries: "t1", origin: () => rect(5, 500), onReturn: () => order.push("return"), onEnd: async () => drawnCard(0) });
+		s.move(50, 10);
+		void s.release(50, 10);
+		await Promise.resolve();
+		await Promise.resolve();
+		DragSession.landNow("t1");
+		expect(order).toEqual(["return", "remove"]);
+	});
+
 	it("lands only once the drop is written and drawn", async () => {
 		const order: string[] = [];
 		const float = new FakeFloat();

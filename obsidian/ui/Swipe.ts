@@ -14,6 +14,11 @@ export interface SwipeTarget {
 	settle(shift: Shift | null): Promise<void>;
 	/** A finger came down while it ran to its place: the finger is free of it from now on. */
 	stand(): void;
+	/**
+	 * A finger or a stroke draws the screen while it still runs to its place: it stops where it is seen, and the offset it
+	 * stands at (0 when it stood) is where the finger draws it on from.
+	 */
+	catch(): number;
 }
 
 export interface SwipeOptions {
@@ -119,7 +124,7 @@ export class Swipe {
 		if (!stream.following) {
 			if (!this.hold()) return;
 			stream.following = true;
-			stream.dx = 0;
+			stream.dx = this.opts.target.catch();
 			stream.recent = [];
 			stream.shrinking = 0;
 		}
@@ -187,7 +192,7 @@ export class Swipe {
 			return;
 		}
 		press.swiping = true;
-		press.from = e.clientX;
+		press.from = e.clientX - this.opts.target.catch();
 		capturePointer(this.el, press.pointerId);
 	}
 

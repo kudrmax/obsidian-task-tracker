@@ -108,10 +108,11 @@ final class BoardModel {
     init(project: ProjectRef? = nil) {
         self.project = project
         place = RibbonPlace.remembered(for: project)
-        dropping.ended = { [weak self] in self?.dropSessionEnded(performed: $0) }
+        dropping.ended = { [weak self] in self?.dropSessionEnded(performed: $0, token: $1) }
+        dropping.carrying = { [weak self] in self?.carry?.token }
         dropping.foldsOnDrop = { [weak self] in self?.carry?.section != nil }
         dropping.fadesOnDrop = { [weak self] in self?.landsInFold == true }
-        dropping.landed = { [weak self] in self?.carryLanded(at: $0) }
+        dropping.landed = { [weak self] in self?.carryLanded(at: $0, token: $1) }
         entry.model = self
     }
 
@@ -210,8 +211,9 @@ final class BoardModel {
     /// A drop's write is made: the next read drawn ends its carry.
     /// The reads started so far, counted as each begins.
     @ObservationIgnored private var readsStarted = 0
-    /// A drop's write is made: the first read started after it ends its carry (one started before shows the file without it).
-    @ObservationIgnored private var dropReadFrom: Int?
+    /// A drop's write is made: the first read started after it (`from`) draws it, and ends its carry, the carry `token`
+    /// lifting card `id` (one started before shows the file without it).
+    @ObservationIgnored private var dropReads: [Int: (from: Int, id: String)] = [:]
     /// The day before and after the shown one, read ahead so the arrows show them in the same frame.
     @ObservationIgnored private var ahead: [String: BoardSnapshot] = [:]
     @ObservationIgnored private var neighbours: (previous: String, next: String)?
@@ -224,6 +226,8 @@ final class BoardModel {
     struct DayTurn {
         let peek: BoardSnapshot
         let shift: Int
+        /// A finger took the turn where it showed: the finger, not the turn that started it, lets it go.
+        var caught = false
     }
     @ObservationIgnored private var watch: FileWatch?
     @ObservationIgnored private var settingsWatch: FileWatch?
@@ -275,20 +279,22 @@ final class BoardModel {
         if let before = snapshot { follow(read.dayChange(since: before), from: before) }
         defer { if reopen, read.day == read.today, !readAgain { reopen = false; dayMoved += 1 } }
         forgetGone(read)
-        let landsDrop = dropReadFrom.map { serial >= $0 } ?? false
-        if landsDrop { dropReadFrom = nil }
+        // Every drop whose write this read shows, by its carry: a second drop let go before the first one's read was drawn
+        // lands in the same drawing, each card in its place at once.
+        let lands = dropReads.filter { serial >= $0.value.from }
+        for token in lands.keys { dropReads[token] = nil }
         draw(motion: read.motion(from: snapshot)) {
             snapshot = read
             entry.screenChanged()
-            if landsDrop { carryWritten() }
+            for (token, drop) in lands { carryWritten(token, id: drop.id) }
         }
-        if landsDrop { carryDrawn() }
+        for token in lands.keys.sorted() { carryDrawn(token) }
     }
 
     /// One transaction for one drawing: still, or the cards moved (each by its id slides, folds away or unfolds with the
     /// system's spring). Another day is drawn still: it came in through the day's own slide (`turn(to:)`).
     func draw(motion: BoardMotion, _ change: () -> Void) {
-        if placedByDrop != nil { placedByDrop = nil }
+        if !placedByDrop.isEmpty { placedByDrop = [] }
         switch motion {
         case .still, .turn:
             var still = Transaction()
@@ -428,7 +434,24 @@ final class BoardModel {
     /// a swipe never pages the ribbon where the core leads to a day; the day comes in under the finger as the arrows bring
     /// it, the one read ahead, or read now when it is not yet.
     func beginDaySwipe(_ shift: Int) -> Bool {
-        guard dayTurn == nil, turnsAhead == 0, carry == nil, let snapshot else { return false }
+        // A carry still ending (its copy settling) ends now; a carry the finger holds takes no swipe.
+        if let token = carry?.token {
+            guard released else { return false }
+            endNow(token)
+        }
+        // A day still sliding (an arrow's turn, a swipe let go) is taken by the finger where it shows now, as a scroll
+        // view's deceleration is: the turns asked after it give way to the finger.
+        if let turn = dayTurn {
+            daySlide.stop()
+            turnEpoch += 1
+            dayTurn?.caught = true
+            swipeSign = shift == turn.shift ? 1 : -1
+            swipeBase = dayShare
+            return true
+        }
+        guard turnsAhead == 0, let snapshot else { return false }
+        swipeSign = 1
+        swipeBase = 0
         let from: JSONValue = ["mode": "calendar", "date": .string(snapshot.day)]
         guard let at = try? board.read("days.stepScreen", [from, .number(Double(shift))], over: board.settingsOnly()).decode(ScreenAt.self),
               at.mode == "calendar" else { return false }
@@ -447,11 +470,17 @@ final class BoardModel {
     /// The finger has carried the day this share of the way.
     func followDaySwipe(_ share: CGFloat) {
         guard dayTurn != nil else { return }
-        dayShare = min(1, max(0, share))
+        dayShare = min(1, max(0, swipeBase + swipeSign * share))
     }
 
-    /// Let go: the day runs on to the next one or back to where it stood, as the plugin's pager settles.
-    func endDaySwipe(arrive: Bool) async {
+    /// The finger's swipe against the turn it carries: 1 the same way, -1 back; and the share it took the turn at.
+    @ObservationIgnored private var swipeSign: CGFloat = 1
+    @ObservationIgnored private var swipeBase: CGFloat = 0
+
+    /// Let go: the day runs on to the next one or back to where it stood, as the plugin's pager settles: a flick goes
+    /// the way it was flicked (`onward`: the swipe's own way), else the day goes where more than half of it stands.
+    func endDaySwipe(flicked: Bool, onward: Bool) async {
+        let arrive = flicked ? onward == (swipeSign > 0) : dayShare * 2 >= 1
         await afterTurns { [self] in await settleDaySwipe(arrive: arrive) }
     }
 
@@ -465,6 +494,8 @@ final class BoardModel {
             landTurn()
             Task { await reload() }
         } else {
+            // Back where it stood: the day shown is the one asked again (a caught turn had asked for the other).
+            if let shown = snapshot { shownDay = shown.day == shown.today ? nil : shown.day }
             dayTurn = nil
             dayShare = 0
         }
@@ -497,6 +528,8 @@ final class BoardModel {
 
     /// The turns asked for and not yet landed, the one under way among them.
     @ObservationIgnored private var turnsAhead = 0
+    /// Counts the fingers that took a sliding day: a turn asked before one is not made.
+    @ObservationIgnored private var turnEpoch = 0
     /// The last turn asked for: the next one starts when it has landed and the screen has drawn its day.
     @ObservationIgnored private var lastTurn: Task<Void, Never>?
 
@@ -504,10 +537,12 @@ final class BoardModel {
     /// never set down in one frame, and this one starts once that day is drawn, not once it is read again.
     private func afterTurns(_ work: @escaping @MainActor () async -> Void) async {
         let before = lastTurn
+        let epoch = turnEpoch
         turnsAhead += 1
         let mine = Task { @MainActor in
             await before?.value
-            await work()
+            // A finger took the day meanwhile: what was asked before it gives way.
+            if epoch == turnEpoch { await work() }
             turnsAhead -= 1
         }
         lastTurn = mine
@@ -531,6 +566,8 @@ final class BoardModel {
         dayTurn = DayTurn(peek: peek, shift: motion)
         dayShare = 0
         let arrived = await daySlide.run(from: 0, to: 1) { [weak self] share in self?.dayShare = share }
+        // Taken by a finger: the finger's swipe lands it or brings it back.
+        if dayTurn?.caught == true { return }
         if arrived { landTurn() }
         // The next turn starts from the day this one brought in, drawn now; the screen is read anew underneath, and a
         // read of a day no longer asked for is never drawn.
@@ -934,6 +971,8 @@ final class BoardModel {
     /// What is carried: a card (its id, its task, the column it is drawn in, where the finger holds it from its top), or
     /// the plus, a task not written yet.
     struct Carry {
+        /// This carry among all: what ends a carry names it, so an earlier one's end never ends a later one.
+        let token: Int
         let id: String
         let item: TaskItem?
         let from: String
@@ -951,6 +990,11 @@ final class BoardModel {
         }
         /// The drop is written and the screen shows it: the card stands in its new place, hidden until its copy lands.
         var written = false
+        /// Who ends it, whatever order its signals come in.
+        var life = CarryLife(kind: .card)
+        /// Let go where it writes: its dashed place closes as the room opens, so the list stands as it will after the write
+        /// and the copy flies where the card will stand.
+        var leaves = false
     }
 
     /// A section carried by its header, as the plugin's (`GroupDrag`): its list, its index among the list's groups, and
@@ -977,9 +1021,9 @@ final class BoardModel {
     /// Told the moment a carry starts (a card, a section or the plus lifted): a gesture still waiting on the touch the
     /// drag took gives way, so the ribbon's own pan, which waits for the day swipe to fail, stops waiting.
     @ObservationIgnored var carryBegins: (() -> Void)?
-    /// The card the drawing of a drop's write put in its new place: it goes there at once, hidden or not, never sliding
-    /// over the list (its copy flies there). Until the next drawing.
-    private(set) var placedByDrop: String?
+    /// The cards the drawing of drops' writes put in their new places: each goes there at once, hidden or not, never
+    /// sliding over the list (its copy flies there). Until the next drawing.
+    private(set) var placedByDrop: Set<String> = []
     var carrying: Bool { carry != nil }
     /// The finger let the carry go: what it carries is still on its way to its place.
     private(set) var released = false
@@ -989,7 +1033,6 @@ final class BoardModel {
     /// The screen's drop interaction, which every list and the calendar register with.
     @ObservationIgnored let dropping = BoardDrop()
     /// How the carry ends, once it was let go: the one owner of its end (`CarryEnd`), nil while the finger holds it.
-    @ObservationIgnored private var ending: CarryEnd?
     /// Where the carried copy came down, in the window: the card glides from there if the screen drew it elsewhere.
     @ObservationIgnored private var touchdown: CGRect?
     /// The card a carry just ended on, and where its copy came down: the card glides from there to where it stands.
@@ -1001,65 +1044,82 @@ final class BoardModel {
     }
 
     /// A card lifted: it waits as a dashed place where it stood and its subtasks fold away under it, as the plugin's.
-    func startCarry(_ card: BoardCard, from column: String, grab: CGFloat) {
-        carryBegins?()
+    @discardableResult
+    func startCarry(_ card: BoardCard, from column: String, grab: CGFloat) -> Int {
+        let token = nextCarry()
         found = nil
         arrival = nil
-        ending = nil
         released = false
         touchdown = nil
-        withAnimation(.snappy(duration: 0.25)) { carry = Carry(id: card.id, item: card.item, from: column, grab: grab) }
+        withAnimation(.snappy(duration: 0.25)) { carry = Carry(token: token, id: card.id, item: card.item, from: column, grab: grab) }
+        return token
     }
+
+    /// A new carry begins: the finger is free the moment a copy has gone, whatever the system still animates. A carry
+    /// still ending (its copy settling, its write being drawn) ends now, its one outcome; what still comes for it later
+    /// names it and changes nothing.
+    private func nextCarry() -> Int {
+        carryBegins?()
+        if let token = carry?.token { endNow(token) }
+        carryTokens += 1
+        return carryTokens
+    }
+
+    @ObservationIgnored private var carryTokens = 0
+
 
     /// Select Tasks: a picked card lifted carries every picked task as a stack, as the plugin's. The core says which go
     /// along with it (`tasks.carried`: the rest of the picked, but a subtask whose task is picked goes with that task).
-    func startGroupCarry(_ card: BoardCard, from column: String) {
-        guard let snapshot else { return }
-        carryBegins?()
+    @discardableResult
+    func startGroupCarry(_ card: BoardCard, from column: String) -> Int {
+        guard let snapshot else { return 0 }
+        let token = nextCarry()
         found = nil
         arrival = nil
-        ending = nil
         released = false
         touchdown = nil
         let picked = pickedItems
         let froms = Dictionary(picked.map { ($0.id, snapshot.column(of: $0.id) ?? column) }, uniquingKeysWith: { first, _ in first })
         let all = picked.map { (item: $0, from: froms[$0.id] ?? column) }
-        withAnimation(.snappy(duration: 0.25)) { carry = Carry(id: card.id, item: card.item, from: column, grab: CardMetrics.height / 2, group: all) }
+        withAnimation(.snappy(duration: 0.25)) { carry = Carry(token: token, id: card.id, item: card.item, from: column, grab: CardMetrics.height / 2, group: all) }
         let board = board
         let arguments: [JSONValue] = [card.item.key.json, keys(picked)]
         Task {
             guard let kept: [TaskKey] = try? await Task.detached(operation: {
                 try board.read("tasks.carried", arguments, over: try board.files(), as: [TaskKey].self)
             }).value,
-                  carry?.id == card.id else { return }
+                  carry?.token == token else { return }
             // The core names the ones that go along with the lifted one, which leads, by their keys as read.
             let going = kept.compactMap { key in all.first { $0.item.key == key } }
             carry?.group = [(item: card.item, from: column)] + going
         }
+        return token
     }
 
     /// A section's header carried: its header and tasks fold away and the list closes over them, as the plugin's.
-    func startSectionCarry(_ column: BoardColumn, _ group: BoardGroup) {
-        carryBegins?()
+    @discardableResult
+    func startSectionCarry(_ column: BoardColumn, _ group: BoardGroup) -> Int? {
         guard let list = snapshot?.lists[column], let name = list.sectionsOf, let lifted = list.groups.firstIndex(where: { $0.id == group.id }),
-              let shape = geometry[column] else { return }
+              let shape = geometry[column] else { return nil }
         let heads = list.groups.map { shape.heads[$0.id]?.minY }
-        guard !heads.contains(where: { $0 == nil }) else { return }
+        guard !heads.contains(where: { $0 == nil }) else { return nil }
         let tops = heads.compactMap { $0 }
         let bottoms = shape.cards.values.map(\.maxY) + shape.heads.values.map(\.maxY)
         let end = (bottoms.max() ?? 0) + (list.groups.last?.empty == true ? CardMetrics.height + CardMetrics.gap : 0)
         let all = tops + [end]
         let height = all[lifted + 1] - all[lifted]
         let places = all.enumerated().map { $0.offset > lifted ? $0.element - height : $0.element }
+        let token = nextCarry()
         found = nil
-        ending = nil
         released = false
         touchdown = nil
         let section = SectionCarry(column: column, list: name, names: list.groups.map(\.name), lifted: lifted, places: places)
         withAnimation(.snappy(duration: 0.25)) {
-            carry = Carry(id: "\u{0}section/\(group.id)", item: nil, from: column.rawValue, grab: 0, section: section)
+            carry = Carry(token: token, id: "\u{0}section/\(group.id)", item: nil, from: column.rawValue, grab: 0, section: section)
+            carry?.life = CarryLife(kind: .section)
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        return token
     }
 
     /// Where a carried section would go: the slot whose place is nearest the finger, the mark there; none at its own place.
@@ -1092,6 +1152,7 @@ final class BoardModel {
         }
         letGo(writes: true)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        guard let token = carry?.token, let id = carry?.id else { return nil }
         Task {
             let board = board
             let arguments: [JSONValue] = [.string(section.list), section.names[section.lifted].json, place]
@@ -1100,9 +1161,11 @@ final class BoardModel {
             } catch {
                 problem = Self.words(error)
             }
-            dropReadFrom = readsStarted + 1
+            dropReads[token] = (readsStarted + 1, id)
             await reload()
-            carryDrawn()
+            // A read that failed drew nothing: the mark goes with it, and the carry waits no longer.
+            dropReads[token] = nil
+            carryDrawn(token)
         }
         return geometry[column]?.mark
     }
@@ -1114,7 +1177,7 @@ final class BoardModel {
     }
 
     /// The card a carry lifted from a list, waiting there as a dashed place until the screen shows it where it was dropped.
-    func isWaiting(_ card: BoardCard) -> Bool { card.id == carry?.id && carry?.written == false }
+    func isWaiting(_ card: BoardCard) -> Bool { card.id == carry?.id && carry?.written == false && carry?.leaves == false }
 
     /// The carried card itself, wherever the screen draws it: hidden until its copy has landed.
     func isHidden(_ card: BoardCard) -> Bool { card.id == carry?.id }
@@ -1126,25 +1189,54 @@ final class BoardModel {
         return isCarried(card)
     }
 
-    func startCarryingPlus() {
-        carryBegins?()
-        ending = nil
+    @discardableResult
+    func startCarryingPlus() -> Int {
+        let token = nextCarry()
         released = false
         touchdown = nil
-        carry = Carry(id: Carried.plus, item: nil, from: "new", grab: 0)
+        carry = Carry(token: token, id: Carried.plus, item: nil, from: "new", grab: 0)
+        carry?.life = CarryLife(kind: .plus)
+        return token
     }
+
+    /// The carry `token` is the one under way.
+    private func isCurrent(_ token: Int) -> Bool { carry?.token == token }
 
     /// The carry let go: it ends once its copy lands and, when it writes, once the screen shows the write.
     private func letGo(writes: Bool) {
-        guard carry != nil, ending == nil else { return }
-        ending = CarryEnd(writes: writes)
+        guard carry?.life.letGo(writes: writes) == true else { return }
         released = true
+        if writes { withAnimation(.snappy(duration: 0.25)) { carry?.leaves = true } }
+    }
+
+    /// A signal of carry `token`, given to its life (`CarryLife`), which says whether it ends now: it ends then, once.
+    private func signal(_ token: Int, ending: (() -> Void)? = nil, _ body: (inout CarryLife) -> Bool) {
+        guard isCurrent(token), var life = carry?.life else { return }
+        let ends = body(&life)
+        carry?.life = life
+        if life.released, !released { released = true }
+        if ends { (ending ?? finishCarry)() }
+    }
+
+    /// The carry `token` ends now from outside (a new lift, a swipe), through its life as every end does: once.
+    private func endNow(_ token: Int) {
+        signal(token) { $0.finish() }
+    }
+
+    /// The carried card let go where it writes, until the write is drawn: its dashed place has closed.
+    func isLeaving(_ card: BoardCard) -> Bool { card.id == carry?.id && carry?.leaves == true && carry?.written == false }
+
+    /// Where a room in `column` stands once the carried card's dashed place above it has closed, as it does the moment the
+    /// card is let go: the geometry was read with that place open.
+    private func afterLeaving(_ rect: CGRect, in column: BoardColumn) -> CGRect {
+        guard let carry, carry.from == column.rawValue, let home = geometry[column]?.cards[carry.id], home.minY < rect.minY else { return rect }
+        return rect.offsetBy(dx: 0, dy: -(home.height + CardMetrics.gap))
     }
 
     /// The carry let go with no drop (on the cancel target, or over no place): the line and the marks go now, the place
     /// is released once the copy is home.
-    func cancelCarry() {
-        guard carry != nil else { return }
+    func cancelCarry(_ token: Int) {
+        guard isCurrent(token) else { return }
         letGo(writes: false)
         withAnimation(.snappy(duration: 0.25)) {
             gap = nil
@@ -1154,24 +1246,23 @@ final class BoardModel {
     }
 
     /// The carried copy came down, at `rect` in the window when the drop's preview flew there.
-    func carryLanded(at rect: CGRect? = nil) {
-        guard carry != nil else { return }
+    func carryLanded(at rect: CGRect? = nil, token: Int?) {
+        guard let token, isCurrent(token) else { return }
         if let rect { touchdown = rect }
-        letGo(writes: false)
-        guard var end = ending else { return }
-        if end.land() { finishCarry() } else { ending = end }
+        signal(token) { $0.landed() }
     }
 
     /// The drop's write is drawn, or failed and draws nothing.
-    private func carryDrawn() {
-        guard var end = ending else { return }
-        if end.draw() { finishCarry() } else { ending = end }
+    private func carryDrawn(_ token: Int) {
+        signal(token) { $0.drawn() }
     }
 
     /// The first drawing of the drop's write: the card takes its new place (still hidden), the room it flew into and the
     /// marks go, in the drawing's own transaction.
-    private func carryWritten() {
-        placedByDrop = carry?.id
+    private func carryWritten(_ token: Int, id: String) {
+        placedByDrop.insert(id)
+        // A carry that ended before its write was drawn: its card only takes its new place, at once.
+        guard isCurrent(token) else { return }
         carry?.written = true
         gap = nil
         settling = nil
@@ -1182,7 +1273,6 @@ final class BoardModel {
     /// The copy is in its place and the screen shows the drop: the card shows where it stands, gliding there from where
     /// the copy came down if that is elsewhere, and its subtasks unfold.
     private func finishCarry() {
-        ending = nil
         if let carry, let touchdown { arrival = Arrival(id: carry.id, from: touchdown) }
         touchdown = nil
         withAnimation(.snappy) { endCarry() }
@@ -1203,24 +1293,23 @@ final class BoardModel {
 
     /// The drag session ended, whatever came of it: anything still flying has landed. A drop still being written ends
     /// its carry once the screen shows the write.
-    func carryEnded() {
-        carryLanded()
+    func carryEnded(_ token: Int) {
+        carryLanded(token: token)
     }
 
     /// A card's drag session ended with a drop. The board's own drop let the carry go when it took the drop, and its
     /// animation ends it; a drop nothing of the board took (another app's view, a field) ends it here, as a carry
     /// let go on no place: every carry ends exactly once.
-    func carryDropped() {
-        guard carry != nil, ending == nil else { return }
-        letGo(writes: false)
-        carryLanded()
+    func carryDropped(_ token: Int) {
+        let open = dropping.knows(carry: token)
+        signal(token) { $0.cardDropped(boardOpen: open) }
     }
 
     /// The screen's drop session ended. Not dropped, a card's copy is still flying home: its card ends the carry once it
     /// is there. A section's lift has no end of its own, so its carry ends here.
-    private func dropSessionEnded(performed: Bool) {
-        if !performed, carry?.section == nil { return }
-        carryEnded()
+    private func dropSessionEnded(performed: Bool, token: Int?) {
+        guard let token else { return }
+        signal(token) { $0.boardEnded(performed: performed) }
     }
 
     private func endCarry() {
@@ -1363,7 +1452,7 @@ final class BoardModel {
         }
         Task { await drop(carry, to: to) }
         // The room is the list's, in its content's space; the drop came down on the title, whose space it is given in.
-        guard let rect = room.flatMap({ gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: .null, line: nil)) }) ?? foldedHead(column, landed),
+        guard let rect = room.flatMap({ gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: .null, line: nil)) }).map({ afterLeaving($0, in: column) }) ?? foldedHead(column, landed),
               let list = dropping.origin(of: "list.\(column.rawValue)"), let title = dropping.origin(of: "title.\(column.rawValue)") else { return nil }
         return rect.offsetBy(dx: list.x - title.x, dy: list.y - title.y)
     }
@@ -1464,7 +1553,7 @@ final class BoardModel {
             await drop(carry, to: to)
             DropTiming.report(since: dropAt)
         }
-        return room.flatMap { gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: place, line: nil)) } ?? foldedHead(column, landed)
+        return room.flatMap { gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: place, line: nil)) }.map { afterLeaving($0, in: column) } ?? foldedHead(column, landed)
     }
 
     /// A card landing in a folded project part (`tasks.landing`'s `part.folded`) flies to that part's header, found by its
@@ -1495,11 +1584,14 @@ final class BoardModel {
 
     /// The plus let go on a place: its carry ends at once, the field opening where it came down.
     private func endPlus() {
-        ending = nil
-        touchdown = nil
-        var still = Transaction()
-        still.disablesAnimations = true
-        withTransaction(still) { endCarry() }
+        guard let token = carry?.token else { return }
+        // Its own end, through its life: no glide, the field takes its place at once.
+        signal(token, ending: { [self] in
+            touchdown = nil
+            var still = Transaction()
+            still.disablesAnimations = true
+            withTransaction(still) { endCarry() }
+        }) { $0.finish() }
     }
 
     /// The drop line of a gap: through the middle of the room above the card it parts from, or above the dashed place
@@ -1576,7 +1668,6 @@ final class BoardModel {
         } catch {
             problem = Self.words(error)
         }
-        dropReadFrom = nil
         await reload()
         stretched = nil
     }
@@ -1693,6 +1784,7 @@ final class BoardModel {
     /// The carried tasks written where they were let go; a carry of picked tasks ends Select Tasks, as any action does.
     private func drop(_ carry: Carry, to: JSONValue) async {
         guard let day = snapshot?.day else { return }
+        let token = carry.token, id = carry.id
         let board = board
         let arguments: [JSONValue] = [carry.dropped, to, .string(day)]
         if !carry.group.isEmpty { endSelection() }
@@ -1701,10 +1793,12 @@ final class BoardModel {
         } catch {
             problem = Self.words(error)
         }
-        dropReadFrom = readsStarted + 1
+        dropReads[token] = (readsStarted + 1, id)
         await reload()
-        // Drawn by the read, or nothing to draw when the write or the read failed: the carry waits no longer.
-        carryDrawn()
+        // Drawn by the read, or nothing to draw when the write or the read failed: the mark goes and the carry waits no
+        // longer.
+        dropReads[token] = nil
+        carryDrawn(token)
     }
 
     /// Where a card carried alone was lifted from in its own list: let go there at its level, nothing is written.

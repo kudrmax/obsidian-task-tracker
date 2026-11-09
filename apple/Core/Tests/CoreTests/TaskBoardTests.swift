@@ -115,9 +115,12 @@ import Testing
         let vault = FakeVault(Self.file)
         let board = board(vault)
         let screen: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files())
-        vault.changeBeforeWrite = Self.file + "- [ ] Typed in Obsidian\n"
+        // Lines typed above the task in between: the write over the old text is refused by the vault and made again over
+        // the new one, the key finding its task where it now stands.
+        vault.changeBeforeWrite = Self.file.replacingOccurrences(of: "## Inbox\n\n", with: "## Inbox\n\n- [ ] Typed in Obsidian\n")
         try board.write("tasks.setStatus", [screen.inbox[0].key.json, "done"])
-        #expect(vault.text.contains("Typed in Obsidian"))
+        #expect(vault.changeBeforeWrite == nil)
+        #expect(vault.text.contains("- [ ] Typed in Obsidian"))
         #expect(!vault.text.contains("- [ ] Idea"))
     }
 
@@ -125,10 +128,27 @@ import Testing
         let vault = FakeVault(Self.file)
         let board = board(vault)
         let screen: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files())
-        vault.text = Self.file.replacingOccurrences(of: "- [ ] Idea", with: "- [ ] Other")
+        // The task removed elsewhere: no line holds its id any more (a line edited in place stays the same task).
+        vault.text = Self.file.replacingOccurrences(of: "- [ ] Idea\n", with: "")
+        #expect(!vault.text.contains("Idea"))
         #expect(throws: BoardError.refused(code: "staleTask", message: "stale task")) {
             try board.write("tasks.setStatus", [screen.inbox[0].key.json, "done"])
         }
+    }
+
+    @Test func aTaskEditedElsewhereInPlaceIsStaleAndKeepsItsId() throws {
+        let vault = FakeVault(Self.file)
+        let board = board(vault)
+        let screen: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files())
+        let before = screen.inbox[0]
+        // The line edited in Obsidian: the key read before it no longer names what the line says (decision 62).
+        vault.text = Self.file.replacingOccurrences(of: "- [ ] Idea", with: "- [ ] Idea, edited")
+        #expect(throws: BoardError.refused(code: "staleTask", message: "stale task")) {
+            try board.write("tasks.setStatus", [before.key.json, "done"])
+        }
+        #expect(vault.text.contains("- [ ] Idea, edited"))
+        let after: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files())
+        #expect(after.inbox[0].id == before.id)
     }
 
     @Test func paintsAreTheCoresInEitherTheme() throws {

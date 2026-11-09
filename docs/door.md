@@ -91,7 +91,12 @@ Every method of `TaskService` but `onChange`, by its name and with its arguments
 priority, place, repeat?, labels?)`, … (87 methods; `methods()` lists them). The answers are those of the plugin's
 TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` checks method by method.
 
-- Reads take a `TaskItem`, a `TaskKey` and the like as the door gave them; a key names a task as read.
+- Reads take a `TaskItem`, a `TaskKey` and the like as the door gave them; a key names a task as read. Every key the door
+  gives carries `id`, its task's `TaskItem.id`: while the host hands `ids` back, a call finds the task by it wherever
+  writes since moved it (a Done just before, a task added above), when the task's line is still the key's or one the
+  door's own writes or undo rewrote it into (`ids.held`). A line changed elsewhere keeps its id (the card changes in
+  place) but makes a key read before `staleTask`: draw again and use the fresh key. A removed task's key is `staleTask`
+  too. A key without `id`, one handed in without `ids`, or one another reading gave, is found by its place and line.
 - What counts as the same task is the core's: `TaskItem.id` (below, «Ids»), the same through every write while the host
   hands `ids` back, so a task whose line a write changed is found again by it. A host compares ids, never a key's
   fields. Keys a call answers alone (`tasks.carried`) are the keys of the items handed in, as read: a host finds each
