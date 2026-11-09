@@ -41,7 +41,7 @@ struct ListColumn: View {
 
     private func content(width columnWidth: CGFloat) -> some View {
         let column = list.column
-        let drawn = rows.map { KeyedRow(row: $0, heirs: model.entry.heirs, carried: [model.carry?.id, model.placedByDrop]) }
+        let drawn = rows.map { KeyedRow(row: $0, heirs: model.entry.heirs, carried: [model.carry?.id] + model.placedByDrop.map { Optional($0) }) }
         return VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
             ColumnTitle(title: title, dayArrows: dayArrows, model: model, list: list)
             ScrollViewReader { scroller in

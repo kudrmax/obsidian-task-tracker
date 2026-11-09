@@ -172,6 +172,10 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     }
     var look: Look?
     let content: UIView & UIContentView
+    /// What a carry hides of the card: the content's holder. The content's own alpha is the menu's and the system lift's,
+    /// which set it and give it back on their own schedule; a carry hiding the same property was overwritten by them
+    /// (a card lifted again while its first drop settled stayed invisible).
+    private let shown = UIView()
     /// Where the capsule draws its subtask counter: the fold button lies there.
     var counterFrame: CGRect? {
         didSet { setNeedsLayout() }
@@ -229,12 +233,19 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         super.init(frame: .zero)
         content.isUserInteractionEnabled = false
         content.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(content)
+        shown.isUserInteractionEnabled = false
+        shown.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(shown)
+        shown.addSubview(content)
         NSLayoutConstraint.activate([
-            content.leadingAnchor.constraint(equalTo: leadingAnchor),
-            content.trailingAnchor.constraint(equalTo: trailingAnchor),
-            content.topAnchor.constraint(equalTo: topAnchor),
-            content.bottomAnchor.constraint(equalTo: bottomAnchor),
+            shown.leadingAnchor.constraint(equalTo: leadingAnchor),
+            shown.trailingAnchor.constraint(equalTo: trailingAnchor),
+            shown.topAnchor.constraint(equalTo: topAnchor),
+            shown.bottomAnchor.constraint(equalTo: bottomAnchor),
+            content.leadingAnchor.constraint(equalTo: shown.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: shown.trailingAnchor),
+            content.topAnchor.constraint(equalTo: shown.topAnchor),
+            content.bottomAnchor.constraint(equalTo: shown.bottomAnchor),
         ])
         press.isUserInteractionEnabled = false
         press.backgroundColor = .label.withAlphaComponent(0.12)
@@ -518,7 +529,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// Only what the card draws hides, never the card: a hidden card still takes the finger, so it can be lifted again the
     /// moment it shows, whatever the system's drop still animates over it (a view at alpha 0 takes no touches).
     private func showsInPlace() {
-        content.alpha = carried && !home && (left || !lifting) ? 0 : 1
+        shown.alpha = carried && !home && (left || !lifting) ? 0 : 1
     }
 
     /// The cancelled copy is home: the card shows in the same frame the copy goes, then the carry ends.
