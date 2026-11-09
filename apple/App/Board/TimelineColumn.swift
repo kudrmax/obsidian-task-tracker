@@ -118,8 +118,7 @@ struct TimelineColumn: View {
             Rectangle().fill(Color(.separator)).frame(width: 1).padding(.top, -8)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { columnWidth = $0 }
-        // The whole column takes a carried card, the all-day strip too: its minute is read where the content stands.
-        .background { TimelineDrop(model: model) }
+
     }
 
     private func canvas(hour: CGFloat, width: CGFloat) -> some View {

@@ -18,8 +18,12 @@ struct ListColumn: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
-            ColumnTitle(title: title, dayArrows: dayArrows, model: model, list: list)
+        VStack(alignment: .leading, spacing: 0) {
+            // A card carried onto the title goes into the list keeping its project; the title's drop reaches down to the list.
+            TitleDrop(column: list.column, model: model) {
+                ColumnTitle(title: title, dayArrows: dayArrows, model: model, list: list)
+                    .padding(.bottom, ColumnMetrics.headGap)
+            }
             DayLane(model: model, width: width, slides: list.column == .day, shown: ListCollection(column: list.column, model: model)) { peek in
                 if let other = peek.lists[.day] { DayRows(list: other, model: model) }
             }
@@ -126,10 +130,6 @@ struct ColumnTitle: View {
         .frame(height: ColumnMetrics.titleRow)
         .padding(.horizontal, dayArrows ? 0 : 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // A card carried onto the title goes into the list keeping its project; its drop area reaches down to the list.
-        .background {
-            if let list { TitleDrop(column: list.column, model: model).padding(.bottom, -ColumnMetrics.headGap) }
-        }
     }
 
     /// A day arrow: the whole 32-point square takes the tap, not only the chevron's strokes, which a plain button's label

@@ -62,14 +62,26 @@ final class PlusRoute {
 }
 
 /// A column's title as a drop target: a card carried onto it lights it, and let go there goes into the list keeping its
-/// project, as the plugin's (`ScreenView.titleDrops`).
-struct TitleDrop: UIViewRepresentable {
+/// project, as the plugin's (`ScreenView.titleDrops`). The title is drawn inside the view that holds the drop interaction,
+/// so a drop over any of it, its words and buttons included, finds it.
+struct TitleDrop<Title: View>: UIViewRepresentable {
     let column: BoardColumn
     let model: BoardModel
+    @ViewBuilder let title: () -> Title
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
         view.backgroundColor = .clear
+        let content = UIHostingConfiguration { title() }.margins(.all, 0).makeContentView()
+        content.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(content)
+        NSLayoutConstraint.activate([
+            content.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            content.topAnchor.constraint(equalTo: view.topAnchor),
+            content.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        context.coordinator.content = content
         view.addInteraction(UIDropInteraction(delegate: context.coordinator))
         return view
     }
@@ -77,6 +89,11 @@ struct TitleDrop: UIViewRepresentable {
     func updateUIView(_ view: UIView, context: Context) {
         context.coordinator.column = column
         context.coordinator.model = model
+        context.coordinator.content?.configuration = UIHostingConfiguration { title() }.margins(.all, 0)
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIView, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 200, height: ColumnMetrics.titleRow + ColumnMetrics.headGap)
     }
 
     func makeCoordinator() -> Delegate { Delegate(column: column, model: model) }
@@ -85,6 +102,7 @@ struct TitleDrop: UIViewRepresentable {
     final class Delegate: NSObject, UIDropInteractionDelegate {
         var column: BoardColumn
         weak var model: BoardModel?
+        var content: (UIView & UIContentView)?
         private var landing: DropLanding?
 
         init(column: BoardColumn, model: BoardModel) {
@@ -114,99 +132,104 @@ struct TitleDrop: UIViewRepresentable {
 
         /// The copy flies into the card's row where the list now draws it.
         func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-            guard let window = interaction.view?.window, let id = landing?.id, let list = model?.listController(column), let frame = list.capsule(of: id) else { return nil }
+            guard let window = interaction.view?.window, let id = landing?.id, let list = model?.listController(column) else { return nil }
             list.collection.layoutIfNeeded()
+            guard let frame = list.capsule(of: id) else { return nil }
             return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: CGPoint(x: frame.midX, y: frame.midY)))
         }
     }
 }
 
-/// The calendar as a drop target, over the whole column, the all-day strip included: a card held over it shows the line
-/// at the minute it would start, on the grid's step; let go, the copy flies to the block the core makes. The plus is
-/// routed here too.
-struct TimelineDrop: UIViewRepresentable {
+/// The calendar as a drop target, its own scroll view holding the drop interaction: a card held over it shows the line at
+/// the minute it would start, on the grid's step; let go, the copy flies to the block the core makes. The plus is routed
+/// here too. The content's probe finds the scroll view and reads minutes from where the content stands.
+struct CanvasProbe: UIViewRepresentable {
     let model: BoardModel
 
-    func makeUIView(context: Context) -> DropView {
-        let view = DropView()
-        view.model = model
-        view.addInteraction(UIDropInteraction(delegate: view))
-        model.plus.add(view)
+    func makeUIView(context: Context) -> Probe {
+        let view = Probe()
+        view.isUserInteractionEnabled = false
+        view.target.model = model
+        model.calendarCanvas = view
+        model.plus.add(view.target)
         return view
     }
 
-    func updateUIView(_ view: DropView, context: Context) {
-        view.model = model
+    func updateUIView(_ view: Probe, context: Context) {
+        view.target.model = model
+        model.calendarCanvas = view
     }
 
-    @MainActor
-    final class DropView: UIView, UIDropInteractionDelegate, PlusTarget {
-        weak var model: BoardModel?
-        private var spot: CGRect?
+    final class Probe: UIView {
+        let target = CalendarDrop()
+        private lazy var interaction = UIDropInteraction(delegate: target)
 
-        /// The minute of the grid under a point of the window.
-        private func minute(at point: CGPoint) -> Double? {
-            guard let model, let canvas = model.calendarCanvas else { return nil }
-            let local = canvas.convert(point, from: window)
-            return Double(max(0, local.y - TimelineGeometry.labelLift) / model.calendarHour * 60)
-        }
-
-        func dropInteraction(_ interaction: UIDropInteraction, canHandle session: any UIDropSession) -> Bool {
-            guard let payload = DragPayload.of(session) else { return false }
-            return !payload.isSection
-        }
-
-        func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: any UIDropSession) -> UIDropProposal {
-            guard let minute = minute(at: convert(session.location(in: self), to: window)) else { return UIDropProposal(operation: .cancel) }
-            model?.hoverCalendar(minute: minute)
-            return UIDropProposal(operation: .move)
-        }
-
-        func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: any UIDropSession) { model?.leaveCalendar() }
-
-        func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) { model?.leaveCalendar() }
-
-        func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
-            spot = model?.dropOnCalendar()
-        }
-
-        func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-            guard let spot, let canvas = model?.calendarCanvas, canvas.window != nil else { return nil }
-            let size = defaultPreview.size
-            let scale = size.width > 0 && size.height > 0 ? CGAffineTransform(scaleX: spot.width / size.width, y: spot.height / size.height) : .identity
-            return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: canvas, center: CGPoint(x: spot.midX, y: spot.midY), transform: scale))
-        }
-
-        // MARK: The plus
-
-        var plusArea: CGRect? { window.map { convert(bounds, to: $0) } }
-
-        func plusHover(at point: CGPoint) {
-            if let minute = minute(at: point) { model?.hoverCalendar(minute: minute) }
-        }
-
-        func plusLeave() { model?.leaveCalendar() }
-
-        func plusLetGo() -> CGRect? {
-            guard let canvas = model?.calendarCanvas, let rect = model?.plusOnCalendar() else { return nil }
-            return canvas.convert(rect, to: nil)
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            var view = superview
+            while let next = view, !(next is UIScrollView) { view = next.superview }
+            guard let scroll = view, interaction.view !== scroll else { return }
+            interaction.view?.removeInteraction(interaction)
+            scroll.addInteraction(interaction)
+            target.scroll = scroll
         }
     }
 }
 
-/// The calendar's content as a view: a carry over the calendar reads its minute from where the content stands.
-struct CanvasProbe: UIViewRepresentable {
-    let model: BoardModel
+@MainActor
+final class CalendarDrop: NSObject, UIDropInteractionDelegate, PlusTarget {
+    weak var model: BoardModel?
+    weak var scroll: UIView?
+    private var spot: CGRect?
 
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        view.isUserInteractionEnabled = false
-        model.calendarCanvas = view
-        return view
+    /// The minute of the grid under a point of the window, `grab` points above it: the carried card's top edge, where the
+    /// line shows above the card rather than under it.
+    private func minute(at point: CGPoint, grab: CGFloat = 0) -> Double? {
+        guard let model, let canvas = model.calendarCanvas else { return nil }
+        let local = canvas.convert(point, from: nil)
+        return Double(max(0, local.y - grab - TimelineGeometry.labelLift) / model.calendarHour * 60)
     }
 
-    func updateUIView(_ view: UIView, context: Context) {
-        model.calendarCanvas = view
+    func dropInteraction(_ interaction: UIDropInteraction, canHandle session: any UIDropSession) -> Bool {
+        guard let payload = DragPayload.of(session) else { return false }
+        return !payload.isSection
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: any UIDropSession) -> UIDropProposal {
+        let grab = DragPayload.of(session)?.grab ?? 0
+        guard let view = interaction.view, let window = view.window, let minute = minute(at: view.convert(session.location(in: view), to: window), grab: grab) else { return UIDropProposal(operation: .cancel) }
+        model?.hoverCalendar(minute: minute)
+        return UIDropProposal(operation: .move)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: any UIDropSession) { model?.leaveCalendar() }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) { model?.leaveCalendar() }
+
+    func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {
+        spot = model?.dropOnCalendar()
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
+        guard let spot, let canvas = model?.calendarCanvas, canvas.window != nil else { return nil }
+        let size = defaultPreview.size
+        let scale = size.width > 0 && size.height > 0 ? CGAffineTransform(scaleX: spot.width / size.width, y: spot.height / size.height) : .identity
+        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: canvas, center: CGPoint(x: spot.midX, y: spot.midY), transform: scale))
+    }
+
+    // MARK: The plus
+
+    var plusArea: CGRect? { scroll.flatMap { view in view.window.map { view.convert(view.bounds, to: $0) } } }
+
+    func plusHover(at point: CGPoint) {
+        if let minute = minute(at: point) { model?.hoverCalendar(minute: minute) }
+    }
+
+    func plusLeave() { model?.leaveCalendar() }
+
+    func plusLetGo() -> CGRect? {
+        guard let canvas = model?.calendarCanvas, let rect = model?.plusOnCalendar() else { return nil }
+        return canvas.convert(rect, to: nil)
     }
 }
 

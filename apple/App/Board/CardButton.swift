@@ -406,7 +406,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     func dragInteraction(_ interaction: UIDragInteraction, itemsForBeginning session: UIDragSession) -> [UIDragItem] {
         guard let card = look?.card else { return [] }
         let item = UIDragItem(itemProvider: Carried.provider(id))
-        item.localObject = DragPayload(.card(card), from: from)
+        let payload = DragPayload(.card(card), from: from)
+        payload.grab = session.location(in: self).y
+        item.localObject = payload
         return [item]
     }
 

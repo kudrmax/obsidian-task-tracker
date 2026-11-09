@@ -1,6 +1,7 @@
 import Core
 import SwiftUI
 import UIKit
+import os
 
 /// What the system's drag carries for the board, as its item's `localObject`: a card, or a section by its header, from the
 /// column it is drawn in. The carry's token is set when the session begins, and its end names it.
@@ -14,6 +15,8 @@ final class DragPayload {
     let kind: Kind
     let from: String
     var token: Int?
+    /// How far below the card's top the finger holds it: the calendar reads the minute at the carried card's top edge.
+    var grab: CGFloat = 0
 
     init(_ kind: Kind, from: String) {
         self.kind = kind
@@ -392,6 +395,9 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         default:
             return []
         }
+        if let cell = collection.cellForItem(at: indexPath) {
+            payload.grab = session.location(in: cell).y - capsule(of: row, in: cell.bounds).minY
+        }
         let item = UIDragItem(itemProvider: Carried.provider(row.id))
         item.localObject = payload
         item.previewProvider = previewProvider(row, at: indexPath)
@@ -494,12 +500,29 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         }
     }
 
-    /// The gap the system opens, as an index among `others`: where the finger is when the system names none.
+    /// The gap the system opens, as an index among `others`: where the finger is when the system names none. A card
+    /// carried within its own list moves its own row as the gap, and over that row the system names the row's place in
+    /// the data, not where it now stands: the gap is then read from where the collection lays that row out.
     private func gap(_ destination: IndexPath?, _ session: any UIDropSession, among others: [DrawnRow]) -> Int {
+        if let payload = DragPayload.of(session), let home = indexPath(of: Self.movingRow(payload)),
+           let holder = collection.layoutAttributesForItem(at: home)?.frame {
+            return others.filter { row in
+                guard let path = indexPath(of: row.id), let frame = collection.layoutAttributesForItem(at: path)?.frame else { return false }
+                return frame.midY < holder.midY
+            }.count
+        }
         if let destination { return min(destination.item, others.count) }
         let y = session.location(in: collection).y
         let first = collection.layoutAttributesForItem(at: IndexPath(item: 0, section: 0))?.frame.minY ?? 0
         return y < first ? 0 : others.count
+    }
+
+    /// The row a carry moves in the list it was lifted from.
+    private static func movingRow(_ payload: DragPayload) -> String {
+        switch payload.kind {
+        case .card(let card): card.id
+        case .section(let group): DrawnRow.header(group, "").id
+        }
     }
 
     /// The core's place for the gap before row `gap` of `others`, at the level the finger's `x` asks for.
@@ -512,10 +535,13 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         if payload.isSection {
             // A section moves only among its own list's sections.
             guard payload.from == column.rawValue else { return UICollectionViewDropProposal(operation: .forbidden) }
+            shownGap = gap(destination, session, among: others(payload))
+            DropLog.target("section \(column.rawValue) gap \(shownGap ?? -1)")
             return UICollectionViewDropProposal(operation: .move, intent: .insertAtDestinationIndexPath)
         }
         let others = others(payload)
         let at = gap(destination, session, among: others)
+        shownGap = at
         if let place = place(at, among: others, x: session.location(in: collection).x) {
             model.hoverList(column, place: place)
             DropLog.target("list \(column.rawValue) gap \(at) \(place)")
@@ -534,18 +560,24 @@ final class ListController: NSObject, UICollectionViewDelegate, UICollectionView
         return IndexPath(item: nearest, section: proposed.section)
     }
 
+    /// The gap the list last showed under the carry: the drop lands where the rows parted, read while they stood so.
+    private var shownGap: Int?
+
     func collectionView(_ collectionView: UICollectionView, dropSessionDidExit session: any UIDropSession) {
+        shownGap = nil
         model?.leaveList(column)
     }
 
     func collectionView(_ collectionView: UICollectionView, dropSessionDidEnd session: any UIDropSession) {
+        shownGap = nil
         model?.leaveList(column)
     }
 
     func collectionView(_ collectionView: UICollectionView, performDropWith coordinator: any UICollectionViewDropCoordinator) {
         guard let model, let item = coordinator.items.first, let payload = item.dragItem.localObject as? DragPayload else { return }
         let others = others(payload)
-        let at = gap(coordinator.destinationIndexPath, coordinator.session, among: others)
+        let at = shownGap ?? gap(coordinator.destinationIndexPath, coordinator.session, among: others)
+        shownGap = nil
         switch payload.kind {
         case .section(let group):
             let slot = others[at...].first { $0.heads }.flatMap { row -> Int? in
@@ -694,11 +726,15 @@ struct EntryRow<Content: View>: View {
     }
 }
 
-/// The resolved target of a carry, told to the log in a DEBUG build: a sweep over the board shows a place everywhere.
+/// The resolved target of a carry, told to the log in a DEBUG build (`category: drop`): a sweep over the board shows a
+/// place everywhere.
 enum DropLog {
+    private static let log = Logger(subsystem: "com.kudrmax.taskcalendar", category: "drop")
+
     static func target(_ words: @autoclosure () -> String) {
         #if DEBUG
-        if ProcessInfo.processInfo.environment["DROP_LOG"] != nil || CommandLine.arguments.contains("--drop-log") { print("DROP target \(words())") }
+        let text = words()
+        log.notice("DROP target \(text, privacy: .public)")
         #endif
     }
 }
