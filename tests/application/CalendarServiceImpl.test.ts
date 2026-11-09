@@ -132,8 +132,8 @@ describe("CalendarServiceImpl", () => {
 		const day = await refreshed(service([google, work], [new FakeFeed("google")]));
 		expect(day.events.map((e) => e.id)).toEqual(["w1", "g1"]);
 		expect(day.statuses).toEqual([
-			{ source: "google", kind: "synced", problem: null, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: false, used: true, tone: "plain", words: { name: "Google Calendar", short: "Google", sub: "Updated today", time: TIME } },
-			{ source: "work", kind: "exported", problem: null, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: "iPhone", stale: false, used: true, tone: "plain", words: { name: "Work calendar", short: "Work", sub: "Exported from iPhone", time: TIME } },
+			{ source: "google", kind: "synced", problem: null, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: false, used: true, tone: "plain", words: { name: "Google Calendar", short: "Google", sub: "Updated today", time: TIME, alert: "" } },
+			{ source: "work", kind: "exported", problem: null, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: "iPhone", stale: false, used: true, tone: "plain", words: { name: "Work calendar", short: "Work", sub: "Exported from iPhone", time: TIME, alert: "" } },
 		]);
 	});
 
@@ -160,7 +160,7 @@ describe("CalendarServiceImpl", () => {
 		feed.failWith = new Error("Google API 500");
 		const day = await refreshed(service([file], [feed]));
 		expect(day.events.map((e) => e.id)).toEqual(["kept"]);
-		expect(day.statuses[0]).toEqual({ source: "google", kind: "synced", problem: { kind: "failed", detail: "Google API 500" }, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: true, used: true, tone: "plain", words: { name: "Google Calendar", short: "Google", sub: "Google API 500", time: TIME } });
+		expect(day.statuses[0]).toEqual({ source: "google", kind: "synced", problem: { kind: "failed", detail: "Google API 500" }, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: true, used: true, tone: "plain", words: { name: "Google Calendar", short: "Google", sub: "Google API 500", time: TIME, alert: "" } });
 	});
 
 	it("a feed that answers again clears its error", async () => {
@@ -223,7 +223,7 @@ describe("CalendarServiceImpl", () => {
 		const work = new FakeFile("work");
 		work.failWith = new SourceProblemError({ kind: "fileMissing" }, "file missing");
 		const day = await refreshed(service([work]));
-		expect(day.statuses[0]).toEqual({ source: "work", kind: "exported", problem: { kind: "fileMissing" }, events: 0, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: true, used: false, tone: "spare", words: { name: "Work calendar", short: "Work", sub: "file missing", time: "" } });
+		expect(day.statuses[0]).toEqual({ source: "work", kind: "exported", problem: { kind: "fileMissing" }, events: 0, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: true, used: false, tone: "spare", words: { name: "Work calendar", short: "Work", sub: "file missing", time: "", alert: "" } });
 	});
 
 	it("a file that is no calendar file says so in a word, not the parser's text", async () => {
@@ -532,6 +532,63 @@ describe("CalendarServiceImpl, the sources' tones", () => {
 			["iphone", true, "old"],
 		]);
 		expect(day.alert).toBe("broken");
+	});
+
+	it("a source whose only file does not hold the open day is spare", async () => {
+		const iphone = new FakeFile("iphone", [{ ...at("iphone", "a", "Home", 10), start: new Date(2026, 9, 20, 10), end: new Date(2026, 9, 20, 11) }]);
+		iphone.exportedAt = minutesAgo(OLD);
+		const day = await refreshed(service([iphone]));
+		expect(tones(day)).toEqual([["iphone", false, "spare"]]);
+		expect(day.alert).toBe("none");
+	});
+
+	it("Google logged out, an old file left from its login still giving a shown calendar, is broken", async () => {
+		const google = new FakeFile("google", [event("google", "g", new Date(2026, 9, 30, 10), new Date(2026, 9, 30, 11))]);
+		google.exportedAt = minutesAgo(OLD);
+		const loggedOut = new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 0 });
+		const day = await refreshed(service([google], [], new FakeClock(), 0, loggedOut));
+		expect(day.statuses[0]).toMatchObject({ problem: { kind: "loggedOut" }, used: true, tone: "broken" });
+		expect(day.alert).toBe("broken");
+	});
+
+	it("the day's stale is always alert other than none", async () => {
+		const days = async () => {
+			const out = [];
+			for (const [ago, failure] of [[30, null], [OLD, null], [OLD, new Error("Google API 500")], [30, new Error("Google API 500")]] as const) {
+				const google = new FakeFile("google", [event("google", "g", new Date(2026, 9, 30, 10), new Date(2026, 9, 30, 11))]);
+				google.exportedAt = minutesAgo(ago);
+				const feed = new FakeFeed("google");
+				feed.failWith = failure;
+				out.push(await refreshed(service([google], [feed])));
+			}
+			const hidden = new FakeFile("iphone", [at("iphone", "a", "Home", 10)]);
+			hidden.exportedAt = minutesAgo(OLD);
+			out.push(await refreshed(service([hidden], [], new FakeClock(), 0, new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 0, calendarsMigrated: true, hiddenCalendars: [{ account: "iCloud", title: "Home" }] }))));
+			return out;
+		};
+		const all = await days();
+		expect(all.map((d) => d.alert)).toEqual(["none", "old", "broken", "none", "none"]);
+		for (const day of all) expect(day.stale).toBe(day.alert !== "none");
+	});
+
+	it("words the marks and the spare rows' heading, ready", async () => {
+		const google = new FakeFile("google", [event("google", "g", new Date(2026, 9, 30, 10), new Date(2026, 9, 30, 11))]);
+		google.exportedAt = minutesAgo(OLD);
+		const feed = new FakeFeed("google", google);
+		feed.failWith = new Error("Google API 500");
+		const iphone = new FakeFile("iphone", [at("iphone", "a", "Home", 10)]);
+		iphone.exportedAt = minutesAgo(OLD);
+		const work = new FakeFile("work");
+		work.failWith = new SourceProblemError({ kind: "fileMissing" }, "missing");
+		const day = await refreshed(service([google, iphone, work], [feed]));
+		expect(day.statuses.map((s) => [s.source, s.words.alert])).toEqual([
+			["google", "Refresh failed"],
+			["iphone", "Out of date"],
+			["work", ""],
+		]);
+		expect(day.words).toEqual({ alert: "Refresh failed", notInUse: "Not in use", notInUseNote: "The timeline takes a calendar from these only when the files above go out of date." });
+		const fresh = await refreshed(service([new FakeFile("iphone", [at("iphone", "a", "Home", 10)])]));
+		expect([fresh.statuses[0].words.alert, fresh.words.alert]).toEqual(["", ""]);
 	});
 
 	it("the cached day carries the tones too", async () => {

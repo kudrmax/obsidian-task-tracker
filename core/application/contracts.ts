@@ -1157,8 +1157,9 @@ export interface SourceStatus {
 }
 
 /** A source's row in the sources window, worded: its names, the line under them, the time on the right. */
-export type { SourceWords } from "./sourceWords";
-import type { SourceWords } from "./sourceWords";
+export type { DayWords, SourceWords } from "./sourceWords";
+export { NO_DAY_EVENTS } from "./calendarDay";
+import type { DayWords, SourceWords } from "./sourceWords";
 
 export interface DayEvents {
 	readonly events: readonly CalendarEvent[];
@@ -1172,6 +1173,8 @@ export interface DayEvents {
 	readonly stale: boolean;
 	/** The dot: the worst `tone` of the sources in use. */
 	readonly alert: CalendarAlert;
+	/** The dot's words and the heading of the rows not in use, ready. */
+	readonly words: DayWords;
 }
 
 /** A calendar some writer's file lists, by account and title, and whether the plugin shows it. */

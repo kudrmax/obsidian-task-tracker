@@ -12,7 +12,7 @@ import { textParts } from "../domain/TaskText";
 import { oneLine } from "../domain/TaskTitle";
 import { samePlacement } from "../domain/operations";
 import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_CARD_SIZE, sameLevels, settingsFrom, type TaskCalendarSettings } from "../settings";
-import { CalendarDay, type CalendarReading } from "./calendarDay";
+import { CalendarDay, type CalendarReading, NO_DAY_EVENTS } from "./calendarDay";
 import { CALENDAR_SOURCES, type CalendarFile, calendarPath, readCalendarFile } from "./calendarFile";
 import { captureTitle } from "./captureTitle";
 import { cardDue } from "./cardDue";
@@ -27,6 +27,7 @@ import {
 	type CalendarSource,
 	type CalendarAlert,
 	type DayEvents,
+	type DayWords,
 	type DropColumn,
 	type GroupedList,
 	type GroupingState,
@@ -157,6 +158,7 @@ export interface WireDayEvents {
 	readonly statuses: readonly WireStatus[];
 	readonly stale: boolean;
 	readonly alert: CalendarAlert;
+	readonly words: DayWords;
 }
 
 /** The screen as a quick entry reads it, on the wire: each list's cards and sections, and which lists show. */
@@ -504,6 +506,7 @@ function wireDay(day: DayEvents, calendar: CalendarDay): WireDayEvents {
 		statuses: day.statuses.map(({ updatedAt, ...rest }) => ({ ...rest, updatedAtMs: updatedAt === null ? null : updatedAt.getTime() })),
 		stale: day.stale,
 		alert: day.alert,
+		words: day.words,
 	};
 }
 
@@ -761,7 +764,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS };
+const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {

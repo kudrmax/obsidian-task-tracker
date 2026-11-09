@@ -19,7 +19,7 @@ function status(source: SourceStatus["source"], tone: SourceTone): SourceStatus 
 		stale: tone === "old" || tone === "broken",
 		used: tone !== "spare",
 		tone,
-		words: { name: NAMES[source], short: SHORT[source], sub: "Exported from iPhone", time: "5 Nov 20:21" },
+		words: { name: NAMES[source], short: SHORT[source], sub: "Exported from iPhone", time: "5 Nov 20:21", alert: "" },
 	};
 }
 

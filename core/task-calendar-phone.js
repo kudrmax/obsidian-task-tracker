@@ -2476,6 +2476,14 @@ ${e.calendar}`;
   }
 
   // core/application/sourceWords.ts
+  function alertText(tone) {
+    if (tone === "old") return "Out of date";
+    if (tone === "broken") return "Refresh failed";
+    return "";
+  }
+  function dayWords(alert) {
+    return { alert: alertText(alert), notInUse: "Not in use", notInUseNote: "The timeline takes a calendar from these only when the files above go out of date." };
+  }
   var NAMES = { google: { name: "Google Calendar", short: "Google" }, iphone: { name: "iPhone calendars", short: "iPhone" }, work: { name: "Work calendar", short: "Work" } };
   function problemText(problem) {
     switch (problem.kind) {
@@ -2505,7 +2513,7 @@ ${e.calendar}`;
     const clock = at ? minutesToHHMM(at.getHours() * 60 + at.getMinutes()) : "";
     const time = !at ? "" : status.updatedDay === "today" ? clock : status.updatedDay === "yesterday" ? `Yesterday ${clock}` : `${date} ${clock}`;
     const sub = status.problem ? problemText(status.problem) : status.kind === "exported" ? `Exported from ${status.detail ?? "file"}` : at ? `Updated ${relative}` : "Not updated yet";
-    return { name: names.name, short: names.short, sub, time };
+    return { name: names.name, short: names.short, sub, time, alert: alertText(status.tone) };
   }
 
   // core/application/calendarChoice.ts
@@ -2741,6 +2749,7 @@ ${key.title}`.toLowerCase();
   var MINUTE_MS4 = 6e4;
   var LOGGED_OUT = { kind: "loggedOut" };
   var WINDOW_ORDER = ["google", "iphone", "work"];
+  var NO_DAY_EVENTS = { events: [], allDay: [], timed: [], statuses: [], stale: false, alert: "none", words: dayWords("none") };
   var ALERTS = ["none", "old", "broken"];
   function alertOf(tone) {
     return tone === "old" || tone === "broken" ? tone : "none";
@@ -2765,7 +2774,8 @@ ${key.title}`.toLowerCase();
         timed: events.filter((e) => !e.allDay),
         statuses: [...inUse, ...statuses.filter((s) => !s.used)],
         stale: chosen.stale,
-        alert
+        alert,
+        words: dayWords(alert)
       };
     }
     /** The timed events of the calendars shown that overlap `from`–`to`: the phone's meetings. */
@@ -2803,6 +2813,8 @@ ${key.title}`.toLowerCase();
       const problem = this.problem(source);
       const file = this.reading.files.get(source);
       const updatedAt = file?.exportedAt ?? null;
+      const old = this.isOld(updatedAt);
+      const tone = toneOf(used, old, problem !== null);
       const facts = {
         source,
         kind: KINDS2[source],
@@ -2810,10 +2822,10 @@ ${key.title}`.toLowerCase();
         updatedAt,
         updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
         updatedDate: updatedAt === null ? null : localDateOf(updatedAt),
-        detail: this.reading.fed(source) ? null : file?.device ?? null
+        detail: this.reading.fed(source) ? null : file?.device ?? null,
+        tone
       };
-      const old = this.isOld(updatedAt);
-      return { ...facts, events: shown, stale: problem !== null || old, used, tone: toneOf(used, old, problem !== null), words: sourceWords(facts) };
+      return { ...facts, events: shown, stale: problem !== null || old, used, words: sourceWords(facts) };
     }
     /** Google logged out says so, whatever its file: there is none to fetch, or what is left of an old login. */
     problem(source) {
@@ -6556,7 +6568,8 @@ ${key.title}`.toLowerCase();
       timed: wire(day.timed),
       statuses: day.statuses.map(({ updatedAt, ...rest }) => ({ ...rest, updatedAtMs: updatedAt === null ? null : updatedAt.getTime() })),
       stale: day.stale,
-      alert: day.alert
+      alert: day.alert,
+      words: day.words
     };
   }
   var FETCHED_BY_DEFAULT = ["google"];
@@ -6764,7 +6777,7 @@ ${key.title}`.toLowerCase();
     onTheDay,
     canPick
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };

@@ -92,3 +92,7 @@ Three codes, the same in the plugin's sources window and the app's Calendars scr
   lists of rows with their fields) is the problem `{ kind: "unreadable" }`, worded «file unreadable», never the parser's
   text. `failed` stays for other errors, its words cut to one line of at most 40 characters, a server's answer quoted
   after «: » left out («Google API 500»). Set in `readCalendarFile` itself, so the plugin and the door agree.
+- Backend: the words come from the core, not the frontends: `SourceWords.alert` per row («Out of date» for `old`,
+  «Refresh failed» for `broken`, empty otherwise) and `DayEvents.words: DayWords` (`alert`, the dot's words by the same
+  rule; `notInUse` «Not in use»; `notInUseNote`, the app's footer). The empty day before any read is the core's too:
+  `NO_DAY_EVENTS` (contracts, and `rules.constants()` on the door).

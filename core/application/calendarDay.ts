@@ -1,4 +1,4 @@
-import { sourceWords } from "./sourceWords";
+import { dayWords, sourceWords } from "./sourceWords";
 import { dayRelation, type DayRelation } from "../domain/Days";
 import { localDateOf } from "../domain/LocalDate";
 import type { LocalDate } from "../domain/Task";
@@ -18,6 +18,9 @@ const LOGGED_OUT: SourceProblem = { kind: "loggedOut" };
 
 /** The sources window's order within the rows in use and within the spare ones. */
 const WINDOW_ORDER: readonly CalendarSource[] = ["google", "iphone", "work"];
+
+/** A day before any calendar file was read: nothing to show, nothing marked. */
+export const NO_DAY_EVENTS: DayEvents = { events: [], allDay: [], timed: [], statuses: [], stale: false, alert: "none", words: dayWords("none") };
 
 /** Each tone the dot shows, worst last. */
 const ALERTS: readonly CalendarAlert[] = ["none", "old", "broken"];
@@ -65,6 +68,7 @@ export class CalendarDay {
 			statuses: [...inUse, ...statuses.filter((s) => !s.used)],
 			stale: chosen.stale,
 			alert,
+			words: dayWords(alert),
 		};
 	}
 
@@ -112,6 +116,8 @@ export class CalendarDay {
 		const problem = this.problem(source);
 		const file = this.reading.files.get(source);
 		const updatedAt = file?.exportedAt ?? null;
+		const old = this.isOld(updatedAt);
+		const tone = toneOf(used, old, problem !== null);
 		const facts = {
 			source,
 			kind: KINDS[source],
@@ -120,9 +126,9 @@ export class CalendarDay {
 			updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
 			updatedDate: updatedAt === null ? null : localDateOf(updatedAt),
 			detail: this.reading.fed(source) ? null : (file?.device ?? null),
+			tone,
 		};
-		const old = this.isOld(updatedAt);
-		return { ...facts, events: shown, stale: problem !== null || old, used, tone: toneOf(used, old, problem !== null), words: sourceWords(facts) };
+		return { ...facts, events: shown, stale: problem !== null || old, used, words: sourceWords(facts) };
 	}
 
 	/** Google logged out says so, whatever its file: there is none to fetch, or what is left of an old login. */

@@ -1,3 +1,4 @@
+import { dayWords } from "../../core/application/sourceWords";
 import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, DayEventsAsk, EventsReason, PolledScreen } from "../../core/application/contracts";
 import type { Clock } from "../../core/application/ports";
 import type { LocalDate } from "../../obsidian/ui/types";
@@ -54,11 +55,12 @@ export class DemoCalendarService implements CalendarService {
 			allDay: events.filter((e) => e.allDay),
 			timed: events.filter((e) => !e.allDay),
 			statuses: [
-				{ source: "google", kind: "synced", problem: null, events: count("google"), updatedAt: GOOGLE_UPDATED, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: false, used: true, tone: "plain", words: { name: "Google Calendar", short: "Google", sub: "Updated today", time: "14:19" } },
-				{ source: "work", kind: "exported", problem: null, events: count("work"), updatedAt: WORK_EXPORTED, updatedDay: "yesterday", updatedDate: "2026-10-29", detail: "iPhone", stale: true, used: true, tone: "old", words: { name: "Work calendar", short: "Work", sub: "Exported from iPhone", time: "Yesterday 08:02" } },
+				{ source: "google", kind: "synced", problem: null, events: count("google"), updatedAt: GOOGLE_UPDATED, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: false, used: true, tone: "plain", words: { name: "Google Calendar", short: "Google", sub: "Updated today", time: "14:19", alert: "" } },
+				{ source: "work", kind: "exported", problem: null, events: count("work"), updatedAt: WORK_EXPORTED, updatedDay: "yesterday", updatedDate: "2026-10-29", detail: "iPhone", stale: true, used: true, tone: "old", words: { name: "Work calendar", short: "Work", sub: "Exported from iPhone", time: "Yesterday 08:02", alert: "Out of date" } },
 			],
 			stale: true,
 			alert: "old",
+			words: dayWords("old"),
 		};
 		this.last.set(date, result);
 		return result;

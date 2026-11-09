@@ -1,3 +1,4 @@
+import { NO_DAY_EVENTS } from "../../core/application/contracts";
 import type { CalendarAlert, CalendarEvent, CalendarService, DayEvents, DayView, DropColumn, DropTo, GroupedList, ListGrouping, ListSection, ProjectRef, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
 import { Reload } from "./Reload";
 import type { LocalDate } from "./types";
@@ -48,8 +49,6 @@ const NO_SECTIONS: ListSections = { inbox: [], backlog: [], soon: [], now: [] };
 /** No sections to offer: nothing read yet. */
 const NO_OFFER: SectionOffer = { lists: { now: [], soon: [], inbox: [], backlog: [] }, ungrouped: "" };
 
-const NO_EVENTS: DayEvents = { events: [], allDay: [], timed: [], statuses: [], stale: false, alert: "none" };
-
 /**
  * What the screen shows for the selected day, in two parts that load on their own: the tasks, read from the file after
  * every change to it, and the events, fetched over the network only when the day opens or a refresh is asked for.
@@ -57,7 +56,7 @@ const NO_EVENTS: DayEvents = { events: [], allDay: [], timed: [], statuses: [], 
  */
 export class DayData {
 	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true, projects: NO_GROUPING, project: null, titleDrops: null };
-	private dayEvents: DayEvents = NO_EVENTS;
+	private dayEvents: DayEvents = NO_DAY_EVENTS;
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
 	private readonly taskReload: Reload<TasksState>;
@@ -71,7 +70,7 @@ export class DayData {
 			() => {
 				const ask = deps.calendars.events(deps.date(), this.around ? "open" : "refresh");
 				this.around = false;
-				return ask.fresh?.() ?? Promise.resolve(ask.cached ?? NO_EVENTS);
+				return ask.fresh?.() ?? Promise.resolve(ask.cached ?? NO_DAY_EVENTS);
 			},
 			(events, hooks) => this.show(() => (this.dayEvents = events), hooks),
 		);
@@ -179,7 +178,7 @@ export class DayData {
 
 	/** Another day is selected: its tasks, the events last fetched for it until the fresh ones come. */
 	selectDay(): Promise<void> {
-		this.showCached({ ...NO_EVENTS, statuses: this.dayEvents.statuses, stale: this.dayEvents.stale, alert: this.dayEvents.alert });
+		this.showCached({ ...NO_DAY_EVENTS, statuses: this.dayEvents.statuses, stale: this.dayEvents.stale, alert: this.dayEvents.alert, words: this.dayEvents.words });
 		return this.fetchBoth();
 	}
 
