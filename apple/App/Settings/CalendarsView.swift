@@ -2,8 +2,9 @@ import Core
 import EventKit
 import SwiftUI
 
-/// Calendars: when each calendar file was last written, an out-of-date one in orange; Refresh Now; and which calendars
-/// the timeline shows, each a system switch.
+/// Calendars: when each calendar file was last written, one the timeline relies on in orange once out of date and red
+/// once its refresh failed too, the spare ones apart and grey; Refresh Now; and which calendars the timeline shows, each
+/// a system switch.
 struct CalendarsView: View {
     /// The main screen's, when opened from «⋯»: it reads the screen again once a calendar is shown or hidden.
     let model: BoardModel?
@@ -19,28 +20,9 @@ struct CalendarsView: View {
     var body: some View {
         Form {
             Section("Sources") {
-                // Each calendar file's row as the core words it (`SourceStatus.words`), the same as the plugin's window:
-                // the source, how it was updated or its problem, and the time, orange once out of date.
-                ForEach(statuses, id: \.source) { status in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(status.words.name)
-                            Text(status.words.sub)
-                                .font(.footnote)
-                                .foregroundStyle(status.problem.isNull ? Color.secondary : Color.red)
-                        }
-                        Spacer()
-                        if !status.words.time.isEmpty {
-                            Text(status.words.time)
-                                .font(.footnote)
-                                .monospacedDigit()
-                                .foregroundStyle(status.stale ? Color.orange : Color.secondary)
-                        }
-                        if status.stale {
-                            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange).accessibilityLabel("Out of date")
-                        }
-                    }
-                }
+                // Each calendar file's row as the core words it (`SourceStatus.words`) and codes it (`tone`), the same
+                // as the plugin's window, in the core's order: the files the timeline takes from here, the spare below.
+                ForEach(statuses.filter { $0.tone != .spare }, id: \.source) { SourceRow(status: $0) }
                 Button {
                     Task { await refresh() }
                 } label: {
@@ -50,6 +32,16 @@ struct CalendarsView: View {
                     await PhoneCalendarExport.requestAccess()
                     access = EKEventStore.authorizationStatus(for: .event)
                     await refresh()
+                }
+            }
+            let spare = statuses.filter { $0.tone == .spare }
+            if !spare.isEmpty {
+                Section {
+                    ForEach(spare, id: \.source) { SourceRow(status: $0) }
+                } header: {
+                    Text("Not in use")
+                } footer: {
+                    Text("The timeline takes a calendar from these only when the files above go out of date.")
                 }
             }
             // Every calendar under its account, as the plugin's settings list them.
@@ -120,10 +112,12 @@ struct CalendarsView: View {
 
     private func load() async {
         let board = board
+        // The day the main screen shows, so the rows tell what its timeline relies on, as the badge on «⋯» does.
+        let open = model?.snapshot?.day
         let read = try? await Task.detached { () -> (DayEvents, [ShownCalendar]) in
             let files = try board.files()
-            let today: String = try board.read("days.today", over: files)
-            return (try board.read("calendars.events", [.string(today)], over: files), try board.read("calendars.known", over: files))
+            let day: String = try open ?? board.read("days.today", over: files)
+            return (try board.read("calendars.events", [.string(day)], over: files), try board.read("calendars.known", over: files))
         }.value
         statuses = read?.0.statuses ?? []
         calendars = read?.1 ?? []
@@ -145,4 +139,35 @@ struct CalendarsView: View {
         await load()
         await model?.reload()
     }
+}
+
+/// A calendar file's row: its name, how it was updated or its problem, and the time, coloured by its tone.
+private struct SourceRow: View {
+    let status: SourceStatus
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(status.words.name)
+                    .foregroundStyle(status.tone == .spare ? Color.secondary : Color.primary)
+                Text(status.words.sub)
+                    .font(.footnote)
+                    .foregroundStyle(status.tone == .broken ? Color.red : Color.secondary)
+            }
+            Spacer()
+            if !status.words.time.isEmpty {
+                Text(status.words.time)
+                    .font(.footnote)
+                    .monospacedDigit()
+                    .foregroundStyle(alerted ? Color.orange : Color.secondary)
+            }
+            if alerted {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundStyle(status.tone == .broken ? Color.red : Color.orange)
+                    .accessibilityLabel(status.tone == .broken ? "Refresh failed" : "Out of date")
+            }
+        }
+    }
+
+    private var alerted: Bool { status.tone == .old || status.tone == .broken }
 }

@@ -68,3 +68,7 @@ Three codes, the same in the plugin's sources window and the app's Calendars scr
 - Backend: Google logged out with a file left from an old login that still gives a shown calendar is in use (its
   events are on screen): `old`/`broken` by its age like any other. With no file, as usual, it is spare.
 - Backend: `statuses` are ordered Google, iPhone, Work by a fixed order, not by the order the host hands the files in.
+- App: Calendars opened from «⋯» reads the day the main screen shows, not today, so its rows say what that day's
+  timeline relies on and agree with the badge on «⋯»; opened from Settings (no main screen behind it) it reads today.
+- App: a spare row's name is secondary too, not only its line and time (the plugin's spare icon and name are muted).
+- App: the symbol's VoiceOver label is «Out of date» on an orange row and «Refresh failed» on a red one.
