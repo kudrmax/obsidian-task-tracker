@@ -3777,7 +3777,7 @@ ${key.title}`.toLowerCase();
   }
   function groupOf(name, items, header = true, id = sectionId(name, [])) {
     const section = name !== null;
-    return { id, name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: section };
+    return { id, name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: header };
   }
   function projectSection(name, items, project, id = sectionId(name, [])) {
     const plain = groupOf(name, items, name !== null, id);
@@ -3787,7 +3787,7 @@ ${key.title}`.toLowerCase();
     if (!sections) return { showsHeaders: false, groups: [groupOf(null, items, false)] };
     const groups = withEmptySections(byGroup(items, listSections), listSections);
     const showsHeaders = groups.some((g) => g.name !== null);
-    return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders })) };
+    return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders, reorder: showsHeaders })) };
   }
   function byGroup(items, sections) {
     const groups = [];
