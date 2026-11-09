@@ -287,7 +287,7 @@ final class CardControl: UIControl {
     /// whole title (the menu lifts the card itself).
     private func wholeTitle(_ look: Look) -> UIImageView? {
         guard let window, let (_, frame) = grownCopy(selectable: false, always: false) else { return nil }
-        return FloatImage.view(TaskCapsule(card: look.card, text: look.text, height: look.height, whole: true).frame(width: frame.width, height: frame.height), like: self, in: window)
+        return FloatImage.view(TaskCapsule(card: look.card, text: look.text, whole: true).frame(width: frame.width, height: frame.height), like: self, in: window)
     }
 
     /// The menu's whole-title preview while it shows: a label set from the menu redraws it.
@@ -317,13 +317,14 @@ final class CardControl: UIControl {
         let grown = (try? board.wholeWidth(card: fit, room: Double(window.bounds.width), margin: margin)) ?? nil
         guard grown != nil || always else { return nil }
         let width = grown.map { CGFloat($0.width) } ?? bounds.width
+        // Laid out by its title, as a card: a tall calendar block's copy is its title, not a tall box with the title on top.
         let copy = UIHostingConfiguration {
-            TaskCapsule(card: look.card, text: look.text, height: look.height, whole: true, selectable: selectable, onCopied: onCopied)
+            TaskCapsule(card: look.card, text: look.text, whole: true, selectable: selectable, onCopied: onCopied)
         }
         .margins(.all, 0)
         .makeContentView()
         copy.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
-        let height = max(bounds.height, copy.systemLayoutSizeFitting(CGSize(width: width, height: UIView.layoutFittingCompressedSize.height), withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height.rounded(.up))
+        let height = max(CardMetrics.height, copy.systemLayoutSizeFitting(CGSize(width: width, height: UIView.layoutFittingCompressedSize.height), withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height.rounded(.up))
         copy.frame = CGRect(x: 0, y: 0, width: width, height: height)
         let card = convert(bounds, to: window)
         guard let left = try? board.grownStart(Double(card.minX), size: Double(card.width), grown: Double(width), room: Double(window.bounds.width), margin: margin),

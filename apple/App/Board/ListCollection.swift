@@ -237,8 +237,9 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     /// changed is drawn again in place. Another day comes in still: it slid in through the day's own motion.
     func update(force: Bool = false) {
         guard let model else { return }
-        // A card's menu going: the list draws the new screen once the card is back in its row.
-        guard !MenuHold.holding else {
+        // A card's menu going: the list draws the new screen once the card is back in its row; a card renamed from it
+        // turns into its field at once, in its own row, the preview landing on it.
+        guard !MenuHold.holding || model.entry.state?.renaming != nil else {
             MenuHold.after(self) { [weak self] in self?.update(force: force) }
             return
         }
@@ -266,8 +267,9 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         let shownDay = model.snapshot?.day
         guard force || ids != shownIds || !changed.isEmpty else { return }
         let gone = Set(shownIds).subtracting(ids)
+        // Only rows drawn anew in place (a card turning into its field, a title written): drawn at once, never cross-faded.
+        let animated = day == shownDay && host.window != nil && ids != shownIds
         shownIds = ids
-        let animated = day == shownDay && host.window != nil
         day = shownDay
         // The quick entry's one field keeps the keyboard from row to row: a row going away hands it to the window's holder
         // first, as any box that stops showing it does, so the collection never deletes the first responder's row.

@@ -170,7 +170,9 @@ what a drop writes.
     previews are the card itself, so the system morphs the card into the whole title and back, no app copies. The system
     places the preview (no longer `rules.grownStart`). A label set from the open menu redraws the card, the menu's rows
     and the preview in place (the whole-title one cross-fades to the new look); Select Text lifts the title exactly where
-    the preview stood. A row the menu's choice removes (Done, Won't Do, Delete) closes once the
+    the preview stood. The whole-title preview is laid out by its title, as a card (a tall calendar block's too, not a tall
+    box). Rename runs as it is chosen: the card turns into its field in its own row as the preview lands on it (the list
+    draws a row turning into its field at once, never cross-faded, and no hold waits for the preview). A row the menu's choice removes (Done, Won't Do, Delete) closes once the
     preview is home, heard from an animation of the app's run inside the menu's going (the animator's own completion
     comes most of a second later). The private trigger that opens the menu on a tap (`_presentMenuAtLocation:`) stays: it
     presents this configuration with the standard morph.
@@ -201,4 +203,8 @@ what a drop writes.
     once it is down.
 23. **frontend-swift: a project group's fold moves in the rows' own time**: the chevron turns, the folded count fades in
     or out and the note's arrow slides beside it as the rows fold (they turned and jumped in one frame).
+24. **frontend-swift: a menu tile that can't be pressed shows so** (`labels.disabled`, `levels.disabled`: a task with a
+    priority carries no labels, one with labels no priority): its coloured icon at the plugin's
+    `--tc-tile-off-opacity` (0.35), its title greyed by the system, and a tap on it does nothing, as the plugin's
+    disabled tile.
 

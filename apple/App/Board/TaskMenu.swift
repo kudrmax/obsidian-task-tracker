@@ -88,7 +88,7 @@ struct TaskMenu {
         for edit in menu.edits {
             switch edit {
             case "rename" where single:
-                rows.append(.action(title: "Rename", symbol: "pencil", opens: true) { if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } })
+                rows.append(.action(title: "Rename", symbol: "pencil") { if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } })
                 if selectsText { rows.append(.action(title: "Select Text", symbol: "selection.pin.in.out", opens: true) { CardControl.selectMenuTitle() }) }
             case "reminder" where single && !menu.reminders.isEmpty:
                 rows.append(.submenu(title: "Reminder", symbol: "bell", subtitle: menu.reminders.first(where: \.checked).map { ReminderWords.title($0.kind) }, children: menu.reminders.map { reminder in
@@ -188,12 +188,17 @@ extension MenuNode {
         UIMenu(children: nodes.map { $0.element(later, palette) })
     }
 
+    /// How strongly a tile that can't be pressed shows: the plugin's `--tc-tile-off-opacity`.
+    static let offOpacity: CGFloat = 0.35
+
     @MainActor
     private func element(_ later: @escaping (@escaping @MainActor () -> Void) -> Void, _ palette: @escaping (String) -> UIColor?) -> UIMenuElement {
         switch self {
         case .action(let title, let symbol, let subtitle, let tint, let destructive, let checked, let keepsOpen, let opens, let disabled, let run):
             var image = symbol.flatMap { UIImage(systemName: $0) }
-            if let tint, let color = palette(tint) { image = image?.withTintColor(color, renderingMode: .alwaysOriginal) }
+            // A tile shown but not pressed (a label's while the task has a priority, a level's while it has labels) is
+            // dimmed as the plugin dims it (`--tc-tile-off-opacity`): its colour drawn as is would read as pressable.
+            if let tint, let color = palette(tint) { image = image?.withTintColor(disabled ? color.withAlphaComponent(Self.offOpacity) : color, renderingMode: .alwaysOriginal) }
             var attributes: UIMenuElement.Attributes = destructive ? [.destructive] : []
             if keepsOpen { attributes.insert(.keepsMenuPresented) }
             if disabled { attributes.insert(.disabled) }
