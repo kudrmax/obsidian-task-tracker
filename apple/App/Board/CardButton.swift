@@ -282,6 +282,13 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
               let (whole, grown) = grownCopy(selectable: false, always: true) else { return }
         let card = convert(bounds, to: window)
         let style = traitCollection.userInterfaceStyle
+        guard grownCopyNeeded(whole: whole, grown: grown, card: card) else {
+            // A card that shows its whole title is lifted itself, as any view in place, and lands back in itself.
+            Self.menuOwner = self
+            Self.lastLifted = (look.card, card)
+            opener.present(menu, at: point) { [weak self] in self?.inPlace }
+            return
+        }
         let made = MenuCopy(look: look, style: style, card: card, whole: whole, grown: grown)
         // In the window, over the card: it grows there from the card into the whole copy, opaque, on the screen itself;
         // then the menu lifts it where it stands, as it lifts any view in place, and lands it back there. A preview the
@@ -317,8 +324,22 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// The copy growing from the card before its menu shows.
     private static let menuGrow: TimeInterval = 0.18
 
-    /// The menu shows over the copy grown in place.
+    /// The menu shows over the copy grown in place, which stays opaque under the menu's twin while it fades in.
     private func menuShown(_ animator: (any UIContextMenuInteractionAnimating)?) {}
+
+    /// The card itself where it stands, for a menu that lifts it in place.
+    private var inPlace: UITargetedPreview? {
+        guard window != nil else { return nil }
+        let parameters = UIPreviewParameters()
+        parameters.visiblePath = UIBezierPath(roundedRect: content.bounds, cornerRadius: CardMetrics.radius)
+        parameters.backgroundColor = .clear
+        return UITargetedPreview(view: content, parameters: parameters)
+    }
+
+    /// Whether the menu shows a copy grown past the card (its title cut), rather than the card itself.
+    private func grownCopyNeeded(whole: UIView, grown: CGRect, card: CGRect) -> Bool {
+        grown.size != card.size
+    }
 
     /// The card's copy with its whole title, sized and placed in the window as the menu lifts it. `always`: a card that
     /// shows its whole title gets a copy too, at its own width, where the menu lifts the card itself.
@@ -369,7 +390,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
             // The menu flies the copy home in place at the size it was lifted at, so nothing of it is scaled on the way;
             // once it is seen down where it stands, it shrinks back into the card on the screen and goes, the card drawn
             // alike under it. The menu's animator tells of its end most of a second after the copy is down.
-            let shrink = {
+            let shrink = { [weak self] in
                 UIView.animate(withDuration: Self.menuShrink, delay: 0, options: [.curveEaseInOut, .allowUserInteraction]) {
                     copy.shrink()
                 } completion: { _ in
@@ -673,3 +694,4 @@ final class LandingWatch: NSObject {
         landed()
     }
 }
+
