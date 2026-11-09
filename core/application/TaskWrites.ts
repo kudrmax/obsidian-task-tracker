@@ -5,6 +5,7 @@ import type {
 	DroppedTask,
 	DropFrom,
 	DropLanding,
+	DropPreview,
 	DropTo,
 	EndList,
 	GroupedList,
@@ -350,6 +351,12 @@ export class TaskWrites {
 	 * `day` read over the result by the same code as the screen.
 	 */
 	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Read<readonly DropLanding[]> {
+		const preview = this.dropPreview(tasks, to, day, project);
+		return { reads: true, answer: (s) => preview.answer(s).landings };
+	}
+
+	/** `landing`, with the whole screen the drop leaves and the text it is read from. */
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Read<DropPreview> {
 		const drop = this.drop(tasks, to, day);
 		return {
 			reads: true,
@@ -357,9 +364,10 @@ export class TaskWrites {
 				const ids = tasks.map((task) => this.rules.entryOf(s!.doc, task.key).id);
 				const write = drop.answer(s);
 				const after = write.operation ? this.rules.trial(s!.doc, write.operation).after : s!.doc;
-				const screen = this.reads.screen({ text: after.serialize(), doc: after, today: s!.today, boundary: s!.boundary }, day, project);
+				const text = after.serialize();
+				const screen = this.reads.screen({ text, doc: after, today: s!.today, boundary: s!.boundary }, day, project);
 				const timeline = this.reads.timeline();
-				return ids.map((id) => landingOf(screen, id, day, timeline));
+				return { landings: ids.map((id) => landingOf(screen, id, day, timeline)), screen, tasks: text };
 			},
 		};
 	}

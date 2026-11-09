@@ -6088,6 +6088,11 @@ ${key.title}`.toLowerCase();
      * `day` read over the result by the same code as the screen.
      */
     landing(tasks, to, day, project) {
+      const preview = this.dropPreview(tasks, to, day, project);
+      return { reads: true, answer: (s) => preview.answer(s).landings };
+    }
+    /** `landing`, with the whole screen the drop leaves and the text it is read from. */
+    dropPreview(tasks, to, day, project) {
       const drop = this.drop(tasks, to, day);
       return {
         reads: true,
@@ -6095,9 +6100,10 @@ ${key.title}`.toLowerCase();
           const ids = tasks.map((task) => this.rules.entryOf(s.doc, task.key).id);
           const write = drop.answer(s);
           const after = write.operation ? this.rules.trial(s.doc, write.operation).after : s.doc;
-          const screen = this.reads.screen({ text: after.serialize(), doc: after, today: s.today, boundary: s.boundary }, day, project);
+          const text = after.serialize();
+          const screen = this.reads.screen({ text, doc: after, today: s.today, boundary: s.boundary }, day, project);
           const timeline = this.reads.timeline();
-          return ids.map((id) => landingOf(screen, id, day, timeline));
+          return { landings: ids.map((id) => landingOf(screen, id, day, timeline)), screen, tasks: text };
         }
       };
     }
@@ -6533,6 +6539,7 @@ ${key.title}`.toLowerCase();
     applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps)),
     drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks, to, day))),
     landing: (c, [tasks, to, day, project]) => c.ask(c.writes.landing(tasks, to, day, project ?? void 0)),
+    dropPreview: (c, [tasks, to, day, project]) => c.ask(c.writes.dropPreview(tasks, to, day, project ?? void 0)),
     normalize: (c) => c.normalize(),
     createFile: (c) => {
       if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");

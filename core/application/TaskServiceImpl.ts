@@ -14,6 +14,7 @@ import {
 	type CreatedTask,
 	type DroppedTask,
 	type DropLanding,
+	type DropPreview,
 	type DropOrigin,
 	type FullTree,
 	type DropTo,
@@ -450,6 +451,10 @@ export class TaskServiceImpl implements TaskService {
 
 	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Promise<readonly DropLanding[]> {
 		return this.ask(this.writes.landing(tasks, to, day, project));
+	}
+
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Promise<DropPreview> {
+		return this.ask(this.writes.dropPreview(tasks, to, day, project));
 	}
 
 	async normalize(): Promise<void> {
