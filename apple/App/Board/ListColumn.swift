@@ -226,6 +226,9 @@ struct ProjectHeader: View {
             }
             Spacer(minLength: 0)
         }
+        // The fold in the rows' own time, not in one frame: the chevron turns, the count fades in or out and the arrow
+        // slides beside it as the rows fold.
+        .animation(.snappy(duration: ListController.unfold), value: project.folded)
         .foregroundStyle(project.zone.isNull ? Palette.muted : Palette.pullInk(scheme))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         .padding(.leading, CardMetrics.leading)
@@ -437,8 +440,8 @@ struct CardRow: View {
                 .frame(height: CardMetrics.height)
                 // Carried, the card's row is its dashed place, as the plugin keeps it (`is-waiting`), until the carry ends.
                 .background { if model.isWaiting(card) { DashedPlace().transition(.identity) } }
-                // The branch shows as soon as the card has its place (the drop's screen drawn), while its copy still flies in.
-                .overlay(alignment: .topLeading) { if let branch = card.branch, !model.isWaiting(card) { BranchLine(branch: branch) } }
+                // The branch shows with its card: a row moving under a copy still flying there carries no branch of its own.
+                .overlay(alignment: .topLeading) { if let branch = card.branch, !model.isHidden(card) { BranchLine(branch: branch).transition(.identity) } }
                 .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
         }
         .frame(height: CardMetrics.height, alignment: .top)

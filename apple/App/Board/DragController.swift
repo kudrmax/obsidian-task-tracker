@@ -13,6 +13,8 @@ struct Lift {
     let frame: CGRect
     /// The copy rises off the board as the system lifts a view (a little larger, a shadow); the plus moves as it is.
     var rises = true
+    /// The copy is a card as it was drawn: it lands as the card drawn where it lands.
+    var card = false
     /// Begins the model's carry: its token, which its end names.
     let begin: () -> Int
     /// Where the thing lifted stands now, in the window: a carry that writes nothing flies back there.
@@ -66,8 +68,13 @@ final class DragController {
         self.route = route
     }
 
-    /// Nothing is carried or landing: a press may lift.
-    var idle: Bool { flow.phase == .idle }
+    /// A press may lift now: nothing is carried. A copy still settling into its place (a press is recognized only after
+    /// the long press's delay, by when the copy has all but landed) is set down at once, so the next card lifts the moment
+    /// the finger asks.
+    var idle: Bool {
+        if case .landing = flow.phase, let live { landed(live) }
+        return flow.phase == .idle
+    }
 
     /// The copy and line flight's motion: the list's own time for rows moving (`ListController.unfold`).
     static let flight: TimeInterval = 0.35
@@ -80,7 +87,7 @@ final class DragController {
     func lift(_ lift: Lift, at point: CGPoint, in window: UIWindow) -> Bool {
         guard let carry = flow.lift() else { return false }
         let token = lift.begin()
-        let copy = CarryCopy(content: lift.copy, frame: lift.frame, style: window.traitCollection.userInterfaceStyle)
+        let copy = CarryCopy(content: lift.copy, frame: lift.frame, style: window.traitCollection.userInterfaceStyle, card: lift.card)
         layer.attach(to: window)
         layer.carry(copy)
         live = Live(token: token, carry: carry, payload: lift.payload, copy: copy, grip: CGPoint(x: point.x - lift.frame.midX, y: point.y - lift.frame.midY), home: lift.home, point: point)
@@ -176,22 +183,29 @@ final class DragController {
     /// The copy is down: the card it flew into shows in this same frame, the copy goes, the carry ends.
     private func landed(_ live: Live) {
         guard flow.landed(live.carry) else { return }
-        if let ids = model?.landingIds { CardControl.reveal(ids) }
+        model?.revealLanding()
         live.copy.removeFromSuperview()
         layer.clear()
         self.live = nil
         model?.endCarry(live.token)
     }
 
-    /// What the copy turns into as it lands where it is a size other than its own: the card as drawn there.
+    /// What the copy turns into as it lands where it is a size other than its own: the card as drawn there, or a
+    /// section's header.
     private func arrival(for landing: CarryLanding) -> UIView? {
-        guard !landing.opens, !landing.folds, let live, let model, let id = model.landedId else { return nil }
+        guard !landing.opens, !landing.folds, let live, let model, let window = live.copy.window else { return nil }
         let size = live.copy.bounds.size
         guard abs(size.width - landing.rect.width) > 1 || abs(size.height - landing.rect.height) > 1 else { return nil }
-        guard let card = model.drawnCard(id) else { return nil }
-        let look = TaskCapsule(card: card, height: landing.rect.height).frame(width: landing.rect.width, height: landing.rect.height)
-        guard let window = live.copy.window else { return nil }
-        return FloatImage.view(look, like: live.copy, in: window)
+        let rect = landing.rect
+        switch live.payload?.kind {
+        case .card:
+            guard let id = model.landedId, let card = model.drawnCard(id) else { return nil }
+            return FloatImage.view(TaskCapsule(card: card, height: rect.height).frame(width: rect.width, height: rect.height), like: live.copy, in: window)
+        case .section(let group):
+            return FloatImage.view(SectionTitle(title: group.header ?? "", muted: group.name == nil).frame(width: rect.width, height: rect.height), like: live.copy, in: window)
+        case nil:
+            return nil
+        }
     }
 
     // MARK: The line
@@ -277,56 +291,77 @@ final class CarryLayer: UIView {
 }
 
 /// The carried copy: the thing lifted, drawn as it stood, opaque. It rises as the system lifts a view (a little larger, a
-/// soft shadow) and, landing, settles back to the card's own size and look where the card is drawn.
+/// soft shadow) and, landing, settles back to the card's own size and look where the card is drawn. A card's copy is
+/// clipped to the card's shape and its looks are drawn from its top-left corner, so a copy landing at another width (a
+/// subtask's level, the calendar) changes its look with the text standing still, never stretched or doubled.
 @MainActor
 final class CarryCopy: UIView {
+    private let clip = UIView()
     private let content: UIView
     private var arrival: UIView?
+    private let card: Bool
     static let rise: CGFloat = 1.04
 
-    init(content: UIView, frame: CGRect, style: UIUserInterfaceStyle) {
+    init(content: UIView, frame: CGRect, style: UIUserInterfaceStyle, card: Bool) {
         self.content = content
+        self.card = card
         super.init(frame: frame)
         isUserInteractionEnabled = false
         overrideUserInterfaceStyle = style
-        content.frame = bounds
-        content.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        content.contentMode = .scaleToFill
-        addSubview(content)
+        clip.frame = bounds
+        clip.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        clip.clipsToBounds = card
+        clip.layer.cornerRadius = card ? CardMetrics.radius : 0
+        clip.layer.cornerCurve = .continuous
+        addSubview(clip)
+        place(content)
+        clip.addSubview(content)
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOpacity = 0
         layer.shadowRadius = 12
         layer.shadowOffset = CGSize(width: 0, height: 6)
-        shadowDark = style == .dark
+        dark = style == .dark
     }
 
-    private var shadowDark = false
+    private var dark = false
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not from a storyboard") }
 
+    /// A look in the copy: a card's at its own size from the top-left corner, anything else filling the copy.
+    private func place(_ look: UIView) {
+        if card {
+            look.frame = CGRect(origin: .zero, size: look.bounds.size == .zero ? bounds.size : look.bounds.size)
+            look.contentMode = .topLeft
+        } else {
+            look.frame = bounds
+            look.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            look.contentMode = .scaleToFill
+        }
+    }
+
     func rise() {
         transform = CGAffineTransform(scaleX: Self.rise, y: Self.rise)
-        layer.shadowOpacity = shadowDark ? 0.55 : 0.16
+        layer.shadowOpacity = dark ? 0.55 : 0.16
     }
 
     /// The copy at its landing, flown there in the animation it is called in: the card's own size and look in place, no
     /// lift left; into a folded part it shrinks into the header's middle and fades; the plus becomes the field.
     func land(on landing: CarryLanding, look: UIView?) {
         if let look, arrival == nil {
-            look.frame = bounds
-            look.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            look.contentMode = .scaleToFill
-            look.alpha = 0
-            UIView.performWithoutAnimation { addSubview(look) }
+            UIView.performWithoutAnimation {
+                place(look)
+                look.alpha = 0
+                clip.addSubview(look)
+            }
             arrival = look
         }
         transform = .identity
         layer.shadowOpacity = 0
         let rect = landing.rect
         if landing.folds {
-            let side = min(rect.width, rect.height) * ListController.foldedLanding
-            bounds = CGRect(origin: .zero, size: CGSize(width: bounds.width * ListController.foldedLanding, height: side))
+            let scale = ListController.foldedLanding
+            bounds = CGRect(origin: .zero, size: CGSize(width: bounds.width * scale, height: bounds.height * scale))
             center = CGPoint(x: rect.midX, y: rect.midY)
             alpha = 0
             return
@@ -334,9 +369,9 @@ final class CarryCopy: UIView {
         bounds = CGRect(origin: .zero, size: rect.size)
         center = CGPoint(x: rect.midX, y: rect.midY)
         arrival?.alpha = 1
-        content.alpha = arrival == nil ? 1 : 0
+        if arrival != nil, !card { content.alpha = 0 }
         if landing.opens {
-            layer.cornerRadius = CardMetrics.radius
+            clip.layer.cornerRadius = CardMetrics.radius
             alpha = 0
         }
     }

@@ -1107,10 +1107,22 @@ final class BoardModel {
         !selecting && group.reorder && snapshot?.lists[column]?.sectionsOf != nil
     }
 
-    /// The section a carry lifted: its tasks are folded away in its list while it is carried.
+    /// The section a carry lifted: its tasks are folded away in its list while it is carried, and come back in the drop's
+    /// own motion as it is let go.
     func isLifted(_ group: BoardGroup, in column: BoardColumn) -> Bool {
+        carry?.landed != true && hidesHeader(group, in: column)
+    }
+
+    /// The header of the section a carry holds: its floating copy stands for it until the copy is down.
+    func hidesHeader(_ group: BoardGroup, in column: BoardColumn) -> Bool {
         guard let section = carry?.section, section.column == column else { return false }
         return section.names.indices.contains(section.lifted) && section.names[section.lifted] == group.name
+    }
+
+    /// The copy is down: the cards and the header it lands as show in this frame, before the carry's end is drawn.
+    func revealLanding() {
+        CardControl.reveal(landingIds)
+        for list in lists.values { list.controller?.showHeaders(all: true) }
     }
 
     /// The carried card itself, wherever the screen draws it: its copy stands for it until the carry ends, once the copy
@@ -1283,7 +1295,8 @@ final class BoardModel {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         // The screen after the drop in one drawing: the carried tasks in their new rows, the selection ended after it.
         landedId = preview.landings.first?.id
-        arriving = Set(preview.landings.map(\.id))
+        // The card the copy lands as waits for it; the other picked tasks come in with the rows, the copy being the lead's.
+        arriving = Set(preview.landings.prefix(1).map(\.id))
         showPreview(preview.snapshot, landed: true)
         if !carry.group.isEmpty { endSelection() }
         writeDrop("tasks.drop", [carry.dropped, to, .string(snapshot.day)])
@@ -1311,12 +1324,11 @@ final class BoardModel {
         }
     }
 
-    /// The screen a drop leaves, drawn now: every list in this same frame, in one animation.
+    /// The screen a drop leaves, drawn now: every list and the calendar in this same frame, in the copy's one animation.
     private func showPreview(_ next: BoardSnapshot, landed: Bool = false) {
         dropReads.previewDrawn()
-        var still = Transaction()
-        still.disablesAnimations = true
-        withTransaction(still) {
+        // In the copy's own motion: the calendar's blocks move to their new stack as the lists' rows do.
+        withAnimation(.spring(duration: DragController.flight, bounce: 0)) {
             if landed { carry?.landed = true }
             hover = nil
             landing = nil
@@ -1338,6 +1350,7 @@ final class BoardModel {
         // The section stands where it was let go, header and tasks, until the read after its write draws it there: the
         // core has no preview of a section's move, so its group moves among the drawn groups, nothing else.
         dropReads.previewDrawn()
+        carry?.landed = true
         sectionMove = SectionMove(column: column, group: group.id, before: list.groups[safe: at]?.id)
         for list in lists.values { list.controller?.update() }
         writeDrop("tasks.moveGroup", [.string(section.list), section.names[section.lifted].json, place])
@@ -1461,9 +1474,21 @@ final class BoardModel {
     func dropOnCalendar() -> CGRect? {
         guard let carry, carry.section == nil, carry.item != nil, let minute = landing, let snapshot else { return nil }
         let to: JSONValue = ["kind": "time", "start": .number(Double(minute))]
-        let events = snapshot.timeline.events
-        guard case .landed(let landed) = land(carry, to: to) else { return nil }
-        return landed.flatMap { blockRect($0, events: events) }
+        guard case .landed(let landed) = land(carry, to: to), let landed, let drawn = self.snapshot else { return nil }
+        return slotRect(landed.id, in: drawn.timeline)
+    }
+
+    /// Where the calendar draws the block of `id` in the screen `timeline` stands for, in the calendar's content: the same
+    /// stack it draws (`stacked`), so the copy lands exactly on the block.
+    private func slotRect(_ id: String, in timeline: BoardTimeline) -> CGRect? {
+        guard let slot = stacked(timeline, hour: calendarHour).first(where: { $0.id == id }) else { return nil }
+        let box = slot.box
+        let left = TimelineGeometry.itemsLeft + CGFloat(box.left)
+        return CGRect(
+            x: left,
+            y: TimelineGeometry.labelLift + CGFloat(box.top),
+            width: max(1, calendarWidth - left - TimelineGeometry.itemsRight - CGFloat(CardMetrics.timeline.itemInset)),
+            height: max(CGFloat(box.height), CardMetrics.height))
     }
 
     /// The plus let go on the calendar: the field opens at the line's time; its place in the calendar's content.
@@ -1473,19 +1498,6 @@ final class BoardModel {
         leaveCalendar()
         entry.openAtDrop(nil, ["kind": "time", "start": .number(Double(minute))])
         return CGRect(x: TimelineGeometry.itemsLeft, y: top, width: calendarWidth - TimelineGeometry.itemsLeft - TimelineGeometry.itemsRight, height: CardMetrics.height)
-    }
-
-    /// The block a timeline landing makes, in the calendar's content space at the hour's height drawn now.
-    private func blockRect(_ landed: DropLanding, events: [BoardEvent]) -> CGRect? {
-        let m = CardMetrics.timeline
-        let measures = TimelineMeasures(hour: Double(calendarHour), cardHeight: m.cardHeight, cardGap: m.cardGap, itemInset: m.itemInset, itemGap: m.itemGap, overlayInset: m.overlayInset)
-        guard let box = try? board.box(of: landed, events: events, measures: measures) else { return nil }
-        let left = TimelineGeometry.itemsLeft + CGFloat(box.left)
-        return CGRect(
-            x: left,
-            y: TimelineGeometry.labelLift + CGFloat(box.top),
-            width: calendarWidth - left - TimelineGeometry.itemsRight - CGFloat(m.itemInset),
-            height: max(CGFloat(box.height), CardMetrics.height))
     }
 
     /// The minute a carry over the calendar stands at, on the grid's step for the timeline drawn `hourHeight` an hour.

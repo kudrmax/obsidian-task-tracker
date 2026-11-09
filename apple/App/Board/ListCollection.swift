@@ -287,6 +287,19 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         snapshot.appendItems(ids)
         snapshot.reconfigureItems(changed)
         source.apply(snapshot, animatingDifferences: animated)
+        showHeaders()
+    }
+
+    /// Each header drawn shows, but the one of a carried section, whose floating copy stands for it until it is down: set
+    /// on the row itself, so it shows in the very frame the copy goes.
+    /// `all`: the carry's copy is down, every header shows now.
+    func showHeaders(all: Bool = false) {
+        for cell in collection.visibleCells { shows(cell, at: collection.indexPath(for: cell), all: all) }
+    }
+
+    private func shows(_ cell: UICollectionViewCell, at path: IndexPath?, all: Bool = false) {
+        guard !all, let path, let model, case .header(let group, _) = rows[safe: path.item] else { return cell.contentView.alpha = 1 }
+        cell.contentView.alpha = model.hidesHeader(group, in: column) ? 0 : 1
     }
 
     /// The rows whose capsule hides a row folding in or out under it: the cards and the texts typed.
@@ -426,6 +439,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     /// A row coming in unfolds from under the row before it, its own view carried down from there with the rows moving
     /// to make its room (`FoldingListLayout`).
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt path: IndexPath) {
+        shows(cell, at: path)
         guard let layout = collectionView.collectionViewLayout as? FoldingListLayout, let rise = layout.takeUnfolding(path.item) else { return }
         // The cell's own frame and transform are the layout's, set again as it is laid out: its content is carried
         // instead, by an animation of its own that no layout pass resets.
@@ -506,7 +520,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
                 copy = Self.image(of: cell.contentView, in: capsule)
             }
             let column = column.rawValue
-            return Lift(payload: payload, copy: copy, frame: start, begin: { model.startCarry(card, from: column) }) { [weak self] in
+            return Lift(payload: payload, copy: copy, frame: start, card: count == 1, begin: { model.startCarry(card, from: column) }) { [weak self] in
                 self?.capsule(of: card.id) ?? payload.home
             }
         case .header(let group, let header):
@@ -849,9 +863,9 @@ struct ListRowContent: View {
     private var content: some View {
         switch row {
         case .header(let group, let header):
-            // Lifted, the section is its floating copy: its header keeps its place but is not drawn twice.
+            // Lifted, the section is its floating copy: its header keeps its place but is not drawn twice (the list hides
+            // its row, `ListController.showHeaders`).
             SectionHeader(title: header, group: group, column: column, model: model)
-                .opacity(model.isLifted(group, in: column) ? 0 : 1)
         case .project(let project):
             ProjectHeader(project: project, column: column, model: model)
         case .newHead(let name):

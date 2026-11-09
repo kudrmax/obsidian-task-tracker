@@ -195,7 +195,7 @@ final class PlusControl: UIControl, CancelTarget {
         let point = pan.location(in: nil)
         switch pan.state {
         case .began:
-            guard let window, !cancelling, drag.idle else { return }
+            guard let window, drag.idle else { return }
             let moved = pan.translation(in: nil)
             start = CGPoint(x: point.x - moved.x, y: point.y - moved.y)
             wandered = false

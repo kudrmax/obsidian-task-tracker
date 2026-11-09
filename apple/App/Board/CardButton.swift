@@ -347,7 +347,7 @@ final class CardControl: UIControl {
             payload.grab = point.y - frame.minY
             payload.home = frame
             let copy = ListController.image(of: content, in: content.bounds)
-            let lift = Lift(payload: payload, copy: copy, frame: frame, begin: onCarry) { [weak self] in
+            let lift = Lift(payload: payload, copy: copy, frame: frame, card: true, begin: onCarry) { [weak self] in
                 guard let self, self.window != nil, self.id == card.id else { return payload.home }
                 return self.convert(self.bounds, to: nil)
             }

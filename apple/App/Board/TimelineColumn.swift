@@ -146,7 +146,9 @@ struct TimelineColumn: View {
                         .padding(.leading, Measure.itemsLeft + CGFloat(slot.box.left))
                         .padding(.trailing, Measure.itemsRight + Measure.itemInset)
                         .offset(y: top)
-                        .zIndex(model.selectedSlot == slot.id ? 1 : 0)
+                        // A card lying over another's body is drawn over it, the deeper the higher, whatever the order the
+                        // core lists them in: one lying under the long card it starts on was hidden whole by it.
+                        .zIndex(model.selectedSlot == slot.id ? .infinity : slot.box.left)
                 }
             }) { peek in
                 ZStack(alignment: .topLeading) {
