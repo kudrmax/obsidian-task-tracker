@@ -1,4 +1,5 @@
 import { SourceProblemError } from "../../core/application/EventSource";
+import { googleLoggedIn } from "../../core/application/googleLogin";
 import type { Clock, SettingsStore } from "../../core/application/ports";
 import type { TokenResponse } from "./GoogleToken";
 
@@ -22,7 +23,7 @@ export class GoogleAuth {
 	) {}
 
 	isLoggedIn(): boolean {
-		return this.settings.get().google.refreshToken !== "";
+		return googleLoggedIn(this.settings.get());
 	}
 
 	/** Runs the login flow and stores the refresh token in the settings; the same on the Mac and on the phone. */

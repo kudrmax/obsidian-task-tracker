@@ -1,4 +1,10 @@
+import type { TaskEntry } from "../domain/TaskDocument";
 import type { TaskKey } from "./contracts";
+
+/** The key of a task as read: its place and line, and its id, which names it after writes moved its place. */
+export function keyOf(entry: TaskEntry): TaskKey {
+	return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
+}
 
 /** The same place in the file: section, index and path. Two reads of one place match even when its line changed. */
 export function samePlace(a: TaskKey, b: TaskKey): boolean {

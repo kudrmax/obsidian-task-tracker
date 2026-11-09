@@ -23,36 +23,64 @@ public struct Branch: Decodable, Sendable, Hashable {
     }
 }
 
-/// A card as a column draws it: its task, how deep it stands, the corner, and its colour.
+/// How a card is coloured: the shades of each of its colours (`TaskItem.colors`, `rules.shadesOf`), the first tinting its
+/// dot and corner; a card of several labels is painted with every one of them, as stripes or, with `blend`, one colour
+/// flowing into the next (the settings' `labelPaint`).
+public struct CardPaint: Sendable, Hashable {
+    public let colors: [Themed<Shades>]
+    public let blend: Bool
+
+    public init(colors: [Themed<Shades>], blend: Bool) {
+        self.colors = colors
+        self.blend = blend
+    }
+}
+
+/// A card as a column draws it: its task, how deep it stands, the corner, and its colours.
 public struct BoardCard: Sendable, Hashable, Identifiable {
     public let item: TaskItem
     public let level: Int
     public let branch: Branch?
     public let due: DueLabel?
     public let repeats: Bool
-    public let shades: Themed<Shades>?
+    public let paint: CardPaint?
+    /// The first colour's shades: the card's tint, its dot's and its corner's.
+    public var shades: Themed<Shades>? { paint?.colors.first }
     /// On the timeline, the corner's two lines (`stackCorner`): the start a stacked card is put on, or the duration of one
     /// shorter than it; nil for neither, and on a list's card.
     public let corner: [String]?
     /// The card's identity on the screen: its task's id, the core's, so a card changed, moved or ticked stays the same
     /// card and the lists move it to its new place instead of drawing a new one.
     public var id: String { item.id }
-    /// In a list grouped by project, the project's part it is drawn in (`ListCard.project`: the link, null for No
-    /// project); nil in a plain list.
+    /// The project's part of a list grouped by project (or a project's view) it is drawn in (`ProjectGroup.zone`): the
+    /// project's link, `.null` for No project; `nil` in a list that groups nothing.
     public let zone: JSONValue?
+    /// Its title in pieces (`rules.textParts`): text, and links drawn in the accent that a tap opens.
+    public let parts: [TextPart]
 
     /// The card shows the task `id`.
     public func names(_ id: String) -> Bool { item.id == id }
 
-    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, corner: [String]? = nil, zone: JSONValue? = .none) {
+    /// Drawn in section `group` of the project's part `zone`: the same section of the same part.
+    public func stands(in group: String?, zone: JSONValue?) -> Bool { item.group == group && self.zone == zone }
+
+    /// The card as the places of its list see it (`ListCard`): its task's id and key, level and section, and its project's part.
+    public var listCard: JSONValue {
+        var card: [String: JSONValue] = ["id": .string(id), "key": item.key.json, "level": .number(Double(level)), "group": item.group.json]
+        if let zone { card["project"] = zone }
+        return .object(card)
+    }
+
+    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, paint: CardPaint?, corner: [String]? = nil, zone: JSONValue? = nil, parts: [TextPart]? = nil) {
         self.zone = zone
+        self.parts = parts ?? [TextPart(text: item.text)]
         self.corner = corner
         self.item = item
         self.level = level
         self.branch = branch
         self.due = due
         self.repeats = repeats
-        self.shades = shades
+        self.paint = paint
     }
 }
 
@@ -337,6 +365,12 @@ public struct BoardTimeline: Sendable, Hashable {
     public let zoomLevels: [Double]
 }
 
+/// How today changed between two reads (`DayChange`).
+public enum DayChange: Sendable, Equatable {
+    case passed
+    case moved
+}
+
 /// Everything the main screen draws for a day, read at one moment through the door.
 public struct BoardSnapshot: Sendable {
     public let today: String
@@ -350,10 +384,40 @@ public struct BoardSnapshot: Sendable {
     public let canUndo: Bool
     /// Each card's menu by its task's id (`TaskItem.id`), as opened from where the card stands.
     public let menus: [String: TaskMenuModel]
+    /// What every screen reads of the shared settings: the cards' height and gap, the long press, the labels' paint.
+    public let look: ScreenSettings
     /// The tasks file's text it was read from: the screen reads again only when it changes.
     public let tasksText: String?
     /// The plugin's settings (`data.json`) it was read over: what is named by them is asked again when they change.
     public let settingsJSON: String
+    /// Each calendar file's text it was read over, by source: a file Sync brings redraws the timeline.
+    public let calendarTexts: [String: String]
+    /// The moment it was read at: the now line and an overdue task riding it stand where they were then.
+    public let readAt: Date
+    /// The hour the day starts at, as the core read it (`days.boundary`).
+    public let startHour: Int
+
+    /// The files as they are now say what this snapshot was read from: no file, no setting, no calendar changed.
+    public func readFrom(_ files: BoardFiles) -> Bool {
+        files.tasks == tasksText && files.settingsJSON == settingsJSON && files.calendars == calendarTexts
+    }
+
+    /// Read from the same files on the same day: a snapshot of another day can stand beside it in a day's turn.
+    public func readAlike(_ other: BoardSnapshot) -> Bool {
+        other.tasksText == tasksText && other.settingsJSON == settingsJSON && other.calendarTexts == calendarTexts && other.today == today
+    }
+
+    /// Still true at `now`: read within the same minute, so the now line stands where it should.
+    public func current(at now: Date, calendar: Calendar = .current) -> Bool {
+        calendar.isDate(readAt, equalTo: now, toGranularity: .minute)
+    }
+
+    /// How the day changed from `before` to this read, as the plugin's `DayService` tells it: `moved` when the day's start
+    /// hour changed (the screen opens today afresh), `passed` when today is another day by the clock.
+    public func dayChange(since before: BoardSnapshot) -> DayChange? {
+        if before.startHour != startHour { return .moved }
+        return before.today == today ? nil : .passed
+    }
 
     /// The task the screen shows under `id`, a card's (`BoardCard.id`) or its task's (`TaskItem.id`), anywhere.
     public func item(_ id: String) -> TaskItem? {
@@ -368,24 +432,33 @@ public struct BoardSnapshot: Sendable {
     }
 }
 
+private struct DayStart: Decodable {
+    let startHour: Int
+}
+
 extension TaskBoard {
-    /// The screen for `day` (`nil`: today) over the vault's files as they are now.
-    public func snapshot(day wanted: String?, measures: TimelineMeasures, now: Date = Date()) throws -> BoardSnapshot {
+    /// The screen for `day` (`nil`: today) over the vault's files as they are now; with `project` (a project's link), that
+    /// project's own view (`tasks.screen(date, project)`). The cards' height and gap are the shared settings' (`look`), the
+    /// timeline's stack laid out at them whatever `measures` say.
+    public func snapshot(day wanted: String?, measures asked: TimelineMeasures, now: Date = Date(), project: String? = nil) throws -> BoardSnapshot {
         let files = try files(now: now)
+        let look: ScreenSettings = try read("screenSettings.get", over: files)
+        let measures = TimelineMeasures(hour: asked.hour, cardHeight: look.cardHeight, cardGap: look.cardGap, itemInset: asked.itemInset, itemGap: asked.itemGap, overlayInset: asked.overlayInset)
         let today: String = try read("days.today", over: files)
         let day = wanted ?? today
-        let screen: ScreenView = try read("tasks.screen", [.string(day)], over: files)
+        let screen: ScreenView = try read("tasks.screen", [.string(day)] + (project.map { [JSONValue.string($0)] } ?? []), over: files)
         let relation: String = try read("days.relation", [.string(day)], over: files)
         let dayTitle: String = try readRule("rules.dayTitle", [.string(day), .string(relation), .string(today)])
-        var painter = Painter(board: self)
+        var painter = Painter(board: self, blend: look.labelPaint == "blend")
 
         func list(_ column: BoardColumn, _ items: [TaskItem], title: String) throws -> BoardList {
             let sections: ColumnSections? = try read("tasks.columnSections", [.string(column.rawValue), .string(day)], over: files)
             let corner = column == .day ? JSONValue.string(day) : .null
             let ungrouped = screen.offer["ungrouped"].string ?? ""
             let titleDrop = screen.titleDrops[column.rawValue]
-            // The grouping the core gives the column's own list (`ScreenView.projects`): none for the day column.
-            let grouping = screen.projects[column.rawValue]
+            // The grouping the core gives the column's own list (`ScreenView.projects`); the day column's is `now`, grouped
+            // only in a project's view.
+            let grouping = screen.projects[column == .day ? "now" : column.rawValue]
             if let grouping, grouping.on {
                 var groups: [BoardGroup] = []
                 var parts: [BoardPart] = []
@@ -419,7 +492,7 @@ extension TaskBoard {
                     id: group.id,
                     name: group.name,
                     header: view.showsHeaders ? (group.name ?? ungrouped) : nil,
-                    cards: try cards(group.rows, corner: corner, painter: &painter),
+                    cards: try cards(group.rows, corner: corner, zone: nil, painter: &painter),
                     empty: group.empty,
                     menu: group.menu,
                     reorder: group.reorder ?? false)
@@ -455,11 +528,23 @@ extension TaskBoard {
             calendarsStale: events.stale,
             canUndo: canUndo,
             menus: menus,
+            look: look,
             tasksText: files.tasks,
-            settingsJSON: files.settingsJSON)
+            settingsJSON: files.settingsJSON,
+            calendarTexts: files.calendars,
+            readAt: files.now,
+            startHour: try read("days.boundary", over: files, as: DayStart.self).startHour)
     }
 
-    private func cards(_ rows: [ListRow], corner: JSONValue, zone: JSONValue? = .none, painter: inout Painter) throws -> [BoardCard] {
+    /// Cards for rows drawn outside the screen's lists (a full screen's subtasks, a search's finds), coloured and dated as
+    /// a list draws them: `corner` the day whose date a card leaves out, none for a list of no day.
+    public func cards(_ rows: [ListRow], corner day: String? = nil) throws -> [BoardCard] {
+        let look: ScreenSettings = try read("screenSettings.get", over: settingsOnly())
+        var painter = Painter(board: self, blend: look.labelPaint == "blend")
+        return try cards(rows, corner: day.json, zone: nil, painter: &painter)
+    }
+
+    private func cards(_ rows: [ListRow], corner: JSONValue, zone: JSONValue?, painter: inout Painter) throws -> [BoardCard] {
         let levels = JSONValue.array(rows.map { .number(Double($0.level)) })
         return try rows.enumerated().map { index, row in
             let due: CardDue? = try readRule("rules.cardDue", [row.item.json, corner])
@@ -469,8 +554,9 @@ extension TaskBoard {
                 branch: try readRule("rules.branchOf", [levels, .number(Double(index))]),
                 due: try due?.date.map { try painter.due($0) },
                 repeats: due?.repeats ?? false,
-                shades: try row.item.colors.first.map { try painter.shades($0) },
-                zone: zone)
+                paint: try painter.paint(row.item),
+                zone: zone,
+                parts: try painter.parts(row.item))
         }
     }
 
@@ -496,7 +582,7 @@ extension TaskBoard {
         let slots = try zip(shown, boxes).map { pair, box -> BoardSlot in
             let start = pair.0.slot?.start ?? pair.1.start
             let corner = try self.corner(box, start: start, pair.1.start, pair.1.end)
-            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, shades: try pair.0.colors.first.map { try painter.shades($0) }, corner: corner)
+            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, paint: try painter.paint(pair.0), corner: corner, parts: try painter.parts(pair.0))
             return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, slotStart: start, box: box)
         }
         let now: Int? = day == today ? try read("boundary.offsetOf", [.string(day), .number((files.now.timeIntervalSince1970 * 1000).rounded())], over: files) : nil
@@ -526,7 +612,7 @@ extension TaskBoard {
         let boxes: [StackBox] = try pure ? rule("rules.stackTasks", arguments) : readRule("rules.stackTasks", arguments)
         return try zip(timeline.slots, boxes).map { slot, box in
             let old = slot.card
-            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, shades: old.shades, corner: try corner(box, start: slot.slotStart, slot.start, slot.end, pure: pure))
+            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, paint: old.paint, corner: try corner(box, start: slot.slotStart, slot.start, slot.end, pure: pure), parts: old.parts)
             return BoardSlot(card: card, start: slot.start, end: slot.end, slotStart: slot.slotStart, box: box)
         }
     }
@@ -587,16 +673,59 @@ extension TaskBoard {
     }
 
     private static func levels(_ levels: [Double]) -> JSONValue { .array(levels.map { ["hourPx": .number($0)] }) }
+
+    /// How wide the copy of a pressed card grows to show a title the card cuts or fades (`rules.wholeWidth`): `nil` while
+    /// the title shows whole, the card then lifted itself.
+    public func wholeWidth(card: TitleFit, room: Double, margin: Double) throws -> GrownWidth? {
+        try rule("rules.wholeWidth", [card.json, ["width": .number(room), "margin": .number(margin)]])
+    }
+
+    /// Where the grown copy of a card starts on one axis (`rules.grownStart`).
+    public func grownStart(_ start: Double, size: Double, grown: Double, room: Double, margin: Double) throws -> Double {
+        try rule("rules.grownStart", [.number(start), .number(size), .number(grown), .number(room), .number(margin)])
+    }
+}
+
+/// A card's title as it is measured, for the copy that shows it whole: the card's width, the title's box, the title's text
+/// on one line, the fade at its end.
+public struct TitleFit: Sendable {
+    public let width: Double
+    public let titleWidth: Double
+    public let textWidth: Double
+    public let fade: Double
+
+    public init(width: Double, titleWidth: Double, textWidth: Double, fade: Double) {
+        self.width = width
+        self.titleWidth = titleWidth
+        self.textWidth = textWidth
+        self.fade = fade
+    }
+
+    var json: JSONValue { ["width": .number(width), "titleWidth": .number(titleWidth), "textWidth": .number(textWidth), "fade": .number(fade)] }
+}
+
+/// How wide the copy grows, and whether the title is still cut at that width: it then wraps onto more lines.
+public struct GrownWidth: Decodable, Sendable, Hashable {
+    public let width: Double
+    public let cut: Bool
 }
 
 /// The core's paints, each asked for once per drawing.
 struct Painter {
     let board: TaskBoard
+    let blend: Bool
     private var shadesByColor: [String: Themed<Shades>] = [:]
     private var dueByDate: [String: DueLabel] = [:]
+    private var partsByText: [String: [TextPart]] = [:]
 
-    init(board: TaskBoard) {
+    init(board: TaskBoard, blend: Bool) {
         self.board = board
+        self.blend = blend
+    }
+
+    /// A task's card colours: none without a priority or a label.
+    mutating func paint(_ item: TaskItem) throws -> CardPaint? {
+        item.colors.isEmpty ? nil : CardPaint(colors: try item.colors.map { try shades($0) }, blend: blend)
     }
 
     mutating func shades(_ color: String) throws -> Themed<Shades> {
@@ -606,6 +735,14 @@ struct Painter {
             light: try board.readRule("rules.shadesOf", [.string(color), "light"]))
         shadesByColor[color] = shades
         return shades
+    }
+
+    /// A title's pieces, asked once per title.
+    mutating func parts(_ item: TaskItem) throws -> [TextPart] {
+        if let known = partsByText[item.text] { return known }
+        let parts: [TextPart] = try board.readRule("rules.textParts", [.string(item.text)])
+        partsByText[item.text] = parts
+        return parts
     }
 
     mutating func due(_ date: String) throws -> DueLabel {

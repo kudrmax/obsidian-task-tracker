@@ -11,33 +11,47 @@ struct TaskCapsule: View {
     var picked = false
     var ringed = false
     var height: CGFloat = CardMetrics.height
+    /// The copy over a menu: the title wraps instead of fading, and the card grows down to hold its lines.
+    var whole = false
     /// Where the subtask counter is drawn, in the capsule's own space: the card lays its fold button there.
     var onCounter: ((CGRect) -> Void)?
+    /// Where the title's room is, in the capsule's own space: the menu's copy grows by what the title lacks of it.
+    var onTitle: ((CGRect) -> Void)?
+    /// Where each link of the title is drawn, in the capsule's own space: a tap there opens it instead of the menu.
+    var onLinks: (([CardLink]) -> Void)?
     /// Where the project's folder mark is drawn, in the capsule's own space: the card lays its button there.
     var onMark: ((CGRect) -> Void)?
+    /// A search's find: the found pieces picked out of the title, and the project's name or the description's line under
+    /// it where the query was found there, as the plugin's search draws its cards.
+    var found: SearchHit?
 
     @Environment(\.colorScheme) private var scheme
 
     private static let space = "capsule"
     /// On the timeline the card's content stands at its top, the corner beside the title's first line.
     private var onTimeline: Bool { card.corner != nil || height != CardMetrics.height }
+    /// The line a find shows under the title: the project's name when the query was found there, else the description's.
+    private var snippet: [FoundPart]? { found.flatMap { $0.project ?? $0.description } }
 
     var body: some View {
-        HStack(alignment: onTimeline ? .top : .center, spacing: 6) {
+        HStack(alignment: onTimeline || whole ? .top : .center, spacing: 6) {
             if selecting { pickCircle }
-            // The title never widens the card: it runs on past the room and fades out over its last points.
-            Color.clear
-                .frame(maxWidth: .infinity, minHeight: 18, maxHeight: 18)
-                .overlay(alignment: .leading) {
-                    Text(text ?? card.item.text)
-                        .font(.system(size: CardMetrics.title))
-                        .lineLimit(1)
-                        .fixedSize()
-                        .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
-                        .strikethrough(card.item.closed, color: Palette.muted)
-                }
-                .mask(fadeMask)
-                .accessibilityElement(children: .combine)
+            if whole {
+                // The copy over a menu shows the whole title, on as many lines as the width it was given needs.
+                title
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, alignment: .leading)
+            } else if let found {
+                foundTitle(found)
+            } else {
+                // The title never widens the card: it runs on past the room and fades out over its last points.
+                Color.clear
+                    .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, maxHeight: CardMetrics.titleLine)
+                    .overlay(alignment: .leading) { linedTitle }
+                    .mask(fadeMask)
+                    .accessibilityElement(children: .combine)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onTitle?($0) }
+            }
             if card.item.project?.mark == true { projectMark }
             if card.item.progress != nil || card.item.description != nil { meta }
             if let corner = card.corner { stackCorner(corner) }
@@ -49,9 +63,10 @@ struct TaskCapsule: View {
         }
         .padding(.leading, CardMetrics.leading)
         .padding(.trailing, CardMetrics.trailing)
-        .padding(.top, onTimeline ? (CardMetrics.height - 18) / 2 : 0)
-        .frame(maxWidth: .infinity, minHeight: CardMetrics.height, maxHeight: onTimeline ? .infinity : CardMetrics.height, alignment: onTimeline ? .top : .center)
-        .frame(height: max(height, CardMetrics.height), alignment: .top)
+        .padding(.top, onTimeline || whole ? (CardMetrics.height - CardMetrics.titleLine) / 2 : snippet == nil ? 0 : Self.snippetPad)
+        .padding(.bottom, whole ? (CardMetrics.height - CardMetrics.titleLine) / 2 : snippet == nil ? 0 : Self.snippetPad)
+        .frame(maxWidth: .infinity, minHeight: max(height, CardMetrics.height), maxHeight: onTimeline || whole || snippet != nil ? .infinity : CardMetrics.height, alignment: onTimeline || whole ? .top : .center)
+        .frame(height: whole || snippet != nil ? nil : max(height, CardMetrics.height), alignment: .top)
         .background(alignment: .topLeading) {
             if card.item.inProgress, !selecting {
                 Circle().fill(metaInk(shades)).frame(width: 4, height: 4)
@@ -59,12 +74,13 @@ struct TaskCapsule: View {
                     .accessibilityLabel("In progress")
             }
         }
-        .background(fill, in: .rect(cornerRadius: CardMetrics.radius))
+        .background { ground.clipShape(.rect(cornerRadius: CardMetrics.radius)) }
         .background(alignment: .bottom) {
             // Its subtasks folded away: a card peeking out under it.
             if card.item.collapsed {
-                RoundedRectangle(cornerRadius: CardMetrics.radius)
-                    .fill(fill.opacity(0.55))
+                ground
+                    .opacity(0.55)
+                    .clipShape(.rect(cornerRadius: CardMetrics.radius))
                     .frame(height: CardMetrics.height)
                     .padding(.horizontal, 8)
                     .offset(y: 4)
@@ -77,6 +93,94 @@ struct TaskCapsule: View {
         }
         .contentShape(.rect(cornerRadius: CardMetrics.radius))
         .coordinateSpace(.named(Self.space))
+    }
+
+    /// A find's title: the found pieces picked out as the plugin's search marks them (the selection's ground, semibold),
+    /// fading at the end; under it the project's name or the description's line it was found in, small and muted.
+    private func foundTitle(_ hit: SearchHit) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Color.clear
+                .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, maxHeight: CardMetrics.titleLine)
+                .overlay(alignment: .leading) {
+                    marked(hit.title.isEmpty ? [FoundPart(text: card.item.title, match: false)] : hit.title, size: CardMetrics.title)
+                        .font(.system(size: CardMetrics.title))
+                        .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
+                        .strikethrough(card.item.closed, color: Palette.muted)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+                .mask(fadeMask)
+            if let snippet {
+                Color.clear
+                    .frame(maxWidth: .infinity, minHeight: Self.snippetLine, maxHeight: Self.snippetLine)
+                    .overlay(alignment: .leading) {
+                        marked(snippet, size: Self.snippetFont).font(.system(size: Self.snippetFont)).foregroundStyle(Palette.muted).lineLimit(1).fixedSize()
+                    }
+                    .mask(fadeMask)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Found pieces in a line: the found ones on the selection's ground, semibold (`mark.tc-hit`).
+    private func marked(_ parts: [FoundPart], size: CGFloat) -> Text {
+        var text = AttributedString()
+        for part in parts {
+            var piece = AttributedString(part.text)
+            if part.match {
+                piece.backgroundColor = Palette.selection(scheme)
+                piece.font = .system(size: size, weight: .semibold)
+            }
+            text += piece
+        }
+        return Text(text)
+    }
+
+    /// The snippet's type and line (`--tc-font-block`, `--tc-leading-block`), and the room over and under a card that
+    /// has one (`--tc-space-6`).
+    private static let snippetFont: CGFloat = 12
+    private static let snippetLine: CGFloat = 15
+    private static let snippetPad: CGFloat = 6
+
+    /// The title's pieces: the card's, or its new text alone while its rename is written.
+    private var parts: [TextPart] { text.map { [TextPart(text: $0)] } ?? card.parts }
+
+    /// The title as the plugin's card writes it: the text as typed, each link by its word in the accent.
+    private var title: Text {
+        parts.reduce(Text(verbatim: "")) { text, part in
+            text + (part.isLink ? Text(verbatim: part.shown).foregroundColor(Palette.accent(scheme)) : Text(verbatim: part.shown))
+        }
+        .font(.system(size: CardMetrics.title))
+        .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
+        .strikethrough(card.item.closed, color: Palette.muted)
+    }
+
+    /// The title on its one line, each piece its own text so a link's place is known for the tap that opens it.
+    @ViewBuilder private var linedTitle: some View {
+        if parts.contains(where: \.isLink) {
+            HStack(spacing: 0) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
+                    piece(part)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frame in
+                            guard part.isLink else { return }
+                            linkFrames[index] = CardLink(part: part, frame: frame)
+                        }
+                }
+            }
+            .lineLimit(1)
+            .fixedSize()
+            .font(.system(size: CardMetrics.title))
+            .strikethrough(card.item.closed, color: Palette.muted)
+            .onChange(of: linkFrames, initial: true) { onLinks?(Array(linkFrames.values)) }
+        } else {
+            title.lineLimit(1).fixedSize()
+        }
+    }
+
+    @State private var linkFrames: [Int: CardLink] = [:]
+
+    private func piece(_ part: TextPart) -> Text {
+        Text(verbatim: part.shown).foregroundColor(part.isLink ? Palette.accent(scheme) : card.item.closed ? Palette.muted : Color.primary)
     }
 
     /// The subtask counter over the description's mark, as the plugin stacks them; either alone when the task has only it.
@@ -151,6 +255,15 @@ struct TaskCapsule: View {
 
     private var shades: Shades? { card.shades.map { scheme == .dark ? $0.dark : $0.light } }
     private var fill: Color { shades.map { Color(hex: $0.fill) } ?? Palette.card(scheme) }
+
+    /// The card's ground: its one colour, or, for several labels, each one's fill as stripes or a blend.
+    @ViewBuilder private var ground: some View {
+        if let paint = card.paint, let fills = LabelFills(paint, scheme) {
+            fills
+        } else {
+            Rectangle().fill(fill)
+        }
+    }
     private var metaColor: Color { metaInk(shades) }
     private func metaInk(_ shades: Shades?) -> Color { shades.map { Color(hex: $0.meta) } ?? Palette.muted }
 
@@ -178,6 +291,58 @@ struct TaskCapsule: View {
         }
         .frame(width: 20, height: 20)
         .accessibilityLabel(picked ? "Selected" : "Not selected")
+    }
+}
+
+/// A link of a card's title and where it is drawn.
+struct CardLink: Equatable {
+    let part: TextPart
+    let frame: CGRect
+}
+
+/// A card of several labels, painted as the plugin paints it (`styles.css`, «A task with several labels»): narrow bands
+/// of their fills in turn across the card at a slant, or, with the settings' blend, one fill flowing into the next from
+/// left to right. The core gives at most `MOST_CARD_COLORS` colours.
+struct LabelFills: View {
+    let fills: [Color]
+    let blend: Bool
+
+    /// A band's width across (`--tc-label-stripe`) and the slant, as CSS turns a gradient (`--tc-label-stripe-angle`).
+    static let stripe: CGFloat = 6
+    static let angle: Angle = .degrees(120)
+
+    init?(_ paint: CardPaint, _ scheme: ColorScheme) {
+        guard paint.colors.count > 1 else { return nil }
+        fills = paint.colors.map { Color(hex: scheme == .dark ? $0.dark.fill : $0.light.fill) }
+        blend = paint.blend
+    }
+
+    var body: some View {
+        if blend {
+            LinearGradient(colors: fills, startPoint: .leading, endPoint: .trailing)
+        } else {
+            Canvas { context, size in
+                // CSS measures a gradient's stops along its line from the corner it starts at: for this slant the
+                // top left, the bands square to the line.
+                let along = CGVector(dx: sin(Self.angle.radians), dy: -cos(Self.angle.radians))
+                let across = CGVector(dx: -along.dy, dy: along.dx)
+                let reach = size.width + size.height
+                let length = size.width * along.dx + size.height * along.dy
+                var band = 0
+                while CGFloat(band) * Self.stripe < length {
+                    // Each band reaches a hair into the next, which covers it: no seam of the ground between them.
+                    let near = CGFloat(band) * Self.stripe, far = near + Self.stripe + 0.5
+                    var path = Path()
+                    path.move(to: CGPoint(x: along.dx * near - across.dx * reach, y: along.dy * near - across.dy * reach))
+                    path.addLine(to: CGPoint(x: along.dx * near + across.dx * reach, y: along.dy * near + across.dy * reach))
+                    path.addLine(to: CGPoint(x: along.dx * far + across.dx * reach, y: along.dy * far + across.dy * reach))
+                    path.addLine(to: CGPoint(x: along.dx * far - across.dx * reach, y: along.dy * far - across.dy * reach))
+                    path.closeSubpath()
+                    context.fill(path, with: .color(fills[band % fills.count]))
+                    band += 1
+                }
+            }
+        }
     }
 }
 

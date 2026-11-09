@@ -1,13 +1,12 @@
-import { type LabelLevel, PRIORITY_COLORS, type PriorityColor, type PriorityLevel, shadesOf, usableColor } from "../../core/application/contracts";
+import { type LabelLevel, type LabelPaint, PRIORITY_COLORS, type PriorityColor, type PriorityLevel, shadesOf, usableColor } from "../../core/application/contracts";
 import { onWindowDocument, windowDocuments } from "./windowDocuments";
-import type { LabelPaint } from "./viewSettings";
 
 export { contrast, inkOf, type PriorityShades, shadesOf } from "../../core/application/contracts";
 
 /** The properties each colour's rule sets, which the stylesheet's rules read. */
 const PROPERTY = { ink: "--tc-priority-ink", fill: "--tc-priority-fill", meta: "--tc-priority-meta" } as const;
 
-/** A card of several labels carries the n-th one's colour in `attribute`; the stylesheet reads its fill as `fill`. */
+/** A card of several labels carries the n-th one's colour in `attribute`; the stylesheet reads its fill as `fill`. One slot for each of the core's `MOST_CARD_COLORS`. */
 export const LABEL_SLOTS = [
 	{ attribute: "data-label0", fill: "--tc-label-fill-0" },
 	{ attribute: "data-label1", fill: "--tc-label-fill-1" },

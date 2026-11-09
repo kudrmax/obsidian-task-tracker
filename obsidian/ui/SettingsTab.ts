@@ -1,6 +1,5 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
-import { type CalendarService, type CountField, type GoogleAccount, isPresetColor, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../../core/application/contracts";
-import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, formatZoomLevels, LABEL_PAINTS, type LabelPaint, type ViewSettings, type ViewSettingsStore } from "./viewSettings";
+import { type CalendarService, type CountField, type GoogleAccount, isPresetColor, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../../core/application/contracts";
 import type { Theme } from "./eventColors";
 import { inkOf, showPriorityColors } from "./priorityColors";
 import { formatTime } from "./dates";
@@ -11,8 +10,6 @@ import { SettingsPage } from "./SettingsPage";
 
 export interface SettingsTabDeps {
 	readonly settings: SettingsService;
-	/** This view's own settings: the cards' size, how several labels paint a card, the zoom levels. */
-	readonly view: ViewSettingsStore;
 	readonly google: GoogleAccount;
 	readonly work: WorkCalendarSetup;
 	readonly calendars: Pick<CalendarService, "known" | "setShown">;
@@ -60,6 +57,9 @@ const SECTION_LABELS: Readonly<Record<keyof SectionNames, string>> = {
 };
 
 export class TaskCalendarSettingsTab extends PluginSettingTab {
+	/** The page a row opened, while it shows: it goes with the settings, never outliving them. */
+	private page: SettingsPage | null = null;
+
 	constructor(
 		app: App,
 		plugin: Plugin,
@@ -86,10 +86,6 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		return this.deps.settings;
 	}
 
-	private get view(): ViewSettings {
-		return this.deps.view.get();
-	}
-
 	/** The set-up-once part, each on a page of its own behind a row. */
 	private moreGroup(el: HTMLElement): void {
 		new Setting(el).setName("More").setHeading();
@@ -104,7 +100,30 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setDesc(desc)
 			.addExtraButton((b) => b.setIcon("chevron-right"));
 		row.settingEl.addClass("tc-settings-link", "mod-navigable");
-		row.settingEl.addEventListener("click", () => new SettingsPage(this.app, name, build, () => this.display()).open());
+		row.settingEl.addEventListener("click", () => this.openPage(name, build));
+	}
+
+	private openPage(name: string, build: (page: HTMLElement, redraw: () => void) => void): void {
+		this.closePage();
+		const page = new SettingsPage(this.app, name, build, () => {
+			if (this.page === page) this.page = null;
+			this.display();
+		});
+		this.page = page;
+		page.open();
+	}
+
+	/** The settings closed: the page shown over them closes too. */
+	override hide(): void {
+		this.closePage();
+		super.hide();
+	}
+
+	/** Closes the page shown, if any: with the settings, and when the plugin unloads. */
+	closePage(): void {
+		const page = this.page;
+		this.page = null;
+		page?.close();
 	}
 
 	private tasksFilePage(el: HTMLElement): void {
@@ -173,8 +192,8 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setName("Several labels")
 			.setDesc("How a card of several labels is painted.")
 			.addDropdown((d) => {
-				for (const paint of LABEL_PAINTS) d.addOption(paint, PAINT_NAMES[paint]);
-				d.setValue(this.view.labelPaint).onChange((value) => this.deps.view.set({ labelPaint: value as LabelPaint }));
+				for (const paint of this.settings.labelPaints) d.addOption(paint, PAINT_NAMES[paint]);
+				d.setValue(this.settings.labelPaint).onChange((value) => void this.service.setLabelPaint(value as LabelPaint));
 			});
 	}
 
@@ -285,8 +304,9 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	/** The cards' size, the same in the list and in a stack on the timeline: they change as the slider moves. */
 	private cardsGroup(el: HTMLElement): void {
 		new Setting(el).setName("Cards").setHeading();
-		this.slider(el, "Card height", "Pixels. The ends of a card are round: half its height.", CARD_HEIGHT_MIN, CARD_HEIGHT_MAX, this.view.cardHeight, (px) => this.deps.view.set({ cardHeight: px }));
-		this.slider(el, "Gap between cards", "Pixels between cards, in the list and in a stack on the timeline.", 0, CARD_GAP_MAX, this.view.cardGap, (px) => this.deps.view.set({ cardGap: px }));
+		const { cardHeights, cardGaps } = this.settings;
+		this.slider(el, "Card height", "Pixels. The ends of a card are round: half its height.", cardHeights.min, cardHeights.max, this.settings.cardHeight, (px) => this.service.setCardHeight(px));
+		this.slider(el, "Gap between cards", "Pixels between cards, in the list and in a stack on the timeline.", cardGaps.min, cardGaps.max, this.settings.cardGap, (px) => this.service.setCardGap(px));
 	}
 
 	private dayPage(el: HTMLElement): void {
@@ -302,7 +322,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		new Setting(el)
 			.setName("Zoom levels")
 			.setDesc("Pixels per hour, like 28, 56, 112, 224: a pinch stops wherever the fingers lift, up to the largest. Zoomed out all the way, it shows the whole day instead of the smallest one. A drag snaps to 30 minutes at 28, 15 at 56, 5 from 112 on.")
-			.addText((t) => t.setValue(formatZoomLevels(this.view.zoomLevels)).onChange((text) => this.deps.view.setZoomLevels(text)));
+			.addText((t) => t.setValue(this.settings.zoomLevels).onChange((text) => this.service.setZoomLevels(text)));
 	}
 
 	/** Which calendars show first; the Google account and the client it needs; the work calendar; when a file counts as stale. */

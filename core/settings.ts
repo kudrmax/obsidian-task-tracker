@@ -70,6 +70,40 @@ export interface SourceSettings {
 	readonly staleAfterMinutes: number;
 }
 
+/** How a card of several labels is painted: narrow diagonal stripes of their colours in turn, or one colour flowing into the next. */
+export type LabelPaint = "stripes" | "blend";
+
+/** The paints a card of several labels may take, in the order the settings offer them; the first is the default. */
+export const LABEL_PAINTS: readonly LabelPaint[] = ["stripes", "blend"];
+
+/** The bounds a card's height and the gap between cards are kept in, px (points on the phone). */
+export const CARD_HEIGHTS = { min: 28, max: 40 } as const;
+export const CARD_GAPS = { min: 0, max: 10 } as const;
+/** A card's height and the gap between cards before the settings say otherwise. */
+export const DEFAULT_CARD_SIZE = { height: 35, gap: 2 } as const;
+
+/** A level of the timeline's zoom: the height of one hour, in the frontend's units. */
+export interface ZoomLevel {
+	readonly hourPx: number;
+}
+
+/** The levels a settings file without its own gives: from the whole day to the closest hour. */
+export const DEFAULT_ZOOM_LEVELS: readonly ZoomLevel[] = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
+
+/** How every frontend zooms its timeline alike: the hour's heights a pinch settles between. */
+export interface TimelineSettings {
+	readonly zoomLevels: readonly ZoomLevel[];
+}
+
+/** How every frontend paints a card alike: its labels, its height and the gap to the next. */
+export interface CardPaintSettings {
+	readonly labelPaint: LabelPaint;
+	/** A task card's height: the list, New task and the timeline's stack; its ends are round, half of it. */
+	readonly cardHeight: number;
+	/** Between two cards: in a list and in a stack on the timeline alike. */
+	readonly cardGap: number;
+}
+
 /** Which notes are projects. */
 export interface ProjectSettings {
 	/** A note with exactly this tag, in its properties or its text, is a project: `#project`. */
@@ -77,7 +111,7 @@ export interface ProjectSettings {
 }
 
 /** The settings every frontend shares: the plugin's data.json holds them, with the TS view's own beside them. */
-export type TaskCalendarSettings = FileFormatSettings & ScreenBehaviour & SourceSettings & ProjectSettings;
+export type TaskCalendarSettings = FileFormatSettings & ScreenBehaviour & SourceSettings & ProjectSettings & CardPaintSettings & TimelineSettings;
 
 export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	tasksFile: "TODOs Tasks.md",
@@ -104,6 +138,10 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	],
 	labelTag: "label",
 	labels: [],
+	labelPaint: LABEL_PAINTS[0],
+	cardHeight: DEFAULT_CARD_SIZE.height,
+	cardGap: DEFAULT_CARD_SIZE.gap,
+	zoomLevels: DEFAULT_ZOOM_LEVELS,
 	projectTag: "#project",
 	groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
 };
@@ -117,5 +155,29 @@ export function settingsFrom(saved: unknown): TaskCalendarSettings {
 		sections: { ...DEFAULT_SETTINGS.sections, ...(s.sections ?? {}) },
 		google: { ...DEFAULT_SETTINGS.google, ...(s.google ?? {}) },
 		groups: { ...DEFAULT_SETTINGS.groups, ...(s.groups ?? {}) },
+		labelPaint: labelPaintOf(s.labelPaint),
+		cardHeight: sizeOf(s.cardHeight, CARD_HEIGHTS, DEFAULT_SETTINGS.cardHeight),
+		cardGap: sizeOf(s.cardGap, CARD_GAPS, DEFAULT_SETTINGS.cardGap),
+		zoomLevels: zoomLevelsOf(saved),
 	};
+}
+
+/** A size as saved: a whole number within its bounds, or the default for anything that is no number. */
+export function sizeOf(saved: unknown, bounds: { readonly min: number; readonly max: number }, fallback: number): number {
+	if (typeof saved !== "number" || !Number.isFinite(saved)) return fallback;
+	return Math.min(bounds.max, Math.max(bounds.min, Math.round(saved)));
+}
+
+/** A paint as saved: one of the paints, or the default for anything else. */
+export function labelPaintOf(saved: unknown): LabelPaint {
+	return LABEL_PAINTS.find((paint) => paint === saved) ?? DEFAULT_SETTINGS.labelPaint;
+}
+
+/** The levels `data.json` keeps under `zoomLevels`, each only its height; the defaults when it keeps none, or one doesn't read. */
+export function zoomLevelsOf(saved: unknown): ZoomLevel[] {
+	const kept = saved !== null && typeof saved === "object" ? (saved as { zoomLevels?: unknown }).zoomLevels : undefined;
+	if (!Array.isArray(kept) || kept.length === 0) return [...DEFAULT_ZOOM_LEVELS];
+	const levels = kept.map((level) => (level !== null && typeof level === "object" ? (level as { hourPx?: unknown }).hourPx : undefined));
+	if (!levels.every((hourPx): hourPx is number => typeof hourPx === "number" && Number.isFinite(hourPx) && hourPx > 0)) return [...DEFAULT_ZOOM_LEVELS];
+	return levels.map((hourPx) => ({ hourPx }));
 }

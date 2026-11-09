@@ -43,6 +43,38 @@ import Testing
         #expect(menu.edits.contains("subtask"))
     }
 
+    @Test func aCardOfSeveralLabelsCarriesEachColourInTheSettingsOrder() throws {
+        let vault = FakeVault(Self.file.replacingOccurrences(of: "- [ ] Idea", with: "- [ ] Idea #label/Quick #label/Calm\n- [ ] Plain #label/Calm"))
+        vault.settings = #"{"labels":[{"name":"Calm","color":"blue"},{"name":"Quick","color":"green"}]}"#
+        let snapshot = try board(vault).snapshot(day: nil, measures: TimelineMeasures(hour: 56, cardHeight: 35, cardGap: 2, itemInset: 1, itemGap: 2, overlayInset: 18), now: Fixtures.date(6, 10))
+        let cards = try #require(snapshot.lists[.inbox]).cards
+        let blue = try board(vault).rule("rules.shadesOf", ["blue", "dark"], as: Shades.self)
+        let green = try board(vault).rule("rules.shadesOf", ["green", "dark"], as: Shades.self)
+        let idea = try #require(cards.first { $0.item.title == "Idea" }?.paint)
+        #expect(idea.colors.map(\.dark) == [blue, green])
+        #expect(!idea.blend)
+        #expect(cards.first { $0.item.title == "Plain" }?.paint?.colors.count == 1)
+    }
+
+    @Test func severalLabelsBlendWhenTheSettingsSaySo() throws {
+        let vault = FakeVault(Self.file.replacingOccurrences(of: "- [ ] Idea", with: "- [ ] Idea #label/Quick #label/Calm"))
+        vault.settings = #"{"labels":[{"name":"Calm","color":"blue"},{"name":"Quick","color":"green"}],"labelPaint":"blend"}"#
+        let snapshot = try board(vault).snapshot(day: nil, measures: TimelineMeasures(hour: 56, cardHeight: 35, cardGap: 2, itemInset: 1, itemGap: 2, overlayInset: 18), now: Fixtures.date(6, 10))
+        #expect(try #require(snapshot.lists[.inbox]).cards.first { $0.item.title == "Idea" }?.paint?.blend == true)
+    }
+
+    @Test func aPressedCardsCopyGrowsAsTheCoreSays() throws {
+        let board = board(FakeVault(Self.file))
+        let whole = try board.wholeWidth(card: TitleFit(width: 170, titleWidth: 140, textWidth: 100, fade: 16), room: 390, margin: 10)
+        #expect(whole == nil)
+        let grown = try board.wholeWidth(card: TitleFit(width: 170, titleWidth: 140, textWidth: 200, fade: 16), room: 390, margin: 10)
+        #expect(grown == GrownWidth(width: 230, cut: false))
+        let cut = try board.wholeWidth(card: TitleFit(width: 170, titleWidth: 140, textWidth: 540, fade: 16), room: 390, margin: 10)
+        #expect(cut == GrownWidth(width: 370, cut: true))
+        #expect(try board.grownStart(200, size: 180, grown: 230, room: 390, margin: 10) == 150)
+        #expect(try board.grownStart(10, size: 170, grown: 230, room: 390, margin: 10) == 10)
+    }
+
     @Test func aSwipeOnTheCalendarLeadsWhereTheCoreSays() throws {
         let board = board(FakeVault(Self.file))
         let files = board.settingsOnly(now: Fixtures.date(6, 10))
@@ -83,9 +115,12 @@ import Testing
         let vault = FakeVault(Self.file)
         let board = board(vault)
         let screen: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files())
-        vault.changeBeforeWrite = Self.file + "- [ ] Typed in Obsidian\n"
+        // Lines typed above the task in between: the write over the old text is refused by the vault and made again over
+        // the new one, the key finding its task where it now stands.
+        vault.changeBeforeWrite = Self.file.replacingOccurrences(of: "## Inbox\n\n", with: "## Inbox\n\n- [ ] Typed in Obsidian\n")
         try board.write("tasks.setStatus", [screen.inbox[0].key.json, "done"])
-        #expect(vault.text.contains("Typed in Obsidian"))
+        #expect(vault.changeBeforeWrite == nil)
+        #expect(vault.text.contains("- [ ] Typed in Obsidian"))
         #expect(!vault.text.contains("- [ ] Idea"))
     }
 
@@ -93,7 +128,9 @@ import Testing
         let vault = FakeVault(Self.file)
         let board = board(vault)
         let screen: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files())
-        vault.text = Self.file.replacingOccurrences(of: "- [ ] Idea", with: "- [ ] Other")
+        // The task removed elsewhere: no line holds its id any more (a line edited in place stays the same task).
+        vault.text = Self.file.replacingOccurrences(of: "- [ ] Idea\n", with: "")
+        #expect(!vault.text.contains("Idea"))
         #expect(throws: BoardError.refused(code: "staleTask", message: "stale task")) {
             try board.write("tasks.setStatus", [screen.inbox[0].key.json, "done"])
         }

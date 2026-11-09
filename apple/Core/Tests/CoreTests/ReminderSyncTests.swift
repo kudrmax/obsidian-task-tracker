@@ -14,7 +14,12 @@ final class FakeVault: TasksVault, @unchecked Sendable {
     init(_ text: String) { self.text = text }
     func settingsJSON() -> String { settings }
     func read(path: String) -> String? { files[path] }
-    func write(path: String, text: String) throws { files[path] = text }
+    func write(path: String, text: String) throws { files[path] = text; edits[path, default: 0] += 1 }
+    /// How many times each file was written: its modification date, as the vault lists it.
+    var edits: [String: Int] = [:]
+    func vaultFiles() -> [VaultFile] {
+        files.keys.sorted().map { VaultFile(path: $0, modified: Date(timeIntervalSince1970: Double(edits[$0, default: 0]))) }
+    }
     func read() throws -> (tasks: String, settingsJSON: String) {
         if let error = readFails { throw error }
         return (text, settings)

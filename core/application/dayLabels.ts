@@ -20,6 +20,12 @@ export interface DueLabel {
 	readonly month: string;
 }
 
+/** `3 Nov`: a date as the quick entry's place button and the sources window write it. */
+export function dayMonth(date: LocalDate): string {
+	const { month, day } = partsOf(date);
+	return `${day} ${MONTHS[month - 1]}`;
+}
+
 export function dueLabel(date: LocalDate): DueLabel {
 	const { month, day } = partsOf(date);
 	return { day: String(day), month: MONTHS[month - 1].toUpperCase() };

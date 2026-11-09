@@ -38,6 +38,20 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
         self = place
     }
 
+    /// Where the ribbon stood when the app last showed it, on this device: Today the first time. A project's view keeps its
+    /// own, by its note, and opens on Inbox the first time, as the plugin's block.
+    static func remembered(for project: ProjectRef?) -> RibbonPlace {
+        UserDefaults.standard.object(forKey: key(project)).flatMap { $0 as? Int }.flatMap(RibbonPlace.init(rawValue:)) ?? (project == nil ? .today : .inbox)
+    }
+
+    func remember(for project: ProjectRef?) {
+        UserDefaults.standard.set(rawValue, forKey: Self.key(project))
+    }
+
+    private static func key(_ project: ProjectRef?) -> String {
+        project.map { "ribbonPlace/" + ($0.note ?? $0.link) } ?? "ribbonPlace"
+    }
+
     var symbol: String {
         switch self {
         case .inbox: "tray"
@@ -85,7 +99,15 @@ final class BoardModel {
     /// The timeline's zoom, kept across days.
     @ObservationIgnored let zoom = TimelineZoom()
 
-    init() {
+    /// The project whose own view this screen is, as the plugin's block at the end of a project's note: every list holds
+    /// only its tasks and every task written here gets it. `nil` for the main screen.
+    nonisolated let project: ProjectRef?
+    /// What `tasks.screen` takes for the project's view.
+    nonisolated var projectLink: String? { project?.link }
+
+    init(project: ProjectRef? = nil) {
+        self.project = project
+        place = RibbonPlace.remembered(for: project)
         dropping.ended = { [weak self] in self?.dropSessionEnded(performed: $0, token: $1) }
         dropping.carrying = { [weak self] in self?.carry?.token }
         dropping.foldsOnDrop = { [weak self] in self?.carry?.section != nil }
@@ -134,13 +156,18 @@ final class BoardModel {
 
     @ObservationIgnored private var shadesByColor: [String: Themed<Shades>] = [:]
 
-    /// Where the ribbon stands. A swipe sets it as the ribbon settles; `go(to:)` moves the ribbon there.
-    var place = RibbonPlace.today
+    /// Where the ribbon stands, remembered on the device as the plugin's wheel is. A swipe sets it as the ribbon settles;
+    /// `go(to:)` moves the ribbon there.
+    var place: RibbonPlace {
+        didSet { if place != oldValue { place.remember(for: project) } }
+    }
     /// The place a tap on a tab asked the ribbon to scroll to, each ask new.
     private(set) var asked: PlaceAsk?
 
     struct PlaceAsk: Equatable {
         let place: RibbonPlace
+        /// To the Done column, left of the place.
+        var done = false
         let id = UUID()
     }
 
@@ -149,7 +176,10 @@ final class BoardModel {
         asked = PlaceAsk(place: place)
     }
     private(set) var snapshot: BoardSnapshot? {
-        didSet { if let timeline = snapshot?.timeline, timeline != oldValue?.timeline { layOutNow(timeline) } }
+        didSet {
+            if let snapshot { CardMetrics.follow(snapshot.look) }
+            if let timeline = snapshot?.timeline, timeline != oldValue?.timeline { layOutNow(timeline) }
+        }
     }
     private(set) var problem: String?
     private(set) var shownDay: String?
@@ -165,6 +195,14 @@ final class BoardModel {
     var repeatFor: TaskItem?
     var newSection: TaskItem?
     var fullScreen: [TaskItem] = []
+    /// The full screen opened by Description (Add description): its page opens with the caret in the description.
+    var describing: String?
+
+    /// Description in a menu: the task on the whole screen, typing its description, as the plugin's Add description.
+    func describe(_ item: TaskItem) {
+        describing = item.id
+        Task { await openFullScreen(item) }
+    }
 
     /// A read asked for while one runs: it runs again once that one ends, so the screen always ends on the latest ask.
     private var readAgain = false
@@ -192,6 +230,7 @@ final class BoardModel {
         var caught = false
     }
     @ObservationIgnored private var watch: FileWatch?
+    @ObservationIgnored private var settingsWatch: FileWatch?
 
     /// The screen read again. A read asked while one runs makes that one read once more, and waits for it: every caller
     /// returns with the screen drawn from the file as it was after its ask. How the drawing moves follows from what
@@ -207,6 +246,7 @@ final class BoardModel {
         running = task
         await task.value
         running = nil
+        if doneShown { await readDone() }
         readAhead()
         rewatchIfMoved()
     }
@@ -218,10 +258,11 @@ final class BoardModel {
             readAgain = false
             let day = shownDay
             let board = board
+            let link = projectLink
             readsStarted += 1
             let serial = readsStarted
             do {
-                let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
+                let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline, project: link) }.value
                 // Another day was asked for meanwhile (a turn that went on): this read is not drawn, the day asked is read.
                 guard shownDay == day else { readAgain = true; continue }
                 show(read, serial: serial)
@@ -235,6 +276,8 @@ final class BoardModel {
     /// The screen drawn from `read` in one transaction, its motion chosen by what differs from the drawing on the screen;
     /// the first read after a drop's write puts the dropped card in its new place, hidden until its copy lands there.
     private func show(_ read: BoardSnapshot, serial: Int) {
+        if let before = snapshot { follow(read.dayChange(since: before), from: before) }
+        defer { if reopen, read.day == read.today, !readAgain { reopen = false; dayMoved += 1 } }
         forgetGone(read)
         let lands = dropRead.flatMap { serial >= $0.from ? $0 : nil }
         if lands != nil { dropRead = nil }
@@ -260,9 +303,10 @@ final class BoardModel {
         }
     }
 
-    /// Reads again only when the tasks file changed under the screen: Obsidian, Sync, a reminder's button. While a card is
-    /// carried or the quick entry's writes run, the read waits for them: the entry draws each of its writes itself, in
-    /// the same drawing as the line it ends.
+    /// Reads again only when the screen no longer stands for the files or the clock: the tasks file changed (Obsidian,
+    /// Sync, a reminder's button), the settings (a list renamed, a colour changed), a calendar file Sync brought, or a
+    /// minute passed since the read. While a card is carried or the quick entry's writes run, the read waits for them:
+    /// the entry draws each of its writes itself, in the same drawing as the line it ends.
     func reloadIfChanged() async {
         guard carried == nil, !entry.writing else {
             readAfterCarry = true
@@ -270,8 +314,51 @@ final class BoardModel {
         }
         let board = board
         guard let files = try? await Task.detached(operation: { try board.files() }).value else { return }
-        // The settings count too: a list renamed or a colour changed in Settings or in Obsidian redraws every name.
-        if files.tasks != snapshot?.tasksText || files.settingsJSON != snapshot?.settingsJSON { await reload() }
+        guard let snapshot, snapshot.readFrom(files), snapshot.current(at: files.now) else { return await reload() }
+    }
+
+    // MARK: The clock
+
+    /// The host's clock, as the plugin keeps it (`DayService`'s `onDayChange`, `catchUp`): while the screen shows, the
+    /// screen is read at each new minute, so the now line and an overdue task riding it move and a day that passed
+    /// brings the new today. A carry, a day's turn or the quick entry (typing or writing) hold the tick until they let go.
+    @ObservationIgnored private var clock: Task<Void, Never>?
+
+    /// Bumped when the day's start hour moved: the calendar opens today afresh, on the now line.
+    private(set) var dayMoved = 0
+    @ObservationIgnored private var reopen = false
+
+    func startClock() {
+        guard clock == nil else { return }
+        clock = Task { [weak self] in
+            while !Task.isCancelled {
+                let now = Date()
+                let next = Calendar.current.dateInterval(of: .minute, for: now)?.end ?? now.addingTimeInterval(60)
+                try? await Task.sleep(for: .seconds(next.timeIntervalSince(now) + 0.05))
+                while !Task.isCancelled, self?.clockHeld == true { try? await Task.sleep(for: .seconds(1)) }
+                guard !Task.isCancelled, let self else { return }
+                await self.reloadIfChanged()
+            }
+        }
+    }
+
+    func stopClock() {
+        clock?.cancel()
+        clock = nil
+    }
+
+    private var clockHeld: Bool { carried != nil || entry.isOpen || entry.writing || dayTurn != nil || running != nil }
+
+    /// Today by the clock: a screen that showed today shows the new today; another start hour opens today afresh.
+    private func follow(_ change: DayChange?, from before: BoardSnapshot) {
+        guard let change else { return }
+        neighbours = nil
+        ahead = [:]
+        let showedToday = shownDay == nil || shownDay == before.today
+        if change == .moved { reopen = true }
+        guard change == .moved || showedToday, shownDay != nil else { return }
+        shownDay = nil
+        readAgain = true
     }
 
     /// The vault's project notes changed: the screen reads again, once a carry or the quick entry's writes let it.
@@ -287,15 +374,17 @@ final class BoardModel {
     /// The project notes changed while a carry or the quick entry held the read: it reads again whatever the file did.
     @ObservationIgnored private var projectsAsked = false
 
-    /// The tasks file watched while the screen shows: a coordinated write elsewhere (iCloud, a reminder's button) reads again.
+    /// The tasks file and the plugin's settings watched while the screen shows: a write elsewhere (Obsidian, iCloud, a
+    /// reminder's button) reads again, and a setting changed in Obsidian redraws the screen at once, as the plugin's.
     func watchFile() {
         AppServices.shared.projects.changed = { [weak self] in
             Task { @MainActor in await self?.projectsChanged() }
         }
-        guard watch == nil else { return }
-        watch = AppServices.shared.vault.watchTasksFile { [weak self] in
+        let changed: @Sendable () -> Void = { [weak self] in
             Task { @MainActor in await self?.reloadIfChanged() }
         }
+        if watch == nil { watch = AppServices.shared.vault.watchTasksFile(changed) }
+        if settingsWatch == nil { settingsWatch = AppServices.shared.vault.watchSettingsFile(changed) }
     }
 
     /// The settings named another tasks file: the watch follows it.
@@ -308,19 +397,22 @@ final class BoardModel {
     func stopWatching() {
         watch?.cancel()
         watch = nil
+        settingsWatch?.cancel()
+        settingsWatch = nil
     }
 
     private func readAhead() {
         guard let shown = snapshot else { return }
         let board = board
         let day = shown.day
+        let link = projectLink
         Task {
             guard let previous: String = try? await read("days.step", [.string(day), -1]),
                   let next: String = try? await read("days.step", [.string(day), 1]) else { return }
             neighbours = (previous, next)
             for other in [previous, next] {
-                if let kept = ahead[other], kept.tasksText == shown.tasksText { continue }
-                if let read = try? await Task.detached(operation: { try board.snapshot(day: other, measures: CardMetrics.timeline) }).value {
+                if let kept = ahead[other], kept.readAlike(shown) { continue }
+                if let read = try? await Task.detached(operation: { try board.snapshot(day: other, measures: CardMetrics.timeline, project: link) }).value {
                     ahead[other] = read
                 }
             }
@@ -366,8 +458,8 @@ final class BoardModel {
             entry.blur()
             return true
         }
-        let kept = ahead[at.date].flatMap { $0.tasksText == snapshot.tasksText ? $0 : nil }
-        guard let peek = kept ?? (try? board.snapshot(day: at.date, measures: CardMetrics.timeline)) else { return true }
+        let kept = ahead[at.date].flatMap { $0.readAlike(snapshot) ? $0 : nil }
+        guard let peek = kept ?? (try? board.snapshot(day: at.date, measures: CardMetrics.timeline, project: projectLink)) else { return true }
         dayTurn = DayTurn(peek: peek, shift: shift)
         dayShare = 0
         return true
@@ -462,10 +554,11 @@ final class BoardModel {
         landTurn()
         shownDay = day
         neighbours = nil
-        var peek = ahead[day].flatMap { $0.tasksText == snapshot?.tasksText ? $0 : nil }
+        var peek = ahead[day].flatMap { shown in snapshot.map(shown.readAlike) == true ? shown : nil }
         if peek == nil {
             let board = board
-            peek = try? await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
+            let link = projectLink
+            peek = try? await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline, project: link) }.value
         }
         guard let peek, shownDay == day else { return await reload() }
         dayTurn = DayTurn(peek: peek, shift: motion)
@@ -543,7 +636,50 @@ final class BoardModel {
             go(to: .inbox)
         }
         await reload()
+        if place.list == "done" {
+            await openDone()
+            found = doneCards.first { $0.item.id == item.id }?.id
+            return
+        }
         found = snapshot?.item(item.id) != nil ? item.id : nil
+    }
+
+    // MARK: Done
+
+    /// The Done column, left of Inbox: only the search opens it, and the ribbon leaving it for Inbox closes it.
+    private(set) var doneShown = false
+    /// Its cards and their menus, read as it opens and again with each read while it shows.
+    private(set) var doneCards: [BoardCard] = []
+    @ObservationIgnored private var doneMenus: [String: TaskMenuModel] = [:]
+
+    func openDone() async {
+        await readDone()
+        withAnimation(.snappy) { doneShown = true }
+        // The tab bar names the nearest place: Inbox, beside the Done column.
+        place = .inbox
+        asked = PlaceAsk(place: .inbox, done: true)
+    }
+
+    func closeDone() {
+        guard doneShown else { return }
+        doneShown = false
+        doneCards = []
+        doneMenus = [:]
+    }
+
+    private func readDone() async {
+        guard let snapshot else { return }
+        let board = board
+        let rows = snapshot.screen.done.map { ListRow(item: $0, level: 0) }
+        let screen = menuScreen
+        guard let read = try? await Task.detached(operation: { () throws -> ([BoardCard], [String: TaskMenuModel]) in
+            let cards = try board.cards(rows)
+            var menus: [String: TaskMenuModel] = [:]
+            for card in cards { menus[card.item.id] = try board.read("tasks.menu", [card.item.json, "done", screen], over: board.settingsOnly()) }
+            return (cards, menus)
+        }).value else { return }
+        doneCards = read.0
+        doneMenus = read.1
     }
 
     // MARK: Writing
@@ -618,6 +754,7 @@ final class BoardModel {
         endSelection()
     }
 
+    /// The menu and the picks stay for the next label: the picked tasks keep their ids through the write.
     func toggleLabel(_ items: [TaskItem], _ name: String) async {
         await write("tasks.toggleLabel", [keys(items), .string(name)])
     }
@@ -694,17 +831,75 @@ final class BoardModel {
         endSelection()
     }
 
-    func openProject(of item: TaskItem) {
-        guard let project = item.project else { return }
-        Task { await openNote(project) }
+    /// Apple's Calendar at an event, as the plugin opens it on the iPhone (`calshow:`, seconds from 2001): at its start.
+    func openInCalendar(_ event: WireEvent) {
+        let start = Date(timeIntervalSince1970: event.startMs / 1000)
+        if let url = URL(string: "calshow:\(Int(start.timeIntervalSinceReferenceDate))") { UIApplication.shared.open(url) }
     }
 
-    /// The project's note in Obsidian: the folder mark's tap and the group's arrow.
-    func openNote(_ project: ProjectRef) async {
-        guard project.canOpenNote, let note = project.note, let vault = UserDefaults.standard.string(forKey: "vaultFolderName") else { return }
+    /// A note of the vault in Obsidian, by its path, through Advanced URI as every Open in Obsidian of the app: a title's
+    /// note link, and the project view's Open in Obsidian.
+    func openNote(_ path: String) {
+        guard let vault = UserDefaults.standard.string(forKey: "vaultFolderName") else { return }
         var link = URLComponents(string: "obsidian://advanced-uri")!
-        link.queryItems = [URLQueryItem(name: "vault", value: vault), URLQueryItem(name: "filepath", value: note)]
-        if let url = link.url { await UIApplication.shared.open(url) }
+        link.queryItems = [URLQueryItem(name: "vault", value: vault), URLQueryItem(name: "filepath", value: path)]
+        if let url = link.url { UIApplication.shared.open(url) }
+    }
+
+    /// Cards for rows drawn outside the lists (the full screen's subtasks), coloured and dated as a list draws them.
+    func cards(_ rows: [ListRow]) async -> [BoardCard] {
+        let board = board
+        return (try? await Task.detached { try board.cards(rows) }.value) ?? []
+    }
+
+    /// What a tap on a card's folder mark does: opens the project's view, the note's block, when it has a note.
+    func projectOpener(_ item: TaskItem) -> (() -> Void)? {
+        guard let project = item.project, project.canOpenNote else { return nil }
+        return { [weak self] in self?.openProject(project) }
+    }
+
+    /// The project's own view over the screen, as the plugin's block at the end of its note: a group's arrow and a card's
+    /// folder mark open it; its bar opens the note itself in Obsidian.
+    var projectShown: ShownProject?
+
+    struct ShownProject: Identifiable {
+        let project: ProjectRef
+        var id: String { project.link }
+    }
+
+    /// A card on the calendar lifted with its subtasks while a subtask is typed under it (Add Subtask there).
+    var stackShown: ShownStack?
+
+    struct ShownStack {
+        let card: BoardCard
+        /// Where the card stands, on the screen.
+        let frame: CGRect
+    }
+
+    func openProject(_ project: ProjectRef) {
+        guard self.project == nil else { return }
+        projectShown = ShownProject(project: project)
+    }
+
+    /// A link in a title tapped: an address opens as it is, a note in Obsidian, the file the core resolves it to.
+    func openLink(_ part: TextPart) {
+        guard let target = part.target else { return }
+        if part.kind == "url" {
+            if let url = URL(string: target) { UIApplication.shared.open(url) }
+            return
+        }
+        let board = board
+        Task {
+            guard let note = try? await Task.detached(operation: { try board.noteToOpen(target) }).value else { return }
+            openNote(note.path)
+        }
+    }
+
+    /// The vault's files listed again, back in front: a note made, renamed or moved elsewhere is offered by `[[` and
+    /// opened by a link. The project notes look again on their own (`VaultProjects`), redrawing the screen when they change.
+    func refreshNotes() async {
+        let board = board
+        await Task.detached { board.refreshNotes() }.value
     }
 
     /// Whose sections a column shows, as the core names the list.
@@ -734,11 +929,39 @@ final class BoardModel {
         if picked.contains(id) { picked.remove(id) } else { picked.insert(id) }
     }
 
-    /// Every card of the lists: the calendar's cannot be picked, as in the plugin.
-    func pickAll() {
-        guard let snapshot else { return }
-        picked = Set(snapshot.lists.values.flatMap { $0.cards.map(\.id) })
+    /// The day list's width beside the calendar for the saved share of the screen, and the bounds the divider moves
+    /// within (`rules.listWidths`); the divider is drawn over the line, taking no width of its own.
+    func listWidths(share: Double, viewWidth: CGFloat) -> ListWidths? {
+        let key = "\(share)/\(viewWidth)"
+        if let known = widths[key] { return known }
+        guard let found = try? board.listWidths(share: share, viewWidth: Double(viewWidth), dividerWidth: 0) else { return nil }
+        if widths.count > 256 { widths = [:] }
+        widths[key] = found
+        return found
     }
+
+    @ObservationIgnored private var widths: [String: ListWidths] = [:]
+
+    /// Where the divider dragged towards `wanted` stands, the finger moving `speed` points per millisecond: brought slowly
+    /// near the middle it holds to it (`rules.dividerAt`).
+    func dividerAt(_ wanted: CGFloat, widths: ListWidths, speed: Double) -> DividerStop? {
+        try? board.dividerAt(Double(wanted), widths: widths, speed: speed)
+    }
+
+    /// The share a divider let go at `width` saves (`rules.listShareOf`).
+    func listShare(of width: CGFloat, viewWidth: CGFloat) -> Double? {
+        ruleNow("rules.listShareOf", [.number(Double(width)), .number(Double(viewWidth)), .number(0)])
+    }
+
+    /// Whether Select Tasks picks a card drawn at `from` (a list column's, never the calendar's), as the core says.
+    func canPick(_ from: String) -> Bool {
+        if let known = pickable[from] { return known }
+        let found: Bool = ruleNow("rules.canPick", [.string(from)]) ?? false
+        pickable[from] = found
+        return found
+    }
+
+    @ObservationIgnored private var pickable: [String: Bool] = [:]
 
     // MARK: Drag and drop
 
@@ -754,6 +977,15 @@ final class BoardModel {
         let grab: CGFloat
         /// A section lifted by its header, carried among its list's sections.
         var section: SectionCarry? = nil
+        /// Select Tasks: every picked task the lift carries (`tasks.carried`), each with the column it is drawn in; empty
+        /// for a card carried alone.
+        var group: [(item: TaskItem, from: String)] = []
+
+        /// What `tasks.drop` takes: each carried task's key and where it was drawn.
+        var dropped: JSONValue {
+            let carried = group.isEmpty ? item.map { [($0, from)] } ?? [] : group
+            return .array(carried.map { ["key": $0.0.key.json, "from": .string($0.1)] })
+        }
         /// The drop is written and the screen shows it: the card stands in its new place, hidden until its copy lands.
         var written = false
         /// Let go where it writes: its dashed place closes as the room opens, so the list stands as it will after the write
@@ -833,12 +1065,43 @@ final class BoardModel {
 
     @ObservationIgnored private var carryTokens = 0
 
-    /// A section's header lifted: its header and tasks fold away and the list closes over them, as the plugin's.
-    func startSectionCarry(_ column: BoardColumn, _ group: BoardGroup) {
+
+    /// Select Tasks: a picked card lifted carries every picked task as a stack, as the plugin's. The core says which go
+    /// along with it (`tasks.carried`: the rest of the picked, but a subtask whose task is picked goes with that task).
+    @discardableResult
+    func startGroupCarry(_ card: BoardCard, from column: String) -> Int {
+        guard let snapshot else { return 0 }
+        let token = nextCarry()
+        found = nil
+        arrival = nil
+        ending = nil
+        released = false
+        touchdown = nil
+        let picked = pickedItems
+        let froms = Dictionary(picked.map { ($0.id, snapshot.column(of: $0.id) ?? column) }, uniquingKeysWith: { first, _ in first })
+        let all = picked.map { (item: $0, from: froms[$0.id] ?? column) }
+        withAnimation(.snappy(duration: 0.25)) { carry = Carry(token: token, id: card.id, item: card.item, from: column, grab: CardMetrics.height / 2, group: all) }
+        let board = board
+        let arguments: [JSONValue] = [card.item.key.json, keys(picked)]
+        Task {
+            guard let kept: [TaskKey] = try? await Task.detached(operation: {
+                try board.read("tasks.carried", arguments, over: try board.files(), as: [TaskKey].self)
+            }).value,
+                  carry?.token == token else { return }
+            // The core names the ones that go along with the lifted one, which leads, by their keys as read.
+            let going = kept.compactMap { key in all.first { $0.item.key == key } }
+            carry?.group = [(item: card.item, from: column)] + going
+        }
+        return token
+    }
+
+    /// A section's header carried: its header and tasks fold away and the list closes over them, as the plugin's.
+    @discardableResult
+    func startSectionCarry(_ column: BoardColumn, _ group: BoardGroup) -> Int? {
         guard let list = snapshot?.lists[column], let name = list.sectionsOf, let lifted = list.groups.firstIndex(where: { $0.id == group.id }),
-              let shape = geometry[column] else { return }
+              let shape = geometry[column] else { return nil }
         let heads = list.groups.map { shape.heads[$0.id]?.minY }
-        guard !heads.contains(where: { $0 == nil }) else { return }
+        guard !heads.contains(where: { $0 == nil }) else { return nil }
         let tops = heads.compactMap { $0 }
         let bottoms = shape.cards.values.map(\.maxY) + shape.heads.values.map(\.maxY)
         let end = (bottoms.max() ?? 0) + (list.groups.last?.empty == true ? CardMetrics.height + CardMetrics.gap : 0)
@@ -855,6 +1118,7 @@ final class BoardModel {
             carry = Carry(token: token, id: "\u{0}section/\(group.id)", item: nil, from: column.rawValue, grab: 0, section: section)
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        return token
     }
 
     /// Where a carried section would go: the slot whose place is nearest the finger, the mark there; none at its own place.
@@ -915,10 +1179,11 @@ final class BoardModel {
     /// The carried card itself, wherever the screen draws it: hidden until its copy has landed.
     func isHidden(_ card: BoardCard) -> Bool { card.id == carry?.id }
 
-    /// A subtask of the carried card: folded away under it until the screen shows them where they were dropped.
+    /// A subtask of the carried card, or another picked task carried with it: folded away under it until the screen shows
+    /// them where they were dropped.
     func isFolded(_ card: BoardCard) -> Bool {
-        guard let carry, !carry.written, card.id != carry.id, let lifted = carry.item else { return false }
-        return Self.contains(lifted, card.item)
+        guard let carry, !carry.written, card.id != carry.id else { return false }
+        return isCarried(card)
     }
 
     @discardableResult
@@ -1054,8 +1319,8 @@ final class BoardModel {
     func isCarried(_ card: BoardCard) -> Bool {
         guard let carry else { return false }
         if card.id == carry.id { return true }
-        guard let lifted = carry.item else { return false }
-        return Self.contains(lifted, card.item)
+        let lifted = carry.group.isEmpty ? carry.item.map { [$0] } ?? [] : carry.group.map(\.item)
+        return lifted.contains { $0.id == card.item.id || Self.contains($0, card.item) }
     }
 
     /// The cards a carry over `column` moves between: the column's, without the carried ones.
@@ -1095,6 +1360,11 @@ final class BoardModel {
     func rest(_ column: BoardColumn, card id: String, _ frame: CGRect) {
         guard settling?.column != column else { return }
         geometry[column, default: ListGeometry()].cards[id] = frame
+    }
+
+    /// A card's frame as its list last laid it out, in the list's content space.
+    func restFrame(_ column: BoardColumn, card id: String) -> CGRect? {
+        geometry[column]?.cards[id]
     }
 
     func rest(_ column: BoardColumn, head id: String, _ frame: CGRect) {
@@ -1156,7 +1426,7 @@ final class BoardModel {
     private func landOnTitle(_ column: BoardColumn) -> CGRect? {
         guard let carry, carry.section == nil else { return nil }
         guard carry.id != Carried.plus else { return land(column) }
-        guard let to = snapshot?.lists[column]?.titleDrop, let item = carry.item else {
+        guard let to = snapshot?.lists[column]?.titleDrop, carry.item != nil else {
             letGo(writes: false)
             return nil
         }
@@ -1165,12 +1435,12 @@ final class BoardModel {
         letGo(writes: true)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let others = others(in: column)
-        let landed = landing(item, from: carry.from, to: to)
+        let landed = landing(carry, to: to)
         let room = landed?.gap(in: column, among: others)
         if let room {
             withAnimation(.snappy(duration: 0.25)) { settling = ListGap(column: column, at: room.at, level: room.level, group: room.group, zone: room.zone, place: .null, line: nil) }
         }
-        Task { await drop(item, from: carry.from, to: to) }
+        Task { await drop(carry, to: to) }
         // The room is the list's, in its content's space; the drop came down on the title, whose space it is given in.
         guard let rect = room.flatMap({ gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: .null, line: nil)) }).map({ afterLeaving($0, in: column) }) ?? foldedHead(column, landed),
               let list = dropping.origin(of: "list.\(column.rawValue)"), let title = dropping.origin(of: "title.\(column.rawValue)") else { return nil }
@@ -1257,20 +1527,20 @@ final class BoardModel {
             return gapRect(column, gap)
         }
         // The core's null: back where it was lifted from, nothing written.
-        guard let item = carry.item, let place, !place.isNull else {
+        guard carry.item != nil, let place, !place.isNull else {
             letGo(writes: false)
             return geometry[column]?.cards[carry.id]
         }
         let to: JSONValue = ["kind": "place", "column": .string(column.rawValue), "place": place]
         letGo(writes: true)
-        let landed = landing(item, from: carry.from, to: to)
+        let landed = landing(carry, to: to)
         let room = landed?.gap(in: column, among: others)
         if let room {
             withAnimation(.snappy(duration: 0.25)) { settling = ListGap(column: column, at: room.at, level: room.level, group: room.group, zone: room.zone, place: place, line: nil) }
         }
         Task {
             let dropAt = ContinuousClock.now
-            await drop(item, from: carry.from, to: to)
+            await drop(carry, to: to)
             DropTiming.report(since: dropAt)
         }
         return room.flatMap { gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: place, line: nil)) }.map { afterLeaving($0, in: column) } ?? foldedHead(column, landed)
@@ -1289,13 +1559,13 @@ final class BoardModel {
     /// The carry's copy lands in a folded part's header: it takes the header's size and fades out on the way.
     @ObservationIgnored private var landsInFold = false
 
-    /// Where the core will leave `item` dropped `to`, asked before the write over the text the screen is drawn from, on
+    /// Where the core will leave the carried tasks dropped `to`, asked before the write over the text the screen is drawn from, on
     /// the pure rules' context: no file is read and no background read is waited for in the frame of the drop.
-    private func landing(_ item: TaskItem, from: String, to: JSONValue) -> DropLanding? {
-        let tasks: JSONValue = [["key": item.key.json, "from": .string(from)]]
+    /// Several picked tasks carried land together; the copy flies where the lifted one, which leads, lands.
+    private func landing(_ carry: Carry, to: JSONValue) -> DropLanding? {
         guard let snapshot else { return nil }
         do {
-            return try board.landing(tasks, to: to, over: snapshot).first
+            return try board.landing(carry.dropped, to: to, over: snapshot).first
         } catch {
             problem = Self.words(error)
             return nil
@@ -1329,7 +1599,7 @@ final class BoardModel {
         let indent = CGFloat(gap.level) * CardMetrics.indent
         let x = CardMetrics.columnInset + indent
         let w = shape.width - CardMetrics.columnInset * 2 - indent
-        let inPart = { (card: BoardCard) in card.item.group == gap.group && card.zone == gap.zone }
+        let inPart = { (card: BoardCard) in card.stands(in: gap.group, zone: gap.zone) }
         if let next = others[safe: gap.at], inPart(next), let frame = shape.cards[next.id] {
             return CGRect(x: x, y: frame.minY, width: w, height: CardMetrics.height)
         }
@@ -1339,6 +1609,55 @@ final class BoardModel {
         let projectHead = gap.zone.flatMap { zone in list.projects.first { $0.zone == zone } }.flatMap { shape.heads[$0.id] }
         guard let frame = above.flatMap({ shape.cards[$0.id] }) ?? header ?? projectHead else { return nil }
         return CGRect(x: x, y: frame.maxY + CardMetrics.gap, width: w, height: CardMetrics.height)
+    }
+
+    // MARK: Stretching a calendar card
+
+    /// The calendar card tapped, as the plugin selects it: ringed, with the two dots that stretch it, until a touch
+    /// elsewhere once its menu has gone.
+    private(set) var selectedSlot: String?
+    /// Where the selected card stands, in the window: a touch there keeps it selected (its dots lie on its edges).
+    @ObservationIgnored var selectedFrame: CGRect = .null
+    /// The selected card while a dot is held: the span it shows, minutes from the day's start.
+    private(set) var stretched: (id: String, start: Int, end: Int)?
+
+    func select(_ slot: BoardSlot) {
+        selectedSlot = slot.card.item.can.resize ? slot.id : nil
+    }
+
+    /// A touch anywhere: one outside the selected card and its dots lets it go, but not the touch that closes its menu.
+    func touched(at point: CGPoint) {
+        guard selectedSlot != nil, stretched == nil, !CardControl.menuShowing else { return }
+        if !selectedFrame.insetBy(dx: -Self.gripReach, dy: -Self.gripReach).contains(point) { selectedSlot = nil }
+    }
+
+    private static let gripReach: CGFloat = 24
+
+    /// A dot held at `minute` of the grid: the card shows the span the core gives (`tasks.stretch`).
+    func stretch(_ slot: BoardSlot, edge: String, minute: Int) {
+        guard let day = snapshot?.day,
+              let span: StretchSpan = try? board.read("tasks.stretch", [slot.card.item.json, .string(day), .string(edge), .number(Double(minute))], over: board.settingsOnly())
+        else { return }
+        guard stretched?.start != span.start || stretched?.end != span.end || stretched?.id != slot.id else { return }
+        if stretched != nil { UISelectionFeedbackGenerator().selectionChanged() }
+        stretched = (slot.id, span.start, span.end)
+    }
+
+    /// The dot let go at `minute`: the new time written as the core says (`tasks.resize`); a card no longer than its
+    /// least height (`least` minutes) loses its duration.
+    func endStretch(_ slot: BoardSlot, edge: String, minute: Int, least: Double) async {
+        guard let day = snapshot?.day else { return }
+        let board = board
+        let arguments: [JSONValue] = [slot.card.item.key.json, .string(day), .string(edge), .number(Double(minute)), .number(least)]
+        do {
+            let changed = try await Task.detached { try board.write("tasks.resize", arguments).bool ?? false }.value
+            if changed { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+        } catch {
+            problem = Self.words(error)
+        }
+        dropRead = nil
+        await reload()
+        stretched = nil
     }
 
     // MARK: The calendar as a place to drop on
@@ -1404,15 +1723,15 @@ final class BoardModel {
             entry.openAtDrop(nil, to)
             return CGRect(x: TimelineGeometry.itemsLeft, y: top, width: calendarWidth - TimelineGeometry.itemsLeft - TimelineGeometry.itemsRight, height: CardMetrics.height)
         }
-        guard let item = carry.item else {
+        guard carry.item != nil else {
             letGo(writes: false)
             return nil
         }
         letGo(writes: true)
-        let spot = landing(item, from: carry.from, to: to).flatMap { blockRect($0, events: snapshot.timeline.events) }
+        let spot = landing(carry, to: to).flatMap { blockRect($0, events: snapshot.timeline.events) }
         Task {
             let dropAt = ContinuousClock.now
-            await drop(item, from: carry.from, to: to)
+            await drop(carry, to: to)
             DropTiming.report(since: dropAt)
         }
         return spot
@@ -1450,10 +1769,13 @@ final class BoardModel {
     /// The grid's minute for each whole minute a carry has passed over at each zoom: a drag asks on every move.
     @ObservationIgnored private var snapped: [SnapKey: Int] = [:]
 
-    private func drop(_ item: TaskItem, from: String, to: JSONValue) async {
-        guard let day = snapshot?.day, let token = carry?.token, let id = carry?.id else { return }
+    /// The carried tasks written where they were let go; a carry of picked tasks ends Select Tasks, as any action does.
+    private func drop(_ carry: Carry, to: JSONValue) async {
+        guard let day = snapshot?.day else { return }
+        let token = carry.token, id = carry.id
         let board = board
-        let arguments: [JSONValue] = [[["key": item.key.json, "from": .string(from)]], to, .string(day)]
+        let arguments: [JSONValue] = [carry.dropped, to, .string(day)]
+        if !carry.group.isEmpty { endSelection() }
         do {
             _ = try await Task.detached { try board.write("tasks.drop", arguments) }.value
         } catch {
@@ -1467,6 +1789,7 @@ final class BoardModel {
 
     /// Where a card carried alone was lifted from in its own list: let go there at its level, nothing is written.
     private func homeGap(_ id: String, in column: BoardColumn) -> JSONValue? {
+        guard carry?.group.isEmpty != false else { return nil }
         guard let cards = snapshot?.lists[column]?.cards, let index = cards.firstIndex(where: { $0.names(id) }) else { return nil }
         let card = cards[index]
         var gap: [String: JSONValue] = ["kind": "gap", "index": .number(Double(index)), "level": .number(Double(card.level)), "group": card.item.group.json]
@@ -1476,11 +1799,7 @@ final class BoardModel {
 
     /// The cards as places in a list see them (`ListCard`): each in its section, and its project's part in a grouped list.
     static func listCards(_ cards: [BoardCard]) -> JSONValue {
-        .array(cards.map { card in
-            var json: [String: JSONValue] = ["id": .string(card.id), "key": card.item.key.json, "level": .number(Double(card.level)), "group": card.item.group.json]
-            if let zone = card.zone { json["project"] = zone }
-            return .object(json)
-        })
+        .array(cards.map(\.listCard))
     }
 
     private static func contains(_ tree: TaskItem, _ item: TaskItem) -> Bool {
@@ -1497,6 +1816,20 @@ final class BoardModel {
         if let url = link.url { await UIApplication.shared.open(url) }
     }
 
+    /// A label's name as the screen shows it (`rules.labelTitle`): the tag's underscores read as spaces.
+    func labelTitle(_ name: String) -> String {
+        ruleNow("rules.labelTitle", [.string(name)]) ?? name
+    }
+
+    /// A weekly schedule's days as the Repeat row tells them: the week's letters (`REPEAT_WORDS`), the days off it as a
+    /// dash, so the seven places read as the week.
+    func weekLetters(_ days: [Int]) -> String {
+        guard let words = repeatWords else { return "" }
+        return words.weekdays.enumerated().map { days.contains($0.offset) ? $0.element.letter : "–" }.joined(separator: " ")
+    }
+
+    @ObservationIgnored private lazy var repeatWords: RepeatWords? = try? board.repeatWords()
+
     /// A level's or a label's colour as a menu's flag draws it, in either theme.
     func ink(_ color: String, dark: Bool) -> UIColor? {
         guard let hex: String = try? board.rule("rules.inkOf", [.string(color), .string(dark ? "dark" : "light")]) else { return nil }
@@ -1504,11 +1837,51 @@ final class BoardModel {
     }
 
     /// The card's menu as UIKit draws it, read from the screen as it stands. `later` holds a row that opens a sheet or a
-    /// page until the menu has gone.
-    func cardMenu(_ item: TaskItem, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
-        guard let menu = snapshot?.menus[item.id] else { return nil }
+    /// page until the menu has gone. Over the core's rows, as the plugin shows them over its menu: the start of the task's
+    /// description, and, for a card on the calendar (`from: "timeline"`), its open subtasks, each opening its own menu.
+    func cardMenu(_ item: TaskItem, from: String = "list", later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
+        guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: self).nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
+        let nodes = lead(item, from: from) + TaskMenu(items: [item], menu: menu, model: self).nodes
+        return MenuNode.uiMenu(nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
+    }
+
+    /// What the plugin shows between a card and its menu, as the menu's first groups.
+    private func lead(_ item: TaskItem, from: String) -> [MenuNode] {
+        var lead: [MenuNode] = []
+        if let peek = descriptionPeek(item) { lead.append(.group(row: false, children: peek)) }
+        if from == "timeline", !item.subtasks.isEmpty {
+            lead.append(.group(row: false, children: item.subtasks.map { subtask in
+                .deferred(title: subtask.title, symbol: subtask.closed ? "checkmark.circle" : "circle", subtitle: nil) { [weak self] in
+                    guard let self, let menu = await self.menu(for: subtask, from: "stack") else { return [] }
+                    return TaskMenu(items: [subtask], menu: menu, model: self).nodes
+                }
+            }))
+        }
+        return lead
+    }
+
+    /// The start of a task's description, as the plugin's peek: its lines as they read (links by their words, no
+    /// markup), the menu cutting it at its own height, a tap opening the task on the whole screen; under it each link of
+    /// it, a tap opening the link.
+    private func descriptionPeek(_ item: TaskItem) -> [MenuNode]? {
+        guard let description = item.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty else { return nil }
+        let start = description.split(separator: "\n", omittingEmptySubsequences: true).joined(separator: "\n")
+        let parts = ruleNow("rules.textParts", [.string(start)]) ?? [TextPart(text: start)]
+        let shown = parts.map { $0.isLink ? $0.shown : Self.readable($0.text ?? "") }.joined()
+        var rows: [MenuNode] = [.action(title: shown, symbol: "text.alignleft", opens: true) { [weak self] in Task { await self?.openFullScreen(item) } }]
+        var seen: Set<String> = []
+        for link in parts where link.isLink {
+            guard let target = link.target, seen.insert(target).inserted else { continue }
+            rows.append(.action(title: link.shown, symbol: link.kind == "url" ? "safari" : "doc.text") { [weak self] in self?.openLink(link) })
+        }
+        return rows
+    }
+
+    /// Markdown's inline marks read as text, as Obsidian draws them: `**intro**` reads «intro».
+    private static func readable(_ markdown: String) -> String {
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        return (try? AttributedString(markdown: markdown, options: options)).map { String($0.characters) } ?? markdown
     }
 
     // MARK: The timeline's zoom

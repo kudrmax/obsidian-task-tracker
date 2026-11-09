@@ -21,6 +21,9 @@ struct ListColumn: View {
     private var key: String { "list.\(list.column.rawValue)" }
     /// The list's own width: another day slides through it.
     @State private var width: CGFloat = 0
+    /// Where the list stands scrolled, for a carry held at its edge to scroll it on.
+    @State private var position = ScrollPosition(y: 0)
+    @State private var scroll = ScrollSpot()
     /// The header names the day that stands nearer while another comes in.
     private var title: String {
         guard list.column == .day else { return list.title }
@@ -69,7 +72,7 @@ struct ListColumn: View {
                                         .padding(.bottom, -CardMetrics.gap)
                                         .transition(.identity)
                                 case .plate(let group):
-                                    EmptyPlate(hot: gap.map { group.holds(group: $0.group, zone: $0.zone) && $0.line == nil } ?? false) { model.entry.openIn(column, group.name, group.zone) }
+                                    EmptyPlate(hot: gap.map { group.holds(group: $0.group, zone: $0.zone) && $0.line == nil } ?? false) { model.entry.openIn(column, group.name, zone: group.zone) }
                                         .transition(.identity)
                                 case .card(let card):
                                     CardRow(card: card, column: column, model: model)
@@ -110,23 +113,53 @@ struct ListColumn: View {
                     }
                 }
                 .scrollIndicators(.hidden)
+                .scrollPosition($position)
+                .onScrollGeometryChange(for: ScrollSpot.Reach.self) { ScrollSpot.Reach($0) } action: { _, reach in scroll.reach = reach }
                 .keyboardRoom()
                 .softEdges(trailing: ListColumn.trailingRoom)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
                     width = $0
                     model.rest(column, width: $0)
                 }
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(key, visible: $0) }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    model.dropping.move(key, visible: $0)
+                    shown = $0
+                }
                 // The field stays in sight: when it opens or moves, and when the keyboard comes over the bottom of the list.
                 .onChange(of: model.entry.moved) { reveal(scroller) }
                 .onChange(of: KeyboardRise.shared.top) { reveal(scroller) }
+                // The card the search led to is scrolled into sight, and nothing more, as the plugin's `FoundCard`.
+                // Once the list has laid the card out: a group the find unfolded draws it in this same pass.
+                .onChange(of: model.found) { showFound(tries: 10) }
             }
         }
-        .onAppear { model.registerList(column) }
+        .onAppear {
+            model.registerList(column)
+            let spot = scroll, position = $position
+            model.dropping.scrolls(key) { dy in spot.scroll(by: dy, trailing: ListColumn.trailingRoom) { position.wrappedValue.scrollTo(y: $0) } }
+        }
         .onDisappear {
             model.dropping.remove(key)
             model.dropping.remove("title.\(list.column.rawValue)")
         }
+    }
+
+    /// Where the list shows on the screen.
+    @State private var shown: CGRect = .zero
+
+    /// The card the search led to is scrolled into sight, and nothing more, as the plugin's `FoundCard`: a card already
+    /// whole between the list's soft top and the tab bar stays; another comes to the middle of what shows.
+    private func showFound(tries: Int) {
+        guard let found = model.found, list.cards.contains(where: { $0.id == found }) else { return }
+        guard tries < 10, let frame = model.restFrame(list.column, card: found) else {
+            if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { showFound(tries: tries - 1) } }
+            return
+        }
+        let room = min(shown.maxY, model.dropping.floor ?? .infinity) - shown.minY
+        let top = frame.minY - scroll.reach.offset
+        guard top < SoftEdges.fade || top + frame.height > room - SoftEdges.fade else { return }
+        let y = min(max(0, frame.midY - room / 2), scroll.reach.most)
+        withAnimation(.snappy) { position.scrollTo(y: y) }
     }
 
     private func reveal(_ scroller: ScrollViewProxy) {
@@ -176,7 +209,8 @@ struct ListColumn: View {
             }
         }
         if let slot, slot >= list.groups.count { rows.append(.mark(first: rows.isEmpty)) }
-        if entry?.at.kind == "end" { rows += typed }
+        // At the end, or in a section the list doesn't draw (a day with no task yet has none): the field stands last.
+        if entry?.at.kind == "end" || entry?.at.kind == "in" && !list.groups.indices.contains(entry?.at.section ?? 0) { rows += typed }
         // The card carried keeps its row, a dashed place; its subtasks fold away under it.
         let carried = Set(list.cards.filter { model.isFolded($0) }.map(\.id))
         return entry == nil && settling == nil && carried.isEmpty ? rows : Self.branched(rows, carried: carried, model: model)
@@ -195,7 +229,7 @@ struct ListColumn: View {
             let branch = level > 0 ? branches[safe: at] ?? nil : nil
             switch row {
             case .card(let card) where card.branch != branch:
-                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, shades: card.shades, corner: card.corner, zone: card.zone))
+                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, paint: card.paint, corner: card.corner, zone: card.zone, parts: card.parts))
             case .gap: return .gap(level: level, branch: branch)
             case .pending(let key, let text, _, _): return .pending(key: key, text: text, level: level, branch: branch)
             case .field(let id, _, _, let section): return .field(id: id, level: level, branch: branch, section: section)
@@ -209,7 +243,7 @@ struct ListColumn: View {
         var rows = group.cards.map(ListRowView.card)
         guard let gap = settling, group.holds(group: gap.group, zone: gap.zone), !group.empty else { return rows }
         let others = model.others(in: list.column)
-        let next = others[safe: gap.at].flatMap { $0.item.group == gap.group && $0.zone == gap.zone ? $0 : nil }
+        let next = others[safe: gap.at].flatMap { $0.stands(in: gap.group, zone: gap.zone) ? $0 : nil }
         let at = next.flatMap { card in rows.firstIndex { $0.id == card.id } } ?? rows.count
         rows.insert(.gap(level: gap.level, branch: nil), at: at)
         return rows
@@ -235,6 +269,7 @@ private struct KeyedRow {
 /// typed and not written yet, or the field it is typed in.
 private enum ListRowView: Identifiable {
     case header(BoardGroup, String)
+    /// A project group's header in a list grouped by project.
     case project(BoardProject)
     /// The section named for the task being typed in a project's group, over the field.
     case newHead(String)
@@ -501,7 +536,7 @@ struct ProjectHeader: View {
                 .animation(.easeInOut(duration: 0.25), value: project.count)
             }
             if project.canOpenNote, let ref = project.project {
-                Button { Task { await model.openNote(ref) } } label: {
+                Button { model.openProject(ref) } label: {
                     Image(systemName: "arrow.up.forward.app")
                         .font(.system(size: 13, weight: .semibold))
                         .frame(width: 28, height: ColumnMetrics.groupHead)
@@ -526,7 +561,8 @@ struct ProjectHeader: View {
     }
 }
 
-/// A section's heading in a list: its menu renames or removes it, as the core offers.
+/// A section's heading in a list: a tap opens its menu, which renames or removes it as the core offers (inside a
+/// project's group, only that project's tasks); a long press lifts it, as the plugin's.
 struct SectionHeader: View {
     let title: String
     let group: BoardGroup
@@ -534,71 +570,47 @@ struct SectionHeader: View {
     @Bindable var model: BoardModel
     @State private var renaming = false
     @State private var name = ""
-    @State private var spot = MenuSpot.Anchor()
     @Environment(\.colorScheme) private var scheme
 
-    /// Rename and Remove Section, as the core offers them for the section.
-    private var headerMenu: UIMenu? {
-        guard let menu = group.menu else { return nil }
-        var actions: [UIMenuElement] = []
-        if menu.rename {
-            actions.append(UIAction(title: String(localized: "Rename"), image: UIImage(systemName: "pencil")) { _ in
-                name = menu.section
-                renaming = true
-            })
-        }
-        if menu.remove {
-            actions.append(UIAction(title: String(localized: "Remove Section"), image: UIImage(systemName: "trash"), attributes: .destructive) { _ in
-                Task { await model.removeSection(column, menu) }
-            })
-        }
-        return actions.isEmpty ? nil : UIMenu(children: actions)
-    }
-
     var body: some View {
-        SectionTitle(title: title, muted: group.name == nil)
-            // As a card's: a tap opens its menu once the finger is up, a long press lifts it; no context menu, so the lift
-            // never flashes one.
-            .background { MenuSpot(spot: spot) }
-            .onTapGesture { point in spot.present(headerMenu, at: point) }
-            .modifier(SectionLift(group: group, column: column, model: model))
+        SectionHeaderControl(group: group, column: column, model: model, menu: { rows }) { SectionTitle(title: title, muted: group.name == nil) }
+            .frame(height: ColumnMetrics.groupHead)
             .alert("Rename Section", isPresented: $renaming) {
                 TextField("Name", text: $name)
                 Button("Cancel", role: .cancel) {}
                 Button("Rename") { if let menu = group.menu { Task { await model.renameSection(column, menu, to: name) } } }
             }
     }
-}
 
-/// A long press on a section's header lifts the section, as the plugin's (`GroupDrag`): moving on carries it among the
-/// list's sections; it shows as a card with the section's name and count over two layers of its tasks.
-private struct SectionLift: ViewModifier {
-    let group: BoardGroup
-    let column: BoardColumn
-    let model: BoardModel
-
-    func body(content: Content) -> some View {
-        if group.reorder {
-            content.onDrag {
-                model.startSectionCarry(column, group)
-                return Carried.provider("section")
-            } preview: {
-                SectionFloat(name: group.header ?? "", count: group.cards.filter { $0.level == 0 }.count)
-            }
-        } else {
-            content
+    /// The header's menu as the core offers it: Rename, Remove Section; none for No section.
+    private var rows: [UIMenuElement] {
+        guard let menu = group.menu else { return [] }
+        var rows: [UIMenuElement] = []
+        if menu.rename {
+            rows.append(UIAction(title: "Rename", image: UIImage(systemName: "pencil")) { _ in
+                DispatchQueue.main.async {
+                    name = menu.section
+                    renaming = true
+                }
+            })
         }
+        if menu.remove {
+            rows.append(UIAction(title: "Remove Section", image: UIImage(systemName: "trash"), attributes: .destructive) { _ in
+                Task { await model.removeSection(column, menu) }
+            })
+        }
+        return rows
     }
 }
 
 /// The lifted section under the finger (`.tc-section-float`): its name and the number of its tasks on a card, two layers
 /// of its tasks beneath.
-private struct SectionFloat: View {
+struct SectionFloat: View {
     let name: String
     let count: Int
     @Environment(\.colorScheme) private var scheme
     static let width: CGFloat = 190
-    static let height: CGFloat = CardMetrics.height + 2
+    static var height: CGFloat { CardMetrics.height + 2 }
     static let step = CGSize(width: 7, height: 6)
 
     var body: some View {
@@ -624,6 +636,16 @@ private struct SectionFloat: View {
         .frame(width: Self.width, height: Self.height + 2 * Self.step.height, alignment: .top)
     }
 
+    /// The floating section's shape, for the system's shadow round it: the card and its two layers.
+    static var outline: UIBezierPath {
+        let path = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: width, height: height), cornerRadius: height / 2)
+        for depth in [1, 2] as [CGFloat] {
+            let layer = CGRect(x: step.width * depth, y: step.height * depth, width: width - 2 * step.width * depth, height: height)
+            path.append(UIBezierPath(roundedRect: layer, cornerRadius: height / 2))
+        }
+        return path
+    }
+
     private func layer(_ fill: Color, depth: CGFloat) -> some View {
         Capsule().fill(fill)
             .frame(width: Self.width - 2 * Self.step.width * depth, height: Self.height)
@@ -640,6 +662,47 @@ private struct SectionMark: View {
             .strokeBorder(Palette.dash(scheme), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             .frame(height: CardMetrics.height)
             .accessibilityHidden(true)
+    }
+}
+
+/// The Done column, left of Inbox, as the plugin's: done and dropped tasks in the file's order. Only the search opens it;
+/// a tap on a card opens its menu.
+struct DoneColumn: View {
+    @Bindable var model: BoardModel
+    @State private var title = "Done"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
+            ColumnTitle(title: title, model: model)
+            ScrollViewReader { scroller in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: CardMetrics.gap) {
+                        if model.doneCards.isEmpty { EmptyPlate() }
+                        ForEach(model.doneCards) { card in
+                            CardButton(
+                                card: card,
+                                menu: { later in model.cardMenu(card.item, from: "done", later: later) },
+                                ringed: model.found == card.id,
+                                draggable: false,
+                                onTouch: { model.found = nil },
+                                onLink: { model.openLink($0) },
+                                onProject: model.projectOpener(card.item))
+                                .frame(height: CardMetrics.height)
+                                .id(card.id)
+                        }
+                        Color.clear.frame(height: ListColumn.trailingRoom)
+                    }
+                    .padding(.horizontal, CardMetrics.columnInset)
+                }
+                .scrollIndicators(.hidden)
+                .softEdges(trailing: ListColumn.trailingRoom)
+                .onChange(of: model.found, initial: true) {
+                    guard let found = model.found, model.doneCards.contains(where: { $0.id == found }) else { return }
+                    scroller.scrollTo(found, anchor: .center)
+                }
+            }
+        }
+        .task { title = (try? await model.read("tasks.listName", ["done"])) ?? title }
     }
 }
 
@@ -677,18 +740,21 @@ struct CardRow: View {
 
     var body: some View {
         let waiting = model.isWaiting(card)
-        // Its subtasks go with a carried card: they fold away under its dashed place; the place itself closes once the card
-        // is let go where it writes, its view kept, for the system still ends its drag from it.
+        // Its subtasks go with a carried card, and the other picked tasks with a picked one: they fold away under its
+        // dashed place; the place itself closes once the card is let go where it writes, its view kept, for the system
+        // still ends its drag from it.
         let folded = model.isFolded(card) || model.isLeaving(card)
         let selecting = model.selecting
+        let picks = self.picks
         HStack(spacing: 10) {
-            if selecting {
+            if picks, !folded {
                 SelectionCircle(on: model.picked.contains(card.id))
                     .contentShape(.rect)
                     .onTapGesture { pick() }
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
-            // One card in and out of Select Tasks: the circle slides in beside it and it makes room, never a new card.
+            // One card in and out of Select Tasks: the circle slides in beside it and it makes room, never a new card. A
+            // picked card lifted carries every picked task as a stack, as the plugin's.
             CardButton(
                 card: card,
                 renamedText: model.entry.renamedTexts[card.id],
@@ -698,13 +764,16 @@ struct CardRow: View {
                 carried: model.isFolded(card) || model.isHidden(card),
                 arrival: model.arrival?.id == card.id ? model.arrival?.from : nil,
                 onTouch: { model.found = nil },
-                onPick: selecting ? { pick() } : nil,
-                onCarry: { model.startCarry(card, from: column.rawValue, grab: $0) },
+                onCarry: { grab in
+                    picks ? model.startGroupCarry(card, from: column.rawValue) : model.startCarry(card, from: column.rawValue, grab: grab)
+                },
                 onCancel: { model.cancelCarry($0) },
                 onEnd: { model.carryEnded($0) },
                 onDropped: { model.carryDropped($0) },
                 onFold: card.item.can.fold && !selecting ? { Task { await model.toggleCollapsed(card.item) } } : nil,
-                onProject: { model.openProject(of: card.item) })
+                onLink: selecting ? nil : { model.openLink($0) },
+                onProject: model.projectOpener(card.item),
+                picking: picks ? CardButton.Picking(picked: model.picked.contains(card.id), count: model.picked.count) { pick() } : nil)
                 .frame(height: CardMetrics.height)
                 // Behind the card from the lift on, with no fade: the card hides over it once the carried copy leaves.
                 .background { if waiting { WaitingPlace().transition(.identity) } }
@@ -716,9 +785,86 @@ struct CardRow: View {
         .accessibilityHidden(folded)
     }
 
+    /// Select Tasks picks this card: the core says which columns' cards are picked.
+    private var picks: Bool { model.selecting && model.canPick(column.rawValue) }
+
     private func pick() {
         UISelectionFeedbackGenerator().selectionChanged()
         withAnimation(.snappy(duration: 0.2)) { model.togglePick(card.id) }
+    }
+}
+
+/// The picked tasks carried as one (`.tc-drag-stack`): the lifted card on two layers of cards, the number carried on it.
+struct StackFloat: View {
+    let card: BoardCard
+    let count: Int
+    let width: CGFloat
+    @Environment(\.colorScheme) private var scheme
+    static let step = CGSize(width: 7, height: 6)
+
+    var body: some View {
+        let dark = scheme == .dark
+        ZStack(alignment: .topLeading) {
+            if count > 1 {
+                layer(Color(hex: dark ? "#1C1C1E" : "#EFEFF2"), depth: 2)
+                layer(Color(hex: dark ? "#242426" : "#F7F7F9"), depth: 1)
+            }
+            TaskCapsule(card: card)
+                .frame(width: width, height: CardMetrics.height)
+                .overlay(alignment: .topTrailing) {
+                    if count > 1 {
+                        Text(verbatim: "\(count)")
+                            .font(.system(size: 12, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .frame(minWidth: Self.badge, minHeight: Self.badge)
+                            .background(Palette.accent(scheme), in: .capsule)
+                            .offset(x: 6, y: -6)
+                    }
+                }
+        }
+        .frame(width: width, height: CardMetrics.height + 2 * Self.step.height, alignment: .top)
+        .padding(Self.room)
+    }
+
+    /// Room round the stack for the number on its corner.
+    static let room: CGFloat = 8
+    static let badge: CGFloat = 20
+
+    /// The stack's shape, for the system's shadow round the carried stack: the card, its two layers and the number.
+    static func outline(width: CGFloat, count: Int) -> UIBezierPath {
+        let height = CardMetrics.height
+        let path = UIBezierPath(roundedRect: CGRect(x: room, y: room, width: width, height: height), cornerRadius: height / 2)
+        for depth in [1, 2] as [CGFloat] {
+            let layer = CGRect(x: room + step.width * depth, y: room + step.height * depth, width: width - 2 * step.width * depth, height: height)
+            path.append(UIBezierPath(roundedRect: layer, cornerRadius: height / 2))
+        }
+        let digits = CGFloat(String(count).count)
+        let badgeWidth = max(badge, 12 + 7 * digits)
+        path.append(UIBezierPath(roundedRect: CGRect(x: room + width + 6 - badgeWidth, y: room - 6, width: badgeWidth, height: badge), cornerRadius: badge / 2))
+        path.usesEvenOddFillRule = false
+        return path
+    }
+
+    private func layer(_ fill: Color, depth: CGFloat) -> some View {
+        Capsule().fill(fill)
+            .frame(width: width - 2 * Self.step.width * depth, height: CardMetrics.height)
+            .offset(x: Self.step.width * depth, y: Self.step.height * depth)
+    }
+}
+
+/// A floating copy drawn for UIKit's drag preview: an image of the view at its own size, in the screen's look. A hosting
+/// view made for a preview has had no layout yet and drew the copy cut, or blank, on a plate.
+enum FloatImage {
+    @MainActor
+    static func view(_ content: some View, like host: UIView, in window: UIWindow) -> UIImageView? {
+        let renderer = ImageRenderer(content: content.environment(\.colorScheme, host.traitCollection.userInterfaceStyle == .dark ? .dark : .light))
+        renderer.scale = window.screen.scale
+        guard let image = renderer.uiImage else { return nil }
+        let view = UIImageView(image: image)
+        view.frame = CGRect(origin: .zero, size: image.size)
+        return view
     }
 }
 
@@ -753,10 +899,10 @@ struct SelectionCircle: View {
 /// plugin's lists do; a list at its top shows no fade there. iOS's own soft scroll edge shows only under the system's bars,
 /// and these columns scroll under their own titles: a mask of the same kind. `trailing` is room at the end of the content
 /// that holds nothing (a list's space to scroll its last card over the keyboard): no fade for it.
-private struct SoftEdges: ViewModifier {
+struct SoftEdges: ViewModifier {
     var trailing: CGFloat = 0
     @State private var edges = Edges()
-    static let fade = CardMetrics.height / 2
+    static var fade: CGFloat { CardMetrics.height / 2 }
 
     struct Edges: Equatable {
         var top: CGFloat = 0
@@ -845,21 +991,3 @@ private struct TopPart: Shape {
     }
 }
 
-/// Where a SwiftUI view opens a UIKit menu at a tap's point, as a card's does (`MenuOpener`): it takes no touches, so a
-/// long press on the view stays its own (a lift, a drag).
-struct MenuSpot: UIViewRepresentable {
-    let spot: Anchor
-
-    @MainActor
-    final class Anchor {
-        let opener = MenuOpener { _ in }
-
-        func present(_ menu: UIMenu?, at point: CGPoint) {
-            guard let menu else { return }
-            opener.present(menu, at: point) { nil }
-        }
-    }
-
-    func makeUIView(context: Context) -> MenuOpener { spot.opener }
-    func updateUIView(_ view: MenuOpener, context: Context) {}
-}

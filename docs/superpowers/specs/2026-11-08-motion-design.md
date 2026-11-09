@@ -454,20 +454,34 @@ every condition that changes the layout is animated by the transaction that chan
     copy flies into the part's header, takes its size on the way and fades as it arrives; the group's count fades to its
     new number. A card's copy always lands at the full size of its place (the plugin reads a growing row's resting
     height before its grow starts). Plugin: `Float.sink`, `TaskList.foldedHeadOf`; iPhone: `DropLanding.part.folded`.
-57. **iPhone, interrupt: every carry has its own number, and an end closes only its own carry.** A drop's copy settles
+62. **Backend: a key stays good while its task is there.** Max acts in the middle of a motion: Done, then at once a drag of
+    another task, whose key was read before Done moved the lines. Every key the core gives now carries its task's id
+    (`TaskKey.id`, added), and `TaskRules.entryOf`, through which every write and every read by key finds its task, finds
+    it by that id wherever writes since took it, and acts on its line as it is now (`applyAll` first takes each key and
+    the keys its changes name to the task's key now). A line edited elsewhere in place (in Obsidian's editor, or by
+    Sync from the Mac) keeps its task's id, as R1 promises, so a key read before such an edit acts on the edited task. A
+    key is refused (`StaleTaskError`, the door's `staleTask`) only when no task has its id any more: removed, or replaced
+    elsewhere by other lines. A key without an id (one a host builds) is found by place and line, as before. A key is
+    found by its id only where that id is this identity's: its task's line now is the key's, or one the task had while
+    this identity knew it (rewritten by its writes or edited elsewhere in place; `TaskIdState.held`, added, the last 8 by
+    id); a key another reading gave (another `TaskBoard` over the same file, whose ids collide with these by design) is
+    found by its place and line instead. The door finds keys by id only while the host hands back `ids`. The frontends
+    pass `item.key` as they did; the iPhone app keeps each key's JSON as the door gave it and hands `ids` back, so it
+    changes nothing.
+63. **iPhone, interrupt: every carry has its own number, and an end closes only its own carry.** A drop's copy settles
     for about a second after the screen stands still, and its session's end, its landing and its write's drawing come
     in that order or another. Each carry gets a token when it starts; every end (the card's session, the board's drop
     session, the landing, the write drawn) names its token and changes nothing for another carry. `BoardDrop` keeps
     each drop session's flight by itself.
-58. **iPhone, interrupt: a new lift closes the carry still ending, with its one outcome.** A finger never waits for an
+64. **iPhone, interrupt: a new lift closes the carry still ending, with its one outcome.** A finger never waits for an
     earlier carry: lifting a card, a section or the plus while a copy settles ends that carry at once as it would have
     ended (its write is already made; its card takes its place), and the new carry starts in the same frame.
-59. **iPhone, interrupt: a card always takes the finger.** A card hidden for a carry hides only what it draws, never
+65. **iPhone, interrupt: a card always takes the finger.** A card hidden for a carry hides only what it draws, never
     itself (a view at alpha 0 takes no touches), so it can be lifted or tapped the moment it shows.
-60. **iPhone, drop: the dashed place closes the moment a card is let go where it writes.** The copy flies to where the
+66. **iPhone, drop: the dashed place closes the moment a card is let go where it writes.** The copy flies to where the
     card will stand after the write (the room is measured as if the place had closed), so the list does not move a row
     while the copy comes down a row too low and then glide up.
-61. **iPhone, day turn: a finger catches a sliding day.** A swipe on the calendar while the day slides (an arrow's turn,
+67. **iPhone, day turn: a finger catches a sliding day.** A swipe on the calendar while the day slides (an arrow's turn,
     a swipe let go) takes the day where it shows, as a scroll catches its deceleration; the turns asked before it are
     dropped, and let go the day goes on or back as any swipe does. For the plugin to follow.
 

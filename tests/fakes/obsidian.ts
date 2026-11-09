@@ -97,6 +97,8 @@ export class PluginSettingTab {
 	) {}
 
 	display(): void {}
+
+	hide(): void {}
 }
 
 export class TextComponent {

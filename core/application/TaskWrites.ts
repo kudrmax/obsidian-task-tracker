@@ -26,6 +26,7 @@ import type { Read, Snapshot, TaskReads } from "./TaskReads";
 import type { Operation, TaskRules } from "./TaskRules";
 import { droppedSpan } from "./TimelineSpans";
 import { landingOf } from "./landing";
+import { keyOf } from "./taskKeys";
 
 /** The document as normalized before and after an operation ran. */
 export interface DocChange {
@@ -74,7 +75,7 @@ export class TaskWrites {
 			operation: this.rules.createInPlace(text, priority, place, repeat, labels),
 			answer: (change) => {
 				const created = change?.after.insertedSince(change.before);
-				return created ? { key: { section: created.section, index: created.index, path: created.path, raw: created.raw }, id: created.id } : null;
+				return created ? { key: keyOf(created), id: created.id } : null;
 			},
 		};
 	}
@@ -370,7 +371,7 @@ export class TaskWrites {
 			answer: (change) => {
 				if (!change) return tasks.map((task) => task.key);
 				const moved = tasks.map((task) => this.rules.entryOf(change.before, task.key));
-				return change.after.movedSince(change.before, moved).flatMap((entry) => (entry ? [{ section: entry.section, index: entry.index, path: entry.path, raw: entry.raw }] : []));
+				return change.after.movedSince(change.before, moved).flatMap((entry) => (entry ? [keyOf(entry)] : []));
 			},
 		};
 	}

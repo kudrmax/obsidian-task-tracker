@@ -17,7 +17,15 @@ export interface TaskIdLine {
 export interface TaskIdState {
 	readonly next: number;
 	readonly lines: readonly TaskIdLine[];
+	/**
+	 * The lines a task had before, the latest first, by id: rewritten by this identity's writes or edited in place
+	 * elsewhere, a key read before still names its task. Left out: none.
+	 */
+	readonly held?: Readonly<Record<string, readonly string[]>>;
 }
+
+/** How many earlier lines of a task are kept: enough for the writes made while an earlier one is still being drawn. */
+const HELD = 8;
 
 export const NO_TASK_IDS: TaskIdState = { next: 0, lines: [] };
 
@@ -63,7 +71,7 @@ export class TaskIdentity {
 		const fresh = outline.some((o) => !known.has(o.tag));
 		for (const o of outline) if (!known.has(o.tag)) known.set(o.tag, `t${next + o.tag}`);
 		const settled = !fresh && sameOutline(this.current.lines, outline) && outline.every((o, i) => known.get(o.tag) === this.current.lines[i].id);
-		if (!settled) this.current = { next: next + doc.nextTag(), lines: outline.map((o) => ({ raw: o.raw, task: o.task, id: known.get(o.tag)! })) };
+		if (!settled) this.settle(next + doc.nextTag(), outline.map((o) => ({ raw: o.raw, task: o.task, id: known.get(o.tag)! })));
 		const ids = { known, next };
 		this.last = { text, ids };
 		return ids;
@@ -72,7 +80,7 @@ export class TaskIdentity {
 	/** A write left `text`, the document `after`: its tasks and headings are who its lines' tags say. */
 	wrote(text: string, after: TaskDocument): void {
 		const tags = after.outlineTags();
-		this.current = { next: after.nextTag(), lines: after.outline().map((o) => ({ raw: o.raw, task: o.task, id: tags.get(o.line)! })) };
+		this.settle(after.nextTag(), after.outline().map((o) => ({ raw: o.raw, task: o.task, id: tags.get(o.line)! })));
 		this.pending = null;
 		this.last = { text, ids: { known: new Map([...tags].map(([line, tag]) => [line, tag])), next: this.current.next } };
 	}
@@ -93,6 +101,25 @@ export class TaskIdentity {
 		this.last = null;
 	}
 
+	/** Whether `raw` is a line the task `id` has, or had while this identity knew it. */
+	held(id: string, raw: string): boolean {
+		return this.current.lines.some((line) => line.id === id && line.raw === raw) || (this.current.held?.[id]?.includes(raw) ?? false);
+	}
+
+	/** The state for `lines`: a task whose line changed keeps the line it had among those it held. */
+	private settle(next: number, lines: readonly TaskIdLine[]): void {
+		const was = new Map(this.current.lines.filter((line) => line.task).map((line) => [line.id, line.raw]));
+		const held: Record<string, readonly string[]> = {};
+		for (const line of lines) {
+			if (!line.task) continue;
+			const before = was.get(line.id);
+			const kept = this.current.held?.[line.id] ?? [];
+			const all = before !== undefined && before !== line.raw ? [before, ...kept.filter((raw) => raw !== before)] : kept;
+			if (all.length > 0) held[line.id] = all.slice(0, HELD);
+		}
+		this.current = { next, lines, ...(Object.keys(held).length > 0 && { held }) };
+	}
+
 	/** The ids of the reading's lines that an undo step gave its text's lines. */
 	private given(outline: readonly OutlineLine[], ids: ReadonlyMap<number, string>): Map<number, string> {
 		const known = new Map<number, string>();
@@ -107,6 +134,7 @@ export class TaskIdentity {
 		return new Map(outline.map((o, i) => [o.tag, this.current.lines[i].id]));
 	}
 
+	/** The ids of the reading the state is for, carried to this reading's lines by place and line. */
 	/** The ids of the reading the state is for, carried to this reading's lines by place and line. */
 	private matched(outline: readonly OutlineLine[]): Map<number, string> {
 		const old = this.current.lines;

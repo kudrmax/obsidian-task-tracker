@@ -1,4 +1,4 @@
-import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, repeatParts, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
+import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
@@ -17,7 +17,6 @@ import { DescriptionPeek } from "./DescriptionPeek";
 import { PanelPages } from "./PanelPages";
 import { Motion } from "../motion/Motion";
 import { repeatPanel } from "../repeat/RepeatPanel";
-import { repeatValue } from "../repeat/repeatLabel";
 
 export type EditRowId = MenuEditId;
 /** What the menu asks about: a status tile that asks first, or Delete. */
@@ -35,6 +34,8 @@ export interface EditRow {
 	/** Repeat's value for a week: the days its letters show on. */
 	readonly days?: readonly Weekday[] | null;
 	readonly icon: IconName;
+	/** Project on a subtask: shown, not pressed. */
+	readonly disabled?: boolean;
 }
 
 const STATUS_LOOKS: Readonly<Record<MenuStatusId, { readonly label: string; readonly icon: IconName }>> = {
@@ -57,44 +58,24 @@ export function askLooks(what: Asking): { readonly verb: string; readonly icon: 
 	return { verb: label, icon, danger: false };
 }
 
-function repeatRow(rule: RepeatRule | null): EditRow {
-	return { id: "repeat", label: "Repeat", value: rule === null ? "" : (repeatValue(rule) ?? ""), days: rule && repeatParts(rule).days, icon: "repeat" };
-}
 
 const REMINDER_NAMES: Readonly<Record<ReminderKind, string>> = { notification: "Notification", alarm: "Alarm", live: "Live Activity", none: "Off" };
 
-/** The edit group's rows as the menu's model has them: the reminder's kind, the rule and the section's name beside theirs. */
+/**
+ * The edit group's rows as the menu's model has them, in its order: the reminder's kind, the rule, the section's name and
+ * the project's beside theirs. Project, disabled on a subtask, shows its parent's.
+ */
 export function editRows(item: TaskItem, model: TaskMenuModel): readonly EditRow[] {
 	const rows: Readonly<Record<EditRowId, () => EditRow>> = {
 		rename: () => ({ id: "rename", label: "Rename", value: "", icon: "rename" }),
 		reminder: () => ({ id: "reminder", label: "Reminder", value: REMINDER_NAMES[item.reminder], icon: "reminder" }),
 		description: () => ({ id: "description", label: "Add description", value: "", icon: "description" }),
-		repeat: () => repeatRow(item.repeat),
+		repeat: () => ({ id: "repeat", label: "Repeat", value: model.repeat.value, days: model.repeat.days, icon: "repeat" }),
 		section: () => ({ id: "section", label: "Section", value: model.sections?.choice.current ?? "", icon: "section" }),
+		project: () => ({ id: "project", label: "Project", value: model.project.value, icon: "project", disabled: model.project.disabled }),
 		subtask: () => ({ id: "subtask", label: "Add subtask", value: "", icon: "subtask" }),
 	};
 	return model.edits.map((id) => rows[id]());
-}
-
-/** The Project row: the project the tasks share, No project for none, nothing when they differ; disabled for subtasks, showing their parent's. */
-export interface ProjectRow {
-	readonly label: string;
-	readonly value: string;
-	readonly icon: IconName;
-	readonly disabled: boolean;
-}
-
-export function projectRow(model: TaskMenuModel): ProjectRow {
-	const { value, disabled } = model.project;
-	return { label: "Project", value, icon: "project", disabled };
-}
-
-/** Where the Project row stands among the edit rows: right after Section, or where Section would stand, before Add subtask. */
-export function projectRowAt(rows: readonly EditRow[]): number {
-	const section = rows.findIndex((row) => row.id === "section");
-	if (section >= 0) return section + 1;
-	const subtask = rows.findIndex((row) => row.id === "subtask");
-	return subtask >= 0 ? subtask : rows.length;
 }
 
 export interface LevelTile extends PriorityLevel {
@@ -367,6 +348,7 @@ export class TaskMenu extends LiftedMenu {
 				description: this.pickNow(() => actions.openDescription(true)),
 				repeat: () => this.showRepeat(),
 				section: () => this.showSections(),
+				project: () => this.showProjects(),
 				subtask: this.stacks ? () => actions.addSubtask(this) : this.pickNow(() => actions.addSubtask(this)),
 			};
 			const draw: Record<MenuGroupId, () => void> = {
@@ -394,10 +376,7 @@ export class TaskMenu extends LiftedMenu {
 				},
 				edits: () => {
 					const rows = editRows(item, model);
-					const specs = rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] }));
-					const project = projectRow(model);
-					specs.splice(projectRowAt(rows), 0, { ...project, onPick: () => this.showProjects() });
-					menuGroup(this.panel, specs);
+					menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, disabled: row.disabled, onPick: edits[row.id] })));
 				},
 				opens: () => {
 					const openFull = actions.openFull;

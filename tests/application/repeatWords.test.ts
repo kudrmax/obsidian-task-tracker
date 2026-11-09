@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RepeatRule } from "../../core/application/contracts";
-import { onTheDay, repeatValue } from "../../obsidian/ui/repeat/repeatLabel";
+import { onTheDay, repeatRow, repeatValue } from "../../core/application/repeatWords";
 
 const rule = (over: Partial<RepeatRule>): RepeatRule => ({ kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null, ...over });
 
@@ -31,5 +31,13 @@ describe("onTheDay", () => {
 	it("the day a monthly schedule falls on, worded by the domain", () => {
 		expect(onTheDay(rule({ unit: "month", dayOfMonth: 22 }))).toBe("On the 22nd");
 		expect(onTheDay(rule({}))).toBe("");
+	});
+});
+
+describe("repeatRow", () => {
+	it("words the rule for the menu's Repeat row: the value, or the weekdays of a weekly schedule", () => {
+		expect(repeatRow(null)).toEqual({ value: "", days: null });
+		expect(repeatRow(rule({ every: 3 }))).toEqual({ value: "Every 3 days", days: null });
+		expect(repeatRow(rule({ unit: "week", days: [0, 4] }))).toEqual({ value: "", days: [0, 4] });
 	});
 });

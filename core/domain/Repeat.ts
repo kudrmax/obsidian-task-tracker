@@ -94,19 +94,25 @@ export class Repeat {
 		return null;
 	}
 
-	static parse(text: string): Repeat | null {
+	/**
+	 * The rule a line's field writes. A schedule of every few units written without `from` (by hand: `every 2 months on
+	 * the 5th`) counts from `anchor`, the task's own day, as though written with it; without an anchor it is no rule.
+	 */
+	static parse(text: string, anchor: LocalDate | null = null): Repeat | null {
 		const m = RULE_RE.exec(text.trim());
 		if (!m) return null;
-		const [, count, unit, plural, whenDone, on, from] = m;
+		const [, count, unit, plural, whenDone, on, written] = m;
 		const every = count === undefined ? 1 : Number(count);
 		if (every < 1 || (count !== undefined && every === 1)) return null;
-		if (from !== undefined && (every === 1 || !isValidLocalDate(from))) return null;
+		if (written !== undefined && (every === 1 || !isValidLocalDate(written))) return null;
 		if ((plural !== undefined) !== every > 1) return null;
-		const rule = { every, unit: unit as RepeatUnit, days: [] as Weekday[], dayOfMonth: null, from: from ?? null };
 		if (whenDone !== undefined) {
-			return from === undefined ? new Repeat({ ...rule, kind: "afterDone" }) : null;
+			const rule = { every, unit: unit as RepeatUnit, days: [] as Weekday[], dayOfMonth: null, from: null };
+			return written === undefined ? new Repeat({ ...rule, kind: "afterDone" }) : null;
 		}
-		if (every > 1 && from === undefined) return null;
+		const from = written ?? (every > 1 ? anchor : null);
+		if (every > 1 && from === null) return null;
+		const rule = { every, unit: unit as RepeatUnit, days: [] as Weekday[], dayOfMonth: null, from };
 		if (unit === "day") return on === undefined ? new Repeat({ ...rule, kind: "schedule" }) : null;
 		if (on === undefined) return null;
 		if (unit === "week") {

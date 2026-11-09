@@ -548,3 +548,26 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   an earlier one does); which way today lies is the frontends' ISO date comparison (the app's `day < today` too) — a
   `days` answer for it would take that line out of both. A tap during a turn stands that turn on its day and starts the
   next once the screen has drawn that day (at most 1 s), so one day peeks at a time and quick taps walk day by day.
+- frontend-swift (labels in the menu, 2026-11-08): the menu's label tiles are titled by the core's `rules.labelTitle`
+  (underscores read as spaces), as the plugin's `labelTiles`; every priority and label tile draws the filled symbol
+  (`flag.fill`, `tag.fill`) in the mark's `rules.inkOf`, and the tile of a mark that is on is the system menu's selected
+  element (`state = .on`), which stands for the plugin's `is-on` fill and ring inside a stock `UIMenu`.
+- frontend-swift (the copy over the menu, 2026-11-08): a card that cuts its title is lifted as a copy, as the plugin's
+  `showWhole`: it grows right by what the title lacks of its room (the title's own width against the room the capsule
+  reports, cut only past the 12 pt fade), up to the window less `--tc-whole-margin` (10 pt) on each side, pulled back by the
+  plugin's `grownStart` so it ends inside the margin; still cut there, the title wraps (lines of `--tc-leading-card`, 18 pt)
+  and the copy grows down, the dot, counter and corner at the first line. The copy is a `UITargetedPreview` of its own view
+  at a `UIPreviewTarget` over the card, and the card hides under it while the menu stands (it shows again as the menu goes
+  or as a drag lifts it). A card that shows its whole title is lifted itself, as before. `grownStart` and the width rule
+  are two lines of the plugin's `obsidian/ui/wholeCard.ts` drawn again in Swift: geometry, but by CLAUDE.md's test they
+  belong in the core (`rules.wholeWidth`, `rules.grownStart`) for both — asked of the backend. iOS may still nudge the
+  preview to keep the menu on screen.
+- frontend-swift (several labels, 2026-11-08): a card of several colours (`TaskItem.colors`, more than one) is painted
+  with each colour's `rules.shadesOf(...).fill`, up to four as the plugin's `LABEL_SLOTS`: stripes 6 pt across at CSS's
+  120° (`--tc-label-stripe`, `--tc-label-stripe-angle`), measured from the top-left corner as CSS measures a gradient, the
+  colours in the core's order; with blend, a left-to-right gradient through the same fills. The first colour still tints
+  the dot and the corner. List cards, timeline cards, the carried and lifted capsule, the menu's copy and the folded
+  peek all draw it. **Missing in the door:** the setting `labelPaint` is the plugin's view setting
+  (`obsidian/ui/viewSettings.ts`, default `"stripes"`), which the core does not hand to a frontend. The app reads it as
+  `screenSettings.get().labelPaint` (`"blend"` blends, anything else stripes); asked of the backend: move `LabelPaint`
+  and its default into the core and answer it in `ScreenSettings`. Until then the app draws stripes always.

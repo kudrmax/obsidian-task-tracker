@@ -36,7 +36,7 @@ async function stored(disk = new Disk()): Promise<{ disk: Disk; settings: Plugin
 describe("view settings", () => {
 	it("read what was saved, the defaults for the rest, and nothing else", () => {
 		expect(viewSettingsFrom(null)).toEqual(VIEW_DEFAULTS);
-		expect(viewSettingsFrom({ cardGap: 4, tasksFile: "x.md" })).toEqual({ ...VIEW_DEFAULTS, cardGap: 4 });
+		expect(viewSettingsFrom({ zoom: 80, zoomLevels: [{ hourPx: 40 }], cardGap: 4, tasksFile: "x.md" })).toEqual({ ...VIEW_DEFAULTS, zoom: 80 });
 	});
 
 	it("keep what the screen sets on the device: data.json is not touched", async () => {
@@ -53,24 +53,14 @@ describe("view settings", () => {
 		expect(told).toBe(3);
 	});
 
-	it("write the zoom levels typed as heights, and nothing for text that isn't", async () => {
-		const { disk, settings } = await stored();
-		const view = new ViewSettingsStore(settings);
-		await view.setZoomLevels("28, x");
-		expect(disk.saves).toBe(0);
-		await view.setZoomLevels(" 40 , 80");
-		expect(view.get().zoomLevels).toEqual([{ hourPx: 40 }, { hourPx: 80 }]);
-		expect(JSON.parse(disk.text).zoomLevels).toEqual([{ hourPx: 40 }, { hourPx: 80 }]);
-	});
-
 	it("are the same object while the settings are", async () => {
 		const { settings } = await stored();
 		const view = new ViewSettingsStore(settings);
 		const first = view.get();
 		expect(view.get()).toBe(first);
-		await view.set({ cardGap: 4 });
+		await view.set({ zoom: 80 });
 		expect(view.get()).not.toBe(first);
-		expect(view.get().cardGap).toBe(4);
+		expect(view.get().zoom).toBe(80);
 	});
 });
 

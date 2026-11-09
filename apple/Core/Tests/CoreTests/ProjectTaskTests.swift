@@ -54,6 +54,20 @@ import Testing
         #expect(menu.sections?.choice.names.contains("Дальний") == true)
     }
 
+    /// By the door's defaults the board groups Backlog by project, as the plugin does: its groups come with the screen, and
+    /// a card's Section menu offers its project's sections.
+    @Test func byDefaultBacklogIsGroupedByProject() throws {
+        let snapshot = try TaskBoard(core: core, vault: FakeVault(Self.file)).snapshot(day: Self.day, measures: Self.measures, now: at)
+        let backlog = try #require(snapshot.screen.projects["backlog"])
+        #expect(backlog.canGroup && backlog.on)
+        #expect(backlog.groups.map(\.title) == [Self.project, "No project"])
+        #expect(backlog.groups[0].zone == .string(Self.project))
+        #expect(backlog.groups[0].sections.flatMap { $0.rows.map(\.item.title) } == ["Someday"])
+        #expect(snapshot.screen.projects["soon"]?.on == false)
+        let someday = try item("Someday", in: snapshot)
+        #expect(snapshot.menus[someday.id]?.sections?.choice.names.contains("Дальний") == false)
+    }
+
     @Test func withTheDoorsDefaultsBacklogWouldBeGroupedAndItsMenuCutToTheProject() throws {
         let screen = try #require(try core.call("tasks.screen", [Self.day], context: DoorContext(tasks: Self.file, now: at)).result as? [String: Any])
         let offer = try #require(screen["offer"] as? [String: Any])
@@ -77,6 +91,7 @@ import Testing
 
     // MARK: Moves
 
+    /// In Backlog's sections, as a device that groups it not by project draws them.
     @Test func aDragIntoAnotherSectionKeepsTheField() throws {
         let vault = FakeVault(Self.file)
         let board = board(vault)
@@ -197,7 +212,7 @@ import Testing
 
     /// A card let go in `column` before its card `index`, past the headers `passed`: the app's drop (`BoardModel.drop`).
     private func drag(_ title: String, in column: BoardColumn, before index: Int, passed: [String?], vault: FakeVault, board: TaskBoard) throws {
-        let snapshot = try snapshot(vault)
+        let snapshot = try board.snapshot(day: Self.day, measures: Self.measures, now: at)
         let list = try #require(snapshot.lists[column])
         let lifted = try item(title, in: snapshot)
         let others = list.cards.filter { $0.item.id != lifted.id }

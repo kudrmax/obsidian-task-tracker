@@ -27,6 +27,17 @@ public enum VaultError: Error, Equatable {
     static let noTasksFileMessage = "No tasks file set in Task Calendar's settings"
 }
 
+/// A file of the vault by its path from the vault folder (NFC, as Obsidian names files), and when it last changed.
+public struct VaultFile: Sendable, Hashable {
+    public let path: String
+    public let modified: Date
+
+    public init(path: String, modified: Date) {
+        self.path = path
+        self.modified = modified
+    }
+}
+
 /// Where the tasks file and the plugin's settings come from.
 public protocol TasksVault: Sendable {
     func read() throws -> (tasks: String, settingsJSON: String)
@@ -43,6 +54,13 @@ public protocol TasksVault: Sendable {
     /// A new file in `folder` (by path from the vault folder, made if missing), never over another: a taken name gets
     /// a number, as Obsidian numbers it. Returns the name written.
     func save(_ data: Data, in folder: String, named name: String) throws -> String
+    /// Every file of the vault but Obsidian's own folder and the trash (hidden ones), by path from its folder.
+    func vaultFiles() -> [VaultFile]
+}
+
+public extension TasksVault {
+    /// None where the vault cannot list its files.
+    func vaultFiles() -> [VaultFile] { [] }
 }
 
 /// The Obsidian vault folder the app was given once, read and written through file coordination.
@@ -126,6 +144,22 @@ public final class Vault: TasksVault, NoteFolder, @unchecked Sendable {
         }
     }
 
+    public func vaultFiles() -> [VaultFile] {
+        (try? withFolder { folder -> [VaultFile] in
+            let keys: [URLResourceKey] = [.isRegularFileKey, .contentModificationDateKey]
+            guard let walk = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return [] }
+            let base = folder.standardizedFileURL.path
+            var found: [VaultFile] = []
+            for case let url as URL in walk {
+                guard let values = try? url.resourceValues(forKeys: Set(keys)), values.isRegularFile == true else { continue }
+                let full = url.standardizedFileURL.path
+                guard full.hasPrefix(base + "/") else { continue }
+                found.append(VaultFile(path: String(full.dropFirst(base.count + 1)).precomposedStringWithCanonicalMapping, modified: values.contentModificationDate ?? .distantPast))
+            }
+            return found
+        }) ?? []
+    }
+
     public func read(path: String) -> String? {
         try? withFolder { folder in try coordinatedRead(folder.appendingPathComponent(path)) }
     }
@@ -190,6 +224,13 @@ public final class Vault: TasksVault, NoteFolder, @unchecked Sendable {
         let watch = FileWatch(file, changed)
         watching.watch = watch
         return watch
+    }
+
+    /// Tells `changed` whenever the plugin's settings (`data.json`) are written while the watch is kept: Obsidian changed
+    /// a setting (the cards' size, Several labels, a list's name) and the screen draws it at once, as the plugin does.
+    public func watchSettingsFile(_ changed: @escaping @Sendable () -> Void) -> FileWatch? {
+        guard let file = try? withFolder({ folder in folder.appendingPathComponent(try rule.settingsFile()) }) else { return nil }
+        return FileWatch(file, changed)
     }
 
     /// The app wrote the tasks file in its own process for someone other than the screen (a reminder's button, Siri, the

@@ -1,3 +1,4 @@
+import { dayMonth } from "./dayLabels";
 import { GROUPED_LISTS } from "../domain/Lists";
 import type { DayBoundary } from "../domain/DayBoundary";
 import { dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../domain/Days";
@@ -329,7 +330,7 @@ export class TaskReads {
 
 	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
 		for (const item of items) {
-			if (samePlace(item.key, key)) return item;
+			if (key.id !== undefined && item.id !== undefined ? item.id === key.id : samePlace(item.key, key)) return item;
 			const inner = this.findIn(item.subtasks, key);
 			if (inner) return inner;
 		}
@@ -337,6 +338,8 @@ export class TaskReads {
 	}
 
 	find({ doc, today }: Snapshot, key: TaskKey, text: string): TaskItem | null {
+		const named = this.rules.named(doc, key);
+		if (named !== undefined) return named ? this.itemAt(doc, named, today) : null;
 		const atPlace = doc.find(key.section, key.index, key.path);
 		const alike = flatten(doc.allTasks()).filter((entry) => entry.raw === key.raw);
 		const entry = atPlace?.raw === key.raw ? atPlace : alike.length === 1 ? alike[0] : atPlace?.task.text === text ? atPlace : undefined;
@@ -395,6 +398,10 @@ export class TaskReads {
 
 	listName(list: SectionKey): string {
 		return this.settings.get().sections[list];
+	}
+
+	placementTitle(placement: Placement): string {
+		return placement.kind === "date" ? dayMonth(placement.date) : this.listName(placement.kind);
 	}
 
 	dayOfPlacement(placement: Placement): LocalDate | null {

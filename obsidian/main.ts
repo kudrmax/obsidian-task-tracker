@@ -45,10 +45,9 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		);
 		this.pluginSettings.onChange(() => {
 			const screen = this.screenSettings.get();
-			const view = this.viewSettings.get();
-			showCardSize({ height: view.cardHeight, gap: view.cardGap });
+			showCardSize({ height: screen.cardHeight, gap: screen.cardGap });
 			showPriorityColors(screen.priorities, screen.labels);
-			showLabelPaint(view.labelPaint);
+			showLabelPaint(screen.labelPaint);
 		});
 		await this.pluginSettings.load();
 		this.register(clearCardSize);
@@ -82,9 +81,9 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
 		this.registerObsidianProtocolHandler(SYNC_ACTION, () => services.syncForApp());
 		this.register(() => services.stopSyncForApp());
-		this.addSettingTab(
-			new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), view: this.viewSettings, google: services.google, work: services.work, calendars: services.calendars, updatesLinks: () => (this.app.vault as unknown as { getConfig(key: string): unknown }).getConfig("alwaysUpdateLinks") !== false }),
-		);
+		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars, updatesLinks: () => (this.app.vault as unknown as { getConfig(key: string): unknown }).getConfig("alwaysUpdateLinks") !== false });
+		this.addSettingTab(settingsTab);
+		this.register(() => settingsTab.closePage());
 		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), runScript: runAppleScript });
 		return {
 			tasks: services.tasks,

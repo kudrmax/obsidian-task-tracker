@@ -207,7 +207,7 @@ describe("DayData", () => {
 
 	it("the dot is the day's stale, not every source's", async () => {
 		const { data, calendars } = setup();
-		const fine = { source: "iphone" as const, kind: "exported" as const, problem: null, events: 0, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: true };
+		const fine = { source: "iphone" as const, kind: "exported" as const, problem: null, events: 0, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: true, words: { name: "iPhone calendars" as const, short: "iPhone" as const, sub: "Exported from file", time: "" } };
 		calendars.last.set(TODAY, { events: [event("kept")], allDay: [], timed: [event("kept")], statuses: [fine], stale: false });
 		void data.load();
 		expect(data.stale).toBe(false);
@@ -302,7 +302,7 @@ describe("DayData", () => {
 
 	it("stays silent when a poll brings the same events only fetched later", async () => {
 		const { data, calendars, parts } = setup();
-		const later = (at: number) => ({ events: [event("same")], allDay: [], timed: [event("same")], statuses: [{ source: "google" as const, kind: "synced" as const, problem: null, events: 1, updatedAt: new Date(at), updatedDay: "other" as const, updatedDate: "2026-11-01", detail: null, stale: false }], stale: false });
+		const later = (at: number) => ({ events: [event("same")], allDay: [], timed: [event("same")], statuses: [{ source: "google" as const, kind: "synced" as const, problem: null, events: 1, updatedAt: new Date(at), updatedDay: "other" as const, updatedDate: "2026-11-01", detail: null, stale: false, words: { name: "Google Calendar" as const, short: "Google" as const, sub: "Updated 1 Nov", time: `1 Nov 00:00:0${at}` } }], stale: false });
 		let at = 0;
 		calendars.eventsOn = async () => later(at++);
 		await data.calendars();

@@ -18,6 +18,11 @@ describe("the form's answers", () => {
 		expect(service({ google: { ...DEFAULT_SETTINGS.google, clientId: "id" } }).svc.form().googleClientReady).toBe(true);
 	});
 
+	it("says whether Google is logged in: the settings keep its token", () => {
+		expect(service().svc.form().googleLoggedIn).toBe(false);
+		expect(service({ google: { ...DEFAULT_SETTINGS.google, refreshToken: "token" } }).svc.form().googleLoggedIn).toBe(true);
+	});
+
 	it("reads a colour code typed and left: none for no colour or the one the level or label has", () => {
 		const shades = { red: "#FF453A", orange: "#FF9F0A", yellow: "#FFD60A", green: "#30D158", teal: "#40C8E0", blue: "#0A84FF" } as const;
 		const { svc } = service({ priorities: [{ prefix: "p1", color: "red" }], labels: [{ name: "A", color: "#123456" }] });
@@ -46,6 +51,53 @@ describe("editing the labels", () => {
 		await svc.setLabelTag(" tags ");
 		await svc.setLabelTag("two words");
 		expect(now().labelTag).toBe("tags");
+	});
+});
+
+describe("how a card of several labels is painted", () => {
+	it("is offered as stripes or blend, stripes unless set", () => {
+		expect(service().svc.form()).toMatchObject({ labelPaint: "stripes", labelPaints: ["stripes", "blend"] });
+		expect(service({ labelPaint: "blend" }).svc.form().labelPaint).toBe("blend");
+	});
+
+	it("writes a paint offered and nothing else", async () => {
+		const { svc, now, writes } = service();
+		await svc.setLabelPaint("blend");
+		expect(now().labelPaint).toBe("blend");
+		await svc.setLabelPaint("plaid");
+		expect(now().labelPaint).toBe("blend");
+		expect(writes()).toBe(1);
+	});
+
+	it("writes a card's height and gap rounded within their bounds, and nothing outside them", async () => {
+		const { svc, now, writes } = service();
+		expect(svc.form()).toMatchObject({ cardHeight: 35, cardGap: 2, cardHeights: { min: 28, max: 40 }, cardGaps: { min: 0, max: 10 } });
+		await svc.setCardHeight(30.4);
+		await svc.setCardGap(0);
+		expect(now()).toMatchObject({ cardHeight: 30, cardGap: 0 });
+		await svc.setCardHeight(41);
+		await svc.setCardGap(-1);
+		await svc.setCardHeight(Number.NaN);
+		expect(now()).toMatchObject({ cardHeight: 30, cardGap: 0 });
+		expect(writes()).toBe(2);
+	});
+});
+
+describe("the timeline's zoom levels", () => {
+	it("are offered as the hour's heights typed, the defaults unless set", () => {
+		expect(service().svc.form().zoomLevels).toBe("28, 56, 112, 224");
+		expect(service({ zoomLevels: [{ hourPx: 40 }, { hourPx: 80 }] }).svc.form().zoomLevels).toBe("40, 80");
+	});
+
+	it("write only text that reads as the hour's heights", async () => {
+		const { svc, now, writes } = service();
+		await svc.setZoomLevels(" 40 , 80");
+		expect(now().zoomLevels).toEqual([{ hourPx: 40 }, { hourPx: 80 }]);
+		await svc.setZoomLevels("28:60, 56:30");
+		expect(now().zoomLevels).toEqual([{ hourPx: 28 }, { hourPx: 56 }]);
+		for (const text of ["", "28, x", "0", "28:"]) await svc.setZoomLevels(text);
+		expect(now().zoomLevels).toEqual([{ hourPx: 28 }, { hourPx: 56 }]);
+		expect(writes()).toBe(2);
 	});
 });
 

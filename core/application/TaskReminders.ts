@@ -4,6 +4,7 @@ import type { LocalDate, Slot } from "../domain/Task";
 import type { TaskDocument, TaskEntry } from "../domain/TaskDocument";
 import { plainText } from "../domain/TaskText";
 import type { TaskKey } from "./contracts";
+import { keyOf } from "./taskKeys";
 import type { Clock } from "./ports";
 import type { Moment, Operation, TaskRules } from "./TaskRules";
 
@@ -28,9 +29,7 @@ function clockOf(date: LocalDate, minutes: number): Date {
 	return new Date(year, month - 1, day, 0, minutes);
 }
 
-function keyOf(entry: TaskEntry): TaskKey {
-	return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw };
-}
+
 
 /** Which tasks ring and when, and the action on one the phone still shows: over the same rules the plugin writes with. */
 export class TaskReminders {

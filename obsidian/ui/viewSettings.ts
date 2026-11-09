@@ -12,13 +12,8 @@ export type RightMode = ScreenPlace;
  */
 
 /** A height of the hour the timeline settles on after a pinch; the step a drag snaps to follows from the height itself. */
-export type { Zoom, ZoomLevel } from "../../core/application/contracts";
-import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, parseZoomLevels, type Zoom, type ZoomLevel } from "../../core/application/contracts";
-export { formatZoomLevels, parseZoomLevels } from "../../core/application/contracts";
-
-/** How a card of several labels is painted: narrow diagonal stripes of their colours in turn, or one colour flowing into the next. */
-export type LabelPaint = "stripes" | "blend";
-export const LABEL_PAINTS: readonly LabelPaint[] = ["stripes", "blend"];
+export type { Zoom } from "../../core/application/contracts";
+import { DEFAULT_ZOOM_HOUR, type Zoom } from "../../core/application/contracts";
 
 export interface ViewSettings {
 	/** The left column's share of the width the two columns split, 0..1, set by dragging the divider: the line keeps its place as the window changes. */
@@ -27,23 +22,12 @@ export interface ViewSettings {
 	readonly rightMode: RightMode;
 	/** The zoom a pinch last settled on: the timeline opens at it. */
 	readonly zoom: Zoom;
-	readonly zoomLevels: readonly ZoomLevel[];
-	/** A task card's height, px: the list, New task and the timeline's stack; its ends are round, half of it. */
-	readonly cardHeight: number;
-	/** Between two cards, px: in the list and in a stack on the timeline alike. */
-	readonly cardGap: number;
-	/** How a card of several labels is painted. */
-	readonly labelPaint: LabelPaint;
 }
 
 export const VIEW_DEFAULTS: ViewSettings = {
 	listShare: 0.5,
 	rightMode: "calendar",
 	zoom: DEFAULT_ZOOM_HOUR,
-	zoomLevels: DEFAULT_ZOOM_LEVELS,
-	cardHeight: 35,
-	cardGap: 2,
-	labelPaint: "stripes",
 };
 
 const VIEW_KEYS = Object.keys(VIEW_DEFAULTS) as (keyof ViewSettings)[];
@@ -51,22 +35,12 @@ const VIEW_KEYS = Object.keys(VIEW_DEFAULTS) as (keyof ViewSettings)[];
 /** What belongs to the device, not the vault: the divider's place, the column shown and the zoom are set by hand on each screen, and must not travel through Sync. */
 export const DEVICE_KEYS = ["listShare", "rightMode", "zoom"] as const satisfies readonly (keyof ViewSettings)[];
 
-export const LIST_WIDTH_MIN = 110;
-export const LIST_WIDTH_MAX = 280;
-export const CARD_HEIGHT_MIN = 28;
-export const CARD_HEIGHT_MAX = 40;
-export const CARD_GAP_MAX = 10;
-
-/** A card's height and the gap between cards before the settings are read. */
-export const DEFAULT_CARD_SIZE: { readonly height: number; readonly gap: number } = { height: VIEW_DEFAULTS.cardHeight, gap: VIEW_DEFAULTS.cardGap };
 
 /** The view's settings of what was saved, the defaults for any it lacks. */
 export function viewSettingsFrom(saved: unknown): ViewSettings {
 	const s = (saved ?? {}) as Partial<Record<keyof ViewSettings, unknown>>;
 	return Object.fromEntries(VIEW_KEYS.map((key) => [key, s[key] ?? VIEW_DEFAULTS[key]])) as unknown as ViewSettings;
 }
-
-/** `28, 56, 112` — the hour's heights in pixels, as the settings tab shows them. */
 
 /** Where the view's settings are kept: the plugin's settings file. */
 export interface ViewSettingsFile {
@@ -95,12 +69,6 @@ export class ViewSettingsStore {
 
 	set(patch: Partial<ViewSettings>): Promise<void> {
 		return this.file.update(patch);
-	}
-
-	/** Written when the text reads as the hour's heights. */
-	async setZoomLevels(text: string): Promise<void> {
-		const zoomLevels = parseZoomLevels(text);
-		if (zoomLevels) await this.set({ zoomLevels });
 	}
 
 	onChange(listener: () => void): () => void {

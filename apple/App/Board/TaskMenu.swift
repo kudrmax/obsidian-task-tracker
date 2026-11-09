@@ -2,17 +2,6 @@ import Core
 import SwiftUI
 import UIKit
 
-/// What the bulk bar's Done asks before it writes, when the core marks it to ask first (a menu asks on its own page).
-enum MenuQuestion: Identifiable {
-    case status([TaskItem], String)
-
-    var id: String {
-        switch self {
-        case .status(let items, let status): "status/\(status)/\(items.map(\.id))"
-        }
-    }
-}
-
 /// One row of a menu, drawn the same by UIKit (a card's menu) and SwiftUI (a bar's menu).
 indirect enum MenuNode {
     /// `opens`: it opens a sheet, an alert or a page, which UIKit shows only once the menu has gone.
@@ -23,6 +12,13 @@ indirect enum MenuNode {
     case group(row: Bool, children: [MenuNode])
     /// A question over its answers, on a page of the menu: the menu asks in place, as the plugin's does.
     case question(String, children: [MenuNode])
+    /// A row whose page is read when it opens: a subtask's own menu.
+    case deferred(title: String, symbol: String, subtitle: String?, load: @MainActor () async -> [MenuNode])
+
+    var keepsOpen: Bool {
+        if case .action(_, _, _, _, _, _, let keepsOpen, _, _, _) = self { return keepsOpen }
+        return false
+    }
 }
 
 /// The task's menu as iOS 26 draws a menu, in the plugin's order as the core gives it: the statuses, the priorities and
@@ -36,6 +32,8 @@ struct TaskMenu {
     var inStack = false
     /// The menu of the task its own full screen shows: no Open Full Screen.
     var ownPage = false
+    /// On the task's own full screen, Description puts the caret in its description instead of opening the page again.
+    var describe: (@MainActor () -> Void)?
 
     private var single: Bool { items.count == 1 }
 
@@ -53,11 +51,11 @@ struct TaskMenu {
             children = menu.statuses.map(status)
         case "levels":
             children = menu.levels.tiles.map { tile in
-                .action(title: tile.mark.title, symbol: tile.on ? "flag.fill" : "flag", tint: tile.mark.color, checked: tile.on, disabled: menu.levels.disabled) { Task { await model.togglePriority(items, tile.mark.title) } }
+                .action(title: tile.mark.title, symbol: "flag.fill", tint: tile.mark.color, checked: tile.on, disabled: menu.levels.disabled) { Task { await model.togglePriority(items, tile.mark.title) } }
             }
         case "labels":
             children = menu.labels.tiles.map { tile in
-                .action(title: tile.mark.title, symbol: tile.on ? "tag.fill" : "tag", tint: tile.mark.color, checked: tile.on, disabled: menu.labels.disabled) { Task { await model.toggleLabel(items, tile.mark.title) } }
+                .action(title: model.labelTitle(tile.mark.title), symbol: "tag.fill", tint: tile.mark.color, checked: tile.on, keepsOpen: true, disabled: menu.labels.disabled) { Task { await model.toggleLabel(items, tile.mark.title) } }
             }
         case "moves":
             children = menu.moves.map { move in
@@ -82,16 +80,10 @@ struct TaskMenu {
 
     /// The edit rows in the core's order (`menu.edits`).
     private var editRows: [MenuNode] {
-        let items = items, model = model, inStack = inStack
+        let items = items, model = model, inStack = inStack, describe = describe
         guard let item = items.first else { return [] }
         var rows: [MenuNode] = []
-        // The Project row stands right after Section, or where Section would stand: before Add Subtask, else last.
-        var project = projectPage
         for edit in menu.edits {
-            if edit == "subtask", let row = project {
-                rows.append(row)
-                project = nil
-            }
             switch edit {
             case "rename" where single:
                 rows.append(.action(title: "Rename", symbol: "pencil", opens: true) { if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } })
@@ -100,29 +92,33 @@ struct TaskMenu {
                     .action(title: ReminderWords.title(reminder.kind), symbol: nil, checked: reminder.checked) { Task { await model.setReminder(item, reminder.kind) } }
                 }))
             case "description" where single:
-                rows.append(.action(title: "Description", symbol: "text.alignleft", opens: true) { Task { await model.openFullScreen(item) } })
+                rows.append(.action(title: "Description", symbol: "text.alignleft", opens: true) { if let describe { describe() } else { model.describe(item) } })
             case "repeat" where single:
-                rows.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item })
+                rows.append(.action(title: "Repeat…", symbol: "repeat", subtitle: repeatValue, opens: true) { model.repeatFor = item })
             case "section":
                 if let section = sectionPage { rows.append(section) }
-                if let row = project {
-                    rows.append(row)
-                    project = nil
-                }
+            case "project":
+                rows.append(projectPage)
             case "subtask" where single:
                 rows.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } })
             default: break
             }
         }
-        if let project { rows.append(project) }
         return rows
     }
 
-    /// The Project row and its page (board Proj3Flow): the notes with the project tag by name, No Project last, the tasks'
-    /// own checked; a subtask's row shows its parent's project and can't be pressed.
-    private var projectPage: MenuNode? {
-        guard let page = menu.project else { return nil }
-        let items = items, model = model
+    /// The Repeat row's value, the core's (`menu.repeat`): the rule in words, or a weekly schedule's days by their letters
+    /// in the week's order.
+    private var repeatValue: String? {
+        let row = menu.repeat
+        if let days = row.days, !days.isEmpty { return model.weekLetters(days) }
+        return row.value.isEmpty ? nil : row.value
+    }
+
+    /// The Project row and its page (board Proj3Flow): the notes with the project tag by name, No Project last in its own
+    /// group, the tasks' own checked; a subtask's row shows its parent's project and can't be pressed. The words are the core's.
+    private var projectPage: MenuNode {
+        let page = menu.project, items = items, model = model
         let subtitle = page.value.isEmpty ? nil : page.value
         guard !page.disabled else {
             return .action(title: "Project", symbol: "folder", subtitle: subtitle, disabled: true) {}
@@ -185,12 +181,12 @@ struct TaskMenu {
 extension MenuNode {
     /// `later`: a row that opens a sheet, an alert or a page runs once the menu has gone, as the menu's own end tells.
     @MainActor
-    static func uiMenu(_ nodes: [MenuNode], later: @escaping (@escaping @MainActor () -> Void) -> Void, palette: (String) -> UIColor?) -> UIMenu {
+    static func uiMenu(_ nodes: [MenuNode], later: @escaping (@escaping @MainActor () -> Void) -> Void, palette: @escaping (String) -> UIColor?) -> UIMenu {
         UIMenu(children: nodes.map { $0.element(later, palette) })
     }
 
     @MainActor
-    private func element(_ later: @escaping (@escaping @MainActor () -> Void) -> Void, _ palette: (String) -> UIColor?) -> UIMenuElement {
+    private func element(_ later: @escaping (@escaping @MainActor () -> Void) -> Void, _ palette: @escaping (String) -> UIColor?) -> UIMenuElement {
         switch self {
         case .action(let title, let symbol, let subtitle, let tint, let destructive, let checked, let keepsOpen, let opens, let disabled, let run):
             var image = symbol.flatMap { UIImage(systemName: $0) }
@@ -213,28 +209,37 @@ extension MenuNode {
             return menu
         case .question(let question, let children):
             return UIMenu(title: question, options: .displayInline, children: children.map { $0.element(later, palette) })
+        case .deferred(let title, let symbol, let subtitle, let load):
+            let rows = UIDeferredMenuElement.uncached { completion in
+                Task { @MainActor in completion(await load().map { $0.element(later, palette) }) }
+            }
+            let menu = UIMenu(title: title, image: UIImage(systemName: symbol), children: [rows])
+            menu.subtitle = subtitle
+            return menu
         }
     }
 }
 
 // MARK: SwiftUI: a bar's menu
 
-/// The same rows inside a SwiftUI `Menu`: the bulk menu's «⋯» and the full screen's.
+/// The same rows inside a SwiftUI `Menu`: the bulk menu's «⋯» and the full screen's. A row's flag or tag is drawn in its
+/// level's or label's colour (`palette`), as the card's UIKit menu draws it.
 struct MenuNodes: View {
     let nodes: [MenuNode]
+    let palette: (String) -> UIColor?
 
     var body: some View {
         ForEach(Array(nodes.enumerated()), id: \.offset) { _, node in
             switch node {
-            case .action(let title, let symbol, let subtitle, _, let destructive, let checked, let keepsOpen, _, let disabled, let run):
+            case .action(let title, let symbol, let subtitle, let tint, let destructive, let checked, let keepsOpen, _, let disabled, let run):
                 let button = Button(role: destructive ? .destructive : nil) { run() } label: {
-                    if let symbol { Label(title, systemImage: checked ? "checkmark" : symbol) } else if checked { Label(title, systemImage: "checkmark") } else { Text(title) }
+                    if let symbol { Label { Text(title) } icon: { icon(checked ? "checkmark" : symbol, tint: checked ? nil : tint) } } else if checked { Label(title, systemImage: "checkmark") } else { Text(title) }
                     if let subtitle { Text(subtitle) }
                 }
                 if keepsOpen { button.menuActionDismissBehavior(.disabled).disabled(disabled) } else { button.disabled(disabled) }
             case .submenu(let title, let symbol, let subtitle, let destructive, let children):
                 Menu {
-                    MenuNodes(nodes: children)
+                    MenuNodes(nodes: children, palette: palette)
                 } label: {
                     Label(title, systemImage: symbol)
                     if let subtitle { Text(subtitle) }
@@ -242,37 +247,48 @@ struct MenuNodes: View {
                 .foregroundStyle(destructive ? .red : .primary)
             case .group(let row, let children):
                 if row {
-                    ControlGroup { MenuNodes(nodes: children) }.controlGroupStyle(.menu)
+                    // A row whose tiles keep the menu open (the labels) keeps it open as a whole: SwiftUI reads the
+                    // behaviour from the group, not from its buttons.
+                    ControlGroup { MenuNodes(nodes: children, palette: palette) }
+                        .controlGroupStyle(.menu)
+                        .menuActionDismissBehavior(children.contains(where: \.keepsOpen) ? .disabled : .automatic)
                 } else {
-                    Section { MenuNodes(nodes: children) }
+                    Section { MenuNodes(nodes: children, palette: palette) }
                 }
             case .question(let question, let children):
-                Section(question) { MenuNodes(nodes: children) }
+                Section(question) { MenuNodes(nodes: children, palette: palette) }
+            case .deferred(let title, let symbol, let subtitle, let load):
+                DeferredMenu(title: title, symbol: symbol, subtitle: subtitle, palette: palette, load: load)
             }
         }
+    }
+
+    /// The symbol in its colour, kept by the menu as drawn (`.alwaysOriginal`); a row with no colour takes the menu's.
+    private func icon(_ symbol: String, tint: String?) -> Image {
+        if let tint, let color = palette(tint), let image = UIImage(systemName: symbol)?.withTintColor(color, renderingMode: .alwaysOriginal) {
+            return Image(uiImage: image)
+        }
+        return Image(systemName: symbol)
     }
 }
 
-extension View {
-    /// The questions a menu asks before it writes, as system confirmation dialogs.
-    func menuQuestions(_ question: Binding<MenuQuestion?>, model: BoardModel) -> some View {
-        confirmationDialog(
-            question.wrappedValue.map(Self.title) ?? "",
-            isPresented: Binding(get: { question.wrappedValue != nil }, set: { if !$0 { question.wrappedValue = nil } }),
-            titleVisibility: .visible,
-            presenting: question.wrappedValue
-        ) { asked in
-            switch asked {
-            case .status(let items, let status):
-                Button(StatusWords.title(status), role: .destructive) { Task { await model.pickStatus(items, status) } }
-            }
-        }
-    }
+/// A row whose page is read as the menu shows it.
+private struct DeferredMenu: View {
+    let title: String
+    let symbol: String
+    let subtitle: String?
+    let palette: (String) -> UIColor?
+    let load: @MainActor () async -> [MenuNode]
+    @State private var nodes: [MenuNode] = []
 
-    private static func title(_ question: MenuQuestion) -> String {
-        switch question {
-        case .status(let items, let status): "\(StatusWords.title(status)): \(items.first?.title ?? "")"
+    var body: some View {
+        Menu {
+            MenuNodes(nodes: nodes, palette: palette)
+        } label: {
+            Label(title, systemImage: symbol)
+            if let subtitle { Text(subtitle) }
         }
+        .task { nodes = await load() }
     }
 }
 
