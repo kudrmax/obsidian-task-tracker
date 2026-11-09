@@ -5342,10 +5342,10 @@ ${key.title}`.toLowerCase();
       return entry;
     }
     /**
-     * The task a key names by its id, when the rules find keys by id: the task with that id, whatever its line is now, when
-     * the key's line is one it has or had while this identity knew it; else the key is another reading's, whose ids mean
-     * nothing here, and is found at its place with its line. Null when it is not found that way either; undefined when
-     * keys are found by place.
+     * The task a key names by its id, when the rules find keys by id: the task with that id wherever writes took it, when its
+     * line is the key's or one this identity's own writes rewrote the key's into. Else the key is stale (its line changed
+     * elsewhere: a fresh key comes with the redraw) or another reading's, whose ids mean nothing here, and is found at its
+     * place with its line. Null when it is not found that way either; undefined when keys are found by place.
      */
     named(doc, key) {
       if (!this.keysById || key.id === void 0) return void 0;
@@ -6129,12 +6129,13 @@ ${key.title}`.toLowerCase();
       const doc = read();
       const outline = doc.outline();
       const next = this.current.next;
-      const known = this.pending?.text === text ? this.given(outline, this.pending.ids) : sameOutline(this.current.lines, outline) ? this.inOrder(outline) : this.matched(outline);
+      const own = this.pending?.text === text;
+      const known = own ? this.given(outline, this.pending.ids) : sameOutline(this.current.lines, outline) ? this.inOrder(outline) : this.matched(outline);
       this.pending = null;
       const fresh = outline.some((o) => !known.has(o.tag));
       for (const o of outline) if (!known.has(o.tag)) known.set(o.tag, `t${next + o.tag}`);
       const settled = !fresh && sameOutline(this.current.lines, outline) && outline.every((o, i) => known.get(o.tag) === this.current.lines[i].id);
-      if (!settled) this.settle(next + doc.nextTag(), outline.map((o) => ({ raw: o.raw, task: o.task, id: known.get(o.tag) })));
+      if (!settled) this.settle(next + doc.nextTag(), outline.map((o) => ({ raw: o.raw, task: o.task, id: known.get(o.tag) })), own);
       const ids = { known, next };
       this.last = { text, ids };
       return ids;
@@ -6142,7 +6143,7 @@ ${key.title}`.toLowerCase();
     /** A write left `text`, the document `after`: its tasks and headings are who its lines' tags say. */
     wrote(text, after) {
       const tags = after.outlineTags();
-      this.settle(after.nextTag(), after.outline().map((o) => ({ raw: o.raw, task: o.task, id: tags.get(o.line) })));
+      this.settle(after.nextTag(), after.outline().map((o) => ({ raw: o.raw, task: o.task, id: tags.get(o.line) })), true);
       this.pending = null;
       this.last = { text, ids: { known: new Map([...tags].map(([line, tag]) => [line, tag])), next: this.current.next } };
     }
@@ -6161,19 +6162,25 @@ ${key.title}`.toLowerCase();
       this.pending = { text: after, ids };
       this.last = null;
     }
-    /** Whether `raw` is a line the task `id` has, or had while this identity knew it. */
+    /** Whether `raw` is a line the task `id` has, or had before this identity's own writes rewrote it into the line it has. */
     held(id, raw) {
       return this.current.lines.some((line) => line.id === id && line.raw === raw) || (this.current.held?.[id]?.includes(raw) ?? false);
     }
-    /** The state for `lines`: a task whose line changed keeps the line it had among those it held. */
-    settle(next, lines) {
+    /**
+     * The state for `lines`. `own`: this identity's write or undo step made them, so a task whose line changed holds the
+     * line it had (a key read before still names it); otherwise the text was changed elsewhere, and a task whose line
+     * changed there holds nothing: a key read before is stale, the task keeping its id.
+     */
+    settle(next, lines, own) {
       const was = new Map(this.current.lines.filter((line) => line.task).map((line) => [line.id, line.raw]));
       const held = {};
       for (const line of lines) {
         if (!line.task) continue;
         const before = was.get(line.id);
+        const changed2 = before !== void 0 && before !== line.raw;
+        if (changed2 && !own) continue;
         const kept = this.current.held?.[line.id] ?? [];
-        const all = before !== void 0 && before !== line.raw ? [before, ...kept.filter((raw) => raw !== before)] : kept;
+        const all = changed2 ? [before, ...kept.filter((raw) => raw !== before)] : kept;
         if (all.length > 0) held[line.id] = all.slice(0, HELD);
       }
       this.current = { next, lines, ...Object.keys(held).length > 0 && { held } };
