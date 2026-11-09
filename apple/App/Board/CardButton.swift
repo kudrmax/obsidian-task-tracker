@@ -385,6 +385,17 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// and where the title still doesn't fit, wrapped onto more lines with the copy grown down. It stands where the core
     /// places it (`rules.grownStart`). A card that shows its whole title is lifted itself.
     private func wholePreview() -> UITargetedPreview? {
+        guard let window, let (copy, frame) = grownCopy(selectable: false, always: false) else { return nil }
+        wholeCopy = copy
+        let parameters = UIPreviewParameters()
+        parameters.visiblePath = UIBezierPath(roundedRect: copy.bounds, cornerRadius: CardMetrics.radius)
+        parameters.backgroundColor = .clear
+        return UITargetedPreview(view: copy, parameters: parameters, target: UIPreviewTarget(container: window, center: CGPoint(x: frame.midX, y: frame.midY)))
+    }
+
+    /// The card's copy with its whole title, sized and placed in the window as the menu lifts it. `always`: a card that
+    /// shows its whole title gets a copy too, at its own width, where the menu lifts the card itself.
+    private func grownCopy(selectable: Bool, always: Bool, onCopied: @escaping () -> Void = {}) -> (UIView & UIContentView, CGRect)? {
         guard let look, let window, let room = titleFrame else { return nil }
         let board = AppServices.shared.board
         // The title as the card draws it: each piece's words, a link by its label, as the plugin measures its drawn title.
@@ -392,25 +403,33 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         let natural = drawn.size(withAttributes: [.font: UIFont.systemFont(ofSize: CardMetrics.title)]).width
         let margin = Double(CardMetrics.wholeMargin)
         let fit = TitleFit(width: Double(bounds.width), titleWidth: Double(room.width), textWidth: Double(natural), fade: Double(CardMetrics.fade))
-        guard let grown = try? board.wholeWidth(card: fit, room: Double(window.bounds.width), margin: margin) else { return nil }
-        let width = CGFloat(grown.width)
+        let grown = (try? board.wholeWidth(card: fit, room: Double(window.bounds.width), margin: margin)) ?? nil
+        guard grown != nil || always else { return nil }
+        let width = grown.map { CGFloat($0.width) } ?? bounds.width
         let copy = UIHostingConfiguration {
-            TaskCapsule(card: look.card, text: look.text, height: look.height, whole: true)
+            TaskCapsule(card: look.card, text: look.text, height: look.height, whole: true, selectable: selectable, onCopied: onCopied)
         }
         .margins(.all, 0)
         .makeContentView()
         copy.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
         let height = max(bounds.height, copy.systemLayoutSizeFitting(CGSize(width: width, height: UIView.layoutFittingCompressedSize.height), withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height.rounded(.up))
         copy.frame = CGRect(x: 0, y: 0, width: width, height: height)
-        wholeCopy = copy
         let card = convert(bounds, to: window)
-        guard let left = try? board.grownStart(Double(card.minX), size: Double(card.width), grown: grown.width, room: Double(window.bounds.width), margin: margin),
+        guard let left = try? board.grownStart(Double(card.minX), size: Double(card.width), grown: Double(width), room: Double(window.bounds.width), margin: margin),
               let top = try? board.grownStart(Double(card.minY), size: Double(card.height), grown: Double(height), room: Double(window.bounds.height), margin: margin)
         else { return nil }
-        let parameters = UIPreviewParameters()
-        parameters.visiblePath = UIBezierPath(roundedRect: copy.bounds, cornerRadius: CardMetrics.radius)
-        parameters.backgroundColor = .clear
-        return UITargetedPreview(view: copy, parameters: parameters, target: UIPreviewTarget(container: window, center: CGPoint(x: CGFloat(left) + width / 2, y: CGFloat(top) + height / 2)))
+        return (copy, CGRect(x: CGFloat(left), y: CGFloat(top), width: width, height: height))
+    }
+
+    /// Select Text in the menu of the card that opened it: its copy is lifted where the menu showed it, the whole
+    /// title selected, as a message in Messages after its Select.
+    static func selectMenuTitle() {
+        guard let owner = menuOwner, let window = owner.window else { return }
+        // The copy stands in for the card, as the menu's does: the card itself, ring and all, is not seen beside it.
+        let selection = TitleSelection(in: window) { [weak owner] in owner?.content.isHidden = false }
+        guard let (copy, frame) = owner.grownCopy(selectable: true, always: true, onCopied: { [weak selection] in selection?.close() }) else { return selection.close() }
+        owner.content.isHidden = true
+        selection.show(copy, at: frame)
     }
 
     /// A row that opens a sheet or a page runs once the menu has gone. The card stays over its neighbours until its
