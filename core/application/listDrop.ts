@@ -54,9 +54,17 @@ function orderOf(heads: readonly PlacedHead[], group: Header): number {
 	return heads.findIndex((h) => sameGap(gapUnder(h.group), gapUnder(group)));
 }
 
-/** A grouped list's first header stands at its top: whatever is under it is in that part, never outside every part. */
-function opensList(head: PlacedHead, i: number): boolean {
-	return i === 0 && head.opens === true;
+/** No section's header stands below another one: its tasks are drawn there, so the list's top is not theirs. */
+function noSectionBelow(heads: readonly PlacedHead[]): boolean {
+	return heads.some((head, i) => i > 0 && head.group === null);
+}
+
+/**
+ * The first header stands at the list's top, whatever is above it is in its part: in a list grouped by project, never
+ * outside every part; in one whose No section is drawn lower, never in No section, which is not there.
+ */
+function opensList(head: PlacedHead, i: number, heads: readonly PlacedHead[]): boolean {
+	return i === 0 && (head.opens === true || noSectionBelow(heads));
 }
 
 /**
@@ -93,7 +101,7 @@ function rawPlaceAt(cards: readonly PlacedCard[], y: number, level: number, shif
 	/** Past this a finger is under the header. The first header with no task outside any section above it takes its whole height: above it is where a card leaves every section. */
 	const headEdge = (h: PlacedHead, i: number) => h.top + (headAfterGap(h) ? shift : 0) + (i === 0 && h.group !== null ? h.height : h.height / 2);
 	const index = cards.filter((c, i) => y > top(i) + c.height / 2).length;
-	const passed = heads.filter((head, i) => head.firstCard === index && (opensList(head, i) || y > headEdge(head, i))).map((head) => head.group);
+	const passed = heads.filter((head, i) => head.firstCard === index && (opensList(head, i, heads) || y > headEdge(head, i))).map((head) => head.group);
 	return gapAt(cards, index, level, passed, heads.length > 0);
 }
 
