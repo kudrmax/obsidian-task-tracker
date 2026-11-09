@@ -41,7 +41,8 @@ struct BoardScreen: View {
             }
             .animation(.snappy, value: barShown)
         }
-        .background { DropAnchor(drop: model.dropping) }
+        // A card held where no list or calendar takes it (the bars, the divider) is routed to the nearest place.
+        .background { BoardRouteAnchor(route: model.plus) }
         .background {
             TouchWatch { point in
                 if model.found != nil { model.found = nil }
@@ -96,10 +97,10 @@ struct BoardScreen: View {
         ZStack(alignment: .topLeading) {
             PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: {
                 plusSlot = $0
-                model.dropping.floor = $0.minY
+                model.plus.floor = $0.minY
             })
             if let slot = plusSlot {
-                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry($0) }, onEnd: { model.carryEnded($0) })
+                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drop: model.plus, onCarry: { model.startCarryingPlus() }, onEnd: { model.endCarry($0) })
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }
@@ -318,7 +319,7 @@ struct Ribbon: View {
                     }
                     // One column, Inbox over Backlog, each exactly the column's width.
                     column(.inbox, half) {
-                        VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
+                        VStack(alignment: .leading, spacing: 0) {
                             lists(.inbox).frame(width: half)
                             lists(.backlog).frame(width: half)
                         }

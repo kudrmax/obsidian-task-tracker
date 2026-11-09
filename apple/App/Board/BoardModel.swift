@@ -61,20 +61,11 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
     }
 }
 
-/// A carry's gap in a list: before card `at` of the cards it moves between, at `level`, in section `group`; `place` is the
-/// core's `GapPlace` as `rules.placeAt` fitted it.
-struct ListGap: Equatable {
-    let column: BoardColumn
-    let at: Int
-    let level: Int
-    let group: String?
-    /// In a list grouped by project, the project's part it stands in; nil in a plain list.
-    var zone: JSONValue? = .none
-    let place: JSONValue
-    /// The drop line as the plugin draws it (`DropLine`), in the list's content space: from `line.x`, the left edge of
-    /// the gap's level, to the list's right edge, through `line.y`, the middle of the gap; nil where the drop changes
-    /// nothing (the card back where it was lifted from) or lands on an empty section's plate, which lights instead.
-    let line: CGPoint?
+/// How the board moves under a carry, one place for all of it: what lights for a target, and a carry's rows folding away
+/// and back.
+enum DropMotion {
+    static let hover = Animation.snappy(duration: 0.15)
+    static let carry = Animation.snappy(duration: 0.25)
 }
 
 /// How long a drop takes to show the card in its new place, told to the log (`Drop landed in … ms`).
@@ -108,17 +99,11 @@ final class BoardModel {
     init(project: ProjectRef? = nil) {
         self.project = project
         place = RibbonPlace.remembered(for: project)
-        dropping.ended = { [weak self] in self?.dropSessionEnded(performed: $0, token: $1) }
-        dropping.carrying = { [weak self] in self?.carry?.token }
-        dropping.foldsOnDrop = { [weak self] in self?.carry?.section != nil }
-        dropping.fadesOnDrop = { [weak self] in self?.landsInFold == true }
-        dropping.landed = { [weak self] in self?.carryLanded(at: $0, token: $1) }
         entry.model = self
     }
 
     /// A screen the quick entry read after its write, drawn in the transaction the entry draws its own state in.
     func draw(_ read: BoardSnapshot) {
-        forgetGone(read)
         snapshot = read
         problem = nil
     }
@@ -208,12 +193,8 @@ final class BoardModel {
     private var readAgain = false
     /// A read the file asked for while something was carried or the quick entry wrote: made once they end.
     private var readAfterCarry = false
-    /// A drop's write is made: the next read drawn ends its carry.
     /// The reads started so far, counted as each begins.
     @ObservationIgnored private var readsStarted = 0
-    /// A drop's write is made: the first read started after it (`from`) draws it, and ends its carry, the carry `token`
-    /// lifting card `id` (one started before shows the file without it).
-    @ObservationIgnored private var dropReads: [Int: (from: Int, id: String)] = [:]
     /// The day before and after the shown one, read ahead so the arrows show them in the same frame.
     @ObservationIgnored private var ahead: [String: BoardSnapshot] = [:]
     @ObservationIgnored private var neighbours: (previous: String, next: String)?
@@ -273,28 +254,22 @@ final class BoardModel {
         } while readAgain
     }
 
-    /// The screen drawn from `read` in one transaction, its motion chosen by what differs from the drawing on the screen;
-    /// the first read after a drop's write puts the dropped card in its new place, hidden until its copy lands there.
+    /// The screen drawn from `read` in one transaction, its motion chosen by what differs from the drawing on the screen.
+    /// While a drop's preview stands, a read begun before its write is not drawn: it shows the file from before the drop.
     private func show(_ read: BoardSnapshot, serial: Int) {
+        guard dropReads.mayDraw(serial) else { return }
         if let before = snapshot { follow(read.dayChange(since: before), from: before) }
         defer { if reopen, read.day == read.today, !readAgain { reopen = false; dayMoved += 1 } }
-        forgetGone(read)
-        // Every drop whose write this read shows, by its carry: a second drop let go before the first one's read was drawn
-        // lands in the same drawing, each card in its place at once.
-        let lands = dropReads.filter { serial >= $0.value.from }
-        for token in lands.keys { dropReads[token] = nil }
         draw(motion: read.motion(from: snapshot)) {
             snapshot = read
+            sectionMove = nil
             entry.screenChanged()
-            for (token, drop) in lands { carryWritten(token, id: drop.id) }
         }
-        for token in lands.keys.sorted() { carryDrawn(token) }
     }
 
     /// One transaction for one drawing: still, or the cards moved (each by its id slides, folds away or unfolds with the
     /// system's spring). Another day is drawn still: it came in through the day's own slide (`turn(to:)`).
     func draw(motion: BoardMotion, _ change: () -> Void) {
-        if !placedByDrop.isEmpty { placedByDrop = [] }
         switch motion {
         case .still, .turn:
             var still = Transaction()
@@ -434,11 +409,8 @@ final class BoardModel {
     /// a swipe never pages the ribbon where the core leads to a day; the day comes in under the finger as the arrows bring
     /// it, the one read ahead, or read now when it is not yet.
     func beginDaySwipe(_ shift: Int) -> Bool {
-        // A carry still ending (its copy settling) ends now; a carry the finger holds takes no swipe.
-        if let token = carry?.token {
-            guard released else { return false }
-            endNow(token)
-        }
+        // A carry the finger holds takes no swipe.
+        guard carry == nil else { return false }
         // A day still sliding (an arrow's turn, a swipe let go) is taken by the finger where it shows now, as a scroll
         // view's deceleration is: the turns asked after it give way to the finger.
         if let turn = dayTurn {
@@ -582,7 +554,6 @@ final class BoardModel {
         guard let turn = dayTurn else { return }
         var instant = Transaction()
         instant.disablesAnimations = true
-        forgetGone(turn.peek)
         withTransaction(instant) {
             snapshot = turn.peek
             entry.screenChanged()
@@ -975,16 +946,15 @@ final class BoardModel {
 
     // MARK: Drag and drop
 
-
-    /// What is carried: a card (its id, its task, the column it is drawn in, where the finger holds it from its top), or
-    /// the plus, a task not written yet.
+    /// What a carry holds: a card (its task, the column it is drawn in), the other picked tasks with it, a section by its
+    /// header, or the plus, a task not written yet. A card's and a section's carry is a drag session of the system's: it
+    /// begins and ends with it.
     struct Carry {
-        /// This carry among all: what ends a carry names it, so an earlier one's end never ends a later one.
+        /// This carry among all: what ends a carry names it, so an earlier session's end never ends a later carry.
         let token: Int
         let id: String
         let item: TaskItem?
         let from: String
-        let grab: CGFloat
         /// A section lifted by its header, carried among its list's sections.
         var section: SectionCarry? = nil
         /// Select Tasks: every picked task the lift carries (`tasks.carried`), each with the column it is drawn in; empty
@@ -996,100 +966,76 @@ final class BoardModel {
             let carried = group.isEmpty ? item.map { [($0, from)] } ?? [] : group
             return .array(carried.map { ["key": $0.0.key.json, "from": .string($0.1)] })
         }
-        /// The drop is written and the screen shows it: the card stands in its new place, hidden until its copy lands.
-        var written = false
-        /// Who ends it, whatever order its signals come in.
-        var life = CarryLife(kind: .card)
-        /// Let go where it writes: its dashed place closes as the room opens, so the list stands as it will after the write
-        /// and the copy flies where the card will stand.
-        var leaves = false
     }
 
-    /// A section carried by its header, as the plugin's (`GroupDrag`): its list, its index among the list's groups, and
-    /// each slot's place read as it was lifted: the top of the header it would go before, or the list's end, the ones
-    /// below it as if it were gone.
+    /// A section carried by its header, as the plugin's (`GroupDrag`): its list, its sections' names and its own index.
     struct SectionCarry {
         let column: BoardColumn
         let list: String
         let names: [String?]
         let lifted: Int
-        let places: [CGFloat]
     }
 
-    /// The carry: its rows close up in their list while it lasts.
     private(set) var carry: Carry?
-    /// Where a carry held over a list would land: the core's gap, its level drawn by the drop line as the finger moves.
-    private(set) var gap: ListGap?
-    /// The gap a card let go over a list flies into: the rows part for it there, until the screen shows the card in it.
-    private(set) var settling: ListGap?
+    @ObservationIgnored private var carries = CarryTurns()
+    var carried: String? { carry?.id }
+    var carrying: Bool { carry != nil }
+    /// The plus's slot is the cancel target while anything is carried.
+    var showsCancelTarget: Bool { carry != nil }
+    /// Told the moment a carry starts: a gesture still waiting on the touch the drag took gives way, so the ribbon's own
+    /// pan, which waits for the day swipe to fail, stops waiting.
+    @ObservationIgnored var carryBegins: (() -> Void)?
+
+    /// What lights for a carry held over a list or a title: the card a subtask would go under, an empty section's plate,
+    /// the title. The target itself is the gap the system opens.
+    enum DropHover: Equatable {
+        case list(BoardColumn, place: JSONValue, parent: String?, plate: String?)
+        case title(BoardColumn)
+    }
+
+    private(set) var hover: DropHover?
     /// The minute a carry held over the calendar would start at.
     private(set) var landing: Int?
+    /// Which reads may draw while drops are written.
+    @ObservationIgnored private var dropReads = DropReads()
+    /// The lists on the screen, which a drop's preview is drawn into at once.
+    @ObservationIgnored private var lists: [BoardColumn: WeakList] = [:]
+    @ObservationIgnored lazy var plus: BoardRoute = {
+        let route = BoardRoute()
+        route.model = self
+        return route
+    }()
 
-    var carried: String? { carry?.id }
-    /// Told the moment a carry starts (a card, a section or the plus lifted): a gesture still waiting on the touch the
-    /// drag took gives way, so the ribbon's own pan, which waits for the day swipe to fail, stops waiting.
-    @ObservationIgnored var carryBegins: (() -> Void)?
-    /// The cards the drawing of drops' writes put in their new places: each goes there at once, hidden or not, never
-    /// sliding over the list (its copy flies there). Until the next drawing.
-    private(set) var placedByDrop: Set<String> = []
-    var carrying: Bool { carry != nil }
-    /// The finger let the carry go: what it carries is still on its way to its place.
-    private(set) var released = false
-    /// The plus's slot is the cancel target while a finger holds a carry, and while the plus's own copy flies home into
-    /// it; a card's copy flies to the card's place, so the slot is the plus again from the moment it is let go.
-    var showsCancelTarget: Bool { carry.map { $0.id == Carried.plus || !released } ?? false }
-    /// The screen's drop interaction, which every list and the calendar register with.
-    @ObservationIgnored let dropping = BoardDrop()
-    /// How the carry ends, once it was let go: the one owner of its end (`CarryEnd`), nil while the finger holds it.
-    /// Where the carried copy came down, in the window: the card glides from there if the screen drew it elsewhere.
-    @ObservationIgnored private var touchdown: CGRect?
-    /// The card a carry just ended on, and where its copy came down: the card glides from there to where it stands.
-    private(set) var arrival: Arrival?
-
-    struct Arrival: Equatable {
-        let id: String
-        let from: CGRect
+    private struct WeakList {
+        weak var controller: ListController?
     }
 
-    /// A card lifted: it waits as a dashed place where it stood and its subtasks fold away under it, as the plugin's.
-    @discardableResult
-    func startCarry(_ card: BoardCard, from column: String, grab: CGFloat) -> Int {
-        let token = nextCarry()
-        found = nil
-        arrival = nil
-        released = false
-        touchdown = nil
-        withAnimation(.snappy(duration: 0.25)) { carry = Carry(token: token, id: card.id, item: card.item, from: column, grab: grab) }
-        return token
+    func register(_ list: ListController) {
+        lists[list.column] = WeakList(controller: list)
+        plus.add(list)
     }
 
-    /// A new carry begins: the finger is free the moment a copy has gone, whatever the system still animates. A carry
-    /// still ending (its copy settling, its write being drawn) ends now, its one outcome; what still comes for it later
-    /// names it and changes nothing.
-    private func nextCarry() -> Int {
+    func listController(_ column: BoardColumn) -> ListController? { lists[column]?.controller }
+
+    private func begin() -> Int {
         carryBegins?()
-        if let token = carry?.token { endNow(token) }
-        carryTokens += 1
-        return carryTokens
+        found = nil
+        return carries.begin()
     }
 
-    @ObservationIgnored private var carryTokens = 0
-
-
-    /// Select Tasks: a picked card lifted carries every picked task as a stack, as the plugin's. The core says which go
-    /// along with it (`tasks.carried`: the rest of the picked, but a subtask whose task is picked goes with that task).
+    /// A card lifted: its row is the gap it was lifted from; its subtasks, and with a picked card the other picked tasks,
+    /// fold away while it is carried. A picked card carries every picked task the core says go along (`tasks.carried`).
     @discardableResult
-    func startGroupCarry(_ card: BoardCard, from column: String) -> Int {
-        guard let snapshot else { return 0 }
-        let token = nextCarry()
-        found = nil
-        arrival = nil
-        released = false
-        touchdown = nil
+    func startCarry(_ card: BoardCard, from column: String) -> Int {
+        let token = begin()
+        guard selecting, picked.contains(card.id), let snapshot else {
+            withAnimation(DropMotion.carry) { carry = Carry(token: token, id: card.id, item: card.item, from: column) }
+            return token
+        }
         let picked = pickedItems
         let froms = Dictionary(picked.map { ($0.id, snapshot.column(of: $0.id) ?? column) }, uniquingKeysWith: { first, _ in first })
         let all = picked.map { (item: $0, from: froms[$0.id] ?? column) }
-        withAnimation(.snappy(duration: 0.25)) { carry = Carry(token: token, id: card.id, item: card.item, from: column, grab: CardMetrics.height / 2, group: all) }
+        withAnimation(DropMotion.carry) { carry = Carry(token: token, id: card.id, item: card.item, from: column, group: all) }
         let board = board
         let arguments: [JSONValue] = [card.item.key.json, keys(picked)]
         Task {
@@ -1104,186 +1050,33 @@ final class BoardModel {
         return token
     }
 
-    /// A section's header carried: its header and tasks fold away and the list closes over them, as the plugin's.
+    /// A section's header lifted: its tasks fold away and the list closes over them, as the plugin's.
     @discardableResult
     func startSectionCarry(_ column: BoardColumn, _ group: BoardGroup) -> Int? {
-        guard let list = snapshot?.lists[column], let name = list.sectionsOf, let lifted = list.groups.firstIndex(where: { $0.id == group.id }),
-              let shape = geometry[column] else { return nil }
-        let heads = list.groups.map { shape.heads[$0.id]?.minY }
-        guard !heads.contains(where: { $0 == nil }) else { return nil }
-        let tops = heads.compactMap { $0 }
-        let bottoms = shape.cards.values.map(\.maxY) + shape.heads.values.map(\.maxY)
-        let end = (bottoms.max() ?? 0) + (list.groups.last?.empty == true ? CardMetrics.height + CardMetrics.gap : 0)
-        let all = tops + [end]
-        let height = all[lifted + 1] - all[lifted]
-        let places = all.enumerated().map { $0.offset > lifted ? $0.element - height : $0.element }
-        let token = nextCarry()
-        found = nil
-        released = false
-        touchdown = nil
-        let section = SectionCarry(column: column, list: name, names: list.groups.map(\.name), lifted: lifted, places: places)
-        withAnimation(.snappy(duration: 0.25)) {
-            carry = Carry(token: token, id: "\u{0}section/\(group.id)", item: nil, from: column.rawValue, grab: 0, section: section)
-            carry?.life = CarryLife(kind: .section)
+        guard let list = snapshot?.lists[column], let name = list.sectionsOf, let lifted = list.groups.firstIndex(where: { $0.id == group.id }) else { return nil }
+        let token = begin()
+        let section = SectionCarry(column: column, list: name, names: list.groups.map(\.name), lifted: lifted)
+        withAnimation(DropMotion.carry) {
+            carry = Carry(token: token, id: "\u{0}section/\(group.id)", item: nil, from: column.rawValue, section: section)
         }
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         return token
-    }
-
-    /// Where a carried section would go: the slot whose place is nearest the finger, the mark there; none at its own place.
-    private(set) var sectionSlot: Int?
-
-    private func hoverSection(_ section: SectionCarry, _ column: BoardColumn, at point: CGPoint) {
-        guard column == section.column else { return leaveSection() }
-        let slot = section.places.indices.min { abs(section.places[$0] - point.y) < abs(section.places[$1] - point.y) } ?? section.lifted
-        let place: JSONValue? = ruleNow("rules.groupPlaceOf", [.array(section.names.map(\.json)), .number(Double(section.lifted)), .number(Double(slot))])
-        // Its own place (the core's null, which comes back as no value) shows no mark.
-        let shown = place == nil || place == .null ? nil : slot
-        guard shown != sectionSlot else { return }
-        if shown != nil { UISelectionFeedbackGenerator().selectionChanged() }
-        withAnimation(.snappy(duration: 0.25)) { sectionSlot = shown }
-    }
-
-    private func leaveSection() {
-        guard sectionSlot != nil else { return }
-        withAnimation(.snappy(duration: 0.25)) { sectionSlot = nil }
-    }
-
-    /// Let go: the section moves before the one at the slot, or to the list's end (`tasks.moveGroup`); its copy flies to
-    /// the mark that showed where.
-    private func landSection(_ section: SectionCarry, _ column: BoardColumn) -> CGRect? {
-        guard column == section.column, let slot = sectionSlot,
-              let place: JSONValue = ruleNow("rules.groupPlaceOf", [.array(section.names.map(\.json)), .number(Double(section.lifted)), .number(Double(slot))]),
-              !place.isNull else {
-            letGo(writes: false)
-            return nil
-        }
-        letGo(writes: true)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        guard let token = carry?.token, let id = carry?.id else { return nil }
-        Task {
-            let board = board
-            let arguments: [JSONValue] = [.string(section.list), section.names[section.lifted].json, place]
-            do {
-                _ = try await Task.detached { try board.write("tasks.moveGroup", arguments) }.value
-            } catch {
-                problem = Self.words(error)
-            }
-            dropReads[token] = (readsStarted + 1, id)
-            await reload()
-            // A read that failed drew nothing: the mark goes with it, and the carry waits no longer.
-            dropReads[token] = nil
-            carryDrawn(token)
-        }
-        return geometry[column]?.mark
-    }
-
-    /// The section a carry lifted, folded away in its list until the screen shows it where it was dropped.
-    func isLifted(_ group: BoardGroup, in column: BoardColumn) -> Bool {
-        guard let carry, !carry.written, let section = carry.section, section.column == column else { return false }
-        return section.names.indices.contains(section.lifted) && section.names[section.lifted] == group.name
-    }
-
-    /// The card a carry lifted from a list, waiting there as a dashed place until the screen shows it where it was dropped.
-    func isWaiting(_ card: BoardCard) -> Bool { card.id == carry?.id && carry?.written == false && carry?.leaves == false }
-
-    /// The carried card itself, wherever the screen draws it: hidden until its copy has landed.
-    func isHidden(_ card: BoardCard) -> Bool { card.id == carry?.id }
-
-    /// A subtask of the carried card, or another picked task carried with it: folded away under it until the screen shows
-    /// them where they were dropped.
-    func isFolded(_ card: BoardCard) -> Bool {
-        guard let carry, !carry.written, card.id != carry.id else { return false }
-        return isCarried(card)
     }
 
     @discardableResult
     func startCarryingPlus() -> Int {
-        let token = nextCarry()
-        released = false
-        touchdown = nil
-        carry = Carry(token: token, id: Carried.plus, item: nil, from: "new", grab: 0)
-        carry?.life = CarryLife(kind: .plus)
+        let token = begin()
+        carry = Carry(token: token, id: Carried.plus, item: nil, from: "new")
         return token
     }
 
-    /// The carry `token` is the one under way.
-    private func isCurrent(_ token: Int) -> Bool { carry?.token == token }
-
-    /// The carry let go: it ends once its copy lands and, when it writes, once the screen shows the write.
-    private func letGo(writes: Bool) {
-        guard carry?.life.letGo(writes: writes) == true else { return }
-        released = true
-        if writes { withAnimation(.snappy(duration: 0.25)) { carry?.leaves = true } }
-    }
-
-    /// A signal of carry `token`, given to its life (`CarryLife`), which says whether it ends now: it ends then, once.
-    private func signal(_ token: Int, ending: (() -> Void)? = nil, _ body: (inout CarryLife) -> Bool) {
-        guard isCurrent(token), var life = carry?.life else { return }
-        let ends = body(&life)
-        carry?.life = life
-        if life.released, !released { released = true }
-        if ends { (ending ?? finishCarry)() }
-    }
-
-    /// The carry `token` ends now from outside (a new lift, a swipe), through its life as every end does: once.
-    private func endNow(_ token: Int) {
-        signal(token) { $0.finish() }
-    }
-
-    /// The carried card let go where it writes, until the write is drawn: its dashed place has closed.
-    func isLeaving(_ card: BoardCard) -> Bool { card.id == carry?.id && carry?.leaves == true && carry?.written == false }
-
-    /// Where a room in `column` stands once the carried card's dashed place above it has closed, as it does the moment the
-    /// card is let go: the geometry was read with that place open.
-    private func afterLeaving(_ rect: CGRect, in column: BoardColumn) -> CGRect {
-        guard let carry, carry.from == column.rawValue, let home = geometry[column]?.cards[carry.id], home.minY < rect.minY else { return rect }
-        return rect.offsetBy(dx: 0, dy: -(home.height + CardMetrics.gap))
-    }
-
-    /// The carry let go with no drop (on the cancel target, or over no place): the line and the marks go now, the place
-    /// is released once the copy is home.
-    func cancelCarry(_ token: Int) {
-        guard isCurrent(token) else { return }
-        letGo(writes: false)
-        withAnimation(.snappy(duration: 0.25)) {
-            gap = nil
+    /// The carry's session ended, whatever came of it: once, and only the carry under way.
+    func endCarry(_ token: Int) {
+        guard carries.end(token) else { return }
+        withAnimation(DropMotion.carry) {
+            carry = nil
+            hover = nil
             landing = nil
-            sectionSlot = nil
         }
-    }
-
-    /// The carried copy came down, at `rect` in the window when the drop's preview flew there.
-    func carryLanded(at rect: CGRect? = nil, token: Int?) {
-        guard let token, isCurrent(token) else { return }
-        if let rect { touchdown = rect }
-        signal(token) { $0.landed() }
-    }
-
-    /// The drop's write is drawn, or failed and draws nothing.
-    private func carryDrawn(_ token: Int) {
-        signal(token) { $0.drawn() }
-    }
-
-    /// The first drawing of the drop's write: the card takes its new place (still hidden), the room it flew into and the
-    /// marks go, in the drawing's own transaction.
-    private func carryWritten(_ token: Int, id: String) {
-        placedByDrop.insert(id)
-        // A carry that ended before its write was drawn: its card only takes its new place, at once.
-        guard isCurrent(token) else { return }
-        carry?.written = true
-        gap = nil
-        settling = nil
-        landing = nil
-        sectionSlot = nil
-    }
-
-    /// The copy is in its place and the screen shows the drop: the card shows where it stands, gliding there from where
-    /// the copy came down if that is elsewhere, and its subtasks unfold.
-    private func finishCarry() {
-        if let carry, let touchdown { arrival = Arrival(id: carry.id, from: touchdown) }
-        touchdown = nil
-        withAnimation(.snappy) { endCarry() }
         readIfAsked()
     }
 
@@ -1299,41 +1092,48 @@ final class BoardModel {
         }
     }
 
-    /// The drag session ended, whatever came of it: anything still flying has landed. A drop still being written ends
-    /// its carry once the screen shows the write.
-    func carryEnded(_ token: Int) {
-        carryLanded(token: token)
+    /// A card may be lifted: any card but while tasks are picked, then only a picked one.
+    func canLift(_ card: BoardCard, from column: String) -> Bool {
+        !selecting || (canPick(column) && picked.contains(card.id))
     }
 
-    /// A card's drag session ended with a drop. The board's own drop let the carry go when it took the drop, and its
-    /// animation ends it; a drop nothing of the board took (another app's view, a field) ends it here, as a carry
-    /// let go on no place: every carry ends exactly once.
-    func carryDropped(_ token: Int) {
-        let open = dropping.knows(carry: token)
-        signal(token) { $0.cardDropped(boardOpen: open) }
+    /// A section may be lifted by its header: where the list moves sections, never while tasks are picked.
+    func canLift(_ group: BoardGroup, in column: BoardColumn) -> Bool {
+        !selecting && group.reorder && snapshot?.lists[column]?.sectionsOf != nil
     }
 
-    /// The screen's drop session ended. Not dropped, a card's copy is still flying home: its card ends the carry once it
-    /// is there. A section's lift has no end of its own, so its carry ends here.
-    private func dropSessionEnded(performed: Bool, token: Int?) {
-        guard let token else { return }
-        signal(token) { $0.boardEnded(performed: performed) }
+    /// The section a carry lifted: its tasks are folded away in its list while it is carried.
+    func isLifted(_ group: BoardGroup, in column: BoardColumn) -> Bool {
+        guard let section = carry?.section, section.column == column else { return false }
+        return section.names.indices.contains(section.lifted) && section.names[section.lifted] == group.name
     }
 
-    private func endCarry() {
-        landsInFold = false
-        carry = nil
-        released = false
-        gap = nil
-        settling = nil
-        sectionSlot = nil
-        landing = nil
-        hovered = nil
-        litTitle = nil
+    /// The carried card itself, wherever the screen draws it: its row is the gap it was lifted from.
+    func isHidden(_ card: BoardCard) -> Bool { card.id == carry?.id || arriving.contains(card.id) }
+
+    /// The cards a drop's copy is still flying into: their place stands empty until it lands, as the system's own list
+    /// drop keeps its row.
+    private(set) var arriving: Set<String> = []
+
+    /// The card a drop's copy flies into stays hidden until the copy is down, then shows in the same frame it goes.
+    func hideUntilLanded(_ item: UIDragItem, _ animator: any UIDragAnimating) {
+        guard let payload = item.localObject as? DragPayload, case .card(let card) = payload.kind else { return }
+        arriving.insert(card.id)
+        animator.addCompletion { [weak self] _ in self?.arriving.remove(card.id) }
     }
 
-    /// Whether a card stands in the carry: the card itself or one of its subtasks, which go with it. A drop reads the gaps
-    /// among the others.
+    /// The drop side's end of a carry's session: the carry ends, if the drag side has not ended it already.
+    func endCarry(of session: any UIDropSession) {
+        if let token = DragPayload.of(session)?.token { endCarry(token) }
+    }
+
+    /// A subtask of the carried card, or another picked task carried with it: folded away while it is carried.
+    func isFolded(_ card: BoardCard) -> Bool {
+        guard let carry, carry.section == nil, card.id != carry.id else { return false }
+        return isCarried(card)
+    }
+
+    /// Whether a card stands in the carry: the card itself or one of its subtasks, which go with it.
     func isCarried(_ card: BoardCard) -> Bool {
         guard let carry else { return false }
         if card.id == carry.id { return true }
@@ -1348,288 +1148,190 @@ final class BoardModel {
 
     // MARK: A list as a place to drop on
 
-    /// Where a list's cards and headers stand with no gap open in it, in its content's space, and its width.
-    struct ListGeometry {
-        var cards: [String: CGRect] = [:]
-        var heads: [String: CGRect] = [:]
-        /// Where a carried section's mark stands.
-        var mark: CGRect?
-        var width: CGFloat = 0
-    }
-
-    @ObservationIgnored private var geometry: [BoardColumn: ListGeometry] = [:]
-    /// The last point a carry was read at over a list, so a finger standing still asks nothing.
-    @ObservationIgnored private var hovered: (column: BoardColumn, point: CGPoint)?
-
-    /// The frames of cards and headers the new drawing no longer shows (a group folded, a section gone) are dropped, so a
-    /// carry never reads a header from an earlier drawing.
-    private func forgetGone(_ read: BoardSnapshot) {
-        for (column, list) in read.lists {
-            guard var shape = geometry[column] else { continue }
-            let cards = Set(list.cards.map(\.id))
-            let heads = Set(list.groups.map(\.id) + list.projects.map(\.id))
-            shape.cards = shape.cards.filter { cards.contains($0.key) }
-            shape.heads = shape.heads.filter { heads.contains($0.key) }
-            geometry[column] = shape
-        }
-    }
-
-    /// A card's or a header's frame as the list lays it out; kept only while no gap is open in the list.
-    func rest(_ column: BoardColumn, card id: String, _ frame: CGRect) {
-        guard settling?.column != column else { return }
-        geometry[column, default: ListGeometry()].cards[id] = frame
-    }
-
-    /// A card's frame as its list last laid it out, in the list's content space.
-    func restFrame(_ column: BoardColumn, card id: String) -> CGRect? {
-        geometry[column]?.cards[id]
-    }
-
-    func rest(_ column: BoardColumn, head id: String, _ frame: CGRect) {
-        guard settling?.column != column else { return }
-        geometry[column, default: ListGeometry()].heads[id] = frame
-    }
-
-    func rest(_ column: BoardColumn, mark frame: CGRect) {
-        geometry[column, default: ListGeometry()].mark = frame
-    }
-
-    func rest(_ column: BoardColumn, width: CGFloat) {
-        geometry[column, default: ListGeometry()].width = width
-    }
-
-    /// The list registers with the screen's drop interaction; the place holds the model weakly.
-    func registerList(_ column: BoardColumn) {
-        dropping.register("list.\(column.rawValue)", DropPlace(
-            hover: { [weak self] in self?.hover(column, at: $0) },
-            leave: { [weak self] in self?.leave(column) },
-            land: { [weak self] in self?.land(column) }))
-        dropping.register("title.\(column.rawValue)", DropPlace(
-            hover: { [weak self] in self?.hoverTitle(column, at: $0) },
-            leave: { [weak self] in self?.leaveTitle(column) },
-            land: { [weak self] in self?.landOnTitle(column) }))
-        if let frame = titleFrames[column] { dropping.move("title.\(column.rawValue)", visible: frame, origin: frame.origin) }
-    }
-
-    // MARK: A list's title as a place to drop on
-
-    /// The title a carried card would land on: it lights as a drop target.
-    private(set) var litTitle: BoardColumn?
-    @ObservationIgnored private var titleFrames: [BoardColumn: CGRect] = [:]
-
-    /// The title's row across its column, in the window.
-    func titleMoved(_ column: BoardColumn, _ frame: CGRect) {
-        titleFrames[column] = frame
-        dropping.move("title.\(column.rawValue)", visible: frame, origin: frame.origin)
-    }
-
-    /// A card over the title lights it; the plus keeps the place at the list's top, as before.
-    private func hoverTitle(_ column: BoardColumn, at point: CGPoint) {
-        guard let carry, carry.section == nil else { return }
-        guard carry.id != Carried.plus, snapshot?.lists[column]?.titleDrop != nil else { return hover(column, at: CGPoint(x: point.x, y: 0)) }
-        if gap != nil { withAnimation(.snappy(duration: 0.12)) { gap = nil } }
-        landing = nil
-        guard litTitle != column else { return }
-        UISelectionFeedbackGenerator().selectionChanged()
-        withAnimation(.snappy(duration: 0.12)) { litTitle = column }
-    }
-
-    private func leaveTitle(_ column: BoardColumn) {
-        leave(column)
-        guard litTitle == column else { return }
-        withAnimation(.snappy(duration: 0.2)) { litTitle = nil }
-    }
-
-    /// Let go on the title: the task goes where the core's drop on it means (`ScreenView.titleDrops`), its project kept.
-    private func landOnTitle(_ column: BoardColumn) -> CGRect? {
-        guard let carry, carry.section == nil else { return nil }
-        guard carry.id != Carried.plus else { return land(column) }
-        guard let to = snapshot?.lists[column]?.titleDrop, carry.item != nil else {
-            letGo(writes: false)
-            return nil
-        }
-        // As any drop: written, and the copy flies to where the core will leave the task (`tasks.landing`), the room
-        // opened there; the carry ends once the copy has landed and the write is drawn.
-        letGo(writes: true)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        let others = others(in: column)
-        let landed = landing(carry, to: to)
-        let room = landed?.gap(in: column, among: others)
-        if let room {
-            withAnimation(.snappy(duration: 0.25)) { settling = ListGap(column: column, at: room.at, level: room.level, group: room.group, zone: room.zone, place: .null, line: nil) }
-        }
-        Task { await drop(carry, to: to) }
-        // The room is the list's, in its content's space; the drop came down on the title, whose space it is given in.
-        guard let rect = room.flatMap({ gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: .null, line: nil)) }).map({ afterLeaving($0, in: column) }) ?? foldedHead(column, landed),
-              let list = dropping.origin(of: "list.\(column.rawValue)"), let title = dropping.origin(of: "title.\(column.rawValue)") else { return nil }
-        return rect.offsetBy(dx: list.x - title.x, dy: list.y - title.y)
-    }
-
-    /// The carry held over `column` at `point`: the gap the core places under the finger, its level from the finger's
-    /// `x` (a card by its middle, the plus by the finger itself), held until the finger is well past its edge.
-    private func hover(_ column: BoardColumn, at point: CGPoint) {
-        if let section = carry?.section { return hoverSection(section, column, at: point) }
-        guard let carry, let list = snapshot?.lists[column], let shape = geometry[column] else { return }
-        if let hovered, hovered.column == column, abs(hovered.point.x - point.x) < 1, abs(hovered.point.y - point.y) < 1 { return }
-        hovered = (column, point)
-        let others = others(in: column)
-        let placed = others.map { card in
-            let frame = shape.cards[card.id] ?? .zero
-            return PlacedCard(level: card.level, group: card.item.group, zone: card.zone, top: Double(frame.minY), height: Double(frame.height))
-        }
-        var heads: [PlacedHead] = []
-        var before = 0
-        for part in list.parts {
-            switch part {
-            case .project(let project):
-                if let frame = shape.heads[project.id] {
-                    heads.append(PlacedHead(group: project.head, opens: true, firstCard: before, top: Double(frame.minY), height: Double(frame.height)))
-                }
-            case .section(let index):
-                let group = list.groups[index]
-                if group.header != nil, let frame = shape.heads[group.id] {
-                    heads.append(PlacedHead(group: group.place, firstCard: before, top: Double(frame.minY), height: Double(frame.height)))
-                }
-                before += group.cards.filter { !isCarried($0) }.count
-            }
-        }
+    /// The core's place for the gap the system opened before row `gap` of `rows` (the list's rows without the carried
+    /// ones), at the level the finger's `x` asks for across the list's `width`.
+    func listPlace(_ column: BoardColumn, rows: [DropRow], gap: Int, x: CGFloat, width: CGFloat) -> JSONValue? {
         let inset = Double(CardMetrics.columnInset)
-        let y = carry.id == Carried.plus ? Double(point.y) : (try? board.carriedMiddle(y: Double(point.y), grab: Double(carry.grab), cardHeight: Double(CardMetrics.height))) ?? Double(point.y)
-        let level = (try? board.levelAt(x: Double(point.x), left: inset, width: Double(shape.width) - 2 * inset, indent: Double(CardMetrics.indent))) ?? 0
-        let home = homeGap(carry.id, in: column)
-        // As the plugin's: no row moves while the finger does, so nothing shifts under it; the place holds against the last.
-        let held = (gap?.column == column ? gap?.place : nil) ?? home ?? .null
-        guard let place = try? board.placeAt(placed, y: y, level: level, shift: 0, room: .null, heads: heads, held: held, hysteresis: 6),
-              let at = place["index"].number, let fitted = place["level"].number else { return }
-        let group = place["group"].string
-        let zone = place.field("project")
-        // The card back where it was lifted from, at its level, changes nothing: the core's null, which comes back as no value.
-        let stays = home.map { home in
-            let drop: JSONValue? = ruleNow("rules.placeOfDrop", [Self.listCards(others), place, home])
-            return drop == nil || drop == .null
-        } ?? false
-        let lights = list.groups.contains { $0.holds(group: group, zone: zone) && $0.empty }
-        let shown = stays || lights ? nil : lineAt(column, at: Int(at), level: Int(fitted), group: group, zone: zone, home: home)
-        let next = ListGap(column: column, at: Int(at), level: Int(fitted), group: group, zone: zone, place: place, line: shown)
-        if litTitle != nil { withAnimation(.snappy(duration: 0.12)) { litTitle = nil } }
-        guard next != gap else { return }
-        if next.place != gap?.place { UISelectionFeedbackGenerator().selectionChanged() }
-        landing = nil
-        withAnimation(.snappy(duration: 0.12)) { gap = next }
-    }
-
-    private func leave(_ column: BoardColumn) {
-        if carry?.section != nil { return leaveSection() }
-        if hovered?.column == column { hovered = nil }
-        guard gap?.column == column else { return }
-        withAnimation(.snappy(duration: 0.25)) { gap = nil }
-    }
-
-    /// Let go over a list (in the list's content space): the place is the core's (`rules.placeOfDrop`), and so is where
-    /// the task lands (`tasks.landing`), asked before the write: the rows part there and the copy flies straight into
-    /// that room, or into its dashed place when nothing is written. The plus opens the field there at once, and its
-    /// copy becomes the field's place.
-    private func land(_ column: BoardColumn) -> CGRect? {
-        guard let carry else { return nil }
-        if let section = carry.section { return landSection(section, column) }
-        guard let gap, gap.column == column else {
-            letGo(writes: false)
-            return nil
-        }
-        let home: JSONValue = homeGap(carry.id, in: column) ?? .null
-        let others = others(in: column)
-        let place: JSONValue? = ruleNow("rules.placeOfDrop", [Self.listCards(others), gap.place, home])
-        if carry.id == Carried.plus {
-            endPlus()
-            if let place { entry.openAtDrop(column, ["kind": "place", "column": .string(column.rawValue), "place": place]) }
-            return gapRect(column, gap)
-        }
-        // The core's null: back where it was lifted from, nothing written.
-        guard carry.item != nil, let place, !place.isNull else {
-            letGo(writes: false)
-            return geometry[column]?.cards[carry.id]
-        }
-        let to: JSONValue = ["kind": "place", "column": .string(column.rawValue), "place": place]
-        letGo(writes: true)
-        let landed = landing(carry, to: to)
-        let room = landed?.gap(in: column, among: others)
-        if let room {
-            withAnimation(.snappy(duration: 0.25)) { settling = ListGap(column: column, at: room.at, level: room.level, group: room.group, zone: room.zone, place: place, line: nil) }
-        }
-        Task {
-            let dropAt = ContinuousClock.now
-            await drop(carry, to: to)
-            DropTiming.report(since: dropAt)
-        }
-        return room.flatMap { gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, zone: $0.zone, place: place, line: nil)) }.map { afterLeaving($0, in: column) } ?? foldedHead(column, landed)
-    }
-
-    /// A card landing in a folded project part (`tasks.landing`'s `part.folded`) flies to that part's header, found by its
-    /// key: nothing of the part is drawn to open a room in.
-    private func foldedHead(_ column: BoardColumn, _ landed: DropLanding?) -> CGRect? {
-        guard let part = landed?.part, part.folded == true, let shape = geometry[column],
-              let project = snapshot?.lists[column]?.projects.first(where: { $0.key == part.key }),
-              let head = shape.heads[project.id] else { return nil }
-        landsInFold = true
-        return head
-    }
-
-    /// The carry's copy lands in a folded part's header: it takes the header's size and fades out on the way.
-    @ObservationIgnored private var landsInFold = false
-
-    /// Where the core will leave the carried tasks dropped `to`, asked before the write over the text the screen is drawn from, on
-    /// the pure rules' context: no file is read and no background read is waited for in the frame of the drop.
-    /// Several picked tasks carried land together; the copy flies where the lifted one, which leads, lands.
-    private func landing(_ carry: Carry, to: JSONValue) -> DropLanding? {
-        guard let snapshot else { return nil }
+        let level = (try? board.levelAt(x: Double(x), left: inset, width: Double(width) - 2 * inset, indent: Double(CardMetrics.indent))) ?? 0
         do {
-            return try board.landing(carry.dropped, to: to, over: snapshot).first
+            return try ListTarget(rows: rows).place(at: gap, level: level, board: board)
         } catch {
             problem = Self.words(error)
             return nil
         }
     }
 
-    /// The plus let go on a place: its carry ends at once, the field opening where it came down.
-    private func endPlus() {
-        guard let token = carry?.token else { return }
-        // Its own end, through its life: no glide, the field takes its place at once.
-        signal(token, ending: { [self] in
-            touchdown = nil
-            var still = Transaction()
-            still.disablesAnimations = true
-            withTransaction(still) { endCarry() }
-        }) { $0.finish() }
-    }
-
-    /// The drop line of a gap: through the middle of the room above the card it parts from, or above the dashed place
-    /// when the card goes back where it was lifted from at another level, from the left edge of its level.
-    private func lineAt(_ column: BoardColumn, at: Int, level: Int, group: String?, zone: JSONValue?, home: JSONValue?) -> CGPoint? {
-        let probe = ListGap(column: column, at: at, level: level, group: group, zone: zone, place: .null, line: nil)
-        guard let rect = gapRect(column, probe) else { return nil }
-        if let home, let carry, home["index"].number.map(Int.init) == at, home["group"].string == group, home.field("project") == zone, let waiting = geometry[column]?.cards[carry.id] {
-            return CGPoint(x: rect.minX, y: waiting.minY - CardMetrics.gap / 2)
-        }
-        return CGPoint(x: rect.minX, y: rect.minY - CardMetrics.gap / 2)
-    }
-
-    /// Where a card put in the gap stands in the list: before the card it parts from, or under the last card of its section.
-    private func gapRect(_ column: BoardColumn, _ gap: ListGap) -> CGRect? {
-        guard let shape = geometry[column], let list = snapshot?.lists[column] else { return nil }
+    /// The carry held over a list at `place`: the card it would go under lights (a subtask's place), or the empty section's
+    /// plate it would go into.
+    func hoverList(_ column: BoardColumn, place: JSONValue) {
+        guard let list = snapshot?.lists[column] else { return }
         let others = others(in: column)
-        let indent = CGFloat(gap.level) * CardMetrics.indent
-        let x = CardMetrics.columnInset + indent
-        let w = shape.width - CardMetrics.columnInset * 2 - indent
-        let inPart = { (card: BoardCard) in card.stands(in: gap.group, zone: gap.zone) }
-        if let next = others[safe: gap.at], inPart(next), let frame = shape.cards[next.id] {
-            return CGRect(x: x, y: frame.minY, width: w, height: CardMetrics.height)
+        // What the place means, the core's: a subtask names its parent, which lights.
+        let home: JSONValue = carry.flatMap { homeGap($0.id, in: column) } ?? .null
+        let meant: JSONValue? = ruleNow("rules.placeOfDrop", [Self.listCards(others), place, home])
+        let parent = meant.flatMap { $0["kind"].string == "subtask" ? $0.field("parent") : nil }.flatMap { key in
+            others.first { $0.item.key.json == key }?.id
         }
-        let above = others.prefix(gap.at).last(where: inPart)
-        let header = list.groups.first { $0.holds(group: gap.group, zone: gap.zone) }.flatMap { shape.heads[$0.id] }
-        // A project's part without a section stands under the project's header.
-        let projectHead = gap.zone.flatMap { zone in list.projects.first { $0.zone == zone } }.flatMap { shape.heads[$0.id] }
-        guard let frame = above.flatMap({ shape.cards[$0.id] }) ?? header ?? projectHead else { return nil }
-        return CGRect(x: x, y: frame.maxY + CardMetrics.gap, width: w, height: CardMetrics.height)
+        let zone = place.field("project")
+        let plate = list.groups.first { $0.empty && $0.holds(group: place["group"].string, zone: zone) }?.id
+        let next = DropHover.list(column, place: place, parent: parent, plate: plate)
+        guard next != hover else { return }
+        if case .list(_, let shown, _, _) = hover, shown["index"] != place["index"] || shown["level"] != place["level"] || shown["group"] != place["group"] {
+            UISelectionFeedbackGenerator().selectionChanged()
+        }
+        landing = nil
+        withAnimation(DropMotion.hover) { hover = next }
+    }
+
+    func leaveList(_ column: BoardColumn) {
+        guard case .list(column, _, _, _) = hover else { return }
+        withAnimation(DropMotion.hover) { hover = nil }
+    }
+
+    /// The card a carry would become a subtask of: it lights.
+    func isParentLit(_ card: BoardCard, in column: BoardColumn) -> Bool {
+        if case .list(column, _, let parent, _) = hover { return parent == card.id }
+        return false
+    }
+
+    /// The empty section a carry would land in: its plate lights, as the plugin's (`is-hot`).
+    func platesLit(_ column: BoardColumn, _ group: BoardGroup) -> Bool {
+        if case .list(column, _, _, let plate) = hover { return plate == group.id }
+        return false
+    }
+
+    /// What came of a drop: back where it was lifted from (nothing written), written with the card's id in the screen
+    /// it leaves, or nothing the board takes.
+    enum Dropped {
+        case stays
+        case landed(DropLanding?)
+        case refused
+    }
+
+    /// Let go over a list at `place`: the core says what it means (`rules.placeOfDrop`); its screen is drawn at once.
+    func dropOnList(_ column: BoardColumn, place: JSONValue) -> Dropped {
+        guard let carry, carry.item != nil, carry.section == nil else { return .refused }
+        let home: JSONValue = homeGap(carry.id, in: column) ?? .null
+        let others = others(in: column)
+        guard let to: JSONValue = ruleNow("rules.placeOfDrop", [Self.listCards(others), place, home]), !to.isNull else { return .stays }
+        return land(carry, to: ["kind": "place", "column": .string(column.rawValue), "place": to])
+    }
+
+    /// A card carried over a column's title: it lights where a drop on it means something (`ScreenView.titleDrops`).
+    func hoverTitle(_ column: BoardColumn) -> Bool {
+        guard let carry, carry.item != nil, carry.section == nil, snapshot?.lists[column]?.titleDrop != nil else { return false }
+        guard hover != .title(column) else { return true }
+        UISelectionFeedbackGenerator().selectionChanged()
+        landing = nil
+        withAnimation(DropMotion.hover) { hover = .title(column) }
+        return true
+    }
+
+    func leaveTitle(_ column: BoardColumn) {
+        guard hover == .title(column) else { return }
+        withAnimation(DropMotion.hover) { hover = nil }
+    }
+
+    func isTitleLit(_ column: BoardColumn) -> Bool { hover == .title(column) }
+
+    /// Let go on the title: the task goes where the core's drop on it means, its project kept.
+    func dropOnTitle(_ column: BoardColumn) -> Dropped {
+        guard let carry, carry.item != nil, carry.section == nil, let to = snapshot?.lists[column]?.titleDrop else { return .refused }
+        return land(carry, to: to)
+    }
+
+    /// The carried tasks dropped `to`: the screen the core says the drop leaves (`tasks.dropPreview`) is drawn at once,
+    /// every list in the same animation the system drops the card in, then the drop is written; the read after the write
+    /// draws the same screen, so nothing moves again. A carry of picked tasks ends Select Tasks, as any action does.
+    private func land(_ carry: Carry, to: JSONValue) -> Dropped {
+        guard let snapshot else { return .refused }
+        let preview: DropPreview
+        do {
+            preview = try board.dropPreview(carry.dropped, to: to, over: snapshot, measures: CardMetrics.timeline, project: projectLink)
+        } catch {
+            problem = Self.words(error)
+            return .refused
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if !carry.group.isEmpty { endSelection() }
+        showPreview(preview.snapshot)
+        writeDrop("tasks.drop", [carry.dropped, to, .string(snapshot.day)])
+        return .landed(preview.landings.first)
+    }
+
+    /// The last drop's write: the next one waits for it, so drops are written in the order they were let go.
+    @ObservationIgnored private var lastDrop: Task<Void, Never>?
+
+    /// A drop's write after its screen was drawn: in drop order; a read begun before it never draws, the one after it does.
+    private func writeDrop(_ method: String, _ arguments: [JSONValue]) {
+        let before = lastDrop
+        let board = board
+        lastDrop = Task {
+            await before?.value
+            let dropAt = ContinuousClock.now
+            do {
+                _ = try await Task.detached { try board.write(method, arguments) }.value
+            } catch {
+                problem = Self.words(error)
+            }
+            dropReads.written(readsStarted: readsStarted)
+            DropTiming.report(since: dropAt)
+            await reload()
+        }
+    }
+
+    /// The screen a drop leaves, drawn now: every list in this same frame, in one animation.
+    private func showPreview(_ next: BoardSnapshot) {
+        dropReads.previewDrawn()
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
+            hover = nil
+            landing = nil
+            snapshot = next
+            entry.screenChanged()
+        }
+        for list in lists.values { list.controller?.update() }
+    }
+
+    /// A section let go before the section at `slot` (nil: at the list's end): moved there (`tasks.moveGroup`), unless
+    /// that is its own place.
+    @discardableResult
+    func dropSection(_ column: BoardColumn, _ group: BoardGroup, slot: Int?) -> Bool {
+        guard let section = carry?.section, section.column == column, let list = snapshot?.lists[column] else { return false }
+        let at = slot ?? section.names.count
+        guard let place: JSONValue = ruleNow("rules.groupPlaceOf", [.array(section.names.map(\.json)), .number(Double(section.lifted)), .number(Double(at))]),
+              !place.isNull else { return false }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        // The section stands where it was let go, header and tasks, until the read after its write draws it there: the
+        // core has no preview of a section's move, so its group moves among the drawn groups, nothing else.
+        dropReads.previewDrawn()
+        sectionMove = SectionMove(column: column, group: group.id, before: list.groups[safe: at]?.id)
+        for list in lists.values { list.controller?.update() }
+        writeDrop("tasks.moveGroup", [.string(section.list), section.names[section.lifted].json, place])
+        return true
+    }
+
+    /// A section let go and written, drawn where it was let go until the read after its write.
+    struct SectionMove: Equatable {
+        let column: BoardColumn
+        let group: String
+        /// The group it goes before; nil: the list's end.
+        let before: String?
+    }
+
+    private(set) var sectionMove: SectionMove?
+
+    /// The project part a card landed in folded, in `column`: the card is not drawn, its copy goes into the part's header.
+    func foldedHeader(_ landed: DropLanding, in column: BoardColumn) -> BoardProject? {
+        guard let part = landed.part, part.folded == true else { return nil }
+        return snapshot?.lists[column]?.projects.first { $0.key == part.key }
+    }
+
+    /// The plus let go on a list's place: the field opens there.
+    func openPlus(_ column: BoardColumn, place: JSONValue) {
+        guard let at: JSONValue = ruleNow("rules.placeOfDrop", [Self.listCards(others(in: column)), place, .null]) else { return }
+        entry.openAtDrop(column, ["kind": "place", "column": .string(column.rawValue), "place": at])
     }
 
     // MARK: Stretching a calendar card
@@ -1685,37 +1387,30 @@ final class BoardModel {
     /// The hour's height the calendar is drawn at now: a carry over it reads minutes by it.
     @ObservationIgnored var calendarHour: CGFloat = CardMetrics.hour
     @ObservationIgnored var calendarWidth: CGFloat = 0
+    /// The calendar's content, which a carry over it reads its minute from.
+    @ObservationIgnored weak var calendarCanvas: UIView?
 
-    func registerCalendar() {
-        dropping.register("timeline", DropPlace(
-            hover: { [weak self] point in
-                guard let self else { return }
-                self.hover(minute: Double(max(0, point.y - TimelineGeometry.labelLift) / self.calendarHour * 60), hourHeight: self.calendarHour)
-            },
-            leave: { [weak self] in self?.leaveCalendar() },
-            land: { [weak self] in self?.landOnCalendar() }))
-    }
-
-    /// The carry held over the calendar at `minute`, the timeline drawn `hourHeight` an hour: the line on the grid's step.
-    private func hover(minute: Double, hourHeight: CGFloat) {
-        // A section lands only among its list's sections.
-        guard carry?.section == nil else { return leaveSection() }
-        let snapped = snap(minute, hourHeight: hourHeight)
-        if gap != nil { withAnimation(.snappy(duration: 0.25)) { gap = nil } }
+    /// The carry held over the calendar at `minute` of its grid: the line on the grid's step.
+    func hoverCalendar(minute: Double) {
+        guard carry?.section == nil else { return }
+        let snapped = snap(minute, hourHeight: calendarHour)
+        if hover != nil { withAnimation(DropMotion.hover) { hover = nil } }
         guard snapped != landing else { return }
         if landing != nil { UISelectionFeedbackGenerator().selectionChanged() }
-        withAnimation(.snappy(duration: 0.15)) { landing = snapped }
+        withAnimation(DropMotion.hover) { landing = snapped }
+        DropLog.target("calendar \(snapped)")
     }
 
-    private func leaveCalendar() {
-        withAnimation(.snappy(duration: 0.15)) { landing = nil }
+    func leaveCalendar() {
+        guard landing != nil else { return }
+        withAnimation(DropMotion.hover) { landing = nil }
     }
 
     /// A long press on the calendar's empty space, held at `minute` of the grid: the line shows where a new task will
     /// stand, as the plus carried there.
     func pressCalendar(at minute: Double) {
         if landing == nil { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-        hover(minute: minute, hourHeight: calendarHour)
+        hoverCalendar(minute: minute)
     }
 
     func cancelCalendarPress() {
@@ -1729,32 +1424,23 @@ final class BoardModel {
         entry.openAtDrop(nil, ["kind": "time", "start": .number(Double(minute))])
     }
 
-    /// Let go over the calendar: the copy flies straight to the block the core will make (`tasks.landing`): its span
-    /// on the now line for a past time of today, its box in the stack the core lays out with the day's other blocks.
-    private func landOnCalendar() -> CGRect? {
-        guard let carry, carry.section == nil, let minute = landing, let snapshot else {
-            letGo(writes: false)
-            return nil
-        }
+    /// Let go over the calendar: the drop's screen is drawn at once; the copy flies to the block the core makes there
+    /// (`tasks.landing`'s span and stack): on the now line for a past time of today. Its rect in the calendar's content.
+    func dropOnCalendar() -> CGRect? {
+        guard let carry, carry.section == nil, carry.item != nil, let minute = landing, let snapshot else { return nil }
         let to: JSONValue = ["kind": "time", "start": .number(Double(minute))]
-        if carry.id == Carried.plus {
-            let top = CGFloat(minute) / 60 * calendarHour + TimelineGeometry.labelLift
-            endPlus()
-            entry.openAtDrop(nil, to)
-            return CGRect(x: TimelineGeometry.itemsLeft, y: top, width: calendarWidth - TimelineGeometry.itemsLeft - TimelineGeometry.itemsRight, height: CardMetrics.height)
-        }
-        guard carry.item != nil else {
-            letGo(writes: false)
-            return nil
-        }
-        letGo(writes: true)
-        let spot = landing(carry, to: to).flatMap { blockRect($0, events: snapshot.timeline.events) }
-        Task {
-            let dropAt = ContinuousClock.now
-            await drop(carry, to: to)
-            DropTiming.report(since: dropAt)
-        }
-        return spot
+        let events = snapshot.timeline.events
+        guard case .landed(let landed) = land(carry, to: to) else { return nil }
+        return landed.flatMap { blockRect($0, events: events) }
+    }
+
+    /// The plus let go on the calendar: the field opens at the line's time; its place in the calendar's content.
+    func plusOnCalendar() -> CGRect? {
+        guard let minute = landing else { return nil }
+        let top = CGFloat(minute) / 60 * calendarHour + TimelineGeometry.labelLift
+        leaveCalendar()
+        entry.openAtDrop(nil, ["kind": "time", "start": .number(Double(minute))])
+        return CGRect(x: TimelineGeometry.itemsLeft, y: top, width: calendarWidth - TimelineGeometry.itemsLeft - TimelineGeometry.itemsRight, height: CardMetrics.height)
     }
 
     /// The block a timeline landing makes, in the calendar's content space at the hour's height drawn now.
@@ -1788,26 +1474,6 @@ final class BoardModel {
 
     /// The grid's minute for each whole minute a carry has passed over at each zoom: a drag asks on every move.
     @ObservationIgnored private var snapped: [SnapKey: Int] = [:]
-
-    /// The carried tasks written where they were let go; a carry of picked tasks ends Select Tasks, as any action does.
-    private func drop(_ carry: Carry, to: JSONValue) async {
-        guard let day = snapshot?.day else { return }
-        let token = carry.token, id = carry.id
-        let board = board
-        let arguments: [JSONValue] = [carry.dropped, to, .string(day)]
-        if !carry.group.isEmpty { endSelection() }
-        do {
-            _ = try await Task.detached { try board.write("tasks.drop", arguments) }.value
-        } catch {
-            problem = Self.words(error)
-        }
-        dropReads[token] = (readsStarted + 1, id)
-        await reload()
-        // Drawn by the read, or nothing to draw when the write or the read failed: the mark goes and the carry waits no
-        // longer.
-        dropReads[token] = nil
-        carryDrawn(token)
-    }
 
     /// Where a card carried alone was lifted from in its own list: let go there at its level, nothing is written.
     private func homeGap(_ id: String, in column: BoardColumn) -> JSONValue? {

@@ -141,6 +141,16 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   - `{ kind: "subtask", parent, index }`: under the task `parent` (its id), `index` among its open subtasks.
   - `{ kind: "away" }`: not on this screen (another day, out of this project's view).
   It needs the tasks file, so it is a `tasks.*` method; `rules.*` are the rules that need no file.
+- `tasks.dropPreview(tasks, to, day, project?)`: `tasks.landing` with the whole next screen, writing nothing (no `tasks`,
+  `history` or `ids` in the answer): `{ landings, screen, tasks }`. `landings` are `tasks.landing`'s with the same
+  arguments; `screen` is the `ScreenView` that `tasks.screen(day, project?)` reads after `tasks.drop` with the same
+  arguments and the same `ids` and `history` handed in, every task with the id it will have; `tasks` is the file's text
+  as the drop leaves it, the text that screen is read from (the file as it is, tidied for today, when the drop writes
+  nothing). Ask it at the moment of the drop and draw the next screen at once: everything else a screen is built from
+  (`tasks.columnSections`, `tasks.shownSpan`, `tasks.menu`, `calendars.events`, `rules.*`) reads no tasks file, so it
+  is asked as for any screen, with `tasks` standing for the file. Then `tasks.drop`; the next read equals the preview
+  unless the file changed meanwhile. Don't keep the `ids` an answer gives over `tasks` before the drop is written.
+  Example: `tasks.dropPreview([{ key, from: "soon" }], { kind: "list", column: "day", before: null }, "2026-11-09")`.
 - `tasks.toggleCollapsed(key)`: a tap on a card's subtask counter (offered while `item.can.fold`).
 - `tasks.snap(minute, hourPx, tolerancePx)`: the minute a drag, a drop or a stretch on the timeline stands at, the
   timeline drawn `hourPx` points an hour: the finest of 5, 15, 30 and 60 minutes a finger moves at least `tolerancePx`

@@ -453,6 +453,16 @@ export type DropLanding =
 	| { readonly kind: "subtask"; readonly id: string; readonly item: TaskItem; readonly parent: string; readonly index: number }
 	| { readonly kind: "away"; readonly id: string; readonly item: null };
 
+/**
+ * A drop before it is written (`TaskService.dropPreview`): where each task lands, the whole screen the drop leaves (its
+ * tasks with the ids the next read gives them), and the file's text that screen is read from.
+ */
+export interface DropPreview {
+	readonly landings: readonly DropLanding[];
+	readonly screen: ScreenView;
+	readonly tasks: string;
+}
+
 /** Whether a target takes the tasks carried from these places, and whether a list shows where in it a task goes or puts it at its end. */
 export { acceptsDrop, placesInGap } from "./drops";
 
@@ -1032,6 +1042,12 @@ export interface TaskService {
 	 * card rides the now line). Rejects as `drop` would.
 	 */
 	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Promise<readonly DropLanding[]>;
+	/**
+	 * `landing`, with the whole screen the drop leaves and the text it is read from, writing nothing: the screen equals the
+	 * one `screen(day, project)` reads after `drop` with the same arguments, ids included, so a frontend draws the next
+	 * screen at the moment of the drop. Rejects as `drop` would.
+	 */
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Promise<DropPreview>;
 
 	/** Applies the normalization rules (spec §4.4). Writes only when something changed. */
 	normalize(): Promise<void>;

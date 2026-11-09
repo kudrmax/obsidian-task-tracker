@@ -67,31 +67,34 @@ reads: `tasks.dropPreview(tasks, to, day, project?)` → `{ landings: DropLandin
 writing nothing. The screen is exactly what the next read after `tasks.drop` with the same arguments draws (ids
 included), checked by a test for every drop case of `drops.test.ts`. Documented in `docs/door.md`. `tasks.landing` stays.
 
-### iPhone (frontend-swift)
+### iPhone (frontend-swift): the stock iOS mechanism
 
-- **One owner, one state machine.** A `CarryController` (or one type of that role) owns a carry from lift to rest:
-  `idle → lifted → over(target) → dropped(preview) → idle`. It owns the token, the target and the preview. UIKit's drag
-  and drop callbacks, the card's long press, the plus and the calendar press only feed it events; it emits the one
-  outcome. `settling`, `leaves`, `afterLeaving`, `released`, `placedByDrop`, `hovered`, `CarryLife`/`CarryEnd`'s
-  refereeing and the flags in `CardControl` that duplicate it go away. The end of a carry is one event: the copy landed.
-- **One resolver, never nil.** `TargetResolver.resolve(point) -> Target` (a pure type, unit-tested): the board's columns
-  tile its width (the divider splits between its neighbours, the title and the list of a column are one place with two
-  zones), so every point over the board belongs to one column; inside a list it picks the nearest slot (the core's
-  `placeAt`, as now); over a column's title the title; over the calendar the snapped minute. Points above or below a
-  column clamp to its first or last slot. The plus uses the same resolver.
-- **Live geometry.** The resolver reads row frames from the layout as it stands at the moment it is asked (one
-  `onGeometryChange` per list producing the whole array, or the views' own frames), never a cache that ignores updates;
-  it is asked on every move and again whenever the layout or the snapshot changes under a still finger (scroll, day turn,
-  redraw).
-- **Drawn once at let-go.** At the drop the controller asks `tasks.dropPreview`, builds the next `BoardSnapshot` from its
-  screen and draws it at once, one animation: the room opens, headers and plates come and go, the copy flies to the
-  task's frame in that drawing. The real read after `tasks.drop` then draws with motion `still` when it equals the
-  preview (the normal case), `change` when the file changed meanwhile.
-- **Day turns while carrying** re-resolve the target against the new day; no view that may hold the copy is keyed by
-  `.id(day)`.
-- **The line above the copy** (z-order), and a line at the dashed place when the target is the home place.
-- **FoldAway and any transition stay free of main-actor code**: no closure handed to a SwiftUI builder inside a
-  `Transition` or `ViewModifier` body that SwiftUI may run on its async renderer.
+Max, 2026-11-09: «хочу, чтобы это просто красиво, стандартно работало… в других приложениях нет проблем». The app
+re-implemented the plugin's web drag (its own line, its own hit-testing, its own landing animation, a SwiftUI `VStack` of
+UIKit cells measured by hand) on top of iOS, and every iOS detail it fought (async rendering, view identity, gesture
+arbitration) came back as a bug. Reminders, Things and Todoist on iOS use the system's own list drag. So does this app:
+
+- **Each list column is a `UICollectionView`** (compositional list layout, a diffable data source keyed by the core's
+  `TaskItem.id` and the section's id), its cells the existing card views (`UIHostingConfiguration` or the existing
+  `CardControl`). Section headers, the empty plate, project headers and subtask branches are items or supplementary
+  views of that one collection, drawn from the core's list as now. The column scrolls itself; no hand-kept geometry.
+- **Lift, carry, drop are UIKit's** (`UICollectionViewDragDelegate` / `UICollectionViewDropDelegate`, `UIDropInteraction`
+  on the timeline): the system lifts the card, shows the copy under the finger, scrolls at the edges, opens the gap
+  where it will go (rows part, the standard iOS look — Decision 1 changed), animates the drop into it and moves cards
+  between columns. The app only turns the proposed index path (and the finger's x for the subtask level) into the
+  core's place: `placeAt`/`placeOfDrop` as now, and writes with `tasks.drop`.
+- **At the drop** the controller asks `tasks.dropPreview` and applies its screen to every collection as one diffable
+  snapshot, so headers and plates come and go in the same animation the system drops the card in; the real read after
+  the write applies with no visible change.
+- **The calendar** keeps its own `UIDropInteraction`; its target is the snapped minute as now. Lifting a timeline block
+  into a list uses the same drag items.
+- Everything the old mechanism needed for itself goes: `BoardDrop`'s place registry and edge scrolling, `ListGeometry` /
+  `rest(...)`, `settling`, `leaves`, `afterLeaving`, `GapSpace`, `DropSpace`, `CarryLife`/`CarryEnd` refereeing, the
+  private `_presentMenuAtLocation:` and the long-press delay patching where the system's drag gives the same. What
+  stays custom must be named in the report with why iOS has no stock way.
+- The day turn while carrying: the system's drag session survives the collection's reload; the day's collection applies
+  the new day's snapshot and the session's proposals follow.
+- Menus stay `UIContextMenuInteraction` on the same cells (the system arbitrates the long press between menu and drag).
 
 ### Out of scope
 
@@ -111,6 +114,36 @@ what a drop writes.
 
 ## Decisions
 
-1. **Lead: the line is drawn above the carried copy**, as Notion's and Linear's drop indicators: the copy hides it
-   otherwise, and the design's «no row moves while the finger does» stays.
-2. **Lead: the home place shows the line too**, at the dashed place, so the target is never «nothing».
+1. **Lead, changed 11-09: the target is the system's gap**, rows parting where the task will go, as in Reminders:
+   Max asked for the standard iOS behaviour; the purple line and «no row moves while the finger does» are the plugin's
+   and stay there.
+2. **Lead: the home place is the gap where the card was lifted from**, so the target is never «nothing».
+3. **Lead, changed 11-09 (was «no target over the bars»): over the bars the target is the nearest place of the column
+   under the finger.** Where no list or calendar takes the drop (the top bar, the tab bar, the divider's handle, the gaps
+   round them), one board-level drop interaction routes it, through the same routing as the plus, to the column under
+   the finger's `x`: above a list its first place, over the tab bar its last place in sight (the end of a short list), on
+   the calendar the minute at its visible top or bottom edge; the list opens the room there and the drop lands there.
+4. **frontend-swift: a subtask's place lights its parent.** The system's gap has no indent: when the finger's `x` makes
+   the place a subtask, the card it will go under gets the accent ring; an empty section's plate lights as before.
+5. **frontend-swift: the calendar's line marks the carried card's top edge** (the minute is read where the card's top
+   stands, the finger's hold on the card known from the lift), so the line shows at the card's edge, not under it.
+6. **frontend-swift: the day arrows are spring-loaded.** A card held over ‹ or › turns the day (the system's spring
+   loading, as Files' folders); the carry goes on and lands in the day now shown.
+7. **frontend-swift: cards and section headers lift after the system's long press.** The settings' Long Press Delay is
+   kept for the calendar's empty-space press only (the system's list drag has no public delay).
+8. **frontend-swift: a card carried out of its list leaves no room there** until it comes back over that list, where
+   its own row is the gap again (the system's own behaviour for a drag between collections).
+9. **frontend-swift: a section carried moves its header with the system's gap**, its tasks hidden. The system asks no
+   reorder snapping of a drop delegate (checked: `targetIndexPathForMoveOfItemFromOriginalIndexPath` is never called),
+   so let go it goes before the section header nearest the gap, or to the list's end; that one slot is both what is
+   written (`tasks.moveGroup`) and what is drawn at once (the section moved among the drawn groups) until the read
+   after the write, which draws the same order.
+10. **frontend-swift: a press that starts during the system's drop animation (about 0.4 s) is not taken by iOS**; a
+    card lifts at once once the dropped one has landed.
+11. **frontend-swift: a card let go on the all-day strip over the calendar goes to the day with no time**: the core has
+    no `DropTo` for a day without a time, so it is the drop on the day list's title (`ScreenView.titleDrops.day`): the
+    end of the day's part without a section, its project kept. The day's title lights while the card is over the strip.
+12. **frontend-swift: a refused or unchanged drop flies the copy back to where the card was lifted** (its row in its own
+    list, or its place on the calendar), never the system's default fade.
+13. **frontend-swift: the calendar scrolls at its top and visible bottom edge under a carry**, as the lists do under the
+    system's drag, faster the nearer the edge; the minute is read anew as the grid passes under the finger.

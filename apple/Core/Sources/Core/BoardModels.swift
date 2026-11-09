@@ -158,6 +158,17 @@ public struct ListSection: Codable, Hashable, Sendable {
     public let id: String
     public let name: String?
     public let empty: Bool
+
+    private enum CodingKeys: String, CodingKey { case id, name, empty }
+
+    /// Handed back to the core with No section's name as `null`, never left out: the core tells No section by its null
+    /// name, and a missing one put an empty section before it (`rules.listView`).
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(empty, forKey: .empty)
+    }
 }
 
 public struct DayView: Decodable, Sendable {

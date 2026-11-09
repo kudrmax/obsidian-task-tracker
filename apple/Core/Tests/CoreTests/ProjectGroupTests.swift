@@ -214,7 +214,11 @@ final class FakeFolder: NoteFolder, @unchecked Sendable {
         let tasks: JSONValue = [["key": free.item.key.json, "from": "backlog"]]
         let landed = try #require(try board.landing(tasks, to: ["kind": "place", "column": "backlog", "place": place], over: snapshot).first)
         #expect(landed.part?.zone == .string(Self.friends) && landed.part?.index == 0)
-        #expect(landed.gap(in: .backlog, among: others) == LandingGap(at: club, level: 0, group: others[club].item.group, zone: .string(Self.friends)))
+        let preview = try board.dropPreview(tasks, to: ["kind": "place", "column": "backlog", "place": place], over: snapshot, measures: Self.measures)
+        let drawn = try #require(preview.snapshot.lists[.backlog])
+        let part = try #require(drawn.projects.first { $0.title == Self.friends })
+        #expect(drawn.groups[part.sections.lowerBound].cards.first?.id == free.id)
+        _ = club
     }
 
     @Test func aDropIntoAFoldedPartLandsUnderItsHeaderWithNoRoom() throws {
@@ -227,7 +231,8 @@ final class FakeFolder: NoteFolder, @unchecked Sendable {
         let title = try #require(backlog.titleDrop)
         let landed = try #require(try board.landing([["key": exchange.item.key.json, "from": "soon"]], to: title, over: snapshot).first)
         #expect(landed.part?.folded == true && landed.part?.key == friends.key)
-        #expect(landed.gap(in: .backlog, among: backlog.cards) == nil)
+        let preview = try board.dropPreview([["key": exchange.item.key.json, "from": "soon"]], to: title, over: snapshot, measures: Self.measures)
+        #expect(preview.snapshot.lists[.backlog]?.cards.contains { $0.id == exchange.id } == false)
     }
 
     @Test func aDropIntoNoProjectTakesTheFieldOff() throws {
