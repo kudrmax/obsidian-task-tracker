@@ -2,27 +2,14 @@ import Core
 import SwiftUI
 import UIKit
 
-/// What a dragged card or the plus carries: a card by its id, or the plus, a task not written yet.
+/// What the plus carries: a task not written yet.
 enum Carried {
     static let plus = "\u{0}plus"
-    /// The type the carried thing is offered as, to this app's process only.
-    static let type = "com.kudrmax.taskcalendar.carried"
-
-    /// The carried thing for the system's drag: of a type only this app's process knows, so no field or other app takes
-    /// it as text; the board's own drop reads what is carried from the carry, not from here.
-    static func provider(_ id: String) -> NSItemProvider {
-        let provider = NSItemProvider()
-        provider.registerDataRepresentation(forTypeIdentifier: type, visibility: .ownProcess) { done in
-            done(Data(id.utf8), nil)
-            return nil
-        }
-        return provider
-    }
 }
 
 /// A card as the design has it: a tap opens its menu, as the plugin's card; the subtask counter is its own button, which
-/// folds. In a list the list's own collection lifts it; on the calendar, where no list holds it, the card's own drag
-/// interaction does (`draggable`), with the same drag items the lists and the calendar take.
+/// folds. In a list the list's own long press lifts it; on the calendar, where no list holds it, the card's own long press
+/// does (`draggable`), into the same board drag.
 struct CardButton: UIViewRepresentable {
     let card: BoardCard
     /// The task's new text while its rename is written: drawn instead of the text as read.
@@ -35,10 +22,10 @@ struct CardButton: UIViewRepresentable {
     /// The card is carried: its place is the gap it was lifted from, until the carry ends.
     var carried = false
     var onTouch: () -> Void = {}
-    /// The card's own drag began: the carry's token, which its end names.
+    /// The board's drag the card's own long press lifts it into.
+    var drag: DragController?
+    /// The card lifted: the carry begins, its token returned.
     var onCarry: () -> Int = { 0 }
-    /// The card's own drag session ended, whatever came of it.
-    var onEnd: (Int) -> Void = { _ in }
     /// Where the card's own drag lifts it from.
     var from = "timeline"
     /// A tap on the subtask counter, when the card offers it: its subtasks fold away or show again.
@@ -94,7 +81,7 @@ struct CardButton: UIViewRepresentable {
         CardControl.follow(card: card, look: look, menu: menu, from: control)
         control.onTouch = onTouch
         control.onCarry = onCarry
-        control.onEnd = onEnd
+        control.drag = drag
         control.from = from
         control.onFold = onFold
         control.onLink = onLink
@@ -107,12 +94,14 @@ struct CardButton: UIViewRepresentable {
     }
 }
 
-final class CardControl: UIControl, UIDragInteractionDelegate {
-    var id = ""
+final class CardControl: UIControl {
+    var id = "" {
+        didSet { Self.live.add(self) }
+    }
     var menuMaker: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? = { _ in nil }
     var onTouch: () -> Void = {}
     var onCarry: () -> Int = { 0 }
-    var onEnd: (Int) -> Void = { _ in }
+    weak var drag: DragController?
     var from = "timeline"
     var onFold: (() -> Void)? {
         didSet { fold.isHidden = onFold == nil }
@@ -125,7 +114,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// Where the title's links are drawn.
     var links: [CardLink] = []
     var draggable = false {
-        didSet { drag.isEnabled = draggable }
+        didSet { press.isEnabled = draggable }
     }
     /// Gone from its place while carried: the system's copy is the card until the carry ends.
     var carried = false {
@@ -157,10 +146,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     private let fold = UIButton(type: .custom)
     private let mark = UIButton(type: .custom)
     /// Shows the menu, anchored to the card, when a tap has ended.
-    private lazy var opener = MenuOpener(shown: { [weak self] in self?.menuShown($0) }, ended: { [weak self] in self?.menuEnded($0) })
-    private var drag: UIDragInteraction!
-    /// The carry this card's own drag session is: what its end names.
-    private var token: Int?
+    private lazy var opener = MenuOpener(ended: { [weak self] in self?.menuEnded($0) })
+    /// The card's own long press, on the calendar: it lifts the card into the board's drag.
+    private let press = UILongPressGestureRecognizer()
     /// A menu row that opens a sheet or a page, run once the menu has begun to go.
     private var afterMenu: (@MainActor () -> Void)?
     init(content: UIView & UIContentView) {
@@ -199,9 +187,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         // A tap opens the menu once the finger is up, as the plugin's tap does; a long press lifts the card for the drag.
         addSubview(opener)
         addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
-        drag = UIDragInteraction(delegate: self)
-        drag.isEnabled = false
-        addInteraction(drag)
+        press.addTarget(self, action: #selector(pressed(_:)))
+        press.isEnabled = false
+        addGestureRecognizer(press)
         isAccessibilityElement = true
         accessibilityTraits = .button
     }
@@ -233,7 +221,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// The card whose menu opened last and where it stood on the screen: Add Subtask on a calendar card lifts it there.
     static private(set) var lastLifted: (card: BoardCard, frame: CGRect)?
 
-    /// A card drawn: when it is the task whose menu shows, the menu and the copy over it take the new drawing.
+    /// A card drawn: when it is the task whose menu shows, the menu takes the new drawing.
     static func follow(card: BoardCard, look: Look, menu: @escaping (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?, from control: CardControl) {
         guard let owner = menuOwner, owner.opener.showing, let shown = owner.look else { return }
         guard shown.card.item.id == card.item.id, shown != look || owner === control else { return }
@@ -242,23 +230,13 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     }
 
     /// The card drawn anew while its menu shows (a label set from the menu, which stays open): the menu ticks it, and the
-    /// copy over it takes the new colours, as the plugin's card over its menu does.
+    /// card takes the new colours.
     private func redrawn(_ look: Look) {
         if self.look != look {
             self.look = look
             content.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, ringed: look.ringed, height: look.height) }.margins(.all, 0)
         }
-        copy?.restyle(look)
         if let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) { opener.refresh(menu) }
-    }
-
-    /// The card as its open menu shows it, from the menu's first frame to its last (`MenuCopy`).
-    private var copy: MenuCopy?
-    /// The menu has lifted its twin of the copy; what it asks for next is where to land.
-    private var liftedOnce = false
-    /// The menu's twin stands for the card: the card is not drawn in its place until the copy is home.
-    private var copied = false {
-        didSet { if copied != oldValue { showsInPlace() } }
     }
 
     @objc private func tapped(_ tap: UITapGestureRecognizer) {
@@ -278,66 +256,21 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         openMenu(at: tap.location(in: opener))
     }
 
-    /// The menu opens over one copy of the card that stands exactly over it, and grows with the menu into the copy with
-    /// the whole title; as the menu goes, the same copy shrinks back into the card (`MenuCopy`) and gives way to it in
-    /// the frame it lands, the two drawn alike.
+    /// The system's menu over the card: the card itself lifts in place; a card whose title is cut shows its whole title in
+    /// the menu's preview, the system morphing the card into it and back (`UIContextMenuConfiguration`'s preview).
     private func openMenu(at point: CGPoint) {
-        guard let look, let window, let menu = menuMaker({ [weak self] run in self?.afterMenu = run }),
-              let (whole, grown) = grownCopy(selectable: false, always: true) else { return }
-        let card = convert(bounds, to: window)
-        let style = traitCollection.userInterfaceStyle
-        guard grownCopyNeeded(whole: whole, grown: grown, card: card) else {
-            // A card that shows its whole title is lifted itself, as any view in place, and lands back in itself.
-            Self.menuOwner = self
-            Self.lastLifted = (look.card, card)
-            opener.present(menu, at: point) { [weak self] in self?.inPlace }
-            return
-        }
-        let made = MenuCopy(look: look, style: style, card: card, whole: whole, grown: grown)
-        // In the window, over the card: it grows there from the card into the whole copy, opaque, on the screen itself;
-        // then the menu lifts it where it stands, as it lifts any view in place, and lands it back there. A preview the
-        // menu brings in from elsewhere, or one that changes size inside the menu, the menu fades in: the rows under it
-        // showed through it as it came.
-        window.addSubview(made)
-        copy = made
-        liftedOnce = false
+        guard let look, let window, let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return }
         Self.menuOwner = self
-        Self.lastLifted = (look.card, card)
-        let present = { [weak self, weak made] in
-            guard let self, let made, made.window != nil else { return }
-            // The menu lifts a twin of the copy, at the copy's place: the copy itself stays drawn under the twin while the
-            // menu fades the twin in and out, so the rows under it never show through.
-            // It lands back on the copy itself, which then shrinks back into the card in the menu's own flight.
-            self.opener.present(menu, at: point) { [weak self, weak made] in
-                guard let self, let made, let window = made.window else { return nil }
-                if self.liftedOnce { return made.inPlace }
-                guard let (whole, _) = self.grownCopy(selectable: false, always: true) else { return nil }
-                self.liftedOnce = true
-                return made.twin(look: look, style: style, whole: whole, in: window, card: card)
-            }
-        }
-        // The menu rises at once with its twin of the copy grown; the copy under it takes the same size in that frame, so
-        // the twin lands back on it at the size it was lifted at, never scaled.
-        made.grow()
-        present()
+        Self.lastLifted = (look.card, convert(bounds, to: window))
+        // Drawn as on the board: inside the menu the system's grounds are its raised level's, lighter, and the card took
+        // the menu's own white.
+        let whole = grownCopy(selectable: false, always: false).flatMap { _, frame in
+            FloatImage.view(TaskCapsule(card: look.card, text: look.text, height: look.height, whole: true).frame(width: frame.width, height: frame.height), like: self, in: window)
+        }.map { image in { WholeTitle(copy: image, size: image.bounds.size) as UIViewController } }
+        opener.present(menu, at: point, whole: whole) { [weak self] in self?.inPlace }
     }
 
-    /// The menu's copy shrinking back into the card as the menu flies it home.
-    private static let menuShrink: TimeInterval = 0.25
-
-    /// The menu shows: its twin comes in over the copy, and the copy and the card leave their place in the same motion,
-    /// so where the menu moves the twin (to make room for itself) the place shows empty, as the system leaves a lifted
-    /// view's place, never the card twice.
-    private func menuShown(_ animator: (any UIContextMenuInteractionAnimating)?) {
-        guard let copy else { return }
-        let leave = { [weak self] in
-            copy.alpha = 0
-            self?.copied = true
-        }
-        if let animator { animator.addAnimations(leave) } else { leave() }
-    }
-
-    /// The card itself where it stands, for a menu that lifts it in place.
+    /// The card itself where it stands: what the menu lifts and lands.
     private var inPlace: UITargetedPreview? {
         guard window != nil else { return nil }
         let parameters = UIPreviewParameters()
@@ -346,13 +279,8 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         return UITargetedPreview(view: content, parameters: parameters)
     }
 
-    /// Whether the menu shows a copy grown past the card (its title cut), rather than the card itself.
-    private func grownCopyNeeded(whole: UIView, grown: CGRect, card: CGRect) -> Bool {
-        grown.size != card.size
-    }
-
-    /// The card's copy with its whole title, sized and placed in the window as the menu lifts it. `always`: a card that
-    /// shows its whole title gets a copy too, at its own width, where the menu lifts the card itself.
+    /// The card's copy with its whole title, sized and placed in the window as the core places it (`rules.wholeWidth`,
+    /// `rules.grownStart`). `always`: a card that shows its whole title gets a copy too, at its own width.
     private func grownCopy(selectable: Bool, always: Bool, onCopied: @escaping () -> Void = {}) -> (UIView & UIContentView, CGRect)? {
         guard let look, let window, let room = titleFrame else { return nil }
         let board = AppServices.shared.board
@@ -390,39 +318,12 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         selection.show(copy, at: frame)
     }
 
-    /// The menu goes: its copy shrinks back into the card in the menu's own motion, and the lists keep the screen they show
-    /// until it has landed (`MenuHold`), so a row the menu's choice removes (Done, Won't Do, Delete) closes only once the
-    /// card is home. A row that opens a sheet or a page runs as the menu starts to go: the animator completes later.
+    /// The menu goes: the system flies its preview back into the card; the lists keep the screen they show until it is
+    /// home (`MenuHold`), so a row the menu's choice removes (Done, Won't Do, Delete) closes only once the card is back. A
+    /// row that opens a sheet or a page runs as the menu starts to go.
     private func menuEnded(_ animator: (any UIContextMenuInteractionAnimating)?) {
-        if let copy {
-            self.copy = nil
-            MenuHold.begin()
-            // The menu flies the copy home in place at the size it was lifted at, so nothing of it is scaled on the way;
-            // once down it shrinks back into the card on the screen and goes, the card drawn alike under it. The menu's
-            // animator tells of its end most of a second after the copy is down: the flight's end is heard from an
-            // animation of the app's run inside it, as long as it.
-            copy.alpha = 1
-            let shrink = { [weak self] in
-                UIView.animate(withDuration: Self.menuShrink, delay: 0, options: [.curveEaseInOut, .allowUserInteraction]) {
-                    copy.shrink()
-                } completion: { _ in
-                    self?.copied = false
-                    copy.removeFromSuperview()
-                    MenuHold.end()
-                }
-            }
-            guard let animator else { return shrink() }
-            var shrunk = false
-            animator.addAnimations {
-                UIView.animate(withDuration: UIView.inheritedAnimationDuration, delay: 0, options: [.overrideInheritedDuration, .overrideInheritedCurve, .allowUserInteraction]) {
-                    copy.mark()
-                } completion: { _ in
-                    guard !shrunk else { return }
-                    shrunk = true
-                    shrink()
-                }
-            }
-        }
+        MenuHold.begin()
+        if let animator { animator.addCompletion { MenuHold.end() } } else { MenuHold.end() }
         guard let run = afterMenu else { return }
         afterMenu = nil
         DispatchQueue.main.async { run() }
@@ -430,68 +331,89 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     // MARK: The card's own drag (on the calendar)
 
-    func dragInteraction(_ interaction: UIDragInteraction, itemsForBeginning session: UIDragSession) -> [UIDragItem] {
-        guard let card = look?.card else { return [] }
-        let item = UIDragItem(itemProvider: Carried.provider(id))
-        let payload = DragPayload(.card(card), from: from)
-        payload.grab = session.location(in: self).y
-        payload.home = window.map { convert(bounds, to: $0) }
-        item.localObject = payload
-        return [item]
+    override func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+        guard recognizer === press else { return super.gestureRecognizerShouldBegin(recognizer) }
+        return drag?.idle == true && look != nil
     }
 
-    /// The capsule itself is lifted: from an open menu the system turns the menu's preview, this capsule, into the carried
-    /// card, and only a lift of the same view lets the menu give way to the drag.
-    func dragInteraction(_ interaction: UIDragInteraction, previewForLifting item: UIDragItem, session: UIDragSession) -> UITargetedDragPreview? {
-        let parameters = UIDragPreviewParameters()
-        parameters.visiblePath = UIBezierPath(roundedRect: content.bounds, cornerRadius: CardMetrics.radius)
-        parameters.backgroundColor = .clear
-        return UITargetedDragPreview(view: content, parameters: parameters)
-    }
-
-    func dragInteraction(_ interaction: UIDragInteraction, sessionIsRestrictedToDraggingApplication session: UIDragSession) -> Bool { true }
-
-    func dragInteraction(_ interaction: UIDragInteraction, sessionAllowsMoveOperation session: UIDragSession) -> Bool { true }
-
-    func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
-        let token = onCarry()
-        self.token = token
-        (session.items.first?.localObject as? DragPayload)?.token = token
-    }
-
-    /// Let go on no place, the copy flies home into the card, in the card's space so it goes with a sliding day.
-    func dragInteraction(_ interaction: UIDragInteraction, previewForCancelling item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-        guard window != nil else { return defaultPreview }
-        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: self, center: CGPoint(x: bounds.midX, y: bounds.midY)))
-    }
-
-    /// The session's end, the carry's one end, whatever came of it.
-    func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) {
-        guard let token else { return }
-        self.token = nil
-        onEnd(token)
+    @objc private func pressed(_ press: UILongPressGestureRecognizer) {
+        guard let drag else { return }
+        let point = press.location(in: nil)
+        switch press.state {
+        case .began:
+            guard let card = look?.card, let window else { return }
+            let payload = DragPayload(.card(card), from: from)
+            let frame = convert(bounds, to: window)
+            payload.grab = point.y - frame.minY
+            payload.home = frame
+            let copy = ListController.image(of: content, in: content.bounds)
+            let lift = Lift(payload: payload, copy: copy, frame: frame, begin: onCarry) { [weak self] in
+                guard let self, self.window != nil, self.id == card.id else { return payload.home }
+                return self.convert(self.bounds, to: nil)
+            }
+            drag.lift(lift, at: point, in: window)
+        case .changed:
+            drag.move(to: point)
+        case .ended:
+            drag.letGo(at: point)
+        case .cancelled, .failed:
+            drag.cancel()
+        default:
+            break
+        }
     }
 
     /// Only what the card draws hides, never the card: a hidden card still takes the finger.
     private func showsInPlace() {
-        shown.alpha = carried || copied ? 0 : 1
+        shown.alpha = carried ? 0 : 1
+    }
+
+    /// Every card on the screen, by its task's id: a copy that lands shows the card it lands as in that same frame.
+    private static let live = NSHashTable<CardControl>.weakObjects()
+
+    /// The cards `ids` shown at once, the copy over them going in this frame.
+    static func reveal(_ ids: Set<String>) {
+        for control in live.allObjects where ids.contains(control.id) && control.window != nil { control.carried = false }
+    }
+}
+
+/// The whole title as the menu's preview: the card's copy laid out with its whole title, the size the core gives it.
+final class WholeTitle: UIViewController {
+    private let copy: UIView
+
+    init(copy: UIView, size: CGSize) {
+        self.copy = copy
+        super.init(nibName: nil, bundle: nil)
+        preferredContentSize = size
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not from a storyboard") }
+
+    override func loadView() {
+        let view = UIView(frame: CGRect(origin: .zero, size: preferredContentSize))
+        view.backgroundColor = .clear
+        copy.frame = CGRect(origin: .zero, size: preferredContentSize)
+        copy.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(copy)
+        self.view = view
     }
 }
 
 /// The card's menu, opened by the card once a tap ends rather than on the touch, so a long press stays the drag's. It
 /// takes no touches itself; the system's context menu is shown at the tap's point.
 final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
-    private let shown: ((any UIContextMenuInteractionAnimating)?) -> Void
     private let ended: ((any UIContextMenuInteractionAnimating)?) -> Void
     private var menu: UIMenu?
     /// The menu is up.
     private(set) var showing = false
-    /// What the menu lifts as it opens and lands as it goes: one and the same view, so it shrinks back into what grew.
+    /// What the menu lifts as it opens and lands as it goes: the card itself.
     private var preview: (() -> UITargetedPreview?)?
+    /// The preview the menu shows over itself instead of the card: the card with its whole title.
+    private var whole: (() -> UIViewController)?
     private lazy var interaction = UIContextMenuInteraction(delegate: self)
 
-    init(shown: @escaping ((any UIContextMenuInteractionAnimating)?) -> Void = { _ in }, ended: @escaping ((any UIContextMenuInteractionAnimating)?) -> Void) {
-        self.shown = shown
+    init(ended: @escaping ((any UIContextMenuInteractionAnimating)?) -> Void) {
         self.ended = ended
         super.init(frame: .zero)
         addInteraction(interaction)
@@ -502,8 +424,9 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool { false }
 
-    func present(_ menu: UIMenu, at point: CGPoint, preview: @escaping () -> UITargetedPreview?) {
+    func present(_ menu: UIMenu, at point: CGPoint, whole: (() -> UIViewController)? = nil, preview: @escaping () -> UITargetedPreview?) {
         self.menu = menu
+        self.whole = whole
         self.preview = preview
         showing = true
         let selector = NSSelectorFromString("_presentMenuAtLocation:")
@@ -520,7 +443,7 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
         guard let menu else { return nil }
-        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in menu }
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: whole) { _ in menu }
     }
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, highlightPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
@@ -531,114 +454,14 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
         preview?()
     }
 
-    func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willDisplayMenuFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
-        shown(animator)
-    }
-
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
         showing = false
         ended(animator)
     }
 }
 
-/// The card as its open menu shows it: one view from the menu's first frame to its last, so the card grows out of itself
-/// and shrinks back into itself, never a copy of another size fading over it. It is as large as the copy with the whole
-/// title the core places (`rules.wholeWidth`, `rules.grownStart`); within it the card's shape stands first exactly over the
-/// card, its own look, then grows with the menu to the whole copy, the card's look giving way to the whole title as it
-/// grows, and shrinks back the same way as the menu goes. A card that shows its whole title keeps its own size and look.
-final class MenuCopy: UIView {
-    private let shape = UIView()
-    private let own: UIView & UIContentView
-    private let whole: UIView & UIContentView
-    /// The card's size, and the whole copy's size and how far its middle stands from the card's.
-    private let card: CGSize
-    private let grown: CGSize
-    private let shift: CGVector
-    let grows: Bool
-
-    /// It starts as exactly the card, where the card stands: the menu lifts it as it lifts a card in place, with no fade
-    /// from one view into another. As the menu shows, it grows in place to the whole copy.
-    init(look: CardControl.Look, style: UIUserInterfaceStyle, card: CGRect, whole: UIView & UIContentView, grown: CGRect) {
-        own = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, height: look.height) }.margins(.all, 0).makeContentView()
-        self.whole = whole
-        self.card = card.size
-        self.grown = grown.size
-        shift = CGVector(dx: grown.midX - card.midX, dy: grown.midY - card.midY)
-        grows = grown.size != card.size
-        super.init(frame: card)
-        overrideUserInterfaceStyle = style
-        isUserInteractionEnabled = false
-        shape.clipsToBounds = true
-        shape.layer.cornerRadius = CardMetrics.radius
-        shape.layer.cornerCurve = .continuous
-        addSubview(shape)
-        whole.frame = CGRect(origin: .zero, size: grown.size)
-        own.frame = CGRect(origin: .zero, size: card.size)
-        // The whole copy beneath, opaque the whole time and revealed by the card's shape as it grows; the card's own look
-        // over it, fading out. Nothing of the copy is ever half transparent, so nothing under it shows through.
-        shape.addSubview(whole)
-        shape.addSubview(own)
-        shape.frame = bounds
-        ticker.alpha = 0
-        addSubview(ticker)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("not from a storyboard") }
-
-    /// The whole copy, as the open menu shows it: grown from the card where it stands, in whatever holds it now.
-    func grow() {
-        guard grows, bounds.size != grown else { return }
-        center = CGPoint(x: center.x + shift.dx, y: center.y + shift.dy)
-        bounds = CGRect(origin: .zero, size: grown)
-        shape.frame = bounds
-        own.alpha = 0
-    }
-
-    /// The card, where it stands.
-    func shrink() {
-        guard grows, bounds.size != card else { return }
-        center = CGPoint(x: center.x - shift.dx, y: center.y - shift.dy)
-        bounds = CGRect(origin: .zero, size: card)
-        shape.frame = bounds
-        own.alpha = 1
-    }
-
-    /// A change nothing shows, for an animation that only times another.
-    private let ticker = UIView()
-    func mark() { ticker.alpha = ticker.alpha == 0 ? 0.01 : 0 }
-
-    /// The card drawn anew while its menu shows (a label set from it): both looks take the new colours.
-    func restyle(_ look: CardControl.Look) {
-        own.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, height: look.height) }.margins(.all, 0)
-        whole.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, height: look.height, whole: true) }.margins(.all, 0)
-    }
-
-    /// Where the menu lands: this copy itself, where it stands.
-    var inPlace: UITargetedPreview {
-        let parameters = UIPreviewParameters()
-        parameters.visiblePath = UIBezierPath(roundedRect: bounds, cornerRadius: CardMetrics.radius)
-        parameters.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: CardMetrics.radius)
-        parameters.backgroundColor = .clear
-        return UITargetedPreview(view: self, parameters: parameters)
-    }
-
-    /// What the menu lifts: a twin of this copy as it stands now, put at its place in `window`, with nothing of
-    /// its own round it.
-    func twin(look: CardControl.Look, style: UIUserInterfaceStyle, whole: UIView & UIContentView, in window: UIWindow, card: CGRect) -> UITargetedPreview {
-        let frame = convert(bounds, to: window)
-        let twin = MenuCopy(look: look, style: style, card: card, whole: whole, grown: frame)
-        if grows { twin.grow() }
-        let parameters = UIPreviewParameters()
-        parameters.visiblePath = UIBezierPath(roundedRect: twin.bounds, cornerRadius: CardMetrics.radius)
-        parameters.shadowPath = UIBezierPath(roundedRect: twin.bounds, cornerRadius: CardMetrics.radius)
-        parameters.backgroundColor = .clear
-        return UITargetedPreview(view: twin, parameters: parameters, target: UIPreviewTarget(container: window, center: CGPoint(x: frame.midX, y: frame.midY)))
-    }
-}
-
-/// The lists keep the screen they show while a card's menu goes and its copy flies home: a row the menu's choice removes
-/// closes once the card has landed in it, never under the copy still flying there.
+/// The lists keep the screen they show while a card's menu goes and its preview flies home: a row the menu's choice
+/// removes closes once the card is back in it, never under the preview still flying there.
 @MainActor
 enum MenuHold {
     private static var holds = 0

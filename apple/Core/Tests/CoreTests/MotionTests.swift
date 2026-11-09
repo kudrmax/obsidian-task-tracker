@@ -179,6 +179,66 @@ import Testing
     }
 }
 
+@Suite struct CarryFlowTests {
+    @Test func aCarryGoesThroughItsPhasesAndLandsOnce() {
+        var flow = CarryFlow()
+        let token = flow.lift()!
+        #expect(flow.phase == .lifted(token))
+        let moved = flow.move(token)
+        #expect(moved)
+        #expect(flow.phase == .carrying(token))
+        let let1 = flow.letGo(token)
+        #expect(let1)
+        #expect(flow.phase == .landing(token))
+        let landed1 = flow.landed(token)
+        let landed2 = flow.landed(token)
+        #expect(landed1)
+        #expect(!landed2)
+        #expect(flow.phase == .idle)
+    }
+
+    /// A press while the last copy still flies lifts nothing; once it is down the next lift goes.
+    @Test func noLiftWhileACopyLands() {
+        var flow = CarryFlow()
+        let first = flow.lift()!
+        _ = flow.letGo(first)
+        #expect(flow.lift() == nil)
+        _ = flow.landed(first)
+        let second = flow.lift()
+        #expect(second != nil && second != first)
+    }
+
+    /// A lift let go before it moved (a long press released in place) lands like any carry.
+    @Test func aLiftLetGoUnmovedLands() {
+        var flow = CarryFlow()
+        let token = flow.lift()!
+        let went = flow.letGo(token)
+        #expect(went)
+        let landed = flow.landed(token)
+        #expect(landed)
+    }
+
+    /// Every order of late signals: a move or a let-go of an ended carry, or a landing heard twice, changes nothing of the
+    /// next carry.
+    @Test func lateSignalsOfAnEndedCarryChangeNothing() {
+        var flow = CarryFlow()
+        let first = flow.lift()!
+        _ = flow.letGo(first)
+        _ = flow.landed(first)
+        let second = flow.lift()!
+        let lateMove = flow.move(first)
+        let lateLetGo = flow.letGo(first)
+        let lateLanding = flow.landed(first)
+        #expect(!lateMove)
+        #expect(!lateLetGo)
+        #expect(!lateLanding)
+        #expect(flow.phase == .lifted(second))
+        let notYet = flow.landed(second)
+        #expect(!notYet)
+        #expect(flow.current == second)
+    }
+}
+
 @Suite struct DropReadsTests {
     /// Drops' writes run in order, but a write that finished later with a lower count never lowers the floor.
     @Test func aWriteFinishedOutOfOrderNeverLetsAnOlderReadDraw() {

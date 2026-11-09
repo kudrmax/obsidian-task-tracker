@@ -44,6 +44,70 @@ public struct CarryTurns: Equatable, Sendable {
     }
 }
 
+/// The phases of the board's own drag, one carry at a time: idle → lifted → carrying → landing → idle. A carry is
+/// lifted by a long press (the plus at once), carried by every move of the finger, let go (into its place, home, or into
+/// the field the plus opens), and is idle again only when its copy is down. Every step names its carry: a step of a carry
+/// that is no longer under way changes nothing, so a late signal (a gesture's end heard after the landing) ends nothing of
+/// the next carry, and a carry lands exactly once.
+public struct CarryFlow: Equatable, Sendable {
+    public enum Phase: Equatable, Sendable {
+        case idle
+        case lifted(Int)
+        case carrying(Int)
+        case landing(Int)
+    }
+
+    public private(set) var phase: Phase = .idle
+    private var last = 0
+
+    public init() {}
+
+    /// The carry under way, in any phase but idle.
+    public var current: Int? {
+        switch phase {
+        case .idle: nil
+        case .lifted(let token), .carrying(let token), .landing(let token): token
+        }
+    }
+
+    /// A lift: a new carry's token, or nil while another carry is under way (a press during a landing lifts nothing).
+    public mutating func lift() -> Int? {
+        guard phase == .idle else { return nil }
+        last += 1
+        phase = .lifted(last)
+        return last
+    }
+
+    /// The finger moved: true when `token` is lifted or carried, which it is now.
+    public mutating func move(_ token: Int) -> Bool {
+        switch phase {
+        case .lifted(token), .carrying(token):
+            phase = .carrying(token)
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Let go (or cancelled): true when `token` was lifted or carried; its copy flies now.
+    public mutating func letGo(_ token: Int) -> Bool {
+        switch phase {
+        case .lifted(token), .carrying(token):
+            phase = .landing(token)
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// The copy of `token` is down: true once, when it was landing; the board is idle again.
+    public mutating func landed(_ token: Int) -> Bool {
+        guard phase == .landing(token) else { return false }
+        phase = .idle
+        return true
+    }
+}
+
 /// Which reads may draw while drops are written: the screen a drop's preview drew stands until a read started after the
 /// drop's write, which shows the file with it. A read started earlier would draw the file from before the drop.
 public struct DropReads: Equatable, Sendable {

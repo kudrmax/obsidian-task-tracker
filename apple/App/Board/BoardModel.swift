@@ -473,6 +473,10 @@ final class BoardModel {
             dayTurn = nil
             dayShare = 0
         }
+        // A carry over the day that came in points at its places now, the finger still.
+        guard carry != nil else { return }
+        for list in lists.values { list.controller?.update() }
+        drag.holdAgain()
     }
 
     var isToday: Bool { snapshot.map { $0.day == $0.today } ?? true }
@@ -947,8 +951,7 @@ final class BoardModel {
     // MARK: Drag and drop
 
     /// What a carry holds: a card (its task, the column it is drawn in), the other picked tasks with it, a section by its
-    /// header, or the plus, a task not written yet. A card's and a section's carry is a drag session of the system's: it
-    /// begins and ends with it.
+    /// header, or the plus, a task not written yet. The board's drag (`DragController`) begins and ends it.
     struct Carry {
         /// This carry among all: what ends a carry names it, so an earlier session's end never ends a later carry.
         let token: Int
@@ -1002,11 +1005,10 @@ final class BoardModel {
     @ObservationIgnored private var dropReads = DropReads()
     /// The lists on the screen, which a drop's preview is drawn into at once.
     @ObservationIgnored private var lists: [BoardColumn: WeakList] = [:]
-    @ObservationIgnored lazy var plus: BoardRoute = {
-        let route = BoardRoute()
-        route.model = self
-        return route
-    }()
+    /// The one routing of a carry's point to its place.
+    @ObservationIgnored let route = BoardRoute()
+    /// The board's drag: lift, carry, drop.
+    @ObservationIgnored lazy var drag = DragController(model: self, route: route)
 
     private struct WeakList {
         weak var controller: ListController?
@@ -1014,7 +1016,7 @@ final class BoardModel {
 
     func register(_ list: ListController) {
         lists[list.column] = WeakList(controller: list)
-        plus.add(list)
+        route.add(list)
     }
 
     func listController(_ column: BoardColumn) -> ListController? { lists[column]?.controller }
@@ -1071,11 +1073,10 @@ final class BoardModel {
         return token
     }
 
-    /// The carry's session ended, whatever came of it: once, and only the carry under way.
+    /// The carry ended, its copy down, whatever came of it: once, and only the carry under way.
     func endCarry(_ token: Int) {
-        // A drop's copy still flies: its landing ends the carry, not the session's end heard before it.
-        guard !flying.contains(token) else { return }
         guard carries.end(token) else { return }
+        arriving = []
         withAnimation(DropMotion.carry) {
             carry = nil
             hover = nil
@@ -1124,85 +1125,29 @@ final class BoardModel {
     private(set) var arriving: Set<String> = []
 
 
-    /// The drop side's end of a carry's session, heard as the finger lets go. Every let-go is a drop (into its place,
-    /// or home when nothing takes it), and a dropped carry ends when its copy is down (`landing`). A session that ended
-    /// with no drop (torn down mid-carry, a day turned away) ends here; the drag side's own end comes most of a second
-    /// after its copy is down.
-    func endCarry(of session: any UIDropSession) {
-        guard let token = DragPayload.of(session)?.token, !flying.contains(token) else { return }
-        endCarry(token)
-    }
-
-    /// The carries whose copy flies into its place or home now: each ends as its copy is down.
-    @ObservationIgnored private var flying: Set<Int> = []
-
-    /// The carry of `session` is let go as a drop: its copy flies, and the carry ends when it is down.
-    func dropping(_ session: any UIDropSession) {
-        // The drop takes what the carry holds: a drop that loads nothing keeps its copy on the screen until the system
-        // gives up waiting, most of a second after it has landed.
-        for item in session.items where item.itemProvider.hasItemConformingToTypeIdentifier(Carried.type) {
-            _ = item.itemProvider.loadDataRepresentation(forTypeIdentifier: Carried.type) { _, _ in }
-        }
-        lastLanded = nil
-        if let token = DragPayload.of(session)?.token { flying.insert(token) }
-    }
-
-    /// A drop's copy flies with `animator`: the card it flies into stays hidden until it is down, and the carry ends then,
-    /// however long the flight.
-    func landing(_ item: UIDragItem, _ animator: (any UIDragAnimating)?) {
-        guard let payload = item.localObject as? DragPayload else { return }
-        let ids = landingIds(payload)
-        var landed = false
-        let land = { [weak self] in
-            guard let self, !landed else { return }
-            landed = true
-            self.arriving.subtract(ids)
-            if let token = payload.token {
-                self.flying.remove(token)
-                self.endCarry(token)
-            }
-        }
-        guard let animator else { return land() }
-        arriving.formUnion(ids)
-        if landingMark.window == nil, let window = UIApplication.shared.connectedScenes.lazy.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first {
-            landingMark.isUserInteractionEnabled = false
-            landingMark.frame = CGRect(x: 0, y: 0, width: 1, height: 1)
-            landingMark.backgroundColor = .clear
-            window.addSubview(landingMark)
-        }
-        // The flight's own animation ends when the copy is down: its transaction's end is the landing. The animator
-        // itself tells of its end most of a second later.
-        // The system runs these animations once for each part of the flight (the copy's move, its last settling): the
-        // copy is down when the last of them ends.
-        var flights = 0
-        animator.addAnimations {
-            // Inside the flight's own animation: an animation of the app's that runs as long as that part of the flight.
-            let mark = self.landingMark
-            flights += 1
-            UIView.animate(withDuration: UIView.inheritedAnimationDuration, delay: 0, options: [.overrideInheritedDuration, .overrideInheritedCurve, .allowUserInteraction]) {
-                mark.transform = mark.transform.isIdentity ? CGAffineTransform(translationX: 1, y: 0) : .identity
-            } completion: { _ in
-                flights -= 1
-                if flights == 0 { land() }
-            }
-        }
-        animator.addCompletion { _ in land() }
-    }
-
-    /// A view nothing shows, animated with a drop's flight so its transaction has an animation of the app's to end with.
-    @ObservationIgnored private let landingMark = UIView()
-
-
-    /// The cards a drop's copy flies into: the carried card, and the card it is in the screen after the drop.
-    private func landingIds(_ payload: DragPayload) -> Set<String> {
-        var ids: Set<String> = []
-        if case .card(let card) = payload.kind { ids.insert(card.id) }
-        if let landed = lastLanded { ids.insert(landed) }
+    /// The cards the copy of the carry lands as: the carried card, and the card it is in the screen after the drop. They
+    /// stay hidden until the copy is down, then show in that frame (`CardControl.reveal`).
+    var landingIds: Set<String> {
+        var ids = arriving
+        if let id = carry?.id { ids.insert(id) }
         return ids
     }
 
     /// The card the last drop landed as, in the screen it leaves.
-    @ObservationIgnored private var lastLanded: String?
+    private(set) var landedId: String?
+
+    /// The card `id` as the screen draws it now, in a list or on the calendar.
+    func drawnCard(_ id: String) -> BoardCard? {
+        guard let snapshot else { return nil }
+        for list in snapshot.lists.values { if let card = list.cards.first(where: { $0.id == id }) { return card } }
+        return snapshot.timeline.slots.first { $0.id == id }?.card
+    }
+
+    /// A drop on the column's title means something: a card carried, the list taking it there.
+    func titleTakes(_ column: BoardColumn) -> Bool {
+        guard let carry, carry.item != nil, carry.section == nil else { return false }
+        return snapshot?.lists[column]?.titleDrop != nil
+    }
 
     /// A subtask of the carried card, or another picked task carried with it: folded away while it is carried.
     func isFolded(_ card: BoardCard) -> Bool {
@@ -1337,7 +1282,8 @@ final class BoardModel {
         }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         // The screen after the drop in one drawing: the carried tasks in their new rows, the selection ended after it.
-        lastLanded = preview.landings.first?.id
+        landedId = preview.landings.first?.id
+        arriving = Set(preview.landings.map(\.id))
         showPreview(preview.snapshot, landed: true)
         if !carry.group.isEmpty { endSelection() }
         writeDrop("tasks.drop", [carry.dropped, to, .string(snapshot.day)])

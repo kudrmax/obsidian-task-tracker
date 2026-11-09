@@ -106,7 +106,7 @@ struct ColumnTitle: View {
             if dayArrows {
                 Button { Task { await model.step(-1) } } label: { arrow("chevron.left") }
                     // A card held over an arrow turns the day, as a folder opens under a carried file in Files.
-                    .background { SpringLoaded { Task { await model.step(-1) } } }
+                    .background { SpringLoaded(model: model) { Task { await model.step(-1) } } }
                     .accessibilityLabel("Previous Day")
             }
             if dayArrows {
@@ -126,7 +126,7 @@ struct ColumnTitle: View {
             }
             if dayArrows {
                 Button { Task { await model.step(1) } } label: { arrow("chevron.right") }
-                    .background { SpringLoaded { Task { await model.step(1) } } }
+                    .background { SpringLoaded(model: model) { Task { await model.step(1) } } }
                     .accessibilityLabel("Next Day")
             }
         }
@@ -525,14 +525,15 @@ struct StackFloat: View {
     }
 }
 
-/// A floating copy drawn for UIKit's drag preview: an image of the view at its own size, in the screen's look. A hosting
+/// A floating copy (the carried stack or section, the menu's whole title): an image of the view at its own size, in the screen's look. A hosting
 /// view made for a preview has had no layout yet and drew the copy cut, or blank, on a plate.
 enum FloatImage {
     @MainActor
     static func view(_ content: some View, like host: UIView, in window: UIWindow) -> UIImageView? {
         let renderer = ImageRenderer(content: content.environment(\.colorScheme, host.traitCollection.userInterfaceStyle == .dark ? .dark : .light))
         renderer.scale = window.screen.scale
-        guard let image = renderer.uiImage else { return nil }
+        guard let drawn = renderer.cgImage else { return nil }
+        let image = UIImage(cgImage: drawn, scale: renderer.scale, orientation: .up)
         let view = UIImageView(image: image)
         view.frame = CGRect(origin: .zero, size: image.size)
         return view
