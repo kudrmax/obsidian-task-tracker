@@ -1110,12 +1110,14 @@ export interface CalendarEvent {
 export type SourceKind = "synced" | "exported";
 
 /**
- * Why a source has nothing fresh: Google not logged in, its file not in the vault, a feed silent for `seconds`, or any
- * other failure with the source's own text. The frontend words it.
+ * Why a source has nothing fresh: Google not logged in, its file not in the vault, its file there but no calendar file
+ * (not JSON, or not the writers' shape), a feed silent for `seconds`, or any other failure with the source's own text.
+ * `SourceStatus.words` words it.
  */
 export type SourceProblem =
 	| { readonly kind: "loggedOut" }
 	| { readonly kind: "fileMissing" }
+	| { readonly kind: "unreadable" }
 	| { readonly kind: "noAnswer"; readonly seconds: number }
 	| { readonly kind: "failed"; readonly detail: string };
 

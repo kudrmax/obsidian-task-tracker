@@ -38,6 +38,7 @@ import {
 	TasksFileMissingError,
 } from "./contracts";
 import { acceptsDrop, placesInGap } from "./drops";
+import { SourceProblemError } from "./EventSource";
 import { branchOf, carriedMiddle, gapBranch, levelAt, placeAt } from "./listDrop";
 import { grownStart, wholeWidth } from "./wholeCard";
 import { onTheDay, REPEAT_WORDS, repeatValue } from "./repeatWords";
@@ -509,7 +510,7 @@ function wireDay(day: DayEvents, calendar: CalendarDay): WireDayEvents {
 /** The sources the plugin fetches itself when the host does not say. */
 const FETCHED_BY_DEFAULT: readonly CalendarSource[] = ["google"];
 
-/** The calendars' files as handed in: a missing file is `fileMissing`, a broken one `failed`. */
+/** The calendars' files as handed in: a missing file is `fileMissing`, one that is no calendar file `unreadable`. */
 function readingOf(c: Call): CalendarReading {
 	const files = new Map<CalendarSource, CalendarFile>();
 	const problems = new Map<CalendarSource, SourceProblem>();
@@ -522,7 +523,7 @@ function readingOf(c: Call): CalendarReading {
 		try {
 			files.set(source, readCalendarFile(text, source));
 		} catch (e) {
-			problems.set(source, { kind: "failed", detail: e instanceof Error ? e.message : String(e) });
+			problems.set(source, e instanceof SourceProblemError ? e.problem : { kind: "failed", detail: e instanceof Error ? e.message : String(e) });
 		}
 	}
 	const fetched = c.context.fetched ?? FETCHED_BY_DEFAULT;

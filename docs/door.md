@@ -218,7 +218,7 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 
 - `events(date)`: the day's events from the files in `context.calendars`, as `WireDayEvents`: `events`, `allDay`,
   `timed` (each event with `startMs`, `endMs` and `past`, over at the call's moment), `statuses` (each with
-  `updatedAtMs`, `used` and `tone`), `stale`, `alert`. A file left out is `fileMissing`, a broken one `failed`. "Cached" and "fresh" are two calls
+  `updatedAtMs`, `used` and `tone`), `stale`, `alert`. A file left out is `fileMissing`; one that is not JSON or not a calendar file's shape `unreadable`. "Cached" and "fresh" are two calls
   of it: the host calls it with the files it has, and again once it has fetched or read them anew. Fetching and
   polling (`keepFresh`) are the host's.
 - `known()`: every calendar the files list, and whether it is shown.
@@ -233,7 +233,8 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 - `isPast(event)`: by `event.endMs`, as CalendarDay greys an event (over once its end has come); `past` on each event is the same.
 - Each status's `words` (`SourceWords`) is its row in the sources window, worded: `name` (`Google Calendar`, `iPhone
   calendars`, `Work calendar`), `short`, `sub` (`Updated today`, `Exported from iPhone`, `Not updated yet`, or the
-  problem: `not logged in`, `file missing`, `no answer in 15 s`, a failure's own text) and `time` (`14:19`, `Yesterday
+  problem: `not logged in`, `file missing`, `file unreadable`, `no answer in 15 s`, a failure's own text on one
+  line of at most 40 characters, a server's answer quoted after it left out: `Google API 500`) and `time` (`14:19`, `Yesterday
   08:02`, `3 Oct 08:02`, empty with no update). Google's problem is `loggedOut` (`not
   logged in`) whenever the shared settings keep no Google token, whatever its file: there is no file to miss then.
 - A status's `used`: a calendar shown on the day is taken from its file. Its `tone` is the row's code, drawn as it

@@ -2184,6 +2184,15 @@
     return zone.startsWith("-") ? -minutes : minutes;
   }
 
+  // core/application/EventSource.ts
+  var SourceProblemError = class extends Error {
+    constructor(problem, message) {
+      super(message);
+      this.problem = problem;
+      this.name = "SourceProblemError";
+    }
+  };
+
   // core/application/calendarFile.ts
   var GOOGLE_CALENDAR_FILE = "calendar/google.json";
   var IPHONE_CALENDAR_FILE = "calendar/iphone.json";
@@ -2195,7 +2204,7 @@
   }
   var dateOrNull = (text) => text ? isoMoment(text) : null;
   function readCalendarFile(text, source) {
-    const content = JSON.parse(text);
+    const content = fileContent(text);
     const events = (content.events ?? []).map((e) => ({
       id: e.id,
       title: e.title,
@@ -2218,6 +2227,28 @@
       to: dateOrNull(content.to),
       validUntil: dateOrNull(content.validUntil)
     };
+  }
+  function fileContent(text) {
+    let value;
+    try {
+      value = JSON.parse(text);
+    } catch {
+      throw unreadable("not JSON");
+    }
+    if (!isObject(value)) throw unreadable("not an object");
+    if (typeof value.exportedAt !== "string" || Number.isNaN(isoMoment(value.exportedAt).getTime())) throw unreadable("no exportedAt");
+    if (!listOf(value.events, (e) => typeof e.start === "string" && typeof e.end === "string" && typeof e.calendar === "string")) throw unreadable("events");
+    if (!listOf(value.calendars, (c) => typeof c.calendar === "string")) throw unreadable("calendars");
+    return value;
+  }
+  function unreadable(why) {
+    return new SourceProblemError({ kind: "unreadable" }, `calendar file unreadable: ${why}`);
+  }
+  function isObject(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  function listOf(value, row) {
+    return value === void 0 || value === null || Array.isArray(value) && value.every((r) => isObject(r) && row(r));
   }
   function eventCalendars(events) {
     const seen = /* @__PURE__ */ new Map();
@@ -2452,11 +2483,19 @@ ${e.calendar}`;
         return "not logged in";
       case "fileMissing":
         return "file missing";
+      case "unreadable":
+        return "file unreadable";
       case "noAnswer":
         return `no answer in ${problem.seconds} s`;
       case "failed":
-        return problem.detail;
+        return shortFailure(problem.detail);
     }
+  }
+  var FAILURE_CHARS = 40;
+  function shortFailure(detail) {
+    const head = detail.replace(/:\s*[{[<][\s\S]*$/, "").trim();
+    const line = head.split(/\r?\n/)[0].trim();
+    return line.length <= FAILURE_CHARS ? line : `${line.slice(0, FAILURE_CHARS - 1)}…`;
   }
   function sourceWords(status) {
     const names = NAMES[status.source];
@@ -6533,7 +6572,7 @@ ${key.title}`.toLowerCase();
       try {
         files.set(source, readCalendarFile(text, source));
       } catch (e) {
-        problems.set(source, { kind: "failed", detail: e instanceof Error ? e.message : String(e) });
+        problems.set(source, e instanceof SourceProblemError ? e.problem : { kind: "failed", detail: e instanceof Error ? e.message : String(e) });
       }
     }
     const fetched = c.context.fetched ?? FETCHED_BY_DEFAULT;

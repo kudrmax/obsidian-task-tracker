@@ -39,4 +39,19 @@ describe("sourceWords", () => {
 		expect(sub({ kind: "noAnswer", seconds: 15 })).toBe("no answer in 15 s");
 		expect(sub({ kind: "failed", detail: "Google API 500: oops" })).toBe("Google API 500: oops");
 	});
+
+	it("words a file that is no calendar file as unreadable", () => {
+		expect(sourceText(status({ problem: { kind: "unreadable" } })).sub).toBe("file unreadable");
+	});
+
+	it("keeps a failure's words to one short line: without the answer quoted after it, else its start", () => {
+		const sub = (detail: string) => sourceText(status({ problem: { kind: "failed", detail } })).sub;
+		expect(sub(`Google API 500: ${JSON.stringify({ error: { code: 500, message: "Backend Error", status: "INTERNAL" } })}`)).toBe("Google API 500");
+		expect(sub("Google token endpoint 400: {\n  \"error\": \"invalid_grant\"\n}")).toBe("Google token endpoint 400");
+		expect(sub("net::ERR_INTERNET_DISCONNECTED")).toBe("net::ERR_INTERNET_DISCONNECTED");
+		expect(sub("first line\nsecond line")).toBe("first line");
+		expect(sub("a".repeat(60))).toBe(`${"a".repeat(39)}…`);
+		expect(sub("x".repeat(60) + ": y")).toBe(`${"x".repeat(39)}…`);
+		expect(sub("Google API 503: <html><body>Service Unavailable</body></html>")).toBe("Google API 503");
+	});
 });

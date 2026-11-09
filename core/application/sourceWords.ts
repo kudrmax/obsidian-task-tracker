@@ -23,11 +23,26 @@ function problemText(problem: SourceProblem): string {
 			return "not logged in";
 		case "fileMissing":
 			return "file missing";
+		case "unreadable":
+			return "file unreadable";
 		case "noAnswer":
 			return `no answer in ${problem.seconds} s`;
 		case "failed":
-			return problem.detail;
+			return shortFailure(problem.detail);
 	}
+}
+
+/** The longest failure shown whole: one line of the sources window. */
+const FAILURE_CHARS = 40;
+
+/**
+ * A failure's own text on one short line: its head, without the server's answer quoted after it (`Google API 500: {…}`);
+ * still too long, its first line's start.
+ */
+function shortFailure(detail: string): string {
+	const head = detail.replace(/:\s*[{[<][\s\S]*$/, "").trim();
+	const line = head.split(/\r?\n/)[0].trim();
+	return line.length <= FAILURE_CHARS ? line : `${line.slice(0, FAILURE_CHARS - 1)}…`;
 }
 
 /** What the words of a status are made of: the source, how it came, its problem, and when it was last brought up to date. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CalendarFile } from "../../core/application/calendarFile";
+import { type CalendarFile, readCalendarFile } from "../../core/application/calendarFile";
 import { CalendarServiceImpl } from "../../core/application/CalendarServiceImpl";
 import type { CalendarEvent, CalendarSource } from "../../core/application/contracts";
 import { type EventFeed, type EventFile, SourceProblemError } from "../../core/application/EventSource";
@@ -224,6 +224,17 @@ describe("CalendarServiceImpl", () => {
 		work.failWith = new SourceProblemError({ kind: "fileMissing" }, "file missing");
 		const day = await refreshed(service([work]));
 		expect(day.statuses[0]).toEqual({ source: "work", kind: "exported", problem: { kind: "fileMissing" }, events: 0, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: true, used: false, tone: "spare", words: { name: "Work calendar", short: "Work", sub: "file missing", time: "" } });
+	});
+
+	it("a file that is no calendar file says so in a word, not the parser's text", async () => {
+		const work = new FakeFile("work");
+		try {
+			readCalendarFile('{"exportedAt": "2026', "work");
+		} catch (e) {
+			work.failWith = e as Error;
+		}
+		const day = await refreshed(service([work]));
+		expect(day.statuses[0]).toMatchObject({ problem: { kind: "unreadable" }, words: { sub: "file unreadable" } });
 	});
 
 	it("a file written longer ago than staleAfterMinutes is stale", async () => {

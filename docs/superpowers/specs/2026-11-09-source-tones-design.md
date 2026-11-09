@@ -88,3 +88,7 @@ Three codes, the same in the plugin's sources window and the app's Calendars scr
   timeline relies on and agree with the badge on «⋯»; opened from Settings (no main screen behind it) it reads today.
 - App: a spare row's name is secondary too, not only its line and time (the plugin's spare icon and name are muted).
 - App: the symbol's VoiceOver label is «Out of date» on an orange row and «Refresh failed» on a red one.
+- Backend: a calendar file that is not JSON or not the writers' shape (no `exportedAt` moment, `events`/`calendars` not
+  lists of rows with their fields) is the problem `{ kind: "unreadable" }`, worded «file unreadable», never the parser's
+  text. `failed` stays for other errors, its words cut to one line of at most 40 characters, a server's answer quoted
+  after «: » left out («Google API 500»). Set in `readCalendarFile` itself, so the plugin and the door agree.
