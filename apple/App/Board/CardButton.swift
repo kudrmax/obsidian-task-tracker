@@ -78,7 +78,7 @@ struct CardButton: UIViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: CardControl, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? 200, height: max(height, CardMetrics.height))
+        CGSize(width: proposal.width ?? uiView.bounds.width, height: max(height, CardMetrics.height))
     }
 
     private func update(_ control: CardControl) {

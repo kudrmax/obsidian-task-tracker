@@ -133,11 +133,17 @@ what a drop writes.
    kept for the calendar's empty-space press only (the system's list drag has no public delay).
 8. **frontend-swift: a card carried out of its list leaves no room there** until it comes back over that list, where
    its own row is the gap again (the system's own behaviour for a drag between collections).
-9. **frontend-swift: a section carried moves its header among the headers** (the system's gap, snapped to section
-   boundaries), its tasks hidden; at the drop the header stays where the gap was until the read after
-   `tasks.moveGroup` draws the section there (the core has no preview of a section's move).
+9. **frontend-swift: a section carried moves its header with the system's gap**, its tasks hidden. The system asks no
+   reorder snapping of a drop delegate (checked: `targetIndexPathForMoveOfItemFromOriginalIndexPath` is never called),
+   so let go it goes before the section header nearest the gap, or to the list's end; that one slot is both what is
+   written (`tasks.moveGroup`) and what is drawn at once (the section moved among the drawn groups) until the read
+   after the write, which draws the same order.
 10. **frontend-swift: a press that starts during the system's drop animation (about 0.4 s) is not taken by iOS**; a
     card lifts at once once the dropped one has landed.
 11. **frontend-swift: a card let go on the all-day strip over the calendar goes to the day with no time**: the core has
     no `DropTo` for a day without a time, so it is the drop on the day list's title (`ScreenView.titleDrops.day`): the
     end of the day's part without a section, its project kept. The day's title lights while the card is over the strip.
+12. **frontend-swift: a refused or unchanged drop flies the copy back to where the card was lifted** (its row in its own
+    list, or its place on the calendar), never the system's default fade.
+13. **frontend-swift: the calendar scrolls at its top and visible bottom edge under a carry**, as the lists do under the
+    system's drag, faster the nearer the edge; the minute is read anew as the grid passes under the finger.

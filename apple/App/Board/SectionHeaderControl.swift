@@ -25,7 +25,7 @@ struct SectionHeaderControl<Label: View>: UIViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: HeaderControl, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? 200, height: ColumnMetrics.groupHead)
+        CGSize(width: proposal.width ?? uiView.bounds.width, height: ColumnMetrics.groupHead)
     }
 
     private func update(_ control: HeaderControl) {
