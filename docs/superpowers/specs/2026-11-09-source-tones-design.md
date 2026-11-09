@@ -84,3 +84,7 @@ Three codes, the same in the plugin's sources window and the app's Calendars scr
   failed» (red) to a screen reader and on hover (`aria-label`, `title`); the time is read as «5 Nov 20:21, Out of
   date». A grey time and no dot say nothing more. The window reads the statuses of the day the screen shows, the same
   `DayEvents` the dot comes from.
+- App: Calendars opened from «⋯» reads the day the main screen shows, not today, so its rows say what that day's
+  timeline relies on and agree with the badge on «⋯»; opened from Settings (no main screen behind it) it reads today.
+- App: a spare row's name is secondary too, not only its line and time (the plugin's spare icon and name are muted).
+- App: the symbol's VoiceOver label is «Out of date» on an orange row and «Refresh failed» on a red one.

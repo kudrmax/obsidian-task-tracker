@@ -224,15 +224,18 @@ struct BoardScreen: View {
         }
     }
 
+    /// A menu badge has one colour in iOS: orange and red alike.
+    private var calendarsAlerted: Bool { (model.snapshot?.calendarsAlert ?? CalendarAlert.none) != CalendarAlert.none }
+
     private var more: some View {
             Menu("More", systemImage: "ellipsis") {
                 Button("Search", systemImage: "magnifyingglass") { sheet = .search }
                 Button("Select Tasks", systemImage: "checkmark.circle") { model.startSelection() }
                 Divider()
-                Button("Calendars", systemImage: model.snapshot?.calendarsStale == true ? "calendar.badge.exclamationmark" : "calendar") { sheet = .calendars }
+                Button("Calendars", systemImage: calendarsAlerted ? "calendar.badge.exclamationmark" : "calendar") { sheet = .calendars }
                 Button("Settings", systemImage: "gear") { sheet = .settings }
             }
-            .badge(model.snapshot?.calendarsStale == true ? 1 : 0)
+            .badge(calendarsAlerted ? 1 : 0)
             .tint(.primary)
     }
 

@@ -380,7 +380,8 @@ public struct BoardSnapshot: Sendable {
     public let lists: [BoardColumn: BoardList]
     public let timeline: BoardTimeline
     public let statuses: [SourceStatus]
-    public let calendarsStale: Bool
+    /// The badge on «⋯» → Calendars.
+    public let calendarsAlert: CalendarAlert
     public let canUndo: Bool
     /// Each card's menu by its task's id (`TaskItem.id`), as opened from where the card stands.
     public let menus: [String: TaskMenuModel]
@@ -525,7 +526,7 @@ extension TaskBoard {
             lists: lists,
             timeline: timeline,
             statuses: events.statuses,
-            calendarsStale: events.stale,
+            calendarsAlert: events.alert,
             canUndo: canUndo,
             menus: menus,
             look: look,
