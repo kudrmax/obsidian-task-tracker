@@ -244,10 +244,13 @@ function calendarCases(): Record<string, unknown> {
 	return out;
 }
 
+/** The reminders corpus takes over a second alone and past vitest's 5 s while the whole suite runs in three zones at once. */
+const CORPUS_MS = 30_000;
+
 describe("TaskCalendarPhone's answers", () => {
 	it("to reminders and their actions stay as they were", () => {
 		expect(reminderCases()).toMatchSnapshot();
-	});
+	}, CORPUS_MS);
 
 	it("to actions on a task that is no longer there stay as they were", () => {
 		expect(staleCases()).toMatchSnapshot();
