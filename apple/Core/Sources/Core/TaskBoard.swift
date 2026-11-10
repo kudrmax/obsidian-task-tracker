@@ -289,12 +289,19 @@ public final class TaskBoard: @unchecked Sendable {
     /// its root, or the note of that name given the project tag; the project notes looked at again at once. The project's
     /// link, for `tasks.setProject`, `entry.setProject` or the New Task sheet; nil for a name of nothing: nothing written.
     public func newProject(_ name: String) throws -> String? {
+        // The vault listed now: a note that came by Sync since the last listing is that note, never a new one over it.
+        fileList.forget()
         let found: NewProjectNote? = try rule("notes.newProject", [.string(name), fileList.all(vault)])
         guard let note = found else { return nil }
-        let old = note.exists ? vault.read(path: note.path) : nil
+        // A note that is there but can't be read now is left alone: its text taken for none would be written over.
+        let old = note.exists ? try vault.readNote(path: note.path) : nil
         let settings = vault.settingsJSON()
         let text = try answer("notes.projectText", [old.json], settingsOnly()).result.decode(String.self)
-        if text != old { try vault.write(path: note.path, text: text) }
+        if let old {
+            if text != old { try vault.write(path: note.path, text: text) }
+        } else {
+            try vault.create(path: note.path, text: text)
+        }
         fileList.forget()
         projects?.written(ProjectNote(name: note.name, path: note.path, link: note.link), tag: tag(of: settings))
         findProjects(settings)

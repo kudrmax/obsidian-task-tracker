@@ -924,10 +924,21 @@ final class BoardModel {
         let frame: CGRect
     }
 
+    /// The project's own view. Inside a project's view, its own project stays (nothing to open) and another one takes the
+    /// view's place, through the screen under it (`openOther`).
     func openProject(_ project: ProjectRef) {
-        guard self.project == nil else { return }
-        projectShown = ShownProject(project: project)
+        guard let own = self.project else { return projectShown = ShownProject(project: project) }
+        if !isOwnProject(project, own) { openOther?(project) }
     }
+
+    /// The project is this view's own: the same note, as the core names it in both (its link).
+    func isOwnProject(_ project: ProjectRef, _ own: ProjectRef? = nil) -> Bool {
+        guard let own = own ?? snapshot?.screen.project ?? self.project else { return false }
+        return project.link == own.link
+    }
+
+    /// A project's view asks the screen under it to show another project in its place.
+    @ObservationIgnored var openOther: ((ProjectRef) -> Void)?
 
     /// A link in a title tapped: an address opens as it is, a note in Obsidian, the file the core resolves it to.
     func openLink(_ part: TextPart) {

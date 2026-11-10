@@ -10,8 +10,11 @@ struct BoardScreen: View {
     @Environment(\.dismiss) private var dismiss
 
     /// `project`: that project's own view, as the plugin's block in its note.
-    init(project: ProjectRef? = nil) {
-        _model = State(initialValue: BoardModel(project: project))
+    /// `openOther`: a project's view shows another project in its place through the screen under it.
+    init(project: ProjectRef? = nil, openOther: ((ProjectRef) -> Void)? = nil) {
+        let model = BoardModel(project: project)
+        model.openOther = openOther
+        _model = State(initialValue: model)
     }
     @State private var router = CaptureRouter.shared
     @State private var sync = ObsidianSync.shared
@@ -67,7 +70,8 @@ struct BoardScreen: View {
         }
         .boardSheets(model: model)
         .fullScreenCover(item: $model.projectShown, onDismiss: { Task { await model.reloadIfChanged() } }) { shown in
-            BoardScreen(project: shown.project)
+            BoardScreen(project: shown.project, openOther: { other in model.projectShown = BoardModel.ShownProject(project: other) })
+                .id(shown.id)
         }
         .task { await model.reload() }
         .onChange(of: scene, initial: true) {

@@ -102,6 +102,35 @@ final class SlowFolder: NoteFolder, @unchecked Sendable {
         #expect(vault.files.count == 2)
     }
 
+    /// Review 11-10: a note that is there but can't be read (iCloud bringing it, Sync writing it) was taken for a new one
+    /// and written over with bare properties.
+    @Test func aNoteThatCantBeReadIsNeverWrittenOver() throws {
+        let vault = UnreadableVault(Self.file)
+        vault.files = ["Garden.md": "Tomatoes."]
+        vault.unreadable = ["Garden.md"]
+        #expect(throws: VaultError.unreadable("Garden.md")) { try board(vault).newProject("Garden") }
+        #expect(vault.files["Garden.md"] == "Tomatoes." && vault.edits.isEmpty)
+    }
+
+    /// Review 11-10: a note that came by Sync after the vault was last listed is that note, given the tag; never a new
+    /// note written over it.
+    @Test func aNoteThatCameSinceTheLastListingIsTaggedNotReplaced() throws {
+        let vault = vault()
+        let board = board(vault)
+        _ = try board.files()
+        _ = try board.suggestNotes("g")
+        vault.files["Porch.md"] = "Paint it."
+        #expect(try board.newProject("Porch") == "Porch")
+        #expect(vault.files["Porch.md"] == "---\ntags:\n  - project\n---\nPaint it.")
+    }
+
+    @Test func aNewNoteIsNeverWrittenOverAFileThatIsThere() throws {
+        let vault = vault()
+        vault.files["Porch.md"] = "Paint it."
+        #expect(throws: VaultError.exists("Porch.md")) { try vault.create(path: "Porch.md", text: "x") }
+        #expect(vault.files["Porch.md"] == "Paint it.")
+    }
+
     @Test func aNameOfNothingWritesNothing() throws {
         let vault = vault()
         #expect(try board(vault).newProject(" [] ") == nil)
@@ -141,4 +170,10 @@ final class SlowFolder: NoteFolder, @unchecked Sendable {
         let idea: FullTree = try board.readRule("tasks.fullTree", [try card(board, "Idea").item.json])
         #expect(idea.project == nil)
     }
+}
+
+/// A vault where some notes are listed but can't be read now.
+final class UnreadableVault: FakeVault, @unchecked Sendable {
+    var unreadable: Set<String> = []
+    override func read(path: String) -> String? { unreadable.contains(path) ? nil : super.read(path: path) }
 }
