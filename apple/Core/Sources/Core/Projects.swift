@@ -67,6 +67,12 @@ public struct ProjectNote: Codable, Hashable, Sendable {
 public protocol ProjectSource: Sendable {
     /// The notes with `tag` (the settings' project tag, as `settings.form` gives it), as last found.
     func notes(tag: String) -> [ProjectNote]
+    /// Looks again at once, a note just written: the next `notes` has it.
+    func lookAgain(tag: String)
+}
+
+public extension ProjectSource {
+    func lookAgain(tag: String) {}
 }
 
 /// A markdown note of the vault as a scan finds it: its path from the vault's folder, when it last changed, and its text
@@ -165,6 +171,10 @@ public final class VaultProjects: ProjectSource, @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return found ?? []
+    }
+
+    public func lookAgain(tag: String) {
+        if scan(tag: tag) { changed?() }
     }
 
     /// Reads the notes changed since the last scan and works the list out anew when it may have changed: true when it

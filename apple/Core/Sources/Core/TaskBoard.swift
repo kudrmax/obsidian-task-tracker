@@ -251,13 +251,18 @@ public final class TaskBoard: @unchecked Sendable {
         if let kept = reply.grouping { grouping.save(kept) }
     }
 
-    /// The project notes for the settings' project tag (`settings.form`), as the context hands them to the door.
-    private func findProjects(_ settings: String) {
-        guard let projects else { return }
+    /// The settings' project tag (`settings.form`).
+    private func tag(of settings: String) -> String {
         lock.lock()
         let known = projectTag?.settings == settings ? projectTag?.tag : nil
         lock.unlock()
-        let tag = known ?? ((try? core.call("settings.form", [], context: DoorContext(tasks: nil, settingsJSON: settings, now: clock())).result as? [String: Any])?["projectTag"] as? String) ?? ""
+        return known ?? ((try? core.call("settings.form", [], context: DoorContext(tasks: nil, settingsJSON: settings, now: clock())).result as? [String: Any])?["projectTag"] as? String) ?? ""
+    }
+
+    /// The project notes for the settings' project tag, as the context hands them to the door.
+    private func findProjects(_ settings: String) {
+        guard let projects else { return }
+        let tag = tag(of: settings)
         let notes = projects.notes(tag: tag)
         let json = try? String(decoding: JSONEncoder().encode(notes), as: UTF8.self)
         lock.lock()
@@ -279,6 +284,28 @@ public final class TaskBoard: @unchecked Sendable {
     }
 
     // MARK: Notes
+
+    /// «New project…» named `name` (`docs/door.md`, `notes.newProject`): the note written through the vault, coordinated, at
+    /// its root, or the note of that name given the project tag; the project notes looked at again at once. The project's
+    /// link, for `tasks.setProject`, `entry.setProject` or the New Task sheet; nil for a name of nothing: nothing written.
+    public func newProject(_ name: String) throws -> String? {
+        let found: NewProjectNote? = try rule("notes.newProject", [.string(name), fileList.all(vault)])
+        guard let note = found else { return nil }
+        let old = note.exists ? vault.read(path: note.path) : nil
+        let settings = vault.settingsJSON()
+        let text = try answer("notes.projectText", [old.json], settingsOnly()).result.decode(String.self)
+        if text != old { try vault.write(path: note.path, text: text) }
+        fileList.forget()
+        projects?.lookAgain(tag: tag(of: settings))
+        findProjects(settings)
+        return note.link
+    }
+
+    /// The New Task sheet's Project row for the project chosen (`capture.project`): its page and whether one is lit.
+    public func captureProject(_ chosen: String?) throws -> EntryProject {
+        findProjects(vault.settingsJSON())
+        return try answer("capture.project", [chosen.json], settingsOnly()).result.decode(EntryProject.self)
+    }
 
     /// The `[[` the caret (UTF-16 offset) stands in, typed in a title; `nil` for none.
     public func linkQuery(in text: String, caret: Int) throws -> LinkQuery? {

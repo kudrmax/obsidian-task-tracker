@@ -183,7 +183,7 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
     }
 
     public func capture(_ task: CaptureTask, text: String, settingsJSON: String, now: Date) throws -> CaptureWrite {
-        let arguments: [Any] = [task.list.key, task.typed, task.recording ?? NSNull(), task.tag]
+        let arguments: [Any] = [task.list.key, task.typed, task.recording ?? NSNull(), task.tag, task.project ?? NSNull()]
         do {
             guard let written = try call("capture.add", arguments, context: DoorContext(tasks: text, settingsJSON: settingsJSON, now: now)).tasks else {
                 throw PhoneCoreError.scriptFailed("capture.add: nothing written")
