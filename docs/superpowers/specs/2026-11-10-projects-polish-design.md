@@ -59,8 +59,11 @@ Backend (the core's contract):
 2. **No Project button for a subtask's field** (new, renamed, or in a menu's stack) nor for a section's name: the bar has
    no Place there either, and a subtask's project is its parent's. A slot's field and a rename of a top-level task have it.
 3. **A project picked in a list drawn by project** moves the field to the end of that project's part, as Place does; a
-   list that draws no part of it (Soon's No project without a task) leaves the field where it is. A rename's field never
-   moves: the task keeps its place in the lane, as with the menu's Project.
+   list that draws no part of it yet (a project just made by New project…, Soon's No project without a task) leaves the
+   field where it is until the list draws one: then the field goes to the end of that part, whenever it appears (the
+   field's first task there drawn, the project's group showing up in any drawing; `listEntry` and `shown` move it), but
+   not while a line entered at the field still waits to be drawn. A rename's field never moves: the task keeps its place
+   in the lane, as with the menu's Project.
 4. **The project travels as the task's own**, `createInPlace`'s and `createWithId`'s sixth argument (`project`), apart
    from `NewTaskPlace.project`, which then only places the task. So Place to an ungrouped list keeps the list's end (no
    jump after the project's last task there) and still writes the project. A subtask's place takes none (the entry hands
