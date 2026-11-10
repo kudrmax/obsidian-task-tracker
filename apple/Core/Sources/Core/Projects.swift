@@ -67,12 +67,12 @@ public struct ProjectNote: Codable, Hashable, Sendable {
 public protocol ProjectSource: Sendable {
     /// The notes with `tag` (the settings' project tag, as `settings.form` gives it), as last found.
     func notes(tag: String) -> [ProjectNote]
-    /// Looks again at once, a note just written: the next `notes` has it.
-    func lookAgain(tag: String)
+    /// A project note the app just wrote (New project…): the next `notes` for `tag` has it at once, before any scan finds it.
+    func written(_ note: ProjectNote, tag: String)
 }
 
 public extension ProjectSource {
-    func lookAgain(tag: String) {}
+    func written(_ note: ProjectNote, tag: String) {}
 }
 
 /// A markdown note of the vault as a scan finds it: its path from the vault's folder, when it last changed, and its text
@@ -160,21 +160,43 @@ public final class VaultProjects: ProjectSource, @unchecked Sendable {
         var shown = foundFor == tag ? found : nil
         lock.unlock()
         if shown == nil, let kept = rememberedNotes(tag) { shown = kept }
-        guard start else { return shown ?? [] }
+        guard start else { return written(shown ?? [], tag) }
         if background {
             DispatchQueue.global(qos: .utility).async { [self] in
                 if scan(tag: tag) { changed?() }
             }
-            return shown ?? []
+            return written(shown ?? [], tag)
         }
         _ = scan(tag: tag)
         lock.lock()
         defer { lock.unlock() }
-        return found ?? []
+        return withWritten(found ?? [], tag: tag)
     }
 
-    public func lookAgain(tag: String) {
-        if scan(tag: tag) { changed?() }
+    /// Held in the list until a scan has seen the note's path: a scan begun before the write never takes it away again.
+    public func written(_ note: ProjectNote, tag: String) {
+        lock.lock()
+        if writtenFor != tag { justWritten = [:] }
+        writtenFor = tag
+        justWritten[note.path] = note
+        lock.unlock()
+    }
+
+    /// The notes written by the app that no scan has seen yet, for the tag they were written with.
+    private var justWritten: [String: ProjectNote] = [:]
+    private var writtenFor: String?
+
+    /// `list` with the notes just written that it lacks.
+    private func withWritten(_ list: [ProjectNote], tag: String) -> [ProjectNote] {
+        guard writtenFor == tag, !justWritten.isEmpty else { return list }
+        let paths = Set(list.map(\.path))
+        return list + justWritten.values.filter { !paths.contains($0.path) }.sorted { $0.path < $1.path }
+    }
+
+    private func written(_ list: [ProjectNote], _ tag: String) -> [ProjectNote] {
+        lock.lock()
+        defer { lock.unlock() }
+        return withWritten(list, tag: tag)
     }
 
     /// Reads the notes changed since the last scan and works the list out anew when it may have changed: true when it
@@ -215,6 +237,8 @@ public final class VaultProjects: ProjectSource, @unchecked Sendable {
         })
         guard let notes: [ProjectNote] = try? rule("rules.projectNotes", [all, .string(tag)]) else { return false }
         lock.lock()
+        // A note written by the app that this scan listed is now the scan's own.
+        if writtenFor == tag { for path in paths { justWritten[path] = nil } }
         listsMade += 1
         tags = next
         found = notes

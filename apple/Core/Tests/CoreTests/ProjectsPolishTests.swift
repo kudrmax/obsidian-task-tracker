@@ -14,6 +14,21 @@ final class FolderOfVault: NoteFolder, @unchecked Sendable {
     }
 }
 
+/// A vault whose scan takes `delay`: a first scan of thousands of notes with no tags kept.
+final class SlowFolder: NoteFolder, @unchecked Sendable {
+    let inner: NoteFolder
+    let delay: TimeInterval
+    init(_ inner: NoteFolder, delay: TimeInterval) {
+        self.inner = inner
+        self.delay = delay
+    }
+
+    func scanNotes(wanted: (String, Date) -> Bool) throws -> [ScannedNote] {
+        Thread.sleep(forTimeInterval: delay)
+        return try inner.scanNotes(wanted: wanted)
+    }
+}
+
 /// Projects polish (`docs/superpowers/specs/2026-11-10-projects-polish-design.md`): New project…, the New Task sheet's
 /// Project, the full screen's project line, through the door in JavaScriptCore.
 @Suite struct ProjectsPolishTests {
@@ -50,6 +65,33 @@ final class FolderOfVault: NoteFolder, @unchecked Sendable {
         let page = try board.captureProject("Свой дом")
         #expect(page.lit && page.page.value == "Свой дом")
         #expect(page.page.options.map(\.project.name) == ["Health", "Свой дом"])
+    }
+
+    /// The coordinator, 11-10: a New project… on a vault of thousands of notes waited ~10 s for the scan. The note written
+    /// is offered at once, whether or not a scan has found it yet.
+    @Test func aNewProjectIsOfferedBeforeAnyScanFindsIt() throws {
+        let vault = vault()
+        let folder = FakeFolder(["Health.md": "Run more. #project"])
+        let board = TaskBoard(core: core, vault: vault, projects: VaultProjects(folder: folder, core: core, background: false), clock: { Fixtures.date(6, 10) })
+        _ = try board.files()
+        #expect(try board.newProject("Shed") == "Shed")
+        #expect(try board.captureProject("Shed").page.options.map(\.project.name) == ["Health", "Shed"])
+        folder.notes["Shed.md"] = (text: "---\ntags:\n  - project\n---\n", modified: Date(timeIntervalSince1970: 2))
+        _ = try board.files(now: Fixtures.date(6, 11))
+        #expect(try board.captureProject(nil).page.options.map(\.project.name) == ["Health", "Shed"])
+    }
+
+    /// The app's own case: the scan runs in the background and takes seconds. New project… waits for none of it.
+    @Test func aNewProjectWaitsForNoScan() throws {
+        let vault = vault()
+        let projects = VaultProjects(folder: SlowFolder(FolderOfVault(vault), delay: 2), core: try PhoneCore(script: Fixtures.phoneScript))
+        let board = TaskBoard(core: core, vault: vault, projects: projects, clock: { Fixtures.date(6, 10) })
+        _ = try board.files()
+        let start = Date()
+        #expect(try board.newProject("Shed") == "Shed")
+        let page = try board.captureProject("Shed")
+        #expect(Date().timeIntervalSince(start) < 0.5)
+        #expect(page.lit && page.page.options.map(\.project.name).contains("Shed"))
     }
 
     @Test func aNoteOfThatNameGetsTheTagInItsPropertiesAndTheRestStays() throws {

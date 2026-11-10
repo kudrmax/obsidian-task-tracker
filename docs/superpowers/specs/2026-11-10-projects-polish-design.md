@@ -111,3 +111,7 @@ Swift (the iPhone app):
 24. **Swift: a card's open menu follows only its own screen's drawings.** A card of the main screen under a project's
     view drew the same task with the folder mark, and the open menu's card in the view took that drawing (the mark showed
     in the project's own view while its menu was open).
+25. **Swift: the note New project… writes is a project at once.** The app knows it from `notes.newProject` and puts it in
+    the project list itself; no scan of the vault is waited for (a first scan of thousands of notes takes tens of
+    seconds). The note stays in the list until a scan has listed its path, so a scan begun before the write never takes
+    it away.

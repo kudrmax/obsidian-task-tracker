@@ -296,7 +296,7 @@ public final class TaskBoard: @unchecked Sendable {
         let text = try answer("notes.projectText", [old.json], settingsOnly()).result.decode(String.self)
         if text != old { try vault.write(path: note.path, text: text) }
         fileList.forget()
-        projects?.lookAgain(tag: tag(of: settings))
+        projects?.written(ProjectNote(name: note.name, path: note.path, link: note.link), tag: tag(of: settings))
         findProjects(settings)
         return note.link
     }
