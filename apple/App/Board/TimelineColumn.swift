@@ -45,7 +45,7 @@ struct TimelineColumn: View {
         static let itemInset: CGFloat = 1
         static let itemGap: CGFloat = 2
         static let nowHeight: CGFloat = 16
-        static let nowWidth: CGFloat = 34
+        static let nowWidth = TimelineGeometry.nowWidth
         static let allDayHeight: CGFloat = 22
         static let allDayGap: CGFloat = 4
         /// A selected card's dots (`--tc-grip`, `--tc-grip-start-right`, `--tc-grip-hit`).
@@ -75,12 +75,24 @@ struct TimelineColumn: View {
         if pinch == nil, isTall(at: hour) { held = nil }
     }
 
+    /// A shorter day (another day come in) cuts the scroll asked for down to what it can show: the position asked keeps to
+    /// what is shown, so a taller day coming back never scrolls to the old ask a few frames after it has landed.
+    private func keepReach() {
+        guard pinch == nil, held == nil, let asked = position.point?.y, visible > 0 else { return }
+        let reach = max(0, scroll.contentHeight - visible)
+        guard asked > reach + 0.5 else { return }
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) { position.scrollTo(y: reach) }
+    }
+
     /// The content has the height of the day at `hour`.
     private func isTall(at hour: CGFloat) -> Bool { scroll.contentHeight >= y(24 * 60, hour) + Measure.labelLift - 0.5 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Measure.allDayGap) {
-            DayLane(model: model, width: columnWidth, shown: allDay(timeline)) { peek in allDay(peek.timeline) }
+            DayLane(model: model, width: columnWidth, shown: allDay(timeline)) { peek in allDay(peek.timeline, menus: false) }
+                .frame(height: allDayHeight, alignment: .top)
                 .clipped()
                 // A card let go on the all-day strip goes to the day with no time.
                 .background { AllDayDrop(model: model) }
@@ -105,6 +117,7 @@ struct TimelineColumn: View {
                 .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, height in
                     scroll.contentHeight = height
                     holdPinchedMinute()
+                    keepReach()
                 }
                 .onChange(of: timeline.zoomLevels) { settleZoom() }
                 .onChange(of: model.entry.moved) { reveal(hour) }
@@ -135,12 +148,13 @@ struct TimelineColumn: View {
             // The day itself, as the plugin's day layers: its events and cards slide within the items' place, its now
             // line within its own; the hours and the grid stand.
             DayLane(model: model, width: width, shown: ZStack(alignment: .topLeading) {
-                events(timeline, hour: hour)
+                events(timeline, hour: hour, width: width)
                 ForEach(slots.filter { $0.card.item.id != model.entry.state?.renaming?.id }) { slot in
                     let stretched = model.stretched.flatMap { $0.id == slot.id ? $0 : nil }
                     let top = stretched.map { y($0.start, hour) + Measure.itemInset } ?? y(0, hour) + CGFloat(slot.box.top)
                     let tall = stretched.map { max(CardMetrics.height, CGFloat($0.end - $0.start) / 60 * hour - Measure.itemGap) }
                     slotCard(slot, tall: tall)
+                        .frame(width: itemWidth(width, left: slot.box.left))
                         .overlay { if model.selectedSlot == slot.id { grips(slot, hour: hour) } }
                         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { if model.selectedSlot == slot.id { model.selectedFrame = $0 } }
                         .padding(.leading, Measure.itemsLeft + CGFloat(slot.box.left))
@@ -152,10 +166,10 @@ struct TimelineColumn: View {
                 }
             }) { peek in
                 ZStack(alignment: .topLeading) {
-                    events(peek.timeline, hour: hour)
+                    events(peek.timeline, hour: hour, width: width, menus: false)
                     ForEach(model.slidingSlots(peek.timeline, hour: hour)) { slot in
                         TaskCapsule(card: slot.card, height: CGFloat(slot.box.height))
-                            .frame(height: max(CGFloat(slot.box.height), CardMetrics.height))
+                            .frame(width: itemWidth(width, left: slot.box.left), height: max(CGFloat(slot.box.height), CardMetrics.height))
                             .padding(.leading, Measure.itemsLeft + CGFloat(slot.box.left))
                             .padding(.trailing, Measure.itemsRight + Measure.itemInset)
                             .offset(y: y(0, hour) + CGFloat(slot.box.top))
@@ -184,21 +198,40 @@ struct TimelineColumn: View {
         .onChange(of: width, initial: true) { model.calendarWidth = width }
     }
 
-    private func allDay(_ timeline: BoardTimeline) -> some View {
+    /// The whole-day strip's height: the shown day's rows, while a day slides in the taller of the two days' rows; set
+    /// here so the hours below move the moment a day lands, never a few frames on when its rows have been laid out.
+    private var allDayHeight: CGFloat {
+        let rows = max(timeline.allDay.count, model.dayTurn?.peek.timeline.allDay.count ?? 0)
+        return rows == 0 ? 0 : CGFloat(rows) * Measure.allDayHeight + CGFloat(rows - 1) * Measure.allDayGap
+    }
+
+    /// The day's whole-day events; `menus` false for a day sliding in, drawn only, its blocks the plain shapes.
+    private func allDay(_ timeline: BoardTimeline, menus: Bool = true) -> some View {
         VStack(alignment: .leading, spacing: Measure.allDayGap) {
+            let rowWidth = max(0, columnWidth - Measure.itemsLeft - Measure.itemsRight)
             ForEach(timeline.allDay) { event in
-                EventMenu(event: event, model: model) { AllDayRow(event: event, paint: paint(event, of: timeline)) }
+                EventMenu(event: event, model: model, active: menus) { AllDayRow(event: event, paint: paint(event, of: timeline)).frame(width: rowWidth) }
+                    // Sized here, not by the menu's label: a day's strip drawn anew has its height from its first frame.
+                    .frame(width: rowWidth, height: Measure.allDayHeight)
                     .padding(.leading, Measure.itemsLeft)
                     .padding(.trailing, Measure.itemsRight)
             }
         }
     }
 
-    private func events(_ timeline: BoardTimeline, hour: CGFloat) -> some View {
+    /// A block's width in the calendar `width` wide, `left` points in from the items' place: a menu's label or a card is
+    /// sized by the calendar, never by its title, so nothing runs past the calendar's edge.
+    private func itemWidth(_ width: CGFloat, left: Double) -> CGFloat {
+        max(0, width - Measure.itemsLeft - CGFloat(left) - Measure.itemsRight - Measure.itemInset)
+    }
+
+    private func events(_ timeline: BoardTimeline, hour: CGFloat, width: CGFloat, menus: Bool = true) -> some View {
         ForEach(timeline.events.sorted { $0.layer < $1.layer }) { event in
             let top = y(event.start, hour) + Measure.itemInset
             let length = CGFloat(event.end - event.start) / 60 * hour - Measure.itemGap
-            EventMenu(event: event, model: model) { EventBlock(event: event, paint: paint(event, of: timeline), height: max(length, 1), contentTop: top) }
+            let blockWidth = itemWidth(width, left: event.left)
+            EventMenu(event: event, model: model, active: menus) { EventBlock(event: event, paint: paint(event, of: timeline), height: max(length, 1), contentTop: top).frame(width: blockWidth) }
+                .frame(width: blockWidth, height: max(length, 1))
                 .padding(.leading, Measure.itemsLeft + CGFloat(event.left))
                 .padding(.trailing, Measure.itemsRight + Measure.itemInset)
                 .offset(y: top)
@@ -245,7 +278,14 @@ struct TimelineColumn: View {
     // MARK: The grid
 
     private func grid(hour: CGFloat) -> some View {
-        let nowY = timeline.now.map { y($0, hour) }
+        // The labels give way to the pill over them: the shown day's, or while a day slides in the one that has come over
+        // the hours (`BoardModel.pillOver`); none while both are away from them.
+        let pill: Int? = switch model.pillOver {
+        case .shown: timeline.now
+        case .coming: model.dayTurn?.peek.timeline.now
+        case .none: nil
+        }
+        let nowY = pill.map { y($0, hour) }
         let marks = model.gridMarks(hour: hour, measures: Measure.grid)
         return ZStack(alignment: .topLeading) {
             ForEach(marks, id: \.minute) { mark in
@@ -468,6 +508,8 @@ enum TimelineGeometry {
     static let labelLift: CGFloat = 7
     static let itemsLeft: CGFloat = 28
     static let itemsRight: CGFloat = 4
+    /// The now line's time pill: an hour's label under it is not drawn.
+    static let nowWidth: CGFloat = 34
 }
 
 /// Where a column stands scrolled: read by a pinch as it starts and by a carry held at an edge, never drawn.
@@ -523,7 +565,7 @@ struct EventBlock: View {
                 .font(.system(size: isTiny ? 10 : 12, weight: .semibold))
                 .lineLimit(1)
                 .fixedSize()
-                .frame(maxWidth: .infinity, minHeight: titleHeight, maxHeight: titleHeight, alignment: .leading)
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: titleHeight, maxHeight: titleHeight, alignment: .leading)
                 .mask(FadeEnd(width: 16))
                 .foregroundStyle(Color(hex: paint.text))
                 .padding(.horizontal, isTiny ? 5 : 6)
@@ -550,9 +592,16 @@ struct EventBlock: View {
 struct EventMenu<Block: View>: View {
     let event: BoardEvent
     let model: BoardModel
+    /// False for a day sliding in: the block alone, with no menu behind it to lay out (the system's button under the menu
+    /// is a view of its own, sized a frame late, which moved the calendar under the finger as a swipe began).
+    var active = true
     @ViewBuilder let block: Block
 
     var body: some View {
+        if active { menu } else { block }
+    }
+
+    private var menu: some View {
         Menu {
             Button("Open in Calendar", systemImage: "calendar") { model.openInCalendar(event.event) }
         } label: {
@@ -576,7 +625,7 @@ struct AllDayRow: View {
                 .font(.system(size: 12, weight: .semibold))
                 .lineLimit(1)
                 .fixedSize()
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .mask(FadeEnd(width: 16))
                 .foregroundStyle(Color(hex: paint.text))
                 .padding(.horizontal, 6)
