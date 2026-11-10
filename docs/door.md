@@ -377,7 +377,8 @@ vault folder (`Projects/Alpha.md`); caret offsets count UTF-16 code units, as `N
 - `newProject(name, notes)`: the note «New project…» named `name` writes, `NewProjectNote` `{ name, path, link, exists }`:
   the vault's note of that name, case aside (the one nearest the vault's root), with `exists`; else a new note at the
   vault's root. What a file's name may not hold (`\ / : * ? " < > | # ^ [ ]`) is left out, and a name of nothing answers
-  `null`: write nothing. `newProject("Свой дом", [{ path: "Дружба.md" }])` → `{ name: "Свой дом", path: "Свой дом.md",
+  `null`: write nothing. So does the name of a file the plugin keeps by its settings (the tasks file, the calendars'
+  files), case aside: such a file is never tagged. `newProject("Свой дом", [{ path: "Дружба.md" }])` → `{ name: "Свой дом", path: "Свой дом.md",
   link: "Свой дом", exists: false }`.
 - `projectText(text)`: the note's text to write, with the settings' project tag in its properties' `tags` (without `#`):
   `text` is the note as read (`exists`), `null` for a new one. A list gets the tag as its last item, a `[a, b]` list at

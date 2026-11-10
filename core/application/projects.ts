@@ -5,6 +5,8 @@ import type { GroupName } from "../domain/Task";
 import type { GroupingState, ListGrouping, ListSection, NewProjectNote, ProjectGroup, ProjectNote, ProjectRef, TaskItem } from "./contracts";
 import { linkedNotes, type VaultNote } from "./notes";
 import type { ListPlace } from "./nesting";
+import { CALENDAR_SOURCES, calendarPath } from "./calendarFile";
+import type { TaskCalendarSettings } from "../settings";
 import { groupKeyOf, type ListGroup, listView, projectSection, sectionId, withEmptySections } from "./sections";
 
 /** The title of the group of tasks without a project. */
@@ -13,13 +15,24 @@ export const NO_PROJECT = "No project";
 /** What a file's name and a link may not hold in Obsidian: the path's and the link's own characters. */
 const NOT_IN_NAME = /[\\/:*?"<>|#^[\]]/g;
 
+/** The files the plugin keeps in the vault by its settings: the tasks file and the calendars' files. Never a project's note. */
+export function pluginFiles(settings: TaskCalendarSettings): readonly string[] {
+	return [settings.tasksFile, ...CALENDAR_SOURCES.map((source) => calendarPath(source, settings))];
+}
+
+function fileName(path: string): string {
+	return (path.split("/").pop() ?? path).replace(/\.[^.]*$/, "");
+}
+
 /**
  * The note «New project…» named `typed` writes: the vault's note of that name (case aside) when it has one, else a new
- * one at the vault's root; null for a name of nothing once what a file's name may not hold is left out.
+ * one at the vault's root; null for a name of nothing once what a file's name may not hold is left out, and for the
+ * name of a file the plugin owns (`owned`, `pluginFiles`), which is never tagged nor shadowed by a note of its name.
  */
-export function newProjectNote(typed: string, notes: readonly VaultNote[]): NewProjectNote | null {
+export function newProjectNote(typed: string, notes: readonly VaultNote[], owned: readonly string[] = []): NewProjectNote | null {
 	const name = typed.replace(NOT_IN_NAME, "").replace(/\s+/g, " ").trim().replace(/^\.+/, "").trim();
 	if (name === "") return null;
+	if (owned.some((path) => projectKey(fileName(path)) === projectKey(name))) return null;
 	const found = linkedNotes(notes.filter((note) => /\.md$/i.test(note.path)))
 		.filter((note) => projectKey(note.name) === projectKey(name))
 		.sort((a, b) => a.path.split("/").length - b.path.split("/").length || (a.path < b.path ? -1 : 1))[0];

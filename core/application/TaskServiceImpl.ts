@@ -43,7 +43,7 @@ import {
 } from "./contracts";
 import type { SectionOffer } from "./sections";
 import { type Clock, type GroupingStore, memoryGrouping, NO_NOTE_FILES, NO_PROJECTS, type NoteFiles, type Projects, type SettingsStore, type TaskFileStore } from "./ports";
-import { newProjectNote, newProjectRef, revealedGrouping, withFoldToggled, withGrouping } from "./projects";
+import { newProjectNote, newProjectRef, pluginFiles, revealedGrouping, withFoldToggled, withGrouping } from "./projects";
 import { withProjectTag } from "../domain/NoteTags";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
@@ -131,7 +131,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null> {
-		const note = newProjectNote(name, this.notes.paths().map((path) => ({ path })));
+		const note = newProjectNote(name, this.notes.paths().map((path) => ({ path })), pluginFiles(this.settings.get()));
 		if (!note) return null;
 		const was = note.exists ? await this.notes.read(note.path) : null;
 		const text = withProjectTag(was, this.settings.get().projectTag);

@@ -53,7 +53,7 @@ import { sectionNameEnd } from "./SectionNameEntry";
 import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
-import { newProjectNote, projectNotesOfTexts, revealedGrouping, withFoldToggled, withGrouping } from "./projects";
+import { newProjectNote, pluginFiles, projectNotesOfTexts, revealedGrouping, withFoldToggled, withGrouping } from "./projects";
 import { noteTags, withProjectTag } from "../domain/NoteTags";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
@@ -883,7 +883,7 @@ const NOTES: Readonly<Record<string, Handler>> = {
 	insert: (_c, [text, at, link]) => withNoteLink(text as string, at as LinkQuery, link as string),
 	open: (_c, [target, notes]) => noteOfLink(target as string, notes as VaultNote[]),
 	/** «New project…» named `name`: the note to write among the vault's `notes`, the one of that name or a new one at the root; null for a name of nothing. */
-	newProject: (_c, [name, notes]) => newProjectNote(name as string, (notes ?? []) as VaultNote[]),
+	newProject: (c, [name, notes]) => newProjectNote(name as string, (notes ?? []) as VaultNote[], pluginFiles(c.settings)),
 	/** The project note's text with the settings' project tag in its properties: `text`, the note's as read (null: a new note); unchanged when it has the tag. */
 	projectText: (c, [text]) => withProjectTag((text ?? null) as string | null, c.settings.projectTag),
 };

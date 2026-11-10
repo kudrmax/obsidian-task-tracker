@@ -138,3 +138,7 @@ Swift (the iPhone app):
     the project list itself; no scan of the vault is waited for (a first scan of thousands of notes takes tens of
     seconds). The note stays in the list until a scan has listed its path, so a scan begun before the write never takes
     it away.
+26. **Backend: New project… never touches the plugin's own files.** A typed name that is, case aside, the name of a file
+    the plugin keeps by its settings (the tasks file, the calendars' files: `pluginFiles`) makes nothing: `newProject`
+    and `notes.newProject` answer null, as for an empty name, so neither the file is tagged nor a note made that its
+    link would clash with. No refusal of its own: the door's shapes stay as they were, and the page just closes.

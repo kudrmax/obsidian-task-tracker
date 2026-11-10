@@ -3463,9 +3463,16 @@ ${text}`;
   // core/application/projects.ts
   var NO_PROJECT = "No project";
   var NOT_IN_NAME = /[\\/:*?"<>|#^[\]]/g;
-  function newProjectNote(typed2, notes) {
+  function pluginFiles(settings) {
+    return [settings.tasksFile, ...CALENDAR_SOURCES.map((source) => calendarPath(source, settings))];
+  }
+  function fileName(path) {
+    return (path.split("/").pop() ?? path).replace(/\.[^.]*$/, "");
+  }
+  function newProjectNote(typed2, notes, owned = []) {
     const name = typed2.replace(NOT_IN_NAME, "").replace(/\s+/g, " ").trim().replace(/^\.+/, "").trim();
     if (name === "") return null;
+    if (owned.some((path) => projectKey(fileName(path)) === projectKey(name))) return null;
     const found = linkedNotes(notes.filter((note) => /\.md$/i.test(note.path))).filter((note) => projectKey(note.name) === projectKey(name)).sort((a, b) => a.path.split("/").length - b.path.split("/").length || (a.path < b.path ? -1 : 1))[0];
     if (found) return { name: found.name, path: found.path, link: found.link, exists: true };
     return { name, path: `${name}.md`, link: name, exists: false };
@@ -7020,7 +7027,7 @@ ${text}`;
     insert: (_c, [text, at, link]) => withNoteLink(text, at, link),
     open: (_c, [target, notes]) => noteOfLink(target, notes),
     /** «New project…» named `name`: the note to write among the vault's `notes`, the one of that name or a new one at the root; null for a name of nothing. */
-    newProject: (_c, [name, notes]) => newProjectNote(name, notes ?? []),
+    newProject: (c, [name, notes]) => newProjectNote(name, notes ?? [], pluginFiles(c.settings)),
     /** The project note's text with the settings' project tag in its properties: `text`, the note's as read (null: a new note); unchanged when it has the tag. */
     projectText: (c, [text]) => withProjectTag(text ?? null, c.settings.projectTag)
   };
