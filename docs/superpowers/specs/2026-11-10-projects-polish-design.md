@@ -126,7 +126,8 @@ Swift (the iPhone app):
     starts with that project (before, the main screen under the view answered the plus and the sheet had none).
 21. **Swift: the full screen's project line** is the parent line's look (subheadline, secondary, the folder), one line cut
     at its end (the plugin's 15). A tap opens the project's view; on a full screen opened inside that project's own view it
-    goes back to the view. A project whose note can't be opened takes no tap, as the card's mark.
+    goes back to the view, inside another project's view (the task's project changed there) that project's view takes its
+    place. A project whose note can't be opened takes no tap, as the card's mark.
 22. **Swift: the narrow mark** is the glyph's own width in the row; its button keeps decision 40's 24 + 3 + 3 = 30 pt,
     centred on the glyph, over the title's faded end.
 23. **Swift: after «New project…» from the quick entry the lists are read again before the field takes the project**, so
@@ -142,3 +143,9 @@ Swift (the iPhone app):
     the plugin keeps by its settings (the tasks file, the calendars' files: `pluginFiles`) makes nothing: `newProject`
     and `notes.newProject` answer null, as for an empty name, so neither the file is tagged nor a note made that its
     link would clash with. No refusal of its own: the door's shapes stay as they were, and the page just closes.
+27. **Swift: New project… never writes over a note.** The vault is listed again before `notes.newProject`, so a note that
+    came by Sync meanwhile is that note (tagged, not replaced); a note that is there but can't be read now (iCloud, Sync)
+    writes nothing and says so; a new note is created only where no file is, never written over one.
+28. **Swift: an open menu stays where it is when the screen under it is drawn again** (the project scan, the file read
+    again): the same rows leave it alone, a changed menu goes up on the page that is open. Before, any redraw put the
+    menu's first page in place of an open Project or Section page (on master too, since 11-08).

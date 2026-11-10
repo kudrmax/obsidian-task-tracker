@@ -485,9 +485,38 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
     }
 
     /// The open menu drawn from `menu`, in place: its rows ticked anew without closing it.
+    /// The menu drawn anew while it is up (the screen under it read again, a label set from it). A menu that shows the same
+    /// rows is left as it is; one that changed is put up on the page the person is on, never on its first page: the
+    /// system hands the update the page that is showing, a submenu as well as the menu itself.
     func refresh(_ menu: UIMenu) {
+        let shown = self.menu.map(Self.shape)
         self.menu = menu
-        interaction.updateVisibleMenu { _ in menu }
+        let next = Self.shape(menu)
+        guard MenuShape.needsUpdate(shown: shown, next: next) else { return }
+        interaction.updateVisibleMenu { visible in
+            guard let path = MenuShape.path(toPage: visible.title, in: next) else { return visible }
+            return Self.page(at: path, in: menu) ?? visible
+        }
+    }
+
+    private static func shape(_ element: UIMenuElement) -> MenuShape {
+        switch element {
+        case let menu as UIMenu:
+            return .page(title: menu.title, detail: "\(menu.subtitle ?? "")|\(menu.options.rawValue)", children: menu.children.map(shape))
+        case let action as UIAction:
+            return .row("\(action.title)|\(action.subtitle ?? "")|\(action.state.rawValue)|\(action.attributes.rawValue)")
+        default:
+            return .row(String(describing: type(of: element)))
+        }
+    }
+
+    private static func page(at path: [Int], in menu: UIMenu) -> UIMenu? {
+        var page = menu
+        for index in path {
+            guard index < page.children.count, let child = page.children[index] as? UIMenu else { return nil }
+            page = child
+        }
+        return page
     }
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {

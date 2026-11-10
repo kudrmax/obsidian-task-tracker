@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Core
 
-final class FakeVault: TasksVault, @unchecked Sendable {
+class FakeVault: TasksVault, @unchecked Sendable {
     var text: String
     var writeFails = false
     var readFails: VaultError?
