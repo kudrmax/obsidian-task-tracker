@@ -503,6 +503,15 @@ public struct MenuProject: Decodable, Hashable, Sendable {
     public let value: String
     /// Only subtasks: the row can't be pressed.
     public let disabled: Bool
+    /// The page's last row, «New project…»: it asks the name (`TaskBoard.newProject`).
+    public let newLabel: String
+}
+
+/// `EntryProject`: the quick entry's Project button and the New Task sheet's Project row: the page, and whether a project
+/// is chosen (the button in the accent).
+public struct EntryProject: Decodable, Hashable, Sendable {
+    public let page: MenuProject
+    public let lit: Bool
 }
 
 /// `RepeatRow`: the Repeat row's value on the right, or the weekdays (0 Monday) lit among the week's letters.
@@ -610,6 +619,8 @@ public struct FullRow: Decodable, Sendable {
 public struct FullTree: Decodable, Sendable {
     public let task: TaskItem
     public let rows: [FullRow]
+    /// The line under the title: the task's project, a subtask's its parent's; nil for none.
+    public let project: ProjectRef?
 }
 
 /// `TaskScreen`: where a task shows, a list or a day.

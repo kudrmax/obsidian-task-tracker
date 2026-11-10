@@ -2,12 +2,48 @@ import type { GroupedList } from "../domain/Lists";
 import { noteTags } from "../domain/NoteTags";
 import { projectKey, projectName, type ProjectZone } from "../domain/Project";
 import type { GroupName } from "../domain/Task";
-import type { GroupingState, ListGrouping, ListSection, ProjectGroup, ProjectNote, ProjectRef, TaskItem } from "./contracts";
+import type { GroupingState, ListGrouping, ListSection, NewProjectNote, ProjectGroup, ProjectNote, ProjectRef, TaskItem } from "./contracts";
+import { linkedNotes, type VaultNote } from "./notes";
 import type { ListPlace } from "./nesting";
+import { CALENDAR_SOURCES, calendarPath } from "./calendarFile";
+import type { TaskCalendarSettings } from "../settings";
 import { groupKeyOf, type ListGroup, listView, projectSection, sectionId, withEmptySections } from "./sections";
 
 /** The title of the group of tasks without a project. */
 export const NO_PROJECT = "No project";
+
+/** What a file's name and a link may not hold in Obsidian: the path's and the link's own characters. */
+const NOT_IN_NAME = /[\\/:*?"<>|#^[\]]/g;
+
+/** The files the plugin keeps in the vault by its settings: the tasks file and the calendars' files. Never a project's note. */
+export function pluginFiles(settings: TaskCalendarSettings): readonly string[] {
+	return [settings.tasksFile, ...CALENDAR_SOURCES.map((source) => calendarPath(source, settings))];
+}
+
+function fileName(path: string): string {
+	return (path.split("/").pop() ?? path).replace(/\.[^.]*$/, "");
+}
+
+/**
+ * The note «New project…» named `typed` writes: the vault's note of that name (case aside) when it has one, else a new
+ * one at the vault's root; null for a name of nothing once what a file's name may not hold is left out, and for the
+ * name of a file the plugin owns (`owned`, `pluginFiles`), which is never tagged nor shadowed by a note of its name.
+ */
+export function newProjectNote(typed: string, notes: readonly VaultNote[], owned: readonly string[] = []): NewProjectNote | null {
+	const name = typed.replace(NOT_IN_NAME, "").replace(/\s+/g, " ").trim().replace(/^\.+/, "").trim();
+	if (name === "") return null;
+	if (owned.some((path) => projectKey(fileName(path)) === projectKey(name))) return null;
+	const found = linkedNotes(notes.filter((note) => /\.md$/i.test(note.path)))
+		.filter((note) => projectKey(note.name) === projectKey(name))
+		.sort((a, b) => a.path.split("/").length - b.path.split("/").length || (a.path < b.path ? -1 : 1))[0];
+	if (found) return { name: found.name, path: found.path, link: found.link, exists: true };
+	return { name, path: `${name}.md`, link: name, exists: false };
+}
+
+/** The project a note «New project…» wrote is, as the screens show it. */
+export function newProjectRef(note: NewProjectNote): ProjectRef {
+	return { name: note.name, link: note.link, note: note.path, canOpenNote: true, mark: true };
+}
 
 /** The lists that may group their tasks by project, and whether they do until a device says otherwise. */
 const GROUPING_DEFAULTS: Readonly<Record<GroupedList, boolean | null>> = { backlog: true, soon: false, inbox: null, now: null };
@@ -139,15 +175,16 @@ export interface GroupingInput {
 }
 
 /**
- * A list's grouping: off, none; on, a group for each project with tasks there (in Backlog for every project note too,
- * empty ones drawing «No tasks»), by name, then No project (outside Backlog only with a task or an empty section). Inside a group its tasks without a section, then its sections
+ * A list's grouping: off, none; on, a group for every project note and every other project with tasks there (an empty
+ * one drawing «No tasks», so a task or the plus can be dropped in it), by name, then No project (outside Backlog only
+ * with a task or an empty section). Inside a group its tasks without a section, then its sections
  * in file order; the list's empty sections only in No project.
  */
 export function listGrouping({ list, items, sections, projects, state }: GroupingInput): ListGrouping {
 	const on = groupingOn(state, list);
 	if (!on) return { canGroup: canGroup(list), on, groups: [] };
 	const refs = new Map<string, ProjectRef>();
-	if (list === "backlog") for (const ref of projects.known()) refs.set(projectKey(ref.name), ref);
+	for (const ref of projects.known()) refs.set(projectKey(ref.name), ref);
 	for (const item of items) if (item.project && !refs.has(projectKey(item.project.name))) refs.set(projectKey(item.project.name), item.project);
 	const named = byName([...refs.values()]).map((ref) => groupOf(list, projectKey(ref.name), ref, items.filter((item) => item.project !== null && projectKey(item.project.name) === projectKey(ref.name)), sections, state, false));
 	const loose = items.filter((item) => item.project === null);

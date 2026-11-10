@@ -48,13 +48,13 @@ import { DIVIDER_SNAP, dividerAt, LIST_WIDTHS, listShareOf, listWidths } from ".
 import { type LinkQuery, linkQuery, noteOfLink, noteSuggestions, type VaultNote, withNoteLink } from "./notes";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, type Header, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
-import { emptySession, type EntryJob, type EntryLook, type EntrySession, type EntryState, type PendingRename, QuickEntry } from "./QuickEntry";
+import { emptySession, entryProject, type EntryJob, type EntryLook, type EntrySession, type EntryState, type PendingRename, QuickEntry } from "./QuickEntry";
 import { sectionNameEnd } from "./SectionNameEntry";
 import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
-import { projectNotesOfTexts, revealedGrouping, withFoldToggled, withGrouping } from "./projects";
-import { noteTags } from "../domain/NoteTags";
+import { newProjectNote, pluginFiles, projectNotesOfTexts, revealedGrouping, withFoldToggled, withGrouping } from "./projects";
+import { noteTags, withProjectTag } from "../domain/NoteTags";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -384,8 +384,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	createInList: (c, [date, text]) => c.run(c.writes.createInList(date as string, text as string)),
 	createInSoon: (c, [text]) => c.run(c.writes.createInSoon(text as string)),
 	createAtTime: (c, [date, start, text]) => c.run(c.writes.createAtTime(date as string, start as number, text as string)),
-	createInPlace: (c, [text, priority, place, repeat, labels]) => c.run(c.writes.createInPlace(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A)),
-	createWithId: (c, [text, priority, place, repeat, labels]) => c.run(c.writes.createWithId(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A)),
+	createInPlace: (c, [text, priority, place, repeat, labels, project]) => c.run(c.writes.createInPlace(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A, project as string | null | undefined)),
+	createWithId: (c, [text, priority, place, repeat, labels, project]) => c.run(c.writes.createWithId(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A, project as string | null | undefined)),
 	create: (c, [draft, slot]) => c.run(c.writes.create(draft as A, (slot ?? undefined) as A)),
 	createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent as A, draft as A)),
 	edit: (c, [key, draft]) => c.run(c.writes.edit(key as A, draft as A)),
@@ -459,8 +459,11 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	},
 };
 
-/** The TaskService methods the door leaves to the host: it is the host that watches its files. */
-export const HOST_TASK_METHODS: readonly string[] = ["onChange"];
+/**
+ * The TaskService methods the door leaves to the host: it is the host that watches its files, and that writes a project's
+ * note (`notes.newProject` names it, `notes.projectText` gives its text, then `tasks.setProject`).
+ */
+export const HOST_TASK_METHODS: readonly string[] = ["onChange", "newProject"];
 
 function boundaryOf(c: Call): DayBoundary {
 	return c.rules.moment().boundary;
@@ -669,14 +672,17 @@ const CAPTURE_LISTS: readonly GroupedList[] = ["inbox", "now", "soon", "backlog"
 /**
  * A task typed or spoken on the phone, last in `list` as the plugin's quick entry puts it: the words typed, then the
  * recording's link and its tag (`captureTitle`). Nothing of either is `blank`; a title of only a priority is written,
- * unlike the plugin's `createInPlace`: the phone's capture writes what it was told.
+ * unlike the plugin's `createInPlace`: the phone's capture writes what it was told. `project`, the New Task sheet's
+ * Project (`ProjectRef.link`): the task gets it, still last in its list; none when left out or null.
  */
 const CAPTURE: Readonly<Record<string, Handler>> = {
-	add: (c, [list, typed, recording, tag]) => {
+	add: (c, [list, typed, recording, tag, project]) => {
 		const title = captureTitle({ typed: typed as string, recording: (recording ?? null) as string | null, tag: (tag ?? "") as string });
 		if (title === "") throw new DoorError("blank", "the task has no title");
-		c.write((text) => c.rules.change(text, c.rules.placeNew(title, null, { kind: "list", list: list as GroupedList, group: null, before: null })).text);
+		c.write((text) => c.rules.change(text, c.rules.placeNew(title, null, { kind: "list", list: list as GroupedList, group: null, before: null }, null, [], (project ?? null) as string | null)).text);
 	},
+	/** The New Task sheet's Project row for the project chosen (null: none; at the start, the view's `ScreenView.project`): the quick entry's Project button, its page and whether it is lit. */
+	project: (c, [chosen]) => entryProject((chosen ?? null) as string | null, c.reads.projectNotes()),
 	lists: (c) => CAPTURE_LISTS.map((list) => ({ list, name: c.settings.sections[list] })),
 };
 
@@ -816,6 +822,7 @@ const ENTRY_METHODS: readonly string[] = [
 	"setLabels",
 	"toggleLabel",
 	"setRepeat",
+	"setProject",
 	"indent",
 	"toggleSection",
 	"enter",
@@ -875,6 +882,10 @@ const NOTES: Readonly<Record<string, Handler>> = {
 	suggest: (_c, [query, notes, limit]) => noteSuggestions(query as string, notes as VaultNote[], (limit ?? undefined) as number | undefined),
 	insert: (_c, [text, at, link]) => withNoteLink(text as string, at as LinkQuery, link as string),
 	open: (_c, [target, notes]) => noteOfLink(target as string, notes as VaultNote[]),
+	/** «New project…» named `name`: the note to write among the vault's `notes`, the one of that name or a new one at the root; null for a name of nothing. */
+	newProject: (c, [name, notes]) => newProjectNote(name as string, (notes ?? []) as VaultNote[], pluginFiles(c.settings)),
+	/** The project note's text with the settings' project tag in its properties: `text`, the note's as read (null: a new note); unchanged when it has the tag. */
+	projectText: (c, [text]) => withProjectTag((text ?? null) as string | null, c.settings.projectTag),
 };
 
 const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {

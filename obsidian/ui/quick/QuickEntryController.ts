@@ -31,7 +31,7 @@ const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox", "backlog"];
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: QuickEntryTasks & Pick<TaskService, "listName" | "placementTitle">;
+	readonly tasks: QuickEntryTasks & Pick<TaskService, "listName" | "placementTitle" | "projectNotes" | "newProject">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
@@ -179,6 +179,9 @@ export class QuickEntryController {
 			onLabel: (name) => this.entry.toggleLabel(name),
 			onPlace: (placement) => void this.moveTo(placement),
 			onRepeat: (rule) => this.entry.setRepeat(rule),
+			onProject: (link) => this.entry.setProject(link),
+			onNewProject: (name) => void this.newProject(name),
+			onNameEnd: () => this.field?.refocus(),
 		});
 		deps.root.ownerDocument.addEventListener("click", this.tapAway, true);
 		deps.root.ownerDocument.addEventListener("pointerdown", this.pressed, true);
@@ -395,8 +398,9 @@ export class QuickEntryController {
 
 	/** The plus came to rest: the field opens where it landed, in a list or in a slot of the timeline. */
 	/** The service as the session writes through it, each task the field writes told to the lists by the id the write answers: its card takes the typed text's row. */
-	private telling(tasks: QuickEntryTasks): QuickEntryTasks {
+	private telling(tasks: QuickEntryControllerDeps["tasks"]): QuickEntryTasks {
 		return {
+			projectNotes: () => tasks.projectNotes(),
 			placementOf: (...a) => tasks.placementOf(...a),
 			placementOfDay: (...a) => tasks.placementOfDay(...a),
 			dayOfPlacement: (...a) => tasks.dayOfPlacement(...a),
@@ -679,7 +683,17 @@ export class QuickEntryController {
 	 */
 	private blurred(handle: QuickFieldHandle): void {
 		window.setTimeout(() => {
-			if (this.field === handle && this.state && !handle.focused) this.entry.blur();
+			if (this.field === handle && this.state && !handle.focused && !this.bar.typing) this.entry.blur();
 		});
+	}
+
+	/** «New project…» on the bar: the note made or tagged (`TaskService.newProject`, no task yet), then the field's project. */
+	private async newProject(name: string): Promise<void> {
+		try {
+			const project = await this.deps.tasks.newProject(name, []);
+			if (project && this.state) this.entry.setProject(project.link);
+		} catch (error) {
+			this.deps.onError(error);
+		}
 	}
 }

@@ -19,5 +19,5 @@ export function fullTree(task: TaskItem): FullTree {
 	const subtasks = unfolded(task.allSubtasks);
 	const rows: FullRow[] = [];
 	rowsOf(subtasks, 0, rows);
-	return { task, subtasks, rows, newSubtask: { index: rows.length, level: 0 } };
+	return { task, subtasks, rows, newSubtask: { index: rows.length, level: 0 }, project: task.project };
 }

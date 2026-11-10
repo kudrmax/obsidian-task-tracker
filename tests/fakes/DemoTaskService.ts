@@ -415,6 +415,10 @@ export class DemoTaskService implements TaskService {
 		return [];
 	}
 
+	async newProject(): Promise<null> {
+		return null;
+	}
+
 	async setGrouping(): Promise<void> {}
 
 	async toggleFold(): Promise<void> {}

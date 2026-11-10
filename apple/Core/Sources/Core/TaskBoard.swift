@@ -61,12 +61,16 @@ public final class TaskBoard: @unchecked Sendable {
     private var projectTag: (settings: String, tag: String)?
     /// The vault's files, for the `[[` search and a title's links.
     private let fileList = VaultFileList()
+    /// The time a call that is handed none is made at: a write's rules (a postpone, a day's roll) read the same day the
+    /// screen was drawn for.
+    private let clock: @Sendable () -> Date
 
     /// `pure`: a second core for the pure rules a screen asks in the same frame; the reading core when none is given.
     /// `preview`: a third for the drops' previews, worked out off the main thread; the pure one when none is given.
     /// `grouping`: where the device keeps how it groups its lists by project; `projects`: who finds the project notes.
-    public init(core: PhoneCore, vault: TasksVault, pure: PhoneCore? = nil, preview: PhoneCore? = nil, grouping: DeviceText = MemoryText(), projects: ProjectSource? = nil) {
+    public init(core: PhoneCore, vault: TasksVault, pure: PhoneCore? = nil, preview: PhoneCore? = nil, grouping: DeviceText = MemoryText(), projects: ProjectSource? = nil, clock: @escaping @Sendable () -> Date = { Date() }) {
         self.core = core
+        self.clock = clock
         self.pure = pure ?? core
         self.previewing = preview ?? pure ?? core
         self.vault = vault
@@ -75,7 +79,8 @@ public final class TaskBoard: @unchecked Sendable {
     }
 
     /// The vault's files as they are now.
-    public func files(now: Date = Date()) throws -> BoardFiles {
+    public func files(now: Date? = nil) throws -> BoardFiles {
+        let now = now ?? clock()
         let settings = vault.settingsJSON()
         // The file and the count of writes are read together: never a text a write just made with the count from before it.
         fileLock.lock()
@@ -114,24 +119,24 @@ public final class TaskBoard: @unchecked Sendable {
     }
 
     /// The settings alone, for a call that reads no file (a task's menu).
-    public func settingsOnly(now: Date = Date()) -> BoardFiles {
-        BoardFiles(tasks: nil, settingsJSON: vault.settingsJSON(), calendars: [:], now: now)
+    public func settingsOnly(now: Date? = nil) -> BoardFiles {
+        BoardFiles(tasks: nil, settingsJSON: vault.settingsJSON(), calendars: [:], now: now ?? clock())
     }
 
     /// A pure rule (`rules.*`) on its own context: made over no file, never waiting for a read on another thread.
     public func rule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], as type: T.Type = T.self) throws -> T {
-        try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: Date()), on: pure).result.decode(T.self)
+        try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: clock()), on: pure).result.decode(T.self)
     }
 
     /// A pure rule asked while a drop's preview is drawn, on the previews' context.
     func previewRule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = []) throws -> T {
-        try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: Date()), on: previewing).result.decode(T.self)
+        try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: clock()), on: previewing).result.decode(T.self)
     }
 
     /// A quick entry's call (`entry.*`), on the pure rules' context over the settings as last read: it reads no file, so a
     /// keystroke never waits for a read.
     public func entry(_ method: String, _ arguments: [JSONValue]) throws -> JSONValue {
-        let files = BoardFiles(tasks: nil, settingsJSON: lastSettings(), calendars: [:], now: Date())
+        let files = BoardFiles(tasks: nil, settingsJSON: lastSettings(), calendars: [:], now: clock())
         return try answer("entry." + method, arguments, files, on: pure).result
     }
 
@@ -151,7 +156,7 @@ public final class TaskBoard: @unchecked Sendable {
 
     /// A pure rule asked by a read on its own thread, on the reading core.
     func readRule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], as type: T.Type = T.self) throws -> T {
-        try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: Date())).result.decode(T.self)
+        try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: clock())).result.decode(T.self)
     }
 
     /// A call that may write: the tasks file's new text is written only over the text it was made from; when the file
@@ -201,7 +206,7 @@ public final class TaskBoard: @unchecked Sendable {
     }
 
     public var canUndo: Bool {
-        (try? answer("history.canUndo", [], BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: Date())).result.bool) ?? false
+        (try? answer("history.canUndo", [], BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: clock())).result.bool) ?? false
     }
 
     private struct Answer {
@@ -246,13 +251,18 @@ public final class TaskBoard: @unchecked Sendable {
         if let kept = reply.grouping { grouping.save(kept) }
     }
 
-    /// The project notes for the settings' project tag (`settings.form`), as the context hands them to the door.
-    private func findProjects(_ settings: String) {
-        guard let projects else { return }
+    /// The settings' project tag (`settings.form`).
+    private func tag(of settings: String) -> String {
         lock.lock()
         let known = projectTag?.settings == settings ? projectTag?.tag : nil
         lock.unlock()
-        let tag = known ?? ((try? core.call("settings.form", [], context: DoorContext(tasks: nil, settingsJSON: settings, now: Date())).result as? [String: Any])?["projectTag"] as? String) ?? ""
+        return known ?? ((try? core.call("settings.form", [], context: DoorContext(tasks: nil, settingsJSON: settings, now: clock())).result as? [String: Any])?["projectTag"] as? String) ?? ""
+    }
+
+    /// The project notes for the settings' project tag, as the context hands them to the door.
+    private func findProjects(_ settings: String) {
+        guard let projects else { return }
+        let tag = tag(of: settings)
         let notes = projects.notes(tag: tag)
         let json = try? String(decoding: JSONEncoder().encode(notes), as: UTF8.self)
         lock.lock()
@@ -274,6 +284,35 @@ public final class TaskBoard: @unchecked Sendable {
     }
 
     // MARK: Notes
+
+    /// «New project…» named `name` (`docs/door.md`, `notes.newProject`): the note written through the vault, coordinated, at
+    /// its root, or the note of that name given the project tag; the project notes looked at again at once. The project's
+    /// link, for `tasks.setProject`, `entry.setProject` or the New Task sheet; nil for a name of nothing: nothing written.
+    public func newProject(_ name: String) throws -> String? {
+        // The vault listed now: a note that came by Sync since the last listing is that note, never a new one over it.
+        fileList.forget()
+        let found: NewProjectNote? = try rule("notes.newProject", [.string(name), fileList.all(vault)])
+        guard let note = found else { return nil }
+        // A note that is there but can't be read now is left alone: its text taken for none would be written over.
+        let old = note.exists ? try vault.readNote(path: note.path) : nil
+        let settings = vault.settingsJSON()
+        let text = try answer("notes.projectText", [old.json], settingsOnly()).result.decode(String.self)
+        if let old {
+            if text != old { try vault.write(path: note.path, text: text) }
+        } else {
+            try vault.create(path: note.path, text: text)
+        }
+        fileList.forget()
+        projects?.written(ProjectNote(name: note.name, path: note.path, link: note.link), tag: tag(of: settings))
+        findProjects(settings)
+        return note.link
+    }
+
+    /// The New Task sheet's Project row for the project chosen (`capture.project`): its page and whether one is lit.
+    public func captureProject(_ chosen: String?) throws -> EntryProject {
+        findProjects(vault.settingsJSON())
+        return try answer("capture.project", [chosen.json], settingsOnly()).result.decode(EntryProject.self)
+    }
 
     /// The `[[` the caret (UTF-16 offset) stands in, typed in a title; `nil` for none.
     public func linkQuery(in text: String, caret: Int) throws -> LinkQuery? {

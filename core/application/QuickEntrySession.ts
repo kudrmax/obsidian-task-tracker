@@ -5,7 +5,7 @@ import type { DropColumn, DropTo, NewTaskPlace, ProjectZone, TaskItem, TaskKey, 
 import type { ListCard, ListPlace } from "./nesting";
 import { type EntryDrawing, type EntryJob, type EntryLook, type EntrySpot, type EntryState, type EntryTasks, type ListEntry, type PendingRename, type PlaceMove, QuickEntry, type StackEntry } from "./QuickEntry";
 
-export { ENTRY_PLACES, type EntryAt, type EntryDrawing, type EntrySpot, type EntryState, type ListEntry, type PendingRename, type PendingText, type PlaceChoice, type PlaceMove, type StackAt, type StackEntry } from "./QuickEntry";
+export { ENTRY_PLACES, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry, type PendingRename, type PendingText, type PlaceChoice, type PlaceMove, type StackAt, type StackEntry } from "./QuickEntry";
 
 /** What the session reads from the service: the marks, the places and the writes. */
 export type QuickEntryTasks = EntryTasks & Pick<TaskService, "createWithId" | "createSection" | "edit">;
@@ -128,6 +128,11 @@ export class QuickEntrySession {
 
 	setRepeat(rule: RepeatRule | null): void {
 		this.entry.setRepeat(rule);
+	}
+
+	/** A project picked on the bar's Project button (null: No project): kept by the field, as its labels are. */
+	setProject(link: string | null): void {
+		this.entry.setProject(link);
 	}
 
 	indent(delta: 1 | -1): void {

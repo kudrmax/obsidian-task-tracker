@@ -3,7 +3,7 @@ import { CALENDAR_SOURCES } from "./calendarFile";
 import type { CalendarService, CalendarSource, DayService, TaskService, UndoService, WorkCalendarSetup } from "./contracts";
 import { DayServiceImpl } from "./DayServiceImpl";
 import type { EventFeed, EventFile } from "./EventSource";
-import type { Clock, GroupingStore, Projects, SettingsStore, TaskFileStore, Ticker, Timers } from "./ports";
+import type { Clock, GroupingStore, NoteFiles, Projects, SettingsStore, TaskFileStore, Ticker, Timers } from "./ports";
 import { TaskServiceImpl } from "./TaskServiceImpl";
 import { UndoHistory } from "./UndoHistory";
 import { TaskIdentity } from "./TaskIdentity";
@@ -27,6 +27,8 @@ export interface CorePorts {
 	readonly projects?: Projects;
 	/** How this device groups its lists by project; kept in memory when left out. */
 	readonly grouping?: GroupingStore;
+	/** The vault's notes as files, which «New project…» writes; none when left out (it then throws). */
+	readonly notes?: NoteFiles;
 }
 
 /** The services every frontend talks to. */
@@ -41,7 +43,7 @@ export interface Core {
 export function composeCore(ports: CorePorts): Core {
 	const identity = new TaskIdentity();
 	const undo = new UndoHistory(ports.tasksFile, identity);
-	const tasks = new TaskServiceImpl(ports.tasksFile, ports.settings, ports.clock, undo, ports.projects, ports.grouping, identity);
+	const tasks = new TaskServiceImpl(ports.tasksFile, ports.settings, ports.clock, undo, ports.projects, ports.grouping, identity, ports.notes);
 	const files = CALENDAR_SOURCES.map((source) => ports.calendarFiles[source]);
 	return {
 		tasks,

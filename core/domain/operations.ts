@@ -297,11 +297,11 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 	const unsorted = isUndated(section);
 	if (entry === null) {
 		const { text, ...marks } = typed(doc, draft.text, draft.priority, draft.labels ?? []);
-		return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : (slot ?? null), ...marks }), draft, today, boundary));
+		return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : (slot ?? null), ...marks, project: draft.project ?? null }), draft, today, boundary));
 	}
 	if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
 	const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-	const changed = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) };
+	const changed = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}), ...(draft.project !== undefined && { project: draft.project }) };
 	const edited = doc.replace(entry, withDraftRepeat(changed, draft, today, boundary));
 	if (same || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
@@ -424,20 +424,25 @@ export type CreatePlace =
 	| { kind: "subtask"; parent: TaskEntry; before: TaskEntry | null }
 	| { kind: "slot"; slot: Slot; project?: ProjectZone };
 
-/** A new task at `place`; `repeat` is set as `setRepeat` sets it, on a task or a subtask; a slot takes none. A priority, chosen or typed, or `labels`: not both. */
-export function createInPlace(doc: TaskDocument, typedText: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary, repeat?: RepeatRule | null, labels: readonly string[] = []): TaskDocument {
+/**
+ * A new task at `place`; `repeat` is set as `setRepeat` sets it, on a task or a subtask; a slot takes none. A priority,
+ * chosen or typed, or `labels`: not both. `own`, the task's project whatever the place's (which then only places it); a
+ * subtask takes none.
+ */
+export function createInPlace(doc: TaskDocument, typedText: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary, repeat?: RepeatRule | null, labels: readonly string[] = [], own?: string | null): TaskDocument {
 	const { text, ...marks } = typed(doc, typedText, priority, labels);
+	const projectOf = (zone: ProjectZone | undefined): string | null => (own !== undefined ? own : (zone ?? null));
 	switch (place.kind) {
 		case "subtask":
 			return intoUnfolded(doc, place.parent, (d, same) =>
 				d.insertUnder(same(place.parent), withRepeat(newTask(text, marks), repeat, today, boundary), place.before && same(place.before)),
 			);
 		case "slot":
-			return createInSlot(doc, place.slot, text, { ...marks, project: place.project ?? null }, today, boundary);
+			return createInSlot(doc, place.slot, text, { ...marks, project: projectOf(place.project) }, today, boundary);
 		case "list": {
 			const { list, before, project } = place;
 			const dueDate = list === "now" ? (place.date ?? today) : enteringList(list, today, place.date).dueDate;
-			const task = withRepeat(newTask(text, { dueDate, ...marks, project: project ?? null }), repeat, today, boundary);
+			const task = withRepeat(newTask(text, { dueDate, ...marks, project: projectOf(project) }), repeat, today, boundary);
 			if (place.section !== undefined) return intoNewSection(doc, list, place.group, place.section, task, place.date, today, boundary, project ?? null);
 			const position = project === undefined || (before !== null && before.section === list) ? positionIn(doc, list, place.group, before) : afterProject(doc, list, place.group, project, place.date, today, boundary, null);
 			return doc.insert(list, position, task);

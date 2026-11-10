@@ -93,12 +93,13 @@ describe("Backlog grouped by project", () => {
 		]);
 	});
 
-	it("Soon grouped shows only the projects with tasks there; a fold is kept and counted", async () => {
+	it("Soon grouped shows every project, as Backlog (projects polish, point 5); a fold is kept and counted", async () => {
 		const { svc } = setup();
 		await svc.setGrouping("soon", true);
 		await svc.toggleFold("soon", "окружение");
 		const { projects } = await svc.screen(T);
 		expect(projects.soon.groups.map((g) => [g.title, g.folded, g.count])).toEqual([
+			["Английский", false, 0],
 			["Окружение", true, 1],
 			[NO_PROJECT, false, 1],
 		]);

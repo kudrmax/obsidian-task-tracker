@@ -1,4 +1,5 @@
 import type { GroupName, MenuProject, MenuSections } from "../../../core/application/contracts";
+import { GroupNameField } from "../GroupNameField";
 import { backRow, menuGroup, menuRow } from "./MenuPanel";
 
 export interface SectionChooserSpec {
@@ -25,13 +26,33 @@ export interface ProjectChooserSpec {
 	onBack(): void;
 	/** A project's link, null for No project. */
 	onPick(link: string | null): void;
+	/** «New project…», which asks for the name (`projectNamePage`). */
+	onNew(): void;
 }
 
-/** The Project page: the way back, the projects the model offers by name, the one the tasks have checked, No project last. */
-export function projectChooser(panel: HTMLElement, spec: ProjectChooserSpec): void {
-	const { options, none, noneLabel } = spec.project;
-	backRow(panel, "Project", () => spec.onBack());
+/**
+ * The Project page: the way back (none on the quick bar's panel, which is the page itself), the projects the model offers by
+ * name, the one the tasks have checked, No project last; «New project…» apart under them, as New section is.
+ */
+export function projectChooser(panel: HTMLElement, spec: ProjectChooserSpec & { readonly back?: boolean }): void {
+	const { options, none, noneLabel, newLabel } = spec.project;
+	if (spec.back !== false) backRow(panel, "Project", () => spec.onBack());
 	const group = menuGroup(panel, []);
 	for (const { project, checked } of options) menuRow(group, { label: project.name, icon: checked ? "check" : undefined, choice: true, onPick: () => spec.onPick(project.link) });
 	menuRow(group, { label: noneLabel, icon: none ? "check" : undefined, choice: true, quiet: true, onPick: () => spec.onPick(null) });
+	menuRow(panel, { label: newLabel, icon: "plus", apart: true, add: true, cls: "tc-new-project", onPick: () => spec.onNew() });
+}
+
+export interface ProjectNameSpec {
+	onBack(): void;
+	/** The name as typed on Enter; null for Escape or a tap elsewhere. Called once. */
+	onDone(name: string | null): void;
+}
+
+/** «New project…»'s page: the way back, then the name typed in a capsule ringed in the accent, the keyboard up, as a section's name is. */
+export function projectNamePage(panel: HTMLElement, spec: ProjectNameSpec): HTMLElement {
+	backRow(panel, "New project", () => spec.onBack());
+	const holder = menuGroup(panel, []);
+	holder.classList.add("tc-project-name");
+	return GroupNameField.open(holder, { value: "", placeholder: "Project name", onDone: (name) => spec.onDone(name) });
 }

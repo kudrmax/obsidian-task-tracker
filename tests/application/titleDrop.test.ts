@@ -77,15 +77,15 @@ describe("a drop on a column's title", () => {
 		]);
 	});
 
-	it("Backlog to grouped Soon with no group of that project there: the project's group appears", async () => {
+	it("Backlog to grouped Soon where the project has no task: into its empty group (projects polish, point 5)", async () => {
 		const { svc, store } = setup(FILE.replace("- [ ] S1 🗂️ [[A]]\n\t- [ ] S1a\n", ""));
 		await svc.setGrouping("soon", true);
 		const screen = await svc.screen(T);
-		expect(screen.projects.soon.groups.map((g) => g.title)).not.toContain("A");
+		expect(screen.projects.soon.groups.find((g) => g.title === "A")?.count).toBe(0);
 		const ba1 = screen.backlog.find((t) => t.text === "BA1")!;
 		await svc.drop([{ key: ba1.key, from: "backlog" }], screen.titleDrops.soon, T);
 		expect(list(store.text!, "## Soon")).toEqual(["- [ ] S2 🗂️ [[B]]", "- [ ] S3", "- [ ] BA1 🗂️ [[A]]"]);
-		expect((await svc.screen(T)).projects.soon.groups.map((g) => g.title)).toContain("A");
+		expect((await svc.screen(T)).projects.soon.groups.find((g) => g.title === "A")?.count).toBe(1);
 	});
 
 	it("an ungrouped list: the end of the list's part without a section, the project kept", async () => {

@@ -188,6 +188,8 @@ final class BoardModel {
     var dateFor: [TaskItem]?
     var repeatFor: TaskItem?
     var newSection: TaskItem?
+    /// «New project…» picked on a Project page: the alert asks the name for these tasks or for the quick entry's field.
+    var newProjectFor: NewProjectAsk?
     var fullScreen: [TaskItem] = []
     /// The full screen opened by Description (Add description): its page opens with the caret in the description.
     var describing: String?
@@ -848,6 +850,35 @@ final class BoardModel {
         endSelection()
     }
 
+    /// «New project…» on a Project page: the name is asked; the quick entry's field keeps its keyboard's place meanwhile.
+    func askNewProject(_ target: NewProjectAsk.Target) {
+        if case .entry = target { entry.paused = true }
+        newProjectFor = NewProjectAsk(target: target)
+    }
+
+    /// The name asked for «New project…»: its note written (`TaskBoard.newProject`), then the project given to the tasks or
+    /// the field; a name of nothing, or Cancel (`name` nil), changes nothing.
+    func newProject(_ name: String?, for target: NewProjectAsk.Target) async {
+        defer { if case .entry = target { entry.resume() } }
+        guard let name else { return }
+        let board = board
+        let link: String?
+        do {
+            link = try await Task.detached { try board.newProject(name) }.value
+        } catch {
+            problem = Self.words(error)
+            return
+        }
+        guard let link else { return }
+        switch target {
+        case .tasks(let items): await setProject(items, link)
+        case .entry:
+            // The lists are drawn with the new project's group first: a list grouped by project takes the field to its end.
+            await reload()
+            entry.setProject(link)
+        }
+    }
+
     /// Apple's Calendar at an event, as the plugin opens it on the iPhone (`calshow:`, seconds from 2001): at its start.
     func openInCalendar(_ event: WireEvent) {
         let start = Date(timeIntervalSince1970: event.startMs / 1000)
@@ -893,10 +924,21 @@ final class BoardModel {
         let frame: CGRect
     }
 
+    /// The project's own view. Inside a project's view, its own project stays (nothing to open) and another one takes the
+    /// view's place, through the screen under it (`openOther`).
     func openProject(_ project: ProjectRef) {
-        guard self.project == nil else { return }
-        projectShown = ShownProject(project: project)
+        guard let own = self.project else { return projectShown = ShownProject(project: project) }
+        if !isOwnProject(project, own) { openOther?(project) }
     }
+
+    /// The project is this view's own: the same note, as the core names it in both (its link).
+    func isOwnProject(_ project: ProjectRef, _ own: ProjectRef? = nil) -> Bool {
+        guard let own = own ?? snapshot?.screen.project ?? self.project else { return false }
+        return project.link == own.link
+    }
+
+    /// A project's view asks the screen under it to show another project in its place.
+    @ObservationIgnored var openOther: ((ProjectRef) -> Void)?
 
     /// A link in a title tapped: an address opens as it is, a note in Obsidian, the file the core resolves it to.
     func openLink(_ part: TextPart) {
@@ -1987,3 +2029,13 @@ extension Array {
     subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
 
+/// «New project…» asked: for which tasks, or for the quick entry's field.
+struct NewProjectAsk: Identifiable {
+    enum Target {
+        case tasks([TaskItem])
+        case entry
+    }
+
+    let id = UUID()
+    let target: Target
+}

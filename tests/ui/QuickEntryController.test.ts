@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import type { LabelLevel, NewTaskPlace, Placement, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../core/application/contracts";
+import type { LabelLevel, NewTaskPlace, Placement, ProjectRef, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../core/application/contracts";
 import type { RightMode } from "../../obsidian/ui/viewSettings";
 import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../obsidian/ui/drag/DropTarget";
 import { GestureArbiter } from "../../obsidian/ui/gestures";
@@ -59,9 +59,11 @@ interface SetUp {
 	drawsOnFresh?: "grows" | "same";
 	/** The labels the settings hold. */
 	labels?: readonly LabelLevel[];
+	/** The project notes the Project page offers. */
+	projects?: readonly ProjectRef[];
 }
 
-function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, drawsOnFresh, sections = false, labels = [] }: SetUp = {}) {
+function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, drawsOnFresh, sections = false, labels = [], projects = [] }: SetUp = {}) {
 	const root = document.createElement("div");
 	document.body.appendChild(root);
 	/** The animation frames asked for, run when the test says. */
@@ -80,7 +82,8 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	let mode = startMode;
 	let day = startDay;
 	const turned: RightMode[] = [];
-	const created: { text: string; priority: string | null; place: NewTaskPlace; repeat?: RepeatRule }[] = [];
+	const created: { text: string; priority: string | null; place: NewTaskPlace; repeat?: RepeatRule; project?: string }[] = [];
+	const newProjects: { name: string; keys: readonly TaskKey[] }[] = [];
 	const edits: { key: TaskKey; draft: TaskDraft }[] = [];
 	const beginNew = vi.fn<(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => void) => boolean>(() => true);
 	/** Each write waits for the lists to catch up; held, the test says when they have. */
@@ -124,8 +127,13 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	controller = new QuickEntryController({
 		root,
 		tasks: {
-			createWithId: async (text, priority, place, repeat) => {
-				created.push({ text, priority, place, ...(repeat ? { repeat } : {}) });
+			projectNotes: () => projects,
+			newProject: async (name, keys) => {
+				newProjects.push({ name, keys });
+				return { name, link: name, note: `${name}.md`, canOpenNote: true, mark: true };
+			},
+			createWithId: async (text, priority, place, repeat, _labels, project) => {
+				created.push({ text, priority, place, ...(repeat ? { repeat } : {}), ...(project ? { project } : {}) });
 				if (drawsOnFresh !== "grows") return null;
 				const added = item(text, key("now", (items.day ?? []).length));
 				(items.day ??= []).push(added);
@@ -220,6 +228,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		type,
 		press,
 		created,
+		newProjects,
 		edits,
 		beginNew,
 		drops,
@@ -444,6 +453,38 @@ describe("QuickEntryController", () => {
 		expect(field()!.dataset.priority).toBe("red");
 		const label = tile(document.body, "Важное") as HTMLButtonElement;
 		expect([label.classList.contains("is-on"), label.disabled]).toEqual([false, true]);
+	});
+
+	describe("the Project button", () => {
+		const KNOWN: readonly ProjectRef[] = [
+			{ name: "Дружба", link: "Дружба", note: "Дружба.md", canOpenNote: true, mark: true },
+			{ name: "Окружение", link: "Окружение", note: "Окружение.md", canOpenNote: true, mark: true },
+		];
+		const rows = () => [...document.querySelectorAll<HTMLButtonElement>(".tc-quick-panel .tc-menu-row")];
+
+		it("offers the project notes the service has, and the task typed after a pick is written with that project", async () => {
+			const { controller, root, type, press, created } = setUp({ projects: KNOWN });
+			controller.openAtEnd("inbox");
+			root.querySelector<HTMLElement>(".tc-bar-project")!.click();
+			expect(rows().map((row) => row.textContent)).toEqual(["Дружба", "Окружение", "No project", "New project…"]);
+			rows()[1].click();
+			expect(root.querySelector<HTMLElement>(".tc-bar-project")!.classList.contains("is-set")).toBe(true);
+			type("Позвонить");
+			press("Enter");
+			await vi.waitFor(() => expect(created).toEqual([expect.objectContaining({ text: "Позвонить", project: "Окружение" })]));
+		});
+
+		it("New project… makes the note with no task yet, and the field takes that project", async () => {
+			const { controller, root, newProjects } = setUp({ projects: KNOWN });
+			controller.openAtEnd("inbox");
+			root.querySelector<HTMLElement>(".tc-bar-project")!.click();
+			rows()[3].click();
+			const input = document.querySelector<HTMLInputElement>(".tc-quick-panel .tc-group-input")!;
+			input.value = "Ремонт";
+			input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+			await vi.waitFor(() => expect(newProjects).toEqual([{ name: "Ремонт", keys: [] }]));
+			await vi.waitFor(() => expect(root.querySelector<HTMLElement>(".tc-bar-project")!.classList.contains("is-set")).toBe(true));
+		});
 	});
 
 	it("shows the bar while the field is open, and puts the switch away", () => {
@@ -1088,7 +1129,7 @@ describe("QuickEntryController", () => {
 				stackEl.className = "tc-menu-subtasks";
 				const source = stackEl.appendChild(document.createElement("div"));
 				source.className = "tc-card";
-				return TaskMenu.open({ item: sub, source, today: TODAY, day: TODAY, menu: (it) => taskMenu([it], TODAY, [], [], null), actions: { setRepeat: async () => {}, pickStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setProject: async () => {}, togglePriority: async () => {}, toggleLabel: async () => null, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
+				return TaskMenu.open({ item: sub, source, today: TODAY, day: TODAY, menu: (it) => taskMenu([it], TODAY, [], [], null), actions: { setRepeat: async () => {}, pickStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setProject: async () => {}, newProject: async () => {}, togglePriority: async () => {}, toggleLabel: async () => null, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
 			};
 			const menuField = () => document.querySelector<HTMLTextAreaElement>(".tc-menu-field textarea.tc-quick-field");
 
@@ -1142,7 +1183,7 @@ describe("QuickEntryController", () => {
 				const source = document.body.appendChild(document.createElement("div"));
 				source.className = "tc-block";
 				source.getBoundingClientRect = () => at;
-				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, menu: (it) => taskMenu([it], TODAY, [], [], null), actions: { setRepeat: async () => {}, pickStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setProject: async () => {}, togglePriority: async () => {}, toggleLabel: async () => null, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
+				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, menu: (it) => taskMenu([it], TODAY, [], [], null), actions: { setRepeat: async () => {}, pickStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setProject: async () => {}, newProject: async () => {}, togglePriority: async () => {}, toggleLabel: async () => null, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
 			};
 			const stack = () => [...document.querySelectorAll<HTMLElement>(".tc-menu-subtasks > *")].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent));
 

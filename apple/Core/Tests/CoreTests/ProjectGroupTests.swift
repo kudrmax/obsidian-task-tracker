@@ -159,7 +159,9 @@ final class FakeFolder: NoteFolder, @unchecked Sendable {
         try board.group("tasks.toggleFold", ["backlog", .string(Self.friends.lowercased())])
         #expect(kept.load()?.contains("soon") == true)
         let snapshot = try snapshot(board)
-        #expect(snapshot.lists[.soon]?.projects.map(\.title) == [Self.friends, "No project"])
+        // Grouped Soon has every project's group, as Backlog: an empty one is there to take a drop (projects polish, point 5).
+        #expect(snapshot.lists[.soon]?.projects.map(\.title) == ["Health", "Nested", Self.friends, "No project"])
+        #expect(snapshot.lists[.soon]?.projects.first { $0.title == "Health" }?.count == 0)
         let friends = try #require(snapshot.lists[.backlog]?.projects.first { $0.title == Self.friends })
         #expect(friends.folded && friends.count == 2 && friends.sections.isEmpty)
         #expect(snapshot.lists[.backlog]?.cards.contains { $0.item.title == "Club" } == false)

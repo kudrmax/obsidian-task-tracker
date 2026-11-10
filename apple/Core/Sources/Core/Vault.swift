@@ -23,8 +23,24 @@ public enum VaultError: Error, Equatable {
     case tasksFileMissing(String)
     /// The plugin's settings name no tasks file.
     case noTasksFile
+    /// A note that is there could not be read (iCloud still bringing it, Sync writing it): nothing is written over it.
+    case unreadable(String)
+    /// A new note's file is there already (it came while the name was asked): it is never written over.
+    case exists(String)
 
     static let noTasksFileMessage = "No tasks file set in Task Calendar's settings"
+}
+
+extension VaultError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .noAccess: "No access to the vault folder: choose it in the app"
+        case .tasksFileMissing(let path): "No tasks file “\(path)” in the vault folder"
+        case .noTasksFile: Self.noTasksFileMessage
+        case .unreadable(let path): "“\(path)” can't be read right now: nothing was written. Try again once it has synced."
+        case .exists(let path): "“\(path)” appeared in the vault meanwhile: nothing was written. Try again."
+        }
+    }
 }
 
 /// A file of the vault by its path from the vault folder (NFC, as Obsidian names files), and when it last changed.
@@ -56,11 +72,25 @@ public protocol TasksVault: Sendable {
     func save(_ data: Data, in folder: String, named name: String) throws -> String
     /// Every file of the vault but Obsidian's own folder and the trash (hidden ones), by path from its folder.
     func vaultFiles() -> [VaultFile]
+    /// A note that is there, read whole; throws `unreadable` rather than answer nothing, so it is never taken for empty.
+    func readNote(path: String) throws -> String
+    /// A new note, its folder made if missing; throws `exists` when a file is there already, which stays untouched.
+    func create(path: String, text: String) throws
 }
 
 public extension TasksVault {
     /// None where the vault cannot list its files.
     func vaultFiles() -> [VaultFile] { [] }
+
+    func readNote(path: String) throws -> String {
+        guard let text = read(path: path) else { throw VaultError.unreadable(path) }
+        return text
+    }
+
+    func create(path: String, text: String) throws {
+        if read(path: path) != nil { throw VaultError.exists(path) }
+        try write(path: path, text: text)
+    }
 }
 
 /// The Obsidian vault folder the app was given once, read and written through file coordination.
@@ -162,6 +192,30 @@ public final class Vault: TasksVault, NoteFolder, @unchecked Sendable {
 
     public func read(path: String) -> String? {
         try? withFolder { folder in try coordinatedRead(folder.appendingPathComponent(path)) }
+    }
+
+    public func readNote(path: String) throws -> String {
+        do {
+            return try withFolder { folder in try coordinatedRead(folder.appendingPathComponent(path)) }
+        } catch VaultError.noAccess {
+            throw VaultError.noAccess
+        } catch {
+            throw VaultError.unreadable(path)
+        }
+    }
+
+    public func create(path: String, text: String) throws {
+        try withFolder { folder in
+            let file = folder.appendingPathComponent(path)
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            var failure: Error?
+            var coordination: NSError?
+            coordinator().coordinate(writingItemAt: file, options: [], error: &coordination) { url in
+                guard !FileManager.default.fileExists(atPath: url.path) else { return failure = VaultError.exists(path) }
+                do { try Data(text.utf8).write(to: url, options: .withoutOverwriting) } catch { failure = error }
+            }
+            if let error = coordination ?? failure { throw error }
+        }
     }
 
     public func write(path: String, text: String) throws {

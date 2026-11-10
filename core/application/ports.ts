@@ -54,6 +54,26 @@ export interface Projects {
 	onChange(listener: () => void): () => void;
 }
 
+/**
+ * The vault's notes as files, for «New project…»: the plugin's vault; none on a host that writes the note itself (the
+ * phone's door gives the path and the text, the app writes them).
+ */
+export interface NoteFiles {
+	/** Every file's path in the vault. */
+	paths(): readonly string[];
+	read(path: string): Promise<string>;
+	/** `text` into the note at `path`, made when it is not there. */
+	write(path: string, text: string): Promise<void>;
+}
+
+export const NO_NOTE_FILES: NoteFiles = {
+	paths: () => [],
+	read: async () => "",
+	write: async () => {
+		throw new Error("Task Calendar: no vault to write a project note to");
+	},
+};
+
 /** What this device keeps of the lists grouped by project, never synced (the plugin: Obsidian's local storage). */
 export interface GroupingStore {
 	get(): GroupingState;
