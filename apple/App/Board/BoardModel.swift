@@ -161,6 +161,8 @@ final class BoardModel {
                 if let laid = comingLaid, laid.timeline == timeline {
                     laidOut = laid
                     comingLaid = nil
+                } else if let laid = slidingLaid, laid.timeline == timeline, laid.hour == zoom.hour {
+                    laidOut = laid
                 } else {
                     layOutNow(timeline)
                 }
@@ -206,9 +208,27 @@ final class BoardModel {
     @ObservationIgnored private var ahead: [String: BoardSnapshot] = [:]
     @ObservationIgnored private var neighbours: (previous: String, next: String)?
     /// Another day coming in, as the plugin's `DayTrack`: the day read for it and the side it comes from (1: the next).
-    private(set) var dayTurn: DayTurn?
+    private(set) var dayTurn: DayTurn? {
+        didSet { coverHours() }
+    }
     /// How far the day has come in, 0 to 1. Only the parts that read it move: the day's cards in each column.
-    var dayShare: CGFloat = 0
+    var dayShare: CGFloat = 0 {
+        didSet { coverHours() }
+    }
+
+    /// Whose now pill lies over the hours' labels while a day slides: the labels redraw only when this changes.
+    private(set) var pillOver = PillOver.shown
+
+    enum PillOver {
+        case shown, coming, none
+    }
+
+    private func coverHours() {
+        let width = calendarWidth
+        let pill = TimelineGeometry.nowWidth
+        let over: PillOver = dayTurn == nil || dayShare * width < pill ? .shown : (1 - dayShare) * width < pill ? .coming : .none
+        if over != pillOver { pillOver = over }
+    }
     @ObservationIgnored private let daySlide = DaySlide()
 
     struct DayTurn {
@@ -1821,17 +1841,27 @@ final class BoardModel {
         if abs(Double(hour) - CardMetrics.timeline.hour) < 0.5 { return timeline.slots }
         if let laid = comingLaid, laid.timeline == timeline, laid.hour == hour { return laid.slots }
         let laid = laidOut.flatMap { $0.timeline == timeline ? $0 : nil }
-        if laid?.hour != hour { layOut(timeline, hour: hour) }
+        // Only the calendar the board draws is laid out: a view still holding the day a turn left (drawn once more in the
+        // turn's own transaction) asks for a stack that, come back, would replace the new day's and slide it in again.
+        if laid?.hour != hour, timeline == drawing?.timeline { layOut(timeline, hour: hour) }
         guard let laid else { return Self.scaled(timeline.slots, from: CGFloat(CardMetrics.timeline.hour), to: hour) }
         return laid.hour == hour ? laid.slots : Self.scaled(laid.slots, from: laid.hour, to: hour)
     }
 
-    /// Another day's calendar cards while it slides in: its read's stack, scaled to the hour shown. The stack laid out for
-    /// the day shown is left as it is; the core lays the new day out once it stands.
+    /// Another day's calendar cards while it slides in: stacked by the core at the hour shown, as they will stand once it
+    /// has come in, so the day lands with no card moving. The stack laid out for the day shown is left as it is.
     func slidingSlots(_ timeline: BoardTimeline, hour: CGFloat) -> [BoardSlot] {
-        let read = CGFloat(CardMetrics.timeline.hour)
-        return abs(hour - read) < 0.5 ? timeline.slots : Self.scaled(timeline.slots, from: read, to: hour)
+        if abs(Double(hour) - CardMetrics.timeline.hour) < 0.5 { return timeline.slots }
+        if let laid = slidingLaid, laid.timeline == timeline, laid.hour == hour { return laid.slots }
+        guard let slots = try? board.stack(timeline, measures: Self.measures(hour), pure: true) else {
+            return Self.scaled(timeline.slots, from: CGFloat(CardMetrics.timeline.hour), to: hour)
+        }
+        slidingLaid = Laid(timeline: timeline, hour: hour, slots: slots)
+        return slots
     }
+
+    /// The stack of the day sliding in, at the hour it was laid out for: the day that comes in stands in it.
+    @ObservationIgnored private var slidingLaid: Laid?
 
     /// The last stack the core laid out, and for which timeline and hour.
     private(set) var laidOut: Laid?
@@ -1871,7 +1901,7 @@ final class BoardModel {
                 let board = board
                 let measures = Self.measures(next.hour)
                 let timeline = next.timeline
-                if let slots = try? await Task.detached(operation: { try board.stack(timeline, measures: measures) }).value {
+                if let slots = try? await Task.detached(operation: { try board.stack(timeline, measures: measures) }).value, timeline == drawing?.timeline {
                     // The core's stack replaces the scaled guess by sliding there, never in one frame.
                     withAnimation(.snappy(duration: 0.2)) { laidOut = Laid(timeline: next.timeline, hour: next.hour, slots: slots) }
                 }

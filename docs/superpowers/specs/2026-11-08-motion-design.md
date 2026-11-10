@@ -506,6 +506,19 @@ every condition that changes the layout is animated by the transaction that chan
 67. **iPhone, day turn: a finger catches a sliding day.** A swipe on the calendar while the day slides (an arrow's turn,
     a swipe let go) takes the day where it shows, as a scroll catches its deceleration; the turns asked before it are
     dropped, and let go the day goes on or back as any swipe does.
+68. **iPhone, day turn: a calendar block is as wide as the calendar, never as its title.** Events, whole-day events and
+    timed cards are sized by the calendar's width (an event's title fades at the edge, a card shows its time corner);
+    before, a long title or a stacked card sized itself and ran past the calendar's edge, and while a day slid out its
+    overflow stayed in sight as grey shapes and old titles over the new day.
+69. **iPhone, day turn: the day that comes in is stacked as it will stand.** The sliding day's timed cards are stacked by
+    the core at the zoom shown, so the day lands with no card moving; a stack asked for the day a turn left is dropped
+    and never replaces the new day's.
+70. **iPhone, day turn: a flick that ends at once still turns the day.** Let go, the day first takes the finger's last
+    place: a quick flick with no step after its start sent the day back.
+71. **iPhone, day turn: the day sliding in is drawn, not live.** Its events are plain blocks with no menu behind them,
+    and the whole-day strip's height is set from the two days' rows (the taller while sliding, the new day's once it
+    stands), so the hours below never move a few frames after the day has landed. The hours' labels give way to the
+    now pill of the day over them while it slides.
 
 ## Done when
 

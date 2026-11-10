@@ -583,6 +583,9 @@ final class DaySwipe: NSObject, UIGestureRecognizerDelegate {
         case .changed:
             model.followDaySwipe(share)
         case .ended:
+            // A quick flick can end with no step after its start: the day takes the finger's last place first, so the
+            // let-go never reads a day that has not moved.
+            model.followDaySwipe(share)
             let speed = -CGFloat(shift) * pan.velocity(in: ribbon).x / 1000
             Task { await model.endDaySwipe(speed: speed) }
         case .cancelled, .failed:
