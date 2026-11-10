@@ -11,7 +11,7 @@ import { moveTiles } from "./quickMoves";
 import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
 import type { IconName } from "../kit/icons";
 import { datePage } from "./DatePage";
-import { projectChooser, sectionChooser } from "./SectionChooser";
+import { projectChooser, projectNamePage, sectionChooser } from "./SectionChooser";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import { DescriptionPeek } from "./DescriptionPeek";
 import { PanelPages } from "./PanelPages";
@@ -109,6 +109,8 @@ export interface MenuActions {
 	newSection(): void;
 	/** The task's project: a note's link (`ProjectRef.link`), null for No project. */
 	setProject(project: string | null): Promise<void>;
+	/** «New project…» named `name` (`TaskService.newProject`): the note made or tagged, and the task gets that project. */
+	newProject(name: string): Promise<void>;
 	/** A tap on a level (`TaskService.togglePriority`). */
 	togglePriority(prefix: string): Promise<void>;
 	/** A tap on a label (`TaskService.toggleLabel`); the task as it then stands, null once it is gone. */
@@ -478,6 +480,31 @@ export class TaskMenu extends LiftedMenu {
 				project: this.context.menu(item).project,
 				onBack: () => this.showMenu(),
 				onPick: (link) => this.pick(() => actions.setProject(link))(),
+				onNew: () => this.showProjectName(),
+			});
+			this.place();
+		});
+	}
+
+	/** «New project…»: the name asked in place of the Project page; Enter makes the project and closes, Escape goes back to the page. */
+	private showProjectName(): void {
+		this.pages.show("projectName", () => {
+			clear(this.panel);
+			clear(this.upper);
+			const { actions } = this.context;
+			let asking = true;
+			const back = () => {
+				if (!asking) return;
+				asking = false;
+				this.showProjects();
+			};
+			projectNamePage(this.panel, {
+				onBack: back,
+				onDone: (name) => {
+					if (name === null) return back();
+					asking = false;
+					this.pick(() => actions.newProject(name))();
+				},
 			});
 			this.place();
 		});

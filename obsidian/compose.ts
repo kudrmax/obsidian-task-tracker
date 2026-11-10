@@ -19,6 +19,7 @@ import { SyncWait, type LeaveSignal } from "./infrastructure/SyncWait";
 import { VaultPathWatcher } from "./infrastructure/VaultPathWatcher";
 import { VaultTaskFileStore } from "./infrastructure/VaultTaskFileStore";
 import { LocalGroupingStore } from "./infrastructure/LocalGroupingStore";
+import { VaultNoteFiles } from "./infrastructure/VaultNoteFiles";
 import { ObsidianNoteIndex, VaultProjects } from "./infrastructure/VaultProjects";
 import { WorkCalendarExportScript } from "./infrastructure/WorkCalendarExportScript";
 import { WorkCalendarShortcut, type WorkCalendarShortcutHost } from "./infrastructure/WorkCalendarShortcut";
@@ -70,6 +71,7 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		isPhone: () => host.shortcuts.isPhone,
 		projects,
 		grouping: new LocalGroupingStore(app),
+		notes: new VaultNoteFiles(app),
 	});
 	return {
 		...core,

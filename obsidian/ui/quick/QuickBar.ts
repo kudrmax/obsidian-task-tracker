@@ -7,12 +7,13 @@ import { Button } from "../kit/Button";
 import { Panel, Picks } from "../kit/Panel";
 import { markLongLabels, type MenuTileSpec, type PlaceIconName, tileGroup, tileRows } from "../menu/MenuPanel";
 import { MonthPicker } from "../menu/MonthPicker";
+import { projectChooser, projectNamePage } from "../menu/SectionChooser";
 import { repeatPanel } from "../repeat/RepeatPanel";
 import type { LocalDate } from "../types";
 import { barBesideField, panelSide, type Side } from "./barPlacement";
 
 /** What the bar shows: the session's answer for the field, what each button shows and whether it shows at all. */
-export type QuickBarState = Pick<EntryState, "canIndent" | "canOutdent" | "indents" | "markable" | "marks" | "place" | "places" | "repeat" | "repeatable" | "repeatDay" | "section">;
+export type QuickBarState = Pick<EntryState, "canIndent" | "canOutdent" | "indents" | "markable" | "marks" | "place" | "places" | "project" | "repeat" | "repeatable" | "repeatDay" | "section">;
 
 /** Where the field stands, for the bar to stand by it. */
 export interface BarAnchor {
@@ -45,15 +46,21 @@ export interface QuickBarDeps {
 	onPlace(placement: Placement): void;
 	/** A rule set in the repeat panel, or null to take it off. */
 	onRepeat(rule: RepeatRule | null): void;
+	/** A project picked on the Project button's page: its link, null for No project. */
+	onProject(link: string | null): void;
+	/** «New project…» named on that page: the note made or tagged, then the field's project. */
+	onNewProject(name: string): void;
+	/** The project's name was being typed in the panel and no longer is: the field takes the focus back. */
+	onNameEnd(): void;
 }
 
-type PanelKind = "priority" | "repeat" | "place";
+type PanelKind = "priority" | "project" | "repeat" | "place";
 
 interface OpenPanel {
 	readonly kind: PanelKind;
 	readonly window: Panel;
 	readonly el: HTMLElement;
-	/** The place panel shows its month picker in place of the tiles. */
+	/** The place panel shows its month picker in place of the tiles; the project panel asks a new project's name in place of the projects. */
 	picking: boolean;
 	/** What its tiles were drawn for: drawn again only once that changes. */
 	drawn: string;
@@ -85,6 +92,7 @@ export class QuickBar implements EntryPart {
 	private readonly outdent: HTMLButtonElement;
 	private readonly indent: HTMLButtonElement;
 	private readonly flag: HTMLButtonElement;
+	private readonly project: HTMLButtonElement;
 	private readonly repeat: HTMLButtonElement;
 	private readonly place: Button;
 	private state: QuickBarState | null = null;
@@ -113,6 +121,7 @@ export class QuickBar implements EntryPart {
 		this.indent = this.shiftButton("tc-bar-indent", "indent", "Move in", "Tab", 1);
 		this.spacer = el(this.bar, "span", "tc-bar-spacer");
 		this.flag = Button.create(this.bar, { kind: "bar", label: "Priority", title: "Priority", icon: "priority", cls: "tc-bar-flag", onPress: () => this.toggle("priority") }).el;
+		this.project = Button.create(this.bar, { kind: "bar", label: "Project", title: "Project", icon: "project", cls: "tc-bar-project", onPress: () => this.toggle("project") }).el;
 		this.repeat = Button.create(this.bar, { kind: "bar", label: "Repeat", title: "Repeat", icon: "repeat", cls: "tc-bar-repeat", onPress: () => this.toggle("repeat") }).el;
 		this.place = Button.create(this.bar, { kind: "bar", label: "Place", title: "Place", icon: "inbox", text: "", cls: "tc-bar-place", onPress: () => this.toggle("place") });
 		this.bar.addEventListener("transitionend", (e) => {
@@ -146,6 +155,10 @@ export class QuickBar implements EntryPart {
 		this.flag.classList.toggle("is-set", color !== null);
 		if (color) this.flag.dataset.priority = color;
 		else delete this.flag.dataset.priority;
+		this.project.hidden = state.project === null;
+		const lit = state.project?.lit === true;
+		this.project.classList.toggle("is-set", lit);
+		this.project.setAttribute("aria-pressed", String(lit));
 		this.repeat.hidden = !state.repeatable;
 		this.repeat.classList.toggle("is-set", state.repeat !== null);
 		this.repeat.setAttribute("aria-pressed", String(state.repeat !== null));
@@ -328,17 +341,20 @@ export class QuickBar implements EntryPart {
 	private closePanel(): void {
 		if (!this.panel) return;
 		const el = this.panel.el;
+		const naming = this.panel.kind === "project" && this.panel.picking;
 		Motion.disappear(el, () => el.remove());
 		this.panel = null;
 		delete this.bar.dataset.panel;
 		this.restand();
 		this.bar.ownerDocument.removeEventListener("pointerdown", this.pressOutside, true);
+		if (naming) this.deps.onNameEnd();
 	}
 
 	/** The shown state changed under an open panel: it follows, or closes when its button is gone. */
 	private refreshPanel(): void {
 		if (!this.panel) return;
-		const gone = this.panel.kind === "priority" ? !this.state?.markable : this.panel.kind === "repeat" ? !this.state?.repeatable : this.state?.place == null;
+		const kind = this.panel.kind;
+		const gone = kind === "priority" ? !this.state?.markable : kind === "repeat" ? !this.state?.repeatable : kind === "project" ? this.state?.project == null : this.state?.place == null;
 		if (gone) this.closePanel();
 		else if (!this.panel.picking && this.panel.drawn !== this.drawnKey(this.panel.kind)) this.renderPanel();
 	}
@@ -350,6 +366,7 @@ export class QuickBar implements EntryPart {
 	private drawnKey(kind: PanelKind): string {
 		const state = this.state;
 		if (kind === "repeat") return JSON.stringify([kind, state?.repeat != null, state?.repeatDay ?? null]);
+		if (kind === "project") return JSON.stringify([kind, state?.project ?? null]);
 		return JSON.stringify([kind, state?.marks ?? null, state?.places ?? null, this.deps.today()]);
 	}
 
@@ -357,10 +374,11 @@ export class QuickBar implements EntryPart {
 		const panel = this.panel;
 		if (!panel) return;
 		panel.drawn = this.drawnKey(panel.kind);
-		panel.el.classList.toggle("is-picker", panel.picking);
+		panel.el.classList.toggle("is-picker", panel.kind === "place" && panel.picking);
 		panel.window.replace((parent) => {
 			if (panel.kind === "priority") this.renderLevels(parent);
 			else if (panel.kind === "repeat") this.renderRepeat(parent);
+			else if (panel.kind === "project") this.renderProject(parent, panel);
 			else if (panel.picking) this.renderPicker(parent);
 			else this.renderPlaces(parent);
 		});
@@ -402,6 +420,51 @@ export class QuickBar implements EntryPart {
 			},
 			onRemove: this.picked(() => this.deps.onRepeat(null)),
 		});
+	}
+
+	/** The Project button's page, the task menu's without its way back: a pick closes it; «New project…» asks the name in its place. */
+	private renderProject(parent: HTMLElement, panel: OpenPanel): void {
+		const page = this.state?.project?.page;
+		if (!page) return;
+		if (!panel.picking) {
+			projectChooser(parent, {
+				project: page,
+				back: false,
+				onBack: () => undefined,
+				onPick: (link) => this.picked(() => this.deps.onProject(link))(),
+				onNew: () => this.nameProject(true),
+			});
+			return;
+		}
+		let asking = true;
+		const back = () => {
+			if (!asking) return;
+			asking = false;
+			this.nameProject(false);
+		};
+		projectNamePage(parent, {
+			onBack: back,
+			onDone: (name) => {
+				if (name === null) return back();
+				asking = false;
+				this.picked(() => this.deps.onNewProject(name))();
+			},
+		});
+	}
+
+	/** The project panel asks a new project's name, or shows the projects again and gives the field its focus back. */
+	private nameProject(on: boolean): void {
+		const panel = this.panel;
+		if (!panel || panel.kind !== "project") return;
+		panel.picking = on;
+		this.renderPanel();
+		if (!on) this.deps.onNameEnd();
+	}
+
+	/** The focus is in one of the bar's own fields: a new project's name. */
+	get typing(): boolean {
+		const active = this.bar.ownerDocument.activeElement;
+		return active !== null && this.owns(active);
 	}
 
 	private renderPlaces(parent: HTMLElement): void {

@@ -35,6 +35,8 @@ export interface BulkDeps {
 	toSection(keys: readonly TaskKey[], name: GroupName): Promise<void>;
 	/** The tasks' project (`TaskService.setProject`), and resolves once the screen shows it. */
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void>;
+	/** «New project…» named `name` for `keys` (`TaskService.newProject`). */
+	newProject(keys: readonly TaskKey[], name: string): Promise<void>;
 	/** ⌘-click is for the desktop; on the phone only Select tasks picks. */
 	desktop(): boolean;
 	/** ⌘ on a Mac, Ctrl elsewhere. */
@@ -201,6 +203,7 @@ export class BulkController {
 				},
 				toSection: (name) => done((picked) => this.deps.toSection(picked, name)),
 				setProject: (project) => done((picked) => this.deps.setProject(picked, project)),
+				newProject: (name) => done((picked) => this.deps.newProject(picked, name)),
 				remove: () => done((picked) => this.deps.remove(picked)),
 			},
 			onClose: () => (this.menu = null),

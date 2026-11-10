@@ -208,6 +208,7 @@ export class CalendarScreen extends Component {
 			cards: (column) => this.listOf(column)?.cards.map((entry) => entry.card) ?? [],
 			toSection: (keys, name) => this.act(() => this.deps.tasks.toSection(keys, name)),
 			setProject: (keys, project) => this.act(() => this.deps.tasks.setProject(keys, project)),
+			newProject: (keys, name) => this.act(async () => (await this.deps.tasks.newProject(name, keys)) !== null),
 			desktop: () => !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
 			isMod: (e) => (Platform.isMacOS ? e.metaKey : e.ctrlKey),
 		});
@@ -1151,6 +1152,7 @@ export class CalendarScreen extends Component {
 					if (this.full) this.showMenu(task, source, source.classList.contains("tc-card") ? (copy) => FullScreen.mark(copy, task) : undefined, this.full);
 				},
 				onClose: () => (this.full = null),
+				openNote: (path) => this.openNote(path),
 				onError: (error) => this.reportFailure(error),
 			},
 			item,
@@ -1187,6 +1189,7 @@ export class CalendarScreen extends Component {
 					if (column) this.askGroupName(current, column);
 				},
 				setProject: (project) => this.act(() => tasks.setProject([current.key], project)),
+				newProject: (name) => this.act(async () => (await tasks.newProject(name, [current.key])) !== null),
 				togglePriority: (prefix) => this.act(() => tasks.togglePriority([current.key], prefix)),
 				toggleLabel: async (name) => {
 					const written: { item: TaskItem | null } = { item: null };
