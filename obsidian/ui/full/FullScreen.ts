@@ -29,6 +29,8 @@ export interface FullScreenDeps {
 	/** The task's own menu over `source`: a subtask's card, or the capsule for the screen's task. */
 	menu(item: TaskItem, source: HTMLElement): void;
 	onClose(): void;
+	/** A project's note opens, as a card's folder opens it. */
+	openNote(path: string): void;
 	/** A write of the typing that failed. */
 	onError(error: unknown): void;
 }
@@ -51,6 +53,8 @@ export class FullScreen {
 	private readonly parentButton: HTMLButtonElement;
 	private readonly parentText: HTMLElement;
 	private readonly titleEl: HTMLElement;
+	private readonly projectButton: HTMLButtonElement;
+	private readonly projectText: HTMLElement;
 	private readonly list: TaskList;
 	private readonly descEl: HTMLElement;
 	private readonly done: Button;
@@ -110,6 +114,10 @@ export class FullScreen {
 		this.parentText = el(this.parentButton, "span", "tc-full-parent-text");
 		this.parentButton.addEventListener("click", () => void this.up());
 		this.titleEl = el(column, "div", "tc-full-title");
+		this.projectButton = el(column, "button", "tc-full-project");
+		this.projectButton.appendChild(icon("project"));
+		this.projectText = el(this.projectButton, "span", "tc-full-project-text");
+		this.projectButton.addEventListener("click", () => this.openProject());
 		this.list = new TaskList(el(column, "div", "tc-full-list"), {
 			items: () => this.tree?.subtasks ?? [],
 			day: () => this.deps.day(),
@@ -213,9 +221,23 @@ export class FullScreen {
 		clear(this.parentText);
 		if (item.parentText !== null) fillTitle(this.parentText, item.parentText);
 		this.drawTitle();
+		this.drawProject();
 		this.list.render();
 		this.field?.refocus();
 		this.showDescription(item);
+	}
+
+	/** The line under the title: the task's project (a subtask's, its parent's), none without one; it opens the note while it can. */
+	private drawProject(): void {
+		const project = this.tree?.project ?? null;
+		this.projectButton.hidden = project === null;
+		this.projectText.textContent = project?.name ?? "";
+		this.projectButton.disabled = !project?.canOpenNote || project.note === null;
+	}
+
+	private openProject(): void {
+		const project = this.tree?.project;
+		if (project?.canOpenNote && project.note !== null) this.deps.openNote(project.note);
 	}
 
 	/** A subtask's card, or its copy over a menu: the circle, filled and the title crossed once it is done. */

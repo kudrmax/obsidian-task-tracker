@@ -8,7 +8,7 @@ import { pickMark } from "../TaskSelection";
 import type { LocalDate } from "../types";
 import { askGroup, menuGroup, menuRow, type MenuRowSpec, type MenuTileSpec, menuRoom, placePanel, tileGroup, tileRows } from "./MenuPanel";
 import { datePage } from "./DatePage";
-import { projectChooser, sectionChooser } from "./SectionChooser";
+import { projectChooser, projectNamePage, sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
 import { moveTiles } from "./quickMoves";
 import { type Asking, askLooks, labelTiles, priorityTiles, statusTiles } from "./TaskMenu";
@@ -30,6 +30,8 @@ export interface BulkActions {
 	toSection(name: GroupName): Promise<void>;
 	/** The tasks' project: a note's link, null for No project. */
 	setProject(project: string | null): Promise<void>;
+	/** «New project…» named `name` (`TaskService.newProject`): the note made or tagged, and every picked task gets it. */
+	newProject(name: string): Promise<void>;
 	remove(): Promise<void>;
 }
 
@@ -196,8 +198,32 @@ export class BulkMenu {
 				project: this.context.menu(this.context.items).project,
 				onBack: () => this.showMenu(),
 				onPick: (link) => this.pick(() => actions.setProject(link))(),
+				onNew: () => this.showProjectName(),
 			}),
 			"projects",
+		);
+	}
+
+	/** «New project…»: the name asked in place of the Project page; Enter makes the project and closes, Escape goes back to the page. */
+	private showProjectName(): void {
+		const { actions } = this.context;
+		let asking = true;
+		const back = () => {
+			if (!asking) return;
+			asking = false;
+			this.showProjects();
+		};
+		this.panel.replace(
+			(panel) =>
+				projectNamePage(panel, {
+					onBack: back,
+					onDone: (name) => {
+						if (name === null) return back();
+						asking = false;
+						this.pick(() => actions.newProject(name))();
+					},
+				}),
+			"projectName",
 		);
 	}
 

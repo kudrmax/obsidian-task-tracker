@@ -1,9 +1,12 @@
 import { SectionNameEntry } from "../../core/application/contracts";
 import { el } from "./dom";
 import { ownUndo } from "./fieldUndo";
+import { OWNS_ESCAPE } from "./menu/Overlay";
 
 export interface GroupNameFieldOptions {
 	readonly value: string;
+	/** What the empty field shows: «Section name» unless told. */
+	readonly placeholder?: string;
 	/** The name as typed on Enter; null for Escape or a tap elsewhere. Called once. */
 	onDone(name: string | null): void;
 }
@@ -14,9 +17,10 @@ export const GroupNameField = {
 		const field = el(parent, "div", "tc-group-field");
 		const input = el(field, "input", "tc-group-input");
 		input.type = "text";
-		input.placeholder = "Section name";
+		input.placeholder = opts.placeholder ?? "Section name";
 		input.value = opts.value;
 		input.enterKeyHint = "done";
+		input.setAttribute(OWNS_ESCAPE, "");
 		const entry = new SectionNameEntry((name) => opts.onDone(name));
 		ownUndo(input);
 		input.addEventListener("keydown", (e) => {

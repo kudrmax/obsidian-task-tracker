@@ -24,9 +24,9 @@ export class Overlay {
 	private gone = false;
 	/** Parts faded away while the overlay stays: showing it shows them no more. */
 	private readonly retired = new Set<HTMLElement>();
-	/** Escape closes this and nothing else: Obsidian would otherwise take it as a step back. */
+	/** Escape closes this and nothing else: Obsidian would otherwise take it as a step back. A name typed on one of its pages takes Escape itself. */
 	private readonly onKey = (e: KeyboardEvent) => {
-		if (e.key !== "Escape") return;
+		if (e.key !== "Escape" || ownsEscape(e.target)) return;
 		e.preventDefault();
 		e.stopPropagation();
 		this.onClose("escape");
@@ -174,3 +174,11 @@ export class Overlay {
 		return [this.backdrop, ...(this.level ? [this.level] : []), ...this.parts];
 	}
 }
+
+/** A field that takes Escape itself (`OWNS_ESCAPE`): a name typed on a menu's page, which Escape takes back a page. */
+function ownsEscape(target: EventTarget | null): boolean {
+	return target instanceof Element && target.closest(`[${OWNS_ESCAPE}]`) !== null;
+}
+
+/** The attribute of a field inside a menu that takes Escape itself. */
+export const OWNS_ESCAPE = "data-owns-escape";

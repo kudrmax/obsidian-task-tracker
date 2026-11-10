@@ -87,6 +87,7 @@ function controller(extra: Partial<BulkDeps> = {}): BulkController {
 		cards: () => [],
 		toSection: async () => {},
 		setProject: async () => {},
+		newProject: async () => {},
 		desktop: () => true,
 		isMod: (e) => e.metaKey,
 		...extra,

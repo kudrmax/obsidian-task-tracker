@@ -87,3 +87,26 @@ Backend (the core's contract):
 10. **The full screen's line** is `FullTree.project` (a subtask's: its parent's); a tap opens `note` in the plugin (while
     `canOpenNote`), `tasks.screen(date, link)` in the app.
 11. **Point 4 (the narrow mark)** needs nothing of the core.
+
+Obsidian (the plugin's frontend):
+
+12. **Obsidian: the phone bar fits 390.** With every button (section, the shifts, flag, Project, repeat, place) the bar
+    is wider than a phone; the round buttons and the shifts give up width down to their height (36 instead of 44), the
+    place keeps its 108. A bar with room keeps 44. The desktop capsule is unchanged (32 × 28 buttons).
+13. **Obsidian: the lit Project button** is the folder filled and stroked in the accent, as the flag is filled in the
+    priority's colour; on the desktop it takes the hover layer while its panel is open, as the flag does.
+14. **Obsidian: «New project…»** is the page's last row, apart (thick line), the accent plus on the right, as New section.
+    A tap asks the name in place of the page: a back row «New project» and a capsule ringed in the accent with the hint
+    «Project name» (the section name field's look and keys, `SectionNameEntry`). Enter writes and closes the menu; Escape
+    or the back row returns to the projects; a tap elsewhere writes nothing. On the quick bar the same page is the
+    button's panel (no back row on the projects, the panel is the page); while the name is typed the entry stays open
+    and the field takes the focus back after it. Escape in the name field is the field's: the menu does not close on it.
+    On the phone Obsidian's navigation stays hidden while the name field has the focus, as it is while the field has it.
+15. **Obsidian: the full screen's project line** has the parent line's metrics (20 high, 16 icon, 6 gap, 15 px text) in
+    the caption colour, 8 under the title, one line cut at its end. A project whose note can't be opened shows the line
+    unpressed.
+16. **Obsidian: the narrow mark's tap target** is a date's width (24) by the line's height, centred on the 16 px icon,
+    lying over the title's faded end.
+17. **Obsidian: `composeCore` takes the `NoteFiles` port** (`CorePorts.notes`, passed on as `TaskServiceImpl`'s eighth
+    argument); the plugin gives the vault's files (`VaultNoteFiles`: paths, read, write through `vault.process` or
+    `vault.create`).

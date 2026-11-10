@@ -6,6 +6,7 @@ import { QuickBar, type QuickBarState } from "../../obsidian/ui/quick/QuickBar";
 import { placementOfDay } from "../../core/domain/Days";
 import { draftMarksOf } from "../../core/application/marks";
 import { dayMonth } from "../../core/application/dayLabels";
+import { entryProject } from "../../core/application/QuickEntry";
 
 const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p1", color: "red" },
@@ -40,7 +41,7 @@ function placesFor(place: Placement | null): QuickBarState["places"] {
 	return [...PLACES.map((kind) => ({ kind, on: place?.kind === kind })), { kind: "date" as const, on: place?.kind === "date", date: place?.kind === "date" ? place.date : null }];
 }
 
-const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, marks: marks(), markable: true, place: { kind: "soon" }, places: placesFor({ kind: "soon" }), repeat: null, repeatable: true, repeatDay: "2026-11-01", section: null };
+const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, marks: marks(), markable: true, place: { kind: "soon" }, places: placesFor({ kind: "soon" }), repeat: null, repeatable: true, repeatDay: "2026-11-01", section: null, project: null };
 
 /** The session's state for the bar: the marks over the labels shown now and the places for its place, unless given. */
 function full(state: Partial<QuickBarState> = {}): QuickBarState {
@@ -62,6 +63,9 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf:
 	const repeats: (RepeatRule | null)[] = [];
 	const sections: true[] = [];
 	const labelled: string[] = [];
+	const projects: (string | null)[] = [];
+	const named: string[] = [];
+	const nameEnds: true[] = [];
 	const bar = new QuickBar(parent, {
 		desktop: () => desktop,
 				onLabel: (name: string) => labelled.push(name),
@@ -74,9 +78,12 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf:
 		onPlace: (placement) => places.push(placement),
 		onRepeat: (rule) => repeats.push(rule),
 		onSection: () => sections.push(true),
+		onProject: (link) => projects.push(link),
+		onNewProject: (name) => named.push(name),
+		onNameEnd: () => nameEnds.push(true),
 	});
 	bar.show(full(state));
-	return { parent, bar, indents, priorities, places, repeats, sections, labelled };
+	return { parent, bar, indents, priorities, places, repeats, sections, labelled, projects, named, nameEnds };
 }
 
 const q = <T extends Element = HTMLButtonElement>(root: ParentNode, selector: string) => root.querySelector<T>(selector)!;
@@ -93,7 +100,7 @@ describe("QuickBar", () => {
 		const parent = document.createElement("div");
 		const first = document.createElement("span");
 		parent.appendChild(first);
-		const bar = new QuickBar(parent, { desktop: () => false, today: () => TODAY, listName, placementTitle, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, today: () => TODAY, listName, placementTitle, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {}, onProject: () => {}, onNewProject: () => {}, onNameEnd: () => {} });
 		expect(parent.lastElementChild?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(true);
 		bar.show(full());
@@ -227,9 +234,67 @@ describe("the priority panel", () => {
 
 	it("has no flag while the session says there is nothing to mark", () => {
 		const parent = document.createElement("div");
-		const bar = new QuickBar(parent, { desktop: () => false, today: () => TODAY, listName, placementTitle, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, today: () => TODAY, listName, placementTitle, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {}, onProject: () => {}, onNewProject: () => {}, onNameEnd: () => {} });
 		bar.show(full({ markable: false }));
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(true);
+	});
+});
+
+describe("the Project button", () => {
+	const KNOWN = [
+		{ name: "Дружба", link: "Дружба", note: "Дружба.md", canOpenNote: true, mark: true },
+		{ name: "Окружение", link: "Окружение", note: "Окружение.md", canOpenNote: true, mark: true },
+	];
+	const rows = (root: ParentNode) => [...root.querySelectorAll<HTMLButtonElement>(".tc-quick-panel .tc-menu-row")];
+	const labels = (root: ParentNode) => rows(root).map((row) => row.textContent);
+
+	it("stands right after the flag, only where the session gives it (none for a subtask or a section's name)", () => {
+		const { parent, bar } = setup({ project: entryProject(null, KNOWN) });
+		expect(q(parent, ".tc-bar-flag").nextElementSibling).toBe(q(parent, ".tc-bar-project"));
+		expect(q(parent, ".tc-bar-project").hidden).toBe(false);
+		expect(q(parent, ".tc-bar-project").getAttribute("aria-label")).toBe("Project");
+		bar.show(full({ project: null }));
+		expect(q(parent, ".tc-bar-project").hidden).toBe(true);
+	});
+
+	it("is lit, as the flag is for a level, while a project is chosen", () => {
+		const { parent, bar } = setup({ project: entryProject(null, KNOWN) });
+		expect(q(parent, ".tc-bar-project").classList.contains("is-set")).toBe(false);
+		bar.show(full({ project: entryProject("Дружба", KNOWN) }));
+		expect(q(parent, ".tc-bar-project").classList.contains("is-set")).toBe(true);
+		expect(q(parent, ".tc-bar-project").getAttribute("aria-pressed")).toBe("true");
+	});
+
+	it("opens the task menu's Project page without its way back: the projects, No project, New project…; a pick closes it", () => {
+		const { parent, projects } = setup({ project: entryProject("Окружение", KNOWN) });
+		q(parent, ".tc-bar-project").click();
+		expect(labels(parent)).toEqual(["Дружба", "Окружение", "No project", "New project…"]);
+		expect(parent.querySelector(".tc-quick-panel .tc-menu-back")).toBeNull();
+		expect(rows(parent)[1].querySelector("svg")).not.toBeNull();
+		rows(parent)[0].click();
+		expect(projects).toEqual(["Дружба"]);
+		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
+		q(parent, ".tc-bar-project").click();
+		rows(parent)[2].click();
+		expect(projects).toEqual(["Дружба", null]);
+	});
+
+	it("asks a new project's name in its place: Enter reports it and closes, Escape goes back to the projects", () => {
+		const { parent, named, nameEnds } = setup({ project: entryProject(null, KNOWN) });
+		q(parent, ".tc-bar-project").click();
+		rows(parent)[3].click();
+		const input = q<HTMLInputElement>(parent, ".tc-quick-panel .tc-group-input");
+		expect(input.placeholder).toBe("Project name");
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+		expect(labels(parent)).toEqual(["Дружба", "Окружение", "No project", "New project…"]);
+		expect(nameEnds).toHaveLength(1);
+		rows(parent)[3].click();
+		const again = q<HTMLInputElement>(parent, ".tc-quick-panel .tc-group-input");
+		again.value = "Ремонт";
+		again.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		expect(named).toEqual(["Ремонт"]);
+		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
+		expect(nameEnds).toHaveLength(2);
 	});
 });
 
@@ -335,8 +400,8 @@ describe("the repeat button", () => {
 
 	it("stands between the flag and the place", () => {
 		const { parent } = setup();
-		const buttons = [...parent.querySelectorAll(".tc-quick-bar > button")].map((b) => b.className.match(/tc-bar-(section|flag|repeat|place)/)?.[1]);
-		expect(buttons).toEqual(["section", "flag", "repeat", "place"]);
+		const buttons = [...parent.querySelectorAll(".tc-quick-bar > button")].map((b) => b.className.match(/tc-bar-(section|flag|project|repeat|place)/)?.[1]);
+		expect(buttons).toEqual(["section", "flag", "project", "repeat", "place"]);
 		expect(q(parent, ".tc-bar-repeat").getAttribute("aria-label")).toBe("Repeat");
 	});
 
@@ -713,7 +778,7 @@ describe("QuickBar on the phone keyboard", () => {
 		for (const desktop of [false, true]) {
 			const parent = document.createElement("div");
 			const other = parent.appendChild(document.createElement("span"));
-			const bar = new QuickBar(parent, { desktop: () => desktop, today: () => TODAY, listName, placementTitle, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+			const bar = new QuickBar(parent, { desktop: () => desktop, today: () => TODAY, listName, placementTitle, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {}, onProject: () => {}, onNewProject: () => {}, onNameEnd: () => {} });
 			bar.show(full({ section: false }));
 			const own = [...parent.querySelectorAll("*")].filter((node) => !other.contains(node));
 			expect(own.length).toBeGreaterThan(0);

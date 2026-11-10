@@ -10,6 +10,10 @@ export class FakeVault {
 	cachedReads = 0;
 	private readonly listeners = new Map<EventRef, { name: VaultEvent; callback: FileListener }>();
 
+	getFiles(): TFile[] {
+		return [...this.files.keys()].map((path) => ({ path }) as TFile);
+	}
+
 	getFileByPath(path: string): TFile | null {
 		return this.files.has(path) ? ({ path } as TFile) : null;
 	}
