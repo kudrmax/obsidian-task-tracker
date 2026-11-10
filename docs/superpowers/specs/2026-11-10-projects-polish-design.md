@@ -87,3 +87,27 @@ Backend (the core's contract):
 10. **The full screen's line** is `FullTree.project` (a subtask's: its parent's); a tap opens `note` in the plugin (while
     `canOpenNote`), `tasks.screen(date, link)` in the app.
 11. **Point 4 (the narrow mark)** needs nothing of the core.
+
+Swift (the iPhone app):
+
+18. **Swift: «New project…» asks by a stock alert**, as New Section does: «New Project», the field «Name», Cancel and
+    Create (Create off while the name is empty), the note «A note of this name becomes the project.». The row stands last
+    on every Project page in its own group with the plus, as New Section… on the Section page. Cancel changes nothing; from
+    the quick entry's button the field keeps its text and takes the keyboard back after the alert (the plugin's 14 in the
+    iOS way: a system menu can't hold a field, so the name is asked over it).
+19. **Swift: the New Task sheet's Project row** is a card row under the list's picker: the folder and «Project» on the
+    left, the value with the up-down chevrons on the right (the stock menu picker), in the accent while a project is
+    chosen and the secondary colour for No project. The sheet keeps the project for the next task after Add, as it keeps
+    the list.
+20. **Swift: the New Task sheet opens from the screen on top**: over a project's view it is that view's sheet, so it
+    starts with that project (before, the main screen under the view answered the plus and the sheet had none).
+21. **Swift: the full screen's project line** is the parent line's look (subheadline, secondary, the folder), one line cut
+    at its end (the plugin's 15). A tap opens the project's view; on a full screen opened inside that project's own view it
+    goes back to the view. A project whose note can't be opened takes no tap, as the card's mark.
+22. **Swift: the narrow mark** is the glyph's own width in the row; its button keeps decision 40's 24 + 3 + 3 = 30 pt,
+    centred on the glyph, over the title's faded end.
+23. **Swift: after «New project…» from the quick entry the lists are read again before the field takes the project**, so
+    in a list grouped by project the field moves to the new project's (empty) group at once.
+24. **Swift: a card's open menu follows only its own screen's drawings.** A card of the main screen under a project's
+    view drew the same task with the folder mark, and the open menu's card in the view took that drawing (the mark showed
+    in the project's own view while its menu was open).
