@@ -54,6 +54,8 @@ describe("New project… through the door (point 6)", () => {
 	it("notes.newProject names the note to write; notes.projectText gives its text with the settings' tag", () => {
 		expect(call("notes.newProject", ["Свой дом", [{ path: "Дружба.md" }]]).result).toEqual({ name: "Свой дом", path: "Свой дом.md", link: "Свой дом", exists: false });
 		expect(call("notes.newProject", ["", []]).result).toBeNull();
+		expect(call("notes.newProject", ["TODOs Tasks", [{ path: "TODOs Tasks.md" }]]).result).toBeNull();
+		expect(call("notes.newProject", ["Tasks", [{ path: "Tasks.md" }]], { settings: JSON.stringify({ tasksFile: "Inbox/Tasks.md" }) }).result).toBeNull();
 		expect(call("notes.projectText", [null]).result).toBe("---\ntags:\n  - project\n---\n");
 		expect(call("notes.projectText", ["Body\n"], { settings: JSON.stringify({ projectTag: "#goal" }) }).result).toBe("---\ntags:\n  - goal\n---\nBody\n");
 	});

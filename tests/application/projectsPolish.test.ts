@@ -112,6 +112,16 @@ describe("New project… on every Project page (point 6)", () => {
 		expect(store.text).toBe(before);
 	});
 
+	it("a name of a file the plugin owns (the tasks file, a calendar file) makes nothing: the file is never tagged", async () => {
+		const owned = ["TODOs Tasks.md", "calendar/work.json", "Дела/Work.md"];
+		expect(newProjectNote("todos tasks", [{ path: "TODOs Tasks.md" }, { path: "Дружба.md" }], owned)).toBeNull();
+		expect(newProjectNote("Work", [{ path: "Дела/Work.md" }], owned)).toBeNull();
+		expect(newProjectNote("Дружба", [{ path: "TODOs Tasks.md" }, { path: "Дружба.md" }], owned)).toMatchObject({ path: "Дружба.md", exists: true });
+		const { svc, notes } = setup(FILE, new Map([["TODOs Tasks.md", "## Inbox\n"]]));
+		expect(await svc.newProject("TODOs Tasks", [])).toBeNull();
+		expect(notes.files.get("TODOs Tasks.md")).toBe("## Inbox\n");
+	});
+
 	it("an empty name writes nothing", async () => {
 		const { svc, notes } = setup();
 		expect(await svc.newProject("  ", [])).toBeNull();
