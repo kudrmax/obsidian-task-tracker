@@ -322,6 +322,7 @@ private struct NewProjectAlert<Asked>: ViewModifier {
         content
             .alert("New Project", isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }), presenting: asking) { asked in
                 TextField("Name", text: $name)
+                    .autocorrectionDisabled()
                 Button("Cancel", role: .cancel) { answer(nil, asked) }
                 Button("Create") { answer(name, asked) }
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)

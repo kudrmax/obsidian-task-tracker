@@ -91,7 +91,7 @@ Backend (the core's contract):
 Swift (the iPhone app):
 
 18. **Swift: «New project…» asks by a stock alert**, as New Section does: «New Project», the field «Name», Cancel and
-    Create (Create off while the name is empty), the note «A note of this name becomes the project.». The row stands last
+    Create (Create off while the name is empty), the note «A note of this name becomes the project.», no autocorrection (a name is written as typed). The row stands last
     on every Project page in its own group with the plus, as New Section… on the Section page. Cancel changes nothing; from
     the quick entry's button the field keeps its text and takes the keyboard back after the alert (the plugin's 14 in the
     iOS way: a system menu can't hold a field, so the name is asked over it).
