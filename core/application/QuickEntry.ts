@@ -386,11 +386,12 @@ export class QuickEntry {
 	 * (the look's cards and sections when left out); `at` is where among them the field stands.
 	 */
 	listEntry(column: DropColumn, drawn?: EntryDrawing): ListEntry | null {
+		const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
+		this.follow(column, drawing);
 		const state = this.state;
 		const list = state && listSpot(state.spot);
 		if (!state || !list || list.column !== column) return null;
 		const section = state.section === true;
-		const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
 		return { place: list.place, pending: state.pending, section, newSection: state.newSection, at: entryAt(drawing, list.place, section || state.newSection !== null) };
 	}
 
@@ -665,7 +666,9 @@ export class QuickEntry {
 		this.run(job.run).pending.shift();
 		job.shown = true;
 		this.shifts = null;
-		if (held !== null && (held === job.run || this.run(held).spot !== was)) this.emit(this.state, true);
+		if (job.landing) this.follow(job.landing, { cards: coming(job.landing), sections: this.look.sections(job.landing) });
+		const now = this.session.field?.run ?? null;
+		if (held !== null && (held === job.run || now !== held || this.run(held)?.spot !== was)) this.emit(this.state, true);
 	}
 
 	/** A task job ended without its line shown (its write failed): the line stops waiting under the cards. */
@@ -759,13 +762,45 @@ export class QuickEntry {
 		return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, ...last } };
 	}
 
-	/** The end of `project`'s part (null: No project's) in a list drawn by project: its last section's last task; null where the list draws none. */
-	private partEnd(column: DropColumn, project: string | null): EntrySpot | null {
-		const parts = this.look.sections(column).map(zoneOf).filter((zone) => zone.project !== undefined && inProject(project, zone.project));
+	/**
+	 * The end of `project`'s part (null: No project's) in a list drawn by project, as `drawing` shows it (the look's when
+	 * left out): its last section's last task; with no header of it yet, right after its last card (a part its first task
+	 * just made, the headers not yet read); null where the list draws none.
+	 */
+	private partEnd(column: DropColumn, project: string | null, drawing?: EntryDrawing): EntrySpot | null {
+		const cards = drawing?.cards ?? this.look.cards(column);
+		const sections = drawing?.sections ?? this.look.sections(column);
+		const parts = sections.map(zoneOf).filter((zone) => zone.project !== undefined && inProject(project, zone.project));
 		const last = parts[parts.length - 1];
-		if (!last) return null;
-		const place = gapOfPlace(this.look.cards(column), { kind: "task", group: last.group, before: null, project: last.project });
-		return { kind: "list", column, place: { ...place, level: 0 } };
+		if (last) return { kind: "list", column, place: { ...gapOfPlace(cards, { kind: "task", group: last.group, before: null, project: last.project }), level: 0 } };
+		let index = cards.length - 1;
+		while (index >= 0 && !(cards[index].project !== undefined && inProject(project, cards[index].project!))) index--;
+		if (index < 0) return null;
+		const card = cards[index];
+		let end = index + 1;
+		while (end < cards.length && cards[end].level > card.level) end++;
+		return { kind: "list", column, place: { kind: "gap", index: end, level: 0, group: card.group, project: card.project } };
+	}
+
+	/**
+	 * A new task's field whose project has no part where it stands (none was drawn when it was picked, or Place took it
+	 * there) goes to the end of that project's part once `column`'s drawing has one: after its first task is drawn, a
+	 * project's group appearing, any drawing. Not while a line entered there still waits to be drawn, nor a rename's field.
+	 */
+	private follow(column: DropColumn, drawing: EntryDrawing): void {
+		const field = this.session.field;
+		if (!field || field.rename || field.section || field.project === undefined) return;
+		const run = this.run(field.run);
+		const list = listSpot(run.spot);
+		if (!list || list.column !== column || list.place.level !== 0 || list.place.project === undefined || run.pending.length > 0) return;
+		if (inProject(field.project, list.place.project)) return;
+		const part = this.partEnd(column, field.project, drawing);
+		if (!part) return;
+		const next = this.newRun(part);
+		this.hold(next);
+		this.release(field.run);
+		this.session.field = { ...field, run: next };
+		this.shifts = null;
 	}
 
 	private find(key: TaskKey): { readonly column: DropColumn; readonly index: number } | null {

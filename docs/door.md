@@ -430,7 +430,8 @@ chosen, the button in the accent as the flag for a level), null where there is n
 and a section's name). The field starts with the project of the group it opened in (`WireLook.sections`' zones), of the
 project's view (`WireLook.project`), or the renamed task's own; Enter's next field keeps it, like the place. A pick is
 `setProject(link | null)`: in a list drawn by project the field goes to the end of that project's part (a rename's field
-stays). Place (`choosePlace`, `moveToEnd`) keeps the project and, in a list drawn by project, puts the field at the end of
+stays); where the list draws no part of it yet (a project just made), the field goes there as soon as a drawing has one,
+its own first task's included: `listEntry` and `shown` move it, so the next `state.spot` is the part's end. Place (`choosePlace`, `moveToEnd`) keeps the project and, in a list drawn by project, puts the field at the end of
 its project's part. The project goes with the task as `createInPlace`'s sixth argument, a rename's in the `edit`'s draft
 (`TaskDraft.project`). Example: `entry.setProject(session, look, "Дружба")` → `state.project`
 `{ lit: true, page: { value: "Дружба", newLabel: "New project…", … } }`.

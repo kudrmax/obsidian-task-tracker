@@ -183,3 +183,74 @@ describe("Place keeps the field's project", () => {
 		expect(entry.state!.project!.lit).toBe(true);
 	});
 });
+
+describe("the field follows its project once the list draws its part", () => {
+	/** Grouped Soon: Окружение's empty part, then No project with «Ремонт»; Дача has no part until its first task is drawn. */
+	function grouped() {
+		const svc = new TaskServiceImpl(new InMemoryTaskFileStore("## Soon\n- [ ] Loose\n### Ремонт\n- [ ] Fix\n"), new FakeSettingsStore(), clock, null, { list: () => NOTES, onChange: () => () => undefined });
+		const soonKey = (raw: string, index: number) => key("soon", raw, index);
+		let cards: ListCard[] = [
+			{ key: soonKey("- [ ] Loose", 0), level: 0, group: null, project: null },
+			{ key: soonKey("- [ ] Fix", 1), level: 0, group: "Ремонт", project: null },
+		];
+		let sections: Header[] = [
+			{ group: null, project: "Окружение" },
+			{ group: null, project: null },
+			{ group: "Ремонт", project: null },
+		];
+		const look: EntryLook = {
+			cards: (column) => (column === "soon" ? cards : []),
+			sections: (column) => (column === "soon" ? sections : []),
+			sectioned: (column) => column === "soon",
+			day: () => T,
+			today: () => T,
+			shown: () => ["soon"],
+		};
+		const entry = new QuickEntry(svc, look);
+		/** Дача's first task drawn: its part comes first, by name. */
+		const drawDacha = () => {
+			const made = { key: soonKey("- [ ] Покрасить забор 🗂️ [[Дача]]", 0), level: 0, group: null, project: "Дача" } as ListCard;
+			cards = [made, ...cards.map((c, i) => ({ ...c, key: soonKey(c.key.raw, i + 1) }))];
+			sections = [{ group: null, project: "Дача" }, ...sections];
+			return made;
+		};
+		return { entry, drawDacha, coming: (column: DropColumn) => look.cards(column) };
+	}
+
+	it("a new project's first task drawn: the next field stands at the end of that project's part, not under a heading", () => {
+		const { entry, drawDacha, coming } = grouped();
+		entry.openIn("soon", null, "Окружение");
+		entry.setProject("Дача");
+		entry.type("Покрасить забор");
+		entry.enter();
+		const [job] = entry.session.jobs;
+		entry.call(job.id);
+		const made = drawDacha();
+		entry.shown(job.id, made.key, coming);
+		entry.done(job.id);
+		const shown = entry.listEntry("soon");
+		expect(shown?.place).toEqual({ kind: "gap", index: 1, level: 0, group: null, project: "Дача" });
+		expect(entry.state!.spot).toEqual({ kind: "list", column: "soon", place: { kind: "gap", index: 1, level: 0, group: null, project: "Дача" } });
+		entry.type("Купить краску");
+		entry.enter();
+		expect(entry.call(entry.session.jobs[0].id)?.args[2]).toMatchObject({ kind: "list", list: "soon", group: null, before: null, project: "Дача" });
+	});
+
+	it("the project's empty group appearing in a drawing takes the field there", () => {
+		const { entry } = grouped();
+		entry.openIn("soon", null, "Окружение");
+		entry.setProject("Дача");
+		const drawn = { cards: [] as ListCard[], sections: [{ group: null, project: "Дача" }, { group: null, project: "Окружение" }] as Header[] };
+		expect(entry.listEntry("soon", drawn)?.place).toEqual({ kind: "gap", index: 0, level: 0, group: null, project: "Дача" });
+	});
+
+	it("while a line still waits to be written, the field stays with it", () => {
+		const { entry, drawDacha } = grouped();
+		entry.openIn("soon", null, "Окружение");
+		entry.setProject("Дача");
+		entry.type("Покрасить забор");
+		entry.enter();
+		drawDacha();
+		expect(entry.listEntry("soon")?.place.project).toBe("Окружение");
+	});
+});
