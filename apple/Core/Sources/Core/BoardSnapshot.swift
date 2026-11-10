@@ -450,6 +450,15 @@ extension TaskBoard {
         return try draw(screen, day: day, today: today, files: files, measures: asked, lane: .reading, canUndo: canUndo)
     }
 
+    /// The screen drawn again over the files it was read from, nothing read from disk: what changed is the screen's own
+    /// state the board keeps (a project group folded or opened, a list grouped by project), not the vault, so a tap
+    /// redraws at once instead of waiting for every note and calendar to be read again.
+    public func redraw(_ shown: BoardSnapshot, changing column: BoardColumn? = nil, measures asked: TimelineMeasures, project: String? = nil, now: Date = Date()) throws -> BoardSnapshot {
+        let files = BoardFiles(tasks: shown.tasksText, settingsJSON: shown.settingsJSON, calendars: shown.calendarTexts, now: now)
+        let screen: ScreenView = try read("tasks.screen", [.string(shown.day)] + (project.map { [JSONValue.string($0)] } ?? []), over: files)
+        return try draw(screen, day: shown.day, today: shown.today, files: files, measures: asked, lane: .reading, canUndo: shown.canUndo, reusing: shown, only: column)
+    }
+
     /// The screen a drop will leave, asked at the moment of the drop before anything is written (`tasks.dropPreview`):
     /// everything `snapshot` reads, read over the text the drop leaves, on the pure rules' context, so the main thread
     /// never waits for a read and no id or undo step of it is kept. The read after the drop's write draws the same.
@@ -472,7 +481,7 @@ extension TaskBoard {
         case preview(BoardSnapshot)
     }
 
-    private func draw(_ screen: ScreenView, day: String, today: String, files: BoardFiles, measures asked: TimelineMeasures, lane: Lane, canUndo: Bool) throws -> BoardSnapshot {
+    private func draw(_ screen: ScreenView, day: String, today: String, files: BoardFiles, measures asked: TimelineMeasures, lane: Lane, canUndo: Bool, reusing drawn: BoardSnapshot? = nil, only: BoardColumn? = nil) throws -> BoardSnapshot {
         let pure: Bool
         if case .preview = lane { pure = true } else { pure = false }
         func read<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], over files: BoardFiles, as type: T.Type = T.self) throws -> T {
@@ -537,21 +546,39 @@ extension TaskBoard {
         }
 
         let name: (String) throws -> String = { try read("tasks.listName", [.string($0)], over: files) }
+        // Drawn again for one list's own change (a project folded, a list grouped): every other list stands as drawn.
+        let same = drawn.map { $0.day == day && $0.settingsJSON == files.settingsJSON && $0.tasksText == files.tasks } ?? false
+        func kept(_ column: BoardColumn) -> BoardList? {
+            guard same, let only, column != only else { return nil }
+            return drawn?.lists[column]
+        }
         let lists: [BoardColumn: BoardList] = [
-            .day: try list(.day, screen.day.list, title: dayTitle),
-            .soon: try list(.soon, screen.soon, title: name("soon")),
-            .inbox: try list(.inbox, screen.inbox, title: name("inbox")),
-            .backlog: try list(.backlog, screen.backlog, title: name("backlog")),
+            .day: try kept(.day) ?? list(.day, screen.day.list, title: dayTitle),
+            .soon: try kept(.soon) ?? list(.soon, screen.soon, title: name("soon")),
+            .inbox: try kept(.inbox) ?? list(.inbox, screen.inbox, title: name("inbox")),
+            .backlog: try kept(.backlog) ?? list(.backlog, screen.backlog, title: name("backlog")),
         ]
-        let events: DayEvents = screen.calendars ? try read("calendars.events", [.string(day)], over: files) : try noDayEvents()
-        let timeline = try timeline(
-            day: day, today: today, screen: screen, events: events, files: files, measures: measures, painter: &painter,
-            ask: { try read($0, $1, over: $2) as JSONValue }, askRule: { try readRule($0, $1) as JSONValue })
+        // The day's calendar drawn already stands as it was when nothing it is made of changed (a project folded in a
+        // list, a list grouped): the same day, files and tasks on it.
+        let timeline: BoardTimeline
+        let statuses: [SourceStatus], alert: CalendarAlert, words: DayWords
+        if let drawn, drawn.day == day, drawn.settingsJSON == files.settingsJSON, drawn.calendarTexts == files.calendars,
+           Set(drawn.timeline.slots.map(\.card.item)) == Set(screen.day.slotted) {
+            timeline = drawn.timeline
+            (statuses, alert, words) = (drawn.statuses, drawn.calendarsAlert, drawn.calendarWords)
+        } else {
+            let events: DayEvents = screen.calendars ? try read("calendars.events", [.string(day)], over: files) : try noDayEvents()
+            (statuses, alert, words) = (events.statuses, events.alert, events.words)
+            timeline = try self.timeline(
+                day: day, today: today, screen: screen, events: events, files: files, measures: measures, painter: &painter,
+                ask: { try read($0, $1, over: $2) as JSONValue }, askRule: { try readRule($0, $1) as JSONValue })
+        }
         let menuScreen: JSONValue = ["today": .string(today), "day": .string(day), "offer": screen.offer]
         // A menu reads no file: asked over the settings alone, it costs nothing per card.
         let settingsOnly = BoardFiles(tasks: nil, settingsJSON: files.settingsJSON, calendars: [:], now: files.now)
         var menus: [String: TaskMenuModel] = [:]
-        var shown: BoardSnapshot?
+        // The menus of a drawing already shown are kept for every task still as it was there: a menu is the task's alone.
+        var shown: BoardSnapshot? = drawn
         if case .preview(let before) = lane { shown = before }
         func menu(_ item: TaskItem, _ from: String) throws -> TaskMenuModel {
             if let shown, let kept = shown.menus[item.id], shown.item(item.id) == item, shown.column(of: item.id) == from { return kept }
@@ -568,9 +595,9 @@ extension TaskBoard {
             screen: screen,
             lists: lists,
             timeline: timeline,
-            statuses: events.statuses,
-            calendarsAlert: events.alert,
-            calendarWords: events.words,
+            statuses: statuses,
+            calendarsAlert: alert,
+            calendarWords: words,
             canUndo: canUndo,
             menus: menus,
             look: look,
@@ -846,3 +873,4 @@ public struct ColumnSections: Decodable, Sendable {
     public let list: String
     public let date: String?
 }
+
