@@ -40,6 +40,8 @@ struct EntryView: Decodable, Equatable {
     let repeatable: Bool
     let repeatDay: String
     let `repeat`: JSONValue?
+    /// The Project button after the flag (`EntryState.project`); nil where the bar has none (a subtask's field, a section's name).
+    let project: EntryProject?
 
     var spotKind: String { spot["kind"].string ?? "" }
     /// The field writes a section's name.
@@ -263,6 +265,8 @@ final class QuickEntryHost {
     func togglePriority(_ prefix: String) { call("togglePriority", [.string(prefix)]) }
     func toggleLabel(_ name: String) { call("toggleLabel", [.string(name)]) }
     func setRepeat(_ rule: JSONValue) { call("setRepeat", [rule]) }
+    /// The Project button's pick: the field's own project (the link, nil for none); a list drawn by project moves the field.
+    func setProject(_ link: String?) { call("setProject", [link.json]) }
 
     /// A tap elsewhere, the check in the top bar, the keyboard put away: the text is kept and the field closes.
     func blur() {
@@ -1106,9 +1110,10 @@ struct KeyBar: View {
                         .glassEffect(.regular.interactive(), in: .capsule)
                     }
                     Spacer(minLength: 0)
-                    if state.markable || state.repeatable || state.place != nil {
+                    if state.markable || state.project != nil || state.repeatable || state.place != nil {
                         HStack(spacing: 0) {
                             if state.markable { priority(host, state) }
+                            if let project = state.project { self.project(host, project) }
                             if state.repeatable {
                                 Button { host.ask(.repeating) } label: {
                                     icon(state.repeat?.isNull == false ? "repeat.circle.fill" : "repeat")
@@ -1175,6 +1180,22 @@ struct KeyBar: View {
         }
         .menuOrder(.fixed)
         .accessibilityLabel("Priority")
+    }
+
+    /// The field's project (board «5 — Новая задача»'s bar, spec point 1): the Project page; a chosen project lights the
+    /// folder in the accent, as a chosen level lights the flag.
+    private func project(_ host: QuickEntryHost, _ project: EntryProject) -> some View {
+        Menu {
+            MenuNodes(nodes: ProjectPage.nodes(project.page, pick: { host.setProject($0) }, new: { host.model?.askNewProject(.entry) }), palette: { _ in nil })
+        } label: {
+            Image(systemName: project.lit ? "folder.fill" : "folder")
+                .foregroundStyle(project.lit ? AnyShapeStyle(Palette.accent(scheme)) : AnyShapeStyle(.primary))
+                .frame(width: 44, height: 44)
+                .contentShape(.rect)
+        }
+        .menuOrder(.fixed)
+        .accessibilityLabel("Project")
+        .accessibilityValue(project.page.value)
     }
 
     /// A menu row's icon in the mark's colour, as the task's own menu draws it: the system menu draws only original colours.

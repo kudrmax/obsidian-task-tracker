@@ -217,13 +217,15 @@ struct TaskCapsule: View {
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onCounter?($0) }
     }
 
-    /// The task's project (board Proj2V1): a folder in the caption colour, in the date's place and of its width, left of the
-    /// date, the repeat and the counter; the card's height does not change.
+    /// The task's project (board Proj2V1): a folder in the caption colour at the card's right edge, left of the date, the
+    /// repeat and the counter, as narrow as the glyph (projects polish, point 4); its button is wider and lies over the
+    /// title's faded end (`CardControl`). The card's height does not change.
     private var projectMark: some View {
         Image(systemName: "folder")
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(metaColor)
-            .frame(width: 24, height: 18)
+            .fixedSize()
+            .frame(height: 18)
             .accessibilityLabel("Project \(card.item.project?.name ?? "")")
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onMark?($0) }
     }

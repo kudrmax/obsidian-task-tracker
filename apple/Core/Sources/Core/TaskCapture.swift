@@ -17,12 +17,15 @@ public struct CaptureTask: Sendable {
     public let typed: String
     public let recording: String?
     public let tag: String
+    /// The sheet's Project (`ProjectRef.link`); nil for none.
+    public let project: String?
 
-    public init(list: CaptureList, typed: String, recording: String? = nil, tag: String = "") {
+    public init(list: CaptureList, typed: String, recording: String? = nil, tag: String = "", project: String? = nil) {
         self.list = list
         self.typed = typed
         self.recording = recording
         self.tag = tag
+        self.project = project
     }
 }
 
@@ -86,7 +89,7 @@ public final class TaskCapture: Sendable {
     }
 
     /// `recording`: an `m4a` file's bytes, or none; `tag` follows its link, empty for none.
-    public func capture(list: CaptureList, text: String, recording: Data?, tag: String = "") -> CaptureOutcome {
+    public func capture(list: CaptureList, text: String, recording: Data?, tag: String = "", project: String? = nil) -> CaptureOutcome {
         let at = now()
         do {
             var saved: String?
@@ -94,7 +97,7 @@ public final class TaskCapture: Sendable {
                 let folder = AttachmentFolder.path(appJSON: vault.read(path: AttachmentFolder.appSettingsPath), notePath: try vault.tasksFilePath())
                 saved = try vault.save(recording, in: folder, named: Self.recordingName(at))
             }
-            let task = CaptureTask(list: list, typed: text, recording: saved, tag: tag)
+            let task = CaptureTask(list: list, typed: text, recording: saved, tag: tag, project: project)
             // A second try reads again: the file may have changed between the read and the write.
             for _ in 0..<2 {
                 let file = try vault.read()

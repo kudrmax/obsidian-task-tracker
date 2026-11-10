@@ -199,12 +199,15 @@ final class CardControl: UIControl {
         if let counter = counterFrame {
             fold.frame = CGRect(x: counter.minX - Self.foldReach, y: 0, width: counter.width + Self.foldReach * 2, height: min(bounds.height, CardMetrics.height))
         }
+        // The folder is drawn as narrow as its glyph; its button keeps the 24 points and 3 on each side it had, centred on it.
         if let folder = markFrame {
-            mark.frame = CGRect(x: folder.minX - Self.foldReach / 2, y: 0, width: folder.width + Self.foldReach, height: min(bounds.height, CardMetrics.height))
+            let width = Self.markTarget + Self.foldReach
+            mark.frame = CGRect(x: folder.midX - width / 2, y: 0, width: width, height: min(bounds.height, CardMetrics.height))
         }
     }
 
     private static let foldReach: CGFloat = 6
+    private static let markTarget: CGFloat = 24
 
     // MARK: The menu
 
@@ -231,7 +234,9 @@ final class CardControl: UIControl {
     /// A card drawn: when it is the task whose menu shows, the menu takes the new drawing.
     static func follow(card: BoardCard, look: Look, menu: @escaping (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?, from control: CardControl) {
         guard let owner = menuOwner, owner.opener.showing, let shown = owner.look else { return }
-        guard shown.card.item.id == card.item.id, shown != look || owner === control else { return }
+        // A card of a screen under another (the main screen under a project's view) draws the same task as that screen
+        // reads it: never the menu's, which follows the screen it was opened on.
+        guard shown.card.item.id == card.item.id, owner === control || (shown != look && control.window != nil) else { return }
         owner.menuMaker = menu
         owner.redrawn(look)
     }

@@ -30,8 +30,8 @@ final class AppServices: Sendable {
         (try? rules.captureLists(settingsJSON: vault.settingsJSON())) ?? []
     }
 
-    func capture(list: CaptureList, text: String, recording: Data?, tag: String = "") -> CaptureOutcome {
-        let outcome = tasks.capture(list: list, text: text, recording: recording, tag: tag)
+    func capture(list: CaptureList, text: String, recording: Data?, tag: String = "", project: String? = nil) -> CaptureOutcome {
+        let outcome = tasks.capture(list: list, text: text, recording: recording, tag: tag, project: project)
         vault.tellWatch()
         return outcome
     }
