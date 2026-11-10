@@ -36,8 +36,10 @@ import Testing
         #expect(try card(try screen(board), "Better idea").id == before.id)
     }
 
+    /// The move is written on the day the screen was drawn: on the real clock the file's dates roll to today first, and a
+    /// postpone to a day already gone moves nothing to it.
     @Test func aCardKeepsItsIdWhenItMovesToAnotherList() throws {
-        let board = TaskBoard(core: core, vault: FakeVault(Self.file))
+        let board = TaskBoard(core: core, vault: FakeVault(Self.file), clock: { Fixtures.date(6, 10) })
         let shop = try card(try screen(board), "Shop")
         try board.write("tasks.postponeAll", [.array([shop.item.key.json]), "2026-11-09"])
         let moved = try board.snapshot(day: "2026-11-09", measures: Self.measures, now: Fixtures.date(6, 10))
