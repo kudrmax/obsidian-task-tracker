@@ -501,6 +501,8 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("reminders.snooze", LUNCH, 15),
 		plain("capture.add", "inbox", "Buy milk"),
 		plain("capture.add", "inbox", "Idea", "Recording 1.m4a", "#transcribe"),
+		plain("capture.add", "inbox", "Call", null, "", "Alpha"),
+		plain("capture.project", "Alpha"),
 		plain("capture.lists"),
 		plain("screenSettings.get"),
 		...SETTINGS_CASES.map(([m, ...a]) => ({ method: `settings.${m}`, args: a, context: context(FILE, { settings: DATA }) })),
@@ -596,6 +598,10 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("notes.insert", "Call [[Alp", { query: "Alp", from: 5, to: 10 }, "Alpha"),
 		plain("notes.open", "Alpha#Plan", [{ path: "Projects/Alpha.md" }]),
 		plain("notes.open", "Gone", [{ path: "Projects/Alpha.md" }]),
+		plain("notes.newProject", "Alpha", [{ path: "Projects/Alpha.md" }]),
+		plain("notes.newProject", "", []),
+		plain("notes.projectText", "Body\n"),
+		plain("notes.projectText", null),
 		...[
 			["openAtEnd", "soon"],
 			["openFromPlus"],
@@ -612,7 +618,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 			["listEntry", "day"],
 			["placeOf", "day", { kind: "task", group: null, before: null }],
 		].map(([m, ...a]) => entry(m as string, ...a)),
-		...[["type", "x"], ["setPriority", "p1"], ["togglePriority", "p1"], ["setLabels", ["Fast"]], ["toggleLabel", "Fast"], ["setRepeat", rule], ["indent", 1], ["toggleSection"], ["enter"], ["blur"], ["escape"], ["choosePlace", { kind: "soon" }], ["moveToEnd", "soon"]].map(([m, ...a]) =>
+		...[["type", "x"], ["setPriority", "p1"], ["togglePriority", "p1"], ["setLabels", ["Fast"]], ["toggleLabel", "Fast"], ["setRepeat", rule], ["setProject", "Alpha"], ["indent", 1], ["toggleSection"], ["enter"], ["blur"], ["escape"], ["choosePlace", { kind: "soon" }], ["moveToEnd", "soon"]].map(([m, ...a]) =>
 			plain(`entry.${m}`, (opened.result as { session: unknown }).session, look, ...a),
 		),
 		...[["call", job], ["job", job], ["shown", job, null, {}], ["unshown", job], ["done", job]].map(([m, ...a]) => plain(`entry.${m}`, session, look, ...a)),
@@ -690,7 +696,7 @@ describe("the door's quick entry", () => {
 		const entered = step("enter");
 		expect(entered.state).toMatchObject({ text: "", pending: [{ text: "Buy milk" }] });
 		const [job] = entered.jobs;
-		expect(step("call", job.id).value).toEqual({ method: "createInPlace", args: ["Buy milk", null, { kind: "day", date: T, group: null, before: null }, null, []] });
+		expect(step("call", job.id).value).toEqual({ method: "createInPlace", args: ["Buy milk", null, { kind: "day", date: T, group: null, before: null }, null, [], null] });
 		const made = { key: { section: "now", index: 0, path: [], raw: "- [ ] Buy milk" }, id: "t9" };
 		const shown = step("shown", job.id, made, { day: [{ key: made.key, id: made.id, level: 0, group: null }] });
 		expect(shown.state?.pending).toEqual([]);

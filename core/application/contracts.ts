@@ -51,7 +51,7 @@ export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace
 /** What a drop in a gap means, and none when it changes nothing; which section a gap is in; where a lifted section goes. */
 export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
-export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
+export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
 export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
 /**
@@ -176,6 +176,17 @@ export interface ProjectRef {
 	readonly mark: boolean;
 }
 
+/**
+ * The note «New project…» writes: the vault's note of the typed name (case aside) when it has one (`exists`: its
+ * properties get the project tag), else a new note at the vault's root. `link` is what `setProject` and a place take.
+ */
+export interface NewProjectNote {
+	readonly name: string;
+	readonly path: string;
+	readonly link: string;
+	readonly exists: boolean;
+}
+
 /** A note with the project tag: what the `Projects` port gives the core. */
 export interface ProjectNote {
 	readonly name: string;
@@ -285,6 +296,11 @@ export interface FullTree {
 	readonly rows: readonly FullRow[];
 	/** Where a new last subtask of the task itself goes: after every row, at the first depth. */
 	readonly newSubtask: FullPlace;
+	/**
+	 * The line under the title: the task's project, a subtask's its parent's; null for none, and no line. A tap opens it:
+	 * the plugin the note (`note`, while `canOpenNote`), the app the project's view (`screen(date, link)`).
+	 */
+	readonly project: ProjectRef | null;
 }
 
 /** A piece of a found task's text; `match` marks a piece the search found. */
@@ -570,6 +586,11 @@ export interface MenuProject {
 	readonly value: string;
 	/** The row can't be pressed: only subtasks, whose project is their parent's. */
 	readonly disabled: boolean;
+	/**
+	 * The page's last option, «New project…»: it asks the name, then `TaskService.newProject` (the door: `notes.newProject`
+	 * and `notes.projectText`, the host writing the note) and the tasks, or the field, get that project.
+	 */
+	readonly newLabel: string;
 }
 
 /**
@@ -790,12 +811,16 @@ export interface TaskService {
 	 * One write per call. Gives the new task's key as the file stands after the write, wherever its rules put it (a schedule
 	 * takes an Inbox task to Soon); null when nothing was created.
 	 */
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[]): Promise<TaskKey | null>;
+	/**
+	 * `project`, the task's own (`ProjectRef.link`, null for none; the quick entry's choice): it is written whatever the
+	 * place's `project` says, which then only decides where the task goes. A subtask takes none: its project is its parent's.
+	 */
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | null): Promise<TaskKey | null>;
 	/**
 	 * `createInPlace`, answering the new task's id with its key: the key names it as the file stands right after this write,
 	 * the id for as long as the service runs, whatever writes come before the screen draws it. Null when nothing was created.
 	 */
-	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[]): Promise<CreatedTask | null>;
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | null): Promise<CreatedTask | null>;
 	/**
 	 * The marks `createInPlace`, `create` or `edit` writes for a title typed as `text` with `priority` (a level's prefix or
 	 * null) and `labels` chosen: the chosen priority, else the level the text's first word is; the labels only without one.
@@ -848,6 +873,13 @@ export interface TaskService {
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void>;
 	/** The notes with the project tag, by name: what the Project page offers. */
 	projectNotes(): readonly ProjectRef[];
+	/**
+	 * «New project…» named `name`: a note of that name at the vault's root with the project tag in its properties, or the
+	 * vault's note of that name tagged (its properties' tags, the rest untouched); then `keys` get that project in one
+	 * write (none: only the note, for the quick entry's field). The project, or null for a name of nothing, which writes
+	 * nothing.
+	 */
+	newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null>;
 	/** Group by project in `list`'s title menu: kept on the device. */
 	setGrouping(list: GroupedList, on: boolean): Promise<void>;
 	/** A group's chevron or title tapped: folded or unfolded, kept on the device. */

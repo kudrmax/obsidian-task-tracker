@@ -66,14 +66,14 @@ export class TaskWrites {
 		return nothing(this.rules.createAtTime(date, start, text));
 	}
 
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Write<TaskKey | null> {
-		const write = this.createWithId(text, priority, place, repeat, labels);
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Write<TaskKey | null> {
+		const write = this.createWithId(text, priority, place, repeat, labels, project);
 		return { operation: write.operation, answer: (change) => write.answer(change)?.key ?? null };
 	}
 
-	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Write<CreatedTask | null> {
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Write<CreatedTask | null> {
 		return {
-			operation: this.rules.createInPlace(text, priority, place, repeat, labels),
+			operation: this.rules.createInPlace(text, priority, place, repeat, labels, project),
 			answer: (change) => {
 				const created = change?.after.insertedSince(change.before);
 				return created ? { key: keyOf(created), id: created.id } : null;

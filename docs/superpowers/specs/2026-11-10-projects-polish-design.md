@@ -49,3 +49,38 @@ Siri, Shortcuts and the voice capture setting a project (they set no label or pr
 ## Decisions
 
 (The agents write here the gaps they decide.)
+
+Backend (the core's contract):
+
+1. **The field's project is its own choice** (`EntryField.project`, the link; null for none), like its labels: it starts
+   with the project of the group the field opened in, of the project's view, or of the renamed task; Enter's next field
+   keeps it (it is the place's, not the line's); Escape drops it with the field. `EntryState.project` is the button
+   (`EntryProject` `{ page, lit }`): `page` the task menu's Project page, `lit` while a project is chosen.
+2. **No Project button for a subtask's field** (new, renamed, or in a menu's stack) nor for a section's name: the bar has
+   no Place there either, and a subtask's project is its parent's. A slot's field and a rename of a top-level task have it.
+3. **A project picked in a list drawn by project** moves the field to the end of that project's part, as Place does; a
+   list that draws no part of it (Soon's No project without a task) leaves the field where it is. A rename's field never
+   moves: the task keeps its place in the lane, as with the menu's Project.
+4. **The project travels as the task's own**, `createInPlace`'s and `createWithId`'s sixth argument (`project`), apart
+   from `NewTaskPlace.project`, which then only places the task. So Place to an ungrouped list keeps the list's end (no
+   jump after the project's last task there) and still writes the project. A subtask's place takes none (the entry hands
+   five arguments there). A rename writes it through `TaskDraft.project` (only when it changed).
+5. **«New project…» is `MenuProject.newLabel`** on every Project page, in every model that has one (task menu, bulk
+   menu, quick entry, New Task sheet). The plugin calls `TaskService.newProject(name, keys)` (the note through the
+   `NoteFiles` port, then `setProject` in one more write; `keys` empty for the field, which then takes the answered
+   `link` by `setProject`); the app asks `notes.newProject(name, notes)` and `notes.projectText(text)`, writes the note
+   and calls `tasks.setProject`.
+6. **The note's name** is the typed name trimmed, without what a file name or a link may not hold
+   (`\ / : * ? " < > | # ^ [ ]`) and leading dots; nothing left: nothing written. «The same name» is a markdown note of
+   that name, case aside, the one nearest the vault's root when several; its link is the one Obsidian would write.
+7. **The tag goes into the properties' `tags` without `#`**: appended to a list, into a `[a, b]` flow list, a plain value
+   turned into a list, `tags:` added as the last property, or properties made first for a note without them. A note that
+   has the tag already (properties or text) is left untouched.
+8. **Grouped Soon** gets a group for every project note, as Backlog; **No project's** group there keeps its rule (only
+   with a task or an empty section): an empty Soon still offers the title drop and the projects' plates.
+9. **The New Task sheet** asks `capture.project(chosen)` for its row (the same `EntryProject` as the bar), starts with
+   `ScreenView.project?.link` of the view it was opened from, and writes by `capture.add(list, typed, recording, tag,
+   project)`: last in the list, the project on the line.
+10. **The full screen's line** is `FullTree.project` (a subtask's: its parent's); a tap opens `note` in the plugin (while
+    `canOpenNote`), `tasks.screen(date, link)` in the app.
+11. **Point 4 (the narrow mark)** needs nothing of the core.

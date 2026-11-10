@@ -1719,11 +1719,11 @@
     const unsorted = isUndated(section);
     if (entry === null) {
       const { text, ...marks } = typed(doc, draft.text, draft.priority, draft.labels ?? []);
-      return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : slot ?? null, ...marks }), draft, today, boundary));
+      return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : slot ?? null, ...marks, project: draft.project ?? null }), draft, today, boundary));
     }
     if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
     const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-    const changed2 = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...same ? {} : { dueDate }, ...unsorted ? { slot: null } : {} };
+    const changed2 = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...same ? {} : { dueDate }, ...unsorted ? { slot: null } : {}, ...draft.project !== void 0 && { project: draft.project } };
     const edited = doc.replace(entry, withDraftRepeat(changed2, draft, today, boundary));
     if (same || entry.section === section) return edited;
     return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
@@ -1797,8 +1797,9 @@
     const next = own.entries[own.entries.indexOf(last) + 1];
     return next ? next.index : { endOf: own.index };
   }
-  function createInPlace(doc, typedText, priority, place, today, boundary, repeat, labels = []) {
+  function createInPlace(doc, typedText, priority, place, today, boundary, repeat, labels = [], own) {
     const { text, ...marks } = typed(doc, typedText, priority, labels);
+    const projectOf = (zone) => own !== void 0 ? own : zone ?? null;
     switch (place.kind) {
       case "subtask":
         return intoUnfolded(
@@ -1807,11 +1808,11 @@
           (d, same) => d.insertUnder(same(place.parent), withRepeat(newTask(text, marks), repeat, today, boundary), place.before && same(place.before))
         );
       case "slot":
-        return createInSlot(doc, place.slot, text, { ...marks, project: place.project ?? null }, today, boundary);
+        return createInSlot(doc, place.slot, text, { ...marks, project: projectOf(place.project) }, today, boundary);
       case "list": {
         const { list, before, project } = place;
         const dueDate = list === "now" ? place.date ?? today : enteringList(list, today, place.date).dueDate;
-        const task = withRepeat(newTask(text, { dueDate, ...marks, project: project ?? null }), repeat, today, boundary);
+        const task = withRepeat(newTask(text, { dueDate, ...marks, project: projectOf(project) }), repeat, today, boundary);
         if (place.section !== void 0) return intoNewSection(doc, list, place.group, place.section, task, place.date, today, boundary, project ?? null);
         const position = project === void 0 || before !== null && before.section === list ? positionIn(doc, list, place.group, before) : afterProject(doc, list, place.group, project, place.date, today, boundary, null);
         return doc.insert(list, position, task);
@@ -3206,829 +3207,6 @@ ${key.title}`.toLowerCase();
     return slot >= groups.length ? "end" : { before: groups[slot] };
   }
 
-  // core/application/fullTree.ts
-  function unfolded(items) {
-    return items.map((item) => ({ ...item, collapsed: false, subtasks: unfolded(item.allSubtasks) }));
-  }
-  function rowsOf(items, level, rows) {
-    for (const item of items) {
-      const at = rows.length;
-      rows.push({ item, level, newSubtask: { index: at + 1, level: level + 1 } });
-      rowsOf(item.subtasks, level + 1, rows);
-      rows[at] = { ...rows[at], newSubtask: { index: rows.length, level: level + 1 } };
-    }
-  }
-  function fullTree(task) {
-    const subtasks = unfolded(task.allSubtasks);
-    const rows = [];
-    rowsOf(subtasks, 0, rows);
-    return { task, subtasks, rows, newSubtask: { index: rows.length, level: 0 } };
-  }
-
-  // core/application/QuickEntry.ts
-  function zoneOf2(header) {
-    return header !== null && typeof header === "object" ? header : { group: header };
-  }
-  function sameZone2(a, b) {
-    return a.group === b.group && a.project === b.project;
-  }
-  function zoneIndex(sections, zone) {
-    return sections.findIndex((header) => sameZone2(zoneOf2(header), zone));
-  }
-  function entryAt(drawing, place, section) {
-    const { cards, sections } = drawing;
-    if (!sections.some((name) => name !== null)) return place.index <= cards.length ? { kind: "in", section: 0, card: place.index, keepsPlate: true } : { kind: "end" };
-    const at = zoneIndex(sections, place);
-    if (at < 0) return place.group === null && place.project === void 0 ? { kind: "top" } : { kind: "end" };
-    const start = cards.findIndex((card2) => zoneIndex(sections, card2) >= at);
-    const from = start < 0 ? cards.length : start;
-    let end = from;
-    while (end < cards.length && sameZone2(cards[end], place)) end++;
-    const card = place.index >= from && place.index <= end ? place.index : end;
-    return { kind: "in", section: at, card, keepsPlate: section };
-  }
-  function stackEntry(state, task) {
-    if (!state || state.spot.kind !== "stack") return null;
-    const { rows, newSubtask } = fullTree(task);
-    const renaming = state.renaming;
-    if (renaming) {
-      if (samePlace2(renaming.key, task.key)) return { at: { kind: "title" }, pending: [] };
-      const index = rows.findIndex((row) => samePlace2(row.item.key, renaming.key));
-      return index < 0 ? null : { at: { kind: "row", index, level: rows[index].level }, pending: [] };
-    }
-    const parent = state.spot.parent;
-    const place = samePlace2(parent, task.key) ? newSubtask : rows.find((row) => samePlace2(row.item.key, parent))?.newSubtask;
-    if (!place) return null;
-    return { at: { kind: "new", index: place.index, level: place.level }, pending: state.pending.map(({ text }) => ({ text, level: place.level })) };
-  }
-  var ENTRY_PLACES = ["inbox", "backlog", "soon", "now"];
-  function emptySession() {
-    return { field: null, runs: {}, jobs: [], next: 0 };
-  }
-  function listSpot(spot) {
-    return spot.kind === "list" ? spot : null;
-  }
-  var ALL_COLUMNS = ["day", "soon", "inbox", "backlog"];
-  var QuickEntry = class {
-    constructor(tasks, look, session = emptySession(), emit = () => void 0, queued = () => void 0) {
-      this.tasks = tasks;
-      this.look = look;
-      this.session = session;
-      this.emit = emit;
-      this.queued = queued;
-      /** What the field may do, kept while it only changes its text or marks, which do not change where it may go. Not state: worked out again. */
-      this.shifts = null;
-    }
-    get state() {
-      const field = this.session.field;
-      if (!field) return null;
-      const task = !field.section;
-      const typed2 = this.tasks.draftMarks(field.text, field.priority, field.labels);
-      const marks = task ? typed2 : { ...typed2, tint: null };
-      const place = task ? this.shownPlace(field) : null;
-      const run = this.run(field.run);
-      return {
-        spot: run.spot,
-        text: field.text,
-        priority: field.priority,
-        labels: field.labels,
-        repeat: field.repeat,
-        pending: run.pending.map(({ text, level }) => ({ text, level })),
-        renaming: field.rename?.item ?? null,
-        indents: task && listSpot(run.spot) !== null,
-        ...this.mayShift(field),
-        section: this.maySection(field) ? field.section : null,
-        newSection: field.newSection ?? null,
-        marks,
-        markable: task && marks.tiles.levels.length + marks.tiles.labels.length > 0,
-        place,
-        places: placeChoices(place),
-        repeatable: task && run.spot.kind !== "slot",
-        repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today()),
-        renamed: this.renamed
-      };
-    }
-    /** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */
-    get renamed() {
-      return this.session.jobs.flatMap((job) => job.kind === "rename" ? [{ id: job.item.id, key: job.item.key, text: job.draft.text, title: plainText(job.draft.text) }] : []);
-    }
-    /** The renamed task, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
-    get renaming() {
-      return this.session.field?.rename?.item.key ?? null;
-    }
-    /** What `column`'s list draws for the field: its gap, the texts waiting before it, and whether it is a section's name; null when it stands elsewhere. */
-    /**
-     * What `column`'s list draws for the field: none when it stands elsewhere. `drawn` is what the list is about to draw
-     * (the look's cards and sections when left out); `at` is where among them the field stands.
-     */
-    listEntry(column, drawn) {
-      const state = this.state;
-      const list = state && listSpot(state.spot);
-      if (!state || !list || list.column !== column) return null;
-      const section = state.section === true;
-      const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
-      return { place: list.place, pending: state.pending, section, newSection: state.newSection, at: entryAt(drawing, list.place, section || state.newSection !== null) };
-    }
-    /** Where `task`'s full screen draws the field: none unless it stands in the stack of `task` or one of its subtasks. */
-    stackEntry(task) {
-      return stackEntry(this.state, task);
-    }
-    /** Where a task's full screen types under `parent` or renames it: the stack of its subtasks there, whatever list shows it. */
-    stackSpot(parent) {
-      return { kind: "stack", parent };
-    }
-    /** A double click on a list's free room: the field after the last card, in the last section, at the top level. */
-    openAtEnd(column) {
-      this.open(this.endOf(column));
-    }
-    /** The plus tapped: the end of the day column while it shows, else of Inbox. */
-    openFromPlus() {
-      this.openAtEnd(this.look.shown().includes("day") ? "day" : "inbox");
-    }
-    /** The No tasks plate of empty section `group` tapped (in a list grouped by project, of the part `project`): the field of a new task in it. */
-    openIn(column, group, project) {
-      const cards = this.look.cards(column);
-      const place = { kind: "task", group, before: null, ...project !== void 0 && { project } };
-      this.open({ kind: "list", column, place: { ...gapOfPlace(cards, place), level: 0 } });
-    }
-    /** A long tap on the timeline's free room let go: the field of a new task in that slot. */
-    openSlot(slot) {
-      this.open({ kind: "slot", slot });
-    }
-    /** The plus came to rest on `column` (null: off the lists) with `result`: the field opens where the drop showed; false where it opens nowhere. */
-    openAtDrop(column, result) {
-      const place = result && column ? placeOfDrop2(result) : null;
-      if (column && place) this.open({ kind: "list", column, place: gapOfPlace(this.look.cards(column), place) });
-      else if (result?.kind === "time") this.openSlot(this.tasks.newSlot(this.look.day(), result.start));
-      else return false;
-      return true;
-    }
-    /** Where a new subtask of `parent` is typed: last among its subtasks in the list that shows it, else last in its menu's stack. */
-    subtaskSpot(parent) {
-      const found = this.find(parent);
-      if (!found) return { kind: "stack", parent };
-      return { kind: "list", column: found.column, place: gapOfPlace(this.look.cards(found.column), { kind: "subtask", parent, before: null }) };
-    }
-    /**
-     * Where `item` is renamed: right before its card in the list that shows it, in its card's section of its project's part
-     * where the list is grouped by project; else, opened from a menu's stack, there; else
-     * over its card on the timeline; null when it shows nowhere the field can stand.
-     */
-    renameSpot(item, inStack) {
-      const found = this.find(item.key);
-      if (found) {
-        const card = this.look.cards(found.column)[found.index];
-        return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group, ...card.project !== void 0 && { project: card.project } } };
-      }
-      if (inStack) return { kind: "stack", parent: item.key };
-      return item.slot ? { kind: "slot", slot: item.slot } : null;
-    }
-    /** A field at `spot`; one already open is finished first, as by a tap elsewhere. A rename's spot is the gap right before its own card. */
-    open(spot, renaming) {
-      if (this.session.field) this.save(this.session.field);
-      const rename2 = renaming ? { item: renaming, home: this.newRun(spot), moved: false } : null;
-      this.reset({ run: this.newRun(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename: rename2, section: false });
-    }
-    type(text) {
-      const field = this.session.field;
-      if (field) this.reset({ ...field, text }, true);
-    }
-    /** A level chosen takes the place of a prefix typed: the text keeps no prefix, so the file gets one. Null takes the level off. */
-    setPriority(prefix) {
-      const field = this.session.field;
-      if (!field) return;
-      const text = this.tasks.parseTitle(field.text).priority ? this.tasks.withPriority(field.text, null) : field.text;
-      this.reset({ ...field, text, priority: prefix }, true);
-    }
-    /** A level's tile tapped: the level, or none when the task is already written with it. */
-    togglePriority(prefix) {
-      const state = this.state;
-      if (state) this.setPriority(state.marks.priority?.prefix === prefix ? null : prefix);
-    }
-    setLabels(labels) {
-      const field = this.session.field;
-      if (field) this.reset({ ...field, labels }, true);
-    }
-    /** A label's tile tapped: on when the task is not written with it, else off. */
-    toggleLabel(name) {
-      const state = this.state;
-      if (!state) return;
-      const chosen = state.marks.labels.map((l) => l.name);
-      this.setLabels(chosen.includes(name) ? chosen.filter((n) => n !== name) : [...chosen, name]);
-    }
-    setRepeat(rule) {
-      const field = this.session.field;
-      if (field) this.reset({ ...field, repeat: rule }, true);
-    }
-    indent(delta) {
-      const place = this.shifted(delta);
-      const field = this.session.field;
-      const run = field && this.run(field.run);
-      const list = run && listSpot(run.spot);
-      if (!place || !run || !list) return;
-      run.spot = { ...list, place };
-      this.shifts = null;
-      this.changed();
-    }
-    /**
-     * The field switches between a task and a section's name. A section stands between tasks of the top level: the field
-     * goes there, past the subtasks of the task above it.
-     */
-    toggleSection() {
-      const field = this.session.field;
-      const list = field && listSpot(this.run(field.run).spot);
-      if (!field || !list || !this.maySection(field)) return;
-      const section = !field.section;
-      const run = section && list.place.level > 0 ? this.newRun({ ...list, place: this.topLevelAfter(list.column, list.place) }) : field.run;
-      const { newSection: _dropped, ...rest } = field;
-      this.reset({ ...rest, run, section });
-    }
-    enter() {
-      const field = this.session.field;
-      if (!field) return;
-      if (field.rename) this.enterRename(field, field.rename);
-      else if (field.section) this.enterSection(field);
-      else if (this.blank(field.text)) this.enterBlank();
-      else this.enterTask(field);
-    }
-    /** A tap elsewhere: the text is kept as by Enter, and the field closes. */
-    blur() {
-      const field = this.session.field;
-      if (!field) return;
-      this.save(field);
-      this.reset(null);
-    }
-    /** The field's own text goes; what Enter already sent is still written. */
-    escape() {
-      this.reset(null);
-    }
-    /**
-     * A place chosen in the bar: the field goes to the end of that place's column at once, a renamed task with it. What it
-     * answers: the column, and the day the day column must open when the place is another day than it shows; null when
-     * the place is the one the field already has, which changes nothing.
-     */
-    choosePlace(placement) {
-      const field = this.session.field;
-      if (!field) return null;
-      const shown = this.shownPlace(field);
-      if (shown && samePlacement(shown, placement)) return null;
-      const column = placement.kind === "now" || placement.kind === "date" ? "day" : placement.kind;
-      const rename2 = field.rename && { ...field.rename, moved: true };
-      this.reset({ ...field, rename: rename2, run: this.newRun(this.endOf(column)) });
-      const day = this.tasks.dayOfPlacement(placement);
-      return { column, day: day === null || day === this.look.day() ? null : day };
-    }
-    /** The field, its text and marks, at the end of `column`; what was entered at the old spot is still written there. */
-    moveToEnd(column) {
-      const field = this.session.field;
-      if (field) this.reset({ ...field, run: this.newRun(this.endOf(column)) });
-    }
-    /** Where a task written in `column` goes: a list's place, or the day column's on the day it shows. */
-    placeOf(column, result, section) {
-      if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
-      const { group, before } = result;
-      const project = result.project !== void 0 ? result.project : this.look.project?.();
-      const zone = { ...project !== void 0 && { project }, ...section !== void 0 && { section } };
-      if (column !== "day") return { kind: "list", list: column, group, before, ...zone };
-      return { kind: "day", date: this.look.day(), group, before, ...zone };
-    }
-    /** A slot of the field: the project's own view writes its project there too. */
-    slotPlace(slot) {
-      const project = this.look.project?.();
-      return project === void 0 ? { kind: "slot", slot } : { kind: "slot", slot, project };
-    }
-    job(id) {
-      const job = this.session.jobs.find((j) => j.id === id);
-      if (!job) throw new Error(`Task Calendar: no entry job ${id}`);
-      return job;
-    }
-    /**
-     * The service call job `id` is, read when the lists show every write before it: a task at the level it was entered at,
-     * as far as the cards then allow; a rename by the key the lists give the task then; a section at the top level where the
-     * field stood. Null when it is nothing to write. A slot takes no rule.
-     */
-    call(id) {
-      const job = this.job(id);
-      switch (job.kind) {
-        case "create": {
-          const { line } = job;
-          const { spot } = this.run(job.run);
-          job.landing = null;
-          switch (spot.kind) {
-            case "slot":
-              return { method: "createInPlace", args: [line.text, line.priority, this.slotPlace(spot.slot), null, line.labels] };
-            case "stack":
-              return { method: "createInPlace", args: [line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null }, line.repeat, line.labels] };
-            case "list": {
-              const cards = this.look.cards(spot.column);
-              const place = fitLevel(cards, { ...spot.place, level: line.level });
-              job.landing = spot.column;
-              return { method: "createInPlace", args: [line.text, line.priority, this.placeOf(spot.column, placeOfGap(cards, place), job.newSection), line.repeat, line.labels] };
-            }
-          }
-          break;
-        }
-        case "rename":
-          return { method: "edit", args: [this.keyAt(job.home, job.item), job.draft] };
-        case "section": {
-          const at = this.placeOf(job.column, placeOfGap(this.look.cards(job.column), { ...job.place, level: 0 }));
-          return at.kind === "list" || at.kind === "day" ? { method: "createSection", args: [job.name, at] } : null;
-        }
-      }
-    }
-    /**
-     * A task job's line is written and the lists are about to draw it (`coming`: the cards each column draws then). It
-     * leaves the queue, and the places at or past its card move down, in the very drawing that shows its card: where the
-     * lists draw the task the file holds (`created`, the key the write gave), which its rules may have put elsewhere.
-     */
-    /** `created`: the task the write made, its key, or with its id (`createWithId`), which finds its card whatever wrote since. */
-    shown(id, created, coming) {
-      const job = this.job(id);
-      if (job.kind !== "create") return;
-      const held = this.session.field?.run ?? null;
-      const was = held === null ? null : this.run(held).spot;
-      if (job.landing && created) this.landed(job.landing, created, coming(job.landing));
-      this.run(job.run).pending.shift();
-      job.shown = true;
-      this.shifts = null;
-      if (held !== null && (held === job.run || this.run(held).spot !== was)) this.emit(this.state, true);
-    }
-    /** A task job ended without its line shown (its write failed): the line stops waiting under the cards. */
-    unshown(id) {
-      const job = this.job(id);
-      if (job.kind !== "create" || job.shown) return;
-      this.run(job.run).pending.shift();
-      this.shifts = null;
-      if (job.run === this.session.field?.run) this.changed();
-    }
-    /** Job `id` ended, written or not: its spot no longer follows the cards for it. */
-    done(id) {
-      const job = this.job(id);
-      this.release(job.kind === "rename" ? job.home : job.run);
-      this.session.jobs.splice(this.session.jobs.indexOf(job), 1);
-    }
-    run(id) {
-      return this.session.runs[id];
-    }
-    newRun(spot) {
-      const id = `r${this.session.next++}`;
-      this.session.runs[id] = { spot, pending: [], holds: 0 };
-      return id;
-    }
-    hold(id) {
-      this.run(id).holds++;
-    }
-    release(id) {
-      const run = this.run(id);
-      if (!run) return;
-      run.holds--;
-      if (run.holds <= 0) delete this.session.runs[id];
-    }
-    maySection(field) {
-      const list = listSpot(this.run(field.run).spot);
-      return !field.rename && list !== null && this.look.sectioned(list.column);
-    }
-    /** The gap of the top level at or after `place` in its section: past the subtasks it stands among. */
-    topLevelAfter(column, place) {
-      const cards = this.look.cards(column);
-      let index = place.index;
-      while (index < cards.length && sameZone2(cards[index], place) && cards[index].level > 0) index++;
-      return { ...place, index, level: 0 };
-    }
-    mayShift(field) {
-      const list = listSpot(this.run(field.run).spot);
-      if (field.rename || field.section || !list) return { canIndent: false, canOutdent: false };
-      const cards = this.look.cards(list.column);
-      const { spot } = this.run(field.run);
-      const kept = this.shifts;
-      if (kept?.cards === cards && kept.spot === spot) return { canIndent: kept.indent, canOutdent: kept.outdent };
-      const shifts = { cards, spot, indent: this.shiftedRun(field.run, cards, 1) !== null, outdent: this.shiftedRun(field.run, cards, -1) !== null };
-      this.shifts = shifts;
-      return { canIndent: shifts.indent, canOutdent: shifts.outdent };
-    }
-    /** The place button: a subtask's field, new or renamed, has none, nor does one off the lists. */
-    shownPlace(field) {
-      const list = listSpot(this.run(field.run).spot);
-      if (!list) return null;
-      if (field.rename) return field.rename.item.isSubtask ? null : this.placement(field);
-      return list.place.level > 0 ? null : this.columnPlacement(list.column);
-    }
-    /** Where a renamed task goes: where it was, until a place is chosen in the bar. */
-    placement(field) {
-      const item = field.rename?.item ?? null;
-      const list = listSpot(this.run(field.run).spot);
-      if (list && (field.rename?.moved || !item)) return this.columnPlacement(list.column);
-      return item ? this.tasks.placementOf(item) : this.columnPlacement("day");
-    }
-    columnPlacement(column) {
-      return column === "day" ? this.tasks.placementOfDay(this.look.day()) : { kind: column };
-    }
-    /** After the last card, in the last section, at the top level. */
-    endOf(column) {
-      const sections = this.look.sections(column);
-      const last = sections.length > 0 ? zoneOf2(sections[sections.length - 1]) : { group: null };
-      return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, ...last } };
-    }
-    find(key) {
-      const shown = this.look.shown();
-      for (const column of [...shown, ...ALL_COLUMNS.filter((c) => !shown.includes(c))]) {
-        const index = this.look.cards(column).findIndex((card) => samePlace2(card.key, key));
-        if (index >= 0) return { column, index };
-      }
-      return null;
-    }
-    /** Saved, then a new line under the task; a blank text cancels the rename. */
-    enterRename(field, rename2) {
-      const list = listSpot(this.run(field.run).spot);
-      if (this.blank(field.text)) this.reset(null);
-      else {
-        this.saveRename(field, rename2);
-        this.reset(list ? { run: this.newRun(this.under(list, rename2.item)), text: "", priority: null, labels: [], repeat: null, rename: null, section: false } : null);
-      }
-    }
-    /**
-     * The section goes to the queue and the field closes; a blank name writes nothing. In a project's part no empty section
-     * is made: the field asks for its first task, and the two are written together.
-     */
-    enterSection(field) {
-      const name = field.text.trim();
-      const list = listSpot(this.run(field.run).spot);
-      if (list && list.place.project !== void 0) {
-        this.reset(name === "" ? null : { ...field, text: "", section: false, newSection: name });
-        return;
-      }
-      this.createSection(field);
-      this.reset(null);
-    }
-    /** As in Obsidian: a level shallower, and the end of the entry where it can go no shallower; a section named for a task not typed goes with it. */
-    enterBlank() {
-      if (this.session.field?.newSection !== void 0) this.reset(null);
-      else if (this.shifted(-1)) this.indent(-1);
-      else this.reset(null);
-    }
-    /** The task goes to the queue; the next field opens at once, without a priority, labels or a repeat. A slot takes one task only. */
-    enterTask(field) {
-      this.create(field);
-      const ends = this.run(field.run).spot.kind === "slot" || field.newSection !== void 0;
-      this.reset(ends ? null : { ...field, text: "", priority: null, labels: [], repeat: null });
-    }
-    /** The field becomes `field` (none: closed); the runs it stands on are held while it does. `sameShifts`: only its text or marks changed. */
-    reset(field, sameShifts = false) {
-      const old = this.session.field;
-      for (const run of runsOf(field)) this.hold(run);
-      for (const run of runsOf(old)) this.release(run);
-      this.session.field = field;
-      if (!sameShifts) this.shifts = null;
-      this.changed();
-    }
-    save(field) {
-      if (field.section) return this.createSection(field);
-      if (this.blank(field.text)) return;
-      if (field.rename) this.saveRename(field, field.rename);
-      else this.create(field);
-    }
-    /** Edits by the key the lists give the task when the job runs: the one read at the open may have gone stale. The task's own rule and labels, the same in the field, are left as the file has them. */
-    saveRename(field, { item, home }) {
-      const draft = { text: field.text, placement: this.placement(field), priority: field.priority, ...!sameNames(field.labels, item.labels.map((l) => l.name)) && { labels: field.labels }, ...!sameRule(field.repeat, item.repeat) && { repeat: field.repeat } };
-      this.queue(home, { id: this.jobId(), kind: "rename", home, item, draft });
-    }
-    /** `### name` queued where the field stands; always at the top level. */
-    createSection(field) {
-      const name = field.text.trim();
-      const list = listSpot(this.run(field.run).spot);
-      if (name === "" || !list) return;
-      this.queue(field.run, { id: this.jobId(), kind: "section", run: field.run, name, column: list.column, place: list.place });
-    }
-    /** The renamed task's key as the lists show it now: the card at its place while that is still it. */
-    keyAt(home, item) {
-      const run = this.run(home);
-      const list = run && listSpot(run.spot);
-      if (!list) return item.key;
-      const card = this.look.cards(list.column)[list.place.index];
-      return card && sameLine(card.key, item.key) ? card.key : item.key;
-    }
-    /** The field's text queued at its run, waiting under the cards until the lists show it written. */
-    create(field) {
-      const run = this.run(field.run);
-      const line = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0 };
-      run.pending.push(line);
-      this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line, ...field.newSection !== void 0 && { newSection: field.newSection } });
-    }
-    /** A job for `run`, which keeps following the cards that land until the job is done. */
-    queue(run, job) {
-      this.hold(run);
-      this.session.jobs.push(job);
-      this.queued(job);
-    }
-    jobId() {
-      return `j${this.session.next++}`;
-    }
-    /**
-     * The places at or past the created task's card move down, when `column` is to show it among `cards`. A key gone stale
-     * because another write or a sync landed between the create and this read finds no card: the field then stays where it
-     * is, as for a task put elsewhere.
-     */
-    landed(column, created, cards) {
-      const key = "key" in created ? created.key : created;
-      const id = "key" in created ? created.id : created.id;
-      const index = cards.findIndex((card) => {
-        const own = card.id ?? card.key.id;
-        return id !== void 0 && own !== void 0 ? own === id : samePlace2(card.key, key) && sameLine(card.key, key);
-      });
-      if (index < 0) return;
-      for (const run of Object.values(this.session.runs)) {
-        const list = listSpot(run.spot);
-        if (!list || list.column !== column || list.place.index < index) continue;
-        run.spot = { ...list, place: { ...list.place, index: list.place.index + 1 } };
-      }
-    }
-    /** Right under a renamed task at its level, or its first subtask when it shows some: nothing may stand between a task and them. */
-    under(spot, item) {
-      const { place } = spot;
-      const shown = item.subtasks.length > 0 && !item.collapsed;
-      return { ...spot, place: { ...place, index: place.index + 1, level: place.level + (shown ? 1 : 0) } };
-    }
-    /** The field's place a level deeper or shallower; null when the cards around forbid it, or the field does not move (a rename, a slot, a stack). */
-    shifted(delta) {
-      const field = this.session.field;
-      const list = field && listSpot(this.run(field.run).spot);
-      if (!field || field.rename || !list) return null;
-      return this.shiftedRun(field.run, this.look.cards(list.column), delta);
-    }
-    /** The run's place a level deeper or shallower, bound by `cards` with the texts entered there standing in before it. */
-    shiftedRun(id, cards, delta) {
-      const run = this.run(id);
-      const list = listSpot(run.spot);
-      if (!list) return null;
-      const { place } = list;
-      const unwritten = run.pending.map((line) => ({ level: line.level, group: place.group, ...place.project !== void 0 && { project: place.project } }));
-      const shown = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
-      const shifted = shiftLevel(shown, { ...place, index: place.index + unwritten.length }, delta);
-      return shifted && { ...place, level: shifted.level };
-    }
-    blank(text) {
-      return this.tasks.isBlank(text);
-    }
-    changed() {
-      this.emit(this.state);
-    }
-  };
-  function placeOfDrop2(result) {
-    switch (result.kind) {
-      case "list":
-        return { kind: "task", group: null, before: result.before };
-      case "group":
-        return { kind: "task", group: result.group, before: result.before, ...result.project !== void 0 && { project: result.project } };
-      case "nest":
-        return { kind: "subtask", parent: result.parent, before: result.before };
-      case "place":
-        return result.place ?? { kind: "task", group: null, before: null };
-      default:
-        return null;
-    }
-  }
-  function placeChoices(place) {
-    const lists = ENTRY_PLACES.map((kind) => ({ kind, on: place?.kind === kind }));
-    return [...lists, { kind: "date", on: place?.kind === "date", date: place?.kind === "date" ? place.date : null }];
-  }
-  function runsOf(field) {
-    if (!field) return [];
-    return field.rename ? [field.run, field.rename.home] : [field.run];
-  }
-  function sameNames(a, b) {
-    return a.length === b.length && a.every((name, i) => name === b[i]);
-  }
-
-  // core/application/wholeCard.ts
-  function wholeWidth(card, room) {
-    if (card.textWidth <= card.titleWidth - card.fade) return null;
-    const missing = Math.ceil(card.textWidth - card.titleWidth);
-    const widest = room.width - 2 * room.margin;
-    const width = Math.max(card.width, Math.min(card.width + missing, widest));
-    return { width, cut: width < card.width + missing };
-  }
-  function grownStart(start, size, grown, room, margin) {
-    const end = Math.max(start + size, room - margin);
-    return Math.max(Math.min(start, margin), Math.min(start, end - grown));
-  }
-
-  // core/application/SectionNameEntry.ts
-  function sectionNameEnd(ended, event, text) {
-    if (ended) return { ended: true };
-    return { ended: true, end: { name: event === "enter" ? text : null } };
-  }
-
-  // core/application/RepeatPage.ts
-  function repeatPageEnd(own, held) {
-    if (held === null) return null;
-    if (held.rule === null) return own === null ? null : held;
-    return sameRule(held.rule, own) ? null : held;
-  }
-
-  // core/application/DescriptionDraft.ts
-  function descriptionOpen(description) {
-    return { state: { file: description, typed: false }, text: description ?? DESCRIPTION_TEMPLATE };
-  }
-  function descriptionTyped(state) {
-    return { ...state, typed: true };
-  }
-  function descriptionSave(state) {
-    return { state: { ...state, typed: false }, write: state.typed };
-  }
-  function descriptionRead(state, description, editor) {
-    const elsewhere = description !== state.file;
-    if (!elsewhere || editor.focused || editor.pending) return { state: { ...state, file: description }, replace: null };
-    return { state: { file: description, typed: false }, replace: description ?? DESCRIPTION_TEMPLATE };
-  }
-
-  // core/application/sections.ts
-  function rowsOf2(items, level = 0) {
-    return items.flatMap((item) => [{ item, level }, ...item.collapsed ? [] : rowsOf2(item.subtasks, level + 1)]);
-  }
-  var NO_SECTION_ID = "none";
-  function sectionId(name, sections) {
-    if (name === null) return NO_SECTION_ID;
-    return sections.find((s) => s.name === name)?.id ?? `section:${name}`;
-  }
-  function groupOf(name, items, header = true, id = sectionId(name, [])) {
-    const section = name !== null;
-    return { id, name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: header };
-  }
-  function projectSection(name, items, project, id = sectionId(name, [])) {
-    const plain = groupOf(name, items, name !== null, id);
-    return { ...plain, menu: plain.menu && { ...plain.menu, project }, reorder: false };
-  }
-  function listView(items, sections, listSections = []) {
-    if (!sections) return { showsHeaders: false, groups: [groupOf(null, items, false)] };
-    const groups = withEmptySections(byGroup(items, listSections), listSections);
-    const showsHeaders = groups.some((g) => g.name !== null);
-    return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders, reorder: showsHeaders })) };
-  }
-  function byGroup(items, sections) {
-    const groups = [];
-    for (const item of items) {
-      const group = groups.find((g) => g.name === item.group);
-      if (group) group.items.push(item);
-      else groups.push({ name: item.group, items: [item] });
-    }
-    return groups.map((g) => groupOf(g.name, g.items, true, sectionId(g.name, sections)));
-  }
-  function withEmptySections(groups, sections) {
-    const drawn = [...groups];
-    sections.forEach((section, i) => {
-      if (!section.empty || drawn.some((g) => g.name === section.name)) return;
-      const above = new Set(sections.slice(0, i).map((s) => s.name));
-      let at = 0;
-      drawn.forEach((g, j) => {
-        if (above.has(g.name)) at = j + 1;
-      });
-      drawn.splice(at, 0, groupOf(section.name, [], true, section.id));
-    });
-    return drawn;
-  }
-  function shownSections(groups, sections) {
-    const shown = groups.reduce((all, name) => all.some((g) => g.name === name) ? all : [...all, groupOf(name, [])], []);
-    return withEmptySections(shown, sections).map((g) => g.name);
-  }
-  function offeredNames(groups, presets, ungrouped) {
-    const names = [...groups.flatMap((group) => group === null ? [] : [group]), ...presets.map((preset) => preset.trim())];
-    return [...new Set(names)].filter((name) => name !== "" && name !== ungrouped);
-  }
-  function sectionChoice(tasks, offer) {
-    const first = tasks[0];
-    const list = first?.list;
-    if (!first || list === "done" || tasks.some((task) => task.isSubtask || task.list !== list)) return null;
-    const byProject = offer.projects?.[list];
-    const key = groupKeyOf(first);
-    const names = byProject && tasks.every((task) => groupKeyOf(task) === key) ? byProject[key] ?? offer.lists[list] : offer.lists[list];
-    return { names, current: first.group, ungrouped: offer.ungrouped };
-  }
-  function groupKeyOf(item) {
-    return item.project ? projectKey(item.project.name) : "";
-  }
-
-  // core/application/listWidth.ts
-  var LIST_WIDTHS = { min: 110, max: 280 };
-  function listWidths(share, viewWidth, dividerWidth) {
-    const columns = viewWidth - dividerWidth;
-    const max = Math.max(LIST_WIDTHS.max, columns - LIST_WIDTHS.min);
-    return { width: Math.min(max, Math.max(LIST_WIDTHS.min, share * columns)), min: LIST_WIDTHS.min, max, center: columns / 2 };
-  }
-  function listShareOf(width, viewWidth, dividerWidth) {
-    return width / (viewWidth - dividerWidth);
-  }
-  var DIVIDER_SNAP = { distance: 8, slowSpeed: 0.08 };
-  function dividerAt(wanted, widths, speed) {
-    const reachable = widths.center >= widths.min && widths.center <= widths.max;
-    const snapped = reachable && speed < DIVIDER_SNAP.slowSpeed && Math.abs(wanted - widths.center) <= DIVIDER_SNAP.distance;
-    const width = snapped ? widths.center : Math.round(wanted);
-    return { width: Math.min(widths.max, Math.max(widths.min, width)), snapped };
-  }
-
-  // core/application/listDrop.ts
-  function levelAt(x, list, indent) {
-    return indent > 0 ? (x - (list.left + list.width / 2)) / indent : 0;
-  }
-  function carriedMiddle(y, grabPx, cardHeight) {
-    return y - grabPx + cardHeight / 2;
-  }
-  function gapUnder(header) {
-    return { kind: "gap", index: 0, level: 0, ...header !== null && typeof header === "object" ? header : { group: header } };
-  }
-  function headerOfPlace(place) {
-    return place.project === void 0 ? place.group : { group: place.group, project: place.project };
-  }
-  function orderOf(heads, group) {
-    return heads.findIndex((h) => sameGap(gapUnder(h.group), gapUnder(group)));
-  }
-  function noSectionBelow(heads) {
-    return heads.some((head, i) => i > 0 && head.group === null);
-  }
-  function opensList(head, i, heads) {
-    return i === 0 && (head.opens === true || noSectionBelow(heads));
-  }
-  function placeAt(cards, y, level, shift, room, heads = [], held = null, hysteresis = 0) {
-    const at = (finger) => rawPlaceAt(cards, finger, level, shift, room, heads);
-    const place = at(y);
-    if (!held || hysteresis <= 0 || sameGap(place, held)) return place;
-    if (!sameGap(at(y - hysteresis), held) && !sameGap(at(y + hysteresis), held)) return place;
-    return fitLevel(cards, { ...held, level: Math.round(level) });
-  }
-  function rawPlaceAt(cards, y, level, shift, gap, heads) {
-    const top = (i) => cards[i].top + (gap && i >= gap.index ? shift : 0);
-    const headAfterGap = (h) => gap !== null && (h.firstCard > gap.index || h.firstCard === gap.index && orderOf(heads, h.group) > orderOf(heads, headerOfPlace(gap)));
-    const headEdge = (h, i) => h.top + (headAfterGap(h) ? shift : 0) + (i === 0 && h.group !== null ? h.height : h.height / 2);
-    const index = cards.filter((c, i) => y > top(i) + c.height / 2).length;
-    const passed = heads.filter((head, i) => head.firstCard === index && (opensList(head, i, heads) || y > headEdge(head, i))).map((head) => head.group);
-    return gapAt(cards, index, level, passed, heads.length > 0);
-  }
-  function branchOf(levels, index) {
-    const level = levels[index];
-    if (level <= 0) return null;
-    const goesOn = (l) => levels.slice(index + 1).find((next) => next <= l) === l;
-    return { last: !goesOn(level), through: Array.from({ length: level - 1 }, (_, k) => goesOn(k + 1)) };
-  }
-  function gapBranch(cards, gap) {
-    const levels = cards.map((card) => card.level);
-    levels.splice(gap.index, 0, gap.level);
-    return branchOf(levels, gap.index);
-  }
-
-  // core/application/drops.ts
-  function readDrop(to, sections) {
-    if (to.kind !== "place") return to;
-    return listDrop(to.column, to.place, to.place ? sections(to.column) : null);
-  }
-  function listDrop(column, place, sections) {
-    if (!place) return { kind: "list", column, before: null };
-    if (place.kind === "subtask") return { kind: "nest", parent: place.parent, before: place.before };
-    if (sections) return { kind: "group", list: sections.list, date: sections.date, group: place.group, before: place.before, ...place.project !== void 0 && { project: place.project } };
-    return { kind: "list", column, before: place.before };
-  }
-  function acceptsDrop(target, origins) {
-    switch (target) {
-      case "timeline":
-        return origins.length <= 1;
-      case "day":
-        return true;
-      case "soon":
-        return origins.every((from) => from !== "timeline");
-      case "inbox":
-      case "backlog":
-        return origins.every((from) => from === "inbox" || from === "backlog" || from === "soon" || from === "new");
-    }
-  }
-  function placesInGap(column, from, grouped) {
-    return from === "new" || from === column || grouped;
-  }
-  function dropMove(from, to, day, project) {
-    switch (to.kind) {
-      case "time":
-        return { kind: "toTime", from, start: to.start, day };
-      case "clearSlot":
-        return { kind: "clearSlot" };
-      case "group":
-        return { kind: "moveToGroup", list: to.list, group: to.group, before: to.before, date: to.date ?? void 0, ...to.project !== void 0 && { project: to.project } };
-      case "title":
-        return { kind: "moveToGroup", list: to.list, group: null, before: null, date: to.date ?? void 0, ...to.byProject && { project } };
-      case "nest":
-        return { kind: "nest", parent: to.parent, before: to.before };
-      case "list":
-        if (from === "timeline") return { kind: "clearSlot", place: { before: to.before, date: day } };
-        if (to.column === "day") return from === "day" ? { kind: "moveBefore", before: to.before, date: day } : { kind: "moveToList", date: day };
-        if (to.before) return { kind: "moveBefore", before: to.before, date: day };
-        return from === "day" ? { kind: "moveToSoon", date: day } : { kind: "moveToEnd", section: to.column };
-    }
-  }
-  function dropMoves(tasks, to, day, projectOf = () => null) {
-    if (tasks.length === 1) return { kind: "one", key: tasks[0].key, move: dropMove(tasks[0].from, to, day, projectOf(tasks[0].key)) };
-    const steps = tasks.flatMap(({ key, from }) => {
-      const move = dropMove(from, to, day, projectOf(key));
-      return move.kind === "toTime" || move.kind === "clearSlot" ? [] : [{ key, change: move }];
-    });
-    return { kind: "many", steps };
-  }
-
   // core/application/repeatWords.ts
   function capital(text) {
     return text.charAt(0).toUpperCase() + text.slice(1);
@@ -4112,9 +3290,186 @@ ${key.title}`.toLowerCase();
     }
     return [...kept.join("\n").matchAll(BODY_TAG)].map((m) => m[1]).filter((tag) => !/^\d+$/.test(tag)).map((tag) => `#${tag}`);
   }
+  function bare(tag) {
+    return tag.trim().replace(/^#/, "");
+  }
+  function withProjectTag(text, tag) {
+    const name = bare(tag);
+    const item = `  - ${name}`;
+    if (text === null) return `---
+tags:
+${item}
+---
+`;
+    if (noteTags(text).some((t) => bare(t).toLowerCase() === name.toLowerCase())) return text;
+    const lines = text.split("\n");
+    const end = lines[0]?.trim() === "---" ? lines.findIndex((line, i) => i > 0 && line.trim() === "---") : -1;
+    if (end < 0) return `---
+tags:
+${item}
+---
+${text}`;
+    const at = lines.findIndex((line, i) => i > 0 && i < end && /^(tags|tag)\s*:/i.test(line));
+    if (at < 0) return [...lines.slice(0, end), "tags:", item, ...lines.slice(end)].join("\n");
+    const colon = lines[at].indexOf(":");
+    const key = lines[at].slice(0, colon);
+    const value = lines[at].slice(colon + 1).trim();
+    if (value.startsWith("[") && value.endsWith("]")) {
+      const inner = value.slice(1, -1).trim();
+      return replaced(lines, at, 1, [`${key}: [${inner === "" ? name : `${inner}, ${name}`}]`]);
+    }
+    if (value !== "") return replaced(lines, at, 1, [`${key}:`, ...value.split(/[,\s]+/).filter((t) => t !== "").map((t) => `  - ${t}`), item]);
+    let last = at;
+    while (last + 1 < end && lines[last + 1].trim().startsWith("-")) last++;
+    const indent = last > at ? /^\s*/.exec(lines[last])?.[0] ?? "  " : "  ";
+    return replaced(lines, last + 1, 0, [`${indent}- ${name}`]);
+  }
+  function replaced(lines, at, count, put) {
+    return [...lines.slice(0, at), ...put, ...lines.slice(at + count)].join("\n");
+  }
+
+  // core/application/notes.ts
+  var MD = ".md";
+  function nameOf(path) {
+    const file = path.slice(path.lastIndexOf("/") + 1);
+    return file.toLowerCase().endsWith(MD) ? file.slice(0, -MD.length) : file;
+  }
+  function withoutMd(path) {
+    return path.toLowerCase().endsWith(MD) ? path.slice(0, -MD.length) : path;
+  }
+  function linkedNotes(notes) {
+    const named = /* @__PURE__ */ new Map();
+    for (const { path } of notes) named.set(projectKey(nameOf(path)), (named.get(projectKey(nameOf(path))) ?? 0) + 1);
+    return notes.map(({ path }) => {
+      const name = nameOf(path);
+      return { name, path, link: named.get(projectKey(name)) === 1 ? name : withoutMd(path) };
+    });
+  }
+  var OPEN = "[[";
+  var CLOSE = "]]";
+  function linkQuery(text, caret) {
+    const before = text.slice(0, caret);
+    const from = before.lastIndexOf(OPEN);
+    if (from < 0) return null;
+    const query = before.slice(from + OPEN.length);
+    if (/[\]\[\n|]/.test(query)) return null;
+    return { query, from, to: text.startsWith(CLOSE, caret) ? caret + CLOSE.length : caret };
+  }
+  var NOTE_SUGGESTIONS = 20;
+  function noteSuggestions(query, notes, limit = NOTE_SUGGESTIONS) {
+    const typed2 = query.trim().toLowerCase();
+    const words = typed2.split(/\s+/).filter((word) => word !== "");
+    const rank = (note) => {
+      const name = note.name.toLowerCase();
+      const path = note.path.toLowerCase();
+      if (typed2 === "") return 0;
+      if (name === typed2) return 0;
+      if (name.startsWith(typed2)) return 1;
+      if (name.includes(typed2)) return 2;
+      if (path.includes(typed2)) return 3;
+      return words.every((word) => path.includes(word)) ? 4 : null;
+    };
+    const ranked = linkedNotes(notes).flatMap((note) => {
+      const r = rank(note);
+      return r === null ? [] : [{ note: { name: note.name, path: note.path, link: note.link }, rank: r }];
+    });
+    ranked.sort((a, b) => a.rank - b.rank || (typed2 === "" ? 0 : a.note.name.length - b.note.name.length) || compare(a.note.name, b.note.name) || compare(a.note.path, b.note.path));
+    return ranked.slice(0, limit).map(({ note }) => note);
+  }
+  function compare(a, b) {
+    const x = a.toLowerCase();
+    const y = b.toLowerCase();
+    return x < y ? -1 : x > y ? 1 : 0;
+  }
+  function withNoteLink(text, at, link) {
+    const written = `${OPEN}${link}${CLOSE}`;
+    return { text: text.slice(0, at.from) + written + text.slice(at.to), caret: at.from + written.length };
+  }
+  function noteOfLink(target, notes) {
+    const bare2 = target.split("#")[0].split("|")[0].trim().replace(/^\//, "");
+    if (bare2 === "") return null;
+    const wanted = projectKey(withoutMd(bare2));
+    const linked = linkedNotes(notes);
+    const found = linked.find((note) => projectKey(withoutMd(note.path)) === wanted) ?? linked.find((note) => projectKey(withoutMd(note.path)).endsWith(`/${wanted}`)) ?? linked.find((note) => projectKey(note.name) === wanted);
+    return found ? { name: found.name, path: found.path, link: found.link } : null;
+  }
+
+  // core/application/sections.ts
+  function rowsOf(items, level = 0) {
+    return items.flatMap((item) => [{ item, level }, ...item.collapsed ? [] : rowsOf(item.subtasks, level + 1)]);
+  }
+  var NO_SECTION_ID = "none";
+  function sectionId(name, sections) {
+    if (name === null) return NO_SECTION_ID;
+    return sections.find((s) => s.name === name)?.id ?? `section:${name}`;
+  }
+  function groupOf(name, items, header = true, id = sectionId(name, [])) {
+    const section = name !== null;
+    return { id, name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: header };
+  }
+  function projectSection(name, items, project, id = sectionId(name, [])) {
+    const plain = groupOf(name, items, name !== null, id);
+    return { ...plain, menu: plain.menu && { ...plain.menu, project }, reorder: false };
+  }
+  function listView(items, sections, listSections = []) {
+    if (!sections) return { showsHeaders: false, groups: [groupOf(null, items, false)] };
+    const groups = withEmptySections(byGroup(items, listSections), listSections);
+    const showsHeaders = groups.some((g) => g.name !== null);
+    return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders, reorder: showsHeaders })) };
+  }
+  function byGroup(items, sections) {
+    const groups = [];
+    for (const item of items) {
+      const group = groups.find((g) => g.name === item.group);
+      if (group) group.items.push(item);
+      else groups.push({ name: item.group, items: [item] });
+    }
+    return groups.map((g) => groupOf(g.name, g.items, true, sectionId(g.name, sections)));
+  }
+  function withEmptySections(groups, sections) {
+    const drawn = [...groups];
+    sections.forEach((section, i) => {
+      if (!section.empty || drawn.some((g) => g.name === section.name)) return;
+      const above = new Set(sections.slice(0, i).map((s) => s.name));
+      let at = 0;
+      drawn.forEach((g, j) => {
+        if (above.has(g.name)) at = j + 1;
+      });
+      drawn.splice(at, 0, groupOf(section.name, [], true, section.id));
+    });
+    return drawn;
+  }
+  function shownSections(groups, sections) {
+    const shown = groups.reduce((all, name) => all.some((g) => g.name === name) ? all : [...all, groupOf(name, [])], []);
+    return withEmptySections(shown, sections).map((g) => g.name);
+  }
+  function offeredNames(groups, presets, ungrouped) {
+    const names = [...groups.flatMap((group) => group === null ? [] : [group]), ...presets.map((preset) => preset.trim())];
+    return [...new Set(names)].filter((name) => name !== "" && name !== ungrouped);
+  }
+  function sectionChoice(tasks, offer) {
+    const first = tasks[0];
+    const list = first?.list;
+    if (!first || list === "done" || tasks.some((task) => task.isSubtask || task.list !== list)) return null;
+    const byProject = offer.projects?.[list];
+    const key = groupKeyOf(first);
+    const names = byProject && tasks.every((task) => groupKeyOf(task) === key) ? byProject[key] ?? offer.lists[list] : offer.lists[list];
+    return { names, current: first.group, ungrouped: offer.ungrouped };
+  }
+  function groupKeyOf(item) {
+    return item.project ? projectKey(item.project.name) : "";
+  }
 
   // core/application/projects.ts
   var NO_PROJECT = "No project";
+  var NOT_IN_NAME = /[\\/:*?"<>|#^[\]]/g;
+  function newProjectNote(typed2, notes) {
+    const name = typed2.replace(NOT_IN_NAME, "").replace(/\s+/g, " ").trim().replace(/^\.+/, "").trim();
+    if (name === "") return null;
+    const found = linkedNotes(notes.filter((note) => /\.md$/i.test(note.path))).filter((note) => projectKey(note.name) === projectKey(name)).sort((a, b) => a.path.split("/").length - b.path.split("/").length || (a.path < b.path ? -1 : 1))[0];
+    if (found) return { name: found.name, path: found.path, link: found.link, exists: true };
+    return { name, path: `${name}.md`, link: name, exists: false };
+  }
   var GROUPING_DEFAULTS = { backlog: true, soon: false, inbox: null, now: null };
   function bareTag(tag) {
     return tag.trim().replace(/^#/, "").toLowerCase();
@@ -4190,7 +3545,7 @@ ${key.title}`.toLowerCase();
     const on = groupingOn(state, list);
     if (!on) return { canGroup: canGroup(list), on, groups: [] };
     const refs = /* @__PURE__ */ new Map();
-    if (list === "backlog") for (const ref of projects.known()) refs.set(projectKey(ref.name), ref);
+    for (const ref of projects.known()) refs.set(projectKey(ref.name), ref);
     for (const item of items) if (item.project && !refs.has(projectKey(item.project.name))) refs.set(projectKey(item.project.name), item.project);
     const named = byName([...refs.values()]).map((ref) => groupOf2(list, projectKey(ref.name), ref, items.filter((item) => item.project !== null && projectKey(item.project.name) === projectKey(ref.name)), sections, state, false));
     const loose = items.filter((item) => item.project === null);
@@ -4336,19 +3691,28 @@ ${key.title}`.toLowerCase();
     return { choice, options: names.map((name) => ({ name, checked: shared && name === choice.current })), create: of.kind === "task" };
   }
   function menuProject(items, known) {
+    return projectPage(
+      items.map((item) => item.project),
+      known,
+      items.every((item) => !item.can.setProject)
+    );
+  }
+  var NEW_PROJECT = "New project…";
+  function projectPage(chosen, known, disabled = false) {
     const key = (ref) => ref ? projectKey(ref.name) : "";
-    const first = items[0]?.project ?? null;
-    const shared = items.every((item) => key(item.project) === key(first));
+    const first = chosen[0] ?? null;
+    const shared = chosen.every((ref) => key(ref) === key(first));
     const options = [...known];
-    for (const item of items) if (item.project && !options.some((ref) => key(ref) === key(item.project))) options.push({ ...item.project, mark: true });
-    const none = items.every((item) => item.project === null);
+    for (const ref of chosen) if (ref && !options.some((option) => key(option) === key(ref))) options.push({ ...ref, mark: true });
+    const none = chosen.every((ref) => ref === null);
     return {
       value: shared && first ? first.name : none ? NO_PROJECT : "",
       current: shared ? first : null,
       options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
       none,
       noneLabel: NO_PROJECT,
-      disabled: items.every((item) => !item.can.setProject)
+      disabled,
+      newLabel: NEW_PROJECT
     };
   }
   var MENU_GROUPS = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
@@ -4376,6 +3740,814 @@ ${key.title}`.toLowerCase();
     return picked.filter((key) => keyId(key) !== id && !picked.some((other) => other !== key && isUnder(key, other)));
   }
 
+  // core/application/fullTree.ts
+  function unfolded(items) {
+    return items.map((item) => ({ ...item, collapsed: false, subtasks: unfolded(item.allSubtasks) }));
+  }
+  function rowsOf2(items, level, rows) {
+    for (const item of items) {
+      const at = rows.length;
+      rows.push({ item, level, newSubtask: { index: at + 1, level: level + 1 } });
+      rowsOf2(item.subtasks, level + 1, rows);
+      rows[at] = { ...rows[at], newSubtask: { index: rows.length, level: level + 1 } };
+    }
+  }
+  function fullTree(task) {
+    const subtasks = unfolded(task.allSubtasks);
+    const rows = [];
+    rowsOf2(subtasks, 0, rows);
+    return { task, subtasks, rows, newSubtask: { index: rows.length, level: 0 }, project: task.project };
+  }
+
+  // core/application/QuickEntry.ts
+  function zoneOf2(header) {
+    return header !== null && typeof header === "object" ? header : { group: header };
+  }
+  function sameZone2(a, b) {
+    return a.group === b.group && a.project === b.project;
+  }
+  function zoneIndex(sections, zone) {
+    return sections.findIndex((header) => sameZone2(zoneOf2(header), zone));
+  }
+  function entryAt(drawing, place, section) {
+    const { cards, sections } = drawing;
+    if (!sections.some((name) => name !== null)) return place.index <= cards.length ? { kind: "in", section: 0, card: place.index, keepsPlate: true } : { kind: "end" };
+    const at = zoneIndex(sections, place);
+    if (at < 0) return place.group === null && place.project === void 0 ? { kind: "top" } : { kind: "end" };
+    const start = cards.findIndex((card2) => zoneIndex(sections, card2) >= at);
+    const from = start < 0 ? cards.length : start;
+    let end = from;
+    while (end < cards.length && sameZone2(cards[end], place)) end++;
+    const card = place.index >= from && place.index <= end ? place.index : end;
+    return { kind: "in", section: at, card, keepsPlate: section };
+  }
+  function stackEntry(state, task) {
+    if (!state || state.spot.kind !== "stack") return null;
+    const { rows, newSubtask } = fullTree(task);
+    const renaming = state.renaming;
+    if (renaming) {
+      if (samePlace2(renaming.key, task.key)) return { at: { kind: "title" }, pending: [] };
+      const index = rows.findIndex((row) => samePlace2(row.item.key, renaming.key));
+      return index < 0 ? null : { at: { kind: "row", index, level: rows[index].level }, pending: [] };
+    }
+    const parent = state.spot.parent;
+    const place = samePlace2(parent, task.key) ? newSubtask : rows.find((row) => samePlace2(row.item.key, parent))?.newSubtask;
+    if (!place) return null;
+    return { at: { kind: "new", index: place.index, level: place.level }, pending: state.pending.map(({ text }) => ({ text, level: place.level })) };
+  }
+  var ENTRY_PLACES = ["inbox", "backlog", "soon", "now"];
+  function emptySession() {
+    return { field: null, runs: {}, jobs: [], next: 0 };
+  }
+  function listSpot(spot) {
+    return spot.kind === "list" ? spot : null;
+  }
+  var ALL_COLUMNS = ["day", "soon", "inbox", "backlog"];
+  var QuickEntry = class {
+    constructor(tasks, look, session = emptySession(), emit = () => void 0, queued = () => void 0) {
+      this.tasks = tasks;
+      this.look = look;
+      this.session = session;
+      this.emit = emit;
+      this.queued = queued;
+      /** What the field may do, kept while it only changes its text or marks, which do not change where it may go. Not state: worked out again. */
+      this.shifts = null;
+    }
+    get state() {
+      const field = this.session.field;
+      if (!field) return null;
+      const task = !field.section;
+      const typed2 = this.tasks.draftMarks(field.text, field.priority, field.labels);
+      const marks = task ? typed2 : { ...typed2, tint: null };
+      const place = task ? this.shownPlace(field) : null;
+      const run = this.run(field.run);
+      return {
+        spot: run.spot,
+        text: field.text,
+        priority: field.priority,
+        labels: field.labels,
+        repeat: field.repeat,
+        pending: run.pending.map(({ text, level }) => ({ text, level })),
+        renaming: field.rename?.item ?? null,
+        indents: task && listSpot(run.spot) !== null,
+        ...this.mayShift(field),
+        section: this.maySection(field) ? field.section : null,
+        newSection: field.newSection ?? null,
+        marks,
+        markable: task && marks.tiles.levels.length + marks.tiles.labels.length > 0,
+        place,
+        places: placeChoices(place),
+        repeatable: task && run.spot.kind !== "slot",
+        repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today()),
+        renamed: this.renamed,
+        project: task && this.topLevel(field) ? this.projectButton(field.project ?? null) : null
+      };
+    }
+    /** The field writes a task of the top level: in a list at its first level, in a slot, or a rename of one. */
+    topLevel(field) {
+      const { spot } = this.run(field.run);
+      if (field.rename) return !field.rename.item.isSubtask;
+      if (spot.kind === "stack") return false;
+      return spot.kind === "slot" || spot.place.level === 0;
+    }
+    projectButton(link) {
+      return entryProject(link, this.tasks.projectNotes?.() ?? []);
+    }
+    /** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */
+    get renamed() {
+      return this.session.jobs.flatMap((job) => job.kind === "rename" ? [{ id: job.item.id, key: job.item.key, text: job.draft.text, title: plainText(job.draft.text) }] : []);
+    }
+    /** The renamed task, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
+    get renaming() {
+      return this.session.field?.rename?.item.key ?? null;
+    }
+    /** What `column`'s list draws for the field: its gap, the texts waiting before it, and whether it is a section's name; null when it stands elsewhere. */
+    /**
+     * What `column`'s list draws for the field: none when it stands elsewhere. `drawn` is what the list is about to draw
+     * (the look's cards and sections when left out); `at` is where among them the field stands.
+     */
+    listEntry(column, drawn) {
+      const state = this.state;
+      const list = state && listSpot(state.spot);
+      if (!state || !list || list.column !== column) return null;
+      const section = state.section === true;
+      const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
+      return { place: list.place, pending: state.pending, section, newSection: state.newSection, at: entryAt(drawing, list.place, section || state.newSection !== null) };
+    }
+    /** Where `task`'s full screen draws the field: none unless it stands in the stack of `task` or one of its subtasks. */
+    stackEntry(task) {
+      return stackEntry(this.state, task);
+    }
+    /** Where a task's full screen types under `parent` or renames it: the stack of its subtasks there, whatever list shows it. */
+    stackSpot(parent) {
+      return { kind: "stack", parent };
+    }
+    /** A double click on a list's free room: the field after the last card, in the last section, at the top level. */
+    openAtEnd(column) {
+      this.open(this.endOf(column));
+    }
+    /** The plus tapped: the end of the day column while it shows, else of Inbox. */
+    openFromPlus() {
+      this.openAtEnd(this.look.shown().includes("day") ? "day" : "inbox");
+    }
+    /** The No tasks plate of empty section `group` tapped (in a list grouped by project, of the part `project`): the field of a new task in it. */
+    openIn(column, group, project) {
+      const cards = this.look.cards(column);
+      const place = { kind: "task", group, before: null, ...project !== void 0 && { project } };
+      this.open({ kind: "list", column, place: { ...gapOfPlace(cards, place), level: 0 } });
+    }
+    /** A long tap on the timeline's free room let go: the field of a new task in that slot. */
+    openSlot(slot) {
+      this.open({ kind: "slot", slot });
+    }
+    /** The plus came to rest on `column` (null: off the lists) with `result`: the field opens where the drop showed; false where it opens nowhere. */
+    openAtDrop(column, result) {
+      const place = result && column ? placeOfDrop2(result) : null;
+      if (column && place) this.open({ kind: "list", column, place: gapOfPlace(this.look.cards(column), place) });
+      else if (result?.kind === "time") this.openSlot(this.tasks.newSlot(this.look.day(), result.start));
+      else return false;
+      return true;
+    }
+    /** Where a new subtask of `parent` is typed: last among its subtasks in the list that shows it, else last in its menu's stack. */
+    subtaskSpot(parent) {
+      const found = this.find(parent);
+      if (!found) return { kind: "stack", parent };
+      return { kind: "list", column: found.column, place: gapOfPlace(this.look.cards(found.column), { kind: "subtask", parent, before: null }) };
+    }
+    /**
+     * Where `item` is renamed: right before its card in the list that shows it, in its card's section of its project's part
+     * where the list is grouped by project; else, opened from a menu's stack, there; else
+     * over its card on the timeline; null when it shows nowhere the field can stand.
+     */
+    renameSpot(item, inStack) {
+      const found = this.find(item.key);
+      if (found) {
+        const card = this.look.cards(found.column)[found.index];
+        return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group, ...card.project !== void 0 && { project: card.project } } };
+      }
+      if (inStack) return { kind: "stack", parent: item.key };
+      return item.slot ? { kind: "slot", slot: item.slot } : null;
+    }
+    /** A field at `spot`; one already open is finished first, as by a tap elsewhere. A rename's spot is the gap right before its own card. */
+    open(spot, renaming) {
+      if (this.session.field) this.save(this.session.field);
+      const rename2 = renaming ? { item: renaming, home: this.newRun(spot), moved: false } : null;
+      const project = renaming ? renaming.project?.link ?? null : this.projectAt(spot);
+      this.reset({ run: this.newRun(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename: rename2, section: false, project });
+    }
+    /** The project a field opened at `spot` starts with: its project's part in a list drawn by project, else the view's own. */
+    projectAt(spot) {
+      if (spot.kind === "list" && spot.place.project !== void 0) return spot.place.project;
+      return this.look.project?.() ?? null;
+    }
+    /**
+     * A project picked on the Project button (null: No project). In a list drawn by project the field goes to the end of
+     * that project's part where the list draws one; a rename's field stays, its task keeping its place in the lane.
+     */
+    setProject(link) {
+      const field = this.session.field;
+      if (!field) return;
+      const list = listSpot(this.run(field.run).spot);
+      const moves = !field.rename && list !== null && list.place.level === 0 && list.place.project !== void 0 && !inProject(link, list.place.project);
+      const part = moves ? this.partEnd(list.column, link) : null;
+      this.reset({ ...field, project: link, ...part && { run: this.newRun(part) } }, part === null);
+    }
+    type(text) {
+      const field = this.session.field;
+      if (field) this.reset({ ...field, text }, true);
+    }
+    /** A level chosen takes the place of a prefix typed: the text keeps no prefix, so the file gets one. Null takes the level off. */
+    setPriority(prefix) {
+      const field = this.session.field;
+      if (!field) return;
+      const text = this.tasks.parseTitle(field.text).priority ? this.tasks.withPriority(field.text, null) : field.text;
+      this.reset({ ...field, text, priority: prefix }, true);
+    }
+    /** A level's tile tapped: the level, or none when the task is already written with it. */
+    togglePriority(prefix) {
+      const state = this.state;
+      if (state) this.setPriority(state.marks.priority?.prefix === prefix ? null : prefix);
+    }
+    setLabels(labels) {
+      const field = this.session.field;
+      if (field) this.reset({ ...field, labels }, true);
+    }
+    /** A label's tile tapped: on when the task is not written with it, else off. */
+    toggleLabel(name) {
+      const state = this.state;
+      if (!state) return;
+      const chosen = state.marks.labels.map((l) => l.name);
+      this.setLabels(chosen.includes(name) ? chosen.filter((n) => n !== name) : [...chosen, name]);
+    }
+    setRepeat(rule) {
+      const field = this.session.field;
+      if (field) this.reset({ ...field, repeat: rule }, true);
+    }
+    indent(delta) {
+      const place = this.shifted(delta);
+      const field = this.session.field;
+      const run = field && this.run(field.run);
+      const list = run && listSpot(run.spot);
+      if (!place || !run || !list) return;
+      run.spot = { ...list, place };
+      this.shifts = null;
+      this.changed();
+    }
+    /**
+     * The field switches between a task and a section's name. A section stands between tasks of the top level: the field
+     * goes there, past the subtasks of the task above it.
+     */
+    toggleSection() {
+      const field = this.session.field;
+      const list = field && listSpot(this.run(field.run).spot);
+      if (!field || !list || !this.maySection(field)) return;
+      const section = !field.section;
+      const run = section && list.place.level > 0 ? this.newRun({ ...list, place: this.topLevelAfter(list.column, list.place) }) : field.run;
+      const { newSection: _dropped, ...rest } = field;
+      this.reset({ ...rest, run, section });
+    }
+    enter() {
+      const field = this.session.field;
+      if (!field) return;
+      if (field.rename) this.enterRename(field, field.rename);
+      else if (field.section) this.enterSection(field);
+      else if (this.blank(field.text)) this.enterBlank();
+      else this.enterTask(field);
+    }
+    /** A tap elsewhere: the text is kept as by Enter, and the field closes. */
+    blur() {
+      const field = this.session.field;
+      if (!field) return;
+      this.save(field);
+      this.reset(null);
+    }
+    /** The field's own text goes; what Enter already sent is still written. */
+    escape() {
+      this.reset(null);
+    }
+    /**
+     * A place chosen in the bar: the field goes to the end of that place's column at once, a renamed task with it. What it
+     * answers: the column, and the day the day column must open when the place is another day than it shows; null when
+     * the place is the one the field already has, which changes nothing.
+     */
+    choosePlace(placement) {
+      const field = this.session.field;
+      if (!field) return null;
+      const shown = this.shownPlace(field);
+      if (shown && samePlacement(shown, placement)) return null;
+      const column = placement.kind === "now" || placement.kind === "date" ? "day" : placement.kind;
+      const rename2 = field.rename && { ...field.rename, moved: true };
+      this.reset({ ...field, rename: rename2, run: this.newRun(this.endOf(column, field.project ?? null)) });
+      const day = this.tasks.dayOfPlacement(placement);
+      return { column, day: day === null || day === this.look.day() ? null : day };
+    }
+    /** The field, its text and marks, at the end of `column`; what was entered at the old spot is still written there. */
+    moveToEnd(column) {
+      const field = this.session.field;
+      if (field) this.reset({ ...field, run: this.newRun(this.endOf(column, field.project ?? null)) });
+    }
+    /** Where a task written in `column` goes: a list's place, or the day column's on the day it shows. */
+    placeOf(column, result, section) {
+      if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
+      const { group, before } = result;
+      const project = result.project !== void 0 ? result.project : this.look.project?.();
+      const zone = { ...project !== void 0 && { project }, ...section !== void 0 && { section } };
+      if (column !== "day") return { kind: "list", list: column, group, before, ...zone };
+      return { kind: "day", date: this.look.day(), group, before, ...zone };
+    }
+    /** A slot of the field: the project's own view writes its project there too. */
+    slotPlace(slot) {
+      const project = this.look.project?.();
+      return project === void 0 ? { kind: "slot", slot } : { kind: "slot", slot, project };
+    }
+    job(id) {
+      const job = this.session.jobs.find((j) => j.id === id);
+      if (!job) throw new Error(`Task Calendar: no entry job ${id}`);
+      return job;
+    }
+    /**
+     * The service call job `id` is, read when the lists show every write before it: a task at the level it was entered at,
+     * as far as the cards then allow, with the field's project (a subtask's is its parent's: none); a rename by the key the
+     * lists give the task then; a section at the top level where the field stood. Null when it is nothing to write. A slot
+     * takes no rule.
+     */
+    call(id) {
+      const job = this.job(id);
+      switch (job.kind) {
+        case "create": {
+          const { line } = job;
+          const { spot } = this.run(job.run);
+          job.landing = null;
+          switch (spot.kind) {
+            case "slot":
+              return { method: "createInPlace", args: [line.text, line.priority, this.slotPlace(spot.slot), null, line.labels, line.project ?? null] };
+            case "stack":
+              return { method: "createInPlace", args: [line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null }, line.repeat, line.labels] };
+            case "list": {
+              const cards = this.look.cards(spot.column);
+              const place = fitLevel(cards, { ...spot.place, level: line.level });
+              job.landing = spot.column;
+              const at = this.placeOf(spot.column, placeOfGap(cards, place), job.newSection);
+              return { method: "createInPlace", args: at.kind === "subtask" ? [line.text, line.priority, at, line.repeat, line.labels] : [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null] };
+            }
+          }
+          break;
+        }
+        case "rename":
+          return { method: "edit", args: [this.keyAt(job.home, job.item), job.draft] };
+        case "section": {
+          const at = this.placeOf(job.column, placeOfGap(this.look.cards(job.column), { ...job.place, level: 0 }));
+          return at.kind === "list" || at.kind === "day" ? { method: "createSection", args: [job.name, at] } : null;
+        }
+      }
+    }
+    /**
+     * A task job's line is written and the lists are about to draw it (`coming`: the cards each column draws then). It
+     * leaves the queue, and the places at or past its card move down, in the very drawing that shows its card: where the
+     * lists draw the task the file holds (`created`, the key the write gave), which its rules may have put elsewhere.
+     */
+    /** `created`: the task the write made, its key, or with its id (`createWithId`), which finds its card whatever wrote since. */
+    shown(id, created, coming) {
+      const job = this.job(id);
+      if (job.kind !== "create") return;
+      const held = this.session.field?.run ?? null;
+      const was = held === null ? null : this.run(held).spot;
+      if (job.landing && created) this.landed(job.landing, created, coming(job.landing));
+      this.run(job.run).pending.shift();
+      job.shown = true;
+      this.shifts = null;
+      if (held !== null && (held === job.run || this.run(held).spot !== was)) this.emit(this.state, true);
+    }
+    /** A task job ended without its line shown (its write failed): the line stops waiting under the cards. */
+    unshown(id) {
+      const job = this.job(id);
+      if (job.kind !== "create" || job.shown) return;
+      this.run(job.run).pending.shift();
+      this.shifts = null;
+      if (job.run === this.session.field?.run) this.changed();
+    }
+    /** Job `id` ended, written or not: its spot no longer follows the cards for it. */
+    done(id) {
+      const job = this.job(id);
+      this.release(job.kind === "rename" ? job.home : job.run);
+      this.session.jobs.splice(this.session.jobs.indexOf(job), 1);
+    }
+    run(id) {
+      return this.session.runs[id];
+    }
+    newRun(spot) {
+      const id = `r${this.session.next++}`;
+      this.session.runs[id] = { spot, pending: [], holds: 0 };
+      return id;
+    }
+    hold(id) {
+      this.run(id).holds++;
+    }
+    release(id) {
+      const run = this.run(id);
+      if (!run) return;
+      run.holds--;
+      if (run.holds <= 0) delete this.session.runs[id];
+    }
+    maySection(field) {
+      const list = listSpot(this.run(field.run).spot);
+      return !field.rename && list !== null && this.look.sectioned(list.column);
+    }
+    /** The gap of the top level at or after `place` in its section: past the subtasks it stands among. */
+    topLevelAfter(column, place) {
+      const cards = this.look.cards(column);
+      let index = place.index;
+      while (index < cards.length && sameZone2(cards[index], place) && cards[index].level > 0) index++;
+      return { ...place, index, level: 0 };
+    }
+    mayShift(field) {
+      const list = listSpot(this.run(field.run).spot);
+      if (field.rename || field.section || !list) return { canIndent: false, canOutdent: false };
+      const cards = this.look.cards(list.column);
+      const { spot } = this.run(field.run);
+      const kept = this.shifts;
+      if (kept?.cards === cards && kept.spot === spot) return { canIndent: kept.indent, canOutdent: kept.outdent };
+      const shifts = { cards, spot, indent: this.shiftedRun(field.run, cards, 1) !== null, outdent: this.shiftedRun(field.run, cards, -1) !== null };
+      this.shifts = shifts;
+      return { canIndent: shifts.indent, canOutdent: shifts.outdent };
+    }
+    /** The place button: a subtask's field, new or renamed, has none, nor does one off the lists. */
+    shownPlace(field) {
+      const list = listSpot(this.run(field.run).spot);
+      if (!list) return null;
+      if (field.rename) return field.rename.item.isSubtask ? null : this.placement(field);
+      return list.place.level > 0 ? null : this.columnPlacement(list.column);
+    }
+    /** Where a renamed task goes: where it was, until a place is chosen in the bar. */
+    placement(field) {
+      const item = field.rename?.item ?? null;
+      const list = listSpot(this.run(field.run).spot);
+      if (list && (field.rename?.moved || !item)) return this.columnPlacement(list.column);
+      return item ? this.tasks.placementOf(item) : this.columnPlacement("day");
+    }
+    columnPlacement(column) {
+      return column === "day" ? this.tasks.placementOfDay(this.look.day()) : { kind: column };
+    }
+    /** After the last card, in the last section, at the top level; with `project`, of that project's part where the list draws one. */
+    endOf(column, project) {
+      const part = project === void 0 ? null : this.partEnd(column, project);
+      if (part) return part;
+      const sections = this.look.sections(column);
+      const last = sections.length > 0 ? zoneOf2(sections[sections.length - 1]) : { group: null };
+      return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, ...last } };
+    }
+    /** The end of `project`'s part (null: No project's) in a list drawn by project: its last section's last task; null where the list draws none. */
+    partEnd(column, project) {
+      const parts = this.look.sections(column).map(zoneOf2).filter((zone) => zone.project !== void 0 && inProject(project, zone.project));
+      const last = parts[parts.length - 1];
+      if (!last) return null;
+      const place = gapOfPlace(this.look.cards(column), { kind: "task", group: last.group, before: null, project: last.project });
+      return { kind: "list", column, place: { ...place, level: 0 } };
+    }
+    find(key) {
+      const shown = this.look.shown();
+      for (const column of [...shown, ...ALL_COLUMNS.filter((c) => !shown.includes(c))]) {
+        const index = this.look.cards(column).findIndex((card) => samePlace2(card.key, key));
+        if (index >= 0) return { column, index };
+      }
+      return null;
+    }
+    /** Saved, then a new line under the task; a blank text cancels the rename. */
+    enterRename(field, rename2) {
+      const list = listSpot(this.run(field.run).spot);
+      if (this.blank(field.text)) this.reset(null);
+      else {
+        this.saveRename(field, rename2);
+        const under = list && this.under(list, rename2.item);
+        this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: this.projectAt(under) } : null);
+      }
+    }
+    /**
+     * The section goes to the queue and the field closes; a blank name writes nothing. In a project's part no empty section
+     * is made: the field asks for its first task, and the two are written together.
+     */
+    enterSection(field) {
+      const name = field.text.trim();
+      const list = listSpot(this.run(field.run).spot);
+      if (list && list.place.project !== void 0) {
+        this.reset(name === "" ? null : { ...field, text: "", section: false, newSection: name });
+        return;
+      }
+      this.createSection(field);
+      this.reset(null);
+    }
+    /** As in Obsidian: a level shallower, and the end of the entry where it can go no shallower; a section named for a task not typed goes with it. */
+    enterBlank() {
+      if (this.session.field?.newSection !== void 0) this.reset(null);
+      else if (this.shifted(-1)) this.indent(-1);
+      else this.reset(null);
+    }
+    /** The task goes to the queue; the next field opens at once, without a priority, labels or a repeat. A slot takes one task only. */
+    enterTask(field) {
+      this.create(field);
+      const ends = this.run(field.run).spot.kind === "slot" || field.newSection !== void 0;
+      this.reset(ends ? null : { ...field, text: "", priority: null, labels: [], repeat: null });
+    }
+    /** The field becomes `field` (none: closed); the runs it stands on are held while it does. `sameShifts`: only its text or marks changed. */
+    reset(field, sameShifts = false) {
+      const old = this.session.field;
+      for (const run of runsOf(field)) this.hold(run);
+      for (const run of runsOf(old)) this.release(run);
+      this.session.field = field;
+      if (!sameShifts) this.shifts = null;
+      this.changed();
+    }
+    save(field) {
+      if (field.section) return this.createSection(field);
+      if (this.blank(field.text)) return;
+      if (field.rename) this.saveRename(field, field.rename);
+      else this.create(field);
+    }
+    /** Edits by the key the lists give the task when the job runs: the one read at the open may have gone stale. The task's own rule and labels, the same in the field, are left as the file has them. */
+    saveRename(field, { item, home }) {
+      const project = field.project === void 0 || inProject(item.project?.link ?? null, field.project) ? {} : { project: field.project };
+      const draft = { text: field.text, placement: this.placement(field), priority: field.priority, ...!sameNames(field.labels, item.labels.map((l) => l.name)) && { labels: field.labels }, ...!sameRule(field.repeat, item.repeat) && { repeat: field.repeat }, ...project };
+      this.queue(home, { id: this.jobId(), kind: "rename", home, item, draft });
+    }
+    /** `### name` queued where the field stands; always at the top level. */
+    createSection(field) {
+      const name = field.text.trim();
+      const list = listSpot(this.run(field.run).spot);
+      if (name === "" || !list) return;
+      this.queue(field.run, { id: this.jobId(), kind: "section", run: field.run, name, column: list.column, place: list.place });
+    }
+    /** The renamed task's key as the lists show it now: the card at its place while that is still it. */
+    keyAt(home, item) {
+      const run = this.run(home);
+      const list = run && listSpot(run.spot);
+      if (!list) return item.key;
+      const card = this.look.cards(list.column)[list.place.index];
+      return card && sameLine(card.key, item.key) ? card.key : item.key;
+    }
+    /** The field's text queued at its run, waiting under the cards until the lists show it written. */
+    create(field) {
+      const run = this.run(field.run);
+      const line = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0, project: field.project ?? null };
+      run.pending.push(line);
+      this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line, ...field.newSection !== void 0 && { newSection: field.newSection } });
+    }
+    /** A job for `run`, which keeps following the cards that land until the job is done. */
+    queue(run, job) {
+      this.hold(run);
+      this.session.jobs.push(job);
+      this.queued(job);
+    }
+    jobId() {
+      return `j${this.session.next++}`;
+    }
+    /**
+     * The places at or past the created task's card move down, when `column` is to show it among `cards`. A key gone stale
+     * because another write or a sync landed between the create and this read finds no card: the field then stays where it
+     * is, as for a task put elsewhere.
+     */
+    landed(column, created, cards) {
+      const key = "key" in created ? created.key : created;
+      const id = "key" in created ? created.id : created.id;
+      const index = cards.findIndex((card) => {
+        const own = card.id ?? card.key.id;
+        return id !== void 0 && own !== void 0 ? own === id : samePlace2(card.key, key) && sameLine(card.key, key);
+      });
+      if (index < 0) return;
+      for (const run of Object.values(this.session.runs)) {
+        const list = listSpot(run.spot);
+        if (!list || list.column !== column || list.place.index < index) continue;
+        run.spot = { ...list, place: { ...list.place, index: list.place.index + 1 } };
+      }
+    }
+    /** Right under a renamed task at its level, or its first subtask when it shows some: nothing may stand between a task and them. */
+    under(spot, item) {
+      const { place } = spot;
+      const shown = item.subtasks.length > 0 && !item.collapsed;
+      return { ...spot, place: { ...place, index: place.index + 1, level: place.level + (shown ? 1 : 0) } };
+    }
+    /** The field's place a level deeper or shallower; null when the cards around forbid it, or the field does not move (a rename, a slot, a stack). */
+    shifted(delta) {
+      const field = this.session.field;
+      const list = field && listSpot(this.run(field.run).spot);
+      if (!field || field.rename || !list) return null;
+      return this.shiftedRun(field.run, this.look.cards(list.column), delta);
+    }
+    /** The run's place a level deeper or shallower, bound by `cards` with the texts entered there standing in before it. */
+    shiftedRun(id, cards, delta) {
+      const run = this.run(id);
+      const list = listSpot(run.spot);
+      if (!list) return null;
+      const { place } = list;
+      const unwritten = run.pending.map((line) => ({ level: line.level, group: place.group, ...place.project !== void 0 && { project: place.project } }));
+      const shown = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
+      const shifted = shiftLevel(shown, { ...place, index: place.index + unwritten.length }, delta);
+      return shifted && { ...place, level: shifted.level };
+    }
+    blank(text) {
+      return this.tasks.isBlank(text);
+    }
+    changed() {
+      this.emit(this.state);
+    }
+  };
+  function placeOfDrop2(result) {
+    switch (result.kind) {
+      case "list":
+        return { kind: "task", group: null, before: result.before };
+      case "group":
+        return { kind: "task", group: result.group, before: result.before, ...result.project !== void 0 && { project: result.project } };
+      case "nest":
+        return { kind: "subtask", parent: result.parent, before: result.before };
+      case "place":
+        return result.place ?? { kind: "task", group: null, before: null };
+      default:
+        return null;
+    }
+  }
+  function placeChoices(place) {
+    const lists = ENTRY_PLACES.map((kind) => ({ kind, on: place?.kind === kind }));
+    return [...lists, { kind: "date", on: place?.kind === "date", date: place?.kind === "date" ? place.date : null }];
+  }
+  function entryProject(link, known) {
+    return { page: projectPage([refOf(link, known)], known), lit: link !== null };
+  }
+  function refOf(link, known) {
+    if (link === null) return null;
+    const name = projectName(link);
+    return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link, note: null, canOpenNote: false, mark: true };
+  }
+  function runsOf(field) {
+    if (!field) return [];
+    return field.rename ? [field.run, field.rename.home] : [field.run];
+  }
+  function sameNames(a, b) {
+    return a.length === b.length && a.every((name, i) => name === b[i]);
+  }
+
+  // core/application/wholeCard.ts
+  function wholeWidth(card, room) {
+    if (card.textWidth <= card.titleWidth - card.fade) return null;
+    const missing = Math.ceil(card.textWidth - card.titleWidth);
+    const widest = room.width - 2 * room.margin;
+    const width = Math.max(card.width, Math.min(card.width + missing, widest));
+    return { width, cut: width < card.width + missing };
+  }
+  function grownStart(start, size, grown, room, margin) {
+    const end = Math.max(start + size, room - margin);
+    return Math.max(Math.min(start, margin), Math.min(start, end - grown));
+  }
+
+  // core/application/SectionNameEntry.ts
+  function sectionNameEnd(ended, event, text) {
+    if (ended) return { ended: true };
+    return { ended: true, end: { name: event === "enter" ? text : null } };
+  }
+
+  // core/application/RepeatPage.ts
+  function repeatPageEnd(own, held) {
+    if (held === null) return null;
+    if (held.rule === null) return own === null ? null : held;
+    return sameRule(held.rule, own) ? null : held;
+  }
+
+  // core/application/DescriptionDraft.ts
+  function descriptionOpen(description) {
+    return { state: { file: description, typed: false }, text: description ?? DESCRIPTION_TEMPLATE };
+  }
+  function descriptionTyped(state) {
+    return { ...state, typed: true };
+  }
+  function descriptionSave(state) {
+    return { state: { ...state, typed: false }, write: state.typed };
+  }
+  function descriptionRead(state, description, editor) {
+    const elsewhere = description !== state.file;
+    if (!elsewhere || editor.focused || editor.pending) return { state: { ...state, file: description }, replace: null };
+    return { state: { file: description, typed: false }, replace: description ?? DESCRIPTION_TEMPLATE };
+  }
+
+  // core/application/listWidth.ts
+  var LIST_WIDTHS = { min: 110, max: 280 };
+  function listWidths(share, viewWidth, dividerWidth) {
+    const columns = viewWidth - dividerWidth;
+    const max = Math.max(LIST_WIDTHS.max, columns - LIST_WIDTHS.min);
+    return { width: Math.min(max, Math.max(LIST_WIDTHS.min, share * columns)), min: LIST_WIDTHS.min, max, center: columns / 2 };
+  }
+  function listShareOf(width, viewWidth, dividerWidth) {
+    return width / (viewWidth - dividerWidth);
+  }
+  var DIVIDER_SNAP = { distance: 8, slowSpeed: 0.08 };
+  function dividerAt(wanted, widths, speed) {
+    const reachable = widths.center >= widths.min && widths.center <= widths.max;
+    const snapped = reachable && speed < DIVIDER_SNAP.slowSpeed && Math.abs(wanted - widths.center) <= DIVIDER_SNAP.distance;
+    const width = snapped ? widths.center : Math.round(wanted);
+    return { width: Math.min(widths.max, Math.max(widths.min, width)), snapped };
+  }
+
+  // core/application/listDrop.ts
+  function levelAt(x, list, indent) {
+    return indent > 0 ? (x - (list.left + list.width / 2)) / indent : 0;
+  }
+  function carriedMiddle(y, grabPx, cardHeight) {
+    return y - grabPx + cardHeight / 2;
+  }
+  function gapUnder(header) {
+    return { kind: "gap", index: 0, level: 0, ...header !== null && typeof header === "object" ? header : { group: header } };
+  }
+  function headerOfPlace(place) {
+    return place.project === void 0 ? place.group : { group: place.group, project: place.project };
+  }
+  function orderOf(heads, group) {
+    return heads.findIndex((h) => sameGap(gapUnder(h.group), gapUnder(group)));
+  }
+  function noSectionBelow(heads) {
+    return heads.some((head, i) => i > 0 && head.group === null);
+  }
+  function opensList(head, i, heads) {
+    return i === 0 && (head.opens === true || noSectionBelow(heads));
+  }
+  function placeAt(cards, y, level, shift, room, heads = [], held = null, hysteresis = 0) {
+    const at = (finger) => rawPlaceAt(cards, finger, level, shift, room, heads);
+    const place = at(y);
+    if (!held || hysteresis <= 0 || sameGap(place, held)) return place;
+    if (!sameGap(at(y - hysteresis), held) && !sameGap(at(y + hysteresis), held)) return place;
+    return fitLevel(cards, { ...held, level: Math.round(level) });
+  }
+  function rawPlaceAt(cards, y, level, shift, gap, heads) {
+    const top = (i) => cards[i].top + (gap && i >= gap.index ? shift : 0);
+    const headAfterGap = (h) => gap !== null && (h.firstCard > gap.index || h.firstCard === gap.index && orderOf(heads, h.group) > orderOf(heads, headerOfPlace(gap)));
+    const headEdge = (h, i) => h.top + (headAfterGap(h) ? shift : 0) + (i === 0 && h.group !== null ? h.height : h.height / 2);
+    const index = cards.filter((c, i) => y > top(i) + c.height / 2).length;
+    const passed = heads.filter((head, i) => head.firstCard === index && (opensList(head, i, heads) || y > headEdge(head, i))).map((head) => head.group);
+    return gapAt(cards, index, level, passed, heads.length > 0);
+  }
+  function branchOf(levels, index) {
+    const level = levels[index];
+    if (level <= 0) return null;
+    const goesOn = (l) => levels.slice(index + 1).find((next) => next <= l) === l;
+    return { last: !goesOn(level), through: Array.from({ length: level - 1 }, (_, k) => goesOn(k + 1)) };
+  }
+  function gapBranch(cards, gap) {
+    const levels = cards.map((card) => card.level);
+    levels.splice(gap.index, 0, gap.level);
+    return branchOf(levels, gap.index);
+  }
+
+  // core/application/drops.ts
+  function readDrop(to, sections) {
+    if (to.kind !== "place") return to;
+    return listDrop(to.column, to.place, to.place ? sections(to.column) : null);
+  }
+  function listDrop(column, place, sections) {
+    if (!place) return { kind: "list", column, before: null };
+    if (place.kind === "subtask") return { kind: "nest", parent: place.parent, before: place.before };
+    if (sections) return { kind: "group", list: sections.list, date: sections.date, group: place.group, before: place.before, ...place.project !== void 0 && { project: place.project } };
+    return { kind: "list", column, before: place.before };
+  }
+  function acceptsDrop(target, origins) {
+    switch (target) {
+      case "timeline":
+        return origins.length <= 1;
+      case "day":
+        return true;
+      case "soon":
+        return origins.every((from) => from !== "timeline");
+      case "inbox":
+      case "backlog":
+        return origins.every((from) => from === "inbox" || from === "backlog" || from === "soon" || from === "new");
+    }
+  }
+  function placesInGap(column, from, grouped) {
+    return from === "new" || from === column || grouped;
+  }
+  function dropMove(from, to, day, project) {
+    switch (to.kind) {
+      case "time":
+        return { kind: "toTime", from, start: to.start, day };
+      case "clearSlot":
+        return { kind: "clearSlot" };
+      case "group":
+        return { kind: "moveToGroup", list: to.list, group: to.group, before: to.before, date: to.date ?? void 0, ...to.project !== void 0 && { project: to.project } };
+      case "title":
+        return { kind: "moveToGroup", list: to.list, group: null, before: null, date: to.date ?? void 0, ...to.byProject && { project } };
+      case "nest":
+        return { kind: "nest", parent: to.parent, before: to.before };
+      case "list":
+        if (from === "timeline") return { kind: "clearSlot", place: { before: to.before, date: day } };
+        if (to.column === "day") return from === "day" ? { kind: "moveBefore", before: to.before, date: day } : { kind: "moveToList", date: day };
+        if (to.before) return { kind: "moveBefore", before: to.before, date: day };
+        return from === "day" ? { kind: "moveToSoon", date: day } : { kind: "moveToEnd", section: to.column };
+    }
+  }
+  function dropMoves(tasks, to, day, projectOf = () => null) {
+    if (tasks.length === 1) return { kind: "one", key: tasks[0].key, move: dropMove(tasks[0].from, to, day, projectOf(tasks[0].key)) };
+    const steps = tasks.flatMap(({ key, from }) => {
+      const move = dropMove(from, to, day, projectOf(key));
+      return move.kind === "toTime" || move.kind === "clearSlot" ? [] : [{ key, change: move }];
+    });
+    return { kind: "many", steps };
+  }
+
   // core/application/contracts.ts
   var StaleTaskError = class extends Error {
     constructor() {
@@ -4392,72 +4564,6 @@ ${key.title}`.toLowerCase();
       this.name = "TasksFileMissingError";
     }
   };
-
-  // core/application/notes.ts
-  var MD = ".md";
-  function nameOf(path) {
-    const file = path.slice(path.lastIndexOf("/") + 1);
-    return file.toLowerCase().endsWith(MD) ? file.slice(0, -MD.length) : file;
-  }
-  function withoutMd(path) {
-    return path.toLowerCase().endsWith(MD) ? path.slice(0, -MD.length) : path;
-  }
-  function linkedNotes(notes) {
-    const named = /* @__PURE__ */ new Map();
-    for (const { path } of notes) named.set(projectKey(nameOf(path)), (named.get(projectKey(nameOf(path))) ?? 0) + 1);
-    return notes.map(({ path }) => {
-      const name = nameOf(path);
-      return { name, path, link: named.get(projectKey(name)) === 1 ? name : withoutMd(path) };
-    });
-  }
-  var OPEN = "[[";
-  var CLOSE = "]]";
-  function linkQuery(text, caret) {
-    const before = text.slice(0, caret);
-    const from = before.lastIndexOf(OPEN);
-    if (from < 0) return null;
-    const query = before.slice(from + OPEN.length);
-    if (/[\]\[\n|]/.test(query)) return null;
-    return { query, from, to: text.startsWith(CLOSE, caret) ? caret + CLOSE.length : caret };
-  }
-  var NOTE_SUGGESTIONS = 20;
-  function noteSuggestions(query, notes, limit = NOTE_SUGGESTIONS) {
-    const typed2 = query.trim().toLowerCase();
-    const words = typed2.split(/\s+/).filter((word) => word !== "");
-    const rank = (note) => {
-      const name = note.name.toLowerCase();
-      const path = note.path.toLowerCase();
-      if (typed2 === "") return 0;
-      if (name === typed2) return 0;
-      if (name.startsWith(typed2)) return 1;
-      if (name.includes(typed2)) return 2;
-      if (path.includes(typed2)) return 3;
-      return words.every((word) => path.includes(word)) ? 4 : null;
-    };
-    const ranked = linkedNotes(notes).flatMap((note) => {
-      const r = rank(note);
-      return r === null ? [] : [{ note: { name: note.name, path: note.path, link: note.link }, rank: r }];
-    });
-    ranked.sort((a, b) => a.rank - b.rank || (typed2 === "" ? 0 : a.note.name.length - b.note.name.length) || compare(a.note.name, b.note.name) || compare(a.note.path, b.note.path));
-    return ranked.slice(0, limit).map(({ note }) => note);
-  }
-  function compare(a, b) {
-    const x = a.toLowerCase();
-    const y = b.toLowerCase();
-    return x < y ? -1 : x > y ? 1 : 0;
-  }
-  function withNoteLink(text, at, link) {
-    const written = `${OPEN}${link}${CLOSE}`;
-    return { text: text.slice(0, at.from) + written + text.slice(at.to), caret: at.from + written.length };
-  }
-  function noteOfLink(target, notes) {
-    const bare = target.split("#")[0].split("|")[0].trim().replace(/^\//, "");
-    if (bare === "") return null;
-    const wanted = projectKey(withoutMd(bare));
-    const linked = linkedNotes(notes);
-    const found = linked.find((note) => projectKey(withoutMd(note.path)) === wanted) ?? linked.find((note) => projectKey(withoutMd(note.path)).endsWith(`/${wanted}`)) ?? linked.find((note) => projectKey(note.name) === wanted);
-    return found ? { name: found.name, path: found.path, link: found.link } : null;
-  }
 
   // core/application/ScreenSettingsImpl.ts
   function screenSettingsOf(settings) {
@@ -4586,8 +4692,8 @@ ${key.title}`.toLowerCase();
       if (zoomLevels) await this.store.update({ zoomLevels });
     }
     async setProjectTag(tag) {
-      const bare = tag.trim().replace(/^#/, "");
-      if (/^[^\s#]+$/.test(bare)) await this.store.update({ projectTag: `#${bare}` });
+      const bare2 = tag.trim().replace(/^#/, "");
+      if (/^[^\s#]+$/.test(bare2)) await this.store.update({ projectTag: `#${bare2}` });
     }
     renameLabel(index, title) {
       return this.patchLabel(index, { name: labelNameOf(title) });
@@ -4692,8 +4798,8 @@ ${key.title}`.toLowerCase();
   var ACCENTS_RE = /[̀-ͯ]/g;
   function foldedChar(char) {
     const lower = char.toLowerCase();
-    const bare = lower.normalize("NFD").replace(ACCENTS_RE, "");
-    if (bare.length === 1) return bare;
+    const bare2 = lower.normalize("NFD").replace(ACCENTS_RE, "");
+    if (bare2.length === 1) return bare2;
     return lower.length === 1 ? lower : char;
   }
   function folded(text) {
@@ -5465,13 +5571,14 @@ ${key.title}`.toLowerCase();
       if (this.isBlank(text)) return null;
       return (doc, today, _settings, boundary) => createAtTime(doc, date, today, start, text, boundary);
     }
-    createInPlace(text, priority, place, repeat, labels = []) {
+    /** `project`, the task's own whatever the place's, which then only places it; a subtask takes none. */
+    createInPlace(text, priority, place, repeat, labels = [], project) {
       if (this.isBlank(text)) return null;
-      return this.placeNew(text, priority, place, repeat, labels);
+      return this.placeNew(text, priority, place, repeat, labels, project);
     }
     /** A new task where `place` says, whatever its title: `createInPlace` without its check for a blank one. */
-    placeNew(text, priority, place, repeat, labels = []) {
-      return (doc, today, _settings, boundary) => createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels);
+    placeNew(text, priority, place, repeat, labels = [], project) {
+      return (doc, today, _settings, boundary) => createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels, project);
     }
     create(draft, slot) {
       if (this.isBlank(draft.text)) return null;
@@ -5854,13 +5961,13 @@ ${key.title}`.toLowerCase();
     createAtTime(date, start, text) {
       return nothing(this.rules.createAtTime(date, start, text));
     }
-    createInPlace(text, priority, place, repeat, labels = []) {
-      const write = this.createWithId(text, priority, place, repeat, labels);
+    createInPlace(text, priority, place, repeat, labels = [], project) {
+      const write = this.createWithId(text, priority, place, repeat, labels, project);
       return { operation: write.operation, answer: (change) => write.answer(change)?.key ?? null };
     }
-    createWithId(text, priority, place, repeat, labels = []) {
+    createWithId(text, priority, place, repeat, labels = [], project) {
       return {
-        operation: this.rules.createInPlace(text, priority, place, repeat, labels),
+        operation: this.rules.createInPlace(text, priority, place, repeat, labels, project),
         answer: (change) => {
           const created = change?.after.insertedSince(change.before);
           return created ? { key: keyOf(created), id: created.id } : null;
@@ -6475,8 +6582,8 @@ ${key.title}`.toLowerCase();
     createInList: (c, [date, text]) => c.run(c.writes.createInList(date, text)),
     createInSoon: (c, [text]) => c.run(c.writes.createInSoon(text)),
     createAtTime: (c, [date, start, text]) => c.run(c.writes.createAtTime(date, start, text)),
-    createInPlace: (c, [text, priority, place, repeat, labels]) => c.run(c.writes.createInPlace(text, priority ?? null, place, repeat ?? null, labels ?? [])),
-    createWithId: (c, [text, priority, place, repeat, labels]) => c.run(c.writes.createWithId(text, priority ?? null, place, repeat ?? null, labels ?? [])),
+    createInPlace: (c, [text, priority, place, repeat, labels, project]) => c.run(c.writes.createInPlace(text, priority ?? null, place, repeat ?? null, labels ?? [], project)),
+    createWithId: (c, [text, priority, place, repeat, labels, project]) => c.run(c.writes.createWithId(text, priority ?? null, place, repeat ?? null, labels ?? [], project)),
     create: (c, [draft, slot]) => c.run(c.writes.create(draft, slot ?? void 0)),
     createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent, draft)),
     edit: (c, [key, draft]) => c.run(c.writes.edit(key, draft)),
@@ -6706,11 +6813,13 @@ ${key.title}`.toLowerCase();
   };
   var CAPTURE_LISTS = ["inbox", "now", "soon", "backlog"];
   var CAPTURE = {
-    add: (c, [list, typed2, recording, tag]) => {
+    add: (c, [list, typed2, recording, tag, project]) => {
       const title = captureTitle({ typed: typed2, recording: recording ?? null, tag: tag ?? "" });
       if (title === "") throw new DoorError("blank", "the task has no title");
-      c.write((text) => c.rules.change(text, c.rules.placeNew(title, null, { kind: "list", list, group: null, before: null })).text);
+      c.write((text) => c.rules.change(text, c.rules.placeNew(title, null, { kind: "list", list, group: null, before: null }, null, [], project ?? null)).text);
     },
+    /** The New Task sheet's Project row for the project chosen (null: none; at the start, the view's `ScreenView.project`): the quick entry's Project button, its page and whether it is lit. */
+    project: (c, [chosen]) => entryProject(chosen ?? null, c.reads.projectNotes()),
     lists: (c) => CAPTURE_LISTS.map((list) => ({ list, name: c.settings.sections[list] }))
   };
   var HISTORY = {
@@ -6828,6 +6937,7 @@ ${key.title}`.toLowerCase();
     "setLabels",
     "toggleLabel",
     "setRepeat",
+    "setProject",
     "indent",
     "toggleSection",
     "enter",
@@ -6874,7 +6984,11 @@ ${key.title}`.toLowerCase();
     linkQuery: (_c, [text, caret]) => linkQuery(text, caret),
     suggest: (_c, [query, notes, limit]) => noteSuggestions(query, notes, limit ?? void 0),
     insert: (_c, [text, at, link]) => withNoteLink(text, at, link),
-    open: (_c, [target, notes]) => noteOfLink(target, notes)
+    open: (_c, [target, notes]) => noteOfLink(target, notes),
+    /** «New project…» named `name`: the note to write among the vault's `notes`, the one of that name or a new one at the root; null for a name of nothing. */
+    newProject: (_c, [name, notes]) => newProjectNote(name, notes ?? []),
+    /** The project note's text with the settings' project tag in its properties: `text`, the note's as read (null: a new note); unchanged when it has the tag. */
+    projectText: (c, [text]) => withProjectTag(text ?? null, c.settings.projectTag)
   };
   var SPACES = {
     tasks: TASKS,

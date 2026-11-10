@@ -34,7 +34,7 @@ describe("the quick entry in a project's group", () => {
 		entry.open({ kind: "list", column: "backlog", place: { kind: "gap", index: 1, level: 0, group: null, project: "P" } });
 		entry.type("New");
 		entry.enter();
-		expect(entry.call(entry.session.jobs[0].id)).toEqual({ method: "createInPlace", args: ["New", null, { kind: "list", list: "backlog", group: null, before: null, project: "P" }, null, []] });
+		expect(entry.call(entry.session.jobs[0].id)).toEqual({ method: "createInPlace", args: ["New", null, { kind: "list", list: "backlog", group: null, before: null, project: "P" }, null, [], "P"] });
 	});
 
 	it("a section is born with its first task: the name, then the task, written together", () => {
@@ -50,7 +50,7 @@ describe("the quick entry in a project's group", () => {
 		entry.enter();
 		expect(entry.state).toBeNull();
 		const call = entry.call(entry.session.jobs[0].id);
-		expect(call).toEqual({ method: "createInPlace", args: ["First", null, { kind: "list", list: "backlog", group: null, before: null, project: "P", section: "Идеи" }, null, []] });
+		expect(call).toEqual({ method: "createInPlace", args: ["First", null, { kind: "list", list: "backlog", group: null, before: null, project: "P", section: "Идеи" }, null, [], "P"] });
 	});
 
 	it("Escape after the name drops both, and so does an empty Enter", () => {
@@ -69,6 +69,6 @@ describe("the quick entry in a project's group", () => {
 		entry.openSlot({ date: T, start: 600, end: null });
 		entry.type("At ten");
 		entry.enter();
-		expect(entry.call(entry.session.jobs[0].id)).toEqual({ method: "createInPlace", args: ["At ten", null, { kind: "slot", slot: { date: T, start: 600, end: null }, project: "P" }, null, []] });
+		expect(entry.call(entry.session.jobs[0].id)).toEqual({ method: "createInPlace", args: ["At ten", null, { kind: "slot", slot: { date: T, start: 600, end: null }, project: "P" }, null, [], "P"] });
 	});
 });

@@ -140,19 +140,35 @@ function menuSections(items: readonly TaskItem[], offer: SectionOffer | null, of
  * has. Only subtasks: disabled, showing their parent's.
  */
 export function menuProject(items: readonly TaskItem[], known: readonly ProjectRef[]): MenuProject {
+	return projectPage(
+		items.map((item) => item.project),
+		known,
+		items.every((item) => !item.can.setProject),
+	);
+}
+
+/** «New project…»: the Project page's last option. */
+export const NEW_PROJECT = "New project…";
+
+/**
+ * A Project page for `chosen`, the project of each of the tasks or fields it is for (null: none): the project notes by
+ * name, then a chosen project that is none of them, No project last; checked the one they all have.
+ */
+export function projectPage(chosen: readonly (ProjectRef | null)[], known: readonly ProjectRef[], disabled = false): MenuProject {
 	const key = (ref: ProjectRef | null) => (ref ? projectKey(ref.name) : "");
-	const first = items[0]?.project ?? null;
-	const shared = items.every((item) => key(item.project) === key(first));
+	const first = chosen[0] ?? null;
+	const shared = chosen.every((ref) => key(ref) === key(first));
 	const options = [...known];
-	for (const item of items) if (item.project && !options.some((ref) => key(ref) === key(item.project))) options.push({ ...item.project, mark: true });
-	const none = items.every((item) => item.project === null);
+	for (const ref of chosen) if (ref && !options.some((option) => key(option) === key(ref))) options.push({ ...ref, mark: true });
+	const none = chosen.every((ref) => ref === null);
 	return {
 		value: shared && first ? first.name : none ? NO_PROJECT : "",
 		current: shared ? first : null,
 		options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
 		none,
 		noneLabel: NO_PROJECT,
-		disabled: items.every((item) => !item.can.setProject),
+		disabled,
+		newLabel: NEW_PROJECT,
 	};
 }
 

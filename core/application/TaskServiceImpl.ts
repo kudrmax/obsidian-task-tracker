@@ -42,8 +42,9 @@ import {
 	type TaskStep,
 } from "./contracts";
 import type { SectionOffer } from "./sections";
-import { type Clock, type GroupingStore, memoryGrouping, NO_PROJECTS, type Projects, type SettingsStore, type TaskFileStore } from "./ports";
-import { revealedGrouping, withFoldToggled, withGrouping } from "./projects";
+import { type Clock, type GroupingStore, memoryGrouping, NO_NOTE_FILES, NO_PROJECTS, type NoteFiles, type Projects, type SettingsStore, type TaskFileStore } from "./ports";
+import { newProjectNote, newProjectRef, revealedGrouping, withFoldToggled, withGrouping } from "./projects";
+import { withProjectTag } from "../domain/NoteTags";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -86,6 +87,7 @@ export class TaskServiceImpl implements TaskService {
 		private readonly projects: Projects = NO_PROJECTS,
 		private readonly grouping: GroupingStore = memoryGrouping(),
 		identity: TaskIdentity = new TaskIdentity(),
+		private readonly notes: NoteFiles = NO_NOTE_FILES,
 	) {
 		this.rules = new TaskRules(settings, clock, identity);
 		this.reads = new TaskReads(this.rules, settings, clock, { notes: () => projects.list(), grouping: () => grouping.get() });
@@ -126,6 +128,16 @@ export class TaskServiceImpl implements TaskService {
 
 	projectNotes(): readonly ProjectRef[] {
 		return this.reads.projectNotes();
+	}
+
+	async newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null> {
+		const note = newProjectNote(name, this.notes.paths().map((path) => ({ path })));
+		if (!note) return null;
+		const was = note.exists ? await this.notes.read(note.path) : null;
+		const text = withProjectTag(was, this.settings.get().projectTag);
+		if (text !== was) await this.notes.write(note.path, text);
+		if (keys.length > 0) await this.setProject(keys, note.link);
+		return newProjectRef(note);
 	}
 
 	async setGrouping(list: GroupedList, on: boolean): Promise<void> {
@@ -201,12 +213,12 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.createAtTime(date, start, text));
 	}
 
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Promise<TaskKey | null> {
-		return this.run(this.writes.createInPlace(text, priority, place, repeat, labels));
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Promise<TaskKey | null> {
+		return this.run(this.writes.createInPlace(text, priority, place, repeat, labels, project));
 	}
 
-	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Promise<CreatedTask | null> {
-		return this.run(this.writes.createWithId(text, priority, place, repeat, labels));
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Promise<CreatedTask | null> {
+		return this.run(this.writes.createWithId(text, priority, place, repeat, labels, project));
 	}
 
 	create(draft: TaskDraft, slot?: Slot): Promise<void> {

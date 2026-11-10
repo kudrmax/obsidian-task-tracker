@@ -55,3 +55,42 @@ function bodyTags(body: string): string[] {
 	}
 	return [...kept.join("\n").matchAll(BODY_TAG)].map((m) => m[1]).filter((tag) => !/^\d+$/.test(tag)).map((tag) => `#${tag}`);
 }
+
+/** A tag compared as a note writes it: no `#`, case aside. */
+function bare(tag: string): string {
+	return tag.trim().replace(/^#/, "");
+}
+
+/**
+ * A note's text with `tag` in its properties' `tags` (without `#`), the rest untouched: a list gets the tag as its last
+ * item, a flow list `[a, b]` at its end, a plain value becomes a list; a note without properties gets them first. A note
+ * with no text (null) is a new one, the properties alone. A note that has the tag already, in its properties or its text,
+ * is left as it is.
+ */
+export function withProjectTag(text: string | null, tag: string): string {
+	const name = bare(tag);
+	const item = `  - ${name}`;
+	if (text === null) return `---\ntags:\n${item}\n---\n`;
+	if (noteTags(text).some((t) => bare(t).toLowerCase() === name.toLowerCase())) return text;
+	const lines = text.split("\n");
+	const end = lines[0]?.trim() === "---" ? lines.findIndex((line, i) => i > 0 && line.trim() === "---") : -1;
+	if (end < 0) return `---\ntags:\n${item}\n---\n${text}`;
+	const at = lines.findIndex((line, i) => i > 0 && i < end && /^(tags|tag)\s*:/i.test(line));
+	if (at < 0) return [...lines.slice(0, end), "tags:", item, ...lines.slice(end)].join("\n");
+	const colon = lines[at].indexOf(":");
+	const key = lines[at].slice(0, colon);
+	const value = lines[at].slice(colon + 1).trim();
+	if (value.startsWith("[") && value.endsWith("]")) {
+		const inner = value.slice(1, -1).trim();
+		return replaced(lines, at, 1, [`${key}: [${inner === "" ? name : `${inner}, ${name}`}]`]);
+	}
+	if (value !== "") return replaced(lines, at, 1, [`${key}:`, ...value.split(/[,\s]+/).filter((t) => t !== "").map((t) => `  - ${t}`), item]);
+	let last = at;
+	while (last + 1 < end && lines[last + 1].trim().startsWith("-")) last++;
+	const indent = last > at ? (/^\s*/.exec(lines[last])?.[0] ?? "  ") : "  ";
+	return replaced(lines, last + 1, 0, [`${indent}- ${name}`]);
+}
+
+function replaced(lines: readonly string[], at: number, count: number, put: readonly string[]): string {
+	return [...lines.slice(0, at), ...put, ...lines.slice(at + count)].join("\n");
+}

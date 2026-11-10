@@ -267,14 +267,15 @@ export class TaskRules {
 		return (doc, today, _settings, boundary) => ops.createAtTime(doc, date, today, start, text, boundary);
 	}
 
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Operation | null {
+	/** `project`, the task's own whatever the place's, which then only places it; a subtask takes none. */
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Operation | null {
 		if (this.isBlank(text)) return null;
-		return this.placeNew(text, priority, place, repeat, labels);
+		return this.placeNew(text, priority, place, repeat, labels, project);
 	}
 
 	/** A new task where `place` says, whatever its title: `createInPlace` without its check for a blank one. */
-	placeNew(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Operation {
-		return (doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels);
+	placeNew(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Operation {
+		return (doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels, project);
 	}
 
 	create(draft: TaskDraft, slot?: Slot): Operation | null {

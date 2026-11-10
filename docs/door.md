@@ -111,6 +111,11 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   `"On the 5th"`, `"Every 2 months on the 5th"`, `"Every 3 weeks after done"`; for a weekly schedule `value` is empty and
   `days` the weekdays (0 Monday) the row lights among the week's letters (`REPEAT_WORDS.weekdays[i].letter`); empty and
   null for no rule and in the bulk menu.
+- `tasks.createInPlace(text, priority, place, repeat?, labels?, project?)` and `tasks.createWithId(…, project?)`:
+  `project` is the task's own (`ProjectRef.link`, `null` for none), written whatever the place's `project` says, which
+  then only decides where it goes; a subtask's place takes none. The quick entry's `entry.call` hands it as the sixth
+  argument for a task of the top level: `["Meet", null, { kind: "list", list: "soon", group: null, before: null }, null,
+  [], "Дружба"]` writes `- [ ] Meet 🗂️ [[Дружба]]` last in Soon.
 - `tasks.createWithId(text, priority, place, repeat?, labels?)`: `tasks.createInPlace`, answering `CreatedTask`
   `{ key, id }` (null when nothing was created) instead of the key alone. The key names the new task as the file stands
   right after this write; the id names it whatever is written before the screen draws it. `tasks.createInPlace` answers
@@ -180,8 +185,9 @@ parent's. Every write keeps it, and no title (`TaskItem.title`, `text`, a remind
   no task to stand before. `entry.*` reads the same: `WireLook.sections` holds `{ group, project }` headers, and
   `WireLook.project` is the project of a project's view (every task written there gets it).
 - `tasks.setProject(keys, link | null)`: one write; a subtask is left as it is. `tasks.projectNotes()`: the project notes
-  by name. A menu's `project` (`MenuProject` `{ current, options, none, noneLabel, value, disabled }`) is the Project
-  row's page; `noneLabel` is No project's own row (`"No project"`), `value` what the row shows beside «Project». Where the row stands is the menu's `edits`: `"project"`
+  by name. A menu's `project` (`MenuProject` `{ current, options, none, noneLabel, value, disabled, newLabel }`) is the Project
+  row's page; `noneLabel` is No project's own row (`"No project"`), `value` what the row shows beside «Project»,
+  `newLabel` the page's last row, «New project…» (`notes.newProject`). Where the row stands is the menu's `edits`: `"project"`
   comes right after `"section"` (where Section would stand when it is not offered), before `"subtask"`, in one task's
   menu and in the bulk menu (`["section", "project"]`); a host draws the edits in that order and places nothing itself.
 - `tasks.setGrouping(list, on)`, `tasks.toggleFold(list, key)`: answer the new `grouping`.
@@ -191,7 +197,18 @@ parent's. Every write keeps it, and no title (`TaskItem.title`, `text`, a remind
   `project`, only that project's tasks (the search opened from its view).
 - A menu's `project.value` is the row's value, ready: the shared project's name, «No project», or empty when they differ.
 - `NewTaskPlace` `list`/`day` take `project` and `section` (a section named in a project's group is born with its first
-  task), `slot` takes `project`. `capture.add` writes no project.
+  task), `slot` takes `project`. `capture.add` writes the New Task sheet's project (`project`, its fifth argument).
+- Grouped Soon has a group for every project note, as Backlog: an empty one draws «No tasks», so a task or the plus can
+  be dropped in it. No project's group in Soon still shows only with a task or an empty section in it.
+- `tasks.fullTree(item)` carries `project`: the task's `ProjectRef`, a subtask's its parent's, null for none. The full
+  screen draws its line under the title (the folder symbol and `name`); a tap opens the project's view,
+  `tasks.screen(date, project.link)`.
+- «New project…» (`MenuProject.newLabel`, on every Project page: a task's menu, the bulk menu, the quick entry's button,
+  the New Task sheet): the host asks the name, then `notes.newProject(name, notes)` names the note and
+  `notes.projectText(text)` gives its text; the host writes it (coordinated, through the vault's bookmark), adds the note
+  to `context.projects`, and gives the project (`link`) to the tasks (`tasks.setProject`), the field
+  (`entry.setProject`) or the sheet. A null answer (an empty name) writes nothing. In the plugin `TaskService.newProject`
+  does all of it.
 
 #### Ids: who a task or a section is
 
@@ -272,12 +289,20 @@ Over `context.tasks` (`tasksFileMissing` without it), at `context.nowMs`:
 
 ### `capture.*`: a task typed or spoken on the phone
 
-`add(list, typed, recording?, tag?)`: written last in `list` (`rules.constants().LISTS`), as the plugin's quick entry
+`add(list, typed, recording?, tag?, project?)`: written last in `list` (`rules.constants().LISTS`), as the plugin's quick entry
 puts it, on one line; in Now with today's date. The title is the words typed, then `[[recording]]` (the recording's file
 name as the host saved it, `null` for none), then the tag (as typed in the app's settings, with or without its `#`;
 blank for none), which goes only with a recording. No words and no recording answer `blank`. A title that is only a
 priority prefix (`p1`) is written as the task's text: the phone's capture writes what it was told, unlike the plugin's
-quick entry, which writes nothing for it.
+quick entry, which writes nothing for it. `project`, the sheet's Project (`ProjectRef.link`; null or left out: none),
+goes on the line as `🗂️ [[link]]`, the task still last in its list: `add("inbox", "Call Anna", null, "", "Дружба")` →
+`- [ ] Call Anna 🗂️ [[Дружба]]`.
+
+`project(chosen)`: the sheet's Project row for the project chosen (`link`, null for none), `EntryProject`
+`{ page, lit }`: `page` the task menu's Project page (`MenuProject`, «New project…» last), `lit` whether one is chosen.
+The sheet starts with the project of the view it was opened from (`ScreenView.project?.link`, null on the main screen);
+a pick on the page is the new `chosen`. `project("Дружба")` → `{ lit: true, page: { current: { name: "Дружба", … },
+value: "Дружба", … } }`.
 
 `lists()`: the lists a new task goes into, `{ list, name }`, `name` the heading's name by the settings, in the order the
 phone's new task screen offers them: Inbox, Now, Soon, Backlog. The first is where a task told to Siri goes.
@@ -349,6 +374,16 @@ vault folder (`Projects/Alpha.md`); caret offsets count UTF-16 code units, as `N
   `{ text, caret }`.
 - `open(target, notes)`: the file a note link in a title opens (`textParts`' `target`): by its path, else its name, as
   Obsidian resolves it, a heading after `#` left aside; `{ name, path, link }`, `null` for none.
+- `newProject(name, notes)`: the note «New project…» named `name` writes, `NewProjectNote` `{ name, path, link, exists }`:
+  the vault's note of that name, case aside (the one nearest the vault's root), with `exists`; else a new note at the
+  vault's root. What a file's name may not hold (`\ / : * ? " < > | # ^ [ ]`) is left out, and a name of nothing answers
+  `null`: write nothing. `newProject("Свой дом", [{ path: "Дружба.md" }])` → `{ name: "Свой дом", path: "Свой дом.md",
+  link: "Свой дом", exists: false }`.
+- `projectText(text)`: the note's text to write, with the settings' project tag in its properties' `tags` (without `#`):
+  `text` is the note as read (`exists`), `null` for a new one. A list gets the tag as its last item, a `[a, b]` list at
+  its end, a plain value becomes a list, a note without properties gets them first; the rest stays as it was. A note that
+  has the tag already (properties or text) comes back unchanged: nothing to write. `projectText(null)` →
+  `"---\ntags:\n  - project\n---\n"`.
 
 ### `history.*`: undo
 
@@ -378,7 +413,7 @@ once its job is `done`.
 
 Methods: `openAtEnd(column)`, `openFromPlus()`, `openIn(column, group)`, `openSlot(slot)`, `openAtDrop(column,
 dropTo)`, `subtaskSpot(parent)`, `renameSpot(item, inStack)`, `stackSpot(parent)`, `open(spot, renaming?)`, `type(text)`,
-`setPriority(prefix)`, `togglePriority(prefix)`, `setLabels(names)`, `toggleLabel(name)`, `setRepeat(rule)`,
+`setPriority(prefix)`, `togglePriority(prefix)`, `setLabels(names)`, `toggleLabel(name)`, `setRepeat(rule)`, `setProject(link)`,
 `indent(1 | -1)`, `toggleSection()`, `enter()`, `blur()`, `escape()`, `choosePlace(placement)`, `moveToEnd(column)`,
 `placeOf(column, listPlace)`, `state()`, `renaming()`, `listEntry(column, drawn?)`, `stackEntry(task)`.
 
@@ -388,6 +423,17 @@ shows in no list: open its full screen and the field last in its stack there), `
 last under `key`, `open(stackSpot(item.key), item)` renames `item` there (the page's own task in its title). Example:
 `entry.stackSpot(session, look, { section: "now", index: 0, path: [1], raw: "\t- [ ] Pack" })` → `value`
 `{ kind: "stack", parent: { … } }`.
+
+**The Project button** stands on the bar right after the priority's flag: `EntryState.project`, `EntryProject`
+`{ page, lit }` (`page` the task menu's Project page, `MenuProject`, its last row «New project…»; `lit`: a project is
+chosen, the button in the accent as the flag for a level), null where there is none (a subtask's field, new or renamed,
+and a section's name). The field starts with the project of the group it opened in (`WireLook.sections`' zones), of the
+project's view (`WireLook.project`), or the renamed task's own; Enter's next field keeps it, like the place. A pick is
+`setProject(link | null)`: in a list drawn by project the field goes to the end of that project's part (a rename's field
+stays). Place (`choosePlace`, `moveToEnd`) keeps the project and, in a list drawn by project, puts the field at the end of
+its project's part. The project goes with the task as `createInPlace`'s sixth argument, a rename's in the `edit`'s draft
+(`TaskDraft.project`). Example: `entry.setProject(session, look, "Дружба")` → `state.project`
+`{ lit: true, page: { value: "Дружба", newLabel: "New project…", … } }`.
 
 `listEntry` answers what a list draws for the field: `{ place, pending, section, at }`, `at` where among the cards and
 sections the list is about to draw (`drawn`: `{ cards, sections }`, the look's when left out) the field stands:
