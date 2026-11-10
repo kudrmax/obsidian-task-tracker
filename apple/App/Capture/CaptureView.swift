@@ -6,6 +6,12 @@ import UIKit
 struct CaptureView: View {
     /// Opened from the plus: the field takes the keyboard as the sheet rises.
     var focused = false
+    /// The project of the view the sheet was opened from (`ScreenView.project?.link`); nil on the main screen.
+    var project: String?
+    /// The Project row's choice and its page (`capture.project`).
+    @State private var chosen: String?
+    @State private var projectRow: EntryProject?
+    @State private var askingProject = false
     /// The lists by their headings' names, read again each time the screen shows: a heading renamed in Obsidian shows here.
     @State private var options: [CaptureList] = []
     @State private var listKey: String?
@@ -27,6 +33,8 @@ struct CaptureView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+
+                if let projectRow { projectPicker(projectRow) }
 
                 // The task's field takes the page down to the recording's bar, as a note does: a tap anywhere on it types.
                 TextField("New task", text: $text, axis: .vertical)
@@ -81,10 +89,60 @@ struct CaptureView: View {
             }
         }
         .onChange(of: text) { if !text.isEmpty, added != nil { withAnimation(.smooth) { added = nil } } }
-        .task { readLists() }
+        .task {
+            readLists()
+            chosen = project
+            await readProject()
+        }
+        .newProjectAlert(asking: Binding(get: { askingProject ? true : nil }, set: { askingProject = $0 ?? false })) { name, _ in
+            guard let name else { return }
+            Task { await newProject(name) }
+        }
         .onChange(of: scene) { if scene == .active { readLists() } }
         .sensoryFeedback(.success, trigger: added) { _, new in new != nil }
         .tabScreen("New Task")
+    }
+
+    /// The Project row under List (spec point 3): «Project» and the chosen one's name, a stock menu with the Project page.
+    private func projectPicker(_ row: EntryProject) -> some View {
+        HStack {
+            Label("Project", systemImage: "folder")
+            Spacer(minLength: 8)
+            Menu {
+                MenuNodes(nodes: ProjectPage.nodes(row.page, pick: { link in
+                    chosen = link
+                    Task { await readProject() }
+                }, new: { askingProject = true }), palette: { _ in nil })
+            } label: {
+                HStack(spacing: 4) {
+                    Text(row.page.value).lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down").font(.footnote.weight(.semibold))
+                }
+                .foregroundStyle(row.lit ? AnyShapeStyle(.tint) : AnyShapeStyle(Color(.secondaryLabel)))
+            }
+            .menuOrder(.fixed)
+            .accessibilityLabel("Project")
+            .accessibilityValue(row.page.value)
+        }
+        .padding(.horizontal, Layout.margin)
+        .frame(minHeight: 44)
+        .card()
+    }
+
+    private func readProject() async {
+        let chosen = chosen
+        projectRow = try? await Task.detached { try AppServices.shared.board.captureProject(chosen) }.value
+    }
+
+    /// «New project…»: the note written, the project chosen.
+    private func newProject(_ name: String) async {
+        do {
+            guard let link = try await Task.detached(operation: { try AppServices.shared.board.newProject(name) }).value else { return }
+            chosen = link
+        } catch {
+            failure = error.localizedDescription
+        }
+        await readProject()
     }
 
     private var list: CaptureList? {
@@ -114,7 +172,8 @@ struct CaptureView: View {
         guard let target = list else { return }
         let typed = text
         let tag = AppSettings.recordingTag
-        let outcome = await Task.detached { AppServices.shared.capture(list: target, text: typed, recording: recording, tag: tag) }.value
+        let project = chosen
+        let outcome = await Task.detached { AppServices.shared.capture(list: target, text: typed, recording: recording, tag: tag, project: project) }.value
         switch outcome {
         case .saved:
             withAnimation(.smooth) {

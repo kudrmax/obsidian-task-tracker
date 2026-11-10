@@ -26,6 +26,9 @@ private struct BoardSheets: ViewModifier {
                 Button("Add") { if let item = model.newSection { Task { await model.toSection([item], text) } } }
             }
             .onChange(of: model.newSection?.id) { text = "" }
+            .newProjectAlert(asking: $model.newProjectFor) { name, ask in
+                Task { await model.newProject(name, for: ask.target) }
+            }
     }
 
     private func present<T>(_ path: ReferenceWritableKeyPath<BoardModel, T?>) -> Binding<Bool> {
@@ -300,4 +303,31 @@ final class RepeatPage {
     var draft: RepeatDraft?
     @ObservationIgnored var touched = false
     @ObservationIgnored var editing: Task<Void, Never>?
+}
+
+extension View {
+    /// «New project…»'s question, as New Section asks: the name, Create or Cancel; `answer` gets the name (nil for Cancel)
+    /// and what was asked, as it was when the question came up: the alert clears `asking` before its buttons run.
+    func newProjectAlert<Asked>(asking: Binding<Asked?>, answer: @escaping (String?, Asked) -> Void) -> some View {
+        modifier(NewProjectAlert(asking: asking, answer: answer))
+    }
+}
+
+private struct NewProjectAlert<Asked>: ViewModifier {
+    @Binding var asking: Asked?
+    let answer: (String?, Asked) -> Void
+    @State private var name = ""
+
+    func body(content: Content) -> some View {
+        content
+            .alert("New Project", isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }), presenting: asking) { asked in
+                TextField("Name", text: $name)
+                Button("Cancel", role: .cancel) { answer(nil, asked) }
+                Button("Create") { answer(name, asked) }
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+            } message: { _ in
+                Text("A note of this name becomes the project.")
+            }
+            .onChange(of: asking != nil) { if asking != nil { name = "" } }
+    }
 }

@@ -126,11 +126,7 @@ struct TaskMenu {
         guard !page.disabled else {
             return .action(title: "Project", symbol: "folder", subtitle: subtitle, disabled: true) {}
         }
-        var rows: [MenuNode] = page.options.map { option in
-            .action(title: option.project.name, symbol: nil, checked: option.checked) { Task { await model.setProject(items, option.project.link) } }
-        }
-        let none: MenuNode = .action(title: page.noneLabel, symbol: nil, checked: page.none) { Task { await model.setProject(items, nil) } }
-        rows = rows.isEmpty ? [none] : [.group(row: false, children: rows), .group(row: false, children: [none])]
+        let rows = ProjectPage.nodes(page, pick: { link in Task { await model.setProject(items, link) } }, new: { model.askNewProject(.tasks(items)) })
         return .submenu(title: "Project", symbol: "folder", subtitle: subtitle, children: rows)
     }
 
@@ -304,6 +300,20 @@ private struct DeferredMenu: View {
             if let subtitle { Text(subtitle) }
         }
         .task { nodes = await load() }
+    }
+}
+
+/// A Project page as every one draws it (a task's menu, the bulk menu, the quick entry's button, the New Task sheet): the
+/// project notes by name, No project in its own group, then «New project…» last (`MenuProject.newLabel`). The words are the core's.
+enum ProjectPage {
+    @MainActor
+    static func nodes(_ page: MenuProject, pick: @escaping @MainActor (String?) -> Void, new: @escaping @MainActor () -> Void) -> [MenuNode] {
+        let options: [MenuNode] = page.options.map { option in
+            .action(title: option.project.name, symbol: nil, checked: option.checked) { pick(option.project.link) }
+        }
+        let none: MenuNode = .action(title: page.noneLabel, symbol: nil, checked: page.none) { pick(nil) }
+        let create: MenuNode = .action(title: page.newLabel, symbol: "plus", opens: true) { new() }
+        return (options.isEmpty ? [] : [.group(row: false, children: options)]) + [.group(row: false, children: [none]), .group(row: false, children: [create])]
     }
 }
 

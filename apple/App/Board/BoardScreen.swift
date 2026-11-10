@@ -53,8 +53,9 @@ struct BoardScreen: View {
         .sheet(item: Binding(get: { model.entry.sheet }, set: { model.entry.sheet = $0 }), onDismiss: { model.entry.resume() }) { sheet in
             entrySheet(sheet)
         }
-        .sheet(isPresented: $router.capturing, onDismiss: { Task { await model.reloadIfChanged() } }) {
-            CaptureView(focused: router.typing)
+        // Only the screen on top opens it: a project's view over the main screen starts it with that project.
+        .sheet(isPresented: Binding(get: { router.capturing && model.projectShown == nil }, set: { router.capturing = $0 }), onDismiss: { Task { await model.reloadIfChanged() } }) {
+            CaptureView(focused: router.typing, project: model.snapshot?.screen.project?.link ?? model.projectLink)
         }
         // Settings may have renamed a list or changed a colour: the screen reads again when it closes.
         .sheet(item: $sheet, onDismiss: { Task { await model.reloadIfChanged() } }) { sheet in
