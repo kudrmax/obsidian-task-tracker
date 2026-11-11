@@ -433,7 +433,9 @@ struct CardRow: View {
             // One card in and out of Select Tasks: the circle slides in beside it and it makes room, never a new card.
             CardButton(
                 card: card,
-                renamedText: model.entry.renamedTexts[card.id],
+                // A folded result's card shows its step: the step's rename is its title's, the result's own its small line's.
+                renamedText: model.entry.renamedTexts[card.face.step?.id ?? card.id],
+                renamedOver: card.face.twoLines ? model.entry.renamedTexts[card.id] : nil,
                 menu: { later in selecting ? nil : model.cardMenu(card, later: later) },
                 overMenu: { later in selecting ? nil : model.cardMenu(card, over: true, later: later) },
                 ringed: model.found == card.id,

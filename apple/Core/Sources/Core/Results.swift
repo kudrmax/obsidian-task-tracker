@@ -25,6 +25,12 @@ extension TaskBoard {
         try write("tasks.newResult", [.array(keys.map(\.json)), .string(name)])["id"].string
     }
 
+    /// A name that writes nothing (`tasks.isBlank`): empty, the result mark alone, or a level's prefix alone. New result…'s
+    /// Create button is off for it.
+    public func isBlank(_ name: String) -> Bool {
+        (try? read("tasks.isBlank", [.string(name)], over: settingsOnly(), as: Bool.self)) ?? true
+    }
+
     /// The setting «Result mark»: kept only when the core takes it (one word, no priority's prefix).
     public func setResultMark(_ mark: String) throws {
         try writeSettings("settings.setResultMark", [.string(mark)])

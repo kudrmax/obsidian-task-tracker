@@ -195,7 +195,7 @@ struct ResultMarkSection: View {
     var body: some View {
         Section {
             LabeledContent("Result Mark") {
-                TextField("🎯", text: $mark)
+                TextField(plugin.form?.defaultResultMark ?? "", text: $mark)
                     .multilineTextAlignment(.trailing)
                     .frame(minWidth: 88)
                     .textInputAutocapitalization(.never)

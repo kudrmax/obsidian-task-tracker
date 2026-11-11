@@ -753,6 +753,8 @@ public struct SettingsForm: Decodable, Sendable {
     public let projectTag: String
     /// The word a result's line starts with (`settings.setResultMark`).
     public let resultMark: String
+    /// The mark before any is set: the Result Mark field's placeholder.
+    public let defaultResultMark: String
     public let labels: [Mark]
     public let presets: [String]
     public let ungrouped: String

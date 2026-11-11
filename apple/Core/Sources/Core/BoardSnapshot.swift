@@ -55,13 +55,10 @@ public struct CardFace: Sendable, Hashable {
         self.steps = step.map { [$0] } ?? []
     }
 
-    /// The task's own title, as the full screen and a search draw it: a result's in semibold, as a result drawn with its
-    /// own title is (results, backend decision 4).
-    public static func own(_ item: TaskItem) -> CardFace { CardFace(text: item.text, semibold: item.isResult) }
-
-    /// A list's card (`TaskItem.card`).
-    public static func list(_ item: TaskItem) -> CardFace {
-        CardFace(text: item.card.text, over: item.card.over, semibold: item.card.semibold, step: item.card.step)
+    /// What the core says a card draws (`TaskItem.card`): a list's (a folded result's step under its title), and the task's
+    /// own title on the full screen and in a search, whose items carry that card.
+    public init(_ card: TaskCard) {
+        self.init(text: card.text, over: card.over, semibold: card.semibold, step: card.step)
     }
 
     /// The timeline's block (`TaskItem.block`): no line over it, and regular weight, as a block has no room for marks.
@@ -111,7 +108,7 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     }
 
     public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, paint: CardPaint?, corner: [String]? = nil, zone: JSONValue? = nil, parts: [TextPart]? = nil, face: CardFace? = nil) {
-        let face = face ?? .own(item)
+        let face = face ?? CardFace(item.card)
         self.face = face
         self.zone = zone
         self.parts = parts ?? [TextPart(text: face.text)]
@@ -658,18 +655,17 @@ extension TaskBoard {
 
     /// Cards for rows drawn outside the screen's lists (a full screen's subtasks, a search's finds), coloured and dated as
     /// a list draws them: `corner` the day whose date a card leaves out, none for a list of no day.
-    /// `asList`: drawn as a list's cards (`TaskItem.card`, Done's list); else each with its own title.
-    public func cards(_ rows: [ListRow], corner day: String? = nil, asList: Bool = false) throws -> [BoardCard] {
+    public func cards(_ rows: [ListRow], corner day: String? = nil) throws -> [BoardCard] {
         let look: ScreenSettings = try read("screenSettings.get", over: settingsOnly())
         var painter = Painter(board: self, blend: look.labelPaint == "blend")
-        return try cards(rows, corner: day.json, zone: nil, painter: &painter, asList: asList)
+        return try cards(rows, corner: day.json, zone: nil, painter: &painter)
     }
 
-    private func cards(_ rows: [ListRow], corner: JSONValue, zone: JSONValue?, painter: inout Painter, asList: Bool = true) throws -> [BoardCard] {
+    private func cards(_ rows: [ListRow], corner: JSONValue, zone: JSONValue?, painter: inout Painter) throws -> [BoardCard] {
         let levels = JSONValue.array(rows.map { .number(Double($0.level)) })
         return try rows.enumerated().map { index, row in
             let due: CardDue? = try painter.rule("rules.cardDue", [row.item.json, corner])
-            let face: CardFace = asList ? .list(row.item) : .own(row.item)
+            let face = CardFace(row.item.card)
             return BoardCard(
                 item: row.item,
                 level: row.level,

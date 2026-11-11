@@ -684,7 +684,7 @@ final class BoardModel {
         let rows = snapshot.screen.done.map { ListRow(item: $0, level: 0) }
         let screen = menuScreen
         guard let read = try? await Task.detached(operation: { () throws -> ([BoardCard], [String: TaskMenuModel]) in
-            let cards = try board.cards(rows, asList: true)
+            let cards = try board.cards(rows)
             var menus: [String: TaskMenuModel] = [:]
             for card in cards { menus[card.item.id] = try board.read("tasks.menu", [card.item.json, "done", screen], over: board.settingsOnly()) }
             return (cards, menus)
@@ -869,6 +869,9 @@ final class BoardModel {
         await write("tasks.addToResult", [keys(items), option.result.key.json])
         endSelection()
     }
+
+    /// A name New result… would write nothing for (the core's `tasks.isBlank`).
+    func isBlank(_ name: String) -> Bool { board.isBlank(name) }
 
     /// «New result…» named `name`: the core writes it at the first task's place, the tasks its steps; a blank name writes
     /// nothing.
@@ -1368,7 +1371,7 @@ final class BoardModel {
     func placeUnder(_ column: BoardColumn, cards: [PlacedCard], heads: [PlacedHead], at point: CGPoint, grab: CGFloat?, width: CGFloat, held: JSONValue?) -> JSONValue? {
         let inset = Double(CardMetrics.columnInset)
         // A folded result's card of two lines is held by its own middle.
-        let carried = carry.flatMap { $0.from == "timeline" ? nil : $0.item }.map { CardFace.list($0).twoLines ? CardMetrics.twoLineHeight : CardMetrics.height } ?? CardMetrics.height
+        let carried = carry.flatMap { $0.from == "timeline" ? nil : $0.item }.map { CardFace($0.card).twoLines ? CardMetrics.twoLineHeight : CardMetrics.height } ?? CardMetrics.height
         let y = grab.flatMap { try? board.carriedMiddle(y: Double(point.y), grab: Double($0), cardHeight: Double(carried)) } ?? Double(point.y)
         do {
             let level = try board.levelAt(x: Double(point.x), left: inset, width: Double(width) - 2 * inset, indent: Double(CardMetrics.indent))
@@ -1875,14 +1878,31 @@ final class BoardModel {
         var lead: [MenuNode] = []
         if let peek = descriptionPeek(item) { lead.append(.group(row: false, children: peek)) }
         if from == "timeline", !stack.subtasks.isEmpty {
-            lead.append(.group(row: false, children: stack.subtasks.map { subtask in
-                .deferred(title: subtask.title, symbol: subtask.closed ? "checkmark.circle" : "circle", subtitle: nil) { [weak self] in
-                    guard let self, let menu = await self.menu(for: subtask, from: "stack") else { return [] }
-                    return TaskMenu(items: [subtask], menu: menu, model: self).nodes
-                }
-            }))
+            lead.append(.group(row: false, children: stack.subtasks.map(stackRow)))
         }
         return lead
+    }
+
+    /// A subtask's row over a calendar card's menu, opening its own menu. A folded result among them follows its card's two
+    /// taps (results, point 5): the row is its step, whose menu it opens, the result's title under it; that menu starts with
+    /// the result's own row, which opens the result's menu.
+    private func stackRow(_ subtask: TaskItem) -> MenuNode {
+        let symbol = subtask.closed ? "checkmark.circle" : "circle"
+        guard let step = subtask.card.step, let over = subtask.card.over else {
+            return .deferred(title: subtask.card.title, symbol: symbol, subtitle: nil) { [weak self] in
+                await self?.stackMenu(subtask) ?? []
+            }
+        }
+        return .deferred(title: subtask.card.title, symbol: symbol, subtitle: over) { [weak self] in
+            guard let self else { return [] }
+            let result: MenuNode = .deferred(title: over, symbol: "scope", subtitle: nil) { [weak self] in await self?.stackMenu(subtask) ?? [] }
+            return [.group(row: false, children: [result])] + (await self.stackMenu(step))
+        }
+    }
+
+    private func stackMenu(_ item: TaskItem) async -> [MenuNode] {
+        guard let menu = await menu(for: item, from: "stack") else { return [] }
+        return TaskMenu(items: [item], menu: menu, model: self).nodes
     }
 
     /// The start of a task's description, as the plugin's peek: its lines as they read (links by their words, no

@@ -42,7 +42,7 @@ struct ResultSheet: View {
                 TextField(page?.namePlaceholder ?? "", text: $name)
                 Button("Cancel", role: .cancel) {}
                 Button("Create") { create() }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(model.isBlank(name))
             }
             .task(id: query) {
                 if page != nil { try? await Task.sleep(for: .milliseconds(120)) }
