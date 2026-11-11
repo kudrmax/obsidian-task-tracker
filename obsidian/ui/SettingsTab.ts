@@ -13,8 +13,6 @@ export interface SettingsTabDeps {
 	readonly google: GoogleAccount;
 	readonly work: WorkCalendarSetup;
 	readonly calendars: Pick<CalendarService, "known" | "setShown">;
-	/** Obsidian rewrites the links to a note it renames (Files and links → Automatically update internal links). */
-	readonly updatesLinks?: () => boolean;
 }
 
 const MINUTES_PER_HOUR = 60;
@@ -138,16 +136,6 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			this.text(el, name, desc, this.settings.markers[marker], (text) => this.service.setMarker(marker, text));
 		}
 		this.text(el, "Label tag", "The tag's part before the slash: a task tagged #label/<name> has the label of that name. One word.", this.settings.labelTag, (tag) => this.service.setLabelTag(tag));
-		this.text(el, "Project tag", this.projectTagDesc(), this.settings.projectTag, (tag) => this.service.setProjectTag(tag));
-	}
-
-	/**
-	 * A note with this tag, in its properties or its text, is a project. A task's project is a link to its note, which
-	 * Obsidian keeps right on a rename only while it updates internal links: said here when that is off.
-	 */
-	private projectTagDesc(): string {
-		const base = "A note with this tag, in its properties or its text, is a project: the task menu's Project offers it. One word.";
-		return this.deps.updatesLinks?.() === false ? `${base} Turn on Files and links → Automatically update internal links: otherwise renaming a project's note breaks its tasks' links.` : base;
 	}
 
 	/** The priorities' rows; see `colourRows`. */
@@ -168,29 +156,6 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		new Setting(group)
 			.setDesc("A task whose text starts with the prefix gets its colour. Pick one of the six, open the last circle to choose any colour, or type its code. Drag a level by its grip: levels show in this order in the task menu and in the bar shown while a task is typed.")
 			.addButton((b) => b.setButtonText("Add priority").onClick(() => void this.redrawn(this.service.addLevel())));
-		this.resultMarkRow(group);
-	}
-
-	/**
-	 * Result mark: saved once typed (Enter or leaving the field), never on every key, so a half-typed word is never read;
-	 * a mark the core refuses gives way to the one saved, shown again.
-	 */
-	private resultMarkRow(group: HTMLElement): void {
-		const form = this.settings;
-		new Setting(group)
-			.setName("Result mark")
-			.setDesc("A task whose text starts with this word is a result: its steps are its subtasks, and its card shows the next one. One word, not a priority's prefix. Lines already in the file are not rewritten.")
-			.addText((t) => {
-				t.setPlaceholder(form.defaultResultMark).setValue(form.resultMark);
-				t.inputEl.addEventListener("change", () => {
-					const typed = t.getValue();
-					if (typed === this.settings.resultMark) return;
-					void this.service.setResultMark(typed).then(() => {
-						const saved = this.settings.resultMark;
-						if (t.getValue() !== saved) t.setValue(saved);
-					});
-				});
-			});
 	}
 
 	/** The labels' rows, as the priorities', the name shown with spaces; how a card of several is painted. */

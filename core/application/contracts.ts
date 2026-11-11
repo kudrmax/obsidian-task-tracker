@@ -5,16 +5,22 @@ import type { Placement, TaskDraft } from "../domain/Placement";
 import type { LabelLevel } from "../domain/Label";
 import type { PresetColor, PriorityColor, PriorityLevel } from "../domain/Priority";
 import type { DayColumn, DayRelation, TaskScreen } from "../domain/Days";
+import type { DueLabel } from "./dayLabels";
 import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionChoice, SectionOffer } from "./sections";
 import type { ListPlace } from "./nesting";
 import type { ZoomLevel } from "./timelineZoom";
-import type { ProjectZone } from "../domain/Project";
 import type { ListGroup } from "./sections";
+import type { TreePlace } from "../domain/ProjectTree";
 
 export type { GroupName, ReminderKind, SectionKey };
-/** A project's part of a list: the link text of its note (`ProjectRef.link`), null for the tasks of no project. */
-export type { ProjectZone };
+/**
+ * A project a place gives the task put there (null: none). Stub until the frontends drop their grouped lists: the core
+ * draws no project parts any more, so no place it gives carries one.
+ */
+export type ProjectZone = string | null;
+/** Where a project goes in the tree: among `parent`'s subprojects (null: the top level), right before `before` or last. */
+export type { TreePlace };
 /** What In progress or Stop progress sets on tasks of these statuses. */
 export { nextProgress } from "../domain/Task";
 /** Whether two slots are the same time: the same day, start and end. */
@@ -53,13 +59,13 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
 export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
-export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+export { placeOfList, placeShowing, SCREEN_PLACES, SHOWN_LISTS, shownLists, SWIPE_FLICK_SPEED, swipeLanding, WHEEL_PLACES, type ScreenAt, type ScreenPlace, type ScreenSpot, type WheelAt, type WheelPlace, type WheelSpot } from "./screenPlaces";
 /**
  * The copy of a pressed card that shows its whole title: `wholeWidth(card, room)` how wide it grows (null: the card shows
  * its title whole and is lifted itself), `grownStart(start, size, grown, room, margin)` where it starts on one axis.
  */
 export { grownStart, type GrownWidth, type TitleFit, type WholeRoom, wholeWidth } from "./wholeCard";
-import type { ScreenAt as ScreenAtOf } from "./screenPlaces";
+import type { ScreenAt as ScreenAtOf, WheelAt as WheelAtOf } from "./screenPlaces";
 /** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
 export { SectionNameEntry } from "./SectionNameEntry";
 /** What a task menu's repeat page writes: a rule changed there as the menu closes, unless it is the task's own again; Remove at once. */
@@ -162,17 +168,19 @@ export interface SubtaskProgress {
 	readonly total: number;
 }
 
-/** A task's project as the screens show it. */
+/** A project as the screens show it: a name of the `## Projects` tree, where it stands, and the note attached to it. */
 export interface ProjectRef {
-	/** The note's name: what a menu, a group's title and a tooltip show. */
+	/** Its name: what a menu, the tree and a tooltip show, and what every project call takes. */
 	readonly name: string;
-	/** What a place (`ProjectZone`) and `setProject` take: the shortest link text Obsidian writes for the note, else the one the line has. */
+	/** Its name again (`setProject` took a link once): stub until the frontends read `name`. */
 	readonly link: string;
-	/** The project note's path, which the arrow and the card's mark open; null when no note with the project tag has that name. */
+	/** The names from the top of the tree down to it, itself last: search's «Дружба › iPhone». */
+	readonly path: readonly string[];
+	/** The link of the note attached to it (the text inside `[[…]]` on its tree line); null without one. */
 	readonly note: string | null;
-	/** A note to open: off for a project whose note is gone or untagged (it keeps its tasks by name). */
+	/** A note is attached: the project menu's Note row opens it. */
 	readonly canOpenNote: boolean;
-	/** The card shows the folder mark: everywhere but inside the project's own view, where the whole view is the project. */
+	/** The card shows the folder mark: everywhere but on the Projects screen, where the tree says the project. */
 	readonly mark: boolean;
 }
 
@@ -228,8 +236,10 @@ export interface TaskItem {
 	readonly colors: readonly PriorityColor[];
 	/** The section of its list it sits in; null outside any. */
 	readonly group: GroupName;
-	/** Its project, a subtask's its parent's; null for none. */
+	/** Its first project, a subtask's its parent's; null for none. */
 	readonly project: ProjectRef | null;
+	/** All its projects, in its line's order, a subtask's its parent's. */
+	readonly projects: readonly ProjectRef[];
 	/** The list the task is in, its task's for a subtask. */
 	readonly list: SectionKey;
 	/** It sits under another task. */
@@ -254,23 +264,23 @@ export interface TaskItem {
 		readonly fold: boolean;
 		/** Its time stretched by the dots on its edges: a task on the timeline. */
 		readonly resize: boolean;
-		/** Put into a project, or taken out: a task; a subtask's is its parent's (its menu shows it, disabled). */
+		/** Put into a project, or taken out: a task; a subtask's is its parent's (its menu shows it, disabled; a drop on the tree takes none). */
 		readonly setProject: boolean;
-		/** Made a result or a task again, and added to a result: an open task or subtask (`TaskMenuModel.result.rows`). */
+		/** Results went: always false. Stub until the frontends drop it. */
 		readonly result: boolean;
 	};
 
-	/** Its line starts with the result mark: a result, a task whose subtasks are the steps of one outcome. */
+	/** Results went: always false. Stub until the frontends drop it. */
 	readonly isResult: boolean;
-	/** The result it is a step of: the nearest result above it; null for none. Add to result's row shows it and its page ticks it. */
+	/** Results went: always null. Stub until the frontends drop it. */
 	readonly resultOf: ResultRef | null;
-	/** How a list's card draws it and what the card's taps open: a folded result shows its next step. */
+	/** How a list's card draws it and what the card's taps open: a folded task with an open subtask shows its next step. */
 	readonly card: TaskCard;
-	/** How the timeline's block draws it and whose menu a tap opens: a result's next step, folded or not. */
+	/** How the timeline's block draws it and whose menu a tap opens: a folded task's next step. */
 	readonly block: TaskBlock;
 	/**
-	 * A result's next step (`card.step`, `block.step`), drawn on that result's card and block: the result's key and its
-	 * slot, where a rename of the step stands when the step has no card of its own. Null for any other task.
+	 * A folded task's next step (`card.step`, `block.step`), drawn on that task's card and block: the folded task's key and
+	 * its slot, where a rename of the step stands when the step has no card of its own. Null for any other task.
 	 */
 	readonly drawnOn: { readonly key: TaskKey; readonly slot: Slot | null } | null;
 
@@ -290,7 +300,7 @@ export interface TaskItem {
 	readonly description: string | null;
 }
 
-/** A result as a step's row and the Add to result page name it. */
+/** Results went. Stub until the frontends drop it. */
 export interface ResultRef {
 	/** The result's id (`TaskItem.id`). */
 	readonly id: string;
@@ -301,9 +311,9 @@ export interface ResultRef {
 }
 
 /**
- * How a card of a list draws a task, every list and a day's list alike, and what its taps open. A folded result with an
- * open step is a card of two lines: `over` (a target symbol and the result's own title, small, in the caption colour),
- * whose tap opens the task's own menu; and the step's title, whose tap (anywhere on the card but `over` and the counter)
+ * How a card of a list draws a task, every list and a day's list alike, and what its taps open. A folded task with an
+ * open subtask (at any depth) is a card of two lines: `over` (the task's own title, small, in the caption colour), whose
+ * tap opens the task's own menu; and its next step's title, whose tap (anywhere on the card but `over` and the counter)
  * opens `step`'s menu, where Done closes the step and the next one takes its place. The card keeps the task's own marks
  * (its counter, project, date, repeat, description, priority and labels), its pick and its drag. Any other card is one
  * line, the task's own title, a tap opening its own menu.
@@ -313,17 +323,17 @@ export interface TaskCard {
 	readonly text: string;
 	/** `text` with each link's word in its place. */
 	readonly title: string;
-	/** The small line over the title: the result's own title, plain; null for a card of one line. */
+	/** The small line over the title: the folded task's own title, plain; null for a card of one line. */
 	readonly over: string | null;
 	/** The step a tap on the card opens the menu of; null: the task's own. */
 	readonly step: TaskItem | null;
-	/** The title in semibold: a result drawn with its own title (unfolded, or with no open step). */
+	/** Results went: always false. Stub until the frontends drop it. */
 	readonly semibold: boolean;
 }
 
 /**
- * How a block of the timeline draws a task: a result's next step (folded or not; there is no room for the result's line),
- * whose menu a tap opens, the result's open subtasks in the stack above it as for any task; else the task's own title.
+ * How a block of the timeline draws a task: a folded task's next step (there is no room for the task's own line), whose
+ * menu a tap opens, the task's open subtasks in the stack above it as for any task; else the task's own title.
  */
 export interface TaskBlock {
 	readonly text: string;
@@ -355,8 +365,8 @@ export interface FullTree {
 	/** Where a new last subtask of the task itself goes: after every row, at the first depth. */
 	readonly newSubtask: FullPlace;
 	/**
-	 * The line under the title: the task's project, a subtask's its parent's; null for none, and no line. A tap opens it:
-	 * the plugin the note (`note`, while `canOpenNote`), the app the project's view (`screen(date, link)`).
+	 * The line under the title: the task's first project, a subtask's its parent's; null for none, and no line. A tap opens
+	 * the Projects screen on it (`selectProjectNode(projectNodeOf(name))`).
 	 */
 	readonly project: ProjectRef | null;
 }
@@ -376,6 +386,8 @@ export interface SearchHit {
 	readonly title: readonly FoundPart[];
 	/** The task's project's name in pieces, when the search found the query there; null otherwise. */
 	readonly project: readonly FoundPart[] | null;
+	/** Where the task stands among the projects: its first project's path in the tree («Дружба», «iPhone»); null for none. */
+	readonly projectPath: readonly string[] | null;
 	readonly description: readonly FoundPart[] | null;
 }
 
@@ -596,6 +608,11 @@ export interface MenuScreen {
 	readonly today: LocalDate;
 	readonly day: LocalDate;
 	readonly offer: SectionOffer;
+	/**
+	 * The projects the Project page offers: the screen's `projectTree`, so a menu reads no tasks file. Left out: the tree
+	 * of the file the service read last (the door: of `tasks`, when it is handed in).
+	 */
+	readonly projects?: readonly ProjectRef[];
 }
 
 /** A status tile: Done, In progress or Stop progress (todo again, when every task is in progress), Won't do, Stop. */
@@ -615,22 +632,22 @@ export interface MenuReminder {
 
 /** A row of the edit group. Project is in every menu, one task's and the bulk menu's, right after Section or where it would stand. */
 export type MenuEditId = "rename" | "reminder" | "description" | "repeat" | "section" | "project" | "subtask";
-/** A result row of a menu's edit group: Add to result, and Make result or Make task. */
+/** Results went. Stub until the frontends drop it. */
 export type MenuResultRowId = "addToResult" | "toggle";
 /** A task menu's groups: the statuses, the priorities, the labels, the moves, the edit rows, Open full screen and Open in Obsidian, Delete. */
 export type MenuGroupId = "statuses" | "levels" | "labels" | "moves" | "edits" | "opens" | "remove";
 
-/** A project the Project page offers; `checked` on the one every task has. */
+/**
+ * A project the Project page offers, the whole tree in its order: `depth` its indent, `checked` while every task has it.
+ * A pick writes `toggleProject(keys, project.name)`: on for all, or off for all when all had it.
+ */
 export interface MenuProjectOption {
 	readonly project: ProjectRef;
 	readonly checked: boolean;
+	readonly depth: number;
 }
 
-/**
- * The menu's result rows, drawn in the edit group right after Project, in `rows`' order. «Add to result» opens the page
- * `TaskService.resultPage` reads; «Make result» or «Make task» (`toggle`, one task's menu only) writes
- * `setResult(key, toggle.result)`.
- */
+/** Results went: `rows` always empty. Stub until the frontends drop it. */
 export interface MenuResult {
 	/** The rows offered, in order: both for an open task, Add to result alone in the bulk menu of open tasks, none else. */
 	readonly rows: readonly MenuResultRowId[];
@@ -644,7 +661,7 @@ export interface MenuResult {
 	readonly toggle: { readonly label: string; readonly result: boolean };
 }
 
-/** An open result the Add to result page offers. */
+/** Results went. Stub until the frontends drop it. */
 export interface ResultOption {
 	readonly result: ResultRef;
 	/** The list it stands in (a subtask's, its task's), drawn as that column's icon: Inbox, Now, Soon or Backlog. */
@@ -655,11 +672,7 @@ export interface ResultOption {
 	readonly checked: boolean;
 }
 
-/**
- * The Add to result page, in place of the menu: a search field on top, the open results the query finds, and «New
- * result…» last, apart. A pick writes `addToResult(keys, option.result.key)`; New result… asks the name (a field like New
- * project…), then `newResult(keys, name)`.
- */
+/** Results went: no options. Stub until the frontends drop it. */
 export interface ResultPage {
 	/** Every open result of the file in file order, the query's finds alone (by title, case and accents aside); never the tasks themselves nor a result inside one of them. */
 	readonly options: readonly ResultOption[];
@@ -677,24 +690,24 @@ import type { RepeatRow } from "./repeatWords";
 /** The words for a rule (`repeatValue`, `onTheDay`) and the repeat page's own (`REPEAT_WORDS`). */
 export { onTheDay, REPEAT_WORDS, repeatValue } from "./repeatWords";
 
-/** The Project page: a pick writes `setProject` with its `link`, No project with null. */
+/**
+ * The Project page, several checks: every project of the tree in its order (a pick toggles it, `toggleProject`), No
+ * project (takes every project off, `setProject(keys, null)`), and «New project…».
+ */
 export interface MenuProject {
-	/** The project the tasks share, which the row shows; a subtask's is its parent's. Null when they have none or differ. */
+	/** The first project the tasks share, a subtask's its parent's; null when they share none. */
 	readonly current: ProjectRef | null;
-	/** The notes with the project tag by name, then a task's project whose note is not one of them. */
+	/** The tree's projects in its order, done ones too, each with its indent and its check. */
 	readonly options: readonly MenuProjectOption[];
-	/** No project, last: checked when no task has one. */
+	/** No project: checked when no task has one. */
 	readonly none: boolean;
 	/** The No project option's label: «No project». */
 	readonly noneLabel: string;
-	/** What the row shows beside «Project»: the shared project's name, «No project» when none has one, nothing when they differ. */
+	/** What the row shows beside «Project»: the one project they share, «Дружба +1» for more, «No project» for none, nothing when they differ. */
 	readonly value: string;
-	/** The row can't be pressed: only subtasks, whose project is their parent's. */
+	/** The row can't be pressed: only subtasks, whose projects are their parent's. */
 	readonly disabled: boolean;
-	/**
-	 * The page's last option, «New project…»: it asks the name, then `TaskService.newProject` (the door: `notes.newProject`
-	 * and `notes.projectText`, the host writing the note) and the tasks, or the field, get that project.
-	 */
+	/** «New project…»: it asks the name, then `TaskService.newProject(name, keys)` makes it at the tree's top and checks it. */
 	readonly newLabel: string;
 }
 
@@ -731,7 +744,7 @@ export interface TaskMenuModel {
 	 * (where Section would stand when it is not offered), its page these options.
 	 */
 	readonly project: MenuProject;
-	/** The result rows: Add to result, and Make result or Make task. */
+	/** Results went: no rows. Stub until the frontends drop it. */
 	readonly result: MenuResult;
 	/**
 	 * One task's: Rename; Reminder (a task on a time); Add description (one without any); Repeat (one that may repeat);
@@ -748,7 +761,7 @@ export interface TaskMenuModel {
 }
 
 /** The tasks the screen shows for a day: its column and timeline, the other lists, their sections and what the menus offer. */
-/** Which lists show their tasks grouped by project, and how. */
+/** Grouping by project in the lists went: never `on`, no groups. Stub until the frontends drop it. */
 export interface ListGrouping {
 	/** The list may group: Backlog and Soon; its column's title opens a menu with Group by project, checked while `on`. */
 	readonly canGroup: boolean;
@@ -801,28 +814,168 @@ export interface ScreenView {
 	readonly missing: boolean;
 	/** The day's events, their sources and the switch's dot are shown: not while the tasks file is missing. */
 	readonly calendars: boolean;
-	/**
-	 * Each list's grouping by project. In a project's own view every list is one untitled group of that project (`titled`
-	 * false), its sections as the main screen shows them, each card, header, plate and place carrying the project's zone;
-	 * `now` there is the day column's, on whatever day it shows.
-	 */
+	/** Grouping by project went: every list ungrouped. Stub until the frontends drop it. */
 	readonly projects: Readonly<Record<GroupedList, ListGrouping>>;
-	/** The project whose view this is (the note's block: every list holds only its tasks); null for the main screen. */
+	/** A project's own view went: always null. Stub until the frontends drop it. */
 	readonly project: ProjectRef | null;
+	/** The tree's projects in its order, the tasks' own in it: what a menu opened over this screen offers (`MenuScreen.projects`). */
+	readonly projectTree: readonly ProjectRef[];
 	/** What a drop on each column's title means, handed back to `TaskService.drop` as it is; the title lights up under a drag as a section header does. */
 	readonly titleDrops: Readonly<Record<DropColumn, DropTo>>;
 }
 
-/**
- * What a device keeps of the lists grouped by project, apart from the defaults (Backlog grouped, Soon not): plain JSON,
- * kept on the device and never synced.
- */
+/** Grouping by project went. Stub until the frontends drop it. */
 export interface GroupingState {
 	/** A list switched on or off by hand. */
 	readonly on?: Partial<Record<GroupedList, boolean>>;
 	/** The keys (`ProjectGroup.key`) of the groups folded in each list. */
 	readonly folded?: Partial<Record<GroupedList, readonly string[]>>;
 }
+
+/**
+ * A node of the Projects screen's tree: `all`, `none` (No project), `done`, or a project, `project:` and its name
+ * (`projectNodeOf`). What a row, a tap and a drop name.
+ */
+export type ProjectsNodeId = string;
+/** The node of a project, by its name: what `selectProjectNode` takes from a search hit's path or a card's folder mark. */
+export { projectNodeOf } from "./projectsScreen";
+
+/** A project's state, computed from its tasks and its subprojects', never set by hand. */
+export type ProjectStatus = "active" | "waiting" | "done";
+
+/** The segment over the tasks of the Projects screen. */
+export type ProjectsMode = "byProject" | "byStage";
+
+/** What a device keeps of the Projects screen, never synced: the node chosen, the segment, the folded branches. */
+export interface ProjectsScreenState {
+	readonly selected?: ProjectsNodeId;
+	readonly mode?: ProjectsMode;
+	/** The project nodes whose branches are folded. */
+	readonly folded?: readonly ProjectsNodeId[];
+	/** Done's branch, the done projects, is shown: folded until tapped open. */
+	readonly doneOpen?: boolean;
+}
+
+/**
+ * A row of the tree, top to bottom: All; the projects active or waiting, each before its subprojects (a folded branch's
+ * left out); No project; Done, then, open, the done projects with theirs. A row at depth 0 is a tile, a deeper one a line
+ * of text indented by its depth.
+ */
+export interface ProjectsRow {
+	readonly node: ProjectsNodeId;
+	readonly kind: "all" | "project" | "none" | "done";
+	/** «All», the project's name, «No project», «Done». */
+	readonly title: string;
+	readonly depth: number;
+	/** Drawn as a tile (depth 0), else as a line of text. */
+	readonly tile: boolean;
+	/** The project waits: its open tasks only in Inbox and Backlog, or none yet. */
+	readonly waiting: boolean;
+	/** Its name is drawn grey: a waiting project, a done one, No project and Done. */
+	readonly muted: boolean;
+	readonly status: ProjectStatus | null;
+	/** Filled light: the chosen node. */
+	readonly selected: boolean;
+	/** It has a branch (a tap on the chosen row folds or unfolds it). */
+	readonly hasBranch: boolean;
+	/** Its branch is folded: a tile shows a layer peeking out, a line an ellipsis. */
+	readonly folded: boolean;
+	readonly project: ProjectRef | null;
+	/** A dragged card may be let go on it: a project, and No project. */
+	readonly acceptsTask: boolean;
+	/** A long press lifts it to reorder or nest: an active or waiting project. */
+	readonly canLift: boolean;
+	/** A held card over it unfolds its branch after a pause: a folded branch. */
+	readonly unfoldsOnHover: boolean;
+}
+
+/** What the right side of a card on the Projects screen shows in By project: the stage's symbol, or the task's date. */
+export type ProjectsStage =
+	| { readonly kind: "today" | "soon" | "inbox" | "backlog" | "done" }
+	| { readonly kind: "date"; readonly date: LocalDate; readonly label: DueLabel };
+
+/** A card of the Projects screen's tasks: the task, and what its card shows besides the task's own card. */
+export interface ProjectsCard {
+	readonly item: TaskItem;
+	/** By project: the stage's mark on the right; null in By stage. */
+	readonly stage: ProjectsStage | null;
+	/** By stage: the subproject the task is in, small over its title; null where it is the chosen project's own, and in By project. */
+	readonly over: string | null;
+	/** The project it is shown under: what `dropOnProject` replaces when the card is dropped on the tree; null for none. */
+	readonly from: string | null;
+	/** What its menu is opened from (`menu(item, from, screen)`): its list's column. */
+	readonly menuFrom: MenuFrom;
+	/** It may be dropped on the tree: a task, not a subtask. */
+	readonly canDrop: boolean;
+}
+
+/** A new task the plus writes where it is let go on the tasks: the place (`createInPlace`'s) and its project (its sixth argument). */
+export interface ProjectsNewTask {
+	readonly place: NewTaskPlace;
+	readonly project: string | null;
+}
+
+/** A part of the chosen node's tasks: By project a subproject's (the node's own first, untitled), By stage a stage's. */
+export interface ProjectsSection {
+	readonly key: string;
+	/** The header: the subproject's name or the stage's (Today, Soon, Inbox, Backlog, Done); null for the node's own tasks. */
+	readonly title: string | null;
+	/** By project: the subproject's path below the chosen node; empty for the node's own and in By stage. */
+	readonly path: readonly string[];
+	/** By project: how deep the subproject is below the chosen node (1 for its own subprojects); 0 otherwise. */
+	readonly depth: number;
+	readonly cards: readonly ProjectsCard[];
+	/** What the plus let go in this part writes; null where it writes nothing (Done). */
+	readonly newTask: ProjectsNewTask | null;
+}
+
+/** The project menu, a tap on the chosen project's name over its tasks: Rename and Note. */
+export interface ProjectMenu {
+	readonly project: ProjectRef;
+	/** «Rename», which asks the name and writes `renameProject`. */
+	readonly renameLabel: string;
+	/** «Note». Without a note: `attachLabel` (the plugin's search of notes, then `setProjectNote`); with one, its name, a tap opening it. */
+	readonly noteLabel: string;
+	/** The attached note: its link, and its name the row shows; null without one. */
+	readonly note: { readonly link: string; readonly name: string } | null;
+	/** «Attach note…»: offered where the host can search its vault's notes (the plugin). */
+	readonly attachLabel: string;
+	/** «Detach»: takes the link off, `setProjectNote(name, null)`; the file stays. */
+	readonly detachLabel: string;
+}
+
+/** The Projects screen: the tree on the left, the chosen node's tasks on the right. */
+export interface ProjectsView {
+	readonly rows: readonly ProjectsRow[];
+	readonly selected: ProjectsNodeId;
+	readonly mode: ProjectsMode;
+	/** The segment's words: «By project», «By stage». */
+	readonly modes: readonly { readonly mode: ProjectsMode; readonly label: string }[];
+	/** The header over the tasks: the chosen node's name. */
+	readonly title: string;
+	/** The chosen project's menu (its title tapped); null for All, No project and Done. */
+	readonly menu: ProjectMenu | null;
+	/** The chosen node's tasks, in parts; an empty part is left out. */
+	readonly sections: readonly ProjectsSection[];
+	/** What the plus let go on the tasks outside any part writes; null for Done. */
+	readonly newTask: ProjectsNewTask | null;
+	/** The words over an empty list of tasks: «No tasks». */
+	readonly emptyLabel: string;
+	/** No tasks file: the tree holds only All, No project and Done. */
+	readonly missing: boolean;
+}
+
+/** Where a project lifted in the tree, or the plus, lands at a gap: the place the call takes, and the depth the gap is drawn at. */
+export interface ProjectsLanding {
+	readonly place: TreePlace;
+	readonly depth: number;
+}
+/**
+ * The tree's gaps: `projectsLevels(rows, gap, lifted)` the depths a gap may take (`gap` before row `gap`, `rows.length`
+ * after the last), `projectsGap(rows, gap, depth, lifted)` the place a drop there at that depth means (the depth kept
+ * within those), null where nothing lands.
+ */
+export { projectsGap, projectsLevels } from "./projectsScreen";
 
 /**
  * Everything the UI does with tasks. Every mutating call reads the file afresh, applies one operation, writes once,
@@ -862,9 +1015,7 @@ export interface TaskService {
 
 	/**
 	 * Everything the screen shows of the tasks for `date`, the file normalized first; without a tasks file, the empty screen
-	 * that says so (`missing`). With `project` (a link or a name), that project's view: every list and the timeline hold
-	 * only its tasks, without the mark, Done too; empty sections are left out, and each list is one untitled group of the
-	 * project (`ScreenView.projects`), so every place there carries its zone.
+	 * that says so (`missing`). `project`: a project's view went; ignored. Stub until the frontends drop it.
 	 */
 	screen(date: LocalDate, project?: string): Promise<ScreenView>;
 	dayView(date: LocalDate): Promise<DayView>;
@@ -881,8 +1032,8 @@ export interface TaskService {
 	 * query's words in their order, each a part of a word; in a title, failing that, its letters in their order. Case and
 	 * accents aside («ё» is «е»), a description read by its words, not its Markdown. Inbox, Backlog, Soon, Now, Done, and in
 	 * each the best match first: one in the title before one only in the description, then by score, ties in file order.
-	 * A query of spaces finds nothing. Each list's finds in a group of its own. With `project` (a link or a name), only that
-	 * project's tasks: the search opened from its view.
+	 * A query of spaces finds nothing. Each list's finds in a group of its own. `project`: a project's view went; ignored.
+	 * Each hit carries its project's path (`SearchHit.projectPath`).
 	 */
 	search(query: string, project?: string): Promise<readonly SearchGroup[]>;
 	/**
@@ -919,8 +1070,9 @@ export interface TaskService {
 	 * takes an Inbox task to Soon); null when nothing was created.
 	 */
 	/**
-	 * `project`, the task's own (`ProjectRef.link`, null for none; the quick entry's choice): it is written whatever the
-	 * place's `project` says, which then only decides where the task goes. A subtask takes none: its project is its parent's.
+	 * `project`, the task's own project (its name, null for none; the quick entry's choice, the Projects screen's
+	 * `ProjectsSection.newTask`): written whatever the place's `project` says. A subtask takes none: its projects are its
+	 * parent's.
 	 */
 	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | null): Promise<TaskKey | null>;
 	/**
@@ -974,43 +1126,75 @@ export interface TaskService {
 	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
 	/**
-	 * The tasks' project: the note's link text (`ProjectRef.link`), null for none. A task keeps its place in the lane; a
-	 * subtask is left as it is, its project its parent's. One write.
+	 * The tasks' projects become `project` alone (null: none). A task keeps its place in the lane; a subtask is left as it
+	 * is, its projects its parent's. One write.
 	 */
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void>;
-	/** The notes with the project tag, by name: what the Project page offers. */
+	/**
+	 * A project of the Project page tapped: put last on every task that lacks it, or taken off them all when every one has
+	 * it; a subtask's key names its top task. One write; each task as it then stands, in the order given, its key fresh;
+	 * null for one gone (as `toggleLabel`).
+	 */
+	toggleProject(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]>;
+	/** The projects of the tree read last, in its order, the tasks' own in it: what the quick entry's Project button offers. */
+	projects(): readonly ProjectRef[];
+	/** `projects()` under its old name. Stub until the frontends drop it. */
 	projectNotes(): readonly ProjectRef[];
 	/**
-	 * «New project…» named `name`: a note of that name at the vault's root with the project tag in its properties, or the
-	 * vault's note of that name tagged (its properties' tags, the rest untouched); then `keys` get that project in one
-	 * write (none: only the note, for the quick entry's field). The project, or null for a name of nothing, which writes
-	 * nothing.
+	 * «New project…» named `name` (`cleanProjectName`): a project at the top of the tree, last, and `keys` get it, in one
+	 * write (none: only the project, for the quick entry's field). A name the tree has gives that project to `keys`. The
+	 * project, or null for a name of nothing, which writes nothing.
 	 */
 	newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null>;
-	/**
-	 * Make result (`result` true): the result mark first on the task's line; a task with an open subtask folds. Make task
-	 * (false): the mark goes, the fold stays as it is. One write, one undo step.
-	 */
+	/** Results went: writes nothing. Stub until the frontends drop it. */
 	setResult(key: TaskKey, result: boolean): Promise<void>;
-	/** The Add to result page for these tasks, `query` typed in its search field (empty: every open result). */
+	/** Results went: an empty page. Stub until the frontends drop it. */
 	resultPage(keys: readonly TaskKey[], query: string): Promise<ResultPage>;
-	/**
-	 * A result picked on the Add to result page: each task, with its subtasks, leaves its place and becomes the last step
-	 * of `result`, in file order, wherever the result stands (its project the result's); the result folds, its next step
-	 * on top. A task already a step of it writes nothing; a subtask of a picked task goes along. One write, one undo step.
-	 */
+	/** Results went: writes nothing. Stub until the frontends drop it. */
 	addToResult(keys: readonly TaskKey[], result: TaskKey): Promise<void>;
-	/**
-	 * New result… named `name` (a priority's prefix typed first is its priority): a result at the first task's place in the
-	 * file (right before it, among the same task's subtasks for a subtask), with that task's project and due date, the tasks
-	 * its steps as `addToResult` takes them, folded. The new result's key and id; null for a blank name, which writes
-	 * nothing. One write, one undo step.
-	 */
+	/** Results went: writes nothing, null. Stub until the frontends drop it. */
 	newResult(keys: readonly TaskKey[], name: string): Promise<CreatedTask | null>;
-	/** Group by project in `list`'s title menu: kept on the device. */
+	/** Grouping by project went: does nothing. Stub until the frontends drop it. */
 	setGrouping(list: GroupedList, on: boolean): Promise<void>;
-	/** A group's chevron or title tapped: folded or unfolded, kept on the device. */
+	/** Grouping by project went: does nothing. Stub until the frontends drop it. */
 	toggleFold(list: GroupedList, key: string): Promise<void>;
+
+	/**
+	 * The Projects screen as this device shows it (`ProjectsView`): the tree with the chosen node, and its tasks By project
+	 * or By stage. Without a tasks file, the screen with nothing but All, No project and Done.
+	 */
+	projectsScreen(): Promise<ProjectsView>;
+	/**
+	 * A tap on a row of the tree: a node not chosen is chosen; the chosen one folds or unfolds its branch (one without a
+	 * branch stays as it is). Kept on the device.
+	 */
+	tapProjectNode(node: ProjectsNodeId): Promise<void>;
+	/** A folded branch opened without choosing its node: a card held over the row. Done opens its done projects. Kept on the device. */
+	unfoldProjectNode(node: ProjectsNodeId): Promise<void>;
+	/** The node chosen, unfolding the branches above it so its row shows: search's path, the card's folder mark. Kept on the device. */
+	selectProjectNode(node: ProjectsNodeId): Promise<void>;
+	/** The segment over the tasks: By project or By stage. Kept on the device. */
+	setProjectsMode(mode: ProjectsMode): Promise<void>;
+	/**
+	 * The plus dropped in the tree: a project named `name` at `place` (`projectsGap`). Answers the project, or null for a
+	 * blank name or one the tree has (nothing written). It is chosen, so its tasks' column shows it.
+	 */
+	createProject(name: string, place: TreePlace): Promise<ProjectRef | null>;
+	/** A project lifted in the tree and let go at `place` (`projectsGap`): reordered, nested, or taken out a level. One write. */
+	moveProject(name: string, place: TreePlace): Promise<void>;
+	/**
+	 * The project menu's Rename: the tree's line and every task's `🗂️` of it. A blank name, the same one, or one another
+	 * project has writes nothing: false.
+	 */
+	renameProject(from: string, to: string): Promise<boolean>;
+	/** The project menu's Note: the note `link` attached (its `[[link]]` on the tree line), or taken off with null. The note's file is never touched. */
+	setProjectNote(name: string, link: string | null): Promise<void>;
+	/**
+	 * A card dropped on a row of the tree (`ProjectsRow.acceptsTask`): the project the card was shown under (`ProjectsCard.from`,
+	 * null for none) gives way to the row's (No project: taken off); the task's other projects and its place in the funnel
+	 * stay. A subtask's key names its top task. One write.
+	 */
+	dropOnProject(keys: readonly TaskKey[], from: string | null, to: ProjectsNodeId): Promise<void>;
 	/** The task's labels become these names, written as tags; a task with a priority keeps none. The task as it now stands, its key fresh; null once it is gone. */
 	setLabels(key: TaskKey, labels: readonly string[]): Promise<TaskItem | null>;
 	/** `setLabels` for several tasks in one write; each task as it then stands, in the order given, null for one gone. */
@@ -1234,6 +1418,8 @@ export interface DayService {
 	step(date: LocalDate, days: number): LocalDate;
 	/** Where a swipe or a day arrow leads from `from`, a step back (-1) or on (1); null past the row's ends. */
 	stepScreen(from: ScreenAtOf, shift: -1 | 1): ScreenAtOf | null;
+	/** `stepScreen` on the wheel, Projects first, left of Inbox (`WHEEL_PLACES`): what a swipe or the wheel's arrows walk now. */
+	stepWheel(from: WheelAtOf, shift: -1 | 1): WheelAtOf | null;
 	/** Where the timeline of `date` opens: today on the now line, another day at the hour the settings name. */
 	openAt(date: LocalDate): DayOpening;
 	/**
@@ -1483,9 +1669,9 @@ export interface SettingsForm {
 	/** The line markers the tab edits, in the order it shows them. */
 	readonly markerOrder: readonly Marker[];
 	readonly priorities: readonly PriorityLevel[];
-	/** Result mark, beside the priorities: the word a result's line starts with, `🎯` by default. */
+	/** Results went. Stub until the frontends drop the field. */
 	readonly resultMark: string;
-	/** The mark before the settings say otherwise, `🎯`: the field's placeholder. */
+	/** Results went. Stub until the frontends drop the field. */
 	readonly defaultResultMark: string;
 	readonly labelTag: string;
 	readonly labels: readonly LabelLevel[];
@@ -1499,7 +1685,7 @@ export interface SettingsForm {
 	readonly cardGaps: SizeBounds;
 	/** Zoom levels as typed: the hour's heights, `28, 56, 112, 224`. */
 	readonly zoomLevels: string;
-	/** The tag that makes a note a project, `#project` by default. */
+	/** Projects live in the tasks file now: no setting. Stub until the frontends drop the field. */
 	readonly projectTag: string;
 	readonly presets: readonly string[];
 	readonly ungrouped: string;
@@ -1545,10 +1731,7 @@ export interface SettingsService {
 	addLevel(): Promise<void>;
 	/** The level at `from` goes to `to`, the others keeping their order. */
 	moveLevel(from: number, to: number): Promise<void>;
-	/**
-	 * The result mark trimmed; written when it is one word that is no level's prefix, else the one saved stays. Only what
-	 * reads as a result from then on changes: no line is rewritten.
-	 */
+	/** Results went: writes nothing. Stub until the frontends drop it. */
 	setResultMark(mark: string): Promise<void>;
 	/** The tag folder trimmed; written when it is one word. */
 	setLabelTag(tag: string): Promise<void>;
@@ -1560,7 +1743,7 @@ export interface SettingsService {
 	setCardGap(px: number): Promise<void>;
 	/** Written when the text reads as the hour's heights (`parseZoomLevels`). */
 	setZoomLevels(text: string): Promise<void>;
-	/** The tag trimmed, `#` first; written when it is one word. */
+	/** No setting any more: writes nothing. Stub until the frontends drop it. */
 	setProjectTag(tag: string): Promise<void>;
 	/** The name as shown, its spaces written as underscores. */
 	renameLabel(index: number, title: string): Promise<void>;

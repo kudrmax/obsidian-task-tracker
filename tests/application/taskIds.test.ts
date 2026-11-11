@@ -354,18 +354,12 @@ describe("a section's id", () => {
 		expect(await sectionIds(svc)).toEqual(after);
 	});
 
-	it("is the same on the groups a column draws, and in a list grouped by project", async () => {
+	it("is the same on the groups a column draws as in the list's sections", async () => {
 		const { svc } = setup();
 		const screen = await svc.screen(T);
 		const errands = screen.sections.now.find((s) => s.name === "Errands")!;
-		await svc.setProject([(await item(svc, "Later")).key], "P");
 		await svc.toSection([(await item(svc, "Later")).key], "Errands");
-		await svc.setGrouping("soon", true);
-		const grouped = (await svc.screen(T)).projects.soon.groups;
-		const ids = grouped.flatMap((g) => g.sections.filter((s) => s.name === "Errands").map((s) => s.id));
-		expect(ids.length).toBeGreaterThan(0);
 		const soonErrands = (await svc.listSections()).soon.find((s) => s.name === "Errands")!;
-		expect(ids.every((id) => id === soonErrands.id)).toBe(true);
 		expect(soonErrands.id).not.toBe(errands.id);
 	});
 

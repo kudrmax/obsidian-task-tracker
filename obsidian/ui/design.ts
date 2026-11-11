@@ -48,6 +48,8 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
 export const PROPERTY = {
 	listWidth: "--tc-list-width",
+	/** The Projects screen's tree, as wide as its divider was let go at on this device. */
+	treeWidth: "--tc-tree-width",
 	/** Room a scrolled list keeps under its last row while its rows fold away, so it stays where it was scrolled. */
 	listHold: "--tc-list-hold",
 	/** The card's height and the gap between cards, from the settings: set on the body, where the tokens built on them live. */
@@ -76,13 +78,15 @@ export const PROPERTY = {
 	level: "--tc-level",
 	/** How many levels back from a subtask's card a line of a task further up passes it. */
 	pass: "--tc-pass",
-	/** Where the switch's wheel stands: 0 with Inbox and Soon in its window, 2 with Now and the calendar, in between under a finger. */
+	/** Where the switch's wheel stands: -0.5 with the Projects folder alone in its window, 1 with Inbox and Soon, 3 with Now and the calendar, in between under a finger. */
 	wheel: "--tc-seg-pos",
 	/** How many icons' widths an icon of the wheel stands out of its window. */
 	depth: "--tc-seg-depth",
 	/** How much of a neighbour's place the track holds on each side of the window: none past the wheel's ends. */
 	before: "--tc-seg-before",
 	after: "--tc-seg-after",
+	/** How much of an icon the window shows: all of it, but at Projects and Done only the one in its middle. */
+	lens: "--tc-seg-lens",
 	/** The view's middle, top and height, which the desktop search panel hangs from. */
 	searchLeft: "--tc-search-left",
 	searchTop: "--tc-search-top",

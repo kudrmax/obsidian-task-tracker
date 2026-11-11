@@ -65,6 +65,7 @@ export class DragSession<P = DragPayload, R = DropResult> {
 		if (target !== this.current) {
 			this.current?.leave();
 			this.current = target;
+			this.opts.float.rideAbove?.(target?.clearsFinger === true);
 		}
 		target?.preview(x, y, this.opts.payload);
 		this.opts.float.moveTo(x, y);

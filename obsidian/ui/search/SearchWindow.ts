@@ -12,8 +12,8 @@ export interface SearchWindowDeps {
 	readonly root: HTMLElement;
 	readonly tasks: Pick<TaskService, "search">;
 	readonly desktop: boolean;
-	/** The project whose view the search was opened from: it finds only that project's tasks. */
-	readonly project?: string;
+	/** Opened from the Projects screen: each found task shows where it stands among the projects. */
+	readonly paths?: boolean;
 	sectionName(section: SectionKey): string;
 	/** The sheet of the window it replaces («⋯»), taken over as it stands; without it the search opens its own. */
 	readonly sheet?: (onClose: (how: CloseHow) => void) => Overlay;
@@ -98,15 +98,14 @@ export class SearchWindow {
 
 	private async find(query: string): Promise<void> {
 		const asked = ++this.asked;
-		const project = this.deps.project;
-		const groups = await (project === undefined ? this.deps.tasks.search(query) : this.deps.tasks.search(query, project));
+		const groups = await this.deps.tasks.search(query);
 		if (asked !== this.asked) return;
 		this.show(query, groups);
 	}
 
 	private show(query: string, groups: readonly SearchGroup[]): void {
 		this.results.textContent = "";
-		this.rows = renderSearchRows(this.results, groups, (section) => this.deps.sectionName(section));
+		this.rows = renderSearchRows(this.results, groups, (section) => this.deps.sectionName(section), this.deps.paths === true);
 		for (const row of this.rows) row.el.addEventListener("click", () => this.pick(row.hit));
 		if (groups.length === 0 && query !== "") el(this.results, "div", "tc-search-empty", "No tasks found");
 		this.picked = -1;

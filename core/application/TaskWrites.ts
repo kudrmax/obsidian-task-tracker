@@ -28,6 +28,14 @@ import type { Operation, TaskRules } from "./TaskRules";
 import { droppedSpan } from "./TimelineSpans";
 import { landingOf } from "./landing";
 import { keyOf } from "./taskKeys";
+import { cleanProjectName } from "../domain/Project";
+import type { TreePlace } from "../domain/ProjectTree";
+
+/** The project named as typed, as the tree after a write has it; null when it has none. */
+function namedIn(change: DocChange | null, typed: string): string | null {
+	const clean = cleanProjectName(typed);
+	return clean === null || !change ? null : (change.after.projectTree().find(clean)?.node.name ?? null);
+}
 
 /** The document as normalized before and after an operation ran. */
 export interface DocChange {
@@ -139,23 +147,49 @@ export class TaskWrites {
 		return nothing(this.rules.setProject(keys, project));
 	}
 
-	setResult(key: TaskKey, result: boolean): Write<void> {
-		return nothing(this.rules.setResult(key, result));
-	}
-
-	addToResult(keys: readonly TaskKey[], result: TaskKey): Write<void> {
-		return nothing(this.rules.addToResult(keys, result));
-	}
-
-	/** The new result's key and id, as the file stands after the write. */
-	newResult(keys: readonly TaskKey[], name: string): Write<CreatedTask | null> {
+	/** Each task as it then stands, found by its id, in the order given; null for one gone. */
+	toggleProject(keys: readonly TaskKey[], name: string): Write<readonly (TaskItem | null)[]> {
 		return {
-			operation: this.rules.newResult(keys, name),
+			operation: this.rules.toggleProject(keys, name),
 			answer: (change) => {
-				const created = change?.after.insertedSince(change.before);
-				return created ? { key: keyOf(created), id: created.id } : null;
+				if (!change) return keys.map(() => null);
+				const today = this.rules.today();
+				return keys.map((key) => {
+					const entry = change.after.byId(this.rules.entryOf(change.before, key).id);
+					return entry ? this.reads.itemAt(change.after, entry, today) : null;
+				});
 			},
 		};
+	}
+
+	/** «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of nothing. */
+	newProject(name: string, keys: readonly TaskKey[]): Write<string | null> {
+		const operation = this.rules.newProject(name, keys);
+		return { operation, answer: (change) => (operation === null ? null : namedIn(change, name)) };
+	}
+
+	dropOnProject(keys: readonly TaskKey[], from: string | null, to: string | null): Write<void> {
+		return nothing(this.rules.dropOnProject(keys, from, to));
+	}
+
+	/** The project made, as the tree has it; null when nothing was written. */
+	createProject(name: string, place: TreePlace): Write<string | null> {
+		const operation = this.rules.createProject(name, place);
+		return { operation, answer: (change) => (operation === null || !change || change.after.serialize() === change.before.serialize() ? null : namedIn(change, name)) };
+	}
+
+	moveProject(name: string, place: TreePlace): Write<void> {
+		return nothing(this.rules.moveProject(name, place));
+	}
+
+	/** Whether the rename wrote. */
+	renameProject(from: string, to: string): Write<boolean> {
+		const operation = this.rules.renameProject(from, to);
+		return { operation, answer: (change) => change !== null && change.after.serialize() !== change.before.serialize() };
+	}
+
+	setProjectNote(name: string, link: string | null): Write<void> {
+		return nothing(this.rules.setProjectNote(name, link));
 	}
 
 	setReminder(key: TaskKey, reminder: ReminderKind): Write<void> {
@@ -359,7 +393,7 @@ export class TaskWrites {
 		return {
 			reads: read.kind === "title" || (tasks.length === 1 && read.kind === "time"),
 			answer: (s) => {
-				const moves = dropMoves(tasks, read, day, (key) => (s ? this.rules.entryOf(s.doc, key).project : null));
+				const moves = dropMoves(tasks, read, day, (key) => (s ? (this.rules.entryOf(s.doc, key).projects[0] ?? null) : null));
 				return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
 			},
 		};

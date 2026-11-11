@@ -1,7 +1,7 @@
 import { googleLoggedIn } from "./googleLogin";
 import { labelNameOf, usableLabelTag } from "../domain/Label";
 import { hexColor, type PresetColor } from "../domain/Priority";
-import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, LABEL_PAINTS, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings, usableLevels, usableResultMark } from "../settings";
+import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, LABEL_PAINTS, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import type { CountField, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
 import type { SettingsStore } from "./ports";
 import { formatZoomLevels, parseZoomLevels } from "./timelineZoom";
@@ -140,14 +140,11 @@ export class SettingsServiceImpl implements SettingsService {
 		if (zoomLevels) await this.store.update({ zoomLevels });
 	}
 
-	async setResultMark(mark: string): Promise<void> {
-		const word = mark.trim();
-		if (usableResultMark(word, usableLevels(this.settings.priorities).map((l) => l.prefix)) !== null) await this.store.update({ resultMark: word });
-	}
+	/** Results went: writes nothing. Stub until the frontends drop the field. */
+	async setResultMark(_mark: string): Promise<void> {}
 
-	async setProjectTag(tag: string): Promise<void> {
-		const bare = tag.trim().replace(/^#/, "");
-		if (/^[^\s#]+$/.test(bare)) await this.store.update({ projectTag: `#${bare}` });
+	/** The project tag is no setting any more (projects live in the tasks file): writes nothing. Stub until the frontends drop the field. */
+	async setProjectTag(_tag: string): Promise<void> {
 	}
 
 	renameLabel(index: number, title: string): Promise<void> {

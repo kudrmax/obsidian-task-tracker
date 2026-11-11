@@ -1,10 +1,11 @@
-import type { ScreenPlace, ScreenSettings, ScreenSettingsStore } from "../../core/application/contracts";
+import type { ScreenSettings, ScreenSettingsStore } from "../../core/application/contracts";
+import type { WheelPlace } from "./screens";
 
 /**
  * Which pair of neighbouring lists the window shows: Inbox and Soon, Soon and the day's list, or the day's list and the
- * calendar. The window's own layout: the services hear only which lists show (`SHOWN_LISTS`).
+ * calendar; or the Projects screen. The window's own layout: the services hear only which lists show (`SHOWN_LISTS`).
  */
-export type RightMode = ScreenPlace;
+export type RightMode = WheelPlace;
 
 /**
  * The settings of this frontend alone: how Obsidian's screen is laid out, zoomed and painted. They are kept in the
@@ -22,18 +23,21 @@ export interface ViewSettings {
 	readonly rightMode: RightMode;
 	/** The zoom a pinch last settled on: the timeline opens at it. */
 	readonly zoom: Zoom;
+	/** The Projects screen's tree, px, as its divider was last let go; null for the design's width. */
+	readonly treeWidth: number | null;
 }
 
 export const VIEW_DEFAULTS: ViewSettings = {
 	listShare: 0.5,
 	rightMode: "calendar",
 	zoom: DEFAULT_ZOOM_HOUR,
+	treeWidth: null,
 };
 
 const VIEW_KEYS = Object.keys(VIEW_DEFAULTS) as (keyof ViewSettings)[];
 
-/** What belongs to the device, not the vault: the divider's place, the column shown and the zoom are set by hand on each screen, and must not travel through Sync. */
-export const DEVICE_KEYS = ["listShare", "rightMode", "zoom"] as const satisfies readonly (keyof ViewSettings)[];
+/** What belongs to the device, not the vault: the dividers' places, the column shown and the zoom are set by hand on each screen, and must not travel through Sync. */
+export const DEVICE_KEYS = ["listShare", "rightMode", "zoom", "treeWidth"] as const satisfies readonly (keyof ViewSettings)[];
 
 
 /** The view's settings of what was saved, the defaults for any it lacks. */
@@ -115,58 +119,5 @@ export class ShownSettingsStore {
 		};
 		const offs = [this.screen.onChange(changed), this.view.onChange(changed)];
 		return () => offs.forEach((off) => off());
-	}
-}
-
-/** What a project note's block keeps of its own: where its window stands, its divider and its zoom. */
-export type NotePlace = Partial<Pick<ViewSettings, (typeof DEVICE_KEYS)[number]>>;
-
-/** Where the blocks keep their places on this device, per note: never synced. */
-export interface NotePlaces {
-	get(path: string): NotePlace;
-	set(path: string, place: NotePlace): void;
-}
-
-/** A block opens at Inbox and Soon, as the board shows it: a project's steps wait there and in Backlog. */
-const BLOCK_DEFAULTS: NotePlace = { rightMode: "inbox" };
-
-/**
- * A project note's block reads the screen's settings as the plugin's view does, but keeps its own window, divider and zoom
- * per note: turning the wheel in one note moves neither the plugin's screen nor another note's block.
- */
-export class NoteShownSettings {
-	private seen: { readonly base: ShownSettings; readonly own: NotePlace } | null = null;
-	private shown: ShownSettings | null = null;
-	private readonly listeners = new Set<() => void>();
-
-	constructor(
-		private readonly base: Pick<ShownSettingsStore, "get" | "onChange">,
-		private readonly places: NotePlaces,
-		private readonly path: () => string,
-	) {}
-
-	get(): ShownSettings {
-		const base = this.base.get();
-		const own = this.places.get(this.path());
-		if (!this.seen || this.seen.base !== base || JSON.stringify(this.seen.own) !== JSON.stringify(own) || !this.shown) {
-			this.seen = { base, own };
-			this.shown = { ...base, ...BLOCK_DEFAULTS, ...own };
-		}
-		return this.shown;
-	}
-
-	async set(patch: NotePlace): Promise<void> {
-		const path = this.path();
-		this.places.set(path, { ...this.places.get(path), ...patch });
-		for (const listener of [...this.listeners]) listener();
-	}
-
-	onChange(listener: () => void): () => void {
-		this.listeners.add(listener);
-		const off = this.base.onChange(listener);
-		return () => {
-			this.listeners.delete(listener);
-			off();
-		};
 	}
 }

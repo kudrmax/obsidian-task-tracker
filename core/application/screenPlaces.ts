@@ -45,6 +45,44 @@ export function stepScreen(from: ScreenAt, shift: -1 | 1, today: LocalDate): Scr
 	return place >= 0 && place < SCREEN_PLACES.length ? { mode: SCREEN_PLACES[place], date: from.date } : null;
 }
 
+/**
+ * A place the wheel turns to: Projects, left of Inbox, a place of its own (the tree and the chosen node's tasks; the
+ * wheel's window holds its folder alone), then the funnel's places (`SCREEN_PLACES`).
+ */
+export type WheelPlace = "projects" | ScreenPlace;
+
+/** The wheel's places left to right, as a swipe walks them. */
+export const WHEEL_PLACES: readonly WheelPlace[] = ["projects", ...SCREEN_PLACES];
+
+/** The funnel's lists a wheel's place shows, in its order: Projects none. */
+export function shownLists(place: WheelPlace): readonly DropColumn[] {
+	return place === "projects" ? [] : SHOWN_LISTS[place];
+}
+
+/** The funnel's place that shows `column` from a wheel's place: from Projects as from Inbox, its neighbour. */
+export function placeOfList(column: DropColumn, place: WheelPlace): ScreenPlace {
+	return placeShowing(column, place === "projects" ? "inbox" : place);
+}
+
+/** Where the wheel stands: one of its places, or Done between Projects and Inbox, which only the search opens. */
+export type WheelSpot = WheelPlace | "done";
+
+/** What the screen shows on the wheel: its place and the day of its day column. */
+export interface WheelAt {
+	readonly mode: WheelSpot;
+	readonly date: LocalDate;
+}
+
+/**
+ * `stepScreen` on the wheel, Projects first: a step back from Inbox and Soon, or from Done, reaches Projects; a step on
+ * from Projects, or from Done, goes to Inbox; nothing stands before Projects. The rest as `stepScreen`.
+ */
+export function stepWheel(from: WheelAt, shift: -1 | 1, today: LocalDate): WheelAt | null {
+	if (from.mode === "projects") return shift > 0 ? { mode: "inbox", date: from.date } : null;
+	if (shift < 0 && (from.mode === "inbox" || from.mode === "done")) return { mode: "projects", date: from.date };
+	return stepScreen({ mode: from.mode, date: from.date }, shift, today);
+}
+
 /** A finger let go this fast, px per ms, sends the screen the way it went, however little of the way it was drawn. */
 export const SWIPE_FLICK_SPEED = 0.3;
 

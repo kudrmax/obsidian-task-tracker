@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TFile } from "obsidian";
 import type { NoteTags } from "../../core/application/projects";
 import { type NoteIndex, ObsidianNoteIndex, VaultProjects } from "../../obsidian/infrastructure/VaultProjects";
-import { GROUPING_KEY, LocalGroupingStore } from "../../obsidian/infrastructure/LocalGroupingStore";
+import { PROJECTS_SCREEN_KEY, LocalProjectsScreenStore } from "../../obsidian/infrastructure/LocalProjectsScreenStore";
 
 class FakeIndex implements NoteIndex {
 	list: NoteTags[] = [];
@@ -90,19 +90,19 @@ describe("VaultProjects", () => {
 	});
 });
 
-describe("LocalGroupingStore", () => {
-	it("keeps the grouping in the device's storage and reads it back", () => {
+describe("LocalProjectsScreenStore", () => {
+	it("keeps the Projects screen in the device's storage and reads it back", () => {
 		const saved = new Map<string, unknown>();
 		const storage = { loadLocalStorage: (key: string) => saved.get(key) ?? null, saveLocalStorage: (key: string, data: unknown) => void saved.set(key, data) };
-		const store = new LocalGroupingStore(storage);
+		const store = new LocalProjectsScreenStore(storage);
 		expect(store.get()).toEqual({});
-		store.set({ on: { soon: true }, folded: { backlog: ["окружение"] } });
-		expect(new LocalGroupingStore(storage).get()).toEqual({ on: { soon: true }, folded: { backlog: ["окружение"] } });
-		expect(typeof saved.get(GROUPING_KEY)).toBe("string");
+		store.set({ selected: "project:Дружба", mode: "byStage", folded: ["project:Спорт"], doneOpen: true });
+		expect(new LocalProjectsScreenStore(storage).get()).toEqual({ selected: "project:Дружба", mode: "byStage", folded: ["project:Спорт"], doneOpen: true });
+		expect(typeof saved.get(PROJECTS_SCREEN_KEY)).toBe("string");
 	});
 
 	it("starts afresh from a spoiled entry", () => {
-		const store = new LocalGroupingStore({ loadLocalStorage: () => "{", saveLocalStorage: () => undefined });
+		const store = new LocalProjectsScreenStore({ loadLocalStorage: () => "{", saveLocalStorage: () => undefined });
 		expect(store.get()).toEqual({});
 	});
 });

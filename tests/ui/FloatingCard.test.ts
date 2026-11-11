@@ -31,4 +31,30 @@ describe("the card carried under the finger", () => {
 		float.moveTo(window.innerWidth - 10, 200);
 		expect(left(float) + float.el.offsetWidth).toBe(window.innerWidth - 10 - 40 + DESIGN.floatWidth);
 	});
+
+	it("over the tree it takes its own width and rides above the finger, its middle over it; off the tree it is held as grabbed again", () => {
+		const float = new FloatingCard(item(), { dx: 40, dy: 10 }, "2026-11-01");
+		const top = () => parseFloat(/translate3d\([-\d.]+px, ([-\d.]+)px/.exec(float.el.style.transform)![1]);
+		Object.defineProperty(float.el, "offsetWidth", { get: () => parseFloat(float.el.style.width) || DESIGN.floatWidth });
+		float.el.style.width = "300px";
+		float.rideAbove(true);
+		float.moveTo(200, 300);
+		expect(float.el.classList.contains("is-aside")).toBe(true);
+		expect(float.el.style.width).toBe(`${DESIGN.floatWidth}px`);
+		expect(left(float)).toBe(200 - DESIGN.floatWidth / 2);
+		expect(top()).toBe(300);
+		float.rideAbove(false);
+		float.moveTo(200, 300);
+		expect(float.el.classList.contains("is-aside")).toBe(false);
+		expect(float.el.style.width).toBe("300px");
+		expect(top()).toBe(290);
+	});
+
+	it("riding above the finger near the window's edge, it stays inside the window", () => {
+		const float = new FloatingCard(item(), { dx: 40, dy: 10 }, "2026-11-01");
+		Object.defineProperty(float.el, "offsetWidth", { get: () => DESIGN.floatWidth });
+		float.rideAbove(true);
+		float.moveTo(20, 300);
+		expect(left(float)).toBeGreaterThanOrEqual(0);
+	});
 });

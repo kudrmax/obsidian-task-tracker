@@ -1,4 +1,5 @@
-import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, placeShowing, type ProjectZone, QuickEntrySession, type QuickEntryTasks, SHOWN_LISTS, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
+import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
+import { placeOfList, shownLists } from "../screens";
 import type { RightMode } from "../viewSettings";
 import type { EntryPart } from "./EntryPart";
 import { DURATION, EASING, LAYOUT, tokenMs } from "../design";
@@ -6,7 +7,7 @@ import { easingOf } from "../easing";
 import { FramePass } from "../FramePass";
 import type { Glide } from "../Keyboard";
 import type { DragController } from "../drag/DragController";
-import type { DropTarget, ListColumn, DropResult } from "../drag/DropTarget";
+import { type DropTarget, type ListColumn, type DropResult, isProjectsDrop } from "../drag/DropTarget";
 import type { GestureArbiter } from "../gestures";
 import type { CloseHow } from "../menu/Overlay";
 import type { TaskMenu } from "../menu/TaskMenu";
@@ -31,7 +32,7 @@ const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox", "backlog"];
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: QuickEntryTasks & Pick<TaskService, "listName" | "placementTitle" | "projectNotes" | "newProject" | "unfoldAbove">;
+	readonly tasks: QuickEntryTasks & Pick<TaskService, "listName" | "placementTitle" | "projects" | "newProject" | "unfoldAbove">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
@@ -58,12 +59,19 @@ export interface QuickEntryControllerDeps {
 	showDay(date: LocalDate): Promise<void>;
 	/** Resolves once the lists show the file as of the last write; `beforeShow` runs once their data is what was read, right before they draw it. */
 	fresh(beforeShow?: () => void): Promise<void>;
-	/** The project whose view the screen is: every task written here gets it. None on the main screen. */
-	project?(): string | undefined;
+	/** The plus on a screen of its own (the Projects screen): where it may be carried, and what a tap and a drop do there; null elsewhere. */
+	aside?(): PlusAside | null;
 	/** Redraws the lists and the timeline, which calls `rendered` once drawn. */
 	render(): void;
 	/** A write that failed. */
 	onError(error: unknown): void;
+}
+
+/** The plus on a screen that is no list of the funnel: its own places, its own tap and drop. */
+export interface PlusAside {
+	readonly targets: readonly DropTarget[];
+	tap(): void;
+	dropped(result: DropResult): void;
 }
 
 /**
@@ -157,8 +165,7 @@ export class QuickEntryController {
 				sectioned: (column) => deps.sectioned(column),
 				day: () => deps.day(),
 				today: () => deps.today(),
-				shown: () => SHOWN_LISTS[deps.mode()],
-				project: () => deps.project?.(),
+				shown: () => shownLists(deps.mode()),
 				fresh: (beforeShow) => this.fresh(beforeShow),
 				onChange: (state, drawnNext) => this.changed(state, drawnNext),
 			},
@@ -192,9 +199,9 @@ export class QuickEntryController {
 	}
 
 	/** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
-	openIn(column: ListColumn, group: GroupName, project?: ProjectZone): void {
+	openIn(column: ListColumn, group: GroupName): void {
 		this.dropField();
-		this.entry.openIn(column, group, project);
+		this.entry.openIn(column, group);
 	}
 
 	/**
@@ -221,17 +228,39 @@ export class QuickEntryController {
 
 	/** The plus tapped: the field opens as the press ends, and what that press still sends is not a tap elsewhere. */
 	private openFromPress(): void {
+		const aside = this.deps.aside?.() ?? null;
+		if (aside) return aside.tap();
 		this.pressEnding = true;
 		this.openFromPlus();
 	}
 
 	/** The plus taken: carried as a task is, and let go on a list, the field opens where the drop showed. */
 	dragFromPlus(e: PointerEvent, source: HTMLElement): void {
+		const aside = this.deps.aside?.() ?? null;
+		if (aside) return this.dragAside(e, source, aside);
 		const { lists, timeline } = this.deps.dropTargets();
 		this.droppedOn = null;
 		const targets = [this.ring, ...lists.map((target) => this.noted(target)), ...(timeline ? [timeline] : [])];
 		this.ring.show();
 		if (!this.deps.drag.beginNew(source, e, targets, (result) => this.dropped(result))) {
+			this.ring.hide();
+			return;
+		}
+		this.carrying = true;
+		this.showPlus();
+	}
+
+	/** The plus carried over a screen of its own: let go on one of its places, that screen opens its field there. */
+	private dragAside(e: PointerEvent, source: HTMLElement, aside: PlusAside): void {
+		const dropped = (result: DropResult | null): null => {
+			this.carrying = false;
+			this.ring.hide();
+			this.showPlus();
+			if (result && isProjectsDrop(result)) aside.dropped(result);
+			return null;
+		};
+		this.ring.show();
+		if (!this.deps.drag.beginNew(source, e, [this.ring, ...aside.targets], dropped)) {
 			this.ring.hide();
 			return;
 		}
@@ -400,7 +429,7 @@ export class QuickEntryController {
 	/** The service as the session writes through it, each task the field writes told to the lists by the id the write answers: its card takes the typed text's row. */
 	private telling(tasks: QuickEntryControllerDeps["tasks"]): QuickEntryTasks {
 		return {
-			projectNotes: () => tasks.projectNotes(),
+			projects: () => tasks.projects(),
 			placementOf: (...a) => tasks.placementOf(...a),
 			placementOfDay: (...a) => tasks.placementOfDay(...a),
 			dayOfPlacement: (...a) => tasks.dayOfPlacement(...a),
@@ -425,6 +454,10 @@ export class QuickEntryController {
 		this.carrying = false;
 		this.ring.hide();
 		this.dropField();
+		if (result && isProjectsDrop(result)) {
+			this.showPlus();
+			return null;
+		}
 		if (!this.entry.openAtDrop(this.droppedOn, result)) {
 			this.showPlus();
 			return null;
@@ -627,7 +660,7 @@ export class QuickEntryController {
 		if (!move) return;
 		this.turning = true;
 		try {
-			this.deps.turnTo(placeShowing(move.column, this.deps.mode()));
+			this.deps.turnTo(placeOfList(move.column, this.deps.mode()));
 		} finally {
 			this.turning = false;
 		}
@@ -688,11 +721,11 @@ export class QuickEntryController {
 		});
 	}
 
-	/** «New project…» on the bar: the note made or tagged (`TaskService.newProject`, no task yet), then the field's project. */
+	/** «New project…» on the bar: the project made at the tree's top (`TaskService.newProject`, no task yet), then the field's project. */
 	private async newProject(name: string): Promise<void> {
 		try {
 			const project = await this.deps.tasks.newProject(name, []);
-			if (project && this.state) this.entry.setProject(project.link);
+			if (project && this.state) this.entry.setProject(project.name);
 		} catch (error) {
 			this.deps.onError(error);
 		}

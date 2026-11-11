@@ -29,8 +29,8 @@ export interface FullScreenDeps {
 	/** The task's own menu over `source`: a subtask's card, or the capsule for the screen's task. */
 	menu(item: TaskItem, source: HTMLElement): void;
 	onClose(): void;
-	/** A project's note opens, as a card's folder opens it. */
-	openNote(path: string): void;
+	/** The Projects screen on the project, as a card's folder opens it. */
+	openProject(name: string): void;
 	/** A write of the typing that failed. */
 	onError(error: unknown): void;
 }
@@ -227,17 +227,16 @@ export class FullScreen {
 		this.showDescription(item);
 	}
 
-	/** The line under the title: the task's project (a subtask's, its parent's), none without one; it opens the note while it can. */
+	/** The line under the title: the task's first project (a subtask's, its parent's), none without one; it opens the Projects screen on it. */
 	private drawProject(): void {
 		const project = this.tree?.project ?? null;
 		this.projectButton.hidden = project === null;
 		this.projectText.textContent = project?.name ?? "";
-		this.projectButton.disabled = !project?.canOpenNote || project.note === null;
 	}
 
 	private openProject(): void {
 		const project = this.tree?.project;
-		if (project?.canOpenNote && project.note !== null) this.deps.openNote(project.note);
+		if (project) this.deps.openProject(project.name);
 	}
 
 	/** A subtask's card, or its copy over a menu: the circle, filled and the title crossed once it is done. */

@@ -2,6 +2,7 @@ import { descriptionIndent, descriptionMarkdown, markdownLines } from "./descrip
 import { DEFAULT_REMINDER, STATUS_CHARS, type GroupName, type SectionKey, type Task } from "./Task";
 import { formatTaskLine, isTaskLine, parseTaskLine, type Markers } from "./TaskLine";
 import { matchLines } from "./LineMatch";
+import { PROJECTS_HEADING, type ProjectTree, readTree, treeLines, treeSpan } from "./ProjectTree";
 
 export interface SectionNamesOf {
 	/** Left out by a reader Inbox means nothing to: the phone's reminders, Inbox tasks having no slot. */
@@ -32,8 +33,8 @@ export interface TaskEntry {
 	readonly task: Task;
 	/** The section of its list it sits in; a subtask's is its task's. */
 	readonly group: GroupName;
-	/** The link text of its project: its own field's, a subtask's its top task's whatever its own line says; null for none. */
-	readonly project: string | null;
+	/** The names of its projects: its own fields', a subtask's its top task's whatever its own line says. */
+	readonly projects: readonly string[];
 	/** The task lines nested right under this one, in file order. */
 	readonly subtasks: readonly TaskEntry[];
 }
@@ -149,7 +150,6 @@ function sameTask(a: Task, b: Task): boolean {
 		a.statusChar === b.statusChar &&
 		a.text === b.text &&
 		a.dueDate === b.dueDate &&
-		a.result === b.result &&
 		a.priority === b.priority &&
 		a.labels.length === b.labels.length &&
 		a.labels.every((label, i) => label === b.labels[i]) &&
@@ -159,7 +159,7 @@ function sameTask(a: Task, b: Task): boolean {
 		a.slot?.end === b.slot?.end &&
 		a.reminder === b.reminder &&
 		a.collapsed === b.collapsed &&
-		a.project === b.project &&
+		sameLines(a.projects, b.projects) &&
 		sameLines(a.children, b.children)
 	);
 }
@@ -260,13 +260,68 @@ export class TaskDocument {
 		return this.markers.priorities ?? [];
 	}
 
-	/** The result mark the file is read with; null: no task is a result. */
-	resultMark(): string | null {
-		return this.markers.result ?? null;
-	}
-
 	serialize(): string {
 		return this.lines.join(this.eol) + (this.trailingEol ? this.eol : "");
+	}
+
+	/** The projects of `## Projects`, as the file has them: none without the heading. */
+	projectTree(): ProjectTree {
+		return readTree(this.lines);
+	}
+
+	/** The file has `## Projects`. */
+	hasProjectTree(): boolean {
+		return treeSpan(this.lines).heading !== null;
+	}
+
+	/**
+	 * The file with `tree` as its `## Projects`: the list's lines in place of the ones it had (where the first stood, else
+	 * under the heading), every other line where it was; without the heading, the section made right after Inbox (at the
+	 * file's end without Inbox). The same tree changes nothing.
+	 */
+	withProjectTree(tree: ProjectTree): TaskDocument {
+		const span = treeSpan(this.lines);
+		if (span.heading !== null && tree.same(readTree(this.lines))) return this;
+		const mint = this.mint();
+		const lines = mint.rows(treeLines(tree, span.unit));
+		if (span.heading === null) return this.withRows(this.newTreeRows(lines, mint), mint);
+		const rows = this.rows.filter((_, i) => !span.items.includes(i));
+		let at = span.items.length > 0 ? span.items[0] : span.heading + 1;
+		if (span.items.length === 0) {
+			if (at < rows.length && rows[at].line.trim() === "") at++;
+			else rows.splice(at++, 0, ...mint.rows([""]));
+		}
+		rows.splice(at, 0, ...lines);
+		const after = at + lines.length;
+		if (span.items.length === 0 && after < rows.length && rows[after].line.trim() !== "") rows.splice(after, 0, ...mint.rows([""]));
+		return this.withRows(rows, mint);
+	}
+
+	/** The rows with a new `## Projects` holding `lines`, right after Inbox, apart from what is around it by blank lines. */
+	private newTreeRows(lines: readonly Row[], mint: Mint): Row[] {
+		const inbox = this.sections.get("inbox");
+		const rows = [...this.rows];
+		let at = inbox ? inbox.endLine : rows.length;
+		while (at > (inbox?.firstLine ?? 0) && rows[at - 1].line.trim() === "") at--;
+		const block = [...(at > 0 ? mint.rows([""]) : []), ...mint.rows([`## ${PROJECTS_HEADING}`, ""]), ...lines];
+		const rest = rows.slice(at);
+		const blankAfter = rest.findIndex((row) => row.line.trim() !== "");
+		const tail = blankAfter < 0 ? [] : rest.slice(blankAfter);
+		return [...rows.slice(0, at), ...block, ...(tail.length > 0 ? mint.rows([""]) : []), ...tail];
+	}
+
+	/** Each entry's own line written anew from its task, as the file's format has it now, even where its task reads the same. */
+	rewrittenLines(entries: readonly TaskEntry[], change: (task: Task) => Task = (task) => task): TaskDocument {
+		const rows = [...this.rows];
+		let changed = false;
+		for (const entry of entries) {
+			const line = this.spanOf(entry).line;
+			const written = formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task: change(entry.task) }, this.markers);
+			if (written === rows[line].line) continue;
+			rows[line] = { line: written, tag: rows[line].tag };
+			changed = true;
+		}
+		return changed ? this.withRows(rows) : this;
 	}
 
 	hasSection(section: SectionKey): boolean {
@@ -378,12 +433,12 @@ export class TaskDocument {
 	}
 
 	/**
-	 * A subtask moved here leaves its task and becomes a task of `section`, with the project it had through it; `project`
-	 * gives it another one (null: none). The section it leaves empty goes, as with `removeEntry`.
+	 * A subtask moved here leaves its task and becomes a task of `section`, with the projects it had through it; `projects`
+	 * gives it others. The section it leaves empty goes, as with `removeEntry`.
 	 */
-	moveEntry(entry: TaskEntry, section: SectionKey, position: InsertPosition, project?: string | null): TaskDocument {
+	moveEntry(entry: TaskEntry, section: SectionKey, position: InsertPosition, projects?: readonly string[]): TaskDocument {
 		const span = this.spanOf(entry);
-		const moved = this.ownRows(entry, span, "", project !== undefined ? project : entry.path.length > 0 ? entry.project : entry.task.project);
+		const moved = this.ownRows(entry, span, "", projects ?? (entry.path.length > 0 ? entry.projects : entry.task.projects));
 		const without = this.withRows(this.splice(span.line, span.lineCount, []));
 		const target = without.insertionLine(section, this.positionAfterRemoval(entry, section, position));
 		return this.leftBy(entry, without.withRows(without.splice(target, 0, moved)));
@@ -459,7 +514,7 @@ export class TaskDocument {
 		if (contains(entry, parent)) throw new Error(`A task cannot go under itself: ${entry.raw}`);
 		const span = this.spanOf(entry);
 		const target = before ? this.spanOf(before).line : this.endOf(parent);
-		const moved = this.ownRows(entry, span, this.childIndent(parent), null);
+		const moved = this.ownRows(entry, span, this.childIndent(parent), []);
 		const without = this.splice(span.line, span.lineCount, []);
 		without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved);
 		return this.leftBy(entry, this.withRows(without));
@@ -542,12 +597,12 @@ export class TaskDocument {
 	}
 
 	/**
-	 * The entry's lines under another indent, its own line written with `project` as its project: a subtask that becomes a
-	 * task takes the one it had through its parent, a task put under another one needs none.
+	 * The entry's lines under another indent, its own line written with `projects` as its projects: a subtask that becomes
+	 * a task takes the ones it had through its parent, a task put under another one needs none.
 	 */
-	private ownRows(entry: TaskEntry, span: Span, indent: string, project: string | null): Row[] {
+	private ownRows(entry: TaskEntry, span: Span, indent: string, projects: readonly string[]): Row[] {
 		const rows = reindented(this.rows.slice(span.line, span.line + span.lineCount), entry.indent, indent);
-		if (entry.task.project !== project) rows[0] = { line: formatTaskLine({ indent, bullet: entry.bullet, task: { ...entry.task, project } }, this.markers), tag: rows[0].tag };
+		if (!sameLines(entry.task.projects, projects)) rows[0] = { line: formatTaskLine({ indent, bullet: entry.bullet, task: { ...entry.task, projects } }, this.markers), tag: rows[0].tag };
 		return rows;
 	}
 
@@ -780,7 +835,7 @@ export class TaskDocument {
 	}
 
 	/** The task lines from `from` to `end` that no task line above them in that range holds, each with its own subtasks. */
-	private readLevel(section: SectionKey, from: number, end: number, parent: Place | null, group: GroupName, firstIndex: number, spans: Map<TaskEntry, Span>, parentProject: string | null): TaskEntry[] {
+	private readLevel(section: SectionKey, from: number, end: number, parent: Place | null, group: GroupName, firstIndex: number, spans: Map<TaskEntry, Span>, parentProjects: readonly string[] | null): TaskEntry[] {
 		const entries: TaskEntry[] = [];
 		let i = from;
 		while (i < end) {
@@ -792,9 +847,9 @@ export class TaskDocument {
 			}
 			const children = this.childrenOf(i, end, parsed.indent.length);
 			const place: Place = parent ? { index: parent.index, path: [...parent.path, entries.length] } : { index: firstIndex + entries.length, path: [] };
-			const project = parent ? parentProject : parsed.task.project;
-			const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, group, 0, spans, project);
-			const entry: TaskEntry = { id: this.rows[i].tag, section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, project, subtasks };
+			const projects = parent ? (parentProjects ?? []) : parsed.task.projects;
+			const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, group, 0, spans, projects);
+			const entry: TaskEntry = { id: this.rows[i].tag, section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, projects, subtasks };
 			entries.push(entry);
 			spans.set(entry, { line: i, lineCount: 1 + children.length });
 			i += 1 + children.length;

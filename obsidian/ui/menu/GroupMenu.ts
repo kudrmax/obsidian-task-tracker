@@ -2,7 +2,7 @@ import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel } from "../kit/Panel";
-import { menuGroup, menuRoom, menuRow, placePanel } from "./MenuPanel";
+import { menuGroup, menuRoom, placePanel } from "./MenuPanel";
 import { Overlay } from "./Overlay";
 
 export interface GroupMenuOptions {
@@ -34,30 +34,43 @@ export const GroupMenu = {
 	},
 };
 
-export interface ColumnMenuOptions {
-	/** The column's title, as it stands over the column. */
+export interface ProjectMenuOptions {
+	/** The project's name, as it stands over its tasks. */
 	readonly title: string;
-	/** The list shows its tasks grouped by project now: the row's check. */
-	readonly grouped: boolean;
-	onGroup(on: boolean): void;
+	readonly renameLabel: string;
+	/** The attached note's name; null without one. */
+	readonly note: string | null;
+	readonly attachLabel: string;
+	readonly detachLabel: string;
+	onRename(): void;
+	onAttach(): void;
+	onOpenNote(): void;
+	onDetach(): void;
 }
 
 /**
- * The menu of a column's title, Backlog's or Soon's, like a section header's: the title stays over the blur, the panel
- * under it holds one row, Group by project, checked while the list is grouped.
+ * The project's menu, a tap on the chosen project's name over its tasks, as a section header's: the title stays over the
+ * blur, the panel under it holds Rename, then the note: «Attach note…» without one; with one, the note's name, which opens
+ * it, and Detach, which takes the link off and leaves the file.
  */
-export const ColumnMenu = {
-	open(title: HTMLElement, opts: ColumnMenuOptions): { close(): void } {
+export const ProjectMenu = {
+	open(title: HTMLElement, opts: ProjectMenuOptions): { close(): void } {
 		const overlay = new Overlay(() => void overlay.close(), title);
 		const rect = title.getBoundingClientRect();
-		const copy = LiftedCopy.over(overlay, el(null, "div", "tc-lifted is-title"), false);
+		const copy = LiftedCopy.over(overlay, el(null, "div", "tc-lifted is-title is-project-title"), false);
 		el(copy.el, "span", "tc-lifted-title", opts.title);
 		copy.pin(rect, { width: true, height: true });
 		const panel = Panel.over(overlay, { root: "tc-panel", place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
 		panel.replace((p) => {
-			const group = menuGroup(p, []);
-			menuRow(group, { label: "Group by project", icon: opts.grouped ? "check" : undefined, choice: true, onPick: panel.pick(() => opts.onGroup(!opts.grouped)) });
-			return group;
+			const rows = [{ label: opts.renameLabel, icon: "rename", onPick: panel.pickNow(() => opts.onRename()) } as const];
+			const note =
+				opts.note === null
+					? [{ label: opts.attachLabel, icon: "plus", onPick: panel.pickNow(() => opts.onAttach()) } as const]
+					: [
+							{ label: opts.note, icon: "openFile", onPick: panel.pick(() => opts.onOpenNote()) } as const,
+							{ label: opts.detachLabel, icon: "cross", onPick: panel.pick(() => opts.onDetach()) } as const,
+						];
+			return menuGroup(p, [...rows, ...note]);
 		});
 		overlay.show();
 		return { close: () => void overlay.close() };

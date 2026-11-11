@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { acceptsDrop, type DropColumn, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, placesInGap, type ProjectNote, type ScreenView, type TaskItem, type TaskKey } from "../../core/application/contracts";
-import { memoryGrouping } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
@@ -252,7 +251,7 @@ describe("landing on a column's title: where the drop leaves the task, before it
 		if (!byProject) return setup();
 		const store = new InMemoryTaskFileStore(PROJECTS);
 		const projects = { list: () => NOTES, onChange: () => () => undefined };
-		return { store, svc: new TaskServiceImpl(store, new FakeSettingsStore(), clock, null, projects, memoryGrouping()) };
+		return { store, svc: new TaskServiceImpl(store, new FakeSettingsStore(), clock, null, projects) };
 	}
 
 	interface TitleCase {
@@ -317,94 +316,3 @@ describe("landing on a column's title: where the drop leaves the task, before it
 	});
 });
 
-describe("landing in a list grouped by project: the part the screen draws, and the place in it", () => {
-	const NOTES: readonly ProjectNote[] = [
-		{ name: "X", path: "X.md", link: "X" },
-		{ name: "Y", path: "Y.md", link: "Y" },
-	];
-	const GROUPED = ["## Inbox", "- [ ] E 🗂️ [[X]]", "- [ ] F", "## Now", "## Soon", "- [ ] B 🗂️ [[Y]]", "- [ ] A 🗂️ [[X]]", "- [ ] N", "### Later", "- [ ] L 🗂️ [[X]]", "## Backlog", "- [ ] BY 🗂️ [[Y]]", "- [ ] BN", "- [ ] BX 🗂️ [[X]]", "## Done", ""].join("\n");
-
-	async function grouped() {
-		const store = new InMemoryTaskFileStore(GROUPED);
-		const projects = { list: () => NOTES, onChange: () => () => undefined };
-		const svc = new TaskServiceImpl(store, new FakeSettingsStore(), clock, null, projects, memoryGrouping());
-		await svc.setGrouping("soon", true);
-		await svc.setGrouping("backlog", true);
-		return { store, svc };
-	}
-
-	const CASES: readonly { name: string; text: string; from: DropFrom; to: (key: (text: string) => TaskKey, screen: ScreenView) => DropTo; part: { key: string; index: number } }[] = [
-		{ name: "Soon, before the first of project X, behind Y's in the file", text: "E", from: "inbox", to: (key) => ({ kind: "place", column: "soon", place: { kind: "task", group: null, before: key("A"), project: "X" } }), part: { key: "x", index: 0 } },
-		{ name: "Soon, at the end of project X", text: "E", from: "inbox", to: () => ({ kind: "place", column: "soon", place: { kind: "task", group: null, before: null, project: "X" } }), part: { key: "x", index: 1 } },
-		{ name: "Soon, into no project", text: "F", from: "inbox", to: () => ({ kind: "place", column: "soon", place: { kind: "task", group: null, before: null, project: null } }), part: { key: "", index: 1 } },
-		{ name: "Soon's title: to its own project's part", text: "E", from: "inbox", to: (_key, screen) => screen.titleDrops.soon, part: { key: "x", index: 1 } },
-		{ name: "Backlog, before X's task, behind no project's in the file", text: "E", from: "inbox", to: (key) => ({ kind: "place", column: "backlog", place: { kind: "task", group: null, before: key("BX"), project: "X" } }), part: { key: "x", index: 0 } },
-		{ name: "Backlog's title: no project", text: "F", from: "inbox", to: (_key, screen) => screen.titleDrops.backlog, part: { key: "", index: 1 } },
-		{ name: "Backlog's title: project Y", text: "B", from: "soon", to: (_key, screen) => screen.titleDrops.backlog, part: { key: "y", index: 1 } },
-	];
-
-	for (const c of CASES) {
-		it(`is where the write leaves it: ${c.name}`, async () => {
-			const { store, svc } = await grouped();
-			const screen = await svc.screen(T);
-			const all = [...screen.inbox, ...screen.soon, ...screen.backlog];
-			const key = (text: string) => all.find((i) => i.text === text)!.key;
-			const task = all.find((i) => i.text === c.text)!;
-			const to = c.to(key, screen);
-			const before = store.text;
-			const [landing] = await svc.landing([{ key: task.key, from: c.from }], to, T);
-			expect(store.text).toBe(before);
-			expect(landing).toMatchObject({ kind: "list", id: task.id, part: c.part });
-			await svc.drop([{ key: task.key, from: c.from }], to, T);
-			const { id: _id, ridesNow: _r, ...place } = landing as unknown as Record<string, unknown>;
-			expect(place).toEqual(await placeAfter(svc, task.id, T));
-		});
-
-		it(`dropPreview gives the screen the drop leaves: ${c.name}`, async () => {
-			const { store, svc } = await grouped();
-			const screen = await svc.screen(T);
-			const all = [...screen.inbox, ...screen.soon, ...screen.backlog];
-			const task = all.find((i) => i.text === c.text)!;
-			await previewIsTheDrop(store, svc, [{ key: task.key, from: c.from }], c.to((text) => all.find((i) => i.text === text)!.key, screen), T);
-		});
-	}
-
-	for (const [name, column, text, from, to] of [
-		["Soon's folded part X, at its header", "soon", "E", "inbox", (s: ScreenView) => ({ kind: "place", column: "soon", place: { kind: "task", group: null, before: null, project: "X" } }) as DropTo],
-		["Soon's title, the task's own part X folded", "soon", "E", "inbox", (s: ScreenView) => s.titleDrops.soon],
-		["Backlog's title, the task's own part X folded", "backlog", "E", "inbox", (s: ScreenView) => s.titleDrops.backlog],
-	] as const) {
-		it(`names a folded part, its card not drawn: ${name}`, async () => {
-			const { store, svc } = await grouped();
-			await svc.toggleFold(column, "x");
-			const screen = await svc.screen(T);
-			const group = screen.projects[column].groups.find((g) => g.key === "x")!;
-			expect(group.folded).toBe(true);
-			const task = [...screen.inbox, ...screen.soon, ...screen.backlog].find((i) => i.text === text)!;
-			const before = store.text;
-			const [landing] = await svc.landing([{ key: task.key, from }], to(screen), T);
-			expect(store.text).toBe(before);
-			expect(landing).toMatchObject({ kind: "list", column, part: { key: "x", zone: "X", folded: true } });
-			await svc.drop([{ key: task.key, from }], to(screen), T);
-			const after = (await svc.screen(T)).projects[column].groups.find((g) => g.key === "x")!;
-			expect(after.folded).toBe(true);
-			expect(after.sections.some((sec) => sec.items.some((i) => i.id === task.id))).toBe(true);
-		});
-	}
-
-	it("says an open part is not folded", async () => {
-		const { svc } = await grouped();
-		const screen = await svc.screen(T);
-		const task = screen.inbox.find((i) => i.text === "E")!;
-		const [landing] = await svc.landing([{ key: task.key, from: "inbox" }], screen.titleDrops.soon, T);
-		expect(landing).toMatchObject({ kind: "list", part: { key: "x", folded: false } });
-	});
-
-	it("gives no part in a list not grouped", async () => {
-		const { svc } = setup();
-		const items = await itemsOf(svc);
-		const [landing] = await svc.landing([{ key: items.get("I1")!.key, from: "inbox" }], { kind: "list", column: "soon", before: null }, T);
-		expect(landing.kind).toBe("list");
-		expect("part" in landing).toBe(false);
-	});
-});

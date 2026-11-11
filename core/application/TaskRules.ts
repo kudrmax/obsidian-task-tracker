@@ -4,7 +4,7 @@ import { isBlankTitle } from "../domain/Priority";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
 import { type Column, columnGroups, columnList } from "../domain/queries";
-import { isOpen, type LocalDate, type ReminderKind, type Slot, type TaskStatus } from "../domain/Task";
+import { type LocalDate, type ReminderKind, type Slot, type TaskStatus } from "../domain/Task";
 import { type LineIds, TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { EntryTags } from "../domain/EntryTags";
 import { taskTitle } from "../domain/TaskTitle";
@@ -24,8 +24,11 @@ import {
 	type TaskKey,
 	type TaskStep,
 } from "./contracts";
-import { boundaryOf, markersOf, parseText, readDocument, readingKey, sectionNames } from "./documentText";
-import { withoutResultMark } from "../domain/Result";
+import { boundaryOf, parseText, readingKey, sectionNames } from "./documentText";
+import * as projectWrites from "../domain/ProjectWrites";
+import { cleanProjectName, namesProject, uniqueNames } from "../domain/Project";
+import type { TreePlace } from "../domain/ProjectTree";
+import type { ProjectNote } from "./contracts";
 import type { Clock, SettingsStore } from "./ports";
 import type { TaskIdentity } from "./TaskIdentity";
 import { isUnder, keyOf, sameLine, samePlace } from "./taskKeys";
@@ -110,6 +113,7 @@ export class TaskRules {
 		private readonly clock: Clock,
 		private readonly identity: TaskIdentity | null = null,
 		private readonly keysById = identity !== null,
+		private readonly legacyNotes: () => readonly ProjectNote[] = () => [],
 	) {}
 
 	moment(): Moment {
@@ -126,25 +130,23 @@ export class TaskRules {
 		return usableLevels(this.settings.get().priorities);
 	}
 
-	/** A title of nothing but a priority, or the result mark, is blank too. */
+	/** A title of nothing but a priority is blank too. */
 	isBlank(text: string): boolean {
-		return isBlankTitle(withoutResultMark(text, markersOf(this.settings.get()).result ?? null), this.priorityLevels().map((l) => l.prefix));
+		return isBlankTitle(text, this.priorityLevels().map((l) => l.prefix));
 	}
 
 	read(text: string, at: Moment = this.moment()): Reading {
-		const { settings, today, boundary } = at;
-		const presets = ops.usablePresets(settings.groups.presets);
+		const { settings } = at;
 		const parsed = parseText(text, settings);
 		const whole = parsed.ensureSections(sectionNames(settings));
-		const doc = normalize(whole, today, boundary, presets);
-		const changed = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
+		const doc = this.tidied(whole, at);
+		const changed = whole === parsed ? doc !== whole : this.tidied(parsed, at) !== parsed;
 		return { doc: this.identified(text, doc, () => doc), changed };
 	}
 
 	/** The text after `operation` on the document read and normalized; the result is normalized again. */
 	change(text: string, operation: Operation, at: Moment = this.moment()): TextChange {
-		const { settings, today, boundary } = at;
-		const doc = readDocument(text, settings, today, boundary);
+		const doc = this.tidied(parseText(text, at.settings).ensureSections(sectionNames(at.settings)), at);
 		return this.written(this.identified(text, doc, () => doc), operation, at);
 	}
 
@@ -184,9 +186,15 @@ export class TaskRules {
 		return this.identity?.of(text, () => this.tidied(parseText(text, this.settings.get()).ensureSections(sectionNames(this.settings.get())), this.moment()));
 	}
 
-	/** A document as today's tidying leaves it. */
+	/**
+	 * A document as today's tidying leaves it: the one move to projects first while the file awaits it, so it is written
+	 * as soon as the file is read (a tidy, no step of undo) and every action runs on a moved file.
+	 */
 	private tidied(doc: TaskDocument, at: Moment): TaskDocument {
-		return normalize(doc, at.today, at.boundary, ops.usablePresets(at.settings.groups.presets));
+		const notes = this.legacyNotes();
+		const mark = at.settings.resultMark;
+		const moved = projectWrites.awaitsMove(doc, notes, mark) ? projectWrites.withTasksInTree(projectWrites.movedToProjects(doc, notes, mark)) : doc;
+		return normalize(moved, at.today, at.boundary, ops.usablePresets(at.settings.groups.presets));
 	}
 
 	/** The document after `operation` on `doc`, already read and normalized at `at`, normalized again. */
@@ -276,7 +284,7 @@ export class TaskRules {
 
 	/** A new task where `place` says, whatever its title: `createInPlace` without its check for a blank one. */
 	placeNew(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Operation {
-		return (doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels, project);
+		return (doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels, project === undefined ? undefined : project === null ? [] : [project]);
 	}
 
 	create(draft: TaskDraft, slot?: Slot): Operation | null {
@@ -335,38 +343,80 @@ export class TaskRules {
 		return { operation, places: () => places };
 	}
 
-	/** Each task's project; a subtask's line is left alone. */
+	/** Each task's projects become `project` alone (null: none); a subtask's line is left alone. */
 	setProject(keys: readonly TaskKey[], project: string | null): Operation | null {
 		if (keys.length === 0) return null;
-		if (keys.length === 1) return (doc) => ops.setProject(doc, this.entryOf(doc, keys[0]), project);
-		return this.applyAll(keys.map((key) => ({ key, change: { kind: "project", project } })));
+		return this.withProjects(keys, () => (project === null ? [] : [project]));
 	}
 
-	/** Make result, or Make task. */
-	setResult(key: TaskKey, result: boolean): Operation | null {
-		if (result && !this.marksResults()) return null;
-		return (doc) => ops.setResult(doc, this.entryOf(doc, key), result);
-	}
-
-	/** The tasks become the last steps of `result`; null for none. A result no longer open, or no longer a result, is stale. */
-	addToResult(keys: readonly TaskKey[], result: TaskKey): Operation | null {
+	/** `name` put last on every task that lacks it, or taken off them all when all have it; a subtask's key names its top task. */
+	toggleProject(keys: readonly TaskKey[], name: string): Operation | null {
 		if (keys.length === 0) return null;
 		return (doc) => {
-			const target = this.entryOf(doc, result);
-			if (!target.task.result || !isOpen(target.task.status)) throw new StaleTaskError();
-			return ops.addToResult(doc, keys.map((key) => this.entryOf(doc, key)), target);
+			const holders = this.holders(doc, keys);
+			const on = !holders.every((entry) => namesProject(entry.task.projects, name));
+			return this.rewrite(doc, holders, (projects) => ops.withProject(projects, name, on));
 		};
 	}
 
-	/** A new result named as typed, at the first task's place, the tasks its steps; null for none or a blank name. */
-	newResult(keys: readonly TaskKey[], name: string): Operation | null {
-		if (keys.length === 0 || this.isBlank(name) || !this.marksResults()) return null;
-		return (doc, _today, _settings, boundary) => ops.newResult(doc, keys.map((key) => this.entryOf(doc, key)), name, boundary);
+	/** «New project…»: the project made at the tree's top when it lacks it, and put on every task (`keys` may be none). */
+	newProject(name: string, keys: readonly TaskKey[]): Operation | null {
+		const clean = cleanProjectName(name);
+		if (clean === null) return null;
+		return (doc) => {
+			const holders = this.holders(doc, keys);
+			const named = projectWrites.addProject(doc, clean, { parent: null, before: null });
+			const found = named.projectTree().find(clean)!.node.name;
+			const moved = holders.map((entry) => named.byId(entry.id)!);
+			return this.rewrite(named, moved, (projects) => ops.withProject(projects, found, true));
+		};
 	}
 
-	/** The settings give a usable result mark: a task can be made a result. */
-	marksResults(): boolean {
-		return markersOf(this.settings.get()).result !== undefined;
+	/** A card let go on the tree: `from` gives way to `to` (null: taken off), the others kept. */
+	dropOnProject(keys: readonly TaskKey[], from: string | null, to: string | null): Operation | null {
+		if (keys.length === 0) return null;
+		return this.withProjects(keys, (projects) => {
+			const without = from === null ? projects : ops.withProject(projects, from, false);
+			return to === null ? without : ops.withProject(without, to, true);
+		});
+	}
+
+	/** A project made at `place` of the tree; null for a name of nothing. */
+	createProject(name: string, place: TreePlace): Operation | null {
+		const clean = cleanProjectName(name);
+		if (clean === null) return null;
+		return (doc) => projectWrites.addProject(doc, clean, place);
+	}
+
+	moveProject(name: string, place: TreePlace): Operation {
+		return (doc) => projectWrites.moveProject(doc, name, place);
+	}
+
+	/** Null for a name of nothing. */
+	renameProject(from: string, to: string): Operation | null {
+		const clean = cleanProjectName(to);
+		if (clean === null || clean === from) return null;
+		return (doc) => projectWrites.renameProject(doc, from, clean);
+	}
+
+	setProjectNote(name: string, link: string | null): Operation {
+		const note = link === null ? null : link.replace(/^\[\[|\]\]$/g, "").trim() || null;
+		return (doc) => projectWrites.setProjectNote(doc, name, note);
+	}
+
+	/** Each task's projects, a subtask's key its top task's, as `change` makes them of their own. */
+	private withProjects(keys: readonly TaskKey[], change: (projects: readonly string[]) => readonly string[]): Operation {
+		return (doc) => this.rewrite(doc, this.holders(doc, keys), change);
+	}
+
+	private rewrite(doc: TaskDocument, holders: readonly TaskEntry[], change: (projects: readonly string[]) => readonly string[]): TaskDocument {
+		return doc.replaceAll(holders.map((entry) => [entry, { ...entry.task, projects: uniqueNames(change(entry.task.projects)) }] as const));
+	}
+
+	/** The top tasks the keys name, each once. */
+	private holders(doc: TaskDocument, keys: readonly TaskKey[]): TaskEntry[] {
+		const seen = new Set<string>();
+		return keys.map((key) => projectWrites.projectHolder(doc, this.entryOf(doc, key))).filter((entry) => !seen.has(entry.id) && (seen.add(entry.id), true));
 	}
 
 	setReminder(key: TaskKey, reminder: ReminderKind): Operation {
@@ -467,9 +517,9 @@ export class TaskRules {
 	}
 
 	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate, project?: ProjectZone): Operation {
-		return (doc, today, _settings, boundary) => {
+		return (doc, today) => {
 			this.groupOf(doc, list, group);
-			return ops.moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today, date ?? null, project, boundary);
+			return ops.moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today, date ?? null, project);
 		};
 	}
 
@@ -487,19 +537,20 @@ export class TaskRules {
 	}
 
 	/** Null for a blank name or the section's own: nothing to write. */
-	renameGroup(list: GroupedList, group: string, name: string, project?: ProjectZone): Operation | null {
+	/** Null for a blank name or the section's own: nothing to write. `_project`: a project's part went; ignored. */
+	renameGroup(list: GroupedList, group: string, name: string, _project?: ProjectZone): Operation | null {
 		if (blankName(name) || name.trim() === group) return null;
 		return (doc, _today, settings) => {
 			this.groupOf(doc, list, group);
-			if (project !== undefined) return ops.renameGroupIn(doc, list, group, name, settings.groups.ungrouped, project);
 			return ops.renameGroup(doc, list, group, name, settings.groups.ungrouped);
 		};
 	}
 
-	removeGroup(list: GroupedList, group: string, project?: ProjectZone): Operation {
+	/** `_project`: a project's part went; ignored. */
+	removeGroup(list: GroupedList, group: string, _project?: ProjectZone): Operation {
 		return (doc) => {
 			this.groupOf(doc, list, group);
-			return project === undefined ? ops.removeGroup(doc, list, group) : ops.removeGroupIn(doc, list, group, project);
+			return ops.removeGroup(doc, list, group);
 		};
 	}
 
@@ -563,7 +614,7 @@ export class TaskRules {
 			case "labels":
 				return ops.setLabels(doc, entry, change.labels);
 			case "project":
-				return ops.setProject(doc, entry, change.project);
+				return ops.setProjects(doc, entry, change.project === null ? [] : [change.project]);
 			case "dueDate":
 				return ops.setDueDate(doc, entry, change.date);
 			case "postpone":
@@ -582,7 +633,7 @@ export class TaskRules {
 				return ops.moveToEnd(doc, entry, change.section);
 			case "moveToGroup":
 				this.groupOf(doc, change.list, change.group);
-				return ops.moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null, change.project, boundary);
+				return ops.moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null, change.project);
 			case "createGroup":
 				return blankName(change.name) ? doc : ops.createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
 			case "nest":
@@ -608,9 +659,21 @@ export class TaskRules {
 		}
 	}
 
+	/**
+	 * A written document with its projects in its tree: when the file as read still awaited the move to projects (old
+	 * fields, the result mark, or no `## Projects`), the move first, whatever the write did; then every project a task names.
+	 */
+	private projected(before: TaskDocument, after: TaskDocument, settings: TaskCalendarSettings): TaskDocument {
+		const notes = this.legacyNotes();
+		const moved = projectWrites.awaitsMove(before, notes, settings.resultMark) ? projectWrites.movedToProjects(after, notes, settings.resultMark) : after;
+		return projectWrites.withTasksInTree(moved);
+	}
+
 	private written(doc: TaskDocument, operation: Operation, at: Moment, writes = true): TextChange {
 		const { settings, today, boundary } = at;
-		const after = normalize(operation(doc, today, settings, boundary), today, boundary, ops.usablePresets(settings.groups.presets));
+		const changed = operation(doc, today, settings, boundary);
+		const projected = changed === doc ? changed : this.projected(doc, changed, settings);
+		const after = normalize(projected, today, boundary, ops.usablePresets(settings.groups.presets));
 		const text = after.serialize();
 		if (writes) this.identity?.wrote(text, after);
 		return { text, before: doc, after };

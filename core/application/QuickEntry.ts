@@ -209,7 +209,7 @@ export interface PlaceMove {
 }
 
 /** What the entry reads of the service, all synchronous: the marks, the places, and the project notes its Project page offers (none without them). */
-export type EntryTasks = Pick<TaskService, "placementOf" | "placementOfDay" | "dayOfPlacement" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks" | "newSlot"> & Partial<Pick<TaskService, "projectNotes">>;
+export type EntryTasks = Pick<TaskService, "placementOf" | "placementOfDay" | "dayOfPlacement" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks" | "newSlot"> & Partial<Pick<TaskService, "projects" | "projectNotes">>;
 
 /**
  * What the entry reads of the screen, as it stands now: its lists' cards and sections, the day it shows, and which of
@@ -381,7 +381,7 @@ export class QuickEntry {
 	}
 
 	private projectButton(link: string | null): EntryProject {
-		return entryProject(link, this.tasks.projectNotes?.() ?? []);
+		return entryProject(link, this.tasks.projects?.() ?? this.tasks.projectNotes?.() ?? []);
 	}
 
 	/** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */
@@ -1063,14 +1063,15 @@ function placeChoices(place: Placement | null): readonly PlaceChoice[] {
 
 /** The Project button for a field (or the New Task sheet) whose project is `link`, null for none, among the `known` project notes. */
 export function entryProject(link: string | null, known: readonly ProjectRef[]): EntryProject {
-	return { page: projectPage([refOf(link, known)], known), lit: link !== null };
+	const ref = refOf(link, known);
+	return { page: projectPage([ref ? [ref] : []], known.map((project) => ({ project, depth: project.path.length - 1 }))), lit: link !== null };
 }
 
 /** The project of link `link` as the Project page shows it: the project note of that name, else the name alone. */
 function refOf(link: string | null, known: readonly ProjectRef[]): ProjectRef | null {
 	if (link === null) return null;
 	const name = projectName(link);
-	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link, note: null, canOpenNote: false, mark: true };
+	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link: name, path: [name], note: null, canOpenNote: false, mark: true };
 }
 
 /** The renamed task as its field stands: in the place of its result's card, that card's key and id. */

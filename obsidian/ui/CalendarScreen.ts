@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type ProjectGroup, type ProjectZone, type MenuFrom, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, type ZoomLevel } from "../../core/application/contracts";
+import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type MenuFrom, projectNodeOf, type ProjectsCard, type ProjectsLanding, type ProjectsNewTask, type ProjectsView, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, type ZoomLevel } from "../../core/application/contracts";
 import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -13,9 +13,13 @@ import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
 import { type ColumnTitle, ListDrop } from "./drag/ListDrop";
-import { type ColumnSections, type DropResult, droppedTasks, type HeldOut, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
+import { type ColumnSections, type DropResult, droppedTasks, type HeldOut, isProjectsDrop, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
-import { ColumnMenu, GroupMenu } from "./menu/GroupMenu";
+import { GroupMenu, ProjectMenu } from "./menu/GroupMenu";
+import { NoteSearch } from "./projects/NoteSearch";
+import { TasksDrop, TreeDrop } from "./projects/ProjectDrops";
+import { TreeLift } from "./projects/TreeLift";
+import type { PlusAside } from "./quick/QuickEntryController";
 import { failureText } from "./failureText";
 import { GroupNameField } from "./GroupNameField";
 import { TimelineDrop } from "./drag/TimelineDrop";
@@ -48,6 +52,7 @@ import { type ScreenPart, ScreenParts } from "./ScreenParts";
 import { settingsEffect } from "./settingsEffect";
 import { StatusBarRoom } from "./StatusBarRoom";
 import { type Place, type Shift } from "./screens";
+import { ProjectsScreen } from "./projects/ProjectsScreen";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
@@ -58,6 +63,8 @@ import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
 
 const MINUTE_MS = 60_000;
+/** The lists a card is carried from: a Projects card of one of them is carried onto the tree. */
+const LIST_COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox", "backlog"];
 /** The place of the screens a list stands at: Backlog under Inbox, Done left of it. */
 const PLACE_OF_LIST: Readonly<Record<Extract<TaskScreen, { kind: "list" }>["list"], Place>> = { done: "done", inbox: "inbox", backlog: "inbox", soon: "soon" };
 
@@ -82,10 +89,8 @@ export interface ViewDeps {
 /** What the screen reads of the settings, and the only ones it sets: where its window stands, its divider and its zoom. */
 export type ShownSettingsSource = Pick<ShownSettingsStore, "get" | "set" | "onChange">;
 
-/** Where a screen is shown: the plugin's own view, or a project note's block. */
+/** Where a screen is shown: the plugin's own view. */
 export interface ScreenPlace {
-	/** The project whose view this screen is (its note's block): every list, Done and the timeline hold only its tasks. */
-	readonly project?: () => string | undefined;
 	/** The plugin's own view shows the undo capsule; a note's block doesn't. Both keep Obsidian's status bar off their foot. */
 	readonly view: boolean;
 	/** The keys of a note's block, over Obsidian's: its fields' own keys stand over them, so none reaches the note. */
@@ -103,6 +108,17 @@ export class CalendarScreen extends Component {
 	private missedTick = false;
 	private headers: ColumnHeaders | null = null;
 	private switcher: ColumnSwitch | null = null;
+	/** The Projects screen, left of Inbox: in the plugin's own view, once the core gives its data. */
+	private projects: ProjectsScreen | null = null;
+	/** The tree of the Projects screen as a place for a card or the plus, and its tasks as a place for the plus. */
+	private readonly treeDrop = new TreeDrop({
+		tree: () => this.projects?.treeShown ?? null,
+		hoverMs: () => this.settings.longPressMs,
+		unfold: (node) => void this.act(() => this.deps.tasks.unfoldProjectNode(node)).then(() => this.projects?.refreshTree()),
+	});
+	private readonly tasksDrop = new TasksDrop(() => this.projects?.tasksShown ?? null);
+	/** The project each Projects card is shown under (`ProjectsCard.from`), by its task's id: what a drop on the tree replaces. */
+	private readonly projectsFrom = new Map<string, string | null>();
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
 	private soonEl: HTMLElement | null = null;
@@ -178,7 +194,7 @@ export class CalendarScreen extends Component {
 		super();
 		this.seen = this.settings;
 		this.selectedDate = this.today();
-		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, project: () => this.where.project?.(), onUpdate: (part) => this.parts.request(part) });
+		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, onUpdate: (part) => this.parts.request(part) });
 		this.groupDrag = new GroupDrag({
 			longPressMs: () => this.settings.longPressMs,
 			arbiter: this.arbiter,
@@ -209,9 +225,7 @@ export class CalendarScreen extends Component {
 			toSection: (keys, name) => this.act(() => this.deps.tasks.toSection(keys, name)),
 			setProject: (keys, project) => this.act(() => this.deps.tasks.setProject(keys, project)),
 			newProject: (keys, name) => this.act(async () => (await this.deps.tasks.newProject(name, keys)) !== null),
-			resultPage: (keys, query) => this.deps.tasks.resultPage(keys, query),
-			addToResult: (keys, result) => this.act(() => this.deps.tasks.addToResult(keys, result)),
-			newResult: (keys, name) => this.act(async () => (await this.deps.tasks.newResult(keys, name)) !== null),
+			toggleProject: (items, name) => this.toggleProject(items, name),
 			desktop: () => !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
 			isMod: (e) => (Platform.isMacOS ? e.metaKey : e.ctrlKey),
 		});
@@ -274,8 +288,6 @@ export class CalendarScreen extends Component {
 			inboxName: () => this.deps.tasks.listName("inbox"),
 			soonName: () => this.deps.tasks.listName("soon"),
 			doneName: () => this.deps.tasks.listName("done"),
-			soonMenu: () => this.data.grouping("soon").canGroup,
-			onSoonTitle: (title) => this.showColumnMenu(title, "soon"),
 		});
 		this.leftEl = el(root, "div", "tc-left");
 		this.list = new TaskList(el(this.leftEl, "div"), {
@@ -283,8 +295,7 @@ export class CalendarScreen extends Component {
 			day: () => this.selectedDate,
 			grouped: () => this.sectionsOf("day") !== null,
 			sections: () => this.listSectionsOf("day"),
-			onPlate: (plate, group, signal, project) => this.attachPlate(plate, "day", group, signal, project),
-			grouping: () => this.data.grouping("now"),
+			onPlate: (plate, group, signal) => this.attachPlate(plate, "day", group, signal),
 			pending: () => this.namingIn("day"),
 			entry: (drawing) => this.quick?.entryIn("day", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -308,8 +319,7 @@ export class CalendarScreen extends Component {
 			day: () => null,
 			grouped: () => this.sectionsOf("inbox") !== null,
 			sections: () => this.listSectionsOf("inbox"),
-			onPlate: (plate, group, signal, project) => this.attachPlate(plate, "inbox", group, signal, project),
-			grouping: () => this.data.grouping("inbox"),
+			onPlate: (plate, group, signal) => this.attachPlate(plate, "inbox", group, signal),
 			pending: () => this.namingIn("inbox"),
 			entry: (drawing) => this.quick?.entryIn("inbox", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -319,18 +329,12 @@ export class CalendarScreen extends Component {
 		});
 		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", (origins) => acceptsDrop("inbox", origins), () => this.sectionsOf("inbox"), true, () => this.haptics.tap(), this.columnTitle("inbox"));
 		this.backlogTitle = el(el(backlogPane, "div", "tc-pane-head"), "div", "tc-head-title");
-		const backlogTitle = this.backlogTitle;
-		backlogTitle.addEventListener("click", () => {
-			if (this.data.grouping("backlog").canGroup) this.showColumnMenu(backlogTitle, "backlog");
-		});
 		this.backlogList = new TaskList(el(backlogPane, "div"), {
 			items: () => this.unnamed(this.data.backlog),
 			day: () => null,
 			grouped: () => this.sectionsOf("backlog") !== null,
 			sections: () => this.listSectionsOf("backlog"),
-			onPlate: (plate, group, signal, project) => this.attachPlate(plate, "backlog", group, signal, project),
-			grouping: () => this.data.grouping("backlog"),
-			onProjectHead: (head, group, signal) => this.attachProjectHead(head, "backlog", group, signal),
+			onPlate: (plate, group, signal) => this.attachPlate(plate, "backlog", group, signal),
 			pending: () => this.namingIn("backlog"),
 			entry: (drawing) => this.quick?.entryIn("backlog", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -345,9 +349,7 @@ export class CalendarScreen extends Component {
 			day: () => null,
 			grouped: () => this.sectionsOf("soon") !== null,
 			sections: () => this.listSectionsOf("soon"),
-			onPlate: (plate, group, signal, project) => this.attachPlate(plate, "soon", group, signal, project),
-			grouping: () => this.data.grouping("soon"),
-			onProjectHead: (head, group, signal) => this.attachProjectHead(head, "soon", group, signal),
+			onPlate: (plate, group, signal) => this.attachPlate(plate, "soon", group, signal),
 			pending: () => this.namingIn("soon"),
 			entry: (drawing) => this.quick?.entryIn("soon", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -356,6 +358,26 @@ export class CalendarScreen extends Component {
 			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "soon", subtree, signal),
 		});
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (origins) => acceptsDrop("soon", origins), () => this.sectionsOf("soon"), true, () => this.haptics.tap(), this.columnTitle("soon"));
+		/** A project of the tree held and carried to another place in it. */
+		const treeLift = new TreeLift({
+			arbiter: this.arbiter,
+			haptics: this.haptics,
+			longPressMs: () => this.settings.longPressMs,
+			tree: () => this.projects?.treeShown ?? null,
+			onMove: (name, place) => void this.act(() => this.deps.tasks.moveProject(name, place)).then(() => this.projects?.refresh()),
+		});
+		if (this.where.view)
+			this.projects = new ProjectsScreen(root, {
+				source: this.deps.tasks,
+				arbiter: this.arbiter,
+				treeWidth: () => this.settings.treeWidth,
+				setTreeWidth: (width) => void this.deps.settings.set({ treeWidth: width }),
+				onSnap: () => this.haptics.tap(),
+				onMenu: (title, view) => this.showProjectMenu(title, view),
+				onCard: (card, model, signal) => this.attachProjectsCard(card, model, signal),
+				onRow: (row, model, signal) => treeLift.attach(row, model, signal),
+				onError: (error) => this.reportFailure(error),
+			});
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
@@ -433,6 +455,7 @@ export class CalendarScreen extends Component {
 			sectioned: (column) => this.sectionsOf(column) !== null,
 			timeline: () => this.timeline,
 			task: (key) => this.deps.tasks.findIn(this.data.day?.slotted ?? [], key),
+			aside: () => this.projectsPlus(),
 			dropTargets: () => {
 				const shown = this.shownDrops();
 				return { lists: shown.filter((drop) => drop instanceof ListDrop), timeline: shown.find((drop) => drop instanceof TimelineDrop) ?? null };
@@ -448,7 +471,6 @@ export class CalendarScreen extends Component {
 				return this.data.tasks();
 			},
 			fresh: (beforeShow) => this.data.tasks(beforeShow),
-			project: () => this.where.project?.(),
 			render: () => this.parts.request("tasks"),
 			onError: (error) => this.reportFailure(error),
 		});
@@ -627,7 +649,7 @@ export class CalendarScreen extends Component {
 		this.landed();
 		const root = this.contentEl;
 		const from = { mode: this.place(), date: this.selectedDate };
-		const to = this.deps.days.stepScreen(from, shift);
+		const to = this.deps.days.stepWheel(from, shift);
 		if (!to) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		if (to.mode !== from.mode) {
 			window.clearTimeout(this.switching);
@@ -773,8 +795,9 @@ export class CalendarScreen extends Component {
 
 	private showPlace(place: Place): void {
 		this.contentEl.classList.toggle("is-lists", place === "soon");
-		this.contentEl.classList.toggle("is-inbox", place === "inbox" || place === "done");
+		this.contentEl.classList.toggle("is-inbox", place === "inbox" || place === "done" || place === "projects");
 		this.contentEl.classList.toggle("is-done", place === "done");
+		this.contentEl.classList.toggle("is-projects", place === "projects");
 	}
 
 	/** A Done card has no drag: a tap, a right click open its menu, as anywhere. */
@@ -814,7 +837,7 @@ export class CalendarScreen extends Component {
 				root: this.contentEl,
 				tasks: this.deps.tasks,
 				desktop: !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
-				project: this.where.project?.(),
+				paths: this.mode() === "projects",
 				...(sheet && { sheet }),
 				sectionName: (section) => this.deps.tasks.listName(section),
 				onPick: (hit) => {
@@ -947,11 +970,12 @@ export class CalendarScreen extends Component {
 	}
 
 	/** The two columns the window shows, as places to drop. */
-	private shownDrops(): (ListDrop | TimelineDrop)[] {
-		const shown: Record<RightMode, (ListDrop | TimelineDrop | null)[]> = {
+	private shownDrops(): (ListDrop | TimelineDrop | TreeDrop)[] {
+		const shown: Record<RightMode, (ListDrop | TimelineDrop | TreeDrop | null)[]> = {
 			calendar: [this.timelineDrop, this.leftDrop],
 			soon: [this.soonDrop, this.leftDrop],
 			inbox: [this.inboxDrop, this.backlogDrop, this.soonDrop],
+			projects: [this.treeDrop],
 		};
 		return shown[this.mode()].filter((target) => target !== null);
 	}
@@ -964,22 +988,76 @@ export class CalendarScreen extends Component {
 		this.drag.attachCard(card, item, column, subtree, signal);
 	}
 
+	/**
+	 * A card of the Projects screen: a tap opens its menu (its list's, `ProjectsCard.menuFrom`), its counter folds it, and a
+	 * task of the funnel is carried onto the tree (`canDrop`).
+	 */
+	private attachProjectsCard(card: HTMLElement, model: ProjectsCard, signal: AbortSignal): void {
+		const item = model.item;
+		card.dataset.menuFrom = model.menuFrom;
+		this.projectsFrom.set(item.id, model.from);
+		this.found.attach(card, item);
+		const from = LIST_COLUMNS.find((column) => column === model.menuFrom) ?? null;
+		if (model.canDrop && from) return this.drag.attachCard(card, item, from, [], signal);
+		card.addEventListener("click", (e) => {
+			if (!this.fold(item, e.target)) this.showMenu(cardMenuTask(item, e.target), card, undefined, undefined, undefined, undefined, item);
+		}, { signal });
+	}
+
+	/** A card let go on a row of the tree: the project it was shown under gives way to the row's; its place in the funnel stays. */
+	private async dropOnTree(drag: TaskDragPayload, node: string): Promise<null> {
+		this.bulk.dropping(drag);
+		const keys = droppedTasks(drag).map((task) => task.key);
+		await this.act(() => this.deps.tasks.dropOnProject(keys, this.projectsFrom.get(drag.item.id) ?? null, node));
+		await this.projects?.refresh();
+		return null;
+	}
+
+	/** The plus at the Projects screen: carried onto the tree or the tasks; tapped, a new task at the end of the chosen node's tasks. */
+	private projectsPlus(): PlusAside | null {
+		const projects = this.projects;
+		if (!projects || this.mode() !== "projects") return null;
+		return {
+			targets: [this.treeDrop, this.tasksDrop],
+			tap: () => {
+				const end = projects.tasksShown;
+				if (end.endTask) void this.newProjectsTask(end.endTask, end.parts[end.parts.length - 1]?.last ?? null);
+			},
+			dropped: (result) => {
+				if (result.kind === "projectGap") void this.newProject(result.gap, result.landing);
+				if (result.kind === "projectTasks") void this.newProjectsTask(result.newTask, result.after);
+			},
+		};
+	}
+
+	/** The plus let go at a gap of the tree: the name asked there, then the project made at that place and chosen. */
+	private async newProject(gap: number, landing: ProjectsLanding): Promise<void> {
+		const projects = this.projects;
+		if (!projects || !this.arbiter.claim(NAMING)) return;
+		const name = await projects.askProjectName(gap, landing.depth);
+		this.arbiter.release(NAMING);
+		if (name !== null) await this.act(async () => void (await this.deps.tasks.createProject(name, landing.place)));
+		await projects.refresh();
+	}
+
+	/** The plus let go on the tasks: the text asked there, then the task written where the part says, with its project. */
+	private async newProjectsTask(newTask: ProjectsNewTask, after: HTMLElement | null): Promise<void> {
+		const projects = this.projects;
+		if (!projects || !this.arbiter.claim(NAMING)) return;
+		const text = await projects.askTaskText(after);
+		this.arbiter.release(NAMING);
+		if (text !== null) await this.act(async () => void (await this.deps.tasks.createInPlace(text, null, newTask.place, null, [], newTask.project)));
+		await projects.refresh();
+	}
+
 	/** A drop: the service says what it means for the file (spec §5.1), for the card under the finger and those carried along. */
 	/** The drop written and drawn: the card the dragged task stands on now, hidden until the float lands on it. */
 	private async applyDrop(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | HeldOut | null> {
+		if (isProjectsDrop(result)) return result.kind === "projectRow" ? this.dropOnTree(drag, result.node) : null;
 		this.bulk.dropping(drag);
 		this.arriving.dropping(drag.item);
 		await this.act(async () => void (await this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate)));
-		return this.arriving.shown ?? this.foldedAway(drag.item.id);
-	}
-
-	/** The header of the folded project group a task went into, in whichever list shows it. */
-	private foldedAway(id: string): HeldOut | null {
-		for (const list of [this.soonList, this.backlogList, this.inboxList, this.list]) {
-			const behind = list?.foldedHeadOf(id);
-			if (behind && behind.getClientRects().length > 0) return { behind };
-		}
-		return null;
+		return this.arriving.shown;
 	}
 
 	/** The card waits at the end of its column under a field for the section's name; Enter makes the section, anything else puts it back. */
@@ -1009,16 +1087,15 @@ export class CalendarScreen extends Component {
 		const menu = group.menu;
 		if (!menu || !(menu.rename || menu.remove)) return;
 		const name = menu.section;
-		const project = menu.project;
 		GroupMenu.open(head, {
 			name,
-			onRename: menu.rename ? () => this.renameInPlace(head, list, name, project) : undefined,
-			onRemove: menu.remove ? () => void this.act(() => this.deps.tasks.removeGroup(list, name, project)) : undefined,
+			onRename: menu.rename ? () => this.renameInPlace(head, list, name) : undefined,
+			onRemove: menu.remove ? () => void this.act(() => this.deps.tasks.removeGroup(list, name)) : undefined,
 		});
 	}
 
 	/** The name is edited where the header stands, the caret at its end. */
-	private renameInPlace(head: HTMLElement, list: GroupedList, name: string, project?: ProjectZone): void {
+	private renameInPlace(head: HTMLElement, list: GroupedList, name: string): void {
 		if (!this.arbiter.claim(NAMING)) return;
 		const slot = el(null, "div", "tc-group-slot is-rename");
 		head.before(slot);
@@ -1031,7 +1108,7 @@ export class CalendarScreen extends Component {
 				this.arbiter.release(NAMING);
 				if (to === null) return this.render();
 				void this.act(async () => {
-					if (!(await this.deps.tasks.renameGroup(list, name, to, project))) this.render();
+					if (!(await this.deps.tasks.renameGroup(list, name, to))) this.render();
 				});
 			},
 		});
@@ -1043,46 +1120,54 @@ export class CalendarScreen extends Component {
 		return sections ? this.data.sections[sections.list] : [];
 	}
 
-	/** A tap on an empty section's No tasks plate (of a project's part in a grouped list): the field of a new task there. */
-	private attachPlate(plate: HTMLElement, column: ListColumn, group: ListGroup, signal: AbortSignal, project?: ProjectZone): void {
-		plate.addEventListener("click", () => this.quick?.openIn(column, group.name, project), { signal });
+	/** A tap on an empty section's No tasks plate: the field of a new task there. */
+	private attachPlate(plate: HTMLElement, column: ListColumn, group: ListGroup, signal: AbortSignal): void {
+		plate.addEventListener("click", () => this.quick?.openIn(column, group.name), { signal });
 	}
 
-	/** A project group's header: a tap folds or unfolds it, the arrow opens the project's note. */
-	private attachProjectHead(head: HTMLElement, list: GroupedList, group: ProjectGroup, signal: AbortSignal): void {
-		head.addEventListener("click", (e) => {
-			if (this.arbiter.busy) return;
-			const note = group.project?.note;
-			if (e.target instanceof Element && e.target.closest(".tc-group-open") && note) {
-				this.openNote(note);
-				return;
-			}
-			this.haptics.tap();
-			void this.act(() => this.deps.tasks.toggleFold(list, group.key));
-		}, { signal });
+	/** A tap on a card's folder mark opens the Projects screen on the task's project, in place of its menu; true when it did. */
+	private openProjectOf(item: TaskItem, target: EventTarget | null): boolean {
+		const project = item.project;
+		if (!onProjectMark(target) || !project) return false;
+		void this.showProjectNode(projectNodeOf(project.name));
+		return true;
 	}
 
-	/** The menu of Backlog's or Soon's title: Group by project, kept on the device. */
-	private showColumnMenu(title: HTMLElement, list: GroupedList): void {
-		if (this.arbiter.busy) return;
-		ColumnMenu.open(title, {
-			title: title.textContent ?? "",
-			grouped: this.data.grouping(list).on,
-			onGroup: (on) => void this.act(() => this.deps.tasks.setGrouping(list, on)),
+	/** The chosen project's menu, its title tapped (spec decision 1): Rename in place, and its note attached, opened or detached. */
+	private showProjectMenu(title: HTMLElement, view: ProjectsView): void {
+		const menu = view.menu;
+		const projects = this.projects;
+		if (!menu || !projects || this.arbiter.busy) return;
+		const name = menu.project.name;
+		const tasks = this.deps.tasks;
+		const changed = (write: () => Promise<unknown>) => void this.act(async () => void (await write())).then(() => projects.refresh());
+		ProjectMenu.open(title, {
+			title: view.title,
+			renameLabel: menu.renameLabel,
+			note: menu.note?.name ?? null,
+			attachLabel: menu.attachLabel,
+			detachLabel: menu.detachLabel,
+			onRename: () => {
+				if (!this.arbiter.claim(NAMING)) return;
+				projects.editTitle((to) => {
+					this.arbiter.release(NAMING);
+					if (to === null) return void projects.refresh();
+					changed(() => tasks.renameProject(name, to));
+				});
+			},
+			onAttach: () => new NoteSearch(this.app, this.settings.tasksFile, (link) => changed(() => tasks.setProjectNote(name, link))).open(),
+			onOpenNote: () => {
+				if (menu.note) void this.app.workspace.openLinkText(menu.note.link, this.settings.tasksFile, "tab");
+			},
+			onDetach: () => changed(() => tasks.setProjectNote(name, null)),
 		});
 	}
 
-	/** A project's note opens in a new tab, as a link does: the calendar stays where it is. */
-	private openNote(path: string): void {
-		void this.app.workspace.openLinkText(path, "", "tab");
-	}
-
-	/** A tap on a card's project mark opens the project's note; true when it did, in place of the menu. */
-	private openProjectOf(item: TaskItem, target: EventTarget | null): boolean {
-		const note = item.project?.note;
-		if (!onProjectMark(target) || !note) return false;
-		this.openNote(note);
-		return true;
+	/** The Projects screen on `node`: chosen, its branches above unfolded, and the window turned there. */
+	private async showProjectNode(node: string): Promise<void> {
+		await this.act(() => this.deps.tasks.selectProjectNode(node));
+		this.switcher?.show("projects");
+		await this.projects?.refresh();
 	}
 
 	/** Whose sections a column shows on the selected day (`TaskService.columnSections`). */
@@ -1099,6 +1184,8 @@ export class CalendarScreen extends Component {
 	/** Where a card pressed for its menu stands: a timeline card's stack, the whole screen, the timeline, a list column, else Done. */
 	private menuFrom(source: HTMLElement, full: FullScreen | undefined): MenuFrom {
 		if (source.closest(".tc-menu-subtasks")) return "stack";
+		const projectsFrom = source.closest(".tc-projects") ? source.dataset.menuFrom : undefined;
+		if (projectsFrom) return projectsFrom as MenuFrom;
 		if (full) return "full";
 		if (source.classList.contains("tc-block")) return "timeline";
 		return this.columnOf(source) ?? "done";
@@ -1106,7 +1193,7 @@ export class CalendarScreen extends Component {
 
 	/** The screen a menu opens over (`TaskService.menu`). */
 	private menuScreen(): MenuScreen {
-		return { today: this.today(), day: this.selectedDate, offer: this.data.offer };
+		return { today: this.today(), day: this.selectedDate, offer: this.data.offer, projects: this.data.projectTree };
 	}
 
 	private listOf(column: ListColumn): TaskList | null {
@@ -1155,7 +1242,10 @@ export class CalendarScreen extends Component {
 					if (this.full) this.showMenu(task, source, source.classList.contains("tc-card") ? (copy) => FullScreen.mark(copy, task) : undefined, this.full);
 				},
 				onClose: () => (this.full = null),
-				openNote: (path) => this.openNote(path),
+				openProject: (name) => {
+					this.full?.close();
+					void this.showProjectNode(projectNodeOf(name));
+				},
 				onError: (error) => this.reportFailure(error),
 			},
 			item,
@@ -1197,10 +1287,11 @@ export class CalendarScreen extends Component {
 				},
 				setProject: (project) => this.act(() => tasks.setProject([current.key], project)),
 				newProject: (name) => this.act(async () => (await tasks.newProject(name, [current.key])) !== null),
-				setResult: (result) => this.act(() => tasks.setResult(current.key, result)),
-				resultPage: (query) => tasks.resultPage([current.key], query),
-				addToResult: (result) => this.act(() => tasks.addToResult([current.key], result)),
-				newResult: (name) => this.act(async () => (await tasks.newResult([current.key], name)) !== null),
+				toggleProject: async (name) => {
+					const [written] = await this.toggleProject([current], name);
+					if (written) current = written;
+					return written ?? null;
+				},
 				togglePriority: (prefix) => this.act(() => tasks.togglePriority([current.key], prefix)),
 				toggleLabel: async (name) => {
 					const written: { item: TaskItem | null } = { item: null };
@@ -1221,6 +1312,15 @@ export class CalendarScreen extends Component {
 				openLink: (link) => this.openLink(link),
 			},
 		});
+	}
+
+	/** A project of the Project page toggled on `items`: each task as it then stands, null for one gone. */
+	private async toggleProject(items: readonly TaskItem[], name: string): Promise<readonly (TaskItem | null)[]> {
+		let written: readonly (TaskItem | null)[] = items.map(() => null);
+		await this.act(async () => {
+			written = await this.deps.tasks.toggleProject(items.map((item) => item.key), name);
+		});
+		return written;
 	}
 
 	/** The tasks file opens in a new tab, as a link does, the cursor at the start of the task's line and the line in the middle. */
@@ -1281,10 +1381,10 @@ export class CalendarScreen extends Component {
 			this.soonList.render(moving);
 			this.inboxList.render(moving);
 			this.backlogTitle.textContent = this.deps.tasks.listName("backlog");
-			this.backlogTitle.classList.toggle("has-menu", this.data.grouping("backlog").canGroup);
 			this.headers.render();
 			this.backlogList.render(moving);
 			this.doneList.render(moving);
+			void this.projects?.refresh().catch((error: unknown) => this.reportFailure(error));
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
 		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.allDay, this.theme(), (event) => this.deps.calendars.isPast(event));

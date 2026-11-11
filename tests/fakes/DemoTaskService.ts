@@ -1,4 +1,4 @@
-import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ResultPage } from "../../core/application/contracts";
+import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ResultPage } from "../../core/application/contracts";
 import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
 import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
@@ -9,6 +9,8 @@ import { NO_SECTION_ID } from "../../core/application/sections";
 import { fullTree } from "../../core/application/fullTree";
 import { droppedSpan, TimelineSpans } from "../../core/application/TimelineSpans";
 import { DayBoundary } from "../../core/domain/DayBoundary";
+import { ProjectTree } from "../../core/domain/ProjectTree";
+import { projectsView } from "../../core/application/projectsScreen";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../../core/domain/Days";
 import { typedMarks } from "../../core/domain/Marks";
 import { draftMarksOf, markColors } from "../../core/application/marks";
@@ -174,6 +176,7 @@ export class DemoTaskService implements TaskService {
 			description: t.description ?? null,
 			group: null,
 			project: null,
+			projects: [],
 			list: section,
 			isSubtask: false,
 			day: dayOfTask(section, t, this.today()),
@@ -211,7 +214,7 @@ export class DemoTaskService implements TaskService {
 		await this.normalize();
 		const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([this.dayView(date), this.soonWithoutDateView(), this.inboxView(), this.backlogView(), this.doneView(), this.listSections(), this.sectionOffer()]);
 		const off = { canGroup: false, on: false, groups: [] };
-		return { day, soon, inbox, backlog, done, sections, offer, missing: false, calendars: true, projects: { inbox: off, backlog: off, soon: off, now: off }, project: null, titleDrops: { day: { kind: "list", column: "day", before: null }, soon: { kind: "title", list: "soon", date: null, byProject: false }, inbox: { kind: "title", list: "inbox", date: null, byProject: false }, backlog: { kind: "title", list: "backlog", date: null, byProject: false } } };
+		return { day, soon, inbox, backlog, done, sections, offer, missing: false, calendars: true, projects: { inbox: off, backlog: off, soon: off, now: off }, project: null, projectTree: [], titleDrops: { day: { kind: "list", column: "day", before: null }, soon: { kind: "title", list: "soon", date: null, byProject: false }, inbox: { kind: "title", list: "inbox", date: null, byProject: false }, backlog: { kind: "title", list: "backlog", date: null, byProject: false } } };
 	}
 
 	async dayView(date: LocalDate): Promise<DayView> {
@@ -253,7 +256,7 @@ export class DemoTaskService implements TaskService {
 		return sections.flatMap((list) => {
 			const hits = this.items(list).flatMap((item) => {
 				const found = fuzzy.match(item.text);
-				return found ? [{ item, title: matchParts(item.text, found.found), project: null, description: null }] : [];
+				return found ? [{ item, title: matchParts(item.text, found.found), project: null, projectPath: null, description: null }] : [];
 			});
 			return hits.length > 0 ? [{ list, hits }] : [];
 		});
@@ -439,6 +442,40 @@ export class DemoTaskService implements TaskService {
 	async setGrouping(): Promise<void> {}
 
 	async toggleFold(): Promise<void> {}
+
+	async toggleProject(): Promise<readonly null[]> {
+		return [];
+	}
+
+	projects(): readonly [] {
+		return [];
+	}
+
+	async unfoldProjectNode(): Promise<void> {}
+
+	async projectsScreen(): Promise<ProjectsView> {
+		return projectsView({ doc: null, tree: ProjectTree.EMPTY, today: this.today(), boundary: DayBoundary.MIDNIGHT, state: {}, item: () => { throw new Error("The board has no projects"); }, listName: (list) => list });
+	}
+
+	async tapProjectNode(): Promise<void> {}
+
+	async selectProjectNode(): Promise<void> {}
+
+	async setProjectsMode(): Promise<void> {}
+
+	async createProject(): Promise<null> {
+		return null;
+	}
+
+	async moveProject(): Promise<void> {}
+
+	async renameProject(): Promise<boolean> {
+		return false;
+	}
+
+	async setProjectNote(): Promise<void> {}
+
+	async dropOnProject(): Promise<void> {}
 
 	snap(minute: number, hourPx: number, tolerancePx: number): number {
 		return snapMinute(minute, hourPx, tolerancePx);
