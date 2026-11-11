@@ -139,6 +139,25 @@ export class TaskWrites {
 		return nothing(this.rules.setProject(keys, project));
 	}
 
+	setResult(key: TaskKey, result: boolean): Write<void> {
+		return nothing(this.rules.setResult(key, result));
+	}
+
+	addToResult(keys: readonly TaskKey[], result: TaskKey): Write<void> {
+		return nothing(this.rules.addToResult(keys, result));
+	}
+
+	/** The new result's key and id, as the file stands after the write. */
+	newResult(keys: readonly TaskKey[], name: string): Write<CreatedTask | null> {
+		return {
+			operation: this.rules.newResult(keys, name),
+			answer: (change) => {
+				const created = change?.after.insertedSince(change.before);
+				return created ? { key: keyOf(created), id: created.id } : null;
+			},
+		};
+	}
+
 	setReminder(key: TaskKey, reminder: ReminderKind): Write<void> {
 		return nothing(this.rules.setReminder(key, reminder));
 	}

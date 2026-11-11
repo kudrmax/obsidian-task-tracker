@@ -4,7 +4,7 @@ import { isBlankTitle } from "../domain/Priority";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
 import { type Column, columnGroups, columnList } from "../domain/queries";
-import type { LocalDate, ReminderKind, Slot, TaskStatus } from "../domain/Task";
+import { isOpen, type LocalDate, type ReminderKind, type Slot, type TaskStatus } from "../domain/Task";
 import { type LineIds, TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { EntryTags } from "../domain/EntryTags";
 import { taskTitle } from "../domain/TaskTitle";
@@ -24,7 +24,8 @@ import {
 	type TaskKey,
 	type TaskStep,
 } from "./contracts";
-import { boundaryOf, parseText, readDocument, readingKey, sectionNames } from "./documentText";
+import { boundaryOf, markersOf, parseText, readDocument, readingKey, sectionNames } from "./documentText";
+import { withoutResultMark } from "../domain/Result";
 import type { Clock, SettingsStore } from "./ports";
 import type { TaskIdentity } from "./TaskIdentity";
 import { isUnder, keyOf, sameLine, samePlace } from "./taskKeys";
@@ -125,9 +126,9 @@ export class TaskRules {
 		return usableLevels(this.settings.get().priorities);
 	}
 
-	/** A title of nothing but a priority is blank too. */
+	/** A title of nothing but a priority, or the result mark, is blank too. */
 	isBlank(text: string): boolean {
-		return isBlankTitle(text, this.priorityLevels().map((l) => l.prefix));
+		return isBlankTitle(withoutResultMark(text, markersOf(this.settings.get()).result ?? null), this.priorityLevels().map((l) => l.prefix));
 	}
 
 	read(text: string, at: Moment = this.moment()): Reading {
@@ -339,6 +340,27 @@ export class TaskRules {
 		if (keys.length === 0) return null;
 		if (keys.length === 1) return (doc) => ops.setProject(doc, this.entryOf(doc, keys[0]), project);
 		return this.applyAll(keys.map((key) => ({ key, change: { kind: "project", project } })));
+	}
+
+	/** Make result, or Make task. */
+	setResult(key: TaskKey, result: boolean): Operation {
+		return (doc) => ops.setResult(doc, this.entryOf(doc, key), result);
+	}
+
+	/** The tasks become the last steps of `result`; null for none. A result no longer open, or no longer a result, is stale. */
+	addToResult(keys: readonly TaskKey[], result: TaskKey): Operation | null {
+		if (keys.length === 0) return null;
+		return (doc) => {
+			const target = this.entryOf(doc, result);
+			if (!target.task.result || !isOpen(target.task.status)) throw new StaleTaskError();
+			return ops.addToResult(doc, keys.map((key) => this.entryOf(doc, key)), target);
+		};
+	}
+
+	/** A new result named as typed, at the first task's place, the tasks its steps; null for none or a blank name. */
+	newResult(keys: readonly TaskKey[], name: string): Operation | null {
+		if (keys.length === 0 || this.isBlank(name)) return null;
+		return (doc) => ops.newResult(doc, keys.map((key) => this.entryOf(doc, key)), name);
 	}
 
 	setReminder(key: TaskKey, reminder: ReminderKind): Operation {

@@ -149,6 +149,7 @@ function sameTask(a: Task, b: Task): boolean {
 		a.statusChar === b.statusChar &&
 		a.text === b.text &&
 		a.dueDate === b.dueDate &&
+		a.result === b.result &&
 		a.priority === b.priority &&
 		a.labels.length === b.labels.length &&
 		a.labels.every((label, i) => label === b.labels[i]) &&
@@ -257,6 +258,11 @@ export class TaskDocument {
 	/** The prefixes of the priority levels the file is read with. */
 	priorityPrefixes(): readonly string[] {
 		return this.markers.priorities ?? [];
+	}
+
+	/** The result mark the file is read with; null: no task is a result. */
+	resultMark(): string | null {
+		return this.markers.result ?? null;
 	}
 
 	serialize(): string {

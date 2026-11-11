@@ -34,6 +34,11 @@ function foldedChar(char: string): string {
 	return lower.length === 1 ? lower : char;
 }
 
+/** A text as a search compares it: case and accents aside. */
+export function foldedText(text: string): string {
+	return folded(text);
+}
+
 function folded(text: string): string {
 	let out = "";
 	for (let i = 0; i < text.length; i++) out += foldedChar(text.charAt(i));

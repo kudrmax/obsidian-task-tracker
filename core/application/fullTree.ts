@@ -1,8 +1,9 @@
 import type { FullRow, FullTree, TaskItem } from "./contracts";
+import { ownCard } from "./taskItems";
 
 /** Each subtask with all its own as its subtasks, none folded away: the full screen's list draws every one. */
 function unfolded(items: readonly TaskItem[]): TaskItem[] {
-	return items.map((item) => ({ ...item, collapsed: false, subtasks: unfolded(item.allSubtasks) }));
+	return items.map((item) => ({ ...item, collapsed: false, card: ownCard(item), subtasks: unfolded(item.allSubtasks) }));
 }
 
 /** The subtasks in the order the list draws them, each at its depth, a new subtask of each after it and all its own. */

@@ -25,6 +25,7 @@ import {
 	type ListSection,
 	type ProjectRef,
 	type ProjectZone,
+	type ResultPage,
 	type NewTaskPlace,
 	type Placement,
 	type RepeatRule,
@@ -124,6 +125,22 @@ export class TaskServiceImpl implements TaskService {
 
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void> {
 		return this.run(this.writes.setProject(keys, project));
+	}
+
+	setResult(key: TaskKey, result: boolean): Promise<void> {
+		return this.run(this.writes.setResult(key, result));
+	}
+
+	resultPage(keys: readonly TaskKey[], query: string): Promise<ResultPage> {
+		return this.ask(this.reads.resultPageRead(keys, query));
+	}
+
+	addToResult(keys: readonly TaskKey[], result: TaskKey): Promise<void> {
+		return this.run(this.writes.addToResult(keys, result));
+	}
+
+	newResult(keys: readonly TaskKey[], name: string): Promise<CreatedTask | null> {
+		return this.run(this.writes.newResult(keys, name));
 	}
 
 	projectNotes(): readonly ProjectRef[] {

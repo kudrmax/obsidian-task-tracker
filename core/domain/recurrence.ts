@@ -20,6 +20,7 @@ export function recurClosed(doc: TaskDocument, today: LocalDate, boundary: DayBo
 		if (!entry) return doc;
 		const { task } = entry;
 		const copy = newTask(task.text, {
+			result: task.result,
 			priority: task.priority,
 			labels: task.labels,
 			project: entry.project,

@@ -210,6 +210,45 @@ parent's. Every write keeps it, and no title (`TaskItem.title`, `text`, a remind
   (`entry.setProject`) or the sheet. A null answer (an empty name) writes nothing. In the plugin `TaskService.newProject`
   does all of it.
 
+#### Results
+
+A result is a task whose line starts with the result mark (`settings.resultMark`, `🎯` by default), before a priority's
+prefix: `- [ ] 🎯 p1 Компания в Белграде 📁 🗂️ [[Окружение в Сербии]]`. The mark is in no title (`text`, `title`,
+a search hit, a reminder, a rename's field); typing it first in a title makes a result. Everything a task does, a result
+does.
+
+- `TaskItem.isResult`; `TaskItem.resultOf`: `ResultRef` `{ id, key, title }`, the nearest result the task is a step
+  of, or `null`; `item.can.result`: an open task or subtask, which the result rows are offered for.
+- `TaskItem.card`: `TaskCard` `{ text, title, over, step, semibold }`, what a list's card draws. A folded result with an
+  open step: `text` is the step's (its first open subtask, then that one's first open one, down), `over` the result's own
+  title (the small line with the target symbol), `step` the step's `TaskItem`. A tap on `over` opens the result's menu
+  (`tasks.menu(item, …)`), a tap anywhere else on the card (the counter aside) the step's (`tasks.menu(card.step, …)`):
+  Done there closes the step, and the next read shows the next. Any other card: its own title, `over` and `step` null;
+  `semibold` for a result (unfolded, or with no open step). Pick and drag take the item itself. Example: the line above
+  folded over `\t- [ ] Write to Marko` → `card` `{ text: "Write to Marko", over: "Компания в Белграде", step: {…}, semibold: false }`.
+- `TaskItem.block`: `TaskBlock` `{ text, title, step }`, what the timeline's block draws: a result's next step, folded or
+  not, whose menu a tap opens (the result's open subtasks in the stack above it, as for any task); else its own title.
+- A menu's `result`: `MenuResult` `{ rows, label, value, current, toggle }`. `rows` are drawn in the edit group right
+  after Project, in order: `["addToResult", "toggle"]` for one open task, `["addToResult"]` in the bulk menu of open
+  tasks, `[]` for a closed one. `label` is «Add to result», `value` what it shows on the right (the result the tasks are
+  steps of, else `""`), `toggle` `{ label: "Make result" | "Make task", result }`, a tap writing
+  `tasks.setResult(key, toggle.result)`.
+- `tasks.setResult(key, result)`: Make result (the mark on; a task with an open subtask folds) or Make task (the mark
+  off, the fold as it is). `tasks.setResult(key, true)` → `- [ ] 🎯 Trip 📁`.
+- `tasks.resultPage(keys, query)`: `ResultPage` `{ options, placeholder, newLabel, namePlaceholder }`, the Add to
+  result page: every open result of the file in file order but the tasks and the results inside them, those whose title
+  holds `query` (case and accents aside), each `ResultOption` `{ result, list, project, checked }` (`list` drawn as its
+  column's icon, `project` its project's name or `null`, `checked` the result the tasks are in). `tasks.resultPage([key],
+  "комп")` → `{ options: [{ result: { title: "Компания", … }, list: "now", project: null, checked: false }], newLabel:
+  "New result…", … }`.
+- `tasks.addToResult(keys, resultKey)`: each task with its subtasks becomes the last step of the result, wherever it
+  stands, in file order (its project the result's); the result folds. A task already a step of it writes nothing; a key
+  that names no open result any more answers `staleTask`.
+- `tasks.newResult(keys, name)`: New result…: a result named `name` at the first task's place (right before it; among
+  the same task's subtasks for a subtask), with that task's project and due date, the tasks its steps, folded. Answers
+  the result's `CreatedTask` `{ key, id }`, `null` for a blank name (nothing written).
+- Each write is one undo step.
+
 #### Ids: who a task or a section is
 
 - `TaskItem.id` (every task and subtask, wherever it is shown: `tasks.screen`'s lists, the timeline, `tasks.search`'s
@@ -313,7 +352,8 @@ The settings screen, every read and write but one, answered by the plugin's own 
 `context.settings`: `form()` (`SettingsForm`, the fields as the screen shows them), `setTasksFile(path)`,
 `setSection(key, name)`, `setMarker(marker, text)`, `setCount(field, text)`, `setDayStartHour(hour)`,
 `renameLevel(index, prefix)`, `recolourLevel(index, color)`, `removeLevel(index)`, `addLevel()`, `moveLevel(from, to)`,
-`setLabelTag(tag)`, `setLabelPaint(paint)` (how a card of several labels is painted: one of the form's `labelPaints`,
+`setResultMark(mark)` (Result mark, beside the priorities: written trimmed when it is one word that is no level's prefix,
+else nothing; the form's `resultMark` is the one saved, `🎯` by default), `setLabelTag(tag)`, `setLabelPaint(paint)` (how a card of several labels is painted: one of the form's `labelPaints`,
 `"stripes"` or `"blend"`; anything else writes nothing), `setCardHeight(px)` and `setCardGap(px)` (Cards: written rounded
 while within the form's `cardHeights` `{ min: 28, max: 40 }` and `cardGaps` `{ min: 0, max: 10 }`, else nothing), `setZoomLevels(text)` (Zoom
 levels as typed, the hour's heights: `"40, 80"` writes `[{ hourPx: 40 }, { hourPx: 80 }]`, the old `"28:60, 56:30"` reads

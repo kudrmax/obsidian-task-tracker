@@ -1,10 +1,12 @@
 import type { GroupSettings } from "./domain/Groups";
 import type { LabelLevel } from "./domain/Label";
 import type { PriorityLevel } from "./domain/Priority";
+import { DEFAULT_RESULT_MARK } from "./domain/Result";
 
 export type { GroupSettings } from "./domain/Groups";
 export { type LabelLevel, sameLabels, usableLabels } from "./domain/Label";
 export { PRIORITY_COLORS, type PriorityColor, type PriorityLevel, sameLevels, usableLevels, usablePrefix } from "./domain/Priority";
+export { DEFAULT_RESULT_MARK, usableResultMark } from "./domain/Result";
 
 export interface SectionNames {
 	readonly inbox: string;
@@ -40,6 +42,8 @@ export interface FileFormatSettings {
 	readonly collapsedMarker: string;
 	/** Priority levels in the order the menu and the task screen offer them. */
 	readonly priorities: readonly PriorityLevel[];
+	/** The word a result's line starts with, before a priority's prefix: `🎯`. One word that is no level's prefix, else no task is a result. */
+	readonly resultMark: string;
 	/** The tag folder of the labels: a task tagged `#<labelTag>/<name>` has the label of that name. */
 	readonly labelTag: string;
 	/** Labels in the order the menu offers them and a card of several paints their colours. */
@@ -136,6 +140,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 		{ prefix: "p1", color: "red" },
 		{ prefix: "p2", color: "orange" },
 	],
+	resultMark: DEFAULT_RESULT_MARK,
 	labelTag: "label",
 	labels: [],
 	labelPaint: LABEL_PAINTS[0],
@@ -156,6 +161,7 @@ export function settingsFrom(saved: unknown): TaskCalendarSettings {
 		google: { ...DEFAULT_SETTINGS.google, ...(s.google ?? {}) },
 		groups: { ...DEFAULT_SETTINGS.groups, ...(s.groups ?? {}) },
 		labelPaint: labelPaintOf(s.labelPaint),
+		resultMark: typeof s.resultMark === "string" ? s.resultMark : DEFAULT_SETTINGS.resultMark,
 		cardHeight: sizeOf(s.cardHeight, CARD_HEIGHTS, DEFAULT_SETTINGS.cardHeight),
 		cardGap: sizeOf(s.cardGap, CARD_GAPS, DEFAULT_SETTINGS.cardGap),
 		zoomLevels: zoomLevelsOf(saved),

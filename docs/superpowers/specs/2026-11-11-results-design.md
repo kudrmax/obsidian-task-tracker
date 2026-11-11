@@ -90,3 +90,43 @@ screen, undo, multi-select). No new logic beyond the three points below.
 ## Decisions
 
 (The agents write here the gaps they decide.)
+
+### Backend
+
+1. **Reading the mark.** A result's mark is the line's first word followed by whitespace, before a priority's prefix.
+   `🎯Компания` (no space), `p1 🎯 Компания` and a line of the mark alone are not results; the mark stays their text.
+2. **Typing the mark.** The mark typed first in any title (the quick entry, Rename, the task sheet, New result…'s name)
+   makes a result and never stays in the text, as the file would read that line anyway. A rename never takes a result's
+   mark off (only Make task does). A title of the mark alone, or of the mark and a priority's prefix, is blank: nothing is
+   written (`isBlank`).
+3. **The setting.** `resultMark` in `data.json` (after `projectTag`), `🎯` when missing or not text. `setResultMark`
+   writes it trimmed only when it is one word that is no usable priority's prefix; otherwise the saved one stays. A saved
+   mark that later equals a level's prefix (the level renamed) reads no results until it is changed: one word can't mean
+   both.
+4. **Semibold.** A result drawn with its own title is semibold: unfolded, and also with no open step (point 6), so a
+   result stays recognisable whenever its card doesn't show a step. A closed result shows its own title, never a step.
+5. **When a step shows.** Only an open result shows a step. A list's card is two-line only while the result is folded;
+   the timeline's block shows the step folded or not (it has no unfolded state). The full screen draws every row with
+   its own title.
+6. **The menu rows.** They are not new `MenuEditId`s but `TaskMenuModel.result.rows`, drawn right after Project:
+   `addToResult` («Add to result»), then `toggle` («Make result» / «Make task»). Adding them to `edits` would break every
+   frontend's exhaustive map of edit rows before it draws them. The bulk menu offers Add to result alone (point 11 names
+   no Make result there), and only when every picked task is open; a closed task's menu has neither row.
+7. **The page.** Results in true file order (by line), which is Inbox, Now, Soon, Backlog in Max's file. It offers open
+   results that are subtasks too (a result is a task wherever it lies), never one in Done. The search matches the query,
+   trimmed, as a part of the plain title, case and accents aside (`ё` is `е`). The tick: the nearest result every chosen
+   task is a step of. The core gives the words: «Search results», «New result…», «Result name».
+8. **Add to result.** The moved task keeps its own due date, slot, repeat, priority and labels; its own project field is
+   dropped (a subtask's project is the result's), as a drop onto a parent does. A task under another chosen one goes
+   along with it; a task already a step of that result (its nearest), the result itself and a task holding it stay. A
+   key that names no open result any more is stale (the page was read before the file changed).
+9. **New result….** Written right before the first chosen task in file order, in its section (for a subtask, among the
+   same parent's subtasks); it takes that task's project and its due date (so it stays on the same day and list), no
+   slot, repeat or labels; a priority's prefix typed first in the name is its priority. It answers the new result's key
+   and id (`CreatedTask`).
+10. **Folding on adding.** Add to result and New result… fold the result (its next step on top). Add subtask, the plus
+    inside an unfolded result and a drop onto a result keep today's rule (a folded parent unfolds so the new subtask is
+    seen); so «the next added step shows again on top» (point 6) is Add to result's.
+11. **Repeat.** A repeating result's next copy keeps the mark.
+12. **One line outside the core.** `obsidian/settingsFile.ts`'s key order gained `resultMark`, so `data.json` stays
+    written byte for byte in its order (`tests/settingsFile.test.ts`).

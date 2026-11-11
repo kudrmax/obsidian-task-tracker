@@ -256,7 +256,18 @@ export interface TaskItem {
 		readonly resize: boolean;
 		/** Put into a project, or taken out: a task; a subtask's is its parent's (its menu shows it, disabled). */
 		readonly setProject: boolean;
+		/** Made a result or a task again, and added to a result: an open task or subtask (`TaskMenuModel.result.rows`). */
+		readonly result: boolean;
 	};
+
+	/** Its line starts with the result mark: a result, a task whose subtasks are the steps of one outcome. */
+	readonly isResult: boolean;
+	/** The result it is a step of: the nearest result above it; null for none. Add to result's row shows it and its page ticks it. */
+	readonly resultOf: ResultRef | null;
+	/** How a list's card draws it and what the card's taps open: a folded result shows its next step. */
+	readonly card: TaskCard;
+	/** How the timeline's block draws it and whose menu a tap opens: a result's next step, folded or not. */
+	readonly block: TaskBlock;
 
 	/** The open subtasks right under this one, in file order, each with its own. */
 	readonly subtasks: readonly TaskItem[];
@@ -272,6 +283,48 @@ export interface TaskItem {
 	readonly parentKey: TaskKey | null;
 	/** Its nested lines without a checkbox as Markdown, its first level unindented; null without any. */
 	readonly description: string | null;
+}
+
+/** A result as a step's row and the Add to result page name it. */
+export interface ResultRef {
+	/** The result's id (`TaskItem.id`). */
+	readonly id: string;
+	/** What `addToResult` takes. */
+	readonly key: TaskKey;
+	/** Its title, each link by its word, without the result mark. */
+	readonly title: string;
+}
+
+/**
+ * How a card of a list draws a task, every list and a day's list alike, and what its taps open. A folded result with an
+ * open step is a card of two lines: `over` (a target symbol and the result's own title, small, in the caption colour),
+ * whose tap opens the task's own menu; and the step's title, whose tap (anywhere on the card but `over` and the counter)
+ * opens `step`'s menu, where Done closes the step and the next one takes its place. The card keeps the task's own marks
+ * (its counter, project, date, repeat, description, priority and labels), its pick and its drag. Any other card is one
+ * line, the task's own title, a tap opening its own menu.
+ */
+export interface TaskCard {
+	/** The title drawn, with its links (`textParts`): the step's for a two-line card, else the task's own `text`. */
+	readonly text: string;
+	/** `text` with each link's word in its place. */
+	readonly title: string;
+	/** The small line over the title: the result's own title, plain; null for a card of one line. */
+	readonly over: string | null;
+	/** The step a tap on the card opens the menu of; null: the task's own. */
+	readonly step: TaskItem | null;
+	/** The title in semibold: a result drawn with its own title (unfolded, or with no open step). */
+	readonly semibold: boolean;
+}
+
+/**
+ * How a block of the timeline draws a task: a result's next step (folded or not; there is no room for the result's line),
+ * whose menu a tap opens, the result's open subtasks in the stack above it as for any task; else the task's own title.
+ */
+export interface TaskBlock {
+	readonly text: string;
+	readonly title: string;
+	/** The step whose menu a tap opens; null: the task's own. */
+	readonly step: TaskItem | null;
 }
 
 /** Where a new subtask stands among the rows of the full screen: the row it takes, and its depth. */
@@ -557,6 +610,8 @@ export interface MenuReminder {
 
 /** A row of the edit group. Project is in every menu, one task's and the bulk menu's, right after Section or where it would stand. */
 export type MenuEditId = "rename" | "reminder" | "description" | "repeat" | "section" | "project" | "subtask";
+/** A result row of a menu's edit group: Add to result, and Make result or Make task. */
+export type MenuResultRowId = "addToResult" | "toggle";
 /** A task menu's groups: the statuses, the priorities, the labels, the moves, the edit rows, Open full screen and Open in Obsidian, Delete. */
 export type MenuGroupId = "statuses" | "levels" | "labels" | "moves" | "edits" | "opens" | "remove";
 
@@ -564,6 +619,51 @@ export type MenuGroupId = "statuses" | "levels" | "labels" | "moves" | "edits" |
 export interface MenuProjectOption {
 	readonly project: ProjectRef;
 	readonly checked: boolean;
+}
+
+/**
+ * The menu's result rows, drawn in the edit group right after Project, in `rows`' order. «Add to result» opens the page
+ * `TaskService.resultPage` reads; «Make result» or «Make task» (`toggle`, one task's menu only) writes
+ * `setResult(key, toggle.result)`.
+ */
+export interface MenuResult {
+	/** The rows offered, in order: both for an open task, Add to result alone in the bulk menu of open tasks, none else. */
+	readonly rows: readonly MenuResultRowId[];
+	/** «Add to result». */
+	readonly label: string;
+	/** What the row shows on the right: the result every task is a step of (`TaskItem.resultOf`), else nothing. */
+	readonly value: string;
+	/** That result, which the page ticks; null when they are steps of none or of different ones. */
+	readonly current: ResultRef | null;
+	/** The toggle's words, «Make result» on a task, «Make task» on a result, and what a tap writes (`setResult`'s `result`). */
+	readonly toggle: { readonly label: string; readonly result: boolean };
+}
+
+/** An open result the Add to result page offers. */
+export interface ResultOption {
+	readonly result: ResultRef;
+	/** The list it stands in (a subtask's, its task's), drawn as that column's icon: Inbox, Now, Soon or Backlog. */
+	readonly list: SectionKey;
+	/** Its project's name, a small line under the title; null without one. */
+	readonly project: string | null;
+	/** The result the tasks are steps of: choosing it writes nothing. */
+	readonly checked: boolean;
+}
+
+/**
+ * The Add to result page, in place of the menu: a search field on top, the open results the query finds, and «New
+ * result…» last, apart. A pick writes `addToResult(keys, option.result.key)`; New result… asks the name (a field like New
+ * project…), then `newResult(keys, name)`.
+ */
+export interface ResultPage {
+	/** Every open result of the file in file order, the query's finds alone (by title, case and accents aside); never the tasks themselves nor a result inside one of them. */
+	readonly options: readonly ResultOption[];
+	/** The search field's placeholder: «Search results». */
+	readonly placeholder: string;
+	/** «New result…». */
+	readonly newLabel: string;
+	/** The name field's placeholder: «Result name». */
+	readonly namePlaceholder: string;
 }
 
 /** The Repeat row of one task's menu: its value on the right, or the weekdays lit among the week's letters. */
@@ -626,10 +726,12 @@ export interface TaskMenuModel {
 	 * (where Section would stand when it is not offered), its page these options.
 	 */
 	readonly project: MenuProject;
+	/** The result rows: Add to result, and Make result or Make task. */
+	readonly result: MenuResult;
 	/**
 	 * One task's: Rename; Reminder (a task on a time); Add description (one without any); Repeat (one that may repeat);
 	 * Section (with `sections`); Project, always; Add subtask, except for a subtask of a timeline card's stack. The bulk
-	 * menu's: Section (with `sections`), then Project.
+	 * menu's: Section (with `sections`), then Project. The result rows (`result.rows`) stand right after Project.
 	 */
 	readonly edits: readonly MenuEditId[];
 	/** The Reminder page's rows, Off last; none without the Reminder row. */
@@ -880,6 +982,26 @@ export interface TaskService {
 	 * nothing.
 	 */
 	newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null>;
+	/**
+	 * Make result (`result` true): the result mark first on the task's line; a task with an open subtask folds. Make task
+	 * (false): the mark goes, the fold stays as it is. One write, one undo step.
+	 */
+	setResult(key: TaskKey, result: boolean): Promise<void>;
+	/** The Add to result page for these tasks, `query` typed in its search field (empty: every open result). */
+	resultPage(keys: readonly TaskKey[], query: string): Promise<ResultPage>;
+	/**
+	 * A result picked on the Add to result page: each task, with its subtasks, leaves its place and becomes the last step
+	 * of `result`, in file order, wherever the result stands (its project the result's); the result folds, its next step
+	 * on top. A task already a step of it writes nothing; a subtask of a picked task goes along. One write, one undo step.
+	 */
+	addToResult(keys: readonly TaskKey[], result: TaskKey): Promise<void>;
+	/**
+	 * New result… named `name` (a priority's prefix typed first is its priority): a result at the first task's place in the
+	 * file (right before it, among the same task's subtasks for a subtask), with that task's project and due date, the tasks
+	 * its steps as `addToResult` takes them, folded. The new result's key and id; null for a blank name, which writes
+	 * nothing. One write, one undo step.
+	 */
+	newResult(keys: readonly TaskKey[], name: string): Promise<CreatedTask | null>;
 	/** Group by project in `list`'s title menu: kept on the device. */
 	setGrouping(list: GroupedList, on: boolean): Promise<void>;
 	/** A group's chevron or title tapped: folded or unfolded, kept on the device. */
@@ -1356,6 +1478,8 @@ export interface SettingsForm {
 	/** The line markers the tab edits, in the order it shows them. */
 	readonly markerOrder: readonly Marker[];
 	readonly priorities: readonly PriorityLevel[];
+	/** Result mark, beside the priorities: the word a result's line starts with, `🎯` by default. */
+	readonly resultMark: string;
 	readonly labelTag: string;
 	readonly labels: readonly LabelLevel[];
 	readonly labelPaint: LabelPaint;
@@ -1414,6 +1538,11 @@ export interface SettingsService {
 	addLevel(): Promise<void>;
 	/** The level at `from` goes to `to`, the others keeping their order. */
 	moveLevel(from: number, to: number): Promise<void>;
+	/**
+	 * The result mark trimmed; written when it is one word that is no level's prefix, else the one saved stays. Only what
+	 * reads as a result from then on changes: no line is rewritten.
+	 */
+	setResultMark(mark: string): Promise<void>;
 	/** The tag folder trimmed; written when it is one word. */
 	setLabelTag(tag: string): Promise<void>;
 	/** Written when it is one of the form's `labelPaints`. */

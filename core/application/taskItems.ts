@@ -10,8 +10,9 @@ import { repeatable } from "../domain/queries";
 import { canRemind, isOpen, type LocalDate } from "../domain/Task";
 import type { TaskEntry } from "../domain/TaskDocument";
 import { plainText } from "../domain/TaskText";
+import { nextStep } from "../domain/Result";
 import { markColors } from "./marks";
-import type { ProjectRef, SubtaskProgress, TaskItem } from "./contracts";
+import type { ProjectRef, ResultRef, SubtaskProgress, TaskBlock, TaskCard, TaskItem } from "./contracts";
 import { keyOf } from "./taskKeys";
 
 /** Of the task's own subtasks, the done ones out of all but those given up. */
@@ -41,14 +42,51 @@ export function itemLevels(levels: readonly PriorityLevel[], labels: readonly La
 	};
 }
 
-/** The task as the UI sees it on `today`; `parent`, the task a subtask sits under; `boundary`, where the day begins. */
-export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = NO_LEVELS, parent: TaskEntry | null = null, boundary: DayBoundary = DayBoundary.MIDNIGHT): TaskItem {
+/** A result as a step's row names it. */
+export function resultRef(entry: TaskEntry): ResultRef {
+	return { id: entry.id, key: keyOf(entry), title: plainText(entry.task.text) };
+}
+
+/** The item of the task with this id among `items` and their subtasks, at every depth. */
+function itemWithId(items: readonly TaskItem[], id: string): TaskItem | null {
+	for (const item of items) {
+		if (item.id === id) return item;
+		const inner = itemWithId(item.allSubtasks, id);
+		if (inner) return inner;
+	}
+	return null;
+}
+
+/** A card of one line: the task's own title, semibold for a result. */
+export function ownCard(item: Pick<TaskItem, "text" | "title" | "isResult">): TaskCard {
+	return { text: item.text, title: item.title, over: null, step: null, semibold: item.isResult };
+}
+
+/** The card of a task: a folded result's next step under its own title, small; any other task's own title. */
+function cardOf(item: Pick<TaskItem, "text" | "title" | "isResult" | "collapsed">, step: TaskItem | null): TaskCard {
+	return item.collapsed && step ? { text: step.text, title: step.title, over: item.title, step, semibold: false } : ownCard(item);
+}
+
+/** The timeline's block of a task: a result's next step, else its own title. */
+function blockOf(item: Pick<TaskItem, "text" | "title">, step: TaskItem | null): TaskBlock {
+	return step ? { text: step.text, title: step.title, step } : { text: item.text, title: item.title, step: null };
+}
+
+/**
+ * The task as the UI sees it on `today`; `parent`, the task a subtask sits under; `boundary`, where the day begins;
+ * `above`, the nearest result above it (the result it is a step of).
+ */
+export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = NO_LEVELS, parent: TaskEntry | null = null, boundary: DayBoundary = DayBoundary.MIDNIGHT, above: TaskEntry | null = null): TaskItem {
 	const marks = marksOfTask(entry.task);
 	const choices = markChoices(marks);
 	const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
 	const labels = levels.labelsOf(marks.labels);
-	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary));
+	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary, entry.task.result ? entry : above));
 	const description = descriptionMarkdown(entry);
+	const open = isOpen(entry.task.status);
+	const shown = entry.task.result && open ? nextStep(entry) : null;
+	const step = shown && itemWithId(allSubtasks, shown.id);
+	const own = { text: entry.task.text, title: plainText(entry.task.text), isResult: entry.task.result, collapsed: entry.task.collapsed && hasOpenSubtask(entry) };
 	return {
 		id: entry.id,
 		key: keyOf(entry),
@@ -82,7 +120,12 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 			fold: hasOpenSubtask(entry),
 			resize: entry.task.slot !== null,
 			setProject: entry.path.length === 0,
+			result: open,
 		},
+		isResult: entry.task.result,
+		resultOf: above ? resultRef(above) : null,
+		card: cardOf(own, step),
+		block: blockOf(own, step),
 		subtasks: allSubtasks.filter((sub) => sub.open),
 		allSubtasks,
 		progress: progressOf(entry),

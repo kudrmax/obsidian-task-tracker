@@ -8,6 +8,7 @@ import { NO_PROJECT } from "./projects";
 import type { ColumnSections, DropColumn, MenuEditId, MenuGroupId, MenuFrom, MenuProject, ProjectRef, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
 import { type SectionOffer, sectionChoice } from "./sections";
 import { isUnder, keyId } from "./taskKeys";
+import { menuResult } from "./results";
 
 /** The tasks a priority may be set on: those without labels. */
 function priorityHolders(items: readonly TaskItem[]): readonly TaskItem[] {
@@ -189,6 +190,7 @@ export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: r
 		dueDate: sharedDueDate(items),
 		sections,
 		project: menuProject(items, projects),
+		result: menuResult(items, of.kind === "bulk"),
 		edits,
 		reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
 		repeat: repeatRow(of.kind === "task" ? (items[0]?.repeat ?? null) : null),
