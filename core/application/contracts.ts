@@ -53,7 +53,9 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
 export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
-export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, shownLists, SWIPE_FLICK_SPEED, swipeLanding, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, shownEntryLists, shownLists, SWIPE_FLICK_SPEED, swipeLanding, type EntryList, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+/** The Projects screen's list as the quick entry reads it: a list the field stands in, like a funnel's column. */
+export { projectsEntryLook, type EntryListLook, type EntryPart } from "./projectsEntry";
 /**
  * The copy of a pressed card that shows its whole title: `wholeWidth(card, room)` how wide it grows (null: the card shows
  * its title whole and is lifted itself), `grownStart(start, size, grown, room, margin)` where it starts on one axis.
@@ -127,13 +129,27 @@ export interface TaskKey {
 
 /**
  * Where to create a task: a place in a list, a place in the day column on `date` (its list and day are the column's,
- * see `dayColumn`), a place among subtasks, or a slot on the calendar.
+ * see `dayColumn`), a place among subtasks, a slot on the calendar, or a place of the Projects screen's list.
  */
 export type NewTaskPlace =
 	| { readonly kind: "list"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate }
 	| { readonly kind: "day"; readonly date: LocalDate; readonly group: GroupName; readonly before: TaskKey | null }
 	| { readonly kind: "subtask"; readonly parent: TaskKey; readonly before: TaskKey | null }
-	| { readonly kind: "slot"; readonly slot: Slot };
+	| { readonly kind: "slot"; readonly slot: Slot }
+	| ProjectsPlace;
+
+/**
+ * A new task typed in the Projects screen's list, in part `group` (`ProjectsSection.group`) before card `before` (null:
+ * the part's end), as the screen stands when it is written: in the list that part writes into (`ProjectsSection.newTask`;
+ * `placement`, a place chosen in the entry's bar, instead), next to the nearest card of that list above it in the part,
+ * else right before the nearest one below, else at that list's end. Its project is `createInPlace`'s own argument.
+ */
+export interface ProjectsPlace {
+	readonly kind: "projects";
+	readonly group: GroupName;
+	readonly before: TaskKey | null;
+	readonly placement?: Placement;
+}
 
 /** Where a section is written from the quick-entry field: a top-level place in a column that shows sections. */
 export type SectionPlace = Extract<NewTaskPlace, { readonly kind: "list" } | { readonly kind: "day" }>;
@@ -168,6 +184,11 @@ export interface ProjectRef {
 	readonly canOpenNote: boolean;
 	/** The card shows the folder mark: everywhere but on the Projects screen, where the tree says the project. */
 	readonly mark: boolean;
+	/**
+	 * A folder (`🗃️` on its tree line): it only holds subprojects, so nothing gives a task it (the Project page's option
+	 * disabled, the tree's row and its own part taking no card, no plus naming it). A task given it by hand shows under it.
+	 */
+	readonly folder: boolean;
 }
 
 /** A note that had the project tag: what the `Projects` port gives the one move to projects. */
@@ -591,6 +612,8 @@ export interface MenuProjectOption {
 	readonly project: ProjectRef;
 	readonly checked: boolean;
 	readonly depth: number;
+	/** It can't be picked: a folder a pick would give to a task (shown so its subprojects are found under it). Checked, it may be taken off. */
+	readonly disabled: boolean;
 }
 
 /** The Repeat row of one task's menu: its value on the right, or the weekdays lit among the week's letters. */
@@ -736,12 +759,18 @@ export interface ProjectsRow {
 	/** Its branch is folded: a tile shows a layer peeking out, a line an ellipsis. */
 	readonly folded: boolean;
 	readonly project: ProjectRef | null;
-	/** A dragged card may be let go on it: a project, and No project. */
+	/** A dragged card may be let go on it: a project that is no folder, and No project. */
 	readonly acceptsTask: boolean;
 	/** A long press lifts it to reorder or nest: an active or waiting project. */
 	readonly canLift: boolean;
 	/** A held card over it unfolds its branch after a pause: a folded branch. */
 	readonly unfoldsOnHover: boolean;
+	/**
+	 * A held card over it chooses it after the same pause (`TaskService.hoverProjectNode`), so its tasks show and the card
+	 * can be let go among them: a row that takes a task (`acceptsTask`) whose list takes drops (`ProjectsView.reorders`),
+	 * not the chosen one. A live project and No project; never All, Done or a done project.
+	 */
+	readonly opensOnHover: boolean;
 }
 
 /** What the right side of a card on the Projects screen shows in By project: the stage's symbol, or the task's date. */
@@ -772,6 +801,19 @@ export interface ProjectsCard {
 export interface ProjectsDrop {
 	readonly key: TaskKey;
 	readonly from: string | null;
+	/**
+	 * The task as its card was lifted, filled by the core on every card and row (`ProjectsCard.drop`, `ProjectsListRow.drop`):
+	 * a frontend passes it back as given. It judges a drop in a list that shows no card of the task (lifted on another node,
+	 * then a held card opened this one); without it such a drop is stale.
+	 */
+	readonly lifted?: ProjectsLifted;
+}
+
+/** A carried task as its card was lifted: who it is (`TaskItem.id`), its list (`TaskItem.list`), the funnel's column it is dragged from (null: a closed task's, from none). */
+export interface ProjectsLifted {
+	readonly id: string;
+	readonly list: SectionKey;
+	readonly origin: DropFrom | null;
 }
 
 /** A new task the plus writes where it is let go on the tasks: the place (`createInPlace`'s) and its project (its sixth argument). */
@@ -813,6 +855,11 @@ export interface ProjectsSection {
 	 * card goes into the own part; with no untitled part (By stage, All), the list's top is the first part's.
 	 */
 	readonly opens: boolean;
+	/**
+	 * A card may be dropped in it (`projectsTakes` is false everywhere else): every part but a folder's own, which shows
+	 * only the tasks given the folder by hand.
+	 */
+	readonly takes: boolean;
 	/** No card in it: shown so a card can be dropped there (a stage By stage, a subproject By project). */
 	readonly empty: boolean;
 	/** The No tasks plate under it: an empty part with a header, or the only part. The node's own part, empty, draws nothing. */
@@ -826,11 +873,11 @@ export interface ProjectsSection {
 	/** By project: how deep the subproject is below the chosen node (1 for its own subprojects); 0 otherwise. */
 	readonly depth: number;
 	readonly cards: readonly ProjectsCard[];
-	/** What the plus let go in this part writes; null where it writes nothing (Done). */
+	/** What the plus let go in this part writes; null where it writes nothing (Done, a folder's own part, a folder's stages). */
 	readonly newTask: ProjectsNewTask | null;
 }
 
-/** The project menu, a tap on the chosen project's name over its tasks: Rename and Note. */
+/** The project menu, a tap on the chosen project's name over its tasks: Rename, Note, Folder and Delete project. */
 export interface ProjectMenu {
 	readonly project: ProjectRef;
 	/** «Rename», which asks the name and writes `renameProject`. */
@@ -843,8 +890,21 @@ export interface ProjectMenu {
 	readonly attachLabel: string;
 	/** «Detach»: takes the link off, `setProjectNote(name, null)`; the file stays. */
 	readonly detachLabel: string;
+	/** «Folder», a switch: a tap writes `setProjectFolder(name, !on)`. */
+	readonly folder: ProjectFolderSwitch;
 	/** «Delete project», destructive, asked first with these words; a confirm writes `deleteProject(name)`. */
 	readonly delete: ProjectDelete;
+}
+
+/** Folder in the project menu: on for a folder; off it may be turned on only while the project has no task of its own. */
+export interface ProjectFolderSwitch {
+	/** «Folder». */
+	readonly label: string;
+	readonly on: boolean;
+	/** It can't be turned on: the project has tasks of its own (open or done; its subprojects' don't count). Never while on. */
+	readonly disabled: boolean;
+	/** Why it is disabled, shown with the row: «Has tasks of its own»; null while it isn't. */
+	readonly reason: string | null;
 }
 
 /** Delete project in the project menu: its row, and the question asked before it writes, which says the tasks stay. */
@@ -872,9 +932,9 @@ export interface ProjectsView {
 	readonly title: string;
 	/** The chosen project's menu (its title tapped); null for All, No project and Done. */
 	readonly menu: ProjectMenu | null;
-	/** The chosen node's tasks, in parts; an empty part is left out. */
+	/** The chosen node's tasks, in parts; an empty part is left out (an empty folder's own part always). */
 	readonly sections: readonly ProjectsSection[];
-	/** What the plus let go on the tasks outside any part writes; null for Done. */
+	/** What the plus let go on the tasks outside any part writes; null for Done, a done project and a folder. */
 	readonly newTask: ProjectsNewTask | null;
 	/** The words over an empty list of tasks: «No tasks». */
 	readonly emptyLabel: string;
@@ -928,8 +988,8 @@ export { projectsDrop } from "./projectsScreen";
  * funnel's columns refuse it (`acceptsDrop`: Inbox and Backlog no dated or timed task, Soon no timed one). A frontend
  * shows no drop line there and lets go of nothing, as over a list that does not take the card.
  */
-export { projectsTakes } from "./projectsDrop";
-/** How long a held card waits over a folded row before its branch opens (`unfoldProjectNode`), ms; the indent of a tree's step, px (pt). */
+export { projectsPlusTakes, projectsTakes } from "./projectsDrop";
+/** How long a held card waits over a row before it unfolds or opens (`hoverProjectNode`), ms; the indent of a tree's step, px (pt). */
 export { PROJECTS_HOVER_MS, PROJECTS_INDENT } from "./projectsScreen";
 
 /**
@@ -1027,7 +1087,7 @@ export interface TaskService {
 	/**
 	 * `project`, the task's own project (its name, null for none; the quick entry's choice, the Projects screen's
 	 * `ProjectsSection.newTask`): written whatever the place's `project` says. A subtask takes none: its projects are its
-	 * parent's.
+	 * parent's. A folder is never written: the task is made without it.
 	 */
 	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | null): Promise<TaskKey | null>;
 	/**
@@ -1082,13 +1142,13 @@ export interface TaskService {
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
 	/**
 	 * The tasks' projects become `project` alone (null: none). A task keeps its place in the lane; a subtask is left as it
-	 * is, its projects its parent's. One write.
+	 * is, its projects its parent's. One write. A folder writes nothing.
 	 */
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void>;
 	/**
 	 * A project of the Project page tapped: put last on every task that lacks it, or taken off them all when every one has
 	 * it; a subtask's key names its top task. One write; each task as it then stands, in the order given, its key fresh;
-	 * null for one gone (as `toggleLabel`).
+	 * null for one gone (as `toggleLabel`). A folder is only taken off (every task has it); put on, nothing is written.
 	 */
 	toggleProject(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]>;
 	/** The projects of the tree read last, in its order, the tasks' own in it: what the quick entry's Project button offers. */
@@ -1096,7 +1156,8 @@ export interface TaskService {
 	/**
 	 * «New project…» named `name` (`cleanProjectName`): a project at the top of the tree, last, and `keys` get it, in one
 	 * write (none: only the project, for the quick entry's field). A name the tree has gives that project to `keys`. The
-	 * project, or null for a name of nothing, which writes nothing.
+	 * project, or null for a name of nothing and for a folder's name (no task may be given a folder), which write nothing:
+	 * an answer is always a project to pick.
 	 */
 	newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null>;
 
@@ -1114,6 +1175,11 @@ export interface TaskService {
 	unfoldProjectNode(node: ProjectsNodeId): Promise<void>;
 	/** The node chosen, unfolding the branches above it so its row shows: search's path, the card's folder mark. Kept on the device. */
 	selectProjectNode(node: ProjectsNodeId): Promise<void>;
+	/**
+	 * A card held over a row for `PROJECTS_HOVER_MS`: its branch unfolds if it unfolds on hover (`ProjectsRow.unfoldsOnHover`),
+	 * and it is chosen if it opens on hover (`ProjectsRow.opensOnHover`), the mode kept. One call, one wait. Kept on the device.
+	 */
+	hoverProjectNode(node: ProjectsNodeId): Promise<void>;
 	/** The segment over the tasks: By project or By stage. Kept on the device. */
 	setProjectsMode(mode: ProjectsMode): Promise<void>;
 	/**
@@ -1135,12 +1201,18 @@ export interface TaskService {
 	 * name the tree lacks writes nothing.
 	 */
 	deleteProject(name: string): Promise<void>;
+	/**
+	 * The project menu's Folder: the project made a folder (`🗃️` on its tree line) or a project again. Turned on only while
+	 * it has no task of its own (`ProjectMenu.folder.disabled`): else nothing is written, false. One write, one step of
+	 * undo; false when nothing changed.
+	 */
+	setProjectFolder(name: string, folder: boolean): Promise<boolean>;
 	/** The project menu's Note: the note `link` attached (its `[[link]]` on the tree line), or taken off with null. The note's file is never touched. */
 	setProjectNote(name: string, link: string | null): Promise<void>;
 	/**
 	 * Cards dropped on a row of the tree (`ProjectsRow.acceptsTask`), each `ProjectsCard.drop`: the project each card was
 	 * shown under gives way to the row's (No project: taken off); the task's other projects and its place in the funnel
-	 * stay. A subtask's key names its top task. One write.
+	 * stay. A subtask's key names its top task. One write; a folder's row (`acceptsTask` false) writes nothing.
 	 */
 	dropOnProject(cards: readonly ProjectsDrop[], to: ProjectsNodeId): Promise<void>;
 	/**

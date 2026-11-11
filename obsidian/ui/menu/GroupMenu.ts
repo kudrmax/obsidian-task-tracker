@@ -2,8 +2,8 @@ import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel } from "../kit/Panel";
-import { askQuestion, menuGroup, menuRoom, placePanel } from "./MenuPanel";
-import type { ProjectDelete } from "../../../core/application/contracts";
+import { askQuestion, menuGroup, menuRoom, menuRow, menuSwitch, placePanel } from "./MenuPanel";
+import type { ProjectDelete, ProjectFolderSwitch } from "../../../core/application/contracts";
 import { Overlay } from "./Overlay";
 
 export interface GroupMenuOptions {
@@ -43,19 +43,24 @@ export interface ProjectMenuOptions {
 	readonly note: string | null;
 	readonly attachLabel: string;
 	readonly detachLabel: string;
+	/** Folder: the switch, its state and why it can't be turned on. */
+	readonly folder: ProjectFolderSwitch;
 	/** Delete project: its row and the question asked before it. */
 	readonly delete: ProjectDelete;
 	onRename(): void;
 	onAttach(): void;
 	onOpenNote(): void;
 	onDetach(): void;
+	/** Folder turned: the value it slid to. */
+	onFolder(on: boolean): void;
 	/** Delete project, confirmed. */
 	onDelete(): void;
 }
 
 /**
  * The project's menu, a tap on the chosen project's name over its tasks, as a section header's: the title stays over the
- * blur, the panel under it holds Rename, then the note: «Attach note…» without one; with one, the note's name, which opens
+ * blur, the panel under it holds Rename, the Folder switch (dimmed with the core's reason while it can't be turned on;
+ * a tap slides it and the menu closes as the write goes), then the note: «Attach note…» without one; with one, the note's name, which opens
  * it, and Detach, which takes the link off and leaves the file. Apart at its foot, Delete project in the danger colour,
  * which asks first in its own place, as a task's Delete does.
  */
@@ -71,7 +76,9 @@ export const ProjectMenu = {
 		/** The menu, with Delete project apart at its foot; asking, the question takes that row's place. */
 		const show = (asking: boolean) =>
 			panel.replace((p) => {
-				const rows = [{ label: opts.renameLabel, icon: "rename", onPick: panel.pickNow(() => opts.onRename()) } as const];
+				const group = menuGroup(p, [{ label: opts.renameLabel, icon: "rename", onPick: panel.pickNow(() => opts.onRename()) }]);
+				const folder = opts.folder;
+				menuSwitch(group, { label: folder.label, on: folder.on, disabled: folder.disabled, reason: folder.reason, onToggle: (on) => panel.pick(() => opts.onFolder(on))() });
 				const note =
 					opts.note === null
 						? [{ label: opts.attachLabel, icon: "plus", onPick: panel.pickNow(() => opts.onAttach()) } as const]
@@ -79,7 +86,7 @@ export const ProjectMenu = {
 								{ label: opts.note, icon: "openFile", onPick: panel.pick(() => opts.onOpenNote()) } as const,
 								{ label: opts.detachLabel, icon: "cross", onPick: panel.pick(() => opts.onDetach()) } as const,
 							];
-				menuGroup(p, [...rows, ...note]);
+				for (const row of note) menuRow(group, row);
 				if (!asking) return void menuGroup(p, [{ label: remove.label, icon: "delete", danger: remove.destructive, onPick: () => show(true) }]);
 				askQuestion(p, {
 					question: remove.title,

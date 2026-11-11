@@ -3,7 +3,7 @@ import { DropLine } from "../drag/DropLine";
 import { CardListDrop } from "../drag/ListDrop";
 import type { DragPayload, DropResult, DropTarget, ProjectsDrop, TaskDragPayload } from "../drag/DropTarget";
 import { readFrame } from "../drag/listFrame";
-import type { DrawnPart, ProjectTasks } from "./ProjectTasks";
+import type { ProjectTasks } from "./ProjectTasks";
 
 /** What the tree's targets read of the tree as drawn. */
 export interface TreeShown {
@@ -76,14 +76,17 @@ export function showGapLine(line: DropLine, tree: TreeShown, gap: number, depth:
 	line.show(left, frame.box.right, y, frame, finger);
 }
 
-/** What the tree's drop asks of the screen: how long a card waits over a folded row, and that row opened. */
+/** What the tree's drop asks of the screen: the tree as drawn, and a row a card waited over unfolded or opened. */
 export interface TreeDropDeps {
 	tree(): TreeShown | null;
-	/** A folded row's branch opened under a held card (`TaskService.unfoldProjectNode`), the tree drawn again. */
-	unfold(node: ProjectsNodeId): void;
+	/**
+	 * A card held over a row for `PROJECTS_HOVER_MS` (`TaskService.hoverProjectNode`): its branch unfolds, it opens, the
+	 * screen drawn again, tree and tasks. Resolves once drawn.
+	 */
+	hover(node: ProjectsNodeId): Promise<void>;
 }
 
-/** The row a held card waits over, and since when its branch is about to open. */
+/** The row a held card waits over, and since when it is about to unfold or open. */
 interface Hover {
 	readonly node: ProjectsNodeId;
 	readonly timer: number;
@@ -91,8 +94,9 @@ interface Hover {
 
 /**
  * The tree as a place to let go (board Drag): a card held over a row that takes it fills the row with the place's colour,
- * and let go there the card's project gives way to the row's; held a moment over a folded row, the row opens (spec: «Задержка
- * над свёрнутой веткой раскрывает её»). The plus held over the tree shows the gap a new project would take, at the depth
+ * and let go there the card's project gives way to the row's; held a moment over a row, the row does what the core says
+ * (`ProjectsRow.unfoldsOnHover`: its branch unfolds; `opensOnHover`: it is chosen and its tasks show, the card still
+ * carried, to be let go among them). The plus held over the tree shows the gap a new project would take, at the depth
  * the finger's distance from the left picks.
  */
 export class TreeDrop implements DropTarget {
@@ -110,13 +114,23 @@ export class TreeDrop implements DropTarget {
 		return this.deps.tree();
 	}
 
-	/** The card waits over `row`: a folded one opens once it has waited a long press's time there, any other stops the wait. */
+	/**
+	 * The card waits over `row`: a row that unfolds or opens under a held card does so once the card has waited
+	 * `PROJECTS_HOVER_MS` there; any other row, or none, stops the wait. Drawn again, the row the card is over is filled anew.
+	 */
 	private hoverOver(row: ProjectsRow | null): void {
 		if (row?.node === this.hover?.node) return;
 		this.stopHover();
-		if (!row?.unfoldsOnHover) return;
+		if (!row || !(row.unfoldsOnHover || row.opensOnHover)) return;
 		const node = row.node;
-		this.hover = { node, timer: window.setTimeout(() => this.deps.unfold(node), PROJECTS_HOVER_MS) };
+		const timer = window.setTimeout(() => void this.deps.hover(node).then(() => this.fillAgain(node)), PROJECTS_HOVER_MS);
+		this.hover = { node, timer };
+	}
+
+	/** The tree drawn again under the card: the row it still waits over shows the drop again. */
+	private fillAgain(node: ProjectsNodeId): void {
+		if (this.hover?.node !== node || this.result?.kind !== "projectRow") return;
+		this.tree()?.showDropOn(this.result.node);
 	}
 
 	private stopHover(): void {
@@ -168,88 +182,57 @@ export class TreeDrop implements DropTarget {
 	}
 }
 
-/** What the tasks' target reads of the tasks as drawn. */
-export interface TasksShown {
-	readonly el: HTMLElement;
-	readonly parts: readonly DrawnPart[];
-	readonly endTask: DrawnPart["newTask"];
-}
-
-/**
- * The tasks as a place for the plus: the part under the finger, its end marked by the drop line; let go, the field of a
- * new task opens there, written into that part's project (decision 10). Done takes nothing.
- */
-export class TasksDrop implements DropTarget {
-	private readonly line: DropLine;
-	private result: ProjectsDrop | null = null;
-
-	constructor(private readonly tasks: () => TasksShown | null) {
-		this.line = new DropLine(() => this.tasks()?.el ?? document.body);
-	}
-
-	hitTest(x: number, y: number, drag: DragPayload): boolean {
-		const tasks = this.tasks();
-		return drag.from === "new" && tasks !== null && within(tasks.el, x, y);
-	}
-
-	preview(x: number, y: number): void {
-		const tasks = this.tasks();
-		if (!tasks) return;
-		const part = tasks.parts.find((p) => p.last.getBoundingClientRect().bottom >= y) ?? null;
-		const newTask = part ? part.newTask : tasks.endTask;
-		if (!newTask) return this.leave();
-		const after = part?.last ?? tasks.parts[tasks.parts.length - 1]?.last ?? null;
-		this.result = { kind: "projectTasks", newTask, after };
-		const frame = readFrame(tasks.el);
-		const lastRect = after?.getBoundingClientRect();
-		const at = lastRect ? lastRect.bottom : frame.box.top;
-		this.line.show(lastRect?.left ?? frame.box.left, lastRect?.right ?? frame.box.right, at, frame, { x, y });
-	}
-
-	landing(): DOMRect | null {
-		return null;
-	}
-
-	leave(): void {
-		this.result = null;
-		this.line.hide();
-	}
-
-	clear(): void {
-		this.leave();
-	}
-
-	drop(): DropResult | null {
-		const result = this.result;
-		this.leave();
-		return result;
-	}
+/** What the tasks' list drop reads of the screen. */
+export interface ProjectsListShown {
+	/** Whether the tasks shown take a card: the node's list reorders (`ProjectsView.reorders`) and no choice is still being drawn. */
+	reorders(): boolean;
+	/** Whether the core takes the carried cards at a place (`projectsTakes`). */
+	takesAt(place: ListPlace, drag: TaskDragPayload): boolean;
+	/** Whether the core lets the plus be let go at a place (`projectsPlusTakes`). */
+	plusTakesAt(place: ListPlace): boolean;
+	/** The node whose tasks are drawn. */
+	node(): ProjectsNodeId | null;
 }
 
 /**
  * The tasks as a list a card is dropped in, as a list column is (spec «Projects order» 1): the same lift, gap, drop line,
  * level and auto-scroll, over the parts as sections, each header opening its part as the core says
  * (`ProjectsSection.opens`); a place the core refuses (`projectsTakes`) is as a list that does not take the card. Let
- * go, the place goes to `dropInProjects`. A card only: the plus has its own place on the tasks (`TasksDrop`). Nothing
- * while the node keeps its order (`ProjectsView.reorders`: Done and a done project).
+ * go, the place goes to `dropInProjects`; nothing while the node keeps its order (`ProjectsView.reorders`: Done and a
+ * done project). The plus is let go here as on a list column: at a gap of a part a new task is written in
+ * (`EntryPart.newTask`), or under a card as its subtask, where the field of the new task opens (`QuickEntrySession.openAt`).
  */
 export class ProjectsListDrop extends CardListDrop {
+	/** The node the place under the finger was read on: a place read on another node than the one let go on is no place. */
+	private readOn: ProjectsNodeId | null = null;
+
 	constructor(
-		tasks: ProjectTasks,
+		private readonly tasks: ProjectTasks,
 		area: HTMLElement,
-		private readonly reorders: () => boolean,
-		/** Whether the core takes the carried cards at a place (`projectsTakes`). */
-		private readonly takesAt: (place: ListPlace, drag: TaskDragPayload) => boolean,
+		private readonly shown: ProjectsListShown,
+		/** A new task's place moved to another gap or level. */
+		onNewPlace?: () => void,
 	) {
-		super(tasks, area);
+		super(tasks, area, onNewPlace);
 	}
 
 	protected takes(drag: DragPayload): boolean {
-		return drag.from !== "new" && this.reorders();
+		return drag.from === "new" ? this.tasks.writesAny : this.shown.reorders();
 	}
 
 	protected override takesPlace(place: ListPlace, drag: DragPayload): boolean {
-		return drag.from !== "new" && this.takesAt(place, drag);
+		if (drag.from !== "new") return this.shown.takesAt(place, drag);
+		return this.shown.plusTakesAt(place);
+	}
+
+	override preview(x: number, y: number, drag: DragPayload): void {
+		this.readOn = this.shown.node();
+		super.preview(x, y, drag);
+	}
+
+	override drop(x: number, y: number, drag: DragPayload): DropResult | null {
+		if (this.readOn !== this.shown.node()) return null;
+		return super.drop(x, y, drag);
 	}
 
 	protected placesAnywhere(): boolean {

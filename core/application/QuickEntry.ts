@@ -12,6 +12,8 @@ import { fitLevel, type GapPlace, gapOfPlace, type Header, type LevelCard, type 
 import { sameLine, samePlace } from "./taskKeys";
 import { fullTree } from "./fullTree";
 import { plainText } from "../domain/TaskText";
+import { ENTRY_LISTS, type EntryList } from "./screenPlaces";
+import { type EntryPart, placementOfNewTask } from "./projectsEntry";
 
 /** Where the field stands: a gap of a list, a slot on the calendar, or the end of a task's subtasks in the calendar menu. */
 /**
@@ -20,7 +22,7 @@ import { plainText } from "../domain/TaskText";
  * subtasks. A host hands the spot back to `open` as it is.
  */
 export type EntrySpot =
-	| { readonly kind: "list"; readonly column: DropColumn; readonly place: GapPlace; readonly unfold?: TaskKey }
+	| { readonly kind: "list"; readonly column: EntryList; readonly place: GapPlace; readonly unfold?: TaskKey }
 	| { readonly kind: "slot"; readonly slot: Slot }
 	| { readonly kind: "stack"; readonly parent: TaskKey };
 
@@ -181,9 +183,12 @@ export interface PendingRename {
 	readonly title: string;
 }
 
-/** A place chosen in the bar: the column the field now stands at the end of, and the day the day column must open, if another. */
+/**
+ * A place chosen in the bar: the list the field now stands in (at the end of a funnel's column; the Projects list keeps it
+ * where it stands), and the day the day column must open, if another. `placeShowing(column, …)` is where the screen goes.
+ */
 export interface PlaceMove {
-	readonly column: DropColumn;
+	readonly column: EntryList;
 	readonly day: LocalDate | null;
 }
 
@@ -195,20 +200,26 @@ export type EntryTasks = Pick<TaskService, "placementOf" | "placementOfDay" | "d
  * the lists it shows. How they are laid out is the frontend's.
  */
 export interface EntryLook {
-	/** The cards of `column` as it shows the file now; none while it does not show. */
-	cards(column: DropColumn): readonly ListCard[];
-	/** The sections `column` draws, in order (in a list grouped by project, each group's: `{ group, project }`); none while it does not show. */
-	sections(column: DropColumn): readonly Header[];
+	/** The cards of `column` as it shows the file now; none while it does not show. The Projects list's: `projectsEntryLook`. */
+	cards(column: EntryList): readonly ListCard[];
+	/** The sections `column` draws, in order; none while it does not show. */
+	sections(column: EntryList): readonly Header[];
 	/** The column shows sections, so a section may be written in it. */
-	sectioned(column: DropColumn): boolean;
+	sectioned(column: EntryList): boolean;
 	/** The day the day column shows. */
 	day(): LocalDate;
 	today(): LocalDate;
 	/**
-	 * The lists the screen shows, in its order: a task is looked for in those first, then in the others (the day's, Soon,
-	 * Inbox, Backlog); the plus opens the field in the day's list while it shows, else in Inbox.
+	 * The lists the screen shows, in its order (`shownEntryLists`): a task is looked for in those first, then in the others
+	 * (`ENTRY_LISTS`); the plus opens the field in the day's list while it shows, else in Inbox, and on the Projects screen
+	 * in the part its plus writes.
 	 */
-	shown(): readonly DropColumn[];
+	shown(): readonly EntryList[];
+	/**
+	 * The parts of a list that decides itself what a new task typed in it writes (the Projects list: `projectsEntryLook`'s
+	 * `parts`); none for a funnel's column, whose place is its own. Left out: none anywhere.
+	 */
+	parts?(column: EntryList): readonly EntryPart[];
 }
 
 /** A line entered: its text, the level it was entered at, and its marks. */
@@ -218,6 +229,8 @@ export interface EntryLine extends PendingText {
 	readonly repeat: RepeatRule | null;
 	/** The field's project as it was when the line was entered (its name), null for none. */
 	readonly project?: string | null;
+	/** The place chosen in the bar for a line typed where the list keeps the field (`EntryField.placement`). */
+	readonly placement?: Placement;
 }
 
 /**
@@ -254,6 +267,11 @@ export interface EntryField {
 	readonly project?: string | null;
 	/** The field writes a section's name (empty sections spec §4). */
 	readonly section: boolean;
+	/**
+	 * A place chosen in the bar where the field stays where it stands (the Projects list shows every stage at once): the
+	 * task is written there instead of where its part writes. Left out: none chosen.
+	 */
+	readonly placement?: Placement;
 }
 
 /**
@@ -261,9 +279,9 @@ export interface EntryField {
  * which call of the task service it is. `landing`, of a task written in a list: the column its card lands in.
  */
 export type EntryJob =
-	| { readonly id: string; readonly kind: "create"; readonly run: string; readonly line: EntryLine; landing?: DropColumn | null; shown?: boolean }
+	| { readonly id: string; readonly kind: "create"; readonly run: string; readonly line: EntryLine; landing?: EntryList | null; shown?: boolean }
 	| { readonly id: string; readonly kind: "rename"; readonly home: string; readonly item: TaskItem; readonly draft: TaskDraft }
-	| { readonly id: string; readonly kind: "section"; readonly run: string; readonly name: string; readonly column: DropColumn; readonly place: GapPlace }
+	| { readonly id: string; readonly kind: "section"; readonly run: string; readonly name: string; readonly column: EntryList; readonly place: GapPlace }
 	/** The tasks `key` is folded away under show their subtasks, so the field typing its subtask stands in the list. */
 	| { readonly id: string; readonly kind: "unfold"; readonly run: string; readonly key: TaskKey };
 
@@ -292,8 +310,13 @@ function listSpot(spot: EntrySpot): ListSpot | null {
 	return spot.kind === "list" ? spot : null;
 }
 
-/** The columns, after the shown ones, a task is looked for in. */
-const ALL_COLUMNS: readonly DropColumn[] = ["day", "soon", "inbox", "backlog"];
+/**
+ * The list writes by parts (the Projects list): it shows every stage at once, so a place chosen in the bar keeps the field
+ * where it stands, and only a part that takes the plus opens a field from it.
+ */
+function keepsField(column: EntryList): boolean {
+	return column === "projects";
+}
 
 /**
  * Typing tasks in place (quick-add spec §4.2–4.9), every rule of it, synchronous over plain state: where a field opens,
@@ -374,7 +397,7 @@ export class QuickEntry {
 	 * What `column`'s list draws for the field: none when it stands elsewhere. `drawn` is what the list is about to draw
 	 * (the look's cards and sections when left out); `at` is where among them the field stands.
 	 */
-	listEntry(column: DropColumn, drawn?: EntryDrawing): ListEntry | null {
+	listEntry(column: EntryList, drawn?: EntryDrawing): ListEntry | null {
 		const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
 		const state = this.state;
 		const list = state && listSpot(state.spot);
@@ -394,20 +417,49 @@ export class QuickEntry {
 	}
 
 	/** A double click on a list's free room: the field after the last card, in the last section, at the top level. */
-	openAtEnd(column: DropColumn): void {
+	openAtEnd(column: EntryList): void {
 		this.open(this.endOf(column));
 	}
 
-	/** The plus tapped: the end of the day column while it shows, else of Inbox. */
-	openFromPlus(): void {
-		this.openAtEnd(this.look.shown().includes("day") ? "day" : "inbox");
+	/**
+	 * The plus tapped: the end of the part a shown list's plus types in (the Projects list's), else of the day column while
+	 * it shows, else of Inbox. A shown list that writes by parts with no part taking the plus (Done) opens nothing. Whether
+	 * a field opened, as `plusOpens` said before the tap.
+	 */
+	openFromPlus(): boolean {
+		const at = this.plusSpot();
+		if (at) this.open(at);
+		return at !== null;
+	}
+
+	/** A tap on the plus opens a field: false on a screen whose list writes by parts and has none that takes the plus (Done). */
+	plusOpens(): boolean {
+		return this.plusSpot() !== null;
+	}
+
+	private plusSpot(): EntrySpot | null {
+		const shown = this.look.shown();
+		for (const column of shown) {
+			const part = this.parts(column).find((p) => p.plus);
+			if (part) return this.spotIn(column, { kind: "task", group: part.group, before: null });
+		}
+		if (shown.some(keepsField)) return null;
+		return this.endOf(shown.includes("day") ? "day" : "inbox");
 	}
 
 	/** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
-	openIn(column: DropColumn, group: GroupName): void {
-		const cards = this.look.cards(column);
-		const place = { kind: "task" as const, group, before: null };
-		this.open({ kind: "list", column, place: { ...gapOfPlace(cards, place), level: 0 } });
+	openIn(column: EntryList, group: GroupName): void {
+		this.openAt(column, { kind: "task", group, before: null });
+	}
+
+	/** The plus let go at `place` of list `column` (the Projects list's `projectsPlace` drop): the field of a new task there. */
+	openAt(column: EntryList, place: ListPlace): void {
+		this.open(this.spotIn(column, place));
+	}
+
+	private spotIn(column: EntryList, place: ListPlace): EntrySpot {
+		const gap = gapOfPlace(this.look.cards(column), place);
+		return { kind: "list", column, place: place.kind === "task" ? { ...gap, level: 0 } : gap };
 	}
 
 	/** A long tap on the timeline's free room let go: the field of a new task in that slot. */
@@ -416,7 +468,7 @@ export class QuickEntry {
 	}
 
 	/** The plus came to rest on `column` (null: off the lists) with `result`: the field opens where the drop showed; false where it opens nowhere. */
-	openAtDrop(column: DropColumn | null, result: DropTo | null): boolean {
+	openAtDrop(column: EntryList | null, result: DropTo | null): boolean {
 		const place = result && column ? placeOfDrop(result) : null;
 		if (column && place) this.open({ kind: "list", column, place: gapOfPlace(this.look.cards(column), place) });
 		else if (result?.kind === "time") this.openSlot(this.tasks.newSlot(this.look.day(), result.start));
@@ -456,10 +508,9 @@ export class QuickEntry {
 	 * The card a list shows a task folded away in, when it has none of its own: the deepest card of a task it sits under
 	 * (a folded result's, whose card shows its step).
 	 */
-	private holder(key: TaskKey): { readonly column: DropColumn; readonly index: number } | null {
-		const shown = this.look.shown();
-		let best: { column: DropColumn; index: number; depth: number } | null = null;
-		for (const column of [...shown, ...ALL_COLUMNS.filter((c) => !shown.includes(c))]) {
+	private holder(key: TaskKey): { readonly column: EntryList; readonly index: number } | null {
+		let best: { column: EntryList; index: number; depth: number } | null = null;
+		for (const column of this.lookOrder()) {
 			this.look.cards(column).forEach((card, index) => {
 				const k = card.key;
 				const holds = k.section === key.section && k.index === key.index && k.path.length < key.path.length && k.path.every((i, n) => key.path[n] === i);
@@ -487,16 +538,22 @@ export class QuickEntry {
 		const spot: EntrySpot = given.kind === "list" ? { kind: "list", column: given.column, place: given.place } : given;
 		const face = renaming ? this.faceOf(renaming, spot) : undefined;
 		const rename = renaming ? { item: renaming, home: this.newRun(spot), moved: false, ...(face && { face }) } : null;
-		const project = renaming ? (renaming.project?.name ?? null) : null;
+		const project = renaming ? (renaming.project?.name ?? null) : this.partProject(spot);
 		const run = this.newRun(spot);
 		this.reset({ run, text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename, section: false, project });
 		if (unfold) this.queue(run, { id: this.jobId(), kind: "unfold", run, key: unfold });
 	}
 
-	/** A project picked on the Project button (its name; null: No project); the field stays where it is. */
+	/**
+	 * A project picked on the Project button (its name; null: No project); the field stays where it is. A folder is not
+	 * taken (the field keeps its project), unless the renamed task carries it already.
+	 */
 	setProject(name: string | null): void {
 		const field = this.session.field;
-		if (field) this.reset({ ...field, project: name }, true);
+		if (!field) return;
+		const held = field.rename?.item.projects.some((p) => inProject(p.name, name)) ?? false;
+		if (!held && isFolderRef(name, this.tasks.projects?.() ?? [])) return;
+		this.reset({ ...field, project: name }, true);
 	}
 
 	type(text: string): void {
@@ -592,25 +649,39 @@ export class QuickEntry {
 		if (!field) return null;
 		const shown = this.shownPlace(field);
 		if (shown && samePlacement(shown, placement)) return null;
-		const column: DropColumn = placement.kind === "now" || placement.kind === "date" ? "day" : placement.kind;
 		const rename = field.rename && { ...field.rename, moved: true };
+		const list = listSpot(this.run(field.run).spot);
+		if (list && keepsField(list.column)) {
+			this.reset({ ...field, rename, placement });
+			return { column: list.column, day: null };
+		}
+		const column: DropColumn = placement.kind === "now" || placement.kind === "date" ? "day" : placement.kind;
 		this.reset({ ...field, rename, run: this.newRun(this.endOf(column)) });
 		const day = this.tasks.dayOfPlacement(placement);
 		return { column, day: day === null || day === this.look.day() ? null : day };
 	}
 
 	/** The field, its text and marks, at the end of `column`; what was entered at the old spot is still written there. */
-	moveToEnd(column: DropColumn): void {
+	moveToEnd(column: EntryList): void {
 		const field = this.session.field;
 		if (field) this.reset({ ...field, run: this.newRun(this.endOf(column)) });
 	}
 
-	/** Where a task written in `column` goes: a list's place, or the day column's on the day it shows. */
-	placeOf(column: DropColumn, result: ListPlace): NewTaskPlace {
+	/**
+	 * Where a task written in `column` goes: a list's place, the day column's on the day it shows, or a place of the
+	 * Projects list, which the service reads off the screen when it writes (`placement`: the one chosen in the bar there).
+	 */
+	placeOf(column: EntryList, result: ListPlace, placement?: Placement): NewTaskPlace {
 		if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
 		const { group, before } = result;
-		if (column !== "day") return { kind: "list", list: column, group, before };
-		return { kind: "day", date: this.look.day(), group, before };
+		switch (column) {
+			case "projects":
+				return { kind: "projects", group, before, ...(placement && { placement }) };
+			case "day":
+				return { kind: "day", date: this.look.day(), group, before };
+			default:
+				return { kind: "list", list: column, group, before };
+		}
 	}
 
 	/** A slot of the field. */
@@ -646,7 +717,7 @@ export class QuickEntry {
 						const cards = this.look.cards(spot.column);
 						const place = fitLevel(cards, { ...spot.place, level: line.level });
 						job.landing = spot.column;
-						const at = this.placeOf(spot.column, placeOfGap(cards, place));
+						const at = this.placeOf(spot.column, placeOfGap(cards, place), line.placement);
 							return { method: "createInPlace", args: at.kind === "subtask" ? [line.text, line.priority, at, line.repeat, line.labels] : [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null] };
 					}
 				}
@@ -669,7 +740,7 @@ export class QuickEntry {
 	 * lists draw the task the file holds (`created`, the key the write gave), which its rules may have put elsewhere.
 	 */
 	/** `created`: the task the write made, its key, or with its id (`createWithId`), which finds its card whatever wrote since. */
-	shown(id: string, created: TaskKey | CreatedTask | null, coming: (column: DropColumn) => readonly ListCard[]): void {
+	shown(id: string, created: TaskKey | CreatedTask | null, coming: (column: EntryList) => readonly ListCard[]): void {
 		const job = this.job(id);
 		if (job.kind !== "create") return;
 		const held = this.session.field?.run ?? null;
@@ -740,7 +811,7 @@ export class QuickEntry {
 	}
 
 	/** The gap of the top level at or after `place` in its section: past the subtasks it stands among. */
-	private topLevelAfter(column: DropColumn, place: GapPlace): GapPlace {
+	private topLevelAfter(column: EntryList, place: GapPlace): GapPlace {
 		const cards = this.look.cards(column);
 		let index = place.index;
 		while (index < cards.length && cards[index].group === place.group && cards[index].level > 0) index++;
@@ -764,31 +835,59 @@ export class QuickEntry {
 		const list = listSpot(this.run(field.run).spot);
 		if (!list) return null;
 		if (field.rename) return field.rename.item.isSubtask ? null : this.placement(field);
-		return list.place.level > 0 ? null : this.columnPlacement(list.column);
+		if (list.place.level > 0) return null;
+		return field.placement ?? this.listPlacement(list);
 	}
 
 	/** Where a renamed task goes: where it was, until a place is chosen in the bar. */
 	private placement(field: EntryField): Placement {
+		if (field.placement) return field.placement;
 		const item = field.rename?.item ?? null;
 		const list = listSpot(this.run(field.run).spot);
-		if (list && (field.rename?.moved || !item)) return this.columnPlacement(list.column);
+		if (list && (field.rename?.moved || !item)) return this.listPlacement(list);
 		return item ? this.tasks.placementOf(item) : this.columnPlacement("day");
+	}
+
+	/** Where a new task at `spot` goes: its column's place, or what its part writes where the list decides that itself. */
+	private listPlacement(spot: ListSpot): Placement {
+		if (spot.column !== "projects") return this.columnPlacement(spot.column);
+		return placementOfNewTask(this.partAt(spot)?.newTask ?? null) ?? { kind: "inbox" };
 	}
 
 	private columnPlacement(column: DropColumn): Placement {
 		return column === "day" ? this.tasks.placementOfDay(this.look.day()) : { kind: column };
 	}
 
+	private parts(column: EntryList): readonly EntryPart[] {
+		return this.look.parts?.(column) ?? [];
+	}
+
+	/** The part a list spot stands in, where its list decides what a new task writes. */
+	private partAt(spot: ListSpot): EntryPart | null {
+		return this.parts(spot.column).find((part) => part.group === spot.place.group) ?? null;
+	}
+
+	/** The project a new task's field opened at `spot` starts with: its part's, where the list has parts; none elsewhere. */
+	private partProject(spot: EntrySpot): string | null {
+		const list = listSpot(spot);
+		return (list && this.partAt(list)?.newTask?.project) ?? null;
+	}
+
+	/** The lists a task is looked for in: the shown ones first, then every other the entry knows. */
+	private lookOrder(): readonly EntryList[] {
+		const shown = this.look.shown();
+		return [...shown, ...ENTRY_LISTS.filter((c) => !shown.includes(c))];
+	}
+
 	/** After the last card, in the last section, at the top level; with `project`, of that project's part where the list draws one. */
-	private endOf(column: DropColumn): EntrySpot {
+	private endOf(column: EntryList): EntrySpot {
 		const sections = this.look.sections(column);
 		const group = sections.length > 0 ? sections[sections.length - 1] : null;
 		return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, group } };
 	}
 
-	private find(key: TaskKey): { readonly column: DropColumn; readonly index: number } | null {
-		const shown = this.look.shown();
-		for (const column of [...shown, ...ALL_COLUMNS.filter((c) => !shown.includes(c))]) {
+	private find(key: TaskKey): { readonly column: EntryList; readonly index: number } | null {
+		for (const column of this.lookOrder()) {
 			const index = this.look.cards(column).findIndex((card) => samePlace(card.key, key));
 			if (index >= 0) return { column, index };
 		}
@@ -802,7 +901,7 @@ export class QuickEntry {
 		else {
 			this.saveRename(field, rename);
 			const under = list && !rename.face && this.under(list, rename.item);
-			this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: null } : null);
+			this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: this.partProject(under) } : null);
 		}
 	}
 
@@ -869,7 +968,7 @@ export class QuickEntry {
 	/** The field's text queued at its run, waiting under the cards until the lists show it written. */
 	private create(field: EntryField): void {
 		const run = this.run(field.run);
-		const line: EntryLine = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0, project: field.project ?? null };
+		const line: EntryLine = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0, project: field.project ?? null, ...(field.placement && { placement: field.placement }) };
 		run.pending.push(line);
 		this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line });
 	}
@@ -890,7 +989,7 @@ export class QuickEntry {
 	 * because another write or a sync landed between the create and this read finds no card: the field then stays where it
 	 * is, as for a task put elsewhere.
 	 */
-	private landed(column: DropColumn, created: TaskKey | CreatedTask, cards: readonly ListCard[]): void {
+	private landed(column: EntryList, created: TaskKey | CreatedTask, cards: readonly ListCard[]): void {
 		const key = "key" in created ? created.key : created;
 		const id = "key" in created ? created.id : created.id;
 		const index = cards.findIndex((card) => {
@@ -969,11 +1068,16 @@ export function entryProject(link: string | null, known: readonly ProjectRef[]):
 	return { page: projectPage([ref ? [ref] : []], known.map((project) => ({ project, depth: project.path.length - 1 }))), lit: link !== null };
 }
 
+/** A folder among the `known` projects: nothing may give a task it. */
+export function isFolderRef(name: string | null, known: readonly ProjectRef[]): boolean {
+	return name !== null && known.some((ref) => ref.folder && projectKey(ref.name) === projectKey(name));
+}
+
 /** The project of link `link` as the Project page shows it: the project note of that name, else the name alone. */
 function refOf(link: string | null, known: readonly ProjectRef[]): ProjectRef | null {
 	if (link === null) return null;
 	const name = projectName(link);
-	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, path: [name], note: null, canOpenNote: false, mark: true };
+	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, path: [name], note: null, canOpenNote: false, mark: true, folder: false };
 }
 
 /** The renamed task as its field stands: in the place of its result's card, that card's key and id. */

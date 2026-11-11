@@ -242,8 +242,8 @@ describe("the priority panel", () => {
 
 describe("the Project button", () => {
 	const KNOWN = [
-		{ name: "Дружба", path: ["Дружба"], note: "Дружба.md", canOpenNote: true, mark: true },
-		{ name: "Окружение", path: ["Окружение"], note: "Окружение.md", canOpenNote: true, mark: true },
+		{ name: "Дружба", path: ["Дружба"], note: "Дружба.md", canOpenNote: true, mark: true, folder: false },
+		{ name: "Окружение", path: ["Окружение"], note: "Окружение.md", canOpenNote: true, mark: true, folder: false },
 	];
 	const rows = (root: ParentNode) => [...root.querySelectorAll<HTMLButtonElement>(".tc-quick-panel .tc-menu-row")];
 	const labels = (root: ParentNode) => rows(root).map((row) => row.textContent);

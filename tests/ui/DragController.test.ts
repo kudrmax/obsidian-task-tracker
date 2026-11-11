@@ -218,6 +218,40 @@ describe("DragController: a drop that changes nothing", () => {
 	});
 });
 
+describe("DragController: what a lift reads", () => {
+	it("hands the drag and its source to onLift before any target reads the drag, and asks putBack before the copy flies home", async () => {
+		const order: string[] = [];
+		const deps = {
+			longPressMs: () => 300,
+			day: () => "2026-11-01",
+			snap: (minute: number) => minute,
+			timeline: () => null,
+			targets: () => {
+				order.push("targets");
+				return [];
+			},
+			haptics: { tap: () => {} },
+			arbiter: new GestureArbiter(),
+			onDragging: () => {},
+			onResult: async () => null,
+			onLift: (_drag: unknown, source: HTMLElement) => order.push(`lift ${source.id}`),
+			putBack: async () => void order.push("put back"),
+		} as unknown as DragControllerDeps;
+		const block = document.body.appendChild(document.createElement("div"));
+		block.id = "b";
+		block.getBoundingClientRect = () => rect(10, 600);
+		const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", priority: null, labels: [], colors: [], dueDate: null, description: null, subtasks: [], links: [], slot: { date: "2026-11-01", start: 600, end: 660 }, card: { text: "A", title: "A", over: null, step: null, semibold: false }, block: { text: "A", title: "A", step: null } };
+		new DragController(deps).attachBlock(block, item as never);
+		const at = (type: string, x: number, y: number, el: EventTarget) =>
+			el.dispatchEvent(Object.assign(new Event(type, { bubbles: true }), { pointerId: 1, clientX: x, clientY: y, isPrimary: true, button: 0, pointerType: "mouse" }));
+		at("pointerdown", 20, 610, block);
+		at("pointermove", 150, 300, block);
+		expect(order).toEqual(["lift b", "targets"]);
+		at("pointerup", 150, 300, document);
+		await vi.waitFor(() => expect(order).toEqual(["lift b", "targets", "put back"]));
+	});
+});
+
 describe("DragController: a finger held on a timeline block", () => {
 	afterEach(() => {
 		vi.useRealTimers();

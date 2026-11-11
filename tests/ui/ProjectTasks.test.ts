@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { ProjectsCard, TaskItem } from "../../core/application/contracts";
 import { ProjectTasks } from "../../obsidian/ui/projects/ProjectTasks";
 import { onDay } from "../fakes/itemOnDay";
+import { projectsView } from "../fakes/projectsView";
 
 const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: "2026-11-12", slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, group: null, subtasks: [], progress: null, parentText: null, description: null, list: "soon", isSubtask: false, ...extra }, "2026-11-07");
 
@@ -10,7 +12,7 @@ const card = (task: TaskItem, stage: ProjectsCard["stage"]): ProjectsCard => ({ 
 
 function drawn(model: ProjectsCard): HTMLElement {
 	const tasks = new ProjectTasks(document.body.appendChild(document.createElement("div")), {});
-	tasks.render({ sections: [{ key: "own", group: null, title: null, header: false, opens: false, empty: false, plate: false, path: [], depth: 0, cards: [model], rows: [{ id: model.id, item: model.item, level: 0, card: model, drop: model.drop }], newTask: null }], emptyLabel: "No tasks", newTask: null }, false);
+	tasks.render(projectsView([{ key: "own", group: null, title: null, header: false, opens: false, takes: true, empty: false, plate: false, path: [], depth: 0, cards: [model], rows: [{ id: model.id, item: model.item, level: 0, card: model, drop: model.drop }], newTask: null }]), false);
 	return tasks.el.querySelector(".tc-card")!;
 }
 
@@ -52,12 +54,12 @@ function rowsOf(part: string, cards: readonly ProjectsCard[], subtasks: Readonly
 }
 
 function section(key: string, title: string | null, cards: readonly ProjectsCard[], extra: Partial<ProjectsSection> = {}): ProjectsSection {
-	return { key, group: title === null ? null : key, title, header: title !== null, opens: title !== null, empty: cards.length === 0, plate: false, path: [], depth: 0, cards, rows: rowsOf(key, cards), newTask: { place: { kind: "list", list: "soon", group: null, before: null }, project: key }, ...extra };
+	return { key, group: title === null ? null : key, title, header: title !== null, opens: title !== null, takes: true, empty: cards.length === 0, plate: false, path: [], depth: 0, cards, rows: rowsOf(key, cards), newTask: { place: { kind: "list", list: "soon", group: null, before: null }, project: key }, ...extra };
 }
 
 function list(sections: readonly ProjectsSection[], onCard?: (card: HTMLElement, owner: ProjectsCard, subtree: readonly HTMLElement[]) => void): ProjectTasks {
 	const tasks = new ProjectTasks(document.body.appendChild(document.createElement("div")), { onCard: (card, _row, owner, subtree) => onCard?.(card, owner, subtree) });
-	tasks.render({ sections, emptyLabel: "No tasks", newTask: null }, false);
+	tasks.render(projectsView(sections), false);
 	return tasks;
 }
 
@@ -90,11 +92,12 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 		expect(tasks.headerAt(tasks.el.children[2] as HTMLElement)).toBe("t");
 	});
 
-	it("an empty part's plate opens the part's new task", () => {
-		const opened: string[] = [];
-		const tasks = new ProjectTasks(document.body.appendChild(document.createElement("div")), { onPlate: (plate, newTask) => plate.addEventListener("click", () => opened.push(newTask.project ?? "")) });
-		tasks.render({ sections: [section("s", "Soon", [], { plate: true })], emptyLabel: "No tasks", newTask: null }, false);
+	it("an empty part's plate opens the field of a new task in its part; a part that takes none has a plate that opens nothing", () => {
+		const opened: (string | null)[] = [];
+		const tasks = new ProjectTasks(document.body.appendChild(document.createElement("div")), { onPlate: (plate, group) => plate.addEventListener("click", () => opened.push(group)) });
+		tasks.render(projectsView([section("s", "Soon", [], { plate: true }), section("d", "Done", [], { plate: true, newTask: null })]), false);
 		tasks.plateOf("s")!.click();
+		tasks.plateOf("d")!.click();
 		expect(opened).toEqual(["s"]);
 	});
 
@@ -108,7 +111,7 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 
 	describe("as a place to drop", () => {
 		/** Rows stand 40 px apart from the list's top at 100. */
-		function placed(sections: readonly ProjectsSection[], reorders = true, takes: (place: ListPlace) => boolean = () => true) {
+		function placed(sections: readonly ProjectsSection[], reorders = true, takes: (place: ListPlace) => boolean = () => true, node: () => string | null = () => "project:P") {
 			document.body.innerHTML = "";
 			const tasks = list(sections);
 			tasks.elements.forEach((node, i) =>
@@ -122,11 +125,20 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 			const area = tasks.el.parentElement!;
 			area.getBoundingClientRect = () => new DOMRect(0, 100, 300, 600);
 			tasks.el.getBoundingClientRect = () => new DOMRect(0, 100, 300, 600);
-			return new ProjectsListDrop(tasks, area, () => reorders, (place) => takes(place));
+			return new ProjectsListDrop(tasks, area, { reorders: () => reorders, takesAt: (place) => takes(place), plusTakesAt: (place) => place.kind === "task" && sections.some((s) => s.group === place.group && s.newTask !== null), node });
 		}
 		const carried = (t: TaskItem) => ({ item: t, from: "soon" as const, grabPx: shownCardSize().height / 2 });
 		/** A carried card hangs by its middle: the finger at `y` is where its middle is. */
 		const middleAt = (y: number) => y;
+
+		it("lets go of nothing at a place read on another node than the one drawn now: the card flies back", () => {
+			let node = "project:P";
+			const drop = placed([section("s", "Soon", [cardOf(a, "s")]), section("t", "Today", [cardOf(b, "t")])], true, () => true, () => node);
+			const y = middleAt(100 + 3 * 40 + 5);
+			drop.preview(10, y, carried(a));
+			node = "project:Q";
+			expect(drop.drop(10, y, carried(a))).toBeNull();
+		});
 
 		it("takes a card between two cards of another part as a place in that part, for dropInProjects", () => {
 			const drop = placed([section("s", "Soon", [cardOf(a, "s")]), section("t", "Today", [cardOf(b, "t")])]);
@@ -176,11 +188,61 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 			expect(asked[0]).toEqual({ kind: "task", group: "t", before: b.key });
 		});
 
-		it("takes no plus and nothing while the node keeps its order", () => {
+		it("takes no card while the node keeps its order", () => {
 			const sections = [section("s", "Soon", [cardOf(a, "s")])];
-			expect(placed(sections).hitTest(10, 150, { from: "new", item: null, grabPx: 0 })).toBe(false);
 			expect(placed(sections, false).hitTest(10, 150, carried(a))).toBe(false);
 			expect(placed(sections).hitTest(10, 150, carried(a))).toBe(true);
 		});
+
+		it("takes the plus as a list does, at a gap of a part a new task is written in, for the field to open there; none in a part that writes none", () => {
+			const plus = { from: "new" as const, item: null, grabPx: 0 };
+			const drop = placed([section("s", "Soon", [cardOf(a, "s")]), section("d", "Done", [cardOf(b, "d")], { newTask: null })]);
+			expect(drop.hitTest(10, 150, plus)).toBe(true);
+			const inSoon = 100 + 40 + 30;
+			drop.preview(10, inSoon, plus);
+			expect(drop.drop(10, inSoon, plus)).toEqual({ kind: "projectsPlace", place: { kind: "task", group: "s", before: null } });
+			const inDone = 100 + 3 * 40 + 30;
+			drop.preview(10, inDone, plus);
+			expect(drop.drop(10, inDone, plus)).toBeNull();
+				expect(placed([section("d", "Done", [cardOf(a, "d")], { newTask: null })]).hitTest(10, 150, plus)).toBe(false);
+		});
+	});
+});
+
+describe("a card still carried while a held card opens another node", () => {
+	const a = task("A", 0);
+	const b = task("B", 2);
+	const c = task("C", 3);
+	const node = (part: string, cards: readonly ProjectsCard[]) => projectsView([section(part, null, cards)]);
+
+	it("stays in the page out of sight, in no list a drop reads, and comes back as itself when its node is drawn again", () => {
+		const tasks = list([section("p1", null, [cardOf(a, "p1"), cardOf(b, "p1")])]);
+		const lifted = tasks.el.querySelector<HTMLElement>(".tc-card")!;
+		lifted.classList.add("is-lifted", "is-waiting");
+		tasks.render(node("p2", [cardOf(c, "p2")]), false);
+		expect(lifted.isConnected).toBe(true);
+		expect(lifted.classList.contains("tc-hidden")).toBe(true);
+		expect(tasks.cards.map((e) => e.item.id)).toEqual(["t3"]);
+		expect(tasks.elements).not.toContain(lifted);
+		tasks.render(node("p3", []), false);
+		expect(lifted.isConnected).toBe(true);
+		tasks.render(node("p1", [cardOf(a, "p1"), cardOf(b, "p1")]), false);
+		expect(tasks.el.querySelector(".tc-card")).toBe(lifted);
+		expect(lifted.classList.contains("tc-hidden")).toBe(false);
+		expect(lifted.classList.contains("is-waiting")).toBe(true);
+	});
+
+	it("is out of sight by the stylesheet, not only by its class", () => {
+		expect(readFileSync("styles.css", "utf8")).toMatch(/\.tc-projects-list > \.tc-hidden \{ display: none; \}/);
+	});
+
+	it("goes once the drag is over and its node is not drawn", () => {
+		const tasks = list([section("p1", null, [cardOf(a, "p1")])]);
+		const lifted = tasks.el.querySelector<HTMLElement>(".tc-card")!;
+		lifted.classList.add("is-lifted");
+		tasks.render(node("p2", [cardOf(c, "p2")]), false);
+		lifted.classList.remove("is-lifted");
+		tasks.render(node("p2", [cardOf(c, "p2")]), true);
+		expect(lifted.isConnected).toBe(false);
 	});
 });

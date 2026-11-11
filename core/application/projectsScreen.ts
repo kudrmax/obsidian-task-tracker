@@ -1,6 +1,7 @@
 import type { DayBoundary } from "../domain/DayBoundary";
 import { namesProject, projectKey } from "../domain/Project";
 import type { PlacedProject, ProjectNode, ProjectTree, TreePlace } from "../domain/ProjectTree";
+import { hasOwnTasks } from "../domain/ProjectWrites";
 import { isOpen, type LocalDate, type SectionKey } from "../domain/Task";
 import type { TaskDocument, TaskEntry } from "../domain/TaskDocument";
 import { projectName } from "../domain/Project";
@@ -26,6 +27,7 @@ import type {
 } from "./contracts";
 import { dueLabel } from "./dayLabels";
 import { NO_PROJECT, refOfPlaced } from "./projects";
+import { dropOf } from "./projectsLift";
 
 /** The words of the Projects screen, the same in every frontend. */
 export const PROJECTS_WORDS = {
@@ -40,6 +42,8 @@ export const PROJECTS_WORDS = {
 	note: "Note",
 	attach: "Attach note…",
 	detach: "Detach",
+	folder: "Folder",
+	folderReason: "Has tasks of its own",
 	deleteProject: "Delete project",
 	deleteMessage: "Its tasks stay; they just lose this project.",
 	deleteConfirm: "Delete",
@@ -69,20 +73,16 @@ function tasksOf(doc: TaskDocument): readonly TaskEntry[] {
 	return doc.allTasks();
 }
 
-/** An open task that moves: in Now or Soon, or with a date or a time. */
-function moving(entry: TaskEntry): boolean {
-	return isOpen(entry.task.status) && (entry.section === "now" || entry.section === "soon" || entry.task.dueDate !== null || entry.task.slot !== null);
-}
-
 /** The tasks that count for a project: open ones in the funnel, closed ones wherever they lie. */
 function counts(entry: TaskEntry): boolean {
 	return isOpen(entry.task.status) ? entry.section !== "done" : true;
 }
 
 /**
- * Each project's state, by its key, from its tasks and its subprojects': active, an open task of its branch moves (Now,
- * Soon, a date or a time); waiting, its branch's open tasks wait in Inbox and Backlog, or its branch has a project
- * without a task yet; done, every task of its branch is closed and every subproject is done.
+ * Each project's state, by its key, from its tasks and its subprojects': active, its branch has an open task, in any
+ * stage (Inbox, Backlog, Soon, Today); waiting (its name grey), its branch has no open task at all, yet a project
+ * without a task in it (a new project, a folder of empty subprojects); done, every task of its branch is closed and
+ * every subproject is done.
  */
 export function projectStatuses(tree: ProjectTree, doc: TaskDocument): ReadonlyMap<string, ProjectStatus> {
 	const tasks = tasksOf(doc).filter(counts);
@@ -92,9 +92,9 @@ export function projectStatuses(tree: ProjectTree, doc: TaskDocument): ReadonlyM
 		const own = tasks.filter((entry) => namesProject(entry.task.projects, node.name));
 		const total = own.length + children.reduce((sum, child) => sum + child.tasks, 0);
 		const status: ProjectStatus =
-			own.some(moving) || children.some((c) => c.status === "active")
+			own.some((e) => isOpen(e.task.status)) || children.some((c) => c.status === "active")
 				? "active"
-				: total === 0 || own.some((e) => isOpen(e.task.status)) || children.some((c) => c.status !== "done")
+				: total === 0 || children.some((c) => c.status !== "done")
 					? "waiting"
 					: "done";
 		statuses.set(projectKey(node.name), status);
@@ -137,7 +137,7 @@ export function projectsView(input: ProjectsInput): ProjectsView {
 	const statusOf = (name: string): ProjectStatus => statuses.get(projectKey(name)) ?? "waiting";
 	const selected = selectedNode(state, tree);
 	const mode: ProjectsMode = state.mode ?? "byProject";
-	const rows = treeRows(tree, state, selected, statusOf);
+	const rows = treeRows(tree, state, selected, statusOf, (node) => input.doc !== null && nodeReorders(node, statusOf));
 	const parts = input.doc ? sectionsOf(input, input.doc, selected, mode, statusOf) : [];
 	const name = projectOfNode(selected);
 	const placed = name === null ? null : tree.find(name);
@@ -150,16 +150,24 @@ export function projectsView(input: ProjectsInput): ProjectsView {
 			{ mode: "byStage", label: PROJECTS_WORDS.byStage },
 		],
 		title: placed ? placed.node.name : selected === "none" ? PROJECTS_WORDS.none : selected === "done" ? PROJECTS_WORDS.done : PROJECTS_WORDS.all,
-		menu: placed ? projectMenu(refOfPlaced(placed, false)) : null,
+		menu: placed ? projectMenu(refOfPlaced(placed, false), input.doc !== null && hasOwnTasks(input.doc, placed.node.name)) : null,
 		sections: parts,
-		newTask: selected === "done" || (placed !== null && statusOf(placed.node.name) === "done") ? null : inInbox(placed?.node.name ?? null),
+		newTask: selected === "done" || (placed !== null && (placed.node.folder || statusOf(placed.node.name) === "done")) ? null : inInbox(placed?.node.name ?? null),
 		emptyLabel: PROJECTS_WORDS.noTasks,
 		missing: input.doc === null,
-		reorders: input.doc !== null && selected !== "done" && !(placed !== null && statusOf(placed.node.name) === "done"),
+		reorders: input.doc !== null && nodeReorders(selected, statusOf),
 	};
 }
 
-function projectMenu(project: ProjectRef): ProjectMenu {
+/** A node's list takes drops: every node but Done and a done project, whose closed tasks stay. */
+function nodeReorders(node: ProjectsNodeId, statusOf: (name: string) => ProjectStatus): boolean {
+	const name = projectOfNode(node);
+	return node !== "done" && !(name !== null && statusOf(name) === "done");
+}
+
+/** The project menu; `ownTasks`: the project has tasks of its own, so it can't be made a folder. */
+function projectMenu(project: ProjectRef, ownTasks: boolean): ProjectMenu {
+	const locked = !project.folder && ownTasks;
 	return {
 		project,
 		renameLabel: PROJECTS_WORDS.rename,
@@ -167,6 +175,7 @@ function projectMenu(project: ProjectRef): ProjectMenu {
 		note: project.note === null ? null : { link: project.note, name: projectName(project.note.split("|")[0].split("#")[0]) },
 		attachLabel: PROJECTS_WORDS.attach,
 		detachLabel: PROJECTS_WORDS.detach,
+		folder: { label: PROJECTS_WORDS.folder, on: project.folder, disabled: locked, reason: locked ? PROJECTS_WORDS.folderReason : null },
 		delete: {
 			label: PROJECTS_WORDS.deleteProject,
 			title: `Delete “${project.name}”?`,
@@ -182,9 +191,14 @@ function inInbox(project: string | null): ProjectsNewTask {
 	return { place: { kind: "list", list: "inbox", group: null, before: null }, project };
 }
 
-/** The rows of the tree: All, the live projects (a folded branch left out), No project, Done and, open, the done projects. */
-function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: ProjectsNodeId, statusOf: (name: string) => ProjectStatus): ProjectsRow[] {
-	const rows: ProjectsRow[] = [fixedRow("all", PROJECTS_WORDS.all, selected, false, false)];
+/**
+ * The rows of the tree: All, the live projects (a folded branch left out), No project, Done and, open, the done projects.
+ * `reorders` says whether a node's list takes drops: a row opens under a held card when it takes the card, its list takes
+ * drops and it is not chosen.
+ */
+function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: ProjectsNodeId, statusOf: (name: string) => ProjectStatus, reorders: (node: ProjectsNodeId) => boolean): ProjectsRow[] {
+	const row = (fields: Omit<ProjectsRow, "opensOnHover">): ProjectsRow => ({ ...fields, opensOnHover: fields.acceptsTask && !fields.selected && reorders(fields.node) });
+	const rows: ProjectsRow[] = [row(fixedRow("all", PROJECTS_WORDS.all, selected, false, false))];
 	const walk = (nodes: readonly ProjectNode[], path: readonly string[], depth: number, done: boolean) => {
 		for (const node of nodes) {
 			if ((statusOf(node.name) === "done") !== done) continue;
@@ -192,7 +206,7 @@ function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: Proje
 			const folded = branch.length > 0 && isFolded(state, node.name);
 			const own = [...path, node.name];
 			const status = statusOf(node.name);
-			rows.push({
+			rows.push(row({
 				node: projectNodeOf(node.name),
 				kind: "project",
 				title: node.name,
@@ -205,19 +219,19 @@ function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: Proje
 				hasBranch: branch.length > 0,
 				folded,
 				project: refOfPlaced({ node, path: own }, false),
-				acceptsTask: true,
+				acceptsTask: !node.folder,
 				canLift: !done,
 				unfoldsOnHover: folded,
-			});
+			}));
 			if (!folded) walk(node.children, own, depth + 1, done);
 		}
 	};
 	walk(tree.roots, [], 0, false);
-	rows.push(fixedRow("none", PROJECTS_WORDS.none, selected, false, true));
+	rows.push(row(fixedRow("none", PROJECTS_WORDS.none, selected, false, true)));
 	const doneTops = doneRoots(tree, statusOf);
 	const open = state.doneOpen === true;
-	rows.push({ ...fixedRow("done", PROJECTS_WORDS.done, selected, doneTops.length > 0, false), folded: doneTops.length > 0 && !open });
-	if (open) for (const top of doneTops) walkDone(top, rows, state, selected, statusOf, 1);
+	rows.push(row({ ...fixedRow("done", PROJECTS_WORDS.done, selected, doneTops.length > 0, false), folded: doneTops.length > 0 && !open }));
+	if (open) for (const top of doneTops) walkDone(top, rows, state, selected, statusOf, 1, row);
 	return rows;
 }
 
@@ -230,10 +244,10 @@ function doneRoots(tree: ProjectTree, statusOf: (name: string) => ProjectStatus)
 	});
 }
 
-function walkDone(placed: PlacedProject, rows: ProjectsRow[], state: ProjectsScreenState, selected: ProjectsNodeId, statusOf: (name: string) => ProjectStatus, depth: number): void {
+function walkDone(placed: PlacedProject, rows: ProjectsRow[], state: ProjectsScreenState, selected: ProjectsNodeId, statusOf: (name: string) => ProjectStatus, depth: number, row: (fields: Omit<ProjectsRow, "opensOnHover">) => ProjectsRow): void {
 	const { node, path } = placed;
 	const folded = node.children.length > 0 && isFolded(state, node.name);
-	rows.push({
+	rows.push(row({
 		node: projectNodeOf(node.name),
 		kind: "project",
 		title: node.name,
@@ -246,14 +260,14 @@ function walkDone(placed: PlacedProject, rows: ProjectsRow[], state: ProjectsScr
 		hasBranch: node.children.length > 0,
 		folded,
 		project: refOfPlaced(placed, false),
-		acceptsTask: true,
+		acceptsTask: !node.folder,
 		canLift: false,
 		unfoldsOnHover: folded,
-	});
-	if (!folded) for (const child of node.children) walkDone({ node: child, path: [...path, child.name] }, rows, state, selected, statusOf, depth + 1);
+	}));
+	if (!folded) for (const child of node.children) walkDone({ node: child, path: [...path, child.name] }, rows, state, selected, statusOf, depth + 1, row);
 }
 
-function fixedRow(node: "all" | "none" | "done", title: string, selected: ProjectsNodeId, hasBranch: boolean, acceptsTask: boolean): ProjectsRow {
+function fixedRow(node: "all" | "none" | "done", title: string, selected: ProjectsNodeId, hasBranch: boolean, acceptsTask: boolean): Omit<ProjectsRow, "opensOnHover"> {
 	return { node, kind: node, title, depth: 0, tile: true, waiting: false, muted: node !== "all", status: null, selected: selected === node, hasBranch, folded: false, project: null, acceptsTask, canLift: false, unfoldsOnHover: false };
 }
 
@@ -300,7 +314,7 @@ function cardOf(input: ProjectsInput, entry: TaskEntry, mode: ProjectsMode, from
 		stage: mode === "byProject" ? stageMark(entry, input.today, input.boundary) : null,
 		over: mode === "byStage" ? over : null,
 		from,
-		drop: { key: item.key, from },
+		drop: dropOf(item, from),
 		menuFrom: menuFromOf(entry),
 		canDrop: item.open,
 	};
@@ -320,7 +334,7 @@ function sectionsOf(input: ProjectsInput, doc: TaskDocument, selected: ProjectsN
 		return mode === "byProject" ? shown([part("none", null, [], 0, byStage(loose).map((e) => cardOf(input, e, mode, null, null)), inInbox(null))], true) : stageSections(input, loose.map((entry) => ({ entry, from: null, over: null })), null, true);
 	}
 	const live = input.tree.all().filter((p) => statusOf(p.node.name) !== "done");
-	if (mode === "byProject") return shown(live.map((p) => part(`project:${p.node.name}`, p.node.name, p.path, p.path.length, byStage(tasksNaming(doc, p.node.name, false)).map((e) => cardOf(input, e, mode, p.node.name, null)), inInbox(p.node.name))), true);
+	if (mode === "byProject") return shown(live.map((p) => projectPart(`project:${p.node.name}`, p, p.path, p.path.length, byStage(tasksNaming(doc, p.node.name, false)).map((e) => cardOf(input, e, mode, p.node.name, null)), inInbox(p.node.name))), true);
 	const tasks = tasksOf(doc).filter((entry) => entry.task.projects.length > 0 && stageOf(entry) !== "done");
 	return stageSections(
 		input,
@@ -340,8 +354,8 @@ function projectSections(input: ProjectsInput, doc: TaskDocument, placed: Placed
 	const branch = input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf(p.node.name) !== "done"));
 	const write = (project: string) => (closed ? null : inInbox(project));
 	if (mode === "byProject") {
-		const own = part(OWN, null, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf(input, e, mode, placed.node.name, null)), write(placed.node.name));
-		const subs = branch.map((p) => part(`project:${p.node.name}`, p.node.name, p.path.slice(top), p.path.length - top, byStage(tasksNaming(doc, p.node.name, closed)).map((e) => cardOf(input, e, mode, p.node.name, null)), write(p.node.name)));
+		const own = projectPart(OWN, { ...placed, title: null }, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf(input, e, mode, placed.node.name, null)), write(placed.node.name));
+		const subs = branch.map((p) => projectPart(`project:${p.node.name}`, p, p.path.slice(top), p.path.length - top, byStage(tasksNaming(doc, p.node.name, closed)).map((e) => cardOf(input, e, mode, p.node.name, null)), write(p.node.name)));
 		return shown([own, ...subs], !closed);
 	}
 	const seen = new Set<string>();
@@ -354,7 +368,7 @@ function projectSections(input: ProjectsInput, doc: TaskDocument, placed: Placed
 			tasks.push({ entry, from: own ? placed.node.name : p.node.name, over: own ? null : p.node.name });
 		}
 	}
-	return stageSections(input, tasks, closed ? null : placed.node.name, !closed);
+	return stageSections(input, tasks, closed ? null : placed.node.name, !closed, !placed.node.folder);
 }
 
 /** Done: each done project's closed tasks, By project; By stage, one part of them all. */
@@ -368,13 +382,14 @@ function doneSections(input: ProjectsInput, doc: TaskDocument, mode: ProjectsMod
 
 /**
  * By stage: Inbox, Backlog, Soon, Today (Done for closed tasks), each in the file's order; the plus there writes into
- * that list with `project`. `open`: the four stages show with no task too (Done never does).
+ * that list with `project` (none at all without `plus`: a folder's). `open`: the four stages show with no task too (Done
+ * never does).
  */
-function stageSections(input: ProjectsInput, tasks: readonly { entry: TaskEntry; from: string | null; over: string | null }[], project: string | null, open: boolean): ProjectsSection[] {
+function stageSections(input: ProjectsInput, tasks: readonly { entry: TaskEntry; from: string | null; over: string | null }[], project: string | null, open: boolean, plus = true): ProjectsSection[] {
 	const parts = STAGE_ORDER.map((stage) => {
 		const here = tasks.filter((s) => stageOf(s.entry) === stage).sort((a, b) => fileOrder(a.entry, b.entry));
 		const title = stage === "today" ? PROJECTS_WORDS.today : stage === "done" ? PROJECTS_WORDS.done : input.listName(stage);
-		const place: NewTaskPlace | null = stage === "done" ? null : { kind: "list", list: stage === "today" ? "now" : stage, group: null, before: null };
+		const place: NewTaskPlace | null = stage === "done" || !plus ? null : { kind: "list", list: stage === "today" ? "now" : stage, group: null, before: null };
 		return part(stage, title, [], 0, here.map((s) => cardOf(input, s.entry, "byStage", s.from, s.over)), place && { place, project });
 	});
 	return shown(parts, open).filter((s) => s.key !== "done" || !s.empty);
@@ -388,26 +403,38 @@ function fileOrder(a: TaskEntry, b: TaskEntry): number {
 /** The key of a project's own part, By project. */
 const OWN = "own";
 
-function part(key: string, title: string | null, path: readonly string[], depth: number, cards: readonly PartCard[], newTask: ProjectsNewTask | null): ProjectsSection {
+function part(key: string, title: string | null, path: readonly string[], depth: number, cards: readonly PartCard[], newTask: ProjectsNewTask | null, takes = true): ProjectsSection {
 	const drawn = cards.map((card) => ({ id: `${key}/${card.item.id}`, ...card }));
 	const rows = drawn.flatMap((card): ProjectsListRow[] => [{ id: card.id, item: card.item, level: 0, card, drop: card.drop }, ...subtaskRows(key, card.item, 1, card.from)]);
 	const header = title !== null;
-	return { key, group: header ? key : null, title, header, opens: header, empty: drawn.length === 0, plate: false, path, depth, cards: drawn, rows, newTask };
+	return { key, group: header ? key : null, title, header, opens: header, takes, empty: drawn.length === 0, plate: false, path, depth, cards: drawn, rows, newTask };
+}
+
+/**
+ * A project's part, By project, titled with its name unless `title` is null (the node's own): a folder's takes no card
+ * and has no plus, and is left out with no card, as it holds only tasks given the folder by hand.
+ */
+function projectPart(key: string, placed: PlacedProject & { readonly title?: null }, path: readonly string[], depth: number, cards: readonly PartCard[], newTask: ProjectsNewTask | null): ProjectsSection | null {
+	const { folder, name } = placed.node;
+	if (folder && cards.length === 0) return null;
+	return part(key, placed.title === null ? null : name, path, depth, cards, folder ? null : newTask, !folder);
 }
 
 /** A task's open subtasks as rows a level deeper, each before its own, unless they are folded away. */
 function subtaskRows(key: string, item: TaskItem, level: number, from: string | null): ProjectsListRow[] {
 	if (item.collapsed) return [];
-	return item.subtasks.flatMap((sub) => [{ id: `${key}/${sub.id}`, item: sub, level, card: null, drop: { key: sub.key, from } }, ...subtaskRows(key, sub, level + 1, from)]);
+	return item.subtasks.flatMap((sub) => [{ id: `${key}/${sub.id}`, item: sub, level, card: null, drop: dropOf(sub, from) }, ...subtaskRows(key, sub, level + 1, from)]);
 }
 
 /**
- * The parts shown: all of them where a drop may go (`open`), else those with a card; the plate under an empty one with a
- * header, or the only one; a header opens its part unless the untitled part stands above it.
+ * The parts shown: all of them where a drop may go (`open`), else those with a card (a folder's left out already); the
+ * plate under an empty one with a header, or the only one; a header opens its part unless an untitled part that takes
+ * cards stands above it (a folder's own part takes none, so the gap under it is the first subproject's).
  */
-function shown(sections: readonly ProjectsSection[], open: boolean): ProjectsSection[] {
-	const kept = open ? sections : sections.filter((s) => !s.empty);
-	const untitledAbove = (i: number) => kept.slice(0, i).some((s) => !s.header);
+function shown(sections: readonly (ProjectsSection | null)[], open: boolean): ProjectsSection[] {
+	const parts = sections.filter((s): s is ProjectsSection => s !== null);
+	const kept = open ? parts : parts.filter((s) => !s.empty);
+	const untitledAbove = (i: number) => kept.slice(0, i).some((s) => !s.header && s.takes);
 	return kept.map((s, i) => ({ ...s, plate: s.empty && (s.header || kept.length === 1), opens: s.header && !untitledAbove(i) }));
 }
 
@@ -426,6 +453,17 @@ export function unfolded(state: ProjectsScreenState, node: ProjectsNodeId): Proj
 	if (node === "done") return state.doneOpen ? state : { ...state, doneOpen: true };
 	const name = projectOfNode(node);
 	return name === null || !isFolded(state, name) ? state : withFold(state, name, false);
+}
+
+/**
+ * A card held over `node`'s row of `rows`, the tree as drawn: its branch unfolded when it unfolds on hover, and it chosen
+ * when it opens on hover, so the rule is the one the row was drawn with. A node without a row stays as it is.
+ */
+export function hovered(state: ProjectsScreenState, tree: ProjectTree, doc: TaskDocument | null, rows: readonly ProjectsRow[], node: ProjectsNodeId): ProjectsScreenState {
+	const row = rows.find((r) => sameNode(r.node, node));
+	if (!row) return state;
+	const open = row.unfoldsOnHover ? unfolded(state, row.node) : state;
+	return row.opensOnHover ? selected(open, tree, doc, row.node) : open;
 }
 
 /** The node chosen with every branch above it open, so its row shows. */
@@ -498,7 +536,7 @@ export function projectsGap(rows: readonly ProjectsRow[], gap: number, depth: nu
 	return { place, depth: level };
 }
 
-/** How long a held card waits over a folded row before its branch opens, ms. */
+/** How long a held card waits over a row before it unfolds or opens (`hovered`), ms. */
 export const PROJECTS_HOVER_MS = 600;
 
 /** The indent of one step of the tree, px (pt): a finger's sideways way of one step changes a lifted row's depth by one. */

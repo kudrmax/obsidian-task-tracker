@@ -11,6 +11,7 @@ import type {
 	EndList,
 	ListPlace,
 	ProjectsDropPreview,
+	ProjectsPlace,
 	GroupedList,
 	GroupName,
 	GroupPlace,
@@ -30,8 +31,10 @@ import type { Operation, TaskRules } from "./TaskRules";
 import { droppedSpan } from "./TimelineSpans";
 import { landingOf } from "./landing";
 import { projectsDropSteps, projectsLandingOf } from "./projectsDrop";
+import { projectsNewPlace } from "./projectsEntry";
 import { keyOf } from "./taskKeys";
 import type { TreePlace } from "../domain/ProjectTree";
+import { isFolder } from "../domain/ProjectWrites";
 
 /** The project of the cleaned name `clean`, as the tree after a write has it; null when it has none. */
 function namedIn(change: DocChange | null, clean: string | null): string | null {
@@ -82,11 +85,21 @@ export class TaskWrites {
 
 	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Write<CreatedTask | null> {
 		return {
-			operation: this.rules.createInPlace(text, priority, place, repeat, labels, project),
+			operation: place.kind === "projects" ? this.createInProjects(text, priority, place, repeat, labels, project) : this.rules.createInPlace(text, priority, place, repeat, labels, project),
 			answer: (change) => {
 				const created = change?.after.insertedSince(change.before);
 				return created ? { key: keyOf(created), id: created.id } : null;
 			},
+		};
+	}
+
+	/** A task typed in the Projects list: its place read off the screen as the file then stands (`projectsNewPlace`). */
+	private createInProjects(text: string, priority: string | null, place: ProjectsPlace, repeat: RepeatRule | null | undefined, labels: readonly string[], project: string | null | undefined): Operation | null {
+		if (this.rules.isBlank(text)) return null;
+		return (doc, today, settings, boundary) => {
+			const view = this.reads.projectsScreen({ text: "", doc, today, boundary });
+			const at = projectsNewPlace(view, doc, (key) => this.rules.entryOf(doc, key), place, today);
+			return this.rules.placeNew(text, priority, at, repeat, labels, project)(doc, today, settings, boundary);
 		};
 	}
 
@@ -163,10 +176,19 @@ export class TaskWrites {
 		};
 	}
 
-	/** «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of nothing. */
+	/**
+	 * «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of
+	 * nothing and for a folder's name, which no task may be given: an answer is always a project to pick.
+	 */
 	newProject(name: string, keys: readonly TaskKey[]): Write<string | null> {
 		const operation = this.rules.newProject(name, keys);
-		return { operation, answer: (change) => (operation === null ? null : namedIn(change, this.rules.cleanName(name))) };
+		return {
+			operation,
+			answer: (change) => {
+				const made = operation === null ? null : namedIn(change, this.rules.cleanName(name));
+				return made === null || isFolder(change!.after, made) ? null : made;
+			},
+		};
 	}
 
 	dropOnProject(cards: readonly ProjectsDrop[], to: string | null): Write<void> {
@@ -191,6 +213,12 @@ export class TaskWrites {
 
 	deleteProject(name: string): Write<void> {
 		return nothing(this.rules.deleteProject(name));
+	}
+
+	/** Whether the project's folder mark changed. */
+	setProjectFolder(name: string, folder: boolean): Write<boolean> {
+		const operation = this.rules.setProjectFolder(name, folder);
+		return { operation, answer: (change) => change !== null && change.after.serialize() !== change.before.serialize() };
 	}
 
 	setProjectNote(name: string, link: string | null): Write<void> {

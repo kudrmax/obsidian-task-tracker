@@ -398,6 +398,20 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.rules.filter((d) => d.selector.includes("is-four") && d.property === "overflow")).toEqual([]);
 	});
 
+	/**
+	 * Max, 2026-11-11: renaming a card on the Projects screen opened its field in an unseen column, and typing left the
+	 * screen half-way between Projects and Inbox for good. The browser had scrolled the screen (overflow: hidden is still a
+	 * scroll container) to bring the caret into sight; no wheel or swipe moves that scroll back.
+	 */
+	it("never lets the browser scroll the screen or a column sideways to bring a field into sight: they clip, they do not scroll", () => {
+		const of = (selector: string) => sheet.rules.filter((d) => d.selector === selector && d.property.startsWith("overflow")).map((d) => `${d.property}: ${d.value}`);
+		for (const selector of ["body .workspace-leaf-content .view-content.tc-view", ".task-calendar", ".tc-left", ".tc-soon", ".tc-inbox", ".tc-done", ".tc-right"]) {
+			expect(of(selector), selector).toEqual(["overflow: clip"]);
+		}
+		const strip = /^\.task-calendar(\.[\w-]+)*( > [^ ,]+)?$|^\.tc-(left|soon|inbox|done|right|projects)$/;
+		expect(sheet.rules.filter((d) => strip.test(d.selector) && d.property.startsWith("overflow") && d.value !== "clip")).toEqual([]);
+	});
+
 	it("stands the switch and the plus in one row over Obsidian's chrome: the phone's navigation, or the desktop's status bar while it is shown", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-status-room")).toBe("0px");

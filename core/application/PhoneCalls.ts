@@ -20,7 +20,8 @@ import { dayMonth, dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
-import { placeShowing, SCREEN_PLACES, type ScreenAt, SHOWN_LISTS, shownLists, stepScreen, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { type EntryList, placeShowing, SCREEN_PLACES, type ScreenAt, SHOWN_LISTS, shownEntryLists, shownLists, stepScreen, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { type EntryPart, projectsEntryLook } from "./projectsEntry";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
 	type CalendarEvent,
@@ -28,7 +29,6 @@ import {
 	type CalendarAlert,
 	type DayEvents,
 	type DayWords,
-	type DropColumn,
 	type GroupedList,
 	type ProjectNote,
 	type ProjectsScreenState,
@@ -48,7 +48,7 @@ import { DIVIDER_SNAP, dividerAt, LIST_WIDTHS, listShareOf, listWidths } from ".
 import { type LinkQuery, linkQuery, noteOfLink, noteSuggestions, type VaultNote, withNoteLink } from "./notes";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, type Header, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
-import { emptySession, entryProject, type EntryJob, type EntryLook, type EntrySession, type EntryState, type PendingRename, QuickEntry } from "./QuickEntry";
+import { emptySession, entryProject, isFolderRef, type EntryJob, type EntryLook, type EntrySession, type EntryState, type PendingRename, QuickEntry } from "./QuickEntry";
 import { sectionNameEnd } from "./SectionNameEntry";
 import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
@@ -56,8 +56,8 @@ import { listView, sectionChoice } from "./sections";
 import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
-import { projectsTakes } from "./projectsDrop";
-import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { projectsPlusTakes, projectsTakes } from "./projectsDrop";
+import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -169,13 +169,16 @@ export interface WireDayEvents {
 
 /** The screen as a quick entry reads it, on the wire: each list's cards and sections, and which lists show. */
 export interface WireLook {
-	readonly cards: Partial<Record<DropColumn, readonly ListCard[]>>;
-	readonly sections?: Partial<Record<DropColumn, readonly Header[]>>;
-	readonly sectioned?: Partial<Record<DropColumn, boolean>>;
+	/** Each list's cards; the Projects list's (`projects`) as `rules.projectsEntryLook` gives them. */
+	readonly cards: Partial<Record<EntryList, readonly ListCard[]>>;
+	readonly sections?: Partial<Record<EntryList, readonly Header[]>>;
+	readonly sectioned?: Partial<Record<EntryList, boolean>>;
 	/** The day the day's list shows. */
 	readonly day: string;
-	/** The lists the screen shows, in its order. */
-	readonly shown: readonly DropColumn[];
+	/** The lists the screen shows, in its order (`rules.shownEntryLists`). */
+	readonly shown: readonly EntryList[];
+	/** The parts of a list that decides its own writes: the Projects list's, `rules.projectsEntryLook`'s `parts`. */
+	readonly parts?: Partial<Record<EntryList, readonly EntryPart[]>>;
 }
 
 class DoorError extends Error {
@@ -416,6 +419,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	projectsScreen: (c) => c.ask(c.reads.projectsScreenRead()),
 	tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node as string)),
 	selectProjectNode: (c, [node]) => c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, node as string)),
+	hoverProjectNode: (c, [node]) => c.keepProjectsScreen(hovered(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, c.ask(c.reads.projectsScreenRead()).rows, node as string)),
 	setProjectsMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, mode: mode as A }),
 	createProject: (c, [name, place]) => {
 		const made = c.run(c.writes.createProject(name as string, place as A));
@@ -432,6 +436,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	dropInProjects: (c, [cards, place]) => c.run(c.ask(c.writes.dropInProjects(cards as A, place as A))),
 	projectsDropPreview: (c, [cards, place]) => c.ask(c.writes.projectsDropPreview(cards as A, place as A)),
 	deleteProject: (c, [name]) => c.run(c.writes.deleteProject(name as string)),
+	setProjectFolder: (c, [name, folder]) => c.run(c.writes.setProjectFolder(name as string, folder === true)),
 	setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name as string, (link ?? null) as string | null)),
 	dropOnProject: (c, [cards, to]) => {
 		const target = to === "none" ? null : projectOfNode(to as string);
@@ -711,7 +716,11 @@ const CAPTURE: Readonly<Record<string, Handler>> = {
 		c.write((text) => c.rules.change(text, c.rules.placeNew(title, null, { kind: "list", list: list as GroupedList, group: null, before: null }, null, [], (project ?? null) as string | null)).text);
 	},
 	/** The New Task sheet's Project row for the project chosen (null: none; at the start, the view's `ScreenView.project`): the quick entry's Project button, its page and whether it is lit. */
-	project: (c, [chosen]) => entryProject((chosen ?? null) as string | null, c.reads.projects()),
+	project: (c, [chosen]) => {
+		const known = c.reads.projects();
+		const name = (chosen ?? null) as string | null;
+		return entryProject(isFolderRef(name, known) ? null : name, known);
+	},
 	lists: (c) => CAPTURE_LISTS.map((list) => ({ list, name: c.settings.sections[list] })),
 };
 
@@ -759,6 +768,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	noteTags,
 	projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
 	projectsTakes: (view, cards, place) => projectsTakes(view as A, cards as A, place as A),
+	projectsPlusTakes: (view, place) => projectsPlusTakes(view as A, place as A),
 	projectsGap: (rows, gap, depth, lifted) => projectsGap(rows, gap, depth, lifted ?? null),
 	projectsLevels: (rows, gap, lifted) => projectsLevels(rows, gap, lifted ?? null),
 	projectsDrop: (rows, gap, shift, lifted) => projectsDrop(rows, gap, shift, lifted ?? null),
@@ -796,6 +806,8 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	placeShowing,
 	swipeLanding,
 	shownLists,
+	shownEntryLists,
+	projectsEntryLook,
 	wholeWidth,
 	grownStart,
 	listWidths,
@@ -823,6 +835,7 @@ function lookOf(c: Call, look: WireLook): EntryLook {
 		day: () => look.day,
 		today: () => c.rules.today(),
 		shown: () => look.shown,
+		parts: (column) => look.parts?.[column] ?? [],
 	};
 }
 
@@ -842,9 +855,11 @@ const ENTRY_METHODS: readonly string[] = [
 	"listEntry",
 	"openAtEnd",
 	"openFromPlus",
+	"plusOpens",
 	"openIn",
 	"openSlot",
 	"openAtDrop",
+	"openAt",
 	"subtaskSpot",
 	"renameSpot",
 	"stackSpot",
@@ -881,7 +896,7 @@ function entryCall(name: string): Handler {
 		if (name === "state") value = entry.state;
 		else if (name === "renaming") value = entry.renaming;
 		else if (name === "shown") {
-			const [id, created, coming] = args as [string, A, Partial<Record<DropColumn, readonly ListCard[]>>];
+			const [id, created, coming] = args as [string, A, Partial<Record<EntryList, readonly ListCard[]>>];
 			entry.shown(id, created ?? null, (column) => coming?.[column] ?? []);
 		} else value = (entry as unknown as Record<string, (...a: unknown[]) => unknown>)[name](...args);
 		return { session: entry.session, state: entry.state, changes, jobs, value: value === undefined ? null : value, renamed: entry.renamed } satisfies EntryAnswer;

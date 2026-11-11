@@ -2,25 +2,31 @@ import type { TaskDocument, TaskEntry } from "../domain/TaskDocument";
 import type { GroupedList } from "../domain/Lists";
 import type { LocalDate } from "../domain/Task";
 import { projectKey } from "../domain/Project";
-import type { DropColumn, DropFrom, GroupName, ProjectsCard, ProjectsDrop, ProjectsDropLanding, ProjectsSection, ProjectsView, TaskItem, TaskKey, TaskStep } from "./contracts";
+import type { DropColumn, DropFrom, GroupName, ProjectsCard, ProjectsDrop, ProjectsDropLanding, ProjectsLifted, ProjectsSection, ProjectsView, TaskItem, TaskKey, TaskStep } from "./contracts";
 import { StaleTaskError } from "./contracts";
 import { acceptsDrop, dropMove } from "./drops";
 import type { ListPlace } from "./nesting";
+import { originOf } from "./projectsLift";
 import { projectOfNode } from "./projectsScreen";
 import { keyOf, samePlace } from "./taskKeys";
 
 const COLUMN_OF: Readonly<Record<GroupedList, DropColumn>> = { now: "day", soon: "soon", inbox: "inbox", backlog: "backlog" };
 
 /** The list a task stands in: its own, a subtask's its task's; Today is Now. */
-function listOf(item: TaskItem): GroupedList | null {
+function listOf(item: { readonly list: ProjectsLifted["list"] }): GroupedList | null {
 	return item.list === "done" ? null : item.list;
 }
 
-/** The funnel's column a card is dragged from there: a task on a time from the timeline, one with a day (Now's, a dated Soon task) from that day's list. */
-function originOf(item: TaskItem): DropFrom {
-	if (item.slot !== null) return "timeline";
-	if (item.list === "now" || (item.list === "soon" && item.dueDate !== null)) return "day";
-	return item.list as DropFrom;
+/**
+ * A carried card as the drop judges it: who its task is, its list, the column it is dragged from, and whether the list
+ * shows a card of it (`shown`): one it does not show was lifted on another node, then a held card opened this one.
+ */
+interface Carried extends ProjectsLifted {
+	readonly shown: boolean;
+}
+
+function carriedOf(item: TaskItem): Carried {
+	return { id: item.id, list: item.list, origin: originOf(item), shown: true };
 }
 
 /** Where a drop between cards goes: next to a card (after the one above, or before the one below), or into an empty part. */
@@ -33,26 +39,37 @@ interface Plan {
 	readonly project: string | null | undefined;
 }
 
-function itemOf(view: ProjectsView, key: TaskKey): TaskItem {
+function shownItem(view: ProjectsView, key: TaskKey): TaskItem | null {
 	for (const section of view.sections) for (const row of section.rows) if (samePlace(row.item.key, key)) return row.item;
-	throw new StaleTaskError();
+	return null;
 }
 
-/** The task a card or a row stands for: one id, wherever it is drawn twice. */
-function sameTask(a: TaskItem, b: TaskItem): boolean {
-	return a.id === b.id;
+/** A carried card as the screen shows it, else as it was lifted (`ProjectsDrop.lifted`); stale when neither says. */
+function carriedIn(view: ProjectsView, card: ProjectsDrop): Carried {
+	const item = shownItem(view, card.key);
+	if (item) return carriedOf(item);
+	if (!card.lifted) throw new StaleTaskError();
+	return { ...card.lifted, shown: false };
+}
+
+/** A carried card as the file has it now (`entry`), the screen read from that file saying whether it shows it. */
+function carriedInFile(view: ProjectsView, entry: TaskEntry, card: ProjectsDrop): Carried {
+	const item = shownItem(view, card.key);
+	if (item) return carriedOf(item);
+	if (!card.lifted) throw new StaleTaskError();
+	return { id: entry.id, list: entry.section, origin: originOf({ list: entry.section, slot: entry.task.slot, dueDate: entry.task.dueDate }), shown: false };
 }
 
 /**
  * The drop's plan over `view`, the screen as read: the part, and the card next to which the cards go (dropped ones never
  * counted, nor a second card of a task shown in two parts). Rejects with StaleTaskError for a part the screen lacks.
  */
-function planOf(view: ProjectsView, carried: readonly TaskItem[], place: Extract<ListPlace, { readonly kind: "task" }>): Plan {
+function planOf(view: ProjectsView, carried: readonly Carried[], place: Extract<ListPlace, { readonly kind: "task" }>): Plan {
 	const section = view.sections.find((s) => s.group === place.group);
 	if (!section) throw new StaleTaskError();
 	const at = place.before === null ? section.cards.length : section.cards.findIndex((card) => samePlace(card.item.key, place.before!));
 	if (at < 0) throw new StaleTaskError();
-	const kept = (card: ProjectsCard) => !carried.some((item) => sameTask(item, card.item));
+	const kept = (card: ProjectsCard) => !carried.some((item) => item.id === card.item.id);
 	const above = section.cards.slice(0, at).filter(kept).pop();
 	const below = section.cards.slice(at).find(kept);
 	const anchors: Anchor[] = [...(above ? [{ kind: "after", item: above.item } as const] : []), ...(below ? [{ kind: "before", item: below.item } as const] : [])];
@@ -61,10 +78,10 @@ function planOf(view: ProjectsView, carried: readonly TaskItem[], place: Extract
 }
 
 /** Every card may stand in `target`: one already in it only moves among its tasks; one from elsewhere as that stage's column takes it. */
-function enters(carried: readonly TaskItem[], target: GroupedList | null): boolean {
+function enters(carried: readonly Carried[], target: GroupedList | null): boolean {
 	if (target === null) return true;
-	const moving = carried.filter((item) => listOf(item) !== target);
-	return moving.length === 0 || acceptsDrop(COLUMN_OF[target], moving.map(originOf));
+	const moving = carried.filter((item) => listOf(item) !== target).map((item) => item.origin);
+	return moving.length === 0 || (moving.every((origin): origin is DropFrom => origin !== null) && acceptsDrop(COLUMN_OF[target], moving));
 }
 
 /** A stage's list, By stage: the list its plus writes into. */
@@ -83,13 +100,44 @@ function targetList(anchor: Anchor): GroupedList | null {
  * its own stage always is (it only moves among its list's tasks); one that changes stage only where that stage's column
  * would take it (Inbox and Backlog never a dated or timed task, Soon never a timed one). Between two cards of different
  * stages the card above decides, or the card below when the card above's stage would refuse them. A place under a task
- * always is.
+ * always is, unless that task is in a part that takes no card (a folder's own: a task nested there would be given the
+ * folder); so is no place in such a part. A card the list shows no card of (lifted on another node) is judged as it was
+ * lifted (`ProjectsDrop.lifted`).
  */
 export function projectsTakes(view: ProjectsView, cards: readonly ProjectsDrop[], place: ListPlace): boolean {
 	if (!view.reorders) return false;
-	if (place.kind === "subtask") return true;
-	const carried = cards.map((card) => itemOf(view, card.key));
+	if (place.kind === "subtask") return nestsUnder(view, place.parent);
+	return takes(view, cards.map((card) => carriedIn(view, card)), place);
+}
+
+/**
+ * The plus may be let go at `place` of the Projects list: a new task may be written there. Between cards, in a part that
+ * writes a new task (`ProjectsSection.newTask`; a folder's own part and Done's write none); under a task, only where a
+ * card may be nested (`nestsUnder`: a part that takes cards, a task carrying no folder), on a node whose list takes drops
+ * (not Done, not a done project).
+ */
+export function projectsPlusTakes(view: ProjectsView, place: ListPlace): boolean {
+	if (place.kind === "subtask") return view.reorders && nestsUnder(view, place.parent);
+	return view.sections.find((s) => s.group === place.group)?.newTask != null;
+}
+
+function takes(view: ProjectsView, carried: readonly Carried[], place: Extract<ListPlace, { readonly kind: "task" }>): boolean {
+	if (!(view.sections.find((s) => s.group === place.group)?.takes ?? true)) return false;
 	return enters(carried, targetList(planOf(view, carried, place).anchor));
+}
+
+/**
+ * A card may be nested under the row of `key`: it is drawn in a part that takes cards, and its task (the card it stands
+ * under, for a subtask) carries no folder, which a subtask would carry too. In whichever part draws it, By stage too.
+ */
+function nestsUnder(view: ProjectsView, key: TaskKey): boolean {
+	for (const section of view.sections) {
+		const at = section.rows.findIndex((row) => samePlace(row.item.key, key));
+		if (at < 0) continue;
+		const top = section.rows.slice(0, at + 1).reverse().find((row) => row.level === 0);
+		return section.takes && !(top?.item.projects.some((p) => p.folder) ?? false);
+	}
+	return false;
 }
 
 /**
@@ -97,14 +145,20 @@ export function projectsTakes(view: ProjectsView, cards: readonly ProjectsDrop[]
  * lists' nest. Between cards: a card that stays in its stage only moves among its list's tasks (`reorder`, nothing on its
  * line changed); one that changes stage moves as a drop on that stage's column writes it (the funnel's `dropMove`); an
  * empty part By project moves nothing. By project the part's project then takes the place of the one each card was
- * shown under. None when the place does not take the cards (`projectsTakes`).
+ * shown under. A card the list does not show (lifted on another node) is judged as the file has it, and By stage the
+ * chosen node's project takes the place of the one it was shown under (No project: that one goes; All: they stay). None
+ * when the place does not take the cards (`projectsTakes`).
  */
 export function projectsDropSteps(view: ProjectsView, doc: TaskDocument, entryOf: (key: TaskKey) => TaskEntry, cards: readonly ProjectsDrop[], place: ListPlace, today: LocalDate): readonly TaskStep[] {
 	if (!view.reorders) throw new StaleTaskError();
-	if (place.kind === "subtask") return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
-	if (!projectsTakes(view, cards, place)) return [];
-	const carried = cards.map((card) => itemOf(view, card.key));
-	const { anchor, project } = planOf(view, carried, place);
+	if (place.kind === "subtask") {
+		if (!nestsUnder(view, place.parent)) return [];
+		return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
+	}
+	const carried = cards.map((card) => carriedInFile(view, entryOf(card.key), card));
+	if (!takes(view, carried, place)) return [];
+	const plan = planOf(view, carried, place);
+	const { anchor } = plan;
 	const target = targetList(anchor);
 	const dropped = new Set(cards.map((card) => entryOf(card.key).id));
 	const spot = target === null ? null : spotOf(doc, anchor, target, entryOf, dropped);
@@ -114,11 +168,12 @@ export function projectsDropSteps(view: ProjectsView, doc: TaskDocument, entryOf
 		if (spot !== null && target !== null) {
 			if (listOf(item) === target) moves.push({ key: card.key, change: { kind: "reorder", group: spot.group, before: spot.before } });
 			else {
-				const move = dropMove(originOf(item), { kind: "group", list: target, date: null, group: spot.group, before: spot.before }, today);
+				const move = dropMove(item.origin!, { kind: "group", list: target, date: null, group: spot.group, before: spot.before }, today);
 				if (move.kind === "toTime" || move.kind === "clearSlot") throw new StaleTaskError();
 				moves.push({ key: card.key, change: move });
 			}
 		}
+		const project = projectFor(view, plan, item);
 		if (project !== undefined && !sameProject(card.from, project)) moves.push({ key: card.key, change: { kind: "swapProject", from: card.from, to: project } });
 		return moves;
 	});
@@ -131,6 +186,15 @@ function spotOf(doc: TaskDocument, anchor: Anchor, list: GroupedList, entryOf: (
 	if (anchor.kind === "before") return { group: entry.group, before: keyOf(entry) };
 	const next = doc.tasks(list).find((other) => other.index > entry.index && other.group === entry.group && !dropped.has(other.id));
 	return { group: entry.group, before: next ? keyOf(next) : null };
+}
+
+/**
+ * The project that takes the place of the one a card was shown under: By project the part's; By stage none for a card the
+ * list shows (its projects stay), else the chosen node's (No project: the old one only goes; All: they stay).
+ */
+function projectFor(view: ProjectsView, plan: Plan, item: Carried): string | null | undefined {
+	if (view.mode === "byProject" || item.shown) return plan.project;
+	return view.selected === "all" ? undefined : projectOfNode(view.selected);
 }
 
 /** The project a part stands for: the chosen node's for its own part, none for No project's, else the part's subproject. */

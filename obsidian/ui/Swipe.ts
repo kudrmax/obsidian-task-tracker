@@ -237,9 +237,10 @@ export class Swipe {
 
 	private settle(shift: Shift | null): void {
 		const round = this.round;
-		void this.opts.target.settle(shift).then(() => {
+		const done = () => {
 			if (round === this.round) this.letGo();
-		});
+		};
+		void this.opts.target.settle(shift).then(done, done);
 	}
 
 	/**

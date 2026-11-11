@@ -90,7 +90,11 @@ struct BoardScreen: View {
                 model.route.floor = $0.minY
             })
             if let slot = plusSlot {
-                CarriedPlus(model: model, accent: Palette.accent(scheme)) { router.openTyping() }
+                CarriedPlus(model: model, accent: Palette.accent(scheme)) {
+                    // On Projects the plus types where the tab stands, in the part the core marks, and nothing where the core
+                    // says it opens nothing (a folder, Done); elsewhere the new task's screen.
+                    if model.place == .projects { model.entry.openFromPlus() } else { router.openTyping() }
+                }
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }

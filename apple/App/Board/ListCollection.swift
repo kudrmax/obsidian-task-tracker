@@ -112,8 +112,8 @@ struct ListCollection: UIViewRepresentable {
         // back are drawn by the model as the carry changes (`BoardModel.markCards`), never through the board's own
         // drawing, so a carry lifted or let go redraws the lists alone.
         _ = model.snapshot?.lists[column]
-        _ = model.entry.lists[column]
-        _ = model.entry.lineKeys[column]
+        _ = model.entry.lists[column.rawValue]
+        _ = model.entry.lineKeys[column.rawValue]
         _ = model.entry.state?.renaming?.id
         _ = model.entry.heirs
         controller.update()
@@ -377,11 +377,11 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     /// cards a carry takes along (a card's subtasks, the other picked tasks) and a lifted section's cards are not drawn.
     static func rows(column: BoardColumn, model: BoardModel, plusRoom: Int?) -> [DrawnRow] {
         guard let list = model.drawing?.lists[column] else { return [] }
-        let entry = model.entry.lists[column]
+        let entry = model.entry.lists[column.rawValue]
         let renaming = model.entry.state?.renaming?.id
         var typed: [DrawnRow] = []
         if let entry {
-            let keys = model.entry.lineKeys[column] ?? []
+            let keys = model.entry.lineKeys[column.rawValue] ?? []
             typed = entry.pending.enumerated().map { .pending(key: keys[safe: $0.offset] ?? "\u{0}line/\($0.offset)", text: $0.element.text, level: $0.element.level, branch: nil) }
             // A card renamed gives its row to the field: the same row, its content now typed in, so nothing comes or goes.
             typed.append(.field(id: renaming ?? keys.last ?? "\u{0}field", level: entry.section ? 0 : entry.place.level, branch: nil, section: entry.section))
@@ -469,9 +469,9 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     }
 
     private func reveal(field: Void) {
-        guard let model, model.entry.lists[column] != nil else { return }
+        guard let model, model.entry.lists[column.rawValue] != nil else { return }
         let renaming = model.entry.state?.renaming?.id
-        guard let id = renaming ?? model.entry.lineKeys[column]?.last ?? rows.first(where: { if case .field = $0 { true } else { false } })?.id,
+        guard let id = renaming ?? model.entry.lineKeys[column.rawValue]?.last ?? rows.first(where: { if case .field = $0 { true } else { false } })?.id,
               let path = indexPath(of: id) else { return }
         collection.layoutIfNeeded()
         reveal(path, centred: false)
@@ -963,7 +963,7 @@ struct ListRowContent: View {
             // its row, `ListController.showHeaders`).
             SectionHeader(title: header, group: group, column: column, model: model)
         case .plate(let group):
-            EmptyPlate(hot: model.platesLit(column, group)) { model.entry.openIn(column, group.name) }
+            EmptyPlate(hot: model.platesLit(column, group)) { model.entry.openIn(column.rawValue, group.name) }
         case .card(let card):
             CardRow(card: card, column: column, model: model)
         case .pending(_, let text, let level, let branch):

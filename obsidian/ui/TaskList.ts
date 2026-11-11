@@ -1,24 +1,14 @@
 import { ScrollEdges } from "./ScrollEdges";
-import { branchOf, type EntryAt, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListRow, type ListSection, type ListView, listView, type PendingText, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import { branchOf, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListRow, type ListSection, type ListView, listView, type TaskItem, type TaskKey } from "../../core/application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
-import { fillCard, fillUnwrittenCard, showProgressDot } from "./TaskCard";
+import { fillCard } from "./TaskCard";
 import { KeyedRows, type RowsDrawing } from "./motion/KeyedRows";
 import { ScrollHold } from "./motion/ScrollHold";
+import { EntryRows, type LevelRow, type ListEntryInput } from "./EntryRows";
 
-/** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
-export interface ListEntryInput {
-	/** Where among the cards and sections drawn the field stands. */
-	readonly at: EntryAt;
-	/** The level the field stands at. */
-	readonly level: number;
-	readonly pending: readonly PendingText[];
-	/** The field writes a section's name: it stands as the new header does, apart from the group above, whose plate stays. */
-	readonly section?: boolean;
-	/** Draws the field into `parent`, the row that stands in the list; gives the field's element. */
-	field(parent: HTMLElement): HTMLElement;
-}
+export type { ListEntryInput } from "./EntryRows";
 
 export interface TaskListDeps {
 	items(): readonly TaskItem[];
@@ -74,10 +64,6 @@ function plateKey(name: GroupName): string {
 	return JSON.stringify(name);
 }
 
-const QUICK_ROW = "tc-quick-row";
-/** The key of the field's row, and of the cards of the texts typed and not yet written, by their order. */
-const ENTRY = "entry";
-const UNWRITTEN = "unwritten:";
 /** The key of the dashed place a lifted section lands on. */
 const LANDING = "landing";
 
@@ -116,16 +102,8 @@ export class TaskList {
 	/** The rows by key: a card by its task's id, a header by its section's, so a row lives as long as what it shows. */
 	private readonly keyed: KeyedRows;
 	private readonly hold: ScrollHold;
-	/**
-	 * The tasks the field has written, by the id each write answered (`TaskService.createWithId`), oldest first: the card
-	 * drawn for one takes over the row of the text it was typed as, so a written text stays the same card on the screen.
-	 */
-	private created: string[] = [];
-	/** A card was renamed in place last time, and is now: its field's row comes and goes with the card's in the same frame. */
-	private renamedDrawn = false;
-	private renamingNow = false;
-	/** How many texts typed have become their tasks' cards in this drawing. */
-	private written = 0;
+	/** The field typed in the list, among its cards. */
+	private readonly entryRows: EntryRows;
 	/** The day of the last drawing: another day is drawn at once, never moved into. */
 	private drawnDay: LocalDate | null | undefined = undefined;
 	/** `listCards` as of the last drawing, made the first time it is asked for. */
@@ -140,6 +118,7 @@ export class TaskList {
 		this.keyed = new KeyedRows(el);
 		this.hold = new ScrollHold(el);
 		this.edges = new ScrollEdges(el);
+		this.entryRows = new EntryRows(this.keyed);
 	}
 
 	/** The list goes away with its view or its peek: it stops following its scroll and size. */
@@ -164,11 +143,8 @@ export class TaskList {
 		const moves = moving && this.drawnDay === day;
 		if (moves) this.hold.keep();
 		const drawing = this.keyed.begin(moves);
-		if (this.renamedDrawn && renaming === null) drawing.forget(ENTRY);
-		this.renamedDrawn = renaming !== null;
-		this.renamingNow = renaming !== null;
+		this.entryRows.begin(drawing, renaming);
 		this.drawnDay = day;
-		this.written = 0;
 		this.entries = [];
 		this.nodes = [];
 		this.heads = new Map();
@@ -177,7 +153,7 @@ export class TaskList {
 		this.sectionCards = new Map();
 		this.rendered = shape.drawn;
 		this.withHeaders = shape.headers;
-		const rows: { node: HTMLElement; level: number }[] = [];
+		const rows: LevelRow[] = [];
 		const signals = new Map<HTMLElement, AbortSignal>();
 		const at = entry?.at ?? null;
 		let entered = entry === null;
@@ -186,7 +162,7 @@ export class TaskList {
 		const enter = (): void => {
 			if (entered || !entry) return;
 			entered = true;
-			entryRow = this.enterRows(drawing, entry, rows);
+			entryRow = this.entryRows.draw(drawing, entry, rows);
 		};
 		const enterAtCard = (): void => {
 			if (at?.kind === "in" && at.section === section && at.card === this.entries.length) enter();
@@ -195,7 +171,7 @@ export class TaskList {
 			enterAtCard();
 			const card = this.cardOf(drawing, item, day, signals);
 			card.style.setProperty(PROPERTY.level, String(level));
-			const renamed = renaming !== null && samePlace(renaming, item.key);
+			const renamed = this.entryRows.renames(item.key);
 			card.classList.toggle("is-renaming", renamed);
 			this.entries.push({ card, item, level, group });
 			this.nodes.push(card);
@@ -233,7 +209,7 @@ export class TaskList {
 		}
 		if (landing && "before" in landing && landing.before >= headsDrawn) mark();
 		enter();
-		if (entryRow) this.markRenamed(entryRow, renaming);
+		if (entryRow) this.entryRows.markRenamed(entryRow, this.entries);
 		rows.forEach((row, i) => {
 			const lines = branchOf(rows.map((r) => r.level), i);
 			if (lines) branch(row.node, lines.through, lines.last);
@@ -246,7 +222,7 @@ export class TaskList {
 
 	/** A task's card: the one drawn for it last time, filled anew, or a new one; its branches go, the list draws them again. */
 	private cardOf(drawing: RowsDrawing, item: TaskItem, day: LocalDate | null, signals: Map<HTMLElement, AbortSignal>): HTMLElement {
-		const heir = this.heirOf(item);
+		const heir = this.entryRows.heirOf(item.id, `task:${item.id}`);
 		const { node, fresh, signal } = drawing.take(`task:${item.id}`, () => el(null, "div", "tc-card"), heir);
 		if (!fresh) node.replaceChildren();
 		fillCard(node, item, { day });
@@ -254,57 +230,14 @@ export class TaskList {
 		return node;
 	}
 
-	/** The typed texts, each as a plain card at its level, then the field's row, after the rows drawn so far. */
-	private enterRows(drawing: RowsDrawing, entry: ListEntryInput, rows: { node: HTMLElement; level: number }[]): HTMLElement {
-		const put = (row: HTMLElement, level: number): void => {
-			row.style.setProperty(PROPERTY.level, String(level));
-			rows.push({ node: row, level });
-		};
-		/** Lines typed since the last drawing: each stands where the field stood, and the field's row opens anew under them. */
-		let typed = false;
-		entry.pending.forEach(({ text, level }, i) => {
-			const { node, fresh } = drawing.take(`${UNWRITTEN}${i}`, () => el(null, "div", "tc-card"), `${UNWRITTEN}${i + this.written}`);
-			if (!fresh) node.replaceChildren();
-			else if (this.keyed.nodeOf(ENTRY)) {
-				drawing.standIn(node);
-				typed = true;
-			}
-			fillUnwrittenCard(node, text);
-			put(node, level);
-		});
-		const row = drawing.take(ENTRY, () => el(null, "div", QUICK_ROW)).node;
-		if (this.renamingNow) drawing.standIn(row);
-		else if (typed) drawing.regrow(row);
-		for (const old of row.querySelectorAll(":scope > .tc-branch, :scope > .tc-branch-pass")) old.remove();
-		entry.field(row);
-		row.classList.toggle("is-section", entry.section === true);
-		put(row, entry.level);
-		return row;
-	}
-
-	/** A task the field has just written takes over the row of the text it was typed as; it stops being awaited then. */
-	private heirOf(item: TaskItem): string | undefined {
-		const at = this.created.indexOf(item.id);
-		if (at < 0 || this.keyed.nodeOf(`task:${item.id}`)) return undefined;
-		this.created.splice(at, 1);
-		return `${UNWRITTEN}${this.written++}`;
-	}
-
 	/** The field wrote a task where it was typed (`id`, as the write answered): its card takes the typed text's row when drawn. */
 	adopt(id: string): void {
-		this.created.push(id);
+		this.entryRows.adopt(id);
 	}
 
 	/** The field closed: no text typed is awaited any more. */
 	forgetTyped(): void {
-		this.created = [];
-	}
-
-	/** The field's row keeps the dot of the task in progress it renames; a row for a new task has none. */
-	private markRenamed(row: HTMLElement, renaming: TaskKey | null): void {
-		const renamed = renaming === null ? undefined : this.entries.find((e) => samePlace(renaming, e.item.key));
-		if (renamed) showProgressDot(row, renamed.item);
-		else row.querySelector(":scope > .tc-progress-dot")?.remove();
+		this.entryRows.forget();
 	}
 
 	/** Where the name of the section a pending card starts is typed; null without one. */

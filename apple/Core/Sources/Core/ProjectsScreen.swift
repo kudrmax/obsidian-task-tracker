@@ -14,7 +14,7 @@ public struct ProjectsRow: Decodable, Hashable, Sendable, Identifiable {
     public let depth: Int
     /// Drawn as a tile (depth 0), else as a line of text indented by its depth.
     public let tile: Bool
-    /// The project waits: its open tasks only in Inbox and Backlog, or none yet.
+    /// The project waits: no open task in its whole branch (it and its subprojects).
     public let waiting: Bool
     /// The name drawn grey: a waiting or done project, No project, Done.
     public let muted: Bool
@@ -29,11 +29,14 @@ public struct ProjectsRow: Decodable, Hashable, Sendable, Identifiable {
     public let canLift: Bool
     /// A held card over it unfolds its branch after a pause.
     public let unfoldsOnHover: Bool
+    /// A held card over it chooses it after the same pause, so the card can be let go among its tasks: a live project
+    /// or No project, not the chosen one (`hoverProjectNode`).
+    public let opensOnHover: Bool
     public let json: JSONValue
 
     public var id: String { node }
 
-    enum CodingKeys: String, CodingKey { case node, kind, title, depth, tile, waiting, muted, selected, hasBranch, folded, project, acceptsTask, canLift, unfoldsOnHover }
+    enum CodingKeys: String, CodingKey { case node, kind, title, depth, tile, waiting, muted, selected, hasBranch, folded, project, acceptsTask, canLift, unfoldsOnHover, opensOnHover }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -51,6 +54,7 @@ public struct ProjectsRow: Decodable, Hashable, Sendable, Identifiable {
         acceptsTask = try c.decode(Bool.self, forKey: .acceptsTask)
         canLift = try c.decode(Bool.self, forKey: .canLift)
         unfoldsOnHover = try c.decode(Bool.self, forKey: .unfoldsOnHover)
+        opensOnHover = try c.decode(Bool.self, forKey: .opensOnHover)
         json = try JSONValue(from: decoder)
     }
 }
@@ -74,12 +78,23 @@ public struct ProjectsCard: Decodable, Hashable, Sendable, Identifiable {
     public let over: String?
     /// The project it is shown under: what a drop on the tree replaces.
     public let from: String?
-    /// What `tasks.dropOnProject` takes for this very card (`ProjectsDrop` `{ key, from }`).
+    /// What `tasks.dropOnProject` takes for this very card (`ProjectsDrop` `{ key, from, lifted }`), passed back as given.
     public let drop: JSONValue
     /// What its menu is opened from (`tasks.menu`'s `from`).
     public let menuFrom: String
     /// It may be dropped on the tree: an open task, not a subtask.
     public let canDrop: Bool
+}
+
+/// `ProjectsListRow`: a row the part's list draws, a task's card or one of its open subtasks under it.
+public struct ProjectsListRow: Decodable, Hashable, Sendable, Identifiable {
+    /// Unique on the screen: a task of two parts is two rows, and so are its subtasks.
+    public let id: String
+    public let item: TaskItem
+    /// 0 for a task, one more for each task above a subtask.
+    public let level: Int
+    /// The part's card for a task; nil for a subtask.
+    public let card: ProjectsCard?
 }
 
 /// `ProjectsNewTask`: what the plus let go on the tasks writes: `tasks.createInPlace`'s place and its project.
@@ -97,6 +112,8 @@ public struct ProjectsSection: Decodable, Hashable, Sendable, Identifiable {
     public let header: Bool
     /// Its header opens its part for a drop (`PlacedHead.opens`), passed through as the core gives it.
     public let opens: Bool
+    /// A card may be dropped in it: every part but a folder's own.
+    public let takes: Bool
     /// No card in it: shown so a card can be dropped there.
     public let empty: Bool
     /// The No tasks plate stands under it: an empty part with a header, or the only part.
@@ -106,12 +123,14 @@ public struct ProjectsSection: Decodable, Hashable, Sendable, Identifiable {
     public let path: [String]
     public let depth: Int
     public let cards: [ProjectsCard]
+    /// The rows the list draws: the cards with their open subtasks, as a funnel list's.
+    public let rows: [ProjectsListRow]
     public let newTask: ProjectsNewTask?
 
     public var id: String { key }
 }
 
-/// `ProjectMenu`: the chosen project's menu, a tap on its name over its tasks: Rename and Note.
+/// `ProjectMenu`: the chosen project's menu, a tap on its name over its tasks: Rename, Folder, Note and Delete project.
 public struct ProjectMenu: Decodable, Hashable, Sendable {
     public let project: ProjectRef
     public let renameLabel: String
@@ -119,6 +138,8 @@ public struct ProjectMenu: Decodable, Hashable, Sendable {
     public let note: AttachedNote?
     public let attachLabel: String
     public let detachLabel: String
+    /// Folder: a switch, a tap writes `setProjectFolder(name, !on)`.
+    public let folder: ProjectFolderSwitch
     /// Delete project: its row and the question asked before it writes.
     public let delete: ProjectDelete
 
@@ -126,6 +147,16 @@ public struct ProjectMenu: Decodable, Hashable, Sendable {
         public let link: String
         public let name: String
     }
+}
+
+/// `ProjectFolderSwitch`: Folder in the project menu, on for a folder; off, it may be turned on only while the project has
+/// no task of its own, else it is disabled with the core's reason.
+public struct ProjectFolderSwitch: Decodable, Hashable, Sendable {
+    public let label: String
+    public let on: Bool
+    public let disabled: Bool
+    /// Why it can't be turned on («Has tasks of its own»); nil while it can.
+    public let reason: String?
 }
 
 /// `ProjectDelete`: Delete project in the project menu, destructive, and the words of the question asked before it
@@ -155,6 +186,26 @@ public struct ProjectsView: Decodable, Hashable, Sendable {
     public let missing: Bool
     /// The task list takes drops between its cards: every node but Done and a done project.
     public let reorders: Bool
+    /// The view as the core gave it: what `rules.projectsEntryLook` takes back.
+    public private(set) var json: JSONValue = .null
+
+    enum CodingKeys: String, CodingKey { case rows, selected, mode, modes, title, menu, sections, newTask, emptyLabel, missing, reorders }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        rows = try c.decode([ProjectsRow].self, forKey: .rows)
+        selected = try c.decode(String.self, forKey: .selected)
+        mode = try c.decode(String.self, forKey: .mode)
+        modes = try c.decode([Mode].self, forKey: .modes)
+        title = try c.decode(String.self, forKey: .title)
+        menu = try c.decodeIfPresent(ProjectMenu.self, forKey: .menu)
+        sections = try c.decode([ProjectsSection].self, forKey: .sections)
+        newTask = try c.decodeIfPresent(ProjectsNewTask.self, forKey: .newTask)
+        emptyLabel = try c.decode(String.self, forKey: .emptyLabel)
+        missing = try c.decode(Bool.self, forKey: .missing)
+        reorders = try c.decode(Bool.self, forKey: .reorders)
+        json = try JSONValue(from: decoder)
+    }
 
     public struct Mode: Decodable, Hashable, Sendable {
         public let mode: String
@@ -199,6 +250,12 @@ extension TaskBoard {
         _ = try screenCall("tasks.unfoldProjectNode", [.string(node)], over: try files())
     }
 
+    /// A card held `PROJECTS_HOVER_MS` over a row, in one call: its branch unfolds (`unfoldsOnHover`) and it is chosen
+    /// (`opensOnHover`), the mode kept.
+    public func hoverProjectNode(_ node: String) throws {
+        _ = try screenCall("tasks.hoverProjectNode", [.string(node)], over: try files())
+    }
+
     /// The segment: `byProject` or `byStage`.
     public func setProjectsMode(_ mode: String) throws {
         _ = try screenCall("tasks.setProjectsMode", [.string(mode)], over: try files())
@@ -224,6 +281,13 @@ extension TaskBoard {
     /// Delete project: its line and its field on every task go, its subprojects move up a level; no task is removed.
     public func deleteProject(_ name: String) throws {
         try write("tasks.deleteProject", [.string(name)])
+    }
+
+    /// Folder turned on or off: the project made a folder (it takes no task) or a project again; false when nothing was
+    /// written (turned on while it has tasks of its own).
+    @discardableResult
+    public func setProjectFolder(_ name: String, _ folder: Bool) throws -> Bool {
+        try write("tasks.setProjectFolder", [.string(name), .bool(folder)]).bool ?? false
     }
 
     /// Detach: the note's link taken off the project's line; the note stays.
@@ -268,6 +332,12 @@ extension TaskBoard {
         (try? read("tasks.isBlank", [.string(text)], over: settingsOnly(), as: Bool.self)) ?? true
     }
 
+    /// The Projects list as the quick entry reads it (`rules.projectsEntryLook`): its cards, its parts' sections and what
+    /// each part writes, handed in as the look's `projects` list; empty while no view is read.
+    public func projectsEntryLook(_ view: ProjectsView?) throws -> ProjectsEntryLook {
+        try rule("rules.projectsEntryLook", [view?.json ?? .null])
+    }
+
     /// The depths a gap of the tree may take.
     public func projectsLevels(_ rows: JSONValue, gap: Int, lifted: String? = nil) throws -> ProjectsLevels {
         try rule("rules.projectsLevels", [rows, .number(Double(gap)), lifted.json])
@@ -276,5 +346,43 @@ extension TaskBoard {
     /// What a tap on an attached note opens: Obsidian at the note, in the vault named `vault`.
     public func noteURL(_ link: String, vault: String) throws -> URL? {
         URL(string: try rule("projects.noteUrl", [.string(link), .string(vault)], as: String.self))
+    }
+}
+
+/// `EntryListLook`: the Projects list as the quick entry reads it, each part as the core gives it, kept as it came.
+public struct ProjectsEntryLook: Decodable, Hashable, Sendable {
+    public let cards: JSONValue
+    public let sections: JSONValue
+    public let parts: JSONValue
+
+    public static let empty = ProjectsEntryLook(cards: [], sections: [], parts: [])
+
+    public init(cards: JSONValue, sections: JSONValue, parts: JSONValue) {
+        self.cards = cards
+        self.sections = sections
+        self.parts = parts
+    }
+}
+
+/// Where a list made of parts draws the quick entry's field (`ListEntry.at`, whose card counts every part's rows in order):
+/// before every part, at a row of a part, or after them all.
+public enum PartedEntryAt: Equatable, Sendable {
+    case top
+    case part(Int, row: Int)
+    case end
+
+    /// `kind`, `section` and `card` as `ListEntry.at` gives them, over parts of `rows` rows each.
+    public init(kind: String, section: Int?, card: Int?, rows: [Int]) {
+        switch kind {
+        case "top":
+            self = .top
+        case "in":
+            guard let section, rows.indices.contains(section) else { self = .end; return }
+            let start = rows.prefix(section).reduce(0, +)
+            let row = (card ?? start + rows[section]) - start
+            self = .part(section, row: min(max(0, row), rows[section]))
+        default:
+            self = .end
+        }
     }
 }

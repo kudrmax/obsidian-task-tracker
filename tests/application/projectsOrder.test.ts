@@ -170,7 +170,7 @@ describe("subtasks in the Projects list, as in the funnel's lists", () => {
 			["Now A", 0, true],
 		]);
 		expect(rowIn(own, "Back A").item.card).toMatchObject({ title: "Step 1", over: "Back A" });
-		expect(rowIn(own, "Child").drop).toEqual({ key: rowIn(own, "Child").item.key, from: "P" });
+		expect(rowIn(own, "Child").drop).toEqual({ key: rowIn(own, "Child").item.key, from: "P", lifted: { id: rowIn(own, "Child").item.id, list: "backlog", origin: "backlog" } });
 		expect(new Set(own.rows.map((r) => r.id)).size).toBe(own.rows.length);
 	});
 

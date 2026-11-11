@@ -5,13 +5,10 @@ import { GroupNameField } from "../GroupNameField";
 import type { GestureArbiter } from "../gestures";
 import { centeredListWidth, listWidthMax } from "../listWidth";
 import { ProjectsSegment } from "./ProjectsSegment";
-import { PLATE } from "../TaskList";
 import { ProjectTasks, type ProjectTasksDeps } from "./ProjectTasks";
-import type { TasksShown, TreeShown } from "./ProjectDrops";
+import type { TreeShown } from "./ProjectDrops";
 import { ProjectTree } from "./ProjectTree";
 import { LIST_WIDTHS, type ProjectsNodeId, type ProjectsRow, type ProjectsView, type TaskService } from "../../../core/application/contracts";
-
-const HIDDEN = "tc-hidden";
 
 /** What the screen asks the core. */
 export type ProjectsSource = Pick<TaskService, "projectsScreen" | "tapProjectNode" | "setProjectsMode">;
@@ -27,6 +24,9 @@ export interface ProjectsScreenDeps {
 	onMenu?(title: HTMLElement, view: ProjectsView): void;
 	onCard?: ProjectTasksDeps["onCard"];
 	onPlate?: ProjectTasksDeps["onPlate"];
+	entry?: ProjectTasksDeps["entry"];
+	renaming?: ProjectTasksDeps["renaming"];
+	coming?: ProjectTasksDeps["coming"];
 	onRow?(row: HTMLElement, model: ProjectsRow, signal: AbortSignal): void;
 	onError(error: unknown): void;
 }
@@ -68,7 +68,7 @@ export class ProjectsScreen {
 			onSnap: () => deps.onSnap(),
 			arbiter: deps.arbiter,
 		});
-		this.tasks = new ProjectTasks(el(this.el, "div", "tc-projects-tasks-column"), { onCard: deps.onCard, onPlate: deps.onPlate });
+		this.tasks = new ProjectTasks(el(this.el, "div", "tc-projects-tasks-column"), { onCard: deps.onCard, onPlate: deps.onPlate, entry: deps.entry, renaming: deps.renaming, coming: deps.coming });
 	}
 
 	/** Rename: the name typed where the title stands, the caret at its end; Enter gives the name, anything else null. */
@@ -97,11 +97,6 @@ export class ProjectsScreen {
 		return this.tasks;
 	}
 
-	/** The tasks as their drop target reads them. */
-	get tasksShown(): TasksShown {
-		return { el: this.tasks.el, parts: this.tasks.parts, endTask: this.tasks.endTask };
-	}
-
 	/** The view drawn last; null before the first read. */
 	get shown(): ProjectsView | null {
 		return this.view;
@@ -115,19 +110,6 @@ export class ProjectsScreen {
 		if (before) before.before(slot);
 		else this.tree.el.appendChild(slot);
 		return this.ask(slot, "Project name");
-	}
-
-	/**
-	 * A new task's text typed after `after` among the tasks (first when null); a No tasks plate gives the field its place
-	 * while it is open. Resolves with the text, or null for nothing typed.
-	 */
-	askTaskText(after: HTMLElement | null): Promise<string | null> {
-		const slot = el(null, "div", "tc-projects-task-field");
-		if (after?.isConnected) after.after(slot);
-		else this.tasks.el.prepend(slot);
-		const plate = after?.classList.contains(PLATE) ? after : null;
-		plate?.classList.add(HIDDEN);
-		return this.ask(slot, "New task").finally(() => plate?.classList.remove(HIDDEN));
 	}
 
 	private ask(slot: HTMLElement, placeholder: string): Promise<string | null> {
@@ -153,20 +135,17 @@ export class ProjectsScreen {
 		this.tree.showDropOn(node);
 	}
 
+	/** The view the screen's data read with the lists, drawn with them; a read of its own still running is dropped. */
+	show(view: ProjectsView): void {
+		this.reading++;
+		this.render(view);
+	}
+
 	/** Reads the screen from the core and draws it; a read overtaken by a later one is dropped. */
 	async refresh(): Promise<void> {
 		const reading = ++this.reading;
 		const view = await this.deps.source.projectsScreen();
 		if (reading === this.reading) this.render(view);
-	}
-
-	/** The tree alone read again and drawn, the tasks left as they stand: a branch opened under a card still carried from them. */
-	async refreshTree(): Promise<void> {
-		const reading = ++this.reading;
-		const view = await this.deps.source.projectsScreen();
-		if (reading !== this.reading || !this.view) return;
-		this.view = { ...this.view, rows: view.rows };
-		this.tree.render(view.rows);
 	}
 
 	render(view: ProjectsView): void {

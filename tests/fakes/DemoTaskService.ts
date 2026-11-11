@@ -430,6 +430,8 @@ export class DemoTaskService implements TaskService {
 
 	async unfoldProjectNode(): Promise<void> {}
 
+	async hoverProjectNode(): Promise<void> {}
+
 	async projectsScreen(): Promise<ProjectsView> {
 		return projectsView({ doc: null, tree: ProjectTree.EMPTY, today: this.today(), boundary: DayBoundary.MIDNIGHT, state: {}, item: () => { throw new Error("The board has no projects"); }, listName: (list) => list });
 	}
@@ -450,6 +452,9 @@ export class DemoTaskService implements TaskService {
 		return false;
 	}
 
+	async setProjectFolder(): Promise<boolean> {
+		return false;
+	}
 	async setProjectNote(): Promise<void> {}
 
 	async dropOnProject(): Promise<void> {}

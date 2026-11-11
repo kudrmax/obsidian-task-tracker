@@ -50,7 +50,7 @@ import {
 import type { SectionOffer } from "./sections";
 import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type ProjectsScreenStore, type SettingsStore, type TaskFileStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
-import { projectOfNode, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { hovered, projectOfNode, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { ProjectTree, type TreePlace } from "../domain/ProjectTree";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
@@ -162,6 +162,12 @@ export class TaskServiceImpl implements TaskService {
 		this.keepScreen(selected(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, s?.doc ?? null, node));
 	}
 
+	async hoverProjectNode(node: ProjectsNodeId): Promise<void> {
+		const { rows } = await this.projectsScreen();
+		const s = await this.snapshotOrNull();
+		this.keepScreen(hovered(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, s?.doc ?? null, rows, node));
+	}
+
 	async setProjectsMode(mode: ProjectsMode): Promise<void> {
 		this.keepScreen({ ...this.projectsScreenStore.get(), mode });
 	}
@@ -184,6 +190,10 @@ export class TaskServiceImpl implements TaskService {
 
 	deleteProject(name: string): Promise<void> {
 		return this.run(this.writes.deleteProject(name));
+	}
+
+	setProjectFolder(name: string, folder: boolean): Promise<boolean> {
+		return this.run(this.writes.setProjectFolder(name, folder));
 	}
 
 	setProjectNote(name: string, link: string | null): Promise<void> {

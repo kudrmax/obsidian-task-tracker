@@ -94,6 +94,27 @@ describe("ScreenPager", () => {
 		expect(stood).toBe(true);
 	});
 
+	/** A turn that goes wrong as it lands still leaves the screen free: a stuck screen took no swipe and no drag (2026-11-11). */
+	it("stands free again however its track lands, so a turn that went wrong keeps nothing waiting on it", async () => {
+		const { pager, tracks } = setUp();
+		const failing: ScreenTrack = {
+			distance: WIDTH,
+			at: () => undefined,
+			land: () => {
+				throw new Error("the screen could not take the place");
+			},
+		};
+		const turn = pager.run(1, () => failing);
+		expect(() => vi.advanceTimersByTime(SLIDE_MS * 2)).toThrow("the screen could not take the place");
+		await expect(turn).resolves.toBeUndefined();
+		pager.follow(-40);
+		expect(tracks.get(1)?.shown).toEqual([-40]);
+		const next = pager.settle(1);
+		vi.advanceTimersByTime(SLIDE_MS * 2);
+		await expect(next).resolves.toBeUndefined();
+		expect(tracks.get(1)?.landed).toEqual([true]);
+	});
+
 	it("runs back to where it stood, and the other way's track goes too", async () => {
 		const { pager, tracks } = setUp();
 		pager.follow(50);
