@@ -498,64 +498,83 @@
     return labels.map((name) => ` #${tag}/${name}`).join("");
   }
 
-  // core/domain/Result.ts
-  var DEFAULT_RESULT_MARK = "🎯";
-  function usableResultMark(mark, prefixes) {
-    return usablePrefix(mark) && !prefixes.includes(mark) ? mark : null;
-  }
-  var FIRST_WORD_RE2 = /^(\S+)\s+(.*)$/s;
-  function resultOfText(text, mark) {
-    const m = mark === null ? null : FIRST_WORD_RE2.exec(text);
-    if (!m || m[1] !== mark) return { result: false, text };
-    return { result: true, text: m[2] };
-  }
-  function withoutResultMark(text, mark) {
-    if (mark !== null && text.trim() === mark) return "";
-    return resultOfText(text.trimStart(), mark).text;
-  }
-  function nextStep(entry) {
-    let step = null;
-    for (let at = entry; ; ) {
-      const open = at.subtasks.find((sub) => isOpen(sub.task.status));
-      if (!open) return step;
-      step = at = open;
-    }
-  }
-  function resultAbove(doc, entry) {
-    for (let depth = entry.path.length - 1; depth >= 0; depth--) {
-      const above = doc.find(entry.section, entry.index, entry.path.slice(0, depth));
-      if (above?.task.result) return above;
-    }
-    return null;
-  }
-  function holds(outer, inner) {
-    return outer.section === inner.section && outer.index === inner.index && outer.path.length <= inner.path.length && outer.path.every((i, k) => inner.path[k] === i);
-  }
-
   // core/domain/Project.ts
   var PROJECT_MARKER = "🗂️";
-  var FIELD_RE = /(?:^|\s+)\u{1F5C2}\u{FE0F}?\s+\[\[([^\[\]|#]+?)(?:#[^\[\]|]*)?(?:\|[^\[\]]*)?\]\](?=\s|$)/gu;
-  function projectOfText(text) {
-    let project = null;
-    const rest = text.replace(FIELD_RE, (_whole, link) => {
-      project ??= link.trim();
-      return "";
-    });
-    return project === null ? { project, text } : { project, text: rest.trim() };
+  var MARK_RE = /(^|\s+)\u{1F5C2}\u{FE0F}?(?=\s|$)/gu;
+  var LINK_RE = /^\s+\[\[([^[\]|#]+?)(?:#[^[\]|]*)?(?:\|[^[\]]*)?\]\](?=\s|$)/u;
+  function escapeRegExp2(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
-  function projectField(link) {
-    return ` ${PROJECT_MARKER} [[${link}]]`;
+  function stopsRe(stops) {
+    const words = ["🗂️?", ...stops.filter((s) => s !== "").map(escapeRegExp2)];
+    return new RegExp(`\\s+(?:(?:${words.join("|")})(?=\\s|$)|#\\S)`, "u");
+  }
+  var stopCache = /* @__PURE__ */ new Map();
+  function stopOf(stops) {
+    const key = stops.join("\0");
+    let re = stopCache.get(key);
+    if (!re) stopCache.set(key, re = stopsRe(stops));
+    return re;
+  }
+  function projectsOfText(text, stops = []) {
+    const names = [];
+    let rest = "";
+    let at = 0;
+    const marks = [...text.matchAll(MARK_RE)];
+    if (marks.length === 0) return { projects: [], text };
+    for (let i = 0; i < marks.length; i++) {
+      const mark = marks[i];
+      const start = mark.index;
+      if (start < at) continue;
+      rest += text.slice(at, start);
+      const from = start + mark[0].length;
+      const link = LINK_RE.exec(text.slice(from));
+      if (link) {
+        names.push(projectName(link[1]));
+        at = from + link[0].length;
+        continue;
+      }
+      const tail = text.slice(from);
+      const stop2 = stopOf(stops).exec(tail);
+      const end = stop2 ? from + stop2.index : text.length;
+      names.push(text.slice(from, end).trim());
+      at = end;
+    }
+    rest += text.slice(at);
+    return { projects: uniqueNames(names), text: rest.trim() };
+  }
+  function uniqueNames(names) {
+    const seen = /* @__PURE__ */ new Set();
+    const unique = [];
+    for (const name of names) {
+      const key = projectKey(name);
+      if (name === "" || seen.has(key)) continue;
+      seen.add(key);
+      unique.push(name);
+    }
+    return unique;
+  }
+  function projectFields(names) {
+    return names.map((name) => ` ${PROJECT_MARKER} ${name}`).join("");
   }
   function projectName(link) {
     const last = link.split("/").pop() ?? link;
     return last.replace(/\.md$/i, "").trim();
   }
+  function cleanProjectName(typed2) {
+    const name = typed2.replace(/\u{1F5C2}\u{FE0F}?/gu, " ").replace(/[[\]]/g, "").replace(/(^|\s)#(?=\S)/g, "$1").replace(/\s+/g, " ").trim();
+    return name === "" ? null : name;
+  }
   function projectKey(name) {
     return name.normalize("NFC").toLowerCase();
   }
-  function inProject(link, zone) {
-    if (link === null || zone === null) return link === zone;
-    return projectKey(projectName(link)) === projectKey(projectName(zone));
+  function namesProject(names, name) {
+    const key = projectKey(name);
+    return names.some((n) => projectKey(n) === key);
+  }
+  function inProject(name, zone) {
+    if (name === null || zone === null) return name === zone;
+    return projectKey(projectName(name)) === projectKey(projectName(zone));
   }
 
   // core/domain/TaskLine.ts
@@ -569,7 +588,7 @@
     }
     return "todo";
   }
-  function escapeRegExp2(s) {
+  function escapeRegExp3(s) {
     return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function slotMarkers(markers) {
@@ -586,11 +605,11 @@
   var FieldSlicer = class {
     constructor(markers) {
       this.kinds = slotMarkers(markers);
-      const alternatives = [...this.kinds.keys()].map(escapeRegExp2).join("|");
+      const alternatives = [...this.kinds.keys()].map(escapeRegExp3).join("|");
       this.slotRe = new RegExp(`(?:^|\\s+)(${alternatives})\\s+${DATE}\\s+${TIME}(?:-${TIME})?$`);
-      this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.dueDate)}\\s+${DATE}$`);
-      this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.repeat)}\\s+(.+?)$`) : null;
-      this.collapsedRe = markers.collapsed ? new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.collapsed)}$`) : null;
+      this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp3(markers.dueDate)}\\s+${DATE}$`);
+      this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp3(markers.repeat)}\\s+(.+?)$`) : null;
+      this.collapsedRe = markers.collapsed ? new RegExp(`(?:^|\\s+)${escapeRegExp3(markers.collapsed)}$`) : null;
     }
     /**
      * The fields at the end of a line's body. A rule of every few units written without `from` counts from the line's own
@@ -687,22 +706,23 @@
     const m = LINE_RE.exec(line);
     if (!m) return null;
     const statusChar = m[3];
-    const linked = projectOfText(m[4]);
-    const tagged = labelsOfText(linked.text, markers.labelTag ?? "", markers.labels ?? []);
-    const fields = fieldSlicerFor(markers).slice(tagged.text);
-    const marked = resultOfText(fields.text, markers.result ?? null);
+    const tagged = labelsOfText(m[4], markers.labelTag ?? "", markers.labels ?? []);
+    const named = projectsOfText(tagged.text, fieldStops(markers));
+    const fields = fieldSlicerFor(markers).slice(named.text);
     return {
       indent: m[1],
       bullet: m[2],
-      task: { status: statusOf(statusChar), statusChar, ...fields, result: marked.result, ...priorityOfText(marked.text, markers.priorities ?? []), labels: tagged.labels, project: linked.project, children: [] }
+      task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOfText(fields.text, markers.priorities ?? []), labels: tagged.labels, projects: named.projects, children: [] }
     };
+  }
+  function fieldStops(markers) {
+    return [markers.dueDate, markers.slot, markers.alarmSlot ?? "", markers.liveSlot ?? "", markers.silentSlot ?? "", markers.repeat ?? "", markers.collapsed ?? ""];
   }
   function formatTaskLine(parsed, markers) {
     const { indent, bullet, task } = parsed;
-    const mark = task.result && markers.result ? `${markers.result} ` : "";
-    let line = `${indent}${bullet} [${task.statusChar}] ${mark}${task.priority ? `${task.priority} ` : ""}${task.text}`;
+    let line = `${indent}${bullet} [${task.statusChar}] ${task.priority ? `${task.priority} ` : ""}${task.text}`;
+    line += projectFields(task.projects);
     if (task.labels.length > 0 && markers.labelTag) line += labelTags(markers.labelTag, task.labels);
-    if (task.project) line += projectField(task.project);
     if (task.collapsed && markers.collapsed) line += ` ${markers.collapsed}`;
     if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
     if (task.slot) {
@@ -929,6 +949,160 @@
     return pairs.every(([x, y]) => alike(x, y)) ? pairs : [];
   }
 
+  // core/domain/ProjectTree.ts
+  var PROJECTS_HEADING = "Projects";
+  var HEADING_RE = /^##\s+(.*?)\s*$/;
+  var LIST_END_RE = /^#{1,2}(\s|$)/;
+  var ITEM_RE = /^([ \t]*)[-*+][ \t]+(.*?)\s*$/;
+  var NOTE_RE = /^(.*?)\s*\[\[([^[\]]+)\]\]$/;
+  var DEFAULT_UNIT = "	";
+  function widthOf(indent) {
+    return indent.replace(/\t/g, "  ").length;
+  }
+  function treeSpan(lines) {
+    const heading = lines.findIndex((line) => HEADING_RE.exec(line)?.[1] === PROJECTS_HEADING);
+    if (heading < 0) return { heading: null, end: lines.length, items: [], unit: DEFAULT_UNIT };
+    let end = heading + 1;
+    while (end < lines.length && !LIST_END_RE.test(lines[end])) end++;
+    const items = [];
+    for (let i = heading + 1; i < end; i++) if (ITEM_RE.test(lines[i]) && !isTaskLine(lines[i])) items.push(i);
+    return { heading, end, items, unit: unitOf(items.map((i) => ITEM_RE.exec(lines[i])[1])) };
+  }
+  function unitOf(indents) {
+    for (let i = 1; i < indents.length; i++) {
+      if (indents[i].length > indents[i - 1].length && indents[i].startsWith(indents[i - 1])) return indents[i].slice(indents[i - 1].length);
+    }
+    return DEFAULT_UNIT;
+  }
+  function readTree(lines) {
+    const span = treeSpan(lines);
+    const roots = [];
+    const known = /* @__PURE__ */ new Map();
+    const stack = [];
+    for (const i of span.items) {
+      const [, indent, body] = ITEM_RE.exec(lines[i]);
+      const width = widthOf(indent);
+      while (stack.length > 0 && stack[stack.length - 1].width >= width) stack.pop();
+      const read = itemOf(body);
+      if (read === null) continue;
+      const parent = stack[stack.length - 1]?.node ?? null;
+      let node = known.get(projectKey(read.name));
+      if (!node) {
+        node = { name: read.name, note: read.note, children: [] };
+        known.set(projectKey(read.name), node);
+        (parent ? parent.children : roots).push(node);
+      } else node.note ??= read.note;
+      stack.push({ width, node });
+    }
+    return new ProjectTree(roots.map(frozen));
+  }
+  function frozen(node) {
+    return { name: node.name, note: node.note, children: node.children.map(frozen) };
+  }
+  function itemOf(body) {
+    const linked = NOTE_RE.exec(body);
+    const name = (linked ? linked[1] : body).trim() || (linked ? projectName(linked[2].split("|")[0]) : "");
+    return name === "" ? null : { name, note: linked ? linked[2] : null };
+  }
+  function treeLines(tree, unit) {
+    const lines = [];
+    const write = (nodes, depth) => {
+      for (const node of nodes) {
+        lines.push(`${unit.repeat(depth)}- ${node.name}${node.note === null ? "" : ` [[${node.note}]]`}`);
+        write(node.children, depth + 1);
+      }
+    };
+    write(tree.roots, 0);
+    return lines;
+  }
+  var ProjectTree = class _ProjectTree {
+    constructor(roots) {
+      this.roots = roots;
+    }
+    static {
+      this.EMPTY = new _ProjectTree([]);
+    }
+    /** Every project, each before its subprojects, with its path. */
+    all() {
+      const out = [];
+      const walk = (nodes, path) => {
+        for (const node of nodes) {
+          const own = [...path, node.name];
+          out.push({ node, path: own });
+          walk(node.children, own);
+        }
+      };
+      walk(this.roots, []);
+      return out;
+    }
+    /** The project of that name (case aside), with its path; null when the tree has none. */
+    find(name) {
+      const key = projectKey(name);
+      return this.all().find((p) => projectKey(p.node.name) === key) ?? null;
+    }
+    has(name) {
+      return this.find(name) !== null;
+    }
+    /** The tree with each of `names` it lacks as a project of its own, last at the top level. */
+    withMissing(names) {
+      let tree = this;
+      for (const name of names) if (!tree.has(name)) tree = tree.added(name, { parent: null, before: null });
+      return tree;
+    }
+    /** A new project at `place`; a name the tree has, a parent or a `before` it lacks: the tree as it is. */
+    added(name, place, note = null) {
+      if (this.has(name) || !this.fits(place)) return this;
+      return new _ProjectTree(inserted(this.roots, { name, note, children: [] }, place));
+    }
+    /** The project with its subprojects moved to `place`; never into itself or below it. */
+    moved(name, place) {
+      const found = this.find(name);
+      if (!found || !this.fits(place)) return this;
+      const into2 = place.parent === null ? null : this.find(place.parent);
+      if (into2 && into2.path.some((n) => projectKey(n) === projectKey(found.node.name))) return this;
+      if (place.before !== null && projectKey(place.before) === projectKey(found.node.name)) return this;
+      const without = removed(this.roots, found.node.name);
+      const tree = new _ProjectTree(inserted(without, found.node, place));
+      return tree.same(this) ? this : tree;
+    }
+    /** The project renamed; a blank name, or one another project has, leaves the tree as it is. */
+    renamed(from, to) {
+      const found = this.find(from);
+      const taken = this.find(to);
+      if (!found || taken && taken.node !== found.node) return this;
+      return new _ProjectTree(mapped(this.roots, found.node.name, (node) => ({ ...node, name: to })));
+    }
+    /** The note attached to a project (its link), or taken off with null. */
+    withNote(name, note) {
+      const found = this.find(name);
+      if (!found || found.node.note === note) return this;
+      return new _ProjectTree(mapped(this.roots, found.node.name, (node) => ({ ...node, note })));
+    }
+    same(other) {
+      return treeLines(this, "	").join("\n") === treeLines(other, "	").join("\n");
+    }
+    /** The place names a parent the tree has and a `before` among that parent's subprojects. */
+    fits(place) {
+      const siblings = place.parent === null ? this.roots : this.find(place.parent)?.node.children;
+      if (!siblings) return false;
+      return place.before === null || siblings.some((n) => projectKey(n.name) === projectKey(place.before));
+    }
+  };
+  function removed(nodes, name) {
+    return nodes.filter((n) => n.name !== name).map((n) => ({ ...n, children: removed(n.children, name) }));
+  }
+  function inserted(nodes, node, place) {
+    if (place.parent === null) return into(nodes, node, place.before);
+    return nodes.map((n) => projectKey(n.name) === projectKey(place.parent) ? { ...n, children: into(n.children, node, place.before) } : { ...n, children: inserted(n.children, node, place) });
+  }
+  function into(siblings, node, before) {
+    const at = before === null ? -1 : siblings.findIndex((n) => projectKey(n.name) === projectKey(before));
+    return at < 0 ? [...siblings, node] : [...siblings.slice(0, at), node, ...siblings.slice(at)];
+  }
+  function mapped(nodes, name, change) {
+    return nodes.map((n) => n.name === name ? change(n) : { ...n, children: mapped(n.children, name, change) });
+  }
+
   // core/domain/TaskDocument.ts
   function ungroupedIndex(groups) {
     for (let i = groups.length - 1; i > 0; i--) if (groups[i].name === null) return i;
@@ -951,7 +1125,7 @@
     return rows.map((row) => row.line);
   }
   var SECTION_KEYS = ["inbox", "backlog", "now", "soon", "done"];
-  var LIST_END_RE = /^#{1,2}(\s|$)/;
+  var LIST_END_RE2 = /^#{1,2}(\s|$)/;
   var GROUP_HEADING_RE = /^###\s+(.*?)\s*$/;
   var SECTION_HEADING_RE = /^##\s+(.*?)\s*$/;
   var INDENT_RE2 = /^[ \t]*/;
@@ -960,7 +1134,7 @@
     return INDENT_RE2.exec(line)[0].length;
   }
   function sameTask(a, b) {
-    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.result === b.result && a.priority === b.priority && a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && a.collapsed === b.collapsed && a.project === b.project && sameLines(a.children, b.children);
+    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && a.collapsed === b.collapsed && sameLines(a.projects, b.projects) && sameLines(a.children, b.children);
   }
   function tagNumber(tag) {
     return Number(tag.slice(1));
@@ -1034,12 +1208,63 @@
     priorityPrefixes() {
       return this.markers.priorities ?? [];
     }
-    /** The result mark the file is read with; null: no task is a result. */
-    resultMark() {
-      return this.markers.result ?? null;
-    }
     serialize() {
       return this.lines.join(this.eol) + (this.trailingEol ? this.eol : "");
+    }
+    /** The projects of `## Projects`, as the file has them: none without the heading. */
+    projectTree() {
+      return readTree(this.lines);
+    }
+    /** The file has `## Projects`. */
+    hasProjectTree() {
+      return treeSpan(this.lines).heading !== null;
+    }
+    /**
+     * The file with `tree` as its `## Projects`: the list's lines in place of the ones it had (where the first stood, else
+     * under the heading), every other line where it was; without the heading, the section made right after Inbox (at the
+     * file's end without Inbox). The same tree changes nothing.
+     */
+    withProjectTree(tree) {
+      const span = treeSpan(this.lines);
+      if (span.heading !== null && tree.same(readTree(this.lines))) return this;
+      const mint = this.mint();
+      const lines = mint.rows(treeLines(tree, span.unit));
+      if (span.heading === null) return this.withRows(this.newTreeRows(lines, mint), mint);
+      const rows = this.rows.filter((_, i) => !span.items.includes(i));
+      let at = span.items.length > 0 ? span.items[0] : span.heading + 1;
+      if (span.items.length === 0) {
+        if (at < rows.length && rows[at].line.trim() === "") at++;
+        else rows.splice(at++, 0, ...mint.rows([""]));
+      }
+      rows.splice(at, 0, ...lines);
+      const after = at + lines.length;
+      if (span.items.length === 0 && after < rows.length && rows[after].line.trim() !== "") rows.splice(after, 0, ...mint.rows([""]));
+      return this.withRows(rows, mint);
+    }
+    /** The rows with a new `## Projects` holding `lines`, right after Inbox, apart from what is around it by blank lines. */
+    newTreeRows(lines, mint) {
+      const inbox = this.sections.get("inbox");
+      const rows = [...this.rows];
+      let at = inbox ? inbox.endLine : rows.length;
+      while (at > (inbox?.firstLine ?? 0) && rows[at - 1].line.trim() === "") at--;
+      const block = [...at > 0 ? mint.rows([""]) : [], ...mint.rows([`## ${PROJECTS_HEADING}`, ""]), ...lines];
+      const rest = rows.slice(at);
+      const blankAfter = rest.findIndex((row) => row.line.trim() !== "");
+      const tail = blankAfter < 0 ? [] : rest.slice(blankAfter);
+      return [...rows.slice(0, at), ...block, ...tail.length > 0 ? mint.rows([""]) : [], ...tail];
+    }
+    /** Each entry's own line written anew from its task, as the file's format has it now, even where its task reads the same. */
+    rewrittenLines(entries, change = (task) => task) {
+      const rows = [...this.rows];
+      let changed2 = false;
+      for (const entry of entries) {
+        const line = this.spanOf(entry).line;
+        const written = formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task: change(entry.task) }, this.markers);
+        if (written === rows[line].line) continue;
+        rows[line] = { line: written, tag: rows[line].tag };
+        changed2 = true;
+      }
+      return changed2 ? this.withRows(rows) : this;
     }
     hasSection(section) {
       return this.sections.has(section);
@@ -1133,12 +1358,12 @@
       return this.leftBy(entry, this.withRows(this.splice(span.line, span.lineCount, [])));
     }
     /**
-     * A subtask moved here leaves its task and becomes a task of `section`, with the project it had through it; `project`
-     * gives it another one (null: none). The section it leaves empty goes, as with `removeEntry`.
+     * A subtask moved here leaves its task and becomes a task of `section`, with the projects it had through it; `projects`
+     * gives it others. The section it leaves empty goes, as with `removeEntry`.
      */
-    moveEntry(entry, section, position, project) {
+    moveEntry(entry, section, position, projects) {
       const span = this.spanOf(entry);
-      const moved2 = this.ownRows(entry, span, "", project !== void 0 ? project : entry.path.length > 0 ? entry.project : entry.task.project);
+      const moved2 = this.ownRows(entry, span, "", projects ?? (entry.path.length > 0 ? entry.projects : entry.task.projects));
       const without = this.withRows(this.splice(span.line, span.lineCount, []));
       const target = without.insertionLine(section, this.positionAfterRemoval(entry, section, position));
       return this.leftBy(entry, without.withRows(without.splice(target, 0, moved2)));
@@ -1188,11 +1413,11 @@
       return this.withRows(this.splice(line, 1, [{ line: `### ${name}`, tag: this.rows[line].tag }]));
     }
     /** What group `from` holds goes to the start or the end of the tasks of group `into`; the heading of `from` goes. */
-    mergeGroup(section, from, into, at) {
-      if (from === into) throw new Error("A group merges into another one");
+    mergeGroup(section, from, into2, at) {
+      if (from === into2) throw new Error("A group merges into another one");
       const content = this.contentOf(this.blockOf(section, from));
       const moved2 = this.rows.slice(content.first, content.last);
-      return this.withRows(this.cutAndInsert(this.cutOf(section, from), this.groupInsertionLine(section, into, at), moved2));
+      return this.withRows(this.cutAndInsert(this.cutOf(section, from), this.groupInsertionLine(section, into2, at), moved2));
     }
     /** A group with nothing but blank lines goes, its blank lines with it unless they part the list from the next one. */
     deleteGroup(section, index) {
@@ -1207,7 +1432,7 @@
       if (contains(entry, parent)) throw new Error(`A task cannot go under itself: ${entry.raw}`);
       const span = this.spanOf(entry);
       const target = before ? this.spanOf(before).line : this.endOf(parent);
-      const moved2 = this.ownRows(entry, span, this.childIndent(parent), null);
+      const moved2 = this.ownRows(entry, span, this.childIndent(parent), []);
       const without = this.splice(span.line, span.lineCount, []);
       without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved2);
       return this.leftBy(entry, this.withRows(without));
@@ -1263,11 +1488,11 @@
       const mint = this.mint();
       for (const heading of headings) {
         const current = rows ?? this.rows;
-        let filled = heading + 1;
-        while (filled < current.length && current[filled].line.trim() === "") filled++;
-        if (filled === current.length || filled === heading + 2 && current[heading + 1].line === "") continue;
+        let filled2 = heading + 1;
+        while (filled2 < current.length && current[filled2].line.trim() === "") filled2++;
+        if (filled2 === current.length || filled2 === heading + 2 && current[heading + 1].line === "") continue;
         rows ??= [...this.rows];
-        rows.splice(heading + 1, filled - heading - 1, ...mint.rows([""]));
+        rows.splice(heading + 1, filled2 - heading - 1, ...mint.rows([""]));
       }
       return rows ? this.withRows(rows, mint) : this;
     }
@@ -1283,12 +1508,12 @@
       return after.deleteGroup(entry.section, left.index);
     }
     /**
-     * The entry's lines under another indent, its own line written with `project` as its project: a subtask that becomes a
-     * task takes the one it had through its parent, a task put under another one needs none.
+     * The entry's lines under another indent, its own line written with `projects` as its projects: a subtask that becomes
+     * a task takes the ones it had through its parent, a task put under another one needs none.
      */
-    ownRows(entry, span, indent, project) {
+    ownRows(entry, span, indent, projects) {
       const rows = reindented(this.rows.slice(span.line, span.line + span.lineCount), entry.indent, indent);
-      if (entry.task.project !== project) rows[0] = { line: formatTaskLine({ indent, bullet: entry.bullet, task: { ...entry.task, project } }, this.markers), tag: rows[0].tag };
+      if (!sameLines(entry.task.projects, projects)) rows[0] = { line: formatTaskLine({ indent, bullet: entry.bullet, task: { ...entry.task, projects } }, this.markers), tag: rows[0].tag };
       return rows;
     }
     /**
@@ -1465,7 +1690,7 @@
     }
     sectionEnd(from) {
       for (let i = from; i < this.lines.length; i++) {
-        if (LIST_END_RE.test(this.lines[i])) return i;
+        if (LIST_END_RE2.test(this.lines[i])) return i;
       }
       return this.lines.length;
     }
@@ -1493,7 +1718,7 @@
       return { index, name: block.name, heading: block.headingLine !== null, id: block.headingLine === null ? null : this.rows[block.headingLine].tag, entries: own, blank };
     }
     /** The task lines from `from` to `end` that no task line above them in that range holds, each with its own subtasks. */
-    readLevel(section, from, end, parent, group, firstIndex, spans, parentProject) {
+    readLevel(section, from, end, parent, group, firstIndex, spans, parentProjects) {
       const entries = [];
       let i = from;
       while (i < end) {
@@ -1505,9 +1730,9 @@
         }
         const children = this.childrenOf(i, end, parsed.indent.length);
         const place = parent ? { index: parent.index, path: [...parent.path, entries.length] } : { index: firstIndex + entries.length, path: [] };
-        const project = parent ? parentProject : parsed.task.project;
-        const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, group, 0, spans, project);
-        const entry = { id: this.rows[i].tag, section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, project, subtasks };
+        const projects = parent ? parentProjects ?? [] : parsed.task.projects;
+        const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, group, 0, spans, projects);
+        const entry = { id: this.rows[i].tag, section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, projects, subtasks };
         entries.push(entry);
         spans.set(entry, { line: i, lineCount: 1 + children.length });
         i += 1 + children.length;
@@ -1573,7 +1798,7 @@
   var HOUR_MINUTES3 = 60;
   var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
-    return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, result: false, priority: null, labels: [], project: null, collapsed: false, children: [], ...patch2 };
+    return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], projects: [], collapsed: false, children: [], ...patch2 };
   }
   function dayOf(task, boundary) {
     return task.dueDate ?? (task.slot ? boundary.dayOfSlot(task.slot) : null);
@@ -1660,15 +1885,22 @@
     if (labels.length > 0 && !markChoices(marksOfTask(entry.task)).labels) return doc;
     return patch(doc, entry, { labels });
   }
-  function setProject(doc, entry, project) {
+  function setProjects(doc, entry, projects) {
     if (entry.path.length > 0) return doc;
-    return patch(doc, entry, { project });
+    return patch(doc, entry, { projects: uniqueNames(projects) });
+  }
+  function withProject(projects, name, on) {
+    const others = projects.filter((p) => projectKey(p) !== projectKey(name));
+    return on ? [...others, ...namesProject(projects, name) ? [projects.find((p) => projectKey(p) === projectKey(name))] : [name]] : others;
+  }
+  function projectsAt(zone, own) {
+    return zone === void 0 ? own : zone === null ? [] : [zone];
   }
   function setReminder(doc, entry, reminder) {
     return patch(doc, entry, { reminder });
   }
   function rename(doc, entry, text) {
-    return patch(doc, entry, retyped(doc, entry.task, text, entry.task.priority, entry.task.labels));
+    return patch(doc, entry, typed(doc, text, entry.task.priority, entry.task.labels));
   }
   function toggleDone(doc, entry) {
     return setStatus(doc, entry, isOpen(entry.task.status) ? "done" : "todo");
@@ -1703,28 +1935,6 @@
   function nest(doc, entry, parent, before) {
     if (before && samePlace(before, entry)) return doc;
     return intoUnfolded(doc, parent, (d, same) => d.nestEntry(same(entry), same(parent), before && same(before)));
-  }
-  function setResult(doc, entry, result) {
-    if (!result) return patch(doc, entry, { result: false });
-    return patch(doc, entry, { result: true, collapsed: entry.task.collapsed || hasOpenSubtask(entry) });
-  }
-  function addToResult(doc, entries, result) {
-    const moving = entries.filter((entry) => !holds(entry, result) && resultAbove(doc, entry)?.id !== result.id && !entries.some((other) => other.id !== entry.id && holds(other, entry))).sort((a, b) => doc.lineOf(a) - doc.lineOf(b));
-    if (moving.length === 0) return doc;
-    let current = doc;
-    for (const entry of moving) current = current.nestEntry(current.byId(entry.id), current.byId(result.id), null);
-    const filled = current.byId(result.id);
-    return hasOpenSubtask(filled) ? patch(current, filled, { collapsed: true }) : current;
-  }
-  function newResult(doc, entries, title, boundary = DayBoundary.MIDNIGHT) {
-    const first = [...entries].sort((a, b) => doc.lineOf(a) - doc.lineOf(b))[0];
-    if (!first || doc.resultMark() === null) return doc;
-    const { text, ...marks } = typed(doc, title, null, []);
-    const top = first.path.length === 0;
-    const task = newTask(text, { ...marks, result: true, project: top ? first.task.project : null, dueDate: top ? dayOf(first.task, boundary) : null });
-    const made = top ? doc.insert(first.section, first.index, task) : doc.insertUnder(doc.find(first.section, first.index, first.path.slice(0, -1)), task, first);
-    const result = made.insertedSince(doc);
-    return addToResult(made, entries.map((entry) => made.byId(entry.id)), result);
   }
   function subtaskDueDate(placement, inherited, today) {
     if (samePlacement(placement, inherited)) return null;
@@ -1781,11 +1991,11 @@
     const unsorted = isUndated(section);
     if (entry === null) {
       const { text, ...marks } = typed(doc, draft.text, draft.priority, draft.labels ?? []);
-      return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : slot ?? null, ...marks, project: draft.project ?? null }), draft, today, boundary));
+      return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : slot ?? null, ...marks, projects: draftProjects(draft) ?? [] }), draft, today, boundary));
     }
     if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
     const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-    const changed2 = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...same ? {} : { dueDate }, ...unsorted ? { slot: null } : {}, ...draft.project !== void 0 && { project: draft.project } };
+    const changed2 = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...same ? {} : { dueDate }, ...unsorted ? { slot: null } : {}, ...draftProjects(draft) !== void 0 && { projects: draftProjects(draft) } };
     const edited = doc.replace(entry, withDraftRepeat(changed2, draft, today, boundary));
     if (same || entry.section === section) return edited;
     return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
@@ -1796,16 +2006,15 @@
     return doc.replace(entry, withDraftRepeat({ ...entry.task, ...draftMarks(doc, entry.task, draft), dueDate }, draft, today, boundary));
   }
   function typed(doc, text, priority, labels) {
-    const resulting = resultOfText(taskTitle(text), doc.resultMark());
-    const marked = typedMarks(resulting.text, priority, labels, doc.priorityPrefixes());
-    return { ...marked, text: taskTitle(marked.text), result: resulting.result };
-  }
-  function retyped(doc, task, text, priority, labels) {
-    const marks = typed(doc, text, priority, labels);
-    return { ...marks, result: task.result || marks.result };
+    const marked = typedMarks(taskTitle(text), priority, labels, doc.priorityPrefixes());
+    return { ...marked, text: taskTitle(marked.text) };
   }
   function draftMarks(doc, task, draft) {
-    return retyped(doc, task, draft.text, draft.priority, draft.labels ?? task.labels);
+    return typed(doc, draft.text, draft.priority, draft.labels ?? task.labels);
+  }
+  function draftProjects(draft) {
+    if (draft.projects !== void 0) return uniqueNames(draft.projects);
+    return draft.project === void 0 ? void 0 : draft.project === null ? [] : [draft.project];
   }
   function toEnd(doc, entry, section) {
     const prepared = isUndated(section) ? patch(doc, entry, { dueDate: null, slot: null }) : doc;
@@ -1840,33 +2049,19 @@
     if (list === "now") return { dueDate: today, slot: null };
     return { dueDate: list === "soon" && date !== null && date > today ? date : null, slot: null };
   }
-  function moveToGroup(doc, entry, list, group, before, today, date = null, project, boundary = DayBoundary.MIDNIGHT) {
-    if (before !== null && entry.path.length === 0 && before.section === entry.section && before.index === entry.index && (project === void 0 || inProject(entry.project, project))) return doc;
+  function moveToGroup(doc, entry, list, group, before, today, date = null, project) {
+    if (before !== null && entry.path.length === 0 && before.section === entry.section && before.index === entry.index && project === void 0) return doc;
     const entered = patch(doc, entry, enteringList(list, today, date));
-    const position = project === void 0 || before !== null && before.section === list ? positionIn(entered, list, group, before) : afterProject(entered, list, group, project, date, today, boundary, entry);
-    return entered.moveEntry(sameEntryIn(entered, entry), list, position, project);
+    const own = entry.path.length > 0 ? entry.projects : entry.task.projects;
+    return entered.moveEntry(sameEntryIn(entered, entry), list, positionIn(entered, list, group, before), projectsAt(project, own));
   }
   function positionIn(doc, list, group, before) {
     if (before !== null && before.section === list) return before.index;
     return group === null ? "end" : { endOf: groupIndex(doc, list, group) };
   }
-  function columnOf(list, date, today) {
-    if (list === "now") return { kind: "day", date: today };
-    if (list === "soon" && date !== null && date > today) return { kind: "day", date };
-    return { kind: list };
-  }
-  function afterProject(doc, list, group, project, date, today, boundary, moving) {
-    const shown = columnGroups(doc, columnOf(list, date, today), today, boundary).find((g) => g.name === group)?.entries ?? [];
-    const ours = shown.filter((e) => e.section === list && inProject(e.project, project) && !(moving && moving.path.length === 0 && samePlace(e, moving)));
-    const last = ours[ours.length - 1];
-    if (!last) return positionIn(doc, list, group, null);
-    const own = doc.groups(list).find((g) => g.entries.includes(last));
-    const next = own.entries[own.entries.indexOf(last) + 1];
-    return next ? next.index : { endOf: own.index };
-  }
   function createInPlace(doc, typedText, priority, place, today, boundary, repeat, labels = [], own) {
     const { text, ...marks } = typed(doc, typedText, priority, labels);
-    const projectOf = (zone) => own !== void 0 ? own : zone ?? null;
+    const projectOf = (zone) => uniqueNames(own ?? projectsAt(zone, []));
     switch (place.kind) {
       case "subtask":
         return intoUnfolded(
@@ -1875,20 +2070,19 @@
           (d, same) => d.insertUnder(same(place.parent), withRepeat(newTask(text, marks), repeat, today, boundary), place.before && same(place.before))
         );
       case "slot":
-        return createInSlot(doc, place.slot, text, { ...marks, project: projectOf(place.project) }, today, boundary);
+        return createInSlot(doc, place.slot, text, { ...marks, projects: projectOf(place.project) }, today, boundary);
       case "list": {
         const { list, before, project } = place;
         const dueDate = list === "now" ? place.date ?? today : enteringList(list, today, place.date).dueDate;
-        const task = withRepeat(newTask(text, { dueDate, ...marks, project: projectOf(project) }), repeat, today, boundary);
-        if (place.section !== void 0) return intoNewSection(doc, list, place.group, place.section, task, place.date, today, boundary, project ?? null);
-        const position = project === void 0 || before !== null && before.section === list ? positionIn(doc, list, place.group, before) : afterProject(doc, list, place.group, project, place.date, today, boundary, null);
-        return doc.insert(list, position, task);
+        const task = withRepeat(newTask(text, { dueDate, ...marks, projects: projectOf(project) }), repeat, today, boundary);
+        if (place.section !== void 0) return intoNewSection(doc, list, place.group, place.section, task);
+        return doc.insert(list, positionIn(doc, list, place.group, before), task);
       }
     }
   }
-  function intoNewSection(doc, list, group, name, task, date, today, boundary, project) {
+  function intoNewSection(doc, list, group, name, task) {
     const index = groupIndex(doc, list, name);
-    if (index >= 0) return doc.insert(list, afterProject(doc, list, name, project, date, today, boundary, null), task);
+    if (index >= 0) return doc.insert(list, { endOf: index }, task);
     const at = Math.max(1, groupIndex(doc, list, group) + 1);
     return doc.addGroup(list, name, at).insert(list, { endOf: at }, task);
   }
@@ -1937,25 +2131,6 @@
     if (name === ungrouped) return removeGroup(doc, list, from);
     return doc.renameGroup(list, groupIndex(doc, list, from), name);
   }
-  function renameGroupIn(doc, list, from, to, ungrouped, project) {
-    const name = to.trim();
-    if (name === "" || name === from) return doc;
-    if (name === ungrouped) return removeGroupIn(doc, list, from, project);
-    if (!doc.groups(list)[groupIndex(doc, list, from)]?.entries.some((e) => inProject(e.project, project))) return doc;
-    const made = groupIndex(doc, list, name) >= 0 ? doc : doc.addGroup(list, name, groupIndex(doc, list, from));
-    return projectOut(made, list, from, project, (d) => ({ endOf: groupIndex(d, list, name) }));
-  }
-  function removeGroupIn(doc, list, name, project) {
-    return projectOut(doc, list, name, project, () => "end");
-  }
-  function projectOut(doc, list, name, project, to) {
-    for (; ; ) {
-      const index = groupIndex(doc, list, name);
-      const entry = index < 0 ? void 0 : doc.groups(list)[index].entries.find((e) => inProject(e.project, project));
-      if (!entry) return doc;
-      doc = doc.moveEntry(entry, list, to(doc));
-    }
-  }
   function removeGroup(doc, list, name) {
     return doc.mergeGroup(list, groupIndex(doc, list, name), ungroupedIndex(doc.groups(list)), "end");
   }
@@ -1976,10 +2151,9 @@
       if (!entry) return doc;
       const { task } = entry;
       const copy = newTask(task.text, {
-        result: task.result,
         priority: task.priority,
         labels: task.labels,
-        project: entry.project,
+        projects: entry.projects,
         children: doc.freshChildren(entry),
         dueDate: task.repeat.next(dayOf(task, boundary), today),
         repeat: task.repeat,
@@ -2123,6 +2297,7 @@
   }
 
   // core/settings.ts
+  var DEFAULT_RESULT_MARK = "🎯";
   var LABEL_PAINTS = ["stripes", "blend"];
   var CARD_HEIGHTS = { min: 28, max: 40 };
   var CARD_GAPS = { min: 0, max: 10 };
@@ -2203,7 +2378,6 @@
       repeat: settings.repeatMarker,
       collapsed: settings.collapsedMarker,
       priorities,
-      result: usableResultMark(settings.resultMark, priorities) ?? void 0,
       labelTag: settings.labelTag,
       labels: usableLabels(settings.labels).map((l) => l.name)
     };
@@ -2506,8 +2680,8 @@ ${e.calendar}`;
     }
     if (g.label !== void 0 && g.href !== void 0) {
       const href = g.href.startsWith("<") ? g.href.slice(1, -1) : g.href;
-      const part = SCHEME_RE.test(href) ? { kind: "url", label: g.label, target: href } : { kind: "note", label: g.label, target: decoded(href) };
-      return { part, rest: "" };
+      const part2 = SCHEME_RE.test(href) ? { kind: "url", label: g.label, target: href } : { kind: "note", label: g.label, target: decoded(href) };
+      return { part: part2, rest: "" };
     }
     if (g.bare !== void 0) {
       const rest = TRAILING_PUNCTUATION_RE.exec(g.bare)?.[0] ?? "";
@@ -3123,8 +3297,8 @@ ${key.title}`.toLowerCase();
   var DEFAULT_ZOOM_HOUR = 56;
   function parseZoomLevels(text) {
     const levels = [];
-    for (const part of text.split(",")) {
-      const m = /^\s*(\d+)\s*(?::\s*\d+\s*)?$/.exec(part);
+    for (const part2 of text.split(",")) {
+      const m = /^\s*(\d+)\s*(?::\s*\d+\s*)?$/.exec(part2);
       if (!m) return null;
       const hourPx = Number(m[1]);
       if (hourPx <= 0) return null;
@@ -3220,11 +3394,11 @@ ${key.title}`.toLowerCase();
   function zoneOf(header) {
     return header !== null && typeof header === "object" ? header : { group: header };
   }
-  function withProject(place, project) {
+  function withProject2(place, project) {
     return project === void 0 ? place : { ...place, project };
   }
   function levelRange(cards, index, group, project) {
-    const zone = withProject({ group }, project);
+    const zone = withProject2({ group }, project);
     const prev = cards[index - 1] && sameZone(cards[index - 1], zone) ? cards[index - 1] : void 0;
     const next = cards[index] && sameZone(cards[index], zone) ? cards[index] : void 0;
     return { min: next?.level ?? 0, max: prev ? prev.level + 1 : 0 };
@@ -3241,7 +3415,7 @@ ${key.title}`.toLowerCase();
   function placeOfGap(cards, place) {
     const next = cards[place.index] && sameZone(cards[place.index], place) ? cards[place.index] : void 0;
     const before = next && next.level === place.level ? next.key : null;
-    if (place.level === 0) return withProject({ kind: "task", group: place.group, before }, place.project);
+    if (place.level === 0) return withProject2({ kind: "task", group: place.group, before }, place.project);
     let parent = place.index - 1;
     while (cards[parent].level !== place.level - 1) parent--;
     return { kind: "subtask", parent: cards[parent].key, before };
@@ -3249,18 +3423,18 @@ ${key.title}`.toLowerCase();
   function gapOfPlace(cards, place) {
     const at = (key) => cards.findIndex((card) => samePlace2(card.key, key));
     const before = place.before ? at(place.before) : -1;
-    if (before >= 0) return withProject({ kind: "gap", index: before, level: cards[before].level, group: cards[before].group }, cards[before].project);
+    if (before >= 0) return withProject2({ kind: "gap", index: before, level: cards[before].level, group: cards[before].group }, cards[before].project);
     const parent = place.kind === "subtask" ? at(place.parent) : -1;
     if (parent >= 0) {
       let end = parent + 1;
       while (end < cards.length && cards[end].level > cards[parent].level) end++;
-      return withProject({ kind: "gap", index: end, level: cards[parent].level + 1, group: cards[parent].group }, cards[parent].project);
+      return withProject2({ kind: "gap", index: end, level: cards[parent].level + 1, group: cards[parent].group }, cards[parent].project);
     }
-    const zone = place.kind === "task" ? withProject({ group: place.group }, place.project) : { group: null };
+    const zone = place.kind === "task" ? withProject2({ group: place.group }, place.project) : { group: null };
     let last = cards.length - 1;
     while (last >= 0 && !sameZone(cards[last], zone)) last--;
     const first = zone.group === null && zone.project === void 0;
-    return withProject({ kind: "gap", index: last >= 0 ? last + 1 : first ? 0 : cards.length, level: 0, group: zone.group }, zone.project);
+    return withProject2({ kind: "gap", index: last >= 0 ? last + 1 : first ? 0 : cards.length, level: 0, group: zone.group }, zone.project);
   }
   function sameGap(a, b) {
     return a.index === b.index && sameZone(a, b);
@@ -3268,7 +3442,7 @@ ${key.title}`.toLowerCase();
   function gapAt(cards, index, level, passed, headers) {
     const above = index > 0 ? cards[index - 1] : headers ? { group: null } : cards[0] ?? { group: null };
     const zone = passed.length > 0 ? zoneOf(passed[passed.length - 1]) : above;
-    return fitLevel(cards, withProject({ kind: "gap", index, level: Math.round(level), group: zone.group }, zone.project));
+    return fitLevel(cards, withProject2({ kind: "gap", index, level: Math.round(level), group: zone.group }, zone.project));
   }
   function placeOfDrop(cards, place, home) {
     if (home && sameGap(place, home) && place.level === home.level) return null;
@@ -3362,108 +3536,127 @@ ${key.title}`.toLowerCase();
     }
     return [...kept.join("\n").matchAll(BODY_TAG)].map((m) => m[1]).filter((tag) => !/^\d+$/.test(tag)).map((tag) => `#${tag}`);
   }
-  function bare(tag) {
-    return tag.trim().replace(/^#/, "");
+
+  // core/domain/ProjectWrites.ts
+  var LEGACY_RESULT_MARK = "🎯";
+  function taskProjects(doc) {
+    return uniqueNames(doc.allTasks().flatMap((entry) => entry.task.projects));
   }
-  function withProjectTag(text, tag) {
-    const name = bare(tag);
-    const item = `  - ${name}`;
-    if (text === null) return `---
-tags:
-${item}
----
-`;
-    if (noteTags(text).some((t) => bare(t).toLowerCase() === name.toLowerCase())) return text;
-    const lines = text.split("\n");
-    const end = lines[0]?.trim() === "---" ? lines.findIndex((line, i) => i > 0 && line.trim() === "---") : -1;
-    if (end < 0) return `---
-tags:
-${item}
----
-${text}`;
-    const at = lines.findIndex((line, i) => i > 0 && i < end && /^(tags|tag)\s*:/i.test(line));
-    if (at < 0) return [...lines.slice(0, end), "tags:", item, ...lines.slice(end)].join("\n");
-    const colon = lines[at].indexOf(":");
-    const key = lines[at].slice(0, colon);
-    const value = lines[at].slice(colon + 1).trim();
-    if (value.startsWith("[") && value.endsWith("]")) {
-      const inner = value.slice(1, -1).trim();
-      return replaced(lines, at, 1, [`${key}: [${inner === "" ? name : `${inner}, ${name}`}]`]);
-    }
-    if (value !== "") return replaced(lines, at, 1, [`${key}:`, ...value.split(/[,\s]+/).filter((t) => t !== "").map((t) => `  - ${t}`), item]);
-    let last = at;
-    while (last + 1 < end && lines[last + 1].trim().startsWith("-")) last++;
-    const indent = last > at ? /^\s*/.exec(lines[last])?.[0] ?? "  " : "  ";
-    return replaced(lines, last + 1, 0, [`${indent}- ${name}`]);
+  function withTasksInTree(doc) {
+    const named = taskProjects(doc);
+    if (named.length === 0) return doc;
+    const tree = doc.projectTree();
+    const full = tree.withMissing(named);
+    return doc.hasProjectTree() && full === tree ? doc : doc.withProjectTree(full);
   }
-  function replaced(lines, at, count, put) {
-    return [...lines.slice(0, at), ...put, ...lines.slice(at + count)].join("\n");
+  function movedToProjects(doc, notes, resultMark = LEGACY_RESULT_MARK) {
+    if (doc.hasProjectTree()) return doc;
+    const all = flatten(doc.allTasks());
+    const marked = all.filter((entry) => startsWithMark(entry.task.text, resultMark));
+    const fielded = all.filter((entry) => entry.task.projects.length > 0);
+    if (notes.length === 0 && marked.length === 0 && fielded.length === 0) return doc;
+    const byName2 = [...notes].sort((a, b) => projectKey(a.name) < projectKey(b.name) ? -1 : projectKey(a.name) > projectKey(b.name) ? 1 : 0);
+    let tree = doc.projectTree();
+    for (const note of byName2) tree = tree.added(note.name, { parent: null, before: null }, note.link);
+    tree = tree.withMissing(taskProjects(doc));
+    const prefixes = doc.priorityPrefixes();
+    const rewritten = doc.rewrittenLines([.../* @__PURE__ */ new Set([...marked, ...fielded])], (task) => {
+      if (!startsWithMark(task.text, resultMark)) return task;
+      const rest = task.text.slice(resultMark.length).trimStart();
+      return task.priority === null ? { ...task, ...priorityOfText(rest, prefixes) } : { ...task, text: rest };
+    });
+    return rewritten.withProjectTree(tree);
+  }
+  function startsWithMark(text, mark) {
+    return mark !== "" && text.startsWith(`${mark} `) && text.slice(mark.length).trim() !== "";
+  }
+  function renameProject(doc, from, to) {
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const renamed = tree.renamed(from, to);
+    if (renamed === tree) return doc;
+    const key = projectKey(from);
+    const named = flatten(doc.allTasks()).filter((entry) => entry.task.projects.some((p) => projectKey(p) === key));
+    const rewritten = doc.replaceAll(named.map((entry) => [entry, { ...entry.task, projects: uniqueNames(entry.task.projects.map((p) => projectKey(p) === key ? to : p)) }]));
+    return rewritten.withProjectTree(renamed);
+  }
+  function addProject(doc, name, place) {
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const added = tree.added(name, place);
+    return added === tree ? doc : doc.withProjectTree(added);
+  }
+  function moveProject(doc, name, place) {
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const moved2 = tree.moved(name, place);
+    return moved2 === tree ? doc : doc.withProjectTree(moved2);
+  }
+  function setProjectNote(doc, name, note) {
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const changed2 = tree.withNote(name, note);
+    return changed2 === tree ? doc : doc.withProjectTree(changed2);
+  }
+  function projectHolder(doc, entry) {
+    return entry.path.length === 0 ? entry : doc.find(entry.section, entry.index, []);
   }
 
-  // core/application/notes.ts
-  var MD = ".md";
-  function nameOf(path) {
-    const file = path.slice(path.lastIndexOf("/") + 1);
-    return file.toLowerCase().endsWith(MD) ? file.slice(0, -MD.length) : file;
+  // core/application/projects.ts
+  var NO_PROJECT = "No project";
+  var NO_GROUPING = { canGroup: false, on: false, groups: [] };
+  function projectTreeOf(doc) {
+    return doc.projectTree().withMissing(taskProjects(doc));
   }
-  function withoutMd(path) {
-    return path.toLowerCase().endsWith(MD) ? path.slice(0, -MD.length) : path;
+  var ProjectIndex = class {
+    constructor(tree) {
+      this.tree = tree;
+      this.byKey = new Map(tree.all().map((placed) => [projectKey(placed.node.name), placed]));
+    }
+    /** The project named `name` as a card shows it (`mark`); a name the tree lacks stands at its top; null for none. */
+    refOf(name, mark = true) {
+      if (name === null) return null;
+      const placed = this.byKey.get(projectKey(name));
+      if (!placed) return { name, link: name, path: [name], note: null, canOpenNote: false, mark };
+      return refOfPlaced(placed, mark);
+    }
+    /** Every project of the tree, in its order. */
+    known() {
+      return this.tree.all().map((placed) => refOfPlaced(placed, true));
+    }
+    placed() {
+      return this.tree.all();
+    }
+  };
+  function refOfPlaced(placed, mark = true) {
+    const { name, note } = placed.node;
+    return { name, link: name, path: placed.path, note, canOpenNote: note !== null, mark };
   }
-  function linkedNotes(notes) {
-    const named = /* @__PURE__ */ new Map();
-    for (const { path } of notes) named.set(projectKey(nameOf(path)), (named.get(projectKey(nameOf(path))) ?? 0) + 1);
-    return notes.map(({ path }) => {
-      const name = nameOf(path);
-      return { name, path, link: named.get(projectKey(name)) === 1 ? name : withoutMd(path) };
+  function bareTag(tag) {
+    return tag.trim().replace(/^#/, "").toLowerCase();
+  }
+  function hasProjectTag(tags, tag) {
+    const wanted = bareTag(tag);
+    return wanted !== "" && tags.some((t) => bareTag(t) === wanted);
+  }
+  function projectNotesOf(notes, tag) {
+    return byName(notes.filter((note) => hasProjectTag(note.tags, tag)).map(({ name, path, link }) => ({ name, path, link })));
+  }
+  function projectNotesOfTexts(notes, tag) {
+    const names = /* @__PURE__ */ new Map();
+    for (const note of notes) names.set(projectKey(nameOfPath(note.path)), (names.get(projectKey(nameOfPath(note.path))) ?? 0) + 1);
+    const read = [...notes].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0).map((note) => {
+      const name = nameOfPath(note.path);
+      const link = (names.get(projectKey(name)) ?? 0) > 1 ? note.path.replace(/\.md$/i, "") : name;
+      return { name, path: note.path, link, tags: note.tags ?? noteTags(note.text ?? "") };
     });
+    return projectNotesOf(read, tag);
   }
-  var OPEN = "[[";
-  var CLOSE = "]]";
-  function linkQuery(text, caret) {
-    const before = text.slice(0, caret);
-    const from = before.lastIndexOf(OPEN);
-    if (from < 0) return null;
-    const query = before.slice(from + OPEN.length);
-    if (/[\]\[\n|]/.test(query)) return null;
-    return { query, from, to: text.startsWith(CLOSE, caret) ? caret + CLOSE.length : caret };
+  function nameOfPath(path) {
+    return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
   }
-  var NOTE_SUGGESTIONS = 20;
-  function noteSuggestions(query, notes, limit = NOTE_SUGGESTIONS) {
-    const typed2 = query.trim().toLowerCase();
-    const words = typed2.split(/\s+/).filter((word) => word !== "");
-    const rank = (note) => {
-      const name = note.name.toLowerCase();
-      const path = note.path.toLowerCase();
-      if (typed2 === "") return 0;
-      if (name === typed2) return 0;
-      if (name.startsWith(typed2)) return 1;
-      if (name.includes(typed2)) return 2;
-      if (path.includes(typed2)) return 3;
-      return words.every((word) => path.includes(word)) ? 4 : null;
-    };
-    const ranked = linkedNotes(notes).flatMap((note) => {
-      const r = rank(note);
-      return r === null ? [] : [{ note: { name: note.name, path: note.path, link: note.link }, rank: r }];
+  function byName(list) {
+    return [...list].sort((a, b) => {
+      const x = projectKey(a.name);
+      const y = projectKey(b.name);
+      return x < y ? -1 : x > y ? 1 : 0;
     });
-    ranked.sort((a, b) => a.rank - b.rank || (typed2 === "" ? 0 : a.note.name.length - b.note.name.length) || compare(a.note.name, b.note.name) || compare(a.note.path, b.note.path));
-    return ranked.slice(0, limit).map(({ note }) => note);
-  }
-  function compare(a, b) {
-    const x = a.toLowerCase();
-    const y = b.toLowerCase();
-    return x < y ? -1 : x > y ? 1 : 0;
-  }
-  function withNoteLink(text, at, link) {
-    const written = `${OPEN}${link}${CLOSE}`;
-    return { text: text.slice(0, at.from) + written + text.slice(at.to), caret: at.from + written.length };
-  }
-  function noteOfLink(target, notes) {
-    const bare2 = target.split("#")[0].split("|")[0].trim().replace(/^\//, "");
-    if (bare2 === "") return null;
-    const wanted = projectKey(withoutMd(bare2));
-    const linked = linkedNotes(notes);
-    const found = linked.find((note) => projectKey(withoutMd(note.path)) === wanted) ?? linked.find((note) => projectKey(withoutMd(note.path)).endsWith(`/${wanted}`)) ?? linked.find((note) => projectKey(note.name) === wanted);
-    return found ? { name: found.name, path: found.path, link: found.link } : null;
   }
 
   // core/application/sections.ts
@@ -3478,10 +3671,6 @@ ${text}`;
   function groupOf(name, items, header = true, id = sectionId(name, [])) {
     const section = name !== null;
     return { id, name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: header };
-  }
-  function projectSection(name, items, project, id = sectionId(name, [])) {
-    const plain = groupOf(name, items, name !== null, id);
-    return { ...plain, menu: plain.menu && { ...plain.menu, project }, reorder: false };
   }
   function listView(items, sections, listSections = []) {
     if (!sections) return { showsHeaders: false, groups: [groupOf(null, items, false)] };
@@ -3530,413 +3719,6 @@ ${text}`;
   }
   function groupKeyOf(item) {
     return item.project ? projectKey(item.project.name) : "";
-  }
-
-  // core/application/projects.ts
-  var NO_PROJECT = "No project";
-  var NOT_IN_NAME = /[\\/:*?"<>|#^[\]]/g;
-  function pluginFiles(settings) {
-    return [settings.tasksFile, ...CALENDAR_SOURCES.map((source) => calendarPath(source, settings))];
-  }
-  function fileName(path) {
-    return (path.split("/").pop() ?? path).replace(/\.[^.]*$/, "");
-  }
-  function newProjectNote(typed2, notes, owned = []) {
-    const name = typed2.replace(NOT_IN_NAME, "").replace(/\s+/g, " ").trim().replace(/^\.+/, "").trim();
-    if (name === "") return null;
-    if (owned.some((path) => projectKey(fileName(path)) === projectKey(name))) return null;
-    const found = linkedNotes(notes.filter((note) => /\.md$/i.test(note.path))).filter((note) => projectKey(note.name) === projectKey(name)).sort((a, b) => a.path.split("/").length - b.path.split("/").length || (a.path < b.path ? -1 : 1))[0];
-    if (found) return { name: found.name, path: found.path, link: found.link, exists: true };
-    return { name, path: `${name}.md`, link: name, exists: false };
-  }
-  var GROUPING_DEFAULTS = { backlog: true, soon: false, inbox: null, now: null };
-  function bareTag(tag) {
-    return tag.trim().replace(/^#/, "").toLowerCase();
-  }
-  function hasProjectTag(tags, tag) {
-    const wanted = bareTag(tag);
-    return wanted !== "" && tags.some((t) => bareTag(t) === wanted);
-  }
-  function projectNotesOf(notes, tag) {
-    return byName(notes.filter((note) => hasProjectTag(note.tags, tag)).map(({ name, path, link }) => ({ name, path, link })));
-  }
-  function projectNotesOfTexts(notes, tag) {
-    const names = /* @__PURE__ */ new Map();
-    for (const note of notes) names.set(projectKey(nameOfPath(note.path)), (names.get(projectKey(nameOfPath(note.path))) ?? 0) + 1);
-    const read = [...notes].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0).map((note) => {
-      const name = nameOfPath(note.path);
-      const link = (names.get(projectKey(name)) ?? 0) > 1 ? note.path.replace(/\.md$/i, "") : name;
-      return { name, path: note.path, link, tags: note.tags ?? noteTags(note.text ?? "") };
-    });
-    return projectNotesOf(read, tag);
-  }
-  function nameOfPath(path) {
-    return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
-  }
-  function byName(list) {
-    return [...list].sort((a, b) => {
-      const x = projectKey(a.name);
-      const y = projectKey(b.name);
-      return x < y ? -1 : x > y ? 1 : 0;
-    });
-  }
-  var ProjectIndex = class {
-    constructor(notes) {
-      const byKey = /* @__PURE__ */ new Map();
-      for (const note of notes) if (!byKey.has(projectKey(note.name))) byKey.set(projectKey(note.name), note);
-      this.notes = byKey;
-    }
-    /** The project of link text `link` as a card shows it (`mark`): the note of that name, else the name alone; null for none. */
-    refOf(link, mark = true) {
-      if (link === null) return null;
-      const note = this.notes.get(projectKey(projectName(link)));
-      if (!note) return { name: projectName(link), link, note: null, canOpenNote: false, mark };
-      return { name: note.name, link: note.link, note: note.path, canOpenNote: true, mark };
-    }
-    /** Every project note, by name. */
-    known() {
-      return byName([...this.notes.values()]).map((note) => this.refOf(note.link));
-    }
-  };
-  function groupingOn(state, list) {
-    const fallback = GROUPING_DEFAULTS[list];
-    if (fallback === null) return false;
-    return state.on?.[list] ?? fallback;
-  }
-  function canGroup(list) {
-    return GROUPING_DEFAULTS[list] !== null;
-  }
-  function withGrouping(state, list, on) {
-    if (!canGroup(list)) return state;
-    return { ...state, on: { ...state.on, [list]: on } };
-  }
-  function isFolded(state, list, key) {
-    return state.folded?.[list]?.includes(key) ?? false;
-  }
-  function withFoldToggled(state, list, key) {
-    return withFolded(state, list, key, !isFolded(state, list, key));
-  }
-  function withFolded(state, list, key, folded2) {
-    const keys = (state.folded?.[list] ?? []).filter((k) => k !== key);
-    return { ...state, folded: { ...state.folded, [list]: folded2 ? [...keys, key] : keys } };
-  }
-  function listGrouping({ list, items, sections, projects, state }) {
-    const on = groupingOn(state, list);
-    if (!on) return { canGroup: canGroup(list), on, groups: [] };
-    const refs = /* @__PURE__ */ new Map();
-    for (const ref of projects.known()) refs.set(projectKey(ref.name), ref);
-    for (const item of items) if (item.project && !refs.has(projectKey(item.project.name))) refs.set(projectKey(item.project.name), item.project);
-    const named = byName([...refs.values()]).map((ref) => groupOf2(list, projectKey(ref.name), ref, items.filter((item) => item.project !== null && projectKey(item.project.name) === projectKey(ref.name)), sections, state, false));
-    const loose = items.filter((item) => item.project === null);
-    const none = groupOf2(list, "", null, loose, sections, state, true);
-    const showsNone = list === "backlog" || loose.length > 0 || sections.some((s) => s.name !== null && s.empty);
-    return { canGroup: true, on, groups: showsNone ? [...named, none] : named };
-  }
-  function groupOf2(list, key, project, items, sections, state, withEmpty) {
-    const zone = project?.link ?? null;
-    const order = sections.map((s) => s.name);
-    const names = [null, ...order.filter((name) => name !== null)];
-    const filled = names.flatMap((name) => {
-      const own = items.filter((item) => item.group === name);
-      return own.length > 0 ? [projectSection(name, own, zone, sectionId(name, sections))] : [];
-    });
-    const drawn = withEmpty ? withEmptySections(filled, sections).map((g) => g.items.length === 0 ? projectSection(g.name, [], zone, g.id) : g) : filled;
-    return projectGroup(key, project, items, zone, drawn, isFolded(state, list, key), true);
-  }
-  function emptyPart(zone) {
-    return { ...projectSection(null, [], zone), empty: true };
-  }
-  function projectGroup(key, project, items, zone, drawn, folded2, titled) {
-    const sections = drawn.length > 0 ? drawn : [emptyPart(zone)];
-    const end = { kind: "task", group: sections[sections.length - 1].name, before: null, project: zone };
-    return {
-      key,
-      project,
-      title: project?.name ?? NO_PROJECT,
-      folded: folded2,
-      count: items.filter((item) => item.open).length,
-      canOpenNote: project?.canOpenNote ?? false,
-      zone,
-      titled,
-      sections,
-      end,
-      head: { group: folded2 ? end.group : null, project: zone }
-    };
-  }
-  function viewGrouping(project, items, shows, sections) {
-    const zone = project.link;
-    const view = items.length === 0 ? [] : listView(items, shows, sections).groups;
-    const drawn = view.map((g) => ({ ...g, menu: g.menu && { ...g.menu, project: zone }, reorder: false }));
-    return { canGroup: false, on: true, groups: [projectGroup(projectKey(project.name), project, items, zone, drawn, false, false)] };
-  }
-  function groupSectionNames(grouping) {
-    return Object.fromEntries(grouping.groups.map((g) => [g.key, g.sections.map((s) => s.name)]));
-  }
-  function revealedGrouping(state, item) {
-    const list = item.list;
-    if (list !== "backlog" && list !== "soon") return state;
-    const key = groupKeyOf(item);
-    return isFolded(state, list, key) ? withFolded(state, list, key, false) : state;
-  }
-
-  // core/domain/search.ts
-  var SNIPPET_LEAD = 24;
-  var ELLIPSIS = "…";
-  var SPACE_RE = /\s/;
-  var PUNCTUATION_RE = /[ -⁯⸀-⹿\\'!"#$%&()*+,\-./:;<=>?@[\]^_`{|}~]/;
-  var WORD_CHAR_RE = /[\p{L}\p{N}]/u;
-  var ACCENTS_RE = /[̀-ͯ]/g;
-  function foldedChar(char) {
-    const lower = char.toLowerCase();
-    const bare2 = lower.normalize("NFD").replace(ACCENTS_RE, "");
-    if (bare2.length === 1) return bare2;
-    return lower.length === 1 ? lower : char;
-  }
-  function foldedText(text) {
-    return folded(text);
-  }
-  function folded(text) {
-    let out = "";
-    for (let i = 0; i < text.length; i++) out += foldedChar(text.charAt(i));
-    return out;
-  }
-  function insideWord(text, at) {
-    if (at === 0) return false;
-    const char = text.charAt(at);
-    const before = text.charAt(at - 1);
-    if (!WORD_CHAR_RE.test(char) || !WORD_CHAR_RE.test(before)) return false;
-    const startsCapital = char !== char.toLowerCase() && before === before.toLowerCase();
-    return !startsCapital;
-  }
-  var FuzzyQuery = class _FuzzyQuery {
-    constructor(length, words, letters2) {
-      this.length = length;
-      this.words = words;
-      this.letters = letters2;
-    }
-    /** Null for a query of spaces: it finds nothing. */
-    static of(query) {
-      const text = folded(query.trim());
-      if (text === "") return null;
-      const words = [];
-      let from = 0;
-      for (let i = 0; i < text.length; i++) {
-        const char = text.charAt(i);
-        if (!SPACE_RE.test(char) && !PUNCTUATION_RE.test(char)) continue;
-        if (from !== i) words.push(text.slice(from, i));
-        if (!SPACE_RE.test(char)) words.push(char);
-        from = i + 1;
-      }
-      if (from !== text.length) words.push(text.slice(from));
-      const letters2 = [...text].filter((char) => !SPACE_RE.test(char));
-      return new _FuzzyQuery(text.length, words, letters2);
-    }
-    /** The words in their order, failing that the letters in theirs. */
-    match(text) {
-      const lower = folded(text);
-      return this.matchPieces(this.words, text, lower, false) ?? this.matchPieces(this.letters, text, lower, true);
-    }
-    /** The words in their order only: letters scattered over a long text would find nearly anything. */
-    matchWords(text) {
-      return this.matchPieces(this.words, text, folded(text), false);
-    }
-    matchPieces(pieces, text, lower, letters2) {
-      if (pieces.length === 0) return null;
-      const found = [];
-      let at = 0;
-      let broken = 0;
-      for (const piece of pieces) {
-        const start = lower.indexOf(piece, at);
-        if (start < 0) return null;
-        const joined = letters2 && start === at;
-        if (!joined && insideWord(text, start)) broken++;
-        const last = found[found.length - 1];
-        if (last && last.end === start) last.end = start + piece.length;
-        else found.push({ start, end: start + piece.length });
-        at = start + piece.length;
-      }
-      return { score: this.score(found, broken, text.length), found };
-    }
-    /** Fewer pieces, fewer of them inside words, tighter, earlier and in a shorter text score higher. */
-    score(found, broken, textLength) {
-      const span = found[found.length - 1].end - found[0].start;
-      return -(found.length - 1) - broken / 10 - (span + 1 - this.length) / 100 - found[0].start / 1e3 - textLength / 1e4;
-    }
-  };
-  function matchParts(text, found) {
-    const parts = [];
-    let at = 0;
-    for (const piece of found) {
-      if (piece.start > at) parts.push({ text: text.slice(at, piece.start), match: false });
-      parts.push({ text: text.slice(piece.start, piece.end), match: true });
-      at = piece.end;
-    }
-    if (at < text.length) parts.push({ text: text.slice(at), match: false });
-    return parts;
-  }
-  var EMBED_RE = /!\[\[[^\]]*\]\]|!\[[^\]]*\]\([^)]*\)/g;
-  var BLOCK_MARK_RE = /^\s*(?:>\s?)*\s*(?:#{1,6}\s+|(?:[-*+]|\d+[.)])\s+(?:\[.\]\s+)?)?/;
-  var LITERAL_RE = /`([^`]*)`|\\(.)/gu;
-  var EMPHASIS_RE = /(\*\*|~~|==|\*|(?<![\p{L}\p{N}])__|(?<![\p{L}\p{N}])_)(?=\S)(.+?)(?<=\S)\1(?![\p{L}\p{N}])/gu;
-  function withoutEmphasis(text) {
-    let out = text;
-    for (let before = ""; before !== out; ) {
-      before = out;
-      out = out.replace(EMPHASIS_RE, "$2");
-    }
-    return out;
-  }
-  function plainInline(text) {
-    let out = "";
-    let at = 0;
-    for (const m of text.matchAll(LITERAL_RE)) {
-      out += plainText(withoutEmphasis(text.slice(at, m.index)));
-      out += m[1] ?? m[2];
-      at = m.index + m[0].length;
-    }
-    return out + plainText(withoutEmphasis(text.slice(at)));
-  }
-  function plainDescription(markdown) {
-    return plainInline(
-      markdown.split("\n").map((line) => line.replace(BLOCK_MARK_RE, "")).join(" ").replace(EMBED_RE, "")
-    ).replace(/\s+/g, " ").trim();
-  }
-  function snippetParts(text, found) {
-    const first = found[0].start;
-    if (first <= SNIPPET_LEAD) return matchParts(text, found);
-    const tail = text.slice(first - SNIPPET_LEAD, first);
-    const space = tail.indexOf(" ");
-    const lead = space >= 0 && space < tail.length - 1 ? tail.slice(space + 1) : tail;
-    const cut = first - lead.length;
-    const shifted = found.map((piece) => ({ start: piece.start - cut + 1, end: piece.end - cut + 1 }));
-    return matchParts(ELLIPSIS + text.slice(cut), shifted);
-  }
-
-  // core/application/taskItems.ts
-  function progressOf(entry) {
-    if (entry.subtasks.length === 0) return null;
-    const counted = entry.subtasks.filter((s) => s.task.status !== "cancelled");
-    return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
-  }
-  var NO_LEVELS = { levelOf: () => null, labelsOf: () => [], projectOf: () => null };
-  function itemLevels(levels, labels, projectOf = () => null) {
-    return {
-      levelOf: (prefix) => levels.find((l) => l.prefix === prefix) ?? null,
-      labelsOf: (names) => labels.filter((l) => names.includes(l.name)),
-      projectOf
-    };
-  }
-  function resultRef(entry) {
-    return { id: entry.id, key: keyOf(entry), title: plainText(entry.task.text) };
-  }
-  function itemWithId(items, id) {
-    for (const item of items) {
-      if (item.id === id) return item;
-      const inner = itemWithId(item.allSubtasks, id);
-      if (inner) return inner;
-    }
-    return null;
-  }
-  function ownCard(item) {
-    return { text: item.text, title: item.title, over: null, step: null, semibold: item.isResult };
-  }
-  function cardOf(item, step) {
-    return item.collapsed && step ? { text: step.text, title: step.title, over: item.title, step, semibold: false } : ownCard(item);
-  }
-  function blockOf(item, step) {
-    return step ? { text: step.text, title: step.title, step } : { text: item.text, title: item.title, step: null };
-  }
-  function toItem(entry, today, levels = NO_LEVELS, parent = null, boundary = DayBoundary.MIDNIGHT, above = null, drawn = null) {
-    const marks = marksOfTask(entry.task);
-    const choices = markChoices(marks);
-    const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
-    const labels = levels.labelsOf(marks.labels);
-    const open = isOpen(entry.task.status);
-    const shown = entry.task.result && open ? nextStep(entry) : null;
-    const drawnBelow = shown ? { id: shown.id, on: entry } : drawn;
-    const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary, entry.task.result ? entry : above, drawnBelow));
-    const description = descriptionMarkdown(entry);
-    const step = shown && itemWithId(allSubtasks, shown.id);
-    const own = { text: entry.task.text, title: plainText(entry.task.text), isResult: entry.task.result, collapsed: entry.task.collapsed && hasOpenSubtask(entry) };
-    return {
-      id: entry.id,
-      key: keyOf(entry),
-      text: entry.task.text,
-      title: plainText(entry.task.text),
-      status: entry.task.status,
-      dueDate: entry.task.dueDate,
-      slot: entry.task.slot,
-      durationMin: entry.task.slot && entry.task.slot.end !== null ? entry.task.slot.end - entry.task.slot.start : null,
-      reminder: entry.task.reminder,
-      repeat: entry.task.repeat?.rule ?? null,
-      open: isOpen(entry.task.status),
-      repeatable: repeatable(entry),
-      priority,
-      labels,
-      colors: markColors(priority, labels),
-      group: entry.group,
-      project: levels.projectOf(entry.project),
-      list: entry.section,
-      isSubtask: entry.path.length > 0,
-      day: dayOfTask(entry.section, entry.task, today),
-      repeatDay: repeatDay(dayOf(entry.task, boundary), today),
-      can: {
-        postpone: canPostpone(entry.section),
-        removeDue: canRemoveDue(entry.task.dueDate, today),
-        remind: canRemind(entry.task.slot),
-        setPriority: choices.priority,
-        setLabels: choices.labels,
-        stop: entry.task.repeat !== null && repeatable(entry),
-        addDescription: description === null,
-        fold: hasOpenSubtask(entry),
-        resize: entry.task.slot !== null,
-        setProject: entry.path.length === 0,
-        result: open
-      },
-      isResult: entry.task.result,
-      resultOf: above ? resultRef(above) : null,
-      card: cardOf(own, step),
-      block: blockOf(own, step),
-      drawnOn: drawn?.id === entry.id ? { key: keyOf(drawn.on), slot: drawn.on.task.slot } : null,
-      subtasks: allSubtasks.filter((sub) => sub.open),
-      allSubtasks,
-      progress: progressOf(entry),
-      collapsed: entry.task.collapsed && hasOpenSubtask(entry),
-      description,
-      parentText: parent?.task.text ?? null,
-      parentKey: parent ? keyOf(parent) : null
-    };
-  }
-
-  // core/application/results.ts
-  var RESULT_WORDS = {
-    addToResult: "Add to result",
-    makeResult: "Make result",
-    makeTask: "Make task",
-    newResult: "New result…",
-    search: "Search results",
-    name: "Result name"
-  };
-  function menuResult(items, bulk, marks = true) {
-    const open = marks && items.length > 0 && items.every((item) => item.can.result);
-    const rows = !open ? [] : bulk ? ["addToResult"] : ["addToResult", "toggle"];
-    const first = items[0]?.resultOf ?? null;
-    const current = first !== null && items.every((item) => item.resultOf?.id === first.id) ? first : null;
-    const isResult = !bulk && items[0]?.isResult === true;
-    return {
-      rows,
-      label: RESULT_WORDS.addToResult,
-      value: current?.title ?? "",
-      current,
-      toggle: isResult ? { label: RESULT_WORDS.makeTask, result: false } : { label: RESULT_WORDS.makeResult, result: true }
-    };
-  }
-  function resultPage(doc, chosen, query, projectName2) {
-    const nearest = chosen.map((entry) => resultAbove(doc, entry)?.id ?? null);
-    const ticked = nearest.length > 0 && nearest.every((id) => id === nearest[0]) ? nearest[0] : null;
-    const typed2 = foldedText(query.trim());
-    const options = flatten(doc.allTasks()).filter((entry) => entry.section !== "done" && entry.task.result && isOpen(entry.task.status)).filter((entry) => !chosen.some((task) => holds(task, entry))).filter((entry) => typed2 === "" || foldedText(plainText(entry.task.text)).includes(typed2)).map((entry) => ({ entry, line: doc.lineOf(entry) })).sort((a, b) => a.line - b.line).map(({ entry }) => ({ result: resultRef(entry), list: entry.section, project: entry.project === null ? null : projectName2(entry.project), checked: entry.id === ticked }));
-    return { options, placeholder: RESULT_WORDS.search, newLabel: RESULT_WORDS.newResult, namePlaceholder: RESULT_WORDS.name };
   }
 
   // core/application/menus.ts
@@ -4031,31 +3813,34 @@ ${text}`;
   }
   function menuProject(items, known) {
     return projectPage(
-      items.map((item) => item.project),
+      items.map((item) => item.projects),
       known,
       items.every((item) => !item.can.setProject)
     );
   }
   var NEW_PROJECT = "New project…";
   function projectPage(chosen, known, disabled = false) {
-    const key = (ref) => ref ? projectKey(ref.name) : "";
-    const first = chosen[0] ?? null;
-    const shared = chosen.every((ref) => key(ref) === key(first));
+    const key = (ref) => projectKey(ref.name);
     const options = [...known];
-    for (const ref of chosen) if (ref && !options.some((option) => key(option) === key(ref))) options.push({ ...ref, mark: true });
-    const none = chosen.every((ref) => ref === null);
+    for (const refs of chosen) for (const ref of refs) if (!options.some((option) => key(option.project) === key(ref))) options.push({ project: { ...ref, mark: true }, depth: 0 });
+    const all = (ref) => chosen.length > 0 && chosen.every((refs) => refs.some((r) => key(r) === key(ref)));
+    const first = chosen[0] ?? [];
+    const same = chosen.every((refs) => refs.length === first.length && refs.every((ref, i) => key(ref) === key(first[i])));
+    const none = chosen.every((refs) => refs.length === 0);
+    const shared = first.find(all) ?? null;
     return {
-      value: shared && first ? first.name : none ? NO_PROJECT : "",
-      current: shared ? first : null,
-      options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
+      value: none ? NO_PROJECT : same ? first.length === 1 ? first[0].name : `${first[0].name} +${first.length - 1}` : "",
+      current: shared,
+      options: options.map(({ project, depth }) => ({ project, depth, checked: all(project) })),
       none,
       noneLabel: NO_PROJECT,
       disabled,
       newLabel: NEW_PROJECT
     };
   }
+  var NO_RESULT_ROWS = { rows: [], label: "", value: "", current: null, toggle: { label: "", result: false } };
   var MENU_GROUPS = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
-  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = [], marksResults = true) {
+  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = []) {
     const sections = menuSections(items, offer, of);
     const edits = menuEdits(items, of, sections);
     return {
@@ -4068,7 +3853,7 @@ ${text}`;
       dueDate: sharedDueDate(items),
       sections,
       project: menuProject(items, projects),
-      result: menuResult(items, of.kind === "bulk", marksResults),
+      result: NO_RESULT_ROWS,
       edits,
       reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
       repeat: repeatRow(of.kind === "task" ? items[0]?.repeat ?? null : null),
@@ -4078,6 +3863,112 @@ ${text}`;
   function carriedWith(lifted, picked) {
     const id = keyId(lifted);
     return picked.filter((key) => keyId(key) !== id && !picked.some((other) => other !== key && isUnder(key, other)));
+  }
+
+  // core/domain/NextStep.ts
+  function nextStep(entry) {
+    let step = null;
+    for (let at = entry; ; ) {
+      const open = at.subtasks.find((sub) => isOpen(sub.task.status));
+      if (!open) return step;
+      step = at = open;
+    }
+  }
+
+  // core/application/taskItems.ts
+  function progressOf(entry) {
+    if (entry.subtasks.length === 0) return null;
+    const counted = entry.subtasks.filter((s) => s.task.status !== "cancelled");
+    return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
+  }
+  var NO_LEVELS = { levelOf: () => null, labelsOf: () => [], projectsOf: () => [] };
+  function itemLevels(levels, labels, projectOf = (name) => ({ name, link: name, path: [name], note: null, canOpenNote: false, mark: true })) {
+    return {
+      levelOf: (prefix) => levels.find((l) => l.prefix === prefix) ?? null,
+      labelsOf: (names) => labels.filter((l) => names.includes(l.name)),
+      projectsOf: (names) => names.map(projectOf)
+    };
+  }
+  function itemWithId(items, id) {
+    for (const item of items) {
+      if (item.id === id) return item;
+      const inner = itemWithId(item.allSubtasks, id);
+      if (inner) return inner;
+    }
+    return null;
+  }
+  function ownCard(item) {
+    return { text: item.text, title: item.title, over: null, step: null, semibold: false };
+  }
+  function cardOf(item, step) {
+    return step ? { text: step.text, title: step.title, over: item.title, step, semibold: false } : ownCard(item);
+  }
+  function blockOf(item, step) {
+    return step ? { text: step.text, title: step.title, step } : { text: item.text, title: item.title, step: null };
+  }
+  function toItem(entry, today, levels = NO_LEVELS, parent = null, boundary = DayBoundary.MIDNIGHT, drawn = null) {
+    const marks = marksOfTask(entry.task);
+    const choices = markChoices(marks);
+    const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
+    const labels = levels.labelsOf(marks.labels);
+    const open = isOpen(entry.task.status);
+    const collapsed = entry.task.collapsed && hasOpenSubtask(entry);
+    const shown = collapsed && open ? nextStep(entry) : null;
+    const drawnBelow = shown ? { id: shown.id, on: entry } : drawn;
+    const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary, drawnBelow));
+    const description = descriptionMarkdown(entry);
+    const step = shown && itemWithId(allSubtasks, shown.id);
+    const own = { text: entry.task.text, title: plainText(entry.task.text) };
+    const projects = levels.projectsOf(entry.projects);
+    return {
+      id: entry.id,
+      key: keyOf(entry),
+      text: entry.task.text,
+      title: plainText(entry.task.text),
+      status: entry.task.status,
+      dueDate: entry.task.dueDate,
+      slot: entry.task.slot,
+      durationMin: entry.task.slot && entry.task.slot.end !== null ? entry.task.slot.end - entry.task.slot.start : null,
+      reminder: entry.task.reminder,
+      repeat: entry.task.repeat?.rule ?? null,
+      open: isOpen(entry.task.status),
+      repeatable: repeatable(entry),
+      priority,
+      labels,
+      colors: markColors(priority, labels),
+      group: entry.group,
+      project: projects[0] ?? null,
+      projects,
+      list: entry.section,
+      isSubtask: entry.path.length > 0,
+      day: dayOfTask(entry.section, entry.task, today),
+      repeatDay: repeatDay(dayOf(entry.task, boundary), today),
+      can: {
+        postpone: canPostpone(entry.section),
+        removeDue: canRemoveDue(entry.task.dueDate, today),
+        remind: canRemind(entry.task.slot),
+        setPriority: choices.priority,
+        setLabels: choices.labels,
+        stop: entry.task.repeat !== null && repeatable(entry),
+        addDescription: description === null,
+        fold: hasOpenSubtask(entry),
+        resize: entry.task.slot !== null,
+        setProject: entry.path.length === 0,
+        result: false
+      },
+      isResult: false,
+      resultOf: null,
+      card: cardOf(own, step),
+      block: blockOf(own, step),
+      drawnOn: drawn?.id === entry.id ? { key: keyOf(drawn.on), slot: drawn.on.task.slot } : null,
+      subtasks: allSubtasks.filter((sub) => sub.open),
+      allSubtasks,
+      progress: progressOf(entry),
+      collapsed,
+      description,
+      parentText: parent?.task.text ?? null,
+      parentKey: parent ? keyOf(parent) : null
+    };
   }
 
   // core/application/fullTree.ts
@@ -4286,8 +4177,8 @@ ${text}`;
       for (const column of [...shown, ...ALL_COLUMNS.filter((c) => !shown.includes(c))]) {
         this.look.cards(column).forEach((card, index) => {
           const k = card.key;
-          const holds2 = k.section === key.section && k.index === key.index && k.path.length < key.path.length && k.path.every((i, n) => key.path[n] === i);
-          if (holds2 && (best === null || k.path.length > best.depth)) best = { column, index, depth: k.path.length };
+          const holds = k.section === key.section && k.index === key.index && k.path.length < key.path.length && k.path.every((i, n) => key.path[n] === i);
+          if (holds && (best === null || k.path.length > best.depth)) best = { column, index, depth: k.path.length };
         });
         if (best) return best;
       }
@@ -4328,8 +4219,8 @@ ${text}`;
       if (!field) return;
       const list = listSpot(this.run(field.run).spot);
       const moves = !field.rename && list !== null && list.place.level === 0 && list.place.project !== void 0 && !inProject(link, list.place.project);
-      const part = moves ? this.partEnd(list.column, link) : null;
-      this.reset({ ...field, project: link, ...part && { run: this.newRun(part) } }, part === null);
+      const part2 = moves ? this.partEnd(list.column, link) : null;
+      this.reset({ ...field, project: link, ...part2 && { run: this.newRun(part2) } }, part2 === null);
     }
     type(text) {
       const field = this.session.field;
@@ -4587,8 +4478,8 @@ ${text}`;
     }
     /** After the last card, in the last section, at the top level; with `project`, of that project's part where the list draws one. */
     endOf(column, project) {
-      const part = project === void 0 ? null : this.partEnd(column, project);
-      if (part) return part;
+      const part2 = project === void 0 ? null : this.partEnd(column, project);
+      if (part2) return part2;
       const sections = this.look.sections(column);
       const last = sections.length > 0 ? zoneOf2(sections[sections.length - 1]) : { group: null };
       return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, ...last } };
@@ -4624,9 +4515,9 @@ ${text}`;
       const list = listSpot(run.spot);
       if (!list || list.column !== column || list.place.level !== 0 || list.place.project === void 0 || run.pending.length > 0) return;
       if (inProject(field.project, list.place.project)) return;
-      const part = this.partEnd(column, field.project, drawing);
-      if (!part) return;
-      const next = this.newRun(part);
+      const part2 = this.partEnd(column, field.project, drawing);
+      if (!part2) return;
+      const next = this.newRun(part2);
       this.hold(next);
       this.release(field.run);
       this.session.field = { ...field, run: next };
@@ -4797,12 +4688,13 @@ ${text}`;
     return [...lists, { kind: "date", on: place?.kind === "date", date: place?.kind === "date" ? place.date : null }];
   }
   function entryProject(link, known) {
-    return { page: projectPage([refOf(link, known)], known), lit: link !== null };
+    const ref = refOf(link, known);
+    return { page: projectPage([ref ? [ref] : []], known.map((project) => ({ project, depth: project.path.length - 1 }))), lit: link !== null };
   }
   function refOf(link, known) {
     if (link === null) return null;
     const name = projectName(link);
-    return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link, note: null, canOpenNote: false, mark: true };
+    return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link: name, path: [name], note: null, canOpenNote: false, mark: true };
   }
   function faced(rename2) {
     const { item, face } = rename2;
@@ -4980,6 +4872,339 @@ ${text}`;
     return { kind: "many", steps };
   }
 
+  // core/application/projectsScreen.ts
+  var PROJECTS_WORDS = {
+    all: "All",
+    none: NO_PROJECT,
+    done: "Done",
+    today: "Today",
+    byProject: "By project",
+    byStage: "By stage",
+    noTasks: "No tasks",
+    rename: "Rename",
+    note: "Note",
+    attach: "Attach note…",
+    detach: "Detach"
+  };
+  var PROJECT_PREFIX = "project:";
+  function projectNodeOf(name) {
+    return `${PROJECT_PREFIX}${name}`;
+  }
+  function projectOfNode(node) {
+    return node.startsWith(PROJECT_PREFIX) ? node.slice(PROJECT_PREFIX.length) : null;
+  }
+  function sameNode(a, b) {
+    const x = projectOfNode(a);
+    const y = projectOfNode(b);
+    return x !== null && y !== null ? projectKey(x) === projectKey(y) : a === b;
+  }
+  function tasksOf(doc) {
+    return doc.allTasks();
+  }
+  function moving(entry) {
+    return isOpen(entry.task.status) && (entry.section === "now" || entry.section === "soon" || entry.task.dueDate !== null || entry.task.slot !== null);
+  }
+  function counts(entry) {
+    return isOpen(entry.task.status) ? entry.section !== "done" : true;
+  }
+  function projectStatuses(tree, doc) {
+    const tasks = tasksOf(doc).filter(counts);
+    const statuses = /* @__PURE__ */ new Map();
+    const visit = (node) => {
+      const children = node.children.map(visit);
+      const own = tasks.filter((entry) => namesProject(entry.task.projects, node.name));
+      const total = own.length + children.reduce((sum, child) => sum + child.tasks, 0);
+      const status = own.some(moving) || children.some((c) => c.status === "active") ? "active" : total === 0 || own.some((e) => isOpen(e.task.status)) || children.some((c) => c.status !== "done") ? "waiting" : "done";
+      statuses.set(projectKey(node.name), status);
+      return { status, tasks: total };
+    };
+    tree.roots.forEach(visit);
+    return statuses;
+  }
+  function selectedNode(state, tree) {
+    const node = state.selected ?? "all";
+    const name = projectOfNode(node);
+    if (name === null) return node === "none" || node === "done" ? node : "all";
+    const found = tree.find(name);
+    return found ? projectNodeOf(found.node.name) : "all";
+  }
+  function isFolded(state, name) {
+    return (state.folded ?? []).some((node) => sameNode(node, projectNodeOf(name)));
+  }
+  function projectsView(input) {
+    const { tree, state } = input;
+    const statuses = input.doc ? projectStatuses(tree, input.doc) : /* @__PURE__ */ new Map();
+    const statusOf2 = (name2) => statuses.get(projectKey(name2)) ?? "waiting";
+    const selected2 = selectedNode(state, tree);
+    const mode = state.mode ?? "byProject";
+    const rows = treeRows(tree, state, selected2, statusOf2);
+    const parts = input.doc ? sectionsOf(input, input.doc, selected2, mode, statusOf2) : [];
+    const name = projectOfNode(selected2);
+    const placed = name === null ? null : tree.find(name);
+    return {
+      rows,
+      selected: selected2,
+      mode,
+      modes: [
+        { mode: "byProject", label: PROJECTS_WORDS.byProject },
+        { mode: "byStage", label: PROJECTS_WORDS.byStage }
+      ],
+      title: placed ? placed.node.name : selected2 === "none" ? PROJECTS_WORDS.none : selected2 === "done" ? PROJECTS_WORDS.done : PROJECTS_WORDS.all,
+      menu: placed ? projectMenu(refOfPlaced(placed, false)) : null,
+      sections: parts,
+      newTask: selected2 === "done" || placed !== null && statusOf2(placed.node.name) === "done" ? null : inInbox(placed?.node.name ?? null),
+      emptyLabel: PROJECTS_WORDS.noTasks,
+      missing: input.doc === null
+    };
+  }
+  function projectMenu(project) {
+    return {
+      project,
+      renameLabel: PROJECTS_WORDS.rename,
+      noteLabel: PROJECTS_WORDS.note,
+      note: project.note === null ? null : { link: project.note, name: projectName(project.note.split("|")[0].split("#")[0]) },
+      attachLabel: PROJECTS_WORDS.attach,
+      detachLabel: PROJECTS_WORDS.detach
+    };
+  }
+  function inInbox(project) {
+    return { place: { kind: "list", list: "inbox", group: null, before: null }, project };
+  }
+  function treeRows(tree, state, selected2, statusOf2) {
+    const rows = [fixedRow("all", PROJECTS_WORDS.all, selected2, false, false)];
+    const walk = (nodes, path, depth, done) => {
+      for (const node of nodes) {
+        if (statusOf2(node.name) === "done" !== done) continue;
+        const branch = node.children.filter((child) => statusOf2(child.name) === "done" === done);
+        const folded2 = branch.length > 0 && isFolded(state, node.name);
+        const own = [...path, node.name];
+        const status = statusOf2(node.name);
+        rows.push({
+          node: projectNodeOf(node.name),
+          kind: "project",
+          title: node.name,
+          depth,
+          tile: depth === 0,
+          waiting: status === "waiting",
+          status,
+          selected: sameNode(selected2, projectNodeOf(node.name)),
+          hasBranch: branch.length > 0,
+          folded: folded2,
+          project: refOfPlaced({ node, path: own }, false),
+          acceptsTask: true,
+          canLift: !done,
+          unfoldsOnHover: folded2
+        });
+        if (!folded2) walk(node.children, own, depth + 1, done);
+      }
+    };
+    const liveRoots = (nodes) => nodes;
+    walk(liveRoots(tree.roots), [], 0, false);
+    rows.push(fixedRow("none", PROJECTS_WORDS.none, selected2, false, true));
+    const doneTops = doneRoots(tree, statusOf2);
+    const open = state.doneOpen === true;
+    rows.push({ ...fixedRow("done", PROJECTS_WORDS.done, selected2, doneTops.length > 0, false), folded: doneTops.length > 0 && !open });
+    if (open) for (const top of doneTops) walkDone(top, rows, state, selected2, statusOf2, 1);
+    return rows;
+  }
+  function doneRoots(tree, statusOf2) {
+    return tree.all().filter((placed) => {
+      if (statusOf2(placed.node.name) !== "done") return false;
+      const parent = placed.path.length > 1 ? placed.path[placed.path.length - 2] : null;
+      return parent === null || statusOf2(parent) !== "done";
+    });
+  }
+  function walkDone(placed, rows, state, selected2, statusOf2, depth) {
+    const { node, path } = placed;
+    const folded2 = node.children.length > 0 && isFolded(state, node.name);
+    rows.push({
+      node: projectNodeOf(node.name),
+      kind: "project",
+      title: node.name,
+      depth,
+      tile: false,
+      waiting: false,
+      status: statusOf2(node.name),
+      selected: sameNode(selected2, projectNodeOf(node.name)),
+      hasBranch: node.children.length > 0,
+      folded: folded2,
+      project: refOfPlaced(placed, false),
+      acceptsTask: true,
+      canLift: false,
+      unfoldsOnHover: folded2
+    });
+    if (!folded2) for (const child of node.children) walkDone({ node: child, path: [...path, child.name] }, rows, state, selected2, statusOf2, depth + 1);
+  }
+  function fixedRow(node, title, selected2, hasBranch, acceptsTask) {
+    return { node, kind: node, title, depth: 0, tile: true, waiting: false, status: null, selected: selected2 === node, hasBranch, folded: false, project: null, acceptsTask, canLift: false, unfoldsOnHover: false };
+  }
+  var STAGES = ["today", "soon", "inbox", "backlog"];
+  function stageOf(entry) {
+    if (!isOpen(entry.task.status) || entry.section === "done") return "done";
+    return entry.section === "now" ? "today" : entry.section;
+  }
+  function stageMark(entry, today, boundary) {
+    const stage = stageOf(entry);
+    const day = dayOf(entry.task, boundary);
+    if (stage === "soon" && day !== null && day !== today) return { kind: "date", date: day, label: dueLabel(day) };
+    return { kind: stage };
+  }
+  function menuFromOf(entry) {
+    if (entry.section === "now") return "day";
+    return entry.section;
+  }
+  function tasksNaming(doc, name, closed) {
+    return tasksOf(doc).filter((entry) => namesProject(entry.task.projects, name) && (closed ? stageOf(entry) === "done" : stageOf(entry) !== "done"));
+  }
+  function byStage(entries) {
+    const rank = (entry) => ["today", "soon", "inbox", "backlog", "done"].indexOf(stageOf(entry));
+    return entries.map((entry, i) => ({ entry, i })).sort((a, b) => rank(a.entry) - rank(b.entry) || a.i - b.i).map(({ entry }) => entry);
+  }
+  function cardOf2(input, entry, mode, from, over) {
+    return {
+      item: input.item(entry),
+      stage: mode === "byProject" ? stageMark(entry, input.today, input.boundary) : null,
+      over: mode === "byStage" ? over : null,
+      from,
+      menuFrom: menuFromOf(entry),
+      canDrop: true
+    };
+  }
+  function sectionsOf(input, doc, selected2, mode, statusOf2) {
+    const name = projectOfNode(selected2);
+    const placed = name === null ? null : input.tree.find(name);
+    if (placed) return projectSections(input, doc, placed, mode, statusOf2);
+    if (selected2 === "done") return doneSections(input, doc, mode, statusOf2);
+    if (selected2 === "none") {
+      const loose = tasksOf(doc).filter((entry) => entry.task.projects.length === 0 && stageOf(entry) !== "done");
+      return mode === "byProject" ? filled([part("none", null, [], 0, byStage(loose).map((e) => cardOf2(input, e, mode, null, null)), inInbox(null))]) : stageSections(input, loose.map((entry) => ({ entry, from: null, over: null })), null);
+    }
+    const live = input.tree.all().filter((p) => statusOf2(p.node.name) !== "done");
+    if (mode === "byProject") return filled(live.map((p) => part(`project:${p.node.name}`, p.node.name, p.path, p.path.length, byStage(tasksNaming(doc, p.node.name, false)).map((e) => cardOf2(input, e, mode, p.node.name, null)), inInbox(p.node.name))));
+    const shown = tasksOf(doc).filter((entry) => entry.task.projects.length > 0 && stageOf(entry) !== "done");
+    return stageSections(
+      input,
+      shown.map((entry) => {
+        const first = input.tree.find(entry.task.projects[0])?.node.name ?? entry.task.projects[0];
+        return { entry, from: first, over: first };
+      }),
+      null
+    );
+  }
+  function projectSections(input, doc, placed, mode, statusOf2) {
+    const closed = statusOf2(placed.node.name) === "done";
+    const top = placed.path.length;
+    const branch = input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf2(p.node.name) !== "done"));
+    const write = (project) => closed ? null : inInbox(project);
+    if (mode === "byProject") {
+      const own = part("own", null, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf2(input, e, mode, placed.node.name, null)), write(placed.node.name));
+      const subs = branch.map((p) => part(`project:${p.node.name}`, p.node.name, p.path.slice(top), p.path.length - top, byStage(tasksNaming(doc, p.node.name, closed)).map((e) => cardOf2(input, e, mode, p.node.name, null)), write(p.node.name)));
+      return filled([own, ...subs]);
+    }
+    const seen = /* @__PURE__ */ new Set();
+    const shown = [];
+    for (const p of [placed, ...branch]) {
+      for (const entry of tasksNaming(doc, p.node.name, closed)) {
+        if (seen.has(entry.id)) continue;
+        seen.add(entry.id);
+        const own = namesProject(entry.task.projects, placed.node.name);
+        shown.push({ entry, from: own ? placed.node.name : p.node.name, over: own ? null : p.node.name });
+      }
+    }
+    return stageSections(input, shown, closed ? null : placed.node.name);
+  }
+  function doneSections(input, doc, mode, statusOf2) {
+    const done = input.tree.all().filter((p) => statusOf2(p.node.name) === "done");
+    if (mode === "byProject") return filled(done.map((p) => part(`project:${p.node.name}`, p.node.name, p.path, p.path.length, tasksNaming(doc, p.node.name, true).map((e) => cardOf2(input, e, mode, p.node.name, null)), null)));
+    const seen = /* @__PURE__ */ new Set();
+    const shown = done.flatMap((p) => tasksNaming(doc, p.node.name, true).filter((e) => !seen.has(e.id) && (seen.add(e.id), true)).map((entry) => ({ entry, from: p.node.name, over: p.node.name })));
+    return stageSections(input, shown, null);
+  }
+  function stageSections(input, shown, project) {
+    const stages = [...STAGES, "done"];
+    return filled(
+      stages.map((stage) => {
+        const here = shown.filter((s) => stageOf(s.entry) === stage);
+        const title = stage === "today" ? PROJECTS_WORDS.today : stage === "done" ? PROJECTS_WORDS.done : input.listName(stage);
+        const place = stage === "done" ? null : { kind: "list", list: stage === "today" ? "now" : stage, group: null, before: null };
+        return part(stage, title, [], 0, here.map((s) => cardOf2(input, s.entry, "byStage", s.from, s.over)), place && { place, project });
+      })
+    );
+  }
+  function part(key, title, path, depth, cards, newTask2) {
+    return { key, title, path, depth, cards, newTask: newTask2 };
+  }
+  function filled(sections) {
+    return sections.filter((s) => s.cards.length > 0);
+  }
+  function tapped(state, tree, node) {
+    const selected2 = selectedNode(state, tree);
+    if (!sameNode(selected2, node)) return { ...state, selected: node };
+    if (node === "done") return { ...state, doneOpen: !(state.doneOpen ?? false) };
+    const name = projectOfNode(node);
+    if (name === null || !tree.find(name)?.node.children.length) return state;
+    return withFold(state, name, !isFolded(state, name));
+  }
+  function selected(state, tree, doc, node) {
+    const name = projectOfNode(node);
+    const found = name === null ? null : tree.find(name);
+    if (name !== null && !found) return state;
+    let next = { ...state, selected: found ? projectNodeOf(found.node.name) : node };
+    if (!found) return next;
+    for (const above of found.path.slice(0, -1)) next = withFold(next, above, false);
+    if (doc && projectStatuses(tree, doc).get(projectKey(found.node.name)) === "done") next = { ...next, doneOpen: true };
+    return next;
+  }
+  function withFold(state, name, folded2) {
+    const others = (state.folded ?? []).filter((node) => !sameNode(node, projectNodeOf(name)));
+    return { ...state, folded: folded2 ? [...others, projectNodeOf(name)] : others };
+  }
+  function renamedIn(state, from, to) {
+    const carry = (node) => sameNode(node, projectNodeOf(from)) ? projectNodeOf(to) : node;
+    return { ...state, ...state.selected !== void 0 && { selected: carry(state.selected) }, ...state.folded && { folded: state.folded.map(carry) } };
+  }
+  function liveRows(rows, lifted) {
+    const none = rows.findIndex((row) => row.kind === "none");
+    const end = none < 0 ? rows.length : none;
+    const kept = [];
+    let skipping = null;
+    for (let i = 0; i < end; i++) {
+      const row = rows[i];
+      if (row.kind !== "project") continue;
+      if (skipping !== null && row.depth > skipping) continue;
+      skipping = null;
+      if (lifted && sameNode(row.node, lifted)) {
+        skipping = row.depth;
+        continue;
+      }
+      kept.push({ row, index: i });
+    }
+    return { rows: kept.map((k) => k.row), at: (gap) => kept.filter((k) => k.index < Math.min(gap, end)).length };
+  }
+  function projectsLevels(rows, gap, lifted) {
+    const live = liveRows(rows, lifted);
+    const i = live.at(gap);
+    const above = live.rows[i - 1];
+    const below = live.rows[i];
+    return { min: below ? below.depth : 0, max: above ? above.depth + 1 : 0 };
+  }
+  function projectsGap(rows, gap, depth, lifted) {
+    const live = liveRows(rows, lifted);
+    const i = live.at(gap);
+    const { min, max } = projectsLevels(rows, gap, lifted);
+    const level = Math.max(min, Math.min(max, Math.round(depth)));
+    let parent = null;
+    for (let k = i - 1; k >= 0 && level > 0; k--) {
+      if (live.rows[k].depth === level - 1) {
+        parent = live.rows[k].title;
+        break;
+      }
+    }
+    const below = live.rows[i];
+    const place = { parent, before: below && below.depth === level ? below.title : null };
+    return { place, depth: level };
+  }
+
   // core/application/contracts.ts
   var StaleTaskError = class extends Error {
     constructor() {
@@ -4996,6 +5221,72 @@ ${text}`;
       this.name = "TasksFileMissingError";
     }
   };
+
+  // core/application/notes.ts
+  var MD = ".md";
+  function nameOf(path) {
+    const file = path.slice(path.lastIndexOf("/") + 1);
+    return file.toLowerCase().endsWith(MD) ? file.slice(0, -MD.length) : file;
+  }
+  function withoutMd(path) {
+    return path.toLowerCase().endsWith(MD) ? path.slice(0, -MD.length) : path;
+  }
+  function linkedNotes(notes) {
+    const named = /* @__PURE__ */ new Map();
+    for (const { path } of notes) named.set(projectKey(nameOf(path)), (named.get(projectKey(nameOf(path))) ?? 0) + 1);
+    return notes.map(({ path }) => {
+      const name = nameOf(path);
+      return { name, path, link: named.get(projectKey(name)) === 1 ? name : withoutMd(path) };
+    });
+  }
+  var OPEN = "[[";
+  var CLOSE = "]]";
+  function linkQuery(text, caret) {
+    const before = text.slice(0, caret);
+    const from = before.lastIndexOf(OPEN);
+    if (from < 0) return null;
+    const query = before.slice(from + OPEN.length);
+    if (/[\]\[\n|]/.test(query)) return null;
+    return { query, from, to: text.startsWith(CLOSE, caret) ? caret + CLOSE.length : caret };
+  }
+  var NOTE_SUGGESTIONS = 20;
+  function noteSuggestions(query, notes, limit = NOTE_SUGGESTIONS) {
+    const typed2 = query.trim().toLowerCase();
+    const words = typed2.split(/\s+/).filter((word) => word !== "");
+    const rank = (note) => {
+      const name = note.name.toLowerCase();
+      const path = note.path.toLowerCase();
+      if (typed2 === "") return 0;
+      if (name === typed2) return 0;
+      if (name.startsWith(typed2)) return 1;
+      if (name.includes(typed2)) return 2;
+      if (path.includes(typed2)) return 3;
+      return words.every((word) => path.includes(word)) ? 4 : null;
+    };
+    const ranked = linkedNotes(notes).flatMap((note) => {
+      const r = rank(note);
+      return r === null ? [] : [{ note: { name: note.name, path: note.path, link: note.link }, rank: r }];
+    });
+    ranked.sort((a, b) => a.rank - b.rank || (typed2 === "" ? 0 : a.note.name.length - b.note.name.length) || compare(a.note.name, b.note.name) || compare(a.note.path, b.note.path));
+    return ranked.slice(0, limit).map(({ note }) => note);
+  }
+  function compare(a, b) {
+    const x = a.toLowerCase();
+    const y = b.toLowerCase();
+    return x < y ? -1 : x > y ? 1 : 0;
+  }
+  function withNoteLink(text, at, link) {
+    const written = `${OPEN}${link}${CLOSE}`;
+    return { text: text.slice(0, at.from) + written + text.slice(at.to), caret: at.from + written.length };
+  }
+  function noteOfLink(target, notes) {
+    const bare = target.split("#")[0].split("|")[0].trim().replace(/^\//, "");
+    if (bare === "") return null;
+    const wanted = projectKey(withoutMd(bare));
+    const linked = linkedNotes(notes);
+    const found = linked.find((note) => projectKey(withoutMd(note.path)) === wanted) ?? linked.find((note) => projectKey(withoutMd(note.path)).endsWith(`/${wanted}`)) ?? linked.find((note) => projectKey(note.name) === wanted);
+    return found ? { name: found.name, path: found.path, link: found.link } : null;
+  }
 
   // core/application/ScreenSettingsImpl.ts
   function screenSettingsOf(settings) {
@@ -5125,13 +5416,11 @@ ${text}`;
       const zoomLevels = parseZoomLevels(text);
       if (zoomLevels) await this.store.update({ zoomLevels });
     }
-    async setResultMark(mark) {
-      const word = mark.trim();
-      if (usableResultMark(word, usableLevels(this.settings.priorities).map((l) => l.prefix)) !== null) await this.store.update({ resultMark: word });
+    /** Results went: writes nothing. Stub until the frontends drop the field. */
+    async setResultMark(_mark) {
     }
-    async setProjectTag(tag) {
-      const bare2 = tag.trim().replace(/^#/, "");
-      if (/^[^\s#]+$/.test(bare2)) await this.store.update({ projectTag: `#${bare2}` });
+    /** The project tag is no setting any more (projects live in the tasks file): writes nothing. Stub until the frontends drop the field. */
+    async setProjectTag(_tag) {
     }
     renameLabel(index, title) {
       return this.patchLabel(index, { name: labelNameOf(title) });
@@ -5227,6 +5516,136 @@ ${text}`;
     return whole >= bounds.min && whole <= bounds.max ? whole : null;
   }
 
+  // core/domain/search.ts
+  var SNIPPET_LEAD = 24;
+  var ELLIPSIS = "…";
+  var SPACE_RE = /\s/;
+  var PUNCTUATION_RE = /[ -⁯⸀-⹿\\'!"#$%&()*+,\-./:;<=>?@[\]^_`{|}~]/;
+  var WORD_CHAR_RE = /[\p{L}\p{N}]/u;
+  var ACCENTS_RE = /[̀-ͯ]/g;
+  function foldedChar(char) {
+    const lower = char.toLowerCase();
+    const bare = lower.normalize("NFD").replace(ACCENTS_RE, "");
+    if (bare.length === 1) return bare;
+    return lower.length === 1 ? lower : char;
+  }
+  function folded(text) {
+    let out = "";
+    for (let i = 0; i < text.length; i++) out += foldedChar(text.charAt(i));
+    return out;
+  }
+  function insideWord(text, at) {
+    if (at === 0) return false;
+    const char = text.charAt(at);
+    const before = text.charAt(at - 1);
+    if (!WORD_CHAR_RE.test(char) || !WORD_CHAR_RE.test(before)) return false;
+    const startsCapital = char !== char.toLowerCase() && before === before.toLowerCase();
+    return !startsCapital;
+  }
+  var FuzzyQuery = class _FuzzyQuery {
+    constructor(length, words, letters2) {
+      this.length = length;
+      this.words = words;
+      this.letters = letters2;
+    }
+    /** Null for a query of spaces: it finds nothing. */
+    static of(query) {
+      const text = folded(query.trim());
+      if (text === "") return null;
+      const words = [];
+      let from = 0;
+      for (let i = 0; i < text.length; i++) {
+        const char = text.charAt(i);
+        if (!SPACE_RE.test(char) && !PUNCTUATION_RE.test(char)) continue;
+        if (from !== i) words.push(text.slice(from, i));
+        if (!SPACE_RE.test(char)) words.push(char);
+        from = i + 1;
+      }
+      if (from !== text.length) words.push(text.slice(from));
+      const letters2 = [...text].filter((char) => !SPACE_RE.test(char));
+      return new _FuzzyQuery(text.length, words, letters2);
+    }
+    /** The words in their order, failing that the letters in theirs. */
+    match(text) {
+      const lower = folded(text);
+      return this.matchPieces(this.words, text, lower, false) ?? this.matchPieces(this.letters, text, lower, true);
+    }
+    /** The words in their order only: letters scattered over a long text would find nearly anything. */
+    matchWords(text) {
+      return this.matchPieces(this.words, text, folded(text), false);
+    }
+    matchPieces(pieces, text, lower, letters2) {
+      if (pieces.length === 0) return null;
+      const found = [];
+      let at = 0;
+      let broken = 0;
+      for (const piece of pieces) {
+        const start = lower.indexOf(piece, at);
+        if (start < 0) return null;
+        const joined = letters2 && start === at;
+        if (!joined && insideWord(text, start)) broken++;
+        const last = found[found.length - 1];
+        if (last && last.end === start) last.end = start + piece.length;
+        else found.push({ start, end: start + piece.length });
+        at = start + piece.length;
+      }
+      return { score: this.score(found, broken, text.length), found };
+    }
+    /** Fewer pieces, fewer of them inside words, tighter, earlier and in a shorter text score higher. */
+    score(found, broken, textLength) {
+      const span = found[found.length - 1].end - found[0].start;
+      return -(found.length - 1) - broken / 10 - (span + 1 - this.length) / 100 - found[0].start / 1e3 - textLength / 1e4;
+    }
+  };
+  function matchParts(text, found) {
+    const parts = [];
+    let at = 0;
+    for (const piece of found) {
+      if (piece.start > at) parts.push({ text: text.slice(at, piece.start), match: false });
+      parts.push({ text: text.slice(piece.start, piece.end), match: true });
+      at = piece.end;
+    }
+    if (at < text.length) parts.push({ text: text.slice(at), match: false });
+    return parts;
+  }
+  var EMBED_RE = /!\[\[[^\]]*\]\]|!\[[^\]]*\]\([^)]*\)/g;
+  var BLOCK_MARK_RE = /^\s*(?:>\s?)*\s*(?:#{1,6}\s+|(?:[-*+]|\d+[.)])\s+(?:\[.\]\s+)?)?/;
+  var LITERAL_RE = /`([^`]*)`|\\(.)/gu;
+  var EMPHASIS_RE = /(\*\*|~~|==|\*|(?<![\p{L}\p{N}])__|(?<![\p{L}\p{N}])_)(?=\S)(.+?)(?<=\S)\1(?![\p{L}\p{N}])/gu;
+  function withoutEmphasis(text) {
+    let out = text;
+    for (let before = ""; before !== out; ) {
+      before = out;
+      out = out.replace(EMPHASIS_RE, "$2");
+    }
+    return out;
+  }
+  function plainInline(text) {
+    let out = "";
+    let at = 0;
+    for (const m of text.matchAll(LITERAL_RE)) {
+      out += plainText(withoutEmphasis(text.slice(at, m.index)));
+      out += m[1] ?? m[2];
+      at = m.index + m[0].length;
+    }
+    return out + plainText(withoutEmphasis(text.slice(at)));
+  }
+  function plainDescription(markdown) {
+    return plainInline(
+      markdown.split("\n").map((line) => line.replace(BLOCK_MARK_RE, "")).join(" ").replace(EMBED_RE, "")
+    ).replace(/\s+/g, " ").trim();
+  }
+  function snippetParts(text, found) {
+    const first = found[0].start;
+    if (first <= SNIPPET_LEAD) return matchParts(text, found);
+    const tail = text.slice(first - SNIPPET_LEAD, first);
+    const space = tail.indexOf(" ");
+    const lead = space >= 0 && space < tail.length - 1 ? tail.slice(space + 1) : tail;
+    const cut = first - lead.length;
+    const shifted = found.map((piece) => ({ start: piece.start - cut + 1, end: piece.end - cut + 1 }));
+    return matchParts(ELLIPSIS + text.slice(cut), shifted);
+  }
+
   // core/application/TimelineSpans.ts
   function droppedSpan(start, durationMin) {
     return clampSlot(start, durationMin === null ? null : start + durationMin);
@@ -5277,9 +5696,8 @@ ${text}`;
   };
 
   // core/application/TaskReads.ts
-  var NO_PROJECT_SOURCE = { notes: () => [], grouping: () => ({}) };
-  var NO_GROUPING = { canGroup: false, on: false, groups: [] };
-  function sectionsOf(doc, list) {
+  var NO_PROJECT_SOURCE = { tree: () => ProjectTree.EMPTY, screen: () => ({}) };
+  function sectionsOf2(doc, list) {
     return doc.groups(list).filter((g) => g.heading || g.entries.length > 0).map((g) => ({ id: g.name === null || g.id === null ? NO_SECTION_ID : g.id, name: g.name, empty: g.name !== null && g.entries.length === 0 }));
   }
   var SEARCH_ORDER = ["inbox", "backlog", "soon", "now", "done"];
@@ -5298,13 +5716,32 @@ ${text}`;
       this.clock = clock;
       this.projects = projects;
     }
-    /** The project notes, by name, as the Project page offers them. */
+    /** The projects of the tree read last, in its order: what the Project page offers. */
     projectNotes() {
-      return this.index().known();
+      return new ProjectIndex(this.projects.tree()).known();
     }
-    /** How this device groups its lists now. */
+    /** Grouping went: none. Stub until the frontends drop it. */
     grouping() {
-      return this.projects.grouping();
+      return {};
+    }
+    /** The Projects screen as this device shows it; without a file, the tree's fixed rows alone. */
+    projectsScreenRead() {
+      return { reads: true, tidies: true, missing: () => this.projectsScreen(null), answer: (s) => this.projectsScreen(s) };
+    }
+    projectsScreen(s) {
+      const tree = s ? projectTreeOf(s.doc) : ProjectTree.EMPTY;
+      const levels = this.itemLevels(new ProjectIndex(tree), false);
+      const today = s?.today ?? this.today();
+      const boundary = s?.boundary ?? this.rules.moment().boundary;
+      return projectsView({
+        doc: s?.doc ?? null,
+        tree,
+        today,
+        boundary,
+        state: this.projects.screen(),
+        item: (entry) => toItem(entry, today, levels, null, boundary),
+        listName: (list) => this.listName(list)
+      });
     }
     priorityLevels() {
       return this.rules.priorityLevels();
@@ -5328,32 +5765,27 @@ ${text}`;
       return withPriority(text, prefix, this.priorityLevels().map((l) => l.prefix));
     }
     /** The screen of `date`: the file tidied for today first; without a file, the empty screen. */
-    screenRead(date, project) {
-      return { reads: true, tidies: true, missing: () => this.missingScreen(date, project), answer: (s) => this.screen(s, date, project) };
+    screenRead(date, _project) {
+      return { reads: true, tidies: true, missing: () => this.missingScreen(date), answer: (s) => this.screen(s, date) };
     }
-    /** The screen of `date`; with `project`, that project's view. */
-    screen(s, date, project) {
-      const scope = { project: project ?? null, index: this.index() };
+    /** The screen of `date`. `_project`: a project's view went; ignored. */
+    screen(s, date, _project) {
       const { doc, today, boundary } = s;
-      const shown = (entries) => scope.project === null ? entries : entries.filter((e) => inProject(e.project, scope.project));
-      const item = this.itemOf(today, scope);
-      const lists = { inbox: shown(inboxList(doc)), backlog: shown(backlogList(doc)), soon: shown(soonWithoutDate(doc)) };
-      const day = { date, list: shown(dayList(doc, date, today, boundary)).map(item), slotted: shown(slottedOn(doc, date, boundary)).map(item) };
-      const all = this.listSections(s);
-      const sections = scope.project === null ? all : Object.fromEntries(GROUPED_LISTS.map((list) => [list, all[list].filter((sec) => !sec.empty)]));
-      const view = { soon: lists.soon.map(item), inbox: lists.inbox.map(item), backlog: lists.backlog.map(item) };
-      const projects = this.listGroupings(scope, { ...view, day: day.list }, sections, date);
-      const offer = this.offerOf(s, date, shown, sections, projects);
+      const item = this.itemOf(today, doc);
+      const day = { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
+      const sections = this.listSections(s);
+      const view = { soon: soonWithoutDate(doc).map(item), inbox: inboxList(doc).map(item), backlog: backlogList(doc).map(item) };
+      const projects = { inbox: NO_GROUPING, backlog: NO_GROUPING, soon: NO_GROUPING, now: NO_GROUPING };
       return {
         day,
         ...view,
-        done: shown(doc.tasks("done")).map(item),
+        done: doc.tasks("done").map(item),
         sections,
-        offer,
+        offer: this.offerOf(s, date, sections),
         missing: false,
         calendars: true,
         projects,
-        project: scope.project === null ? null : scope.index.refOf(scope.project, false),
+        project: null,
         titleDrops: this.titleDrops(date, projects)
       };
     }
@@ -5368,24 +5800,8 @@ ${text}`;
         backlog: title("backlog", null, projects.backlog)
       };
     }
-    /** Each list's grouping by project on this device; none in a project's view. */
-    listGroupings(scope, view, sections, date) {
-      if (scope.project !== null) {
-        const ref = scope.index.refOf(scope.project, false);
-        const dayList2 = this.columnSections("day", date)?.list ?? null;
-        return {
-          inbox: viewGrouping(ref, view.inbox, true, sections.inbox),
-          backlog: viewGrouping(ref, view.backlog, true, sections.backlog),
-          soon: viewGrouping(ref, view.soon, true, sections.soon),
-          now: viewGrouping(ref, view.day, dayList2 !== null, dayList2 === null ? [] : sections[dayList2])
-        };
-      }
-      const state = this.projects.grouping();
-      const of = (list) => listGrouping({ list, items: view[list], sections: sections[list], projects: scope.index, state });
-      return { inbox: of("inbox"), backlog: of("backlog"), soon: of("soon"), now: NO_GROUPING };
-    }
     /** The screen without a tasks file: nothing in any list, and no calendars beside nothing. */
-    missingScreen(date, project) {
+    missingScreen(date) {
       const none = { inbox: [], backlog: [], soon: [], now: [] };
       const off = { inbox: NO_GROUPING, backlog: NO_GROUPING, soon: NO_GROUPING, now: NO_GROUPING };
       return {
@@ -5399,90 +5815,82 @@ ${text}`;
         missing: true,
         calendars: false,
         projects: off,
-        project: project === void 0 ? null : this.index().refOf(project, false),
+        project: null,
         titleDrops: this.titleDrops(date, off)
       };
     }
     dayView({ doc, today, boundary }, date) {
-      const item = this.itemOf(today);
+      const item = this.itemOf(today, doc);
       return { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
     }
     soonWithoutDateView({ doc, today }) {
-      return soonWithoutDate(doc).map(this.itemOf(today));
+      return soonWithoutDate(doc).map(this.itemOf(today, doc));
     }
     inboxView({ doc, today }) {
-      return inboxList(doc).map(this.itemOf(today));
+      return inboxList(doc).map(this.itemOf(today, doc));
     }
     backlogView({ doc, today }) {
-      return backlogList(doc).map(this.itemOf(today));
+      return backlogList(doc).map(this.itemOf(today, doc));
     }
     doneView({ doc, today }) {
-      return doc.tasks("done").map(this.itemOf(today));
+      return doc.tasks("done").map(this.itemOf(today, doc));
     }
     sectionOffer(s, date) {
       return this.screen(s, date).offer;
     }
-    /** The sections the menus offer on the screen `shown` draws; a list grouped by project offers each group its own. */
-    offerOf({ doc, today, boundary }, date, filter, sections, projects) {
+    /** The sections the menus offer on the screen. */
+    offerOf({ doc, today, boundary }, date, sections) {
       const { presets, ungrouped } = this.settings.get().groups;
-      const shown = filter([...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)]);
+      const shown = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
       const names = (list) => offeredNames(shownSections(shown.filter((entry) => entry.section === list).map((entry) => entry.group), sections[list]), presets, ungrouped);
-      const lists = { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") };
-      const grouped = GROUPED_LISTS.filter((list) => projects[list].on);
-      if (grouped.length === 0) return { lists, ungrouped };
-      const byGroup2 = (list) => Object.fromEntries(Object.entries(groupSectionNames(projects[list])).map(([key, groups]) => [key, offeredNames(groups, presets, ungrouped)]));
-      return { lists, ungrouped, projects: Object.fromEntries(grouped.map((list) => [list, byGroup2(list)])) };
+      return { lists: { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") }, ungrouped };
     }
     listSections({ doc }) {
-      return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(doc, list)]));
+      return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf2(doc, list)]));
     }
     /** A query that finds nothing reads no file. */
-    searchRead(query, project) {
-      return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query, project) };
+    searchRead(query, _project) {
+      return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query) };
     }
-    /** With `project`, only that project's tasks (and their subtasks). */
-    search(s, query, project) {
+    /** Every task the query finds, each with its project's path. `_project`: a project's view went; ignored. */
+    search(s, query, _project) {
       const fuzzy = FuzzyQuery.of(query);
       if (!fuzzy || !s) return [];
       const { doc, today } = s;
-      const item = this.itemOf(today, this.scopeAll(), doc);
+      const item = this.itemOf(today, doc);
       const ranked = [];
-      const index = this.index();
       const visit = (entry) => {
         const titleText = plainText(entry.task.text);
         const title = fuzzy.match(titleText);
         const markdown = descriptionMarkdown(entry);
         const descriptionText = markdown === null ? "" : plainDescription(markdown);
         const description = descriptionText === "" ? null : fuzzy.matchWords(descriptionText);
-        const projectText = entry.project === null || entry.path.length > 0 ? "" : index.refOf(entry.project)?.name ?? projectName(entry.project);
-        const project2 = projectText === "" ? null : fuzzy.matchWords(projectText);
-        if (title || description || project2) {
-          const found = item(entry);
+        const found = item(entry);
+        const projectText = entry.path.length > 0 ? "" : found.project?.name ?? "";
+        const project = projectText === "" ? null : fuzzy.matchWords(projectText);
+        if (title || description || project) {
           const hit = {
             item: { ...found, card: ownCard(found) },
             title: title ? matchParts(titleText, title.found) : [],
-            project: project2 ? matchParts(projectText, project2.found) : null,
+            project: project ? matchParts(projectText, project.found) : null,
+            projectPath: found.project?.path ?? null,
             description: description ? snippetParts(descriptionText, description.found) : null
           };
-          ranked.push({ hit, title, description: description ?? project2 });
+          ranked.push({ hit, title, description: description ?? project });
         }
         for (const sub of entry.subtasks) if (isOpen(sub.task.status)) visit(sub);
       };
       const groups = [];
       for (const list of SEARCH_ORDER) {
         ranked.length = 0;
-        for (const entry of doc.tasks(list)) if (project === void 0 || inProject(entry.project, project)) visit(entry);
+        for (const entry of doc.tasks(list)) visit(entry);
         if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
       }
       return groups;
     }
-    resultPageRead(keys, query) {
-      return { reads: true, answer: (s) => this.resultPage(s, keys, query) };
-    }
-    /** The Add to result page for the tasks `keys` names, `query` typed in its search. */
-    resultPage({ doc }, keys, query) {
-      const index = this.index();
-      return resultPage(doc, keys.map((key) => this.rules.entryOf(doc, key)), query, (link) => index.refOf(link)?.name ?? projectName(link));
+    /** Results went: an empty page. Stub until the frontends drop it. */
+    resultPage() {
+      return { options: [], placeholder: "", newLabel: "", namePlaceholder: "" };
     }
     screenOf({ doc, today }, item) {
       const top = item.isSubtask ? doc.find(item.key.section, item.key.index, []) : void 0;
@@ -5506,11 +5914,11 @@ ${text}`;
     }
     /** The tasks the keys name as the file has them, in their order; throws StaleTaskError when one is gone. */
     itemsAt({ doc, today }, keys) {
-      const levels = this.itemLevels(this.scopeAll());
+      const levels = this.itemLevels(new ProjectIndex(projectTreeOf(doc)));
       return keys.map((key) => {
         const entry = this.rules.entryOf(doc, key);
         const parent = key.path.length > 0 ? doc.find(key.section, key.index, key.path.slice(0, -1)) ?? null : null;
-        return toItem(entry, today, levels, parent, void 0, resultAbove(doc, entry));
+        return toItem(entry, today, levels, parent);
       });
     }
     /** The task at `place` in `doc` as the UI sees it, with the task it sits under; null when none stands there. */
@@ -5518,7 +5926,7 @@ ${text}`;
       const entry = doc.find(place.section, place.index, place.path);
       if (!entry) return null;
       const parent = place.path.length > 0 ? doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null : null;
-      return toItem(entry, today, this.itemLevels(this.scopeAll()), parent, this.rules.moment().boundary, resultAbove(doc, entry));
+      return toItem(entry, today, this.itemLevels(new ProjectIndex(projectTreeOf(doc))), parent, this.rules.moment().boundary);
     }
     /** The task's line in the file once tidied for today, from 0. */
     lineOfRead(key) {
@@ -5557,11 +5965,11 @@ ${text}`;
     }
     menu(item, from, screen) {
       const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-      return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectNotes(), this.rules.marksResults());
+      return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectChoices());
     }
     bulkMenu(picked, screen) {
       const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-      return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectNotes(), this.rules.marksResults());
+      return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices());
     }
     carried(lifted, picked) {
       return carriedWith(lifted, picked);
@@ -5585,22 +5993,19 @@ ${text}`;
     timeline() {
       return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
     }
-    /** The item of a task, its subtasks below it; with `doc`, the result it is a step of too (a subtask's). */
-    itemOf(today, scope = this.scopeAll(), doc) {
-      const levels = this.itemLevels(scope);
+    /** The item of a task of `doc`, its subtasks below it, its projects as `doc`'s tree has them. */
+    itemOf(today, doc) {
+      const levels = this.itemLevels(new ProjectIndex(projectTreeOf(doc)));
       const { boundary } = this.rules.moment();
-      return (entry) => toItem(entry, today, levels, null, boundary, doc ? resultAbove(doc, entry) : null);
+      return (entry) => toItem(entry, today, levels, null, boundary);
     }
-    itemLevels(scope) {
+    itemLevels(index, mark = true) {
       const settings = this.settings.get();
-      const mark = scope.project === null;
-      return itemLevels(usableLevels(settings.priorities), usableLabels(settings.labels), (link) => scope.index.refOf(link, mark));
+      return itemLevels(usableLevels(settings.priorities), usableLabels(settings.labels), (name) => index.refOf(name, mark));
     }
-    index() {
-      return new ProjectIndex(this.projects.notes());
-    }
-    scopeAll() {
-      return { project: null, index: this.index() };
+    /** The projects the Project page offers: the tree read last, each with its depth. */
+    projectChoices() {
+      return new ProjectIndex(this.projects.tree()).known().map((project) => ({ project, depth: project.path.length - 1 }));
     }
     today() {
       return this.rules.today();
@@ -5687,11 +6092,12 @@ ${text}`;
      * service's; the door's when the host hands its ids back), so a key's task is found by its id. Otherwise an id means
      * nothing here and a key names its task by place and line alone.
      */
-    constructor(settings, clock, identity = null, keysById = identity !== null) {
+    constructor(settings, clock, identity = null, keysById = identity !== null, legacyNotes = () => []) {
       this.settings = settings;
       this.clock = clock;
       this.identity = identity;
       this.keysById = keysById;
+      this.legacyNotes = legacyNotes;
     }
     moment() {
       const settings = this.settings.get();
@@ -5704,9 +6110,9 @@ ${text}`;
     priorityLevels() {
       return usableLevels(this.settings.get().priorities);
     }
-    /** A title of nothing but a priority, or the result mark, is blank too. */
+    /** A title of nothing but a priority is blank too. */
     isBlank(text) {
-      return isBlankTitle(withoutResultMark(text, markersOf(this.settings.get()).result ?? null), this.priorityLevels().map((l) => l.prefix));
+      return isBlankTitle(text, this.priorityLevels().map((l) => l.prefix));
     }
     read(text, at = this.moment()) {
       const { settings, today, boundary } = at;
@@ -5831,7 +6237,7 @@ ${text}`;
     }
     /** A new task where `place` says, whatever its title: `createInPlace` without its check for a blank one. */
     placeNew(text, priority, place, repeat, labels = [], project) {
-      return (doc, today, _settings, boundary) => createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels, project);
+      return (doc, today, _settings, boundary) => createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels, project === void 0 ? void 0 : project === null ? [] : [project]);
     }
     create(draft, slot) {
       if (this.isBlank(draft.text)) return null;
@@ -5882,34 +6288,70 @@ ${text}`;
       };
       return { operation, places: () => places };
     }
-    /** Each task's project; a subtask's line is left alone. */
+    /** Each task's projects become `project` alone (null: none); a subtask's line is left alone. */
     setProject(keys, project) {
       if (keys.length === 0) return null;
-      if (keys.length === 1) return (doc) => setProject(doc, this.entryOf(doc, keys[0]), project);
-      return this.applyAll(keys.map((key) => ({ key, change: { kind: "project", project } })));
+      return this.withProjects(keys, () => project === null ? [] : [project]);
     }
-    /** Make result, or Make task. */
-    setResult(key, result) {
-      if (result && !this.marksResults()) return null;
-      return (doc) => setResult(doc, this.entryOf(doc, key), result);
-    }
-    /** The tasks become the last steps of `result`; null for none. A result no longer open, or no longer a result, is stale. */
-    addToResult(keys, result) {
+    /** `name` put last on every task that lacks it, or taken off them all when all have it; a subtask's key names its top task. */
+    toggleProject(keys, name) {
       if (keys.length === 0) return null;
       return (doc) => {
-        const target = this.entryOf(doc, result);
-        if (!target.task.result || !isOpen(target.task.status)) throw new StaleTaskError();
-        return addToResult(doc, keys.map((key) => this.entryOf(doc, key)), target);
+        const holders = this.holders(doc, keys);
+        const on = !holders.every((entry) => namesProject(entry.task.projects, name));
+        return this.rewrite(doc, holders, (projects) => withProject(projects, name, on));
       };
     }
-    /** A new result named as typed, at the first task's place, the tasks its steps; null for none or a blank name. */
-    newResult(keys, name) {
-      if (keys.length === 0 || this.isBlank(name) || !this.marksResults()) return null;
-      return (doc, _today, _settings, boundary) => newResult(doc, keys.map((key) => this.entryOf(doc, key)), name, boundary);
+    /** «New project…»: the project made at the tree's top when it lacks it, and put on every task (`keys` may be none). */
+    newProject(name, keys) {
+      const clean = cleanProjectName(name);
+      if (clean === null) return null;
+      return (doc) => {
+        const holders = this.holders(doc, keys);
+        const named = addProject(doc, clean, { parent: null, before: null });
+        const found = named.projectTree().find(clean).node.name;
+        const moved2 = holders.map((entry) => named.byId(entry.id));
+        return this.rewrite(named, moved2, (projects) => withProject(projects, found, true));
+      };
     }
-    /** The settings give a usable result mark: a task can be made a result. */
-    marksResults() {
-      return markersOf(this.settings.get()).result !== void 0;
+    /** A card let go on the tree: `from` gives way to `to` (null: taken off), the others kept. */
+    dropOnProject(keys, from, to) {
+      if (keys.length === 0) return null;
+      return this.withProjects(keys, (projects) => {
+        const without = from === null ? projects : withProject(projects, from, false);
+        return to === null ? without : withProject(without, to, true);
+      });
+    }
+    /** A project made at `place` of the tree; null for a name of nothing. */
+    createProject(name, place) {
+      const clean = cleanProjectName(name);
+      if (clean === null) return null;
+      return (doc) => addProject(doc, clean, place);
+    }
+    moveProject(name, place) {
+      return (doc) => moveProject(doc, name, place);
+    }
+    /** Null for a name of nothing. */
+    renameProject(from, to) {
+      const clean = cleanProjectName(to);
+      if (clean === null || clean === from) return null;
+      return (doc) => renameProject(doc, from, clean);
+    }
+    setProjectNote(name, link) {
+      const note = link === null ? null : link.replace(/^\[\[|\]\]$/g, "").trim() || null;
+      return (doc) => setProjectNote(doc, name, note);
+    }
+    /** Each task's projects, a subtask's key its top task's, as `change` makes them of their own. */
+    withProjects(keys, change) {
+      return (doc) => this.rewrite(doc, this.holders(doc, keys), change);
+    }
+    rewrite(doc, holders, change) {
+      return doc.replaceAll(holders.map((entry) => [entry, { ...entry.task, projects: uniqueNames(change(entry.task.projects)) }]));
+    }
+    /** The top tasks the keys name, each once. */
+    holders(doc, keys) {
+      const seen = /* @__PURE__ */ new Set();
+      return keys.map((key) => projectHolder(doc, this.entryOf(doc, key))).filter((entry) => !seen.has(entry.id) && (seen.add(entry.id), true));
     }
     setReminder(key, reminder) {
       return (doc) => setReminder(doc, this.entryOf(doc, key), reminder);
@@ -5989,9 +6431,9 @@ ${text}`;
       return (doc) => moveToEnd(doc, this.entryOf(doc, key), section);
     }
     moveToGroup(key, list, group, before, date, project) {
-      return (doc, today, _settings, boundary) => {
+      return (doc, today) => {
         this.groupOf(doc, list, group);
-        return moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today, date ?? null, project, boundary);
+        return moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today, date ?? null, project);
       };
     }
     createGroup(key, list, name, date) {
@@ -6006,18 +6448,19 @@ ${text}`;
       };
     }
     /** Null for a blank name or the section's own: nothing to write. */
-    renameGroup(list, group, name, project) {
+    /** Null for a blank name or the section's own: nothing to write. `_project`: a project's part went; ignored. */
+    renameGroup(list, group, name, _project) {
       if (blankName(name) || name.trim() === group) return null;
       return (doc, _today, settings) => {
         this.groupOf(doc, list, group);
-        if (project !== void 0) return renameGroupIn(doc, list, group, name, settings.groups.ungrouped, project);
         return renameGroup(doc, list, group, name, settings.groups.ungrouped);
       };
     }
-    removeGroup(list, group, project) {
+    /** `_project`: a project's part went; ignored. */
+    removeGroup(list, group, _project) {
       return (doc) => {
         this.groupOf(doc, list, group);
-        return project === void 0 ? removeGroup(doc, list, group) : removeGroupIn(doc, list, group, project);
+        return removeGroup(doc, list, group);
       };
     }
     /**
@@ -6075,7 +6518,7 @@ ${text}`;
         case "labels":
           return setLabels(doc, entry, change.labels);
         case "project":
-          return setProject(doc, entry, change.project);
+          return setProjects(doc, entry, change.project === null ? [] : [change.project]);
         case "dueDate":
           return setDueDate(doc, entry, change.date);
         case "postpone":
@@ -6094,7 +6537,7 @@ ${text}`;
           return moveToEnd(doc, entry, change.section);
         case "moveToGroup":
           this.groupOf(doc, change.list, change.group);
-          return moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null, change.project, boundary);
+          return moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null, change.project);
         case "createGroup":
           return blankName(change.name) ? doc : createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
         case "nest":
@@ -6118,9 +6561,19 @@ ${text}`;
           return place;
       }
     }
+    /**
+     * A written document with its projects in its tree: on a file still without `## Projects`, the one move to projects
+     * first (the notes that were projects, the result mark of the settings), then every project a task names.
+     */
+    projected(doc, settings) {
+      const moved2 = movedToProjects(doc, this.legacyNotes(), settings.resultMark);
+      return withTasksInTree(moved2);
+    }
     written(doc, operation, at, writes = true) {
       const { settings, today, boundary } = at;
-      const after = normalize(operation(doc, today, settings, boundary), today, boundary, usablePresets(settings.groups.presets));
+      const changed2 = operation(doc, today, settings, boundary);
+      const projected = changed2 === doc ? changed2 : this.projected(changed2, settings);
+      const after = normalize(projected, today, boundary, usablePresets(settings.groups.presets));
       const text = after.serialize();
       if (writes) this.identity?.wrote(text, after);
       return { text, before: doc, after };
@@ -6189,8 +6642,8 @@ ${text}`;
     for (const [column, items] of columns) {
       const card = items.find((item) => item.id === id);
       if (card) {
-        const part = partOf(screen, column, id);
-        return { kind: "list", id, item: card, column, group: card.group, index: items.filter((item) => item.group === card.group).indexOf(card), ...part && { part } };
+        const part2 = partOf(screen, column, id);
+        return { kind: "list", id, item: card, column, group: card.group, index: items.filter((item) => item.group === card.group).indexOf(card), ...part2 && { part: part2 } };
       }
       for (const top of items) {
         const under = subtaskOf(top, id);
@@ -6222,6 +6675,10 @@ ${text}`;
   }
 
   // core/application/TaskWrites.ts
+  function namedIn(change, typed2) {
+    const clean = cleanProjectName(typed2);
+    return clean === null || !change ? null : change.after.projectTree().find(clean)?.node.name ?? null;
+  }
   var nothing = (operation) => ({ operation, answer: () => void 0 });
   var TaskWrites = class {
     constructor(rules, reads) {
@@ -6298,21 +6755,32 @@ ${text}`;
     setProject(keys, project) {
       return nothing(this.rules.setProject(keys, project));
     }
-    setResult(key, result) {
-      return nothing(this.rules.setResult(key, result));
+    toggleProject(keys, name) {
+      return nothing(this.rules.toggleProject(keys, name));
     }
-    addToResult(keys, result) {
-      return nothing(this.rules.addToResult(keys, result));
+    /** «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of nothing. */
+    newProject(name, keys) {
+      const operation = this.rules.newProject(name, keys);
+      return { operation, answer: (change) => operation === null ? null : namedIn(change, name) };
     }
-    /** The new result's key and id, as the file stands after the write. */
-    newResult(keys, name) {
-      return {
-        operation: this.rules.newResult(keys, name),
-        answer: (change) => {
-          const created = change?.after.insertedSince(change.before);
-          return created ? { key: keyOf(created), id: created.id } : null;
-        }
-      };
+    dropOnProject(keys, from, to) {
+      return nothing(this.rules.dropOnProject(keys, from, to));
+    }
+    /** The project made, as the tree has it; null when nothing was written. */
+    createProject(name, place) {
+      const operation = this.rules.createProject(name, place);
+      return { operation, answer: (change) => operation === null || !change || change.after.serialize() === change.before.serialize() ? null : namedIn(change, name) };
+    }
+    moveProject(name, place) {
+      return nothing(this.rules.moveProject(name, place));
+    }
+    /** Whether the rename wrote. */
+    renameProject(from, to) {
+      const operation = this.rules.renameProject(from, to);
+      return { operation, answer: (change) => change !== null && change.after.serialize() !== change.before.serialize() };
+    }
+    setProjectNote(name, link) {
+      return nothing(this.rules.setProjectNote(name, link));
     }
     setReminder(key, reminder) {
       return nothing(this.rules.setReminder(key, reminder));
@@ -6480,7 +6948,7 @@ ${text}`;
       return {
         reads: read.kind === "title" || tasks.length === 1 && read.kind === "time",
         answer: (s) => {
-          const moves = dropMoves(tasks, read, day, (key) => s ? this.rules.entryOf(s.doc, key).project : null);
+          const moves = dropMoves(tasks, read, day, (key) => s ? this.rules.entryOf(s.doc, key).projects[0] ?? null : null);
           return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
         }
       };
@@ -6741,8 +7209,8 @@ ${text}`;
       };
       this.store = store;
       this.identity = new TaskIdentity(context.ids);
-      this.rules = new TaskRules(store, clock, this.identity, context.ids !== void 0);
-      this.reads = new TaskReads(this.rules, store, clock, { notes: () => context.projects ?? [], grouping: () => this.grouping });
+      this.rules = new TaskRules(store, clock, this.identity, context.ids !== void 0, () => context.projects ?? []);
+      this.reads = new TaskReads(this.rules, store, clock, { tree: () => this.tree(), screen: () => this.projectsScreen });
       this.writes = new TaskWrites(this.rules, this.reads);
       this.text = context.tasks ?? null;
     }
@@ -6751,13 +7219,17 @@ ${text}`;
       const ids = this.identity.state;
       return ids === (this.context.ids ?? NO_TASK_IDS) ? this.kept : Object.assign(this.kept, { ids });
     }
-    /** The device's grouping as this call has it: handed in, with what the call changed. */
-    get grouping() {
-      return this.effects.grouping ?? this.context.grouping ?? {};
+    /** The device's Projects screen as this call has it: handed in, with what the call changed. */
+    get projectsScreen() {
+      return this.effects.projectsScreen ?? this.context.projectsScreen ?? {};
     }
-    /** A change of the device's grouping: the answer carries it for the host to keep. */
-    keepGrouping(state) {
-      if (state !== this.grouping) this.effects.grouping = state;
+    /** A change of the device's Projects screen: the answer carries it for the host to keep. */
+    keepProjectsScreen(state) {
+      if (state !== this.projectsScreen) this.effects.projectsScreen = state;
+    }
+    /** The projects of the file as this call has it, the tasks' own in the tree; none without a file. */
+    tree() {
+      return this.text === null ? ProjectTree.EMPTY : projectTreeOf(this.snapshot().doc);
     }
     get settings() {
       return this.current;
@@ -6865,7 +7337,6 @@ ${text}`;
     screenOf: (c, [item]) => c.reads.screenOf(KEPT(c), item),
     reveal: (c, [item]) => {
       c.run(c.writes.revealUnfold(item));
-      c.keepGrouping(revealedGrouping(c.grouping, item));
       return c.reads.screenOf(KEPT(c), item);
     },
     findIn: (c, [items, key]) => c.reads.findIn(items, key),
@@ -6894,12 +7365,39 @@ ${text}`;
     setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps)),
     setProject: (c, [keys, project]) => c.run(c.writes.setProject(keys, project ?? null)),
     projectNotes: (c) => c.reads.projectNotes(),
-    setResult: (c, [key, result]) => c.run(c.writes.setResult(key, result === true)),
-    resultPage: (c, [keys, query]) => c.ask(c.reads.resultPageRead(keys, query ?? "")),
-    addToResult: (c, [keys, result]) => c.run(c.writes.addToResult(keys, result)),
-    newResult: (c, [keys, name]) => c.run(c.writes.newResult(keys, name)),
-    setGrouping: (c, [list, on]) => c.keepGrouping(withGrouping(c.grouping, list, on)),
-    toggleFold: (c, [list, key]) => c.keepGrouping(withFoldToggled(c.grouping, list, key)),
+    toggleProject: (c, [keys, name]) => c.run(c.writes.toggleProject(keys, name)),
+    newProject: (c, [name, keys]) => {
+      const made = c.run(c.writes.newProject(name, keys ?? []));
+      return made === null ? null : new ProjectIndex(c.tree()).refOf(made);
+    },
+    setResult: () => null,
+    resultPage: (c) => c.reads.resultPage(),
+    addToResult: () => null,
+    newResult: () => null,
+    setGrouping: () => null,
+    toggleFold: () => null,
+    projectsScreen: (c) => c.ask(c.reads.projectsScreenRead()),
+    tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node)),
+    selectProjectNode: (c, [node]) => c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, node)),
+    setProjectsMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, mode }),
+    createProject: (c, [name, place]) => {
+      const made = c.run(c.writes.createProject(name, place));
+      if (made === null) return null;
+      c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.snapshot().doc, projectNodeOf(made)));
+      return new ProjectIndex(c.tree()).refOf(made);
+    },
+    moveProject: (c, [name, place]) => c.run(c.writes.moveProject(name, place)),
+    renameProject: (c, [from, to]) => {
+      const renamed = c.run(c.writes.renameProject(from, to));
+      if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from, to.trim()));
+      return renamed;
+    },
+    setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name, link ?? null)),
+    dropOnProject: (c, [keys, from, to]) => {
+      const target = to === "none" ? null : projectOfNode(to);
+      if (target === null && to !== "none") return null;
+      return c.run(c.writes.dropOnProject(keys, from ?? null, target));
+    },
     setReminder: (c, [key, reminder]) => c.run(c.writes.setReminder(key, reminder)),
     togglePriority: (c, [keys, prefix]) => c.run(c.ask(c.writes.togglePriority(keys, prefix))),
     toggleLabel: (c, [keys, name]) => c.run(c.ask(c.writes.toggleLabel(keys, name))),
@@ -7160,6 +7658,9 @@ ${text}`;
     placesInGap,
     noteTags,
     projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
+    projectsGap: (rows, gap, depth, lifted) => projectsGap(rows, gap, depth, lifted ?? null),
+    projectsLevels: (rows, gap, lifted) => projectsLevels(rows, gap, lifted ?? null),
+    projectNodeOf,
     shadesOf,
     inkOf,
     contrast,
@@ -7282,11 +7783,18 @@ ${text}`;
     suggest: (_c, [query, notes, limit]) => noteSuggestions(query, notes, limit ?? void 0),
     insert: (_c, [text, at, link]) => withNoteLink(text, at, link),
     open: (_c, [target, notes]) => noteOfLink(target, notes),
-    /** «New project…» named `name`: the note to write among the vault's `notes`, the one of that name or a new one at the root; null for a name of nothing. */
-    newProject: (c, [name, notes]) => newProjectNote(name, notes ?? [], pluginFiles(c.settings)),
-    /** The project note's text with the settings' project tag in its properties: `text`, the note's as read (null: a new note); unchanged when it has the tag. */
-    projectText: (c, [text]) => withProjectTag(text ?? null, c.settings.projectTag)
+    /** «New project…» writes no note any more (`tasks.newProject` makes the project): null. Stub until the app drops it. */
+    newProject: () => null,
+    /** No note is tagged any more: the text as it is. Stub until the app drops it. */
+    projectText: (_c, [text]) => text ?? ""
   };
+  var PROJECTS = {
+    noteUrl: (_c, [link, vault]) => noteUrl(link, vault)
+  };
+  function noteUrl(link, vault) {
+    const file = link.split("|")[0].split("#")[0].trim();
+    return `obsidian://open?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(file)}`;
+  }
   var SPACES = {
     tasks: TASKS,
     days: DAYS,
@@ -7303,6 +7811,7 @@ ${text}`;
     capture: CAPTURE,
     timeline: TIMELINE,
     notes: NOTES,
+    projects: PROJECTS,
     rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c, args) => fn(...args)])), constants: () => CONSTANTS }
   };
   function doorMethods() {

@@ -44,7 +44,7 @@ describe("the edit group", () => {
 
 	it("holds Rename, Repeat, Project and Add subtask, with no due date row: the quick moves and their picker set it", () => {
 		const rows = editRows(item({ dueDate: "2026-11-03", description: "- note" }), menuOf([])(item({ dueDate: "2026-11-03", description: "- note" })));
-		expect(rows.map((r) => r.id)).toEqual(["rename", "repeat", "project", "addToResult", "toggle", "subtask"]);
+		expect(rows.map((r) => r.id)).toEqual(["rename", "repeat", "project", "subtask"]);
 	});
 
 	it("offers Add description by what the task may have", () => {
@@ -53,18 +53,18 @@ describe("the edit group", () => {
 
 	it("offers Add description after Rename for a task without one", () => {
 		const rows = editRows(item(), menuOf([])(item()));
-		expect(rows.map((r) => r.label)).toEqual(["Rename", "Add description", "Repeat", "Project", "Add to result", "Make result", "Add subtask"]);
+		expect(rows.map((r) => r.label)).toEqual(["Rename", "Add description", "Repeat", "Project", "Add subtask"]);
 		expect(rows[1].icon).toBe("description");
 	});
 
 	it("offers Section, then Project, before Add subtask for a list card, the section's and the project's names beside them", () => {
 		const rows = editRows(item({ description: "- note", group: "Morning" }), menuOf([], [], sections)(item({ description: "- note", group: "Morning" })));
-		expect(rows.map((r) => [r.label, r.value])).toEqual([["Rename", ""], ["Repeat", ""], ["Section", "Morning"], ["Project", "No project"], ["Add to result", ""], ["Make result", ""], ["Add subtask", ""]]);
+		expect(rows.map((r) => [r.label, r.value])).toEqual([["Rename", ""], ["Repeat", ""], ["Section", "Morning"], ["Project", "No project"], ["Add subtask", ""]]);
 	});
 
 	it("offers Repeat after Add description, or after Rename for a task with a description", () => {
-		expect(editRows(item(), menuOf([])(item())).map((r) => r.id)).toEqual(["rename", "description", "repeat", "project", "addToResult", "toggle", "subtask"]);
-		expect(editRows(item({ description: "- note" }), menuOf([], [], sections)(item({ description: "- note" }))).map((r) => r.id)).toEqual(["rename", "repeat", "section", "project", "addToResult", "toggle", "subtask"]);
+		expect(editRows(item(), menuOf([])(item())).map((r) => r.id)).toEqual(["rename", "description", "repeat", "project", "subtask"]);
+		expect(editRows(item({ description: "- note" }), menuOf([], [], sections)(item({ description: "- note" }))).map((r) => r.id)).toEqual(["rename", "repeat", "section", "project", "subtask"]);
 		expect(editRows(item(), menuOf([])(item())).find((r) => r.id === "repeat")).toMatchObject({ label: "Repeat", value: "", icon: "repeat" });
 	});
 
@@ -81,7 +81,7 @@ describe("the edit group", () => {
 	it("offers the reminder of a task on a time, its kind beside it, after Rename", () => {
 		const slot = { date: "2026-11-03", start: 600, end: null };
 		const rows = editRows(item({ description: "- note", slot, reminder: "alarm" }), menuOf([])(item({ description: "- note", slot, reminder: "alarm" })));
-		expect(rows.map((r) => [r.id, r.value])).toEqual([["rename", ""], ["reminder", "Alarm"], ["repeat", ""], ["project", "No project"], ["addToResult", ""], ["toggle", ""], ["subtask", ""]]);
+		expect(rows.map((r) => [r.id, r.value])).toEqual([["rename", ""], ["reminder", "Alarm"], ["repeat", ""], ["project", "No project"], ["subtask", ""]]);
 		expect(editRows(item({ description: "- note", slot, reminder: "none" }), menuOf([])(item({ description: "- note", slot, reminder: "none" })))[1].value).toBe("Off");
 		expect(editRows(item({ description: "- note", slot, reminder: "live" }), menuOf([])(item({ description: "- note", slot, reminder: "live" })))[1].value).toBe("Live Activity");
 		expect(editRows(item({ description: "- note", slot }), menuOf([])(item({ description: "- note", slot })))[1].value).toBe("Notification");
@@ -464,7 +464,7 @@ describe("the menu", () => {
 		expect(labels(".tc-menu-tiles.is-status .tc-menu-tile-label")).toEqual(["Done", "In progress", "Won’t do"]);
 		expect(labels(".tc-menu-tiles.is-priority .tc-menu-tile-label")).toEqual(["p1", "p2"]);
 		expect(labels(".tc-menu-tiles.is-move .tc-menu-tile-label")).toEqual(["Tomorrow", "Pick a date"]);
-		expect(labels(".tc-menu-label")).toEqual(["Rename", "Add description", "Repeat", "Project", "Add to result", "Make result", "Add subtask", "Open full screen", "Open in Obsidian", "Delete"]);
+		expect(labels(".tc-menu-label")).toEqual(["Rename", "Add description", "Repeat", "Project", "Add subtask", "Open full screen", "Open in Obsidian", "Delete"]);
 		expect(panel().querySelector(".tc-menu-badge")).toBeNull();
 	});
 
@@ -852,7 +852,7 @@ describe("the menu of a subtask from the calendar menu's stack", () => {
 	it("draws no Add subtask, which the model offers no subtask of a stack", () => {
 		const { menu } = openOnStackCard();
 		expect(menu.inStack).toBe(true);
-		expect([...panel().querySelectorAll(".tc-menu-label")].map((l) => l.textContent)).toEqual(["Rename", "Add description", "Project", "Add to result", "Make result", "Open in Obsidian", "Delete"]);
+		expect([...panel().querySelectorAll(".tc-menu-label")].map((l) => l.textContent)).toEqual(["Rename", "Add description", "Project", "Open in Obsidian", "Delete"]);
 	});
 
 	it("stays open on Rename and hands itself to the action", () => {
@@ -908,24 +908,24 @@ describe("the parts over the blur, raised over the keyboard", () => {
 
 
 describe("the Project row", () => {
-	const ENV = { name: "Окружение", link: "Окружение", note: "Окружение.md", canOpenNote: true, mark: true };
-	const HAPPY = { name: "Стать счастливым", link: "Стать счастливым", note: "Стать счастливым.md", canOpenNote: true, mark: true };
-	const withProjects = (task: TaskItem): TaskMenuModel => taskMenu([task], "2026-11-01", [], [], null, { kind: "task", from: "day" }, [ENV, HAPPY]);
+	const ENV = { name: "Окружение", path: ["Окружение"], link: "Окружение", note: "Окружение.md", canOpenNote: true, mark: true };
+	const HAPPY = { name: "Стать счастливым", path: ["Стать счастливым"], link: "Стать счастливым", note: "Стать счастливым.md", canOpenNote: true, mark: true };
+	const withProjects = (task: TaskItem): TaskMenuModel => taskMenu([task], "2026-11-01", [], [], null, { kind: "task", from: "day" }, [ENV, HAPPY].map((project) => ({ project, depth: 0 })));
 
 	const projectRow = (task: TaskItem) => editRows(task, withProjects(task)).find((row) => row.id === "project")!;
 
 	it("says No project for a task without one, and the project's name for one with it", () => {
 		expect(projectRow(item())).toMatchObject({ label: "Project", value: "No project", icon: "project", disabled: false });
-		expect(projectRow(item({ project: ENV })).value).toBe("Окружение");
+		expect(projectRow(item({ project: ENV, projects: [ENV] })).value).toBe("Окружение");
 	});
 
 	it("is disabled on a subtask, showing its parent's project", () => {
-		const sub = item({ key: { section: "now", index: 0, path: [0], raw: "\t- [ ] s" }, project: ENV, can: { ...item().can, setProject: false } });
+		const sub = item({ key: { section: "now", index: 0, path: [0], raw: "\t- [ ] s" }, project: ENV, projects: [ENV], can: { ...item().can, setProject: false } });
 		expect(projectRow(sub)).toMatchObject({ value: "Окружение", disabled: true });
 	});
 
 	it("stands where the model's edits put it", () => {
-		expect(editRows(item(), withProjects(item())).map((row) => row.id)).toEqual(["rename", "description", "repeat", "project", "addToResult", "toggle", "subtask"]);
+		expect(editRows(item(), withProjects(item())).map((row) => row.id)).toEqual(["rename", "description", "repeat", "project", "subtask"]);
 	});
 
 	it("opens the page of projects by name, No project last and checked, and a pick writes the project's link", async () => {

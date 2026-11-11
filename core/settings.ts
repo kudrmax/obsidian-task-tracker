@@ -1,12 +1,12 @@
 import type { GroupSettings } from "./domain/Groups";
 import type { LabelLevel } from "./domain/Label";
 import type { PriorityLevel } from "./domain/Priority";
-import { DEFAULT_RESULT_MARK } from "./domain/Result";
 
 export type { GroupSettings } from "./domain/Groups";
 export { type LabelLevel, sameLabels, usableLabels } from "./domain/Label";
 export { PRIORITY_COLORS, type PriorityColor, type PriorityLevel, sameLevels, usableLevels, usablePrefix } from "./domain/Priority";
-export { DEFAULT_RESULT_MARK, usableResultMark } from "./domain/Result";
+/** The mark a result's line started with before results went: what the one move to projects takes off the lines. */
+export const DEFAULT_RESULT_MARK = "🎯";
 
 export interface SectionNames {
 	readonly inbox: string;
@@ -42,7 +42,7 @@ export interface FileFormatSettings {
 	readonly collapsedMarker: string;
 	/** Priority levels in the order the menu and the task screen offer them. */
 	readonly priorities: readonly PriorityLevel[];
-	/** The word a result's line starts with, before a priority's prefix: `🎯`. One word that is no level's prefix, else no task is a result. */
+	/** The word a result's line started with before results went (`🎯`): read only by the one move to projects, which takes it off the lines. */
 	readonly resultMark: string;
 	/** The tag folder of the labels: a task tagged `#<labelTag>/<name>` has the label of that name. */
 	readonly labelTag: string;
@@ -108,9 +108,9 @@ export interface CardPaintSettings {
 	readonly cardGap: number;
 }
 
-/** Which notes are projects. */
+/** Which notes were projects before projects lived in the tasks file. */
 export interface ProjectSettings {
-	/** A note with exactly this tag, in its properties or its text, is a project: `#project`. */
+	/** The tag of the notes that were projects (`#project`): read only by the one move to projects, which attaches them. */
 	readonly projectTag: string;
 }
 

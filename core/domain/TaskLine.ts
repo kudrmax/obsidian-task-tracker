@@ -2,8 +2,7 @@ import { Repeat } from "./Repeat";
 import { isValidLocalDate, MINUTES_PER_DAY, minutesToHHMM, parseHHMM } from "./LocalDate";
 import { labelsOfText, labelTags } from "./Label";
 import { priorityOfText } from "./Priority";
-import { resultOfText } from "./Result";
-import { projectField, projectOfText } from "./Project";
+import { projectFields, projectsOfText } from "./Project";
 
 import { DEFAULT_REMINDER, STATUS_CHARS, type ReminderKind, type Slot, type Task, type TaskStatus } from "./Task";
 
@@ -20,8 +19,6 @@ export interface Markers {
 	readonly repeat?: string;
 	/** Stands alone among the fields of a task whose subtasks are folded away. */
 	readonly collapsed?: string;
-	/** The word a result's text starts with, before a priority's prefix (`usableResultMark`); none: no task is a result. */
-	readonly result?: string;
 	/** Prefixes of the priority levels: a line whose text starts with one of them, then more text, has that priority. */
 	readonly priorities?: readonly string[];
 	/** The tag folder of the labels: `label` for `#label/<name>`. */
@@ -188,23 +185,27 @@ function readTaskLine(line: string, markers: Markers): ParsedTaskLine | null {
 	const m = LINE_RE.exec(line);
 	if (!m) return null;
 	const statusChar = m[3];
-	const linked = projectOfText(m[4]);
-	const tagged = labelsOfText(linked.text, markers.labelTag ?? "", markers.labels ?? []);
-	const fields = fieldSlicerFor(markers).slice(tagged.text);
-	const marked = resultOfText(fields.text, markers.result ?? null);
+	const tagged = labelsOfText(m[4], markers.labelTag ?? "", markers.labels ?? []);
+	const named = projectsOfText(tagged.text, fieldStops(markers));
+	const fields = fieldSlicerFor(markers).slice(named.text);
 	return {
 		indent: m[1],
 		bullet: m[2],
-		task: { status: statusOf(statusChar), statusChar, ...fields, result: marked.result, ...priorityOfText(marked.text, markers.priorities ?? []), labels: tagged.labels, project: linked.project, children: [] },
+		task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOfText(fields.text, markers.priorities ?? []), labels: tagged.labels, projects: named.projects, children: [] },
 	};
 }
 
+/** The marks of the fields a project's name runs up to. */
+export function fieldStops(markers: Markers): readonly string[] {
+	return [markers.dueDate, markers.slot, markers.alarmSlot ?? "", markers.liveSlot ?? "", markers.silentSlot ?? "", markers.repeat ?? "", markers.collapsed ?? ""];
+}
+
+/** The line: the title, its projects, its labels, then the other fields; the projects right after the title, where the app of 0.4.189 keeps them too. */
 export function formatTaskLine(parsed: ParsedTaskLine, markers: Markers): string {
 	const { indent, bullet, task } = parsed;
-	const mark = task.result && markers.result ? `${markers.result} ` : "";
-	let line = `${indent}${bullet} [${task.statusChar}] ${mark}${task.priority ? `${task.priority} ` : ""}${task.text}`;
+	let line = `${indent}${bullet} [${task.statusChar}] ${task.priority ? `${task.priority} ` : ""}${task.text}`;
+	line += projectFields(task.projects);
 	if (task.labels.length > 0 && markers.labelTag) line += labelTags(markers.labelTag, task.labels);
-	if (task.project) line += projectField(task.project);
 	if (task.collapsed && markers.collapsed) line += ` ${markers.collapsed}`;
 	if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
 	if (task.slot) {

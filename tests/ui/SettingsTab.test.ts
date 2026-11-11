@@ -178,13 +178,6 @@ describe("the settings tab: the tasks file", () => {
 		}
 	});
 
-	it("writes the project tag with its #, on the Tasks file page", async () => {
-		await open();
-		page("Tasks file");
-		expect(input("Project tag").value).toBe("#project");
-		await writes(() => type(input("Project tag"), "goal"), { projectTag: "#goal" });
-	});
-
 	it("writes each marker as typed", async () => {
 		const markers = [
 			["Due date marker", "dueDateMarker"],
@@ -512,23 +505,6 @@ describe("the settings tab: the order", () => {
 });
 
 describe("the settings tab: the result mark", () => {
-	it("writes the mark once typed (Enter or leaving), never per key, and shows the saved one again when the core refuses", async () => {
-		await open();
-		const field = input("Result mark");
-		expect(field.value).toBe("🎯");
-		expect(field.placeholder).toBe("🎯");
-		type(field, "⭐");
-		await settled();
-		expect(settings.get().resultMark).toBe("🎯");
-		type(field, "⭐", "change");
-		await settled();
-		expect(settings.get().resultMark).toBe("⭐");
-		type(field, "two words", "change");
-		await settled();
-		expect(settings.get().resultMark).toBe("⭐");
-		expect(field.value).toBe("⭐");
-	});
-
 	/** Obsidian's text field tells a change of its value made by code as one typed: a refused mark once spun the test Obsidian, the correction answered as a new change without end. */
 	it("ends when the field tells its own correction as a change", async () => {
 		await open();
