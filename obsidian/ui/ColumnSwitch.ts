@@ -5,7 +5,7 @@ import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { icon } from "./kit/icons";
-import { type Place, placeIndex, WHEEL_END, SCREEN_PLACES, type ScreenPlace } from "./screens";
+import { type Place, placeIndex, SCREEN_PLACES, type ScreenPlace } from "./screens";
 import { labelMark } from "./sources/labelMark";
 
 export interface ColumnSwitchOptions {
@@ -87,6 +87,8 @@ export class ColumnSwitch {
 	/** The click that ends a drag or a hold is not a tap. */
 	private swallowClick = false;
 	private settling = 0;
+	/** Where the wheel stands, in `placeIndex` units. */
+	private at = 0;
 
 	constructor(parent: HTMLElement, private readonly opts: ColumnSwitchOptions) {
 		this.el = el(parent, "div", "tc-seg");
@@ -115,7 +117,6 @@ export class ColumnSwitch {
 		for (const column of COLUMNS) {
 			const cell = el(reel, "span", "tc-seg-icon");
 			cell.dataset.column = column;
-			if (lens) cell.classList.add("is-lens");
 			if (lens) cell.setAttribute("aria-hidden", "true");
 			else cell.setAttribute("aria-label", NAME_OF[column]);
 			cell.appendChild(icon(ICON_OF[column]));
@@ -221,28 +222,29 @@ export class ColumnSwitch {
 	}
 
 	/**
-	 * Both copies of the wheel to one place: the window keeps its two icons whole, the rest shrink and fade by how far out
+	 * Both copies of the wheel to one place: the window keeps its icons whole, the rest shrink and fade by how far out
 	 * they stand. The track holds one neighbour on each side, and only where the wheel has one: past an end it stops at the window.
-	 * At Projects the window holds the folder alone in its middle: the half of the window it leaves empty counts as inside,
-	 * and the window shows no other icon (board Nav); Done, which has no icon, holds Inbox alone the same way.
+	 * The window is as wide as what it shows: the folder alone at Projects, Inbox alone at Done, two columns from Inbox on;
+	 * between Done and Inbox it widens over Soon, so no icon is ever cut by its edge.
 	 */
 	private turn(position: number): void {
-		this.el.style.setProperty(PROPERTY.wheel, String(position));
-		this.el.style.setProperty(PROPERTY.before, String(Math.max(0, Math.min(1, position))));
-		this.el.style.setProperty(PROPERTY.after, String(Math.max(0, Math.min(1, WHEEL_END - position))));
-		const middle = position + 1;
-		const spare = Math.max(0, Math.min(HALF, -position));
-		/** How sharply the window hides what is out of its middle: fully at Projects and Done, not at all from Inbox on. */
-		const alone = 2 * Math.max(0, Math.min(1, (placeIndex("inbox") - position) / HALF));
+		this.at = position;
+		const span = 1 + Math.max(0, Math.min(1, 2 * (position - placeIndex("done"))));
+		const left = position + 1 - span / 2;
+		this.el.style.setProperty(PROPERTY.windowAt, String(left));
+		this.el.style.setProperty(PROPERTY.span, String(span));
+		this.el.style.setProperty(PROPERTY.before, String(Math.max(0, Math.min(1, left))));
+		this.el.style.setProperty(PROPERTY.after, String(Math.max(0, Math.min(1, COLUMNS.length - left - span))));
+		const middle = left + span / 2;
+		const inside = span / 2 - HALF;
 		this.icons.forEach((cell, i) => {
 			const off = Math.abs((i % COLUMNS.length) + HALF - middle);
-			cell.style.setProperty(PROPERTY.depth, String(Math.max(0, off - HALF - spare)));
-			if (cell.classList.contains("is-lens")) cell.style.setProperty(PROPERTY.lens, String(Math.max(0, Math.min(1, 1 - alone * Math.max(0, off - HALF)))));
+			cell.style.setProperty(PROPERTY.depth, String(Math.max(0, off - inside)));
 		});
 	}
 
 	private position(): number {
-		return parseFloat(this.el.style.getPropertyValue(PROPERTY.wheel));
+		return this.at;
 	}
 
 	render(): void {

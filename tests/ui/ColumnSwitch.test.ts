@@ -39,7 +39,10 @@ function setUp(initial: Place, dot: CalendarAlert = "none", arbiter = new Gestur
 	});
 	const icons = [...control.el.querySelectorAll<HTMLElement>(".tc-seg-reel")[0].querySelectorAll<HTMLElement>(".tc-seg-icon")];
 	for (const icon of control.el.querySelectorAll<HTMLElement>(".tc-seg-icon")) Object.defineProperty(icon, "offsetWidth", { get: () => STEP });
-	const wheel = () => parseFloat(control.el.style.getPropertyValue("--tc-seg-pos"));
+	const prop = (name: string) => parseFloat(control.el.style.getPropertyValue(name));
+	/** Where the wheel stands: the window's middle, an icon's width left of the icon it centres on. */
+	const wheel = () => prop("--tc-seg-left") + prop("--tc-seg-span") / 2 - 1;
+	const frame = () => [prop("--tc-seg-left"), prop("--tc-seg-span")];
 	const lit = () => [Math.round(wheel()), Math.round(wheel()) + 1];
 	const depth = (column: number) => icons[column].style.getPropertyValue("--tc-seg-depth");
 	const tap = (column: number) => {
@@ -68,7 +71,7 @@ function setUp(initial: Place, dot: CalendarAlert = "none", arbiter = new Gestur
 		control.el.dispatchEvent(pointer("pointerup", x, t));
 		control.el.click();
 	};
-	return { control, changes, sources: () => sources, wheel, lit, depth, tap, drag, creep, move, release };
+	return { control, changes, sources: () => sources, wheel, frame, lit, depth, tap, drag, creep, move, release };
 }
 
 describe("ColumnSwitch", () => {
@@ -85,14 +88,16 @@ describe("ColumnSwitch", () => {
 		expect([0, 1, 2, 3, 4].map(inbox.depth)).toEqual(["1", "0", "0", "1", "2"]);
 	});
 
-	it("holds the Projects folder alone in the middle of its window, Inbox beside it unshrunk and kept out of the window (board Nav)", () => {
+	it("narrows the window to the folder alone at Projects and to Inbox alone at Done, so no icon is ever cut by its edge", () => {
 		const projects = setUp("projects");
 		expect(projects.wheel()).toBe(-0.5);
-		expect([0, 1, 2, 3, 4].map(projects.depth)).toEqual(["0", "0", "1", "2", "3"]);
-		const lens = [...projects.control.el.querySelectorAll<HTMLElement>(".tc-seg-pill .tc-seg-icon")].map((icon) => icon.style.getPropertyValue("--tc-seg-lens"));
-		expect(lens).toEqual(["1", "0", "0", "0", "0"]);
-		const inbox = [...setUp("inbox").control.el.querySelectorAll<HTMLElement>(".tc-seg-pill .tc-seg-icon")].map((icon) => icon.style.getPropertyValue("--tc-seg-lens"));
-		expect(inbox).toEqual(["1", "1", "1", "1", "1"]);
+		expect(projects.frame()).toEqual([0, 1]);
+		expect([0, 1, 2, 3, 4].map(projects.depth)).toEqual(["0", "1", "2", "3", "4"]);
+		const done = setUp("done");
+		expect(done.frame()).toEqual([1, 1]);
+		expect([0, 1, 2, 3, 4].map(done.depth)).toEqual(["1", "0", "1", "2", "3"]);
+		expect(setUp("inbox").frame()).toEqual([1, 2]);
+		expect(setUp("calendar").frame()).toEqual([3, 2]);
 	});
 
 	it("turns to Projects for a tap on the folder, and from Projects to the place nearest Inbox for a list's icon", () => {
@@ -123,7 +128,8 @@ describe("ColumnSwitch", () => {
 		const s = setUp("soon");
 		const at = s.creep(100, 1);
 		s.move(at.x + 50, at.t + 20);
-		expect(sides(s)).toEqual(["0.5", "1"]);
+		expect(s.frame()).toEqual([1, 1]);
+		expect(sides(s)).toEqual(["1", "1"]);
 	});
 
 	it("draws the wheel twice, the copy under the window turning with it", () => {
