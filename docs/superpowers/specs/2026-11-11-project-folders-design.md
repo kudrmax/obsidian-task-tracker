@@ -72,3 +72,20 @@ task can be put straight into it.
    it has none and is not done (a project of it with no task yet); `done` as before. `ProjectsRow.waiting` and `muted`
    follow it, so a frontend that only reads them follows without code of its own. A folder with no task in its branch
    is grey.
+
+### iPhone app
+
+1. **Folder is a stock `Toggle` in the project menu, right under Rename**, in Rename's group (both act on the project
+   itself; Note and Delete project keep their own groups). Symbol `folder`. On, iOS draws its checkmark; while the core
+   says `disabled`, the row is greyed and the core's `reason` («Has tasks of its own») is the row's subtitle. A tap
+   closes the menu (a menu's stock toggle does), writes `setProjectFolder(name, !on)` and reads the screen again.
+2. **A folder's option on the Project page and in the quick entry's/New Task's project choice** is a stock disabled menu
+   row (greyed, no tap), with no extra symbol; the menu's own grey says it can't be picked, and its subprojects keep
+   their parent's name under them as before.
+3. **The plus held over a folder's tasks shows no drop line** where letting go writes nothing: the line is shown only
+   where the part's `newTask` (else the list's) is given, the same answer the let-go reads. So the plus over an empty
+   folder's list, Done, or a folder's hand-given own part shows nothing and flies back; over a subproject's part it shows
+   the line and types a task of that subproject.
+4. `ProjectsSection.takes` is decoded but drives nothing yet: the app's Projects list takes no card drops between cards
+   (only the tree takes a card, by `acceptsTask`), so the part's refusal is already the core's `newTask` null and
+   `plate` false.

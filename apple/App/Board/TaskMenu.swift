@@ -330,7 +330,7 @@ enum ProjectPage {
     /// choice (the quick entry's button, the New Task sheet) closes.
     static func nodes(_ page: MenuProject, keepsOpen: Bool = false, pick: @escaping @MainActor (String?) -> Void, new: @escaping @MainActor () -> Void) -> [MenuNode] {
         let options: [MenuNode] = page.options.map { option in
-            .action(title: option.project.name, symbol: nil, subtitle: option.project.path.dropLast().last, checked: option.checked, keepsOpen: keepsOpen) { pick(option.project.name) }
+            .action(title: option.project.name, symbol: nil, subtitle: option.project.path.dropLast().last, checked: option.checked, keepsOpen: keepsOpen, disabled: option.disabled) { pick(option.project.name) }
         }
         let none: MenuNode = .action(title: page.noneLabel, symbol: nil, checked: page.none) { pick(nil) }
         let create: MenuNode = .action(title: page.newLabel, symbol: "plus", opens: true) { new() }

@@ -192,6 +192,12 @@ final class ProjectsBoard {
         await write { try $0.deleteProject(name) }
     }
 
+    /// Folder switched: the project made a folder, which takes no task, or a project again; the core refuses turning it
+    /// on while the project has tasks of its own.
+    func setFolder(_ name: String, _ folder: Bool) async {
+        await write { _ = try $0.setProjectFolder(name, folder) }
+    }
+
     /// Detach: the note's link taken off the project; the note stays in the vault.
     func detach(_ name: String) async {
         await write { try $0.detachProjectNote(name) }

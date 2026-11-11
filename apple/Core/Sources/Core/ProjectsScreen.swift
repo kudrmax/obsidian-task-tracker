@@ -14,7 +14,7 @@ public struct ProjectsRow: Decodable, Hashable, Sendable, Identifiable {
     public let depth: Int
     /// Drawn as a tile (depth 0), else as a line of text indented by its depth.
     public let tile: Bool
-    /// The project waits: its open tasks only in Inbox and Backlog, or none yet.
+    /// The project waits: no open task in its whole branch (it and its subprojects).
     public let waiting: Bool
     /// The name drawn grey: a waiting or done project, No project, Done.
     public let muted: Bool
@@ -97,6 +97,8 @@ public struct ProjectsSection: Decodable, Hashable, Sendable, Identifiable {
     public let header: Bool
     /// Its header opens its part for a drop (`PlacedHead.opens`), passed through as the core gives it.
     public let opens: Bool
+    /// A card may be dropped in it: every part but a folder's own.
+    public let takes: Bool
     /// No card in it: shown so a card can be dropped there.
     public let empty: Bool
     /// The No tasks plate stands under it: an empty part with a header, or the only part.
@@ -111,7 +113,7 @@ public struct ProjectsSection: Decodable, Hashable, Sendable, Identifiable {
     public var id: String { key }
 }
 
-/// `ProjectMenu`: the chosen project's menu, a tap on its name over its tasks: Rename and Note.
+/// `ProjectMenu`: the chosen project's menu, a tap on its name over its tasks: Rename, Folder, Note and Delete project.
 public struct ProjectMenu: Decodable, Hashable, Sendable {
     public let project: ProjectRef
     public let renameLabel: String
@@ -119,6 +121,8 @@ public struct ProjectMenu: Decodable, Hashable, Sendable {
     public let note: AttachedNote?
     public let attachLabel: String
     public let detachLabel: String
+    /// Folder: a switch, a tap writes `setProjectFolder(name, !on)`.
+    public let folder: ProjectFolderSwitch
     /// Delete project: its row and the question asked before it writes.
     public let delete: ProjectDelete
 
@@ -126,6 +130,16 @@ public struct ProjectMenu: Decodable, Hashable, Sendable {
         public let link: String
         public let name: String
     }
+}
+
+/// `ProjectFolderSwitch`: Folder in the project menu, on for a folder; off, it may be turned on only while the project has
+/// no task of its own, else it is disabled with the core's reason.
+public struct ProjectFolderSwitch: Decodable, Hashable, Sendable {
+    public let label: String
+    public let on: Bool
+    public let disabled: Bool
+    /// Why it can't be turned on («Has tasks of its own»); nil while it can.
+    public let reason: String?
 }
 
 /// `ProjectDelete`: Delete project in the project menu, destructive, and the words of the question asked before it
@@ -224,6 +238,13 @@ extension TaskBoard {
     /// Delete project: its line and its field on every task go, its subprojects move up a level; no task is removed.
     public func deleteProject(_ name: String) throws {
         try write("tasks.deleteProject", [.string(name)])
+    }
+
+    /// Folder turned on or off: the project made a folder (it takes no task) or a project again; false when nothing was
+    /// written (turned on while it has tasks of its own).
+    @discardableResult
+    public func setProjectFolder(_ name: String, _ folder: Bool) throws -> Bool {
+        try write("tasks.setProjectFolder", [.string(name), .bool(folder)]).bool ?? false
     }
 
     /// Detach: the note's link taken off the project's line; the note stays.
