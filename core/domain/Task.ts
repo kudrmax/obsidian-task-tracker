@@ -63,7 +63,9 @@ export interface Task {
 	readonly reminder: ReminderKind;
 	/** The rule after the repeat marker; null for a task that does not repeat. */
 	readonly repeat: Repeat | null;
-	/** The prefix of a priority level, the first word of the line's text; null without one. */
+	/** The line's text starts with the result mark (before a priority's prefix): the task is a result, a multi-step outcome. */
+	readonly result: boolean;
+	/** The prefix of a priority level, the first word of the line's text after the result mark; null without one. */
 	readonly priority: string | null;
 	/** The names of the labels the line is tagged with, in its order; a task has these or a priority, not both. */
 	readonly labels: readonly string[];

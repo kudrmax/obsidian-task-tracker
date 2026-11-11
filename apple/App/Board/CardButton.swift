@@ -14,8 +14,13 @@ struct CardButton: UIViewRepresentable {
     let card: BoardCard
     /// The task's new text while its rename is written: drawn instead of the text as read.
     var renamedText: String?
+    /// A folded result's own new title while its rename is written: drawn in its small line over the step.
+    var renamedOver: String?
     /// The card's menu; `later` holds a row that opens a sheet or a page until the menu has gone.
     let menu: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?
+    /// A folded result's own menu, which a tap on its line over the step opens (`CardFace.over`); the rest of the card
+    /// opens `menu`, the step's.
+    var overMenu: ((_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?)?
     var ringed = false
     var height: CGFloat = CardMetrics.height
     var draggable = false
@@ -51,11 +56,12 @@ struct CardButton: UIViewRepresentable {
     private func configuration(control: CardControl?) -> UIHostingConfiguration<TaskCapsule, EmptyView> {
         UIHostingConfiguration {
             TaskCapsule(
-                card: card, text: renamedText, ringed: ringed, height: height,
+                card: card, text: renamedText, overText: renamedOver, ringed: ringed, height: height,
                 onCounter: { [weak control] in control?.counterFrame = $0 },
                 onTitle: { [weak control] in control?.titleFrame = $0 },
                 onLinks: { [weak control] in control?.links = $0 },
-                onMark: { [weak control] in control?.markFrame = $0 })
+                onMark: { [weak control] in control?.markFrame = $0 },
+                onOver: { [weak control] in control?.overFrame = $0 })
         }
         .margins(.all, 0)
     }
@@ -65,18 +71,19 @@ struct CardButton: UIViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: CardControl, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? uiView.bounds.width, height: max(height, CardMetrics.height))
+        CGSize(width: proposal.width ?? uiView.bounds.width, height: max(height, card.listHeight))
     }
 
     private func update(_ control: CardControl) {
         control.id = card.id
-        let look = CardControl.Look(card: card, text: renamedText, ringed: ringed, height: height)
+        let look = CardControl.Look(card: card, text: renamedText, over: renamedOver, ringed: ringed, height: height)
         control.menuMaker = menu
+        control.overMenuMaker = card.face.twoLines ? overMenu : nil
         if control.look != look {
             control.look = look
             control.content.configuration = configuration(control: control)
         }
-        CardControl.follow(card: card, look: look, menu: menu, from: control)
+        CardControl.follow(card: card, look: look, menu: menu, over: card.face.twoLines ? overMenu : nil, from: control)
         control.onTouch = onTouch
         control.onCarry = onCarry
         control.from = from
@@ -96,6 +103,12 @@ final class CardControl: UIControl {
         didSet { Self.live.add(self) }
     }
     var menuMaker: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? = { _ in nil }
+    /// A folded result's own menu, opened by a tap on its line over the step.
+    var overMenuMaker: ((_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?)?
+    /// The menu up was opened from the result's line: a redraw keeps it the result's.
+    private var openedOver = false
+    /// Where the capsule draws a folded result's own line.
+    var overFrame: CGRect?
     var onTouch: () -> Void = {}
     var onCarry: () -> Int = { 0 }
     var from = "timeline"
@@ -119,6 +132,7 @@ final class CardControl: UIControl {
     struct Look: Equatable {
         let card: BoardCard
         let text: String?
+        let over: String?
         let ringed: Bool
         let height: CGFloat
     }
@@ -197,12 +211,12 @@ final class CardControl: UIControl {
         opener.frame = bounds
         // The counter's own button, as tall as the card and a little wider than the digits, as the plugin's hit area.
         if let counter = counterFrame {
-            fold.frame = CGRect(x: counter.minX - Self.foldReach, y: 0, width: counter.width + Self.foldReach * 2, height: min(bounds.height, CardMetrics.height))
+            fold.frame = CGRect(x: counter.minX - Self.foldReach, y: 0, width: counter.width + Self.foldReach * 2, height: min(bounds.height, look?.card.listHeight ?? CardMetrics.height))
         }
         // The folder is drawn as narrow as its glyph; its button keeps the 24 points and 3 on each side it had, centred on it.
         if let folder = markFrame {
             let width = Self.markTarget + Self.foldReach
-            mark.frame = CGRect(x: folder.midX - width / 2, y: 0, width: width, height: min(bounds.height, CardMetrics.height))
+            mark.frame = CGRect(x: folder.midX - width / 2, y: 0, width: width, height: min(bounds.height, look?.card.listHeight ?? CardMetrics.height))
         }
     }
 
@@ -232,12 +246,13 @@ final class CardControl: UIControl {
     static private(set) var lastLifted: (card: BoardCard, frame: CGRect)?
 
     /// A card drawn: when it is the task whose menu shows, the menu takes the new drawing.
-    static func follow(card: BoardCard, look: Look, menu: @escaping (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?, from control: CardControl) {
+    static func follow(card: BoardCard, look: Look, menu: @escaping (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?, over: ((_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?)? = nil, from control: CardControl) {
         guard let owner = menuOwner, owner.opener.showing, let shown = owner.look else { return }
         // A card of a screen under another (the main screen under a project's view) draws the same task as that screen
         // reads it: never the menu's, which follows the screen it was opened on.
         guard shown.card.item.id == card.item.id, owner === control || (shown != look && control.window != nil) else { return }
         owner.menuMaker = menu
+        owner.overMenuMaker = over
         owner.redrawn(look)
     }
 
@@ -246,9 +261,9 @@ final class CardControl: UIControl {
     private func redrawn(_ look: Look) {
         if self.look != look {
             self.look = look
-            content.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, ringed: look.ringed, height: look.height) }.margins(.all, 0)
+            content.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, overText: look.over, ringed: look.ringed, height: look.height) }.margins(.all, 0)
         }
-        if let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) { opener.refresh(menu) }
+        if let menu = maker({ [weak self] run in self?.afterMenu = run }) { opener.refresh(menu) }
         if let shownWhole, let image = wholeTitle(look)?.image { shownWhole.show(image) }
     }
 
@@ -266,13 +281,25 @@ final class CardControl: UIControl {
             onLink(link.part)
             return
         }
+        // A folded result's own line, from the card's top down to under the line, as wide as the title's room.
+        if overMenuMaker != nil, let over = overFrame {
+            let reach = CGRect(x: 0, y: 0, width: titleFrame?.maxX ?? over.maxX, height: over.maxY + 2)
+            openedOver = reach.contains(point)
+        } else {
+            openedOver = false
+        }
         openMenu(at: tap.location(in: opener))
+    }
+
+    /// The menu the last tap asked for: the result's own from its line, else the card's.
+    private var maker: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
+        openedOver ? overMenuMaker ?? menuMaker : menuMaker
     }
 
     /// The system's menu over the card: the card itself lifts in place; a card whose title is cut shows its whole title in
     /// the menu's preview, the system morphing the card into it and back (`UIContextMenuConfiguration`'s preview).
     private func openMenu(at point: CGPoint) {
-        guard let look, let window, let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return }
+        guard let look, let window, let menu = maker({ [weak self] run in self?.afterMenu = run }) else { return }
         Self.menuOwner = self
         Self.lastLifted = (look.card, convert(bounds, to: window))
         shownWhole = nil
@@ -293,7 +320,7 @@ final class CardControl: UIControl {
     /// whole title (the menu lifts the card itself).
     private func wholeTitle(_ look: Look) -> UIImageView? {
         guard let window, let (_, frame) = grownCopy(selectable: false, always: false) else { return nil }
-        return FloatImage.view(TaskCapsule(card: look.card, text: look.text, whole: true).frame(width: frame.width, height: frame.height), like: self, in: window)
+        return FloatImage.view(TaskCapsule(card: look.card, text: look.text, overText: look.over, whole: true).frame(width: frame.width, height: frame.height), like: self, in: window)
     }
 
     /// The menu's whole-title preview while it shows: a label set from the menu redraws it.
@@ -325,7 +352,7 @@ final class CardControl: UIControl {
         let width = grown.map { CGFloat($0.width) } ?? bounds.width
         // Laid out by its title, as a card: a tall calendar block's copy is its title, not a tall box with the title on top.
         let copy = UIHostingConfiguration {
-            TaskCapsule(card: look.card, text: look.text, whole: true, selectable: selectable, onCopied: onCopied)
+            TaskCapsule(card: look.card, text: look.text, overText: look.over, whole: true, selectable: selectable, onCopied: onCopied)
         }
         .margins(.all, 0)
         .makeContentView()

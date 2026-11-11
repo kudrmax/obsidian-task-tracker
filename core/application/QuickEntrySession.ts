@@ -8,7 +8,7 @@ import { type EntryDrawing, type EntryJob, type EntryLook, type EntrySpot, type 
 export { ENTRY_PLACES, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry, type PendingRename, type PendingText, type PlaceChoice, type PlaceMove, type StackAt, type StackEntry } from "./QuickEntry";
 
 /** What the session reads from the service: the marks, the places and the writes. */
-export type QuickEntryTasks = EntryTasks & Pick<TaskService, "createWithId" | "createSection" | "edit">;
+export type QuickEntryTasks = EntryTasks & Pick<TaskService, "createWithId" | "createSection" | "edit"> & Partial<Pick<TaskService, "unfoldAbove">>;
 
 /** What the session reads from the screen, and tells it. */
 export interface QuickEntryView extends EntryLook {
@@ -198,6 +198,10 @@ export class QuickEntrySession {
 			}
 			case "createSection":
 				await this.tasks.createSection(...call.args);
+				await this.view.fresh();
+				return;
+			case "unfoldAbove":
+				await this.tasks.unfoldAbove?.(...call.args);
 				await this.view.fresh();
 		}
 	}

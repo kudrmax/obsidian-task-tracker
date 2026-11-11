@@ -1,4 +1,4 @@
-import type { GroupName, MenuEditId, MenuStatusId, TaskItem, TaskMenuModel } from "../../../core/application/contracts";
+import type { GroupName, MenuStatusId, ResultPage, TaskItem, TaskKey, TaskMenuModel } from "../../../core/application/contracts";
 import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
@@ -11,7 +11,8 @@ import { datePage } from "./DatePage";
 import { projectChooser, projectNamePage, sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
 import { moveTiles } from "./quickMoves";
-import { type Asking, askLooks, labelTiles, priorityTiles, statusTiles } from "./TaskMenu";
+import { resultChooser, resultNamePage } from "./ResultChooser";
+import { type Asking, askLooks, type EditRowId, labelTiles, priorityTiles, statusTiles, withResultRows } from "./TaskMenu";
 
 /** "3 tasks". */
 export function countLabel(count: number): string {
@@ -32,6 +33,12 @@ export interface BulkActions {
 	setProject(project: string | null): Promise<void>;
 	/** «New project…» named `name` (`TaskService.newProject`): the note made or tagged, and every picked task gets it. */
 	newProject(name: string): Promise<void>;
+	/** The Add to result page for the picked tasks, `query` typed in its search field (`TaskService.resultPage`). */
+	resultPage(query: string): Promise<ResultPage>;
+	/** Every picked task to the end of `result`'s steps, in file order (`TaskService.addToResult`). */
+	addToResult(result: TaskKey): Promise<void>;
+	/** «New result…» named `name` (`TaskService.newResult`): the picked tasks its steps. */
+	newResult(name: string): Promise<void>;
 	remove(): Promise<void>;
 }
 
@@ -128,11 +135,12 @@ export class BulkMenu {
 		if (labels.length > 0) tileGroup(panel, "is-labels", tileRows(labels));
 		const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({ label, icon, onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)) }));
 		if (moves.length > 0) tileGroup(panel, "is-move", [moves]);
-		const rows: Partial<Record<MenuEditId, MenuRowSpec>> = {
+		const rows: Partial<Record<EditRowId, MenuRowSpec>> = {
 			section: { label: "Section", icon: "section", onPick: () => this.showSections() },
 			project: { label: "Project", value: model.project.value, icon: "project", disabled: model.project.disabled, onPick: () => this.showProjects() },
+			addToResult: { label: model.result.label, value: model.result.value, icon: "target", onPick: () => void this.showResults() },
 		};
-		menuGroup(panel, model.edits.flatMap((id) => rows[id] ?? []));
+		menuGroup(panel, withResultRows(model).flatMap((id) => rows[id] ?? []));
 		const remove = model.remove;
 		if (this.asking === "delete") this.askGroup(panel, "delete");
 		else if (remove) menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
@@ -224,6 +232,52 @@ export class BulkMenu {
 					},
 				}),
 			"projectName",
+		);
+	}
+
+	/** The Add to result page: every picked task goes to the result picked; «New result…» asks for a name. */
+	private async showResults(): Promise<void> {
+		const { actions } = this.context;
+		const title = this.context.menu(this.context.items).result.label;
+		const page = await actions.resultPage("");
+		if (this.overlay.isClosed) return;
+		this.asking = null;
+		this.panel.replace(
+			(panel) =>
+				resultChooser(panel, {
+					title,
+					page,
+					onBack: () => this.showMenu(),
+					find: (query) => actions.resultPage(query),
+					onPick: (result) => this.pick(() => actions.addToResult(result))(),
+					onNew: () => this.showResultName(page.namePlaceholder),
+					onChange: () => this.panel.changed(),
+				}),
+			"results",
+		);
+	}
+
+	/** «New result…»: the name asked in place of the Add to result page; Enter makes the result and closes, Escape goes back. */
+	private showResultName(placeholder: string): void {
+		const { actions } = this.context;
+		let asking = true;
+		const back = () => {
+			if (!asking) return;
+			asking = false;
+			void this.showResults();
+		};
+		this.panel.replace(
+			(panel) =>
+				resultNamePage(panel, {
+					placeholder,
+					onBack: back,
+					onDone: (name) => {
+						if (name === null) return back();
+						asking = false;
+						this.pick(() => actions.newResult(name))();
+					},
+				}),
+			"resultName",
 		);
 	}
 

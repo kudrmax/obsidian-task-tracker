@@ -4,10 +4,11 @@ import { usablePresets } from "../domain/operations";
 import type { LocalDate } from "../domain/Task";
 import { TaskDocument } from "../domain/TaskDocument";
 import type { Markers } from "../domain/TaskLine";
-import { type TaskCalendarSettings, usableLabels, usableLevels } from "../settings";
+import { type TaskCalendarSettings, usableLabels, usableLevels, usableResultMark } from "../settings";
 
 /** How the tasks file is read under these settings: one pipeline for the plugin's service and the phone. */
 export function markersOf(settings: TaskCalendarSettings): Markers {
+	const priorities = usableLevels(settings.priorities).map((l) => l.prefix);
 	return {
 		dueDate: settings.dueDateMarker,
 		slot: settings.slotMarker,
@@ -16,7 +17,8 @@ export function markersOf(settings: TaskCalendarSettings): Markers {
 		silentSlot: settings.silentSlotMarker,
 		repeat: settings.repeatMarker,
 		collapsed: settings.collapsedMarker,
-		priorities: usableLevels(settings.priorities).map((l) => l.prefix),
+		priorities,
+		result: usableResultMark(settings.resultMark, priorities) ?? undefined,
 		labelTag: settings.labelTag,
 		labels: usableLabels(settings.labels).map((l) => l.name),
 	};

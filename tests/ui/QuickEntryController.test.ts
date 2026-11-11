@@ -128,6 +128,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		root,
 		tasks: {
 			projectNotes: () => projects,
+			unfoldAbove: async () => {},
 			newProject: async (name, keys) => {
 				newProjects.push({ name, keys });
 				return { name, link: name, note: `${name}.md`, canOpenNote: true, mark: true };
@@ -1129,7 +1130,7 @@ describe("QuickEntryController", () => {
 				stackEl.className = "tc-menu-subtasks";
 				const source = stackEl.appendChild(document.createElement("div"));
 				source.className = "tc-card";
-				return TaskMenu.open({ item: sub, source, today: TODAY, day: TODAY, menu: (it) => taskMenu([it], TODAY, [], [], null), actions: { setRepeat: async () => {}, pickStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setProject: async () => {}, newProject: async () => {}, togglePriority: async () => {}, toggleLabel: async () => null, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
+				return TaskMenu.open({ item: sub, source, today: TODAY, day: TODAY, menu: (it) => taskMenu([it], TODAY, [], [], null), actions: { setRepeat: async () => {}, pickStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setProject: async () => {}, newProject: async () => {}, togglePriority: async () => {}, toggleLabel: async () => null, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {}, setResult: async () => {}, resultPage: async () => ({ options: [], placeholder: "Search results", newLabel: "New result…", namePlaceholder: "Result name" }), addToResult: async () => {}, newResult: async () => {} } });
 			};
 			const menuField = () => document.querySelector<HTMLTextAreaElement>(".tc-menu-field textarea.tc-quick-field");
 
@@ -1183,7 +1184,7 @@ describe("QuickEntryController", () => {
 				const source = document.body.appendChild(document.createElement("div"));
 				source.className = "tc-block";
 				source.getBoundingClientRect = () => at;
-				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, menu: (it) => taskMenu([it], TODAY, [], [], null), actions: { setRepeat: async () => {}, pickStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setProject: async () => {}, newProject: async () => {}, togglePriority: async () => {}, toggleLabel: async () => null, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
+				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, menu: (it) => taskMenu([it], TODAY, [], [], null), actions: { setRepeat: async () => {}, pickStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setProject: async () => {}, newProject: async () => {}, togglePriority: async () => {}, toggleLabel: async () => null, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {}, setResult: async () => {}, resultPage: async () => ({ options: [], placeholder: "Search results", newLabel: "New result…", namePlaceholder: "Result name" }), addToResult: async () => {}, newResult: async () => {} } });
 			};
 			const stack = () => [...document.querySelectorAll<HTMLElement>(".tc-menu-subtasks > *")].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent));
 

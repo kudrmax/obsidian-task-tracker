@@ -79,6 +79,8 @@ export class Panel {
 	}
 
 	private readonly pages: PanelPages;
+	/** The page shown now, which a change in place keeps. */
+	private shown = "page";
 
 	private constructor(
 		element: HTMLElement,
@@ -107,11 +109,17 @@ export class Panel {
 		return this.picks.pickNow(then);
 	}
 
+	/** The page shown changed in place (a search narrowed it): the window grows or shrinks to it, placed again, its scroll kept. */
+	changed(): void {
+		this.pages.show(this.shown, () => this.place());
+	}
+
 	/**
 	 * Another page of the window in its place: what it showed goes, `build` lays out the new one, and it is placed again;
 	 * the window grows or shrinks to it and the page `name` keeps its own scroll.
 	 */
 	replace(build: (panel: HTMLElement) => void, name = "page"): void {
+		this.shown = name;
 		this.pages.show(name, () => {
 			clear(this.el);
 			build(this.el);

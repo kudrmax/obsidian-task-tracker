@@ -335,8 +335,8 @@ struct TimelineColumn: View {
         let dimmed = model.selecting && !model.canPick("timeline")
         return CardButton(
             card: slot.card,
-            renamedText: model.entry.renamedTexts[slot.card.id],
-            menu: { later in dimmed ? nil : model.cardMenu(slot.card.item, from: "timeline", later: later) },
+            renamedText: model.entry.renamedTexts[slot.card.face.step?.id ?? slot.card.id],
+            menu: { later in dimmed ? nil : model.cardMenu(slot.card, from: "timeline", later: later) },
             ringed: model.found == slot.id || model.selectedSlot == slot.id,
             height: tall,
             draggable: !dimmed,

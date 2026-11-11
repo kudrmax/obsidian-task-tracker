@@ -14,8 +14,13 @@ import { fullTree } from "./fullTree";
 import { plainText } from "../domain/TaskText";
 
 /** Where the field stands: a gap of a list, a slot on the calendar, or the end of a task's subtasks in the calendar menu. */
+/**
+ * `unfold`, on a list's spot: the task the field types a subtask of is folded away inside the card above the place (a
+ * folded result's step); opening the field there unfolds it first (a job), and the field then stands last among its
+ * subtasks. A host hands the spot back to `open` as it is.
+ */
 export type EntrySpot =
-	| { readonly kind: "list"; readonly column: DropColumn; readonly place: GapPlace }
+	| { readonly kind: "list"; readonly column: DropColumn; readonly place: GapPlace; readonly unfold?: TaskKey }
 	| { readonly kind: "slot"; readonly slot: Slot }
 	| { readonly kind: "stack"; readonly parent: TaskKey };
 
@@ -148,7 +153,11 @@ export interface EntryState {
 	readonly repeat: RepeatRule | null;
 	/** Texts entered here and not yet written, in order: drawn right before the field. */
 	readonly pending: readonly PendingText[];
-	/** The task whose text the field edits; null for a new one. */
+	/**
+	 * The task whose text the field edits, whose card the lists and the timeline hide while it is open; null for a new
+	 * one. A step drawn on its folded result's card or block (`TaskItem.drawnOn`) is renamed in that card's place: here
+	 * its `key` and `id` are that card's, so it is the result's card that hides; the write names the step.
+	 */
 	readonly renaming: TaskItem | null;
 	/** The field shifts a level at all: one in a list writing a task; then whether it can go a level in or out now. */
 	readonly indents: boolean;
@@ -247,6 +256,8 @@ export interface EntryRun {
 /** A rename: the task, and its own spot (a run), which stays its even when the field moves to another spot. */
 export interface EntryRename {
 	readonly item: TaskItem;
+	/** The card the field stands in place of when the task has none of its own: its folded result's. */
+	readonly face?: TaskKey;
 	readonly home: string;
 	/** A place was chosen in the bar: the task goes where the field now stands, not where it was. */
 	readonly moved: boolean;
@@ -277,7 +288,9 @@ export interface EntryField {
 export type EntryJob =
 	| { readonly id: string; readonly kind: "create"; readonly run: string; readonly line: EntryLine; readonly newSection?: string; landing?: DropColumn | null; shown?: boolean }
 	| { readonly id: string; readonly kind: "rename"; readonly home: string; readonly item: TaskItem; readonly draft: TaskDraft }
-	| { readonly id: string; readonly kind: "section"; readonly run: string; readonly name: string; readonly column: DropColumn; readonly place: GapPlace };
+	| { readonly id: string; readonly kind: "section"; readonly run: string; readonly name: string; readonly column: DropColumn; readonly place: GapPlace }
+	/** The tasks `key` is folded away under show their subtasks, so the field typing its subtask stands in the list. */
+	| { readonly id: string; readonly kind: "unfold"; readonly run: string; readonly key: TaskKey };
 
 /** The entry's whole state, plain data: what a frontend without a long-lived entry keeps between calls. */
 export interface EntrySession {
@@ -291,7 +304,8 @@ export interface EntrySession {
 export type EntryCall =
 	| { readonly method: "createInPlace"; readonly args: readonly [string, string | null, NewTaskPlace, RepeatRule | null, readonly string[], (string | null)?] }
 	| { readonly method: "edit"; readonly args: readonly [TaskKey, TaskDraft] }
-	| { readonly method: "createSection"; readonly args: readonly [string, Extract<NewTaskPlace, { readonly kind: "list" | "day" }>] };
+	| { readonly method: "createSection"; readonly args: readonly [string, Extract<NewTaskPlace, { readonly kind: "list" | "day" }>] }
+	| { readonly method: "unfoldAbove"; readonly args: readonly [TaskKey] };
 
 export function emptySession(): EntrySession {
 	return { field: null, runs: {}, jobs: [], next: 0 };
@@ -342,7 +356,7 @@ export class QuickEntry {
 			labels: field.labels,
 			repeat: field.repeat,
 			pending: run.pending.map(({ text, level }) => ({ text, level })),
-			renaming: field.rename?.item ?? null,
+			renaming: field.rename ? faced(field.rename) : null,
 			indents: task && listSpot(run.spot) !== null,
 			...this.mayShift(field),
 			section: this.maySection(field) ? field.section : null,
@@ -377,7 +391,8 @@ export class QuickEntry {
 
 	/** The renamed task, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
 	get renaming(): TaskKey | null {
-		return this.session.field?.rename?.item.key ?? null;
+		const rename = this.session.field?.rename;
+		return rename ? (rename.face ?? rename.item.key) : null;
 	}
 
 	/** What `column`'s list draws for the field: its gap, the texts waiting before it, and whether it is a section's name; null when it stands elsewhere. */
@@ -439,6 +454,11 @@ export class QuickEntry {
 	/** Where a new subtask of `parent` is typed: last among its subtasks in the list that shows it, else last in its menu's stack. */
 	subtaskSpot(parent: TaskKey): EntrySpot {
 		const found = this.find(parent);
+		const holder = found ? null : this.holder(parent);
+		if (holder) {
+			const card = this.look.cards(holder.column)[holder.index];
+			return { kind: "list", column: holder.column, place: gapOfPlace(this.look.cards(holder.column), { kind: "subtask", parent: card.key, before: null }), unfold: parent };
+		}
 		if (!found) return { kind: "stack", parent };
 		return { kind: "list", column: found.column, place: gapOfPlace(this.look.cards(found.column), { kind: "subtask", parent, before: null }) };
 	}
@@ -449,21 +469,55 @@ export class QuickEntry {
 	 * over its card on the timeline; null when it shows nowhere the field can stand.
 	 */
 	renameSpot(item: TaskItem, inStack: boolean): EntrySpot | null {
-		const found = this.find(item.key);
+		const found = this.find(item.key) ?? (inStack ? null : this.holder(item.key));
 		if (found) {
 			const card = this.look.cards(found.column)[found.index];
 			return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group, ...(card.project !== undefined && { project: card.project }) } };
 		}
 		if (inStack) return { kind: "stack", parent: item.key };
-		return item.slot ? { kind: "slot", slot: item.slot } : null;
+		const slot = item.slot ?? item.drawnOn?.slot ?? null;
+		return slot ? { kind: "slot", slot } : null;
+	}
+
+	/**
+	 * The card a list shows a task folded away in, when it has none of its own: the deepest card of a task it sits under
+	 * (a folded result's, whose card shows its step).
+	 */
+	private holder(key: TaskKey): { readonly column: DropColumn; readonly index: number } | null {
+		const shown = this.look.shown();
+		let best: { column: DropColumn; index: number; depth: number } | null = null;
+		for (const column of [...shown, ...ALL_COLUMNS.filter((c) => !shown.includes(c))]) {
+			this.look.cards(column).forEach((card, index) => {
+				const k = card.key;
+				const holds = k.section === key.section && k.index === key.index && k.path.length < key.path.length && k.path.every((i, n) => key.path[n] === i);
+				if (holds && (best === null || k.path.length > best.depth)) best = { column, index, depth: k.path.length };
+			});
+			if (best) return best;
+		}
+		return best;
+	}
+
+	/** The card the field renaming `item` at `spot` stands in place of when the task has no card of its own there. */
+	private faceOf(item: TaskItem, spot: EntrySpot): TaskKey | undefined {
+		if (spot.kind === "list") {
+			if (this.find(item.key)) return undefined;
+			const card = this.look.cards(spot.column)[spot.place.index];
+			return card ? { ...card.key, ...((card.id ?? card.key.id) !== undefined && { id: card.id ?? card.key.id }) } : undefined;
+		}
+		return spot.kind === "slot" && item.slot === null && item.drawnOn ? item.drawnOn.key : undefined;
 	}
 
 	/** A field at `spot`; one already open is finished first, as by a tap elsewhere. A rename's spot is the gap right before its own card. */
-	open(spot: EntrySpot, renaming?: TaskItem): void {
+	open(given: EntrySpot, renaming?: TaskItem): void {
 		if (this.session.field) this.save(this.session.field);
-		const rename = renaming ? { item: renaming, home: this.newRun(spot), moved: false } : null;
+		const unfold = given.kind === "list" && !renaming ? given.unfold : undefined;
+		const spot: EntrySpot = given.kind === "list" ? { kind: "list", column: given.column, place: given.place } : given;
+		const face = renaming ? this.faceOf(renaming, spot) : undefined;
+		const rename = renaming ? { item: renaming, home: this.newRun(spot), moved: false, ...(face && { face }) } : null;
 		const project = renaming ? (renaming.project?.link ?? null) : this.projectAt(spot);
-		this.reset({ run: this.newRun(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename, section: false, project });
+		const run = this.newRun(spot);
+		this.reset({ run, text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename, section: false, project });
+		if (unfold) this.queue(run, { id: this.jobId(), kind: "unfold", run, key: unfold });
 	}
 
 	/** The project a field opened at `spot` starts with: its project's part in a list drawn by project, else the view's own. */
@@ -644,6 +698,8 @@ export class QuickEntry {
 			}
 			case "rename":
 				return { method: "edit", args: [this.keyAt(job.home, job.item), job.draft] };
+			case "unfold":
+				return { method: "unfoldAbove", args: [job.key] };
 			case "section": {
 				const at = this.placeOf(job.column, placeOfGap(this.look.cards(job.column), { ...job.place, level: 0 }));
 				return at.kind === "list" || at.kind === "day" ? { method: "createSection", args: [job.name, at] } : null;
@@ -683,8 +739,23 @@ export class QuickEntry {
 	/** Job `id` ended, written or not: its spot no longer follows the cards for it. */
 	done(id: string): void {
 		const job = this.job(id);
+		if (job.kind === "unfold") this.unfolded(job);
 		this.release(job.kind === "rename" ? job.home : job.run);
 		this.session.jobs.splice(this.session.jobs.indexOf(job), 1);
+	}
+
+	/**
+	 * The lists show the task unfolded: the field typing its subtask goes last among its subtasks there. Still folded away
+	 * (the write failed), the field closes rather than type a subtask of the card it stood under.
+	 */
+	private unfolded(job: Extract<EntryJob, { kind: "unfold" }>): void {
+		const run = this.run(job.run);
+		if (!run || this.session.field?.run !== job.run) return;
+		const at = this.find(job.key);
+		if (!at) return this.reset(null);
+		run.spot = { kind: "list", column: at.column, place: gapOfPlace(this.look.cards(at.column), { kind: "subtask", parent: job.key, before: null }) };
+		this.shifts = null;
+		this.changed();
 	}
 
 	private run(id: string): EntryRun {
@@ -818,7 +889,7 @@ export class QuickEntry {
 		if (this.blank(field.text)) this.reset(null);
 		else {
 			this.saveRename(field, rename);
-			const under = list && this.under(list, rename.item);
+			const under = list && !rename.face && this.under(list, rename.item);
 			this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: this.projectAt(under) } : null);
 		}
 	}
@@ -1000,6 +1071,12 @@ function refOf(link: string | null, known: readonly ProjectRef[]): ProjectRef | 
 	if (link === null) return null;
 	const name = projectName(link);
 	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link, note: null, canOpenNote: false, mark: true };
+}
+
+/** The renamed task as its field stands: in the place of its result's card, that card's key and id. */
+function faced(rename: EntryRename): TaskItem {
+	const { item, face } = rename;
+	return face ? { ...item, key: face, id: face.id ?? item.id } : item;
 }
 
 function runsOf(field: EntryField | null): string[] {

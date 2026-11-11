@@ -32,6 +32,7 @@ struct SettingsView: View {
                 }
                 Button("Add Priority") { Task { await plugin.write("settings.addLevel") } }
             }
+            ResultMarkSection(plugin: plugin)
             if let form = plugin.form {
                 CardsSection(form: form, plugin: plugin)
             }
@@ -182,6 +183,40 @@ struct LabelsPage: View {
     private func saveTag() {
         guard let saved = plugin.form?.labelTag, tag != saved else { return }
         Task { await plugin.write("settings.setLabelTag", [.string(tag)]) }
+    }
+}
+
+/// «Result mark» (results, point 3), beside the priorities as the plugin has it: the word a result's line starts with. The
+/// core keeps it only when it is one word that is no priority's prefix; otherwise the saved one comes back into the field.
+struct ResultMarkSection: View {
+    let plugin: PluginSettings
+    @State private var mark = ""
+
+    var body: some View {
+        Section {
+            LabeledContent("Result Mark") {
+                TextField(plugin.form?.defaultResultMark ?? "", text: $mark)
+                    .multilineTextAlignment(.trailing)
+                    .frame(minWidth: 88)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit(save)
+            }
+        } footer: {
+            Text("A task whose line starts with this word is a result: its card shows its next open subtask under the result’s title. Changing it rewrites no task.")
+        }
+        .onAppear { mark = plugin.form?.resultMark ?? "" }
+        .onDisappear(perform: save)
+        .onChange(of: plugin.form?.resultMark) { mark = plugin.form?.resultMark ?? "" }
+    }
+
+    /// Kept on Return and on leaving, as Settings keeps a field; a mark the core refuses puts the saved one back.
+    private func save() {
+        guard let saved = plugin.form?.resultMark, mark != saved else { return }
+        Task {
+            await plugin.write("settings.setResultMark", [.string(mark)])
+            mark = plugin.form?.resultMark ?? saved
+        }
     }
 }
 

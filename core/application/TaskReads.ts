@@ -38,13 +38,15 @@ import { carriedWith, menuOffer, taskMenu } from "./menus";
 import { NO_SECTION_ID, offeredNames, type SectionOffer, shownSections } from "./sections";
 import { samePlace } from "./taskKeys";
 import { fullTree } from "./fullTree";
-import { type ItemLevels, itemLevels, toItem } from "./taskItems";
+import { type ItemLevels, itemLevels, ownCard, toItem } from "./taskItems";
+import { resultPage } from "./results";
+import { resultAbove } from "../domain/Result";
 import type { TaskRules } from "./TaskRules";
 import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
 import type { Clock, SettingsStore } from "./ports";
 import { inProject, projectName } from "../domain/Project";
 import { groupSectionNames, listGrouping, ProjectIndex, viewGrouping } from "./projects";
-import type { DropTo, GroupingState, ListGrouping, ProjectNote, ProjectRef } from "./contracts";
+import type { DropTo, GroupingState, ListGrouping, ProjectNote, ProjectRef, ResultPage } from "./contracts";
 
 /** The file as one read sees it: normalized for `today`, the day beginning at `boundary`; `text` as the file holds it. */
 export interface Snapshot {
@@ -292,7 +294,7 @@ export class TaskReads {
 		const fuzzy = FuzzyQuery.of(query);
 		if (!fuzzy || !s) return [];
 		const { doc, today } = s;
-		const item = this.itemOf(today);
+		const item = this.itemOf(today, this.scopeAll(), doc);
 		const ranked: RankedHit[] = [];
 		const index = this.index();
 		const visit = (entry: TaskEntry): void => {
@@ -304,8 +306,9 @@ export class TaskReads {
 			const projectText = entry.project === null || entry.path.length > 0 ? "" : (index.refOf(entry.project)?.name ?? projectName(entry.project));
 			const project = projectText === "" ? null : fuzzy.matchWords(projectText);
 			if (title || description || project) {
+				const found = item(entry);
 				const hit: SearchHit = {
-					item: item(entry),
+					item: { ...found, card: ownCard(found) },
 					title: title ? matchParts(titleText, title.found) : [],
 					project: project ? matchParts(projectText, project.found) : null,
 					description: description ? snippetParts(descriptionText, description.found) : null,
@@ -321,6 +324,16 @@ export class TaskReads {
 			if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
 		}
 		return groups;
+	}
+
+	resultPageRead(keys: readonly TaskKey[], query: string): Read<ResultPage> {
+		return { reads: true, answer: (s) => this.resultPage(s!, keys, query) };
+	}
+
+	/** The Add to result page for the tasks `keys` names, `query` typed in its search. */
+	resultPage({ doc }: Snapshot, keys: readonly TaskKey[], query: string): ResultPage {
+		const index = this.index();
+		return resultPage(doc, keys.map((key) => this.rules.entryOf(doc, key)), query, (link) => index.refOf(link)?.name ?? projectName(link));
 	}
 
 	screenOf({ doc, today }: Snapshot, item: TaskItem): TaskScreen {
@@ -352,7 +365,7 @@ export class TaskReads {
 		return keys.map((key) => {
 			const entry = this.rules.entryOf(doc, key);
 			const parent = key.path.length > 0 ? (doc.find(key.section, key.index, key.path.slice(0, -1)) ?? null) : null;
-			return toItem(entry, today, levels, parent);
+			return toItem(entry, today, levels, parent, undefined, resultAbove(doc, entry));
 		});
 	}
 
@@ -361,7 +374,7 @@ export class TaskReads {
 		const entry = doc.find(place.section, place.index, place.path);
 		if (!entry) return null;
 		const parent = place.path.length > 0 ? (doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null) : null;
-		return toItem(entry, today, this.itemLevels(this.scopeAll()), parent, this.rules.moment().boundary);
+		return toItem(entry, today, this.itemLevels(this.scopeAll()), parent, this.rules.moment().boundary, resultAbove(doc, entry));
 	}
 
 	/** The task's line in the file once tidied for today, from 0. */
@@ -410,12 +423,12 @@ export class TaskReads {
 
 	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel {
 		const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectNotes());
+		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectNotes(), this.rules.marksResults());
 	}
 
 	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel {
 		const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectNotes());
+		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectNotes(), this.rules.marksResults());
 	}
 
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[] {
@@ -447,10 +460,11 @@ export class TaskReads {
 		return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
 	}
 
-	private itemOf(today: LocalDate, scope: Scope = this.scopeAll()): (entry: TaskEntry) => TaskItem {
+	/** The item of a task, its subtasks below it; with `doc`, the result it is a step of too (a subtask's). */
+	private itemOf(today: LocalDate, scope: Scope = this.scopeAll(), doc?: TaskDocument): (entry: TaskEntry) => TaskItem {
 		const levels = this.itemLevels(scope);
 		const { boundary } = this.rules.moment();
-		return (entry) => toItem(entry, today, levels, null, boundary);
+		return (entry) => toItem(entry, today, levels, null, boundary, doc ? resultAbove(doc, entry) : null);
 	}
 
 	private itemLevels(scope: Scope): ItemLevels {

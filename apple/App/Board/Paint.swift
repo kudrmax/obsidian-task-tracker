@@ -78,6 +78,12 @@ enum CardMetrics {
         return changed
     }
     static let leading: CGFloat = 14
+    /// A folded result's card (results, point 4): its title's line over the step's title, the card as tall as a card with
+    /// a parent line (the board's 44 at the default 35), never taller.
+    static var twoLineHeight: CGFloat { height + 9 }
+    /// The small line over a result's step: its type and its line (11 points, as the caption).
+    static let overFont: CGFloat = 11
+    static let overLine: CGFloat = 13
     static let trailing: CGFloat = 10
     static let title: CGFloat = 15
     /// A title's line (`--tc-leading-card`): one on a card, as many as a copy over the menu needs.
@@ -129,4 +135,9 @@ private struct BoardTint: ViewModifier {
     func body(content: Content) -> some View {
         content.tint(Palette.accent(scheme))
     }
+}
+
+extension BoardCard {
+    /// The card's height in a list: a folded result's card of two lines is taller.
+    var listHeight: CGFloat { face.twoLines ? CardMetrics.twoLineHeight : CardMetrics.height }
 }

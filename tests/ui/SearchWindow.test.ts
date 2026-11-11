@@ -8,6 +8,7 @@ function item(text: string, list: SectionKey, extra: Partial<TaskItem> = {}): Ta
 		key: { section: list, index: 0, path: [], raw: `- [ ] ${text}` },
 		text,
 		title: text,
+		card: { text, title: text, over: null, step: null, semibold: false },
 		status: list === "done" ? "done" : "todo",
 		dueDate: null,
 		slot: null,

@@ -79,7 +79,8 @@ enum DrawnRow: Hashable {
     var height: CGFloat? {
         switch self {
         case .header, .project, .newHead: ColumnMetrics.groupHead
-        case .plate, .card, .plusRoom: CardMetrics.height
+        case .card(let card): card.listHeight
+        case .plate, .plusRoom: CardMetrics.height
         case .pending, .field: nil
         }
     }
@@ -437,7 +438,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
             let branch = level > 0 ? branches[safe: at] ?? nil : nil
             switch row {
             case .card(let card) where card.branch != branch:
-                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, paint: card.paint, corner: card.corner, zone: card.zone, parts: card.parts))
+                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, paint: card.paint, corner: card.corner, zone: card.zone, parts: card.parts, face: card.face))
             case .pending(let key, let text, _, _): return .pending(key: key, text: text, level: level, branch: branch)
             case .field(let id, _, _, let section): return .field(id: id, level: level, branch: branch, section: section)
             default: return row
@@ -606,7 +607,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     /// Where a row's capsule stands in its cell: below the room over it, at its depth, after the selection circle.
     func capsule(of row: DrawnRow, in bounds: CGRect) -> CGRect {
         let top = drawn[keys[row.id] ?? row.id]?.top ?? 0
-        let height = row.heads ? ColumnMetrics.groupHead : CardMetrics.height
+        let height = row.height ?? CardMetrics.height
         var left = CGFloat(row.level ?? 0) * CardMetrics.indent
         if case .card = row, let model, model.selecting, model.canPick(column.rawValue) { left += CardRow.circleRoom }
         return CGRect(x: left, y: top, width: max(1, bounds.width - left), height: min(height, max(1, bounds.height - top)))
@@ -697,7 +698,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
             let top = frame.minY + (drawn[keys[row.id] ?? row.id]?.top ?? 0)
             switch row {
             case .card(let card) where card.id != carried && model?.isCarried(card) != true:
-                cards.append((card, CGRect(x: frame.minX, y: top, width: frame.width, height: CardMetrics.height)))
+                cards.append((card, CGRect(x: frame.minX, y: top, width: frame.width, height: card.listHeight)))
             case .field(let id, _, _, _):
                 // A card being renamed stands in the list as its field: to the core's places it is still that card.
                 if let card = listed.first(where: { $0.id == id }) { cards.append((card, CGRect(x: frame.minX, y: top, width: frame.width, height: CardMetrics.height))) }

@@ -52,7 +52,7 @@ import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
 import { type DayLane, DayTrack, EdgeTrack, edgeParts, restore, StripTrack } from "./ScreenTracks";
-import { onCounter, onProjectMark } from "./TaskCard";
+import { cardMenuTask, onCounter, onProjectMark } from "./TaskCard";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -209,6 +209,9 @@ export class CalendarScreen extends Component {
 			toSection: (keys, name) => this.act(() => this.deps.tasks.toSection(keys, name)),
 			setProject: (keys, project) => this.act(() => this.deps.tasks.setProject(keys, project)),
 			newProject: (keys, name) => this.act(async () => (await this.deps.tasks.newProject(name, keys)) !== null),
+			resultPage: (keys, query) => this.deps.tasks.resultPage(keys, query),
+			addToResult: (keys, result) => this.act(() => this.deps.tasks.addToResult(keys, result)),
+			newResult: (keys, name) => this.act(async () => (await this.deps.tasks.newResult(keys, name)) !== null),
 			desktop: () => !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
 			isMod: (e) => (Platform.isMacOS ? e.metaKey : e.ctrlKey),
 		});
@@ -242,7 +245,7 @@ export class CalendarScreen extends Component {
 				await this.act(async () => (written = await this.deps.tasks.resize(item.key, this.selectedDate, edge, minute, minDurationMin)));
 				return written;
 			},
-			onMenu: (item, source, lifted, held) => this.showMenu(item, source, lifted, undefined, held),
+			onMenu: (item, source, lifted, held, drawn) => this.showMenu(item, source, lifted, undefined, held, undefined, drawn),
 			onRename: (item) => this.quick?.rename(item),
 			newSlot: () => this.timelineDrop,
 			onNewSlot: (slot) => this.quick?.openSlot(slot),
@@ -781,7 +784,7 @@ export class CalendarScreen extends Component {
 		card.addEventListener(
 			"click",
 			(e) => {
-				if (!this.fold(item, e.target)) this.showMenu(item, card);
+				if (!this.fold(item, e.target)) this.showMenu(cardMenuTask(item, e.target), card, undefined, undefined, undefined, undefined, item);
 			},
 			{ signal },
 		);
@@ -789,7 +792,7 @@ export class CalendarScreen extends Component {
 			"contextmenu",
 			(e) => {
 				e.preventDefault();
-				this.showMenu(item, card);
+				this.showMenu(cardMenuTask(item, e.target), card, undefined, undefined, undefined, undefined, item);
 			},
 			{ signal },
 		);
@@ -1160,8 +1163,11 @@ export class CalendarScreen extends Component {
 		);
 	}
 
-	/** The task menu; a list card's offers the sections of its list too. On the whole screen, typing and opening stay there. */
-	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen, held?: boolean, sheet?: Sheet): TaskMenu {
+	/**
+	 * The task menu; a list card's offers the sections of its list too. On the whole screen, typing and opening stay there.
+	 * `drawn`: the task whose card `source` is, when the menu is its shown step's (a folded result, `TaskItem.card`).
+	 */
+	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen, held?: boolean, sheet?: Sheet, drawn?: TaskItem): TaskMenu {
 		const tasks = this.deps.tasks;
 		const from = this.menuFrom(source, full);
 		const column = this.columnOf(source);
@@ -1175,8 +1181,9 @@ export class CalendarScreen extends Component {
 			lifted,
 			held,
 			sheet,
+			drawn,
 			menu: (task) => tasks.menu(task, from, screen),
-			onSubtask: (subtask, card, taken) => this.showMenu(subtask, card, undefined, undefined, undefined, taken),
+			onSubtask: (subtask, card, taken, drawnCard) => this.showMenu(subtask, card, undefined, undefined, undefined, taken, drawnCard),
 			markdown: full?.holds(item) ? undefined : this.markdown,
 			today,
 			day: this.selectedDate,
@@ -1190,6 +1197,10 @@ export class CalendarScreen extends Component {
 				},
 				setProject: (project) => this.act(() => tasks.setProject([current.key], project)),
 				newProject: (name) => this.act(async () => (await tasks.newProject(name, [current.key])) !== null),
+				setResult: (result) => this.act(() => tasks.setResult(current.key, result)),
+				resultPage: (query) => tasks.resultPage([current.key], query),
+				addToResult: (result) => this.act(() => tasks.addToResult([current.key], result)),
+				newResult: (name) => this.act(async () => (await tasks.newResult([current.key], name)) !== null),
 				togglePriority: (prefix) => this.act(() => tasks.togglePriority([current.key], prefix)),
 				toggleLabel: async (name) => {
 					const written: { item: TaskItem | null } = { item: null };

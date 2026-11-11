@@ -44,7 +44,8 @@ export class FloatingCard implements Float {
 	private showTask(item: TaskItem, day: LocalDate, count: number): void {
 		fillCard(this.el, item, { day });
 		if (item.subtasks.length > 0 || count > 1) {
-			for (let depth = STACK_DEPTH; depth >= 1; depth--) this.stack.push(el(activeDocument.body, "div", `tc-float-under is-${depth}`));
+			const twoLine = this.el.classList.contains("is-two-line") ? " is-two-line" : "";
+			for (let depth = STACK_DEPTH; depth >= 1; depth--) this.stack.push(el(activeDocument.body, "div", `tc-float-under is-${depth}${twoLine}`));
 		}
 		activeDocument.body.appendChild(this.el);
 		stretchWhole(this.el, { width: DESIGN.floatWidth, height: this.el.getBoundingClientRect().height }, windowRoom(this.el));

@@ -1,7 +1,7 @@
 import { googleLoggedIn } from "./googleLogin";
 import { labelNameOf, usableLabelTag } from "../domain/Label";
 import { hexColor, type PresetColor } from "../domain/Priority";
-import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, LABEL_PAINTS, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
+import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, LABEL_PAINTS, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings, usableLevels, usableResultMark } from "../settings";
 import type { CountField, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
 import type { SettingsStore } from "./ports";
 import { formatZoomLevels, parseZoomLevels } from "./timelineZoom";
@@ -42,6 +42,8 @@ export class SettingsServiceImpl implements SettingsService {
 				collapsedMarker: s.collapsedMarker,
 			},
 			priorities: s.priorities,
+			resultMark: s.resultMark,
+			defaultResultMark: DEFAULT_SETTINGS.resultMark,
 			labelTag: s.labelTag,
 			labels: s.labels,
 			labelPaint: s.labelPaint,
@@ -136,6 +138,11 @@ export class SettingsServiceImpl implements SettingsService {
 	async setZoomLevels(text: string): Promise<void> {
 		const zoomLevels = parseZoomLevels(text);
 		if (zoomLevels) await this.store.update({ zoomLevels });
+	}
+
+	async setResultMark(mark: string): Promise<void> {
+		const word = mark.trim();
+		if (usableResultMark(word, usableLevels(this.settings.priorities).map((l) => l.prefix)) !== null) await this.store.update({ resultMark: word });
 	}
 
 	async setProjectTag(tag: string): Promise<void> {

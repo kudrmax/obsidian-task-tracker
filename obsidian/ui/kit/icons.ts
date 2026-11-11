@@ -52,6 +52,10 @@ const DRAWINGS = {
 	refresh: { d: "M20 12a8 8 0 1 1-2.3-5.7 M20 4v4.5h-4.5" },
 	repeat: { d: "M17 2.5l3.5 3.5-3.5 3.5 M3.5 11.5V10a4 4 0 0 1 4-4h13 M7 21.5L3.5 18 7 14.5 M20.5 12.5V14a4 4 0 0 1-4 4h-13" },
 	stop: { d: `${CIRCLE} M9.5 9.5h5v5h-5z` },
+	/** A result: Lucide's target, on a folded result's small line and on Add to result. */
+	target: { d: "M12 2a10 10 0 1 1 0 20a10 10 0 1 1 0-20z M12 6a6 6 0 1 1 0 12a6 6 0 1 1 0-12z M12 10a2 2 0 1 1 0 4a2 2 0 1 1 0-4z" },
+	/** Make result, Make task: Lucide's goal. */
+	goal: { d: ["M12 13V2l8 4-8 4", "M20.561 10.222a9 9 0 1 1-12.55-5.29", "M8.002 9.997a5 5 0 1 0 8.9 2.02"] },
 } satisfies Record<string, IconSpec>;
 
 export type IconName = keyof typeof DRAWINGS;

@@ -7,6 +7,7 @@ import type { Placement, TaskDraft } from "./Placement";
 import { type Column, columnGroups, columnList } from "./queries";
 import { inProject, type ProjectZone } from "./Project";
 import { Repeat, type RepeatRule } from "./Repeat";
+import { holds, resultAbove, resultOfText } from "./Result";
 import { DEFAULT_REMINDER, isOpen, STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import { taskTitle } from "./TaskTitle";
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
@@ -15,7 +16,7 @@ const HOUR_MINUTES = 60;
 const MINUTE_MS = 60_000;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], project: null, collapsed: false, children: [], ...patch };
+	return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, result: false, priority: null, labels: [], project: null, collapsed: false, children: [], ...patch };
 }
 
 /** The day a task is set for: its due date, else its slot's day. */
@@ -166,7 +167,7 @@ export function setReminder(doc: TaskDocument, entry: TaskEntry, reminder: Remin
  * typed prefix is the priority of a task without one). The same title and marks give this very document: nothing to write.
  */
 export function rename(doc: TaskDocument, entry: TaskEntry, text: string): TaskDocument {
-	return patch(doc, entry, typed(doc, text, entry.task.priority, entry.task.labels));
+	return patch(doc, entry, retyped(doc, entry.task, text, entry.task.priority, entry.task.labels));
 }
 
 /** The circle of a task: an open one is ticked done, a done or given-up one is open again. */
@@ -226,6 +227,45 @@ function intoUnfolded(doc: TaskDocument, parent: TaskEntry, operation: (doc: Tas
 export function nest(doc: TaskDocument, entry: TaskEntry, parent: TaskEntry, before: TaskEntry | null): TaskDocument {
 	if (before && samePlace(before, entry)) return doc;
 	return intoUnfolded(doc, parent, (d, same) => d.nestEntry(same(entry), same(parent), before && same(before)));
+}
+
+/** Make result, or Make task: the mark on or off. A task made a result folds its open subtasks away; one made a task keeps its fold. */
+export function setResult(doc: TaskDocument, entry: TaskEntry, result: boolean): TaskDocument {
+	if (!result) return patch(doc, entry, { result: false });
+	return patch(doc, entry, { result: true, collapsed: entry.task.collapsed || hasOpenSubtask(entry) });
+}
+
+/**
+ * Add to result: each entry, with its subtasks, leaves its place and becomes the last subtask of `result`, in file order;
+ * the result then folds, its next step on top. An entry already a step of it (its nearest result), the result itself, one
+ * holding it, and one under another entry moved (it goes along) stay where they are.
+ */
+export function addToResult(doc: TaskDocument, entries: readonly TaskEntry[], result: TaskEntry): TaskDocument {
+	const moving = entries
+		.filter((entry) => !holds(entry, result) && resultAbove(doc, entry)?.id !== result.id && !entries.some((other) => other.id !== entry.id && holds(other, entry)))
+		.sort((a, b) => doc.lineOf(a) - doc.lineOf(b));
+	if (moving.length === 0) return doc;
+	let current = doc;
+	for (const entry of moving) current = current.nestEntry(current.byId(entry.id)!, current.byId(result.id)!, null);
+	const filled = current.byId(result.id)!;
+	return hasOpenSubtask(filled) ? patch(current, filled, { collapsed: true }) : current;
+}
+
+/**
+ * New result…: a result titled as typed, at the place of the first of the entries in the file (right before it, among
+ * the same task's subtasks for a subtask), with that task's project and day (its due date, else its slot's day, so it
+ * stays on that day and list), and the entries as its steps (as `addToResult` takes them), folded. Nothing while the file
+ * is read without a result mark.
+ */
+export function newResult(doc: TaskDocument, entries: readonly TaskEntry[], title: string, boundary = DayBoundary.MIDNIGHT): TaskDocument {
+	const first = [...entries].sort((a, b) => doc.lineOf(a) - doc.lineOf(b))[0];
+	if (!first || doc.resultMark() === null) return doc;
+	const { text, ...marks } = typed(doc, title, null, []);
+	const top = first.path.length === 0;
+	const task = newTask(text, { ...marks, result: true, project: top ? first.task.project : null, dueDate: top ? dayOf(first.task, boundary) : null });
+	const made = top ? doc.insert(first.section, first.index, task) : doc.insertUnder(doc.find(first.section, first.index, first.path.slice(0, -1))!, task, first);
+	const result = made.insertedSince(doc)!;
+	return addToResult(made, entries.map((entry) => made.byId(entry.id)!), result);
 }
 
 /** The due date a subtask takes from the sheet: none for the place it would have anyway, today's for Now, the day for Date. */
@@ -314,15 +354,28 @@ function placeSubtask(doc: TaskDocument, entry: TaskEntry, draft: TaskDraft, tod
 	return doc.replace(entry, withDraftRepeat({ ...entry.task, ...draftMarks(doc, entry.task, draft), dueDate }, draft, today, boundary));
 }
 
-/** A title as typed, with the priority and labels chosen for it, as the file is to get it. */
-function typed(doc: TaskDocument, text: string, priority: string | null, labels: readonly string[]): Marks & { readonly text: string } {
-	const marked = typedMarks(taskTitle(text), priority, labels, doc.priorityPrefixes());
-	return { ...marked, text: taskTitle(marked.text) };
+/** What a title typed is written with: its marks, and a result for one typed with the result mark first. */
+type Typed = Marks & { readonly text: string; readonly result: boolean };
+
+/**
+ * A title as typed, with the priority and labels chosen for it, as the file is to get it. The result mark typed first
+ * makes a result, as the file would read the line; it never stays in the text.
+ */
+function typed(doc: TaskDocument, text: string, priority: string | null, labels: readonly string[]): Typed {
+	const resulting = resultOfText(taskTitle(text), doc.resultMark());
+	const marked = typedMarks(resulting.text, priority, labels, doc.priorityPrefixes());
+	return { ...marked, text: taskTitle(marked.text), result: resulting.result };
+}
+
+/** A task's title typed anew: a result stays one, and a task becomes one when the result mark is typed first. */
+function retyped(doc: TaskDocument, task: Task, text: string, priority: string | null, labels: readonly string[]): Typed {
+	const marks = typed(doc, text, priority, labels);
+	return { ...marks, result: task.result || marks.result };
 }
 
 /** What an edit writes: the draft's text, its priority or the one typed, and its labels, else the task's own, while there is none. */
-function draftMarks(doc: TaskDocument, task: Task, draft: TaskDraft): Marks & { readonly text: string } {
-	return typed(doc, draft.text, draft.priority, draft.labels ?? task.labels);
+function draftMarks(doc: TaskDocument, task: Task, draft: TaskDraft): Typed {
+	return retyped(doc, task, draft.text, draft.priority, draft.labels ?? task.labels);
 }
 
 /** The end of Inbox, Backlog or Soon: a drop on that list from another one, or at the end of its own. Into Inbox and Backlog the due date and slot go. */

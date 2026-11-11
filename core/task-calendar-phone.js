@@ -498,6 +498,40 @@
     return labels.map((name) => ` #${tag}/${name}`).join("");
   }
 
+  // core/domain/Result.ts
+  var DEFAULT_RESULT_MARK = "🎯";
+  function usableResultMark(mark, prefixes) {
+    return usablePrefix(mark) && !prefixes.includes(mark) ? mark : null;
+  }
+  var FIRST_WORD_RE2 = /^(\S+)\s+(.*)$/s;
+  function resultOfText(text, mark) {
+    const m = mark === null ? null : FIRST_WORD_RE2.exec(text);
+    if (!m || m[1] !== mark) return { result: false, text };
+    return { result: true, text: m[2] };
+  }
+  function withoutResultMark(text, mark) {
+    if (mark !== null && text.trim() === mark) return "";
+    return resultOfText(text.trimStart(), mark).text;
+  }
+  function nextStep(entry) {
+    let step = null;
+    for (let at = entry; ; ) {
+      const open = at.subtasks.find((sub) => isOpen(sub.task.status));
+      if (!open) return step;
+      step = at = open;
+    }
+  }
+  function resultAbove(doc, entry) {
+    for (let depth = entry.path.length - 1; depth >= 0; depth--) {
+      const above = doc.find(entry.section, entry.index, entry.path.slice(0, depth));
+      if (above?.task.result) return above;
+    }
+    return null;
+  }
+  function holds(outer, inner) {
+    return outer.section === inner.section && outer.index === inner.index && outer.path.length <= inner.path.length && outer.path.every((i, k) => inner.path[k] === i);
+  }
+
   // core/domain/Project.ts
   var PROJECT_MARKER = "🗂️";
   var FIELD_RE = /(?:^|\s+)\u{1F5C2}\u{FE0F}?\s+\[\[([^\[\]|#]+?)(?:#[^\[\]|]*)?(?:\|[^\[\]]*)?\]\](?=\s|$)/gu;
@@ -656,15 +690,17 @@
     const linked = projectOfText(m[4]);
     const tagged = labelsOfText(linked.text, markers.labelTag ?? "", markers.labels ?? []);
     const fields = fieldSlicerFor(markers).slice(tagged.text);
+    const marked = resultOfText(fields.text, markers.result ?? null);
     return {
       indent: m[1],
       bullet: m[2],
-      task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOfText(fields.text, markers.priorities ?? []), labels: tagged.labels, project: linked.project, children: [] }
+      task: { status: statusOf(statusChar), statusChar, ...fields, result: marked.result, ...priorityOfText(marked.text, markers.priorities ?? []), labels: tagged.labels, project: linked.project, children: [] }
     };
   }
   function formatTaskLine(parsed, markers) {
     const { indent, bullet, task } = parsed;
-    let line = `${indent}${bullet} [${task.statusChar}] ${task.priority ? `${task.priority} ` : ""}${task.text}`;
+    const mark = task.result && markers.result ? `${markers.result} ` : "";
+    let line = `${indent}${bullet} [${task.statusChar}] ${mark}${task.priority ? `${task.priority} ` : ""}${task.text}`;
     if (task.labels.length > 0 && markers.labelTag) line += labelTags(markers.labelTag, task.labels);
     if (task.project) line += projectField(task.project);
     if (task.collapsed && markers.collapsed) line += ` ${markers.collapsed}`;
@@ -924,7 +960,7 @@
     return INDENT_RE2.exec(line)[0].length;
   }
   function sameTask(a, b) {
-    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && a.collapsed === b.collapsed && a.project === b.project && sameLines(a.children, b.children);
+    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.result === b.result && a.priority === b.priority && a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && a.collapsed === b.collapsed && a.project === b.project && sameLines(a.children, b.children);
   }
   function tagNumber(tag) {
     return Number(tag.slice(1));
@@ -997,6 +1033,10 @@
     /** The prefixes of the priority levels the file is read with. */
     priorityPrefixes() {
       return this.markers.priorities ?? [];
+    }
+    /** The result mark the file is read with; null: no task is a result. */
+    resultMark() {
+      return this.markers.result ?? null;
     }
     serialize() {
       return this.lines.join(this.eol) + (this.trailingEol ? this.eol : "");
@@ -1533,7 +1573,7 @@
   var HOUR_MINUTES3 = 60;
   var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
-    return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], project: null, collapsed: false, children: [], ...patch2 };
+    return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, result: false, priority: null, labels: [], project: null, collapsed: false, children: [], ...patch2 };
   }
   function dayOf(task, boundary) {
     return task.dueDate ?? (task.slot ? boundary.dayOfSlot(task.slot) : null);
@@ -1628,7 +1668,7 @@
     return patch(doc, entry, { reminder });
   }
   function rename(doc, entry, text) {
-    return patch(doc, entry, typed(doc, text, entry.task.priority, entry.task.labels));
+    return patch(doc, entry, retyped(doc, entry.task, text, entry.task.priority, entry.task.labels));
   }
   function toggleDone(doc, entry) {
     return setStatus(doc, entry, isOpen(entry.task.status) ? "done" : "todo");
@@ -1663,6 +1703,28 @@
   function nest(doc, entry, parent, before) {
     if (before && samePlace(before, entry)) return doc;
     return intoUnfolded(doc, parent, (d, same) => d.nestEntry(same(entry), same(parent), before && same(before)));
+  }
+  function setResult(doc, entry, result) {
+    if (!result) return patch(doc, entry, { result: false });
+    return patch(doc, entry, { result: true, collapsed: entry.task.collapsed || hasOpenSubtask(entry) });
+  }
+  function addToResult(doc, entries, result) {
+    const moving = entries.filter((entry) => !holds(entry, result) && resultAbove(doc, entry)?.id !== result.id && !entries.some((other) => other.id !== entry.id && holds(other, entry))).sort((a, b) => doc.lineOf(a) - doc.lineOf(b));
+    if (moving.length === 0) return doc;
+    let current = doc;
+    for (const entry of moving) current = current.nestEntry(current.byId(entry.id), current.byId(result.id), null);
+    const filled = current.byId(result.id);
+    return hasOpenSubtask(filled) ? patch(current, filled, { collapsed: true }) : current;
+  }
+  function newResult(doc, entries, title, boundary = DayBoundary.MIDNIGHT) {
+    const first = [...entries].sort((a, b) => doc.lineOf(a) - doc.lineOf(b))[0];
+    if (!first || doc.resultMark() === null) return doc;
+    const { text, ...marks } = typed(doc, title, null, []);
+    const top = first.path.length === 0;
+    const task = newTask(text, { ...marks, result: true, project: top ? first.task.project : null, dueDate: top ? dayOf(first.task, boundary) : null });
+    const made = top ? doc.insert(first.section, first.index, task) : doc.insertUnder(doc.find(first.section, first.index, first.path.slice(0, -1)), task, first);
+    const result = made.insertedSince(doc);
+    return addToResult(made, entries.map((entry) => made.byId(entry.id)), result);
   }
   function subtaskDueDate(placement, inherited, today) {
     if (samePlacement(placement, inherited)) return null;
@@ -1734,11 +1796,16 @@
     return doc.replace(entry, withDraftRepeat({ ...entry.task, ...draftMarks(doc, entry.task, draft), dueDate }, draft, today, boundary));
   }
   function typed(doc, text, priority, labels) {
-    const marked = typedMarks(taskTitle(text), priority, labels, doc.priorityPrefixes());
-    return { ...marked, text: taskTitle(marked.text) };
+    const resulting = resultOfText(taskTitle(text), doc.resultMark());
+    const marked = typedMarks(resulting.text, priority, labels, doc.priorityPrefixes());
+    return { ...marked, text: taskTitle(marked.text), result: resulting.result };
+  }
+  function retyped(doc, task, text, priority, labels) {
+    const marks = typed(doc, text, priority, labels);
+    return { ...marks, result: task.result || marks.result };
   }
   function draftMarks(doc, task, draft) {
-    return typed(doc, draft.text, draft.priority, draft.labels ?? task.labels);
+    return retyped(doc, task, draft.text, draft.priority, draft.labels ?? task.labels);
   }
   function toEnd(doc, entry, section) {
     const prepared = isUndated(section) ? patch(doc, entry, { dueDate: null, slot: null }) : doc;
@@ -1909,6 +1976,7 @@
       if (!entry) return doc;
       const { task } = entry;
       const copy = newTask(task.text, {
+        result: task.result,
         priority: task.priority,
         labels: task.labels,
         project: entry.project,
@@ -2083,6 +2151,7 @@
       { prefix: "p1", color: "red" },
       { prefix: "p2", color: "orange" }
     ],
+    resultMark: DEFAULT_RESULT_MARK,
     labelTag: "label",
     labels: [],
     labelPaint: LABEL_PAINTS[0],
@@ -2101,6 +2170,7 @@
       google: { ...DEFAULT_SETTINGS.google, ...s.google ?? {} },
       groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} },
       labelPaint: labelPaintOf(s.labelPaint),
+      resultMark: typeof s.resultMark === "string" ? s.resultMark : DEFAULT_SETTINGS.resultMark,
       cardHeight: sizeOf(s.cardHeight, CARD_HEIGHTS, DEFAULT_SETTINGS.cardHeight),
       cardGap: sizeOf(s.cardGap, CARD_GAPS, DEFAULT_SETTINGS.cardGap),
       zoomLevels: zoomLevelsOf(saved)
@@ -2123,6 +2193,7 @@
 
   // core/application/documentText.ts
   function markersOf(settings) {
+    const priorities = usableLevels(settings.priorities).map((l) => l.prefix);
     return {
       dueDate: settings.dueDateMarker,
       slot: settings.slotMarker,
@@ -2131,7 +2202,8 @@
       silentSlot: settings.silentSlotMarker,
       repeat: settings.repeatMarker,
       collapsed: settings.collapsedMarker,
-      priorities: usableLevels(settings.priorities).map((l) => l.prefix),
+      priorities,
+      result: usableResultMark(settings.resultMark, priorities) ?? void 0,
       labelTag: settings.labelTag,
       labels: usableLabels(settings.labels).map((l) => l.name)
     };
@@ -3607,6 +3679,266 @@ ${text}`;
     return isFolded(state, list, key) ? withFolded(state, list, key, false) : state;
   }
 
+  // core/domain/search.ts
+  var SNIPPET_LEAD = 24;
+  var ELLIPSIS = "…";
+  var SPACE_RE = /\s/;
+  var PUNCTUATION_RE = /[ -⁯⸀-⹿\\'!"#$%&()*+,\-./:;<=>?@[\]^_`{|}~]/;
+  var WORD_CHAR_RE = /[\p{L}\p{N}]/u;
+  var ACCENTS_RE = /[̀-ͯ]/g;
+  function foldedChar(char) {
+    const lower = char.toLowerCase();
+    const bare2 = lower.normalize("NFD").replace(ACCENTS_RE, "");
+    if (bare2.length === 1) return bare2;
+    return lower.length === 1 ? lower : char;
+  }
+  function foldedText(text) {
+    return folded(text);
+  }
+  function folded(text) {
+    let out = "";
+    for (let i = 0; i < text.length; i++) out += foldedChar(text.charAt(i));
+    return out;
+  }
+  function insideWord(text, at) {
+    if (at === 0) return false;
+    const char = text.charAt(at);
+    const before = text.charAt(at - 1);
+    if (!WORD_CHAR_RE.test(char) || !WORD_CHAR_RE.test(before)) return false;
+    const startsCapital = char !== char.toLowerCase() && before === before.toLowerCase();
+    return !startsCapital;
+  }
+  var FuzzyQuery = class _FuzzyQuery {
+    constructor(length, words, letters2) {
+      this.length = length;
+      this.words = words;
+      this.letters = letters2;
+    }
+    /** Null for a query of spaces: it finds nothing. */
+    static of(query) {
+      const text = folded(query.trim());
+      if (text === "") return null;
+      const words = [];
+      let from = 0;
+      for (let i = 0; i < text.length; i++) {
+        const char = text.charAt(i);
+        if (!SPACE_RE.test(char) && !PUNCTUATION_RE.test(char)) continue;
+        if (from !== i) words.push(text.slice(from, i));
+        if (!SPACE_RE.test(char)) words.push(char);
+        from = i + 1;
+      }
+      if (from !== text.length) words.push(text.slice(from));
+      const letters2 = [...text].filter((char) => !SPACE_RE.test(char));
+      return new _FuzzyQuery(text.length, words, letters2);
+    }
+    /** The words in their order, failing that the letters in theirs. */
+    match(text) {
+      const lower = folded(text);
+      return this.matchPieces(this.words, text, lower, false) ?? this.matchPieces(this.letters, text, lower, true);
+    }
+    /** The words in their order only: letters scattered over a long text would find nearly anything. */
+    matchWords(text) {
+      return this.matchPieces(this.words, text, folded(text), false);
+    }
+    matchPieces(pieces, text, lower, letters2) {
+      if (pieces.length === 0) return null;
+      const found = [];
+      let at = 0;
+      let broken = 0;
+      for (const piece of pieces) {
+        const start = lower.indexOf(piece, at);
+        if (start < 0) return null;
+        const joined = letters2 && start === at;
+        if (!joined && insideWord(text, start)) broken++;
+        const last = found[found.length - 1];
+        if (last && last.end === start) last.end = start + piece.length;
+        else found.push({ start, end: start + piece.length });
+        at = start + piece.length;
+      }
+      return { score: this.score(found, broken, text.length), found };
+    }
+    /** Fewer pieces, fewer of them inside words, tighter, earlier and in a shorter text score higher. */
+    score(found, broken, textLength) {
+      const span = found[found.length - 1].end - found[0].start;
+      return -(found.length - 1) - broken / 10 - (span + 1 - this.length) / 100 - found[0].start / 1e3 - textLength / 1e4;
+    }
+  };
+  function matchParts(text, found) {
+    const parts = [];
+    let at = 0;
+    for (const piece of found) {
+      if (piece.start > at) parts.push({ text: text.slice(at, piece.start), match: false });
+      parts.push({ text: text.slice(piece.start, piece.end), match: true });
+      at = piece.end;
+    }
+    if (at < text.length) parts.push({ text: text.slice(at), match: false });
+    return parts;
+  }
+  var EMBED_RE = /!\[\[[^\]]*\]\]|!\[[^\]]*\]\([^)]*\)/g;
+  var BLOCK_MARK_RE = /^\s*(?:>\s?)*\s*(?:#{1,6}\s+|(?:[-*+]|\d+[.)])\s+(?:\[.\]\s+)?)?/;
+  var LITERAL_RE = /`([^`]*)`|\\(.)/gu;
+  var EMPHASIS_RE = /(\*\*|~~|==|\*|(?<![\p{L}\p{N}])__|(?<![\p{L}\p{N}])_)(?=\S)(.+?)(?<=\S)\1(?![\p{L}\p{N}])/gu;
+  function withoutEmphasis(text) {
+    let out = text;
+    for (let before = ""; before !== out; ) {
+      before = out;
+      out = out.replace(EMPHASIS_RE, "$2");
+    }
+    return out;
+  }
+  function plainInline(text) {
+    let out = "";
+    let at = 0;
+    for (const m of text.matchAll(LITERAL_RE)) {
+      out += plainText(withoutEmphasis(text.slice(at, m.index)));
+      out += m[1] ?? m[2];
+      at = m.index + m[0].length;
+    }
+    return out + plainText(withoutEmphasis(text.slice(at)));
+  }
+  function plainDescription(markdown) {
+    return plainInline(
+      markdown.split("\n").map((line) => line.replace(BLOCK_MARK_RE, "")).join(" ").replace(EMBED_RE, "")
+    ).replace(/\s+/g, " ").trim();
+  }
+  function snippetParts(text, found) {
+    const first = found[0].start;
+    if (first <= SNIPPET_LEAD) return matchParts(text, found);
+    const tail = text.slice(first - SNIPPET_LEAD, first);
+    const space = tail.indexOf(" ");
+    const lead = space >= 0 && space < tail.length - 1 ? tail.slice(space + 1) : tail;
+    const cut = first - lead.length;
+    const shifted = found.map((piece) => ({ start: piece.start - cut + 1, end: piece.end - cut + 1 }));
+    return matchParts(ELLIPSIS + text.slice(cut), shifted);
+  }
+
+  // core/application/taskItems.ts
+  function progressOf(entry) {
+    if (entry.subtasks.length === 0) return null;
+    const counted = entry.subtasks.filter((s) => s.task.status !== "cancelled");
+    return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
+  }
+  var NO_LEVELS = { levelOf: () => null, labelsOf: () => [], projectOf: () => null };
+  function itemLevels(levels, labels, projectOf = () => null) {
+    return {
+      levelOf: (prefix) => levels.find((l) => l.prefix === prefix) ?? null,
+      labelsOf: (names) => labels.filter((l) => names.includes(l.name)),
+      projectOf
+    };
+  }
+  function resultRef(entry) {
+    return { id: entry.id, key: keyOf(entry), title: plainText(entry.task.text) };
+  }
+  function itemWithId(items, id) {
+    for (const item of items) {
+      if (item.id === id) return item;
+      const inner = itemWithId(item.allSubtasks, id);
+      if (inner) return inner;
+    }
+    return null;
+  }
+  function ownCard(item) {
+    return { text: item.text, title: item.title, over: null, step: null, semibold: item.isResult };
+  }
+  function cardOf(item, step) {
+    return item.collapsed && step ? { text: step.text, title: step.title, over: item.title, step, semibold: false } : ownCard(item);
+  }
+  function blockOf(item, step) {
+    return step ? { text: step.text, title: step.title, step } : { text: item.text, title: item.title, step: null };
+  }
+  function toItem(entry, today, levels = NO_LEVELS, parent = null, boundary = DayBoundary.MIDNIGHT, above = null, drawn = null) {
+    const marks = marksOfTask(entry.task);
+    const choices = markChoices(marks);
+    const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
+    const labels = levels.labelsOf(marks.labels);
+    const open = isOpen(entry.task.status);
+    const shown = entry.task.result && open ? nextStep(entry) : null;
+    const drawnBelow = shown ? { id: shown.id, on: entry } : drawn;
+    const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary, entry.task.result ? entry : above, drawnBelow));
+    const description = descriptionMarkdown(entry);
+    const step = shown && itemWithId(allSubtasks, shown.id);
+    const own = { text: entry.task.text, title: plainText(entry.task.text), isResult: entry.task.result, collapsed: entry.task.collapsed && hasOpenSubtask(entry) };
+    return {
+      id: entry.id,
+      key: keyOf(entry),
+      text: entry.task.text,
+      title: plainText(entry.task.text),
+      status: entry.task.status,
+      dueDate: entry.task.dueDate,
+      slot: entry.task.slot,
+      durationMin: entry.task.slot && entry.task.slot.end !== null ? entry.task.slot.end - entry.task.slot.start : null,
+      reminder: entry.task.reminder,
+      repeat: entry.task.repeat?.rule ?? null,
+      open: isOpen(entry.task.status),
+      repeatable: repeatable(entry),
+      priority,
+      labels,
+      colors: markColors(priority, labels),
+      group: entry.group,
+      project: levels.projectOf(entry.project),
+      list: entry.section,
+      isSubtask: entry.path.length > 0,
+      day: dayOfTask(entry.section, entry.task, today),
+      repeatDay: repeatDay(dayOf(entry.task, boundary), today),
+      can: {
+        postpone: canPostpone(entry.section),
+        removeDue: canRemoveDue(entry.task.dueDate, today),
+        remind: canRemind(entry.task.slot),
+        setPriority: choices.priority,
+        setLabels: choices.labels,
+        stop: entry.task.repeat !== null && repeatable(entry),
+        addDescription: description === null,
+        fold: hasOpenSubtask(entry),
+        resize: entry.task.slot !== null,
+        setProject: entry.path.length === 0,
+        result: open
+      },
+      isResult: entry.task.result,
+      resultOf: above ? resultRef(above) : null,
+      card: cardOf(own, step),
+      block: blockOf(own, step),
+      drawnOn: drawn?.id === entry.id ? { key: keyOf(drawn.on), slot: drawn.on.task.slot } : null,
+      subtasks: allSubtasks.filter((sub) => sub.open),
+      allSubtasks,
+      progress: progressOf(entry),
+      collapsed: entry.task.collapsed && hasOpenSubtask(entry),
+      description,
+      parentText: parent?.task.text ?? null,
+      parentKey: parent ? keyOf(parent) : null
+    };
+  }
+
+  // core/application/results.ts
+  var RESULT_WORDS = {
+    addToResult: "Add to result",
+    makeResult: "Make result",
+    makeTask: "Make task",
+    newResult: "New result…",
+    search: "Search results",
+    name: "Result name"
+  };
+  function menuResult(items, bulk, marks = true) {
+    const open = marks && items.length > 0 && items.every((item) => item.can.result);
+    const rows = !open ? [] : bulk ? ["addToResult"] : ["addToResult", "toggle"];
+    const first = items[0]?.resultOf ?? null;
+    const current = first !== null && items.every((item) => item.resultOf?.id === first.id) ? first : null;
+    const isResult = !bulk && items[0]?.isResult === true;
+    return {
+      rows,
+      label: RESULT_WORDS.addToResult,
+      value: current?.title ?? "",
+      current,
+      toggle: isResult ? { label: RESULT_WORDS.makeTask, result: false } : { label: RESULT_WORDS.makeResult, result: true }
+    };
+  }
+  function resultPage(doc, chosen, query, projectName2) {
+    const nearest = chosen.map((entry) => resultAbove(doc, entry)?.id ?? null);
+    const ticked = nearest.length > 0 && nearest.every((id) => id === nearest[0]) ? nearest[0] : null;
+    const typed2 = foldedText(query.trim());
+    const options = flatten(doc.allTasks()).filter((entry) => entry.section !== "done" && entry.task.result && isOpen(entry.task.status)).filter((entry) => !chosen.some((task) => holds(task, entry))).filter((entry) => typed2 === "" || foldedText(plainText(entry.task.text)).includes(typed2)).map((entry) => ({ entry, line: doc.lineOf(entry) })).sort((a, b) => a.line - b.line).map(({ entry }) => ({ result: resultRef(entry), list: entry.section, project: entry.project === null ? null : projectName2(entry.project), checked: entry.id === ticked }));
+    return { options, placeholder: RESULT_WORDS.search, newLabel: RESULT_WORDS.newResult, namePlaceholder: RESULT_WORDS.name };
+  }
+
   // core/application/menus.ts
   function priorityHolders(items) {
     return items.filter((item) => item.can.setPriority);
@@ -3723,7 +4055,7 @@ ${text}`;
     };
   }
   var MENU_GROUPS = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
-  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = []) {
+  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = [], marksResults = true) {
     const sections = menuSections(items, offer, of);
     const edits = menuEdits(items, of, sections);
     return {
@@ -3736,6 +4068,7 @@ ${text}`;
       dueDate: sharedDueDate(items),
       sections,
       project: menuProject(items, projects),
+      result: menuResult(items, of.kind === "bulk", marksResults),
       edits,
       reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
       repeat: repeatRow(of.kind === "task" ? items[0]?.repeat ?? null : null),
@@ -3749,7 +4082,7 @@ ${text}`;
 
   // core/application/fullTree.ts
   function unfolded(items) {
-    return items.map((item) => ({ ...item, collapsed: false, subtasks: unfolded(item.allSubtasks) }));
+    return items.map((item) => ({ ...item, collapsed: false, card: ownCard(item), subtasks: unfolded(item.allSubtasks) }));
   }
   function rowsOf2(items, level, rows) {
     for (const item of items) {
@@ -3835,7 +4168,7 @@ ${text}`;
         labels: field.labels,
         repeat: field.repeat,
         pending: run.pending.map(({ text, level }) => ({ text, level })),
-        renaming: field.rename?.item ?? null,
+        renaming: field.rename ? faced(field.rename) : null,
         indents: task && listSpot(run.spot) !== null,
         ...this.mayShift(field),
         section: this.maySection(field) ? field.section : null,
@@ -3866,7 +4199,8 @@ ${text}`;
     }
     /** The renamed task, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
     get renaming() {
-      return this.session.field?.rename?.item.key ?? null;
+      const rename2 = this.session.field?.rename;
+      return rename2 ? rename2.face ?? rename2.item.key : null;
     }
     /** What `column`'s list draws for the field: its gap, the texts waiting before it, and whether it is a section's name; null when it stands elsewhere. */
     /**
@@ -3919,6 +4253,11 @@ ${text}`;
     /** Where a new subtask of `parent` is typed: last among its subtasks in the list that shows it, else last in its menu's stack. */
     subtaskSpot(parent) {
       const found = this.find(parent);
+      const holder = found ? null : this.holder(parent);
+      if (holder) {
+        const card = this.look.cards(holder.column)[holder.index];
+        return { kind: "list", column: holder.column, place: gapOfPlace(this.look.cards(holder.column), { kind: "subtask", parent: card.key, before: null }), unfold: parent };
+      }
       if (!found) return { kind: "stack", parent };
       return { kind: "list", column: found.column, place: gapOfPlace(this.look.cards(found.column), { kind: "subtask", parent, before: null }) };
     }
@@ -3928,20 +4267,52 @@ ${text}`;
      * over its card on the timeline; null when it shows nowhere the field can stand.
      */
     renameSpot(item, inStack) {
-      const found = this.find(item.key);
+      const found = this.find(item.key) ?? (inStack ? null : this.holder(item.key));
       if (found) {
         const card = this.look.cards(found.column)[found.index];
         return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group, ...card.project !== void 0 && { project: card.project } } };
       }
       if (inStack) return { kind: "stack", parent: item.key };
-      return item.slot ? { kind: "slot", slot: item.slot } : null;
+      const slot = item.slot ?? item.drawnOn?.slot ?? null;
+      return slot ? { kind: "slot", slot } : null;
+    }
+    /**
+     * The card a list shows a task folded away in, when it has none of its own: the deepest card of a task it sits under
+     * (a folded result's, whose card shows its step).
+     */
+    holder(key) {
+      const shown = this.look.shown();
+      let best = null;
+      for (const column of [...shown, ...ALL_COLUMNS.filter((c) => !shown.includes(c))]) {
+        this.look.cards(column).forEach((card, index) => {
+          const k = card.key;
+          const holds2 = k.section === key.section && k.index === key.index && k.path.length < key.path.length && k.path.every((i, n) => key.path[n] === i);
+          if (holds2 && (best === null || k.path.length > best.depth)) best = { column, index, depth: k.path.length };
+        });
+        if (best) return best;
+      }
+      return best;
+    }
+    /** The card the field renaming `item` at `spot` stands in place of when the task has no card of its own there. */
+    faceOf(item, spot) {
+      if (spot.kind === "list") {
+        if (this.find(item.key)) return void 0;
+        const card = this.look.cards(spot.column)[spot.place.index];
+        return card ? { ...card.key, ...(card.id ?? card.key.id) !== void 0 && { id: card.id ?? card.key.id } } : void 0;
+      }
+      return spot.kind === "slot" && item.slot === null && item.drawnOn ? item.drawnOn.key : void 0;
     }
     /** A field at `spot`; one already open is finished first, as by a tap elsewhere. A rename's spot is the gap right before its own card. */
-    open(spot, renaming) {
+    open(given, renaming) {
       if (this.session.field) this.save(this.session.field);
-      const rename2 = renaming ? { item: renaming, home: this.newRun(spot), moved: false } : null;
+      const unfold = given.kind === "list" && !renaming ? given.unfold : void 0;
+      const spot = given.kind === "list" ? { kind: "list", column: given.column, place: given.place } : given;
+      const face = renaming ? this.faceOf(renaming, spot) : void 0;
+      const rename2 = renaming ? { item: renaming, home: this.newRun(spot), moved: false, ...face && { face } } : null;
       const project = renaming ? renaming.project?.link ?? null : this.projectAt(spot);
-      this.reset({ run: this.newRun(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename: rename2, section: false, project });
+      const run = this.newRun(spot);
+      this.reset({ run, text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename: rename2, section: false, project });
+      if (unfold) this.queue(run, { id: this.jobId(), kind: "unfold", run, key: unfold });
     }
     /** The project a field opened at `spot` starts with: its project's part in a list drawn by project, else the view's own. */
     projectAt(spot) {
@@ -4103,6 +4474,8 @@ ${text}`;
         }
         case "rename":
           return { method: "edit", args: [this.keyAt(job.home, job.item), job.draft] };
+        case "unfold":
+          return { method: "unfoldAbove", args: [job.key] };
         case "section": {
           const at = this.placeOf(job.column, placeOfGap(this.look.cards(job.column), { ...job.place, level: 0 }));
           return at.kind === "list" || at.kind === "day" ? { method: "createSection", args: [job.name, at] } : null;
@@ -4139,8 +4512,22 @@ ${text}`;
     /** Job `id` ended, written or not: its spot no longer follows the cards for it. */
     done(id) {
       const job = this.job(id);
+      if (job.kind === "unfold") this.unfolded(job);
       this.release(job.kind === "rename" ? job.home : job.run);
       this.session.jobs.splice(this.session.jobs.indexOf(job), 1);
+    }
+    /**
+     * The lists show the task unfolded: the field typing its subtask goes last among its subtasks there. Still folded away
+     * (the write failed), the field closes rather than type a subtask of the card it stood under.
+     */
+    unfolded(job) {
+      const run = this.run(job.run);
+      if (!run || this.session.field?.run !== job.run) return;
+      const at = this.find(job.key);
+      if (!at) return this.reset(null);
+      run.spot = { kind: "list", column: at.column, place: gapOfPlace(this.look.cards(at.column), { kind: "subtask", parent: job.key, before: null }) };
+      this.shifts = null;
+      this.changed();
     }
     run(id) {
       return this.session.runs[id];
@@ -4259,7 +4646,7 @@ ${text}`;
       if (this.blank(field.text)) this.reset(null);
       else {
         this.saveRename(field, rename2);
-        const under = list && this.under(list, rename2.item);
+        const under = list && !rename2.face && this.under(list, rename2.item);
         this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: this.projectAt(under) } : null);
       }
     }
@@ -4416,6 +4803,10 @@ ${text}`;
     if (link === null) return null;
     const name = projectName(link);
     return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link, note: null, canOpenNote: false, mark: true };
+  }
+  function faced(rename2) {
+    const { item, face } = rename2;
+    return face ? { ...item, key: face, id: face.id ?? item.id } : item;
   }
   function runsOf(field) {
     if (!field) return [];
@@ -4652,6 +5043,8 @@ ${text}`;
           collapsedMarker: s.collapsedMarker
         },
         priorities: s.priorities,
+        resultMark: s.resultMark,
+        defaultResultMark: DEFAULT_SETTINGS.resultMark,
         labelTag: s.labelTag,
         labels: s.labels,
         labelPaint: s.labelPaint,
@@ -4731,6 +5124,10 @@ ${text}`;
     async setZoomLevels(text) {
       const zoomLevels = parseZoomLevels(text);
       if (zoomLevels) await this.store.update({ zoomLevels });
+    }
+    async setResultMark(mark) {
+      const word = mark.trim();
+      if (usableResultMark(word, usableLevels(this.settings.priorities).map((l) => l.prefix)) !== null) await this.store.update({ resultMark: word });
     }
     async setProjectTag(tag) {
       const bare2 = tag.trim().replace(/^#/, "");
@@ -4828,201 +5225,6 @@ ${text}`;
     if (typeof value !== "number" || !Number.isFinite(value)) return null;
     const whole = Math.round(value);
     return whole >= bounds.min && whole <= bounds.max ? whole : null;
-  }
-
-  // core/domain/search.ts
-  var SNIPPET_LEAD = 24;
-  var ELLIPSIS = "…";
-  var SPACE_RE = /\s/;
-  var PUNCTUATION_RE = /[ -⁯⸀-⹿\\'!"#$%&()*+,\-./:;<=>?@[\]^_`{|}~]/;
-  var WORD_CHAR_RE = /[\p{L}\p{N}]/u;
-  var ACCENTS_RE = /[̀-ͯ]/g;
-  function foldedChar(char) {
-    const lower = char.toLowerCase();
-    const bare2 = lower.normalize("NFD").replace(ACCENTS_RE, "");
-    if (bare2.length === 1) return bare2;
-    return lower.length === 1 ? lower : char;
-  }
-  function folded(text) {
-    let out = "";
-    for (let i = 0; i < text.length; i++) out += foldedChar(text.charAt(i));
-    return out;
-  }
-  function insideWord(text, at) {
-    if (at === 0) return false;
-    const char = text.charAt(at);
-    const before = text.charAt(at - 1);
-    if (!WORD_CHAR_RE.test(char) || !WORD_CHAR_RE.test(before)) return false;
-    const startsCapital = char !== char.toLowerCase() && before === before.toLowerCase();
-    return !startsCapital;
-  }
-  var FuzzyQuery = class _FuzzyQuery {
-    constructor(length, words, letters2) {
-      this.length = length;
-      this.words = words;
-      this.letters = letters2;
-    }
-    /** Null for a query of spaces: it finds nothing. */
-    static of(query) {
-      const text = folded(query.trim());
-      if (text === "") return null;
-      const words = [];
-      let from = 0;
-      for (let i = 0; i < text.length; i++) {
-        const char = text.charAt(i);
-        if (!SPACE_RE.test(char) && !PUNCTUATION_RE.test(char)) continue;
-        if (from !== i) words.push(text.slice(from, i));
-        if (!SPACE_RE.test(char)) words.push(char);
-        from = i + 1;
-      }
-      if (from !== text.length) words.push(text.slice(from));
-      const letters2 = [...text].filter((char) => !SPACE_RE.test(char));
-      return new _FuzzyQuery(text.length, words, letters2);
-    }
-    /** The words in their order, failing that the letters in theirs. */
-    match(text) {
-      const lower = folded(text);
-      return this.matchPieces(this.words, text, lower, false) ?? this.matchPieces(this.letters, text, lower, true);
-    }
-    /** The words in their order only: letters scattered over a long text would find nearly anything. */
-    matchWords(text) {
-      return this.matchPieces(this.words, text, folded(text), false);
-    }
-    matchPieces(pieces, text, lower, letters2) {
-      if (pieces.length === 0) return null;
-      const found = [];
-      let at = 0;
-      let broken = 0;
-      for (const piece of pieces) {
-        const start = lower.indexOf(piece, at);
-        if (start < 0) return null;
-        const joined = letters2 && start === at;
-        if (!joined && insideWord(text, start)) broken++;
-        const last = found[found.length - 1];
-        if (last && last.end === start) last.end = start + piece.length;
-        else found.push({ start, end: start + piece.length });
-        at = start + piece.length;
-      }
-      return { score: this.score(found, broken, text.length), found };
-    }
-    /** Fewer pieces, fewer of them inside words, tighter, earlier and in a shorter text score higher. */
-    score(found, broken, textLength) {
-      const span = found[found.length - 1].end - found[0].start;
-      return -(found.length - 1) - broken / 10 - (span + 1 - this.length) / 100 - found[0].start / 1e3 - textLength / 1e4;
-    }
-  };
-  function matchParts(text, found) {
-    const parts = [];
-    let at = 0;
-    for (const piece of found) {
-      if (piece.start > at) parts.push({ text: text.slice(at, piece.start), match: false });
-      parts.push({ text: text.slice(piece.start, piece.end), match: true });
-      at = piece.end;
-    }
-    if (at < text.length) parts.push({ text: text.slice(at), match: false });
-    return parts;
-  }
-  var EMBED_RE = /!\[\[[^\]]*\]\]|!\[[^\]]*\]\([^)]*\)/g;
-  var BLOCK_MARK_RE = /^\s*(?:>\s?)*\s*(?:#{1,6}\s+|(?:[-*+]|\d+[.)])\s+(?:\[.\]\s+)?)?/;
-  var LITERAL_RE = /`([^`]*)`|\\(.)/gu;
-  var EMPHASIS_RE = /(\*\*|~~|==|\*|(?<![\p{L}\p{N}])__|(?<![\p{L}\p{N}])_)(?=\S)(.+?)(?<=\S)\1(?![\p{L}\p{N}])/gu;
-  function withoutEmphasis(text) {
-    let out = text;
-    for (let before = ""; before !== out; ) {
-      before = out;
-      out = out.replace(EMPHASIS_RE, "$2");
-    }
-    return out;
-  }
-  function plainInline(text) {
-    let out = "";
-    let at = 0;
-    for (const m of text.matchAll(LITERAL_RE)) {
-      out += plainText(withoutEmphasis(text.slice(at, m.index)));
-      out += m[1] ?? m[2];
-      at = m.index + m[0].length;
-    }
-    return out + plainText(withoutEmphasis(text.slice(at)));
-  }
-  function plainDescription(markdown) {
-    return plainInline(
-      markdown.split("\n").map((line) => line.replace(BLOCK_MARK_RE, "")).join(" ").replace(EMBED_RE, "")
-    ).replace(/\s+/g, " ").trim();
-  }
-  function snippetParts(text, found) {
-    const first = found[0].start;
-    if (first <= SNIPPET_LEAD) return matchParts(text, found);
-    const tail = text.slice(first - SNIPPET_LEAD, first);
-    const space = tail.indexOf(" ");
-    const lead = space >= 0 && space < tail.length - 1 ? tail.slice(space + 1) : tail;
-    const cut = first - lead.length;
-    const shifted = found.map((piece) => ({ start: piece.start - cut + 1, end: piece.end - cut + 1 }));
-    return matchParts(ELLIPSIS + text.slice(cut), shifted);
-  }
-
-  // core/application/taskItems.ts
-  function progressOf(entry) {
-    if (entry.subtasks.length === 0) return null;
-    const counted = entry.subtasks.filter((s) => s.task.status !== "cancelled");
-    return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
-  }
-  var NO_LEVELS = { levelOf: () => null, labelsOf: () => [], projectOf: () => null };
-  function itemLevels(levels, labels, projectOf = () => null) {
-    return {
-      levelOf: (prefix) => levels.find((l) => l.prefix === prefix) ?? null,
-      labelsOf: (names) => labels.filter((l) => names.includes(l.name)),
-      projectOf
-    };
-  }
-  function toItem(entry, today, levels = NO_LEVELS, parent = null, boundary = DayBoundary.MIDNIGHT) {
-    const marks = marksOfTask(entry.task);
-    const choices = markChoices(marks);
-    const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
-    const labels = levels.labelsOf(marks.labels);
-    const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary));
-    const description = descriptionMarkdown(entry);
-    return {
-      id: entry.id,
-      key: keyOf(entry),
-      text: entry.task.text,
-      title: plainText(entry.task.text),
-      status: entry.task.status,
-      dueDate: entry.task.dueDate,
-      slot: entry.task.slot,
-      durationMin: entry.task.slot && entry.task.slot.end !== null ? entry.task.slot.end - entry.task.slot.start : null,
-      reminder: entry.task.reminder,
-      repeat: entry.task.repeat?.rule ?? null,
-      open: isOpen(entry.task.status),
-      repeatable: repeatable(entry),
-      priority,
-      labels,
-      colors: markColors(priority, labels),
-      group: entry.group,
-      project: levels.projectOf(entry.project),
-      list: entry.section,
-      isSubtask: entry.path.length > 0,
-      day: dayOfTask(entry.section, entry.task, today),
-      repeatDay: repeatDay(dayOf(entry.task, boundary), today),
-      can: {
-        postpone: canPostpone(entry.section),
-        removeDue: canRemoveDue(entry.task.dueDate, today),
-        remind: canRemind(entry.task.slot),
-        setPriority: choices.priority,
-        setLabels: choices.labels,
-        stop: entry.task.repeat !== null && repeatable(entry),
-        addDescription: description === null,
-        fold: hasOpenSubtask(entry),
-        resize: entry.task.slot !== null,
-        setProject: entry.path.length === 0
-      },
-      subtasks: allSubtasks.filter((sub) => sub.open),
-      allSubtasks,
-      progress: progressOf(entry),
-      collapsed: entry.task.collapsed && hasOpenSubtask(entry),
-      description,
-      parentText: parent?.task.text ?? null,
-      parentKey: parent ? keyOf(parent) : null
-    };
   }
 
   // core/application/TimelineSpans.ts
@@ -5243,7 +5445,7 @@ ${text}`;
       const fuzzy = FuzzyQuery.of(query);
       if (!fuzzy || !s) return [];
       const { doc, today } = s;
-      const item = this.itemOf(today);
+      const item = this.itemOf(today, this.scopeAll(), doc);
       const ranked = [];
       const index = this.index();
       const visit = (entry) => {
@@ -5255,8 +5457,9 @@ ${text}`;
         const projectText = entry.project === null || entry.path.length > 0 ? "" : index.refOf(entry.project)?.name ?? projectName(entry.project);
         const project2 = projectText === "" ? null : fuzzy.matchWords(projectText);
         if (title || description || project2) {
+          const found = item(entry);
           const hit = {
-            item: item(entry),
+            item: { ...found, card: ownCard(found) },
             title: title ? matchParts(titleText, title.found) : [],
             project: project2 ? matchParts(projectText, project2.found) : null,
             description: description ? snippetParts(descriptionText, description.found) : null
@@ -5272,6 +5475,14 @@ ${text}`;
         if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
       }
       return groups;
+    }
+    resultPageRead(keys, query) {
+      return { reads: true, answer: (s) => this.resultPage(s, keys, query) };
+    }
+    /** The Add to result page for the tasks `keys` names, `query` typed in its search. */
+    resultPage({ doc }, keys, query) {
+      const index = this.index();
+      return resultPage(doc, keys.map((key) => this.rules.entryOf(doc, key)), query, (link) => index.refOf(link)?.name ?? projectName(link));
     }
     screenOf({ doc, today }, item) {
       const top = item.isSubtask ? doc.find(item.key.section, item.key.index, []) : void 0;
@@ -5299,7 +5510,7 @@ ${text}`;
       return keys.map((key) => {
         const entry = this.rules.entryOf(doc, key);
         const parent = key.path.length > 0 ? doc.find(key.section, key.index, key.path.slice(0, -1)) ?? null : null;
-        return toItem(entry, today, levels, parent);
+        return toItem(entry, today, levels, parent, void 0, resultAbove(doc, entry));
       });
     }
     /** The task at `place` in `doc` as the UI sees it, with the task it sits under; null when none stands there. */
@@ -5307,7 +5518,7 @@ ${text}`;
       const entry = doc.find(place.section, place.index, place.path);
       if (!entry) return null;
       const parent = place.path.length > 0 ? doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null : null;
-      return toItem(entry, today, this.itemLevels(this.scopeAll()), parent, this.rules.moment().boundary);
+      return toItem(entry, today, this.itemLevels(this.scopeAll()), parent, this.rules.moment().boundary, resultAbove(doc, entry));
     }
     /** The task's line in the file once tidied for today, from 0. */
     lineOfRead(key) {
@@ -5346,11 +5557,11 @@ ${text}`;
     }
     menu(item, from, screen) {
       const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-      return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectNotes());
+      return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectNotes(), this.rules.marksResults());
     }
     bulkMenu(picked, screen) {
       const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-      return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectNotes());
+      return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectNotes(), this.rules.marksResults());
     }
     carried(lifted, picked) {
       return carriedWith(lifted, picked);
@@ -5374,10 +5585,11 @@ ${text}`;
     timeline() {
       return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
     }
-    itemOf(today, scope = this.scopeAll()) {
+    /** The item of a task, its subtasks below it; with `doc`, the result it is a step of too (a subtask's). */
+    itemOf(today, scope = this.scopeAll(), doc) {
       const levels = this.itemLevels(scope);
       const { boundary } = this.rules.moment();
-      return (entry) => toItem(entry, today, levels, null, boundary);
+      return (entry) => toItem(entry, today, levels, null, boundary, doc ? resultAbove(doc, entry) : null);
     }
     itemLevels(scope) {
       const settings = this.settings.get();
@@ -5492,9 +5704,9 @@ ${text}`;
     priorityLevels() {
       return usableLevels(this.settings.get().priorities);
     }
-    /** A title of nothing but a priority is blank too. */
+    /** A title of nothing but a priority, or the result mark, is blank too. */
     isBlank(text) {
-      return isBlankTitle(text, this.priorityLevels().map((l) => l.prefix));
+      return isBlankTitle(withoutResultMark(text, markersOf(this.settings.get()).result ?? null), this.priorityLevels().map((l) => l.prefix));
     }
     read(text, at = this.moment()) {
       const { settings, today, boundary } = at;
@@ -5675,6 +5887,29 @@ ${text}`;
       if (keys.length === 0) return null;
       if (keys.length === 1) return (doc) => setProject(doc, this.entryOf(doc, keys[0]), project);
       return this.applyAll(keys.map((key) => ({ key, change: { kind: "project", project } })));
+    }
+    /** Make result, or Make task. */
+    setResult(key, result) {
+      if (result && !this.marksResults()) return null;
+      return (doc) => setResult(doc, this.entryOf(doc, key), result);
+    }
+    /** The tasks become the last steps of `result`; null for none. A result no longer open, or no longer a result, is stale. */
+    addToResult(keys, result) {
+      if (keys.length === 0) return null;
+      return (doc) => {
+        const target = this.entryOf(doc, result);
+        if (!target.task.result || !isOpen(target.task.status)) throw new StaleTaskError();
+        return addToResult(doc, keys.map((key) => this.entryOf(doc, key)), target);
+      };
+    }
+    /** A new result named as typed, at the first task's place, the tasks its steps; null for none or a blank name. */
+    newResult(keys, name) {
+      if (keys.length === 0 || this.isBlank(name) || !this.marksResults()) return null;
+      return (doc, _today, _settings, boundary) => newResult(doc, keys.map((key) => this.entryOf(doc, key)), name, boundary);
+    }
+    /** The settings give a usable result mark: a task can be made a result. */
+    marksResults() {
+      return markersOf(this.settings.get()).result !== void 0;
     }
     setReminder(key, reminder) {
       return (doc) => setReminder(doc, this.entryOf(doc, key), reminder);
@@ -6062,6 +6297,22 @@ ${text}`;
     }
     setProject(keys, project) {
       return nothing(this.rules.setProject(keys, project));
+    }
+    setResult(key, result) {
+      return nothing(this.rules.setResult(key, result));
+    }
+    addToResult(keys, result) {
+      return nothing(this.rules.addToResult(keys, result));
+    }
+    /** The new result's key and id, as the file stands after the write. */
+    newResult(keys, name) {
+      return {
+        operation: this.rules.newResult(keys, name),
+        answer: (change) => {
+          const created = change?.after.insertedSince(change.before);
+          return created ? { key: keyOf(created), id: created.id } : null;
+        }
+      };
     }
     setReminder(key, reminder) {
       return nothing(this.rules.setReminder(key, reminder));
@@ -6643,6 +6894,10 @@ ${text}`;
     setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps)),
     setProject: (c, [keys, project]) => c.run(c.writes.setProject(keys, project ?? null)),
     projectNotes: (c) => c.reads.projectNotes(),
+    setResult: (c, [key, result]) => c.run(c.writes.setResult(key, result === true)),
+    resultPage: (c, [keys, query]) => c.ask(c.reads.resultPageRead(keys, query ?? "")),
+    addToResult: (c, [keys, result]) => c.run(c.writes.addToResult(keys, result)),
+    newResult: (c, [keys, name]) => c.run(c.writes.newResult(keys, name)),
     setGrouping: (c, [list, on]) => c.keepGrouping(withGrouping(c.grouping, list, on)),
     toggleFold: (c, [list, key]) => c.keepGrouping(withFoldToggled(c.grouping, list, key)),
     setReminder: (c, [key, reminder]) => c.run(c.writes.setReminder(key, reminder)),
@@ -6796,6 +7051,7 @@ ${text}`;
     "removeLevel",
     "addLevel",
     "moveLevel",
+    "setResultMark",
     "setLabelTag",
     "setLabelPaint",
     "setCardHeight",

@@ -47,7 +47,8 @@ export function showWhole(copy: HTMLElement, size: Size, room: Room): Size {
 	const title = copy.querySelector<HTMLElement>(".tc-card-title")!;
 	copy.classList.add("is-whole");
 	const body = getComputedStyle(copy.querySelector(".tc-block-card") ?? copy);
-	const height = Math.max(size.height, Math.ceil(title.getBoundingClientRect().height + parseFloat(body.paddingTop) + parseFloat(body.paddingBottom)));
+	const lines = copy.querySelector<HTMLElement>(".tc-card-lines") ?? title;
+	const height = Math.max(size.height, Math.ceil(lines.getBoundingClientRect().height + parseFloat(body.paddingTop) + parseFloat(body.paddingBottom)));
 	copy.style.height = px(height);
 	return { width, height };
 }

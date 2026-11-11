@@ -1,4 +1,4 @@
-import { type GroupName, keyId, type MenuStatusId, type PickedTask, type TaskItem, type TaskKey, type TaskMenuModel } from "../../core/application/contracts";
+import { type GroupName, keyId, type MenuStatusId, type PickedTask, type ResultPage, type TaskItem, type TaskKey, type TaskMenuModel } from "../../core/application/contracts";
 import { carriesMany, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
 import { el } from "./dom";
@@ -37,6 +37,12 @@ export interface BulkDeps {
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void>;
 	/** «New project…» named `name` for `keys` (`TaskService.newProject`). */
 	newProject(keys: readonly TaskKey[], name: string): Promise<void>;
+	/** The Add to result page for `keys`, `query` typed in its search field (`TaskService.resultPage`). */
+	resultPage(keys: readonly TaskKey[], query: string): Promise<ResultPage>;
+	/** The tasks to the end of `result`'s steps (`TaskService.addToResult`), and resolves once the screen shows them. */
+	addToResult(keys: readonly TaskKey[], result: TaskKey): Promise<void>;
+	/** «New result…» named `name` for `keys` (`TaskService.newResult`). */
+	newResult(keys: readonly TaskKey[], name: string): Promise<void>;
 	/** ⌘-click is for the desktop; on the phone only Select tasks picks. */
 	desktop(): boolean;
 	/** ⌘ on a Mac, Ctrl elsewhere. */
@@ -204,6 +210,9 @@ export class BulkController {
 				toSection: (name) => done((picked) => this.deps.toSection(picked, name)),
 				setProject: (project) => done((picked) => this.deps.setProject(picked, project)),
 				newProject: (name) => done((picked) => this.deps.newProject(picked, name)),
+				resultPage: (query) => this.deps.resultPage(keys(), query),
+				addToResult: (result) => done((picked) => this.deps.addToResult(picked, result)),
+				newResult: (name) => done((picked) => this.deps.newResult(picked, name)),
 				remove: () => done((picked) => this.deps.remove(picked)),
 			},
 			onClose: () => (this.menu = null),

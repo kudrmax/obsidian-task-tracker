@@ -190,6 +190,8 @@ final class BoardModel {
     var newSection: TaskItem?
     /// «New project…» picked on a Project page: the alert asks the name for these tasks or for the quick entry's field.
     var newProjectFor: NewProjectAsk?
+    /// The tasks whose Add to result page is open.
+    var resultFor: ResultAsk?
     var fullScreen: [TaskItem] = []
     /// The full screen opened by Description (Add description): its page opens with the caret in the description.
     var describing: String?
@@ -850,6 +852,34 @@ final class BoardModel {
         endSelection()
     }
 
+    // MARK: Results
+
+    /// «Make result» or «Make task» (`MenuResult.toggle`).
+    func setResult(_ item: TaskItem, _ result: Bool) async {
+        await write("tasks.setResult", [item.key.json, .bool(result)])
+    }
+
+    /// The Add to result page for the tasks, the results whose title holds `query` (the core searches).
+    func resultPage(_ items: [TaskItem], query: String) async -> ResultPage? {
+        try? await read("tasks.resultPage", [keys(items), .string(query)])
+    }
+
+    /// A result picked on the page: the tasks become its last steps. The ticked one writes nothing, as the core says.
+    func addToResult(_ items: [TaskItem], _ option: ResultOption) async {
+        await write("tasks.addToResult", [keys(items), option.result.key.json])
+        endSelection()
+    }
+
+    /// A name New result… would write nothing for (the core's `tasks.isBlank`).
+    func isBlank(_ name: String) -> Bool { board.isBlank(name) }
+
+    /// «New result…» named `name`: the core writes it at the first task's place, the tasks its steps; a blank name writes
+    /// nothing.
+    func newResult(_ items: [TaskItem], _ name: String) async {
+        await write("tasks.newResult", [keys(items), .string(name)])
+        endSelection()
+    }
+
     /// «New project…» on a Project page: the name is asked; the quick entry's field keeps its keyboard's place meanwhile.
     func askNewProject(_ target: NewProjectAsk.Target) {
         if case .entry = target { entry.paused = true }
@@ -1340,7 +1370,9 @@ final class BoardModel {
     /// by the finger's `x` (`rules.levelAt`); the place shown holds until the finger is well past it.
     func placeUnder(_ column: BoardColumn, cards: [PlacedCard], heads: [PlacedHead], at point: CGPoint, grab: CGFloat?, width: CGFloat, held: JSONValue?) -> JSONValue? {
         let inset = Double(CardMetrics.columnInset)
-        let y = grab.flatMap { try? board.carriedMiddle(y: Double(point.y), grab: Double($0), cardHeight: Double(CardMetrics.height)) } ?? Double(point.y)
+        // A folded result's card of two lines is held by its own middle.
+        let carried = carry.flatMap { $0.from == "timeline" ? nil : $0.item }.map { CardFace($0.card).twoLines ? CardMetrics.twoLineHeight : CardMetrics.height } ?? CardMetrics.height
+        let y = grab.flatMap { try? board.carriedMiddle(y: Double(point.y), grab: Double($0), cardHeight: Double(carried)) } ?? Double(point.y)
         do {
             let level = try board.levelAt(x: Double(point.x), left: inset, width: Double(width) - 2 * inset, indent: Double(CardMetrics.indent))
             let hold = held ?? carry.flatMap { homeGap($0.id, in: column) } ?? .null
@@ -1829,26 +1861,48 @@ final class BoardModel {
     /// The card's menu as UIKit draws it, read from the screen as it stands. `later` holds a row that opens a sheet or a
     /// page until the menu has gone. Over the core's rows, as the plugin shows them over its menu: the start of the task's
     /// description, and, for a card on the calendar (`from: "timeline"`), its open subtasks, each opening its own menu.
-    func cardMenu(_ item: TaskItem, from: String = "list", later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
+    /// A result's card shows its next step (`CardFace.step`): a tap on the card opens the step's menu, a tap on the result's
+    /// own line over it (`over`) the result's (results, point 5); on the calendar the step's, the result's open subtasks
+    /// above it as for any task (point 8).
+    func cardMenu(_ card: BoardCard, from: String = "list", over: Bool = false, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
+        let item = over ? card.item : card.face.step ?? card.item
         guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        let nodes = lead(item, from: from) + TaskMenu(items: [item], menu: menu, model: self, selectsText: true).nodes
+        let nodes = lead(item, stack: card.item, from: from) + TaskMenu(items: [item], menu: menu, model: self, selectsText: true).nodes
         return MenuNode.uiMenu(nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
     }
 
-    /// What the plugin shows between a card and its menu, as the menu's first groups.
-    private func lead(_ item: TaskItem, from: String) -> [MenuNode] {
+    /// What the plugin shows between a card and its menu, as the menu's first groups: `item`'s description, and on the
+    /// calendar the open subtasks of the card's task (`stack`).
+    private func lead(_ item: TaskItem, stack: TaskItem, from: String) -> [MenuNode] {
         var lead: [MenuNode] = []
         if let peek = descriptionPeek(item) { lead.append(.group(row: false, children: peek)) }
-        if from == "timeline", !item.subtasks.isEmpty {
-            lead.append(.group(row: false, children: item.subtasks.map { subtask in
-                .deferred(title: subtask.title, symbol: subtask.closed ? "checkmark.circle" : "circle", subtitle: nil) { [weak self] in
-                    guard let self, let menu = await self.menu(for: subtask, from: "stack") else { return [] }
-                    return TaskMenu(items: [subtask], menu: menu, model: self).nodes
-                }
-            }))
+        if from == "timeline", !stack.subtasks.isEmpty {
+            lead.append(.group(row: false, children: stack.subtasks.map(stackRow)))
         }
         return lead
+    }
+
+    /// A subtask's row over a calendar card's menu, opening its own menu. A folded result among them follows its card's two
+    /// taps (results, point 5): the row is its step, whose menu it opens, the result's title under it; that menu starts with
+    /// the result's own row, which opens the result's menu.
+    private func stackRow(_ subtask: TaskItem) -> MenuNode {
+        let symbol = subtask.closed ? "checkmark.circle" : "circle"
+        guard let step = subtask.card.step, let over = subtask.card.over else {
+            return .deferred(title: subtask.card.title, symbol: symbol, subtitle: nil) { [weak self] in
+                await self?.stackMenu(subtask) ?? []
+            }
+        }
+        return .deferred(title: subtask.card.title, symbol: symbol, subtitle: over) { [weak self] in
+            guard let self else { return [] }
+            let result: MenuNode = .deferred(title: over, symbol: "scope", subtitle: nil) { [weak self] in await self?.stackMenu(subtask) ?? [] }
+            return [.group(row: false, children: [result])] + (await self.stackMenu(step))
+        }
+    }
+
+    private func stackMenu(_ item: TaskItem) async -> [MenuNode] {
+        guard let menu = await menu(for: item, from: "stack") else { return [] }
+        return TaskMenu(items: [item], menu: menu, model: self).nodes
     }
 
     /// The start of a task's description, as the plugin's peek: its lines as they read (links by their words, no
@@ -2027,6 +2081,14 @@ final class BoardModel {
 
 extension Array {
     subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
+}
+
+/// The Add to result page asked for these tasks.
+struct ResultAsk: Identifiable {
+    let id = UUID()
+    let items: [TaskItem]
+    /// The menu row's words, the page's title: «Add to result».
+    let title: String
 }
 
 /// «New project…» asked: for which tasks, or for the quick entry's field.
