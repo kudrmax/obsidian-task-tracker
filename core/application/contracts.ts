@@ -59,13 +59,13 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
 export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
-export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+export { placeOfList, placeShowing, SCREEN_PLACES, SHOWN_LISTS, shownLists, SWIPE_FLICK_SPEED, swipeLanding, WHEEL_PLACES, type ScreenAt, type ScreenPlace, type ScreenSpot, type WheelAt, type WheelPlace, type WheelSpot } from "./screenPlaces";
 /**
  * The copy of a pressed card that shows its whole title: `wholeWidth(card, room)` how wide it grows (null: the card shows
  * its title whole and is lifted itself), `grownStart(start, size, grown, room, margin)` where it starts on one axis.
  */
 export { grownStart, type GrownWidth, type TitleFit, type WholeRoom, wholeWidth } from "./wholeCard";
-import type { ScreenAt as ScreenAtOf } from "./screenPlaces";
+import type { ScreenAt as ScreenAtOf, WheelAt as WheelAtOf } from "./screenPlaces";
 /** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
 export { SectionNameEntry } from "./SectionNameEntry";
 /** What a task menu's repeat page writes: a rule changed there as the menu closes, unless it is the task's own again; Remove at once. */
@@ -862,8 +862,10 @@ export interface ProjectsRow {
 	readonly depth: number;
 	/** Drawn as a tile (depth 0), else as a line of text. */
 	readonly tile: boolean;
-	/** The project waits (grey name): its open tasks only in Inbox and Backlog, or none yet. */
+	/** The project waits: its open tasks only in Inbox and Backlog, or none yet. */
 	readonly waiting: boolean;
+	/** Its name is drawn grey: a waiting project, a done one, No project and Done. */
+	readonly muted: boolean;
 	readonly status: ProjectStatus | null;
 	/** Filled light: the chosen node. */
 	readonly selected: boolean;
@@ -1123,10 +1125,13 @@ export interface TaskService {
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void>;
 	/**
 	 * A project of the Project page tapped: put last on every task that lacks it, or taken off them all when every one has
-	 * it; a subtask's key names its top task. One write.
+	 * it; a subtask's key names its top task. One write; each task as it then stands, in the order given, its key fresh;
+	 * null for one gone (as `toggleLabel`).
 	 */
-	toggleProject(keys: readonly TaskKey[], name: string): Promise<void>;
-	/** The projects of the tree, in its order: stub until the frontends read the Project page's options. */
+	toggleProject(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]>;
+	/** The projects of the tree read last, in its order, the tasks' own in it: what the quick entry's Project button offers. */
+	projects(): readonly ProjectRef[];
+	/** `projects()` under its old name. Stub until the frontends drop it. */
 	projectNotes(): readonly ProjectRef[];
 	/**
 	 * «New project…» named `name` (`cleanProjectName`): a project at the top of the tree, last, and `keys` get it, in one
@@ -1157,6 +1162,8 @@ export interface TaskService {
 	 * branch stays as it is). Kept on the device.
 	 */
 	tapProjectNode(node: ProjectsNodeId): Promise<void>;
+	/** A folded branch opened without choosing its node: a card held over the row. Done opens its done projects. Kept on the device. */
+	unfoldProjectNode(node: ProjectsNodeId): Promise<void>;
 	/** The node chosen, unfolding the branches above it so its row shows: search's path, the card's folder mark. Kept on the device. */
 	selectProjectNode(node: ProjectsNodeId): Promise<void>;
 	/** The segment over the tasks: By project or By stage. Kept on the device. */
@@ -1404,6 +1411,8 @@ export interface DayService {
 	step(date: LocalDate, days: number): LocalDate;
 	/** Where a swipe or a day arrow leads from `from`, a step back (-1) or on (1); null past the row's ends. */
 	stepScreen(from: ScreenAtOf, shift: -1 | 1): ScreenAtOf | null;
+	/** `stepScreen` on the wheel, Projects first, left of Inbox (`WHEEL_PLACES`): what a swipe or the wheel's arrows walk now. */
+	stepWheel(from: WheelAtOf, shift: -1 | 1): WheelAtOf | null;
 	/** Where the timeline of `date` opens: today on the now line, another day at the hour the settings name. */
 	openAt(date: LocalDate): DayOpening;
 	/**

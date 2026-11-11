@@ -443,7 +443,15 @@ export class DemoTaskService implements TaskService {
 
 	async toggleFold(): Promise<void> {}
 
-	async toggleProject(): Promise<void> {}
+	async toggleProject(): Promise<readonly null[]> {
+		return [];
+	}
+
+	projects(): readonly [] {
+		return [];
+	}
+
+	async unfoldProjectNode(): Promise<void> {}
 
 	async projectsScreen(): Promise<ProjectsView> {
 		return projectsView({ doc: null, tree: ProjectTree.EMPTY, today: this.today(), boundary: DayBoundary.MIDNIGHT, state: {}, item: () => { throw new Error("The board has no projects"); }, listName: (list) => list });

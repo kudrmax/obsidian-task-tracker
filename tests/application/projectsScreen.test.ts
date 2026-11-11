@@ -310,3 +310,67 @@ describe("the tree's gaps", () => {
 		expect(projectsGap(view.rows, gap, 2, lifted)).toEqual({ place: { parent: "Окружение в Сербии", before: "Свидание" }, depth: 1 });
 	});
 });
+
+describe("the one move to projects, whatever the first write is", () => {
+	const OLD = ["## Inbox", "", "- [ ] Позвонить 🗂️ [[Дружба]]", "- [ ] 🎯 iPhone", "\t- [ ] План", "", "## Now", "", "## Soon", "", "## Backlog", "", "## Done", ""].join("\n");
+	const notes = { list: () => [{ name: "Дружба", path: "Дружба.md", link: "Дружба" }, { name: "Спорт", path: "Спорт.md", link: "Спорт" }], onChange: () => () => undefined };
+	const service = (text: string) => {
+		const store = new InMemoryTaskFileStore(text);
+		return { store, svc: new TaskServiceImpl(store, new FakeSettingsStore(), clock, null, notes) };
+	};
+
+	it("is not stopped by a project made in the tree first: that one and the tasks' names stand before the move's notes", async () => {
+		const { store, svc } = service(OLD);
+		await svc.createProject("Новый", { parent: null, before: null });
+		expect(store.text).toBe(["## Inbox", "", "- [ ] Позвонить 🗂️ Дружба", "- [ ] iPhone", "\t- [ ] План", "", "## Projects", "", "- Дружба [[Дружба]]", "- Новый", "- Спорт [[Спорт]]", "", "## Now", "", "## Soon", "", "## Backlog", "", "## Done", ""].join("\n"));
+	});
+
+	it("is not stopped by a ## Projects written by hand: old fields and 🎯 lines are moved on the next write", async () => {
+		const { store, svc } = service(OLD.replace("## Now", "## Projects\n\n- Дружба\n\n## Now"));
+		await svc.setStatus((await svc.screen(T)).inbox[0].key, "inProgress");
+		expect(store.text).toContain("- [/] Позвонить 🗂️ Дружба\n- [ ] iPhone\n");
+		expect(store.text).toContain("## Projects\n\n- Дружба [[Дружба]]\n- Спорт [[Спорт]]\n\n## Now");
+	});
+
+	it("leaves a moved file's plain lines as they are", async () => {
+		const plain = "## Inbox\n\n- [ ] A #label/x 🗂️ Дружба\n- [ ] B\n\n## Projects\n\n- Дружба\n\n## Now\n\n## Soon\n\n## Backlog\n\n## Done\n";
+		const { store, svc } = service(plain);
+		await svc.setStatus((await svc.screen(T)).inbox[1].key, "inProgress");
+		expect(store.text).toBe(plain.replace("- [ ] B", "- [/] B"));
+	});
+});
+
+describe("the frontends' follow-ups", () => {
+	it("a held card unfolds a folded branch without choosing it", async () => {
+		const { svc } = setup();
+		await svc.tapProjectNode("project:Окружение в Сербии");
+		await svc.tapProjectNode("project:Окружение в Сербии");
+		await svc.tapProjectNode("all");
+		await svc.unfoldProjectNode("project:Окружение в Сербии");
+		const view = await svc.projectsScreen();
+		expect(row(view, "Окружение в Сербии")).toMatchObject({ folded: false, selected: false });
+		expect(view.selected).toBe("all");
+		await svc.unfoldProjectNode("done");
+		expect((await svc.projectsScreen()).rows.map((r) => r.title)).toContain("Самолёт");
+	});
+
+	it("toggleProject answers the tasks as they then stand", async () => {
+		const { svc } = setup();
+		const item = (await svc.screen(T)).backlog.find((i) => i.title === "Зал")!;
+		const [after] = await svc.toggleProject([item.key], "Дружба");
+		expect(after!.projects.map((p) => p.name)).toEqual(["Спорт", "Дружба"]);
+	});
+
+	it("the tree's projects, in its order, for the quick entry's button", async () => {
+		const { svc } = setup();
+		await svc.screen(T);
+		expect(svc.projects().map((p) => p.name).slice(0, 3)).toEqual(["Окружение в Сербии", "Где знакомиться", "Приложения для знакомств"]);
+	});
+
+	it("No project, Done, a waiting project and a done one are drawn grey; an active one is not", async () => {
+		const { svc } = setup();
+		await svc.unfoldProjectNode("done");
+		const view = await svc.projectsScreen();
+		expect(["All", "Окружение в Сербии", "Спорт", "No project", "Done", "Самолёт"].map((t) => row(view, t).muted)).toEqual([false, false, true, true, true, true]);
+	});
+});

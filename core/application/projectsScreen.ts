@@ -185,6 +185,7 @@ function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: Proje
 				depth,
 				tile: depth === 0,
 				waiting: status === "waiting",
+				muted: status !== "active",
 				status,
 				selected: sameNode(selected, projectNodeOf(node.name)),
 				hasBranch: branch.length > 0,
@@ -197,8 +198,7 @@ function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: Proje
 			if (!folded) walk(node.children, own, depth + 1, done);
 		}
 	};
-	const liveRoots = (nodes: readonly ProjectNode[]) => nodes;
-	walk(liveRoots(tree.roots), [], 0, false);
+	walk(tree.roots, [], 0, false);
 	rows.push(fixedRow("none", PROJECTS_WORDS.none, selected, false, true));
 	const doneTops = doneRoots(tree, statusOf);
 	const open = state.doneOpen === true;
@@ -226,6 +226,7 @@ function walkDone(placed: PlacedProject, rows: ProjectsRow[], state: ProjectsScr
 		depth,
 		tile: false,
 		waiting: false,
+		muted: true,
 		status: statusOf(node.name),
 		selected: sameNode(selected, projectNodeOf(node.name)),
 		hasBranch: node.children.length > 0,
@@ -239,7 +240,7 @@ function walkDone(placed: PlacedProject, rows: ProjectsRow[], state: ProjectsScr
 }
 
 function fixedRow(node: "all" | "none" | "done", title: string, selected: ProjectsNodeId, hasBranch: boolean, acceptsTask: boolean): ProjectsRow {
-	return { node, kind: node, title, depth: 0, tile: true, waiting: false, status: null, selected: selected === node, hasBranch, folded: false, project: null, acceptsTask, canLift: false, unfoldsOnHover: false };
+	return { node, kind: node, title, depth: 0, tile: true, waiting: false, muted: node !== "all", status: null, selected: selected === node, hasBranch, folded: false, project: null, acceptsTask, canLift: false, unfoldsOnHover: false };
 }
 
 /** The stage a task stands at: its list, Now as Today; Done for a closed one. */
@@ -370,6 +371,13 @@ export function tapped(state: ProjectsScreenState, tree: ProjectTree, node: Proj
 	const name = projectOfNode(node);
 	if (name === null || !tree.find(name)?.node.children.length) return state;
 	return withFold(state, name, !isFolded(state, name));
+}
+
+/** A node's branch opened without choosing it: a project's fold taken off, Done's done projects shown. */
+export function unfolded(state: ProjectsScreenState, node: ProjectsNodeId): ProjectsScreenState {
+	if (node === "done") return state.doneOpen ? state : { ...state, doneOpen: true };
+	const name = projectOfNode(node);
+	return name === null || !isFolded(state, name) ? state : withFold(state, name, false);
 }
 
 /** The node chosen with every branch above it open, so its row shows. */

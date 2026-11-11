@@ -205,6 +205,8 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "newProject", args: (s) => ["Дружба", [key(s, "Idea")]] },
 	{ method: "newProject", args: () => ["  ", []] },
 	{ method: "projectsScreen", args: () => [] },
+	{ method: "projects", args: () => [] },
+	{ method: "unfoldProjectNode", args: () => ["done"] },
 	{ method: "projectsScreen", args: () => [], text: null },
 	{ method: "tapProjectNode", args: () => ["project:Окружение"] },
 	{ method: "selectProjectNode", args: () => ["project:Окружение"] },
@@ -234,7 +236,7 @@ const TASK_CASES: readonly Case[] = [
 ];
 
 /** The service's menus offer the projects of the file it read last; the door's, of the text it is handed: the plugin reads the screen before any menu. */
-const READ_FIRST: ReadonlySet<string> = new Set(["menu", "bulkMenu", "projectNotes"]);
+const READ_FIRST: ReadonlySet<string> = new Set(["menu", "bulkMenu", "projectNotes", "projects"]);
 
 /** What the service answers, and the text it leaves; an error by its code. */
 async function serviceAnswer(c: Case, screen: ScreenView): Promise<{ result: unknown; text: string | null; steps: boolean }> {
@@ -515,6 +517,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("days.relation", LATER),
 		plain("days.step", T, -3),
 		plain("days.stepScreen", { mode: "calendar", date: T }, 1),
+		plain("days.stepWheel", { mode: "inbox", date: T }, -1),
 		plain("days.boundary"),
 		plain("days.openAt", LATER),
 		...["startHour", "hourAt", "offsetOfHour"].map((m) => plain(`boundary.${m}`, 3)),
@@ -615,6 +618,8 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.branchOf", [0, 1, 1], 1),
 		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
 		plain("rules.placeShowing", "day", "inbox"),
+		plain("rules.shownLists", "projects"),
+		plain("rules.placeOfList", "day", "projects"),
 		plain("rules.swipeLanding", 120, 200, 0.1),
 		plain("rules.listWidths", 0.5, 390, 16),
 		plain("rules.listShareOf", 187, 390, 16),

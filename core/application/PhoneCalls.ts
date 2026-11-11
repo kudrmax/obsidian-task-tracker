@@ -20,7 +20,7 @@ import { dayMonth, dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
-import { placeShowing, SCREEN_PLACES, type ScreenAt, SHOWN_LISTS, stepScreen, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { placeOfList, placeShowing, SCREEN_PLACES, type ScreenAt, SHOWN_LISTS, shownLists, stepScreen, stepWheel, SWIPE_FLICK_SPEED, swipeLanding, type WheelAt, WHEEL_PLACES } from "./screenPlaces";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
 	type CalendarEvent,
@@ -57,7 +57,7 @@ import { listView, sectionChoice } from "./sections";
 import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
-import { projectNodeOf, projectOfNode, projectsGap, projectsLevels, renamedIn, selected, tapped } from "./projectsScreen";
+import { projectNodeOf, projectOfNode, projectsGap, projectsLevels, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -419,6 +419,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps as A)),
 	setProject: (c, [keys, project]) => c.run(c.writes.setProject(keys as A, (project ?? null) as string | null)),
 	projectNotes: (c) => c.reads.projectNotes(),
+	projects: (c) => c.reads.projectNotes(),
+	unfoldProjectNode: (c, [node]) => c.keepProjectsScreen(unfolded(c.projectsScreen, node as string)),
 	toggleProject: (c, [keys, name]) => c.run(c.writes.toggleProject(keys as A, name as string)),
 	newProject: (c, [name, keys]) => {
 		const made = c.run(c.writes.newProject(name as string, (keys ?? []) as A));
@@ -517,6 +519,7 @@ const DAYS: Readonly<Record<string, Handler>> = {
 	relation: (c, [date]) => dayRelation(date as string, c.rules.today()),
 	step: (_c, [date, days]) => addDays(date as string, days as number),
 	stepScreen: (c, [from, shift]) => stepScreen(from as ScreenAt, shift as -1 | 1, c.rules.today()),
+	stepWheel: (c, [from, shift]) => stepWheel(from as WheelAt, shift as -1 | 1, c.rules.today()),
 	openAt: (c, [date]) => dayOpening(date as string, boundaryOf(c), c.rules.today(), c.now, c.settings.scrollToHour),
 	/** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
 	boundary: (c) => ({ startHour: boundaryOf(c).startHour }),
@@ -808,6 +811,8 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	gapBranch,
 	placeShowing,
 	swipeLanding,
+	shownLists,
+	placeOfList,
 	wholeWidth,
 	grownStart,
 	listWidths,
@@ -819,7 +824,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, WHEEL_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {

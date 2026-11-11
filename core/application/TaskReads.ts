@@ -119,12 +119,17 @@ export class TaskReads {
 		private readonly rules: TaskRules,
 		private readonly settings: SettingsStore,
 		private readonly clock: Clock,
-		private readonly projects: ProjectSource = NO_PROJECT_SOURCE,
+		private readonly source: ProjectSource = NO_PROJECT_SOURCE,
 	) {}
 
 	/** The projects of the tree read last, in its order: what the Project page offers. */
 	projectNotes(): readonly ProjectRef[] {
-		return new ProjectIndex(this.projects.tree()).known();
+		return new ProjectIndex(this.source.tree()).known();
+	}
+
+	/** The projects of the tree read last, in its order: the quick entry's Project button. */
+	projects(): readonly ProjectRef[] {
+		return this.projectNotes();
 	}
 
 	/** Grouping went: none. Stub until the frontends drop it. */
@@ -147,7 +152,7 @@ export class TaskReads {
 			tree,
 			today,
 			boundary,
-			state: this.projects.screen(),
+			state: this.source.screen(),
 			item: (entry) => toItem(entry, today, levels, null, boundary),
 			listName: (list) => this.listName(list),
 		});
@@ -461,7 +466,7 @@ export class TaskReads {
 
 	/** The projects the Project page offers: the tree read last, each with its depth. */
 	private projectChoices(): readonly { readonly project: ProjectRef; readonly depth: number }[] {
-		return new ProjectIndex(this.projects.tree()).known().map((project) => ({ project, depth: project.path.length - 1 }));
+		return new ProjectIndex(this.source.tree()).known().map((project) => ({ project, depth: project.path.length - 1 }));
 	}
 
 	private today(): LocalDate {
