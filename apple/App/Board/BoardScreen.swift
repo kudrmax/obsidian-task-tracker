@@ -462,16 +462,85 @@ struct BulkMenu<Label: View>: View {
 
     var body: some View {
         let items = model.pickedItems
-        Menu {
-            if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model).nodes, palette: { model.ink($0, dark: scheme == .dark) }) }
-        } label: {
-            label
+        // The label is drawn by SwiftUI (its glass); the menu is the system's UIKit menu over it, as a card's, so a page
+        // left open (the Project page's checks, a label set) is drawn again in place after each pick instead of closing
+        // back to the first page.
+        Button {} label: { label }
+            .allowsHitTesting(false)
+            .overlay {
+                BulkMenuButton(nodes: menu.map { TaskMenu(items: items, menu: $0, model: model).nodes } ?? [], palette: { model.ink($0, dark: scheme == .dark) })
+                    .accessibilityHidden(true)
+            }
+            .tint(.primary)
+            .disabled(items.isEmpty)
+            .task(id: BulkRead(picked: model.picked, file: model.snapshot?.tasksText)) { menu = items.isEmpty ? nil : await model.bulkMenu() }
+    }
+}
+
+/// The bulk menu's button: a clear UIKit button over the label, opening the menu on a tap; the menu, while up, drawn
+/// again in place on the page that shows (`MenuOpener.refresh`'s way), a row that opens a sheet run once it has gone.
+private struct BulkMenuButton: UIViewRepresentable {
+    let nodes: [MenuNode]
+    let palette: (String) -> UIColor?
+
+    func makeUIView(context: Context) -> MenuButton {
+        let button = MenuButton()
+        button.showsMenuAsPrimaryAction = true
+        button.preferredMenuElementOrder = .fixed
+        return button
+    }
+
+    func updateUIView(_ button: MenuButton, context: Context) {
+        button.isEnabled = !nodes.isEmpty
+        button.show(MenuNode.uiMenu(nodes, later: { [weak button] work in button?.later.append(work) }, palette: palette))
+    }
+
+    final class MenuButton: UIButton {
+        var later: [@MainActor () -> Void] = []
+        private var showing = false
+        /// The menu as last drawn, up or not: what a redraw compares with.
+        private var drawn: MenuShape?
+        /// The menu read while one was up: the button takes it once that one has gone. Setting the button's menu while it
+        /// is up puts the system's menu back on its first page under the finger.
+        private var pending: UIMenu?
+
+        func show(_ next: UIMenu) {
+            let shape = MenuOpener.shape(next)
+            let shown = drawn
+            drawn = shape
+            guard showing, let interaction = contextMenuInteraction else {
+                menu = next
+                return
+            }
+            pending = next
+            guard MenuShape.needsUpdate(shown: shown, next: shape) else { return }
+            interaction.updateVisibleMenu { visible in
+                guard let path = MenuShape.path(toPage: visible.title, in: shape) else { return visible }
+                return MenuOpener.page(at: path, in: next) ?? visible
+            }
         }
-        // The core's order, the plugin's, wherever the menu opens: Delete stays last even over the bottom bar.
-        .menuOrder(.fixed)
-        .tint(.primary)
-        .disabled(items.isEmpty)
-        .task(id: BulkRead(picked: model.picked, file: model.snapshot?.tasksText)) { menu = items.isEmpty ? nil : await model.bulkMenu() }
+
+        override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willDisplayMenuFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
+            super.contextMenuInteraction(interaction, willDisplayMenuFor: configuration, animator: animator)
+            showing = true
+        }
+
+        override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
+            super.contextMenuInteraction(interaction, willEndFor: configuration, animator: animator)
+            showing = false
+            if let pending {
+                menu = pending
+                self.pending = nil
+            }
+            let work = later
+            later = []
+            guard !work.isEmpty else { return }
+            if let animator {
+                animator.addCompletion { work.forEach { $0() } }
+            } else {
+                work.forEach { $0() }
+            }
+        }
     }
 }
 

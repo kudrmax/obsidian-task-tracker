@@ -172,7 +172,13 @@ final class ProjectsBoard {
     }
 
     /// The tree's sideways step and the pause over a folded row before it opens, the core's.
-    @ObservationIgnored lazy var measures: (indent: Double, hoverMs: Double) = (try? board.projectsMeasures()) ?? (12, 600)
+    @ObservationIgnored lazy var measures: (indent: Double, hoverMs: Double) = {
+        do {
+            return try board.projectsMeasures()
+        } catch {
+            fatalError("The core gives no Projects tree measures: \(error)")
+        }
+    }()
 
     /// Detach: the note's link taken off the project; the note stays in the vault.
     func detach(_ name: String) async {
