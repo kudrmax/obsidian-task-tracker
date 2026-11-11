@@ -43,10 +43,20 @@ describe("the nodes a held card chooses on the Projects screen", () => {
 		expect(drawn()).toBe("project:A");
 	});
 
-	it("chooses nothing going back when the node it was lifted on still shows", async () => {
+	it("puts nothing back, draws nothing, when no choice is pending and the node it was lifted on still shows", () => {
 		const { choices, log } = screen("project:A");
+		expect(choices.backTo("project:A")).toBeNull();
+		expect(log).toEqual([]);
+	});
+
+	it("goes back after a hover that opened another node and is drawn", async () => {
+		const { choices, log, answer } = screen("project:A");
+		const hovering = choices.hover("project:B");
+		await Promise.resolve();
+		answer();
+		await hovering;
 		await choices.backTo("project:A");
-		expect(log).toEqual(["draw project:A"]);
+		expect(log).toEqual(["hover project:B", "draw project:B", "select project:A", "draw project:A"]);
 	});
 
 	it("has nothing to wait for when the drag was lifted elsewhere", () => {

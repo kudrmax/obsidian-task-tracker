@@ -41,10 +41,11 @@ export class ProjectsChoices {
 
 	/**
 	 * A drag lifted on `start` let go nowhere: once the choices before are drawn, `start` is chosen again if another node
-	 * shows. Null when the drag was lifted elsewhere: nothing to wait for.
+	 * shows. Null when there is nothing to put back: the drag was lifted elsewhere, or no choice is pending and `start`
+	 * is the node drawn.
 	 */
 	backTo(start: ProjectsNodeId | null): Promise<void> | null {
-		if (start === null) return null;
+		if (start === null || (!this.choosing && this.deps.selected() === start)) return null;
 		return this.queue(async () => {
 			if (this.deps.selected() !== start) await this.deps.select(start);
 		});

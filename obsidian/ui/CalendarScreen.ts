@@ -118,7 +118,6 @@ export class CalendarScreen extends Component {
 	private readonly tasksDrop = new TasksDrop(() => this.projects?.tasksShown ?? null);
 	/** The Projects screen's tasks as a list a card is dropped in, as a list column is. */
 	private projectsListDrop: ProjectsListDrop | null = null;
-	/** The rows each drag from the Projects screen carries and the node it was lifted on, read at the lift. */
 	/** The nodes a held card chooses, one after another, each drawn before the next. */
 	private readonly choices = new ProjectsChoices({
 		hover: (node) => this.deps.tasks.hoverProjectNode(node),
@@ -127,6 +126,7 @@ export class CalendarScreen extends Component {
 		selected: () => this.projects?.shown?.selected ?? null,
 		onError: (error) => this.reportFailure(error),
 	});
+	/** The rows each drag from the Projects screen carries and the node it was lifted on, read at the lift. */
 	private readonly carry = new ProjectsCarry({
 		rowOf: (card) => this.projects?.tasksList.rowOf(card),
 		selected: () => this.projects?.shown?.selected ?? null,
