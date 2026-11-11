@@ -117,6 +117,11 @@ export class TextComponent {
 		return this.inputEl.value;
 	}
 
+	setPlaceholder(placeholder: string): this {
+		this.inputEl.placeholder = placeholder;
+		return this;
+	}
+
 	onChange(listener: (value: string) => unknown): this {
 		this.inputEl.addEventListener("input", () => void listener(this.inputEl.value));
 		return this;

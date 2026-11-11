@@ -21,7 +21,7 @@ function fillParts(parent: HTMLElement, parts: readonly FoundPart[]): void {
  * title, else found in the description, the description's line.
  */
 function renderRow(parent: HTMLElement, hit: SearchHit): HTMLElement {
-	const card = renderTaskCard(parent, hit.item, { day: null, own: true });
+	const card = renderTaskCard(parent, hit.item, { day: null });
 	card.classList.add("tc-hit-card");
 	const title = card.querySelector<HTMLElement>(":scope > .tc-card-title");
 	if (!title) return card;

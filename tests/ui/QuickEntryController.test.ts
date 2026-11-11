@@ -128,6 +128,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		root,
 		tasks: {
 			projectNotes: () => projects,
+			unfoldAbove: async () => {},
 			newProject: async (name, keys) => {
 				newProjects.push({ name, keys });
 				return { name, link: name, note: `${name}.md`, canOpenNote: true, mark: true };
