@@ -7,7 +7,9 @@ export const PROJECTS_HEADING = "Projects";
 /** The mark of a folder on its tree line, a word of its own right after the name: `- Работа 🗃️`. */
 export const FOLDER_MARK = "🗃️";
 /** The folder's mark as a word of a tree line, with or without its variation selector. */
-const FOLDER_RE = /(^|\s)\u{1F5C3}\u{FE0F}?(?=\s|$)/gu;
+const FOLDER_RE = /(?:^|\s)\u{1F5C3}\u{FE0F}?(?=\s|$)/u;
+/** A note's link on a tree line, where the folder's mark is only text. */
+const LINK_RE = /(\[\[[^[\]]*\]\])/;
 
 /**
  * A project of the tree: its name, the link of the note attached to it (the text inside `[[…]]`), whether it is a folder
@@ -118,11 +120,14 @@ function frozen(node: Building): ProjectNode {
 	return { name: node.name, note: node.note, folder: node.folder, children: node.children.map(frozen) };
 }
 
-/** A line's project: its name, the note's link after it when one is attached, and the folder's mark anywhere; null for a line of nothing. */
+/**
+ * A line's project: its name, the note's link after it when one is attached, and the folder's mark as a word anywhere
+ * outside the link (taken out with the space before it, the rest of the line as typed); null for a line of nothing.
+ */
 function itemOf(line: string): { name: string; note: string | null; folder: boolean } | null {
-	const folder = FOLDER_RE.test(line);
-	FOLDER_RE.lastIndex = 0;
-	const body = folder ? line.replace(FOLDER_RE, "$1").replace(/\s+/g, " ").trim() : line;
+	const parts = line.split(LINK_RE);
+	const folder = parts.some((part, i) => i % 2 === 0 && FOLDER_RE.test(part));
+	const body = folder ? parts.map((part, i) => (i % 2 === 0 ? part.replace(new RegExp(FOLDER_RE.source, "gu"), "") : part)).join("").trim() : line;
 	const linked = NOTE_RE.exec(body);
 	const name = (linked ? linked[1] : body).trim() || (linked ? projectName(linked[2].split("|")[0]) : "");
 	return name === "" ? null : { name, note: linked ? linked[2] : null, folder };

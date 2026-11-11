@@ -955,7 +955,8 @@
   // core/domain/ProjectTree.ts
   var PROJECTS_HEADING = "Projects";
   var FOLDER_MARK = "🗃️";
-  var FOLDER_RE = /(^|\s)\u{1F5C3}\u{FE0F}?(?=\s|$)/gu;
+  var FOLDER_RE = /(?:^|\s)\u{1F5C3}\u{FE0F}?(?=\s|$)/u;
+  var LINK_RE2 = /(\[\[[^[\]]*\]\])/;
   var HEADING_RE = /^##\s+(.*?)\s*$/;
   var LIST_END_RE = /^#{1,2}(\s|$)/;
   var ITEM_RE = /^([ \t]*)[-*+][ \t]+(.*?)\s*$/;
@@ -1018,9 +1019,9 @@
     return { name: node.name, note: node.note, folder: node.folder, children: node.children.map(frozen) };
   }
   function itemOf(line) {
-    const folder = FOLDER_RE.test(line);
-    FOLDER_RE.lastIndex = 0;
-    const body = folder ? line.replace(FOLDER_RE, "$1").replace(/\s+/g, " ").trim() : line;
+    const parts = line.split(LINK_RE2);
+    const folder = parts.some((part2, i) => i % 2 === 0 && FOLDER_RE.test(part2));
+    const body = folder ? parts.map((part2, i) => i % 2 === 0 ? part2.replace(new RegExp(FOLDER_RE.source, "gu"), "") : part2).join("").trim() : line;
     const linked = NOTE_RE.exec(body);
     const name = (linked ? linked[1] : body).trim() || (linked ? projectName(linked[2].split("|")[0]) : "");
     return name === "" ? null : { name, note: linked ? linked[2] : null, folder };
@@ -1837,6 +1838,112 @@
     return groups.map((g) => ({ list, index: g.index, name: g.name, entries: [...g.index === ungrouped ? others : [], ...shown2.filter((e) => e.section === list && g.entries.includes(e))] })).filter((g, i) => g.entries.length > 0 || groups[i].heading && g.name !== null && groups[i].entries.length === 0);
   }
 
+  // core/domain/ProjectWrites.ts
+  var LEGACY_RESULT_MARK = "🎯";
+  function taskProjects(doc) {
+    return uniqueNames(doc.allTasks().flatMap((entry) => entry.task.projects));
+  }
+  function withTasksInTree(doc) {
+    const named = taskProjects(doc);
+    if (named.length === 0) return doc;
+    const tree = doc.projectTree();
+    const full = tree.withMissing(named);
+    return doc.hasProjectTree() && full === tree ? doc : doc.withProjectTree(full);
+  }
+  function notesOfOldFields(doc, notes, resultMark) {
+    const named = new Set(oldLines(doc, resultMark).flatMap((entry) => [...entry.raw.matchAll(OLD_LINK_RE)].map((m) => projectKey(projectName(m[1])))));
+    const linked = new Set(doc.projectTree().all().flatMap((p) => p.node.note === null ? [] : [projectKey(projectName(p.node.note.split("|")[0].split("#")[0]))]));
+    return notes.filter((note) => named.has(projectKey(note.name)) && !linked.has(projectKey(projectName(note.link))));
+  }
+  function attachedAny(doc) {
+    return doc.hasProjectTree() && doc.projectTree().all().some((p) => p.node.note !== null);
+  }
+  var OLD_LINK_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[([^[\]|#]+)/gu;
+  var OLD_FIELD_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[/u;
+  function oldLines(doc, resultMark) {
+    return flatten(doc.allTasks()).filter((entry) => OLD_FIELD_RE.test(entry.raw) || startsWithMark(entry.task.text, resultMark));
+  }
+  function awaitsMove(doc, notes, resultMark = LEGACY_RESULT_MARK) {
+    if (oldLines(doc, resultMark).length > 0) return true;
+    return !doc.hasProjectTree() && (notes.length > 0 || taskProjects(doc).length > 0);
+  }
+  function movedToProjects(doc, given, resultMark = LEGACY_RESULT_MARK) {
+    const notes = attachedAny(doc) ? notesOfOldFields(doc, given, resultMark) : given;
+    const byName2 = [...notes].sort((a, b) => projectKey(a.name) < projectKey(b.name) ? -1 : projectKey(a.name) > projectKey(b.name) ? 1 : 0);
+    let tree = doc.projectTree();
+    for (const note of byName2) {
+      const found = tree.find(note.name);
+      tree = found ? found.node.note === null ? tree.withNote(found.node.name, note.link) : tree : tree.added(note.name, { parent: null, before: null }, note.link);
+    }
+    tree = tree.withMissing(taskProjects(doc));
+    const prefixes = doc.priorityPrefixes();
+    const rewritten = doc.rewrittenLines(oldLines(doc, resultMark), (task) => {
+      if (!startsWithMark(task.text, resultMark)) return task;
+      const rest = task.text.slice(resultMark.length).trimStart();
+      return task.priority === null ? { ...task, ...priorityOfText(rest, prefixes) } : { ...task, text: rest };
+    });
+    return rewritten.withProjectTree(tree);
+  }
+  function startsWithMark(text, mark) {
+    return mark !== "" && text.startsWith(`${mark} `) && text.slice(mark.length).trim() !== "";
+  }
+  function renameProject(doc, from, to) {
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const renamed = tree.renamed(from, to);
+    if (renamed === tree) return doc;
+    const key = projectKey(from);
+    const named = flatten(doc.allTasks()).filter((entry) => entry.task.projects.some((p) => projectKey(p) === key));
+    const rewritten = doc.replaceAll(named.map((entry) => [entry, { ...entry.task, projects: uniqueNames(entry.task.projects.map((p) => projectKey(p) === key ? to : p)) }]));
+    return rewritten.withProjectTree(renamed);
+  }
+  function deleteProject(doc, name) {
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const deleted = tree.deleted(name);
+    if (deleted === tree) return doc;
+    const key = projectKey(name);
+    const named = flatten(doc.allTasks()).filter((entry) => entry.task.projects.some((p) => projectKey(p) === key));
+    const rewritten = doc.replaceAll(named.map((entry) => [entry, { ...entry.task, projects: entry.task.projects.filter((p) => projectKey(p) !== key) }]));
+    return rewritten.withProjectTree(deleted);
+  }
+  function addProject(doc, name, place) {
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const added = tree.added(name, place);
+    return added === tree ? doc : doc.withProjectTree(added);
+  }
+  function moveProject(doc, name, place) {
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const moved2 = tree.moved(name, place);
+    return moved2 === tree ? doc : doc.withProjectTree(moved2);
+  }
+  function hasOwnTasks(doc, name) {
+    const key = projectKey(name);
+    return doc.allTasks().some((entry) => entry.task.projects.some((p) => projectKey(p) === key));
+  }
+  function isFolder(doc, name) {
+    return name !== null && (doc.projectTree().find(name)?.node.folder ?? false);
+  }
+  function setProjectFolder(doc, name, folder) {
+    if (folder && hasOwnTasks(doc, name)) return doc;
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const changed2 = tree.withFolder(name, folder);
+    return changed2 === tree ? doc : doc.withProjectTree(changed2);
+  }
+  function setProjectNote(doc, name, note) {
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const changed2 = tree.withNote(name, note);
+    return changed2 === tree ? doc : doc.withProjectTree(changed2);
+  }
+  function swappedProjects(projects, from, to) {
+    const at = from === null ? -1 : projects.findIndex((p) => projectKey(p) === projectKey(from));
+    const has = to !== null && projects.some((p) => projectKey(p) === projectKey(to));
+    if (at < 0) return uniqueNames(to === null || has ? projects : [...projects, to]);
+    const swapped = projects.flatMap((p, i) => i !== at ? [p] : to === null || has ? [] : [to]);
+    return uniqueNames(swapped);
+  }
+  function projectHolder(doc, entry) {
+    return entry.path.length === 0 ? entry : doc.find(entry.section, entry.index, []);
+  }
+
   // core/domain/operations.ts
   var HOUR_MINUTES3 = 60;
   var MINUTE_MS = 6e4;
@@ -2031,11 +2138,11 @@
     const unsorted = isUndated(section);
     if (entry === null) {
       const { text, ...marks } = typed(doc, draft.text, draft.priority, draft.labels ?? []);
-      return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : slot ?? null, ...marks, projects: draftProjects(draft) ?? [] }), draft, today, boundary));
+      return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : slot ?? null, ...marks, projects: draftProjects(doc, draft, []) ?? [] }), draft, today, boundary));
     }
     if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
     const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-    const changed2 = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...same ? {} : { dueDate }, ...unsorted ? { slot: null } : {}, ...draftProjects(draft) !== void 0 && { projects: draftProjects(draft) } };
+    const changed2 = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...same ? {} : { dueDate }, ...unsorted ? { slot: null } : {}, ...draftProjects(doc, draft, entry.task.projects) !== void 0 && { projects: draftProjects(doc, draft, entry.task.projects) } };
     const edited = doc.replace(entry, withDraftRepeat(changed2, draft, today, boundary));
     if (same || entry.section === section) return edited;
     return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
@@ -2052,9 +2159,9 @@
   function draftMarks(doc, task, draft) {
     return typed(doc, draft.text, draft.priority, draft.labels ?? task.labels);
   }
-  function draftProjects(draft) {
-    if (draft.projects !== void 0) return uniqueNames(draft.projects);
-    return draft.project === void 0 ? void 0 : draft.project === null ? [] : [draft.project];
+  function draftProjects(doc, draft, had) {
+    const named = draft.projects !== void 0 ? draft.projects : draft.project === void 0 ? void 0 : draft.project === null ? [] : [draft.project];
+    return named === void 0 ? void 0 : uniqueNames(named.filter((name) => namesProject(had, name) || !isFolder(doc, name)));
   }
   function toEnd(doc, entry, section) {
     const prepared = isUndated(section) ? patch(doc, entry, { dueDate: null, slot: null }) : doc;
@@ -3562,112 +3669,6 @@ ${key.title}`.toLowerCase();
     return [...kept.join("\n").matchAll(BODY_TAG)].map((m) => m[1]).filter((tag) => !/^\d+$/.test(tag)).map((tag) => `#${tag}`);
   }
 
-  // core/domain/ProjectWrites.ts
-  var LEGACY_RESULT_MARK = "🎯";
-  function taskProjects(doc) {
-    return uniqueNames(doc.allTasks().flatMap((entry) => entry.task.projects));
-  }
-  function withTasksInTree(doc) {
-    const named = taskProjects(doc);
-    if (named.length === 0) return doc;
-    const tree = doc.projectTree();
-    const full = tree.withMissing(named);
-    return doc.hasProjectTree() && full === tree ? doc : doc.withProjectTree(full);
-  }
-  function notesOfOldFields(doc, notes, resultMark) {
-    const named = new Set(oldLines(doc, resultMark).flatMap((entry) => [...entry.raw.matchAll(OLD_LINK_RE)].map((m) => projectKey(projectName(m[1])))));
-    const linked = new Set(doc.projectTree().all().flatMap((p) => p.node.note === null ? [] : [projectKey(projectName(p.node.note.split("|")[0].split("#")[0]))]));
-    return notes.filter((note) => named.has(projectKey(note.name)) && !linked.has(projectKey(projectName(note.link))));
-  }
-  function attachedAny(doc) {
-    return doc.hasProjectTree() && doc.projectTree().all().some((p) => p.node.note !== null);
-  }
-  var OLD_LINK_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[([^[\]|#]+)/gu;
-  var OLD_FIELD_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[/u;
-  function oldLines(doc, resultMark) {
-    return flatten(doc.allTasks()).filter((entry) => OLD_FIELD_RE.test(entry.raw) || startsWithMark(entry.task.text, resultMark));
-  }
-  function awaitsMove(doc, notes, resultMark = LEGACY_RESULT_MARK) {
-    if (oldLines(doc, resultMark).length > 0) return true;
-    return !doc.hasProjectTree() && (notes.length > 0 || taskProjects(doc).length > 0);
-  }
-  function movedToProjects(doc, given, resultMark = LEGACY_RESULT_MARK) {
-    const notes = attachedAny(doc) ? notesOfOldFields(doc, given, resultMark) : given;
-    const byName2 = [...notes].sort((a, b) => projectKey(a.name) < projectKey(b.name) ? -1 : projectKey(a.name) > projectKey(b.name) ? 1 : 0);
-    let tree = doc.projectTree();
-    for (const note of byName2) {
-      const found = tree.find(note.name);
-      tree = found ? found.node.note === null ? tree.withNote(found.node.name, note.link) : tree : tree.added(note.name, { parent: null, before: null }, note.link);
-    }
-    tree = tree.withMissing(taskProjects(doc));
-    const prefixes = doc.priorityPrefixes();
-    const rewritten = doc.rewrittenLines(oldLines(doc, resultMark), (task) => {
-      if (!startsWithMark(task.text, resultMark)) return task;
-      const rest = task.text.slice(resultMark.length).trimStart();
-      return task.priority === null ? { ...task, ...priorityOfText(rest, prefixes) } : { ...task, text: rest };
-    });
-    return rewritten.withProjectTree(tree);
-  }
-  function startsWithMark(text, mark) {
-    return mark !== "" && text.startsWith(`${mark} `) && text.slice(mark.length).trim() !== "";
-  }
-  function renameProject(doc, from, to) {
-    const tree = doc.projectTree().withMissing(taskProjects(doc));
-    const renamed = tree.renamed(from, to);
-    if (renamed === tree) return doc;
-    const key = projectKey(from);
-    const named = flatten(doc.allTasks()).filter((entry) => entry.task.projects.some((p) => projectKey(p) === key));
-    const rewritten = doc.replaceAll(named.map((entry) => [entry, { ...entry.task, projects: uniqueNames(entry.task.projects.map((p) => projectKey(p) === key ? to : p)) }]));
-    return rewritten.withProjectTree(renamed);
-  }
-  function deleteProject(doc, name) {
-    const tree = doc.projectTree().withMissing(taskProjects(doc));
-    const deleted = tree.deleted(name);
-    if (deleted === tree) return doc;
-    const key = projectKey(name);
-    const named = flatten(doc.allTasks()).filter((entry) => entry.task.projects.some((p) => projectKey(p) === key));
-    const rewritten = doc.replaceAll(named.map((entry) => [entry, { ...entry.task, projects: entry.task.projects.filter((p) => projectKey(p) !== key) }]));
-    return rewritten.withProjectTree(deleted);
-  }
-  function addProject(doc, name, place) {
-    const tree = doc.projectTree().withMissing(taskProjects(doc));
-    const added = tree.added(name, place);
-    return added === tree ? doc : doc.withProjectTree(added);
-  }
-  function moveProject(doc, name, place) {
-    const tree = doc.projectTree().withMissing(taskProjects(doc));
-    const moved2 = tree.moved(name, place);
-    return moved2 === tree ? doc : doc.withProjectTree(moved2);
-  }
-  function hasOwnTasks(doc, name) {
-    const key = projectKey(name);
-    return doc.allTasks().some((entry) => entry.task.projects.some((p) => projectKey(p) === key));
-  }
-  function isFolder(doc, name) {
-    return name !== null && (doc.projectTree().find(name)?.node.folder ?? false);
-  }
-  function setProjectFolder(doc, name, folder) {
-    if (folder && hasOwnTasks(doc, name)) return doc;
-    const tree = doc.projectTree().withMissing(taskProjects(doc));
-    const changed2 = tree.withFolder(name, folder);
-    return changed2 === tree ? doc : doc.withProjectTree(changed2);
-  }
-  function setProjectNote(doc, name, note) {
-    const tree = doc.projectTree().withMissing(taskProjects(doc));
-    const changed2 = tree.withNote(name, note);
-    return changed2 === tree ? doc : doc.withProjectTree(changed2);
-  }
-  function swappedProjects(projects, from, to) {
-    const at = from === null ? -1 : projects.findIndex((p) => projectKey(p) === projectKey(from));
-    const has = to !== null && projects.some((p) => projectKey(p) === projectKey(to));
-    if (at < 0) return uniqueNames(to === null || has ? projects : [...projects, to]);
-    const swapped = projects.flatMap((p, i) => i !== at ? [p] : to === null || has ? [] : [to]);
-    return uniqueNames(swapped);
-  }
-  function projectHolder(doc, entry) {
-    return entry.path.length === 0 ? entry : doc.find(entry.section, entry.index, []);
-  }
-
   // core/application/projects.ts
   var NO_PROJECT = "No project";
   function projectTreeOf(doc) {
@@ -4258,10 +4259,16 @@ ${key.title}`.toLowerCase();
       this.reset({ run, text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename: rename2, section: false, project });
       if (unfold) this.queue(run, { id: this.jobId(), kind: "unfold", run, key: unfold });
     }
-    /** A project picked on the Project button (its name; null: No project); the field stays where it is. */
+    /**
+     * A project picked on the Project button (its name; null: No project); the field stays where it is. A folder is not
+     * taken (the field keeps its project), unless the renamed task carries it already.
+     */
     setProject(name) {
       const field = this.session.field;
-      if (field) this.reset({ ...field, project: name }, true);
+      if (!field) return;
+      const held = field.rename?.item.projects.some((p) => inProject(p.name, name)) ?? false;
+      if (!held && isFolderRef(name, this.tasks.projects?.() ?? [])) return;
+      this.reset({ ...field, project: name }, true);
     }
     type(text) {
       const field = this.session.field;
@@ -4675,6 +4682,9 @@ ${key.title}`.toLowerCase();
   function entryProject(link, known) {
     const ref = refOf(link, known);
     return { page: projectPage([ref ? [ref] : []], known.map((project) => ({ project, depth: project.path.length - 1 }))), lit: link !== null };
+  }
+  function isFolderRef(name, known) {
+    return name !== null && known.some((ref) => ref.folder && projectKey(ref.name) === projectKey(name));
   }
   function refOf(link, known) {
     if (link === null) return null;
@@ -5282,13 +5292,19 @@ ${key.title}`.toLowerCase();
   }
   function projectsTakes(view, cards, place) {
     if (!view.reorders) return false;
-    if (place.kind === "subtask") return sectionHolding(view, place.parent)?.takes ?? false;
+    if (place.kind === "subtask") return nestsUnder(view, place.parent);
     if (!(view.sections.find((s) => s.group === place.group)?.takes ?? true)) return false;
     const carried = cards.map((card) => itemOf2(view, card.key));
     return enters(carried, targetList(planOf(view, carried, place).anchor));
   }
-  function sectionHolding(view, key) {
-    return view.sections.find((s) => s.rows.some((row) => samePlace2(row.item.key, key))) ?? null;
+  function nestsUnder(view, key) {
+    for (const section of view.sections) {
+      const at = section.rows.findIndex((row) => samePlace2(row.item.key, key));
+      if (at < 0) continue;
+      const top = section.rows.slice(0, at + 1).reverse().find((row) => row.level === 0);
+      return section.takes && !(top?.item.projects.some((p) => p.folder) ?? false);
+    }
+    return false;
   }
   function projectsDropSteps(view, doc, entryOf, cards, place, today) {
     if (!view.reorders) throw new StaleTaskError();
@@ -6904,10 +6920,19 @@ ${key.title}`.toLowerCase();
         }
       };
     }
-    /** «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of nothing. */
+    /**
+     * «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of
+     * nothing and for a folder's name, which no task may be given: an answer is always a project to pick.
+     */
     newProject(name, keys) {
       const operation = this.rules.newProject(name, keys);
-      return { operation, answer: (change) => operation === null ? null : namedIn(change, this.rules.cleanName(name)) };
+      return {
+        operation,
+        answer: (change) => {
+          const made = operation === null ? null : namedIn(change, this.rules.cleanName(name));
+          return made === null || isFolder(change.after, made) ? null : made;
+        }
+      };
     }
     dropOnProject(cards, to) {
       return nothing(this.rules.dropOnProject(cards, to));
@@ -7788,7 +7813,11 @@ ${key.title}`.toLowerCase();
       c.write((text) => c.rules.change(text, c.rules.placeNew(title, null, { kind: "list", list, group: null, before: null }, null, [], project ?? null)).text);
     },
     /** The New Task sheet's Project row for the project chosen (null: none; at the start, the view's `ScreenView.project`): the quick entry's Project button, its page and whether it is lit. */
-    project: (c, [chosen]) => entryProject(chosen ?? null, c.reads.projects()),
+    project: (c, [chosen]) => {
+      const known = c.reads.projects();
+      const name = chosen ?? null;
+      return entryProject(isFolderRef(name, known) ? null : name, known);
+    },
     lists: (c) => CAPTURE_LISTS.map((list) => ({ list, name: c.settings.sections[list] }))
   };
   var HISTORY = {

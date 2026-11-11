@@ -88,15 +88,24 @@ function targetList(anchor: Anchor): GroupedList | null {
  */
 export function projectsTakes(view: ProjectsView, cards: readonly ProjectsDrop[], place: ListPlace): boolean {
 	if (!view.reorders) return false;
-	if (place.kind === "subtask") return sectionHolding(view, place.parent)?.takes ?? false;
+	if (place.kind === "subtask") return nestsUnder(view, place.parent);
 	if (!(view.sections.find((s) => s.group === place.group)?.takes ?? true)) return false;
 	const carried = cards.map((card) => itemOf(view, card.key));
 	return enters(carried, targetList(planOf(view, carried, place).anchor));
 }
 
-/** The part a row of `key` is drawn in; null when none is. */
-function sectionHolding(view: ProjectsView, key: TaskKey): ProjectsSection | null {
-	return view.sections.find((s) => s.rows.some((row) => samePlace(row.item.key, key))) ?? null;
+/**
+ * A card may be nested under the row of `key`: it is drawn in a part that takes cards, and its task (the card it stands
+ * under, for a subtask) carries no folder, which a subtask would carry too. In whichever part draws it, By stage too.
+ */
+function nestsUnder(view: ProjectsView, key: TaskKey): boolean {
+	for (const section of view.sections) {
+		const at = section.rows.findIndex((row) => samePlace(row.item.key, key));
+		if (at < 0) continue;
+		const top = section.rows.slice(0, at + 1).reverse().find((row) => row.level === 0);
+		return section.takes && !(top?.item.projects.some((p) => p.folder) ?? false);
+	}
+	return false;
 }
 
 /**
