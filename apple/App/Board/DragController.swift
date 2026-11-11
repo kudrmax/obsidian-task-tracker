@@ -25,7 +25,7 @@ struct Lift {
 /// Where a let-go lands, in the window: the copy flies there and gives way to the card drawn there.
 struct CarryLanding {
     var rect: CGRect
-    /// Into a folded project part: the copy shrinks into the middle of its header and is gone.
+    /// Into a row of the Projects page's tree: the copy shrinks into the middle of it and is gone.
     var folds = false
     /// The plus taken by a place: the copy becomes the field that opens there.
     var opens = false
@@ -219,7 +219,7 @@ final class DragController {
             return FloatImage.view(TaskCapsule(card: card, height: rect.height).frame(width: rect.width, height: rect.height), like: live.copy, in: window)
         case .section(let group):
             return FloatImage.view(SectionTitle(title: group.header ?? "", muted: group.name == nil).frame(width: rect.width, height: rect.height), like: live.copy, in: window)
-        case nil:
+        case .project, nil:
             return nil
         }
     }

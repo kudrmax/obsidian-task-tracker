@@ -74,7 +74,9 @@ struct TaskCapsule: View {
             if card.item.project?.mark == true { projectMark }
             if card.item.progress != nil || card.item.description != nil { meta }
             if let corner = card.corner { stackCorner(corner) }
-            if let due = card.due {
+            if let stage = card.stage {
+                stageMark(stage)
+            } else if let due = card.due {
                 dueCorner(due)
             } else if card.repeats {
                 repeatIcon.frame(minWidth: 24)
@@ -166,14 +168,14 @@ struct TaskCapsule: View {
     /// The room over the title's lines (and under them on a menu's copy).
     private var edge: CGFloat { (base - CardMetrics.titleLine - (card.face.twoLines ? CardMetrics.overLine : 0)) / 2 }
 
-    /// A folded result's own title over its step (results, point 4): small, in the caption colour, after a target, on one
-    /// line fading out as a title does.
+    /// The small line over the title, in the caption colour, on one line fading out as a title does: a folded task's own
+    /// title over its next step, after a target; on the Projects page By stage, the task's subproject, after a folder.
     private func overLine(_ over: String) -> some View {
         Color.clear
             .frame(maxWidth: .infinity, minHeight: CardMetrics.overLine, maxHeight: CardMetrics.overLine)
             .overlay(alignment: .leading) {
                 HStack(spacing: 3) {
-                    Image(systemName: "scope").font(.system(size: CardMetrics.overFont, weight: .semibold))
+                    Image(systemName: card.face.overSymbol).font(.system(size: CardMetrics.overFont, weight: .semibold))
                     Text(verbatim: over).font(.system(size: CardMetrics.overFont))
                 }
                 .foregroundStyle(metaColor)
@@ -182,7 +184,7 @@ struct TaskCapsule: View {
             }
             .mask(fadeMask)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Result \(over)")
+            .accessibilityLabel(card.face.overSymbol == "folder" ? "Project \(over)" : "Task \(over)")
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onOver?($0) }
     }
 
@@ -264,6 +266,16 @@ struct TaskCapsule: View {
             .frame(height: 18)
             .accessibilityLabel("Project \(card.item.project?.name ?? "")")
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onMark?($0) }
+    }
+
+    /// On the Projects page By project, where the task stands in the funnel, in the date's place and of its width: the
+    /// list's symbol in the caption colour.
+    private func stageMark(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(metaColor)
+            .frame(minWidth: 24)
+            .accessibilityLabel(StageWords.name(symbol))
     }
 
     /// A list card's corner: the due day over its month, the repeat mark beside the day; it grows with what it holds.
@@ -427,5 +439,18 @@ struct BranchLine: View {
         .frame(width: 11 + reach, height: height)
         .offset(x: -11 - reach, y: -4)
         .accessibilityHidden(true)
+    }
+}
+
+/// The words a stage's symbol is read out with.
+enum StageWords {
+    static func name(_ symbol: String) -> String {
+        switch symbol {
+        case "sun.max": "Today"
+        case "hourglass": "Soon"
+        case "tray": "Inbox"
+        case "archivebox": "Backlog"
+        default: "Done"
+        }
     }
 }

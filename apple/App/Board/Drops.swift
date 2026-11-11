@@ -22,7 +22,7 @@ protocol BoardTarget: AnyObject {
 }
 
 extension BoardTarget {
-    func takes(_ payload: DragPayload?) -> Bool { payload?.isSection != true }
+    func takes(_ payload: DragPayload?) -> Bool { payload?.isSection != true && payload?.isProject != true }
     var priority: Int { 0 }
     var scrolls: UIScrollView? { nil }
 }

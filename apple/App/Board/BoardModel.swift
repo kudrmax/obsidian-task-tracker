@@ -3,12 +3,14 @@ import SwiftUI
 import UIKit
 import os
 
-/// The three places of the ribbon the tab bar switches: two half-screen columns each.
+/// The places of the ribbon the tab bar switches: the Projects page, the whole screen, then three of two half-screen
+/// columns each. Projects' raw value keeps the places saved before it came.
 enum RibbonPlace: Int, Hashable, CaseIterable {
-    case inbox, soon, today
+    case projects = -1, inbox = 0, soon, today
 
     var title: LocalizedStringKey {
         switch self {
+        case .projects: "Projects"
         case .inbox: "Inbox"
         case .soon: "Soon"
         case .today: "Today"
@@ -18,15 +20,18 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
     /// The words the tab bar shows.
     var name: String {
         switch self {
+        case .projects: String(localized: "Projects")
         case .inbox: String(localized: "Inbox")
         case .soon: String(localized: "Soon")
         case .today: String(localized: "Today")
         }
     }
 
-    /// The core's name of the place (`SCREEN_PLACES`): Today is the calendar's.
+    /// The core's name of the place (`SCREEN_PLACES`): Today is the calendar's. Projects is none of the core's places: it
+    /// shows no list of the funnel.
     var key: String {
         switch self {
+        case .projects: "projects"
         case .inbox: "inbox"
         case .soon: "soon"
         case .today: "calendar"
@@ -51,6 +56,7 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
 
     var symbol: String {
         switch self {
+        case .projects: "folder"
         case .inbox: "tray"
         case .soon: "hourglass"
         case .today: "sun.max"
@@ -77,12 +83,15 @@ final class BoardModel {
 
     /// Typing tasks in place: the core's quick entry, driven for this screen.
     @ObservationIgnored let entry = QuickEntryHost()
+    /// The Projects page: the tree and the chosen node's tasks.
+    @ObservationIgnored let projects = ProjectsBoard()
     /// The timeline's zoom, kept across days.
     @ObservationIgnored let zoom = TimelineZoom()
 
     init() {
         place = RibbonPlace.remembered()
         entry.model = self
+        projects.model = self
     }
 
     /// A screen the quick entry read after its write, drawn in the transaction the entry draws its own state in.
@@ -852,8 +861,18 @@ final class BoardModel {
         return (try? await Task.detached { try board.cards(rows) }.value) ?? []
     }
 
-    /// What a tap on a card's folder mark does: nothing yet.
-    func projectOpener(_ item: TaskItem) -> (() -> Void)? { nil }
+    /// What a tap on a card's folder mark does: the Projects page opens on the task's project, the branches above it open.
+    func projectOpener(_ item: TaskItem) -> (() -> Void)? {
+        guard let project = item.project, project.mark else { return nil }
+        return { [weak self] in self?.openProject(project) }
+    }
+
+    /// The Projects page on `project`: chosen, with the branches above it opened (`tasks.selectProjectNode`).
+    func openProject(_ project: ProjectRef) {
+        fullScreen = []
+        go(to: .projects)
+        Task { await projects.select(project.name) }
+    }
 
     /// A card on the calendar lifted with its subtasks while a subtask is typed under it (Add Subtask there).
     var stackShown: ShownStack?
@@ -1064,6 +1083,14 @@ final class BoardModel {
             let going = kept.compactMap { key in all.first { $0.item.key == key } }
             carry?.group = [(item: card.item, from: column)] + going
         }
+        return token
+    }
+
+    /// A project lifted in the tree by its row: carried among the tree's gaps, to reorder or nest it.
+    @discardableResult
+    func startTreeCarry(_ row: ProjectsRow) -> Int {
+        let token = begin()
+        withAnimation(CarryMotion.carry) { carry = Carry(token: token, id: row.node, item: nil, from: "tree") }
         return token
     }
 
@@ -1746,7 +1773,7 @@ final class BoardModel {
     /// above it as for any task (point 8).
     func cardMenu(_ card: BoardCard, from: String = "list", over: Bool = false, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         let item = over ? card.item : card.face.step ?? card.item
-        guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] else { return nil }
+        guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] ?? projects.menus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
         let nodes = lead(item, stack: card.item, from: from) + TaskMenu(items: [item], menu: menu, model: self, selectsText: true).nodes
         return MenuNode.uiMenu(nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }

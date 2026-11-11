@@ -9,6 +9,8 @@ final class DragPayload {
     enum Kind {
         case card(BoardCard)
         case section(BoardGroup)
+        /// A project lifted in the Projects page's tree.
+        case project(ProjectsRow)
     }
 
     let kind: Kind
@@ -25,6 +27,10 @@ final class DragPayload {
 
     var isSection: Bool {
         if case .section = kind { true } else { false }
+    }
+
+    var isProject: Bool {
+        if case .project = kind { true } else { false }
     }
 }
 
@@ -774,7 +780,8 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     private var plusRoom: Int?
 
     func takes(_ payload: DragPayload?) -> Bool {
-        guard let payload, payload.isSection else { return true }
+        guard let payload, !payload.isProject else { return payload == nil }
+        guard payload.isSection else { return true }
         return payload.from == column.rawValue
     }
 

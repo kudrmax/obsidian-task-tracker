@@ -41,15 +41,18 @@ public struct CardPaint: Sendable, Hashable {
 public struct CardFace: Sendable, Hashable {
     /// The title drawn, with its links.
     public let text: String
-    /// The small line over the title, with the target symbol; nil for a card of one line.
+    /// The small line over the title; nil for a card of one line.
     public let over: String?
+    /// The symbol before the small line: a target over a folded task's next step, a folder over a task's subproject.
+    public let overSymbol: String
     /// Whose menu a tap on the card (but on `over`) opens; nil: the card's own task.
     private let steps: [TaskItem]
     public var step: TaskItem? { steps.first }
 
-    public init(text: String, over: String? = nil, step: TaskItem? = nil) {
+    public init(text: String, over: String? = nil, overSymbol: String = "scope", step: TaskItem? = nil) {
         self.text = text
         self.over = over
+        self.overSymbol = overSymbol
         self.steps = step.map { [$0] } ?? []
     }
 
@@ -88,6 +91,8 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     public let parts: [TextPart]
     /// What its face shows: the task's own title, or a folded task's next step under the task's title.
     public let face: CardFace
+    /// The Projects screen's mark of where the task stands in the funnel, in the date's place (`ProjectsStage`): a symbol.
+    public let stage: String?
 
     /// The card shows the task `id`.
     public func names(_ id: String) -> Bool { item.id == id }
@@ -100,9 +105,10 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
         ["id": .string(id), "key": item.key.json, "level": .number(Double(level)), "group": item.group.json]
     }
 
-    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, paint: CardPaint?, corner: [String]? = nil, parts: [TextPart]? = nil, face: CardFace? = nil) {
+    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, paint: CardPaint?, corner: [String]? = nil, parts: [TextPart]? = nil, face: CardFace? = nil, stage: String? = nil) {
         let face = face ?? CardFace(item.card)
         self.face = face
+        self.stage = stage
         self.parts = parts ?? [TextPart(text: face.text)]
         self.corner = corner
         self.item = item

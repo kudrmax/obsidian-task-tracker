@@ -259,14 +259,18 @@ struct Ribbon: View {
             // As the plugin's screen: Inbox and Soon split the screen in half wherever the divider stands; at Today the
             // divider sets the day list against the calendar, the list's edge gliding there from the half on the way
             // from Soon (`RibbonColumns`, tested: Max asked for this three times).
-            let columns = RibbonColumns(width: Double(width), list: Double(listWidth(width)), done: model.doneShown)
+            let columns = RibbonColumns(width: Double(width), list: Double(listWidth(width)), done: model.doneShown, projects: true)
             let half = CGFloat(columns.half)
             let list = CGFloat(columns.list)
             let dayList = CGFloat(columns.dayList(toToday: Double(toToday)))
-            let lead = CGFloat(columns.lead)
             let stops = columns.stops.map { CGFloat($0) }
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
+                    // The Projects page, its own place left of Inbox: the whole screen.
+                    ProjectsPage(model: model)
+                        .frame(width: width)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .id(RibbonPlace.projects)
                     if model.doneShown {
                         DoneColumn(model: model)
                             .frame(width: half)
@@ -311,18 +315,17 @@ struct Ribbon: View {
                 // At rest (a tab's scroll, the size changing) the ribbon stands where the next swipe starts; under the
                 // finger it goes no further than the next place either way, as the plugin's screen.
                 swipe.moved(within: stops)
-                let from = x - lead
                 toToday = CGFloat(columns.toToday(at: Double(x)))
                 // The selection moves along with a swipe; a tab's own scroll leaves it on the tab chosen.
                 guard phase == .interacting || phase == .decelerating else { return }
-                let near = nearest(from, soon: half, width: width)
+                let near = nearest(x, columns)
                 if near != model.place { model.place = near }
             }
             .onScrollPhaseChange { _, new in
                 phase = new
                 if new == .idle {
-                    // Off the Done column, onto Inbox or further: it closes until the next search, Inbox where it stood.
-                    if lead > 0, offset > lead / 2 {
+                    // Off the Done column, onto Inbox or Projects: it closes until the next search, the place where it stood.
+                    if model.doneShown, abs(offset - CGFloat(columns.doneStop)) > half / 2 {
                         var instant = Transaction()
                         instant.disablesAnimations = true
                         withTransaction(instant) {
@@ -334,10 +337,10 @@ struct Ribbon: View {
                     // A touch that stops a tab's scroll on its way leaves the ribbon between two places: it goes on to the
                     // nearer one, as a swipe would.
                     // At rest the tab bar names where the ribbon stands, whatever moved it there.
-                    let near = nearest(offset - lead, soon: half, width: width)
-                    let stop: CGFloat = switch near { case .inbox: 0; case .soon: half; case .today: width }
-                    if lead == 0, model.place != near { model.place = near }
-                    if lead == 0, abs(offset - stop) > 0.5 {
+                    let near = nearest(offset, columns)
+                    let stop = stopOf(near, columns)
+                    if !model.doneShown, model.place != near { model.place = near }
+                    if !model.doneShown, abs(offset - stop) > 0.5 {
                         withAnimation(.smooth) { position.scrollTo(id: near, anchor: .leading) }
                         return
                     }
@@ -358,15 +361,27 @@ struct Ribbon: View {
                     return
                 }
                 // The Done column is laid out first, then the ribbon goes to it.
-                DispatchQueue.main.async { withAnimation(.smooth) { position.scrollTo(x: 0) } }
+                DispatchQueue.main.async { withAnimation(.smooth) { position.scrollTo(x: CGFloat(columns.doneStop)) } }
             }
         }
     }
 
-    /// The place nearest the ribbon's offset: the tab bar's selection moves along with a swipe.
-    private func nearest(_ x: CGFloat, soon: CGFloat, width: CGFloat) -> RibbonPlace {
-        let stops: [(RibbonPlace, CGFloat)] = [(.inbox, 0), (.soon, soon), (.today, width)]
+    /// The place nearest the ribbon's offset: the tab bar's selection moves along with a swipe. The Done column counts as
+    /// Inbox, beside it.
+    private func nearest(_ x: CGFloat, _ columns: RibbonColumns) -> RibbonPlace {
+        var stops: [(RibbonPlace, CGFloat)] = RibbonPlace.allCases.map { ($0, stopOf($0, columns)) }
+        if columns.done { stops.append((.inbox, CGFloat(columns.doneStop))) }
         return stops.min { abs($0.1 - x) < abs($1.1 - x) }?.0 ?? .today
+    }
+
+    /// Where a place's left edge stands in the ribbon.
+    private func stopOf(_ place: RibbonPlace, _ columns: RibbonColumns) -> CGFloat {
+        switch place {
+        case .projects: 0
+        case .inbox: CGFloat(columns.lead)
+        case .soon: CGFloat(columns.lead + columns.half)
+        case .today: CGFloat(columns.lead + columns.width)
+        }
     }
 
     /// The day list's width for its saved share of the screen, within the bounds the core gives (`rules.listWidths`).
