@@ -138,3 +138,16 @@ The plugin comes first (Max: «плагин в приоритете»); the iPho
 8. **A place the core refuses** (`projectsTakes`, Backend decision 11) is a list that does not take the card: no drop
    line, no plate lit, and letting go there drops nothing (the card flies back), the same path as over a funnel column
    that refuses a card.
+
+### iPhone app
+
+1. **The No tasks plate is the lists' plate** (`EmptyPlate`, dashed, the core's `emptyLabel`), drawn under a part whose
+   `plate` is true and, as before, alone when the screen has no part at all. A tap on it asks the task's name as the
+   plus let go in that part does and writes it with the part's `newTask`, as a tap on an empty section's plate opens
+   the field there in the lists (`docs/plugin/tasks.md`). A part without `newTask` (Done) has a plate that does nothing.
+2. **The gap over a part's header** is the lists' section gap only when something stands above it (a header, a card or
+   a plate); under an empty own part, which draws nothing, the first header sits right under the segment.
+3. **Delete project's question is the stock `confirmationDialog`** with the title shown, the core's `message` under it,
+   `confirm` as the destructive button and `cancel` as the cancel role (on iPhone iOS 26 draws it as a popover from the
+   project's name, the cancel being a tap outside, as Apple's own menus' confirmations are). Delete project stands last
+   in the project menu, in its own section, with the trash symbol.
