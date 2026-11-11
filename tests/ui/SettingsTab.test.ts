@@ -510,3 +510,42 @@ describe("the settings tab: the order", () => {
 		expect(description()).toContain("client id and secret below");
 	});
 });
+
+describe("the settings tab: the result mark", () => {
+	it("writes the mark once typed (Enter or leaving), never per key, and shows the saved one again when the core refuses", async () => {
+		await open();
+		const field = input("Result mark");
+		expect(field.value).toBe("🎯");
+		expect(field.placeholder).toBe("🎯");
+		type(field, "⭐");
+		await settled();
+		expect(settings.get().resultMark).toBe("🎯");
+		type(field, "⭐", "change");
+		await settled();
+		expect(settings.get().resultMark).toBe("⭐");
+		type(field, "two words", "change");
+		await settled();
+		expect(settings.get().resultMark).toBe("⭐");
+		expect(field.value).toBe("⭐");
+	});
+
+	/** Obsidian's text field tells a change of its value made by code as one typed: a refused mark once spun the test Obsidian, the correction answered as a new change without end. */
+	it("ends when the field tells its own correction as a change", async () => {
+		await open();
+		const field = input("Result mark");
+		const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!;
+		let changes = 0;
+		Object.defineProperty(field, "value", {
+			get: () => set.get!.call(field),
+			set: (v: string) => {
+				set.set!.call(field, v);
+				if (++changes < 50) queueMicrotask(() => field.dispatchEvent(new Event("change")));
+			},
+		});
+		type(field, "two words", "change");
+		await settled();
+		expect(changes).toBeLessThan(5);
+		expect(field.value).toBe("🎯");
+		expect(settings.get().resultMark).toBe("🎯");
+	});
+});

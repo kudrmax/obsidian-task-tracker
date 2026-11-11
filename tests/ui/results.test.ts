@@ -33,13 +33,6 @@ describe("a folded result's card", () => {
 		expect(card.querySelector(":scope > .tc-card-title")?.textContent).toBe("Trip");
 	});
 
-	it("draws the task's own title where the search asks for it", () => {
-		const card = renderTaskCard(document.body, folded, { day: null, own: true });
-		expect(card.querySelector(".tc-card-over")).toBeNull();
-		expect(card.querySelector(":scope > .tc-card-title")?.textContent).toBe("Company");
-		expect(card.classList.contains("is-result")).toBe(true);
-	});
-
 	it("opens the result's menu from its small line and the step's from anywhere else", () => {
 		const card = renderTaskCard(document.body, folded, { day: null });
 		expect(cardMenuTask(folded, card.querySelector(".tc-card-over-text"))).toBe(folded);

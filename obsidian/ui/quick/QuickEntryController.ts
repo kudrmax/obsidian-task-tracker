@@ -31,7 +31,7 @@ const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox", "backlog"];
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: QuickEntryTasks & Pick<TaskService, "listName" | "placementTitle" | "projectNotes" | "newProject">;
+	readonly tasks: QuickEntryTasks & Pick<TaskService, "listName" | "placementTitle" | "projectNotes" | "newProject" | "unfoldAbove">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
@@ -411,6 +411,7 @@ export class QuickEntryController {
 			newSlot: (...a) => tasks.newSlot(...a),
 			createSection: (...a) => tasks.createSection(...a),
 			edit: (...a) => tasks.edit(...a),
+			unfoldAbove: (...a) => tasks.unfoldAbove(...a),
 			createWithId: async (...a) => {
 				const created = await tasks.createWithId(...a);
 				if (created) for (const column of COLUMNS) this.deps.list(column)?.adopt(created.id);

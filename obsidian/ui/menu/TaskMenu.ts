@@ -442,9 +442,11 @@ export class TaskMenu extends LiftedMenu {
 			const next = await this.context.actions.toggleLabel(name);
 			if (this.isClosed) return;
 			if (!next) return this.close();
-			this.context = { ...this.context, item: next };
+			/** The copy is this task's own card, not a folded result's that shows it as its step: it takes the new colours. */
+			const ownCopy = this.drawn.id === this.context.item.id;
+			this.context = { ...this.context, item: next, drawn: ownCopy ? next : this.context.drawn };
 			const card = this.lifted.classList.contains("is-block") ? this.lifted.querySelector<HTMLElement>(".tc-block-card") : this.lifted;
-			if (card && !this.context.drawn) markColours(card, next);
+			if (card && ownCopy) markColours(card, next);
 			this.showMenu(this.groupsAbove());
 		} finally {
 			this.labelling = false;

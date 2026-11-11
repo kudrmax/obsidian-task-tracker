@@ -180,7 +180,9 @@ screen, undo, multi-select). No new logic beyond the three points below.
    (the core writes nothing). Typing narrows the page in place, the panel growing or shrinking to it.
 10. **New result….** Its page is New project…'s: back row «New result», the name field ringed in the accent with
     `namePlaceholder`; Escape or the back row returns to the results.
-11. **Result mark** stands in the Priorities group, right under Add priority, as a text row with its description.
+11. **Result mark** stands in the Priorities group, right under Add priority, as a text row with its description. It is
+    written on Enter or on leaving the field, never per key (as the app's, Swift 10); a mark the core refuses gives way
+    to the saved one, shown again; the empty field shows `defaultResultMark` as its placeholder.
 12. **The bulk menu.** Add to result stands in the edit group after Project (when the core offers it) and opens the same
     page and New result… as one task's menu.
 
