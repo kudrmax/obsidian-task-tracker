@@ -1193,7 +1193,7 @@ export class CalendarScreen extends Component {
 
 	/** The screen a menu opens over (`TaskService.menu`). */
 	private menuScreen(): MenuScreen {
-		return { today: this.today(), day: this.selectedDate, offer: this.data.offer };
+		return { today: this.today(), day: this.selectedDate, offer: this.data.offer, projects: this.data.projectTree };
 	}
 
 	private listOf(column: ListColumn): TaskList | null {

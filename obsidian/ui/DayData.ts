@@ -1,5 +1,5 @@
 import { NO_DAY_EVENTS } from "../../core/application/contracts";
-import type { CalendarAlert, CalendarEvent, DayWords, CalendarService, DayEvents, DayView, DropColumn, DropTo, GroupedList, ListSection, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
+import type { CalendarAlert, CalendarEvent, DayWords, CalendarService, DayEvents, DayView, DropColumn, DropTo, GroupedList, ListSection, ProjectRef, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
 import { Reload } from "./Reload";
 import type { LocalDate } from "./types";
 
@@ -29,6 +29,8 @@ interface TasksState {
 	readonly missing: boolean;
 	/** The day's events, their sources and the switch's dot show: the screen read says when not. */
 	readonly calendars: boolean;
+	/** The tree's projects in its order: what a menu's Project page offers. */
+	readonly projectTree: readonly ProjectRef[];
 	/** What a drop on each column's title means; none before the screen is read. */
 	readonly titleDrops: Readonly<Record<DropColumn, DropTo>> | null;
 }
@@ -46,7 +48,7 @@ const NO_OFFER: SectionOffer = { lists: { now: [], soon: [], inbox: [], backlog:
  * A change to a task never waits for the calendars.
  */
 export class DayData {
-	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true, titleDrops: null };
+	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true, projectTree: [], titleDrops: null };
 	private dayEvents: DayEvents = NO_DAY_EVENTS;
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
@@ -90,6 +92,11 @@ export class DayData {
 	/** What a drop on `column`'s title means, handed to the drop as it is; none before the screen is read. */
 	titleDrop(column: DropColumn): DropTo | null {
 		return this.state.titleDrops?.[column] ?? null;
+	}
+
+	/** The tree's projects as the screen last read them: a menu's Project page. */
+	get projectTree(): readonly ProjectRef[] {
+		return this.state.projectTree;
 	}
 
 	/** The sections the menus offer. */
@@ -184,8 +191,8 @@ export class DayData {
 
 	private async readTasks(): Promise<TasksState> {
 		const date = this.deps.date();
-		const { day, soon, inbox, backlog, done, sections, offer, missing, calendars, titleDrops } = await this.deps.tasks.screen(date);
-		return { date, day: missing ? null : day, soon, inbox, backlog, done, sections, offer, missing, calendars, titleDrops };
+		const { day, soon, inbox, backlog, done, sections, offer, missing, calendars, projectTree, titleDrops } = await this.deps.tasks.screen(date);
+		return { date, day: missing ? null : day, soon, inbox, backlog, done, sections, offer, missing, calendars, projectTree, titleDrops };
 	}
 
 	/** The data changes, the hooks of the read run on it, and only then is the screen told. */

@@ -184,45 +184,50 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
     plugin's (its note search, then `setProjectNote(name, link)`); a link typed with `[[ ]]` is taken without them.
 18. **The old settings** `projectTag` and `resultMark` stay in `data.json`, read only by the move; the settings form's
     fields and `setProjectTag`/`setResultMark` are stubs that write nothing until the frontends drop them.
+22. **A menu's Project page reads no file.** `ScreenView.projectTree` is the tree's projects in its order; a frontend
+    hands it in as `MenuScreen.projects` with every `tasks.menu` and `tasks.bulkMenu`, the plugin and the app alike, so the
+    app's menus stay asked over the settings alone. Left out, the plugin's service takes the tree of the file it read
+    last and the door the tree of `tasks` when handed in.
+
 
 ### Obsidian frontend
 
-22. **The wheel at Projects** (board Nav). The window stays two icons wide with the folder alone in its middle: the
+23. **The wheel at Projects** (board Nav). The window stays two icons wide with the folder alone in its middle: the
     other icons are hidden inside it, Inbox beside it in the track at full size, Soon a step smaller. At Done, which has
     no icon, the window now holds Inbox alone in its middle the same way (it stood half empty, a step left of Inbox).
     The wheel keeps the plugin's own icons (the folder is the card's project mark; Inbox, Backlog, Soon, Now as today),
     not the boards' slightly different drawings of them.
-23. **Done is never seen on a swipe.** Done waits left of Inbox where Projects slides in: it is hidden except at its own
+24. **Done is never seen on a swipe.** Done waits left of Inbox where Projects slides in: it is hidden except at its own
     place (the search) and while the window leaves it.
-24. **The tree's width.** The divider sets it as the day list's divider sets the list's (same bounds, the same hold to
+25. **The tree's width.** The divider sets it as the day list's divider sets the list's (same bounds, the same hold to
     the middle), kept per device in the plugin's own view settings (`treeWidth`, never synced). Until dragged: half the
     window on the phone; on the desktop the column of DeskProj (300 px of tree, 20 px from the view's edge).
-25. **Grey names** follow `ProjectsRow.muted` (core decision 21): No project and Done always, as the boards draw them.
-26. **The right side of a card.** By project the stage's mark (or the date, for a dated Soon task) takes the date's
+26. **Grey names** follow `ProjectsRow.muted` (core decision 21): No project and Done always, as the boards draw them.
+27. **The right side of a card.** By project the stage's mark (or the date, for a dated Soon task) takes the date's
     place, the card's own due date is not drawn beside it; By stage the card shows its date as in any list.
-27. **A folded task in By stage**: its two-line card shows the subproject (folder mark and name) on the small line and
+28. **A folded task in By stage**: its two-line card shows the subproject (folder mark and name) on the small line and
     its next step under it; the folded task's own title shows in By project.
-28. **A folded task's small line has no symbol.** The target was the result's mark; every folded task now shows its
+29. **A folded task's small line has no symbol.** The target was the result's mark; every folded task now shows its
     next step, and the small line is its own title alone.
-29. **The Project page keeps its checks open.** A project tapped is toggled and the page is drawn again for the next
+30. **The Project page keeps its checks open.** A project tapped is toggled and the page is drawn again for the next
     one; No project takes every project off and closes. Each project stands a tree indent (12 px) further in per level.
-    The plugin reads the tasks back after a toggle (`find`) to draw fresh checks.
-30. **The project menu** (decision 1) in the plugin: the title stays over the blur in its own size; Rename types the new
+    The checks are drawn from the tasks `toggleProject` answers.
+31. **The project menu** (decision 1) in the plugin: the title stays over the blur in its own size; Rename types the new
     name in place of the title (the section name's capsule); «Attach note…» (a plus) opens Obsidian's fuzzy search of
     the vault's notes and attaches the pick as the link Obsidian writes from the tasks file; with a note, its name (the
     open-file arrow) opens it in a new tab and Detach (a cross) takes it off.
-31. **The plus on the Projects screen** has no quick bar: it opens the section name's capsule — at the gap of the tree
+32. **The plus on the Projects screen** has no quick bar: it opens the section name's capsule — at the gap of the tree
     («Project name»), or after the part's last card among the tasks («New task»; a priority's prefix typed first still
     sets it). A tap on the plus there opens the task field at the end of the tasks (`ProjectsView.newTask`).
-32. **The depth of a gap in the tree** follows the finger: a step per tree indent from the tree's left edge, within
+33. **The depth of a gap in the tree** follows the finger: a step per tree indent from the tree's left edge, within
     `projectsLevels`.
-33. **A lifted project** is its row on the float's ground with the lift shadow; its place in the tree dims.
-34. **The search path** shows only in a search opened from the Projects screen, on the card's small line after the
+34. **A lifted project** is its row on the float's ground with the lift shadow; its place in the tree dims.
+35. **The search path** shows only in a search opened from the Projects screen, on the card's small line after the
     folder mark, the names joined by « › »; the card's folder mark is left out there (the path says it), and so is the
     description's line.
-35. **The card's folder mark and the full screen's project line** open the Projects screen on that project
+36. **The card's folder mark and the full screen's project line** open the Projects screen on that project
     (`selectProjectNode`), the wheel turning there.
-36. **A wide card held by its far side** (a desktop list, the tasks of the Projects screen): the float under the finger is
+37. **A wide card held by its far side** (a desktop list, the tasks of the Projects screen): the float under the finger is
     held by its middle once the grab lies further right than the float reaches; it used to hang far left of the finger.
-37. **A card held over a folded row** opens it after a long press's time (the Long press setting), the tree alone drawn
+38. **A card held over a folded row** opens it after a long press's time (the Long press setting), the tree alone drawn
     again so the card carried from the tasks stays under the finger; leaving the row before then opens nothing.

@@ -608,6 +608,11 @@ export interface MenuScreen {
 	readonly today: LocalDate;
 	readonly day: LocalDate;
 	readonly offer: SectionOffer;
+	/**
+	 * The projects the Project page offers: the screen's `projectTree`, so a menu reads no tasks file. Left out: the tree
+	 * of the file the service read last (the door: of `tasks`, when it is handed in).
+	 */
+	readonly projects?: readonly ProjectRef[];
 }
 
 /** A status tile: Done, In progress or Stop progress (todo again, when every task is in progress), Won't do, Stop. */
@@ -813,6 +818,8 @@ export interface ScreenView {
 	readonly projects: Readonly<Record<GroupedList, ListGrouping>>;
 	/** A project's own view went: always null. Stub until the frontends drop it. */
 	readonly project: ProjectRef | null;
+	/** The tree's projects in its order, the tasks' own in it: what a menu opened over this screen offers (`MenuScreen.projects`). */
+	readonly projectTree: readonly ProjectRef[];
 	/** What a drop on each column's title means, handed back to `TaskService.drop` as it is; the title lights up under a drag as a section header does. */
 	readonly titleDrops: Readonly<Record<DropColumn, DropTo>>;
 }
