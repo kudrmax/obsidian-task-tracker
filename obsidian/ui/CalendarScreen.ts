@@ -18,6 +18,7 @@ import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu, ProjectMenu } from "./menu/GroupMenu";
 import { NoteSearch } from "./projects/NoteSearch";
 import { ProjectsListDrop, TasksDrop, TreeDrop } from "./projects/ProjectDrops";
+import { ProjectsCarry } from "./projects/ProjectsCarry";
 import { TreeLift } from "./projects/TreeLift";
 import type { PlusAside } from "./quick/QuickEntryController";
 import { failureText } from "./failureText";
@@ -111,15 +112,19 @@ export class CalendarScreen extends Component {
 	/** The tree of the Projects screen as a place for a card or the plus, and its tasks as a place for the plus. */
 	private readonly treeDrop = new TreeDrop({
 		tree: () => this.projects?.treeShown ?? null,
-		unfold: (node) => void this.act(() => this.deps.tasks.unfoldProjectNode(node)).then(() => this.projects?.refreshTree()),
+		hover: (node) => this.showProjects(() => this.deps.tasks.hoverProjectNode(node)),
 	});
 	private readonly tasksDrop = new TasksDrop(() => this.projects?.tasksShown ?? null);
 	/** The Projects screen's tasks as a list a card is dropped in, as a list column is. */
 	private projectsListDrop: ProjectsListDrop | null = null;
-	/** The Projects row pressed last: a drop of it hands the core this very row's `drop` (a task of two parts is two cards). */
-	private pressedProjectsRow: ProjectsListRow | null = null;
-	/** The rows each drag carries, as the core takes them (`projectsDrops`). */
-	private readonly carriedRows = new WeakMap<TaskDragPayload, readonly ProjectsDrop[]>();
+	/** The rows each drag from the Projects screen carries and the node it was lifted on, read at the lift. */
+	private readonly carry = new ProjectsCarry({
+		rowOf: (card) => this.projects?.tasksList.rowOf(card),
+		selected: () => this.projects?.shown?.selected ?? null,
+		carried: (item) => this.bulk.carried(item),
+	});
+	/** The last choice of a node under a held card, drawn once it resolves (`showProjects`). */
+	private projectsChoice: Promise<void> = Promise.resolve();
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
 	private soonEl: HTMLElement | null = null;
@@ -254,6 +259,8 @@ export class CalendarScreen extends Component {
 				this.contentEl.classList.toggle("is-dragging", active);
 			},
 			onResult: (drag, result) => this.applyDrop(drag, result),
+			onLift: (drag, source) => this.carry.lift(drag, source),
+			putBack: (drag) => this.backToLiftedOn(drag),
 			stretch: (item, edge, minute) => this.deps.tasks.stretch(item, this.selectedDate, edge, minute),
 			onResize: async (item, edge, minute, minDurationMin) => {
 				let written = false;
@@ -1006,7 +1013,6 @@ export class CalendarScreen extends Component {
 		const item = row.item;
 		card.dataset.menuFrom = owner.menuFrom;
 		card.dataset.card = row.id;
-		card.addEventListener("pointerdown", () => (this.pressedProjectsRow = row), { capture: true, signal });
 		this.found.attach(card, item);
 		if (owner.canDrop) {
 			/** The drag's origin is only what the lists read; the Projects screen takes the row's own `drop`. An open task's card is of a list. */
@@ -1019,20 +1025,33 @@ export class CalendarScreen extends Component {
 		}, { signal });
 	}
 
-	/**
-	 * What the core takes for the rows a drag carries on the Projects screen: the one pressed, then the picked ones carried
-	 * along. Read once a drag.
-	 */
+	/** What the core takes for the rows a drag carries on the Projects screen, as read at the lift. */
 	private projectsDrops(drag: TaskDragPayload): readonly ProjectsDrop[] {
-		const known = this.carriedRows.get(drag);
-		if (known) return known;
-		const tasks = this.projects?.tasksList;
-		const pressed = this.pressedProjectsRow;
-		if (!tasks || !pressed) return [];
-		const carried = this.bulk.carried(drag.item).flatMap((picked) => tasks.rowOf(picked.card)?.drop ?? []);
-		const drops = [pressed.drop, ...carried];
-		this.carriedRows.set(drag, drops);
-		return drops;
+		return this.carry.dropsOf(drag);
+	}
+
+	/** A drag from the Projects screen let go nowhere: the node it was lifted on is chosen again if a hover opened another (spec decision 6). */
+	private async backToLiftedOn(drag: TaskDragPayload): Promise<void> {
+		const start = this.carry.liftedOn(drag);
+		if (start === null) return;
+		await this.projectsChoice;
+		if (this.projects?.shown?.selected !== start) await this.showProjects(() => this.deps.tasks.selectProjectNode(start));
+	}
+
+	/**
+	 * A choice kept on the device (a node chosen or unfolded), the Projects screen drawn again after it; a failure is said,
+	 * never thrown. One after another: a drag let go just as a hover opens a node goes back only once that node is drawn.
+	 */
+	private showProjects(change: () => Promise<void>): Promise<void> {
+		this.projectsChoice = this.projectsChoice.then(async () => {
+			try {
+				await change();
+				await this.projects?.refresh();
+			} catch (error) {
+				this.reportFailure(error);
+			}
+		});
+		return this.projectsChoice;
 	}
 
 	/** Cards let go on a row of the tree: the project each was shown under gives way to the row's; its place in the funnel stays. */

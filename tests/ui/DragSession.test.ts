@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TaskItem } from "../../core/application/contracts";
 import { DragSession, type DragPayload, type DropResult, type DropTarget, type Float, type HeldOut, type NewTaskPayload } from "../../obsidian/ui/drag/DragSession";
 import { onDay } from "../fakes/itemOnDay";
@@ -279,6 +279,37 @@ describe("DragSession", () => {
 		s.move(50, 10);
 		await s.cancel();
 		expect(order).toEqual(["clear", "fly", "return", "remove"]);
+	});
+
+	it("puts the screen back as it stood at the lift before the copy flies home, let go nowhere or called off", async () => {
+		for (const end of ["nowhere", "cancel"] as const) {
+			const order: string[] = [];
+			const float = new FakeFloat();
+			float.flyTo = async (to) => void order.push(`fly ${to.y}`);
+			let place = 900;
+			const s = new DragSession({
+				payload,
+				targets: [new FakeTarget("a", 0, 100, null)],
+				float,
+				origin: () => rect(5, place),
+				beforeReturn: async () => {
+					order.push("put back");
+					place = 500;
+				},
+				onEnd: async () => void order.push("ended"),
+			});
+			s.move(300, 10);
+			await (end === "cancel" ? s.cancel() : s.release(300, 10));
+			expect(order).toEqual(["put back", "fly 500", "ended"]);
+		}
+	});
+
+	it("puts nothing back when the drop is let go on a place", async () => {
+		const beforeReturn = vi.fn(async () => undefined);
+		const s = new DragSession({ payload, targets: [new FakeTarget("a", 0, 100, { kind: "clearSlot" })], float: new FakeFloat(), origin: () => rect(5, 500), beforeReturn, onEnd: async () => drawnCard(0) });
+		s.move(50, 10);
+		await s.release(50, 10);
+		expect(beforeReturn).not.toHaveBeenCalled();
 	});
 
 	it("releases the dropped card's place only once the copy has landed on it", async () => {

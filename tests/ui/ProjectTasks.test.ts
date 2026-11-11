@@ -184,3 +184,37 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 		});
 	});
 });
+
+describe("a card still carried while a held card opens another node", () => {
+	const a = task("A", 0);
+	const b = task("B", 2);
+	const c = task("C", 3);
+	const node = (part: string, cards: readonly ProjectsCard[]) => ({ sections: [section(part, null, cards)], emptyLabel: "No tasks", newTask: null });
+
+	it("stays in the page out of sight, in no list a drop reads, and comes back as itself when its node is drawn again", () => {
+		const tasks = list([section("p1", null, [cardOf(a, "p1"), cardOf(b, "p1")])]);
+		const lifted = tasks.el.querySelector<HTMLElement>(".tc-card")!;
+		lifted.classList.add("is-lifted", "is-waiting");
+		tasks.render(node("p2", [cardOf(c, "p2")]), false);
+		expect(lifted.isConnected).toBe(true);
+		expect(lifted.classList.contains("tc-hidden")).toBe(true);
+		expect(tasks.cards.map((e) => e.item.id)).toEqual(["t3"]);
+		expect(tasks.elements).not.toContain(lifted);
+		tasks.render(node("p3", []), false);
+		expect(lifted.isConnected).toBe(true);
+		tasks.render(node("p1", [cardOf(a, "p1"), cardOf(b, "p1")]), false);
+		expect(tasks.el.querySelector(".tc-card")).toBe(lifted);
+		expect(lifted.classList.contains("tc-hidden")).toBe(false);
+		expect(lifted.classList.contains("is-waiting")).toBe(true);
+	});
+
+	it("goes once the drag is over and its node is not drawn", () => {
+		const tasks = list([section("p1", null, [cardOf(a, "p1")])]);
+		const lifted = tasks.el.querySelector<HTMLElement>(".tc-card")!;
+		lifted.classList.add("is-lifted");
+		tasks.render(node("p2", [cardOf(c, "p2")]), false);
+		lifted.classList.remove("is-lifted");
+		tasks.render(node("p2", [cardOf(c, "p2")]), true);
+		expect(lifted.isConnected).toBe(false);
+	});
+});

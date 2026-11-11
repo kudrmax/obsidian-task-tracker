@@ -45,6 +45,10 @@ export interface DragControllerDeps {
 	readonly arbiter: GestureArbiter;
 	/** A card is lifted or settled: the plus hides while it is carried. */
 	onDragging(active: boolean): void;
+	/** `drag` lifted from `source`, before any target reads it: what the drop will hand the core is read now, as the screen stands. */
+	onLift?(drag: TaskDragPayload, source: HTMLElement): void;
+	/** `drag` let go nowhere or called off: the screen put back as it stood at the lift, before the copy flies home. Never rejects. */
+	putBack?(drag: TaskDragPayload): Promise<void>;
 	/** Writes the drop and draws it: gives the dropped task's card as drawn now, null when none shows. */
 	onResult(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | HeldOut | null>;
 	/** The card of `item` while its `edge` dot is held at `minute` of the shown day. */
@@ -301,6 +305,7 @@ export class DragController {
 		timeline?.layoutTasks(true);
 		capturePointer(source, e.pointerId);
 		this.deps.onDragging(true);
+		this.deps.onLift?.(payload, source);
 		const reopen = () => {
 			for (const card of lifted) card.classList.remove("is-lifted", WAITING, FOLDED);
 			timeline?.layoutTasks(true);
@@ -313,7 +318,8 @@ export class DragController {
 					payload,
 					targets: this.deps.targets(payload),
 					float,
-					origin: () => (source.isConnected ? source.getBoundingClientRect() : origin),
+					origin: () => (source.isConnected && source.getClientRects().length > 0 ? source.getBoundingClientRect() : origin),
+					beforeReturn: () => this.deps.putBack?.(payload) ?? Promise.resolve(),
 					carries: payload.item.id,
 					letGo: () => {
 						detach();

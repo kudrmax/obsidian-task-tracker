@@ -69,4 +69,33 @@ Follows `2026-11-11-projects-screen-design.md` and `2026-11-11-projects-order-de
 
 ### Obsidian frontend
 
+1. **One timer, the row's fields.** `TreeDrop` starts the `PROJECTS_HOVER_MS` wait over a row with `unfoldsOnHover ||
+   opensOnHover` and then calls `tasks.hoverProjectNode(node)` only; the whole screen (tree and tasks) is read and drawn
+   again while the card stays carried. The plus never waits over a row (as before). The wait fires once per row: the card
+   has to leave the row and come back to fire it again (2 → 3 → 1 each open in turn).
+2. **The carried cards' drops and the node they were lifted on are read at the lift** (`ProjectsCarry`, called by the
+   drag before any target reads it), from the lifted card's own row (no longer «the row pressed last») and the picked
+   cards' rows; every later `projectsTakes`, `projectsDropPreview`, `dropInProjects` and `dropOnProject` gets exactly those.
+3. **A carried card stays in the page while another node is drawn**: its row (and its folded subtasks, and picked cards)
+   is kept by the list out of sight (`tc-hidden`), in no list a drop reads, so the finger's pointer keeps its element
+   (iOS sends a finger's moves to the element it touched) and the dashed gap is gone from the opened list. Drawn again on
+   the node it was lifted on, it is the same element, still the dashed place, so the copy flies home onto it. Once the
+   drag is over, the next drawing drops it.
+4. **Going back before flying back**: let go nowhere, on a place that refuses, or Escape, the screen is put back first
+   (`selectProjectNode(start)` and a redraw), then the copy flies to its card. Branches a hover unfolded stay unfolded
+   (choosing never folds), as an unfold under a held card always did. A release while a hover's choice is still being
+   drawn waits for it, then goes back.
+5. **The row stays filled** under a still finger after the redraw the hover caused (the fill is drawn again on the new tree).
+6. **A hover's choice is not a write**: no tasks file re-read for it (as `act` would), only the Projects screen; a
+   failure is shown as any failure and never stops the drag.
+7. **Docs**: `docs/plugin/tasks.md` («Экран Projects») tells the hover; `docs/plugin/app.md` is left as it is (the app's
+   tree keeps its unfold until its in-list drop, decision 7).
+
 ### iPhone app
+
+1. **The contract mirrored, nothing drawn yet** (decision 7): `ProjectsRow` decodes `opensOnHover` (required, as the core
+   always sends it), and `TaskBoard.hoverProjectNode(_:)` sits next to `unfoldProjectNode(_:)`, calling
+   `tasks.hoverProjectNode`. No view calls it in this branch: the spring-loaded unfold in `ProjectsPage.hover` keeps
+   `unfoldsOnHover` → `unfoldProjectNode`, so a held card never changes the chosen node until the app's list takes cards.
+2. **`ProjectsCard.drop` stays an opaque `JSONValue`**: the core's `lifted` rides in it untouched and goes back to
+   `tasks.dropOnProject` as it came; Swift reads none of its fields.

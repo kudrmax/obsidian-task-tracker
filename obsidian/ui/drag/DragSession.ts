@@ -10,6 +10,11 @@ export interface DragSessionOptions<P = DragPayload, R = DropResult> {
 	/** Where the card's place stands now, so a cancelled drag flies back to it. */
 	origin(): DOMRect;
 	/**
+	 * A drag let go nowhere or called off, before its copy flies back: the screen is put back as it stood at the lift (a
+	 * held card opened another project), so the copy flies to its place drawn again. Never rejects.
+	 */
+	beforeReturn?(): Promise<void>;
+	/**
 	 * The finger let go, or the drag was called off: the screen is free from now on, so the next gesture starts while the
 	 * copy still flies.
 	 */
@@ -125,6 +130,7 @@ export class DragSession<P = DragPayload, R = DropResult> {
 	private async settleBack(): Promise<void> {
 		this.clearAll();
 		DragSession.landing.add(this.land);
+		await this.opts.beforeReturn?.();
 		await this.opts.float.flyTo(this.opts.origin());
 		this.landed();
 		this.opts.float.remove();
