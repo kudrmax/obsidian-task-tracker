@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type EntryList, type ListCard, placeShowing, projectsEntryLook, type ProjectsView, QuickEntrySession, shownEntryLists, type TaskItem, type WriteLine } from "../../core/application/contracts";
+import { type EntryList, type ListCard, placeShowing, projectsEntryLook, projectsPlusTakes, type ProjectsView, QuickEntrySession, shownEntryLists, type TaskItem, type WriteLine } from "../../core/application/contracts";
 import { callDoor } from "../../core/application/PhoneCalls";
 import { memoryProjectsScreen, type Clock } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
@@ -304,5 +304,49 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 		expect(callDoor("entry.plusOpens", [null, none], context as never)).toMatchObject({ ok: true, result: { value: false, state: null } });
 		expect(callDoor("entry.openFromPlus", [null, none], context as never)).toMatchObject({ ok: true, result: { value: false, state: null } });
 	});
-});
 
+	describe("a folder chosen (`- Work 🗃️`): its own part writes no task", () => {
+		const FOLDER = FILE.replace("- Q\n", "- Q\n- Work 🗃️\n\t- Sub2\n").replace("- [ ] Inbox loose", "- [ ] Inbox loose\n- [ ] In sub 🗂️ Sub2\n- [ ] By hand 🗂️ Work");
+
+		for (const mode of ["byProject", "byStage"] as const) {
+			it(`${mode}: no part takes the plus, so a tap on it opens nothing`, async () => {
+				const s = await projectsScreen("project:Work", mode, FOLDER);
+				expect(s.view().newTask).toBeNull();
+				expect(projectsEntryLook(s.view()).parts.some((p) => p.plus)).toBe(false);
+				expect(s.entry.plusOpens()).toBe(false);
+				expect(s.entry.openFromPlus()).toBe(false);
+				expect(s.entry.state).toBeNull();
+			});
+		}
+
+		it("All keeps its fallback: the first part that writes takes the plus", async () => {
+			const s = await projectsScreen("all", "byProject", FOLDER);
+			const look = projectsEntryLook(s.view());
+			expect(look.parts.filter((p) => p.plus).map((p) => p.group)).toEqual([s.view().sections.find((x) => x.newTask !== null)!.group]);
+		});
+
+		it("the plus may be let go only where a new task may be written: a subproject's gap and under its tasks, never in the folder's own part or under a task carrying the folder", async () => {
+			const s = await projectsScreen("project:Work", "byProject", FOLDER);
+			const view = s.view();
+			const own = view.sections.find((x) => x.group === null)!;
+			const sub = view.sections.find((x) => x.title === "Sub2")!;
+			expect(own.cards.map((c) => c.item.title)).toEqual(["By hand"]);
+			expect(projectsPlusTakes(view, { kind: "task", group: null, before: null })).toBe(false);
+			expect(projectsPlusTakes(view, { kind: "subtask", parent: s.item("By hand").key, before: null })).toBe(false);
+			expect(projectsPlusTakes(view, { kind: "task", group: sub.group, before: null })).toBe(true);
+			expect(projectsPlusTakes(view, { kind: "subtask", parent: s.item("In sub").key, before: null })).toBe(true);
+			expect(projectsPlusTakes(view, { kind: "task", group: "project:Gone", before: null })).toBe(false);
+		});
+
+		it("under Done the plus is let go nowhere", async () => {
+			const s = await projectsScreen("done", "byProject", FILE.replace("## Done\n", "## Done\n\n- [x] Closed 🗂️ Q\n"));
+			for (const section of s.view().sections) expect(projectsPlusTakes(s.view(), { kind: "task", group: section.group, before: null })).toBe(false);
+		});
+
+		it("the door answers it as `rules.projectsPlusTakes`", async () => {
+			const s = await projectsScreen("project:Work", "byProject", FOLDER);
+			const context = { tasks: FOLDER, settings: "", now: "2026-11-11T12:00:00" };
+			expect(callDoor("rules.projectsPlusTakes", [s.view(), { kind: "task", group: null, before: null }], context as never)).toMatchObject({ ok: true, result: false });
+		});
+	});
+});

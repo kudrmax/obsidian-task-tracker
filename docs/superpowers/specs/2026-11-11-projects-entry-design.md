@@ -81,7 +81,15 @@ nothing shows, and the first key typed turns the screen to that funnel column (M
    `openFromPlus()` opens nothing, never the hidden Inbox, and answers `false`; `true` when a field opened. The ready
    answer before the tap is `plusOpens()` (`QuickEntrySession.plusOpens()`, door `entry.plusOpens(session, look)` →
    `value`), the same rule; off Projects it is always true. A frontend reads it instead of looking at `EntryPart.plus`.
-
+10. **No part takes the plus when the screen writes no task of its own** (review, High). `projectsEntryLook` marks a part
+    `plus` only when `ProjectsView.newTask` is not null: the part writing it, else the first part that writes one (All
+    By project, whose own task has no part). A folder chosen (both modes) and Done have a null `newTask`, so no part is
+    marked and `plusOpens()`/`openFromPlus()` are false: a tap on the plus does nothing (folders Obsidian 6, iPhone 5).
+11. **Where the plus may be let go is the core's** (review, Medium). `rules.projectsPlusTakes(view, place: ListPlace):
+    boolean` (`contracts.ts`, `projectsDrop.ts`): a `task` place only in a part whose `newTask` is set (a folder's own
+    part and Done's write none; a part the screen lacks is false); a `subtask` place only where `projectsTakes` would
+    nest a card (`nestsUnder`: the part takes cards and the task it stands under carries no folder) on a node whose list
+    takes drops (`reorders`). The plus's drop line and its field follow it; a frontend computes none of it.
 
 ### Obsidian frontend
 

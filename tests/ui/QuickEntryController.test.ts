@@ -1375,7 +1375,8 @@ describe("QuickEntryController: the Projects list is a list the field stands in 
 		return { key: name, group: name, title, header: true, opens: true, takes: true, empty: tasks.length === 0, plate: tasks.length === 0, path: [], depth: 0, cards, rows, newTask: { place: { kind: "list", list, group: null, before: null }, project: "P" } };
 	}
 
-	const view = () => projectsView([part("s", "Soon", [a], "soon"), part("t", "Today", [b], "now"), part("i", "Inbox", [], "inbox")]);
+	/** A node that writes a task of its own (`newTask`, here the Soon part's), as a project node does: the plus has a part. */
+	const view = () => projectsView([part("s", "Soon", [a], "soon"), part("t", "Today", [b], "now"), part("i", "Inbox", [], "inbox")], { newTask: { place: { kind: "list", list: "soon", group: null, before: null }, project: "P" } });
 	const onProjects = () => setUp({ mode: "projects", items: { soon: [a], day: [b] }, projectsView: view() });
 
 	it("Rename turns the card into the field in the Projects list, not in a funnel column, and typing never turns the screen", async () => {

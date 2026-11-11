@@ -56,7 +56,7 @@ import { listView, sectionChoice } from "./sections";
 import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
-import { projectsTakes } from "./projectsDrop";
+import { projectsPlusTakes, projectsTakes } from "./projectsDrop";
 import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
@@ -768,6 +768,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	noteTags,
 	projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
 	projectsTakes: (view, cards, place) => projectsTakes(view as A, cards as A, place as A),
+	projectsPlusTakes: (view, place) => projectsPlusTakes(view as A, place as A),
 	projectsGap: (rows, gap, depth, lifted) => projectsGap(rows, gap, depth, lifted ?? null),
 	projectsLevels: (rows, gap, lifted) => projectsLevels(rows, gap, lifted ?? null),
 	projectsDrop: (rows, gap, shift, lifted) => projectsDrop(rows, gap, shift, lifted ?? null),

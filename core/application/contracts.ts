@@ -988,7 +988,7 @@ export { projectsDrop } from "./projectsScreen";
  * funnel's columns refuse it (`acceptsDrop`: Inbox and Backlog no dated or timed task, Soon no timed one). A frontend
  * shows no drop line there and lets go of nothing, as over a list that does not take the card.
  */
-export { projectsTakes } from "./projectsDrop";
+export { projectsPlusTakes, projectsTakes } from "./projectsDrop";
 /** How long a held card waits over a row before it unfolds or opens (`hoverProjectNode`), ms; the indent of a tree's step, px (pt). */
 export { PROJECTS_HOVER_MS, PROJECTS_INDENT } from "./projectsScreen";
 

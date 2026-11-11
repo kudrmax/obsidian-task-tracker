@@ -498,7 +498,11 @@ Typing tasks in place, every rule of it (`core/application/QuickEntry.ts`). Each
   `parts.projects` are `rules.projectsEntryLook(view)`'s `cards`, `sections` and `parts` for the view shown (`null`: no
   view, all empty). A part (`EntryPart` `{ group, newTask, plus }`) is a `ProjectsSection`: its `group`, its `newTask`,
   and `plus` on the one part a tap on the plus types in (the one writing the screen's own `ProjectsView.newTask`, else
-  the first that writes one). Rename, Add Subtask, the No tasks plate (`openIn("projects", section.group)`), the plus
+  the first that writes one, as under All; none when `ProjectsView.newTask` is null: a folder, Done). Where the plus
+  may be let go in the list is `rules.projectsPlusTakes(view, listPlace)`: true only where a new task may be written,
+  a gap of a part with a `newTask`, or under a task a card may be nested under (a part that takes cards, a task carrying
+  no folder, a node whose list takes drops); elsewhere the host shows no drop line and opens no field. Example: a
+  folder's own part, `projectsPlusTakes(view, { kind: "task", group: null, before: null })` → `false`. Rename, Add Subtask, the No tasks plate (`openIn("projects", section.group)`), the plus
   let go in the list (`openAt("projects", listPlace)`, the `ListPlace` of the drop) and Enter's next field then all stand
   in the Projects list, never in a funnel column; a new task's field starts with its part's project and the bar's place
   shows where its part writes. A task written there is `createInPlace` with a `NewTaskPlace` `{ kind: "projects", group,

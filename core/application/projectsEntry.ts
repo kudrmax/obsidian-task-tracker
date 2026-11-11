@@ -26,18 +26,19 @@ export interface EntryListLook {
 /**
  * The Projects screen's list as the quick entry reads it (`EntryLook` for list `projects`): its rows as cards, each in its
  * part's section, the parts in order, and what each part's new task writes. The plus types in the part that writes the
- * screen's own new task (`ProjectsView.newTask`), else in the first part that writes one. None while the screen has no view.
+ * screen's own new task (`ProjectsView.newTask`), else in the first part that writes one (All By project); none when the
+ * screen writes no task of its own (a folder, Done). None while the screen has no view.
  */
 export function projectsEntryLook(view: ProjectsView | null): EntryListLook {
 	if (!view) return { cards: [], sections: [], parts: [] };
 	const cards = view.sections.flatMap((section) => section.rows.map((row): ListCard => ({ key: row.item.key, id: row.item.id, level: row.level, group: section.group })));
 	const own = view.newTask;
-	const plusAt = Math.max(0, own ? view.sections.findIndex((s) => s.newTask !== null && sameNewTask(s.newTask, own)) : -1);
-	const first = view.sections.findIndex((s, i) => i >= plusAt && s.newTask !== null);
+	const first = own === null ? -1 : Math.max(0, view.sections.findIndex((s) => s.newTask !== null && sameNewTask(s.newTask, own)));
+	const plusPart = first < 0 ? -1 : view.sections.findIndex((s, i) => i >= first && s.newTask !== null);
 	return {
 		cards,
 		sections: view.sections.map((section) => section.group),
-		parts: view.sections.map((section, i) => ({ group: section.group, newTask: section.newTask, plus: i === first })),
+		parts: view.sections.map((section, i) => ({ group: section.group, newTask: section.newTask, plus: i === plusPart })),
 	};
 }
 

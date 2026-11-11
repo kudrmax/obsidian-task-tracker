@@ -215,6 +215,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	projectNodeOf: "./projectsScreen",
 	projectsGap: "./projectsScreen",
 	projectsTakes: "./projectsDrop",
+	projectsPlusTakes: "./projectsDrop",
 	projectsLevels: "./projectsScreen",
 	projectsDrop: "./projectsScreen",
 	PROJECTS_HOVER_MS: "./projectsScreen",

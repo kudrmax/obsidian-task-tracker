@@ -5396,6 +5396,10 @@ ${key.title}`.toLowerCase();
     if (place.kind === "subtask") return nestsUnder(view, place.parent);
     return takes(view, cards.map((card) => carriedIn(view, card)), place);
   }
+  function projectsPlusTakes(view, place) {
+    if (place.kind === "subtask") return view.reorders && nestsUnder(view, place.parent);
+    return view.sections.find((s) => s.group === place.group)?.newTask != null;
+  }
   function takes(view, carried, place) {
     if (!(view.sections.find((s) => s.group === place.group)?.takes ?? true)) return false;
     return enters(carried, targetList(planOf(view, carried, place).anchor));
@@ -5496,12 +5500,12 @@ ${key.title}`.toLowerCase();
     if (!view) return { cards: [], sections: [], parts: [] };
     const cards = view.sections.flatMap((section) => section.rows.map((row) => ({ key: row.item.key, id: row.item.id, level: row.level, group: section.group })));
     const own = view.newTask;
-    const plusAt = Math.max(0, own ? view.sections.findIndex((s) => s.newTask !== null && sameNewTask(s.newTask, own)) : -1);
-    const first = view.sections.findIndex((s, i) => i >= plusAt && s.newTask !== null);
+    const first = own === null ? -1 : Math.max(0, view.sections.findIndex((s) => s.newTask !== null && sameNewTask(s.newTask, own)));
+    const plusPart = first < 0 ? -1 : view.sections.findIndex((s, i) => i >= first && s.newTask !== null);
     return {
       cards,
       sections: view.sections.map((section) => section.group),
-      parts: view.sections.map((section, i) => ({ group: section.group, newTask: section.newTask, plus: i === first }))
+      parts: view.sections.map((section, i) => ({ group: section.group, newTask: section.newTask, plus: i === plusPart }))
     };
   }
   function sameNewTask(a, b) {
@@ -8042,6 +8046,7 @@ ${key.title}`.toLowerCase();
     noteTags,
     projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
     projectsTakes: (view, cards, place) => projectsTakes(view, cards, place),
+    projectsPlusTakes: (view, place) => projectsPlusTakes(view, place),
     projectsGap: (rows, gap, depth, lifted2) => projectsGap(rows, gap, depth, lifted2 ?? null),
     projectsLevels: (rows, gap, lifted2) => projectsLevels(rows, gap, lifted2 ?? null),
     projectsDrop: (rows, gap, shift, lifted2) => projectsDrop(rows, gap, shift, lifted2 ?? null),

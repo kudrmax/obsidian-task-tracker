@@ -110,6 +110,17 @@ export function projectsTakes(view: ProjectsView, cards: readonly ProjectsDrop[]
 	return takes(view, cards.map((card) => carriedIn(view, card)), place);
 }
 
+/**
+ * The plus may be let go at `place` of the Projects list: a new task may be written there. Between cards, in a part that
+ * writes a new task (`ProjectsSection.newTask`; a folder's own part and Done's write none); under a task, only where a
+ * card may be nested (`nestsUnder`: a part that takes cards, a task carrying no folder), on a node whose list takes drops
+ * (not Done, not a done project).
+ */
+export function projectsPlusTakes(view: ProjectsView, place: ListPlace): boolean {
+	if (place.kind === "subtask") return view.reorders && nestsUnder(view, place.parent);
+	return view.sections.find((s) => s.group === place.group)?.newTask != null;
+}
+
 function takes(view: ProjectsView, carried: readonly Carried[], place: Extract<ListPlace, { readonly kind: "task" }>): boolean {
 	if (!(view.sections.find((s) => s.group === place.group)?.takes ?? true)) return false;
 	return enters(carried, targetList(planOf(view, carried, place).anchor));
