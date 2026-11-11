@@ -691,7 +691,7 @@ export class CalendarScreen extends Component {
 				if (!way || !pager || pager.caught !== caught) return;
 				await pager.run(way.shift, () => this.dayTrack(way.date, way.shift));
 			});
-		});
+		}).catch((error: unknown) => this.reportFailure(error));
 	}
 
 	/** Resolves once the screen has drawn the day a turn brought in, or at once when none waits to be drawn. */

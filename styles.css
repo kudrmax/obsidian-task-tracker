@@ -716,8 +716,8 @@ body.is-mobile:has(.tc-quick-bar .tc-group-input:focus) .mobile-navbar { display
 
 /* The view fills its leaf and draws everything itself. */
 /* Obsidian paints .mod-root .view-content with its theme; the board's ground must win in every theme, so this selector outranks it. */
-body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); }
-.task-calendar { position: relative; height: 100%; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: clip; background: var(--tc-bg); color: var(--tc-text); }
+.task-calendar { position: relative; height: 100%; overflow: clip; background: var(--tc-bg); color: var(--tc-text); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 /* One reset for every button of the plugin, the board draws its own; not tied to a container, so it holds in Obsidian's settings too. */
 button.tc-btn { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 /* Obsidian lights its buttons under the pointer; the board's buttons keep their own ground, and dim while pressed. At zero weight: it quiets Obsidian's light, never a button's own ground. */
@@ -859,17 +859,17 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 /* The columns on the strip, Inbox, Soon, the list and the right column; the fixed dividers between the halves, and the one with its handle. */
 /* A list column: its list runs to the bottom of the view, under its foot (the switch's row, Obsidian's navigation) and the fade. */
 .tc-left, .tc-soon, .tc-inbox, .tc-done { display: flex; flex-direction: column; }
-.tc-left { position: absolute; left: 0; top: var(--tc-columns-top); bottom: 0; width: var(--tc-list-width); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: hidden; }
+.tc-left { position: absolute; left: 0; top: var(--tc-columns-top); bottom: 0; width: var(--tc-list-width); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: clip; }
 .task-calendar.is-lists .tc-left { left: calc(var(--tc-half-column) + var(--tc-divider)); width: var(--tc-half-column); padding: var(--tc-column-pad-far); }
-.tc-soon { position: absolute; left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: hidden; }
+.tc-soon { position: absolute; left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: clip; }
 .task-calendar.is-lists .tc-soon { left: 0; }
 .task-calendar.is-inbox .tc-soon { left: calc(var(--tc-half-column) + var(--tc-divider)); padding: var(--tc-column-pad-far); }
 .task-calendar.is-inbox .tc-left { left: calc(100% + var(--tc-divider)); width: var(--tc-half-column); padding: var(--tc-column-pad-far); }
-.tc-inbox { position: absolute; left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: hidden; }
+.tc-inbox { position: absolute; left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: clip; }
 .task-calendar.is-lists .tc-inbox { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
 .task-calendar.is-inbox .tc-inbox { left: 0; }
 /* Done stands left of Inbox, reached only from the search: there the whole strip stands one column further right. */
-.tc-done { position: absolute; left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider)) - var(--tc-half-column) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: hidden; }
+.tc-done { position: absolute; left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider)) - var(--tc-half-column) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: clip; }
 .task-calendar.is-lists .tc-done { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); }
 .task-calendar.is-inbox .tc-done { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
 .task-calendar.is-done > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-right, .tc-divider, .tc-head) { margin-left: calc(var(--tc-half-column) + var(--tc-divider)); }
@@ -895,7 +895,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .task-calendar.is-inbox .tc-divider.is-fixed.is-done { left: calc(-1 * var(--tc-divider)); }
 .tc-divider-line { width: var(--tc-hairline); height: 100%; background: var(--tc-line); }
 .task-calendar .tc-divider-handle { position: absolute; top: var(--tc-handle-top); left: var(--tc-handle-left); width: var(--tc-handle-w); height: var(--tc-handle-h); border-radius: var(--tc-radius-handle); background: var(--tc-handle); cursor: col-resize; }
-.tc-right { position: absolute; left: calc(var(--tc-list-width) + var(--tc-divider)); width: calc(100% - var(--tc-list-width) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; overflow: hidden; }
+.tc-right { position: absolute; left: calc(var(--tc-list-width) + var(--tc-divider)); width: calc(100% - var(--tc-list-width) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; overflow: clip; }
 .task-calendar.is-lists .tc-right { left: calc(100% + var(--tc-divider)); }
 .task-calendar.is-inbox .tc-right { left: calc(100% + 2 * var(--tc-divider) + var(--tc-half-column)); }
 .task-calendar.is-switching :is(.tc-done, .tc-inbox, .tc-left, .tc-soon, .tc-divider, .tc-right, .tc-head, .tc-day-nav .tc-arrow) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding var(--tc-duration-slide) var(--tc-ease-in-out), gap var(--tc-duration-slide) var(--tc-ease-in-out); }
