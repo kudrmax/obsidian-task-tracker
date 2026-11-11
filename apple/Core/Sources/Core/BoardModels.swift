@@ -240,6 +240,9 @@ public struct ScreenView: Decodable, Sendable {
     public let offer: JSONValue
     public let missing: Bool
     public let calendars: Bool
+    /// The tree's projects in its order (`ScreenView.projectTree`): handed back as `MenuScreen.projects`, so a menu's
+    /// Project page lists the whole tree while the menu reads no file.
+    public let projectTree: JSONValue
     /// What a drop on each column's title means (`DropTo`), handed back to `tasks.drop` as it is.
     public let titleDrops: [String: JSONValue]
 }

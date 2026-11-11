@@ -39,14 +39,14 @@ import Testing
     @Test func thePageHoldsTheWholeTreeWithItsDepthsAndChecks() throws {
         let board = board(FakeVault(Self.file))
         let snapshot = try snapshot(board)
-        let screen: JSONValue = ["today": .string(snapshot.today), "day": .string(snapshot.day), "offer": snapshot.screen.offer]
-        let chat = try board.projectPage([(try card(snapshot, "Chat").item, "soon")], screen: screen)
+        // The menus are read over the settings alone, the tree handed in with the screen.
+        let chat = try #require(snapshot.menus[try card(snapshot, "Chat").item.id]?.project)
         #expect(chat.options.map(\.project.name) == ["Дружба", "Small talk", "Health"])
         #expect(chat.options.map(\.depth) == [0, 1, 0])
         #expect(chat.options.map(\.checked) == [true, true, false])
         #expect(chat.value == "Дружба +1")
         #expect(!chat.none && chat.newLabel == "New project…")
-        let idea = try board.projectPage([(try card(snapshot, "Idea").item, "inbox")], screen: screen)
+        let idea = try #require(snapshot.menus[try card(snapshot, "Idea").item.id]?.project)
         #expect(idea.none && idea.value == "No project" && !idea.disabled)
     }
 

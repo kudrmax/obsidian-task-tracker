@@ -497,7 +497,7 @@ extension TaskBoard {
         let timeline = try self.timeline(
             day: day, today: today, screen: screen, events: events, files: files, measures: measures, painter: &painter,
             ask: { try read($0, $1, over: $2) as JSONValue }, askRule: { try readRule($0, $1) as JSONValue })
-        let menuScreen: JSONValue = ["today": .string(today), "day": .string(day), "offer": screen.offer]
+        let menuScreen = screen.menuScreen(today: today, day: day)
         // A menu reads no file: asked over the settings alone, it costs nothing per card.
         let settingsOnly = BoardFiles(tasks: nil, settingsJSON: files.settingsJSON, calendars: [:], now: files.now)
         var menus: [String: TaskMenuModel] = [:]
@@ -807,3 +807,11 @@ public struct ColumnSections: Decodable, Sendable {
     public let date: String?
 }
 
+
+extension ScreenView {
+    /// What a task's menu is read for (`MenuScreen`): the day, today, the sections offered, and the tree's projects, so
+    /// a menu asked over the settings alone offers the whole tree on its Project page.
+    public func menuScreen(today: String, day: String) -> JSONValue {
+        ["today": .string(today), "day": .string(day), "offer": offer, "projects": projectTree]
+    }
+}

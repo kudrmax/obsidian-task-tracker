@@ -707,7 +707,7 @@ final class BoardModel {
 
     var menuScreen: JSONValue {
         guard let snapshot else { return .null }
-        return ["today": .string(snapshot.today), "day": .string(snapshot.day), "offer": snapshot.screen.offer]
+        return snapshot.screen.menuScreen(today: snapshot.today, day: snapshot.day)
     }
 
     /// A task's menu: it reads no file, only the settings.
@@ -803,15 +803,6 @@ final class BoardModel {
     func toggleProject(_ items: [TaskItem], _ name: String) async {
         await write("tasks.toggleProject", [keys(items), .string(name)])
         endSelection()
-    }
-
-    /// The Project page of the tasks, read over the tasks file as it opens: the whole tree, each project checked while
-    /// every task has it.
-    func projectPage(_ items: [TaskItem]) async -> MenuProject? {
-        guard let snapshot else { return nil }
-        let board = board, screen = menuScreen
-        let picked = items.map { (item: $0, from: snapshot.column(of: $0.id) ?? "day") }
-        return try? await Task.detached { try board.projectPage(picked, screen: screen) }.value
     }
 
     /// «New project…» on a Project page: the name is asked; the quick entry's field keeps its keyboard's place meanwhile.

@@ -118,22 +118,20 @@ struct TaskMenu {
         return row.value.isEmpty ? nil : row.value
     }
 
-    /// The Project row and its page of checks: the whole tree of `## Projects` in its order, each indented by its depth and
-    /// checked while every task has it (a pick toggles it, `tasks.toggleProject`), No project in its own group, «New
-    /// project…» last. The page is read over the tasks file as it opens (the menu itself reads no file); a subtask's row
-    /// shows its parent's projects and can't be pressed. The words are the core's.
+    /// The Project row and its page of checks: the whole tree of `## Projects` in its order (the screen's tree, handed in
+    /// with the menu's screen), each checked while every task has it (a pick toggles it, `tasks.toggleProject`), No project
+    /// in its own group, «New project…» last; a subtask's row shows its parent's projects and can't be pressed. The words
+    /// are the core's.
     private var projectPage: MenuNode {
         let page = menu.project, items = items, model = model
         let subtitle = page.value.isEmpty ? nil : page.value
         guard !page.disabled else {
             return .action(title: "Project", symbol: "folder", subtitle: subtitle, disabled: true) {}
         }
-        return .deferred(title: "Project", symbol: "folder", subtitle: subtitle) {
-            let full = await model.projectPage(items) ?? page
-            return ProjectPage.nodes(full, pick: { name in
-                Task { if let name { await model.toggleProject(items, name) } else { await model.setProject(items, nil) } }
-            }, new: { model.askNewProject(.tasks(items)) })
-        }
+        let rows = ProjectPage.nodes(page, pick: { name in
+            Task { if let name { await model.toggleProject(items, name) } else { await model.setProject(items, nil) } }
+        }, new: { model.askNewProject(.tasks(items)) })
+        return .submenu(title: "Project", symbol: "folder", subtitle: subtitle, children: rows)
     }
 
     private var sectionPage: MenuNode? {

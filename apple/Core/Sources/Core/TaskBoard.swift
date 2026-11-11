@@ -266,13 +266,6 @@ public final class TaskBoard: @unchecked Sendable {
         try read("capture.project", [chosen.json], over: try files())
     }
 
-    /// The Project page of the tasks `picked` (each with the column it is drawn in, `MenuFrom`), read over the tasks file
-    /// when the page opens: a menu drawn over the settings alone knows only the tasks' own projects, never the whole tree.
-    public func projectPage(_ picked: [(item: TaskItem, from: String)], screen: JSONValue) throws -> MenuProject {
-        let rows = JSONValue.array(picked.map { ["item": $0.item.json, "from": .string($0.from)] })
-        return try read("tasks.bulkMenu", [rows, screen], over: try files(), as: TaskMenuModel.self).project
-    }
-
     /// The `[[` the caret (UTF-16 offset) stands in, typed in a title; `nil` for none.
     public func linkQuery(in text: String, caret: Int) throws -> LinkQuery? {
         try rule("notes.linkQuery", [.string(text), .number(Double(caret))])
