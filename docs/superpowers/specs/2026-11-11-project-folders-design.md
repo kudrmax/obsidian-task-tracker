@@ -83,9 +83,14 @@ task can be put straight into it.
    row (greyed, no tap), with no extra symbol; the menu's own grey says it can't be picked, and its subprojects keep
    their parent's name under them as before.
 3. **The plus held over a folder's tasks shows no drop line** where letting go writes nothing: the line is shown only
-   where the part's `newTask` (else the list's) is given, the same answer the let-go reads. So the plus over an empty
+   where the aimed part's `newTask` is given (the list's only when no part is aimed at, above them all; never the list's
+   in a part's stead), the same answer the let-go reads. So the plus over an empty
    folder's list, Done, or a folder's hand-given own part shows nothing and flies back; over a subproject's part it shows
    the line and types a task of that subproject.
 4. `ProjectsSection.takes` is decoded but drives nothing yet: the app's Projects list takes no card drops between cards
    (only the tree takes a card, by `acceptsTask`), so the part's refusal is already the core's `newTask` null and
    `plate` false.
+5. **A tap on the plus with a folder, Done or a done project chosen does nothing** (lead, from the Obsidian frontend's
+   Decision 6): it opens New Task only while the Projects list has a `newTask`; elsewhere in the app, and before the
+   Projects page is read, it opens as always.
+6. **A grey row's VoiceOver value is «No open tasks»**, what grey now means; «Waiting» is gone.

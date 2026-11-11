@@ -196,7 +196,7 @@ private struct TreeRow: View {
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(row.selected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityValue(row.folded ? "Collapsed" : row.waiting ? "Waiting" : "")
+        .accessibilityValue(row.folded ? "Collapsed" : row.waiting ? "No open tasks" : "")
     }
 
     private var ink: Color {
@@ -740,10 +740,11 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         return (nil, firstTop.map { $0 - CardMetrics.gap / 2 } ?? area.map { $0.minY + 4 })
     }
 
-    /// What the plus let go in `part` writes, the core's: the part's own, else the list's; nil where it writes nothing (a
-    /// folder's tasks, Done), and then no line is shown either.
+    /// What the plus let go in `part` writes, the core's: the part's own when one is aimed at, the list's only above them
+    /// all; nil where it writes nothing (a folder's tasks, Done), and then no line is shown either.
     private func newTask(in part: ProjectsBoard.Part?) -> ProjectsNewTask? {
-        part?.section.newTask ?? model?.projects.view?.newTask
+        guard let part else { return model?.projects.view?.newTask }
+        return part.section.newTask
     }
 
     /// The part let go in, as the line showed it; above them all, the node's own.
