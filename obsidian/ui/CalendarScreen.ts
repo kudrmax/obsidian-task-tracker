@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type MenuFrom, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ListPlace, type ProjectsNewTask, type ProjectsView, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, type ZoomLevel } from "../../core/application/contracts";
+import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type MenuFrom, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ListPlace, projectsTakes, type ProjectsNewTask, type ProjectsView, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, type ZoomLevel } from "../../core/application/contracts";
 import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -118,6 +118,8 @@ export class CalendarScreen extends Component {
 	private projectsListDrop: ProjectsListDrop | null = null;
 	/** The Projects row pressed last: a drop of it hands the core this very row's `drop` (a task of two parts is two cards). */
 	private pressedProjectsRow: ProjectsListRow | null = null;
+	/** The rows each drag carries, as the core takes them (`projectsDrops`). */
+	private readonly carriedRows = new WeakMap<TaskDragPayload, readonly ProjectsDrop[]>();
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
 	private soonEl: HTMLElement | null = null;
@@ -380,7 +382,10 @@ export class CalendarScreen extends Component {
 			});
 		if (this.projects) {
 			const projects = this.projects;
-			this.projectsListDrop = new ProjectsListDrop(projects.tasksList, projects.tasksList.el.parentElement!, () => projects.shown?.reorders ?? false);
+			this.projectsListDrop = new ProjectsListDrop(projects.tasksList, projects.tasksList.el.parentElement!, () => projects.shown?.reorders ?? false, (place, drag) => {
+				const view = projects.shown;
+				return view !== null && projectsTakes(view, this.projectsDrops(drag), place);
+			});
 		}
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
@@ -1014,13 +1019,20 @@ export class CalendarScreen extends Component {
 		}, { signal });
 	}
 
-	/** What the core takes for the rows a drag carries on the Projects screen: the one pressed, then the picked ones carried along. */
+	/**
+	 * What the core takes for the rows a drag carries on the Projects screen: the one pressed, then the picked ones carried
+	 * along. Read once a drag.
+	 */
 	private projectsDrops(drag: TaskDragPayload): readonly ProjectsDrop[] {
+		const known = this.carriedRows.get(drag);
+		if (known) return known;
 		const tasks = this.projects?.tasksList;
 		const pressed = this.pressedProjectsRow;
 		if (!tasks || !pressed) return [];
 		const carried = this.bulk.carried(drag.item).flatMap((picked) => tasks.rowOf(picked.card)?.drop ?? []);
-		return [pressed.drop, ...carried];
+		const drops = [pressed.drop, ...carried];
+		this.carriedRows.set(drag, drops);
+		return drops;
 	}
 
 	/** Cards let go on a row of the tree: the project each was shown under gives way to the row's; its place in the funnel stays. */

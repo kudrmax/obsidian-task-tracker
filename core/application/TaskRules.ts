@@ -65,18 +65,18 @@ export interface TextChange {
 }
 
 /** The changes that take a task elsewhere: its subtasks go along with it. */
-const MOVES: ReadonlySet<TaskChange["kind"]> = new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest"]);
+const MOVES: ReadonlySet<TaskChange["kind"]> = new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest", "reorder"]);
 
 /** The other tasks a change names: the task to stand before, or the parent and the subtask to stand before. */
 function refsOf(change: TaskChange): readonly (TaskKey | null)[] {
-	if (change.kind === "moveBefore" || change.kind === "moveToGroup") return [change.before];
+	if (change.kind === "moveBefore" || change.kind === "moveToGroup" || change.kind === "reorder") return [change.before];
 	if (change.kind === "nest") return [change.parent, change.before];
 	return [];
 }
 
 /** The change with the tasks it names keyed as the document now has them. */
 function freshChange(change: TaskChange, fresh: (key: TaskKey | null) => TaskKey | null): TaskChange {
-	if (change.kind === "moveBefore" || change.kind === "moveToGroup") return { ...change, before: fresh(change.before) };
+	if (change.kind === "moveBefore" || change.kind === "moveToGroup" || change.kind === "reorder") return { ...change, before: fresh(change.before) };
 	if (change.kind === "nest") return { ...change, parent: fresh(change.parent)!, before: fresh(change.before) };
 	return change;
 }
@@ -627,6 +627,8 @@ export class TaskRules {
 				return ops.setLabels(doc, entry, change.labels);
 			case "project":
 				return ops.setProjects(doc, entry, change.project === null ? [] : [change.project]);
+			case "reorder":
+				return ops.reorder(doc, entry, change.group, first);
 			case "swapProject": {
 				const holder = projectWrites.projectHolder(doc, entry);
 				return doc.replace(holder, { ...holder.task, projects: projectWrites.swappedProjects(holder.task.projects, change.from, change.to) });

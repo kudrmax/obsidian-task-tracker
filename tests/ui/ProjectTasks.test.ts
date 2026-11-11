@@ -34,7 +34,7 @@ describe("a card of the Projects screen By project", () => {
 	});
 });
 
-import type { ProjectsListRow, ProjectsSection } from "../../core/application/contracts";
+import type { ListPlace, ProjectsListRow, ProjectsSection } from "../../core/application/contracts";
 import { ProjectsListDrop } from "../../obsidian/ui/projects/ProjectDrops";
 import { shownCardSize } from "../../obsidian/ui/cardSize";
 
@@ -108,7 +108,7 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 
 	describe("as a place to drop", () => {
 		/** Rows stand 40 px apart from the list's top at 100. */
-		function placed(sections: readonly ProjectsSection[], reorders = true) {
+		function placed(sections: readonly ProjectsSection[], reorders = true, takes: (place: ListPlace) => boolean = () => true) {
 			document.body.innerHTML = "";
 			const tasks = list(sections);
 			tasks.elements.forEach((node, i) =>
@@ -122,7 +122,7 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 			const area = tasks.el.parentElement!;
 			area.getBoundingClientRect = () => new DOMRect(0, 100, 300, 600);
 			tasks.el.getBoundingClientRect = () => new DOMRect(0, 100, 300, 600);
-			return new ProjectsListDrop(tasks, area, () => reorders);
+			return new ProjectsListDrop(tasks, area, () => reorders, (place) => takes(place));
 		}
 		const carried = (t: TaskItem) => ({ item: t, from: "soon" as const, grabPx: shownCardSize().height / 2 });
 		/** A carried card hangs by its middle: the finger at `y` is where its middle is. */
@@ -161,6 +161,19 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 			const over = 100 + 5;
 			drop.preview(10, over, carried(b));
 			expect(drop.drop(10, over, carried(b))).toEqual({ kind: "projectsPlace", place: { kind: "task", group: "s", before: a.key } });
+		});
+
+		it("a place the core refuses shows no line and lets go of nothing, as a list that does not take the card", () => {
+			const asked: ListPlace[] = [];
+			const drop = placed([section("s", "Soon", [cardOf(a, "s")]), section("t", "Today", [cardOf(b, "t")])], true, (place) => {
+				asked.push(place);
+				return false;
+			});
+			const y = 100 + 3 * 40 + 5;
+			drop.preview(10, y, carried(a));
+			expect(document.querySelector(".tc-list-drop")).toBeNull();
+			expect(drop.drop(10, y, carried(a))).toBeNull();
+			expect(asked[0]).toEqual({ kind: "task", group: "t", before: b.key });
 		});
 
 		it("takes no plus and nothing while the node keeps its order", () => {

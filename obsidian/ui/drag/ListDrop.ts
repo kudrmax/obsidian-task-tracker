@@ -112,6 +112,14 @@ export abstract class CardListDrop implements DropTarget {
 	/** What a drop at `place` means; null for the list's end, in a list that takes the card there only. */
 	protected abstract resultOf(place: ListPlace | null): DropResult | null;
 
+	/**
+	 * Whether the list takes the carried cards at this place: a place it refuses is as a list that does not take them, no
+	 * line or plate shown and nothing let go there.
+	 */
+	protected takesPlace(_place: ListPlace, _drag: DragPayload): boolean {
+		return true;
+	}
+
 	/** How far over the area the list still takes a finger: a column's title stands there. */
 	protected reachAbove(): number {
 		return 0;
@@ -165,7 +173,14 @@ export abstract class CardListDrop implements DropTarget {
 				);
 		this.place = place;
 		if (fresh && (!before || !sameGap(before, place) || before.level !== place.level)) this.onNewPlace();
-		const home = this.isHome(place, frame);
+		const where = placeOfDrop(this.placed(frame), place, this.home());
+		const home = where === null;
+		if (where !== null && !this.takesPlace(where, drag)) {
+			this.light(null);
+			this.line.hide();
+			this.scroll.follow(y, frame.box);
+			return;
+		}
 		const plate = home ? null : this.list.plateOf(place.group);
 		this.light(plate);
 		if (plate) this.line.hide();
@@ -226,17 +241,12 @@ export abstract class CardListDrop implements DropTarget {
 		if (!this.place) this.preview(x, y, drag);
 		if (!this.place) return null;
 		const place = placeOfDrop(this.placed(readFrame(this.list.el)), this.place, this.home());
-		return place && this.resultOf(place);
+		return place && this.takesPlace(place, drag) ? this.resultOf(place) : null;
 	}
 
 	/** The place a card carried alone was lifted from, at its level; several cards carried have none. */
 	private home(): GapPlace | null {
 		return this.carriesMany() ? null : this.liftedFrom();
-	}
-
-	/** The card goes back where it was lifted from: the drop would change nothing, so no line or plate shows. */
-	private isHome(place: GapPlace, frame: ListFrame): boolean {
-		return placeOfDrop(this.placed(frame), place, this.home()) === null;
 	}
 
 	private carriesMany(): boolean {

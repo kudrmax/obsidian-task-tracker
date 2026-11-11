@@ -53,7 +53,7 @@ export function placesInGap(column: DropColumn, from: DropOrigin, grouped: boole
 }
 
 /** The table of spec §5.1: what a task dragged from `from` and let go on `to` means, the day column showing `day`. */
-function dropMove(from: DropFrom, to: ReadDrop, day: LocalDate): DropMove {
+export function dropMove(from: DropFrom, to: ReadDrop, day: LocalDate): DropMove {
 	switch (to.kind) {
 		case "time":
 			return { kind: "toTime", from, start: to.start, day };

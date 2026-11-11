@@ -6,12 +6,12 @@ import type { GestureArbiter } from "../gestures";
 import { centeredListWidth, listWidthMax } from "../listWidth";
 import { ProjectsSegment } from "./ProjectsSegment";
 import { PLATE } from "../TaskList";
-
-const HIDDEN = "tc-hidden";
 import { ProjectTasks, type ProjectTasksDeps } from "./ProjectTasks";
 import type { TasksShown, TreeShown } from "./ProjectDrops";
 import { ProjectTree } from "./ProjectTree";
 import { LIST_WIDTHS, type ProjectsNodeId, type ProjectsRow, type ProjectsView, type TaskService } from "../../../core/application/contracts";
+
+const HIDDEN = "tc-hidden";
 
 /** What the screen asks the core. */
 export type ProjectsSource = Pick<TaskService, "projectsScreen" | "tapProjectNode" | "setProjectsMode">;

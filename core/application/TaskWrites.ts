@@ -435,7 +435,7 @@ export class TaskWrites {
 		return {
 			reads: true,
 			answer: (s) => {
-				const steps = projectsDropSteps(this.reads.projectsScreen(s), s!.doc, (key) => this.rules.entryOf(s!.doc, key), cards, place);
+				const steps = projectsDropSteps(this.reads.projectsScreen(s), s!.doc, (key) => this.rules.entryOf(s!.doc, key), cards, place, s!.today);
 				return this.landed(cards, this.applyAll(steps));
 			},
 		};

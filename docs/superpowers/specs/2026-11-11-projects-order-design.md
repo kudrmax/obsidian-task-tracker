@@ -64,16 +64,17 @@ The plugin comes first (Max: «плагин в приоритете»); the iPho
    call is `tasks.dropInProjects(cards, place)` with `projectsDropPreview(cards, place)` (`{ landings, view, tasks }`)
    rather than a new `DropTo`: a Projects card carries the project it is shown under (`ProjectsDrop`), which a
    `DroppedTask` (key and column) has no room for, and its landing is on the Projects screen, not the funnel's.
-4. **Where a drop between cards goes, both modes:** right after the card above it in the file (before the next task of
-   that card's list and section that is not being dropped, else that section's end), in that card's list and section;
-   no card above: right before the card below; an empty part: where its plus writes (`newTask.place`). The dropped
-   cards are neither above nor below, nor is the second card of a task shown in two parts. Today is Now and is written
-   as the day list's drop writes it (`moveToGroup` to Now: dated today).
+4. **Where a drop between cards goes, both modes:** next to the card above it in the file (right after it: before the
+   next task of that card's list and section that is not being dropped, else that section's end), in its section; no
+   card above, or the card above's stage refusing the cards (decision 11): right before the card below. The dropped
+   cards are neither above nor below, nor is the second card of a task shown in two parts. What the move writes is
+   decisions 10–12: in its own stage a reorder, in another stage the funnel column's own write; an empty part is
+   decision 12.
 5. **The project swap** is a new `TaskChange` `swapProject` `{ from, to }`, the very rule `dropOnProject` now runs too
-   (`swappedProjects`): `from` off, `to` last, the others kept. By project only, when the part's project (the node's
-   for its own part, none for No project's) differs from the card's `from`. A subtask's row carries its card's `from`;
-   a subtask let go between cards becomes a task with its parent's projects (as in the lists), then the swap. A nest
-   place writes only the nest: a subtask has its parent's projects.
+   (`swappedProjects`): `to` takes `from`'s place in the line's order (decision 13), the others kept. By project only,
+   when the part's project (the node's for its own part, none for No project's) differs from the card's `from`. A
+   subtask's row carries its card's `from`; a subtask let go between cards becomes a task with its parent's projects (as
+   in the lists), then the swap. A nest place writes only the nest: a subtask has its parent's projects.
 6. **By stage keeps the file's order inside a stage** (the list's order), not the order of the branch's projects.
 7. **A part the screen no longer has** (or a list that takes no drop) rejects with StaleTaskError, writing nothing.
 8. **The landing** prefers the part the card was dropped in when the task shows in two; a nested card lands as a
@@ -85,6 +86,30 @@ The plugin comes first (Max: «плагин в приоритете»); the iPho
    place: a card let go above the first header goes into the node's own part (the plugin's rule had opened that header,
    leaving no way into an empty own part from the list). With no untitled part (By stage, All) every header opens, so the
    list's top is the first part's.
+10. **A drop that leaves a task in its own stage only reorders** (lead, review). Its line moves in the file next to its
+    neighbour, into the neighbour's section, and nothing else on it changes: no date, time (`⏰`), reminder or field is
+    cleared (`TaskChange` `reorder` `{ group, before }`, `ops.reorder`). A stage is the file's list (`stageOf`: Today is
+    Now), so a card and its neighbour in one stage always share a list; there is no case of a card whose list differs
+    from its stage. Repros: `Now T ⏰ 14:00-15:00` dragged above `Now A` keeps its time; `Soon D 📅 2026-11-20` above
+    `Soon A` keeps its date; both modes.
+11. **Another stage takes a card only as its funnel column would** (`acceptsDrop`, each card's origin as the funnel
+    knows it: a task on a time from the timeline, Now's and a dated Soon task from their day's list, else its list):
+    Inbox and Backlog refuse a dated or timed task, Soon a timed one, Today takes any. The move is the column's own
+    write (`dropMove` of the group drop: into Today, dated today; from Today to Soon, undated). Where it would refuse,
+    `rules.projectsTakes(view, cards, place)` (in `contracts.ts`, as `acceptsDrop` and `placesInGap` are) is false: the
+    frontend shows no drop line and lets go of nothing, as over a list that does not take the card; `dropInProjects`
+    there writes nothing. Several cards are taken only when the column takes them all.
+12. **By project, an empty part or a drop whose only effect is the project changes only the project** (lead, review):
+    the task keeps its stage, list, place, date and time; the empty part's plus target is never used for a task that
+    exists (By stage an empty stage is still that stage's list, its end, as the column). Between cards the stage is the
+    card above's when the cards may enter it; my addition: at a boundary between two stages, where the card above's
+    stage refuses them, the card below's is tried (a dated Soon card let go at the top of the Soon cards, under the last
+    Backlog card, reorders before the first Soon card instead of being refused); only when neither takes them is the
+    drop refused.
+13. **The swap keeps the line's order** (lead, review). `swappedProjects(projects, from, to)`: `to` takes `from`'s place;
+    `to` there already: `from` only goes; null `to`: `from` goes; null `from` (or one the task lacks): `to` last. So a
+    task's first project changes only when `from` was first. `dropOnProject` runs the same rule: `🗂️ P 🗂️ Q` from P
+    onto Empty is `🗂️ Empty 🗂️ Q`.
 
 ### Obsidian frontend
 
@@ -110,3 +135,6 @@ The plugin comes first (Max: «плагин в приоритете»); the iPho
 7. **The drop line never stands over the list's top.** Into an empty own part drawn as nothing (Backend decision 9) the
    gap is above the first header, at the list's very top, where half the line's dot was cut off. The line stands no
    higher than its dot whole under the list's top, in every list (the funnel's columns too).
+8. **A place the core refuses** (`projectsTakes`, Backend decision 11) is a list that does not take the card: no drop
+   line, no plate lit, and letting go there drops nothing (the card flies back), the same path as over a funnel column
+   that refuses a card.

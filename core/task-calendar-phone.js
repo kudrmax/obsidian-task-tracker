@@ -743,8 +743,8 @@
       this.changes = changes;
     }
     /** `ids`, who the tasks are on each side: each changed block keeps its lines' (`Hunk.removedIds`, `addedIds`). */
-    static between(before, after2, ids) {
-      const hunks = hunksOf(before.split("\n"), after2.split("\n"));
+    static between(before, after, ids) {
+      const hunks = hunksOf(before.split("\n"), after.split("\n"));
       if (!ids) return new _TextPatch(hunks);
       const of = (map, from, count) => Array.from({ length: count }, (_, k) => map.get(from + k) ?? null);
       return new _TextPatch(hunks.map((h) => ({ ...h, removedIds: of(ids.before, h.before, h.removed.length), addedIds: of(ids.after, h.after, h.added.length) })));
@@ -803,16 +803,16 @@
     }
     return best;
   }
-  function hunksOf(before, after2) {
+  function hunksOf(before, after) {
     const hunks = [];
-    for (const [b0, b1, a0, a1] of mergedBlocks(changedBlocks(before, after2))) {
+    for (const [b0, b1, a0, a1] of mergedBlocks(changedBlocks(before, after))) {
       const above = Math.max(0, b0 - CONTEXT);
       const below = Math.min(before.length, b1 + CONTEXT);
       hunks.push({
         before: b0,
         after: a0,
         removed: before.slice(b0, b1),
-        added: after2.slice(a0, a1),
+        added: after.slice(a0, a1),
         above: before.slice(above, b0),
         below: before.slice(b1, below),
         atStart: b0 < CONTEXT,
@@ -832,13 +832,13 @@
     }
     return merged;
   }
-  function changedBlocks(before, after2) {
+  function changedBlocks(before, after) {
     let head = 0;
-    while (head < before.length && head < after2.length && before[head] === after2[head]) head++;
+    while (head < before.length && head < after.length && before[head] === after[head]) head++;
     let tail = 0;
-    while (tail < before.length - head && tail < after2.length - head && before[before.length - 1 - tail] === after2[after2.length - 1 - tail]) tail++;
+    while (tail < before.length - head && tail < after.length - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
     const b = before.slice(head, before.length - tail);
-    const a = after2.slice(head, after2.length - tail);
+    const a = after.slice(head, after.length - tail);
     const same = sharedLines(b, a);
     const blocks = [];
     let i = 0;
@@ -928,17 +928,17 @@
   }
 
   // core/domain/LineMatch.ts
-  function matchLines(before, after2, alike) {
+  function matchLines(before, after, alike) {
     let head = 0;
-    while (head < before.length && head < after2.length && before[head] === after2[head]) head++;
+    while (head < before.length && head < after.length && before[head] === after[head]) head++;
     let tail = 0;
-    while (tail < before.length - head && tail < after2.length - head && before[before.length - 1 - tail] === after2[after2.length - 1 - tail]) tail++;
-    const shared = sharedLines(before.slice(head, before.length - tail), after2.slice(head, after2.length - tail)).map(([b2, a2]) => [b2 + head, a2 + head]);
-    const anchors = [...Array.from({ length: head }, (_, i) => [i, i]), ...shared, ...Array.from({ length: tail }, (_, i) => [before.length - tail + i, after2.length - tail + i])];
+    while (tail < before.length - head && tail < after.length - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
+    const shared = sharedLines(before.slice(head, before.length - tail), after.slice(head, after.length - tail)).map(([b2, a2]) => [b2 + head, a2 + head]);
+    const anchors = [...Array.from({ length: head }, (_, i) => [i, i]), ...shared, ...Array.from({ length: tail }, (_, i) => [before.length - tail + i, after.length - tail + i])];
     const pairs = [];
     let b = 0;
     let a = 0;
-    for (const anchor of [...anchors, [before.length, after2.length]]) {
+    for (const anchor of [...anchors, [before.length, after.length]]) {
       pairs.push(...inPlace(b, anchor[0], a, anchor[1], alike));
       if (anchor[0] < before.length) pairs.push(anchor);
       b = anchor[0] + 1;
@@ -1266,8 +1266,8 @@
         else rows.splice(at++, 0, ...mint.rows([""]));
       }
       rows.splice(at, 0, ...lines);
-      const after2 = at + lines.length;
-      if (span.own.length === 0 && after2 < rows.length && rows[after2].line.trim() !== "") rows.splice(after2, 0, ...mint.rows([""]));
+      const after = at + lines.length;
+      if (span.own.length === 0 && after < rows.length && rows[after].line.trim() !== "") rows.splice(after, 0, ...mint.rows([""]));
       return this.withRows(rows, mint);
     }
     /** The rows with a new `## Projects` holding `lines`, right after Inbox, apart from what is around it by blank lines. */
@@ -1529,12 +1529,12 @@
      * `after`, this document once `entry` was taken from its place (and put elsewhere): without the section it was the
      * last task of, when only blank lines are left under its heading. No section's heading is left to the rules.
      */
-    leftBy(entry, after2) {
-      if (entry.path.length > 0 || entry.group === null) return after2;
+    leftBy(entry, after) {
+      if (entry.path.length > 0 || entry.group === null) return after;
       const group = this.groups(entry.section).find((g) => g.entries.some((e) => e.index === entry.index));
-      const left = group && after2.groups(entry.section)[group.index];
-      if (!group || !left?.heading || left.name !== group.name || !left.blank) return after2;
-      return after2.deleteGroup(entry.section, left.index);
+      const left = group && after.groups(entry.section)[group.index];
+      if (!group || !left?.heading || left.name !== group.name || !left.blank) return after;
+      return after.deleteGroup(entry.section, left.index);
     }
     /**
      * The entry's lines under another indent, its own line written with `projects` as its projects: a subtask that becomes
@@ -2080,6 +2080,12 @@
     const entered = patch(doc, entry, enteringList(list, today, date));
     return entered.moveEntry(sameEntryIn(entered, entry), list, positionIn(entered, list, group, before));
   }
+  function reorder(doc, entry, group, before) {
+    if (before !== null && samePlace(before, entry)) return doc;
+    const list = entry.section;
+    if (list === "done") return doc;
+    return doc.moveEntry(entry, list, positionIn(doc, list, group, before));
+  }
   function positionIn(doc, list, group, before) {
     if (before !== null && before.section === list) return before.index;
     return group === null ? "end" : { endOf: groupIndex(doc, list, group) };
@@ -2575,11 +2581,11 @@ ${e.calendar}`;
   var IPHONE_FRESH_MS = 10 * 6e4;
   function iphoneCalendarAdds(next, last, nowMs) {
     const before = parsedObject(last);
-    const after2 = parsedObject(next);
-    if (before === null || after2 === null || typeof before.exportedAt !== "string") return true;
+    const after = parsedObject(next);
+    if (before === null || after === null || typeof before.exportedAt !== "string") return true;
     const written = isoMoment(before.exportedAt).getTime();
     if (Number.isNaN(written) || nowMs - written >= IPHONE_FRESH_MS) return true;
-    return !sameJson(withoutExportedAt(before), withoutExportedAt(after2));
+    return !sameJson(withoutExportedAt(before), withoutExportedAt(after));
   }
   function parsedObject(text) {
     if (text === null) return null;
@@ -3625,10 +3631,11 @@ ${key.title}`.toLowerCase();
     return changed2 === tree ? doc : doc.withProjectTree(changed2);
   }
   function swappedProjects(projects, from, to) {
-    const without = from === null ? projects : projects.filter((p) => projectKey(p) !== projectKey(from));
-    if (to === null) return uniqueNames(without);
-    const kept = without.filter((p) => projectKey(p) !== projectKey(to));
-    return uniqueNames([...kept, projects.find((p) => projectKey(p) === projectKey(to)) ?? to]);
+    const at = from === null ? -1 : projects.findIndex((p) => projectKey(p) === projectKey(from));
+    const has = to !== null && projects.some((p) => projectKey(p) === projectKey(to));
+    if (at < 0) return uniqueNames(to === null || has ? projects : [...projects, to]);
+    const swapped = projects.flatMap((p, i) => i !== at ? [p] : to === null || has ? [] : [to]);
+    return uniqueNames(swapped);
   }
   function projectHolder(doc, entry) {
     return entry.path.length === 0 ? entry : doc.find(entry.section, entry.index, []);
@@ -5195,6 +5202,109 @@ ${key.title}`.toLowerCase();
     return projectsGap(rows, gap, base + Math.round(shift / PROJECTS_INDENT), lifted2);
   }
 
+  // core/application/projectsDrop.ts
+  var COLUMN_OF = { now: "day", soon: "soon", inbox: "inbox", backlog: "backlog" };
+  function listOf2(item) {
+    return item.list === "done" ? null : item.list;
+  }
+  function originOf(item) {
+    if (item.slot !== null) return "timeline";
+    if (item.list === "now" || item.list === "soon" && item.dueDate !== null) return "day";
+    return item.list;
+  }
+  function itemOf2(view, key) {
+    for (const section of view.sections) for (const row of section.rows) if (samePlace2(row.item.key, key)) return row.item;
+    throw new StaleTaskError();
+  }
+  function sameTask2(a, b) {
+    return a.id === b.id;
+  }
+  function planOf(view, carried, place) {
+    const section = view.sections.find((s) => s.group === place.group);
+    if (!section) throw new StaleTaskError();
+    const at = place.before === null ? section.cards.length : section.cards.findIndex((card) => samePlace2(card.item.key, place.before));
+    if (at < 0) throw new StaleTaskError();
+    const kept = (card) => !carried.some((item) => sameTask2(item, card.item));
+    const above = section.cards.slice(0, at).filter(kept).pop();
+    const below = section.cards.slice(at).find(kept);
+    const anchors = [...above ? [{ kind: "after", item: above.item }] : [], ...below ? [{ kind: "before", item: below.item }] : []];
+    const anchor = anchors.find((a) => enters(carried, targetList(a))) ?? anchors[0] ?? { kind: "empty", list: view.mode === "byStage" ? stageList(section) : null };
+    return { anchor, project: view.mode === "byProject" ? partProject(view, section) : void 0 };
+  }
+  function enters(carried, target) {
+    if (target === null) return true;
+    const moving2 = carried.filter((item) => listOf2(item) !== target);
+    return moving2.length === 0 || acceptsDrop(COLUMN_OF[target], moving2.map(originOf));
+  }
+  function stageList(section) {
+    const place = section.newTask?.place;
+    return place && place.kind === "list" ? place.list : null;
+  }
+  function targetList(anchor) {
+    return anchor.kind === "empty" ? anchor.list : listOf2(anchor.item);
+  }
+  function projectsTakes(view, cards, place) {
+    if (!view.reorders) return false;
+    if (place.kind === "subtask") return true;
+    const carried = cards.map((card) => itemOf2(view, card.key));
+    return enters(carried, targetList(planOf(view, carried, place).anchor));
+  }
+  function projectsDropSteps(view, doc, entryOf, cards, place, today) {
+    if (!view.reorders) throw new StaleTaskError();
+    if (place.kind === "subtask") return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
+    if (!projectsTakes(view, cards, place)) return [];
+    const carried = cards.map((card) => itemOf2(view, card.key));
+    const { anchor, project } = planOf(view, carried, place);
+    const target = targetList(anchor);
+    const dropped = new Set(cards.map((card) => entryOf(card.key).id));
+    const spot = target === null ? null : spotOf(doc, anchor, target, entryOf, dropped);
+    return cards.flatMap((card, i) => {
+      const item = carried[i];
+      const moves = [];
+      if (spot !== null && target !== null) {
+        if (listOf2(item) === target) moves.push({ key: card.key, change: { kind: "reorder", group: spot.group, before: spot.before } });
+        else {
+          const move = dropMove(originOf(item), { kind: "group", list: target, date: null, group: spot.group, before: spot.before }, today);
+          if (move.kind === "toTime" || move.kind === "clearSlot") throw new StaleTaskError();
+          moves.push({ key: card.key, change: move });
+        }
+      }
+      if (project !== void 0 && !sameProject(card.from, project)) moves.push({ key: card.key, change: { kind: "swapProject", from: card.from, to: project } });
+      return moves;
+    });
+  }
+  function spotOf(doc, anchor, list, entryOf, dropped) {
+    if (anchor.kind === "empty") return { group: null, before: null };
+    const entry = entryOf(anchor.item.key);
+    if (anchor.kind === "before") return { group: entry.group, before: keyOf(entry) };
+    const next = doc.tasks(list).find((other) => other.index > entry.index && other.group === entry.group && !dropped.has(other.id));
+    return { group: entry.group, before: next ? keyOf(next) : null };
+  }
+  function partProject(view, section) {
+    return section.group === null ? projectOfNode(view.selected) : projectOfNode(section.key);
+  }
+  function sameProject(a, b) {
+    return a === null || b === null ? a === b : projectKey(a) === projectKey(b);
+  }
+  function projectsLandingOf(view, id, group) {
+    const parts = [...view.sections.filter((s) => group !== void 0 && s.group === group), ...view.sections.filter((s) => group === void 0 || s.group !== group)];
+    for (const section of parts) {
+      const index = section.cards.findIndex((card) => card.item.id === id);
+      if (index >= 0) {
+        const card = section.cards[index];
+        return { kind: "card", id, item: card.item, card: card.id, section: section.key, index };
+      }
+    }
+    for (const section of parts) {
+      const rowAt = section.rows.findIndex((row2) => row2.level > 0 && row2.item.id === id);
+      if (rowAt < 0) continue;
+      const row = section.rows[rowAt];
+      const parent = section.rows.slice(0, rowAt).reverse().find((r) => r.level === row.level - 1);
+      return { kind: "subtask", id, item: row.item, parent: parent.item.id, index: parent.item.subtasks.findIndex((sub) => sub.id === id) };
+    }
+    return { kind: "away", id, item: null };
+  }
+
   // core/application/contracts.ts
   var StaleTaskError = class extends Error {
     constructor() {
@@ -6032,14 +6142,14 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/TaskRules.ts
-  var MOVES = /* @__PURE__ */ new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest"]);
+  var MOVES = /* @__PURE__ */ new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest", "reorder"]);
   function refsOf(change) {
-    if (change.kind === "moveBefore" || change.kind === "moveToGroup") return [change.before];
+    if (change.kind === "moveBefore" || change.kind === "moveToGroup" || change.kind === "reorder") return [change.before];
     if (change.kind === "nest") return [change.parent, change.before];
     return [];
   }
   function freshChange(change, fresh) {
-    if (change.kind === "moveBefore" || change.kind === "moveToGroup") return { ...change, before: fresh(change.before) };
+    if (change.kind === "moveBefore" || change.kind === "moveToGroup" || change.kind === "reorder") return { ...change, before: fresh(change.before) };
     if (change.kind === "nest") return { ...change, parent: fresh(change.parent), before: fresh(change.before) };
     return change;
   }
@@ -6501,6 +6611,8 @@ ${key.title}`.toLowerCase();
           return setLabels(doc, entry, change.labels);
         case "project":
           return setProjects(doc, entry, change.project === null ? [] : [change.project]);
+        case "reorder":
+          return reorder(doc, entry, change.group, first);
         case "swapProject": {
           const holder = projectHolder(doc, entry);
           return doc.replace(holder, { ...holder.task, projects: swappedProjects(holder.task.projects, change.from, change.to) });
@@ -6553,21 +6665,21 @@ ${key.title}`.toLowerCase();
      * While the host's notes are not complete, a file that awaits the move is written without either: the move comes
      * once they are.
      */
-    projected(before, after2, settings) {
+    projected(before, after, settings) {
       const notes = this.legacy.list();
       const mark = settings.resultMark;
-      if (!this.legacy.ready()) return awaitsMove(after2, notes, mark) ? after2 : withTasksInTree(after2);
-      const moved2 = awaitsMove(before, notes, mark) ? movedToProjects(after2, notes, mark) : after2;
+      if (!this.legacy.ready()) return awaitsMove(after, notes, mark) ? after : withTasksInTree(after);
+      const moved2 = awaitsMove(before, notes, mark) ? movedToProjects(after, notes, mark) : after;
       return withTasksInTree(moved2);
     }
     written(doc, operation, at, writes = true) {
       const { settings, today, boundary } = at;
       const changed2 = operation(doc, today, settings, boundary);
       const projected = changed2 === doc ? changed2 : this.projected(doc, changed2, settings);
-      const after2 = normalize(projected, today, boundary, usablePresets(settings.groups.presets));
-      const text = after2.serialize();
-      if (writes) this.identity?.wrote(text, after2);
-      return { text, before: doc, after: after2 };
+      const after = normalize(projected, today, boundary, usablePresets(settings.groups.presets));
+      const text = after.serialize();
+      if (writes) this.identity?.wrote(text, after);
+      return { text, before: doc, after };
     }
   };
 
@@ -6648,69 +6760,6 @@ ${key.title}`.toLowerCase();
       if (deeper) return deeper;
     }
     return null;
-  }
-
-  // core/application/projectsDrop.ts
-  var GROUPED = /* @__PURE__ */ new Set(["inbox", "backlog", "soon", "now"]);
-  function projectsDropSteps(view, doc, entryOf, cards, place) {
-    if (!view.reorders) throw new StaleTaskError();
-    if (place.kind === "subtask") return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
-    const section = view.sections.find((s) => s.group === place.group);
-    if (!section) throw new StaleTaskError();
-    const move = placeIn(section, doc, entryOf, new Set(cards.map((card) => entryOf(card.key).id)), place.before);
-    if (move === null) return [];
-    const to = partProject(view, section);
-    return cards.flatMap((card) => [
-      { key: card.key, change: move },
-      ...view.mode === "byProject" && !sameProject(card.from, to) ? [{ key: card.key, change: { kind: "swapProject", from: card.from, to } }] : []
-    ]);
-  }
-  function placeIn(section, doc, entryOf, dropped, before) {
-    const at = before === null ? section.cards.length : section.cards.findIndex((card) => samePlace2(card.item.key, before));
-    if (at < 0) throw new StaleTaskError();
-    const kept = (card) => !dropped.has(entryOf(card.item.key).id);
-    const above = section.cards.slice(0, at).filter(kept).pop();
-    const below = section.cards.slice(at).find(kept);
-    if (above) return after(doc, entryOf(above.item.key), dropped);
-    if (below) {
-      const entry = entryOf(below.item.key);
-      return { kind: "moveToGroup", list: listOf2(entry), group: entry.group, before: keyOf(entry) };
-    }
-    const plus = section.newTask?.place;
-    return plus && plus.kind === "list" ? { kind: "moveToGroup", list: plus.list, group: plus.group, before: plus.before } : null;
-  }
-  function after(doc, entry, dropped) {
-    const list = listOf2(entry);
-    const next = doc.tasks(entry.section).find((other) => other.index > entry.index && other.group === entry.group && !dropped.has(other.id));
-    return { kind: "moveToGroup", list, group: entry.group, before: next ? keyOf(next) : null };
-  }
-  function listOf2(entry) {
-    if (!GROUPED.has(entry.section)) throw new StaleTaskError();
-    return entry.section;
-  }
-  function partProject(view, section) {
-    return section.group === null ? projectOfNode(view.selected) : projectOfNode(section.key);
-  }
-  function sameProject(a, b) {
-    return a === null || b === null ? a === b : projectKey(a) === projectKey(b);
-  }
-  function projectsLandingOf(view, id, group) {
-    const parts = [...view.sections.filter((s) => group !== void 0 && s.group === group), ...view.sections.filter((s) => group === void 0 || s.group !== group)];
-    for (const section of parts) {
-      const index = section.cards.findIndex((card) => card.item.id === id);
-      if (index >= 0) {
-        const card = section.cards[index];
-        return { kind: "card", id, item: card.item, card: card.id, section: section.key, index };
-      }
-    }
-    for (const section of parts) {
-      const rowAt = section.rows.findIndex((row2) => row2.level > 0 && row2.item.id === id);
-      if (rowAt < 0) continue;
-      const row = section.rows[rowAt];
-      const parent = section.rows.slice(0, rowAt).reverse().find((r) => r.level === row.level - 1);
-      return { kind: "subtask", id, item: row.item, parent: parent.item.id, index: parent.item.subtasks.findIndex((sub) => sub.id === id) };
-    }
-    return { kind: "away", id, item: null };
   }
 
   // core/application/TaskWrites.ts
@@ -7021,9 +7070,9 @@ ${key.title}`.toLowerCase();
         answer: (s) => {
           const ids = tasks.map((task) => this.rules.entryOf(s.doc, task.key).id);
           const write = drop.answer(s);
-          const after2 = write.operation ? this.rules.trial(s.doc, write.operation).after : s.doc;
-          const text = after2.serialize();
-          const screen = this.reads.screen({ text, doc: after2, today: s.today, boundary: s.boundary }, day);
+          const after = write.operation ? this.rules.trial(s.doc, write.operation).after : s.doc;
+          const text = after.serialize();
+          const screen = this.reads.screen({ text, doc: after, today: s.today, boundary: s.boundary }, day);
           const timeline = this.reads.timeline();
           return { landings: ids.map((id) => landingOf(screen, id, day, timeline)), screen, tasks: text };
         }
@@ -7034,7 +7083,7 @@ ${key.title}`.toLowerCase();
       return {
         reads: true,
         answer: (s) => {
-          const steps = projectsDropSteps(this.reads.projectsScreen(s), s.doc, (key) => this.rules.entryOf(s.doc, key), cards, place);
+          const steps = projectsDropSteps(this.reads.projectsScreen(s), s.doc, (key) => this.rules.entryOf(s.doc, key), cards, place, s.today);
           return this.landed(cards, this.applyAll(steps));
         }
       };
@@ -7047,9 +7096,9 @@ ${key.title}`.toLowerCase();
         answer: (s) => {
           const ids = cards.map((card) => this.rules.entryOf(s.doc, card.key).id);
           const write = drop.answer(s);
-          const after2 = write.operation ? this.rules.trial(s.doc, write.operation).after : s.doc;
-          const text = after2.serialize();
-          const view = this.reads.projectsScreen({ text, doc: after2, today: s.today, boundary: s.boundary });
+          const after = write.operation ? this.rules.trial(s.doc, write.operation).after : s.doc;
+          const text = after.serialize();
+          const view = this.reads.projectsScreen({ text, doc: after, today: s.today, boundary: s.boundary });
           return { landings: ids.map((id) => projectsLandingOf(view, id, place.kind === "task" ? place.group : void 0)), view, tasks: text };
         }
       };
@@ -7098,8 +7147,8 @@ ${key.title}`.toLowerCase();
       return { done: this.done.map((p) => p.hunks), undone: this.undone.map((p) => p.hunks) };
     }
     /** A change just made: a new step, and nothing left to do again. False when it changed no line. */
-    record(before, after2, ids) {
-      const patch2 = TextPatch.between(before, after2, ids);
+    record(before, after, ids) {
+      const patch2 = TextPatch.between(before, after, ids);
       if (patch2.empty) return false;
       this.done.push(patch2);
       if (this.done.length > DEPTH) this.done.shift();
@@ -7169,9 +7218,9 @@ ${key.title}`.toLowerCase();
       return ids;
     }
     /** A write left `text`, the document `after`: its tasks and headings are who its lines' tags say. */
-    wrote(text, after2) {
-      const tags = after2.outlineTags();
-      this.settle(after2.nextTag(), after2.outline().map((o) => ({ raw: o.raw, task: o.task, id: tags.get(o.line) })), true);
+    wrote(text, after) {
+      const tags = after.outlineTags();
+      this.settle(after.nextTag(), after.outline().map((o) => ({ raw: o.raw, task: o.task, id: tags.get(o.line) })), true);
       this.pending = null;
       this.last = { text, ids: { known: new Map([...tags].map(([line, tag]) => [line, tag])), next: this.current.next } };
     }
@@ -7179,7 +7228,7 @@ ${key.title}`.toLowerCase();
      * An undo step made `after` of `before`: a line it gave back is who it was, a line it left is who it was. Known once
      * `after` is read (`of`).
      */
-    carried(before, after2, step) {
+    carried(before, after, step) {
       const was = this.last?.text === before ? this.last.ids.known : this.pending?.text === before ? this.pending.ids : /* @__PURE__ */ new Map();
       const given = new Set(step.ids.values());
       const ids = /* @__PURE__ */ new Map();
@@ -7187,7 +7236,7 @@ ${key.title}`.toLowerCase();
         const own = step.ids.get(line) ?? (origin === null ? void 0 : was.get(origin));
         if (own !== void 0 && (step.ids.has(line) || !given.has(own))) ids.set(line, own);
       });
-      this.pending = { text: after2, ids };
+      this.pending = { text: after, ids };
       this.last = null;
     }
     /** Whether `raw` is a line the task `id` has, or had before this identity's own writes rewrote it into the line it has. */
@@ -7729,6 +7778,7 @@ ${key.title}`.toLowerCase();
     placesInGap,
     noteTags,
     projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
+    projectsTakes: (view, cards, place) => projectsTakes(view, cards, place),
     projectsGap: (rows, gap, depth, lifted2) => projectsGap(rows, gap, depth, lifted2 ?? null),
     projectsLevels: (rows, gap, lifted2) => projectsLevels(rows, gap, lifted2 ?? null),
     projectsDrop: (rows, gap, shift, lifted2) => projectsDrop(rows, gap, shift, lifted2 ?? null),

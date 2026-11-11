@@ -403,7 +403,12 @@ export type TaskChange =
 	| { readonly kind: "moveToGroup"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate }
 	/** The task's projects become this one alone (its name), null for none; a subtask keeps its parent's. */
 	| { readonly kind: "project"; readonly project: string | null }
-	/** The project `from` gives way to `to` (null: `from` taken off; `from` null: `to` added), the others kept, as a drop on the tree's row; a subtask's names its top task. */
+	/**
+	 * The task moved among its own list's tasks into `group` right before `before` (else that section's end), nothing on
+	 * its line changed: a drop that leaves a task in its own stage.
+	 */
+	| { readonly kind: "reorder"; readonly group: GroupName; readonly before: TaskKey | null }
+	/** The project `from` gives way to `to` in `from`'s place in the line's order (null `to`: `from` taken off; null `from`: `to` added last), the others kept, as a drop on the tree's row; a subtask's names its top task. */
 	| { readonly kind: "swapProject"; readonly from: string | null; readonly to: string | null }
 	| { readonly kind: "createGroup"; readonly list: GroupedList; readonly name: string; readonly date?: LocalDate }
 	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null };
@@ -917,6 +922,13 @@ export { projectsGap, projectsLevels } from "./projectsScreen";
  * row above's), kept within the gap's depths.
  */
 export { projectsDrop } from "./projectsScreen";
+/**
+ * Whether the Projects list takes these cards at a place (`projectsTakes(view, cards, place)`, each card its row's
+ * `drop`, `place` from `placeOfDrop`): false where a card would change stage into a column that refuses it, as the
+ * funnel's columns refuse it (`acceptsDrop`: Inbox and Backlog no dated or timed task, Soon no timed one). A frontend
+ * shows no drop line there and lets go of nothing, as over a list that does not take the card.
+ */
+export { projectsTakes } from "./projectsDrop";
 /** How long a held card waits over a folded row before its branch opens (`unfoldProjectNode`), ms; the indent of a tree's step, px (pt). */
 export { PROJECTS_HOVER_MS, PROJECTS_INDENT } from "./projectsScreen";
 
@@ -1133,14 +1145,15 @@ export interface TaskService {
 	dropOnProject(cards: readonly ProjectsDrop[], to: ProjectsNodeId): Promise<void>;
 	/**
 	 * Cards dropped in the Projects list (`ProjectsView.reorders`), each its row's `drop`, at `place` as the list's drop
-	 * machinery found it (`placeAt`, then `placeOfDrop` over the rows, a part's `group` as the section): the funnel's own
-	 * moves, one write, one step of undo. A place under a task nests there, as in the lists. A place between cards puts each
-	 * card right after the card above it in the file, in that card's list and section (no card above: right before the card
-	 * below; an empty part: where its plus writes, `ProjectsSection.newTask`); Today is Now, written as a drop on the day
-	 * list. By stage that is the stage's list, the projects kept. By project the part's project also takes the place of the
-	 * project the card was shown under (`ProjectsDrop.from`), as a drop on the tree's row does; its other projects stay.
-	 * Gives the tasks' keys as the file now has them. Rejects with StaleTaskError, writing nothing, for a part the screen
-	 * no longer has.
+	 * machinery found it (`placeAt`, then `placeOfDrop` over the rows, a part's `group` as the section). One write, one
+	 * step of undo. A place under a task nests there, as in the lists. Between cards the card above says where (the card
+	 * below at a part's top, or where the card above's stage refuses the cards): a card in that card's stage only moves
+	 * among its list's tasks next to it, nothing on its line changed; a card from another stage moves as a drop on that
+	 * stage's column writes it (Today is Now, dated today). An empty part: By stage that stage's list's end; By project
+	 * nothing moves. By project the part's project then takes the place of the one the card was shown under
+	 * (`ProjectsDrop.from`) in the line's order, as a drop on the tree's row does. Where a stage's column refuses a card
+	 * (`projectsTakes` false) it writes nothing. Gives the tasks' keys as the file now has them. Rejects with
+	 * StaleTaskError, writing nothing, for a part the screen no longer has.
 	 */
 	dropInProjects(cards: readonly ProjectsDrop[], place: ListPlace): Promise<readonly TaskKey[]>;
 	/** `dropInProjects` writing nothing: where each card lands and the Projects screen the drop leaves, equal to the next `projectsScreen()` after it. */

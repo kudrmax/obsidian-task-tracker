@@ -210,10 +210,15 @@ as one tree, the first name winning, and is written back as one under the first 
 - `tasks.dropInProjects(cards, place)`: cards dropped in the Projects list, each its row's `drop`; `place` the
   `ListPlace` the list's own machinery gives (`rules.placeAt` over the rows as `PlacedCard`s with `group` and the
   headers, then `rules.placeOfDrop`, null: nothing to write). A place under a task nests there as in the lists. Between
-  cards: right after the card above in the file, in its list and section (none above: right before the card below; an
-  empty part: where its plus writes); Today is Now, written as a drop on the day list (dated today). By stage the
-  projects stay; By project the part's project replaces the card's `from`, the others stay (as `dropOnProject`). One
-  write; answers the tasks' keys as the file now has them; `staleTask` for a part the screen no longer has.
+  cards, the card above says where (the card below at a part's top, or when the card above's stage would refuse the
+  cards): a card already in that card's stage only moves among its list's tasks, right after it (before it), nothing on
+  its line changed (a time, a date, a reminder stay); a card from another stage moves as a drop on that stage's column
+  writes it (Today: into Now, dated today; Soon from Today: undated). An empty part: By stage the end of that stage's
+  list, as the column; By project nothing moves. By project the part's project then takes the place of the card's
+  `from` in the line's order, the others stay. Where a stage's column would refuse a card (`rules.acceptsDrop`: Inbox
+  and Backlog no dated or timed task, Soon no timed one) the place takes no drop: `rules.projectsTakes(view, cards,
+  place)` is false, the host shows no drop line and lets go of nothing, and `dropInProjects` writes nothing. One write;
+  answers the tasks' keys as the file now has them; `staleTask` for a part the screen no longer has.
   `tasks.dropInProjects([card.drop], { kind: "task", group: "today", before: null })` puts a Soon card into Now.
 - `tasks.projectsDropPreview(cards, place)`: the same, writing nothing: `{ landings, view, tasks }`, `view` the
   `ProjectsView` the drop leaves (equal to the next `projectsScreen`), each landing `{ kind: "card", id, item, card,
@@ -239,7 +244,8 @@ as one tree, the first name winning, and is written back as one under the first 
 - `tasks.dropOnProject(cards, row.node)`, each card's `drop` (`ProjectsDrop` `{ key, from }`): cards let go on a row
   (`acceptsTask`): each card's `from` gives way to the row's project (No project: taken off), the others and the place in
   the funnel stay. `tasks.dropOnProject([{ key, from: "Где знакомиться" }], "project:Small talk")` turns `🗂️ Где
-  знакомиться 🗂️ Дружба` into `🗂️ Дружба 🗂️ Small talk`.
+  знакомиться 🗂️ Дружба` into `🗂️ Small talk 🗂️ Дружба`: the new project takes the old one's place in the line (one
+  the task has already: the old one only goes), so the first project changes only when the old one was first.
 - The plus let go on the tasks writes `tasks.createInPlace(text, priority, newTask.place, null, [], newTask.project)`
   with the section's `newTask` (By project: Inbox with that subproject; By stage: that stage's list with the node's
   project), or the view's `newTask` outside any section.

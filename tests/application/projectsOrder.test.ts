@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placeAt, StaleTaskError, type ListPlace, type PlacedCard, type PlacedHead, type ProjectsSection, type ProjectsView } from "../../core/application/contracts";
+import { placeAt, projectsTakes, StaleTaskError, type ListPlace, type PlacedCard, type PlacedHead, type ProjectsSection, type ProjectsView } from "../../core/application/contracts";
 import { callDoor, type DoorAnswer } from "../../core/application/PhoneCalls";
 import { memoryProjectsScreen, type Clock } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
@@ -225,9 +225,9 @@ describe("By stage: a drop moves the task to that stage's list at that place", (
 	it("several cards go together, in the file's order", async () => {
 		const { svc, store } = await setup("project:P", "byStage");
 		const view = await svc.projectsScreen();
-		const cards = [cardIn(titled(view, "Today"), "Now A").drop, cardIn(titled(view, "Inbox"), "Inbox A").drop];
+		const cards = [cardIn(titled(view, "Soon"), "Soon A").drop, cardIn(titled(view, "Inbox"), "Inbox A").drop];
 		await svc.dropInProjects(cards, { kind: "task", group: "backlog", before: null });
-		expect(lines(store.text!, "Backlog")).toContain("- [ ] Back B 🗂️ P\n\t- [ ] Child\n- [ ] Inbox A 🗂️ P\n- [ ] Now A 🗂️ P\n- [ ] Back Q 🗂️ Q\n");
+		expect(lines(store.text!, "Backlog")).toContain("- [ ] Back B 🗂️ P\n\t- [ ] Child\n- [ ] Inbox A 🗂️ P\n- [ ] Soon A 🗂️ P\n- [ ] Back Q 🗂️ Q\n");
 	});
 });
 
@@ -235,8 +235,15 @@ describe("By project: a drop takes the stage of the card above, and the part's p
 	it("between cards of another stage, right after the card above in the file", async () => {
 		const { svc, store } = await setup();
 		const own = (await svc.projectsScreen()).sections[0];
+		await svc.dropInProjects([cardIn(own, "Inbox A").drop], { kind: "task", group: null, before: cardIn(own, "Soon A").item.key });
+		expect(lines(store.text!, "Backlog")).toContain("- [ ] Back B 🗂️ P\n\t- [ ] Child\n- [ ] Inbox A 🗂️ P\n- [ ] Back Q 🗂️ Q\n");
+	});
+
+	it("where the card above's stage refuses it, the card below's stage takes it", async () => {
+		const { svc, store } = await setup();
+		const own = (await svc.projectsScreen()).sections[0];
 		await svc.dropInProjects([cardIn(own, "Now A").drop], { kind: "task", group: null, before: cardIn(own, "Soon A").item.key });
-		expect(lines(store.text!, "Backlog")).toContain("- [ ] Back B 🗂️ P\n\t- [ ] Child\n- [ ] Now A 🗂️ P\n- [ ] Back Q 🗂️ Q\n");
+		expect(lines(store.text!, "Soon")).toContain("- [ ] Now A 🗂️ P\n- [ ] Soon A 🗂️ P\n");
 		expect(store.text).toContain("## Now\n\n## Soon");
 	});
 
@@ -248,19 +255,19 @@ describe("By project: a drop takes the stage of the card above, and the part's p
 		expect(lines(store.text!, "Soon")).toContain("- [ ] Soon other\n- [ ] Now A 🗂️ Sub\n- [ ] Soon B 🗂️ Sub 🗂️ Q\n");
 	});
 
-	it("a card shown under a subproject dropped in the node's own part takes the node, its other projects stay", async () => {
+	it("a card shown under a subproject dropped in the node's own part takes the node in that project's place, its other projects stay", async () => {
 		const { svc, store } = await setup();
 		const view = await svc.projectsScreen();
 		const own = view.sections[0];
 		await svc.dropInProjects([cardIn(titled(view, "Sub"), "Soon B").drop], { kind: "task", group: null, before: cardIn(own, "Soon E").item.key });
-		expect(lines(store.text!, "Soon")).toContain("- [ ] Soon B 🗂️ Q 🗂️ P\n");
+		expect(lines(store.text!, "Soon")).toContain("- [ ] Soon A 🗂️ P\n- [ ] Soon B 🗂️ P 🗂️ Q\n- [ ] Soon other\n");
 	});
 
-	it("into an empty part, as that part's plus writes: at the end of Inbox, with that project", async () => {
+	it("into an empty part only the project changes: the task keeps its place, stage and fields", async () => {
 		const { svc, store } = await setup();
 		const view = await svc.projectsScreen();
 		await svc.dropInProjects([cardIn(view.sections[0], "Back A").drop], { kind: "task", group: "project:Empty", before: null });
-		expect(lines(store.text!, "Inbox")).toBe("- [ ] Inbox A 🗂️ P\n- [ ] Inbox loose\n- [ ] Back A 🗂️ Empty 📁\n\t- [ ] Step 1\n\t- [ ] Step 2\n");
+		expect(lines(store.text!, "Backlog")).toBe("- [ ] Back A 🗂️ Empty 📁\n\t- [ ] Step 1\n\t- [ ] Step 2\n- [ ] Back B 🗂️ P\n\t- [ ] Child\n- [ ] Back Q 🗂️ Q\n");
 	});
 
 	it("All: a drop at another project's part's end takes the stage of its last card and swaps the project", async () => {
@@ -322,5 +329,82 @@ describe("the door", () => {
 		expect(deleted.tasks).toContain("## Projects\n\n- Sub\n- Empty\n- Q\n");
 		expect(deleted.tasks).toContain("- [ ] Inbox A\n");
 		expect(deleted.tasks).toContain("- [x] Closed\n");
+	});
+});
+
+/** The review's repros: a drop that keeps a task in its stage changes nothing but its place; another stage takes it only as its column would. */
+const TIMED = FILE.replace("- [ ] Now A 🗂️ P", "- [ ] Now A 🗂️ P\n- [ ] Now T 🗂️ P ⏰ 2026-11-11 14:00-15:00").replace("- [ ] Soon E 🗂️ P", "- [ ] Soon E 🗂️ P\n- [ ] Soon D 🗂️ P 📅 2026-11-20");
+
+describe("a drop in its own stage only reorders", () => {
+	it("a timed task among Today's cards keeps its time, both modes", async () => {
+		for (const mode of ["byStage", "byProject"] as const) {
+			const { svc, store } = await setup("project:P", mode, TIMED);
+			const view = await svc.projectsScreen();
+			const part = mode === "byStage" ? titled(view, "Today") : view.sections[0];
+			await svc.dropInProjects([cardIn(part, "Now T").drop], { kind: "task", group: part.group, before: cardIn(part, "Now A").item.key });
+			expect(lines(store.text!, "Now")).toBe("- [ ] Now T 🗂️ P ⏰ 2026-11-11 14:00-15:00\n- [ ] Now A 🗂️ P\n");
+		}
+	});
+
+	it("a dated Soon task keeps its date, both modes", async () => {
+		for (const mode of ["byStage", "byProject"] as const) {
+			const { svc, store } = await setup("project:P", mode, TIMED);
+			const view = await svc.projectsScreen();
+			const part = mode === "byStage" ? titled(view, "Soon") : view.sections[0];
+			await svc.dropInProjects([cardIn(part, "Soon D").drop], { kind: "task", group: part.group, before: cardIn(part, "Soon A").item.key });
+			expect(lines(store.text!, "Soon")).toContain("- [ ] Soon D 🗂️ P 📅 2026-11-20\n- [ ] Soon A 🗂️ P\n");
+		}
+	});
+});
+
+describe("another stage takes a card only as its column would", () => {
+	it("Inbox and Backlog refuse a dated or a timed task, both modes: no place, nothing written", async () => {
+		for (const mode of ["byStage", "byProject"] as const) {
+			for (const title of ["Soon D", "Now T"]) {
+				const { svc, store } = await setup("project:P", mode, TIMED);
+				const view = await svc.projectsScreen();
+				const card = view.sections.flatMap((s) => s.cards).find((c) => c.item.title === title)!;
+				const into = mode === "byStage" ? [titled(view, "Inbox"), titled(view, "Backlog")] : [view.sections[0]];
+				for (const part of into) {
+					const before = mode === "byStage" ? null : cardIn(part, "Back B").item.key;
+					const place: ListPlace = { kind: "task", group: part.group, before };
+					expect(projectsTakes(view, [card.drop], place)).toBe(false);
+					const text = store.text;
+					await svc.dropInProjects([card.drop], place);
+					expect(store.text).toBe(text);
+				}
+			}
+		}
+	});
+
+	it("Soon refuses a timed task; Today takes a dated one", async () => {
+		const { svc, store } = await setup("project:P", "byStage", TIMED);
+		const view = await svc.projectsScreen();
+		expect(projectsTakes(view, [cardIn(titled(view, "Today"), "Now T").drop], { kind: "task", group: "soon", before: null })).toBe(false);
+		const place: ListPlace = { kind: "task", group: "today", before: null };
+		expect(projectsTakes(view, [cardIn(titled(view, "Soon"), "Soon D").drop], place)).toBe(true);
+		await svc.dropInProjects([cardIn(titled(view, "Soon"), "Soon D").drop], place);
+		expect(lines(store.text!, "Now")).toContain("- [ ] Soon D 🗂️ P 📅 2026-11-11\n");
+	});
+
+	it("an empty subproject's part takes a dated task, which keeps its stage and date", async () => {
+		const { svc, store } = await setup("project:P", "byProject", TIMED);
+		const view = await svc.projectsScreen();
+		const place: ListPlace = { kind: "task", group: "project:Empty", before: null };
+		expect(projectsTakes(view, [cardIn(view.sections[0], "Soon D").drop], place)).toBe(true);
+		await svc.dropInProjects([cardIn(view.sections[0], "Soon D").drop], place);
+		expect(lines(store.text!, "Soon")).toContain("- [ ] Soon E 🗂️ P\n- [ ] Soon D 🗂️ Empty 📅 2026-11-20\n");
+	});
+});
+
+describe("the project swap keeps the line's order", () => {
+	it("the new project takes the old one's place; one the task has already only loses the old", async () => {
+		const text = FILE.replace("- [ ] Back Q 🗂️ Q", "- [ ] Back Q 🗂️ P 🗂️ Q").replace("- [ ] Inbox loose", "- [ ] Inbox loose 🗂️ P 🗂️ Sub");
+		const { svc, store } = await setup("project:P", "byProject", text);
+		const own = (await svc.projectsScreen()).sections[0];
+		await svc.dropOnProject([cardIn(own, "Back Q").drop], "project:Empty");
+		expect(store.text).toContain("- [ ] Back Q 🗂️ Empty 🗂️ Q\n");
+		await svc.dropInProjects([cardIn((await svc.projectsScreen()).sections[0], "Inbox loose").drop], { kind: "task", group: "project:Sub", before: null });
+		expect(store.text).toContain("- [ ] Inbox loose 🗂️ Sub\n");
 	});
 });

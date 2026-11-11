@@ -214,6 +214,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	keyId: "./taskKeys",
 	projectNodeOf: "./projectsScreen",
 	projectsGap: "./projectsScreen",
+	projectsTakes: "./projectsDrop",
 	projectsLevels: "./projectsScreen",
 	projectsDrop: "./projectsScreen",
 	PROJECTS_HOVER_MS: "./projectsScreen",
