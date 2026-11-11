@@ -3,6 +3,17 @@ import type { LocalDate } from "../domain/Task";
 import type { DropColumn } from "./contracts";
 
 /**
+ * A list a task's field can stand in: a funnel's column, or the Projects screen's list of the chosen node's tasks. Every
+ * rule of the entry that walks the lists walks `ENTRY_LISTS`, so a list added here is one it knows everywhere.
+ */
+export type EntryList = DropColumn | "projects";
+
+const LIST_SET: Readonly<Record<EntryList, true>> = { day: true, soon: true, inbox: true, backlog: true, projects: true };
+
+/** Every list a field can stand in, the funnel's first. */
+export const ENTRY_LISTS: readonly EntryList[] = Object.keys(LIST_SET) as EntryList[];
+
+/**
  * Where the screen stands: Projects (the tree and the chosen node's tasks, a place of its own: the wheel's window holds
  * its folder alone), Inbox (Inbox over Backlog beside Soon), Soon (Soon beside the day's list), the calendar (the day's
  * list beside the timeline).
@@ -20,11 +31,17 @@ export function shownLists(place: ScreenPlace): readonly DropColumn[] {
 	return SHOWN_LISTS[place];
 }
 
+/** The lists a field can stand in that `place` shows, in its order: the Projects screen its own list, the others their funnel lists. */
+export function shownEntryLists(place: ScreenPlace): readonly EntryList[] {
+	return place === "projects" ? ["projects"] : SHOWN_LISTS[place];
+}
+
 /**
  * The place that shows `column`: `place` itself when it does, else the nearest that does, the left one of two as near;
- * from Projects as from Inbox, its neighbour.
+ * from Projects as from Inbox, its neighbour. The Projects list shows only on Projects.
  */
-export function placeShowing(column: DropColumn, place: ScreenPlace): ScreenPlace {
+export function placeShowing(column: EntryList, place: ScreenPlace): ScreenPlace {
+	if (column === "projects") return "projects";
 	const at: ScreenPlace = place === "projects" ? "inbox" : place;
 	if (SHOWN_LISTS[at].includes(column)) return at;
 	const from = SCREEN_PLACES.indexOf(at);

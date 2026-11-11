@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ProjectsCard, TaskItem } from "../../core/application/contracts";
 import { ProjectTasks } from "../../obsidian/ui/projects/ProjectTasks";
 import { onDay } from "../fakes/itemOnDay";
+import { projectsView } from "../fakes/projectsView";
 
 const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: "2026-11-12", slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, group: null, subtasks: [], progress: null, parentText: null, description: null, list: "soon", isSubtask: false, ...extra }, "2026-11-07");
 
@@ -10,7 +11,7 @@ const card = (task: TaskItem, stage: ProjectsCard["stage"]): ProjectsCard => ({ 
 
 function drawn(model: ProjectsCard): HTMLElement {
 	const tasks = new ProjectTasks(document.body.appendChild(document.createElement("div")), {});
-	tasks.render({ sections: [{ key: "own", group: null, title: null, header: false, opens: false, takes: true, empty: false, plate: false, path: [], depth: 0, cards: [model], rows: [{ id: model.id, item: model.item, level: 0, card: model, drop: model.drop }], newTask: null }], emptyLabel: "No tasks", newTask: null }, false);
+	tasks.render(projectsView([{ key: "own", group: null, title: null, header: false, opens: false, takes: true, empty: false, plate: false, path: [], depth: 0, cards: [model], rows: [{ id: model.id, item: model.item, level: 0, card: model, drop: model.drop }], newTask: null }]), false);
 	return tasks.el.querySelector(".tc-card")!;
 }
 
@@ -57,7 +58,7 @@ function section(key: string, title: string | null, cards: readonly ProjectsCard
 
 function list(sections: readonly ProjectsSection[], onCard?: (card: HTMLElement, owner: ProjectsCard, subtree: readonly HTMLElement[]) => void): ProjectTasks {
 	const tasks = new ProjectTasks(document.body.appendChild(document.createElement("div")), { onCard: (card, _row, owner, subtree) => onCard?.(card, owner, subtree) });
-	tasks.render({ sections, emptyLabel: "No tasks", newTask: null }, false);
+	tasks.render(projectsView(sections), false);
 	return tasks;
 }
 
@@ -90,11 +91,12 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 		expect(tasks.headerAt(tasks.el.children[2] as HTMLElement)).toBe("t");
 	});
 
-	it("an empty part's plate opens the part's new task", () => {
-		const opened: string[] = [];
-		const tasks = new ProjectTasks(document.body.appendChild(document.createElement("div")), { onPlate: (plate, newTask) => plate.addEventListener("click", () => opened.push(newTask.project ?? "")) });
-		tasks.render({ sections: [section("s", "Soon", [], { plate: true })], emptyLabel: "No tasks", newTask: null }, false);
+	it("an empty part's plate opens the field of a new task in its part; a part that takes none has a plate that opens nothing", () => {
+		const opened: (string | null)[] = [];
+		const tasks = new ProjectTasks(document.body.appendChild(document.createElement("div")), { onPlate: (plate, group) => plate.addEventListener("click", () => opened.push(group)) });
+		tasks.render(projectsView([section("s", "Soon", [], { plate: true }), section("d", "Done", [], { plate: true, newTask: null })]), false);
 		tasks.plateOf("s")!.click();
+		tasks.plateOf("d")!.click();
 		expect(opened).toEqual(["s"]);
 	});
 
@@ -176,11 +178,23 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 			expect(asked[0]).toEqual({ kind: "task", group: "t", before: b.key });
 		});
 
-		it("takes no plus and nothing while the node keeps its order", () => {
+		it("takes no card while the node keeps its order", () => {
 			const sections = [section("s", "Soon", [cardOf(a, "s")])];
-			expect(placed(sections).hitTest(10, 150, { from: "new", item: null, grabPx: 0 })).toBe(false);
 			expect(placed(sections, false).hitTest(10, 150, carried(a))).toBe(false);
 			expect(placed(sections).hitTest(10, 150, carried(a))).toBe(true);
+		});
+
+		it("takes the plus as a list does, at a gap of a part a new task is written in, for the field to open there; none in a part that writes none", () => {
+			const plus = { from: "new" as const, item: null, grabPx: 0 };
+			const drop = placed([section("s", "Soon", [cardOf(a, "s")]), section("d", "Done", [cardOf(b, "d")], { newTask: null })]);
+			expect(drop.hitTest(10, 150, plus)).toBe(true);
+			const inSoon = 100 + 40 + 30;
+			drop.preview(10, inSoon, plus);
+			expect(drop.drop(10, inSoon, plus)).toEqual({ kind: "projectsPlace", place: { kind: "task", group: "s", before: null } });
+			const inDone = 100 + 3 * 40 + 30;
+			drop.preview(10, inDone, plus);
+			expect(drop.drop(10, inDone, plus)).toBeNull();
+				expect(placed([section("d", "Done", [cardOf(a, "d")], { newTask: null })]).hitTest(10, 150, plus)).toBe(false);
 		});
 	});
 });

@@ -152,7 +152,7 @@ class FakeTasks {
 				dayOfPlacement: (placement) => (placement.kind === "now" ? DAY : placement.kind === "date" ? placement.date : null),
 			},
 			{
-				cards: (column) => this.columns[column] ?? this.cards,
+				cards: (column) => (column === "projects" ? [] : (this.columns[column] ?? this.cards)),
 				sections: () => this.sections,
 				sectioned: () => this.sectioned,
 				day: () => this.day,

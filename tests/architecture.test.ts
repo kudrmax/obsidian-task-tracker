@@ -288,6 +288,8 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	SCREEN_PLACES: "./screenPlaces",
 	SHOWN_LISTS: "./screenPlaces",
 	shownLists: "./screenPlaces",
+	shownEntryLists: "./screenPlaces",
+	projectsEntryLook: "./projectsEntry",
 	swipeLanding: "./screenPlaces",
 	SWIPE_FLICK_SPEED: "./screenPlaces",
 	wholeWidth: "./wholeCard",

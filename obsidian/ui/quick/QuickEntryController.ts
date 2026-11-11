@@ -1,5 +1,5 @@
-import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
-import { placeShowing, shownLists } from "../screens";
+import { type EntryDrawing, type EntryList, type EntryPart as ListPart, type EntrySpot, type EntryState, type GroupName, type Header, type ListCard, type ListPlace, type Placement, QuickEntrySession, type QuickEntryTasks, shownEntryLists, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
+import { placeShowing } from "../screens";
 import type { RightMode } from "../viewSettings";
 import type { EntryPart } from "./EntryPart";
 import { DURATION, EASING, LAYOUT, tokenMs } from "../design";
@@ -11,7 +11,7 @@ import { type DropTarget, type ListColumn, type DropResult, isProjectsDrop } fro
 import type { GestureArbiter } from "../gestures";
 import type { CloseHow } from "../menu/Overlay";
 import type { TaskMenu } from "../menu/TaskMenu";
-import type { ListEntryInput, TaskList } from "../TaskList";
+import type { ListEntryInput } from "../EntryRows";
 import type { Timeline } from "../Timeline";
 import type { LocalDate, Slot } from "../types";
 import { RenamedTexts } from "../RenamedTexts";
@@ -26,8 +26,27 @@ import { WriteQueue } from "./WriteQueue";
 /** A list as a place to drop, and the column it is. */
 export type ColumnDrop = DropTarget & { readonly column: ListColumn };
 
-/** The list columns a field types in. */
-const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox", "backlog"];
+/** Every list a field types in, as a record so a list the core adds is one this must name. */
+const LIST_SET: Readonly<Record<EntryList, true>> = { day: true, soon: true, inbox: true, backlog: true, projects: true };
+const LISTS = Object.keys(LIST_SET) as EntryList[];
+
+/**
+ * A list the field stands in, as the entry reads it and tells it what was written: a funnel's column (`TaskList`), or the
+ * Projects screen's list (`ProjectTasks`), whose look and parts are the core's (`projectsEntryLook`).
+ */
+export interface EntryListShown {
+	readonly el: HTMLElement;
+	/** The cards as drawn, each in its section. */
+	readonly listCards: readonly ListCard[];
+	/** The sections as drawn. */
+	readonly sections: readonly Header[];
+	/** The cards it is about to draw from what it is to show now. */
+	readonly comingCards: readonly ListCard[];
+	/** Its parts' own writes, where the list decides what a new task typed in it writes; none for a funnel's column. */
+	readonly parts?: readonly ListPart[];
+	adopt(id: string): void;
+	forgetTyped(): void;
+}
 
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
@@ -37,9 +56,9 @@ export interface QuickEntryControllerDeps {
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
 	readonly titleField: TitleFieldFactory;
-	list(column: ListColumn): TaskList | null;
-	/** The column shows sections: the field may write one there. */
-	sectioned(column: ListColumn): boolean;
+	list(column: EntryList): EntryListShown | null;
+	/** The list shows sections: the field may write one there. */
+	sectioned(column: EntryList): boolean;
 	timeline(): Timeline | null;
 	/** A task of the timeline as the screen shows it now; null once it is not there. */
 	task(key: TaskKey): TaskItem | null;
@@ -67,10 +86,12 @@ export interface QuickEntryControllerDeps {
 	onError(error: unknown): void;
 }
 
-/** The plus on a screen that is no list of the funnel: its own places, its own tap and drop. */
+/**
+ * The plus on the Projects screen: its places (the tree, and the tasks' list, where the field opens as in any list),
+ * and what a drop on a place of its own (the tree) does.
+ */
 export interface PlusAside {
 	readonly targets: readonly DropTarget[];
-	tap(): void;
 	dropped(result: DropResult): void;
 }
 
@@ -107,7 +128,7 @@ export class QuickEntryController {
 	private focused = false;
 	private dragging = false;
 	private carrying = false;
-	private droppedOn: ListColumn | null = null;
+	private droppedOn: EntryList | null = null;
 	/** The bar's place is turning the wheel to the column the field has just moved to. */
 	private turning = false;
 	private stack: MenuField | null = null;
@@ -160,12 +181,13 @@ export class QuickEntryController {
 		this.entry = new QuickEntrySession(
 			this.telling(deps.tasks),
 			{
-				cards: (column) => this.cards(column),
+				cards: (column) => deps.list(column)?.listCards ?? [],
 				sections: (column) => deps.list(column)?.sections ?? [],
 				sectioned: (column) => deps.sectioned(column),
+				parts: (column) => deps.list(column)?.parts ?? [],
 				day: () => deps.day(),
 				today: () => deps.today(),
-				shown: () => shownLists(deps.mode()),
+				shown: () => shownEntryLists(deps.mode()),
 				fresh: (beforeShow) => this.fresh(beforeShow),
 				onChange: (state, drawnNext) => this.changed(state, drawnNext),
 			},
@@ -199,9 +221,15 @@ export class QuickEntryController {
 	}
 
 	/** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
-	openIn(column: ListColumn, group: GroupName): void {
+	openIn(column: EntryList, group: GroupName): void {
 		this.dropField();
 		this.entry.openIn(column, group);
+	}
+
+	/** The plus let go at `place` of list `column`: the field of a new task there. */
+	private openAt(column: EntryList, place: ListPlace): void {
+		this.dropField();
+		this.entry.openAt(column, place);
 	}
 
 	/**
@@ -226,10 +254,12 @@ export class QuickEntryController {
 		this.entry.openFromPlus();
 	}
 
-	/** The plus tapped: the field opens as the press ends, and what that press still sends is not a tap elsewhere. */
+	/**
+	 * The plus tapped: the field opens as the press ends, and what that press still sends is not a tap elsewhere; nothing
+	 * where the core says the plus opens no field (`plusOpens`: the Projects screen on Done).
+	 */
 	private openFromPress(): void {
-		const aside = this.deps.aside?.() ?? null;
-		if (aside) return aside.tap();
+		if (!this.entry.plusOpens()) return;
 		this.pressEnding = true;
 		this.openFromPlus();
 	}
@@ -250,13 +280,19 @@ export class QuickEntryController {
 		this.showPlus();
 	}
 
-	/** The plus carried over a screen of its own: let go on one of its places, that screen opens its field there. */
+	/**
+	 * The plus carried over the Projects screen: let go in its list, the field opens at that place in the same tap, and the
+	 * plus lands in it; on a place of the screen's own (the tree), the screen does what it does there.
+	 */
 	private dragAside(e: PointerEvent, source: HTMLElement, aside: PlusAside): void {
-		const dropped = (result: DropResult | null): null => {
+		const dropped = (result: DropResult | null): HTMLElement | null => {
 			this.carrying = false;
 			this.ring.hide();
+			if (result?.kind === "projectsPlace") {
+				this.openAt("projects", result.place);
+				if (this.field?.el.isConnected) return this.field.el;
+			} else if (result && isProjectsDrop(result)) aside.dropped(result);
 			this.showPlus();
-			if (result && isProjectsDrop(result)) aside.dropped(result);
 			return null;
 		};
 		this.ring.show();
@@ -320,7 +356,7 @@ export class QuickEntryController {
 	}
 
 	/** What `column`'s list draws for the entry: none when the field stands elsewhere. */
-	entryIn(column: ListColumn, drawing: EntryDrawing): ListEntryInput | null {
+	entryIn(column: EntryList, drawing: EntryDrawing): ListEntryInput | null {
 		const entry = this.state && this.entry.listEntry(column, drawing);
 		return entry ? { at: entry.at, level: entry.place.level, pending: entry.pending, section: entry.section, field: (row) => this.fieldIn(row) } : null;
 	}
@@ -406,10 +442,6 @@ export class QuickEntryController {
 		this.entry.open(spot, renaming);
 	}
 
-	private cards(column: ListColumn): readonly ListCard[] {
-		return this.deps.list(column)?.listCards ?? [];
-	}
-
 	/** A list the plus is carried over, which notes that it took the drop: the result alone does not say which list it was. */
 	private noted(target: ColumnDrop): DropTarget {
 		return {
@@ -443,7 +475,7 @@ export class QuickEntryController {
 			unfoldAbove: (...a) => tasks.unfoldAbove(...a),
 			createWithId: async (...a) => {
 				const created = await tasks.createWithId(...a);
-				if (created) for (const column of COLUMNS) this.deps.list(column)?.adopt(created.id);
+				if (created) for (const column of LISTS) this.deps.list(column)?.adopt(created.id);
 				return created;
 			},
 		};
@@ -605,7 +637,7 @@ export class QuickEntryController {
 	 * The lists read afresh; with `beforeShow`, the entry changes as they draw what was read. A read the same as shown, or
 	 * one a gesture holds back, draws nothing then: the entry's change is drawn here, or waits with the gesture.
 	 */
-	private async fresh(beforeShow?: (coming: (column: ListColumn) => readonly ListCard[]) => void): Promise<void> {
+	private async fresh(beforeShow?: (coming: (column: EntryList) => readonly ListCard[]) => void): Promise<void> {
 		if (!beforeShow) return this.deps.fresh();
 		let mark = -1;
 		await this.deps.fresh(() => {
@@ -619,7 +651,7 @@ export class QuickEntryController {
 		const before = this.state;
 		this.state = state;
 		if (!state) {
-			for (const column of COLUMNS) this.deps.list(column)?.forgetTyped();
+			for (const column of LISTS) this.deps.list(column)?.forgetTyped();
 			this.glide.stop();
 			this.revealing = false;
 			this.pass.cancel();

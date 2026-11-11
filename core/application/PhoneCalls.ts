@@ -20,7 +20,8 @@ import { dayMonth, dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
-import { placeShowing, SCREEN_PLACES, type ScreenAt, SHOWN_LISTS, shownLists, stepScreen, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { type EntryList, placeShowing, SCREEN_PLACES, type ScreenAt, SHOWN_LISTS, shownEntryLists, shownLists, stepScreen, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { type EntryPart, projectsEntryLook } from "./projectsEntry";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
 	type CalendarEvent,
@@ -28,7 +29,6 @@ import {
 	type CalendarAlert,
 	type DayEvents,
 	type DayWords,
-	type DropColumn,
 	type GroupedList,
 	type ProjectNote,
 	type ProjectsScreenState,
@@ -169,13 +169,16 @@ export interface WireDayEvents {
 
 /** The screen as a quick entry reads it, on the wire: each list's cards and sections, and which lists show. */
 export interface WireLook {
-	readonly cards: Partial<Record<DropColumn, readonly ListCard[]>>;
-	readonly sections?: Partial<Record<DropColumn, readonly Header[]>>;
-	readonly sectioned?: Partial<Record<DropColumn, boolean>>;
+	/** Each list's cards; the Projects list's (`projects`) as `rules.projectsEntryLook` gives them. */
+	readonly cards: Partial<Record<EntryList, readonly ListCard[]>>;
+	readonly sections?: Partial<Record<EntryList, readonly Header[]>>;
+	readonly sectioned?: Partial<Record<EntryList, boolean>>;
 	/** The day the day's list shows. */
 	readonly day: string;
-	/** The lists the screen shows, in its order. */
-	readonly shown: readonly DropColumn[];
+	/** The lists the screen shows, in its order (`rules.shownEntryLists`). */
+	readonly shown: readonly EntryList[];
+	/** The parts of a list that decides its own writes: the Projects list's, `rules.projectsEntryLook`'s `parts`. */
+	readonly parts?: Partial<Record<EntryList, readonly EntryPart[]>>;
 }
 
 class DoorError extends Error {
@@ -801,6 +804,8 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	placeShowing,
 	swipeLanding,
 	shownLists,
+	shownEntryLists,
+	projectsEntryLook,
 	wholeWidth,
 	grownStart,
 	listWidths,
@@ -828,6 +833,7 @@ function lookOf(c: Call, look: WireLook): EntryLook {
 		day: () => look.day,
 		today: () => c.rules.today(),
 		shown: () => look.shown,
+		parts: (column) => look.parts?.[column] ?? [],
 	};
 }
 
@@ -847,9 +853,11 @@ const ENTRY_METHODS: readonly string[] = [
 	"listEntry",
 	"openAtEnd",
 	"openFromPlus",
+	"plusOpens",
 	"openIn",
 	"openSlot",
 	"openAtDrop",
+	"openAt",
 	"subtaskSpot",
 	"renameSpot",
 	"stackSpot",
@@ -886,7 +894,7 @@ function entryCall(name: string): Handler {
 		if (name === "state") value = entry.state;
 		else if (name === "renaming") value = entry.renaming;
 		else if (name === "shown") {
-			const [id, created, coming] = args as [string, A, Partial<Record<DropColumn, readonly ListCard[]>>];
+			const [id, created, coming] = args as [string, A, Partial<Record<EntryList, readonly ListCard[]>>];
 			entry.shown(id, created ?? null, (column) => coming?.[column] ?? []);
 		} else value = (entry as unknown as Record<string, (...a: unknown[]) => unknown>)[name](...args);
 		return { session: entry.session, state: entry.state, changes, jobs, value: value === undefined ? null : value, renamed: entry.renamed } satisfies EntryAnswer;

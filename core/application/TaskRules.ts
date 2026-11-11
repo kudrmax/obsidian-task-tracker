@@ -681,6 +681,8 @@ export class TaskRules {
 				return { kind: "subtask", parent: this.entryOf(doc, place.parent), before: before(place.before) };
 			case "slot":
 				return place;
+			case "projects":
+				throw new StaleTaskError();
 		}
 	}
 

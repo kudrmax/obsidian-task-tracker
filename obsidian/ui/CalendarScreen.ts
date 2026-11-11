@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type MenuFrom, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ListPlace, projectsTakes, type ProjectsNewTask, type ProjectsView, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, type ZoomLevel } from "../../core/application/contracts";
+import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type MenuFrom, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ListPlace, projectsTakes, type ProjectsView, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, type ZoomLevel } from "../../core/application/contracts";
 import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -17,7 +17,7 @@ import { type ColumnSections, type DropResult, droppedTasks, type HeldOut, isPro
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu, ProjectMenu } from "./menu/GroupMenu";
 import { NoteSearch } from "./projects/NoteSearch";
-import { ProjectsListDrop, TasksDrop, TreeDrop } from "./projects/ProjectDrops";
+import { ProjectsListDrop, TreeDrop } from "./projects/ProjectDrops";
 import { TreeLift } from "./projects/TreeLift";
 import type { PlusAside } from "./quick/QuickEntryController";
 import { failureText } from "./failureText";
@@ -108,13 +108,12 @@ export class CalendarScreen extends Component {
 	private switcher: ColumnSwitch | null = null;
 	/** The Projects screen, left of Inbox: in the plugin's own view, once the core gives its data. */
 	private projects: ProjectsScreen | null = null;
-	/** The tree of the Projects screen as a place for a card or the plus, and its tasks as a place for the plus. */
+	/** The tree of the Projects screen as a place for a card or the plus. */
 	private readonly treeDrop = new TreeDrop({
 		tree: () => this.projects?.treeShown ?? null,
 		unfold: (node) => void this.act(() => this.deps.tasks.unfoldProjectNode(node)).then(() => this.projects?.refreshTree()),
 	});
-	private readonly tasksDrop = new TasksDrop(() => this.projects?.tasksShown ?? null);
-	/** The Projects screen's tasks as a list a card is dropped in, as a list column is. */
+	/** The Projects screen's tasks as a list a card or the plus is dropped in, as a list column is. */
 	private projectsListDrop: ProjectsListDrop | null = null;
 	/** The Projects row pressed last: a drop of it hands the core this very row's `drop` (a task of two parts is two cards). */
 	private pressedProjectsRow: ProjectsListRow | null = null;
@@ -195,7 +194,7 @@ export class CalendarScreen extends Component {
 		super();
 		this.seen = this.settings;
 		this.selectedDate = this.today();
-		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, onUpdate: (part) => this.parts.request(part) });
+		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, projects: where.view, onUpdate: (part) => this.parts.request(part) });
 		this.groupDrag = new GroupDrag({
 			longPressMs: () => this.settings.longPressMs,
 			arbiter: this.arbiter,
@@ -376,16 +375,25 @@ export class CalendarScreen extends Component {
 				onSnap: () => this.haptics.tap(),
 				onMenu: (title, view) => this.showProjectMenu(title, view),
 				onCard: (card, row, owner, subtree, signal) => this.attachProjectsCard(card, row, owner, subtree, signal),
-				onPlate: (plate, newTask, signal) => plate.addEventListener("click", () => void this.newProjectsTask(newTask, plate), { signal }),
+				onPlate: (plate, group, signal) => plate.addEventListener("click", () => this.quick?.openIn("projects", group), { signal }),
+				entry: (drawing) => this.quick?.entryIn("projects", drawing) ?? null,
+				renaming: () => this.quick?.renaming() ?? null,
+				coming: () => this.data.projects,
 				onRow: (row, model, signal) => treeLift.attach(row, model, signal),
 				onError: (error) => this.reportFailure(error),
 			});
 		if (this.projects) {
 			const projects = this.projects;
-			this.projectsListDrop = new ProjectsListDrop(projects.tasksList, projects.tasksList.el.parentElement!, () => projects.shown?.reorders ?? false, (place, drag) => {
-				const view = projects.shown;
-				return view !== null && projectsTakes(view, this.projectsDrops(drag), place);
-			});
+			this.projectsListDrop = new ProjectsListDrop(
+				projects.tasksList,
+				projects.tasksList.el.parentElement!,
+				() => projects.shown?.reorders ?? false,
+				(place, drag) => {
+					const view = projects.shown;
+					return view !== null && projectsTakes(view, this.projectsDrops(drag), place);
+				},
+				() => this.haptics.tap(),
+			);
 		}
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
@@ -460,8 +468,8 @@ export class CalendarScreen extends Component {
 			arbiter: this.arbiter,
 			drag: this.drag,
 			titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts, this.where.keys),
-			list: (column) => this.listOf(column),
-			sectioned: (column) => this.sectionsOf(column) !== null,
+			list: (column) => (column === "projects" ? (this.projects?.tasksList ?? null) : this.listOf(column)),
+			sectioned: (column) => column !== "projects" && this.sectionsOf(column) !== null,
 			timeline: () => this.timeline,
 			task: (key) => this.deps.tasks.findIn(this.data.day?.slotted ?? [], key),
 			aside: () => this.projectsPlus(),
@@ -1064,19 +1072,18 @@ export class CalendarScreen extends Component {
 		return card;
 	}
 
-	/** The plus at the Projects screen: carried onto the tree or the tasks; tapped, a new task at the end of the chosen node's tasks. */
+	/**
+	 * The plus at the Projects screen: carried onto the tree (a new project) or into the tasks, where the field opens as in
+	 * any list. A tap is the entry's own (`QuickEntrySession.plusOpens`).
+	 */
 	private projectsPlus(): PlusAside | null {
 		const projects = this.projects;
-		if (!projects || this.mode() !== "projects") return null;
+		const tasks = this.projectsListDrop;
+		if (!projects || !tasks || this.mode() !== "projects") return null;
 		return {
-			targets: [this.treeDrop, this.tasksDrop],
-			tap: () => {
-				const end = projects.tasksShown;
-				if (end.endTask) void this.newProjectsTask(end.endTask, end.parts[end.parts.length - 1]?.last ?? null);
-			},
+			targets: [this.treeDrop, tasks],
 			dropped: (result) => {
 				if (result.kind === "projectGap") void this.newProject(result.gap, result.landing);
-				if (result.kind === "projectTasks") void this.newProjectsTask(result.newTask, result.after);
 			},
 		};
 	}
@@ -1088,16 +1095,6 @@ export class CalendarScreen extends Component {
 		const name = await projects.askProjectName(gap, landing.depth);
 		this.arbiter.release(NAMING);
 		if (name !== null) await this.act(async () => void (await this.deps.tasks.createProject(name, landing.place)));
-		await projects.refresh();
-	}
-
-	/** The plus let go on the tasks: the text asked there, then the task written where the part says, with its project. */
-	private async newProjectsTask(newTask: ProjectsNewTask, after: HTMLElement | null): Promise<void> {
-		const projects = this.projects;
-		if (!projects || !this.arbiter.claim(NAMING)) return;
-		const text = await projects.askTaskText(after);
-		this.arbiter.release(NAMING);
-		if (text !== null) await this.act(async () => void (await this.deps.tasks.createInPlace(text, null, newTask.place, null, [], newTask.project)));
 		await projects.refresh();
 	}
 
@@ -1442,7 +1439,7 @@ export class CalendarScreen extends Component {
 			this.headers.render();
 			this.backlogList.render(moving);
 			this.doneList.render(moving);
-			void this.projects?.refresh().catch((error: unknown) => this.reportFailure(error));
+			if (this.data.projects) this.projects?.show(this.data.projects);
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
 		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.allDay, this.theme(), (event) => this.deps.calendars.isPast(event));

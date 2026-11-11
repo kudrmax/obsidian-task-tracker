@@ -476,10 +476,27 @@ Typing tasks in place, every rule of it (`core/application/QuickEntry.ts`). Each
 `entry.<method>(session, look, ...args)`:
 
 - `session`: the `EntrySession` the last answer gave, `null` to start.
-- `look` (`WireLook`): the screen as it stands: `cards` of each list shown (`{ day?, soon?, inbox?, backlog? }`, each a
-  list of `ListCard` `{ key, level, group }` in drawing order: `rules.listView`'s rows), `sections` each draws, which
-  are `sectioned`, the `day` the day list shows, and `shown`: the lists on screen in their order (a task is looked for
-  there first; the plus opens in the day list while it shows, else in Inbox). The layout is the frontend's.
+- `look` (`WireLook`): the screen as it stands: `cards` of each list shown (`{ day?, soon?, inbox?, backlog?, projects? }`,
+  each a list of `ListCard` `{ key, level, group }` in drawing order: `rules.listView`'s rows), `sections` each draws,
+  which are `sectioned`, the `day` the day list shows, `shown`: the lists on screen in their order
+  (`rules.shownEntryLists(place)`: a task is looked for there first; the plus opens in the day list while it shows, else
+  in Inbox, and on the Projects screen in the part its plus writes), and `parts`: `{ projects? }`, the parts of a list
+  that decides itself what a new task in it writes. The layout is the frontend's.
+- **The Projects screen's list is a list the field stands in** (`"projects"`, an `EntryList` like a funnel's column):
+  while the Projects screen shows, `look.shown` is `["projects"]` and `cards.projects`, `sections.projects` and
+  `parts.projects` are `rules.projectsEntryLook(view)`'s `cards`, `sections` and `parts` for the view shown (`null`: no
+  view, all empty). A part (`EntryPart` `{ group, newTask, plus }`) is a `ProjectsSection`: its `group`, its `newTask`,
+  and `plus` on the one part a tap on the plus types in (the one writing the screen's own `ProjectsView.newTask`, else
+  the first that writes one). Rename, Add Subtask, the No tasks plate (`openIn("projects", section.group)`), the plus
+  let go in the list (`openAt("projects", listPlace)`, the `ListPlace` of the drop) and Enter's next field then all stand
+  in the Projects list, never in a funnel column; a new task's field starts with its part's project and the bar's place
+  shows where its part writes. A task written there is `createInPlace` with a `NewTaskPlace` `{ kind: "projects", group,
+  before, placement? }`, which the service reads off the screen as the file then stands. A place chosen in the bar keeps
+  the field where it stands (`choosePlace` → `{ column: "projects", day: null }`; `placeShowing("projects", …)` is
+  `"projects"`: the screen does not turn) and the task is written there instead. `coming` for `entry.shown` carries
+  `projects` too. Example: `rules.projectsEntryLook(view)` → `{ cards: [{ key, id, level: 0, group: null }, …],
+  sections: [null, "project:Sub"], parts: [{ group: null, newTask: { place: { kind: "list", list: "inbox", group:
+  null, before: null }, project: "P" }, plus: true }, …] }`.
 
 The answer's `result` is `{ session, state, changes, jobs, value, renamed }`: the session to hand in next; the field's
 `EntryState` (null: closed); each change on the way (`{ state, drawnNext }`); the jobs this call queued; the method's own
@@ -489,11 +506,13 @@ written (`PendingRename` `{ id, key, text, title }`: the task's `TaskItem.id`, i
 same while the field is open. A card whose `id` is in `renamed` draws `title` in place of its own; the entry drops it
 once its job is `done`.
 
-Methods: `openAtEnd(column)`, `openFromPlus()`, `openIn(column, group)`, `openSlot(slot)`, `openAtDrop(column,
-dropTo)`, `subtaskSpot(parent)`, `renameSpot(item, inStack)`, `stackSpot(parent)`, `open(spot, renaming?)`, `type(text)`,
+Methods: `openAtEnd(column)`, `openFromPlus()`, `openIn(column, group)`, `openAt(column, listPlace)` (the plus let go
+at a place of a list: the field of a new task there), `plusOpens()` (whether a tap on the plus opens a field: `false` on
+the Projects screen when no part is marked `plus`, as under Done; ask it before the tap and draw no field, or treat the
+tap as doing nothing, when false; `openFromPlus()` answers the same boolean as its `value` and opens nothing then), `openSlot(slot)`, `openAtDrop(column, dropTo)`, `subtaskSpot(parent)`, `renameSpot(item, inStack)`, `stackSpot(parent)`, `open(spot, renaming?)`, `type(text)`,
 `setPriority(prefix)`, `togglePriority(prefix)`, `setLabels(names)`, `toggleLabel(name)`, `setRepeat(rule)`, `setProject(link)`,
 `indent(1 | -1)`, `toggleSection()`, `enter()`, `blur()`, `escape()`, `choosePlace(placement)`, `moveToEnd(column)`,
-`placeOf(column, listPlace)`, `state()`, `renaming()`, `listEntry(column, drawn?)`, `stackEntry(task)`.
+`placeOf(column, listPlace, placement?)`, `state()`, `renaming()`, `listEntry(column, drawn?)`, `stackEntry(task)`.
 
 Where a field opens: `subtaskSpot(parent)` for Add Subtask from a list or the calendar (a `"stack"` spot means the task
 shows in no list: open its full screen and the field last in its stack there), `renameSpot(item, inStack)` for Rename
@@ -650,8 +669,9 @@ name: "Monday", letter: "M" }`, `remove` `"Remove repeat"`),
 `SCREEN_PLACES` (`["projects", "inbox", "soon", "calendar"]`, left to right: Projects a place of its own, the wheel's
 window holding its folder alone) and `SHOWN_LISTS` (the funnel's lists each place shows, in its order: `{ projects: [],
 inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] }`, also `rules.shownLists(place)`; the
-quick entry's `look.shown`); `rules.placeShowing(column, "projects")` turns as from Inbox (`placeShowing("day",
-"projects")` → `"soon"`). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
+quick entry's `look.shown` is `rules.shownEntryLists(place)`: the same, but `["projects"]` on Projects);
+`rules.placeShowing(column, "projects")` turns as from Inbox (`placeShowing("day", "projects")` → `"soon"`), and
+`placeShowing("projects", place)` is always `"projects"`. `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.
 
 ## What the door leaves to the host
