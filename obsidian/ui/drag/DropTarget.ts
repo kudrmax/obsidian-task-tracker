@@ -77,6 +77,8 @@ export function isProjectsDrop(result: DropResult): result is ProjectsDrop {
 /** Somewhere a dragged task may land: it previews while the pointer is over it and says what the drop means. */
 /** A place to drop on: a list, the timeline, the plus's cancel ring; or the slots among a list's sections for a lifted section (`P`, `R`). */
 export interface DropTarget<P = DragPayload, R = DropResult> {
+	/** What it shows under the finger (a row to land on and its fill) must stay in sight: the float rides above the finger over it. */
+	readonly clearsFinger?: boolean;
 	hitTest(x: number, y: number, drag: P): boolean;
 	preview(x: number, y: number, drag: P): void;
 	/** Where a new task carried on the plus comes to rest, in client pixels, while a preview shows. A task's card lands on its card as drawn after the drop. */
@@ -96,6 +98,8 @@ export interface HeldOut {
 /** The card under the finger. */
 export interface Float {
 	moveTo(x: number, y: number): void;
+	/** Over a target that `clearsFinger`: the float narrows to its own width and rides above the finger; off, it is held as grabbed again. */
+	rideAbove?(on: boolean): void;
 	/** Settles where the drop puts it. */
 	land(rect: DOMRect): Promise<void>;
 	/** Goes into `rect` and fades there: the drop is written into a part held out of sight under that header. */

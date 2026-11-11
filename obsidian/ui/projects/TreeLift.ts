@@ -1,5 +1,6 @@
 import { projectsGap, type ProjectsRow, type TreePlace } from "../../../core/application/contracts";
 import { px } from "../dom";
+import { windowRoom } from "../wholeCard";
 import { DropLine } from "../drag/DropLine";
 import { LongPress } from "../drag/LongPress";
 import type { GestureArbiter } from "../gestures";
@@ -19,7 +20,7 @@ const LIFT = "project-lift";
 
 /**
  * A project of the tree held and carried, to reorder it or nest it (spec: «долгое нажатие переставляет; бросок со сдвигом
- * вправо вкладывает»): its row follows the finger, the drop line shows the gap and the depth the finger's distance from
+ * вправо вкладывает»): its row rides below the finger (the stylesheet moves it), so the drop line and the row it would nest under stay seen, the drop line shows the gap and the depth the finger's distance from
  * the left picks, its own branch left out; let go, it goes there.
  */
 export class TreeLift {
@@ -47,11 +48,13 @@ export class TreeLift {
 		doc.body.appendChild(float);
 		const grab = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 		const line = new DropLine(() => tree.el);
+		/** The row stays inside the window, as a carried card does. */
+		const margin = windowRoom(row).margin;
 		row.classList.add("is-lifted");
 		let at: { readonly gap: number; readonly depth: number } | null = null;
 		const move = (x: number, y: number): void => {
-			float.style.transform = `translate3d(${px(x - grab.x)}, ${px(y - grab.y)}, 0)`;
-			at = treeGap(tree, x, y, model.node);
+			float.style.transform = `translate3d(${px(Math.max(margin, Math.min(window.innerWidth - margin - rect.width, x - grab.x)))}, ${px(y)}, 0)`;
+			at = treeGap(tree, x, y, model.node, { depth: model.depth, x: e.clientX });
 			if (at) showGapLine(line, tree, at.gap, at.depth, null);
 			else line.hide();
 		};

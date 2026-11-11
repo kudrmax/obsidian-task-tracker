@@ -32,11 +32,19 @@ export function rowUnder(tree: TreeShown, y: number): ProjectsRow | null {
 	return null;
 }
 
+/** A lifted project's own depth and where the finger stood when it was lifted: its depth changes only with the finger's sideways shift. */
+export interface ShiftFrom {
+	readonly depth: number;
+	readonly x: number;
+}
+
 /**
  * The gap a point of the tree stands at, among the projects (All above them and No project below closing the run): the
- * row whose middle is under the point, and the depth its distance from the tree's left edge picks, a step per indent.
+ * row whose middle is under the point, and its depth. The plus takes the depth of where the finger stands, a step per
+ * indent from the tree's left edge; a lifted project (`from`) keeps its own depth until the finger shifts sideways, a
+ * level per indent either way.
  */
-export function treeGap(tree: TreeShown, x: number, y: number, lifted?: ProjectsNodeId | null): { readonly gap: number; readonly depth: number } | null {
+export function treeGap(tree: TreeShown, x: number, y: number, lifted?: ProjectsNodeId | null, from?: ShiftFrom): { readonly gap: number; readonly depth: number } | null {
 	const rows = tree.rows;
 	const first = rows.findIndex((row) => row.kind === "project" || row.kind === "none");
 	const last = rows.findIndex((row) => row.kind === "none");
@@ -51,7 +59,7 @@ export function treeGap(tree: TreeShown, x: number, y: number, lifted?: Projects
 	}
 	const left = rectOf(tree, first)?.left ?? tree.el.getBoundingClientRect().left;
 	const indent = tokenPx(tree.el, "--tc-tree-indent") || 1;
-	const depth = Math.max(0, Math.round((x - left) / indent - 0.5));
+	const depth = Math.max(0, from ? from.depth + Math.round((x - from.x) / indent) : Math.round((x - left) / indent - 0.5));
 	const landing = projectsGap(rows, gap, depth, lifted);
 	return { gap, depth: landing.depth };
 }
@@ -88,6 +96,8 @@ interface Hover {
  * the finger's distance from the left picks.
  */
 export class TreeDrop implements DropTarget {
+	/** The row a card lands on, filled, and the plus's line stay in sight: the card rides above the finger. */
+	readonly clearsFinger = true;
 	private readonly line: DropLine;
 	private result: ProjectsDrop | null = null;
 	private hover: Hover | null = null;

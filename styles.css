@@ -288,6 +288,8 @@ body {
 	/* The dragged card stands a little taller than the one it was lifted from. */
 	--tc-float-h: calc(var(--tc-card-h) + var(--tc-float-grow));
 	--tc-float-grow: 2px;
+	/* Over the Projects screen's tree a carried card or project rides this far above the finger. */
+	--tc-float-above: var(--tc-space-16);
 	/* The number of tasks carried at once, on the top card's upper right corner, standing out of it by `out`. */
 	--tc-float-count-size: 22px;
 	--tc-float-count-out: 9px;
@@ -1532,3 +1534,6 @@ body:not(.is-mobile) .tc-projects-title-field { top: var(--tc-desk-projects-titl
 .tc-lifted.is-title.is-project-title { padding: 0 0 0 calc(var(--tc-space-2) + var(--tc-space-4)); }
 body:not(.is-mobile) .tc-lifted.is-title.is-project-title { padding: 0 0 0 var(--tc-desk-projects-far); }
 body:not(.is-mobile) .tc-lifted.is-project-title .tc-lifted-title { font-size: var(--tc-font-desk-projects-title); }
+/* Over the Projects screen's tree the carried card rides above the finger, so the row it will land on, filled, stays in sight; a lifted project rides below it, so the drop line and the row it would nest under stay in sight. */
+.tc-float.is-aside, .tc-float-under.is-aside, .tc-float-count.is-aside { translate: 0 calc(-1 * (var(--tc-float-h) + var(--tc-float-above))); }
+.tc-tree-float { translate: 0 var(--tc-float-above); }
