@@ -1,13 +1,17 @@
-import { LIST_WIDTHS } from "../../../core/application/contracts";
 import { PROPERTY } from "../design";
 import { Divider } from "../Divider";
 import { el, px } from "../dom";
+import { GroupNameField } from "../GroupNameField";
 import type { GestureArbiter } from "../gestures";
 import { centeredListWidth, listWidthMax } from "../listWidth";
 import { ProjectsSegment } from "./ProjectsSegment";
 import { ProjectTasks } from "./ProjectTasks";
+import type { TasksShown, TreeShown } from "./ProjectDrops";
 import { ProjectTree } from "./ProjectTree";
-import type { ProjectsCard, ProjectsNodeId, ProjectsRow, ProjectsSource, ProjectsView } from "./projectsView";
+import { LIST_WIDTHS, type ProjectsCard, type ProjectsNodeId, type ProjectsRow, type ProjectsView, type TaskService } from "../../../core/application/contracts";
+
+/** What the screen asks the core. */
+export type ProjectsSource = Pick<TaskService, "projectsScreen" | "tapProjectNode" | "setProjectsMode">;
 
 export interface ProjectsScreenDeps {
 	readonly source: ProjectsSource;
@@ -61,6 +65,69 @@ export class ProjectsScreen {
 			arbiter: deps.arbiter,
 		});
 		this.tasks = new ProjectTasks(el(this.el, "div", "tc-projects-tasks-column"), { onCard: deps.onCard });
+	}
+
+	/** Rename: the name typed where the title stands, the caret at its end; Enter gives the name, anything else null. */
+	editTitle(onDone: (name: string | null) => void): void {
+		const name = this.title.textContent ?? "";
+		this.title.classList.add("is-renaming");
+		const slot = el(this.el, "div", "tc-projects-title-field");
+		GroupNameField.open(slot, {
+			value: name,
+			onDone: (to) => {
+				slot.remove();
+				this.title.classList.remove("is-renaming");
+				onDone(to);
+			},
+		});
+	}
+
+	/** The tree as its drop targets read it. */
+	get treeShown(): TreeShown {
+		const tree = this.tree;
+		return { el: tree.el, rows: tree.rows, elementOf: (i) => tree.elementOf(i), showDropOn: (node) => tree.showDropOn(node) };
+	}
+
+	/** The tasks as their drop target reads them. */
+	get tasksShown(): TasksShown {
+		return { el: this.tasks.el, parts: this.tasks.parts, endTask: this.tasks.endTask };
+	}
+
+	/** The view drawn last; null before the first read. */
+	get shown(): ProjectsView | null {
+		return this.view;
+	}
+
+	/** A new project's name typed at a gap of the tree, `depth` steps in; resolves with the name, or null for nothing typed. */
+	askProjectName(gap: number, depth: number): Promise<string | null> {
+		const before = this.tree.elementOf(gap);
+		const slot = el(null, "div", "tc-tree-field");
+		slot.style.setProperty(PROPERTY.level, String(depth));
+		if (before) before.before(slot);
+		else this.tree.el.appendChild(slot);
+		return this.ask(slot, "Project name");
+	}
+
+	/** A new task's text typed after `after` among the tasks (first when null); resolves with the text, or null for nothing typed. */
+	askTaskText(after: HTMLElement | null): Promise<string | null> {
+		const slot = el(null, "div", "tc-projects-task-field");
+		if (after?.isConnected) after.after(slot);
+		else this.tasks.el.prepend(slot);
+		return this.ask(slot, "New task");
+	}
+
+	private ask(slot: HTMLElement, placeholder: string): Promise<string | null> {
+		return new Promise((resolve) => {
+			const field = GroupNameField.open(slot, {
+				value: "",
+				placeholder,
+				onDone: (text) => {
+					slot.remove();
+					resolve(text);
+				},
+			});
+			field.scrollIntoView({ block: "nearest" });
+		});
 	}
 
 	/** The tree's row of `node`, where a card held over the tree is let go. */

@@ -74,7 +74,7 @@ function read(drop: ListDrop, sections: () => ColumnSections | null): ListDrop {
 	drop.drop = (x, y, drag) => {
 		const place = answer(x, y, drag);
 		expect(place === null || place.kind === "place").toBe(true);
-		return place && readDrop(place, () => sections());
+		return place && readDrop(place as DropTo, () => sections());
 	};
 	return drop;
 }

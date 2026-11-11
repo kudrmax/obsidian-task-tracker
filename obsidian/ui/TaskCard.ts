@@ -68,22 +68,21 @@ export function renderDue(card: HTMLElement, date: LocalDate | null, repeats: bo
 }
 
 /**
- * The card's title as the core draws it (`TaskItem.card`): a folded result with an open step on two lines, the result's
- * own title small over a target symbol and the step's title under it; any other card its own title on one line, a
- * result's in semibold. A rename waiting to be written shows on whichever line it renames.
+ * The card's title as the core draws it (`TaskItem.card`): a folded task with an open subtask on two lines, the task's own
+ * title small over its next step's title; any other card its own title on one line. On the Projects screen By stage the
+ * small line is the subproject, after the folder mark. A rename waiting to be written shows on whichever line it renames.
  */
 function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: string | null): void {
 	const face = task.card;
 	const step = face.step;
 	card.classList.toggle("is-two-line", step !== null || project !== null);
-	card.classList.toggle("is-result", face.semibold);
 	if (!step && project === null) {
 		fillTitle(el(card, "div", "tc-card-title"), shown.text);
 		return;
 	}
 	const lines = el(card, "div", "tc-card-lines");
 	const over = el(lines, "div", "tc-card-over");
-	over.appendChild(icon(project === null ? "target" : "project"));
+	if (project !== null) over.appendChild(icon("project"));
 	el(over, "span", "tc-card-over-text", project ?? (shown === task ? face.over ?? "" : shown.title));
 	fillTitle(el(lines, "div", "tc-card-title"), step ? RenamedTexts.shown(step).text : shown.text);
 }
@@ -130,10 +129,9 @@ export function renderProjectMark(card: HTMLElement, item: Pick<TaskItem, "proje
 	mark.appendChild(icon("project"));
 	mark.setAttribute("aria-label", project.name);
 	mark.title = project.name;
-	mark.classList.toggle("is-openable", project.canOpenNote);
 }
 
-/** A tap on a card's project mark opens the project's note, in place of its menu. */
+/** A tap on a card's folder mark opens the Projects screen on the project, in place of its menu. */
 export function onProjectMark(target: EventTarget | null): boolean {
 	return target instanceof Element && target.closest(".tc-project-mark") !== null;
 }

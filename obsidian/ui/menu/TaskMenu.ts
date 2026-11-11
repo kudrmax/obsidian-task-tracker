@@ -1,8 +1,7 @@
-import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuResultRowId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, RepeatPage, type RepeatRule, type ResultPage, type TaskItem, type TaskKey, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
+import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { cardMenuTask, fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
-import { resultChooser, resultNamePage } from "./ResultChooser";
 import { linkAt, type TaskLink } from "../TaskTitle";
 import { showWhole } from "../wholeCard";
 import type { LocalDate } from "../types";
@@ -19,8 +18,8 @@ import { PanelPages } from "./PanelPages";
 import { Motion } from "../motion/Motion";
 import { repeatPanel } from "../repeat/RepeatPanel";
 
-/** A row of the edit group: the model's edit rows, and its result rows right after Project. */
-export type EditRowId = MenuEditId | MenuResultRowId;
+/** A row of the edit group. */
+export type EditRowId = MenuEditId;
 /** What the menu asks about: a status tile that asks first, or Delete. */
 export type Asking = MenuStatusId | "delete";
 
@@ -65,8 +64,7 @@ const REMINDER_NAMES: Readonly<Record<ReminderKind, string>> = { notification: "
 
 /**
  * The edit group's rows as the menu's model has them, in its order: the reminder's kind, the rule, the section's name and
- * the project's beside theirs. Project, disabled on a subtask, shows its parent's. The result rows stand right after
- * Project (`TaskMenuModel.result`): Add to result with the result the task is a step of, then Make result or Make task.
+ * the project's beside theirs. Project, disabled on a subtask, shows its parent's.
  */
 export function editRows(item: TaskItem, model: TaskMenuModel): readonly EditRow[] {
 	const rows: Readonly<Record<EditRowId, () => EditRow>> = {
@@ -77,15 +75,8 @@ export function editRows(item: TaskItem, model: TaskMenuModel): readonly EditRow
 		section: () => ({ id: "section", label: "Section", value: model.sections?.choice.current ?? "", icon: "section" }),
 		project: () => ({ id: "project", label: "Project", value: model.project.value, icon: "project", disabled: model.project.disabled }),
 		subtask: () => ({ id: "subtask", label: "Add subtask", value: "", icon: "subtask" }),
-		addToResult: () => ({ id: "addToResult", label: model.result.label, value: model.result.value, icon: "target" }),
-		toggle: () => ({ id: "toggle", label: model.result.toggle.label, value: "", icon: "goal" }),
 	};
-	return withResultRows(model).map((id) => rows[id]());
-}
-
-/** The model's edit rows with its result rows right after Project, in the model's order. */
-export function withResultRows(model: TaskMenuModel): readonly EditRowId[] {
-	return model.edits.flatMap((id): EditRowId[] => (id === "project" ? [id, ...model.result.rows] : [id]));
+	return model.edits.map((id) => rows[id]());
 }
 
 export interface LevelTile extends PriorityLevel {
@@ -117,18 +108,12 @@ export interface MenuActions {
 	toSection(name: GroupName): Promise<void>;
 	/** The task waits at the end of its list under a field for the new section's name. */
 	newSection(): void;
-	/** The task's project: a note's link (`ProjectRef.link`), null for No project. */
+	/** No project: every project taken off the task (`TaskService.setProject` with null). */
 	setProject(project: string | null): Promise<void>;
-	/** «New project…» named `name` (`TaskService.newProject`): the note made or tagged, and the task gets that project. */
+	/** A project of the Project page tapped: on, or off when the task had it (`TaskService.toggleProject`); the task as it then stands, null once it is gone. */
+	toggleProject(name: string): Promise<TaskItem | null>;
+	/** «New project…» named `name` (`TaskService.newProject`): a project at the tree's top, and the task gets it. */
 	newProject(name: string): Promise<void>;
-	/** Make result (true) or Make task (false) (`TaskService.setResult`). */
-	setResult(result: boolean): Promise<void>;
-	/** The Add to result page for the task, `query` typed in its search field (`TaskService.resultPage`). */
-	resultPage(query: string): Promise<ResultPage>;
-	/** The task to the end of `result`'s steps (`TaskService.addToResult`). */
-	addToResult(result: TaskKey): Promise<void>;
-	/** «New result…» named `name` (`TaskService.newResult`): the task its only step. */
-	newResult(name: string): Promise<void>;
 	/** A tap on a level (`TaskService.togglePriority`). */
 	togglePriority(prefix: string): Promise<void>;
 	/** A tap on a label (`TaskService.toggleLabel`); the task as it then stands, null once it is gone. */
@@ -382,8 +367,6 @@ export class TaskMenu extends LiftedMenu {
 				section: () => this.showSections(),
 				project: () => this.showProjects(),
 				subtask: this.stacks ? () => actions.addSubtask(this) : this.pickNow(() => actions.addSubtask(this)),
-				addToResult: () => void this.showResults(),
-				toggle: this.pick(() => actions.setResult(model.result.toggle.result)),
 			};
 			const draw: Record<MenuGroupId, () => void> = {
 				statuses: () => {
@@ -503,7 +486,11 @@ export class TaskMenu extends LiftedMenu {
 		});
 	}
 
-	/** The Project page in place of the menu, as Section's: the project notes by name, No project last, the current one checked. */
+	/**
+	 * The Project page in place of the menu, as Section's: the whole tree, each project at its depth, a check on each the
+	 * task has. A project tapped is toggled and the page stays, drawn again, for the next check; No project takes them all
+	 * off and closes.
+	 */
 	private showProjects(): void {
 		this.pages.show("projects", () => {
 			this.askFor(null, false);
@@ -513,11 +500,21 @@ export class TaskMenu extends LiftedMenu {
 			projectChooser(this.panel, {
 				project: this.context.menu(item).project,
 				onBack: () => this.showMenu(),
-				onPick: (link) => this.pick(() => actions.setProject(link))(),
+				onPick: (name) => (name === null ? this.pick(() => actions.setProject(null))() : void this.toggleProject(name)),
 				onNew: () => this.showProjectName(),
 			});
 			this.place();
 		});
+	}
+
+	/** A project of the Project page tapped: written, and the page drawn again over the task as it then stands. */
+	private async toggleProject(name: string): Promise<void> {
+		const next = await this.context.actions.toggleProject(name);
+		if (this.isClosed) return;
+		if (!next) return this.close();
+		const ownCopy = this.drawn.id === this.context.item.id;
+		this.context = { ...this.context, item: next, drawn: ownCopy ? next : this.context.drawn };
+		this.showProjects();
 	}
 
 	/** «New project…»: the name asked in place of the Project page; Enter makes the project and closes, Escape goes back to the page. */
@@ -538,57 +535,6 @@ export class TaskMenu extends LiftedMenu {
 					if (name === null) return back();
 					asking = false;
 					this.pick(() => actions.newProject(name))();
-				},
-			});
-			this.place();
-		});
-	}
-
-	/**
-	 * The Add to result page in place of the menu, as Project's: a search over the open results, the one the task is a step
-	 * of ticked, «New result…» last; a pick adds the task to it and closes.
-	 */
-	private async showResults(): Promise<void> {
-		const { item, actions } = this.context;
-		const title = this.context.menu(item).result.label;
-		const page = await actions.resultPage("");
-		if (this.isClosed) return;
-		this.pages.show("results", () => {
-			this.askFor(null, false);
-			clear(this.panel);
-			clear(this.upper);
-			resultChooser(this.panel, {
-				title,
-				page,
-				onBack: () => this.showMenu(),
-				find: (query) => actions.resultPage(query),
-				onPick: (result) => this.pick(() => actions.addToResult(result))(),
-				onNew: () => this.showResultName(page.namePlaceholder),
-				onChange: () => this.pages.show("results", () => this.place()),
-			});
-			this.place();
-		});
-	}
-
-	/** «New result…»: the name asked in place of the Add to result page; Enter makes the result and closes, Escape goes back to the page. */
-	private showResultName(placeholder: string): void {
-		this.pages.show("resultName", () => {
-			clear(this.panel);
-			clear(this.upper);
-			const { actions } = this.context;
-			let asking = true;
-			const back = () => {
-				if (!asking) return;
-				asking = false;
-				void this.showResults();
-			};
-			resultNamePage(this.panel, {
-				placeholder,
-				onBack: back,
-				onDone: (name) => {
-					if (name === null) return back();
-					asking = false;
-					this.pick(() => actions.newResult(name))();
 				},
 			});
 			this.place();

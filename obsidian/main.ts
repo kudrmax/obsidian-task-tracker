@@ -16,7 +16,6 @@ import { clearPriorityColors, showLabelPaint, showPriorityColors } from "./ui/pr
 import { addWindowDocument } from "./ui/windowDocuments";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
-import { ProjectBlocks } from "./ui/ProjectBlocks";
 import { ShownSettingsStore, ViewSettingsStore } from "./ui/viewSettings";
 
 /** obsidian://task-calendar-open: a tap on a reminder on the phone opens the calendar. */
@@ -62,7 +61,6 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		});
 		const deps = this.createDeps();
 		this.registerView(VIEW_TYPE, (leaf) => new TaskCalendarView(leaf, deps));
-		this.addChild(new ProjectBlocks({ app: this.app, deps, settings: deps.settings }));
 		this.addRibbonIcon("calendar-days", "Task Calendar", () => void this.openView());
 		this.addCommand({ id: "open", name: "Open Task Calendar", callback: () => void this.openView() });
 	}
@@ -81,7 +79,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
 		this.registerObsidianProtocolHandler(SYNC_ACTION, () => services.syncForApp());
 		this.register(() => services.stopSyncForApp());
-		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars, updatesLinks: () => (this.app.vault as unknown as { getConfig(key: string): unknown }).getConfig("alwaysUpdateLinks") !== false });
+		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars });
 		this.addSettingTab(settingsTab);
 		this.register(() => settingsTab.closePage());
 		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), runScript: runAppleScript });

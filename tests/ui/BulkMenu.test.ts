@@ -44,7 +44,7 @@ describe("BulkMenu (block 3)", () => {
 			return card;
 		});
 		const done = async () => undefined;
-		const actions: BulkActions = { pickStatus: done, togglePriority: done, postpone: done, removeDue: done, toSection: done, setProject: done, newProject: done, resultPage: async () => ({ options: [], placeholder: "Search results", newLabel: "New result…", namePlaceholder: "Result name" }), addToResult: done, newResult: done, remove: done, toggleLabel: async () => null };
+		const actions: BulkActions = { pickStatus: done, togglePriority: done, postpone: done, removeDue: done, toSection: done, setProject: done, newProject: done, toggleProject: async () => null, remove: done, toggleLabel: async () => null };
 		BulkMenu.open({ items: cards.map((_, i) => item(i)), cards, source: cards[0], at: "beside", today: "2026-11-04", day: "2026-11-04", menu: (items) => taskMenu(items, "2026-11-04", [], [], null, { kind: "bulk" }), actions, onClose: () => {} });
 		expect(lifted.length).toBeGreaterThanOrEqual(5);
 		expect(lifted.every((count) => count === 0)).toBe(true);
@@ -60,7 +60,7 @@ describe("the bulk menu draws its model", () => {
 
 	const open = (model: Partial<TaskMenuModel>, items = [item(0), item(1)]) => {
 		const cards = items.map(() => document.body.appendChild(document.createElement("div")));
-		const actions = { pickStatus: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), setProject: vi.fn(async () => {}), newProject: vi.fn(async () => {}), resultPage: vi.fn(async () => ({ options: [], placeholder: "Search results", newLabel: "New result…", namePlaceholder: "Result name" })), addToResult: vi.fn(async () => {}), newResult: vi.fn(async () => {}), remove: vi.fn(async () => {}), toggleLabel: vi.fn(async () => items) };
+		const actions = { pickStatus: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), setProject: vi.fn(async () => {}), newProject: vi.fn(async () => {}), toggleProject: vi.fn(async () => null), remove: vi.fn(async () => {}), toggleLabel: vi.fn(async () => items) };
 		const base = taskMenu(items, "2026-11-04", [P1], [RED, BLUE], null, { kind: "bulk" });
 		BulkMenu.open({ items, cards, source: cards[0], at: "beside", today: "2026-11-04", day: "2026-11-04", menu: () => ({ ...base, ...model }), actions, onClose: () => {} });
 		return actions;

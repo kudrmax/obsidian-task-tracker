@@ -1,6 +1,6 @@
 import { clear, el } from "../dom";
 import { Button } from "../kit/Button";
-import type { ProjectsMode, ProjectsView } from "./projectsView";
+import type { ProjectsMode, ProjectsView } from "../../../core/application/contracts";
 
 /** By project / By stage over the tasks: two halves of one track, the chosen one filled. */
 export class ProjectsSegment {
