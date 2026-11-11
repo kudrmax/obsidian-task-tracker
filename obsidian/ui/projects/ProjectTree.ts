@@ -78,7 +78,7 @@ export class ProjectTree {
 		row.setAttribute("aria-selected", String(model.selected));
 		if (model.hasBranch) row.setAttribute("aria-expanded", String(!model.folded));
 		row.classList.toggle("is-selected", model.selected);
-		row.classList.toggle("is-waiting", model.waiting);
+		row.classList.toggle("is-muted", model.muted);
 		row.classList.toggle("is-folded", model.folded);
 		el(row, "span", "tc-tree-name", model.title);
 		if (model.folded && !model.tile) el(row, "span", "tc-tree-more", "…").setAttribute("aria-hidden", "true");

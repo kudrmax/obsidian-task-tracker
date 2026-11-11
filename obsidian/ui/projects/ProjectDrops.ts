@@ -23,11 +23,11 @@ function within(el: HTMLElement, x: number, y: number): boolean {
 	return el.getClientRects().length > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
 }
 
-/** The row under `y` that takes a card (`ProjectsRow.acceptsTask`); null over any other row or none. */
-export function rowTakingCard(tree: TreeShown, y: number): ProjectsNodeId | null {
+/** The row under `y`; null between rows and past them. */
+export function rowUnder(tree: TreeShown, y: number): ProjectsRow | null {
 	for (let i = 0; i < tree.rows.length; i++) {
 		const r = rectOf(tree, i);
-		if (r && y >= r.top && y <= r.bottom) return tree.rows[i].acceptsTask ? tree.rows[i].node : null;
+		if (r && y >= r.top && y <= r.bottom) return tree.rows[i];
 	}
 	return null;
 }
@@ -66,17 +66,52 @@ export function showGapLine(line: DropLine, tree: TreeShown, gap: number, depth:
 	line.show(left, frame.box.right, y, frame, finger);
 }
 
+/** What the tree's drop asks of the screen: how long a card waits over a folded row, and that row opened. */
+export interface TreeDropDeps {
+	tree(): TreeShown | null;
+	/** How long a card held still over a folded row waits before its branch opens: a long press's time. */
+	hoverMs(): number;
+	/** A folded row's branch opened under a held card (`TaskService.unfoldProjectNode`), the tree drawn again. */
+	unfold(node: ProjectsNodeId): void;
+}
+
+/** The row a held card waits over, and since when its branch is about to open. */
+interface Hover {
+	readonly node: ProjectsNodeId;
+	readonly timer: number;
+}
+
 /**
  * The tree as a place to let go (board Drag): a card held over a row that takes it fills the row with the place's colour,
- * and let go there the card's project gives way to the row's; the plus held over the tree shows the gap a new project
- * would take, at the depth the finger's distance from the left picks.
+ * and let go there the card's project gives way to the row's; held a moment over a folded row, the row opens (spec: «Задержка
+ * над свёрнутой веткой раскрывает её»). The plus held over the tree shows the gap a new project would take, at the depth
+ * the finger's distance from the left picks.
  */
 export class TreeDrop implements DropTarget {
 	private readonly line: DropLine;
 	private result: ProjectsDrop | null = null;
+	private hover: Hover | null = null;
 
-	constructor(private readonly tree: () => TreeShown | null) {
-		this.line = new DropLine(() => this.tree()?.el ?? document.body);
+	constructor(private readonly deps: TreeDropDeps) {
+		this.line = new DropLine(() => this.deps.tree()?.el ?? document.body);
+	}
+
+	private tree(): TreeShown | null {
+		return this.deps.tree();
+	}
+
+	/** The card waits over `row`: a folded one opens once it has waited a long press's time there, any other stops the wait. */
+	private hoverOver(row: ProjectsRow | null): void {
+		if (row?.node === this.hover?.node) return;
+		this.stopHover();
+		if (!row?.unfoldsOnHover) return;
+		const node = row.node;
+		this.hover = { node, timer: window.setTimeout(() => this.deps.unfold(node), this.deps.hoverMs()) };
+	}
+
+	private stopHover(): void {
+		if (this.hover) window.clearTimeout(this.hover.timer);
+		this.hover = null;
 	}
 
 	hitTest(x: number, y: number): boolean {
@@ -88,8 +123,10 @@ export class TreeDrop implements DropTarget {
 		const tree = this.tree();
 		if (!tree) return;
 		if (drag.from !== "new") {
-			const node = rowTakingCard(tree, y);
+			const row = rowUnder(tree, y);
+			const node = row?.acceptsTask ? row.node : null;
 			tree.showDropOn(node);
+			this.hoverOver(row);
 			this.result = node === null ? null : { kind: "projectRow", node };
 			return;
 		}
@@ -105,6 +142,7 @@ export class TreeDrop implements DropTarget {
 
 	leave(): void {
 		this.result = null;
+		this.stopHover();
 		this.tree()?.showDropOn(null);
 		this.line.hide();
 	}

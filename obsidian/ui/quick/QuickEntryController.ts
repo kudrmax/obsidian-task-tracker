@@ -32,7 +32,7 @@ const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox", "backlog"];
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: QuickEntryTasks & Pick<TaskService, "listName" | "placementTitle" | "projectNotes" | "newProject" | "unfoldAbove">;
+	readonly tasks: QuickEntryTasks & Pick<TaskService, "listName" | "placementTitle" | "projects" | "newProject" | "unfoldAbove">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
@@ -429,7 +429,7 @@ export class QuickEntryController {
 	/** The service as the session writes through it, each task the field writes told to the lists by the id the write answers: its card takes the typed text's row. */
 	private telling(tasks: QuickEntryControllerDeps["tasks"]): QuickEntryTasks {
 		return {
-			projectNotes: () => tasks.projectNotes(),
+			projects: () => tasks.projects(),
 			placementOf: (...a) => tasks.placementOf(...a),
 			placementOfDay: (...a) => tasks.placementOfDay(...a),
 			dayOfPlacement: (...a) => tasks.dayOfPlacement(...a),

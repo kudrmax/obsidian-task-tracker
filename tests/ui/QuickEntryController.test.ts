@@ -127,7 +127,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	controller = new QuickEntryController({
 		root,
 		tasks: {
-			projectNotes: () => projects,
+			projects: () => projects,
 			unfoldAbove: async () => {},
 			newProject: async (name, keys) => {
 				newProjects.push({ name, keys });

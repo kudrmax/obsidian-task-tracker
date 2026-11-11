@@ -51,7 +51,7 @@ import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
 import { settingsEffect } from "./settingsEffect";
 import { StatusBarRoom } from "./StatusBarRoom";
-import { type Place, type Shift, stepWithProjects } from "./screens";
+import { type Place, type Shift } from "./screens";
 import { ProjectsScreen } from "./projects/ProjectsScreen";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
@@ -111,7 +111,11 @@ export class CalendarScreen extends Component {
 	/** The Projects screen, left of Inbox: in the plugin's own view, once the core gives its data. */
 	private projects: ProjectsScreen | null = null;
 	/** The tree of the Projects screen as a place for a card or the plus, and its tasks as a place for the plus. */
-	private readonly treeDrop = new TreeDrop(() => this.projects?.treeShown ?? null);
+	private readonly treeDrop = new TreeDrop({
+		tree: () => this.projects?.treeShown ?? null,
+		hoverMs: () => this.settings.longPressMs,
+		unfold: (node) => void this.act(() => this.deps.tasks.unfoldProjectNode(node)).then(() => this.projects?.refreshTree()),
+	});
 	private readonly tasksDrop = new TasksDrop(() => this.projects?.tasksShown ?? null);
 	/** The project each Projects card is shown under (`ProjectsCard.from`), by its task's id: what a drop on the tree replaces. */
 	private readonly projectsFrom = new Map<string, string | null>();
@@ -645,7 +649,7 @@ export class CalendarScreen extends Component {
 		this.landed();
 		const root = this.contentEl;
 		const from = { mode: this.place(), date: this.selectedDate };
-		const to = stepWithProjects(from, shift, (at, way) => this.deps.days.stepScreen(at, way));
+		const to = this.deps.days.stepWheel(from, shift);
 		if (!to) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		if (to.mode !== from.mode) {
 			window.clearTimeout(this.switching);
@@ -1310,12 +1314,11 @@ export class CalendarScreen extends Component {
 		});
 	}
 
-	/** A project of the Project page toggled on `items`: written, then each task as it now stands, found by its key and text. */
+	/** A project of the Project page toggled on `items`: each task as it then stands, null for one gone. */
 	private async toggleProject(items: readonly TaskItem[], name: string): Promise<readonly (TaskItem | null)[]> {
 		let written: readonly (TaskItem | null)[] = items.map(() => null);
 		await this.act(async () => {
-			await this.deps.tasks.toggleProject(items.map((item) => item.key), name);
-			written = await Promise.all(items.map((item) => this.deps.tasks.find(item.key, item.text)));
+			written = await this.deps.tasks.toggleProject(items.map((item) => item.key), name);
 		});
 		return written;
 	}

@@ -1494,7 +1494,7 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 .tc-tree-row.is-tile.is-folded { margin-bottom: var(--tc-stack-step-y); box-shadow: var(--tc-shadow-fold); }
 .tc-tree-row.is-all { margin-bottom: calc(var(--tc-tree-group-gap) - var(--tc-tree-gap)); }
 .tc-tree-row.is-none { margin-top: var(--tc-tree-group-gap); }
-.tc-tree-row:is(.is-waiting, .is-none, .is-done) { color: var(--tc-muted); }
+.tc-tree-row.is-muted { color: var(--tc-muted); }
 .tc-tree-row.is-selected { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
 .tc-tree-row.is-drop { background: var(--tc-drop-bg); color: var(--tc-accent); }
 .tc-tree-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; line-height: var(--tc-leading-tree); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
