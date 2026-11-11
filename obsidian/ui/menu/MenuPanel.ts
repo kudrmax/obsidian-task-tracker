@@ -146,9 +146,35 @@ export function askGroup(parent: HTMLElement, spec: MenuAskSpec): HTMLElement {
 	el(question, "span", "", `${spec.verb} “`);
 	el(question, "span", "tc-menu-ask-title", spec.title);
 	el(question, "span", "", "”?");
+	askButtons(group, { ...spec, cancel: "Cancel" });
+	return group;
+}
+
+/** Cancel and the confirming button of a question, side by side. */
+function askButtons(group: HTMLElement, spec: Pick<MenuAskSpec, "confirm" | "icon" | "danger" | "onCancel" | "onConfirm"> & { readonly cancel: string }): void {
 	const buttons = el(group, "div", "tc-menu-ask-buttons");
-	Button.create(buttons, { kind: "pill", label: "Cancel", cls: "tc-menu-ask-btn", onPress: spec.onCancel });
+	Button.create(buttons, { kind: "pill", label: spec.cancel, cls: "tc-menu-ask-btn", onPress: spec.onCancel });
 	Button.create(buttons, { kind: "pill", tone: spec.danger ? "danger" : "strong", label: spec.confirm, icon: spec.icon, cls: "tc-menu-ask-btn", onPress: spec.onConfirm });
+}
+
+/** A question the core words whole (`ProjectDelete`): its lines, wrapped so the name shows whole, what it means under it, then the buttons. */
+export interface MenuQuestionSpec {
+	readonly question: string;
+	readonly message: string;
+	readonly cancel: string;
+	readonly confirm: string;
+	readonly icon: IconName;
+	readonly danger: boolean;
+	readonly onCancel: () => void;
+	readonly onConfirm: () => void;
+}
+
+/** A question in place of what asked it, as `askGroup`, with a line under it that says what the answer does. */
+export function askQuestion(parent: HTMLElement, spec: MenuQuestionSpec): HTMLElement {
+	const group = el(parent, "div", "tc-menu-ask");
+	el(el(group, "div", "tc-menu-ask-question is-whole"), "span", "", spec.question);
+	el(group, "div", "tc-menu-ask-message", spec.message);
+	askButtons(group, spec);
 	return group;
 }
 

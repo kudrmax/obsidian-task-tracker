@@ -1,5 +1,5 @@
 import { type GroupName, keyId, type MenuStatusId, type PickedTask, type TaskItem, type TaskKey, type TaskMenuModel } from "../../core/application/contracts";
-import { carriesMany, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
+import { carriesMany, type DropTarget, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
 import { el } from "./dom";
 import { Button } from "./kit/Button";
@@ -29,8 +29,8 @@ export interface BulkDeps {
 	removeDue(keys: readonly TaskKey[]): Promise<void>;
 	/** The picked tasks that go along when `lifted` is carried (`TaskService.carried`). */
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[];
-	/** The cards of a list, in order. */
-	cards(column: ListColumn): readonly HTMLElement[];
+	/** The cards of the list `card` stands in, in order: a Shift-click picks a run of them. */
+	cards(card: PickedCard): readonly HTMLElement[];
 	/** The tasks into section `name` of their list, and resolves once the screen shows them. */
 	toSection(keys: readonly TaskKey[], name: GroupName): Promise<void>;
 	/** The tasks' project (`TaskService.setProject`), and resolves once the screen shows it. */
@@ -110,7 +110,7 @@ export class BulkController {
 			return true;
 		}
 		if (how === "tap" && e.shiftKey && selection.size > 0) {
-			const column = this.deps.cards(card.column).flatMap((el) => selection.cardOf(el) ?? []);
+			const column = this.deps.cards(card).flatMap((el) => selection.cardOf(el) ?? []);
 			selection.extend(card, column);
 			return true;
 		}

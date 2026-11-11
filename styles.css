@@ -1261,6 +1261,9 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-menu-ask-question > span { flex-shrink: 0; }
 .tc-menu-ask-question > .tc-menu-ask-title { flex-shrink: 1; min-width: 0; overflow: hidden; }
 .tc-menu-ask-title.is-long { -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); }
+.tc-menu-ask-question.is-whole { white-space: normal; }
+.tc-menu-ask-question.is-whole > span { flex-shrink: 1; min-width: 0; }
+.tc-menu-ask-message { padding: 0 var(--tc-space-8); font-size: var(--tc-font-caption); line-height: var(--tc-leading-card); color: var(--tc-muted); }
 .tc-menu-ask-buttons { display: flex; gap: var(--tc-space-6); }
 .tc-panel button.tc-menu-ask-btn { flex: 1; min-width: 0; }
 .tc-menu-ask-btn > svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
@@ -1526,6 +1529,7 @@ body:not(.is-mobile) .tc-projects-title-field { top: var(--tc-desk-projects-titl
 /* A new project's name typed at a gap of the tree, as far in as the gap's depth; a new task's text among the tasks. */
 .tc-tree-field { flex-shrink: 0; margin-left: calc(var(--tc-level) * var(--tc-tree-indent)); }
 .tc-projects-task-field { flex-shrink: 0; }
+.tc-projects-list > .tc-hidden { display: none; }
 /* A project carried in the tree: its row under the finger, lifted, its place in the tree dimmed. */
 .tc-tree-float { position: fixed; left: 0; top: 0; z-index: var(--tc-layer-float); pointer-events: none; background: var(--tc-float-bg); color: var(--tc-text); box-shadow: var(--tc-shadow-lift); }
 .tc-tree-row.is-lifted { opacity: var(--tc-tile-off-opacity); }

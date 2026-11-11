@@ -25,6 +25,13 @@ export class ArrivingCard {
 		this.card = card;
 	}
 
+	/** The card a drop lands on, known as drawn: hidden until the float has landed on it. */
+	hold(card: HTMLElement): void {
+		if (this.card !== card) this.arrived();
+		card.classList.add(ARRIVING);
+		this.card = card;
+	}
+
 	/** The dropped task's card as drawn now; null when none stands on the screen. */
 	get shown(): HTMLElement | null {
 		return this.card?.isConnected ? this.card : null;

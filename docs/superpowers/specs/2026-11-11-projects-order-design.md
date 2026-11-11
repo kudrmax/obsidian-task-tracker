@@ -78,3 +78,28 @@ The plugin comes first (Max: «плагин в приоритете»); the iPho
 7. **A part the screen no longer has** (or a list that takes no drop) rejects with StaleTaskError, writing nothing.
 8. **The landing** prefers the part the card was dropped in when the task shows in two; a nested card lands as a
    `subtask` of its new parent.
+
+### Obsidian frontend
+
+1. **The gap under the untitled part.** By project the node's own part (no header) stands over the first subproject's
+   header. With `PlacedHead.opens` true on that first header, `placeAt` gives the gap under the own part's last card to
+   the subproject, so a card could never be dropped at the end of the own part. The plugin marks the first header as
+   opening only when no card of the untitled part is drawn above it (By stage, or an own part that is empty and drawn as
+   nothing); every other header opens as the contract says. The Swift frontend maps its headers the same way.
+2. **The No tasks plate is tapped as a list's.** A tap on an empty part's plate opens the new task's field in the
+   plate's place (the plate hidden while it is open), written where that part's plus writes (`ProjectsSection.newTask`),
+   as a tap on a list's empty section does.
+3. **Delete project's look.** The row stands apart at the menu's foot as its own group, in the danger colour with the
+   trash icon (as a task's Delete). Tapped, the question takes the row's place in the same panel: the core's `title` on
+   its own line, wrapped so the name shows whole (it is not faded, unlike a task's name), the `message` under it smaller
+   in the muted colour, then `cancel` and the red `confirm` with the trash icon. Cancel gives the row back; Delete writes
+   `deleteProject` and closes the menu. No Enter shortcut.
+4. **Subtask rows act as the lists' subtasks.** A subtask row opens its menu from its card's column (`menuFrom` of the
+   card it belongs to), folds with its counter, and is lifted, nested and un-nested when its card may be dropped
+   (`canDrop`); a lifted task carries its subtasks' rows folded under its dashed place.
+5. **Several cards on the Projects screen.** ⌘-click, Shift-click (a run of the Projects list's own cards) and Select
+   tasks pick Projects cards as list cards; a lifted picked card carries the others as a stack. Each carried card gives
+   its own row's `drop` (the card it was picked on), both to `dropInProjects` and to a drop on the tree's row
+   (`dropOnProject`), which now takes the whole stack too.
+6. **Where the float lands.** The float lands on the card `projectsDropPreview` names for the card under the finger
+   (`landings[0]`, read before the write), drawn after the write; that card stays hidden until the float is down.
