@@ -5,7 +5,7 @@ import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { icon } from "./kit/icons";
-import { type Place, placeIndex, WHEEL_END, WHEEL_PLACES, type WheelPlace } from "./screens";
+import { type Place, placeIndex, WHEEL_END, SCREEN_PLACES, type ScreenPlace } from "./screens";
 import { labelMark } from "./sources/labelMark";
 
 export interface ColumnSwitchOptions {
@@ -39,7 +39,7 @@ const placeOf = (place: Place): number => placeIndex(place);
 const LIST_OF: Readonly<Record<SwitchColumn, DropColumn | null>> = { projects: null, inbox: "inbox", soon: "soon", now: "day", calendar: null };
 
 /** The place a tap on an icon turns to: the one standing, when it shows the icon's column, else the nearest that does (from Done and Projects, as from Inbox, its neighbour). */
-function placeForIcon(column: SwitchColumn, from: Place): WheelPlace {
+function placeForIcon(column: SwitchColumn, from: Place): ScreenPlace {
 	const list = LIST_OF[column];
 	if (list === null) return column === "projects" ? "projects" : "calendar";
 	return placeShowing(list, from === "done" || from === "projects" ? "inbox" : from);
@@ -47,17 +47,17 @@ function placeForIcon(column: SwitchColumn, from: Place): WheelPlace {
 
 /** The place of the wheel's places a place counts as: Done as Inbox, its neighbour. */
 function wheelIndex(place: Place): number {
-	return WHEEL_PLACES.indexOf(place === "done" ? "inbox" : place);
+	return SCREEN_PLACES.indexOf(place === "done" ? "inbox" : place);
 }
 
 /** The wheel's place nearest to where it stands. */
-function nearest(at: number): WheelPlace {
-	return WHEEL_PLACES.reduce((best, place) => (Math.abs(placeIndex(place) - at) < Math.abs(placeIndex(best) - at) ? place : best));
+function nearest(at: number): ScreenPlace {
+	return SCREEN_PLACES.reduce((best, place) => (Math.abs(placeIndex(place) - at) < Math.abs(placeIndex(best) - at) ? place : best));
 }
 
 interface Press {
 	readonly pointerId: number;
-	/** The wheel's place it stood on when pressed (`WHEEL_PLACES`), and where it stood. */
+	/** The wheel's place it stood on when pressed (`SCREEN_PLACES`), and where it stood. */
 	readonly start: number;
 	readonly startAt: number;
 	/** The wheel stands at `from` with the finger at `x`, and turns a place per icon's width the finger travels from there. */
@@ -105,7 +105,7 @@ export class ColumnSwitch {
 			if (shift === 0) return;
 			e.preventDefault();
 			const place = wheelIndex(this.opts.value()) + shift;
-			if (place >= 0 && place < WHEEL_PLACES.length) this.show(WHEEL_PLACES[place]);
+			if (place >= 0 && place < SCREEN_PLACES.length) this.show(SCREEN_PLACES[place]);
 		});
 		this.render();
 	}
@@ -168,9 +168,9 @@ export class ColumnSwitch {
 
 	/** Where the finger puts the wheel: a quick swipe reaches no further than the next place, a careful one anywhere. */
 	private under(press: Press, x: number): number {
-		const reach = press.pace.careful ? WHEEL_PLACES.length : 1;
-		const least = placeIndex(WHEEL_PLACES[Math.max(0, press.start - reach)]);
-		const most = placeIndex(WHEEL_PLACES[Math.min(WHEEL_PLACES.length - 1, press.start + reach)]);
+		const reach = press.pace.careful ? SCREEN_PLACES.length : 1;
+		const least = placeIndex(SCREEN_PLACES[Math.max(0, press.start - reach)]);
+		const most = placeIndex(SCREEN_PLACES[Math.min(SCREEN_PLACES.length - 1, press.start + reach)]);
 		return Math.min(most, Math.max(least, press.from - (x - press.x) / press.step));
 	}
 
@@ -188,7 +188,7 @@ export class ColumnSwitch {
 		const at = this.position();
 		if (press.pace.careful) return this.show(nearest(at));
 		const way = Math.sign(at - press.startAt);
-		this.show(way === 0 ? this.opts.value() : WHEEL_PLACES[Math.min(WHEEL_PLACES.length - 1, Math.max(0, press.start + way))]);
+		this.show(way === 0 ? this.opts.value() : SCREEN_PLACES[Math.min(SCREEN_PLACES.length - 1, Math.max(0, press.start + way))]);
 	}
 
 	private tap(target: EventTarget | null): void {

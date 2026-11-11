@@ -1,9 +1,9 @@
-import { type ScreenAt, WHEEL_PLACES, type WheelPlace, type WheelSpot } from "../../core/application/contracts";
+import { type ScreenAt, SCREEN_PLACES, type ScreenPlace, type ScreenSpot } from "../../core/application/contracts";
 
-export { placeOfList, shownLists, WHEEL_PLACES, type WheelPlace } from "../../core/application/contracts";
+export { placeShowing, shownLists, SCREEN_PLACES, type ScreenPlace } from "../../core/application/contracts";
 
 /** Where the window stands: one of the wheel's places, or Done left of Inbox, which only the search opens. */
-export type Place = WheelSpot;
+export type Place = ScreenSpot;
 
 /**
  * Where the wheel stands for a place, in icons' widths from the folder to the window's left edge: Projects alone in the
@@ -16,7 +16,7 @@ export function placeIndex(place: Place): number {
 }
 
 /** The wheel's last place, the calendar's. */
-export const WHEEL_END = WHEEL_AT[WHEEL_PLACES[WHEEL_PLACES.length - 1] as WheelPlace];
+export const WHEEL_END = WHEEL_AT[SCREEN_PLACES[SCREEN_PLACES.length - 1] as ScreenPlace];
 
 /** A step back, to the left, or on, to the right. */
 export type Shift = -1 | 1;

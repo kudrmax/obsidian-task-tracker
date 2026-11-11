@@ -3266,33 +3266,22 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/screenPlaces.ts
-  var SCREEN_PLACES = ["inbox", "soon", "calendar"];
-  var SHOWN_LISTS = { inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] };
+  var SCREEN_PLACES = ["projects", "inbox", "soon", "calendar"];
+  var SHOWN_LISTS = { projects: [], inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] };
+  function shownLists(place) {
+    return SHOWN_LISTS[place];
+  }
   function placeShowing(column, place) {
-    if (SHOWN_LISTS[place].includes(column)) return place;
-    const from = SCREEN_PLACES.indexOf(place);
+    const at = place === "projects" ? "inbox" : place;
+    if (SHOWN_LISTS[at].includes(column)) return at;
+    const from = SCREEN_PLACES.indexOf(at);
     const showing = SCREEN_PLACES.filter((other) => SHOWN_LISTS[other].includes(column));
     return showing.reduce((best, other) => Math.abs(SCREEN_PLACES.indexOf(other) - from) < Math.abs(SCREEN_PLACES.indexOf(best) - from) ? other : best);
   }
-  function spotIndex(spot) {
-    return spot === "done" ? -1 : SCREEN_PLACES.indexOf(spot);
-  }
   function stepScreen(from, shift, today) {
     if (from.mode === "calendar" && (shift > 0 || from.date !== today)) return { mode: "calendar", date: addDays(from.date, shift) };
-    const place = spotIndex(from.mode) + shift;
-    return place >= 0 && place < SCREEN_PLACES.length ? { mode: SCREEN_PLACES[place], date: from.date } : null;
-  }
-  var WHEEL_PLACES = ["projects", ...SCREEN_PLACES];
-  function shownLists(place) {
-    return place === "projects" ? [] : SHOWN_LISTS[place];
-  }
-  function placeOfList(column, place) {
-    return placeShowing(column, place === "projects" ? "inbox" : place);
-  }
-  function stepWheel(from, shift, today) {
-    if (from.mode === "projects") return shift > 0 ? { mode: "inbox", date: from.date } : null;
-    if (shift < 0 && (from.mode === "inbox" || from.mode === "done")) return { mode: "projects", date: from.date };
-    return stepScreen({ mode: from.mode, date: from.date }, shift, today);
+    const at = from.mode === "done" ? SCREEN_PLACES.indexOf("inbox") + (shift > 0 ? 0 : -1) : SCREEN_PLACES.indexOf(from.mode) + shift;
+    return at >= 0 && at < SCREEN_PLACES.length ? { mode: SCREEN_PLACES[at], date: from.date } : null;
   }
   var SWIPE_FLICK_SPEED = 0.3;
   function swipeLanding(moved2, distance, speed) {
@@ -7504,7 +7493,6 @@ ${key.title}`.toLowerCase();
     relation: (c, [date]) => dayRelation(date, c.rules.today()),
     step: (_c, [date, days]) => addDays(date, days),
     stepScreen: (c, [from, shift]) => stepScreen(from, shift, c.rules.today()),
-    stepWheel: (c, [from, shift]) => stepWheel(from, shift, c.rules.today()),
     openAt: (c, [date]) => dayOpening(date, boundaryOf2(c), c.rules.today(), c.now, c.settings.scrollToHour),
     /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
     boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
@@ -7741,7 +7729,6 @@ ${key.title}`.toLowerCase();
     placeShowing,
     swipeLanding,
     shownLists,
-    placeOfList,
     wholeWidth,
     grownStart,
     listWidths,
@@ -7751,7 +7738,7 @@ ${key.title}`.toLowerCase();
     onTheDay,
     canPick
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, WHEEL_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };

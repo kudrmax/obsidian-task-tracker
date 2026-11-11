@@ -1,11 +1,11 @@
 import type { ScreenSettings, ScreenSettingsStore } from "../../core/application/contracts";
-import type { WheelPlace } from "./screens";
+import type { ScreenPlace } from "./screens";
 
 /**
  * Which pair of neighbouring lists the window shows: Inbox and Soon, Soon and the day's list, or the day's list and the
  * calendar; or the Projects screen. The window's own layout: the services hear only which lists show (`SHOWN_LISTS`).
  */
-export type RightMode = WheelPlace;
+export type RightMode = ScreenPlace;
 
 /**
  * The settings of this frontend alone: how Obsidian's screen is laid out, zoomed and painted. They are kept in the
