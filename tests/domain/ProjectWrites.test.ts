@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { movedToProjects, renameProject, withTasksInTree } from "../../core/domain/ProjectWrites";
+import { awaitsMove, movedToProjects, renameProject, withTasksInTree } from "../../core/domain/ProjectWrites";
 import { TaskDocument } from "../../core/domain/TaskDocument";
 import type { Markers } from "../../core/domain/TaskLine";
 
@@ -56,14 +56,13 @@ describe("the one move to projects", () => {
 		expect(moved).not.toContain("🎯");
 	});
 
-	it("runs once: a file with ## Projects is left as it is", () => {
+	it("is awaited while an old field or a 🎯 line is left, or while there is no ## Projects and something to put in it", () => {
+		expect(awaitsMove(parse(BEFORE), [])).toBe(true);
 		const done = movedToProjects(parse(BEFORE), NOTES);
-		expect(movedToProjects(done, [{ name: "Новое", link: "Новое" }])).toBe(done);
-	});
-
-	it("leaves a file with nothing to move as it is", () => {
-		const plain = parse("## Inbox\n\n- [ ] A\n");
-		expect(movedToProjects(plain, [])).toBe(plain);
+		expect(awaitsMove(done, [{ name: "Новое", link: "Новое" }])).toBe(false);
+		expect(awaitsMove(parse("## Inbox\n\n- [ ] A\n"), [])).toBe(false);
+		expect(awaitsMove(parse("## Inbox\n\n- [ ] A\n"), NOTES)).toBe(true);
+		expect(awaitsMove(parse("## Inbox\n\n- [ ] A 🗂️ [[B]]\n\n## Projects\n\n- B\n"), [])).toBe(true);
 	});
 });
 

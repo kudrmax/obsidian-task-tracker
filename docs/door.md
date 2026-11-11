@@ -171,8 +171,10 @@ order of lines the manual order, `[[note]]` after a name only when a note is att
 one `🗂️ Name` field each, right after its title (before its labels and other fields); a name runs to the next field's
 mark. A subtask's projects are its parent's. The old `🗂️ [[Note]]` reads as `Note`. A project a task names that the tree
 lacks shows at the tree's end and is written into it on the next write. Every write keeps the fields, and no title holds
-them. The first write to a file without `## Projects` moves it once: the notes of `context.projects` become projects
-with their notes attached, the fields are written plain, `🎯` goes off every line.
+them. The move to projects is part of tidying: any read of a file that still awaits it (an old `🗂️ [[…]]` field or a
+`🎯` line anywhere, or no `## Projects` while there is something to put in it) answers the moved text in `tasks`, with no
+`step`, before any action: the notes of `context.projects` become projects with their notes attached (a project of that
+name gets the note), the old fields are written plain, `🎯` goes off the lines.
 
 - `TaskItem.project` (the first, or `null`) and `TaskItem.projects`: `ProjectRef` `{ name, link, path, note,
   canOpenNote, mark }`; `name` is what every call takes (`link` is the name again, a stub), `path` the names from the top
@@ -193,7 +195,8 @@ with their notes attached, the fields are written plain, `🎯` goes off every l
   `menu`: `ProjectMenu` `{ project, renameLabel, noteLabel, note, attachLabel, detachLabel }` for a project, `null` for
   All, No project, Done.
 - `tasks.tapProjectNode(node)`: a node not chosen is chosen; the chosen one folds or unfolds its branch (Done opens its
-  done projects). `tasks.selectProjectNode(node)`: chosen, the branches above it opened (a search hit's path, a card's
+  done projects). `tasks.unfoldProjectNode(node)`: the branch opened without choosing it, for a card held over a folded
+  row (`unfoldsOnHover`). `ProjectsRow.muted`: the name drawn grey (a waiting or done project, No project, Done). `tasks.selectProjectNode(node)`: chosen, the branches above it opened (a search hit's path, a card's
   folder). `tasks.setProjectsMode("byProject" | "byStage")`. Each answers `projectsScreen`.
 - `tasks.createProject(name, { parent, before })`: the plus let go in the tree; answers the `ProjectRef` (chosen at
   once), `null` for a blank name or one the tree has. `tasks.moveProject(name, place)`: a project lifted and let go.
@@ -211,10 +214,12 @@ with their notes attached, the fields are written plain, `🎯` goes off every l
   project), or the view's `newTask` outside any section.
 - A menu's `project` (`MenuProject` `{ current, options, none, noneLabel, value, disabled, newLabel }`) is the Project
   row's page, several checks: `options` the whole tree, each `{ project, checked, depth }`; a pick writes
-  `tasks.toggleProject(keys, name)` (on for all, off for all when all have it), No project `tasks.setProject(keys, null)`,
+  `tasks.toggleProject(keys, name)` (on for all, off for all when all have it; answers each task as it then stands, as
+  `tasks.toggleLabel`), No project `tasks.setProject(keys, null)`,
   «New project…» `tasks.newProject(name, keys)` (a project at the tree's top, checked; answers its `ProjectRef`).
   `value`: «Дружба», «Дружба +1», «No project», or empty when the tasks differ. The same in the bulk menu.
-- `tasks.setProject(keys, name | null)`: the tasks' projects become that one alone.
+- `tasks.setProject(keys, name | null)`: the tasks' projects become that one alone. `tasks.projects()`: the tree's
+  projects in its order (the quick entry's Project button and `capture.project`; `tasks.projectNotes()` is its old name).
 - `tasks.search(query)`: each `SearchHit` carries `projectPath`, the task's first project's path, `null` for none.
 - `tasks.fullTree(item).project`: the task's first project; a tap opens the Projects screen on it
   (`tasks.selectProjectNode(rules.projectNodeOf(name))`).
@@ -256,7 +261,10 @@ empty; `settings.setResultMark` and `settings.setProjectTag` write nothing.
 
 ### `days.*`: `DayService`
 
-`today()`, `relation(date)`, `step(date, days)`, `stepScreen({mode, date}, shift)` (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends), `boundary()` (`{ startHour }`), `openAt(date)`: where the day's
+`today()`, `relation(date)`, `step(date, days)`, `stepScreen({mode, date}, shift)` (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends),
+`stepWheel({mode, date}, shift)` (the same with Projects first: back from Inbox and Soon, or from Done, to
+`{ mode: "projects" }`; on from Projects to Inbox; null back from Projects; `rules.swipeLanding` still makes one swipe one
+step), `boundary()` (`{ startHour }`), `openAt(date)`: where the day's
 timeline opens, minutes from the day's start: `{ kind: "now", minute }` for today (the now line, which the plugin holds
 at half the height), `{ kind: "hour", minute }` for another day (the settings' `scrollToHour`, at the top). `onDayChange` and `catchUp` are the
 host's: it checks the clock (once a minute while a screen is open), and when `days.today` answers another day it calls
@@ -589,7 +597,10 @@ name: "Monday", letter: "M" }`, `remove` `"Remove repeat"`),
 `NO_DAY_EVENTS` (a day before any calendar file was read, as `calendars.events` answers it: no events, no statuses, `alert` `"none"`, its `words`),
 `SCREEN_PLACES` (`["inbox", "soon", "calendar"]`, left to right) and `SHOWN_LISTS` (the lists each place shows, in its
 order: `{ inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] }`; the quick entry's
-`look.shown`). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
+`look.shown`), `WHEEL_PLACES` (`["projects", "inbox", "soon", "calendar"]`: the wheel's places, Projects a place of its
+own left of Inbox, its window holding the folder alone). `rules.shownLists(place)` the funnel's lists a wheel's place
+shows (`"projects"` → `[]`), `rules.placeOfList(column, place)` the funnel's place that shows a list from a wheel's place
+(from Projects as from Inbox: `placeOfList("day", "projects")` → `"soon"`). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.
 
 ## What the door leaves to the host

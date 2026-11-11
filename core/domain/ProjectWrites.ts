@@ -29,24 +29,41 @@ export function withTasksInTree(doc: TaskDocument): TaskDocument {
 	return doc.hasProjectTree() && full === tree ? doc : doc.withProjectTree(full);
 }
 
+/** A task line still in the old format: a `🗂️ [[Note]]` field. */
+const OLD_FIELD_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[/u;
+
+/** The lines the move rewrites: an old `🗂️ [[…]]` field, or the result mark first. */
+function oldLines(doc: TaskDocument, resultMark: string): TaskEntry[] {
+	return flatten(doc.allTasks()).filter((entry) => OLD_FIELD_RE.test(entry.raw) || startsWithMark(entry.task.text, resultMark));
+}
+
 /**
- * The move to projects in the tasks file, once, on a file without `## Projects`: each project note becomes a top-level
- * project with its note attached, by name; each name a task's field gives that no note has, a project without a note;
- * every task line with a project is written anew, its field plain; every line starting with the result mark loses it.
- * Nothing of this to do (no note, no project, no mark): the file as it is.
+ * The file still waits for the move to projects: it has an old `🗂️ [[…]]` field or a line starting with the result
+ * mark, wherever `## Projects` stands (one written by hand stops nothing); or it has no `## Projects` while there is a
+ * note that was a project, or a task with a project, to put in it.
+ */
+export function awaitsMove(doc: TaskDocument, notes: readonly LegacyProjectNote[], resultMark: string = LEGACY_RESULT_MARK): boolean {
+	if (oldLines(doc, resultMark).length > 0) return true;
+	return !doc.hasProjectTree() && (notes.length > 0 || taskProjects(doc).length > 0);
+}
+
+/**
+ * The move to projects: each note that was a project becomes a top-level project with its note attached (a project of
+ * that name already in the tree gets the note when it has none), by name; each name a task gives that the tree lacks, a
+ * project without a note; every line with an old field is written anew, its fields plain; every line starting with the
+ * result mark loses it. Run on a file that `awaitsMove` (looked at before the write that brings it), whatever else that
+ * write did: a project it made in the tree stops nothing. Lines already plain are left as they are.
  */
 export function movedToProjects(doc: TaskDocument, notes: readonly LegacyProjectNote[], resultMark: string = LEGACY_RESULT_MARK): TaskDocument {
-	if (doc.hasProjectTree()) return doc;
-	const all = flatten(doc.allTasks());
-	const marked = all.filter((entry) => startsWithMark(entry.task.text, resultMark));
-	const fielded = all.filter((entry) => entry.task.projects.length > 0);
-	if (notes.length === 0 && marked.length === 0 && fielded.length === 0) return doc;
 	const byName = [...notes].sort((a, b) => (projectKey(a.name) < projectKey(b.name) ? -1 : projectKey(a.name) > projectKey(b.name) ? 1 : 0));
 	let tree: ProjectTree = doc.projectTree();
-	for (const note of byName) tree = tree.added(note.name, { parent: null, before: null }, note.link);
+	for (const note of byName) {
+		const found = tree.find(note.name);
+		tree = found ? (found.node.note === null ? tree.withNote(found.node.name, note.link) : tree) : tree.added(note.name, { parent: null, before: null }, note.link);
+	}
 	tree = tree.withMissing(taskProjects(doc));
 	const prefixes = doc.priorityPrefixes();
-	const rewritten = doc.rewrittenLines([...new Set([...marked, ...fielded])], (task) => {
+	const rewritten = doc.rewrittenLines(oldLines(doc, resultMark), (task) => {
 		if (!startsWithMark(task.text, resultMark)) return task;
 		const rest = task.text.slice(resultMark.length).trimStart();
 		return task.priority === null ? { ...task, ...priorityOfText(rest, prefixes) } : { ...task, text: rest };

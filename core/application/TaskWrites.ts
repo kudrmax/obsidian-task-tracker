@@ -147,8 +147,19 @@ export class TaskWrites {
 		return nothing(this.rules.setProject(keys, project));
 	}
 
-	toggleProject(keys: readonly TaskKey[], name: string): Write<void> {
-		return nothing(this.rules.toggleProject(keys, name));
+	/** Each task as it then stands, found by its id, in the order given; null for one gone. */
+	toggleProject(keys: readonly TaskKey[], name: string): Write<readonly (TaskItem | null)[]> {
+		return {
+			operation: this.rules.toggleProject(keys, name),
+			answer: (change) => {
+				if (!change) return keys.map(() => null);
+				const today = this.rules.today();
+				return keys.map((key) => {
+					const entry = change.after.byId(this.rules.entryOf(change.before, key).id);
+					return entry ? this.reads.itemAt(change.after, entry, today) : null;
+				});
+			},
+		};
 	}
 
 	/** «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of nothing. */

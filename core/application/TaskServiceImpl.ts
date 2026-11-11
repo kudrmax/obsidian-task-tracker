@@ -49,7 +49,7 @@ import {
 import type { SectionOffer } from "./sections";
 import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type ProjectsScreenStore, type SettingsStore, type TaskFileStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
-import { renamedIn, selected, tapped } from "./projectsScreen";
+import { renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { ProjectTree, type TreePlace } from "../domain/ProjectTree";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
@@ -90,11 +90,11 @@ export class TaskServiceImpl implements TaskService {
 		private readonly settings: SettingsStore,
 		clock: Clock,
 		private readonly history: UndoHistory | null = null,
-		private readonly projects: Projects = NO_PROJECTS,
+		private readonly legacyProjects: Projects = NO_PROJECTS,
 		private readonly projectsScreenStore: ProjectsScreenStore = memoryProjectsScreen(),
 		identity: TaskIdentity = new TaskIdentity(),
 	) {
-		this.rules = new TaskRules(settings, clock, identity, true, () => projects.list());
+		this.rules = new TaskRules(settings, clock, identity, true, () => legacyProjects.list());
 		this.reads = new TaskReads(this.rules, settings, clock, { tree: () => this.lastTree(), screen: () => projectsScreenStore.get() });
 		this.writes = new TaskWrites(this.rules, this.reads);
 	}
@@ -131,7 +131,7 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.setProject(keys, project));
 	}
 
-	toggleProject(keys: readonly TaskKey[], name: string): Promise<void> {
+	toggleProject(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]> {
 		return this.run(this.writes.toggleProject(keys, name));
 	}
 
@@ -147,8 +147,16 @@ export class TaskServiceImpl implements TaskService {
 		return null;
 	}
 
-	projectNotes(): readonly ProjectRef[] {
+	projects(): readonly ProjectRef[] {
 		return this.reads.projectNotes();
+	}
+
+	projectNotes(): readonly ProjectRef[] {
+		return this.projects();
+	}
+
+	async unfoldProjectNode(node: ProjectsNodeId): Promise<void> {
+		this.keepScreen(unfolded(this.projectsScreenStore.get(), node));
 	}
 
 	async newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null> {
@@ -164,7 +172,8 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async tapProjectNode(node: ProjectsNodeId): Promise<void> {
-		this.keepScreen(tapped(this.projectsScreenStore.get(), this.lastTree(), node));
+		const s = await this.snapshotOrNull();
+		this.keepScreen(tapped(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, node));
 	}
 
 	async selectProjectNode(node: ProjectsNodeId): Promise<void> {
@@ -546,7 +555,7 @@ export class TaskServiceImpl implements TaskService {
 		this.listeners.add(listener);
 		this.unsubscribeStore ??= this.store.onChange(() => this.emit());
 		this.unsubscribeSettings ??= this.watchReading();
-		this.unsubscribeProjects ??= this.projects.onChange(() => this.emit());
+		this.unsubscribeProjects ??= this.legacyProjects.onChange(() => this.emit());
 		return () => {
 			this.listeners.delete(listener);
 			if (this.listeners.size === 0) {

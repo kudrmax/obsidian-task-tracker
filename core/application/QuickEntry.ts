@@ -209,7 +209,7 @@ export interface PlaceMove {
 }
 
 /** What the entry reads of the service, all synchronous: the marks, the places, and the project notes its Project page offers (none without them). */
-export type EntryTasks = Pick<TaskService, "placementOf" | "placementOfDay" | "dayOfPlacement" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks" | "newSlot"> & Partial<Pick<TaskService, "projectNotes">>;
+export type EntryTasks = Pick<TaskService, "placementOf" | "placementOfDay" | "dayOfPlacement" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks" | "newSlot"> & Partial<Pick<TaskService, "projects" | "projectNotes">>;
 
 /**
  * What the entry reads of the screen, as it stands now: its lists' cards and sections, the day it shows, and which of
@@ -381,7 +381,7 @@ export class QuickEntry {
 	}
 
 	private projectButton(link: string | null): EntryProject {
-		return entryProject(link, this.tasks.projectNotes?.() ?? []);
+		return entryProject(link, this.tasks.projects?.() ?? this.tasks.projectNotes?.() ?? []);
 	}
 
 	/** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */

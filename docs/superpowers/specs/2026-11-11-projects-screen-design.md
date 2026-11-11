@@ -165,11 +165,16 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
     top-level project last and checks it (a taken name: that project). The row's value: «Дружба», «Дружба +1», «No
     project», or empty when the tasks differ. The quick entry's button stays one project: a rename writes it only when
     the button was touched, then the task's projects become that one.
-13. **The one move** runs on the first write of an action to a file without `## Projects` that has a note, a field or
-    a `🎯` line to move (a tidy-only write moves nothing): the notes the host knows (the plugin's `Projects` port by the
-    old Project tag, the app's `context.projects`) by name, then each name a task's field gives; only the lines with a
-    field or the mark are rewritten; the mark is the settings' old `resultMark` (`🎯`), a priority after it read as the
-    priority. Undoing that write undoes the move; the next write makes it again.
+13. **The one move is a write of its own, as tidying is.** Whenever the core reads the file (the plugin's start, a change
+    from outside, every screen, the door's reads) and the file awaits the move (an old `🗂️ [[…]]` field or a `🎯` line
+    anywhere, a `## Projects` written by hand stopping nothing; or no `## Projects` while a note that was a project or a
+    task's project waits to go in it), the move is part of today's tidying: written at once, before any action, and no
+    step of undo (Max can't take the migration back by Cmd+Z). So every action, and every key the screen hands out, works
+    on the moved file. The move: the notes the host knows (the plugin's `Projects` port by the old Project tag, the app's
+    `context.projects`) by name, a project of that name already in the tree getting the note, then each name a task
+    gives; only the lines with an old field or the mark are rewritten; the mark is the settings' old `resultMark` (`🎯`),
+    a priority after it read as the priority. A `🗂️ [[…]]` typed by hand later is moved at the next read the same way
+    (its notes go only where the tree lacks them).
 14. **Every action's write puts the tasks' projects in the tree**, one the tree lacks last at its top.
 15. **The next step** is any folded task's with an open subtask, on its card and its timeline block (the block now only
     while folded, as the card); `semibold` is always false.

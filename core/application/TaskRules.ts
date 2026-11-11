@@ -24,7 +24,7 @@ import {
 	type TaskKey,
 	type TaskStep,
 } from "./contracts";
-import { boundaryOf, parseText, readDocument, readingKey, sectionNames } from "./documentText";
+import { boundaryOf, parseText, readingKey, sectionNames } from "./documentText";
 import * as projectWrites from "../domain/ProjectWrites";
 import { cleanProjectName, namesProject, uniqueNames } from "../domain/Project";
 import type { TreePlace } from "../domain/ProjectTree";
@@ -136,19 +136,17 @@ export class TaskRules {
 	}
 
 	read(text: string, at: Moment = this.moment()): Reading {
-		const { settings, today, boundary } = at;
-		const presets = ops.usablePresets(settings.groups.presets);
+		const { settings } = at;
 		const parsed = parseText(text, settings);
 		const whole = parsed.ensureSections(sectionNames(settings));
-		const doc = normalize(whole, today, boundary, presets);
-		const changed = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
+		const doc = this.tidied(whole, at);
+		const changed = whole === parsed ? doc !== whole : this.tidied(parsed, at) !== parsed;
 		return { doc: this.identified(text, doc, () => doc), changed };
 	}
 
 	/** The text after `operation` on the document read and normalized; the result is normalized again. */
 	change(text: string, operation: Operation, at: Moment = this.moment()): TextChange {
-		const { settings, today, boundary } = at;
-		const doc = readDocument(text, settings, today, boundary);
+		const doc = this.tidied(parseText(text, at.settings).ensureSections(sectionNames(at.settings)), at);
 		return this.written(this.identified(text, doc, () => doc), operation, at);
 	}
 
@@ -188,9 +186,15 @@ export class TaskRules {
 		return this.identity?.of(text, () => this.tidied(parseText(text, this.settings.get()).ensureSections(sectionNames(this.settings.get())), this.moment()));
 	}
 
-	/** A document as today's tidying leaves it. */
+	/**
+	 * A document as today's tidying leaves it: the one move to projects first while the file awaits it, so it is written
+	 * as soon as the file is read (a tidy, no step of undo) and every action runs on a moved file.
+	 */
 	private tidied(doc: TaskDocument, at: Moment): TaskDocument {
-		return normalize(doc, at.today, at.boundary, ops.usablePresets(at.settings.groups.presets));
+		const notes = this.legacyNotes();
+		const mark = at.settings.resultMark;
+		const moved = projectWrites.awaitsMove(doc, notes, mark) ? projectWrites.withTasksInTree(projectWrites.movedToProjects(doc, notes, mark)) : doc;
+		return normalize(moved, at.today, at.boundary, ops.usablePresets(at.settings.groups.presets));
 	}
 
 	/** The document after `operation` on `doc`, already read and normalized at `at`, normalized again. */
@@ -656,18 +660,19 @@ export class TaskRules {
 	}
 
 	/**
-	 * A written document with its projects in its tree: on a file still without `## Projects`, the one move to projects
-	 * first (the notes that were projects, the result mark of the settings), then every project a task names.
+	 * A written document with its projects in its tree: when the file as read still awaited the move to projects (old
+	 * fields, the result mark, or no `## Projects`), the move first, whatever the write did; then every project a task names.
 	 */
-	private projected(doc: TaskDocument, settings: TaskCalendarSettings): TaskDocument {
-		const moved = projectWrites.movedToProjects(doc, this.legacyNotes(), settings.resultMark);
+	private projected(before: TaskDocument, after: TaskDocument, settings: TaskCalendarSettings): TaskDocument {
+		const notes = this.legacyNotes();
+		const moved = projectWrites.awaitsMove(before, notes, settings.resultMark) ? projectWrites.movedToProjects(after, notes, settings.resultMark) : after;
 		return projectWrites.withTasksInTree(moved);
 	}
 
 	private written(doc: TaskDocument, operation: Operation, at: Moment, writes = true): TextChange {
 		const { settings, today, boundary } = at;
 		const changed = operation(doc, today, settings, boundary);
-		const projected = changed === doc ? changed : this.projected(changed, settings);
+		const projected = changed === doc ? changed : this.projected(doc, changed, settings);
 		const after = normalize(projected, today, boundary, ops.usablePresets(settings.groups.presets));
 		const text = after.serialize();
 		if (writes) this.identity?.wrote(text, after);

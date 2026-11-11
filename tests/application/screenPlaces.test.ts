@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placeShowing, SCREEN_PLACES, SHOWN_LISTS } from "../../core/application/contracts";
+import { placeOfList, placeShowing, SCREEN_PLACES, SHOWN_LISTS, shownLists, WHEEL_PLACES } from "../../core/application/contracts";
 
 describe("the screen's places", () => {
 	it("stand left to right as Inbox, Soon and the calendar, each showing its lists in their order", () => {
@@ -14,5 +14,12 @@ describe("the screen's places", () => {
 			["soon", ["inbox", "inbox", "soon", "soon"]],
 			["calendar", ["inbox", "inbox", "soon", "calendar"]],
 		]);
+	});
+
+	it("the wheel holds Projects left of Inbox, a place of its own showing none of the funnel's lists; from it a list turns to Inbox's neighbours", () => {
+		expect(WHEEL_PLACES).toEqual(["projects", "inbox", "soon", "calendar"]);
+		expect(shownLists("projects")).toEqual([]);
+		expect(shownLists("soon")).toEqual(["soon", "day"]);
+		expect((["inbox", "backlog", "soon", "day"] as const).map((column) => placeOfList(column, "projects"))).toEqual(["inbox", "inbox", "inbox", "soon"]);
 	});
 });
