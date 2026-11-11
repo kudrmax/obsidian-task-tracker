@@ -1505,6 +1505,7 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 .tc-projects-tree-column, .tc-projects-tasks-column { position: absolute; bottom: 0; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
 .tc-projects-tree-column { left: 0; top: var(--tc-projects-top); width: var(--tc-tree-width); padding: var(--tc-column-pad-near); }
 .tc-projects-tasks-column { left: calc(var(--tc-tree-width) + var(--tc-divider)); right: 0; top: calc(var(--tc-projects-top) + var(--tc-seg) + var(--tc-projects-seg-gap)); padding: var(--tc-column-pad-far); }
+.tc-projects-list > .tc-hidden { display: none; }
 .task-calendar .tc-projects > .tc-divider { left: var(--tc-tree-width); top: var(--tc-projects-top); }
 .tc-projects.is-missing :is(.tc-projects-seg, .tc-projects-tasks-column) { visibility: hidden; }
 

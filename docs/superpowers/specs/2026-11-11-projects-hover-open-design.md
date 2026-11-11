@@ -52,6 +52,9 @@ Follows `2026-11-11-projects-screen-design.md` and `2026-11-11-projects-order-de
 10. **With the in-place entry (merge)**: the plus is let go in the Projects list (`ProjectsListDrop`) and never hovers a
     tree row open (the plus's own tree drop is the new project's gap); the list's node check (decision Obsidian 8) holds
     for the plus too, so a field never opens on a node other than the one the place was read on.
+11. **The carried card's hiding rule stays** (merge): `release-projects-2` dropped `.tc-projects-list > .tc-hidden` (its
+    field no longer hides the plate); the card a hover carries away is hidden by it, so it is back, with a test that the
+    stylesheet keeps it. Without it the carried card's dashed place showed in the opened project's list.
 
 (the agents add theirs below)
 

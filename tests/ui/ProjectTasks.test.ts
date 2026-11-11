@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { ProjectsCard, TaskItem } from "../../core/application/contracts";
@@ -229,6 +230,10 @@ describe("a card still carried while a held card opens another node", () => {
 		expect(tasks.el.querySelector(".tc-card")).toBe(lifted);
 		expect(lifted.classList.contains("tc-hidden")).toBe(false);
 		expect(lifted.classList.contains("is-waiting")).toBe(true);
+	});
+
+	it("is out of sight by the stylesheet, not only by its class", () => {
+		expect(readFileSync("styles.css", "utf8")).toMatch(/\.tc-projects-list > \.tc-hidden \{ display: none; \}/);
 	});
 
 	it("goes once the drag is over and its node is not drawn", () => {
