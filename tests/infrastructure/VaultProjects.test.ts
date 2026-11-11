@@ -153,6 +153,7 @@ describe("ObsidianNoteIndex", () => {
 		(loaded.app as { metadataCache: { initialized?: boolean } }).metadataCache.initialized = true;
 		expect(new ObsidianNoteIndex(loaded.app, () => "TODOs Tasks.md").ready()).toBe(true);
 		const starting = fakeApp();
+		starting.caches.delete("B.md");
 		const index = new ObsidianNoteIndex(starting.app, () => "TODOs Tasks.md");
 		const heard = vi.fn();
 		index.onChange(heard);
@@ -163,6 +164,18 @@ describe("ObsidianNoteIndex", () => {
 		vi.useRealTimers();
 		expect(index.ready()).toBe(true);
 		expect(heard).toHaveBeenCalledTimes(1);
+	});
+
+	it("without Obsidian's internal flag, is ready at once when every note already has its metadata: a plugin loaded or updated into an indexed vault", () => {
+		const indexed = fakeApp();
+		expect((indexed.app as { metadataCache: { initialized?: boolean } }).metadataCache.initialized).toBeUndefined();
+		expect(new ObsidianNoteIndex(indexed.app, () => "TODOs Tasks.md").ready()).toBe(true);
+		const reading = fakeApp();
+		reading.caches.delete("B.md");
+		const index = new ObsidianNoteIndex(reading.app, () => "TODOs Tasks.md");
+		expect(index.ready()).toBe(false);
+		reading.caches.set("B.md", {});
+		expect(index.ready()).toBe(true);
 	});
 
 	it("works out a note's link only when asked for it", () => {

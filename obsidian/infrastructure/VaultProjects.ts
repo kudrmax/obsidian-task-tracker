@@ -101,9 +101,19 @@ export class ObsidianNoteIndex implements NoteIndex {
 		private readonly tasksFile: () => string,
 	) {}
 
-	/** Obsidian has read every note's metadata: already when the index is made (`initialized`), or at its first `resolved`. */
+	/**
+	 * Obsidian has read every note's metadata: its first `resolved`, its internal `initialized` flag where it has one, or,
+	 * not leaning on that flag, every markdown note already holding its cache (a plugin loaded or updated through BRAT into
+	 * a vault Obsidian has indexed hears no `resolved` until a file changes). Once ready, it stays so.
+	 */
 	ready(): boolean {
-		return this.resolved || (this.app.metadataCache as { initialized?: boolean }).initialized === true;
+		if (this.resolved) return true;
+		const { metadataCache, vault } = this.app;
+		const indexed = (metadataCache as { initialized?: boolean }).initialized === true || vault.getMarkdownFiles().every((file) => metadataCache.getFileCache(file) !== null);
+		if (!indexed) return false;
+		this.resolved = true;
+		this.kept = null;
+		return true;
 	}
 
 	notes(): readonly NoteTags[] {
