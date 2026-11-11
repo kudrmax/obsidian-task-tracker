@@ -265,7 +265,7 @@ struct ProjectTasks: View {
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: CardMetrics.gap) {
                         ForEach(Array(projects.parts.enumerated()), id: \.element.id) { index, part in
-                            if let title = part.section.title {
+                            if part.section.header, let title = part.section.title {
                                 Color.clear
                                     .frame(maxWidth: .infinity, minHeight: ColumnMetrics.groupLeading, maxHeight: ColumnMetrics.groupLeading)
                                     .overlay(alignment: .leading) {
@@ -278,20 +278,19 @@ struct ProjectTasks: View {
                                     .mask(Fade())
                                     .frame(maxWidth: .infinity, minHeight: ColumnMetrics.groupHead, alignment: .bottomLeading)
                                     .padding(.leading, CardMetrics.leading)
-                                    .padding(.top, index == 0 ? 0 : ColumnMetrics.sectionGap)
+                                    .padding(.top, projects.drawsAnything(before: index) ? ColumnMetrics.sectionGap : 0)
                                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.projects.geometry.parts[part.id] = $0 }
                             }
                             ForEach(part.cards) { card in
                                 ProjectCard(card: card, model: model)
                                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.projects.geometry.cards[part.id + "/" + card.id] = $0 }
                             }
+                            if part.section.plate {
+                                EmptyPlate(open: part.section.newTask.map { new in { model.projects.asking = .task(new) } }, label: view.emptyLabel)
+                            }
                         }
                         if projects.parts.isEmpty {
-                            Text(verbatim: view.emptyLabel)
-                                .font(.system(size: CardMetrics.title))
-                                .foregroundStyle(Palette.muted)
-                                .padding(.leading, CardMetrics.leading)
-                                .frame(maxWidth: .infinity, minHeight: CardMetrics.height, alignment: .leading)
+                            EmptyPlate(label: view.emptyLabel)
                         }
                     }
                     .padding(.horizontal, CardMetrics.columnInset)
@@ -326,11 +325,25 @@ struct ProjectTasks: View {
                         Button(menu.detachLabel, systemImage: "minus.circle", role: .destructive) { Task { await model.projects.detach(menu.project.name) } }
                     }
                 }
+                Section {
+                    Button(menu.delete.label, systemImage: "trash", role: menu.delete.destructive ? .destructive : nil) { model.projects.deleting = menu }
+                }
             } label: {
                 text.contentShape(.rect)
             }
             .buttonStyle(.plain)
             .menuOrder(.fixed)
+            .confirmationDialog(
+                model.projects.deleting?.delete.title ?? "",
+                isPresented: Binding(get: { model.projects.deleting != nil }, set: { if !$0 { model.projects.deleting = nil } }),
+                titleVisibility: .visible,
+                presenting: model.projects.deleting
+            ) { asked in
+                Button(asked.delete.confirm, role: asked.delete.destructive ? .destructive : nil) { Task { await model.projects.delete(asked.project.name) } }
+                Button(asked.delete.cancel, role: .cancel) {}
+            } message: { asked in
+                Text(verbatim: asked.delete.message)
+            }
         } else {
             text
         }

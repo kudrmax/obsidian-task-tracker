@@ -91,6 +91,16 @@ public struct ProjectsNewTask: Decodable, Hashable, Sendable {
 /// `ProjectsSection`: a part of the chosen node's tasks.
 public struct ProjectsSection: Decodable, Hashable, Sendable, Identifiable {
     public let key: String
+    /// What the list's drop machinery knows the part by: nil for the untitled part (the node's own, No project's).
+    public let group: String?
+    /// It draws its header (`title`): every part but the untitled one.
+    public let header: Bool
+    /// Its header opens its part for a drop (`PlacedHead.opens`), passed through as the core gives it.
+    public let opens: Bool
+    /// No card in it: shown so a card can be dropped there.
+    public let empty: Bool
+    /// The No tasks plate stands under it: an empty part with a header, or the only part.
+    public let plate: Bool
     /// The header; nil for the node's own tasks.
     public let title: String?
     public let path: [String]
@@ -109,11 +119,24 @@ public struct ProjectMenu: Decodable, Hashable, Sendable {
     public let note: AttachedNote?
     public let attachLabel: String
     public let detachLabel: String
+    /// Delete project: its row and the question asked before it writes.
+    public let delete: ProjectDelete
 
     public struct AttachedNote: Decodable, Hashable, Sendable {
         public let link: String
         public let name: String
     }
+}
+
+/// `ProjectDelete`: Delete project in the project menu, destructive, and the words of the question asked before it
+/// writes, which say the tasks stay.
+public struct ProjectDelete: Decodable, Hashable, Sendable {
+    public let label: String
+    public let title: String
+    public let message: String
+    public let confirm: String
+    public let cancel: String
+    public let destructive: Bool
 }
 
 /// `ProjectsView`: the whole screen.
@@ -130,6 +153,8 @@ public struct ProjectsView: Decodable, Hashable, Sendable {
     public let newTask: ProjectsNewTask?
     public let emptyLabel: String
     public let missing: Bool
+    /// The task list takes drops between its cards: every node but Done and a done project.
+    public let reorders: Bool
 
     public struct Mode: Decodable, Hashable, Sendable {
         public let mode: String
@@ -194,6 +219,11 @@ extension TaskBoard {
     @discardableResult
     public func renameProject(_ from: String, to: String) throws -> Bool {
         try write("tasks.renameProject", [.string(from), .string(to)]).bool ?? false
+    }
+
+    /// Delete project: its line and its field on every task go, its subprojects move up a level; no task is removed.
+    public func deleteProject(_ name: String) throws {
+        try write("tasks.deleteProject", [.string(name)])
     }
 
     /// Detach: the note's link taken off the project's line; the note stays.

@@ -310,10 +310,12 @@ struct EmptyPlate: View {
     var hot = false
     /// A tap types a new task in the section.
     var open: (() -> Void)?
+    /// The core's words for it, where a screen is given them (the Projects page's `emptyLabel`).
+    var label: String?
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        Text("No tasks")
+        words
             .font(.system(size: CardMetrics.title))
             .foregroundStyle(hot ? Palette.accent(scheme) : Palette.muted)
             .padding(.leading, CardMetrics.leading)
@@ -326,6 +328,10 @@ struct EmptyPlate: View {
             .contentShape(.rect(cornerRadius: CardMetrics.radius))
             .onTapGesture { open?() }
             .accessibilityAddTraits(open == nil ? [] : .isButton)
+    }
+
+    private var words: Text {
+        label.map { Text(verbatim: $0) } ?? Text("No tasks")
     }
 }
 
