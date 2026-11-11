@@ -101,4 +101,10 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
 
 ## Decisions
 
-(Filled by the agents as they go.)
+1. **The project's menu** (lead, 2026-11-11; Max: «на твое усмотрение»). A long press in the tree lifts a project to
+   reorder or nest it, so the menu opens elsewhere: a tap on the chosen project's name over the tasks, as a tap on
+   «Backlog» opens that column's menu today. Rows: Rename, and Note. Without a note, Note in the plugin opens a search of
+   the vault's notes and the picked one is attached (its link written on the tree line). With one, the row shows the note's
+   name: a tap opens the note, and the row's Detach takes the link off (the file stays). The iPhone app opens an attached
+   note in Obsidian (`obsidian://open`) and cannot attach one: it sees only the tasks file. All, No project and Done have
+   no menu.
