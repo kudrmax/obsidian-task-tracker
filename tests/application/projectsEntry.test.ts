@@ -229,6 +229,24 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 		expect(s.entry.state).toMatchObject({ spot: { kind: "list", column: "projects", place: { group: null } }, place: { kind: "inbox" } });
 	});
 
+	it("on Done no part takes the plus: the plus opens nothing, never the hidden Inbox, and says so before the tap", async () => {
+		const s = await projectsScreen("done");
+		expect(s.entry.plusOpens()).toBe(false);
+		expect(s.entry.openFromPlus()).toBe(false);
+		expect(s.entry.state).toBeNull();
+		const p = await projectsScreen();
+		expect(p.entry.plusOpens()).toBe(true);
+		expect(p.entry.openFromPlus()).toBe(true);
+	});
+
+	it("off the Projects screen the plus opens in the day list or Inbox, as before", async () => {
+		const s = await projectsScreen();
+		const screen = new QuickEntrySession(s.svc, { cards: () => [], sections: () => [], sectioned: () => false, day: () => TODAY, today: () => TODAY, shown: () => shownEntryLists("inbox"), fresh: async () => undefined, onChange: () => undefined }, s.writes);
+		expect(screen.plusOpens()).toBe(true);
+		expect(screen.openFromPlus()).toBe(true);
+		expect(screen.state).toMatchObject({ spot: { kind: "list", column: "inbox" } });
+	});
+
 	it("a place chosen in the bar keeps the field where it stands on the Projects screen: the screen does not turn, the task goes there", async () => {
 		const s = await projectsScreen();
 		s.entry.openIn("projects", null);
@@ -282,6 +300,9 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 		const opened = callDoor("entry.openIn", [null, wire, "projects", null], context as never);
 		expect(opened).toMatchObject({ ok: true, result: { state: { spot: { column: "projects" }, place: { kind: "inbox" } } } });
 		expect(callDoor("rules.shownEntryLists", ["projects"], context as never)).toMatchObject({ ok: true, result: ["projects"] });
+		const none = { ...wire, cards: {}, sections: {}, parts: { projects: [] } };
+		expect(callDoor("entry.plusOpens", [null, none], context as never)).toMatchObject({ ok: true, result: { value: false, state: null } });
+		expect(callDoor("entry.openFromPlus", [null, none], context as never)).toMatchObject({ ok: true, result: { value: false, state: null } });
 	});
 });
 

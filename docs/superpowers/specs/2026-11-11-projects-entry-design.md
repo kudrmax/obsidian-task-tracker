@@ -76,4 +76,8 @@ nothing shows, and the first key typed turns the screen to that funnel column (M
    `"projects"` (a type-only adaptation), so the plugin must now wire the Projects list in (its look from
    `projectsEntryLook`, `shown` from `shownEntryLists`, `listEntry("projects")` drawn in `ProjectTasks`, `coming` for
    it, the plate and the plus through `openIn`/`openAt`/`openFromPlus` instead of `askTaskText`).
-
+9. **Whether the plus opens anything is the core's** (the plugin's Obsidian decision 4, moved into the core). On a screen
+   whose shown list writes by parts (the Projects list) with no part marked `plus` (Done; a folder once folders land),
+   `openFromPlus()` opens nothing, never the hidden Inbox, and answers `false`; `true` when a field opened. The ready
+   answer before the tap is `plusOpens()` (`QuickEntrySession.plusOpens()`, door `entry.plusOpens(session, look)` →
+   `value`), the same rule; off Projects it is always true. A frontend reads it instead of looking at `EntryPart.plus`.

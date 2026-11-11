@@ -638,6 +638,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		...[
 			["openAtEnd", "soon"],
 			["openFromPlus"],
+			["plusOpens"],
 			["openIn", "day", "Errands"],
 			["openSlot", { date: T, start: 600, end: null }],
 			["openAtDrop", "day", { kind: "list", column: "day", before: null }],
