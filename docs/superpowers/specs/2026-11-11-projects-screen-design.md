@@ -206,8 +206,9 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
     the ribbon whatever moves it.
 23. **The plus on the Projects page** asks a name in an alert, as New Section and New Project do: let go on the tasks,
     «New Task» for the part it is let go in (`newTask` of that part, else the view's); let go in the tree, «New
-    Project» for the gap the line shows. The finger's shift right nests: one level per 24 points past the tree's edge,
-    kept within `projectsLevels`. The app's typed-in-place field belongs to the funnel's lists.
+    Project» for the gap the line shows, at the depth the finger stands at, one level per 24 points past the tree's edge.
+    A lifted project keeps its own depth until the finger shifts, a level per 24 points either way. Both are kept
+    within `projectsLevels`. The app's typed-in-place field belongs to the funnel's lists.
 24. **The project menu in the app** (Decision 1): Rename; with a note, a «Note» group holding the note's name (opens it
     in Obsidian, `projects.noteUrl`) and Detach; without one, Rename alone, as the app cannot attach.
 25. **By stage on the app's card**: the subproject small over the title after a folder (`ProjectsCard.over`); on a folded

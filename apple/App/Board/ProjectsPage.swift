@@ -404,6 +404,8 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     private var pressed: ProjectsRow?
     /// The gap shown under a carried project or the plus: where it goes, and the row it was asked before.
     private var aimed: (landing: ProjectsLanding, gap: Int, line: CGPoint)?
+    /// Where the finger lifted a project and how deep the project stood: its depth moves only by the finger's shift.
+    private var liftedFrom: (x: CGFloat, depth: Int)?
 
     override init() {
         super.init()
@@ -440,6 +442,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         switch press.state {
         case .began:
             guard let row = pressed, let window = scroll?.window, let frame = projects?.geometry.rows[row.node], let lift = lift(row, frame: frame, in: window) else { return }
+            liftedFrom = (x: point.x, depth: row.depth)
             model.drag.lift(lift, at: point, in: window)
         case .changed:
             model.drag.move(to: point)
@@ -498,7 +501,14 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         let framed = rows.compactMap { row in projects.geometry.rows[row.node].map { (row, $0) } }
         let gap = framed.firstIndex { point.y < $0.1.midY } ?? framed.count
         let left = area.minX + TreeMetrics.inset
-        let depth = max(0, Int(((point.x - left) / (TreeMetrics.indent * 2)).rounded(.down)))
+        // A lifted project keeps its depth until the finger shifts; the plus takes the depth the finger stands at.
+        let step = TreeMetrics.indent * 2
+        let depth: Int
+        if lifted != nil, let from = liftedFrom {
+            depth = max(0, from.depth + Int(((point.x - from.x) / step).rounded(.towardZero)))
+        } else {
+            depth = max(0, Int(((point.x - left) / step).rounded(.down)))
+        }
         guard let landing = projects.landing(gap: gap, depth: depth, lifted: lifted) else {
             aimed = nil
             return model.drag.hideLine()
@@ -532,6 +542,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     }
 
     func leave() {
+        if model?.carrying != true { liftedFrom = nil }
         springLoad(nil)
         projects?.dropOn = nil
         aimed = nil
