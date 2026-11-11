@@ -128,7 +128,7 @@ struct TaskMenu {
         guard !page.disabled else {
             return .action(title: "Project", symbol: "folder", subtitle: subtitle, disabled: true) {}
         }
-        let rows = ProjectPage.nodes(page, pick: { name in
+        let rows = ProjectPage.nodes(page, keepsOpen: true, pick: { name in
             Task { if let name { await model.toggleProject(items, name) } else { await model.setProject(items, nil) } }
         }, new: { model.askNewProject(.tasks(items)) })
         return .submenu(title: "Project", symbol: "folder", subtitle: subtitle, children: rows)
@@ -313,9 +313,11 @@ private struct DeferredMenu: View {
 /// (`MenuProject.newLabel`). A pick hands the project's name, No project nil. The words are the core's.
 enum ProjectPage {
     @MainActor
-    static func nodes(_ page: MenuProject, pick: @escaping @MainActor (String?) -> Void, new: @escaping @MainActor () -> Void) -> [MenuNode] {
+    /// `keepsOpen`: a page of checks (a task's menu) stays open after a pick, drawn again for the next; a page of one
+    /// choice (the quick entry's button, the New Task sheet) closes.
+    static func nodes(_ page: MenuProject, keepsOpen: Bool = false, pick: @escaping @MainActor (String?) -> Void, new: @escaping @MainActor () -> Void) -> [MenuNode] {
         let options: [MenuNode] = page.options.map { option in
-            .action(title: option.project.name, symbol: nil, subtitle: option.project.path.dropLast().last, checked: option.checked) { pick(option.project.name) }
+            .action(title: option.project.name, symbol: nil, subtitle: option.project.path.dropLast().last, checked: option.checked, keepsOpen: keepsOpen) { pick(option.project.name) }
         }
         let none: MenuNode = .action(title: page.noneLabel, symbol: nil, checked: page.none) { pick(nil) }
         let create: MenuNode = .action(title: page.newLabel, symbol: "plus", opens: true) { new() }

@@ -15,7 +15,7 @@ enum CarryMotion {
     /// The copy rising off the board as the system lifts a view (a little larger, a soft shadow).
     static let rise: TimeInterval = 0.25
     static let riseScale: CGFloat = 1.04
-    /// Over the Projects page's tree the copy rides this far above the finger, the row under it in sight.
+    /// Over the Projects page's tree the copy rides this far above (a card) or below (a lifted project) the finger.
     static let aboveFinger: CGFloat = 16
 
     /// The drop line stepping from one place to the next.

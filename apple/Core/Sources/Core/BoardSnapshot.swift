@@ -85,8 +85,10 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     /// shorter than it; nil for neither, and on a list's card.
     public let corner: [String]?
     /// The card's identity on the screen: its task's id, the core's, so a card changed, moved or ticked stays the same
-    /// card and the lists move it to its new place instead of drawing a new one.
-    public var id: String { item.id }
+    /// card and the lists move it to its new place instead of drawing a new one; on the Projects page, where a task of
+    /// two parts is two cards, the core's id of the card (`ProjectsCard.id`).
+    public var id: String { drawnId ?? item.id }
+    private let drawnId: String?
     /// Its title in pieces (`rules.textParts`): text, and links drawn in the accent that a tap opens.
     public let parts: [TextPart]
     /// What its face shows: the task's own title, or a folded task's next step under the task's title.
@@ -102,10 +104,11 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
 
     /// The card as the places of its list see it (`ListCard`): its task's id and key, level and section.
     public var listCard: JSONValue {
-        ["id": .string(id), "key": item.key.json, "level": .number(Double(level)), "group": item.group.json]
+        ["id": .string(item.id), "key": item.key.json, "level": .number(Double(level)), "group": item.group.json]
     }
 
-    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, paint: CardPaint?, corner: [String]? = nil, parts: [TextPart]? = nil, face: CardFace? = nil, stage: String? = nil) {
+    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, paint: CardPaint?, corner: [String]? = nil, parts: [TextPart]? = nil, face: CardFace? = nil, stage: String? = nil, id: String? = nil) {
+        self.drawnId = id
         let face = face ?? CardFace(item.card)
         self.face = face
         self.stage = stage

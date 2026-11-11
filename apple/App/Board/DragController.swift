@@ -67,8 +67,8 @@ final class DragController {
         let home: () -> CGRect?
         var point: CGPoint
         var cancelling = false
-        /// The copy rides above the finger.
-        var raised = false
+        /// Where the copy rides against the finger.
+        var ride = CopyRide.held
     }
 
     private var live: Live?
@@ -135,20 +135,20 @@ final class DragController {
         follow(point)
     }
 
-    /// The copy where the finger holds it; over a place whose target is a row under the finger (the Projects page's
-    /// tree), it rides above the finger, so the row lit under it and the drop line stay in sight. Going in and out of
-    /// such a place it glides there.
+    /// The copy where the finger holds it; over the Projects page's tree a card rides above the finger, so the row lit
+    /// under it stays in sight, and a lifted project below it, so the line and the row above the line do. Going in and
+    /// out of such a place it glides there.
     private func follow(_ point: CGPoint) {
         guard var live else { return }
-        let raised = !live.cancelling && route.raisesCopy
+        let ride = live.cancelling ? .held : route.ride(live.payload)
         let center: CGPoint
-        if raised {
-            center = CGPoint(x: point.x - live.grip.x, y: point.y - live.copy.bounds.height / 2 - CarryMotion.aboveFinger)
-        } else {
-            center = CGPoint(x: point.x - live.grip.x, y: point.y - live.grip.y)
+        switch ride {
+        case .above: center = CGPoint(x: point.x - live.grip.x, y: point.y - live.copy.bounds.height / 2 - CarryMotion.aboveFinger)
+        case .below: center = CGPoint(x: point.x - live.grip.x, y: point.y + live.copy.bounds.height / 2 + CarryMotion.aboveFinger)
+        case .held: center = CGPoint(x: point.x - live.grip.x, y: point.y - live.grip.y)
         }
-        if raised != live.raised {
-            live.raised = raised
+        if ride != live.ride {
+            live.ride = ride
             self.live = live
             UIView.animate(springDuration: CarryMotion.rise, bounce: 0, options: [.allowUserInteraction, .beginFromCurrentState]) { live.copy.center = center }
         } else {

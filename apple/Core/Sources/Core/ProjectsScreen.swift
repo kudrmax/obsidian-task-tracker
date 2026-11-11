@@ -65,6 +65,8 @@ public struct ProjectsStage: Decodable, Hashable, Sendable {
 
 /// `ProjectsCard`: a card of the chosen node's tasks.
 public struct ProjectsCard: Decodable, Hashable, Sendable, Identifiable {
+    /// Who the card is: one per drawn card, so a task shown in two parts is two cards.
+    public let id: String
     public let item: TaskItem
     /// By project: the stage's mark on the right; nil in By stage.
     public let stage: ProjectsStage?
@@ -72,12 +74,12 @@ public struct ProjectsCard: Decodable, Hashable, Sendable, Identifiable {
     public let over: String?
     /// The project it is shown under: what a drop on the tree replaces.
     public let from: String?
+    /// What `tasks.dropOnProject` takes for this very card (`ProjectsDrop` `{ key, from }`).
+    public let drop: JSONValue
     /// What its menu is opened from (`tasks.menu`'s `from`).
     public let menuFrom: String
-    /// It may be dropped on the tree: a task, not a subtask.
+    /// It may be dropped on the tree: an open task, not a subtask.
     public let canDrop: Bool
-
-    public var id: String { item.id }
 }
 
 /// `ProjectsNewTask`: what the plus let go on the tasks writes: `tasks.createInPlace`'s place and its project.
@@ -199,14 +201,38 @@ extension TaskBoard {
         try write("tasks.setProjectNote", [.string(name), .null])
     }
 
-    /// Cards let go on a row: `from` gives way to the row's project (No project: taken off); the place in the funnel stays.
-    public func dropOnProject(_ keys: [TaskKey], from: String?, to node: String) throws {
-        try write("tasks.dropOnProject", [.array(keys.map { .object(["key": $0.json, "from": from.json]) }), .string(node)])
+    /// Cards let go on a row, each by its own `drop`: the project it was shown under gives way to the row's (No project:
+    /// taken off); the place in the funnel stays.
+    public func dropOnProject(_ cards: [ProjectsCard], to node: String) throws {
+        try write("tasks.dropOnProject", [.array(cards.map(\.drop)), .string(node)])
     }
 
     /// Where a project lifted (or the plus) let go at `gap`, at `depth`, lands; nil where nothing lands.
     public func projectsGap(_ rows: JSONValue, gap: Int, depth: Int, lifted: String? = nil) throws -> ProjectsLanding? {
         try rule("rules.projectsGap", [rows, .number(Double(gap)), .number(Double(depth)), lifted.json])
+    }
+
+    /// Where a project lifted (`lifted`), or the plus, let go at `gap` lands: its own depth (the plus: the row above the
+    /// gap's) shifted a step per `PROJECTS_INDENT` of the finger's sideways way `shift` since the lift; nil where nothing
+    /// lands.
+    public func projectsDrop(_ rows: JSONValue, gap: Int, shift: Double, lifted: String? = nil) throws -> ProjectsLanding? {
+        try rule("rules.projectsDrop", [rows, .number(Double(gap)), .number(shift), lifted.json])
+    }
+
+    /// The tree's sideways step and how long a held card waits over a folded row (`PROJECTS_INDENT`, `PROJECTS_HOVER_MS`).
+    public func projectsMeasures() throws -> (indent: Double, hoverMs: Double) {
+        let constants: JSONValue = try rule("rules.constants")
+        return (constants["PROJECTS_INDENT"].number ?? 12, constants["PROJECTS_HOVER_MS"].number ?? 600)
+    }
+
+    /// A name «New project…», the plus in the tree or Rename would write nothing for: the Create button is off for it.
+    public func isBlankProjectName(_ name: String) -> Bool {
+        (try? read("tasks.isBlankProjectName", [.string(name)], over: settingsOnly(), as: Bool.self)) ?? true
+    }
+
+    /// A task's title that writes nothing (`tasks.isBlank`).
+    public func isBlankTask(_ text: String) -> Bool {
+        (try? read("tasks.isBlank", [.string(text)], over: settingsOnly(), as: Bool.self)) ?? true
     }
 
     /// The depths a gap of the tree may take.

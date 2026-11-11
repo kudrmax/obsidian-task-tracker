@@ -95,6 +95,7 @@ private struct NameField: View {
             let typed = name
             Task { await board.answer(typed, to: ask) }
         }
+        .disabled(board.isBlank(name, for: ask))
     }
 }
 
@@ -405,7 +406,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     /// The gap shown under a carried project or the plus: where it goes, and the row it was asked before.
     private var aimed: (landing: ProjectsLanding, gap: Int, line: CGPoint)?
     /// Where the finger lifted a project and how deep the project stood: its depth moves only by the finger's shift.
-    private var liftedFrom: (x: CGFloat, depth: Int)?
+    private var liftedFrom: CGFloat?
 
     override init() {
         super.init()
@@ -442,7 +443,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         switch press.state {
         case .began:
             guard let row = pressed, let window = scroll?.window, let frame = projects?.geometry.rows[row.node], let lift = lift(row, frame: frame, in: window) else { return }
-            liftedFrom = (x: point.x, depth: row.depth)
+            liftedFrom = point.x
             model.drag.lift(lift, at: point, in: window)
         case .changed:
             model.drag.move(to: point)
@@ -469,8 +470,15 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
 
     var scrolls: UIScrollView? { scroll }
 
-    /// The row lit under a carried card, and the line a lifted project or the plus would go in at, stay seen.
-    var raisesCopy: Bool { true }
+    /// A card rides above the finger, the row lit under it seen; a lifted project below it, its line and the row above
+    /// the line seen. The plus stands aside of the finger already.
+    func ride(_ payload: DragPayload?) -> CopyRide {
+        switch payload?.kind {
+        case .card: .above
+        case .project: .below
+        default: .held
+        }
+    }
 
     /// A card only where it may go to a project (a task, not a subtask); a project lifted here; the plus.
     func takes(_ payload: DragPayload?) -> Bool {
@@ -499,24 +507,30 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     private func aim(at point: CGPoint, lifted: String?) {
         guard let projects, let model, let area else { return }
         let framed = rows.compactMap { row in projects.geometry.rows[row.node].map { (row, $0) } }
-        let gap = framed.firstIndex { point.y < $0.1.midY } ?? framed.count
+        // Projects go only among the projects: from before the first one to before No project, never above All or among
+        // Done's rows.
+        let none = framed.firstIndex { $0.0.kind == "none" } ?? framed.count
+        let first = framed.firstIndex { $0.0.kind == "project" } ?? none
+        let gap = min(max(framed.firstIndex { point.y < $0.1.midY } ?? framed.count, min(first, none)), none)
         let left = area.minX + TreeMetrics.inset
-        // A lifted project keeps its depth until the finger shifts; the plus takes the depth the finger stands at.
-        let step = TreeMetrics.indent * 2
-        let depth: Int
+        let indent = CGFloat(projects.measures.indent)
+        // A lifted project keeps its depth until the finger shifts; the plus takes the depth the finger stands at, the
+        // core counting it from the row above the gap's.
+        let shift: CGFloat
         if lifted != nil, let from = liftedFrom {
-            depth = max(0, from.depth + Int(((point.x - from.x) / step).rounded(.towardZero)))
+            shift = point.x - from
         } else {
-            depth = max(0, Int(((point.x - left) / step).rounded(.down)))
+            let above = gap > 0 ? CGFloat(framed[gap - 1].0.depth) : 0
+            shift = point.x - left - above * indent - indent / 2
         }
-        guard let landing = projects.landing(gap: gap, depth: depth, lifted: lifted) else {
+        guard let landing = projects.landing(gap: gap, shift: Double(shift), lifted: lifted) else {
             aimed = nil
             return model.drag.hideLine()
         }
         let above = gap > 0 ? framed[gap - 1].1.maxY : framed.first?.1.minY ?? area.minY
         let below = gap < framed.count ? framed[gap].1.minY : above + 4
         let y = gap == 0 ? (framed.first?.1.minY ?? area.minY) - 2 : (above + below) / 2
-        let start = CGPoint(x: left + CGFloat(landing.depth) * TreeMetrics.indent, y: y)
+        let start = CGPoint(x: left + CGFloat(landing.depth) * indent, y: y)
         aimed = (landing, gap, start)
         model.drag.showLine(from: start, to: area.maxX - TreeMetrics.inset)
     }
@@ -538,7 +552,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
             Task { await projects.unfold(node) }
         }
         unfold = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + CarryMotion.springLoad, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + projects.measures.hoverMs / 1000, execute: work)
     }
 
     func leave() {
@@ -666,25 +680,42 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     /// Where the plus is held: the part let go in is read from it.
     private var held: CGPoint?
 
+    /// The plus held over the tasks shows the drop line where the task will go, as the plugin's: after the last card of
+    /// the part under the finger (the last whose header or card stands above it), or over the first part above them all.
     func hover(at point: CGPoint, carrying payload: DragPayload?) {
-        model?.drag.hideLine()
         held = point
+        guard let model, let area, let line = target(at: point.y).line else { return model?.drag.hideLine() ?? () }
+        model.drag.showLine(from: CGPoint(x: area.minX + CardMetrics.columnInset, y: line), to: area.maxX - CardMetrics.columnInset)
     }
 
-    func leave() { held = nil }
+    func leave() {
+        held = nil
+        model?.drag.hideLine()
+    }
 
-    /// The part let go in: the last whose header or card stands above the finger; above them all, the node's own.
+    /// The part a let-go at `y` (window) writes into, and where its line stands.
+    private func target(at y: CGFloat) -> (part: ProjectsBoard.Part?, line: CGFloat?) {
+        guard let projects = model?.projects else { return (nil, nil) }
+        let geometry = projects.geometry
+        var found: (part: ProjectsBoard.Part, bottom: CGFloat)?
+        var firstTop: CGFloat?
+        for candidate in projects.parts {
+            let frames = ([geometry.parts[candidate.id]] + candidate.cards.map { geometry.cards[candidate.id + "/" + $0.id] }).compactMap { $0 }
+            guard let top = frames.map(\.minY).min(), let bottom = frames.map(\.maxY).max() else { continue }
+            if firstTop == nil { firstTop = top }
+            if top <= y { found = (candidate, bottom) }
+        }
+        if let found { return (found.part, found.bottom + CardMetrics.gap / 2) }
+        return (nil, firstTop.map { $0 - CardMetrics.gap / 2 } ?? area.map { $0.minY + 4 })
+    }
+
+    /// The part let go in, as the line showed it; above them all, the node's own.
     func letGo(carrying payload: DragPayload?) -> CarryLanding? {
         guard payload == nil, let projects = model?.projects, let view = projects.view else { return nil }
-        let y = held?.y ?? 0
-        let geometry = projects.geometry
-        var part: ProjectsBoard.Part?
-        for candidate in projects.parts {
-            let tops = ([geometry.parts[candidate.id]] + candidate.cards.map { geometry.cards[candidate.id + "/" + $0.id] }).compactMap { $0?.minY }
-            if let top = tops.min(), top <= y { part = candidate }
-        }
         let at = held
+        let part = target(at: at?.y ?? 0).part
         held = nil
+        model?.drag.hideLine()
         guard let new = part?.section.newTask ?? view.newTask else { return nil }
         projects.asking = .task(new)
         return CarryLanding(rect: at.map { CGRect(x: $0.x - 4, y: $0.y - 4, width: 8, height: 8) } ?? .null, folds: true)

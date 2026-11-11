@@ -38,8 +38,6 @@ final class DragPayload {
 /// it is typed in, or the room the plus held over the list opens.
 enum DrawnRow: Hashable {
     case header(BoardGroup, String)
-    /// The section named for the task being typed, over the field.
-    case newHead(String)
     case plate(BoardGroup)
     case card(BoardCard)
     case pending(key: String, text: String, level: Int, branch: Branch?)
@@ -51,7 +49,6 @@ enum DrawnRow: Hashable {
     var id: String {
         switch self {
         case .header(let group, _): "\u{0}head/\(group.id)"
-        case .newHead: "\u{0}newHead"
         case .plate(let group): "\u{0}plate/\(group.id)"
         case .card(let card): card.id
         case .pending(let key, _, _, _): key
@@ -65,14 +62,14 @@ enum DrawnRow: Hashable {
         switch self {
         case .card(let card): card.level
         case .pending(_, _, let level, _), .field(_, let level, _, _): level
-        case .header, .plate, .newHead, .plusRoom: nil
+        case .header, .plate, .plusRoom: nil
         }
     }
 
     /// A header of some kind: it stands a section's gap below the row before it, and the row after it on its bottom.
     var heads: Bool {
         switch self {
-        case .header, .newHead: true
+        case .header: true
         default: false
         }
     }
@@ -81,7 +78,7 @@ enum DrawnRow: Hashable {
     /// lines. The list lays a fixed row out at this height without measuring its content.
     var height: CGFloat? {
         switch self {
-        case .header, .newHead: ColumnMetrics.groupHead
+        case .header: ColumnMetrics.groupHead
         case .card(let card): card.listHeight
         case .plate, .plusRoom: CardMetrics.height
         case .pending, .field: nil
@@ -388,7 +385,6 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
             typed = entry.pending.enumerated().map { .pending(key: keys[safe: $0.offset] ?? "\u{0}line/\($0.offset)", text: $0.element.text, level: $0.element.level, branch: nil) }
             // A card renamed gives its row to the field: the same row, its content now typed in, so nothing comes or goes.
             typed.append(.field(id: renaming ?? keys.last ?? "\u{0}field", level: entry.section ? 0 : entry.place.level, branch: nil, section: entry.section))
-            if let name = entry.newSection { typed.insert(.newHead(name), at: 0) }
         }
         var rows: [DrawnRow] = []
         if entry?.at.kind == "top" { rows += typed }
@@ -966,8 +962,6 @@ struct ListRowContent: View {
             // Lifted, the section is its floating copy: its header keeps its place but is not drawn twice (the list hides
             // its row, `ListController.showHeaders`).
             SectionHeader(title: header, group: group, column: column, model: model)
-        case .newHead(let name):
-            SectionTitle(title: name, muted: false)
         case .plate(let group):
             EmptyPlate(hot: model.platesLit(column, group)) { model.entry.openIn(column, group.name) }
         case .card(let card):

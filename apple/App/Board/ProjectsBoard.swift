@@ -84,7 +84,7 @@ final class ProjectsBoard {
             return (view, drawn, menus)
         }).value else { return }
         menus = read.2
-        cards = Dictionary(read.0.sections.flatMap(\.cards).map { ($0.item.id, $0) }, uniquingKeysWith: { first, _ in first })
+        cards = Dictionary(uniqueKeysWithValues: read.0.sections.flatMap(\.cards).map { ($0.id, $0) })
         withAnimation(.snappy) {
             view = read.0
             parts = zip(read.0.sections, read.1).map { Part(section: $0.0, cards: $0.1) }
@@ -100,7 +100,7 @@ final class ProjectsBoard {
             if let label = mark.label { due = label } else { due = nil; stage = symbol(mark.kind) }
         }
         let face = card.over.map { CardFace(text: painted.face.text, over: $0, overSymbol: "folder", step: painted.face.step) } ?? painted.face
-        return BoardCard(item: painted.item, level: 0, branch: nil, due: due, repeats: painted.repeats, paint: painted.paint, parts: painted.parts, face: face, stage: stage)
+        return BoardCard(item: painted.item, level: 0, branch: nil, due: due, repeats: painted.repeats, paint: painted.paint, parts: painted.parts, face: face, stage: stage, id: card.id)
     }
 
     /// A stage's symbol: the tab bar's for the funnel's lists, the archive box for Backlog.
@@ -124,7 +124,7 @@ final class ProjectsBoard {
 
     /// A project chosen from elsewhere (a card's folder, the full screen's project line), the branches above it opened.
     func select(_ name: String) async {
-        let node: String = model?.ruleNow("rules.projectNodeOf", [.string(name)]) ?? "project:" + name
+        guard let node: String = model?.ruleNow("rules.projectNodeOf", [.string(name)]) else { return }
         await act { try $0.selectProjectNode(node) }
     }
 
@@ -139,10 +139,11 @@ final class ProjectsBoard {
         await act { try $0.setProjectsMode(mode) }
     }
 
-    /// A card let go on a row: the project it was shown under gives way to the row's; its place in the funnel stays.
+    /// A card let go on a row (by the card's own id): the project it was shown under gives way to the row's; its place in
+    /// the funnel stays.
     func drop(_ id: String, on node: String) async {
         guard let card = cards[id] else { return }
-        await write { try $0.dropOnProject([card.item.key], from: card.from, to: node) }
+        await write { try $0.dropOnProject([card], to: node) }
     }
 
     /// A project lifted and let go in a gap.
@@ -152,7 +153,7 @@ final class ProjectsBoard {
 
     /// The name typed for what was asked: a task of the part, a project of the gap, a rename; Cancel (nil) writes nothing.
     func answer(_ name: String?, to ask: Ask) async {
-        guard let name, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard let name, !isBlank(name, for: ask) else { return }
         switch ask {
         case .task(let new):
             await model?.write("tasks.createInPlace", [.string(name), .null, new.place, .null, .array([]), new.project.json])
@@ -163,6 +164,15 @@ final class ProjectsBoard {
             await write { _ = try $0.renameProject(from, to: name) }
         }
     }
+
+    /// A name that writes nothing, as the core says: the alert's Add is off for it.
+    func isBlank(_ name: String, for ask: Ask) -> Bool {
+        if case .task = ask { return board.isBlankTask(name) }
+        return board.isBlankProjectName(name)
+    }
+
+    /// The tree's sideways step and the pause over a folded row before it opens, the core's.
+    @ObservationIgnored lazy var measures: (indent: Double, hoverMs: Double) = (try? board.projectsMeasures()) ?? (12, 600)
 
     /// Detach: the note's link taken off the project; the note stays in the vault.
     func detach(_ name: String) async {
@@ -175,10 +185,11 @@ final class ProjectsBoard {
         UIApplication.shared.open(url)
     }
 
-    /// Where a project lifted, or the plus, let go before row `gap` at `depth` lands, and the depth its line is drawn at.
-    func landing(gap: Int, depth: Int, lifted: String?) -> ProjectsLanding? {
+    /// Where a project lifted, or the plus, let go before row `gap` with the finger `shift` points sideways (since the
+    /// lift; the plus: from the row above's depth) lands, and the depth its line is drawn at (`rules.projectsDrop`).
+    func landing(gap: Int, shift: Double, lifted: String?) -> ProjectsLanding? {
         guard let rows = view?.rowsJSON else { return nil }
-        return try? board.projectsGap(rows, gap: gap, depth: depth, lifted: lifted)
+        return try? board.projectsDrop(rows, gap: gap, shift: shift, lifted: lifted)
     }
 
     // MARK: Calls
