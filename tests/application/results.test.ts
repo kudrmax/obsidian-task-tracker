@@ -4,6 +4,7 @@ import { memoryGrouping, type Clock } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
 import { UndoHistory } from "../../core/application/UndoHistory";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
 
 const T = "2026-11-11";
@@ -132,6 +133,23 @@ describe("a result's card", () => {
 		const goal = (await svc.search("компания")).flatMap((g) => g.hits)[0];
 		expect(goal.item.text).toBe("Компания в Белграде");
 	});
+
+	it("a found result's card is its own title, semibold, even folded: the search draws the task it found", async () => {
+		const { svc } = setup();
+		const goal = (await svc.search("компания")).flatMap((g) => g.hits)[0];
+		expect(goal.item.card).toEqual({ text: "Компания в Белграде", title: "Компания в Белграде", over: null, step: null, semibold: true });
+	});
+
+	it("every step drawn on its result knows the result's card and block; any other task none", async () => {
+		const { svc } = setup();
+		const s = await svc.screen(T);
+		const result = named(s, "Компания в Белграде");
+		expect(named(s, "Draft the letter").drawnOn).toEqual({ key: result.key, slot: null });
+		expect(result.card.step!.drawnOn).toEqual({ key: result.key, slot: null });
+		expect(named(s, "Book a table").drawnOn).toBeNull();
+		const tree = (await svc.screen("2026-11-12")).day.slotted.find((i) => i.isResult)!;
+		expect(tree.block.step!.drawnOn).toEqual({ key: tree.key, slot: tree.slot });
+	});
 });
 
 describe("the menu's result rows", () => {
@@ -224,11 +242,32 @@ describe("the writes", () => {
 		const { svc, store, history } = setup();
 		const s = await svc.screen(T);
 		const made = await svc.newResult([named(s, "Lunch").key], "Health");
-		expect(store.text).toContain("- [ ] 🎯 Health 📁\n\t- [ ] Lunch ⏰ 2026-11-11 13:00-14:00\n## Soon");
+		expect(store.text).toContain("- [ ] 🎯 Health 📁 📅 2026-11-11\n\t- [ ] Lunch ⏰ 2026-11-11 13:00-14:00\n## Soon");
 		const result = named(await svc.screen(T), "Health");
 		expect(made).toEqual({ key: result.key, id: result.id });
 		expect(result.card).toMatchObject({ text: "Lunch", over: "Health" });
 		expect(history.canUndo()).toBe(true);
+	});
+
+	it("New result… on a task with only a time gives the result the slot's day, so it stays on that day", async () => {
+		const { svc, store } = setup("## Now\n## Soon\n- [ ] Call ⏰ 2026-11-14 10:00\n## Done\n");
+		await svc.screen(T);
+		const call = (await svc.screen("2026-11-14")).day.slotted[0];
+		await svc.newResult([call.key], "Calls");
+		expect(store.text).toContain("- [ ] 🎯 Calls 📁 📅 2026-11-14\n\t- [ ] Call ⏰ 2026-11-14 10:00\n");
+	});
+
+	it("while the settings give no usable mark: no result rows, and Make result and New result… write nothing", async () => {
+		const store = new InMemoryTaskFileStore(FILE);
+		const svc = new TaskServiceImpl(store, new FakeSettingsStore({ ...DEFAULT_SETTINGS, resultMark: "p1" }), clock, null, undefined, memoryGrouping());
+		const s = await svc.screen(T);
+		const before = store.text;
+		const lunch = named(s, "Lunch");
+		expect(svc.menu(lunch, "day", menuScreen(s)).result.rows).toEqual([]);
+		expect(svc.bulkMenu([{ item: lunch, from: "day" }], menuScreen(s)).result.rows).toEqual([]);
+		await svc.setResult(lunch.key, true);
+		expect(await svc.newResult([lunch.key], "Health")).toBeNull();
+		expect(store.text).toBe(before);
 	});
 
 	it("New result… with a blank name, or the mark alone, writes nothing", async () => {

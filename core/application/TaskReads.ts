@@ -38,7 +38,7 @@ import { carriedWith, menuOffer, taskMenu } from "./menus";
 import { NO_SECTION_ID, offeredNames, type SectionOffer, shownSections } from "./sections";
 import { samePlace } from "./taskKeys";
 import { fullTree } from "./fullTree";
-import { type ItemLevels, itemLevels, toItem } from "./taskItems";
+import { type ItemLevels, itemLevels, ownCard, toItem } from "./taskItems";
 import { resultPage } from "./results";
 import { resultAbove } from "../domain/Result";
 import type { TaskRules } from "./TaskRules";
@@ -306,8 +306,9 @@ export class TaskReads {
 			const projectText = entry.project === null || entry.path.length > 0 ? "" : (index.refOf(entry.project)?.name ?? projectName(entry.project));
 			const project = projectText === "" ? null : fuzzy.matchWords(projectText);
 			if (title || description || project) {
+				const found = item(entry);
 				const hit: SearchHit = {
-					item: item(entry),
+					item: { ...found, card: ownCard(found) },
 					title: title ? matchParts(titleText, title.found) : [],
 					project: project ? matchParts(projectText, project.found) : null,
 					description: description ? snippetParts(descriptionText, description.found) : null,
@@ -422,12 +423,12 @@ export class TaskReads {
 
 	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel {
 		const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectNotes());
+		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectNotes(), this.rules.marksResults());
 	}
 
 	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel {
 		const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectNotes());
+		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectNotes(), this.rules.marksResults());
 	}
 
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[] {

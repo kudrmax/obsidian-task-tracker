@@ -245,8 +245,16 @@ does.
   stands, in file order (its project the result's); the result folds. A task already a step of it writes nothing; a key
   that names no open result any more answers `staleTask`.
 - `tasks.newResult(keys, name)`: New result…: a result named `name` at the first task's place (right before it; among
-  the same task's subtasks for a subtask), with that task's project and due date, the tasks its steps, folded. Answers
+  the same task's subtasks for a subtask), with that task's project and day (its due date, else its slot's day), the
+  tasks its steps, folded. Answers
   the result's `CreatedTask` `{ key, id }`, `null` for a blank name (nothing written).
+- `TaskItem.drawnOn`: `{ key, slot }` on a result's next step (also on `card.step` and `block.step`), the result's key
+  and slot; null for any other task. The quick entry renames such a step in its result's place (`entry.*` below).
+- A search hit's `item.card` is its own title (`semibold` for a result), never a step: the search draws the task it found.
+- While the settings give no usable mark (empty, two words, or a level's prefix), a menu's `result.rows` is `[]`, and
+  `tasks.setResult(key, true)` and `tasks.newResult` write nothing.
+- New result…'s name field: `tasks.isBlank(name)` is the Create button's check (a blank name, the mark alone, or a level's
+  prefix alone write nothing). The Result mark field's placeholder: `settings.form().defaultResultMark` (`🎯`).
 - Each write is one undo step.
 
 #### Ids: who a task or a section is
@@ -460,7 +468,13 @@ dropTo)`, `subtaskSpot(parent)`, `renameSpot(item, inStack)`, `stackSpot(parent)
 
 Where a field opens: `subtaskSpot(parent)` for Add Subtask from a list or the calendar (a `"stack"` spot means the task
 shows in no list: open its full screen and the field last in its stack there), `renameSpot(item, inStack)` for Rename
-(null: nowhere), and on a task's full screen `stackSpot(parent)` for both: `open(stackSpot(key))` types a new subtask
+(null: nowhere), and on a task's full screen `stackSpot(parent)` for both. A folded result's step has no card of its
+own (`TaskItem.drawnOn` names its result's): `renameSpot(step, false)` stands in the result card's place in a list, else
+over the result's block on the timeline, and `state.renaming` then carries that card's `key` and `id` (the step's text,
+its write the step's), so the result's card or block hides as a renamed card does; Enter writes the step and closes the
+field. `subtaskSpot(step.key)` answers a list spot with `unfold` (the step's key): hand it to `open` as it is; the field
+queues an `unfoldAbove` job first and, once the lists draw the result unfolded, stands last among the step's subtasks.
+Without a card holding it, the spot is `"stack"` as for any task. For the rest: `open(stackSpot(key))` types a new subtask
 last under `key`, `open(stackSpot(item.key), item)` renames `item` there (the page's own task in its title). Example:
 `entry.stackSpot(session, look, { section: "now", index: 0, path: [1], raw: "\t- [ ] Pack" })` → `value`
 `{ kind: "stack", parent: { … } }`.
@@ -495,12 +509,12 @@ pending: [{ text: "Charger", level: 1 }] }`.
 in order, each once its lists show every write before it:
 
 1. Wait until the lists are drawn from the file as of the last write.
-2. `entry.call(session, look, jobId)` → `value`: `{ method: "createInPlace" | "edit" | "createSection", args }` or null.
+2. `entry.call(session, look, jobId)` → `value`: `{ method: "createInPlace" | "edit" | "createSection" | "unfoldAbove", args }` or null.
    Call `tasks.<method>` with those `args` and write the text it answers.
 3. For `createInPlace`: read the file again and, right before drawing it, `entry.shown(session, look, jobId, key,
    coming)`: `key` is what `createInPlace` answered, `coming` the cards each list is about to draw. The line stops
    waiting under the cards in that drawing. If the write failed, `entry.unshown(session, look, jobId)` instead.
-   For `createSection`: read and draw the lists again.
+   For `createSection` and `unfoldAbove`: read and draw the lists again.
 4. `entry.done(session, look, jobId)`, whatever happened.
 
 After a rename's `edit`, the task as it now stands is its answer (the plugin keeps it open on the full screen).

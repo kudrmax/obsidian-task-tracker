@@ -18,11 +18,11 @@ export const RESULT_WORDS = {
 
 /**
  * The result rows of a menu of `items`: Add to result and the toggle for one open task, Add to result alone for several
- * open ones (`bulk`), none while one of them is closed. The row's value and the page's tick: the result they all are
+ * open ones (`bulk`), none while one of them is closed or the settings give no usable result mark (`marks`). The row's value and the page's tick: the result they all are
  * steps of.
  */
-export function menuResult(items: readonly TaskItem[], bulk: boolean): MenuResult {
-	const open = items.length > 0 && items.every((item) => item.can.result);
+export function menuResult(items: readonly TaskItem[], bulk: boolean, marks = true): MenuResult {
+	const open = marks && items.length > 0 && items.every((item) => item.can.result);
 	const rows: readonly MenuResultRowId[] = !open ? [] : bulk ? ["addToResult"] : ["addToResult", "toggle"];
 	const first = items[0]?.resultOf ?? null;
 	const current = first !== null && items.every((item) => item.resultOf?.id === first.id) ? first : null;

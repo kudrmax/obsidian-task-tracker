@@ -253,15 +253,16 @@ export function addToResult(doc: TaskDocument, entries: readonly TaskEntry[], re
 
 /**
  * New result…: a result titled as typed, at the place of the first of the entries in the file (right before it, among
- * the same task's subtasks for a subtask), with that task's project and due date, and the entries as its steps (as
- * `addToResult` takes them), folded.
+ * the same task's subtasks for a subtask), with that task's project and day (its due date, else its slot's day, so it
+ * stays on that day and list), and the entries as its steps (as `addToResult` takes them), folded. Nothing while the file
+ * is read without a result mark.
  */
-export function newResult(doc: TaskDocument, entries: readonly TaskEntry[], title: string): TaskDocument {
+export function newResult(doc: TaskDocument, entries: readonly TaskEntry[], title: string, boundary = DayBoundary.MIDNIGHT): TaskDocument {
 	const first = [...entries].sort((a, b) => doc.lineOf(a) - doc.lineOf(b))[0];
-	if (!first) return doc;
+	if (!first || doc.resultMark() === null) return doc;
 	const { text, ...marks } = typed(doc, title, null, []);
 	const top = first.path.length === 0;
-	const task = newTask(text, { ...marks, result: true, project: top ? first.task.project : null, dueDate: top ? first.task.dueDate : null });
+	const task = newTask(text, { ...marks, result: true, project: top ? first.task.project : null, dueDate: top ? dayOf(first.task, boundary) : null });
 	const made = top ? doc.insert(first.section, first.index, task) : doc.insertUnder(doc.find(first.section, first.index, first.path.slice(0, -1))!, task, first);
 	const result = made.insertedSince(doc)!;
 	return addToResult(made, entries.map((entry) => made.byId(entry.id)!), result);

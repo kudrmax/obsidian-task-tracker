@@ -43,6 +43,7 @@ export class SettingsServiceImpl implements SettingsService {
 			},
 			priorities: s.priorities,
 			resultMark: s.resultMark,
+			defaultResultMark: DEFAULT_SETTINGS.resultMark,
 			labelTag: s.labelTag,
 			labels: s.labels,
 			labelPaint: s.labelPaint,

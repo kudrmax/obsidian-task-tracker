@@ -19,6 +19,7 @@ describe("the Result mark setting", () => {
 
 	it("is on the form beside the priorities", () => {
 		expect(service({ resultMark: "★" }).svc.form().resultMark).toBe("★");
+		expect(service({ resultMark: "★" }).svc.form().defaultResultMark).toBe("🎯");
 	});
 
 	it("is written trimmed when it is one word that is no level's prefix; else the one saved stays", async () => {

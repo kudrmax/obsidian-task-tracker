@@ -56,6 +56,7 @@ describe("toItem", () => {
 			can: { postpone: true, removeDue: false, remind: true, setPriority: true, setLabels: true, stop: false, addDescription: true, fold: false, resize: true, setProject: true, result: true },
 			isResult: false,
 			resultOf: null,
+			drawnOn: null,
 			card: { text: "Slotted today", title: "Slotted today", over: null, step: null, semibold: false },
 			block: { text: "Slotted today", title: "Slotted today", step: null },
 			subtasks: [],

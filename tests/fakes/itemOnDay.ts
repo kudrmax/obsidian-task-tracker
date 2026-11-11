@@ -7,13 +7,14 @@ import { plainText } from "../../core/domain/TaskText";
 import { ownCard } from "../../core/application/taskItems";
 
 /** A task item as the service reads it on `today`: its title, its duration, its day and what may be done to it follow from its fields, unless given; no labels (the colours from the priority and labels given), not collapsed, of no project and under no task's key unless given; its id its key's; all its subtasks the open ones unless given. */
-export function onDay(item: Omit<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "id" | "isResult" | "resultOf" | "card" | "block"> & Partial<Pick<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "id" | "isResult" | "resultOf" | "card" | "block">>, today: LocalDate): TaskItem {
+export function onDay(item: Omit<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "id" | "isResult" | "resultOf" | "card" | "block" | "drawnOn"> & Partial<Pick<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "id" | "isResult" | "resultOf" | "card" | "block" | "drawnOn">>, today: LocalDate): TaskItem {
 	const title = item.title ?? plainText(item.text);
 	const isResult = item.isResult ?? false;
 	return {
 		id: keyId(item.key),
 		isResult,
 		resultOf: null,
+		drawnOn: null,
 		card: ownCard({ text: item.text, title, isResult }),
 		block: { text: item.text, title, step: null },
 		labels: [],

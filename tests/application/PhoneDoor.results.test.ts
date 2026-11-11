@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { callDoor, type DoorAnswer, type DoorContext } from "../../core/application/PhoneCalls";
+import { callDoor, type DoorAnswer, type DoorContext, type EntryAnswer } from "../../core/application/PhoneCalls";
 import type { CreatedTask, ResultPage, ScreenView, SettingsForm, TaskItem, TaskMenuModel } from "../../core/application/contracts";
 import { phoneDoor } from "../../core/application/PhoneDoor";
 
@@ -59,6 +59,30 @@ describe("results through the door", () => {
 		expect((call("settings.form", [], { settings }).result as SettingsForm).resultMark).toBe("★");
 		expect(JSON.parse(call("settings.setResultMark", [" ◎ "], { settings }).settings!)).toMatchObject({ resultMark: "◎" });
 		expect(call("settings.setResultMark", ["two words"], { settings }).settings).toBeUndefined();
+	});
+
+	it("entry.*: a folded result's step is renamed in its card's place, and Add subtask on it unfolds first (a job)", () => {
+		const s = screen();
+		const result = named(s, "Компания");
+		const cards = [...s.day.list].map((item) => ({ key: item.key, id: item.id, level: 0, group: item.group }));
+		const look = { cards: { day: cards }, sections: {}, sectioned: {}, day: T, shown: ["day"] };
+		const step = result.card.step!;
+		const spot = (call("entry.renameSpot", [null, look, step, false]).result as EntryAnswer).value;
+		const opened = call("entry.open", [null, look, spot, step]).result as EntryAnswer;
+		expect(opened.state?.renaming).toMatchObject({ id: result.id, text: "Write to Marko" });
+		const sub = (call("entry.subtaskSpot", [null, look, step.key]).result as EntryAnswer).value as { unfold?: unknown };
+		expect(sub.unfold).toEqual(step.key);
+		const field = call("entry.open", [null, look, sub]).result as EntryAnswer;
+		expect(field.jobs).toHaveLength(1);
+		const job = call("entry.call", [field.session, look, field.jobs[0].id]).result as EntryAnswer;
+		expect(job.value).toEqual({ method: "unfoldAbove", args: [step.key] });
+		expect(call("tasks.unfoldAbove", [step.key]).tasks).toContain("- [ ] 🎯 Компания 📅 2026-11-11\n");
+	});
+
+	it("tasks.isBlank checks a New result name as the write does; settings.form gives the default mark", () => {
+		expect(call("tasks.isBlank", ["🎯 "]).result).toBe(true);
+		expect(call("tasks.isBlank", ["Health"]).result).toBe(false);
+		expect((call("settings.form", []).result as SettingsForm).defaultResultMark).toBe("🎯");
 	});
 
 	it("is listed among the door's methods", () => {

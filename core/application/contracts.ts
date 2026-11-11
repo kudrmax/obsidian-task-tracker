@@ -268,6 +268,11 @@ export interface TaskItem {
 	readonly card: TaskCard;
 	/** How the timeline's block draws it and whose menu a tap opens: a result's next step, folded or not. */
 	readonly block: TaskBlock;
+	/**
+	 * A result's next step (`card.step`, `block.step`), drawn on that result's card and block: the result's key and its
+	 * slot, where a rename of the step stands when the step has no card of its own. Null for any other task.
+	 */
+	readonly drawnOn: { readonly key: TaskKey; readonly slot: Slot | null } | null;
 
 	/** The open subtasks right under this one, in file order, each with its own. */
 	readonly subtasks: readonly TaskItem[];
@@ -1480,6 +1485,8 @@ export interface SettingsForm {
 	readonly priorities: readonly PriorityLevel[];
 	/** Result mark, beside the priorities: the word a result's line starts with, `🎯` by default. */
 	readonly resultMark: string;
+	/** The mark before the settings say otherwise, `🎯`: the field's placeholder. */
+	readonly defaultResultMark: string;
 	readonly labelTag: string;
 	readonly labels: readonly LabelLevel[];
 	readonly labelPaint: LabelPaint;

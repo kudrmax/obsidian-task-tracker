@@ -130,6 +130,22 @@ screen, undo, multi-select). No new logic beyond the three points below.
 11. **Repeat.** A repeating result's next copy keeps the mark.
 12. **One line outside the core.** `obsidian/settingsFile.ts`'s key order gained `resultMark`, so `data.json` stays
     written byte for byte in its order (`tests/settingsFile.test.ts`).
+13. **Rename of a hidden step.** A folded result's step has no card of its own; it carries `drawnOn` (its result's key
+    and slot). `renameSpot` puts the field in the result card's place in a list (the deepest card holding the step),
+    else over the result's block on the timeline. The entry's `renaming` then carries that card's key and id with the
+    step's text, so the result's card or block hides exactly as a renamed card does, with no code of either frontend's;
+    the write (`edit`) names the step. Enter writes the step and closes the field (a new line under it would be another
+    hidden step).
+14. **Add subtask on a hidden step.** `subtaskSpot` answers a list spot carrying `unfold` (the step's key); `open` turns
+    it into an `unfoldAbove` job, run like any entry job, and once the lists draw the result unfolded the field stands
+    last among the step's subtasks (the field closes if the write failed and the step is still hidden). A step with no
+    card holding it (a result only on the timeline) gets the stack, as any task only on the calendar.
+15. **New result… on a task with only a time** takes the slot's day as its due date (`dayOf`), so it stays on that day.
+16. **No usable mark** (the setting a level's prefix): no result rows in any menu; `setResult(…, true)` and `newResult`
+    write nothing.
+17. **A search hit's card** is the task's own title (semibold for a result), never its step.
+18. **What the frontends ask for the result fields:** `tasks.isBlank(name)` for New result…'s Create button, and
+    `SettingsForm.defaultResultMark` (`🎯`) for the Result mark field's placeholder.
 
 ### Obsidian
 

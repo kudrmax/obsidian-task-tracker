@@ -76,15 +76,22 @@ function blockOf(item: Pick<TaskItem, "text" | "title">, step: TaskItem | null):
  * The task as the UI sees it on `today`; `parent`, the task a subtask sits under; `boundary`, where the day begins;
  * `above`, the nearest result above it (the result it is a step of).
  */
-export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = NO_LEVELS, parent: TaskEntry | null = null, boundary: DayBoundary = DayBoundary.MIDNIGHT, above: TaskEntry | null = null): TaskItem {
+/** The step a result shows, by its id, and the result it is drawn on. */
+interface DrawnStep {
+	readonly id: string;
+	readonly on: TaskEntry;
+}
+
+export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = NO_LEVELS, parent: TaskEntry | null = null, boundary: DayBoundary = DayBoundary.MIDNIGHT, above: TaskEntry | null = null, drawn: DrawnStep | null = null): TaskItem {
 	const marks = marksOfTask(entry.task);
 	const choices = markChoices(marks);
 	const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
 	const labels = levels.labelsOf(marks.labels);
-	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary, entry.task.result ? entry : above));
-	const description = descriptionMarkdown(entry);
 	const open = isOpen(entry.task.status);
 	const shown = entry.task.result && open ? nextStep(entry) : null;
+	const drawnBelow = shown ? { id: shown.id, on: entry } : drawn;
+	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary, entry.task.result ? entry : above, drawnBelow));
+	const description = descriptionMarkdown(entry);
 	const step = shown && itemWithId(allSubtasks, shown.id);
 	const own = { text: entry.task.text, title: plainText(entry.task.text), isResult: entry.task.result, collapsed: entry.task.collapsed && hasOpenSubtask(entry) };
 	return {
@@ -126,6 +133,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 		resultOf: above ? resultRef(above) : null,
 		card: cardOf(own, step),
 		block: blockOf(own, step),
+		drawnOn: drawn?.id === entry.id ? { key: keyOf(drawn.on), slot: drawn.on.task.slot } : null,
 		subtasks: allSubtasks.filter((sub) => sub.open),
 		allSubtasks,
 		progress: progressOf(entry),

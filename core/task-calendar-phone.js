@@ -1716,12 +1716,12 @@
     const filled = current.byId(result.id);
     return hasOpenSubtask(filled) ? patch(current, filled, { collapsed: true }) : current;
   }
-  function newResult(doc, entries, title) {
+  function newResult(doc, entries, title, boundary = DayBoundary.MIDNIGHT) {
     const first = [...entries].sort((a, b) => doc.lineOf(a) - doc.lineOf(b))[0];
-    if (!first) return doc;
+    if (!first || doc.resultMark() === null) return doc;
     const { text, ...marks } = typed(doc, title, null, []);
     const top = first.path.length === 0;
-    const task = newTask(text, { ...marks, result: true, project: top ? first.task.project : null, dueDate: top ? first.task.dueDate : null });
+    const task = newTask(text, { ...marks, result: true, project: top ? first.task.project : null, dueDate: top ? dayOf(first.task, boundary) : null });
     const made = top ? doc.insert(first.section, first.index, task) : doc.insertUnder(doc.find(first.section, first.index, first.path.slice(0, -1)), task, first);
     const result = made.insertedSince(doc);
     return addToResult(made, entries.map((entry) => made.byId(entry.id)), result);
@@ -3846,15 +3846,16 @@ ${text}`;
   function blockOf(item, step) {
     return step ? { text: step.text, title: step.title, step } : { text: item.text, title: item.title, step: null };
   }
-  function toItem(entry, today, levels = NO_LEVELS, parent = null, boundary = DayBoundary.MIDNIGHT, above = null) {
+  function toItem(entry, today, levels = NO_LEVELS, parent = null, boundary = DayBoundary.MIDNIGHT, above = null, drawn = null) {
     const marks = marksOfTask(entry.task);
     const choices = markChoices(marks);
     const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
     const labels = levels.labelsOf(marks.labels);
-    const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary, entry.task.result ? entry : above));
-    const description = descriptionMarkdown(entry);
     const open = isOpen(entry.task.status);
     const shown = entry.task.result && open ? nextStep(entry) : null;
+    const drawnBelow = shown ? { id: shown.id, on: entry } : drawn;
+    const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary, entry.task.result ? entry : above, drawnBelow));
+    const description = descriptionMarkdown(entry);
     const step = shown && itemWithId(allSubtasks, shown.id);
     const own = { text: entry.task.text, title: plainText(entry.task.text), isResult: entry.task.result, collapsed: entry.task.collapsed && hasOpenSubtask(entry) };
     return {
@@ -3896,6 +3897,7 @@ ${text}`;
       resultOf: above ? resultRef(above) : null,
       card: cardOf(own, step),
       block: blockOf(own, step),
+      drawnOn: drawn?.id === entry.id ? { key: keyOf(drawn.on), slot: drawn.on.task.slot } : null,
       subtasks: allSubtasks.filter((sub) => sub.open),
       allSubtasks,
       progress: progressOf(entry),
@@ -3915,8 +3917,8 @@ ${text}`;
     search: "Search results",
     name: "Result name"
   };
-  function menuResult(items, bulk) {
-    const open = items.length > 0 && items.every((item) => item.can.result);
+  function menuResult(items, bulk, marks = true) {
+    const open = marks && items.length > 0 && items.every((item) => item.can.result);
     const rows = !open ? [] : bulk ? ["addToResult"] : ["addToResult", "toggle"];
     const first = items[0]?.resultOf ?? null;
     const current = first !== null && items.every((item) => item.resultOf?.id === first.id) ? first : null;
@@ -4053,7 +4055,7 @@ ${text}`;
     };
   }
   var MENU_GROUPS = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
-  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = []) {
+  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = [], marksResults = true) {
     const sections = menuSections(items, offer, of);
     const edits = menuEdits(items, of, sections);
     return {
@@ -4066,7 +4068,7 @@ ${text}`;
       dueDate: sharedDueDate(items),
       sections,
       project: menuProject(items, projects),
-      result: menuResult(items, of.kind === "bulk"),
+      result: menuResult(items, of.kind === "bulk", marksResults),
       edits,
       reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
       repeat: repeatRow(of.kind === "task" ? items[0]?.repeat ?? null : null),
@@ -4166,7 +4168,7 @@ ${text}`;
         labels: field.labels,
         repeat: field.repeat,
         pending: run.pending.map(({ text, level }) => ({ text, level })),
-        renaming: field.rename?.item ?? null,
+        renaming: field.rename ? faced(field.rename) : null,
         indents: task && listSpot(run.spot) !== null,
         ...this.mayShift(field),
         section: this.maySection(field) ? field.section : null,
@@ -4197,7 +4199,8 @@ ${text}`;
     }
     /** The renamed task, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
     get renaming() {
-      return this.session.field?.rename?.item.key ?? null;
+      const rename2 = this.session.field?.rename;
+      return rename2 ? rename2.face ?? rename2.item.key : null;
     }
     /** What `column`'s list draws for the field: its gap, the texts waiting before it, and whether it is a section's name; null when it stands elsewhere. */
     /**
@@ -4250,6 +4253,11 @@ ${text}`;
     /** Where a new subtask of `parent` is typed: last among its subtasks in the list that shows it, else last in its menu's stack. */
     subtaskSpot(parent) {
       const found = this.find(parent);
+      const holder = found ? null : this.holder(parent);
+      if (holder) {
+        const card = this.look.cards(holder.column)[holder.index];
+        return { kind: "list", column: holder.column, place: gapOfPlace(this.look.cards(holder.column), { kind: "subtask", parent: card.key, before: null }), unfold: parent };
+      }
       if (!found) return { kind: "stack", parent };
       return { kind: "list", column: found.column, place: gapOfPlace(this.look.cards(found.column), { kind: "subtask", parent, before: null }) };
     }
@@ -4259,20 +4267,52 @@ ${text}`;
      * over its card on the timeline; null when it shows nowhere the field can stand.
      */
     renameSpot(item, inStack) {
-      const found = this.find(item.key);
+      const found = this.find(item.key) ?? (inStack ? null : this.holder(item.key));
       if (found) {
         const card = this.look.cards(found.column)[found.index];
         return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group, ...card.project !== void 0 && { project: card.project } } };
       }
       if (inStack) return { kind: "stack", parent: item.key };
-      return item.slot ? { kind: "slot", slot: item.slot } : null;
+      const slot = item.slot ?? item.drawnOn?.slot ?? null;
+      return slot ? { kind: "slot", slot } : null;
+    }
+    /**
+     * The card a list shows a task folded away in, when it has none of its own: the deepest card of a task it sits under
+     * (a folded result's, whose card shows its step).
+     */
+    holder(key) {
+      const shown = this.look.shown();
+      let best = null;
+      for (const column of [...shown, ...ALL_COLUMNS.filter((c) => !shown.includes(c))]) {
+        this.look.cards(column).forEach((card, index) => {
+          const k = card.key;
+          const holds2 = k.section === key.section && k.index === key.index && k.path.length < key.path.length && k.path.every((i, n) => key.path[n] === i);
+          if (holds2 && (best === null || k.path.length > best.depth)) best = { column, index, depth: k.path.length };
+        });
+        if (best) return best;
+      }
+      return best;
+    }
+    /** The card the field renaming `item` at `spot` stands in place of when the task has no card of its own there. */
+    faceOf(item, spot) {
+      if (spot.kind === "list") {
+        if (this.find(item.key)) return void 0;
+        const card = this.look.cards(spot.column)[spot.place.index];
+        return card ? { ...card.key, ...(card.id ?? card.key.id) !== void 0 && { id: card.id ?? card.key.id } } : void 0;
+      }
+      return spot.kind === "slot" && item.slot === null && item.drawnOn ? item.drawnOn.key : void 0;
     }
     /** A field at `spot`; one already open is finished first, as by a tap elsewhere. A rename's spot is the gap right before its own card. */
-    open(spot, renaming) {
+    open(given, renaming) {
       if (this.session.field) this.save(this.session.field);
-      const rename2 = renaming ? { item: renaming, home: this.newRun(spot), moved: false } : null;
+      const unfold = given.kind === "list" && !renaming ? given.unfold : void 0;
+      const spot = given.kind === "list" ? { kind: "list", column: given.column, place: given.place } : given;
+      const face = renaming ? this.faceOf(renaming, spot) : void 0;
+      const rename2 = renaming ? { item: renaming, home: this.newRun(spot), moved: false, ...face && { face } } : null;
       const project = renaming ? renaming.project?.link ?? null : this.projectAt(spot);
-      this.reset({ run: this.newRun(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename: rename2, section: false, project });
+      const run = this.newRun(spot);
+      this.reset({ run, text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename: rename2, section: false, project });
+      if (unfold) this.queue(run, { id: this.jobId(), kind: "unfold", run, key: unfold });
     }
     /** The project a field opened at `spot` starts with: its project's part in a list drawn by project, else the view's own. */
     projectAt(spot) {
@@ -4434,6 +4474,8 @@ ${text}`;
         }
         case "rename":
           return { method: "edit", args: [this.keyAt(job.home, job.item), job.draft] };
+        case "unfold":
+          return { method: "unfoldAbove", args: [job.key] };
         case "section": {
           const at = this.placeOf(job.column, placeOfGap(this.look.cards(job.column), { ...job.place, level: 0 }));
           return at.kind === "list" || at.kind === "day" ? { method: "createSection", args: [job.name, at] } : null;
@@ -4470,8 +4512,22 @@ ${text}`;
     /** Job `id` ended, written or not: its spot no longer follows the cards for it. */
     done(id) {
       const job = this.job(id);
+      if (job.kind === "unfold") this.unfolded(job);
       this.release(job.kind === "rename" ? job.home : job.run);
       this.session.jobs.splice(this.session.jobs.indexOf(job), 1);
+    }
+    /**
+     * The lists show the task unfolded: the field typing its subtask goes last among its subtasks there. Still folded away
+     * (the write failed), the field closes rather than type a subtask of the card it stood under.
+     */
+    unfolded(job) {
+      const run = this.run(job.run);
+      if (!run || this.session.field?.run !== job.run) return;
+      const at = this.find(job.key);
+      if (!at) return this.reset(null);
+      run.spot = { kind: "list", column: at.column, place: gapOfPlace(this.look.cards(at.column), { kind: "subtask", parent: job.key, before: null }) };
+      this.shifts = null;
+      this.changed();
     }
     run(id) {
       return this.session.runs[id];
@@ -4590,7 +4646,7 @@ ${text}`;
       if (this.blank(field.text)) this.reset(null);
       else {
         this.saveRename(field, rename2);
-        const under = list && this.under(list, rename2.item);
+        const under = list && !rename2.face && this.under(list, rename2.item);
         this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: this.projectAt(under) } : null);
       }
     }
@@ -4747,6 +4803,10 @@ ${text}`;
     if (link === null) return null;
     const name = projectName(link);
     return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link, note: null, canOpenNote: false, mark: true };
+  }
+  function faced(rename2) {
+    const { item, face } = rename2;
+    return face ? { ...item, key: face, id: face.id ?? item.id } : item;
   }
   function runsOf(field) {
     if (!field) return [];
@@ -4984,6 +5044,7 @@ ${text}`;
         },
         priorities: s.priorities,
         resultMark: s.resultMark,
+        defaultResultMark: DEFAULT_SETTINGS.resultMark,
         labelTag: s.labelTag,
         labels: s.labels,
         labelPaint: s.labelPaint,
@@ -5396,8 +5457,9 @@ ${text}`;
         const projectText = entry.project === null || entry.path.length > 0 ? "" : index.refOf(entry.project)?.name ?? projectName(entry.project);
         const project2 = projectText === "" ? null : fuzzy.matchWords(projectText);
         if (title || description || project2) {
+          const found = item(entry);
           const hit = {
-            item: item(entry),
+            item: { ...found, card: ownCard(found) },
             title: title ? matchParts(titleText, title.found) : [],
             project: project2 ? matchParts(projectText, project2.found) : null,
             description: description ? snippetParts(descriptionText, description.found) : null
@@ -5495,11 +5557,11 @@ ${text}`;
     }
     menu(item, from, screen) {
       const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-      return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectNotes());
+      return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectNotes(), this.rules.marksResults());
     }
     bulkMenu(picked, screen) {
       const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-      return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectNotes());
+      return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectNotes(), this.rules.marksResults());
     }
     carried(lifted, picked) {
       return carriedWith(lifted, picked);
@@ -5828,6 +5890,7 @@ ${text}`;
     }
     /** Make result, or Make task. */
     setResult(key, result) {
+      if (result && !this.marksResults()) return null;
       return (doc) => setResult(doc, this.entryOf(doc, key), result);
     }
     /** The tasks become the last steps of `result`; null for none. A result no longer open, or no longer a result, is stale. */
@@ -5841,8 +5904,12 @@ ${text}`;
     }
     /** A new result named as typed, at the first task's place, the tasks its steps; null for none or a blank name. */
     newResult(keys, name) {
-      if (keys.length === 0 || this.isBlank(name)) return null;
-      return (doc) => newResult(doc, keys.map((key) => this.entryOf(doc, key)), name);
+      if (keys.length === 0 || this.isBlank(name) || !this.marksResults()) return null;
+      return (doc, _today, _settings, boundary) => newResult(doc, keys.map((key) => this.entryOf(doc, key)), name, boundary);
+    }
+    /** The settings give a usable result mark: a task can be made a result. */
+    marksResults() {
+      return markersOf(this.settings.get()).result !== void 0;
     }
     setReminder(key, reminder) {
       return (doc) => setReminder(doc, this.entryOf(doc, key), reminder);

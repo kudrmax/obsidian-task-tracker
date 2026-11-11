@@ -343,7 +343,8 @@ export class TaskRules {
 	}
 
 	/** Make result, or Make task. */
-	setResult(key: TaskKey, result: boolean): Operation {
+	setResult(key: TaskKey, result: boolean): Operation | null {
+		if (result && !this.marksResults()) return null;
 		return (doc) => ops.setResult(doc, this.entryOf(doc, key), result);
 	}
 
@@ -359,8 +360,13 @@ export class TaskRules {
 
 	/** A new result named as typed, at the first task's place, the tasks its steps; null for none or a blank name. */
 	newResult(keys: readonly TaskKey[], name: string): Operation | null {
-		if (keys.length === 0 || this.isBlank(name)) return null;
-		return (doc) => ops.newResult(doc, keys.map((key) => this.entryOf(doc, key)), name);
+		if (keys.length === 0 || this.isBlank(name) || !this.marksResults()) return null;
+		return (doc, _today, _settings, boundary) => ops.newResult(doc, keys.map((key) => this.entryOf(doc, key)), name, boundary);
+	}
+
+	/** The settings give a usable result mark: a task can be made a result. */
+	marksResults(): boolean {
+		return markersOf(this.settings.get()).result !== undefined;
 	}
 
 	setReminder(key: TaskKey, reminder: ReminderKind): Operation {

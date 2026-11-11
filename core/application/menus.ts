@@ -177,7 +177,7 @@ export function projectPage(chosen: readonly (ProjectRef | null)[], known: reado
 export const MENU_GROUPS: readonly MenuGroupId[] = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
 
 /** The menu of one task or of several picked at once: what each group offers, what is on, what can't be pressed, what asks first. */
-export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD, projects: readonly ProjectRef[] = []): TaskMenuModel {
+export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD, projects: readonly ProjectRef[] = [], marksResults = true): TaskMenuModel {
 	const sections = menuSections(items, offer, of);
 	const edits = menuEdits(items, of, sections);
 	return {
@@ -190,7 +190,7 @@ export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: r
 		dueDate: sharedDueDate(items),
 		sections,
 		project: menuProject(items, projects),
-		result: menuResult(items, of.kind === "bulk"),
+		result: menuResult(items, of.kind === "bulk", marksResults),
 		edits,
 		reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
 		repeat: repeatRow(of.kind === "task" ? (items[0]?.repeat ?? null) : null),

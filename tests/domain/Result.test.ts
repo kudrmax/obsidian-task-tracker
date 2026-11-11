@@ -183,6 +183,13 @@ describe("New result…", () => {
 		expect(after).toBe("## Soon\n- [ ] Parent\n\t- [ ] X\n\t- [ ] 🎯 Goal 📁\n\t\t- [ ] Y\n## Done\n");
 	});
 
+	it("gives the result the day of a task with only a time, and writes nothing without a result mark", () => {
+		const doc = parse("## Soon\n- [ ] Call ⏰ 2026-11-14 10:00\n## Done\n");
+		expect(settled(newResult(doc, [named(doc, "Call")], "Calls"))).toContain("- [ ] 🎯 Calls 📁 📅 2026-11-14\n\t- [ ] Call ⏰ 2026-11-14 10:00\n");
+		const unmarked = TaskDocument.parse("## Soon\n- [ ] Call\n## Done\n", SECTIONS, { ...M, result: undefined });
+		expect(newResult(unmarked, [named(unmarked, "Call")], "Calls")).toBe(unmarked);
+	});
+
 	it("takes several, at the first one's place", () => {
 		const doc = parse("## Inbox\n- [ ] Q\n## Soon\n- [ ] P\n## Done\n");
 		const after = settled(newResult(doc, [named(doc, "P"), named(doc, "Q")], "Goal"));

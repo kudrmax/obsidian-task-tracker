@@ -181,6 +181,7 @@ export class DemoTaskService implements TaskService {
 			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false, resize: t.slot != null, setProject: true, result: t.status === "todo" || t.status === "inProgress" },
 			isResult: false,
 			resultOf: null,
+			drawnOn: null,
 			card: { text: t.text, title: plainText(t.text), over: null, step: null, semibold: false },
 			block: { text: t.text, title: plainText(t.text), step: null },
 		};
