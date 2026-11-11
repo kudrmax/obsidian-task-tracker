@@ -320,7 +320,7 @@ struct ProjectTasks: View {
                 if let note = menu.note {
                     Section(menu.noteLabel) {
                         Button(note.name, systemImage: "doc.text") { model.projects.openNote(note.link) }
-                        Button(menu.detachLabel, systemImage: "link.badge.minus", role: .destructive) { Task { await model.projects.detach(menu.project.name) } }
+                        Button(menu.detachLabel, systemImage: "minus.circle", role: .destructive) { Task { await model.projects.detach(menu.project.name) } }
                     }
                 }
             } label: {
