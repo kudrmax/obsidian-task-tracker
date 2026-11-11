@@ -40,7 +40,7 @@ struct SearchScreen: View {
             .task(id: query) {
                 try? await Task.sleep(for: .milliseconds(150))
                 guard !Task.isCancelled else { return }
-                let found: [SearchGroup] = (try? await model.read("tasks.search", [.string(query)] + (model.projectLink.map { [JSONValue.string($0)] } ?? []))) ?? []
+                let found: [SearchGroup] = (try? await model.read("tasks.search", [.string(query)])) ?? []
                 let drawn = await model.cards(found.flatMap(\.hits).map { ListRow(item: $0.item, level: 0) })
                 var named = names
                 for group in found where named[group.list] == nil {

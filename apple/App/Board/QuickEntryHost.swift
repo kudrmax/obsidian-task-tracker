@@ -165,10 +165,9 @@ final class QuickEntryHost {
         opening { call("openAtDrop", [column.map { .string($0.rawValue) } ?? .null, result]) }
     }
 
-    /// A tap on a «No tasks» plate: the field of a new task in that section, of the project's part `zone` in a list
-    /// grouped by project (the task written there gets that project).
-    func openIn(_ column: BoardColumn, _ group: String?, zone: JSONValue? = nil) {
-        opening { call("openIn", [.string(column.rawValue), group.json] + (zone.map { [$0] } ?? [])) }
+    /// A tap on a «No tasks» plate: the field of a new task in that section.
+    func openIn(_ column: BoardColumn, _ group: String?) {
+        opening { call("openIn", [.string(column.rawValue), group.json]) }
     }
 
     /// Add Subtask: the field last among the task's subtasks in its list; a task only on the calendar is lifted where it
@@ -399,7 +398,6 @@ final class QuickEntryHost {
         let shown = shown(at: model?.place ?? .today)
         var look: [String: JSONValue] = ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map(JSONValue.string))]
         // A project's view: every task written here gets its project.
-        if let link = model?.projectLink { look["project"] = .string(link) }
         return .object(look)
     }
 
@@ -608,8 +606,7 @@ final class QuickEntryHost {
         if case .failure(let error) = written { model.problem(error) }
         let read: BoardSnapshot?
         do {
-            let link = model.projectLink
-            read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline, project: link) }.value
+            read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
         } catch {
             model.problem(error)
             read = nil

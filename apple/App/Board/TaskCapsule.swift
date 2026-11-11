@@ -122,7 +122,7 @@ struct TaskCapsule: View {
                 .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, maxHeight: CardMetrics.titleLine)
                 .overlay(alignment: .leading) {
                     marked(hit.title.isEmpty ? [FoundPart(text: card.item.title, match: false)] : hit.title, size: CardMetrics.title)
-                        .font(.system(size: CardMetrics.title, weight: weight))
+                        .font(.system(size: CardMetrics.title))
                         .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
                         .strikethrough(card.item.closed, color: Palette.muted)
                         .lineLimit(1)
@@ -165,8 +165,6 @@ struct TaskCapsule: View {
     private var base: CGFloat { card.listHeight }
     /// The room over the title's lines (and under them on a menu's copy).
     private var edge: CGFloat { (base - CardMetrics.titleLine - (card.face.twoLines ? CardMetrics.overLine : 0)) / 2 }
-    /// The title's weight: semibold for a result drawn with its own title.
-    private var weight: Font.Weight { card.face.semibold ? .semibold : .regular }
 
     /// A folded result's own title over its step (results, point 4): small, in the caption colour, after a target, on one
     /// line fading out as a title does.
@@ -196,7 +194,7 @@ struct TaskCapsule: View {
         parts.reduce(Text(verbatim: "")) { text, part in
             text + (part.isLink ? Text(verbatim: part.shown).foregroundColor(Palette.accent(scheme)) : Text(verbatim: part.shown))
         }
-        .font(.system(size: CardMetrics.title, weight: weight))
+        .font(.system(size: CardMetrics.title))
         .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
         .strikethrough(card.item.closed, color: Palette.muted)
     }
@@ -215,7 +213,7 @@ struct TaskCapsule: View {
             }
             .lineLimit(1)
             .fixedSize()
-            .font(.system(size: CardMetrics.title, weight: weight))
+            .font(.system(size: CardMetrics.title))
             .strikethrough(card.item.closed, color: Palette.muted)
             .onChange(of: linkFrames, initial: true) { onLinks?(Array(linkFrames.values)) }
         } else {

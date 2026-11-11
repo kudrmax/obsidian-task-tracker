@@ -24,14 +24,6 @@ public struct TextPart: Decodable, Hashable, Sendable {
     public var shown: String { label ?? text ?? "" }
 }
 
-/// `NewProjectNote`: the note «New project…» writes: the vault's note of that name (`exists`), or a new one at its root.
-public struct NewProjectNote: Decodable, Hashable, Sendable {
-    public let name: String
-    public let path: String
-    public let link: String
-    public let exists: Bool
-}
-
 /// `notes.linkQuery`: the `[[` the caret stands in, and the range (UTF-16 offsets) a picked note's link replaces.
 public struct LinkQuery: Decodable, Hashable, Sendable {
     public let query: String

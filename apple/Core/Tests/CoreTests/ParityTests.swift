@@ -2,15 +2,16 @@ import Foundation
 import Testing
 @testable import Core
 
-/// What the app asks of the core to do what the plugin does: the vault's projects, the grouping kept on the device, a
-/// title's links, the `[[` search, the cards' size, and the words the plugin shows, through the door in JavaScriptCore.
+/// What the app asks of the core to do what the plugin does: a project's attached note, the lists without project
+/// groups, a title's links, the `[[` search, the cards' size, and the words the plugin shows, through the door in JavaScriptCore.
 @Suite struct ParityTests {
     static let day = "2026-11-06"
     static let file = [
         "## Inbox", "", "- [ ] Call [[Clients/Acme|Acme]] about https://acme.example/deal.", "",
+        "## Projects", "", "- Acme [[Clients/Acme]]", "",
         "## Now", "", "- [ ] Weekly 📅 2026-11-06 🔁 every 3 days from 2026-11-06", "",
         "## Soon", "", "",
-        "## Backlog", "", "- [ ] Draft the offer 🗂️ [[Acme]]", "- [ ] Free", "",
+        "## Backlog", "", "- [ ] Draft the offer 🗂️ Acme", "- [ ] Free", "",
         "## Done", "",
     ].joined(separator: "\n")
     static let measures = TimelineMeasures(hour: 56, cardHeight: 35, cardGap: 2, itemInset: 1, itemGap: 2, overlayInset: 18)
@@ -18,11 +19,7 @@ import Testing
     let core = try! PhoneCore(script: Fixtures.phoneScript)
     let at = Fixtures.date(6, 10)
 
-    /// The board as the app makes it: the project notes found by a scan of the vault's notes (`VaultProjects`).
-    func board(_ vault: FakeVault) -> TaskBoard {
-        let notes = vault.files.filter { $0.key.hasSuffix(".md") }
-        return TaskBoard(core: core, vault: vault, projects: VaultProjects(folder: FakeFolder(notes), core: core, background: false))
-    }
+    func board(_ vault: FakeVault) -> TaskBoard { TaskBoard(core: core, vault: vault) }
 
     func vault() -> FakeVault {
         let vault = FakeVault(Self.file)
@@ -32,11 +29,11 @@ import Testing
         return vault
     }
 
-    @Test func theVaultsProjectNotesComeWithEveryCall() throws {
+    @Test func aProjectsAttachedNoteComesWithItsCards() throws {
         let board = board(vault())
         let snapshot = try board.snapshot(day: Self.day, measures: Self.measures, now: at)
         let draft = try #require(snapshot.screen.backlog.first { $0.title == "Draft the offer" })
-        #expect(draft.project?.note == "Clients/Acme.md")
+        #expect(draft.project?.note == "Clients/Acme")
         #expect(draft.project?.canOpenNote == true)
         #expect(draft.project?.mark == true)
         #expect(draft.can.setProject)
@@ -44,7 +41,6 @@ import Testing
         #expect(menu.project.value == "Acme")
         #expect(menu.project.noneLabel == "No project")
         #expect(menu.project.options.map(\.project.name) == ["Acme"])
-        #expect(snapshot.screen.projects["backlog"]?.groups.first?.canOpenNote == true)
     }
 
     @Test func aTitleComesInPiecesItsLinksWithWhatATapOpens() throws {
@@ -142,40 +138,24 @@ import Testing
         #expect(draft.kind == "afterDone")
     }
 
-    @Test func backlogComesGroupedByProjectEachCardInItsProjectsPart() throws {
+    /// Grouping by project inside the funnel went: Backlog is one list of sections, its cards and places name no project.
+    @Test func backlogDrawsNoProjectParts() throws {
         let snapshot = try board(vault()).snapshot(day: Self.day, measures: Self.measures, now: at)
         let backlog = try #require(snapshot.lists[.backlog])
-        #expect(backlog.grouped)
-        #expect(backlog.canGroup)
-        #expect(backlog.projects.map(\.title) == ["Acme", "No project"])
-        let draft = try #require(backlog.cards.first { $0.item.title == "Draft the offer" })
-        #expect(draft.zone == "Acme")
-        #expect(draft.listCard["project"] == "Acme")
-        let free = try #require(backlog.cards.first { $0.item.title == "Free" })
-        #expect(free.zone == .null)
-        #expect(backlog.places.array.first?["project"] == "Acme")
-        #expect(snapshot.lists[.inbox]?.grouped == false)
-        #expect(snapshot.lists[.inbox]?.cards.first?.zone == nil)
+        #expect(backlog.groups.count == 1)
+        #expect(backlog.cards.map(\.item.title) == ["Draft the offer", "Free"])
+        #expect(backlog.cards.allSatisfy { $0.listCard["project"].isNull })
+        #expect(snapshot.screen.titleDrops["backlog"]?["byProject"] == false)
     }
 
-    @Test func aDropInAProjectsPartGivesTheTaskThatProject() throws {
+    @Test func aDropKeepsTheTasksProject() throws {
         let vault = vault()
         let board = board(vault)
         let backlog = try #require(try board.snapshot(day: Self.day, measures: Self.measures, now: at).lists[.backlog])
-        let free = try #require(backlog.cards.first { $0.item.title == "Free" })
-        let place: JSONValue = try board.rule("rules.placeOfDrop", [.array(backlog.cards.map(\.listCard)), ["kind": "gap", "index": 0, "level": 0, "group": .null, "project": "Acme"], .null])
-        #expect(place["project"] == "Acme")
-        try board.write("tasks.drop", [[["key": free.item.key.json, "from": "backlog"]], ["kind": "place", "column": "backlog", "place": place], .string(Self.day)])
-        #expect(vault.text.contains("- [ ] Free 🗂️ [[Acme]]"))
-    }
-
-    @Test func aProjectGroupsHeaderOpensItsPartToADrop() throws {
-        let cards = [PlacedCard(level: 0, group: nil, zone: "Acme", top: 30, height: 35)]
-        let heads = [PlacedHead(group: ["group": .null, "project": "Acme"], opens: true, firstCard: 0, top: 0, height: 26)]
-        let board = TaskBoard(core: core, vault: vault())
-        let place = try board.placeAt(cards, y: 10, level: 0, shift: 0, room: .null, heads: heads, held: .null, hysteresis: 6)
-        #expect(place["project"] == "Acme")
-        #expect(place["index"].number == 0)
+        let draft = try #require(backlog.cards.first { $0.item.title == "Draft the offer" })
+        let place: JSONValue = try board.rule("rules.placeOfDrop", [.array(backlog.cards.map(\.listCard)), ["kind": "gap", "index": 2, "level": 0, "group": .null], .null])
+        try board.write("tasks.drop", [[["key": draft.item.key.json, "from": "backlog"]], ["kind": "place", "column": "backlog", "place": place], .string(Self.day)])
+        #expect(vault.text.contains("- [ ] Free\n- [ ] Draft the offer 🗂️ Acme\n"))
     }
 
     @Test func theCardsAreTheSettingsSizeAndCarryTheirTitlesLinks() throws {

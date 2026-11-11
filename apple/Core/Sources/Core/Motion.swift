@@ -275,21 +275,8 @@ public struct DropLanding: Decodable, Sendable {
     public let column: String?
     public let group: String?
     public let index: Int?
-    /// In a list drawn in project parts: the part it is drawn in, the section there and its index among that section's
-    /// cards in the part.
-    public let part: LandingPart?
     /// A subtask: its parent's id, and its index among the parent's open subtasks.
     public let parent: String?
-}
-
-/// The project part a card lands in (`LandingPart`): the part's key and zone, its section and index there.
-public struct LandingPart: Decodable, Sendable, Equatable {
-    public let key: String
-    public let zone: JSONValue
-    public let section: String?
-    public let index: Int
-    /// The part is folded: its cards are not drawn, the card lands under its header.
-    public let folded: Bool?
 }
 
 extension TaskBoard {

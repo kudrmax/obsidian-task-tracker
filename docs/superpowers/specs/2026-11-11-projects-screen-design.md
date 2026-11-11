@@ -179,3 +179,15 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
     plugin's (its note search, then `setProjectNote(name, link)`); a link typed with `[[ ]]` is taken without them.
 18. **The old settings** `projectTag` and `resultMark` stay in `data.json`, read only by the move; the settings form's
     fields and `setProjectTag`/`setResultMark` are stubs that write nothing until the frontends drop them.
+
+### iPhone app (frontend-swift)
+
+19. **The Project page is read over the tasks file when it opens.** The app draws a card's menu over the settings alone
+    (no file per card), and such a menu's `project.options` hold only the task's own projects. The Project row is drawn
+    from that menu (its value is right), and its page is asked again, over the file, as it opens (`tasks.bulkMenu` of the
+    tasks) — the whole tree. The New Task sheet's `capture.project` is read over the file too.
+20. **A subproject on a Project page in the app's menus** shows its parent's name as the row's subtitle, not an indent:
+    an iOS menu row has no indent, and one faked with spaces wraps a long name back under its parent.
+21. **No vault scan on the phone.** The app hands the door no `context.projects`: projects are the tree, and the one
+    move made by the app (if it writes first) makes each `🗂️ [[Note]]` a project without its note attached; the plugin,
+    which knows the notes, attaches them when it moves first. Max's plugin is released first, so the move is its.

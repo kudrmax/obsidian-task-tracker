@@ -13,15 +13,10 @@ final class PluginSettings {
     /// The six preset colours in the core's order (`PRIORITY_COLORS`).
     private(set) var presets: [String] = []
     private var shades: [String: Themed<Shades>] = [:]
-    /// Obsidian updates internal links on a rename (`alwaysUpdateLinks` in the vault's `.obsidian/app.json`, on unless
-    /// it says false, as the plugin reads it): off, the Project tag tells to turn it on.
-    private(set) var updatesLinks = true
 
     func load() async {
         let board = board
         form = try? await Task.detached { try board.read("settings.form", over: try board.files()) }.value
-        let config = AppServices.shared.vault.read(path: ".obsidian/app.json").flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] }
-        updatesLinks = (config?["alwaysUpdateLinks"] as? Bool) != false
         if presetInk.isEmpty, let constants: [String: JSONValue] = try? board.rule("rules.constants") {
             presets = constants["PRIORITY_COLORS"]?.array.compactMap(\.string) ?? []
             for preset in presets {

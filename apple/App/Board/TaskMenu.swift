@@ -102,7 +102,6 @@ struct TaskMenu {
                 if let section = sectionPage { rows.append(section) }
             case "project":
                 rows.append(projectPage)
-                rows += resultRows
             case "subtask" where single:
                 rows.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } })
             default: break
@@ -119,32 +118,21 @@ struct TaskMenu {
         return row.value.isEmpty ? nil : row.value
     }
 
-    /// The Project row and its page (board Proj3Flow): the notes with the project tag by name, No Project last in its own
-    /// group, the tasks' own checked; a subtask's row shows its parent's project and can't be pressed. The words are the core's.
+    /// The Project row and its page of checks: the whole tree of `## Projects` in its order, each indented by its depth and
+    /// checked while every task has it (a pick toggles it, `tasks.toggleProject`), No project in its own group, «New
+    /// project…» last. The page is read over the tasks file as it opens (the menu itself reads no file); a subtask's row
+    /// shows its parent's projects and can't be pressed. The words are the core's.
     private var projectPage: MenuNode {
         let page = menu.project, items = items, model = model
         let subtitle = page.value.isEmpty ? nil : page.value
         guard !page.disabled else {
             return .action(title: "Project", symbol: "folder", subtitle: subtitle, disabled: true) {}
         }
-        let rows = ProjectPage.nodes(page, pick: { link in Task { await model.setProject(items, link) } }, new: { model.askNewProject(.tasks(items)) })
-        return .submenu(title: "Project", symbol: "folder", subtitle: subtitle, children: rows)
-    }
-
-    /// The result rows, right after Project in the core's order (`menu.result.rows`): Add to result, its value the result
-    /// the tasks are steps of, opening the page in place of the menu; Make result or Make task.
-    private var resultRows: [MenuNode] {
-        let result = menu.result, items = items, model = model
-        return result.rows.compactMap { row in
-            switch row {
-            case "addToResult":
-                return .action(title: result.label, symbol: "scope", subtitle: result.value.isEmpty ? nil : result.value, opens: true) { model.resultFor = ResultAsk(items: items, title: result.label) }
-            case "toggle":
-                guard let item = items.first else { return nil }
-                return .action(title: result.toggle.label, symbol: result.toggle.result ? "target" : "circle.dashed") { Task { await model.setResult(item, result.toggle.result) } }
-            default:
-                return nil
-            }
+        return .deferred(title: "Project", symbol: "folder", subtitle: subtitle) {
+            let full = await model.projectPage(items) ?? page
+            return ProjectPage.nodes(full, pick: { name in
+                Task { if let name { await model.toggleProject(items, name) } else { await model.setProject(items, nil) } }
+            }, new: { model.askNewProject(.tasks(items)) })
         }
     }
 
@@ -322,12 +310,14 @@ private struct DeferredMenu: View {
 }
 
 /// A Project page as every one draws it (a task's menu, the bulk menu, the quick entry's button, the New Task sheet): the
-/// project notes by name, No project in its own group, then «New project…» last (`MenuProject.newLabel`). The words are the core's.
+/// tree's projects in its order, a subproject with its parent's name under its own (a menu row has no indent, and one
+/// faked with spaces wraps a long name back under its parent), No project in its own group, then «New project…» last
+/// (`MenuProject.newLabel`). A pick hands the project's name, No project nil. The words are the core's.
 enum ProjectPage {
     @MainActor
     static func nodes(_ page: MenuProject, pick: @escaping @MainActor (String?) -> Void, new: @escaping @MainActor () -> Void) -> [MenuNode] {
         let options: [MenuNode] = page.options.map { option in
-            .action(title: option.project.name, symbol: nil, checked: option.checked) { pick(option.project.link) }
+            .action(title: option.project.name, symbol: nil, subtitle: option.project.path.dropLast().last, checked: option.checked) { pick(option.project.name) }
         }
         let none: MenuNode = .action(title: page.noneLabel, symbol: nil, checked: page.none) { pick(nil) }
         let create: MenuNode = .action(title: page.newLabel, symbol: "plus", opens: true) { new() }

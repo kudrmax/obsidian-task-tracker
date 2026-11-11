@@ -32,14 +32,12 @@ struct SettingsView: View {
                 }
                 Button("Add Priority") { Task { await plugin.write("settings.addLevel") } }
             }
-            ResultMarkSection(plugin: plugin)
             if let form = plugin.form {
                 CardsSection(form: form, plugin: plugin)
             }
             Section("Show and set up") {
                 link("Labels", value: plugin.form.map { "\($0.labels.count)" }, symbol: "tag.fill", tint: .green) { LabelsPage(plugin: plugin) }
                 link("Sections", value: plugin.form.map { "\($0.presets.count)" }, symbol: "rectangle.stack.fill", tint: .indigo) { SectionsPage(plugin: plugin) }
-                link("Projects", value: plugin.form?.projectTag, symbol: "folder.fill", tint: .teal) { ProjectsPage(plugin: plugin) }
                 link("Calendars", symbol: "calendar", tint: .red) { CalendarsView(model: nil) }
                 link("Day and Timeline", symbol: "clock.fill", tint: .blue) { DayPage(plugin: plugin) }
                 link("Tasks File", symbol: "doc.text.fill", tint: .gray) { TasksFilePage(model: model, plugin: plugin) }
@@ -183,75 +181,6 @@ struct LabelsPage: View {
     private func saveTag() {
         guard let saved = plugin.form?.labelTag, tag != saved else { return }
         Task { await plugin.write("settings.setLabelTag", [.string(tag)]) }
-    }
-}
-
-/// «Result mark» (results, point 3), beside the priorities as the plugin has it: the word a result's line starts with. The
-/// core keeps it only when it is one word that is no priority's prefix; otherwise the saved one comes back into the field.
-struct ResultMarkSection: View {
-    let plugin: PluginSettings
-    @State private var mark = ""
-
-    var body: some View {
-        Section {
-            LabeledContent("Result Mark") {
-                TextField(plugin.form?.defaultResultMark ?? "", text: $mark)
-                    .multilineTextAlignment(.trailing)
-                    .frame(minWidth: 88)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .onSubmit(save)
-            }
-        } footer: {
-            Text("A task whose line starts with this word is a result: its card shows its next open subtask under the result’s title. Changing it rewrites no task.")
-        }
-        .onAppear { mark = plugin.form?.resultMark ?? "" }
-        .onDisappear(perform: save)
-        .onChange(of: plugin.form?.resultMark) { mark = plugin.form?.resultMark ?? "" }
-    }
-
-    /// Kept on Return and on leaving, as Settings keeps a field; a mark the core refuses puts the saved one back.
-    private func save() {
-        guard let saved = plugin.form?.resultMark, mark != saved else { return }
-        Task {
-            await plugin.write("settings.setResultMark", [.string(mark)])
-            mark = plugin.form?.resultMark ?? saved
-        }
-    }
-}
-
-/// The tag that makes a note a project, as the plugin's Project tag setting.
-struct ProjectsPage: View {
-    let plugin: PluginSettings
-    @State private var tag = ""
-
-    var body: some View {
-        Form {
-            Section {
-                LabeledContent("Project Tag") {
-                    TextField("#project", text: $tag)
-                        .multilineTextAlignment(.trailing)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .onSubmit(saveTag)
-                }
-            } footer: {
-                // As the plugin's Project tag: the warning only while Obsidian would leave a renamed note's links behind.
-                Text(plugin.updatesLinks
-                    ? "A note with this tag, in its properties or its text, is a project: Backlog and Soon group their tasks by it, and a task’s menu offers it under Project."
-                    : "A note with this tag, in its properties or its text, is a project: Backlog and Soon group their tasks by it, and a task’s menu offers it under Project. Turn on Files and links → Automatically update internal links in Obsidian: otherwise renaming a project’s note breaks its tasks’ links.")
-            }
-        }
-        .navigationTitle("Projects")
-        .onAppear { tag = plugin.form?.projectTag ?? "" }
-        .onDisappear(perform: saveTag)
-        .onChange(of: plugin.form?.projectTag) { tag = plugin.form?.projectTag ?? "" }
-    }
-
-    /// The tag typed is kept on Return and on leaving the page, as Settings keeps a field.
-    private func saveTag() {
-        guard let saved = plugin.form?.projectTag, tag != saved else { return }
-        Task { await plugin.write("settings.setProjectTag", [.string(tag)]) }
     }
 }
 

@@ -52,13 +52,8 @@ public final class TaskBoard: @unchecked Sendable {
     private var ids: DoorIds?
     /// The writes made so far: an answer over files read before the last write never replaces the ids that write gave.
     private var generation = 0
-    /// How this device groups its lists by project (`GroupingState`), as the door last answered it.
-    private let grouping: DeviceText
-    private let projects: ProjectSource?
-    /// The project notes as last found, as the door's context takes them.
-    private var projectsJSON: String?
-    /// The project tag of the settings last read, and the settings it was read from.
-    private var projectTag: (settings: String, tag: String)?
+    /// What this device keeps of the Projects screen (`ProjectsScreenState`), as the door last answered it.
+    private let projectsScreen: DeviceText
     /// The vault's files, for the `[[` search and a title's links.
     private let fileList = VaultFileList()
     /// The time a call that is handed none is made at: a write's rules (a postpone, a day's roll) read the same day the
@@ -67,15 +62,14 @@ public final class TaskBoard: @unchecked Sendable {
 
     /// `pure`: a second core for the pure rules a screen asks in the same frame; the reading core when none is given.
     /// `preview`: a third for the drops' previews, worked out off the main thread; the pure one when none is given.
-    /// `grouping`: where the device keeps how it groups its lists by project; `projects`: who finds the project notes.
-    public init(core: PhoneCore, vault: TasksVault, pure: PhoneCore? = nil, preview: PhoneCore? = nil, grouping: DeviceText = MemoryText(), projects: ProjectSource? = nil, clock: @escaping @Sendable () -> Date = { Date() }) {
+    /// `projectsScreen`: where the device keeps the Projects screen's node, segment and folds.
+    public init(core: PhoneCore, vault: TasksVault, pure: PhoneCore? = nil, preview: PhoneCore? = nil, projectsScreen: DeviceText = MemoryText(), clock: @escaping @Sendable () -> Date = { Date() }) {
         self.core = core
         self.clock = clock
         self.pure = pure ?? core
         self.previewing = preview ?? pure ?? core
         self.vault = vault
-        self.grouping = grouping
-        self.projects = projects
+        self.projectsScreen = projectsScreen
     }
 
     /// The vault's files as they are now.
@@ -99,7 +93,6 @@ public final class TaskBoard: @unchecked Sendable {
         } catch VaultError.noTasksFile {
             throw BoardError.noTasksFile
         }
-        findProjects(settings)
         var calendars: [String: String] = [:]
         for file in sources(settings) {
             if let text = vault.read(path: file.path) { calendars[file.source] = text }
@@ -169,7 +162,7 @@ public final class TaskBoard: @unchecked Sendable {
             let files = try files()
             let reply = try answer(method, arguments, files)
             if let settings = reply.settings { try vault.write(path: try core.settingsFile(), text: settings) }
-            if let kept = reply.grouping { grouping.save(kept) }
+            if let kept = reply.projectsScreen { projectsScreen.save(kept) }
             guard let tasks = reply.tasks else {
                 keep(reply.history)
                 keep(reply.ids, over: files)
@@ -215,7 +208,7 @@ public final class TaskBoard: @unchecked Sendable {
         let settings: String?
         let history: DoorHistory?
         let ids: DoorIds?
-        let grouping: String?
+        let projectsScreen: String?
     }
 
     /// A call over the text a screen was drawn from, on the pure rules' context: no file is read and no read waits.
@@ -233,10 +226,10 @@ public final class TaskBoard: @unchecked Sendable {
     private func answer(_ method: String, _ arguments: [JSONValue], _ files: BoardFiles, on lane: PhoneCore? = nil) throws -> Answer {
         // Ids name the lines of a file: a call made over none (a menu, a pure rule) neither takes them nor gives them back.
         let ids = files.tasks == nil ? nil : keptIds()
-        let context = DoorContext(tasks: files.tasks, settingsJSON: files.settingsJSON, now: files.now, calendars: files.calendars, fetched: [], history: kept(), groupingJSON: grouping.load(), projectsJSON: foundProjects(), ids: ids)
+        let context = DoorContext(tasks: files.tasks, settingsJSON: files.settingsJSON, now: files.now, calendars: files.calendars, fetched: [], history: kept(), projectsScreenJSON: projectsScreen.load(), ids: ids)
         do {
             let reply = try (lane ?? core).call(method, arguments.map(\.any), context: context)
-            return Answer(result: JSONValue(any: reply.result), tasks: reply.tasks, settings: reply.settingsJSON, history: reply.history, ids: files.tasks == nil ? nil : reply.ids, grouping: reply.groupingJSON)
+            return Answer(result: JSONValue(any: reply.result), tasks: reply.tasks, settings: reply.settingsJSON, history: reply.history, ids: files.tasks == nil ? nil : reply.ids, projectsScreen: reply.projectsScreenJSON)
         } catch PhoneCoreError.refused(let code, let message) {
             throw BoardError.refused(code: code, message: message)
         } catch PhoneCoreError.scriptFailed(let message) {
@@ -244,74 +237,40 @@ public final class TaskBoard: @unchecked Sendable {
         }
     }
 
-    /// A call that changes only how this device groups its lists (`tasks.setGrouping`, `tasks.toggleFold`): the answer's
-    /// grouping is kept, nothing is written to the vault.
-    public func group(_ method: String, _ arguments: [JSONValue]) throws {
-        let reply = try answer(method, arguments, settingsOnly())
-        if let kept = reply.grouping { grouping.save(kept) }
+    /// A read over `files` that keeps what the answer changed of the device's Projects screen
+    /// (`tasks.tapProjectNode`, `selectProjectNode`, `setProjectsMode`): nothing is written to the vault.
+    public func screenCall(_ method: String, _ arguments: [JSONValue], over files: BoardFiles) throws -> JSONValue {
+        let reply = try answer(method, arguments, files)
+        if let kept = reply.projectsScreen { projectsScreen.save(kept) }
+        keep(reply.ids, over: files)
+        return reply.result
     }
 
-    /// The settings' project tag (`settings.form`).
-    private func tag(of settings: String) -> String {
-        lock.lock()
-        let known = projectTag?.settings == settings ? projectTag?.tag : nil
-        lock.unlock()
-        return known ?? ((try? core.call("settings.form", [], context: DoorContext(tasks: nil, settingsJSON: settings, now: clock())).result as? [String: Any])?["projectTag"] as? String) ?? ""
-    }
-
-    /// The project notes for the settings' project tag, as the context hands them to the door.
-    private func findProjects(_ settings: String) {
-        guard let projects else { return }
-        let tag = tag(of: settings)
-        let notes = projects.notes(tag: tag)
-        let json = try? String(decoding: JSONEncoder().encode(notes), as: UTF8.self)
-        lock.lock()
-        projectTag = (settings, tag)
-        projectsJSON = json
-        lock.unlock()
-    }
-
-    private func foundProjects() -> String? {
-        lock.lock()
-        defer { lock.unlock() }
-        return projectsJSON
-    }
-
-    /// The vault's files listed again: a note made or renamed elsewhere is offered by the next `[[`. The project notes
-    /// look again on their own (`VaultProjects`).
+    /// The vault's files listed again: a note made or renamed elsewhere is offered by the next `[[`.
     public func refreshNotes() {
         fileList.forget()
     }
 
     // MARK: Notes
 
-    /// «New project…» named `name` (`docs/door.md`, `notes.newProject`): the note written through the vault, coordinated, at
-    /// its root, or the note of that name given the project tag; the project notes looked at again at once. The project's
-    /// link, for `tasks.setProject`, `entry.setProject` or the New Task sheet; nil for a name of nothing: nothing written.
-    public func newProject(_ name: String) throws -> String? {
-        // The vault listed now: a note that came by Sync since the last listing is that note, never a new one over it.
-        fileList.forget()
-        let found: NewProjectNote? = try rule("notes.newProject", [.string(name), fileList.all(vault)])
-        guard let note = found else { return nil }
-        // A note that is there but can't be read now is left alone: its text taken for none would be written over.
-        let old = note.exists ? try vault.readNote(path: note.path) : nil
-        let settings = vault.settingsJSON()
-        let text = try answer("notes.projectText", [old.json], settingsOnly()).result.decode(String.self)
-        if let old {
-            if text != old { try vault.write(path: note.path, text: text) }
-        } else {
-            try vault.create(path: note.path, text: text)
-        }
-        fileList.forget()
-        projects?.written(ProjectNote(name: note.name, path: note.path, link: note.link), tag: tag(of: settings))
-        findProjects(settings)
-        return note.link
+    /// «New project…» named `name`: a project at the top of `## Projects`, checked on the tasks `keys` (none: only made,
+    /// for a field that writes it with its task). A taken name is that project; a blank one makes nothing (nil).
+    @discardableResult
+    public func newProject(_ name: String, for keys: [TaskKey] = []) throws -> ProjectRef? {
+        try write("tasks.newProject", [.string(name), .array(keys.map(\.json))]).decode(ProjectRef?.self)
     }
 
-    /// The New Task sheet's Project row for the project chosen (`capture.project`): its page and whether one is lit.
+    /// The New Task sheet's Project row for the project chosen (`capture.project`): its page and whether one is lit,
+    /// read over the tasks file, whose `## Projects` the page lists.
     public func captureProject(_ chosen: String?) throws -> EntryProject {
-        findProjects(vault.settingsJSON())
-        return try answer("capture.project", [chosen.json], settingsOnly()).result.decode(EntryProject.self)
+        try read("capture.project", [chosen.json], over: try files())
+    }
+
+    /// The Project page of the tasks `picked` (each with the column it is drawn in, `MenuFrom`), read over the tasks file
+    /// when the page opens: a menu drawn over the settings alone knows only the tasks' own projects, never the whole tree.
+    public func projectPage(_ picked: [(item: TaskItem, from: String)], screen: JSONValue) throws -> MenuProject {
+        let rows = JSONValue.array(picked.map { ["item": $0.item.json, "from": .string($0.from)] })
+        return try read("tasks.bulkMenu", [rows, screen], over: try files(), as: TaskMenuModel.self).project
     }
 
     /// The `[[` the caret (UTF-16 offset) stands in, typed in a title; `nil` for none.

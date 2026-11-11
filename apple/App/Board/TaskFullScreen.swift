@@ -238,28 +238,14 @@ struct TaskFullScreen: View {
     }
 
     /// Under the title: the task's project, a subtask's its parent's, the folder and the name in the caption colour, as a
-    /// search hit's project line (spec point 7), on one line cut at its end. A tap opens the project's view; inside that
-    /// project's own view it goes back to it, inside another project's view that project's view takes its place. A project with no note to open is drawn the same and takes no tap, as the card's mark.
+    /// search hit's project line (spec point 7), on one line cut at its end.
     @ViewBuilder private func projectLine(_ project: ProjectRef) -> some View {
-        let line = Label(project.name, systemImage: "folder")
+        Label(project.name, systemImage: "folder")
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .truncationMode(.tail)
-        if project.canOpenNote {
-            Button {
-                if model.project != nil, model.isOwnProject(project) {
-                    close()
-                } else {
-                    model.openProject(project)
-                }
-            } label: { line }
-            .buttonStyle(.plain)
             .accessibilityLabel("Project \(project.name)")
-            .accessibilityHint("Opens the project")
-        } else {
-            line.accessibilityLabel("Project \(project.name)")
-        }
     }
 
     /// The description: drawn as it reads, links tappable, until a tap in it puts the caret there; typed, it saves itself.
