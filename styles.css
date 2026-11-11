@@ -1526,10 +1526,8 @@ body:not(.is-mobile) .tc-projects-tasks-column { top: var(--tc-projects-top); pa
 .tc-projects-title.is-renaming { visibility: hidden; }
 .tc-projects-title-field { position: absolute; top: var(--tc-day-row-top); left: calc(var(--tc-tree-width) + var(--tc-divider) + var(--tc-space-2)); right: var(--tc-space-10); z-index: var(--tc-layer-switch); }
 body:not(.is-mobile) .tc-projects-title-field { top: var(--tc-desk-projects-title-top); left: calc(var(--tc-tree-width) + var(--tc-divider) + var(--tc-desk-projects-far)); right: calc(var(--tc-desk-projects-seg-w) + var(--tc-desk-projects-side) + var(--tc-space-16)); }
-/* A new project's name typed at a gap of the tree, as far in as the gap's depth; a new task's text among the tasks. */
+/* A new project's name typed at a gap of the tree, as far in as the gap's depth. */
 .tc-tree-field { flex-shrink: 0; margin-left: calc(var(--tc-level) * var(--tc-tree-indent)); }
-.tc-projects-task-field { flex-shrink: 0; }
-.tc-projects-list > .tc-hidden { display: none; }
 /* A project carried in the tree: its row under the finger, lifted, its place in the tree dimmed. */
 .tc-tree-float { position: fixed; left: 0; top: 0; z-index: var(--tc-layer-float); pointer-events: none; background: var(--tc-float-bg); color: var(--tc-text); box-shadow: var(--tc-shadow-lift); }
 .tc-tree-row.is-lifted { opacity: var(--tc-tile-off-opacity); }

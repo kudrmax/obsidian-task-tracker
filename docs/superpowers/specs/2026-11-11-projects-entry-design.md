@@ -77,3 +77,24 @@ nothing shows, and the first key typed turns the screen to that funnel column (M
    `projectsEntryLook`, `shown` from `shownEntryLists`, `listEntry("projects")` drawn in `ProjectTasks`, `coming` for
    it, the plate and the plus through `openIn`/`openAt`/`openFromPlus` instead of `askTaskText`).
 
+
+### Obsidian frontend
+
+1. **One drawing of the entry for every list.** The field's rows (the texts typed and not yet written, the field's row,
+   the renamed card hidden in its place with the branches passing it, a written text's card taking over its row) are
+   `EntryRows` (`obsidian/ui/EntryRows.ts`), used by `TaskList` and `ProjectTasks` alike; `QuickEntryController` reads
+   any list through `EntryListShown` (`listCards`, `sections`, `comingCards`, `parts`, `adopt`, `forgetTyped`), and its
+   lists are a `Record<EntryList, true>`, so a list the core adds must be named there.
+2. **The Projects view is read with the lists.** `DayData` reads `projectsScreen()` in the same read as `screen()` (the
+   plugin's own view only) and the Projects screen is drawn in the same draw as the columns, so `coming("projects")` is
+   the cards about to be drawn and the field lands under a written task as in the lists. `ProjectsScreen.refresh` stays
+   for the screen's own taps and drops.
+3. **The plus is let go in the Projects list as in a column.** `ProjectsListDrop` takes the plus: the line between
+   cards, a subtask place by the finger's level, the field opening there (`openAt("projects", place)`) and the plus
+   landing in it. It refuses a gap of a part whose `EntryPart.newTask` is null, and the whole list where no part writes
+   one (Done: not even as a subtask). The old `TasksDrop` (a line under
+   a part's last card) and `askTaskText` are gone.
+4. **The plus tap on Projects opens nothing where no part takes a new task** (Done): `PlusAside.opens()` reads
+   `EntryPart.plus`. Without it `openFromPlus` falls back to the end of Inbox, a hidden funnel column; the core could
+   answer this itself (backend follow-up).
+5. **The No tasks plate of a part that writes no task does nothing** (it gets no tap), as before.
