@@ -973,7 +973,7 @@ export function entryProject(link: string | null, known: readonly ProjectRef[]):
 function refOf(link: string | null, known: readonly ProjectRef[]): ProjectRef | null {
 	if (link === null) return null;
 	const name = projectName(link);
-	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, path: [name], note: null, canOpenNote: false, mark: true };
+	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, path: [name], note: null, canOpenNote: false, mark: true, folder: false };
 }
 
 /** The renamed task as its field stands: in the place of its result's card, that card's key and id. */

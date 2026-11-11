@@ -83,13 +83,20 @@ function targetList(anchor: Anchor): GroupedList | null {
  * its own stage always is (it only moves among its list's tasks); one that changes stage only where that stage's column
  * would take it (Inbox and Backlog never a dated or timed task, Soon never a timed one). Between two cards of different
  * stages the card above decides, or the card below when the card above's stage would refuse them. A place under a task
- * always is.
+ * always is, unless that task is in a part that takes no card (a folder's own: a task nested there would be given the
+ * folder); so is no place in such a part.
  */
 export function projectsTakes(view: ProjectsView, cards: readonly ProjectsDrop[], place: ListPlace): boolean {
 	if (!view.reorders) return false;
-	if (place.kind === "subtask") return true;
+	if (place.kind === "subtask") return sectionHolding(view, place.parent)?.takes ?? false;
+	if (!(view.sections.find((s) => s.group === place.group)?.takes ?? true)) return false;
 	const carried = cards.map((card) => itemOf(view, card.key));
 	return enters(carried, targetList(planOf(view, carried, place).anchor));
+}
+
+/** The part a row of `key` is drawn in; null when none is. */
+function sectionHolding(view: ProjectsView, key: TaskKey): ProjectsSection | null {
+	return view.sections.find((s) => s.rows.some((row) => samePlace(row.item.key, key))) ?? null;
 }
 
 /**
@@ -101,8 +108,8 @@ export function projectsTakes(view: ProjectsView, cards: readonly ProjectsDrop[]
  */
 export function projectsDropSteps(view: ProjectsView, doc: TaskDocument, entryOf: (key: TaskKey) => TaskEntry, cards: readonly ProjectsDrop[], place: ListPlace, today: LocalDate): readonly TaskStep[] {
 	if (!view.reorders) throw new StaleTaskError();
-	if (place.kind === "subtask") return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
 	if (!projectsTakes(view, cards, place)) return [];
+	if (place.kind === "subtask") return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
 	const carried = cards.map((card) => itemOf(view, card.key));
 	const { anchor, project } = planOf(view, carried, place);
 	const target = targetList(anchor);

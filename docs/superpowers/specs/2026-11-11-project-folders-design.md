@@ -25,7 +25,50 @@ task can be put straight into it.
    ignored safely by the 0.4.189 app — `tests/phone/oldAppKeepsProjects.test.ts`). `docs/plugin/file.md` and
    `agents.md` say how.
 5. **Both the plugin and the iPhone app** get the toggle and the refusals (the app through the core's models).
+6. **A grey name means no open task at all** (Max, 2026-11-11: «Пусть светлее когда ВООБЩЕ нет задач, а остальное
+   одинаково»). A project's row is grey only while its whole branch (it and its subprojects) has no open task: a new
+   empty project, a folder whose subprojects are empty. Any open task in the branch, in any stage (Inbox, Backlog, Soon,
+   Today), draws the name in full colour; there is no separate active/waiting look. Done projects go to Done as before.
 
 ## Decisions
 
 (the agents add theirs here, numbered per side)
+
+### Backend
+
+1. **The mark is `🗃️` on the project's tree line**, a word of its own right after the name, before the note's link:
+   `- Работа 🗃️`, `- Работа 🗃️ [[Заметка]]` (`FOLDER_MARK`). Read anywhere on the line as a word (with or without the
+   variation selector, `- 🗃 Работа` too), written back in that place; a name never holds it (`cleanProjectName` takes it
+   out). `ProjectNode.folder`; rename, move, nest keep it, Delete lifts the subprojects with theirs, undo restores the
+   text. The 0.4.189 app reads the line as a project named «Работа 🗃️» and keeps it byte for byte through its writes
+   (`oldAppKeepsProjects.test.ts`); until the app is updated it shows the mark in that project's name.
+2. **The contract.** `ProjectRef.folder: boolean` (every ref: tree rows, menus, the quick entry's `projects()`);
+   `MenuProjectOption.disabled` = a folder not checked on every task (a checked one, given by hand, may be taken off);
+   `ProjectMenu.folder: ProjectFolderSwitch` `{ label: "Folder", on, disabled, reason }`, `reason` «Has tasks of its
+   own» while disabled, else null; `ProjectsSection.takes: boolean`; `TaskService.setProjectFolder(name, folder):
+   Promise<boolean>`, door `tasks.setProjectFolder(name, folder)` → boolean. One write, one step of undo.
+3. **A task of its own** is a task line (not a subtask, whose `🗂️` is its parent's) naming the project, in any section,
+   open or done (`hasOwnTasks`). Turning Folder on with one is refused, writing nothing (`false`); off always writes.
+4. **The folder's Projects list.** By project the folder's own part is left out while empty, so the first subproject's
+   header opens and the list's top is that subproject's. With a task given the folder by hand the own part shows it,
+   `takes` false, `newTask` null, no plate, and an untitled part that takes nothing does not keep the next header from
+   opening. The same for a folder's part under All and under a parent project. `ProjectsRow.acceptsTask` is false on a
+   folder's row.
+5. **The plus let go on a folder's tasks is refused**: `ProjectsView.newTask` null for a folder, and By stage every
+   stage's `newTask` null (the stages still take dropped cards, which only change stage, never a project; their plate
+   shows and does nothing, as Done's). Each subproject's part keeps its own plus.
+6. **Writes that would give a folder refuse it**: `toggleProject` putting it on writes nothing (each task answered as it
+   stands; taking it off where every task has it works); `setProject` and `dropOnProject` onto a folder write nothing;
+   `newProject` with a folder's name answers the folder's ref and gives it to no task; `createInPlace`/`createWithId`
+   with a folder make the task without a project; the `project` and `swapProject` steps of `applyAll` (a list grouped
+   by project, the Projects list's swap) leave a task as it is; `projectsTakes` is false in a part that takes nothing
+   and under a task drawn in such a part (a subtask is given its parent's projects), and `dropInProjects` writes
+   nothing there. `createProject` inside a folder works.
+7. **Hand edits stay hand edits.** A task carrying `🗂️ Folder` (hand, agent, a title typed with the field) is read and
+   shown under the folder; the core never strips it. Nesting a task under such a task in the funnel's lists is not
+   refused: the folder is that task's, as its subtasks' projects always are.
+8. **Grey names** (item 6). `ProjectStatus` keeps its three values with a new meaning: `active` while the branch has an
+   open task in any stage (an open task in the Done section, written by hand, doesn't count, as before); `waiting` when
+   it has none and is not done (a project of it with no task yet); `done` as before. `ProjectsRow.waiting` and `muted`
+   follow it, so a frontend that only reads them follows without code of its own. A folder with no task in its branch
+   is grey.

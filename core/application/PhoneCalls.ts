@@ -432,6 +432,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	dropInProjects: (c, [cards, place]) => c.run(c.ask(c.writes.dropInProjects(cards as A, place as A))),
 	projectsDropPreview: (c, [cards, place]) => c.ask(c.writes.projectsDropPreview(cards as A, place as A)),
 	deleteProject: (c, [name]) => c.run(c.writes.deleteProject(name as string)),
+	setProjectFolder: (c, [name, folder]) => c.run(c.writes.setProjectFolder(name as string, folder === true)),
 	setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name as string, (link ?? null) as string | null)),
 	dropOnProject: (c, [cards, to]) => {
 		const target = to === "none" ? null : projectOfNode(to as string);

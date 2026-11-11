@@ -450,6 +450,9 @@ export class DemoTaskService implements TaskService {
 		return false;
 	}
 
+	async setProjectFolder(): Promise<boolean> {
+		return false;
+	}
 	async setProjectNote(): Promise<void> {}
 
 	async dropOnProject(): Promise<void> {}

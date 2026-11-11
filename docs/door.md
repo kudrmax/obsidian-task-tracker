@@ -173,18 +173,34 @@ the `Projects` port says its notes are complete (`ready()`). Every `## Projects`
 as one tree, the first name winning, and is written back as one under the first heading.
 
 - `TaskItem.project` (the first, or `null`) and `TaskItem.projects`: `ProjectRef` `{ name, path, note,
-  canOpenNote, mark }`; `name` is what every call takes, `path` the names from the top
+  canOpenNote, mark, folder }`; `name` is what every call takes, `path` the names from the top
   of the tree («Дружба», «iPhone»), `note` the attached note's link, `mark` the card's folder icon (off on the Projects
-  screen). `item.can.setProject` is false on a subtask.
+  screen), `folder` a folder (`🗃️` on its tree line: it only holds subprojects, no task is given it). `item.can.setProject`
+  is false on a subtask.
+- **Folders.** `tasks.setProjectFolder(name, folder)` → `true` when it wrote: the project menu's Folder switch,
+  `ProjectMenu.folder` `{ label: "Folder", on, disabled, reason }`; a tap writes `setProjectFolder(name, !on)`. Turning it
+  on is refused (`false`, nothing written) while the project has a task of its own, open or done (its subprojects' tasks
+  don't count): then `disabled` is true and `reason` «Has tasks of its own». Off is always taken. One step of undo.
+  `tasks.setProjectFolder("Работа", true)` turns `- Работа` into `- Работа 🗃️`. A folder takes no task anywhere: its
+  Project page option (`MenuProjectOption.disabled`, true while the folder is not checked; a folder a task carries by
+  hand is checked and may be taken off), the quick entry's project page alike, its tree row (`acceptsTask` false), its
+  own part (`ProjectsSection.takes` false, `newTask` null, no plate; an empty one is left out, so the first subproject's
+  header opens), its stages By stage and the view's `newTask` (null); `rules.projectsTakes` is false in a part that
+  takes nothing and under a task of it. `tasks.toggleProject` putting a folder on, `tasks.setProject`,
+  `tasks.dropOnProject` onto a folder and `tasks.newProject` with a folder's name write no task; `tasks.createInPlace`
+  with a folder makes the task without it. A task given a folder by hand is read and shown as it is.
+- **Grey names.** `ProjectsRow.status` is `active` while the project's branch (it and its subprojects) has an open task
+  in any stage, `waiting` (`waiting` and `muted` true: the name grey) while it has none and a project of it has no task
+  yet, `done` when every task of the branch is closed.
 - `tasks.projectsScreen()`: `ProjectsView` `{ rows, selected, mode, modes, title, menu, sections, newTask, emptyLabel,
   missing, reorders }`. `rows`: the tree top to bottom, each `ProjectsRow` `{ node, kind, title, depth, tile, waiting, status,
   selected, hasBranch, folded, project, acceptsTask, canLift, unfoldsOnHover }`: All, the active and waiting projects (a
   folded branch left out), No project, Done and, once tapped open, the done projects. `node` is `"all"`, `"none"`,
   `"done"` or `"project:<name>"` (`rules.projectNodeOf(name)`). `status` is computed: `active` (an open task of its
-  branch in Now or Soon, or with a date or a time), `waiting` (open tasks only in Inbox and Backlog, or a project of its
-  branch with no task yet; `waiting` draws the name grey), `done` (every task of its branch closed, every subproject
-  done). `sections`: the chosen node's tasks, `ProjectsSection` `{ key, group, title, header, opens, empty, plate, path,
-  depth, cards, rows, newTask }`; By project the node's own first (`title` null), then each subproject's at any depth, each
+  branch, in any stage), `waiting` (no open task in its branch, and a project of it with no task yet; `waiting` and
+  `muted` draw the name grey), `done` (every task of its branch closed, every subproject
+  done). `sections`: the chosen node's tasks, `ProjectsSection` `{ key, group, title, header, opens, takes, empty, plate,
+  path, depth, cards, rows, newTask }` (`takes`: a card may be dropped in it, false only in a folder's own part); By project the node's own first (`title` null), then each subproject's at any depth, each
   in stage order (Inbox, Backlog, Soon, Today), then the file's; By stage Inbox, Backlog, Soon, Today (Done last, only
   under Done). Where cards can be dropped (`reorders`: every node but Done and a done project) every part a drop can go
   to shows, empty too (`empty`; `plate`: the No tasks plate, under an empty part with a header or the only part; the
@@ -199,7 +215,7 @@ as one tree, the first name winning, and is written back as one under the first 
   `tasks.dropOnProject` takes for that very card, `canDrop` an open task (a closed one under Done stays); `stage` (By
   project) `{ kind: "today" | "soon" | "inbox" | "backlog" | "done" }` or `{ kind: "date", date, label }`; `over` (By
   stage) the subproject the card stands in; `from` the project it is shown under; `menuFrom` what `tasks.menu` takes.
-  `menu`: `ProjectMenu` `{ project, renameLabel, noteLabel, note, attachLabel, detachLabel, delete }` for a project,
+  `menu`: `ProjectMenu` `{ project, renameLabel, noteLabel, note, attachLabel, detachLabel, folder, delete }` for a project,
   `null` for All, No project, Done. `delete`: `{ label, title, message, confirm, cancel, destructive }`, «Delete
   project», asked as «Delete “Дружба”?» / «Its tasks stay; they just lose this project.» before
   `tasks.deleteProject(name)`.
@@ -250,7 +266,7 @@ as one tree, the first name winning, and is written back as one under the first 
   with the section's `newTask` (By project: Inbox with that subproject; By stage: that stage's list with the node's
   project), or the view's `newTask` outside any section.
 - A menu's `project` (`MenuProject` `{ current, options, none, noneLabel, value, disabled, newLabel }`) is the Project
-  row's page, several checks: `options` the whole tree, each `{ project, checked, depth }`; a pick writes
+  row's page, several checks: `options` the whole tree, each `{ project, checked, depth, disabled }` (`disabled`: a folder a pick would give the tasks); a pick writes
   `tasks.toggleProject(keys, name)` (on for all, off for all when all have it; answers each task as it then stands, as
   `tasks.toggleLabel`), No project `tasks.setProject(keys, null)`,
   «New project…» `tasks.newProject(name, keys)` (a project at the tree's top, checked; answers its `ProjectRef`).

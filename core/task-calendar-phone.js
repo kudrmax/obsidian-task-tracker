@@ -565,7 +565,7 @@
   function cleanProjectName(typed2, stops = DEFAULT_STOPS) {
     const marks = stops.filter((m) => m !== "").map(escapeRegExp2);
     const fields = marks.length === 0 ? null : new RegExp(`(^|\\s)(?:${marks.join("|")})(?=\\s|$)`, "gu");
-    const name = (fields ? typed2.replace(fields, "$1") : typed2).replace(/\u{1F5C2}\u{FE0F}?/gu, " ").replace(/[[\]]/g, "").replace(/(^|\s)#(?=\S)/g, "$1").replace(/\s+/g, " ").trim();
+    const name = (fields ? typed2.replace(fields, "$1") : typed2).replace(/[\u{1F5C2}\u{1F5C3}]\u{FE0F}?/gu, " ").replace(/[[\]]/g, "").replace(/(^|\s)#(?=\S)/g, "$1").replace(/\s+/g, " ").trim();
     return name === "" ? null : name;
   }
   function projectKey(name) {
@@ -954,6 +954,8 @@
 
   // core/domain/ProjectTree.ts
   var PROJECTS_HEADING = "Projects";
+  var FOLDER_MARK = "🗃️";
+  var FOLDER_RE = /(^|\s)\u{1F5C3}\u{FE0F}?(?=\s|$)/gu;
   var HEADING_RE = /^##\s+(.*?)\s*$/;
   var LIST_END_RE = /^#{1,2}(\s|$)/;
   var ITEM_RE = /^([ \t]*)[-*+][ \t]+(.*?)\s*$/;
@@ -1001,27 +1003,33 @@
       const parent = stack[stack.length - 1]?.node ?? null;
       let node = known.get(projectKey(read.name));
       if (!node) {
-        node = { name: read.name, note: read.note, children: [] };
+        node = { name: read.name, note: read.note, folder: read.folder, children: [] };
         known.set(projectKey(read.name), node);
         (parent ? parent.children : roots).push(node);
-      } else node.note ??= read.note;
+      } else {
+        node.note ??= read.note;
+        node.folder ||= read.folder;
+      }
       stack.push({ width, node });
     }
     return new ProjectTree(roots.map(frozen));
   }
   function frozen(node) {
-    return { name: node.name, note: node.note, children: node.children.map(frozen) };
+    return { name: node.name, note: node.note, folder: node.folder, children: node.children.map(frozen) };
   }
-  function itemOf(body) {
+  function itemOf(line) {
+    const folder = FOLDER_RE.test(line);
+    FOLDER_RE.lastIndex = 0;
+    const body = folder ? line.replace(FOLDER_RE, "$1").replace(/\s+/g, " ").trim() : line;
     const linked = NOTE_RE.exec(body);
     const name = (linked ? linked[1] : body).trim() || (linked ? projectName(linked[2].split("|")[0]) : "");
-    return name === "" ? null : { name, note: linked ? linked[2] : null };
+    return name === "" ? null : { name, note: linked ? linked[2] : null, folder };
   }
   function treeLines(tree, unit) {
     const lines = [];
     const write = (nodes, depth) => {
       for (const node of nodes) {
-        lines.push(`${unit.repeat(depth)}- ${node.name}${node.note === null ? "" : ` [[${node.note}]]`}`);
+        lines.push(`${unit.repeat(depth)}- ${node.name}${node.folder ? ` ${FOLDER_MARK}` : ""}${node.note === null ? "" : ` [[${node.note}]]`}`);
         write(node.children, depth + 1);
       }
     };
@@ -1065,7 +1073,7 @@
     /** A new project at `place`; a name the tree has, a parent or a `before` it lacks: the tree as it is. */
     added(name, place, note = null) {
       if (this.has(name) || !this.fits(place)) return this;
-      return new _ProjectTree(inserted(this.roots, { name, note, children: [] }, place));
+      return new _ProjectTree(inserted(this.roots, { name, note, folder: false, children: [] }, place));
     }
     /** The project with its subprojects moved to `place`; never into itself or below it. */
     moved(name, place) {
@@ -1090,6 +1098,12 @@
       const found = this.find(name);
       if (!found || found.node.note === note) return this;
       return new _ProjectTree(mapped(this.roots, found.node.name, (node) => ({ ...node, note })));
+    }
+    /** The project made a folder, or a project again. */
+    withFolder(name, folder) {
+      const found = this.find(name);
+      if (!found || found.node.folder === folder) return this;
+      return new _ProjectTree(mapped(this.roots, found.node.name, (node) => ({ ...node, folder })));
     }
     /** The project gone from the tree, its subprojects lifted a level into its place, in their order. */
     deleted(name) {
@@ -3625,6 +3639,19 @@ ${key.title}`.toLowerCase();
     const moved2 = tree.moved(name, place);
     return moved2 === tree ? doc : doc.withProjectTree(moved2);
   }
+  function hasOwnTasks(doc, name) {
+    const key = projectKey(name);
+    return doc.allTasks().some((entry) => entry.task.projects.some((p) => projectKey(p) === key));
+  }
+  function isFolder(doc, name) {
+    return name !== null && (doc.projectTree().find(name)?.node.folder ?? false);
+  }
+  function setProjectFolder(doc, name, folder) {
+    if (folder && hasOwnTasks(doc, name)) return doc;
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const changed2 = tree.withFolder(name, folder);
+    return changed2 === tree ? doc : doc.withProjectTree(changed2);
+  }
   function setProjectNote(doc, name, note) {
     const tree = doc.projectTree().withMissing(taskProjects(doc));
     const changed2 = tree.withNote(name, note);
@@ -3655,7 +3682,7 @@ ${key.title}`.toLowerCase();
     refOf(name, mark = true) {
       if (name === null) return null;
       const placed = this.byKey.get(projectKey(name));
-      if (!placed) return { name, path: [name], note: null, canOpenNote: false, mark };
+      if (!placed) return { name, path: [name], note: null, canOpenNote: false, mark, folder: false };
       return refOfPlaced(placed, mark);
     }
     /** Every project of the tree, in its order. */
@@ -3667,8 +3694,8 @@ ${key.title}`.toLowerCase();
     }
   };
   function refOfPlaced(placed, mark = true) {
-    const { name, note } = placed.node;
-    return { name, path: placed.path, note, canOpenNote: note !== null, mark };
+    const { name, note, folder } = placed.node;
+    return { name, path: placed.path, note, canOpenNote: note !== null, mark, folder };
   }
   function bareTag(tag) {
     return tag.trim().replace(/^#/, "").toLowerCase();
@@ -3867,7 +3894,10 @@ ${key.title}`.toLowerCase();
     return {
       value: none ? NO_PROJECT : same ? first.length === 1 ? first[0].name : `${first[0].name} +${first.length - 1}` : "",
       current: shared,
-      options: options.map(({ project, depth }) => ({ project, depth, checked: all(project) })),
+      options: options.map(({ project, depth }) => {
+        const checked = all(project);
+        return { project, depth, checked, disabled: project.folder && !checked };
+      }),
       none,
       noneLabel: NO_PROJECT,
       disabled,
@@ -3916,7 +3946,7 @@ ${key.title}`.toLowerCase();
     return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
   }
   var NO_LEVELS = { levelOf: () => null, labelsOf: () => [], projectsOf: () => [] };
-  function itemLevels(levels, labels, projectOf = (name) => ({ name, path: [name], note: null, canOpenNote: false, mark: true })) {
+  function itemLevels(levels, labels, projectOf = (name) => ({ name, path: [name], note: null, canOpenNote: false, mark: true, folder: false })) {
     return {
       levelOf: (prefix) => levels.find((l) => l.prefix === prefix) ?? null,
       labelsOf: (names) => labels.filter((l) => names.includes(l.name)),
@@ -4649,7 +4679,7 @@ ${key.title}`.toLowerCase();
   function refOf(link, known) {
     if (link === null) return null;
     const name = projectName(link);
-    return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, path: [name], note: null, canOpenNote: false, mark: true };
+    return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, path: [name], note: null, canOpenNote: false, mark: true, folder: false };
   }
   function faced(rename2) {
     const { item, face } = rename2;
@@ -4840,6 +4870,8 @@ ${key.title}`.toLowerCase();
     note: "Note",
     attach: "Attach note…",
     detach: "Detach",
+    folder: "Folder",
+    folderReason: "Has tasks of its own",
     deleteProject: "Delete project",
     deleteMessage: "Its tasks stay; they just lose this project.",
     deleteConfirm: "Delete",
@@ -4860,9 +4892,6 @@ ${key.title}`.toLowerCase();
   function tasksOf(doc) {
     return doc.allTasks();
   }
-  function moving(entry) {
-    return isOpen(entry.task.status) && (entry.section === "now" || entry.section === "soon" || entry.task.dueDate !== null || entry.task.slot !== null);
-  }
   function counts(entry) {
     return isOpen(entry.task.status) ? entry.section !== "done" : true;
   }
@@ -4873,7 +4902,7 @@ ${key.title}`.toLowerCase();
       const children = node.children.map(visit);
       const own = tasks.filter((entry) => namesProject(entry.task.projects, node.name));
       const total = own.length + children.reduce((sum, child) => sum + child.tasks, 0);
-      const status = own.some(moving) || children.some((c) => c.status === "active") ? "active" : total === 0 || own.some((e) => isOpen(e.task.status)) || children.some((c) => c.status !== "done") ? "waiting" : "done";
+      const status = own.some((e) => isOpen(e.task.status)) || children.some((c) => c.status === "active") ? "active" : total === 0 || children.some((c) => c.status !== "done") ? "waiting" : "done";
       statuses.set(projectKey(node.name), status);
       return { status, tasks: total };
     };
@@ -4909,15 +4938,16 @@ ${key.title}`.toLowerCase();
         { mode: "byStage", label: PROJECTS_WORDS.byStage }
       ],
       title: placed ? placed.node.name : selected2 === "none" ? PROJECTS_WORDS.none : selected2 === "done" ? PROJECTS_WORDS.done : PROJECTS_WORDS.all,
-      menu: placed ? projectMenu(refOfPlaced(placed, false)) : null,
+      menu: placed ? projectMenu(refOfPlaced(placed, false), input.doc !== null && hasOwnTasks(input.doc, placed.node.name)) : null,
       sections: parts,
-      newTask: selected2 === "done" || placed !== null && statusOf2(placed.node.name) === "done" ? null : inInbox(placed?.node.name ?? null),
+      newTask: selected2 === "done" || placed !== null && (placed.node.folder || statusOf2(placed.node.name) === "done") ? null : inInbox(placed?.node.name ?? null),
       emptyLabel: PROJECTS_WORDS.noTasks,
       missing: input.doc === null,
       reorders: input.doc !== null && selected2 !== "done" && !(placed !== null && statusOf2(placed.node.name) === "done")
     };
   }
-  function projectMenu(project) {
+  function projectMenu(project, ownTasks) {
+    const locked = !project.folder && ownTasks;
     return {
       project,
       renameLabel: PROJECTS_WORDS.rename,
@@ -4925,6 +4955,7 @@ ${key.title}`.toLowerCase();
       note: project.note === null ? null : { link: project.note, name: projectName(project.note.split("|")[0].split("#")[0]) },
       attachLabel: PROJECTS_WORDS.attach,
       detachLabel: PROJECTS_WORDS.detach,
+      folder: { label: PROJECTS_WORDS.folder, on: project.folder, disabled: locked, reason: locked ? PROJECTS_WORDS.folderReason : null },
       delete: {
         label: PROJECTS_WORDS.deleteProject,
         title: `Delete “${project.name}”?`,
@@ -4960,7 +4991,7 @@ ${key.title}`.toLowerCase();
           hasBranch: branch.length > 0,
           folded: folded2,
           project: refOfPlaced({ node, path: own }, false),
-          acceptsTask: true,
+          acceptsTask: !node.folder,
           canLift: !done,
           unfoldsOnHover: folded2
         });
@@ -4998,7 +5029,7 @@ ${key.title}`.toLowerCase();
       hasBranch: node.children.length > 0,
       folded: folded2,
       project: refOfPlaced(placed, false),
-      acceptsTask: true,
+      acceptsTask: !node.folder,
       canLift: false,
       unfoldsOnHover: folded2
     });
@@ -5051,7 +5082,7 @@ ${key.title}`.toLowerCase();
       return mode === "byProject" ? shown([part("none", null, [], 0, byStage(loose).map((e) => cardOf2(input, e, mode, null, null)), inInbox(null))], true) : stageSections(input, loose.map((entry) => ({ entry, from: null, over: null })), null, true);
     }
     const live = input.tree.all().filter((p) => statusOf2(p.node.name) !== "done");
-    if (mode === "byProject") return shown(live.map((p) => part(`project:${p.node.name}`, p.node.name, p.path, p.path.length, byStage(tasksNaming(doc, p.node.name, false)).map((e) => cardOf2(input, e, mode, p.node.name, null)), inInbox(p.node.name))), true);
+    if (mode === "byProject") return shown(live.map((p) => projectPart(`project:${p.node.name}`, p, p.path, p.path.length, byStage(tasksNaming(doc, p.node.name, false)).map((e) => cardOf2(input, e, mode, p.node.name, null)), inInbox(p.node.name))), true);
     const tasks = tasksOf(doc).filter((entry) => entry.task.projects.length > 0 && stageOf(entry) !== "done");
     return stageSections(
       input,
@@ -5069,8 +5100,8 @@ ${key.title}`.toLowerCase();
     const branch = input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf2(p.node.name) !== "done"));
     const write = (project) => closed ? null : inInbox(project);
     if (mode === "byProject") {
-      const own = part(OWN, null, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf2(input, e, mode, placed.node.name, null)), write(placed.node.name));
-      const subs = branch.map((p) => part(`project:${p.node.name}`, p.node.name, p.path.slice(top), p.path.length - top, byStage(tasksNaming(doc, p.node.name, closed)).map((e) => cardOf2(input, e, mode, p.node.name, null)), write(p.node.name)));
+      const own = projectPart(OWN, { ...placed, title: null }, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf2(input, e, mode, placed.node.name, null)), write(placed.node.name));
+      const subs = branch.map((p) => projectPart(`project:${p.node.name}`, p, p.path.slice(top), p.path.length - top, byStage(tasksNaming(doc, p.node.name, closed)).map((e) => cardOf2(input, e, mode, p.node.name, null)), write(p.node.name)));
       return shown([own, ...subs], !closed);
     }
     const seen = /* @__PURE__ */ new Set();
@@ -5083,7 +5114,7 @@ ${key.title}`.toLowerCase();
         tasks.push({ entry, from: own ? placed.node.name : p.node.name, over: own ? null : p.node.name });
       }
     }
-    return stageSections(input, tasks, closed ? null : placed.node.name, !closed);
+    return stageSections(input, tasks, closed ? null : placed.node.name, !closed, !placed.node.folder);
   }
   function doneSections(input, doc, mode, statusOf2) {
     const done = input.tree.all().filter((p) => statusOf2(p.node.name) === "done");
@@ -5092,11 +5123,11 @@ ${key.title}`.toLowerCase();
     const tasks = done.flatMap((p) => tasksNaming(doc, p.node.name, true).filter((e) => !seen.has(e.id) && (seen.add(e.id), true)).map((entry) => ({ entry, from: p.node.name, over: p.node.name })));
     return stageSections(input, tasks, null, false);
   }
-  function stageSections(input, tasks, project, open) {
+  function stageSections(input, tasks, project, open, plus = true) {
     const parts = STAGE_ORDER.map((stage) => {
       const here = tasks.filter((s) => stageOf(s.entry) === stage).sort((a, b) => fileOrder(a.entry, b.entry));
       const title = stage === "today" ? PROJECTS_WORDS.today : stage === "done" ? PROJECTS_WORDS.done : input.listName(stage);
-      const place = stage === "done" ? null : { kind: "list", list: stage === "today" ? "now" : stage, group: null, before: null };
+      const place = stage === "done" || !plus ? null : { kind: "list", list: stage === "today" ? "now" : stage, group: null, before: null };
       return part(stage, title, [], 0, here.map((s) => cardOf2(input, s.entry, "byStage", s.from, s.over)), place && { place, project });
     });
     return shown(parts, open).filter((s) => s.key !== "done" || !s.empty);
@@ -5105,19 +5136,25 @@ ${key.title}`.toLowerCase();
     return a.section === b.section ? a.index - b.index : 0;
   }
   var OWN = "own";
-  function part(key, title, path, depth, cards, newTask2) {
+  function part(key, title, path, depth, cards, newTask2, takes = true) {
     const drawn = cards.map((card) => ({ id: `${key}/${card.item.id}`, ...card }));
     const rows = drawn.flatMap((card) => [{ id: card.id, item: card.item, level: 0, card, drop: card.drop }, ...subtaskRows(key, card.item, 1, card.from)]);
     const header = title !== null;
-    return { key, group: header ? key : null, title, header, opens: header, empty: drawn.length === 0, plate: false, path, depth, cards: drawn, rows, newTask: newTask2 };
+    return { key, group: header ? key : null, title, header, opens: header, takes, empty: drawn.length === 0, plate: false, path, depth, cards: drawn, rows, newTask: newTask2 };
+  }
+  function projectPart(key, placed, path, depth, cards, newTask2) {
+    const { folder, name } = placed.node;
+    if (folder && cards.length === 0) return null;
+    return part(key, placed.title === null ? null : name, path, depth, cards, folder ? null : newTask2, !folder);
   }
   function subtaskRows(key, item, level, from) {
     if (item.collapsed) return [];
     return item.subtasks.flatMap((sub) => [{ id: `${key}/${sub.id}`, item: sub, level, card: null, drop: { key: sub.key, from } }, ...subtaskRows(key, sub, level + 1, from)]);
   }
   function shown(sections, open) {
-    const kept = open ? sections : sections.filter((s) => !s.empty);
-    const untitledAbove = (i) => kept.slice(0, i).some((s) => !s.header);
+    const parts = sections.filter((s) => s !== null);
+    const kept = open ? parts : parts.filter((s) => !s.empty);
+    const untitledAbove = (i) => kept.slice(0, i).some((s) => !s.header && s.takes);
     return kept.map((s, i) => ({ ...s, plate: s.empty && (s.header || kept.length === 1), opens: s.header && !untitledAbove(i) }));
   }
   function tapped(state, tree, node) {
@@ -5233,8 +5270,8 @@ ${key.title}`.toLowerCase();
   }
   function enters(carried, target) {
     if (target === null) return true;
-    const moving2 = carried.filter((item) => listOf2(item) !== target);
-    return moving2.length === 0 || acceptsDrop(COLUMN_OF[target], moving2.map(originOf));
+    const moving = carried.filter((item) => listOf2(item) !== target);
+    return moving.length === 0 || acceptsDrop(COLUMN_OF[target], moving.map(originOf));
   }
   function stageList(section) {
     const place = section.newTask?.place;
@@ -5245,14 +5282,18 @@ ${key.title}`.toLowerCase();
   }
   function projectsTakes(view, cards, place) {
     if (!view.reorders) return false;
-    if (place.kind === "subtask") return true;
+    if (place.kind === "subtask") return sectionHolding(view, place.parent)?.takes ?? false;
+    if (!(view.sections.find((s) => s.group === place.group)?.takes ?? true)) return false;
     const carried = cards.map((card) => itemOf2(view, card.key));
     return enters(carried, targetList(planOf(view, carried, place).anchor));
   }
+  function sectionHolding(view, key) {
+    return view.sections.find((s) => s.rows.some((row) => samePlace2(row.item.key, key))) ?? null;
+  }
   function projectsDropSteps(view, doc, entryOf, cards, place, today) {
     if (!view.reorders) throw new StaleTaskError();
-    if (place.kind === "subtask") return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
     if (!projectsTakes(view, cards, place)) return [];
+    if (place.kind === "subtask") return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
     const carried = cards.map((card) => itemOf2(view, card.key));
     const { anchor, project } = planOf(view, carried, place);
     const target = targetList(anchor);
@@ -6321,7 +6362,10 @@ ${key.title}`.toLowerCase();
     }
     /** A new task where `place` says, whatever its title: `createInPlace` without its check for a blank one. */
     placeNew(text, priority, place, repeat, labels = [], project) {
-      return (doc, today, _settings, boundary) => createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels, project === void 0 ? void 0 : project === null ? [] : [project]);
+      return (doc, today, _settings, boundary) => {
+        const own = project === void 0 ? void 0 : project === null || isFolder(doc, project) ? [] : [project];
+        return createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels, own);
+      };
     }
     create(draft, slot) {
       if (this.isBlank(draft.text)) return null;
@@ -6372,21 +6416,22 @@ ${key.title}`.toLowerCase();
       };
       return { operation, places: () => places };
     }
-    /** Each task's projects become `project` alone (null: none); a subtask's line is left alone. */
+    /** Each task's projects become `project` alone (null: none); a subtask's line is left alone; a folder: nothing. */
     setProject(keys, project) {
       if (keys.length === 0) return null;
-      return this.withProjects(keys, () => project === null ? [] : [project]);
+      return (doc) => isFolder(doc, project) ? doc : this.rewrite(doc, this.holders(doc, keys), () => project === null ? [] : [project]);
     }
-    /** `name` put last on every task that lacks it, or taken off them all when all have it; a subtask's key names its top task. */
+    /** `name` put last on every task that lacks it (a folder: nothing), or taken off them all when all have it; a subtask's key names its top task. */
     toggleProject(keys, name) {
       if (keys.length === 0) return null;
       return (doc) => {
         const holders = this.holders(doc, keys);
         const on = !holders.every((entry) => namesProject(entry.task.projects, name));
+        if (on && isFolder(doc, name)) return doc;
         return this.rewrite(doc, holders, (projects) => withProject(projects, name, on));
       };
     }
-    /** «New project…»: the project made at the tree's top when it lacks it, and put on every task (`keys` may be none). */
+    /** «New project…»: the project made at the tree's top when it lacks it, and put on every task (`keys` may be none) unless it is a folder. */
     newProject(name, keys) {
       const clean = this.cleanName(name);
       if (clean === null) return null;
@@ -6394,14 +6439,16 @@ ${key.title}`.toLowerCase();
         const holders = this.holders(doc, keys);
         const named = addProject(doc, clean, { parent: null, before: null });
         const found = named.projectTree().find(clean).node.name;
+        if (isFolder(named, found)) return named;
         const moved2 = holders.map((entry) => named.byId(entry.id));
         return this.rewrite(named, moved2, (projects) => withProject(projects, found, true));
       };
     }
-    /** Cards let go on the tree: each one's `from` gives way to `to` (null: taken off), the others kept; a task's cards in turn. */
+    /** Cards let go on the tree: each one's `from` gives way to `to` (null: taken off), the others kept; a task's cards in turn; a folder: nothing. */
     dropOnProject(cards, to) {
       if (cards.length === 0) return null;
       return (doc) => {
+        if (isFolder(doc, to)) return doc;
         const changed2 = /* @__PURE__ */ new Map();
         for (const card of cards) {
           const entry = projectHolder(doc, this.entryOf(doc, card.key));
@@ -6433,13 +6480,13 @@ ${key.title}`.toLowerCase();
     deleteProject(name) {
       return (doc) => deleteProject(doc, name);
     }
+    /** The project made a folder, or a project again (`setProjectFolder`). */
+    setProjectFolder(name, folder) {
+      return (doc) => setProjectFolder(doc, name, folder);
+    }
     setProjectNote(name, link) {
       const note = link === null ? null : link.replace(/^\[\[|\]\]$/g, "").trim() || null;
       return (doc) => setProjectNote(doc, name, note);
-    }
-    /** Each task's projects, a subtask's key its top task's, as `change` makes them of their own. */
-    withProjects(keys, change) {
-      return (doc) => this.rewrite(doc, this.holders(doc, keys), change);
     }
     rewrite(doc, holders, change) {
       return doc.replaceAll(holders.map((entry) => [entry, { ...entry.task, projects: uniqueNames(change(entry.task.projects)) }]));
@@ -6610,10 +6657,11 @@ ${key.title}`.toLowerCase();
         case "labels":
           return setLabels(doc, entry, change.labels);
         case "project":
-          return setProjects(doc, entry, change.project === null ? [] : [change.project]);
+          return isFolder(doc, change.project) ? doc : setProjects(doc, entry, change.project === null ? [] : [change.project]);
         case "reorder":
           return reorder(doc, entry, change.group, first);
         case "swapProject": {
+          if (isFolder(doc, change.to)) return doc;
           const holder = projectHolder(doc, entry);
           return doc.replace(holder, { ...holder.task, projects: swappedProjects(holder.task.projects, change.from, change.to) });
         }
@@ -6879,6 +6927,11 @@ ${key.title}`.toLowerCase();
     }
     deleteProject(name) {
       return nothing(this.rules.deleteProject(name));
+    }
+    /** Whether the project's folder mark changed. */
+    setProjectFolder(name, folder) {
+      const operation = this.rules.setProjectFolder(name, folder);
+      return { operation, answer: (change) => change !== null && change.after.serialize() !== change.before.serialize() };
     }
     setProjectNote(name, link) {
       return nothing(this.rules.setProjectNote(name, link));
@@ -7513,6 +7566,7 @@ ${key.title}`.toLowerCase();
     dropInProjects: (c, [cards, place]) => c.run(c.ask(c.writes.dropInProjects(cards, place))),
     projectsDropPreview: (c, [cards, place]) => c.ask(c.writes.projectsDropPreview(cards, place)),
     deleteProject: (c, [name]) => c.run(c.writes.deleteProject(name)),
+    setProjectFolder: (c, [name, folder]) => c.run(c.writes.setProjectFolder(name, folder === true)),
     setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name, link ?? null)),
     dropOnProject: (c, [cards, to]) => {
       const target = to === "none" ? null : projectOfNode(to);

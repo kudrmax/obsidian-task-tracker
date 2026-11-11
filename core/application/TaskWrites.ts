@@ -193,6 +193,12 @@ export class TaskWrites {
 		return nothing(this.rules.deleteProject(name));
 	}
 
+	/** Whether the project's folder mark changed. */
+	setProjectFolder(name: string, folder: boolean): Write<boolean> {
+		const operation = this.rules.setProjectFolder(name, folder);
+		return { operation, answer: (change) => change !== null && change.after.serialize() !== change.before.serialize() };
+	}
+
 	setProjectNote(name: string, link: string | null): Write<void> {
 		return nothing(this.rules.setProjectNote(name, link));
 	}
