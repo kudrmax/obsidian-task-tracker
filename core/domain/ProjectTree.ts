@@ -4,10 +4,21 @@ import { projectKey, projectName } from "./Project";
 /** The heading of the tasks file's projects: `## Projects`, a nested list of their names. */
 export const PROJECTS_HEADING = "Projects";
 
-/** A project of the tree: its name, the link of the note attached to it (the text inside `[[…]]`), and its subprojects in order. */
+/** The mark of a folder on its tree line, a word of its own right after the name: `- Работа 🗃️`. */
+export const FOLDER_MARK = "🗃️";
+/** The folder's mark as a word of a tree line, with or without its variation selector. */
+const FOLDER_RE = /(?:^|\s)\u{1F5C3}\u{FE0F}?(?=\s|$)/u;
+/** A note's link on a tree line, where the folder's mark is only text. */
+const LINK_RE = /(\[\[[^[\]]*\]\])/;
+
+/**
+ * A project of the tree: its name, the link of the note attached to it (the text inside `[[…]]`), whether it is a folder
+ * (it only holds subprojects: no task is given it), and its subprojects in order.
+ */
 export interface ProjectNode {
 	readonly name: string;
 	readonly note: string | null;
+	readonly folder: boolean;
 	readonly children: readonly ProjectNode[];
 }
 
@@ -74,6 +85,7 @@ function unitOf(indents: readonly string[]): string {
 interface Building {
 	readonly name: string;
 	note: string | null;
+	folder: boolean;
 	readonly children: Building[];
 }
 
@@ -92,32 +104,41 @@ export function readTree(lines: readonly string[]): ProjectTree {
 		const parent = stack[stack.length - 1]?.node ?? null;
 		let node = known.get(projectKey(read.name));
 		if (!node) {
-			node = { name: read.name, note: read.note, children: [] };
+			node = { name: read.name, note: read.note, folder: read.folder, children: [] };
 			known.set(projectKey(read.name), node);
 			(parent ? parent.children : roots).push(node);
-		} else node.note ??= read.note;
+		} else {
+			node.note ??= read.note;
+			node.folder ||= read.folder;
+		}
 		stack.push({ width, node });
 	}
 	return new ProjectTree(roots.map(frozen));
 }
 
 function frozen(node: Building): ProjectNode {
-	return { name: node.name, note: node.note, children: node.children.map(frozen) };
+	return { name: node.name, note: node.note, folder: node.folder, children: node.children.map(frozen) };
 }
 
-/** A line's project: its name, and the note's link after it when one is attached; null for a line of nothing. */
-function itemOf(body: string): { name: string; note: string | null } | null {
+/**
+ * A line's project: its name, the note's link after it when one is attached, and the folder's mark as a word anywhere
+ * outside the link (taken out with the space before it, the rest of the line as typed); null for a line of nothing.
+ */
+function itemOf(line: string): { name: string; note: string | null; folder: boolean } | null {
+	const parts = line.split(LINK_RE);
+	const folder = parts.some((part, i) => i % 2 === 0 && FOLDER_RE.test(part));
+	const body = folder ? parts.map((part, i) => (i % 2 === 0 ? part.replace(new RegExp(FOLDER_RE.source, "gu"), "") : part)).join("").trim() : line;
 	const linked = NOTE_RE.exec(body);
 	const name = (linked ? linked[1] : body).trim() || (linked ? projectName(linked[2].split("|")[0]) : "");
-	return name === "" ? null : { name, note: linked ? linked[2] : null };
+	return name === "" ? null : { name, note: linked ? linked[2] : null, folder };
 }
 
-/** The projects, a nested list, each tree line `- Name` and `[[note]]` after it when one is attached. */
+/** The projects, a nested list, each tree line `- Name`, the folder's mark after it, then `[[note]]` when one is attached. */
 export function treeLines(tree: ProjectTree, unit: string): string[] {
 	const lines: string[] = [];
 	const write = (nodes: readonly ProjectNode[], depth: number) => {
 		for (const node of nodes) {
-			lines.push(`${unit.repeat(depth)}- ${node.name}${node.note === null ? "" : ` [[${node.note}]]`}`);
+			lines.push(`${unit.repeat(depth)}- ${node.name}${node.folder ? ` ${FOLDER_MARK}` : ""}${node.note === null ? "" : ` [[${node.note}]]`}`);
 			write(node.children, depth + 1);
 		}
 	};
@@ -171,7 +192,7 @@ export class ProjectTree {
 	/** A new project at `place`; a name the tree has, a parent or a `before` it lacks: the tree as it is. */
 	added(name: string, place: TreePlace, note: string | null = null): ProjectTree {
 		if (this.has(name) || !this.fits(place)) return this;
-		return new ProjectTree(inserted(this.roots, { name, note, children: [] }, place));
+		return new ProjectTree(inserted(this.roots, { name, note, folder: false, children: [] }, place));
 	}
 
 	/** The project with its subprojects moved to `place`; never into itself or below it. */
@@ -199,6 +220,13 @@ export class ProjectTree {
 		const found = this.find(name);
 		if (!found || found.node.note === note) return this;
 		return new ProjectTree(mapped(this.roots, found.node.name, (node) => ({ ...node, note })));
+	}
+
+	/** The project made a folder, or a project again. */
+	withFolder(name: string, folder: boolean): ProjectTree {
+		const found = this.find(name);
+		if (!found || found.node.folder === folder) return this;
+		return new ProjectTree(mapped(this.roots, found.node.name, (node) => ({ ...node, folder })));
 	}
 
 	/** The project gone from the tree, its subprojects lifted a level into its place, in their order. */

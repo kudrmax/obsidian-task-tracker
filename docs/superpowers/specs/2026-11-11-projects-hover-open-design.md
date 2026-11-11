@@ -43,6 +43,15 @@ Follows `2026-11-11-projects-screen-design.md` and `2026-11-11-projects-order-de
 8. **A nest under a task of the opened project swaps no project** (lead, review): a subtask belongs to its task's
    projects (`docs/plugin/file.md`), so a task nested under one of P's tasks is P's through it; its own `🗂️` on the
    subtask line does not count, as for any subtask.
+9. **With project folders (merge of `release-projects-2`, lead)**: a folder row never opens under a held card
+   (`opensOnHover` follows `acceptsTask`, false on a folder); a folded folder only unfolds, so the card goes on to a
+   subproject's row. A folder opened otherwise (tapped) is a list like any: a card lifted on another node is refused in
+   the folder's own part (`ProjectsSection.takes`) and under its tasks (`nestsUnder`), and taken in a subproject's part,
+   where that subproject takes `from`'s place. `projectsTakes` and `projectsDropSteps` share one `takes` (the part's
+   `takes`, then the column rules) for cards shown and cards lifted elsewhere.
+10. **With the in-place entry (merge)**: the plus is let go in the Projects list (`ProjectsListDrop`) and never hovers a
+    tree row open (the plus's own tree drop is the new project's gap); the list's node check (decision Obsidian 8) holds
+    for the plus too, so a field never opens on a node other than the one the place was read on.
 
 (the agents add theirs below)
 

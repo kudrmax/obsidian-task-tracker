@@ -353,6 +353,17 @@ describe("DayData", () => {
 		expect(seen).toBe("Renamed");
 	});
 
+	it("reads the Projects screen with the lists where the screen has it, so beforeShow sees the Projects cards about to be drawn", async () => {
+		const tasks = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
+		const withProjects = new DayData({ tasks, calendars: new SlowCalendars(), date: () => TODAY, projects: true, onUpdate: () => {} });
+		let seen: unknown = undefined;
+		await withProjects.tasks(() => (seen = withProjects.projects));
+		expect(seen).toEqual(await tasks.projectsScreen());
+		const without = new DayData({ tasks, calendars: new SlowCalendars(), date: () => TODAY, onUpdate: () => {} });
+		await without.tasks();
+		expect(without.projects).toBeNull();
+	});
+
 	it("runs beforeShow even when the tasks read are the same", async () => {
 		const { data, updates } = setup();
 		await data.tasks();

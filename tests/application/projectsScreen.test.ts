@@ -83,20 +83,22 @@ describe("the tree", () => {
 		expect(row(view, "All").selected).toBe(true);
 	});
 
-	it("computes each project's state: active with a task in Today, Soon or dated; waiting with open tasks only in Inbox and Backlog, or none yet; done", async () => {
+	/** Max, 2026-11-11: «Пусть светлее когда ВООБЩЕ нет задач, а остальное одинаково». */
+	it("computes each project's state: active with an open task in its branch, any stage; waiting with none, a project of its branch without a task yet; done", async () => {
 		const view = await setup().svc.projectsScreen();
 		const states = Object.fromEntries(view.rows.filter((r) => r.kind === "project").map((r) => [r.title, r.status]));
 		expect(states).toEqual({
 			"Окружение в Сербии": "active",
 			"Где знакомиться": "active",
 			"Приложения для знакомств": "waiting",
-			Свидание: "waiting",
+			Свидание: "active",
 			Дружба: "active",
-			"Small talk": "waiting",
-			Спорт: "waiting",
+			"Small talk": "active",
+			Спорт: "active",
 			Новый: "waiting",
 		});
-		expect(row(view, "Спорт").waiting).toBe(true);
+		expect(row(view, "Спорт").waiting).toBe(false);
+		expect(row(view, "Новый").waiting).toBe(true);
 		expect(row(view, "Done")).toMatchObject({ hasBranch: true, folded: true });
 	});
 
@@ -110,7 +112,7 @@ describe("the tree", () => {
 			["Самолёт", 1, false],
 		]);
 		store.text = store.text!.replace("- [ ] Зал 🗂️ Спорт", "- [ ] Зал 🗂️ Спорт\n- [ ] Ещё 🗂️ Самолёт");
-		expect(row(await svc.projectsScreen(), "Самолёт")).toMatchObject({ depth: 0, status: "waiting" });
+		expect(row(await svc.projectsScreen(), "Самолёт")).toMatchObject({ depth: 0, status: "active" });
 	});
 
 	it("a tap chooses a node; a tap on the chosen one folds its branch", async () => {
@@ -376,10 +378,10 @@ describe("the frontends' follow-ups", () => {
 		expect(svc.projects().map((p) => p.name).slice(0, 3)).toEqual(["Окружение в Сербии", "Где знакомиться", "Приложения для знакомств"]);
 	});
 
-	it("No project, Done, a waiting project and a done one are drawn grey; an active one is not", async () => {
+	it("No project, Done, a project with no open task in its branch and a done one are drawn grey; one with an open task anywhere is not", async () => {
 		const { svc } = setup();
 		await svc.unfoldProjectNode("done");
 		const view = await svc.projectsScreen();
-		expect(["All", "Окружение в Сербии", "Спорт", "No project", "Done", "Самолёт"].map((t) => row(view, t).muted)).toEqual([false, false, true, true, true, true]);
+		expect(["All", "Окружение в Сербии", "Спорт", "Новый", "No project", "Done", "Самолёт"].map((t) => row(view, t).muted)).toEqual([false, false, false, true, true, true, true]);
 	});
 });

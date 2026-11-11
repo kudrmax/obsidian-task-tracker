@@ -192,6 +192,10 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.deleteProject(name));
 	}
 
+	setProjectFolder(name: string, folder: boolean): Promise<boolean> {
+		return this.run(this.writes.setProjectFolder(name, folder));
+	}
+
 	setProjectNote(name: string, link: string | null): Promise<void> {
 		return this.run(this.writes.setProjectNote(name, link));
 	}

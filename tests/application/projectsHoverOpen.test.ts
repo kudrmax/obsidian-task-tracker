@@ -225,3 +225,44 @@ describe("a card lifted on another project, let go in the list a held card opene
 		await expect(svc.dropInProjects(bare, { kind: "task", group: null, before: null })).rejects.toBeInstanceOf(StaleTaskError);
 	});
 });
+
+describe("a folder (🗃️) under a held card", () => {
+	const WITH_FOLDER = FILE.replace("- Q\n", "- F 🗃️\n\t- FSub\n- Q\n").replace("- [ ] Soon other\n", "- [ ] Soon other\n- [ ] Soon F 🗂️ FSub\n");
+
+	async function folderSetup(node: string, mode: "byProject" | "byStage" = "byProject") {
+		const store = new InMemoryTaskFileStore(WITH_FOLDER);
+		const svc = new TaskServiceImpl(store, new FakeSettingsStore(), clock, new UndoHistory(store), undefined, memoryProjectsScreen());
+		await svc.selectProjectNode(node);
+		await svc.setProjectsMode(mode);
+		return { store, svc };
+	}
+
+	it("a folder's row never opens, its subproject's does; a folded folder only unfolds", async () => {
+		const { svc } = await folderSetup("project:Q");
+		const view = await svc.projectsScreen();
+		expect([row(view, "F").acceptsTask, row(view, "F").opensOnHover, row(view, "FSub").opensOnHover]).toEqual([false, false, true]);
+		await svc.selectProjectNode("project:F");
+		await svc.tapProjectNode("project:F");
+		await svc.selectProjectNode("project:Q");
+		expect(row(await svc.projectsScreen(), "F")).toMatchObject({ folded: true, unfoldsOnHover: true, opensOnHover: false });
+		await svc.hoverProjectNode("project:F");
+		const after = await svc.projectsScreen();
+		expect([after.selected, row(after, "F").folded]).toEqual(["project:Q", false]);
+	});
+
+	it("a card lifted on Q and let go in an opened folder: its own part refuses it, a subproject's part takes it", async () => {
+		const { svc, store } = await folderSetup("project:Q");
+		const lifted: ProjectsDrop = cardOf(await svc.projectsScreen(), "Back Q").drop;
+		await svc.selectProjectNode("project:F");
+		const folder = await svc.projectsScreen();
+		const own = folder.sections.find((s) => s.group === null);
+		if (own) expect(projectsTakes(folder, [lifted], { kind: "task", group: own.group, before: null })).toBe(false);
+		const sub = folder.sections.find((s) => s.title === "FSub")!;
+		expect(sub.takes).toBe(true);
+		const place = { kind: "task" as const, group: sub.group, before: null };
+		expect(projectsTakes(folder, [lifted], place)).toBe(true);
+		await svc.dropInProjects([lifted], place);
+		expect(lines(store.text!, "Soon")).toContain("- [ ] Soon F 🗂️ FSub\n- [ ] Back Q 🗂️ FSub");
+		expect((await svc.projectsScreen()).selected).toBe("project:F");
+	});
+});

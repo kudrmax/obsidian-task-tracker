@@ -5,6 +5,7 @@ import { ProjectTasks } from "../../obsidian/ui/projects/ProjectTasks";
 import { ProjectsCarry } from "../../obsidian/ui/projects/ProjectsCarry";
 import type { TaskDragPayload } from "../../obsidian/ui/drag/DropTarget";
 import { onDay } from "../fakes/itemOnDay";
+import { projectsView } from "../fakes/projectsView";
 
 const task = (text: string, index: number): TaskItem =>
 	onDay({ key: { section: "soon", index, path: [], raw: `- [ ] ${text}` }, id: `t${index}`, text, status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, group: null, subtasks: [], progress: null, parentText: null, description: null, list: "soon", isSubtask: false } as Partial<TaskItem> as TaskItem, "2026-11-07");
@@ -15,7 +16,7 @@ const cardOf = (t: TaskItem, part: string): ProjectsCard => ({ id: `${part}/${t.
 function drawNode(tasks: ProjectTasks, part: string, items: readonly TaskItem[]): void {
 	const cards = items.map((t) => cardOf(t, part));
 	const rows = cards.map((card) => ({ id: card.id, item: card.item, level: 0, card, drop: card.drop }));
-	tasks.render({ sections: [{ key: part, group: null, title: null, header: false, opens: false, empty: cards.length === 0, plate: false, path: [], depth: 0, cards, rows, newTask: null }], emptyLabel: "No tasks", newTask: null }, false);
+	tasks.render(projectsView([{ key: part, group: null, title: null, header: false, opens: false, takes: true, empty: cards.length === 0, plate: false, path: [], depth: 0, cards, rows, newTask: null }]), false);
 }
 
 describe("the cards a drag carries from the Projects screen", () => {

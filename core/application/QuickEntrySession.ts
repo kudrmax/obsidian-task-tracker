@@ -1,8 +1,9 @@
 import type { GroupName, Slot } from "../domain/Task";
 import type { RepeatRule } from "../domain/Repeat";
 import type { Placement } from "../domain/Placement";
-import type { DropColumn, DropTo, NewTaskPlace, TaskItem, TaskKey, TaskService } from "./contracts";
+import type { DropTo, NewTaskPlace, TaskItem, TaskKey, TaskService } from "./contracts";
 import type { ListCard, ListPlace } from "./nesting";
+import type { EntryList } from "./screenPlaces";
 import { type EntryDrawing, type EntryJob, type EntryLook, type EntrySpot, type EntryState, type EntryTasks, type ListEntry, type PendingRename, type PlaceMove, QuickEntry, type StackEntry } from "./QuickEntry";
 
 export { ENTRY_PLACES, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry, type PendingRename, type PendingText, type PlaceChoice, type PlaceMove, type StackAt, type StackEntry } from "./QuickEntry";
@@ -16,7 +17,7 @@ export interface QuickEntryView extends EntryLook {
 	 * Resolves once the lists show the file as of the last write; `beforeShow` runs right before they draw it, given the
 	 * cards each column is about to draw.
 	 */
-	fresh(beforeShow?: (coming: (column: DropColumn) => readonly ListCard[]) => void): Promise<void>;
+	fresh(beforeShow?: (coming: (column: EntryList) => readonly ListCard[]) => void): Promise<void>;
 	/**
 	 * After every change of the state; null once the field closed. `drawnNext`: the lists are about to draw the data this
 	 * change belongs to, so it needs no drawing of its own.
@@ -61,27 +62,37 @@ export class QuickEntrySession {
 	}
 
 	/** What `column`'s list draws for the field, among what it is about to draw (`drawn`); none when the field stands elsewhere. */
-	listEntry(column: DropColumn, drawn?: EntryDrawing): ListEntry | null {
+	listEntry(column: EntryList, drawn?: EntryDrawing): ListEntry | null {
 		return this.entry.listEntry(column, drawn);
 	}
 
-	openAtEnd(column: DropColumn): void {
+	openAtEnd(column: EntryList): void {
 		this.entry.openAtEnd(column);
 	}
 
-	openFromPlus(): void {
-		this.entry.openFromPlus();
+	openFromPlus(): boolean {
+		return this.entry.openFromPlus();
 	}
 
-	openIn(column: DropColumn, group: GroupName): void {
+	/** A tap on the plus opens a field (`QuickEntry.plusOpens`): false on the Projects screen where no part takes it. */
+	plusOpens(): boolean {
+		return this.entry.plusOpens();
+	}
+
+	openIn(column: EntryList, group: GroupName): void {
 		this.entry.openIn(column, group);
+	}
+
+	/** The plus let go at `place` of list `column` (the Projects list's): the field of a new task there. */
+	openAt(column: EntryList, place: ListPlace): void {
+		this.entry.openAt(column, place);
 	}
 
 	openSlot(slot: Slot): void {
 		this.entry.openSlot(slot);
 	}
 
-	openAtDrop(column: DropColumn | null, result: DropTo | null): boolean {
+	openAtDrop(column: EntryList | null, result: DropTo | null): boolean {
 		return this.entry.openAtDrop(column, result);
 	}
 
@@ -159,7 +170,7 @@ export class QuickEntrySession {
 		return this.entry.choosePlace(placement);
 	}
 
-	moveToEnd(column: DropColumn): void {
+	moveToEnd(column: EntryList): void {
 		this.entry.moveToEnd(column);
 	}
 
@@ -168,8 +179,8 @@ export class QuickEntrySession {
 		return this.writes.idle();
 	}
 
-	placeOf(column: DropColumn, result: ListPlace): NewTaskPlace {
-		return this.entry.placeOf(column, result);
+	placeOf(column: EntryList, result: ListPlace, placement?: Placement): NewTaskPlace {
+		return this.entry.placeOf(column, result, placement);
 	}
 
 	/** A job, once the lists show the writes before it; whatever happens, its spot stops following the cards after it. */

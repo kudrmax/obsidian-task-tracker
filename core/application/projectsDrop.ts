@@ -100,16 +100,33 @@ function targetList(anchor: Anchor): GroupedList | null {
  * its own stage always is (it only moves among its list's tasks); one that changes stage only where that stage's column
  * would take it (Inbox and Backlog never a dated or timed task, Soon never a timed one). Between two cards of different
  * stages the card above decides, or the card below when the card above's stage would refuse them. A place under a task
- * always is. A card the list shows no card of (lifted on another node) is judged as it was lifted (`ProjectsDrop.lifted`).
+ * always is, unless that task is in a part that takes no card (a folder's own: a task nested there would be given the
+ * folder); so is no place in such a part. A card the list shows no card of (lifted on another node) is judged as it was
+ * lifted (`ProjectsDrop.lifted`).
  */
 export function projectsTakes(view: ProjectsView, cards: readonly ProjectsDrop[], place: ListPlace): boolean {
 	if (!view.reorders) return false;
-	if (place.kind === "subtask") return true;
+	if (place.kind === "subtask") return nestsUnder(view, place.parent);
 	return takes(view, cards.map((card) => carriedIn(view, card)), place);
 }
 
 function takes(view: ProjectsView, carried: readonly Carried[], place: Extract<ListPlace, { readonly kind: "task" }>): boolean {
+	if (!(view.sections.find((s) => s.group === place.group)?.takes ?? true)) return false;
 	return enters(carried, targetList(planOf(view, carried, place).anchor));
+}
+
+/**
+ * A card may be nested under the row of `key`: it is drawn in a part that takes cards, and its task (the card it stands
+ * under, for a subtask) carries no folder, which a subtask would carry too. In whichever part draws it, By stage too.
+ */
+function nestsUnder(view: ProjectsView, key: TaskKey): boolean {
+	for (const section of view.sections) {
+		const at = section.rows.findIndex((row) => samePlace(row.item.key, key));
+		if (at < 0) continue;
+		const top = section.rows.slice(0, at + 1).reverse().find((row) => row.level === 0);
+		return section.takes && !(top?.item.projects.some((p) => p.folder) ?? false);
+	}
+	return false;
 }
 
 /**
@@ -123,7 +140,10 @@ function takes(view: ProjectsView, carried: readonly Carried[], place: Extract<L
  */
 export function projectsDropSteps(view: ProjectsView, doc: TaskDocument, entryOf: (key: TaskKey) => TaskEntry, cards: readonly ProjectsDrop[], place: ListPlace, today: LocalDate): readonly TaskStep[] {
 	if (!view.reorders) throw new StaleTaskError();
-	if (place.kind === "subtask") return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
+	if (place.kind === "subtask") {
+		if (!nestsUnder(view, place.parent)) return [];
+		return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
+	}
 	const carried = cards.map((card) => carriedInFile(view, entryOf(card.key), card));
 	if (!takes(view, carried, place)) return [];
 	const plan = planOf(view, carried, place);

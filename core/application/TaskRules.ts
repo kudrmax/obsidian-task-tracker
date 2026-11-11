@@ -286,7 +286,10 @@ export class TaskRules {
 
 	/** A new task where `place` says, whatever its title: `createInPlace` without its check for a blank one. */
 	placeNew(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Operation {
-		return (doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels, project === undefined ? undefined : project === null ? [] : [project]);
+		return (doc, today, _settings, boundary) => {
+			const own = project === undefined ? undefined : project === null || projectWrites.isFolder(doc, project) ? [] : [project];
+			return ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels, own);
+		};
 	}
 
 	create(draft: TaskDraft, slot?: Slot): Operation | null {
@@ -345,23 +348,24 @@ export class TaskRules {
 		return { operation, places: () => places };
 	}
 
-	/** Each task's projects become `project` alone (null: none); a subtask's line is left alone. */
+	/** Each task's projects become `project` alone (null: none); a subtask's line is left alone; a folder: nothing. */
 	setProject(keys: readonly TaskKey[], project: string | null): Operation | null {
 		if (keys.length === 0) return null;
-		return this.withProjects(keys, () => (project === null ? [] : [project]));
+		return (doc) => (projectWrites.isFolder(doc, project) ? doc : this.rewrite(doc, this.holders(doc, keys), () => (project === null ? [] : [project])));
 	}
 
-	/** `name` put last on every task that lacks it, or taken off them all when all have it; a subtask's key names its top task. */
+	/** `name` put last on every task that lacks it (a folder: nothing), or taken off them all when all have it; a subtask's key names its top task. */
 	toggleProject(keys: readonly TaskKey[], name: string): Operation | null {
 		if (keys.length === 0) return null;
 		return (doc) => {
 			const holders = this.holders(doc, keys);
 			const on = !holders.every((entry) => namesProject(entry.task.projects, name));
+			if (on && projectWrites.isFolder(doc, name)) return doc;
 			return this.rewrite(doc, holders, (projects) => ops.withProject(projects, name, on));
 		};
 	}
 
-	/** «New project…»: the project made at the tree's top when it lacks it, and put on every task (`keys` may be none). */
+	/** «New project…»: the project made at the tree's top when it lacks it, and put on every task (`keys` may be none) unless it is a folder. */
 	newProject(name: string, keys: readonly TaskKey[]): Operation | null {
 		const clean = this.cleanName(name);
 		if (clean === null) return null;
@@ -369,15 +373,17 @@ export class TaskRules {
 			const holders = this.holders(doc, keys);
 			const named = projectWrites.addProject(doc, clean, { parent: null, before: null });
 			const found = named.projectTree().find(clean)!.node.name;
+			if (projectWrites.isFolder(named, found)) return named;
 			const moved = holders.map((entry) => named.byId(entry.id)!);
 			return this.rewrite(named, moved, (projects) => ops.withProject(projects, found, true));
 		};
 	}
 
-	/** Cards let go on the tree: each one's `from` gives way to `to` (null: taken off), the others kept; a task's cards in turn. */
+	/** Cards let go on the tree: each one's `from` gives way to `to` (null: taken off), the others kept; a task's cards in turn; a folder: nothing. */
 	dropOnProject(cards: readonly ProjectsDrop[], to: string | null): Operation | null {
 		if (cards.length === 0) return null;
 		return (doc) => {
+			if (projectWrites.isFolder(doc, to)) return doc;
 			const changed = new Map<string, { entry: TaskEntry; projects: readonly string[] }>();
 			for (const card of cards) {
 				const entry = projectWrites.projectHolder(doc, this.entryOf(doc, card.key));
@@ -415,14 +421,14 @@ export class TaskRules {
 		return (doc) => projectWrites.deleteProject(doc, name);
 	}
 
+	/** The project made a folder, or a project again (`setProjectFolder`). */
+	setProjectFolder(name: string, folder: boolean): Operation {
+		return (doc) => projectWrites.setProjectFolder(doc, name, folder);
+	}
+
 	setProjectNote(name: string, link: string | null): Operation {
 		const note = link === null ? null : link.replace(/^\[\[|\]\]$/g, "").trim() || null;
 		return (doc) => projectWrites.setProjectNote(doc, name, note);
-	}
-
-	/** Each task's projects, a subtask's key its top task's, as `change` makes them of their own. */
-	private withProjects(keys: readonly TaskKey[], change: (projects: readonly string[]) => readonly string[]): Operation {
-		return (doc) => this.rewrite(doc, this.holders(doc, keys), change);
 	}
 
 	private rewrite(doc: TaskDocument, holders: readonly TaskEntry[], change: (projects: readonly string[]) => readonly string[]): TaskDocument {
@@ -626,10 +632,11 @@ export class TaskRules {
 			case "labels":
 				return ops.setLabels(doc, entry, change.labels);
 			case "project":
-				return ops.setProjects(doc, entry, change.project === null ? [] : [change.project]);
+				return projectWrites.isFolder(doc, change.project) ? doc : ops.setProjects(doc, entry, change.project === null ? [] : [change.project]);
 			case "reorder":
 				return ops.reorder(doc, entry, change.group, first);
 			case "swapProject": {
+				if (projectWrites.isFolder(doc, change.to)) return doc;
 				const holder = projectWrites.projectHolder(doc, entry);
 				return doc.replace(holder, { ...holder.task, projects: projectWrites.swappedProjects(holder.task.projects, change.from, change.to) });
 			}
@@ -674,6 +681,8 @@ export class TaskRules {
 				return { kind: "subtask", parent: this.entryOf(doc, place.parent), before: before(place.before) };
 			case "slot":
 				return place;
+			case "projects":
+				throw new StaleTaskError();
 		}
 	}
 

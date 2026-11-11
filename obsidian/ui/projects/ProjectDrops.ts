@@ -3,7 +3,7 @@ import { DropLine } from "../drag/DropLine";
 import { CardListDrop } from "../drag/ListDrop";
 import type { DragPayload, DropResult, DropTarget, ProjectsDrop, TaskDragPayload } from "../drag/DropTarget";
 import { readFrame } from "../drag/listFrame";
-import type { DrawnPart, ProjectTasks } from "./ProjectTasks";
+import type { ProjectTasks } from "./ProjectTasks";
 
 /** What the tree's targets read of the tree as drawn. */
 export interface TreeShown {
@@ -182,64 +182,6 @@ export class TreeDrop implements DropTarget {
 	}
 }
 
-/** What the tasks' target reads of the tasks as drawn. */
-export interface TasksShown {
-	readonly el: HTMLElement;
-	readonly parts: readonly DrawnPart[];
-	readonly endTask: DrawnPart["newTask"];
-}
-
-/**
- * The tasks as a place for the plus: the part under the finger, its end marked by the drop line; let go, the field of a
- * new task opens there, written into that part's project (decision 10). Done takes nothing.
- */
-export class TasksDrop implements DropTarget {
-	private readonly line: DropLine;
-	private result: ProjectsDrop | null = null;
-
-	constructor(private readonly tasks: () => TasksShown | null) {
-		this.line = new DropLine(() => this.tasks()?.el ?? document.body);
-	}
-
-	hitTest(x: number, y: number, drag: DragPayload): boolean {
-		const tasks = this.tasks();
-		return drag.from === "new" && tasks !== null && within(tasks.el, x, y);
-	}
-
-	preview(x: number, y: number): void {
-		const tasks = this.tasks();
-		if (!tasks) return;
-		const part = tasks.parts.find((p) => p.last.getBoundingClientRect().bottom >= y) ?? null;
-		const newTask = part ? part.newTask : tasks.endTask;
-		if (!newTask) return this.leave();
-		const after = part?.last ?? tasks.parts[tasks.parts.length - 1]?.last ?? null;
-		this.result = { kind: "projectTasks", newTask, after };
-		const frame = readFrame(tasks.el);
-		const lastRect = after?.getBoundingClientRect();
-		const at = lastRect ? lastRect.bottom : frame.box.top;
-		this.line.show(lastRect?.left ?? frame.box.left, lastRect?.right ?? frame.box.right, at, frame, { x, y });
-	}
-
-	landing(): DOMRect | null {
-		return null;
-	}
-
-	leave(): void {
-		this.result = null;
-		this.line.hide();
-	}
-
-	clear(): void {
-		this.leave();
-	}
-
-	drop(): DropResult | null {
-		const result = this.result;
-		this.leave();
-		return result;
-	}
-}
-
 /** What the tasks' list drop reads of the screen. */
 export interface ProjectsListShown {
 	/** Whether the tasks shown take a card: the node's list reorders (`ProjectsView.reorders`) and no choice is still being drawn. */
@@ -254,27 +196,31 @@ export interface ProjectsListShown {
  * The tasks as a list a card is dropped in, as a list column is (spec «Projects order» 1): the same lift, gap, drop line,
  * level and auto-scroll, over the parts as sections, each header opening its part as the core says
  * (`ProjectsSection.opens`); a place the core refuses (`projectsTakes`) is as a list that does not take the card. Let
- * go, the place goes to `dropInProjects`. A card only: the plus has its own place on the tasks (`TasksDrop`). Nothing
- * while the node keeps its order (`ProjectsView.reorders`: Done and a done project).
+ * go, the place goes to `dropInProjects`; nothing while the node keeps its order (`ProjectsView.reorders`: Done and a
+ * done project). The plus is let go here as on a list column: at a gap of a part a new task is written in
+ * (`EntryPart.newTask`), or under a card as its subtask, where the field of the new task opens (`QuickEntrySession.openAt`).
  */
 export class ProjectsListDrop extends CardListDrop {
 	/** The node the place under the finger was read on: a place read on another node than the one let go on is no place. */
 	private readOn: ProjectsNodeId | null = null;
 
 	constructor(
-		tasks: ProjectTasks,
+		private readonly tasks: ProjectTasks,
 		area: HTMLElement,
 		private readonly shown: ProjectsListShown,
+		/** A new task's place moved to another gap or level. */
+		onNewPlace?: () => void,
 	) {
-		super(tasks, area);
+		super(tasks, area, onNewPlace);
 	}
 
 	protected takes(drag: DragPayload): boolean {
-		return drag.from !== "new" && this.shown.reorders();
+		return drag.from === "new" ? this.tasks.writesAny : this.shown.reorders();
 	}
 
 	protected override takesPlace(place: ListPlace, drag: DragPayload): boolean {
-		return drag.from !== "new" && this.shown.takesAt(place, drag);
+		if (drag.from !== "new") return this.shown.takesAt(place, drag);
+		return place.kind === "subtask" || this.tasks.writesIn(place.group);
 	}
 
 	override preview(x: number, y: number, drag: DragPayload): void {
