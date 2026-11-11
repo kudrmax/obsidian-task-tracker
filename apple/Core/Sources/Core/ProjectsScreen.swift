@@ -29,11 +29,14 @@ public struct ProjectsRow: Decodable, Hashable, Sendable, Identifiable {
     public let canLift: Bool
     /// A held card over it unfolds its branch after a pause.
     public let unfoldsOnHover: Bool
+    /// A held card over it chooses it after the same pause, so the card can be let go among its tasks: a live project
+    /// or No project, not the chosen one (`hoverProjectNode`).
+    public let opensOnHover: Bool
     public let json: JSONValue
 
     public var id: String { node }
 
-    enum CodingKeys: String, CodingKey { case node, kind, title, depth, tile, waiting, muted, selected, hasBranch, folded, project, acceptsTask, canLift, unfoldsOnHover }
+    enum CodingKeys: String, CodingKey { case node, kind, title, depth, tile, waiting, muted, selected, hasBranch, folded, project, acceptsTask, canLift, unfoldsOnHover, opensOnHover }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -51,6 +54,7 @@ public struct ProjectsRow: Decodable, Hashable, Sendable, Identifiable {
         acceptsTask = try c.decode(Bool.self, forKey: .acceptsTask)
         canLift = try c.decode(Bool.self, forKey: .canLift)
         unfoldsOnHover = try c.decode(Bool.self, forKey: .unfoldsOnHover)
+        opensOnHover = try c.decode(Bool.self, forKey: .opensOnHover)
         json = try JSONValue(from: decoder)
     }
 }
@@ -74,7 +78,7 @@ public struct ProjectsCard: Decodable, Hashable, Sendable, Identifiable {
     public let over: String?
     /// The project it is shown under: what a drop on the tree replaces.
     public let from: String?
-    /// What `tasks.dropOnProject` takes for this very card (`ProjectsDrop` `{ key, from }`).
+    /// What `tasks.dropOnProject` takes for this very card (`ProjectsDrop` `{ key, from, lifted }`), passed back as given.
     public let drop: JSONValue
     /// What its menu is opened from (`tasks.menu`'s `from`).
     public let menuFrom: String
@@ -197,6 +201,12 @@ extension TaskBoard {
     /// A card held over a folded row: its branch opened, without choosing it (`unfoldsOnHover`).
     public func unfoldProjectNode(_ node: String) throws {
         _ = try screenCall("tasks.unfoldProjectNode", [.string(node)], over: try files())
+    }
+
+    /// A card held `PROJECTS_HOVER_MS` over a row, in one call: its branch unfolds (`unfoldsOnHover`) and it is chosen
+    /// (`opensOnHover`), the mode kept.
+    public func hoverProjectNode(_ node: String) throws {
+        _ = try screenCall("tasks.hoverProjectNode", [.string(node)], over: try files())
     }
 
     /// The segment: `byProject` or `byStage`.

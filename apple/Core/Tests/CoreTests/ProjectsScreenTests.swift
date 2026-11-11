@@ -68,6 +68,51 @@ import Testing
         #expect(opened.selected == "project:Окружение")
     }
 
+    /// A held card opens a live project and No project, never All, Done, a done project or the chosen row.
+    @Test func aRowOpensUnderAHeldCardByTheCore() throws {
+        let file = Self.file.replacingOccurrences(of: "- Спорт\n", with: "- Спорт\n- Архив\n").replacingOccurrences(of: "## Done\n", with: "## Done\n\n- [x] Old 🗂️ Архив\n")
+        let board = board(FakeVault(file))
+        try board.selectProjectNode("project:Окружение")
+        let rows = try board.projectsScreen().rows
+        let opens = Dictionary(uniqueKeysWithValues: rows.map { ($0.node, $0.opensOnHover) })
+        #expect(opens["all"] == false && opens["done"] == false)
+        #expect(opens["project:Окружение"] == false)
+        #expect(opens["project:Дружба"] == true && opens["project:Спорт"] == true && opens["none"] == true)
+    }
+
+    /// One call, one wait: the folded row over which a card is held unfolds and is chosen, the mode kept.
+    @Test func aHeldCardUnfoldsAndChoosesTheRowThroughTheDoor() throws {
+        let kept = MemoryText()
+        let board = board(FakeVault(Self.file), kept: kept)
+        try board.tapProjectNode("project:Дружба")
+        try board.tapProjectNode("project:Дружба")
+        try board.selectProjectNode("project:Окружение")
+        try board.setProjectsMode("byStage")
+        let before = try board.projectsScreen()
+        let row = try #require(before.rows.first { $0.node == "project:Дружба" })
+        #expect(row.folded && row.unfoldsOnHover && row.opensOnHover)
+        try board.hoverProjectNode("project:Дружба")
+        let after = try board.projectsScreen()
+        #expect(after.selected == "project:Дружба" && after.mode == "byStage")
+        #expect(after.rows.contains { $0.title == "Small talk" })
+        #expect(kept.load()?.contains("Дружба") == true)
+    }
+
+    /// The card's drop carries what the core filled at the lift (`lifted`), and goes back to the door as it came.
+    @Test func aCardsDropKeepsWhatTheCoreFilledAtTheLift() throws {
+        let vault = FakeVault(Self.file)
+        let board = board(vault)
+        try board.selectProjectNode("project:Окружение")
+        let card = try #require(try board.projectsScreen().sections[1].cards.first)
+        guard case .object(let drop) = card.drop, case .object(let lifted)? = drop["lifted"] else {
+            Issue.record("no lifted in \(card.drop)"); return
+        }
+        #expect(lifted["id"] == .string(card.item.id))
+        try board.hoverProjectNode("project:Дружба")
+        try board.dropOnProject([card], to: "project:Small talk")
+        #expect(vault.text.contains("- [ ] Активности 🗂️ Small talk\n"))
+    }
+
     @Test func byStageGivesTheStagesAndEachCardsSubproject() throws {
         let board = board(FakeVault(Self.file))
         try board.selectProjectNode("project:Окружение")
