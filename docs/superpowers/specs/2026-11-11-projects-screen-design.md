@@ -11,8 +11,9 @@ The funnel (Inbox / Backlog → Soon → Today → calendar) answers «when» an
 
 ## What Max gets
 
-1. **Projects are one thing, nested to any depth.** A result is a nested project. A project is a name kept by the app; a
-   note is optional (a note of the same name is the project's note). A project is made as fast as a section.
+1. **Projects are one thing, nested to any depth.** A result is a nested project. A project is a name kept by the app, not a
+   file. A note is optional: a project has none unless Max attaches one, and then only its tree line holds the link
+   (never by a name match). A project is made as fast as a section.
 2. **A task may have several projects.** It shows in each of them; its place in the funnel is one.
 3. **A project's status is computed, never set:** active — a task in Today, Soon or with a date; waiting — open tasks only
    in Backlog and Inbox (grey name); done — every task done, the project goes to Done, a new task brings it back; a new
