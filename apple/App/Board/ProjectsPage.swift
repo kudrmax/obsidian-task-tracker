@@ -114,6 +114,8 @@ struct ProjectTree: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     TreeRow(row: row, lit: projects.dropOn == row.node)
+                        // Lifted, the project's own row stays as its faded place while its copy is carried.
+                        .opacity(model.carried == row.node ? 0.4 : 1)
                         .padding(.top, TreeMetrics.gap(before: row, after: index > 0 ? rows[index - 1] : nil))
                         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.projects.geometry.rows[row.node] = $0 }
                         .onTapGesture { Task { await model.projects.tap(row) } }
@@ -463,6 +465,9 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     var area: CGRect? { scroll.flatMap { view in view.window.map { view.convert(view.bounds, to: $0).intersection($0.bounds) } } }
 
     var scrolls: UIScrollView? { scroll }
+
+    /// The row lit under a carried card, and the line a lifted project or the plus would go in at, stay seen.
+    var raisesCopy: Bool { true }
 
     /// A card only where it may go to a project (a task, not a subtask); a project lifted here; the plus.
     func takes(_ payload: DragPayload?) -> Bool {

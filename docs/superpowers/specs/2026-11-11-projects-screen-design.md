@@ -220,3 +220,7 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md Â«AgentsÂ
     line where the project's name stands otherwise.
 29. **The tree's width** is the divider's, kept on the device, within the bounds the core gives a list beside the
     calendar (`rules.listWidths`), as Today's divider.
+30. **Over the tree the carried copy rides above the finger** (16 points over it, gliding there as the finger enters
+    the tree and back as it leaves): a card's target is the row under the finger, lit in the drop's colour, and a lifted
+    project's or the plus's is the line under it; neither may be covered. Elsewhere the copy stays where the finger took
+    it. The card keeps its own width; a lifted project's own row stays as its faded place.
