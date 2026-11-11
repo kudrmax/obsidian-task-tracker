@@ -43,6 +43,8 @@ interface Layout {
 	readonly size: CardSize;
 	readonly width: number;
 	readonly indent: number;
+	/** The drop line's dot across. */
+	readonly dot: number;
 	readonly cards: readonly Measured[];
 	/** Their `top` in content pixels too. */
 	readonly heads: readonly PlacedHead[];
@@ -278,7 +280,9 @@ export abstract class CardListDrop implements DropTarget {
 			const header = this.list.headerAt(node);
 			if (header !== undefined) heads.push({ group: header, opens: this.list.headerOpens?.(node) ?? false, firstCard: cards.length, top: node.offsetTop - removed, height: node.offsetHeight });
 		}
-		return { nodes, size, width, indent: tokenPx(this.list.el, INDENT), cards, heads, waiting };
+		const tokens = getComputedStyle(this.list.el);
+		const read = (token: string) => parseFloat(tokens.getPropertyValue(token)) || 0;
+		return { nodes, size, width, indent: read(INDENT), dot: read(DOT), cards, heads, waiting };
 	}
 
 	/** A measured card in client pixels. */
@@ -354,7 +358,7 @@ export abstract class CardListDrop implements DropTarget {
 
 	/** The highest the line stands: its dot whole under the list's top, where a part drawn as nothing (an empty own part) takes it. */
 	private topmostLine(frame: ListFrame): number {
-		return toClient(frame, 0, 0).y + tokenPx(this.list.el, DOT) / 2;
+		return toClient(frame, 0, 0).y + this.layoutFor(frame).dot / 2;
 	}
 
 	/** Where a task's card starts: a subtask's stands its levels further in. */
