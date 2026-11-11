@@ -130,3 +130,40 @@ screen, undo, multi-select). No new logic beyond the three points below.
 11. **Repeat.** A repeating result's next copy keeps the mark.
 12. **One line outside the core.** `obsidian/settingsFile.ts`'s key order gained `resultMark`, so `data.json` stays
     written byte for byte in its order (`tests/settingsFile.test.ts`).
+
+### Obsidian
+
+1. **The two-line card's height.** The card height is a setting (28–40 px), so the folded result's card is that height
+   plus its small line's 9 px: 44 px at the default 35 px. It stays a capsule (corners half its height) wherever it is
+   drawn: in a list, as the menu's copy over the blur, and as the card under the finger (its stack layers too).
+2. **The small line.** 11 px type at 13 px line height in the caption colour (`--tc-muted`; the level's meta tint on a
+   coloured card, like the date), the target symbol as tall as the line's type, 4 px before the title, the title fading
+   out at the end as the card's does. The step's title under it is the card's usual 15 px at 18 px line height; the two
+   lines are centred in the card. The counter, project mark, description mark and date stay centred on the whole card.
+3. **The two tap targets.** The result's target is the small line across the whole title column, from the card's top
+   edge down to the line's bottom; everything else (the step's title, the padding, the right marks) is the step's, the
+   counter and the project mark keeping their own taps. On the Mac a right click follows the same two targets, and a
+   double click renames the task whose menu the first click opened.
+4. **The step's menu keeps the card.** The copy over the blur is the result's two-line card as it stands in the list,
+   never the step's own card, so nothing jumps; a label set in the step's menu doesn't repaint that copy.
+5. **The timeline.** A tap, a held finger and a right click on a result's block all open the shown step's menu; the stack
+   under the copy holds the result's open subtasks (the step among them). The block's title is regular weight, never
+   semibold (a block has no room for marks); the block's grips still stretch the result.
+6. **Search.** A found result shows its own title, on one line and semibold, never its step: the search picks out the
+   words it found in that title.
+7. **The rows' icons.** Add to result: Lucide `target` (the card's symbol). Make result and Make task: Lucide `goal`, the
+   same both ways, as In progress and Stop progress share theirs.
+8. **A long value on a row.** A row's value too long for its row (a long result's or project's name) now gives way and
+   fades out at its end; the row's own word always stays whole. This changes Project's row too, which could overlap
+   before.
+9. **The Add to result page.** Its back row is titled by `MenuResult.label`. The search field is the search window's
+   field on a tile's ground, in its own group. On the Mac the caret is in it at once and Enter takes the first result
+   shown; on the phone a tap on it raises the keyboard (focusing it at once would cover the list). Each option: the
+   column's icon in the caption colour, the title, the project's name small under it, the accent tick. A query that
+   finds nothing leaves only «New result…», with no empty-state words. A tap on the ticked result closes the menu
+   (the core writes nothing). Typing narrows the page in place, the panel growing or shrinking to it.
+10. **New result….** Its page is New project…'s: back row «New result», the name field ringed in the accent with
+    `namePlaceholder`; Escape or the back row returns to the results.
+11. **Result mark** stands in the Priorities group, right under Add priority, as a text row with its description.
+12. **The bulk menu.** Add to result stands in the edit group after Project (when the core offers it) and opens the same
+    page and New result… as one task's menu.

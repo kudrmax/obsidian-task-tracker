@@ -1,7 +1,8 @@
-import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
+import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuResultRowId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, RepeatPage, type RepeatRule, type ResultPage, type TaskItem, type TaskKey, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
-import { fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
+import { cardMenuTask, fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
+import { resultChooser, resultNamePage } from "./ResultChooser";
 import { linkAt, type TaskLink } from "../TaskTitle";
 import { showWhole } from "../wholeCard";
 import type { LocalDate } from "../types";
@@ -18,7 +19,8 @@ import { PanelPages } from "./PanelPages";
 import { Motion } from "../motion/Motion";
 import { repeatPanel } from "../repeat/RepeatPanel";
 
-export type EditRowId = MenuEditId;
+/** A row of the edit group: the model's edit rows, and its result rows right after Project. */
+export type EditRowId = MenuEditId | MenuResultRowId;
 /** What the menu asks about: a status tile that asks first, or Delete. */
 export type Asking = MenuStatusId | "delete";
 
@@ -63,7 +65,8 @@ const REMINDER_NAMES: Readonly<Record<ReminderKind, string>> = { notification: "
 
 /**
  * The edit group's rows as the menu's model has them, in its order: the reminder's kind, the rule, the section's name and
- * the project's beside theirs. Project, disabled on a subtask, shows its parent's.
+ * the project's beside theirs. Project, disabled on a subtask, shows its parent's. The result rows stand right after
+ * Project (`TaskMenuModel.result`): Add to result with the result the task is a step of, then Make result or Make task.
  */
 export function editRows(item: TaskItem, model: TaskMenuModel): readonly EditRow[] {
 	const rows: Readonly<Record<EditRowId, () => EditRow>> = {
@@ -74,8 +77,15 @@ export function editRows(item: TaskItem, model: TaskMenuModel): readonly EditRow
 		section: () => ({ id: "section", label: "Section", value: model.sections?.choice.current ?? "", icon: "section" }),
 		project: () => ({ id: "project", label: "Project", value: model.project.value, icon: "project", disabled: model.project.disabled }),
 		subtask: () => ({ id: "subtask", label: "Add subtask", value: "", icon: "subtask" }),
+		addToResult: () => ({ id: "addToResult", label: model.result.label, value: model.result.value, icon: "target" }),
+		toggle: () => ({ id: "toggle", label: model.result.toggle.label, value: "", icon: "goal" }),
 	};
-	return model.edits.map((id) => rows[id]());
+	return withResultRows(model).map((id) => rows[id]());
+}
+
+/** The model's edit rows with its result rows right after Project, in the model's order. */
+export function withResultRows(model: TaskMenuModel): readonly EditRowId[] {
+	return model.edits.flatMap((id): EditRowId[] => (id === "project" ? [id, ...model.result.rows] : [id]));
 }
 
 export interface LevelTile extends PriorityLevel {
@@ -111,6 +121,14 @@ export interface MenuActions {
 	setProject(project: string | null): Promise<void>;
 	/** «New project…» named `name` (`TaskService.newProject`): the note made or tagged, and the task gets that project. */
 	newProject(name: string): Promise<void>;
+	/** Make result (true) or Make task (false) (`TaskService.setResult`). */
+	setResult(result: boolean): Promise<void>;
+	/** The Add to result page for the task, `query` typed in its search field (`TaskService.resultPage`). */
+	resultPage(query: string): Promise<ResultPage>;
+	/** The task to the end of `result`'s steps (`TaskService.addToResult`). */
+	addToResult(result: TaskKey): Promise<void>;
+	/** «New result…» named `name` (`TaskService.newResult`): the task its only step. */
+	newResult(name: string): Promise<void>;
 	/** A tap on a level (`TaskService.togglePriority`). */
 	togglePriority(prefix: string): Promise<void>;
 	/** A tap on a label (`TaskService.toggleLabel`); the task as it then stands, null once it is gone. */
@@ -134,6 +152,11 @@ export interface MenuActions {
 
 export interface TaskMenuContext {
 	readonly item: TaskItem;
+	/**
+	 * The task whose card or block `source` is, when the menu is another's: a folded result's, whose step's menu a tap
+	 * opens. Its copy stays over the blur as it is drawn, a timeline block with its subtasks under it.
+	 */
+	readonly drawn?: TaskItem;
 	/** The card or block tapped; a copy of it stays over the backdrop, grown only to show a title the card cuts. */
 	readonly source: HTMLElement;
 	readonly today: LocalDate;
@@ -145,7 +168,7 @@ export interface TaskMenuContext {
 	/** Dresses the copy over the blur: a selected timeline card gives its copy the dots that stretch it. */
 	readonly lifted?: (copy: HTMLElement, close: () => void) => void;
 	/** A timeline card's subtasks stand between its copy and the panel; a tap on one opens its own menu instead. */
-	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement, sheet: Sheet) => void;
+	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement, sheet: Sheet, drawn?: TaskItem) => void;
 	/** The sheet of the menu this one replaces, taken over as it stands: a subtask's menu opened from its task's stack. */
 	readonly sheet?: Sheet;
 	/** Draws the start of the task's description over its copy; without it the menu shows none. */
@@ -205,9 +228,9 @@ export class TaskMenu extends LiftedMenu {
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
-		} else fillCard(this.lifted, context.item, { day: context.day });
+		} else fillCard(this.lifted, this.drawn, { day: context.day });
 		const copy = this.liftWhole(context.source, showWhole);
-		this.anchor = this.stacks && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
+		this.anchor = this.stacks && this.drawn.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
 		this.panel = this.addPanel("is-task").el;
@@ -224,6 +247,11 @@ export class TaskMenu extends LiftedMenu {
 		e.preventDefault();
 		e.stopPropagation();
 		this.pick(() => this.context.actions.openLink(link))();
+	}
+
+	/** The task whose card the copy is: the menu's own, or the folded result whose step's menu this is. */
+	private get drawn(): TaskItem {
+		return this.context.drawn ?? this.context.item;
 	}
 
 	/** The menu of a timeline card: its subtasks stand in a stack under its copy. */
@@ -298,7 +326,7 @@ export class TaskMenu extends LiftedMenu {
 	/** The open subtasks of a timeline card, under its copy at its width; the panel then goes by them. */
 	private showSubtasks(copy: DOMRect): DOMRect {
 		const stack = (this.stack = this.stackUnder(copy));
-		this.fillStack(stack, this.context.item.subtasks);
+		this.fillStack(stack, this.drawn.subtasks);
 		return new DOMRect(copy.left, copy.top, copy.width, stack.getBoundingClientRect().bottom - copy.top);
 	}
 
@@ -314,9 +342,11 @@ export class TaskMenu extends LiftedMenu {
 		for (const subtask of subtasks) {
 			const card = renderTaskCard(null, subtask, { day });
 			stack.insertBefore(card, this.stackRow);
+			let pressed: EventTarget | null = null;
+			card.addEventListener("pointerdown", (e) => (pressed = e.target));
 			card.addEventListener(
 				"click",
-				this.picks.handOff(() => onSubtask?.(subtask, card, (onClose) => this.overlay.handOver(onClose))),
+				this.picks.handOff(() => onSubtask?.(cardMenuTask(subtask, pressed), card, (onClose) => this.overlay.handOver(onClose), subtask)),
 			);
 		}
 	}
@@ -352,6 +382,8 @@ export class TaskMenu extends LiftedMenu {
 				section: () => this.showSections(),
 				project: () => this.showProjects(),
 				subtask: this.stacks ? () => actions.addSubtask(this) : this.pickNow(() => actions.addSubtask(this)),
+				addToResult: () => void this.showResults(),
+				toggle: this.pick(() => actions.setResult(model.result.toggle.result)),
 			};
 			const draw: Record<MenuGroupId, () => void> = {
 				statuses: () => {
@@ -412,7 +444,7 @@ export class TaskMenu extends LiftedMenu {
 			if (!next) return this.close();
 			this.context = { ...this.context, item: next };
 			const card = this.lifted.classList.contains("is-block") ? this.lifted.querySelector<HTMLElement>(".tc-block-card") : this.lifted;
-			if (card) markColours(card, next);
+			if (card && !this.context.drawn) markColours(card, next);
 			this.showMenu(this.groupsAbove());
 		} finally {
 			this.labelling = false;
@@ -504,6 +536,57 @@ export class TaskMenu extends LiftedMenu {
 					if (name === null) return back();
 					asking = false;
 					this.pick(() => actions.newProject(name))();
+				},
+			});
+			this.place();
+		});
+	}
+
+	/**
+	 * The Add to result page in place of the menu, as Project's: a search over the open results, the one the task is a step
+	 * of ticked, «New result…» last; a pick adds the task to it and closes.
+	 */
+	private async showResults(): Promise<void> {
+		const { item, actions } = this.context;
+		const title = this.context.menu(item).result.label;
+		const page = await actions.resultPage("");
+		if (this.isClosed) return;
+		this.pages.show("results", () => {
+			this.askFor(null, false);
+			clear(this.panel);
+			clear(this.upper);
+			resultChooser(this.panel, {
+				title,
+				page,
+				onBack: () => this.showMenu(),
+				find: (query) => actions.resultPage(query),
+				onPick: (result) => this.pick(() => actions.addToResult(result))(),
+				onNew: () => this.showResultName(page.namePlaceholder),
+				onChange: () => this.pages.show("results", () => this.place()),
+			});
+			this.place();
+		});
+	}
+
+	/** «New result…»: the name asked in place of the Add to result page; Enter makes the result and closes, Escape goes back to the page. */
+	private showResultName(placeholder: string): void {
+		this.pages.show("resultName", () => {
+			clear(this.panel);
+			clear(this.upper);
+			const { actions } = this.context;
+			let asking = true;
+			const back = () => {
+				if (!asking) return;
+				asking = false;
+				void this.showResults();
+			};
+			resultNamePage(this.panel, {
+				placeholder,
+				onBack: back,
+				onDone: (name) => {
+					if (name === null) return back();
+					asking = false;
+					this.pick(() => actions.newResult(name))();
 				},
 			});
 			this.place();
