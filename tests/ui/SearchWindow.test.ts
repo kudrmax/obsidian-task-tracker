@@ -78,6 +78,7 @@ describe("SearchWindow", () => {
 		expect(inProject.el.querySelector(".tc-card-over svg")).not.toBeNull();
 		expect(inProject.el.querySelector("mark.tc-hit")?.textContent).toBe("паспорт");
 		expect(none.el.querySelector(".tc-card-over")).toBeNull();
+		expect(inProject.el.querySelector(".tc-project-mark")).toBeNull();
 	});
 
 	it("from the main screen shows no path", async () => {

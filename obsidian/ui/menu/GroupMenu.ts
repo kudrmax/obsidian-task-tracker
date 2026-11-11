@@ -57,7 +57,7 @@ export const ProjectMenu = {
 	open(title: HTMLElement, opts: ProjectMenuOptions): { close(): void } {
 		const overlay = new Overlay(() => void overlay.close(), title);
 		const rect = title.getBoundingClientRect();
-		const copy = LiftedCopy.over(overlay, el(null, "div", "tc-lifted is-title"), false);
+		const copy = LiftedCopy.over(overlay, el(null, "div", "tc-lifted is-title is-project-title"), false);
 		el(copy.el, "span", "tc-lifted-title", opts.title);
 		copy.pin(rect, { width: true, height: true });
 		const panel = Panel.over(overlay, { root: "tc-panel", place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
@@ -65,7 +65,7 @@ export const ProjectMenu = {
 			const rows = [{ label: opts.renameLabel, icon: "rename", onPick: panel.pickNow(() => opts.onRename()) } as const];
 			const note =
 				opts.note === null
-					? [{ label: opts.attachLabel, icon: "openFile", onPick: panel.pickNow(() => opts.onAttach()) } as const]
+					? [{ label: opts.attachLabel, icon: "plus", onPick: panel.pickNow(() => opts.onAttach()) } as const]
 					: [
 							{ label: opts.note, icon: "openFile", onPick: panel.pick(() => opts.onOpenNote()) } as const,
 							{ label: opts.detachLabel, icon: "cross", onPick: panel.pick(() => opts.onDetach()) } as const,

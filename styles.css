@@ -1494,7 +1494,7 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 .tc-tree-row.is-tile.is-folded { margin-bottom: var(--tc-stack-step-y); box-shadow: var(--tc-shadow-fold); }
 .tc-tree-row.is-all { margin-bottom: calc(var(--tc-tree-group-gap) - var(--tc-tree-gap)); }
 .tc-tree-row.is-none { margin-top: var(--tc-tree-group-gap); }
-.tc-tree-row.is-waiting { color: var(--tc-muted); }
+.tc-tree-row:is(.is-waiting, .is-none, .is-done) { color: var(--tc-muted); }
 .tc-tree-row.is-selected { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
 .tc-tree-row.is-drop { background: var(--tc-drop-bg); color: var(--tc-accent); }
 .tc-tree-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; line-height: var(--tc-leading-tree); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
@@ -1521,10 +1521,14 @@ body:not(.is-mobile) .tc-projects-tasks-column { top: var(--tc-projects-top); pa
 /* Rename: the name typed where the title stood, in the section name's capsule. */
 .tc-projects-title.is-renaming { visibility: hidden; }
 .tc-projects-title-field { position: absolute; top: var(--tc-day-row-top); left: calc(var(--tc-tree-width) + var(--tc-divider) + var(--tc-space-2)); right: var(--tc-space-10); z-index: var(--tc-layer-switch); }
-body:not(.is-mobile) .tc-projects-title-field { top: var(--tc-desk-projects-title-top); left: calc(var(--tc-tree-width) + var(--tc-divider) + var(--tc-desk-projects-far)); right: var(--tc-desk-projects-side); }
+body:not(.is-mobile) .tc-projects-title-field { top: var(--tc-desk-projects-title-top); left: calc(var(--tc-tree-width) + var(--tc-divider) + var(--tc-desk-projects-far)); right: calc(var(--tc-desk-projects-seg-w) + var(--tc-desk-projects-side) + var(--tc-space-16)); }
 /* A new project's name typed at a gap of the tree, as far in as the gap's depth; a new task's text among the tasks. */
 .tc-tree-field { flex-shrink: 0; margin-left: calc(var(--tc-level) * var(--tc-tree-indent)); }
 .tc-projects-task-field { flex-shrink: 0; }
 /* A project carried in the tree: its row under the finger, lifted, its place in the tree dimmed. */
-.tc-tree-float { position: fixed; left: 0; top: 0; z-index: var(--tc-layer-float); pointer-events: none; box-shadow: var(--tc-shadow-lift); }
+.tc-tree-float { position: fixed; left: 0; top: 0; z-index: var(--tc-layer-float); pointer-events: none; background: var(--tc-float-bg); color: var(--tc-text); box-shadow: var(--tc-shadow-lift); }
 .tc-tree-row.is-lifted { opacity: var(--tc-tile-off-opacity); }
+/* The project's menu: the title over the blur stands as the title it copies, in its size and at its inset. */
+.tc-lifted.is-title.is-project-title { padding: 0 0 0 calc(var(--tc-space-2) + var(--tc-space-4)); }
+body:not(.is-mobile) .tc-lifted.is-title.is-project-title { padding: 0 0 0 var(--tc-desk-projects-far); }
+body:not(.is-mobile) .tc-lifted.is-project-title .tc-lifted-title { font-size: var(--tc-font-desk-projects-title); }

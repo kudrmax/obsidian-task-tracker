@@ -66,12 +66,21 @@ export class FloatingCard implements Float {
 	}
 
 	/**
+	 * Where across the copy the finger holds it: where it held the card, or the copy's middle when it held a wide card
+	 * (a desktop list, the Projects screen's tasks) further right than the copy reaches, which would leave the copy far from the finger.
+	 */
+	private heldAt(): number {
+		const width = this.el.offsetWidth;
+		return width > 0 && this.grab.dx > width ? width / 2 : this.grab.dx;
+	}
+
+	/**
 	 * The card under the finger as it was grabbed; stretched further right than the window lets it, it is pulled back
 	 * inside the window's margin as the menu's copy is (`grownStart`), never past the card's own end under the finger.
 	 */
 	moveTo(x: number, y: number): void {
 		const room = windowRoom(this.el);
-		const left = grownStart(x - this.grab.dx, DESIGN.floatWidth, this.el.offsetWidth, room.width, room.margin);
+		const left = grownStart(x - this.heldAt(), DESIGN.floatWidth, this.el.offsetWidth, room.width, room.margin);
 		const transform = `translate3d(${left}px, ${y - this.grab.dy}px, 0)`;
 		this.el.style.transform = transform;
 		for (const layer of this.stack) layer.style.transform = transform;

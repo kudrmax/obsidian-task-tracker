@@ -23,13 +23,14 @@ const PATH_STEP = " › ";
  * A found task as its card: the found words picked out of the title; found in its project's name, that name's line under the
  * title, else found in the description, the description's line. From the Projects screen (`paths`) the task's place among
  * the projects stands small over its title, after the folder mark, as a By stage card's subproject: the same task in two
- * projects is told apart at once.
+ * projects is told apart at once; the folder mark goes, the path says the project.
  */
 function renderRow(parent: HTMLElement, hit: SearchHit, paths: boolean): HTMLElement {
 	const path = paths && hit.projectPath ? hit.projectPath.join(PATH_STEP) : null;
 	const card = renderTaskCard(parent, hit.item, { day: null, over: path });
 	card.classList.add("tc-hit-card");
 	if (path !== null) {
+		card.querySelector(":scope > .tc-project-mark")?.remove();
 		const title = card.querySelector<HTMLElement>(".tc-card-lines > .tc-card-title");
 		if (title && hit.title.length > 0 && !hit.item.card.step) fillParts(title, hit.title);
 		return card;
