@@ -1,4 +1,4 @@
-import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
+import { type EntryDrawing, type EntryList, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
 import { placeShowing, shownLists } from "../screens";
 import type { RightMode } from "../viewSettings";
 import type { EntryPart } from "./EntryPart";
@@ -160,9 +160,9 @@ export class QuickEntryController {
 		this.entry = new QuickEntrySession(
 			this.telling(deps.tasks),
 			{
-				cards: (column) => this.cards(column),
-				sections: (column) => deps.list(column)?.sections ?? [],
-				sectioned: (column) => deps.sectioned(column),
+				cards: (column) => (column === "projects" ? [] : this.cards(column)),
+				sections: (column) => (column === "projects" ? [] : (deps.list(column)?.sections ?? [])),
+				sectioned: (column) => column !== "projects" && deps.sectioned(column),
 				day: () => deps.day(),
 				today: () => deps.today(),
 				shown: () => shownLists(deps.mode()),
@@ -516,7 +516,7 @@ export class QuickEntryController {
 
 	/** What scrolls the field into sight: its list, or the timeline; a menu's stack does not scroll. */
 	private scrollerOf(spot: EntrySpot): HTMLElement | null {
-		if (spot.kind === "list") return this.deps.list(spot.column)?.el ?? null;
+		if (spot.kind === "list") return spot.column === "projects" ? null : (this.deps.list(spot.column)?.el ?? null);
 		if (spot.kind === "slot") return this.deps.timeline()?.el ?? null;
 		return null;
 	}
@@ -605,11 +605,11 @@ export class QuickEntryController {
 	 * The lists read afresh; with `beforeShow`, the entry changes as they draw what was read. A read the same as shown, or
 	 * one a gesture holds back, draws nothing then: the entry's change is drawn here, or waits with the gesture.
 	 */
-	private async fresh(beforeShow?: (coming: (column: ListColumn) => readonly ListCard[]) => void): Promise<void> {
+	private async fresh(beforeShow?: (coming: (column: EntryList) => readonly ListCard[]) => void): Promise<void> {
 		if (!beforeShow) return this.deps.fresh();
 		let mark = -1;
 		await this.deps.fresh(() => {
-			beforeShow((column) => this.deps.list(column)?.comingCards ?? []);
+			beforeShow((column) => (column === "projects" ? [] : (this.deps.list(column)?.comingCards ?? [])));
 			mark = this.draws;
 		});
 		if (mark === this.draws) this.deps.render();

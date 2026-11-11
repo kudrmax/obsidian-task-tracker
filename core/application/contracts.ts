@@ -53,7 +53,9 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
 export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
-export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, shownLists, SWIPE_FLICK_SPEED, swipeLanding, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, shownEntryLists, shownLists, SWIPE_FLICK_SPEED, swipeLanding, type EntryList, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+/** The Projects screen's list as the quick entry reads it: a list the field stands in, like a funnel's column. */
+export { projectsEntryLook, type EntryListLook, type EntryPart } from "./projectsEntry";
 /**
  * The copy of a pressed card that shows its whole title: `wholeWidth(card, room)` how wide it grows (null: the card shows
  * its title whole and is lifted itself), `grownStart(start, size, grown, room, margin)` where it starts on one axis.
@@ -127,13 +129,27 @@ export interface TaskKey {
 
 /**
  * Where to create a task: a place in a list, a place in the day column on `date` (its list and day are the column's,
- * see `dayColumn`), a place among subtasks, or a slot on the calendar.
+ * see `dayColumn`), a place among subtasks, a slot on the calendar, or a place of the Projects screen's list.
  */
 export type NewTaskPlace =
 	| { readonly kind: "list"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate }
 	| { readonly kind: "day"; readonly date: LocalDate; readonly group: GroupName; readonly before: TaskKey | null }
 	| { readonly kind: "subtask"; readonly parent: TaskKey; readonly before: TaskKey | null }
-	| { readonly kind: "slot"; readonly slot: Slot };
+	| { readonly kind: "slot"; readonly slot: Slot }
+	| ProjectsPlace;
+
+/**
+ * A new task typed in the Projects screen's list, in part `group` (`ProjectsSection.group`) before card `before` (null:
+ * the part's end), as the screen stands when it is written: in the list that part writes into (`ProjectsSection.newTask`;
+ * `placement`, a place chosen in the entry's bar, instead), next to the nearest card of that list above it in the part,
+ * else right before the nearest one below, else at that list's end. Its project is `createInPlace`'s own argument.
+ */
+export interface ProjectsPlace {
+	readonly kind: "projects";
+	readonly group: GroupName;
+	readonly before: TaskKey | null;
+	readonly placement?: Placement;
+}
 
 /** Where a section is written from the quick-entry field: a top-level place in a column that shows sections. */
 export type SectionPlace = Extract<NewTaskPlace, { readonly kind: "list" } | { readonly kind: "day" }>;

@@ -11,6 +11,7 @@ import type {
 	EndList,
 	ListPlace,
 	ProjectsDropPreview,
+	ProjectsPlace,
 	GroupedList,
 	GroupName,
 	GroupPlace,
@@ -30,6 +31,7 @@ import type { Operation, TaskRules } from "./TaskRules";
 import { droppedSpan } from "./TimelineSpans";
 import { landingOf } from "./landing";
 import { projectsDropSteps, projectsLandingOf } from "./projectsDrop";
+import { projectsNewPlace } from "./projectsEntry";
 import { keyOf } from "./taskKeys";
 import type { TreePlace } from "../domain/ProjectTree";
 
@@ -82,11 +84,21 @@ export class TaskWrites {
 
 	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Write<CreatedTask | null> {
 		return {
-			operation: this.rules.createInPlace(text, priority, place, repeat, labels, project),
+			operation: place.kind === "projects" ? this.createInProjects(text, priority, place, repeat, labels, project) : this.rules.createInPlace(text, priority, place, repeat, labels, project),
 			answer: (change) => {
 				const created = change?.after.insertedSince(change.before);
 				return created ? { key: keyOf(created), id: created.id } : null;
 			},
+		};
+	}
+
+	/** A task typed in the Projects list: its place read off the screen as the file then stands (`projectsNewPlace`). */
+	private createInProjects(text: string, priority: string | null, place: ProjectsPlace, repeat: RepeatRule | null | undefined, labels: readonly string[], project: string | null | undefined): Operation | null {
+		if (this.rules.isBlank(text)) return null;
+		return (doc, today, settings, boundary) => {
+			const view = this.reads.projectsScreen({ text: "", doc, today, boundary });
+			const at = projectsNewPlace(view, doc, (key) => this.rules.entryOf(doc, key), place, today);
+			return this.rules.placeNew(text, priority, at, repeat, labels, project)(doc, today, settings, boundary);
 		};
 	}
 

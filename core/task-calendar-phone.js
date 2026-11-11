@@ -3290,12 +3290,18 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/screenPlaces.ts
+  var LIST_SET = { day: true, soon: true, inbox: true, backlog: true, projects: true };
+  var ENTRY_LISTS = Object.keys(LIST_SET);
   var SCREEN_PLACES = ["projects", "inbox", "soon", "calendar"];
   var SHOWN_LISTS = { projects: [], inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] };
   function shownLists(place) {
     return SHOWN_LISTS[place];
   }
+  function shownEntryLists(place) {
+    return place === "projects" ? ["projects"] : SHOWN_LISTS[place];
+  }
   function placeShowing(column, place) {
+    if (column === "projects") return "projects";
     const at = place === "projects" ? "inbox" : place;
     if (SHOWN_LISTS[at].includes(column)) return at;
     const from = SCREEN_PLACES.indexOf(at);
@@ -3313,59 +3319,6 @@ ${key.title}`.toLowerCase();
     const shift = moved2 > 0 ? 1 : -1;
     if (Math.abs(speed) >= SWIPE_FLICK_SPEED) return Math.sign(speed) === shift ? shift : 0;
     return Math.abs(moved2) * 2 >= distance ? shift : 0;
-  }
-
-  // core/application/timelineZoom.ts
-  var DEFAULT_ZOOM_HOUR = 56;
-  function parseZoomLevels(text) {
-    const levels = [];
-    for (const part2 of text.split(",")) {
-      const m = /^\s*(\d+)\s*(?::\s*\d+\s*)?$/.exec(part2);
-      if (!m) return null;
-      const hourPx = Number(m[1]);
-      if (hourPx <= 0) return null;
-      levels.push({ hourPx });
-    }
-    return levels.length > 0 ? levels : null;
-  }
-  function formatZoomLevels(levels) {
-    return levels.map((l) => String(l.hourPx)).join(", ");
-  }
-  function levelsFor(wholeDayPx, levels) {
-    const closer = [...levels].sort((a, b) => a.hourPx - b.hourPx).slice(1).filter((level) => level.hourPx > wholeDayPx);
-    return [{ hourPx: wholeDayPx }, ...closer];
-  }
-  var MINUTES_PER_HOUR2 = 60;
-  function gridAt(hourPx, measures) {
-    const px = (minutes) => minutes / MINUTES_PER_HOUR2 * hourPx;
-    const labels = measures.divisions.find((minutes) => px(minutes) >= measures.labelGap) ?? MINUTES_PER_HOUR2;
-    const ticks = px(measures.tickMinutes) >= measures.tickGap;
-    return { labels, lines: ticks ? measures.tickMinutes : labels };
-  }
-  function gridMarks(grid, dayHours) {
-    const marks = [];
-    for (let minutes = grid.lines; minutes < dayHours * MINUTES_PER_HOUR2; minutes += grid.lines) {
-      const minute = minutes % MINUTES_PER_HOUR2;
-      if (minute === 0) continue;
-      marks.push({ minute: minutes, label: minute % grid.labels === 0 ? `:${String(minute).padStart(2, "0")}` : null });
-    }
-    return marks;
-  }
-  function wholeDayOr(wholeDayPx, levels) {
-    return wholeDayPx ?? Math.min(...levels.map((level) => level.hourPx));
-  }
-  function zoomAfterPinch(hourPx, wholeDayPx, levels) {
-    return hourPx <= levelsFor(wholeDayOr(wholeDayPx, levels), levels)[0].hourPx ? "wholeDay" : hourPx;
-  }
-  function zoomShown(saved, wholeDayPx, levels) {
-    const ends = levelsFor(wholeDayOr(wholeDayPx, levels), levels);
-    const [min, max] = [ends[0].hourPx, ends[ends.length - 1].hourPx];
-    if (saved === "wholeDay") return min;
-    const hourPx = typeof saved === "number" && Number.isFinite(saved) && saved > 0 ? saved : DEFAULT_ZOOM_HOUR;
-    return Math.min(max, Math.max(min, hourPx));
-  }
-  function labelHidesNearNow(y, nowY, lift, pillHeight) {
-    return nowY !== null && Math.abs(y - nowY) < lift + pillHeight / 2;
   }
 
   // core/application/taskKeys.ts
@@ -4058,7 +4011,9 @@ ${key.title}`.toLowerCase();
   function listSpot(spot) {
     return spot.kind === "list" ? spot : null;
   }
-  var ALL_COLUMNS = ["day", "soon", "inbox", "backlog"];
+  function keepsField(column) {
+    return column === "projects";
+  }
   var QuickEntry = class {
     constructor(tasks, look, session = emptySession(), emit = () => void 0, queued = () => void 0) {
       this.tasks = tasks;
@@ -4142,15 +4097,23 @@ ${key.title}`.toLowerCase();
     openAtEnd(column) {
       this.open(this.endOf(column));
     }
-    /** The plus tapped: the end of the day column while it shows, else of Inbox. */
+    /** The plus tapped: the end of the part a shown list's plus types in (the Projects list's), else of the day column while it shows, else of Inbox. */
     openFromPlus() {
-      this.openAtEnd(this.look.shown().includes("day") ? "day" : "inbox");
+      const shown2 = this.look.shown();
+      for (const column of shown2) {
+        const part2 = this.parts(column).find((p) => p.plus);
+        if (part2) return this.openIn(column, part2.group);
+      }
+      this.openAtEnd(shown2.includes("day") ? "day" : "inbox");
     }
     /** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
     openIn(column, group) {
-      const cards = this.look.cards(column);
-      const place = { kind: "task", group, before: null };
-      this.open({ kind: "list", column, place: { ...gapOfPlace(cards, place), level: 0 } });
+      this.openAt(column, { kind: "task", group, before: null });
+    }
+    /** The plus let go at `place` of list `column` (the Projects list's `projectsPlace` drop): the field of a new task there. */
+    openAt(column, place) {
+      const gap = gapOfPlace(this.look.cards(column), place);
+      this.open({ kind: "list", column, place: place.kind === "task" ? { ...gap, level: 0 } : gap });
     }
     /** A long tap on the timeline's free room let go: the field of a new task in that slot. */
     openSlot(slot) {
@@ -4195,9 +4158,8 @@ ${key.title}`.toLowerCase();
      * (a folded result's, whose card shows its step).
      */
     holder(key) {
-      const shown2 = this.look.shown();
       let best = null;
-      for (const column of [...shown2, ...ALL_COLUMNS.filter((c) => !shown2.includes(c))]) {
+      for (const column of this.lookOrder()) {
         this.look.cards(column).forEach((card, index) => {
           const k = card.key;
           const holds = k.section === key.section && k.index === key.index && k.path.length < key.path.length && k.path.every((i, n) => key.path[n] === i);
@@ -4223,7 +4185,7 @@ ${key.title}`.toLowerCase();
       const spot = given.kind === "list" ? { kind: "list", column: given.column, place: given.place } : given;
       const face = renaming ? this.faceOf(renaming, spot) : void 0;
       const rename2 = renaming ? { item: renaming, home: this.newRun(spot), moved: false, ...face && { face } } : null;
-      const project = renaming ? renaming.project?.name ?? null : null;
+      const project = renaming ? renaming.project?.name ?? null : this.partProject(spot);
       const run = this.newRun(spot);
       this.reset({ run, text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename: rename2, section: false, project });
       if (unfold) this.queue(run, { id: this.jobId(), kind: "unfold", run, key: unfold });
@@ -4315,8 +4277,13 @@ ${key.title}`.toLowerCase();
       if (!field) return null;
       const shown2 = this.shownPlace(field);
       if (shown2 && samePlacement(shown2, placement)) return null;
-      const column = placement.kind === "now" || placement.kind === "date" ? "day" : placement.kind;
       const rename2 = field.rename && { ...field.rename, moved: true };
+      const list = listSpot(this.run(field.run).spot);
+      if (list && keepsField(list.column)) {
+        this.reset({ ...field, rename: rename2, placement });
+        return { column: list.column, day: null };
+      }
+      const column = placement.kind === "now" || placement.kind === "date" ? "day" : placement.kind;
       this.reset({ ...field, rename: rename2, run: this.newRun(this.endOf(column)) });
       const day = this.tasks.dayOfPlacement(placement);
       return { column, day: day === null || day === this.look.day() ? null : day };
@@ -4326,12 +4293,21 @@ ${key.title}`.toLowerCase();
       const field = this.session.field;
       if (field) this.reset({ ...field, run: this.newRun(this.endOf(column)) });
     }
-    /** Where a task written in `column` goes: a list's place, or the day column's on the day it shows. */
-    placeOf(column, result) {
+    /**
+     * Where a task written in `column` goes: a list's place, the day column's on the day it shows, or a place of the
+     * Projects list, which the service reads off the screen when it writes (`placement`: the one chosen in the bar there).
+     */
+    placeOf(column, result, placement) {
       if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
       const { group, before } = result;
-      if (column !== "day") return { kind: "list", list: column, group, before };
-      return { kind: "day", date: this.look.day(), group, before };
+      switch (column) {
+        case "projects":
+          return { kind: "projects", group, before, ...placement && { placement } };
+        case "day":
+          return { kind: "day", date: this.look.day(), group, before };
+        default:
+          return { kind: "list", list: column, group, before };
+      }
     }
     /** A slot of the field. */
     slotPlace(slot) {
@@ -4364,7 +4340,7 @@ ${key.title}`.toLowerCase();
               const cards = this.look.cards(spot.column);
               const place = fitLevel(cards, { ...spot.place, level: line.level });
               job.landing = spot.column;
-              const at = this.placeOf(spot.column, placeOfGap(cards, place));
+              const at = this.placeOf(spot.column, placeOfGap(cards, place), line.placement);
               return { method: "createInPlace", args: at.kind === "subtask" ? [line.text, line.priority, at, line.repeat, line.labels] : [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null] };
             }
           }
@@ -4470,17 +4446,41 @@ ${key.title}`.toLowerCase();
       const list = listSpot(this.run(field.run).spot);
       if (!list) return null;
       if (field.rename) return field.rename.item.isSubtask ? null : this.placement(field);
-      return list.place.level > 0 ? null : this.columnPlacement(list.column);
+      if (list.place.level > 0) return null;
+      return field.placement ?? this.listPlacement(list);
     }
     /** Where a renamed task goes: where it was, until a place is chosen in the bar. */
     placement(field) {
+      if (field.placement) return field.placement;
       const item = field.rename?.item ?? null;
       const list = listSpot(this.run(field.run).spot);
-      if (list && (field.rename?.moved || !item)) return this.columnPlacement(list.column);
+      if (list && (field.rename?.moved || !item)) return this.listPlacement(list);
       return item ? this.tasks.placementOf(item) : this.columnPlacement("day");
+    }
+    /** Where a new task at `spot` goes: its column's place, or what its part writes where the list decides that itself. */
+    listPlacement(spot) {
+      if (spot.column !== "projects") return this.columnPlacement(spot.column);
+      return placementOfNewTask(this.partAt(spot)?.newTask ?? null) ?? { kind: "inbox" };
     }
     columnPlacement(column) {
       return column === "day" ? this.tasks.placementOfDay(this.look.day()) : { kind: column };
+    }
+    parts(column) {
+      return this.look.parts?.(column) ?? [];
+    }
+    /** The part a list spot stands in, where its list decides what a new task writes. */
+    partAt(spot) {
+      return this.parts(spot.column).find((part2) => part2.group === spot.place.group) ?? null;
+    }
+    /** The project a new task's field opened at `spot` starts with: its part's, where the list has parts; none elsewhere. */
+    partProject(spot) {
+      const list = listSpot(spot);
+      return (list && this.partAt(list)?.newTask?.project) ?? null;
+    }
+    /** The lists a task is looked for in: the shown ones first, then every other the entry knows. */
+    lookOrder() {
+      const shown2 = this.look.shown();
+      return [...shown2, ...ENTRY_LISTS.filter((c) => !shown2.includes(c))];
     }
     /** After the last card, in the last section, at the top level; with `project`, of that project's part where the list draws one. */
     endOf(column) {
@@ -4489,8 +4489,7 @@ ${key.title}`.toLowerCase();
       return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, group } };
     }
     find(key) {
-      const shown2 = this.look.shown();
-      for (const column of [...shown2, ...ALL_COLUMNS.filter((c) => !shown2.includes(c))]) {
+      for (const column of this.lookOrder()) {
         const index = this.look.cards(column).findIndex((card) => samePlace2(card.key, key));
         if (index >= 0) return { column, index };
       }
@@ -4503,7 +4502,7 @@ ${key.title}`.toLowerCase();
       else {
         this.saveRename(field, rename2);
         const under = list && !rename2.face && this.under(list, rename2.item);
-        this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: null } : null);
+        this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: this.partProject(under) } : null);
       }
     }
     /** The section goes to the queue and the field closes; a blank name writes nothing. */
@@ -4561,7 +4560,7 @@ ${key.title}`.toLowerCase();
     /** The field's text queued at its run, waiting under the cards until the lists show it written. */
     create(field) {
       const run = this.run(field.run);
-      const line = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0, project: field.project ?? null };
+      const line = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0, project: field.project ?? null, ...field.placement && { placement: field.placement } };
       run.pending.push(line);
       this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line });
     }
@@ -4721,6 +4720,59 @@ ${key.title}`.toLowerCase();
     const snapped = reachable && speed < DIVIDER_SNAP.slowSpeed && Math.abs(wanted - widths.center) <= DIVIDER_SNAP.distance;
     const width = snapped ? widths.center : Math.round(wanted);
     return { width: Math.min(widths.max, Math.max(widths.min, width)), snapped };
+  }
+
+  // core/application/timelineZoom.ts
+  var DEFAULT_ZOOM_HOUR = 56;
+  function parseZoomLevels(text) {
+    const levels = [];
+    for (const part2 of text.split(",")) {
+      const m = /^\s*(\d+)\s*(?::\s*\d+\s*)?$/.exec(part2);
+      if (!m) return null;
+      const hourPx = Number(m[1]);
+      if (hourPx <= 0) return null;
+      levels.push({ hourPx });
+    }
+    return levels.length > 0 ? levels : null;
+  }
+  function formatZoomLevels(levels) {
+    return levels.map((l) => String(l.hourPx)).join(", ");
+  }
+  function levelsFor(wholeDayPx, levels) {
+    const closer = [...levels].sort((a, b) => a.hourPx - b.hourPx).slice(1).filter((level) => level.hourPx > wholeDayPx);
+    return [{ hourPx: wholeDayPx }, ...closer];
+  }
+  var MINUTES_PER_HOUR2 = 60;
+  function gridAt(hourPx, measures) {
+    const px = (minutes) => minutes / MINUTES_PER_HOUR2 * hourPx;
+    const labels = measures.divisions.find((minutes) => px(minutes) >= measures.labelGap) ?? MINUTES_PER_HOUR2;
+    const ticks = px(measures.tickMinutes) >= measures.tickGap;
+    return { labels, lines: ticks ? measures.tickMinutes : labels };
+  }
+  function gridMarks(grid, dayHours) {
+    const marks = [];
+    for (let minutes = grid.lines; minutes < dayHours * MINUTES_PER_HOUR2; minutes += grid.lines) {
+      const minute = minutes % MINUTES_PER_HOUR2;
+      if (minute === 0) continue;
+      marks.push({ minute: minutes, label: minute % grid.labels === 0 ? `:${String(minute).padStart(2, "0")}` : null });
+    }
+    return marks;
+  }
+  function wholeDayOr(wholeDayPx, levels) {
+    return wholeDayPx ?? Math.min(...levels.map((level) => level.hourPx));
+  }
+  function zoomAfterPinch(hourPx, wholeDayPx, levels) {
+    return hourPx <= levelsFor(wholeDayOr(wholeDayPx, levels), levels)[0].hourPx ? "wholeDay" : hourPx;
+  }
+  function zoomShown(saved, wholeDayPx, levels) {
+    const ends = levelsFor(wholeDayOr(wholeDayPx, levels), levels);
+    const [min, max] = [ends[0].hourPx, ends[ends.length - 1].hourPx];
+    if (saved === "wholeDay") return min;
+    const hourPx = typeof saved === "number" && Number.isFinite(saved) && saved > 0 ? saved : DEFAULT_ZOOM_HOUR;
+    return Math.min(max, Math.max(min, hourPx));
+  }
+  function labelHidesNearNow(y, nowY, lift, pillHeight) {
+    return nowY !== null && Math.abs(y - nowY) < lift + pillHeight / 2;
   }
 
   // core/application/listDrop.ts
@@ -5321,6 +5373,62 @@ ${key.title}`.toLowerCase();
       this.name = "TasksFileMissingError";
     }
   };
+
+  // core/application/projectsEntry.ts
+  function projectsEntryLook(view) {
+    if (!view) return { cards: [], sections: [], parts: [] };
+    const cards = view.sections.flatMap((section) => section.rows.map((row) => ({ key: row.item.key, id: row.item.id, level: row.level, group: section.group })));
+    const own = view.newTask;
+    const plusAt = Math.max(0, own ? view.sections.findIndex((s) => s.newTask !== null && sameNewTask(s.newTask, own)) : -1);
+    const first = view.sections.findIndex((s, i) => i >= plusAt && s.newTask !== null);
+    return {
+      cards,
+      sections: view.sections.map((section) => section.group),
+      parts: view.sections.map((section, i) => ({ group: section.group, newTask: section.newTask, plus: i === first }))
+    };
+  }
+  function sameNewTask(a, b) {
+    const project = a.project === null || b.project === null ? a.project === b.project : projectKey(a.project) === projectKey(b.project);
+    return project && JSON.stringify(a.place) === JSON.stringify(b.place);
+  }
+  function placementOfNewTask(newTask2) {
+    const place = newTask2?.place;
+    if (!place || place.kind !== "list") return null;
+    return place.date ? { kind: "date", date: place.date } : { kind: place.list };
+  }
+  function targetOf(section, placement, today) {
+    if (placement) {
+      if (placement.kind !== "date") return { list: placement.kind, date: null };
+      const { list, date } = dayColumn(placement.date, today);
+      return { list, date };
+    }
+    const place = section.newTask?.place;
+    if (!place || place.kind !== "list") throw new StaleTaskError();
+    return { list: place.list, date: place.date ?? null };
+  }
+  function listOf3(item) {
+    return item.list === "done" ? null : item.list;
+  }
+  function projectsNewPlace(view, doc, entryOf, place, today) {
+    const section = view.sections.find((s) => s.group === place.group);
+    if (!section || !section.newTask && !place.placement) throw new StaleTaskError();
+    const { list, date } = targetOf(section, place.placement, today);
+    const at = place.before === null ? section.cards.length : section.cards.findIndex((card) => samePlace2(card.item.key, place.before));
+    if (at < 0) throw new StaleTaskError();
+    const dated = date === null ? {} : { date };
+    const above = section.cards.slice(0, at).filter((card) => listOf3(card.item) === list).pop();
+    if (above) {
+      const entry = entryOf(above.item.key);
+      const next = doc.tasks(list).find((other) => other.index > entry.index && other.group === entry.group);
+      return { kind: "list", list, group: entry.group, before: next ? keyOf(next) : null, ...dated };
+    }
+    const below = section.cards.slice(at).find((card) => listOf3(card.item) === list);
+    if (below) {
+      const entry = entryOf(below.item.key);
+      return { kind: "list", list, group: entry.group, before: keyOf(entry), ...dated };
+    }
+    return { kind: "list", list, group: null, before: null, ...dated };
+  }
 
   // core/application/notes.ts
   var MD = ".md";
@@ -6657,6 +6765,8 @@ ${key.title}`.toLowerCase();
           return { kind: "subtask", parent: this.entryOf(doc, place.parent), before: before(place.before) };
         case "slot":
           return place;
+        case "projects":
+          throw new StaleTaskError();
       }
     }
     /**
@@ -6787,11 +6897,20 @@ ${key.title}`.toLowerCase();
     }
     createWithId(text, priority, place, repeat, labels = [], project) {
       return {
-        operation: this.rules.createInPlace(text, priority, place, repeat, labels, project),
+        operation: place.kind === "projects" ? this.createInProjects(text, priority, place, repeat, labels, project) : this.rules.createInPlace(text, priority, place, repeat, labels, project),
         answer: (change) => {
           const created = change?.after.insertedSince(change.before);
           return created ? { key: keyOf(created), id: created.id } : null;
         }
+      };
+    }
+    /** A task typed in the Projects list: its place read off the screen as the file then stands (`projectsNewPlace`). */
+    createInProjects(text, priority, place, repeat, labels, project) {
+      if (this.rules.isBlank(text)) return null;
+      return (doc, today, settings, boundary) => {
+        const view = this.reads.projectsScreen({ text: "", doc, today, boundary });
+        const at = projectsNewPlace(view, doc, (key) => this.rules.entryOf(doc, key), place, today);
+        return this.rules.placeNew(text, priority, at, repeat, labels, project)(doc, today, settings, boundary);
       };
     }
     create(draft, slot) {
@@ -7816,6 +7935,8 @@ ${key.title}`.toLowerCase();
     placeShowing,
     swipeLanding,
     shownLists,
+    shownEntryLists,
+    projectsEntryLook,
     wholeWidth,
     grownStart,
     listWidths,
@@ -7836,7 +7957,8 @@ ${key.title}`.toLowerCase();
       sectioned: (column) => look.sectioned?.[column] ?? false,
       day: () => look.day,
       today: () => c.rules.today(),
-      shown: () => look.shown
+      shown: () => look.shown,
+      parts: (column) => look.parts?.[column] ?? []
     };
   }
   var ENTRY_METHODS = [
@@ -7846,6 +7968,7 @@ ${key.title}`.toLowerCase();
     "openIn",
     "openSlot",
     "openAtDrop",
+    "openAt",
     "subtaskSpot",
     "renameSpot",
     "stackSpot",
