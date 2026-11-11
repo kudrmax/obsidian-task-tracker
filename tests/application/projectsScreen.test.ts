@@ -319,10 +319,18 @@ describe("the one move to projects, whatever the first write is", () => {
 		return { store, svc: new TaskServiceImpl(store, new FakeSettingsStore(), clock, null, notes) };
 	};
 
-	it("is not stopped by a project made in the tree first: that one and the tasks' names stand before the move's notes", async () => {
+	it("is written as soon as the file is read, as tidying is, no step of undo", async () => {
+		const store = new InMemoryTaskFileStore(OLD);
+		const svc = new TaskServiceImpl(store, new FakeSettingsStore(), clock, new UndoHistory(store), notes);
+		await svc.screen(T);
+		expect(store.text).toBe(["## Inbox", "", "- [ ] Позвонить 🗂️ Дружба", "- [ ] iPhone", "\t- [ ] План", "", "## Projects", "", "- Дружба [[Дружба]]", "- Спорт [[Спорт]]", "", "## Now", "", "## Soon", "", "## Backlog", "", "## Done", ""].join("\n"));
+		expect(await svc.projectsScreen()).toMatchObject({ missing: false });
+	});
+
+	it("runs before the first action, so a project made then goes after the moved ones", async () => {
 		const { store, svc } = service(OLD);
 		await svc.createProject("Новый", { parent: null, before: null });
-		expect(store.text).toBe(["## Inbox", "", "- [ ] Позвонить 🗂️ Дружба", "- [ ] iPhone", "\t- [ ] План", "", "## Projects", "", "- Дружба [[Дружба]]", "- Новый", "- Спорт [[Спорт]]", "", "## Now", "", "## Soon", "", "## Backlog", "", "## Done", ""].join("\n"));
+		expect(store.text).toBe(["## Inbox", "", "- [ ] Позвонить 🗂️ Дружба", "- [ ] iPhone", "\t- [ ] План", "", "## Projects", "", "- Дружба [[Дружба]]", "- Спорт [[Спорт]]", "- Новый", "", "## Now", "", "## Soon", "", "## Backlog", "", "## Done", ""].join("\n"));
 	});
 
 	it("is not stopped by a ## Projects written by hand: old fields and 🎯 lines are moved on the next write", async () => {

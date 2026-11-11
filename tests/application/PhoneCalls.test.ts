@@ -342,15 +342,15 @@ describe("the door's screen settings", () => {
 describe("the door's notes", () => {
 	const ok = (answer: DoorAnswer) => (answer as Extract<DoorAnswer, { ok: true }>).result;
 
-	it("finds the notes that were projects by their tag, and the first write moves them into the tree with their notes attached", () => {
+	it("finds the notes that were projects by their tag, and the first read moves them into the tree with their notes attached, a tidy", () => {
 		const vault = [{ path: "Clients/Acme.md", text: "---\ntags: [client]\n---\n" }, { path: "Home.md", text: "#project" }];
 		const projects = ok(callDoor("rules.projectNotes", [vault, "#client"], context()));
 		expect(projects).toEqual([{ name: "Acme", path: "Clients/Acme.md", link: "Acme" }]);
 		const text = "## Inbox\n- [ ] Call 🗂️ [[Acme]]\n- [ ] Other\n";
-		const screen = ok(callDoor("tasks.screen", [T], context(text, { projects: projects as never }))) as { inbox: { project: unknown; key: unknown }[] };
-		expect(screen.inbox[0].project).toMatchObject({ name: "Acme", note: null, canOpenNote: false });
-		const moved = callDoor("tasks.setStatus", [screen.inbox[1].key, "done"], context(text, { projects: projects as never }));
-		expect((moved as { tasks: string }).tasks).toContain("- [ ] Call 🗂️ Acme\n\n## Projects\n\n- Acme [[Acme]]\n");
+		const read = callDoor("tasks.screen", [T], context(text, { projects: projects as never })) as Extract<DoorAnswer, { ok: true }>;
+		expect((read.result as { inbox: { project: unknown }[] }).inbox[0].project).toMatchObject({ name: "Acme", note: "Acme", canOpenNote: true });
+		expect(read.tasks).toContain("- [ ] Call 🗂️ Acme\n- [ ] Other\n\n## Projects\n\n- Acme [[Acme]]\n");
+		expect(read.step).toBeUndefined();
 	});
 
 	it("opens a project's note in Obsidian by its link", () => {

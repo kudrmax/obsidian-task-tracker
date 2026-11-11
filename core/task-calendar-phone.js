@@ -2400,9 +2400,6 @@
       markersOf(settings)
     );
   }
-  function readDocument(text, settings, today, boundary = boundaryOf(settings)) {
-    return normalize(parseText(text, settings).ensureSections(sectionNames(settings)), today, boundary, usablePresets(settings.groups.presets));
-  }
   function readingKey(settings) {
     return JSON.stringify([settings.sections, settings.groups.ungrouped, settings.groups.presets, markersOf(settings)]);
   }
@@ -6143,18 +6140,16 @@ ${key.title}`.toLowerCase();
       return isBlankTitle(text, this.priorityLevels().map((l) => l.prefix));
     }
     read(text, at = this.moment()) {
-      const { settings, today, boundary } = at;
-      const presets = usablePresets(settings.groups.presets);
+      const { settings } = at;
       const parsed = parseText(text, settings);
       const whole = parsed.ensureSections(sectionNames(settings));
-      const doc = normalize(whole, today, boundary, presets);
-      const changed2 = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
+      const doc = this.tidied(whole, at);
+      const changed2 = whole === parsed ? doc !== whole : this.tidied(parsed, at) !== parsed;
       return { doc: this.identified(text, doc, () => doc), changed: changed2 };
     }
     /** The text after `operation` on the document read and normalized; the result is normalized again. */
     change(text, operation, at = this.moment()) {
-      const { settings, today, boundary } = at;
-      const doc = readDocument(text, settings, today, boundary);
+      const doc = this.tidied(parseText(text, at.settings).ensureSections(sectionNames(at.settings)), at);
       return this.written(this.identified(text, doc, () => doc), operation, at);
     }
     /**
@@ -6187,9 +6182,15 @@ ${key.title}`.toLowerCase();
     idsFor(text) {
       return this.identity?.of(text, () => this.tidied(parseText(text, this.settings.get()).ensureSections(sectionNames(this.settings.get())), this.moment()));
     }
-    /** A document as today's tidying leaves it. */
+    /**
+     * A document as today's tidying leaves it: the one move to projects first while the file awaits it, so it is written
+     * as soon as the file is read (a tidy, no step of undo) and every action runs on a moved file.
+     */
     tidied(doc, at) {
-      return normalize(doc, at.today, at.boundary, usablePresets(at.settings.groups.presets));
+      const notes = this.legacyNotes();
+      const mark = at.settings.resultMark;
+      const moved2 = awaitsMove(doc, notes, mark) ? withTasksInTree(movedToProjects(doc, notes, mark)) : doc;
+      return normalize(moved2, at.today, at.boundary, usablePresets(at.settings.groups.presets));
     }
     /** The document after `operation` on `doc`, already read and normalized at `at`, normalized again. */
     changeOf(doc, operation, at = this.moment()) {
