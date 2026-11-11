@@ -428,6 +428,9 @@ const TASKS: Readonly<Record<string, Handler>> = {
 		if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from as string, c.rules.cleanName(to as string)!));
 		return renamed;
 	},
+	dropInProjects: (c, [cards, place]) => c.run(c.ask(c.writes.dropInProjects(cards as A, place as A))),
+	projectsDropPreview: (c, [cards, place]) => c.ask(c.writes.projectsDropPreview(cards as A, place as A)),
+	deleteProject: (c, [name]) => c.run(c.writes.deleteProject(name as string)),
 	setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name as string, (link ?? null) as string | null)),
 	dropOnProject: (c, [cards, to]) => {
 		const target = to === "none" ? null : projectOfNode(to as string);

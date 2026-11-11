@@ -382,8 +382,7 @@ export class TaskRules {
 			for (const card of cards) {
 				const entry = projectWrites.projectHolder(doc, this.entryOf(doc, card.key));
 				const projects = changed.get(entry.id)?.projects ?? entry.task.projects;
-				const without = card.from === null ? projects : ops.withProject(projects, card.from, false);
-				changed.set(entry.id, { entry, projects: to === null ? without : ops.withProject(without, to, true) });
+				changed.set(entry.id, { entry, projects: projectWrites.swappedProjects(projects, card.from, to) });
 			}
 			return doc.replaceAll([...changed.values()].map(({ entry, projects }) => [entry, { ...entry.task, projects: uniqueNames(projects) }] as const));
 		};
@@ -410,6 +409,10 @@ export class TaskRules {
 		const clean = this.cleanName(to);
 		if (clean === null || clean === from) return null;
 		return (doc) => projectWrites.renameProject(doc, from, clean);
+	}
+
+	deleteProject(name: string): Operation {
+		return (doc) => projectWrites.deleteProject(doc, name);
 	}
 
 	setProjectNote(name: string, link: string | null): Operation {
@@ -624,6 +627,10 @@ export class TaskRules {
 				return ops.setLabels(doc, entry, change.labels);
 			case "project":
 				return ops.setProjects(doc, entry, change.project === null ? [] : [change.project]);
+			case "swapProject": {
+				const holder = projectWrites.projectHolder(doc, entry);
+				return doc.replace(holder, { ...holder.task, projects: projectWrites.swappedProjects(holder.task.projects, change.from, change.to) });
+			}
 			case "dueDate":
 				return ops.setDueDate(doc, entry, change.date);
 			case "postpone":

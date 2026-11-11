@@ -25,6 +25,8 @@ import {
 	type ListSection,
 	type ProjectRef,
 	type ProjectsDrop,
+	type ProjectsDropPreview,
+	type ListPlace,
 	type ProjectsMode,
 	type ProjectsNodeId,
 	type ProjectsScreenState,
@@ -180,6 +182,10 @@ export class TaskServiceImpl implements TaskService {
 		return renamed;
 	}
 
+	deleteProject(name: string): Promise<void> {
+		return this.run(this.writes.deleteProject(name));
+	}
+
 	setProjectNote(name: string, link: string | null): Promise<void> {
 		return this.run(this.writes.setProjectNote(name, link));
 	}
@@ -188,6 +194,14 @@ export class TaskServiceImpl implements TaskService {
 		const target = to === "none" ? null : projectOfNode(to);
 		if (target === null && to !== "none") return Promise.resolve();
 		return this.run(this.writes.dropOnProject(cards, target));
+	}
+
+	async dropInProjects(cards: readonly ProjectsDrop[], place: ListPlace): Promise<readonly TaskKey[]> {
+		return this.run(await this.ask(this.writes.dropInProjects(cards, place)));
+	}
+
+	projectsDropPreview(cards: readonly ProjectsDrop[], place: ListPlace): Promise<ProjectsDropPreview> {
+		return this.ask(this.writes.projectsDropPreview(cards, place));
 	}
 
 	isBlankProjectName(name: string): boolean {

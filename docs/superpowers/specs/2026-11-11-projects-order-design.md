@@ -23,6 +23,11 @@ dragged only onto the tree, a task with subtasks shows «1/3» and never opens, 
 5. **By stage order is the funnel's: Inbox, Backlog, Soon, Today** (Done last, for closed tasks). By project sorts each
    section's cards in the same stage order, then the file's order inside a stage.
 6. Dropping a card on a tree row still moves it to that project (unchanged), and the tree keeps its own drags.
+7. **Delete project** (Max, 2026-11-11): the project menu offers Delete project, destructive, asked first with words that
+   say the tasks stay. Deleting a project **never deletes, closes or moves a task**: its line leaves `## Projects`, its
+   `🗂️ Name` leaves every task line that has it (a task left with none shows under No project), its subprojects move up
+   a level into its place in order, an attached note's file is untouched. One undo brings it all back. Not offered for
+   All, No project or Done.
 
 The plugin comes first (Max: «плагин в приоритете»); the iPhone app follows in its own stage with the same contract.
 
@@ -37,3 +42,39 @@ The plugin comes first (Max: «плагин в приоритете»); the iPho
 ## Decisions
 
 (the agents add theirs here, numbered from 1)
+
+### Backend
+
+1. **Delete project** (Max's item 7). `tasks.deleteProject(name)`: the tree line goes, the subprojects lifted a level
+   into its place in order (`ProjectTree.deleted`), the `🗂️` of that project goes from every task line, subtask and Done
+   lines included (`ProjectWrites.deleteProject`); nothing else in any line changes. One write, one step of undo; a name
+   the tree lacks changes nothing; the chosen node falls back to All. `ProjectMenu.delete` `{ label: "Delete project",
+   title: "Delete “Name”?", message: "Its tasks stay; they just lose this project.", confirm: "Delete", cancel:
+   "Cancel", destructive: true }`; the menu exists only for a project, so All, No project and Done never offer it.
+2. **Every part a drop can go to shows, empty too.** By stage the four stages always (Inbox, Backlog, Soon, Today; Done
+   only under Done, with cards); By project every live subproject of the node (All: every live project) and the node's
+   own part. Each `ProjectsSection` says `empty`, `header` and `plate` (the No tasks plate: an empty part with a header,
+   or the only part; the node's own part, empty above subprojects, draws nothing). Under Done and a done project an
+   empty part is still left out, and `ProjectsView.reorders` is false there: closed tasks are not reordered. This
+   replaces «an empty part left out» of the parent spec's decision 8 for live nodes.
+3. **One mechanism with the lists.** The gesture is the lists' own: a part is a section (`ProjectsSection.group`, null
+   for the untitled part, `PlacedHead.opens` true for every header), its `rows` (`ProjectsListRow` `{ id, item, level,
+   card, drop }`) are what `ListGroup.rows` are, so `placeAt`, `placeOfDrop`, `branchOf` and `gapBranch` run unchanged.
+   The write is the funnel's own moves (`moveToGroup`, `nest`) run through `applyAll`, plus a `swapProject` step. The
+   call is `tasks.dropInProjects(cards, place)` with `projectsDropPreview(cards, place)` (`{ landings, view, tasks }`)
+   rather than a new `DropTo`: a Projects card carries the project it is shown under (`ProjectsDrop`), which a
+   `DroppedTask` (key and column) has no room for, and its landing is on the Projects screen, not the funnel's.
+4. **Where a drop between cards goes, both modes:** right after the card above it in the file (before the next task of
+   that card's list and section that is not being dropped, else that section's end), in that card's list and section;
+   no card above: right before the card below; an empty part: where its plus writes (`newTask.place`). The dropped
+   cards are neither above nor below, nor is the second card of a task shown in two parts. Today is Now and is written
+   as the day list's drop writes it (`moveToGroup` to Now: dated today).
+5. **The project swap** is a new `TaskChange` `swapProject` `{ from, to }`, the very rule `dropOnProject` now runs too
+   (`swappedProjects`): `from` off, `to` last, the others kept. By project only, when the part's project (the node's
+   for its own part, none for No project's) differs from the card's `from`. A subtask's row carries its card's `from`;
+   a subtask let go between cards becomes a task with its parent's projects (as in the lists), then the swap. A nest
+   place writes only the nest: a subtask has its parent's projects.
+6. **By stage keeps the file's order inside a stage** (the list's order), not the order of the branch's projects.
+7. **A part the screen no longer has** (or a list that takes no drop) rejects with StaleTaskError, writing nothing.
+8. **The landing** prefers the part the card was dropped in when the task shows in two; a nested card lands as a
+   `subtask` of its new parent.

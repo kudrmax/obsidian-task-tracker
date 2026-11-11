@@ -16,8 +16,10 @@ describe("the door's Projects screen", () => {
 		const view = call("tasks.projectsScreen", [], { projectsScreen: moded.projectsScreen }).result as ProjectsView;
 		expect(view).toMatchObject({ selected: "project:Дружба", mode: "byStage", title: "Дружба" });
 		expect(view.sections.map((s) => [s.title, s.cards.map((c) => [c.item.title, c.over])])).toEqual([
-			["Today", [["Call", null]]],
 			["Inbox", [["Voice", "Small talk"]]],
+			["Backlog", []],
+			["Soon", []],
+			["Today", [["Call", null]]],
 		]);
 	});
 

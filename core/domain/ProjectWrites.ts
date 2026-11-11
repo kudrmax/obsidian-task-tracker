@@ -108,6 +108,21 @@ export function renameProject(doc: TaskDocument, from: string, to: string): Task
 	return rewritten.withProjectTree(renamed);
 }
 
+/**
+ * The project gone: its line out of the tree, its subprojects lifted into its place, and its field off every task line
+ * that has it (subtask lines too). No task is removed, closed or moved; the note's file is never touched. A name the tree
+ * lacks: nothing.
+ */
+export function deleteProject(doc: TaskDocument, name: string): TaskDocument {
+	const tree = doc.projectTree().withMissing(taskProjects(doc));
+	const deleted = tree.deleted(name);
+	if (deleted === tree) return doc;
+	const key = projectKey(name);
+	const named = flatten(doc.allTasks()).filter((entry) => entry.task.projects.some((p) => projectKey(p) === key));
+	const rewritten = doc.replaceAll(named.map((entry) => [entry, { ...entry.task, projects: entry.task.projects.filter((p) => projectKey(p) !== key) }] as const));
+	return rewritten.withProjectTree(deleted);
+}
+
 /** A new project at `place` of the tree (the tasks' own projects kept in it); a name it has: nothing. */
 export function addProject(doc: TaskDocument, name: string, place: TreePlace): TaskDocument {
 	const tree = doc.projectTree().withMissing(taskProjects(doc));
@@ -127,6 +142,14 @@ export function setProjectNote(doc: TaskDocument, name: string, note: string | n
 	const tree = doc.projectTree().withMissing(taskProjects(doc));
 	const changed = tree.withNote(name, note);
 	return changed === tree ? doc : doc.withProjectTree(changed);
+}
+
+/** A task's projects with `from` giving way to `to` (null `from`: `to` added; null `to`: `from` taken off), the others kept in order. */
+export function swappedProjects(projects: readonly string[], from: string | null, to: string | null): readonly string[] {
+	const without = from === null ? projects : projects.filter((p) => projectKey(p) !== projectKey(from));
+	if (to === null) return uniqueNames(without);
+	const kept = without.filter((p) => projectKey(p) !== projectKey(to));
+	return uniqueNames([...kept, projects.find((p) => projectKey(p) === projectKey(to)) ?? to]);
 }
 
 /** The top-level task a project change of `entry` writes: a subtask's projects are its top task's. */
