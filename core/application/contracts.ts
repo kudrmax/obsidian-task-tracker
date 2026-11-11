@@ -59,13 +59,13 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
 export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
-export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+export { placeOfList, placeShowing, SCREEN_PLACES, SHOWN_LISTS, shownLists, SWIPE_FLICK_SPEED, swipeLanding, WHEEL_PLACES, type ScreenAt, type ScreenPlace, type ScreenSpot, type WheelAt, type WheelPlace, type WheelSpot } from "./screenPlaces";
 /**
  * The copy of a pressed card that shows its whole title: `wholeWidth(card, room)` how wide it grows (null: the card shows
  * its title whole and is lifted itself), `grownStart(start, size, grown, room, margin)` where it starts on one axis.
  */
 export { grownStart, type GrownWidth, type TitleFit, type WholeRoom, wholeWidth } from "./wholeCard";
-import type { ScreenAt as ScreenAtOf } from "./screenPlaces";
+import type { ScreenAt as ScreenAtOf, WheelAt as WheelAtOf } from "./screenPlaces";
 /** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
 export { SectionNameEntry } from "./SectionNameEntry";
 /** What a task menu's repeat page writes: a rule changed there as the menu closes, unless it is the task's own again; Remove at once. */
@@ -1404,6 +1404,8 @@ export interface DayService {
 	step(date: LocalDate, days: number): LocalDate;
 	/** Where a swipe or a day arrow leads from `from`, a step back (-1) or on (1); null past the row's ends. */
 	stepScreen(from: ScreenAtOf, shift: -1 | 1): ScreenAtOf | null;
+	/** `stepScreen` on the wheel, Projects first, left of Inbox (`WHEEL_PLACES`): what a swipe or the wheel's arrows walk now. */
+	stepWheel(from: WheelAtOf, shift: -1 | 1): WheelAtOf | null;
 	/** Where the timeline of `date` opens: today on the now line, another day at the hour the settings name. */
 	openAt(date: LocalDate): DayOpening;
 	/**

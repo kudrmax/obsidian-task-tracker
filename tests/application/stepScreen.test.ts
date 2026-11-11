@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stepScreen } from "../../core/application/screenPlaces";
+import { stepScreen, stepWheel } from "../../core/application/screenPlaces";
 import { placeIndex } from "../../obsidian/ui/screens";
 
 const TODAY = "2026-11-01";
@@ -39,5 +39,20 @@ describe("stepScreen", () => {
 		expect(stepScreen({ mode: "done", date: TODAY }, 1, DAYS)).toEqual({ mode: "inbox", date: TODAY });
 		expect(stepScreen({ mode: "done", date: TODAY }, -1, DAYS)).toBeNull();
 		expect(stepScreen({ mode: "inbox", date: TODAY }, -1, DAYS)).toBeNull();
+	});
+});
+
+describe("stepWheel: the screens with Projects first, left of Inbox", () => {
+	it("goes back from Inbox and Soon to Projects, nowhere back from there, and on from it to Inbox", () => {
+		expect(stepWheel({ mode: "inbox", date: TODAY }, -1, DAYS)).toEqual({ mode: "projects", date: TODAY });
+		expect(stepWheel({ mode: "projects", date: TODAY }, -1, DAYS)).toBeNull();
+		expect(stepWheel({ mode: "projects", date: TODAY }, 1, DAYS)).toEqual({ mode: "inbox", date: TODAY });
+	});
+
+	it("goes from Done on to Inbox and back to Projects; the rest walks as stepScreen", () => {
+		expect(stepWheel({ mode: "done", date: TODAY }, 1, DAYS)).toEqual({ mode: "inbox", date: TODAY });
+		expect(stepWheel({ mode: "done", date: TODAY }, -1, DAYS)).toEqual({ mode: "projects", date: TODAY });
+		expect(stepWheel({ mode: "inbox", date: TODAY }, 1, DAYS)).toEqual({ mode: "soon", date: TODAY });
+		expect(stepWheel({ mode: "calendar", date: TODAY }, -1, DAYS)).toEqual({ mode: "soon", date: TODAY });
 	});
 });

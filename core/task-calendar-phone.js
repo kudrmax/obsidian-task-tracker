@@ -3285,6 +3285,18 @@ ${key.title}`.toLowerCase();
     const place = spotIndex(from.mode) + shift;
     return place >= 0 && place < SCREEN_PLACES.length ? { mode: SCREEN_PLACES[place], date: from.date } : null;
   }
+  var WHEEL_PLACES = ["projects", ...SCREEN_PLACES];
+  function shownLists(place) {
+    return place === "projects" ? [] : SHOWN_LISTS[place];
+  }
+  function placeOfList(column, place) {
+    return placeShowing(column, place === "projects" ? "inbox" : place);
+  }
+  function stepWheel(from, shift, today) {
+    if (from.mode === "projects") return shift > 0 ? { mode: "inbox", date: from.date } : null;
+    if (shift < 0 && (from.mode === "inbox" || from.mode === "done")) return { mode: "projects", date: from.date };
+    return stepScreen({ mode: from.mode, date: from.date }, shift, today);
+  }
   var SWIPE_FLICK_SPEED = 0.3;
   function swipeLanding(moved2, distance, speed) {
     if (moved2 === 0) return 0;
@@ -7458,6 +7470,7 @@ ${key.title}`.toLowerCase();
     relation: (c, [date]) => dayRelation(date, c.rules.today()),
     step: (_c, [date, days]) => addDays(date, days),
     stepScreen: (c, [from, shift]) => stepScreen(from, shift, c.rules.today()),
+    stepWheel: (c, [from, shift]) => stepWheel(from, shift, c.rules.today()),
     openAt: (c, [date]) => dayOpening(date, boundaryOf2(c), c.rules.today(), c.now, c.settings.scrollToHour),
     /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
     boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
@@ -7693,6 +7706,8 @@ ${key.title}`.toLowerCase();
     gapBranch,
     placeShowing,
     swipeLanding,
+    shownLists,
+    placeOfList,
     wholeWidth,
     grownStart,
     listWidths,
@@ -7702,7 +7717,7 @@ ${key.title}`.toLowerCase();
     onTheDay,
     canPick
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, WHEEL_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };
