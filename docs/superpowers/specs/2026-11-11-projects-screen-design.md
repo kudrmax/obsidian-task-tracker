@@ -1,7 +1,10 @@
 # Projects screen: long-term planning
 
-Status: plan, waiting for Max's yes. Max's spec: «Спека — экран Projects» (2026-11-11). Boards: the canvas «Проекты: дерево
-и задачи» (https://claude.ai/artifact/LzBy4xktpJtsJPM7Ppo33G): pages «Экран», «Дерево: варианты» → variant В, «Десктоп».
+Status: approved by Max 2026-11-11, being built. Max's own spec, in his words: `2026-11-11-projects-screen-max.md` beside
+this file; it and this file are one spec. Boards (approved): `docs/design/canvas/projects-screen/` — `Main` (a project, By
+project), `ByStage`, `Drag` (drop onto the tree), `AllStage` (All, By stage), `Nav` (how to get there), `TreeC` (the tree,
+variant В), `SubSel` (a subproject chosen), `DeskProj` and `DeskAll` (desktop). Source canvas:
+https://claude.ai/artifact/LzBy4xktpJtsJPM7Ppo33G. Variants А, Б and Г of the tree were rejected.
 Where this file and the boards disagree, the boards win.
 
 ## The idea
