@@ -82,3 +82,19 @@ task can be put straight into it.
 5. **A folder on the Project page and the quick entry's panel is a plain disabled row** (`MenuProjectOption.disabled` → the row's `disabled`), at the tile-off opacity, no extra icon; its subprojects stay checkable under it (= the iPhone's decision 2).
 6. **The plus over a folder's tasks shows no drop line where letting go writes nothing**: already so, `TasksDrop` draws the line only where the part's `newTask` (else the list's) is given (= the iPhone's decision 3). A tap on the plus with a folder chosen does nothing, as with Done. A folder's By stage plates show and do nothing (Backend 5), as Done's.
 7. **The tree draws a folder as any project**: no mark of its own on its row. What tells it is the Folder switch in its menu and the refusals; the grey name follows `muted` only.
+### iPhone app
+
+1. **Folder is a stock `Toggle` in the project menu, right under Rename**, in Rename's group (both act on the project
+   itself; Note and Delete project keep their own groups). Symbol `folder`. On, iOS draws its checkmark; while the core
+   says `disabled`, the row is greyed and the core's `reason` («Has tasks of its own») is the row's subtitle. A tap
+   closes the menu (a menu's stock toggle does), writes `setProjectFolder(name, !on)` and reads the screen again.
+2. **A folder's option on the Project page and in the quick entry's/New Task's project choice** is a stock disabled menu
+   row (greyed, no tap), with no extra symbol; the menu's own grey says it can't be picked, and its subprojects keep
+   their parent's name under them as before.
+3. **The plus held over a folder's tasks shows no drop line** where letting go writes nothing: the line is shown only
+   where the part's `newTask` (else the list's) is given, the same answer the let-go reads. So the plus over an empty
+   folder's list, Done, or a folder's hand-given own part shows nothing and flies back; over a subproject's part it shows
+   the line and types a task of that subproject.
+4. `ProjectsSection.takes` is decoded but drives nothing yet: the app's Projects list takes no card drops between cards
+   (only the tree takes a card, by `acceptsTask`), so the part's refusal is already the core's `newTask` null and
+   `plate` false.

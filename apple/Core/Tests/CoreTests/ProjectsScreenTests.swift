@@ -37,8 +37,9 @@ import Testing
         #expect(view.rows.map(\.title) == ["All", "Окружение", "Где знакомиться", "Свидание", "Дружба", "Small talk", "Спорт", "No project", "Done"])
         #expect(view.rows.map(\.depth) == [0, 0, 1, 1, 0, 1, 0, 0, 0])
         #expect(view.rows.filter(\.tile).map(\.title) == ["All", "Окружение", "Дружба", "Спорт", "No project", "Done"])
-        #expect(view.rows.first { $0.title == "Спорт" }?.waiting == true)
-        #expect(view.rows.filter(\.muted).map(\.title) == ["Где знакомиться", "Свидание", "Спорт", "No project", "Done"])
+        // Grey only a branch with no open task at all: «Спорт»'s Backlog task draws it in full colour.
+        #expect(view.rows.first { $0.title == "Спорт" }?.waiting == false)
+        #expect(view.rows.filter(\.muted).map(\.title) == ["No project", "Done"])
         #expect(view.rows.first { $0.title == "Окружение" }?.waiting == false)
         #expect(view.selected == "all" && view.mode == "byProject")
         #expect(view.modes.map(\.label) == ["By project", "By stage"])
