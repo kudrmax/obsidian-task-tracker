@@ -92,8 +92,8 @@ final class QuickEntryHost {
 
     /// The field, or nil while no entry is open.
     private(set) var state: EntryView?
-    /// What each list draws for the field.
-    private(set) var lists: [BoardColumn: ListEntryView] = [:]
+    /// What each list draws for the field, by the core's name of the list (`EntryList`: a funnel's column or `projects`).
+    private(set) var lists: [String: ListEntryView] = [:]
     /// The field's minute from the day's start, when it stands on the calendar.
     private(set) var slotMinute: Int?
     /// The renames entered and not yet written (`PendingRename`), each task's new text by its id: its card shows that
@@ -103,7 +103,7 @@ final class QuickEntryHost {
     private(set) var moved = 0
     /// The rows of each list's typed lines and, last, its field, by keys that never repeat: Enter turns the field's row
     /// into the line typed in it and opens a new row for the field under it; a line written leaves its row to its card.
-    private(set) var lineKeys: [BoardColumn: [String]] = [:]
+    private(set) var lineKeys: [String: [String]] = [:]
     /// A card made from a typed line keeps that line's row (its key): the text becomes the card in place, never one copy
     /// going as another comes.
     private(set) var heirs: [String: String] = [:]
@@ -163,9 +163,23 @@ final class QuickEntryHost {
         opening { call("openAtDrop", [column.map { .string($0.rawValue) } ?? .null, result]) }
     }
 
-    /// A tap on a «No tasks» plate: the field of a new task in that section.
-    func openIn(_ column: BoardColumn, _ group: String?) {
-        opening { call("openIn", [.string(column.rawValue), group.json]) }
+    /// A tap on a «No tasks» plate: the field of a new task in that section of list `list` (a column's, or `projects`).
+    func openIn(_ list: String, _ group: String?) {
+        opening { call("openIn", [.string(list), group.json]) }
+    }
+
+    /// The plus let go at `place` (`ListPlace`) of list `list`: the field of a new task there.
+    func openAt(_ list: String, _ place: JSONValue) {
+        opening { call("openAt", [.string(list), place]) }
+    }
+
+    /// Whether a tap on the plus opens a field here (`plusOpens`): not on Projects where no part takes it, as under Done.
+    var plusOpens: Bool { value("plusOpens", [])?.bool ?? false }
+
+    /// The plus tapped: the field where the core says the plus types (`openFromPlus`), nothing where it types nowhere.
+    func openFromPlus() {
+        guard plusOpens else { return }
+        opening { call("openFromPlus", []) }
     }
 
     /// Add Subtask: the field last among the task's subtasks in its list; a task only on the calendar is lifted where it
@@ -306,6 +320,7 @@ final class QuickEntryHost {
     /// A place chosen in the bar: the field goes to the end of that column at once and the ribbon goes there; another day
     /// opens once what was typed is written, the field then at the end of that day's list.
     func choosePlace(_ placement: JSONValue) {
+        // A field in the Projects list stays where it stands (`{ column: "projects" }`): no column to turn to.
         guard let move = value("choosePlace", [placement], keep: true), !move.isNull, let column = move["column"].string.flatMap(BoardColumn.init) else { return }
         turn(to: column)
         guard let day = move["day"].string else { return }
@@ -372,19 +387,19 @@ final class QuickEntryHost {
 
     // MARK: The door
 
-    /// The lists each place of the ribbon shows, in order, as the core says (`rules.shownLists`): Projects none.
+    /// The lists each place of the ribbon shows, in order, as the core says (`rules.shownEntryLists`): on Projects its own.
     private func shown(at place: RibbonPlace) -> [String] {
         if let known = shownLists[place.key] { return known }
-        let found: [String] = model?.ruleNow("rules.shownLists", [.string(place.key)]) ?? []
+        let found: [String] = model?.ruleNow("rules.shownEntryLists", [.string(place.key)]) ?? []
         shownLists[place.key] = found
         return found
     }
 
     @ObservationIgnored private var shownLists: [String: [String]] = [:]
 
-    /// The screen as the entry reads it: each list's cards and sections, which show sections, the day, and the lists the
-    /// ribbon's place shows.
-    private func look(_ snapshot: BoardSnapshot) -> JSONValue {
+    /// The screen as the entry reads it: each list's cards and sections, which show sections, the day, the lists the
+    /// ribbon's place shows, and the Projects list (`projects`) with its parts as the core gives them.
+    private func look(_ snapshot: BoardSnapshot, projects: ProjectsEntryLook? = nil) -> JSONValue {
         var cards: [String: JSONValue] = [:]
         var sections: [String: JSONValue] = [:]
         var sectioned: [String: JSONValue] = [:]
@@ -394,19 +409,27 @@ final class QuickEntryHost {
             sectioned[column.rawValue] = .bool(list.sectioned)
         }
         let shown = shown(at: model?.place ?? .today)
-        var look: [String: JSONValue] = ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map(JSONValue.string))]
-        // A project's view: every task written here gets its project.
-        return .object(look)
+        var parts: [String: JSONValue] = [:]
+        if shown.contains(Self.projects), let list = projects ?? model?.projects.entryLook {
+            cards[Self.projects] = list.cards
+            sections[Self.projects] = list.sections
+            sectioned[Self.projects] = false
+            parts[Self.projects] = list.parts
+        }
+        return ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map(JSONValue.string)), "parts": .object(parts)]
     }
+
+    /// The core's name of the Projects list (`EntryList`).
+    static let projects = "projects"
 
     private static func listCards(_ cards: [BoardCard]) -> JSONValue {
         .array(cards.map(\.listCard))
     }
 
-    private func answer(_ method: String, _ arguments: [JSONValue], over snapshot: BoardSnapshot? = nil) -> JSONValue? {
+    private func answer(_ method: String, _ arguments: [JSONValue], over snapshot: BoardSnapshot? = nil, projects: ProjectsEntryLook? = nil) -> JSONValue? {
         guard let snapshot = snapshot ?? model?.snapshot else { return nil }
         do {
-            return try board.entry(method, [session, look(snapshot)] + arguments)
+            return try board.entry(method, [session, look(snapshot, projects: projects)] + arguments)
         } catch {
             model?.problem(error)
             return nil
@@ -434,16 +457,16 @@ final class QuickEntryHost {
         return reply["value"]
     }
 
-    private func apply(_ reply: JSONValue, over snapshot: BoardSnapshot? = nil) {
+    private func apply(_ reply: JSONValue, over snapshot: BoardSnapshot? = nil, projects: ProjectsEntryLook? = nil) {
         session = reply["session"]
         let renames = Self.renames(reply["renamed"])
         if renames != renamedTexts { renamedTexts = renames }
-        show(reply["state"], over: snapshot)
+        show(reply["state"], over: snapshot, projects: projects)
         if case .array(let jobs) = session["jobs"], !jobs.isEmpty { pump() }
     }
 
     /// The state drawn: the field's text in the text field, and where each list draws it.
-    private func show(_ raw: JSONValue, over snapshot: BoardSnapshot? = nil) {
+    private func show(_ raw: JSONValue, over snapshot: BoardSnapshot? = nil, projects: ProjectsEntryLook? = nil) {
         let next: EntryView? = raw.isNull ? nil : try? raw.decode(EntryView.self)
         let before = state
         state = next
@@ -470,27 +493,33 @@ final class QuickEntryHost {
             KeyboardRise.shared.next { [weak self] in
                 guard let self, self.placed == mine, self.state != nil else { return }
                 withAnimation(.snappy) {
-                    self.placeField(over: snapshot)
+                    self.placeField(over: snapshot, projects: projects)
                     self.moved += 1
                 }
             }
         } else {
             placed += 1
-            placeField(over: snapshot)
+            placeField(over: snapshot, projects: projects)
             if shift { moved += 1 }
         }
         field.begin()
     }
 
     /// Where the field stands in each list, and on the calendar, for the screen as it is about to be drawn.
-    private func placeField(over snapshot: BoardSnapshot? = nil) {
+    private func placeField(over snapshot: BoardSnapshot? = nil, projects: ProjectsEntryLook? = nil) {
         guard let snapshot = snapshot ?? model?.snapshot, let state else { return }
-        var found: [BoardColumn: ListEntryView] = [:]
+        var found: [String: ListEntryView] = [:]
         if state.spotKind == "list" {
+            var drawings: [String: JSONValue] = [:]
             for (column, list) in snapshot.lists {
-                let drawn: JSONValue = ["cards": Self.listCards(list.cards), "sections": list.places]
-                if let entry = answer("listEntry", [.string(column.rawValue), drawn], over: snapshot)?["value"], !entry.isNull {
-                    found[column] = try? entry.decode(ListEntryView.self)
+                drawings[column.rawValue] = ["cards": Self.listCards(list.cards), "sections": list.places]
+            }
+            // The Projects list draws what the core reads of it: the drawing is the look's own.
+            if state.spot["column"].string == Self.projects { drawings[Self.projects] = .null }
+            for (list, drawn) in drawings {
+                let arguments: [JSONValue] = drawn.isNull ? [.string(list)] : [.string(list), drawn]
+                if let entry = answer("listEntry", arguments, over: snapshot, projects: projects)?["value"], !entry.isNull {
+                    found[list] = try? entry.decode(ListEntryView.self)
                 }
             }
         }
@@ -511,8 +540,8 @@ final class QuickEntryHost {
 
     /// Each list's row keys for the lines and the field it now draws: lines written leave from the front (the first to the
     /// card just made), lines typed take the field's row and the field a new one; a card gone from the lists frees its key.
-    private func keepKeys(_ found: [BoardColumn: ListEntryView], of snapshot: BoardSnapshot) {
-        var keys: [BoardColumn: [String]] = [:]
+    private func keepKeys(_ found: [String: ListEntryView], of snapshot: BoardSnapshot) {
+        var keys: [String: [String]] = [:]
         for (column, entry) in found {
             let lines = entry.pending.count
             var kept = lineKeys[column] ?? []
@@ -529,7 +558,7 @@ final class QuickEntryHost {
             keys[column] = kept
         }
         lineKeys = keys
-        let drawn = Set(snapshot.lists.values.flatMap { $0.cards.map(\.id) })
+        let drawn = Set(snapshot.lists.values.flatMap { $0.cards.map(\.id) } + (model?.projects.parts.flatMap { $0.cards.map(\.item.id) } ?? []))
         if heirs.keys.contains(where: { !drawn.contains($0) }) { heirs = heirs.filter { drawn.contains($0.key) } }
     }
 
@@ -544,7 +573,8 @@ final class QuickEntryHost {
         return try? entry.decode(StackEntryView.self)
     }
 
-    /// The screen was read anew (a write elsewhere, another day): the field keeps its place among the cards as drawn.
+    /// The screen was read anew (a write elsewhere, another day, the Projects list read again): the field keeps its place
+    /// among the cards as drawn.
     func screenChanged() {
         guard state != nil else { return }
         placed += 1
@@ -609,6 +639,9 @@ final class QuickEntryHost {
             model.problem(error)
             read = nil
         }
+        // On Projects the Projects list is read with the screen and drawn in the same transaction: the line typed there
+        // ends in the drawing that shows its card.
+        let projectsRead = model.place == .projects ? await ProjectsBoard.fetch(board, screen: model.menuScreen) : nil
         if method == "edit", case .success(let answer) = written, let item = try? answer.decode(TaskItem.self) { renamed?(item) }
         let created: JSONValue? = if method == "createInPlace", case .success(let made) = written, !made.isNull, read != nil { made } else { nil }
         let stack = created != nil && state?.spotKind == "stack" ? await stackRead?() : nil
@@ -621,18 +654,22 @@ final class QuickEntryHost {
         return finish(id, motion: motion) {
             if method == "createInPlace" {
                 var reply: JSONValue?
+                let projects = projectsRead?.entryLook
                 if let created, let read {
-                    let coming = JSONValue.object(Dictionary(uniqueKeysWithValues: read.lists.map { ($0.key.rawValue, Self.listCards($0.value.cards)) }))
-                    reply = answer("shown", [.string(id), created, coming], over: read)
+                    var coming = Dictionary(uniqueKeysWithValues: read.lists.map { ($0.key.rawValue, Self.listCards($0.value.cards)) })
+                    if let projects { coming[Self.projects] = projects.cards }
+                    reply = answer("shown", [.string(id), created, .object(coming)], over: read, projects: projects)
                     heirComing = reply == nil ? nil : created["id"].string
                 }
-                if reply == nil { reply = answer("unshown", [.string(id)], over: read) }
+                if reply == nil { reply = answer("unshown", [.string(id)], over: read, projects: projects) }
                 if let read { model.draw(read) }
+                if let projectsRead { model.projects.draw(projectsRead) }
                 stack?()
-                if let reply { apply(reply, over: read) }
+                if let reply { apply(reply, over: read, projects: projects) }
             } else if let read {
                 model.draw(read)
-                placeField(over: read)
+                if let projectsRead { model.projects.draw(projectsRead) }
+                placeField(over: read, projects: projectsRead?.entryLook)
             }
         }
     }

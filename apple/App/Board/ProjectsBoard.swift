@@ -24,7 +24,7 @@ final class ProjectsBoard {
 
     /// The tree's row a carried card would be let go on: lit in the drop's colour.
     var dropOn: String?
-    /// The name asked: a task typed for the plus let go on the tasks, a project for the plus in the tree, a rename.
+    /// The name asked: a project for the plus in the tree, a rename.
     var asking: Ask?
     /// The project Delete project was chosen for, its question shown before anything is written.
     var deleting: ProjectMenu?
@@ -36,13 +36,11 @@ final class ProjectsBoard {
     }
 
     enum Ask: Identifiable {
-        case task(ProjectsNewTask)
         case project(JSONValue)
         case rename(String)
 
         var id: String {
             switch self {
-            case .task: "task"
             case .project: "project"
             case .rename(let name): "rename/" + name
             }
@@ -50,7 +48,6 @@ final class ProjectsBoard {
 
         var title: String {
             switch self {
-            case .task: String(localized: "New Task")
             case .project: String(localized: "New Project")
             case .rename: String(localized: "Rename Project")
             }
@@ -58,7 +55,7 @@ final class ProjectsBoard {
 
         var action: String {
             switch self {
-            case .task, .project: String(localized: "Add")
+            case .project: String(localized: "Add")
             case .rename: String(localized: "Rename")
             }
         }
@@ -68,34 +65,59 @@ final class ProjectsBoard {
 
     /// The page read again over the files as they are now, its cards painted and their menus asked.
     func read() async {
-        guard let model else { return }
-        let board = board, screen = model.menuScreen
-        guard let read = try? await Task.detached(operation: { () throws -> (ProjectsView, [[BoardCard]], [String: TaskMenuModel]) in
+        guard let model, let read = await Self.fetch(board, screen: model.menuScreen) else { return }
+        withAnimation(.snappy) {
+            draw(read)
+            model.entry.screenChanged()
+        }
+    }
+
+    /// The page as read once: the view, its parts' rows painted, their menus, and the list as the quick entry reads it.
+    struct Read: Sendable {
+        let view: ProjectsView
+        let rows: [[BoardCard]]
+        let menus: [String: TaskMenuModel]
+        let entryLook: ProjectsEntryLook
+    }
+
+    /// The page read off the main thread; nil when the files cannot be read.
+    static func fetch(_ board: TaskBoard, screen: JSONValue) async -> Read? {
+        try? await Task.detached(operation: { () throws -> Read in
             let view = try board.projectsScreen()
             var drawn: [[BoardCard]] = []
             var menus: [String: TaskMenuModel] = [:]
             for section in view.sections {
-                let painted = try board.cards(section.cards.map { ListRow(item: $0.item, level: 0) })
-                drawn.append(zip(section.cards, painted).map { Self.card($0.1, as: $0.0) })
-                for card in section.cards {
-                    for item in [card.item] + (card.item.card.step.map { [$0] } ?? []) where menus[item.id] == nil {
-                        menus[item.id] = try board.read("tasks.menu", [item.json, .string(card.menuFrom), screen], over: board.settingsOnly())
+                let painted = try board.cards(section.rows.map { ListRow(item: $0.item, level: $0.level) })
+                drawn.append(zip(section.rows, painted).map { Self.card($0.1, as: $0.0) })
+                for row in section.rows {
+                    let from = row.card?.menuFrom ?? "list"
+                    for item in [row.item] + (row.item.card.step.map { [$0] } ?? []) where menus[item.id] == nil {
+                        menus[item.id] = try board.read("tasks.menu", [item.json, .string(from), screen], over: board.settingsOnly())
                     }
                 }
             }
-            return (view, drawn, menus)
-        }).value else { return }
-        menus = read.2
-        cards = Dictionary(uniqueKeysWithValues: read.0.sections.flatMap(\.cards).map { ($0.id, $0) })
-        withAnimation(.snappy) {
-            view = read.0
-            parts = zip(read.0.sections, read.1).map { Part(section: $0.0, cards: $0.1) }
-        }
+            return Read(view: view, rows: drawn, menus: menus, entryLook: try board.projectsEntryLook(view))
+        }).value
     }
+
+    /// A read drawn, in the transaction the caller draws it in (the quick entry's line ending with its card).
+    func draw(_ read: Read) {
+        menus = read.menus
+        cards = Dictionary(read.view.sections.flatMap(\.cards).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        entryLook = read.entryLook
+        view = read.view
+        parts = zip(read.view.sections, read.rows).map { Part(section: $0.0, cards: $0.1) }
+    }
+
+    /// The list as the quick entry reads it (`rules.projectsEntryLook`): handed in as its `projects` list.
+    @ObservationIgnored private(set) var entryLook = ProjectsEntryLook.empty
 
     /// A card of the page: By project the stage's symbol, or the date, in the date's place; By stage the subproject the
     /// task stands in, small over its title after a folder.
-    nonisolated private static func card(_ painted: BoardCard, as card: ProjectsCard) -> BoardCard {
+    nonisolated private static func card(_ painted: BoardCard, as row: ProjectsListRow) -> BoardCard {
+        guard let card = row.card else {
+            return BoardCard(item: painted.item, level: painted.level, branch: painted.branch, due: painted.due, repeats: painted.repeats, paint: painted.paint, parts: painted.parts, face: painted.face, id: row.id)
+        }
         var due = painted.due
         var stage: String?
         if let mark = card.stage {
@@ -158,13 +180,10 @@ final class ProjectsBoard {
         await write { try $0.moveProject(name, to: place) }
     }
 
-    /// The name typed for what was asked: a task of the part, a project of the gap, a rename; Cancel (nil) writes nothing.
+    /// The name typed for what was asked: a project of the gap, a rename; Cancel (nil) writes nothing.
     func answer(_ name: String?, to ask: Ask) async {
         guard let name, !isBlank(name, for: ask) else { return }
         switch ask {
-        case .task(let new):
-            await model?.write("tasks.createInPlace", [.string(name), .null, new.place, .null, .array([]), new.project.json])
-            await read()
         case .project(let place):
             await write { _ = try $0.createProject(name, at: place) }
         case .rename(let from):
@@ -174,8 +193,7 @@ final class ProjectsBoard {
 
     /// A name that writes nothing, as the core says: the alert's Add is off for it.
     func isBlank(_ name: String, for ask: Ask) -> Bool {
-        if case .task = ask { return board.isBlankTask(name) }
-        return board.isBlankProjectName(name)
+        board.isBlankProjectName(name)
     }
 
     /// The tree's sideways step and the pause over a folded row before it opens, the core's.

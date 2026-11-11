@@ -262,42 +262,135 @@ struct ProjectTasks: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal, CardMetrics.columnInset)
                 .padding(.bottom, 8)
-                ScrollView(.vertical) {
-                    VStack(alignment: .leading, spacing: CardMetrics.gap) {
-                        ForEach(Array(projects.parts.enumerated()), id: \.element.id) { index, part in
-                            if part.section.header, let title = part.section.title {
-                                Color.clear
-                                    .frame(maxWidth: .infinity, minHeight: ColumnMetrics.groupLeading, maxHeight: ColumnMetrics.groupLeading)
-                                    .overlay(alignment: .leading) {
-                                        Text(verbatim: title)
-                                            .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
-                                            .foregroundStyle(Palette.pullInk(scheme))
-                                            .lineLimit(1)
-                                            .fixedSize()
+                ScrollViewReader { scroller in
+                    ScrollView(.vertical) {
+                        let entry = model.entry.lists[QuickEntryHost.projects]
+                        let at = entry.map { PartedEntryAt(kind: $0.at.kind, section: $0.at.section, card: $0.at.card, rows: projects.parts.map(\.cards.count)) }
+                        VStack(alignment: .leading, spacing: CardMetrics.gap) {
+                            if at == .top, let entry { typed(entry) }
+                            ForEach(Array(projects.parts.enumerated()), id: \.element.id) { index, part in
+                                if part.section.header, let title = part.section.title {
+                                    Color.clear
+                                        .frame(maxWidth: .infinity, minHeight: ColumnMetrics.groupLeading, maxHeight: ColumnMetrics.groupLeading)
+                                        .overlay(alignment: .leading) {
+                                            Text(verbatim: title)
+                                                .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
+                                                .foregroundStyle(Palette.pullInk(scheme))
+                                                .lineLimit(1)
+                                                .fixedSize()
+                                        }
+                                        .mask(Fade())
+                                        .frame(maxWidth: .infinity, minHeight: ColumnMetrics.groupHead, alignment: .bottomLeading)
+                                        .padding(.leading, CardMetrics.leading)
+                                        .padding(.top, projects.drawsAnything(before: index) ? ColumnMetrics.sectionGap : 0)
+                                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.projects.geometry.parts[part.id] = $0 }
+                                }
+                                let here: Int? = if case .part(index, let row) = at { row } else { nil }
+                                ForEach(rows(of: part, entry: here.flatMap { row in entry.map { ($0, row) } })) { row in
+                                    switch row {
+                                    case .card(let card, _):
+                                        ProjectCard(card: card, model: model)
+                                            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.projects.geometry.cards[part.id + "/" + card.id] = $0 }
+                                    case .pending(_, let text, let level, let branch):
+                                        EntryRow(level: level, branch: branch) { PendingCapsule(text: text) }
+                                    case .field(_, let level, let branch):
+                                        EntryRow(level: level, branch: branch) { EntryCapsule(host: model.entry) }
                                     }
-                                    .mask(Fade())
-                                    .frame(maxWidth: .infinity, minHeight: ColumnMetrics.groupHead, alignment: .bottomLeading)
-                                    .padding(.leading, CardMetrics.leading)
-                                    .padding(.top, projects.drawsAnything(before: index) ? ColumnMetrics.sectionGap : 0)
-                                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.projects.geometry.parts[part.id] = $0 }
+                                }
+                                if part.section.plate, here == nil || entry?.at.keepsPlate == true {
+                                    EmptyPlate(open: part.section.newTask.map { _ in { model.entry.openIn(QuickEntryHost.projects, part.section.group) } }, label: view.emptyLabel)
+                                }
                             }
-                            ForEach(part.cards) { card in
-                                ProjectCard(card: card, model: model)
-                                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.projects.geometry.cards[part.id + "/" + card.id] = $0 }
-                            }
-                            if part.section.plate {
-                                EmptyPlate(open: part.section.newTask.map { new in { model.projects.asking = .task(new) } }, label: view.emptyLabel)
+                            if at == .end, let entry { typed(entry) }
+                            if projects.parts.isEmpty {
+                                EmptyPlate(label: view.emptyLabel)
                             }
                         }
-                        if projects.parts.isEmpty {
-                            EmptyPlate(label: view.emptyLabel)
-                        }
+                        .padding(.horizontal, CardMetrics.columnInset)
+                        .padding(.bottom, 120)
+                        .background { TasksProbe(model: model) }
                     }
-                    .padding(.horizontal, CardMetrics.columnInset)
-                    .padding(.bottom, 120)
-                    .background { TasksProbe(model: model) }
+                    .keyboardRoom()
+                    .onChange(of: model.entry.moved) {
+                        guard let id = fieldId else { return }
+                        withAnimation(.snappy) { scroller.scrollTo(id) }
+                    }
+                    .scrollIndicators(.hidden)
                 }
-                .scrollIndicators(.hidden)
+            }
+        }
+    }
+
+    /// A row of a part: a card, a text typed and waiting to be written, or the quick entry's field.
+    enum PartRow: Identifiable {
+        /// `key`: the card's own id, or the typed line's it was written from (`QuickEntryHost.heirs`): the text becomes the
+        /// card in place.
+        case card(BoardCard, key: String)
+        case pending(key: String, text: String, level: Int, branch: Branch?)
+        case field(id: String, level: Int, branch: Branch?)
+
+        var id: String {
+            switch self {
+            case .card(_, let key): key
+            case .pending(let key, _, _, _): key
+            case .field(let id, _, _): id
+            }
+        }
+
+        var level: Int {
+            switch self {
+            case .card(let card, _): card.level
+            case .pending(_, _, let level, _), .field(_, let level, _): level
+            }
+        }
+    }
+
+    /// The field's row id, where it stands in this list.
+    private var fieldId: String? {
+        guard model.entry.lists[QuickEntryHost.projects] != nil else { return nil }
+        return model.entry.state?.renaming?.id ?? model.entry.lineKeys[QuickEntryHost.projects]?.last
+    }
+
+    /// The typed rows (the texts waiting and the field) as the list draws them, at the field's level.
+    private func typedRows(_ entry: ListEntryView) -> [PartRow] {
+        let keys = model.entry.lineKeys[QuickEntryHost.projects] ?? []
+        let level = entry.place.level
+        var rows: [PartRow] = entry.pending.enumerated().map { .pending(key: keys[safe: $0.offset] ?? "\u{0}line/\($0.offset)", text: $0.element.text, level: $0.element.level, branch: nil) }
+        rows.append(.field(id: model.entry.state?.renaming?.id ?? keys.last ?? "\u{0}field", level: level, branch: nil))
+        return rows
+    }
+
+    /// The typed rows standing alone, before or after every part.
+    @ViewBuilder
+    private func typed(_ entry: ListEntryView) -> some View {
+        ForEach(typedRows(entry)) { row in
+            switch row {
+            case .pending(_, let text, let level, _): EntryRow(level: level, branch: nil) { PendingCapsule(text: text) }
+            case .field(_, let level, _): EntryRow(level: level, branch: nil) { EntryCapsule(host: model.entry) }
+            case .card: EmptyView()
+            }
+        }
+    }
+
+    /// A part's rows: its cards, the renamed task's card giving its place to the field (in every part that shows it), and
+    /// the typed rows at `entry`'s row; the branch lines drawn anew over the levels as they then stand, as a list's.
+    private func rows(of part: ProjectsBoard.Part, entry: (ListEntryView, Int)?) -> [PartRow] {
+        let heirs = model.entry.heirs
+        var rows = part.cards.map { PartRow.card($0, key: heirs[$0.item.id] ?? $0.id) }
+        guard let (entry, at) = entry else { return rows }
+        let renaming = model.entry.state?.renaming?.id
+        rows.insert(contentsOf: typedRows(entry), at: min(at, rows.count))
+        rows = rows.filter { if case .card(let card, _) = $0 { card.item.id != renaming } else { true } }
+        let levels = rows.map(\.level)
+        let branches = model.branches(levels: levels)
+        return rows.enumerated().map { index, row in
+            let branch = levels[index] > 0 ? branches[safe: index] ?? nil : nil
+            switch row {
+            case .card(let card, let key) where card.branch != branch:
+                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, paint: card.paint, corner: card.corner, parts: card.parts, face: card.face, stage: card.stage, id: card.id), key: key)
+            case .pending(let key, let text, let level, _): return .pending(key: key, text: text, level: level, branch: branch)
+            case .field(let id, let level, _): return .field(id: id, level: level, branch: branch)
+            default: return row
             }
         }
     }
@@ -359,7 +452,9 @@ private struct ProjectCard: View {
         let mark = model.mark(card.id)
         CardButton(
             card: card,
-            renamedText: model.entry.renamedTexts[card.face.step?.id ?? card.id],
+            // Renames are kept by the task's id: a card here is drawn per part, its own id is not the task's.
+            renamedText: model.entry.renamedTexts[card.face.step?.id ?? card.item.id],
+            renamedOver: card.face.twoLines ? model.entry.renamedTexts[card.item.id] : nil,
             menu: { later in model.cardMenu(card, later: later) },
             overMenu: { later in model.cardMenu(card, over: true, later: later) },
             draggable: model.projects.cards[card.id]?.canDrop == true,
@@ -370,6 +465,8 @@ private struct ProjectCard: View {
             onLink: { model.openLink($0) })
             .frame(height: card.listHeight)
             .background { if mark.waiting { DashedPlace() } }
+            .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch, card: card.listHeight) } }
+            .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
     }
 }
 
@@ -722,15 +819,18 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         return (nil, firstTop.map { $0 - CardMetrics.gap / 2 } ?? area.map { $0.minY + 4 })
     }
 
-    /// The part let go in, as the line showed it; above them all, the node's own.
+    /// The part let go in, as the line showed it: the field at its end; above them all, before the first part's first card.
+    /// A part that writes no task (Done) takes nothing.
     func letGo(carrying payload: DragPayload?) -> CarryLanding? {
-        guard payload == nil, let projects = model?.projects, let view = projects.view else { return nil }
+        guard payload == nil, let model, let first = model.projects.parts.first else { return nil }
         let at = held
-        let part = target(at: at?.y ?? 0).part
+        let found = target(at: at?.y ?? 0).part
         held = nil
-        model?.drag.hideLine()
-        guard let new = part?.section.newTask ?? view.newTask else { return nil }
-        projects.asking = .task(new)
+        model.drag.hideLine()
+        let part = found ?? first
+        guard part.section.newTask != nil else { return nil }
+        let before = found == nil ? part.section.cards.first?.item.key.json ?? .null : .null
+        model.entry.openAt(QuickEntryHost.projects, ["kind": "task", "group": part.section.group.json, "before": before])
         return CarryLanding(rect: at.map { CGRect(x: $0.x - 4, y: $0.y - 4, width: 8, height: 8) } ?? .null, folds: true)
     }
 }

@@ -82,6 +82,17 @@ public struct ProjectsCard: Decodable, Hashable, Sendable, Identifiable {
     public let canDrop: Bool
 }
 
+/// `ProjectsListRow`: a row the part's list draws, a task's card or one of its open subtasks under it.
+public struct ProjectsListRow: Decodable, Hashable, Sendable, Identifiable {
+    /// Unique on the screen: a task of two parts is two rows, and so are its subtasks.
+    public let id: String
+    public let item: TaskItem
+    /// 0 for a task, one more for each task above a subtask.
+    public let level: Int
+    /// The part's card for a task; nil for a subtask.
+    public let card: ProjectsCard?
+}
+
 /// `ProjectsNewTask`: what the plus let go on the tasks writes: `tasks.createInPlace`'s place and its project.
 public struct ProjectsNewTask: Decodable, Hashable, Sendable {
     public let place: JSONValue
@@ -106,6 +117,8 @@ public struct ProjectsSection: Decodable, Hashable, Sendable, Identifiable {
     public let path: [String]
     public let depth: Int
     public let cards: [ProjectsCard]
+    /// The rows the list draws: the cards with their open subtasks, as a funnel list's.
+    public let rows: [ProjectsListRow]
     public let newTask: ProjectsNewTask?
 
     public var id: String { key }
@@ -155,6 +168,26 @@ public struct ProjectsView: Decodable, Hashable, Sendable {
     public let missing: Bool
     /// The task list takes drops between its cards: every node but Done and a done project.
     public let reorders: Bool
+    /// The view as the core gave it: what `rules.projectsEntryLook` takes back.
+    public private(set) var json: JSONValue = .null
+
+    enum CodingKeys: String, CodingKey { case rows, selected, mode, modes, title, menu, sections, newTask, emptyLabel, missing, reorders }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        rows = try c.decode([ProjectsRow].self, forKey: .rows)
+        selected = try c.decode(String.self, forKey: .selected)
+        mode = try c.decode(String.self, forKey: .mode)
+        modes = try c.decode([Mode].self, forKey: .modes)
+        title = try c.decode(String.self, forKey: .title)
+        menu = try c.decodeIfPresent(ProjectMenu.self, forKey: .menu)
+        sections = try c.decode([ProjectsSection].self, forKey: .sections)
+        newTask = try c.decodeIfPresent(ProjectsNewTask.self, forKey: .newTask)
+        emptyLabel = try c.decode(String.self, forKey: .emptyLabel)
+        missing = try c.decode(Bool.self, forKey: .missing)
+        reorders = try c.decode(Bool.self, forKey: .reorders)
+        json = try JSONValue(from: decoder)
+    }
 
     public struct Mode: Decodable, Hashable, Sendable {
         public let mode: String
@@ -268,6 +301,12 @@ extension TaskBoard {
         (try? read("tasks.isBlank", [.string(text)], over: settingsOnly(), as: Bool.self)) ?? true
     }
 
+    /// The Projects list as the quick entry reads it (`rules.projectsEntryLook`): its cards, its parts' sections and what
+    /// each part writes, handed in as the look's `projects` list; empty while no view is read.
+    public func projectsEntryLook(_ view: ProjectsView?) throws -> ProjectsEntryLook {
+        try rule("rules.projectsEntryLook", [view?.json ?? .null])
+    }
+
     /// The depths a gap of the tree may take.
     public func projectsLevels(_ rows: JSONValue, gap: Int, lifted: String? = nil) throws -> ProjectsLevels {
         try rule("rules.projectsLevels", [rows, .number(Double(gap)), lifted.json])
@@ -276,5 +315,43 @@ extension TaskBoard {
     /// What a tap on an attached note opens: Obsidian at the note, in the vault named `vault`.
     public func noteURL(_ link: String, vault: String) throws -> URL? {
         URL(string: try rule("projects.noteUrl", [.string(link), .string(vault)], as: String.self))
+    }
+}
+
+/// `EntryListLook`: the Projects list as the quick entry reads it, each part as the core gives it, kept as it came.
+public struct ProjectsEntryLook: Decodable, Hashable, Sendable {
+    public let cards: JSONValue
+    public let sections: JSONValue
+    public let parts: JSONValue
+
+    public static let empty = ProjectsEntryLook(cards: [], sections: [], parts: [])
+
+    public init(cards: JSONValue, sections: JSONValue, parts: JSONValue) {
+        self.cards = cards
+        self.sections = sections
+        self.parts = parts
+    }
+}
+
+/// Where a list made of parts draws the quick entry's field (`ListEntry.at`, whose card counts every part's rows in order):
+/// before every part, at a row of a part, or after them all.
+public enum PartedEntryAt: Equatable, Sendable {
+    case top
+    case part(Int, row: Int)
+    case end
+
+    /// `kind`, `section` and `card` as `ListEntry.at` gives them, over parts of `rows` rows each.
+    public init(kind: String, section: Int?, card: Int?, rows: [Int]) {
+        switch kind {
+        case "top":
+            self = .top
+        case "in":
+            guard let section, rows.indices.contains(section) else { self = .end; return }
+            let start = rows.prefix(section).reduce(0, +)
+            let row = (card ?? start + rows[section]) - start
+            self = .part(section, row: min(max(0, row), rows[section]))
+        default:
+            self = .end
+        }
     }
 }

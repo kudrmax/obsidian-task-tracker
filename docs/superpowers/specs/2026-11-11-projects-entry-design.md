@@ -81,3 +81,28 @@ nothing shows, and the first key typed turns the screen to that funnel column (M
    `openFromPlus()` opens nothing, never the hidden Inbox, and answers `false`; `true` when a field opened. The ready
    answer before the tap is `plusOpens()` (`QuickEntrySession.plusOpens()`, door `entry.plusOpens(session, look)` →
    `value`), the same rule; off Projects it is always true. A frontend reads it instead of looking at `EntryPart.plus`.
+
+### iPhone app
+
+1. **The app's Projects list is the core's list, one mechanism with the funnel's.** `QuickEntryHost` hands the Projects
+   list in as list `projects` (`look.cards/sections/parts.projects` from `rules.projectsEntryLook`, `shown` from
+   `rules.shownEntryLists`) and keeps every list's field by the core's list name (`EntryList`), so the funnel columns and
+   the Projects list go through the same `listEntry`, pending lines, heirs, jobs and `shown`/`coming`. A job written on
+   Projects reads the Projects screen with the board and draws both in the job's one transaction, so a typed line becomes
+   its card in place. Before, Rename and Add Subtask from a Projects card opened the field in a hidden funnel column
+   (nothing showed), and the plate and the plus let go there asked the name in an alert and wrote it to the end of Inbox.
+2. **The app's Projects list draws the core's `rows`**: the cards with their open subtasks under them, the branch lines
+   as a list's, so the field's place (an index among the look's cards, which are the rows) is the place drawn, and a
+   subtask can be renamed or typed under its card there. Before, the app drew `cards` only (no subtasks).
+3. **The plus tapped on Projects types in place** (`openFromPlus`, after `plusOpens`; under Done it does nothing, the
+   plus staying as it is). Elsewhere the plus still opens the app's new-task screen (text or voice), which the app has
+   in place of the plugin's plus-at-the-end; the widget and the Action button still open that screen on Projects too.
+4. **The plus let go above every part** opens the field before the first card of the first part (`openAt` with that
+   card's key); let go in a part, at the part's end; a part that writes no task (Done) takes nothing and the plus flies
+   home, as before.
+5. **A rename's new title shows on a Projects card by the task's id** (`renamedTexts[item.id]`): a Projects card is
+   drawn per part, its own id is not the task's.
+6. **Audit of the app's screen turns:** the only paths that move the ribbon are a tab tap or a swipe (Max's own), the
+   search's pick (`tasks.reveal`, left as it is, as the core's Decision 7), a card's folder mark (opens Projects), and the
+   entry's place move (`choosePlace`), which on Projects answers `projects` and turns nothing. Menu moves, Undo and drops
+   write and read again; none moves the ribbon.
