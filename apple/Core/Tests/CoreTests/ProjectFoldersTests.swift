@@ -83,4 +83,19 @@ import Testing
         #expect(own.cards.map(\.item.title) == ["Без проекта"])
         #expect(!own.takes && own.newTask == nil && !own.plate)
     }
+
+    /// What the plus reads: a tap opens New Task only where the list has a `newTask`, a let-go in a part only where that
+    /// part has one, never the list's in its stead.
+    @Test func thePlusHasNothingToWriteInAFolderOrDone() throws {
+        let board = board(FakeVault(Self.file))
+        try board.selectProjectNode("project:Работа")
+        try board.setProjectsMode("byStage")
+        let stages = try board.projectsScreen()
+        #expect(stages.newTask == nil)
+        #expect(stages.sections.allSatisfy { $0.newTask == nil })
+        try board.selectProjectNode("done")
+        #expect(try board.projectsScreen().newTask == nil)
+        try board.selectProjectNode("project:Дружба")
+        #expect(try board.projectsScreen().newTask?.project == "Дружба")
+    }
 }

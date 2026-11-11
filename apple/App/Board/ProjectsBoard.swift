@@ -116,6 +116,10 @@ final class ProjectsBoard {
         }
     }
 
+    /// A tap on the plus opens New Task here: the core gives the list a `newTask` (a folder, Done and a done project give
+    /// none, and there the tap does nothing, as in the plugin). Before the page is read the tap opens as anywhere.
+    var plusTaps: Bool { view == nil || view?.newTask != nil }
+
     /// Something stands on the page above part `index`: a header, a card or a plate (an empty own part draws nothing).
     func drawsAnything(before index: Int) -> Bool {
         parts.prefix(index).contains { $0.section.header || !$0.cards.isEmpty || $0.section.plate }
