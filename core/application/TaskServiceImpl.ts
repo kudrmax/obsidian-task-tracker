@@ -49,7 +49,6 @@ import type { SectionOffer } from "./sections";
 import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type ProjectsScreenStore, type SettingsStore, type TaskFileStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
 import { projectOfNode, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
-import { cleanProjectName } from "../domain/Project";
 import { ProjectTree, type TreePlace } from "../domain/ProjectTree";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
@@ -177,7 +176,7 @@ export class TaskServiceImpl implements TaskService {
 
 	async renameProject(from: string, to: string): Promise<boolean> {
 		const renamed = await this.run(this.writes.renameProject(from, to));
-		if (renamed) this.keepScreen(renamedIn(this.projectsScreenStore.get(), from, cleanProjectName(to)!));
+		if (renamed) this.keepScreen(renamedIn(this.projectsScreenStore.get(), from, this.rules.cleanName(to)!));
 		return renamed;
 	}
 
@@ -192,7 +191,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	isBlankProjectName(name: string): boolean {
-		return cleanProjectName(name) === null;
+		return this.rules.cleanName(name) === null;
 	}
 
 	/** The device's Projects screen changed: the screens draw again. */

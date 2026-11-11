@@ -157,3 +157,31 @@ describe("names", () => {
 		expect(await svc.createProject("  ", { parent: null, before: null })).toBeNull();
 	});
 });
+
+describe("re-review", () => {
+	it("a project made before the host's notes are complete stops no note from becoming a project at the move", async () => {
+		const OLD = ["## Inbox", "", "- [ ] Позвонить 🗂️ [[Дружба]]", "", "## Now", "", "## Soon", "", "## Backlog", "", "## Done", ""].join("\n");
+		let ready = false;
+		const notes = [
+			{ name: "Дружба", path: "Дружба.md", link: "Дружба" },
+			{ name: "Музыка", path: "Музыка.md", link: "Музыка" },
+		];
+		const port: Projects = { list: () => (ready ? notes : []), ready: () => ready, onChange: () => () => undefined };
+		const { svc, store } = setup(OLD, port);
+		await svc.createProject("Новый", { parent: null, before: null });
+		expect(store.text).toContain("- Новый");
+		ready = true;
+		await svc.screen(T);
+		expect(store.text).toContain("- [ ] Позвонить 🗂️ Дружба\n");
+		expect(store.text).toContain("- Дружба [[Дружба]]\n");
+		expect(store.text).toContain("- Музыка [[Музыка]]\n");
+	});
+
+	it("a typed name loses the settings' own field marks standing as words", async () => {
+		const settings = new FakeSettingsStore();
+		await settings.update({ dueDateMarker: "🗓" });
+		const svc = new TaskServiceImpl(new InMemoryTaskFileStore(FILE), settings, clock, null, undefined, memoryProjectsScreen());
+		expect(svc.isBlankProjectName(" 🗓 ")).toBe(true);
+		expect(await svc.createProject("Бег 🗓 утро", { parent: null, before: null })).toMatchObject({ name: "Бег утро" });
+	});
+});

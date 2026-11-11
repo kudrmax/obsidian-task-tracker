@@ -28,12 +28,10 @@ import type { Operation, TaskRules } from "./TaskRules";
 import { droppedSpan } from "./TimelineSpans";
 import { landingOf } from "./landing";
 import { keyOf } from "./taskKeys";
-import { cleanProjectName } from "../domain/Project";
 import type { TreePlace } from "../domain/ProjectTree";
 
-/** The project named as typed, as the tree after a write has it; null when it has none. */
-function namedIn(change: DocChange | null, typed: string): string | null {
-	const clean = cleanProjectName(typed);
+/** The project of the cleaned name `clean`, as the tree after a write has it; null when it has none. */
+function namedIn(change: DocChange | null, clean: string | null): string | null {
 	return clean === null || !change ? null : (change.after.projectTree().find(clean)?.node.name ?? null);
 }
 
@@ -165,7 +163,7 @@ export class TaskWrites {
 	/** «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of nothing. */
 	newProject(name: string, keys: readonly TaskKey[]): Write<string | null> {
 		const operation = this.rules.newProject(name, keys);
-		return { operation, answer: (change) => (operation === null ? null : namedIn(change, name)) };
+		return { operation, answer: (change) => (operation === null ? null : namedIn(change, this.rules.cleanName(name))) };
 	}
 
 	dropOnProject(cards: readonly ProjectsDrop[], to: string | null): Write<void> {
@@ -175,7 +173,7 @@ export class TaskWrites {
 	/** The project made, as the tree has it; null when nothing was written. */
 	createProject(name: string, place: TreePlace): Write<string | null> {
 		const operation = this.rules.createProject(name, place);
-		return { operation, answer: (change) => (operation === null || !change || change.after.serialize() === change.before.serialize() ? null : namedIn(change, name)) };
+		return { operation, answer: (change) => (operation === null || !change || change.after.serialize() === change.before.serialize() ? null : namedIn(change, this.rules.cleanName(name))) };
 	}
 
 	moveProject(name: string, place: TreePlace): Write<void> {

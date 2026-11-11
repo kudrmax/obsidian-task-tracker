@@ -39,6 +39,14 @@ function notesOfOldFields(doc: TaskDocument, notes: readonly LegacyProjectNote[]
 	return notes.filter((note) => named.has(projectKey(note.name)) && !linked.has(projectKey(projectName(note.link))));
 }
 
+/**
+ * The tree holds a note already: the move attached the notes once, so only the notes old fields name since come. A tree
+ * without any (none yet, or one a write made before the host's notes were complete) takes them all.
+ */
+function attachedAny(doc: TaskDocument): boolean {
+	return doc.hasProjectTree() && doc.projectTree().all().some((p) => p.node.note !== null);
+}
+
 /** An old field's link on a line. */
 const OLD_LINK_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[([^[\]|#]+)/gu;
 
@@ -68,7 +76,7 @@ export function awaitsMove(doc: TaskDocument, notes: readonly LegacyProjectNote[
  * write did: a project it made in the tree stops nothing. Lines already plain are left as they are.
  */
 export function movedToProjects(doc: TaskDocument, given: readonly LegacyProjectNote[], resultMark: string = LEGACY_RESULT_MARK): TaskDocument {
-	const notes = doc.hasProjectTree() ? notesOfOldFields(doc, given, resultMark) : given;
+	const notes = attachedAny(doc) ? notesOfOldFields(doc, given, resultMark) : given;
 	const byName = [...notes].sort((a, b) => (projectKey(a.name) < projectKey(b.name) ? -1 : projectKey(a.name) > projectKey(b.name) ? 1 : 0));
 	let tree: ProjectTree = doc.projectTree();
 	for (const note of byName) {

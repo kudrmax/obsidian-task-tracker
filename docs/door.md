@@ -168,7 +168,7 @@ them. The move to projects is part of tidying: any read of a file that still awa
 `🎯` line anywhere, or no `## Projects` while there is something to put in it) answers the moved text in `tasks`, with no
 `step`, before any action: the old fields are written plain, `🎯` goes off the lines, and the notes of `context.projects`
 are attached: all of them, as top-level projects (a project of that name gets the note), to a file without a tree; to a
-file with one, only those an old field names, never a note a tree line holds already. In the plugin the move waits until
+file whose tree holds a note already, only those an old field names, never a note a tree line holds already. In the plugin the move waits until
 the `Projects` port says its notes are complete (`ready()`). Every `## Projects` of the file (Sync may merge two) reads
 as one tree, the first name winning, and is written back as one under the first heading.
 

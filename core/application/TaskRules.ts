@@ -23,7 +23,8 @@ import {
 	type TaskKey,
 	type TaskStep,
 } from "./contracts";
-import { boundaryOf, parseText, readingKey, sectionNames } from "./documentText";
+import { boundaryOf, markersOf, parseText, readingKey, sectionNames } from "./documentText";
+import { fieldStops } from "../domain/TaskLine";
 import * as projectWrites from "../domain/ProjectWrites";
 import { cleanProjectName, namesProject, uniqueNames } from "../domain/Project";
 import type { TreePlace } from "../domain/ProjectTree";
@@ -362,7 +363,7 @@ export class TaskRules {
 
 	/** «New project…»: the project made at the tree's top when it lacks it, and put on every task (`keys` may be none). */
 	newProject(name: string, keys: readonly TaskKey[]): Operation | null {
-		const clean = cleanProjectName(name);
+		const clean = this.cleanName(name);
 		if (clean === null) return null;
 		return (doc) => {
 			const holders = this.holders(doc, keys);
@@ -390,7 +391,7 @@ export class TaskRules {
 
 	/** A project made at `place` of the tree; null for a name of nothing. */
 	createProject(name: string, place: TreePlace): Operation | null {
-		const clean = cleanProjectName(name);
+		const clean = this.cleanName(name);
 		if (clean === null) return null;
 		return (doc) => projectWrites.addProject(doc, clean, place);
 	}
@@ -399,9 +400,14 @@ export class TaskRules {
 		return (doc) => projectWrites.moveProject(doc, name, place);
 	}
 
+	/** A project's name as typed, cleaned by the settings' field marks (`cleanProjectName`); null for a name of nothing. */
+	cleanName(typed: string): string | null {
+		return cleanProjectName(typed, fieldStops(markersOf(this.settings.get())));
+	}
+
 	/** Null for a name of nothing. */
 	renameProject(from: string, to: string): Operation | null {
-		const clean = cleanProjectName(to);
+		const clean = this.cleanName(to);
 		if (clean === null || clean === from) return null;
 		return (doc) => projectWrites.renameProject(doc, from, clean);
 	}

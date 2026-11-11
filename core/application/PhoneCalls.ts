@@ -55,7 +55,6 @@ import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
 import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
-import { cleanProjectName } from "../domain/Project";
 import { ProjectTree } from "../domain/ProjectTree";
 import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
@@ -426,7 +425,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	moveProject: (c, [name, place]) => c.run(c.writes.moveProject(name as string, place as A)),
 	renameProject: (c, [from, to]) => {
 		const renamed = c.run(c.writes.renameProject(from as string, to as string));
-		if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from as string, cleanProjectName(to as string)!));
+		if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from as string, c.rules.cleanName(to as string)!));
 		return renamed;
 	},
 	setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name as string, (link ?? null) as string | null)),
@@ -435,7 +434,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 		if (target === null && to !== "none") return null;
 		return c.run(c.writes.dropOnProject(cards as A, target));
 	},
-	isBlankProjectName: (_c, [name]) => cleanProjectName(name as string) === null,
+	isBlankProjectName: (c, [name]) => c.rules.cleanName(name as string) === null,
 	setReminder: (c, [key, reminder]) => c.run(c.writes.setReminder(key as A, reminder as A)),
 	togglePriority: (c, [keys, prefix]) => c.run(c.ask(c.writes.togglePriority(keys as A, prefix as string))),
 	toggleLabel: (c, [keys, name]) => c.run(c.ask(c.writes.toggleLabel(keys as A, name as string))),

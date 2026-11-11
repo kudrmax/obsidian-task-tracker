@@ -82,14 +82,19 @@ export function projectName(link: string): string {
 	return last.replace(/\.md$/i, "").trim();
 }
 
+/** The field marks a name stops at before the settings say otherwise. */
+const DEFAULT_STOPS: readonly string[] = ["📅", "⏰", "🚨", "📌", "🔕", "🔁", "📁"];
+
 /**
  * A project's name as typed, the way it can be written: on one line, its spaces single, without brackets (a name is never
- * a link) or the project's mark; null for a name of nothing.
+ * a link), the project's mark, or a field's mark standing as a word (`stops`: the settings' marks, as the line is read
+ * by them); null for a name of nothing.
  */
-export function cleanProjectName(typed: string): string | null {
-	const name = typed
+export function cleanProjectName(typed: string, stops: readonly string[] = DEFAULT_STOPS): string | null {
+	const marks = stops.filter((m) => m !== "").map(escapeRegExp);
+	const fields = marks.length === 0 ? null : new RegExp(`(^|\\s)(?:${marks.join("|")})(?=\\s|$)`, "gu");
+	const name = (fields ? typed.replace(fields, "$1") : typed)
 		.replace(/\u{1F5C2}\u{FE0F}?/gu, " ")
-		.replace(/(^|\s)(?:📅|⏰|🚨|📌|🔕|🔁|📁)(?=\s|$)/gu, "$1")
 		.replace(/[[\]]/g, "")
 		.replace(/(^|\s)#(?=\S)/g, "$1")
 		.replace(/\s+/g, " ")

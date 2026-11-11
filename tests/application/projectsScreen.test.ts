@@ -333,11 +333,11 @@ describe("the one move to projects, whatever the first write is", () => {
 		expect(store.text).toBe(["## Inbox", "", "- [ ] Позвонить 🗂️ Дружба", "- [ ] iPhone", "\t- [ ] План", "", "## Projects", "", "- Дружба [[Дружба]]", "- Спорт [[Спорт]]", "- Новый", "", "## Now", "", "## Soon", "", "## Backlog", "", "## Done", ""].join("\n"));
 	});
 
-	it("is not stopped by a ## Projects written by hand: old fields and 🎯 lines are moved, only the notes the old fields name attached", async () => {
+	it("is not stopped by a ## Projects written by hand: old fields and 🎯 lines are moved, every note attached while the tree holds none yet", async () => {
 		const { store, svc } = service(OLD.replace("## Now", "## Projects\n\n- Дружба\n\n## Now"));
 		await svc.setStatus((await svc.screen(T)).inbox[0].key, "inProgress");
 		expect(store.text).toContain("- [/] Позвонить 🗂️ Дружба\n- [ ] iPhone\n");
-		expect(store.text).toContain("## Projects\n\n- Дружба [[Дружба]]\n\n## Now");
+		expect(store.text).toContain("## Projects\n\n- Дружба [[Дружба]]\n- Спорт [[Спорт]]\n\n## Now");
 	});
 
 	it("leaves a moved file's plain lines as they are", async () => {

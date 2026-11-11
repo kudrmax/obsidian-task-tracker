@@ -561,8 +561,11 @@
     const last = link.split("/").pop() ?? link;
     return last.replace(/\.md$/i, "").trim();
   }
-  function cleanProjectName(typed2) {
-    const name = typed2.replace(/\u{1F5C2}\u{FE0F}?/gu, " ").replace(/(^|\s)(?:📅|⏰|🚨|📌|🔕|🔁|📁)(?=\s|$)/gu, "$1").replace(/[[\]]/g, "").replace(/(^|\s)#(?=\S)/g, "$1").replace(/\s+/g, " ").trim();
+  var DEFAULT_STOPS = ["📅", "⏰", "🚨", "📌", "🔕", "🔁", "📁"];
+  function cleanProjectName(typed2, stops = DEFAULT_STOPS) {
+    const marks = stops.filter((m) => m !== "").map(escapeRegExp2);
+    const fields = marks.length === 0 ? null : new RegExp(`(^|\\s)(?:${marks.join("|")})(?=\\s|$)`, "gu");
+    const name = (fields ? typed2.replace(fields, "$1") : typed2).replace(/\u{1F5C2}\u{FE0F}?/gu, " ").replace(/[[\]]/g, "").replace(/(^|\s)#(?=\S)/g, "$1").replace(/\s+/g, " ").trim();
     return name === "" ? null : name;
   }
   function projectKey(name) {
@@ -3547,6 +3550,9 @@ ${key.title}`.toLowerCase();
     const linked = new Set(doc.projectTree().all().flatMap((p) => p.node.note === null ? [] : [projectKey(projectName(p.node.note.split("|")[0].split("#")[0]))]));
     return notes.filter((note) => named.has(projectKey(note.name)) && !linked.has(projectKey(projectName(note.link))));
   }
+  function attachedAny(doc) {
+    return doc.hasProjectTree() && doc.projectTree().all().some((p) => p.node.note !== null);
+  }
   var OLD_LINK_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[([^[\]|#]+)/gu;
   var OLD_FIELD_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[/u;
   function oldLines(doc, resultMark) {
@@ -3557,7 +3563,7 @@ ${key.title}`.toLowerCase();
     return !doc.hasProjectTree() && (notes.length > 0 || taskProjects(doc).length > 0);
   }
   function movedToProjects(doc, given, resultMark = LEGACY_RESULT_MARK) {
-    const notes = doc.hasProjectTree() ? notesOfOldFields(doc, given, resultMark) : given;
+    const notes = attachedAny(doc) ? notesOfOldFields(doc, given, resultMark) : given;
     const byName2 = [...notes].sort((a, b) => projectKey(a.name) < projectKey(b.name) ? -1 : projectKey(a.name) > projectKey(b.name) ? 1 : 0);
     let tree = doc.projectTree();
     for (const note of byName2) {
@@ -6223,7 +6229,7 @@ ${key.title}`.toLowerCase();
     }
     /** «New project…»: the project made at the tree's top when it lacks it, and put on every task (`keys` may be none). */
     newProject(name, keys) {
-      const clean = cleanProjectName(name);
+      const clean = this.cleanName(name);
       if (clean === null) return null;
       return (doc) => {
         const holders = this.holders(doc, keys);
@@ -6249,16 +6255,20 @@ ${key.title}`.toLowerCase();
     }
     /** A project made at `place` of the tree; null for a name of nothing. */
     createProject(name, place) {
-      const clean = cleanProjectName(name);
+      const clean = this.cleanName(name);
       if (clean === null) return null;
       return (doc) => addProject(doc, clean, place);
     }
     moveProject(name, place) {
       return (doc) => moveProject(doc, name, place);
     }
+    /** A project's name as typed, cleaned by the settings' field marks (`cleanProjectName`); null for a name of nothing. */
+    cleanName(typed2) {
+      return cleanProjectName(typed2, fieldStops(markersOf(this.settings.get())));
+    }
     /** Null for a name of nothing. */
     renameProject(from, to) {
-      const clean = cleanProjectName(to);
+      const clean = this.cleanName(to);
       if (clean === null || clean === from) return null;
       return (doc) => renameProject(doc, from, clean);
     }
@@ -6586,8 +6596,7 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/TaskWrites.ts
-  function namedIn(change, typed2) {
-    const clean = cleanProjectName(typed2);
+  function namedIn(change, clean) {
     return clean === null || !change ? null : change.after.projectTree().find(clean)?.node.name ?? null;
   }
   var nothing = (operation) => ({ operation, answer: () => void 0 });
@@ -6683,7 +6692,7 @@ ${key.title}`.toLowerCase();
     /** «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of nothing. */
     newProject(name, keys) {
       const operation = this.rules.newProject(name, keys);
-      return { operation, answer: (change) => operation === null ? null : namedIn(change, name) };
+      return { operation, answer: (change) => operation === null ? null : namedIn(change, this.rules.cleanName(name)) };
     }
     dropOnProject(cards, to) {
       return nothing(this.rules.dropOnProject(cards, to));
@@ -6691,7 +6700,7 @@ ${key.title}`.toLowerCase();
     /** The project made, as the tree has it; null when nothing was written. */
     createProject(name, place) {
       const operation = this.rules.createProject(name, place);
-      return { operation, answer: (change) => operation === null || !change || change.after.serialize() === change.before.serialize() ? null : namedIn(change, name) };
+      return { operation, answer: (change) => operation === null || !change || change.after.serialize() === change.before.serialize() ? null : namedIn(change, this.rules.cleanName(name)) };
     }
     moveProject(name, place) {
       return nothing(this.rules.moveProject(name, place));
@@ -7303,7 +7312,7 @@ ${key.title}`.toLowerCase();
     moveProject: (c, [name, place]) => c.run(c.writes.moveProject(name, place)),
     renameProject: (c, [from, to]) => {
       const renamed = c.run(c.writes.renameProject(from, to));
-      if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from, cleanProjectName(to)));
+      if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from, c.rules.cleanName(to)));
       return renamed;
     },
     setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name, link ?? null)),
@@ -7312,7 +7321,7 @@ ${key.title}`.toLowerCase();
       if (target === null && to !== "none") return null;
       return c.run(c.writes.dropOnProject(cards, target));
     },
-    isBlankProjectName: (_c, [name]) => cleanProjectName(name) === null,
+    isBlankProjectName: (c, [name]) => c.rules.cleanName(name) === null,
     setReminder: (c, [key, reminder]) => c.run(c.writes.setReminder(key, reminder)),
     togglePriority: (c, [keys, prefix]) => c.run(c.ask(c.writes.togglePriority(keys, prefix))),
     toggleLabel: (c, [keys, name]) => c.run(c.ask(c.writes.toggleLabel(keys, name))),

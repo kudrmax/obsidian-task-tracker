@@ -176,8 +176,9 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md Â«AgentsÂ
     a priority after it read as the priority. The move waits until the host's notes are complete (the `Projects` port's
     `ready()`: the plugin's metadata cache resolved; the door takes `context.projects` as complete), since a note missing
     then would never be attached. To a file with a tree already (old fields written later: by hand, or the app of 0.4.189)
-    it attaches only the notes an old field names, never a note a tree line holds already, so a renamed project gets no
-    empty twin. Every `## Projects` of the file (Sync may merge two) reads as one tree, the first name winning, and is
+    that holds a note already (the move attached them once) it attaches only the notes an old field names, never a note a
+    tree line holds already, so a renamed project gets no empty twin; a tree that holds no note yet (one written by hand,
+    or by a write made before the host's notes were complete) takes them all. Every `## Projects` of the file (Sync may merge two) reads as one tree, the first name winning, and is
     written back as one under the first heading.
 14. **Every action's write puts the tasks' projects in the tree**, one the tree lacks last at its top.
 15. **The next step** is any folded task's with an open subtask, on its card and its timeline block (the block now only
@@ -207,7 +208,8 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md Â«AgentsÂ
     very card let go. `canDrop` is false for a closed task (under Done). The hover delay over a folded row is
     `PROJECTS_HOVER_MS` (600: the core had no hold delay of the day arrows to reuse), a sideways step `PROJECTS_INDENT`
     (12), and `projectsDrop(rows, gap, shift, lifted?)` keeps a lifted project's own depth until the finger shifts a step.
-    A typed name loses the field marks standing as words; `isBlankProjectName` is the Create button's rule. Search finds
+    A typed name loses the settings' field marks standing as words (as the line is read); `isBlankProjectName` is the
+    Create button's rule. Search finds
     a task by any of its projects.
 
 ### Obsidian frontend
