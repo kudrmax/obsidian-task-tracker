@@ -228,13 +228,13 @@ export class TasksDrop implements DropTarget {
 
 /**
  * The tasks as a list a card is dropped in, as a list column is (spec «Projects order» 1): the same lift, gap, drop line,
- * level and auto-scroll, over the parts as sections, every header opening its part. Let go, the place goes to
- * `dropInProjects`. A card only: the plus has its own place on the tasks (`TasksDrop`). Nothing while the node keeps its
- * order (`ProjectsView.reorders`: Done and a done project).
+ * level and auto-scroll, over the parts as sections, each header opening its part as the core says
+ * (`ProjectsSection.opens`). Let go, the place goes to `dropInProjects`. A card only: the plus has its own place on the
+ * tasks (`TasksDrop`). Nothing while the node keeps its order (`ProjectsView.reorders`: Done and a done project).
  */
 export class ProjectsListDrop extends CardListDrop {
 	constructor(
-		private readonly tasks: ProjectTasks,
+		tasks: ProjectTasks,
 		area: HTMLElement,
 		private readonly reorders: () => boolean,
 	) {
@@ -251,11 +251,6 @@ export class ProjectsListDrop extends CardListDrop {
 
 	protected showsSections(): boolean {
 		return true;
-	}
-
-	/** Every header opens its part, the first one too unless cards of the untitled part stand over it: the gap under them is theirs. */
-	protected override headersOpen(): boolean {
-		return !this.tasks.untitledDrawn;
 	}
 
 	protected resultOf(place: ListPlace | null): DropResult | null {

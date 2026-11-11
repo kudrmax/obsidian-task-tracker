@@ -10,7 +10,7 @@ const card = (task: TaskItem, stage: ProjectsCard["stage"]): ProjectsCard => ({ 
 
 function drawn(model: ProjectsCard): HTMLElement {
 	const tasks = new ProjectTasks(document.body.appendChild(document.createElement("div")), {});
-	tasks.render({ sections: [{ key: "own", group: null, title: null, header: false, empty: false, plate: false, path: [], depth: 0, cards: [model], rows: [{ id: model.id, item: model.item, level: 0, card: model, drop: model.drop }], newTask: null }], emptyLabel: "No tasks", newTask: null }, false);
+	tasks.render({ sections: [{ key: "own", group: null, title: null, header: false, opens: false, empty: false, plate: false, path: [], depth: 0, cards: [model], rows: [{ id: model.id, item: model.item, level: 0, card: model, drop: model.drop }], newTask: null }], emptyLabel: "No tasks", newTask: null }, false);
 	return tasks.el.querySelector(".tc-card")!;
 }
 
@@ -52,7 +52,7 @@ function rowsOf(part: string, cards: readonly ProjectsCard[], subtasks: Readonly
 }
 
 function section(key: string, title: string | null, cards: readonly ProjectsCard[], extra: Partial<ProjectsSection> = {}): ProjectsSection {
-	return { key, group: title === null ? null : key, title, header: title !== null, empty: cards.length === 0, plate: false, path: [], depth: 0, cards, rows: rowsOf(key, cards), newTask: { place: { kind: "list", list: "soon", group: null, before: null }, project: key }, ...extra };
+	return { key, group: title === null ? null : key, title, header: title !== null, opens: title !== null, empty: cards.length === 0, plate: false, path: [], depth: 0, cards, rows: rowsOf(key, cards), newTask: { place: { kind: "list", list: "soon", group: null, before: null }, project: key }, ...extra };
 }
 
 function list(sections: readonly ProjectsSection[], onCard?: (card: HTMLElement, owner: ProjectsCard, subtree: readonly HTMLElement[]) => void): ProjectTasks {
@@ -109,6 +109,7 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 	describe("as a place to drop", () => {
 		/** Rows stand 40 px apart from the list's top at 100. */
 		function placed(sections: readonly ProjectsSection[], reorders = true) {
+			document.body.innerHTML = "";
 			const tasks = list(sections);
 			tasks.elements.forEach((node, i) =>
 				Object.defineProperties(node, {
@@ -134,11 +135,32 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 			expect(drop.drop(10, y, carried(a))).toEqual({ kind: "projectsPlace", place: { kind: "task", group: "t", before: b.key } });
 		});
 
-		it("the gap under the untitled part's last card is that part's, the first header's top opening the next", () => {
-			const drop = placed([section("own", null, [cardOf(a, "own")]), section("s", "Sub", [cardOf(b, "s")])]);
+		it("passes each header's opens as the core gives it: the gap under the own part's last card is the own part's", () => {
+			const drop = placed([section("own", null, [cardOf(a, "own")]), section("s", "Sub", [cardOf(b, "s")], { opens: false })]);
 			const under = 100 + 40 - 2;
 			drop.preview(10, under, carried(b));
 			expect(drop.drop(10, under, carried(b))).toEqual({ kind: "projectsPlace", place: { kind: "task", group: null, before: null } });
+		});
+
+		it("an empty own part drawn as nothing still takes a card let go over the first header", () => {
+			const drop = placed([section("own", null, []), section("s", "Sub", [cardOf(a, "s"), cardOf(b, "s")], { opens: false })]);
+			const over = 100 + 5;
+			drop.preview(10, over, carried(b));
+			expect(drop.drop(10, over, carried(b))).toEqual({ kind: "projectsPlace", place: { kind: "task", group: null, before: null } });
+		});
+
+		it("the line into an empty own part stands under the list's top, not over it", () => {
+			const drop = placed([section("own", null, []), section("s", "Sub", [cardOf(a, "s"), cardOf(b, "s")], { opens: false })]);
+			drop.preview(10, 100 + 5, carried(b));
+			const line = document.querySelector<HTMLElement>(".tc-list-drop")!;
+			expect(Number(/translate3d\([^,]+,\s*(-?[\d.]+)px/.exec(line.style.transform)![1])).toBeGreaterThanOrEqual(0);
+		});
+
+		it("a header that opens its part takes the list's top for it", () => {
+			const drop = placed([section("s", "Soon", [cardOf(a, "s"), cardOf(b, "s")])]);
+			const over = 100 + 5;
+			drop.preview(10, over, carried(b));
+			expect(drop.drop(10, over, carried(b))).toEqual({ kind: "projectsPlace", place: { kind: "task", group: "s", before: a.key } });
 		});
 
 		it("takes no plus and nothing while the node keeps its order", () => {

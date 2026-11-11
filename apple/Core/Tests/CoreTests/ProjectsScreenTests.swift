@@ -74,9 +74,9 @@ import Testing
         try board.setProjectsMode("byStage")
         let view = try board.projectsScreen()
         #expect(view.mode == "byStage")
-        #expect(view.sections.map(\.title) == ["Soon", "Inbox", "Backlog"])
-        #expect(view.sections[1].cards.first?.over == "Свидание")
-        #expect(view.sections[0].cards.first?.over == nil)
+        #expect(view.sections.map(\.title) == ["Inbox", "Backlog", "Soon", "Today"])
+        #expect(view.sections[0].cards.first?.over == "Свидание")
+        #expect(view.sections[2].cards.first?.over == nil)
     }
 
     @Test func aCardDroppedOnTheTreeChangesThatProjectAndStaysInTheFunnel() throws {

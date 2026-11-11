@@ -58,7 +58,7 @@ The plugin comes first (Max: «плагин в приоритете»); the iPho
    empty part is still left out, and `ProjectsView.reorders` is false there: closed tasks are not reordered. This
    replaces «an empty part left out» of the parent spec's decision 8 for live nodes.
 3. **One mechanism with the lists.** The gesture is the lists' own: a part is a section (`ProjectsSection.group`, null
-   for the untitled part, `PlacedHead.opens` true for every header), its `rows` (`ProjectsListRow` `{ id, item, level,
+   for the untitled part; `PlacedHead.opens` is `ProjectsSection.opens`, decision 9), its `rows` (`ProjectsListRow` `{ id, item, level,
    card, drop }`) are what `ListGroup.rows` are, so `placeAt`, `placeOfDrop`, `branchOf` and `gapBranch` run unchanged.
    The write is the funnel's own moves (`moveToGroup`, `nest`) run through `applyAll`, plus a `swapProject` step. The
    call is `tasks.dropInProjects(cards, place)` with `projectsDropPreview(cards, place)` (`{ landings, view, tasks }`)
@@ -78,14 +78,18 @@ The plugin comes first (Max: «плагин в приоритете»); the iPho
 7. **A part the screen no longer has** (or a list that takes no drop) rejects with StaleTaskError, writing nothing.
 8. **The landing** prefers the part the card was dropped in when the task shows in two; a nested card lands as a
    `subtask` of its new parent.
+9. **A header's `opens` is the core's** (the plugin's Obsidian decision 1, moved into the core). `ProjectsSection.opens:
+   boolean`, which a frontend passes as `PlacedHead.opens` unmapped: a header opens its part unless the untitled part
+   (the node's own, By project) stands above it. So the gap under the own part's last card is the own part's, and only
+   past the first subproject's header does a card go to that subproject. An empty own part, drawn as nothing, is still a
+   place: a card let go above the first header goes into the node's own part (the plugin's rule had opened that header,
+   leaving no way into an empty own part from the list). With no untitled part (By stage, All) every header opens, so the
+   list's top is the first part's.
 
 ### Obsidian frontend
 
-1. **The gap under the untitled part.** By project the node's own part (no header) stands over the first subproject's
-   header. With `PlacedHead.opens` true on that first header, `placeAt` gives the gap under the own part's last card to
-   the subproject, so a card could never be dropped at the end of the own part. The plugin marks the first header as
-   opening only when no card of the untitled part is drawn above it (By stage, or an own part that is empty and drawn as
-   nothing); every other header opens as the contract says. The Swift frontend maps its headers the same way.
+1. **The gap under the untitled part** (moved into the core: Backend decision 9). The plugin passes each part's
+   `ProjectsSection.opens` as its header's `PlacedHead.opens`, unmapped.
 2. **The No tasks plate is tapped as a list's.** A tap on an empty part's plate opens the new task's field in the
    plate's place (the plate hidden while it is open), written where that part's plus writes (`ProjectsSection.newTask`),
    as a tap on a list's empty section does.
@@ -103,3 +107,6 @@ The plugin comes first (Max: «плагин в приоритете»); the iPho
    (`dropOnProject`), which now takes the whole stack too.
 6. **Where the float lands.** The float lands on the card `projectsDropPreview` names for the card under the finger
    (`landings[0]`, read before the write), drawn after the write; that card stays hidden until the float is down.
+7. **The drop line never stands over the list's top.** Into an empty own part drawn as nothing (Backend decision 9) the
+   gap is above the first header, at the list's very top, where half the line's dot was cut off. The line stands no
+   higher than its dot whole under the list's top, in every list (the funnel's columns too).

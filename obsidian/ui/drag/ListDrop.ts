@@ -9,6 +9,7 @@ import { type ListFrame, readFrame, toClient } from "./listFrame";
 import { headerOfPlace, type PlacedCard, type PlacedHead, placeAt, sameHeader } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
+const DOT = "--tc-drop-dot";
 const LIFTED = "is-lifted";
 /** A lifted card that stays where it stood as a dashed place; the other lifted ones, its subtasks, fold away under it. */
 const WAITING = "is-waiting";
@@ -60,6 +61,8 @@ export interface DropList {
 	headerAt(node: HTMLElement): Header | undefined;
 	/** The No tasks plate of empty section `name`; null when none is drawn. */
 	plateOf(name: GroupName): HTMLElement | null;
+	/** Whether a header drawn opens its part (`PlacedHead.opens`); none for a list whose headers don't. */
+	headerOpens?(node: HTMLElement): boolean;
 }
 
 /**
@@ -106,11 +109,6 @@ export abstract class CardListDrop implements DropTarget {
 
 	/** What a drop at `place` means; null for the list's end, in a list that takes the card there only. */
 	protected abstract resultOf(place: ListPlace | null): DropResult | null;
-
-	/** Every header opens a part of the list: the gap above the first one is that part's (`PlacedHead.opens`). */
-	protected headersOpen(): boolean {
-		return false;
-	}
 
 	/** How far over the area the list still takes a finger: a column's title stands there. */
 	protected reachAbove(): number {
@@ -278,7 +276,7 @@ export abstract class CardListDrop implements DropTarget {
 				continue;
 			}
 			const header = this.list.headerAt(node);
-			if (header !== undefined) heads.push({ group: header, opens: this.headersOpen(), firstCard: cards.length, top: node.offsetTop - removed, height: node.offsetHeight });
+			if (header !== undefined) heads.push({ group: header, opens: this.list.headerOpens?.(node) ?? false, firstCard: cards.length, top: node.offsetTop - removed, height: node.offsetHeight });
 		}
 		return { nodes, size, width, indent: tokenPx(this.list.el, INDENT), cards, heads, waiting };
 	}
@@ -351,7 +349,12 @@ export abstract class CardListDrop implements DropTarget {
 			const over = toClient(frame, 0, layout.waiting.top - layout.size.gap / 2).y;
 			return new DOMRect(gap.left, over, gap.width, 0);
 		}
-		return new DOMRect(gap.left, gap.top - layout.size.gap / 2, gap.width, 0);
+		return new DOMRect(gap.left, Math.max(gap.top - layout.size.gap / 2, this.topmostLine(frame)), gap.width, 0);
+	}
+
+	/** The highest the line stands: its dot whole under the list's top, where a part drawn as nothing (an empty own part) takes it. */
+	private topmostLine(frame: ListFrame): number {
+		return toClient(frame, 0, 0).y + tokenPx(this.list.el, DOT) / 2;
 	}
 
 	/** Where a task's card starts: a subtask's stands its levels further in. */

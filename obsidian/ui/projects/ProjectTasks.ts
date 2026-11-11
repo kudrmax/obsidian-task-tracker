@@ -58,7 +58,7 @@ export class ProjectTasks implements DropList {
 	private plates = new Map<string, HTMLElement>();
 	private rowsByCard = new Map<HTMLElement, ProjectsListRow>();
 	private cardsByRow = new Map<string, HTMLElement>();
-	private untitled = false;
+	private opening = new Map<HTMLElement, boolean>();
 
 	constructor(
 		parent: HTMLElement,
@@ -101,9 +101,9 @@ export class ProjectTasks implements DropList {
 		return this.plates.get(plateKey(name)) ?? null;
 	}
 
-	/** Cards of the untitled part (the node's own, No project's) stand over the first header: the gap above it is theirs. */
-	get untitledDrawn(): boolean {
-		return this.untitled;
+	/** The part's header opens its part as the core says (`ProjectsSection.opens`). */
+	headerOpens(node: HTMLElement): boolean {
+		return this.opening.get(node) ?? false;
 	}
 
 	/** The row a drawn card stands for. */
@@ -132,7 +132,7 @@ export class ProjectTasks implements DropList {
 		this.plates = new Map();
 		this.rowsByCard = new Map();
 		this.cardsByRow = new Map();
-		this.untitled = view.sections.some((section) => !section.header && section.rows.length > 0);
+		this.opening = new Map();
 		if (view.sections.length === 0) this.nodes.push(this.plate(drawing.take("plate:none", () => el(null, "div", PLATE)).node, view.emptyLabel, null));
 		const rows: { node: HTMLElement; level: number }[] = [];
 		const signals = new Map<HTMLElement, AbortSignal>();
@@ -144,6 +144,7 @@ export class ProjectTasks implements DropList {
 				head.replaceChildren();
 				el(head, "span", "tc-group-name", section.title ?? "");
 				this.heads.set(head, section.group);
+				this.opening.set(head, section.opens);
 				this.nodes.push(head);
 				last = head;
 			}

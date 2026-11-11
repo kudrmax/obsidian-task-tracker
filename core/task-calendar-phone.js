@@ -5102,7 +5102,7 @@ ${key.title}`.toLowerCase();
     const drawn = cards.map((card) => ({ id: `${key}/${card.item.id}`, ...card }));
     const rows = drawn.flatMap((card) => [{ id: card.id, item: card.item, level: 0, card, drop: card.drop }, ...subtaskRows(key, card.item, 1, card.from)]);
     const header = title !== null;
-    return { key, group: header ? key : null, title, header, empty: drawn.length === 0, plate: false, path, depth, cards: drawn, rows, newTask: newTask2 };
+    return { key, group: header ? key : null, title, header, opens: header, empty: drawn.length === 0, plate: false, path, depth, cards: drawn, rows, newTask: newTask2 };
   }
   function subtaskRows(key, item, level, from) {
     if (item.collapsed) return [];
@@ -5110,7 +5110,8 @@ ${key.title}`.toLowerCase();
   }
   function shown(sections, open) {
     const kept = open ? sections : sections.filter((s) => !s.empty);
-    return kept.map((s) => ({ ...s, plate: s.empty && (s.header || kept.length === 1) }));
+    const untitledAbove = (i) => kept.slice(0, i).some((s) => !s.header);
+    return kept.map((s, i) => ({ ...s, plate: s.empty && (s.header || kept.length === 1), opens: s.header && !untitledAbove(i) }));
   }
   function tapped(state, tree, node) {
     const selected2 = selectedNode(state, tree);
