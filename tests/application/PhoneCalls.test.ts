@@ -345,9 +345,9 @@ describe("the door's notes", () => {
 		const projects = ok(callDoor("rules.projectNotes", [vault, "#client"], context()));
 		expect(projects).toEqual([{ name: "Acme", path: "Clients/Acme.md", link: "Acme" }]);
 		const text = "## Inbox\n- [ ] Call 🗂️ [[Acme]]\n- [ ] Other\n";
-		const screen = ok(callDoor("tasks.screen", [T], context(text, { projects: projects as never }))) as { inbox: { project: unknown }[] };
+		const screen = ok(callDoor("tasks.screen", [T], context(text, { projects: projects as never }))) as { inbox: { project: unknown; key: unknown }[] };
 		expect(screen.inbox[0].project).toMatchObject({ name: "Acme", note: null, canOpenNote: false });
-		const moved = callDoor("tasks.setStatus", [(screen.inbox[1] as { key: unknown }).key, "done"], context(text, { projects: projects as never }));
+		const moved = callDoor("tasks.setStatus", [screen.inbox[1].key, "done"], context(text, { projects: projects as never }));
 		expect((moved as { tasks: string }).tasks).toContain("- [ ] Call 🗂️ Acme\n\n## Projects\n\n- Acme [[Acme]]\n");
 	});
 

@@ -111,3 +111,71 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
    name: a tap opens the note, and the row's Detach takes the link off (the file stays). The iPhone app opens an attached
    note in Obsidian (`obsidian://open`) and cannot attach one: it sees only the tasks file. All, No project and Done have
    no menu.
+
+### Backend (the core's contract)
+
+2. **`## Projects`** is a fixed heading (not a setting), made right after Inbox (at the file's end without Inbox) on the
+   first write that has a project to put in it. Its list items that are not task lines are the tree; a tab is as deep
+   as two spaces; the tree is written back with the indent it was read with (a tab when it had none), where its first
+   item stood; any other line of the section stays where it was. A name met twice (case aside) is the first one, the
+   second's subprojects joining it.
+3. **The field's place: right after the title, before the labels and every other field**
+   (`- [ ] Call 🗂️ Дружба 🗂️ Small talk #label/Fast 📁 📅 …`), not after the labels as the old `🗂️ [[…]]`. Max's phone
+   keeps the app of master 0.4.189 until the new app follows, and that core reads a plain field as part of the title and
+   writes the title before the labels: in this order every line it rewrites comes back byte for byte.
+   `tests/phone/oldAppKeepsProjects.test.ts` runs master's bundle (moves, Done, rename, add, a subtask taken out, a new
+   time) on a file of the new format: `## Projects` and every `🗂️` field survive. Until the new app, the old one shows
+   the fields inside titles, draws every task under No project, and a subtask it takes out of its parent does not carry
+   the parent's projects.
+4. **A name runs** to the next `🗂️`, a tag (`#…`) or a field's mark as a word of its own (`📅 ⏰ 🚨 📌 🔕 🔁 📁`, as the
+   settings name them), else to the line's end; it is trimmed; the same project twice is once. The old `🗂️ [[Note]]`
+   reads as the note's name, an alias or heading left out, and what follows the link stays text. A name typed for a new
+   or renamed project (`cleanProjectName`) is put on one line, single spaces, without `[ ]`, a tag's `#` or the mark.
+5. **Status, per branch.** Active: an open task of the project or of any subproject is in Now or Soon or has a date or
+   a time. Waiting: otherwise, while an open task of the branch waits in Inbox or Backlog, or the branch holds a project
+   with no task at all (a new subproject keeps its parent from Done). Done: every task of the branch is closed and every
+   subproject is done. Closed tasks count wherever they lie; open ones only in the funnel.
+6. **Done in the tree.** A done project leaves its place with its branch and shows under the Done row, which is folded
+   until tapped (a tap on the chosen Done opens or closes it); a done subproject of a live project shows there too, at
+   the top of its own done branch. Choosing a done project or Done shows the closed tasks; its plus writes nothing; a
+   done project is not lifted. A new task brings it back to its place.
+7. **The device's screen** is `ProjectsScreenState` `{ selected, mode, folded, doneOpen }`: in the plugin through the
+   `ProjectsScreenStore` port (its local storage), in the app as the door answers `projectsScreen`. Nothing chosen: All,
+   By project. A node is `"all"`, `"none"`, `"done"` or `"project:<name>"`; a name the tree lost falls back to All; a
+   rename carries the choice and the fold to the new name.
+8. **A node's tasks** are its open top-level tasks in the funnel (a subtask goes with its card), in funnel order (Today,
+   Soon, Inbox, Backlog) then the file's. By project: the node's own first, untitled, then a part for every subproject at
+   any depth in the tree's order (`title` its name, `path` and `depth` below the node), an empty part left out; a task of
+   two of them is in both. All: a part per live project; No project: one untitled part. By stage: Today (Now), Soon,
+   Inbox, Backlog, each with `over` the subproject the task is in (none for the node's own; All: the task's first
+   project). The card's `stage`: Today for Now, the date (`DueLabel`) for a Soon task with a day other than today, else
+   the list's symbol.
+9. **A card dropped on the tree** replaces the project it was shown under (`ProjectsCard.from`: the part's project, By
+   stage the one `over` names or the node) and keeps the others; on No project it loses that one; All and Done take no
+   drop; a subtask's key names its top task. Its place in the funnel never changes.
+10. **The plus let go on the tasks** writes at the end of Inbox with that part's project (By project), at the end of that
+    stage's list with the node's project (By stage; Today is Now, dated today), or at the end of Inbox with the node's
+    project outside any part; nothing in Done. Inbox first, because a task named in a project is not yet sorted in time.
+11. **The plus or a lifted project in the tree** lands by `projectsGap(rows, gap, depth, lifted)`: a gap's depth runs from
+    the row below's to one deeper than the row above's (a shift to the right nests), the lifted project's branch left
+    out; let go deeper than a folded row, it goes last into its branch. A new project is chosen at once. A taken name
+    makes nothing (`createProject` answers null); a rename to a taken name writes nothing (false), never merges.
+12. **The Project page** holds the whole tree in its order (`depth` its indent), done projects too, a check on each project
+    every task has; a pick toggles it for all (`toggleProject`), No project takes them all off, «New project…» makes a
+    top-level project last and checks it (a taken name: that project). The row's value: «Дружба», «Дружба +1», «No
+    project», or empty when the tasks differ. The quick entry's button stays one project: a rename writes it only when
+    the button was touched, then the task's projects become that one.
+13. **The one move** runs on the first write of an action to a file without `## Projects` that has a note, a field or
+    a `🎯` line to move (a tidy-only write moves nothing): the notes the host knows (the plugin's `Projects` port by the
+    old Project tag, the app's `context.projects`) by name, then each name a task's field gives; only the lines with a
+    field or the mark are rewritten; the mark is the settings' old `resultMark` (`🎯`), a priority after it read as the
+    priority. Undoing that write undoes the move; the next write makes it again.
+14. **Every action's write puts the tasks' projects in the tree**, one the tree lacks last at its top.
+15. **The next step** is any folded task's with an open subtask, on its card and its timeline block (the block now only
+    while folded, as the card); `semibold` is always false.
+16. **Search** gives each hit `projectPath`, its first project's path in the tree.
+17. **The note.** The menu's `note` names the attached note by its link's last part; the app opens it with
+    `projects.noteUrl(link, vault)` (`obsidian://open?vault=…&file=…`, an alias or heading left out). Attaching is the
+    plugin's (its note search, then `setProjectNote(name, link)`); a link typed with `[[ ]]` is taken without them.
+18. **The old settings** `projectTag` and `resultMark` stay in `data.json`, read only by the move; the settings form's
+    fields and `setProjectTag`/`setResultMark` are stubs that write nothing until the frontends drop them.
