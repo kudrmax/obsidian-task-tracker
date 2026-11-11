@@ -205,6 +205,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "renameProject", args: () => ["Окружение", "Сербия"] },
 	{ method: "renameProject", args: () => ["Окружение", " "] },
 	{ method: "setProjectNote", args: () => ["Окружение", "Заметки/Окружение"] },
+	{ method: "setProjectFolder", args: () => ["Окружение", true] },
 	{ method: "dropOnProject", args: (s) => [[{ key: key(s, "Someday"), from: "Окружение" }], "none"] },
 	{ method: "dropOnProject", args: (s) => [[{ key: key(s, "Idea"), from: null }], "project:Окружение"] },
 	{ method: "dropInProjects", args: (s) => [[{ key: key(s, "Idea"), from: null }], { kind: "task", group: "project:Окружение", before: null }] },

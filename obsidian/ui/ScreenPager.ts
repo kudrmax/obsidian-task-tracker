@@ -137,19 +137,25 @@ export class ScreenPager implements SwipeTarget {
 		settling.frame = requestAnimationFrame((next) => this.frame(settling, next));
 	}
 
-	/** The screen stands where it was going: on the next screen or back. */
+	/**
+	 * The screen stands where it was going: on the next screen or back. Whatever the track does as it lands, the pager is
+	 * free again and the settle resolves, so nothing waiting on it (the swipe's hold on the screen, the next turn) is kept.
+	 */
 	private finish(): void {
 		const settling = this.settling;
 		if (!settling) return;
 		this.settling = null;
 		cancelAnimationFrame(settling.frame);
 		window.clearTimeout(settling.timer);
-		settling.track.at(settling.to);
-		settling.track.land(settling.arrived);
 		this.way = null;
 		this.shift = null;
 		this.dx = 0;
-		settling.resolve();
+		try {
+			settling.track.at(settling.to);
+			settling.track.land(settling.arrived);
+		} finally {
+			settling.resolve();
+		}
 	}
 
 	private reset(): void {

@@ -48,7 +48,7 @@ import { DIVIDER_SNAP, dividerAt, LIST_WIDTHS, listShareOf, listWidths } from ".
 import { type LinkQuery, linkQuery, noteOfLink, noteSuggestions, type VaultNote, withNoteLink } from "./notes";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, type Header, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
-import { emptySession, entryProject, type EntryJob, type EntryLook, type EntrySession, type EntryState, type PendingRename, QuickEntry } from "./QuickEntry";
+import { emptySession, entryProject, isFolderRef, type EntryJob, type EntryLook, type EntrySession, type EntryState, type PendingRename, QuickEntry } from "./QuickEntry";
 import { sectionNameEnd } from "./SectionNameEntry";
 import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
@@ -435,6 +435,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	dropInProjects: (c, [cards, place]) => c.run(c.ask(c.writes.dropInProjects(cards as A, place as A))),
 	projectsDropPreview: (c, [cards, place]) => c.ask(c.writes.projectsDropPreview(cards as A, place as A)),
 	deleteProject: (c, [name]) => c.run(c.writes.deleteProject(name as string)),
+	setProjectFolder: (c, [name, folder]) => c.run(c.writes.setProjectFolder(name as string, folder === true)),
 	setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name as string, (link ?? null) as string | null)),
 	dropOnProject: (c, [cards, to]) => {
 		const target = to === "none" ? null : projectOfNode(to as string);
@@ -714,7 +715,11 @@ const CAPTURE: Readonly<Record<string, Handler>> = {
 		c.write((text) => c.rules.change(text, c.rules.placeNew(title, null, { kind: "list", list: list as GroupedList, group: null, before: null }, null, [], (project ?? null) as string | null)).text);
 	},
 	/** The New Task sheet's Project row for the project chosen (null: none; at the start, the view's `ScreenView.project`): the quick entry's Project button, its page and whether it is lit. */
-	project: (c, [chosen]) => entryProject((chosen ?? null) as string | null, c.reads.projects()),
+	project: (c, [chosen]) => {
+		const known = c.reads.projects();
+		const name = (chosen ?? null) as string | null;
+		return entryProject(isFolderRef(name, known) ? null : name, known);
+	},
 	lists: (c) => CAPTURE_LISTS.map((list) => ({ list, name: c.settings.sections[list] })),
 };
 

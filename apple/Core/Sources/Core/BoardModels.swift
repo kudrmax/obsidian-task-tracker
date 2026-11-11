@@ -67,6 +67,8 @@ public struct ProjectRef: Codable, Hashable, Sendable {
     public let canOpenNote: Bool
     /// The card shows the folder mark: everywhere but on the Projects screen.
     public let mark: Bool
+    /// A folder: it only holds subprojects, so nothing in the app gives a task it.
+    public let folder: Bool
 }
 
 public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
@@ -488,6 +490,8 @@ public struct MenuProjectOption: Decodable, Hashable, Sendable {
     public let project: ProjectRef
     public let checked: Bool
     public let depth: Int
+    /// It can't be picked: a folder a pick would give the tasks, shown so its subprojects are found under it.
+    public let disabled: Bool
 }
 
 /// `MenuProject`: the Project row and its page of checks: a pick writes `tasks.toggleProject` with its name, No project

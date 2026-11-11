@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import type { LabelLevel, NewTaskPlace, Placement, ProjectRef, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../core/application/contracts";
+import type { EntryList, LabelLevel, NewTaskPlace, Placement, ProjectRef, ProjectsCard, ProjectsSection, ProjectsView, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../core/application/contracts";
 import type { RightMode } from "../../obsidian/ui/viewSettings";
 import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../obsidian/ui/drag/DropTarget";
 import { GestureArbiter } from "../../obsidian/ui/gestures";
-import { type ColumnDrop, QuickEntryController } from "../../obsidian/ui/quick/QuickEntryController";
+import { type ColumnDrop, type EntryListShown, type PlusAside, QuickEntryController } from "../../obsidian/ui/quick/QuickEntryController";
+import { ProjectTasks } from "../../obsidian/ui/projects/ProjectTasks";
 import { TaskMenu } from "../../obsidian/ui/menu/TaskMenu";
 import { taskMenu } from "../../core/application/menus";
 import { dayColumn, dayOfPlacement, placementOfDay } from "../../core/domain/Days";
@@ -16,6 +17,7 @@ import { FakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";
 import { withShownSpan } from "../fakes/timelineDeps";
 import { DEFAULT_SETTINGS } from "../../core/settings";
+import { projectsView } from "../fakes/projectsView";
 
 const TODAY = "2026-11-01";
 const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox"];
@@ -61,9 +63,11 @@ interface SetUp {
 	labels?: readonly LabelLevel[];
 	/** The project notes the Project page offers. */
 	projects?: readonly ProjectRef[];
+	/** The Projects screen's tasks, drawn in its own list (`ProjectTasks`), whose plus places are its own. */
+	projectsView?: ProjectsView;
 }
 
-function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, drawsOnFresh, sections = false, labels = [], projects = [] }: SetUp = {}) {
+function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, drawsOnFresh, sections = false, labels = [], projects = [], projectsView }: SetUp = {}) {
 	const root = document.createElement("div");
 	document.body.appendChild(root);
 	/** The animation frames asked for, run when the test says. */
@@ -92,6 +96,16 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	const drops: ColumnDrop[] = [];
 	const lists = {} as Record<ListColumn, TaskList>;
 	let controller: QuickEntryController | null = null;
+	const projectsList = projectsView
+		? new ProjectTasks(root.appendChild(document.createElement("div")), {
+				entry: (drawing) => controller?.entryIn("projects", drawing) ?? null,
+				renaming: () => controller?.renaming() ?? null,
+				coming: () => projectsView,
+			})
+		: null;
+	const shownList = (column: EntryList): EntryListShown | null => (column === "projects" ? projectsList : (lists[column] ?? null));
+	/** The Projects screen's own drops of the plus: the tree's. */
+	const asideDrops: DropResult[] = [];
 	/** Every title field the entry made, in order. */
 	const titleFields: FakeTitleField[] = [];
 	for (const column of COLUMNS) {
@@ -119,6 +133,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	const render = () => {
 		draws++;
 		for (const column of COLUMNS) lists[column].render();
+		if (projectsView) projectsList?.render(projectsView, true);
 		timeline.render();
 		controller?.rendered();
 		drawnLeft.push(rowsOf("day"));
@@ -131,7 +146,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			unfoldAbove: async () => {},
 			newProject: async (name, keys) => {
 				newProjects.push({ name, keys });
-				return { name, path: [name], note: `${name}.md`, canOpenNote: true, mark: true };
+				return { name, path: [name], note: `${name}.md`, canOpenNote: true, mark: true, folder: false };
 			},
 			createWithId: async (text, priority, place, repeat, _labels, project) => {
 				created.push({ text, priority, place, ...(repeat ? { repeat } : {}), ...(project ? { project } : {}) });
@@ -160,7 +175,11 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			titleFields.push(made);
 			return made;
 		},
-		list: (column) => lists[column],
+		list: shownList,
+		aside: (): PlusAside | null =>
+			projectsList && mode === "projects"
+				? { targets: [stubDrop("day", { kind: "projectsPlace", place: { kind: "task", group: "s", before: null } })], dropped: (result) => asideDrops.push(result) }
+				: null,
 		sectioned: () => sections,
 		timeline: () => timeline,
 		task: (k) => slotted.find((t) => t.key.raw === k.raw) ?? null,
@@ -192,8 +211,8 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	render();
 	const plus = root.querySelector<HTMLElement>(".tc-plus")!;
 	const field = () => root.querySelector<HTMLTextAreaElement>("textarea.tc-quick-field");
-	function rowsOf(column: ListColumn): string[] {
-		return [...lists[column].el.children].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent || row.className));
+	function rowsOf(column: EntryList): string[] {
+		return [...shownList(column)!.el.children].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.classList.contains("is-renaming") ? "hidden" : row.textContent || row.className));
 	}
 	const type = (text: string) => {
 		field()!.value = text;
@@ -222,6 +241,8 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		field,
 		titleFields,
 		lists,
+		projectsList,
+		asideDrops,
 		timeline,
 		slotted,
 		render,
@@ -458,8 +479,8 @@ describe("QuickEntryController", () => {
 
 	describe("the Project button", () => {
 		const KNOWN: readonly ProjectRef[] = [
-			{ name: "Дружба", path: ["Дружба"], note: "Дружба.md", canOpenNote: true, mark: true },
-			{ name: "Окружение", path: ["Окружение"], note: "Окружение.md", canOpenNote: true, mark: true },
+			{ name: "Дружба", path: ["Дружба"], note: "Дружба.md", canOpenNote: true, mark: true, folder: false },
+			{ name: "Окружение", path: ["Окружение"], note: "Окружение.md", canOpenNote: true, mark: true, folder: false },
 		];
 		const rows = () => [...document.querySelectorAll<HTMLButtonElement>(".tc-quick-panel .tc-menu-row")];
 
@@ -1175,7 +1196,7 @@ describe("QuickEntryController", () => {
 			const task = onTimeline("Report", 0);
 			const { controller, root, rowsOf } = setUp({ items: { day: [task] }, slotted: [task] });
 			controller.rename(task);
-			expect(rowsOf("day")).toEqual(["field", "Report"]);
+			expect(rowsOf("day")).toEqual(["field", "hidden"]);
 			expect(timelineField(root)).toBeNull();
 		});
 
@@ -1337,5 +1358,108 @@ describe("QuickEntryController: the field switched to a section", () => {
 		controller.openAtEnd("day");
 		expect(sectionButton(root).parentElement?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(root.querySelector<HTMLElement>(".tc-quick-mode")!.hidden).toBe(true);
+	});
+});
+
+describe("QuickEntryController: the Projects list is a list the field stands in (spec «The entry field on the Projects screen»)", () => {
+	const sub = item("A1", key("soon", 0, [0]));
+	const a = item("A", key("soon", 0), null, [sub]);
+	const b = item("B", key("now", 0));
+
+	function part(name: string, title: string, tasks: readonly TaskItem[], list: "soon" | "now" | "inbox"): ProjectsSection {
+		const cards = tasks.map((t): ProjectsCard => ({ id: `${name}/${t.id}`, item: t, stage: null, over: null, from: name, drop: { key: t.key, from: name }, menuFrom: "soon", canDrop: true }));
+		const rows = cards.flatMap((card) => [
+			{ id: card.id, item: card.item, level: 0, card, drop: card.drop },
+			...card.item.subtasks.map((s) => ({ id: `${name}/${s.id}`, item: s, level: 1, card: null, drop: { key: s.key, from: name } })),
+		]);
+		return { key: name, group: name, title, header: true, opens: true, takes: true, empty: tasks.length === 0, plate: tasks.length === 0, path: [], depth: 0, cards, rows, newTask: { place: { kind: "list", list, group: null, before: null }, project: "P" } };
+	}
+
+	const view = () => projectsView([part("s", "Soon", [a], "soon"), part("t", "Today", [b], "now"), part("i", "Inbox", [], "inbox")]);
+	const onProjects = () => setUp({ mode: "projects", items: { soon: [a], day: [b] }, projectsView: view() });
+
+	it("Rename turns the card into the field in the Projects list, not in a funnel column, and typing never turns the screen", async () => {
+		const { controller, rowsOf, field, type: typeIn, press, edits, turned } = onProjects();
+		controller.rename(a);
+		expect(rowsOf("projects")).toEqual(["Soon", "field", "hidden", "A1", "Today", "B", "Inbox", "No tasks"]);
+		expect(rowsOf("soon")).not.toContain("field");
+		expect(field()!.value).toBe("A");
+		typeIn("A2");
+		expect(turned).toEqual([]);
+		press("Enter");
+		await vi.waitFor(() => expect(edits.map((e) => [e.key, e.draft.text])).toEqual([[a.key, "A2"]]));
+	});
+
+	it("Escape cancels a rename: the card shows again and nothing is written", () => {
+		const { controller, rowsOf, type: typeIn, press, edits } = onProjects();
+		controller.rename(a);
+		typeIn("A2");
+		press("Escape");
+		expect(rowsOf("projects")).toEqual(["Soon", "A", "A1", "Today", "B", "Inbox", "No tasks"]);
+		expect(edits).toEqual([]);
+	});
+
+	it("renames a subtask in its own row", () => {
+		const { controller, rowsOf, field } = onProjects();
+		controller.rename(sub);
+		expect(rowsOf("projects")).toEqual(["Soon", "A", "field", "hidden", "Today", "B", "Inbox", "No tasks"]);
+		expect(field()!.value).toBe("A1");
+	});
+
+	it("Add Subtask opens the field under the task's subtasks, a level in", () => {
+		const { controller, rowsOf, projectsList } = onProjects();
+		controller.addSubtask(a);
+		expect(rowsOf("projects")).toEqual(["Soon", "A", "A1", "field", "Today", "B", "Inbox", "No tasks"]);
+		expect(projectsList!.el.querySelector<HTMLElement>(".tc-quick-row")!.style.getPropertyValue("--tc-level")).toBe("1");
+	});
+
+	it("an empty part's plate opens the field in its place, the plate hidden, and Enter writes where the part writes and opens the next", async () => {
+		const { controller, rowsOf, type: typeIn, press, created } = onProjects();
+		controller.openIn("projects", "i");
+		expect(rowsOf("projects").slice(-2)).toEqual(["Inbox", "field"]);
+		typeIn("New");
+		press("Enter");
+		expect(rowsOf("projects").slice(-3)).toEqual(["Inbox", "New", "field"]);
+		await vi.waitFor(() => expect(created).toEqual([{ text: "New", priority: null, place: { kind: "projects", group: "i", before: null }, project: "P" }]));
+	});
+
+	it("the plus tapped opens the field at the end of the part the core marks for it", () => {
+		const { plus, rowsOf } = onProjects();
+		const tap = (type: string) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 3, pointerType: "touch", isPrimary: true, button: 0 });
+		plus.dispatchEvent(tap("pointerdown"));
+		plus.dispatchEvent(tap("pointerup"));
+		expect(rowsOf("projects")).toEqual(["Soon", "A", "A1", "field", "Today", "B", "Inbox", "No tasks"]);
+	});
+
+	it("the plus tapped where no part takes a new task (Done) opens nothing, not even in a hidden funnel column", () => {
+		const done = projectsView([{ ...part("d", "Done", [b], "now"), newTask: null }]);
+		const { plus, root } = setUp({ mode: "projects", items: { day: [b] }, projectsView: done });
+		const tap = (type: string) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 4, pointerType: "touch", isPrimary: true, button: 0 });
+		plus.dispatchEvent(tap("pointerdown"));
+		plus.dispatchEvent(tap("pointerup"));
+		expect(root.querySelector(".tc-quick-row")).toBeNull();
+		expect(root.classList.contains("is-entering")).toBe(false);
+	});
+
+	it("the plus let go in the list opens the field at that place and lands in it; let go on the tree, the screen has it", () => {
+		const { controller, plus, beginNew, rowsOf, field, asideDrops } = onProjects();
+		controller.dragFromPlus(new PointerEvent("pointermove"), plus);
+		const onDrop = beginNew.mock.calls[0][3] as (result: DropResult | null) => HTMLElement | null;
+		expect(onDrop({ kind: "projectsPlace", place: { kind: "task", group: "t", before: b.key } })).toBe(field());
+		expect(rowsOf("projects")).toEqual(["Soon", "A", "A1", "Today", "field", "B", "Inbox", "No tasks"]);
+		controller.dragFromPlus(new PointerEvent("pointermove"), plus);
+		const gap: DropResult = { kind: "projectGap", gap: 1, landing: { depth: 0, place: { parent: null, before: null } } as never };
+		(beginNew.mock.calls[1][3] as (result: DropResult | null) => HTMLElement | null)(gap);
+		expect(asideDrops).toEqual([gap]);
+	});
+
+	it("a place chosen in the bar keeps the field where it stands and the screen on Projects", () => {
+		const { controller, root, rowsOf, turned } = onProjects();
+		controller.openIn("projects", "i");
+		type(root, "Call");
+		root.querySelector<HTMLElement>(".tc-bar-place")!.click();
+		tile(root, "Soon").click();
+		expect(turned.every((to) => to === "projects")).toBe(true);
+		expect(rowsOf("projects").slice(-2)).toEqual(["Inbox", "field"]);
 	});
 });

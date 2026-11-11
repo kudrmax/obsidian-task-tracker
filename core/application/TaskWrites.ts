@@ -34,6 +34,7 @@ import { projectsDropSteps, projectsLandingOf } from "./projectsDrop";
 import { projectsNewPlace } from "./projectsEntry";
 import { keyOf } from "./taskKeys";
 import type { TreePlace } from "../domain/ProjectTree";
+import { isFolder } from "../domain/ProjectWrites";
 
 /** The project of the cleaned name `clean`, as the tree after a write has it; null when it has none. */
 function namedIn(change: DocChange | null, clean: string | null): string | null {
@@ -175,10 +176,19 @@ export class TaskWrites {
 		};
 	}
 
-	/** «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of nothing. */
+	/**
+	 * «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of
+	 * nothing and for a folder's name, which no task may be given: an answer is always a project to pick.
+	 */
 	newProject(name: string, keys: readonly TaskKey[]): Write<string | null> {
 		const operation = this.rules.newProject(name, keys);
-		return { operation, answer: (change) => (operation === null ? null : namedIn(change, this.rules.cleanName(name))) };
+		return {
+			operation,
+			answer: (change) => {
+				const made = operation === null ? null : namedIn(change, this.rules.cleanName(name));
+				return made === null || isFolder(change!.after, made) ? null : made;
+			},
+		};
 	}
 
 	dropOnProject(cards: readonly ProjectsDrop[], to: string | null): Write<void> {
@@ -203,6 +213,12 @@ export class TaskWrites {
 
 	deleteProject(name: string): Write<void> {
 		return nothing(this.rules.deleteProject(name));
+	}
+
+	/** Whether the project's folder mark changed. */
+	setProjectFolder(name: string, folder: boolean): Write<boolean> {
+		const operation = this.rules.setProjectFolder(name, folder);
+		return { operation, answer: (change) => change !== null && change.after.serialize() !== change.before.serialize() };
 	}
 
 	setProjectNote(name: string, link: string | null): Write<void> {

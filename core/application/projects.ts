@@ -25,7 +25,7 @@ export class ProjectIndex {
 	refOf(name: string | null, mark = true): ProjectRef | null {
 		if (name === null) return null;
 		const placed = this.byKey.get(projectKey(name));
-		if (!placed) return { name, path: [name], note: null, canOpenNote: false, mark };
+		if (!placed) return { name, path: [name], note: null, canOpenNote: false, mark, folder: false };
 		return refOfPlaced(placed, mark);
 	}
 
@@ -40,8 +40,8 @@ export class ProjectIndex {
 }
 
 export function refOfPlaced(placed: PlacedProject, mark = true): ProjectRef {
-	const { name, note } = placed.node;
-	return { name, path: placed.path, note, canOpenNote: note !== null, mark };
+	const { name, note, folder } = placed.node;
+	return { name, path: placed.path, note, canOpenNote: note !== null, mark, folder };
 }
 
 /** A note's tags, as the host reads them from its properties and its body: what the one move to projects reads. */

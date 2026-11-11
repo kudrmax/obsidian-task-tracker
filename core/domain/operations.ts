@@ -6,6 +6,7 @@ import type { EndList, GroupedList, GroupPlace } from "./Lists";
 import type { Placement, TaskDraft } from "./Placement";
 import { type Column, columnGroups, columnList } from "./queries";
 import { namesProject, projectKey, uniqueNames } from "./Project";
+import { isFolder } from "./ProjectWrites";
 import { Repeat, type RepeatRule } from "./Repeat";
 import { DEFAULT_REMINDER, isOpen, STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import { taskTitle } from "./TaskTitle";
@@ -303,11 +304,11 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 	const unsorted = isUndated(section);
 	if (entry === null) {
 		const { text, ...marks } = typed(doc, draft.text, draft.priority, draft.labels ?? []);
-		return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : (slot ?? null), ...marks, projects: draftProjects(draft) ?? [] }), draft, today, boundary));
+		return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : (slot ?? null), ...marks, projects: draftProjects(doc, draft, []) ?? [] }), draft, today, boundary));
 	}
 	if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
 	const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-	const changed = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}), ...(draftProjects(draft) !== undefined && { projects: draftProjects(draft)! }) };
+	const changed = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}), ...(draftProjects(doc, draft, entry.task.projects) !== undefined && { projects: draftProjects(doc, draft, entry.task.projects)! }) };
 	const edited = doc.replace(entry, withDraftRepeat(changed, draft, today, boundary));
 	if (same || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
@@ -334,10 +335,13 @@ function draftMarks(doc: TaskDocument, task: Task, draft: TaskDraft): Typed {
 	return typed(doc, draft.text, draft.priority, draft.labels ?? task.labels);
 }
 
-/** The draft's projects: `projects`, else the one of `project` (null: none); undefined keeps the task's own. */
-function draftProjects(draft: TaskDraft): readonly string[] | undefined {
-	if (draft.projects !== undefined) return uniqueNames(draft.projects);
-	return draft.project === undefined ? undefined : draft.project === null ? [] : [draft.project];
+/**
+ * The draft's projects: `projects`, else the one of `project` (null: none); undefined keeps the task's own. A folder the
+ * task (`had`) doesn't carry already is left out: nothing gives a task a folder.
+ */
+function draftProjects(doc: TaskDocument, draft: TaskDraft, had: readonly string[]): readonly string[] | undefined {
+	const named = draft.projects !== undefined ? draft.projects : draft.project === undefined ? undefined : draft.project === null ? [] : [draft.project];
+	return named === undefined ? undefined : uniqueNames(named.filter((name) => namesProject(had, name) || !isFolder(doc, name)));
 }
 
 /** The end of Inbox, Backlog or Soon: a drop on that list from another one, or at the end of its own. Into Inbox and Backlog the due date and slot go. */

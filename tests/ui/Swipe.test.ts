@@ -121,6 +121,25 @@ describe("Swipe", () => {
 		expect(arbiter.busy).toBe(false);
 	});
 
+	/** A screen that fails to stand must not keep the swipe holding it: no card could be dragged after (2026-11-11). */
+	it("lets the screen go even when the screen fails to stand, so a card can be dragged after", async () => {
+		const arbiter = new GestureArbiter();
+		const root = document.createElement("div");
+		const target: SwipeTarget = {
+			distance: () => WIDTH,
+			follow: () => undefined,
+			settle: () => Promise.reject(new Error("the screen could not take the place")),
+			stand: () => undefined,
+			catch: () => 0,
+		};
+		new Swipe(root, { arbiter, accepts: () => true, target });
+		root.dispatchEvent(pointer("pointerdown", 300));
+		root.dispatchEvent(pointer("pointermove", 280));
+		root.dispatchEvent(pointer("pointerup", 100));
+		await settled();
+		expect(arbiter.claim("drag")).toBe(true);
+	});
+
 	it("leaves a finger that goes up or down to the scroll", () => {
 		const { inner, shifts, follows, arbiter, swipe } = setUp();
 		inner.dispatchEvent(pointer("pointerdown", 300, 300));

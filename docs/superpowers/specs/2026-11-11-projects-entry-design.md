@@ -82,6 +82,29 @@ nothing shows, and the first key typed turns the screen to that funnel column (M
    answer before the tap is `plusOpens()` (`QuickEntrySession.plusOpens()`, door `entry.plusOpens(session, look)` →
    `value`), the same rule; off Projects it is always true. A frontend reads it instead of looking at `EntryPart.plus`.
 
+
+### Obsidian frontend
+
+1. **One drawing of the entry for every list.** The field's rows (the texts typed and not yet written, the field's row,
+   the renamed card hidden in its place with the branches passing it, a written text's card taking over its row) are
+   `EntryRows` (`obsidian/ui/EntryRows.ts`), used by `TaskList` and `ProjectTasks` alike; `QuickEntryController` reads
+   any list through `EntryListShown` (`listCards`, `sections`, `comingCards`, `parts`, `adopt`, `forgetTyped`), and its
+   lists are a `Record<EntryList, true>`, so a list the core adds must be named there.
+2. **The Projects view is read with the lists.** `DayData` reads `projectsScreen()` in the same read as `screen()` (the
+   plugin's own view only) and the Projects screen is drawn in the same draw as the columns, so `coming("projects")` is
+   the cards about to be drawn and the field lands under a written task as in the lists. `ProjectsScreen.refresh` stays
+   for the screen's own taps and drops.
+3. **The plus is let go in the Projects list as in a column.** `ProjectsListDrop` takes the plus: the line between
+   cards, a subtask place by the finger's level, the field opening there (`openAt("projects", place)`) and the plus
+   landing in it. It refuses a gap of a part whose `EntryPart.newTask` is null, and the whole list where no part writes
+   one (Done: not even as a subtask). The old `TasksDrop` (a line under a part's last card) and `askTaskText` are
+   gone.
+4. **The plus tap on Projects opens nothing where no part takes a new task** (Done): the core decides (Backend
+   Decision 9). The controller asks `plusOpens()` before the tap; the plugin reads no `EntryPart.plus` of its own.
+5. **The No tasks plate of a part that writes no task does nothing** (it gets no tap), as before.
+6. **The screen never scrolls.** The plugin's view and its strip's columns clip what lies beyond them (`overflow: clip`) and are no scroll containers, so the browser can never slide the screen sideways to bring a caret, a focused field or a found row into sight. The places stand only where the wheel, a swipe or a turn put them. Before this, a field opened in an unseen column slid the Projects screen half off to the left for good on the first key typed (`scrollLeft` of the view root, which nothing resets). Guarded by `tests/styles.test.ts`. The Swift app has no such scroll: nothing to carry over.
+7. **A turn that goes wrong as it lands still frees the screen.** `ScreenPager` resolves its settle and forgets its way whatever the track does as it lands, the swipe lets the gesture arbiter go even when the settle fails, and the arrows' chain of day turns reports a failure and goes on instead of dropping every later turn. Nothing a turn takes (the swipe's hold, the pager's way, the next turn) stays held after it. Guarded by `tests/ui/ScreenPager.test.ts` and `tests/ui/Swipe.test.ts`.
+
 ### iPhone app
 
 1. **The app's Projects list is the core's list, one mechanism with the funnel's.** `QuickEntryHost` hands the Projects
@@ -94,12 +117,12 @@ nothing shows, and the first key typed turns the screen to that funnel column (M
 2. **The app's Projects list draws the core's `rows`**: the cards with their open subtasks under them, the branch lines
    as a list's, so the field's place (an index among the look's cards, which are the rows) is the place drawn, and a
    subtask can be renamed or typed under its card there. Before, the app drew `cards` only (no subtasks).
-3. **The plus tapped on Projects types in place** (`openFromPlus`, after `plusOpens`; under Done it does nothing, the
-   plus staying as it is). Elsewhere the plus still opens the app's new-task screen (text or voice), which the app has
+3. **The plus tapped on Projects types in place** (`openFromPlus`, after `plusOpens`; under Done, a folder or a done project it does nothing,
+   the plus staying as it is: one path, the core's, in place of the app's own `plusTaps`). Elsewhere the plus still opens the app's new-task screen (text or voice), which the app has
    in place of the plugin's plus-at-the-end; the widget and the Action button still open that screen on Projects too.
 4. **The plus let go above every part** opens the field before the first card of the first part (`openAt` with that
-   card's key); let go in a part, at the part's end; a part that writes no task (Done) takes nothing and the plus flies
-   home, as before.
+   card's key); let go in a part, at the part's end; a part whose `newTask` is null (a folder's own, Done), or above
+   every part a list whose `newTask` is null, takes nothing, shows no line, and the plus flies home.
 5. **A rename's new title shows on a Projects card by the task's id** (`renamedTexts[item.id]`): a Projects card is
    drawn per part, its own id is not the task's.
 6. **Audit of the app's screen turns:** the only paths that move the ribbon are a tab tap or a swipe (Max's own), the

@@ -138,3 +138,33 @@ describe("an old field and a 🎯 the app of 0.4.189 writes into the new file", 
 		expect(text).not.toContain("Музыка");
 	});
 });
+
+describe("the app of master 0.4.189 on a file with a folder", () => {
+	const FOLDER_TREE = ["## Projects", "", "- Работа 🗃️", "\t- Отчёты", "\t- Найм [[Найм]]", "- Дружба [[Моя заметка о дружбе]]", "\t- Small talk"];
+	const WITH_FOLDER = FILE.replace(TREE.join("\n"), FOLDER_TREE.join("\n")).replace("- [ ] Plain", "- [ ] Plain 🗂️ Отчёты");
+	const folderTree = (text: string) => {
+		const lines = text.split("\n");
+		const start = lines.indexOf("## Projects");
+		return lines.slice(start, start + FOLDER_TREE.length);
+	};
+	const writes: [string, (text: string) => string][] = [
+		["reads and tidies it", (t) => run(t, "tasks.screen", "2026-11-04")],
+		["moves a task of the folder's subproject to Soon", (t) => run(t, "tasks.moveToSoon", key("backlog", 1, "- [ ] Plain 🗂️ Отчёты"), "2026-11-04")],
+		["marks it done", (t) => run(t, "tasks.setStatus", key("backlog", 1, "- [ ] Plain 🗂️ Отчёты"), "done")],
+		["adds a task", (t) => run(t, "tasks.createInPlace", "New one", null, { kind: "list", list: "inbox", group: null, before: null })],
+	];
+
+	it.each(writes)("keeps the folder's line and the section byte for byte when it %s", (_name, write) => {
+		const after = write(WITH_FOLDER);
+		expect(folderTree(after)).toEqual(FOLDER_TREE);
+		expect(fieldsOf(after).sort()).toEqual(fieldsOf(WITH_FOLDER).sort());
+	});
+
+	it("is read back by the new core as the folder it was", async () => {
+		const { TaskDocument } = await import("../../core/domain/TaskDocument");
+		const after = run(WITH_FOLDER, "tasks.setStatus", key("backlog", 1, "- [ ] Plain 🗂️ Отчёты"), "done");
+		const doc = TaskDocument.parse(after, { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done", ungrouped: "No section" }, { dueDate: "📅", slot: "⏰", collapsed: "📁" });
+		expect(doc.projectTree().find("Работа")!.node.folder).toBe(true);
+		expect(doc.projectTree().find("Найм")!.node.note).toBe("Найм");
+	});
+});
