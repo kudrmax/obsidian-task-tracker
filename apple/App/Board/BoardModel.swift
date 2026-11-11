@@ -435,7 +435,7 @@ final class BoardModel {
         swipeSign = 1
         swipeBase = 0
         let from: JSONValue = ["mode": "calendar", "date": .string(snapshot.day)]
-        guard let at = try? board.read("days.stepScreen", [from, .number(Double(shift))], over: board.settingsOnly()).decode(ScreenAt.self),
+        guard let at = try? board.read("days.stepWheel", [from, .number(Double(shift))], over: board.settingsOnly()).decode(ScreenAt.self),
               at.mode == "calendar" else { return false }
         // A text being typed is finished first, written for the day it was typed on, as before the arrows turn the day.
         if entry.isOpen || entry.writing {

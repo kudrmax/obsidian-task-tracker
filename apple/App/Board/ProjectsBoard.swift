@@ -128,6 +128,11 @@ final class ProjectsBoard {
         await act { try $0.selectProjectNode(node) }
     }
 
+    /// A card held over a folded row: its branch opens, nothing chosen.
+    func unfold(_ node: String) async {
+        await act { try $0.unfoldProjectNode(node) }
+    }
+
     /// The segment: By project or By stage.
     func setMode(_ mode: String) async {
         guard mode != view?.mode else { return }

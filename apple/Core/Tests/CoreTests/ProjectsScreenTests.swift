@@ -38,6 +38,7 @@ import Testing
         #expect(view.rows.map(\.depth) == [0, 0, 1, 1, 0, 1, 0, 0, 0])
         #expect(view.rows.filter(\.tile).map(\.title) == ["All", "Окружение", "Дружба", "Спорт", "No project", "Done"])
         #expect(view.rows.first { $0.title == "Спорт" }?.waiting == true)
+        #expect(view.rows.filter(\.muted).map(\.title) == ["Где знакомиться", "Свидание", "Спорт", "No project", "Done"])
         #expect(view.rows.first { $0.title == "Окружение" }?.waiting == false)
         #expect(view.selected == "all" && view.mode == "byProject")
         #expect(view.modes.map(\.label) == ["By project", "By stage"])
@@ -59,6 +60,12 @@ import Testing
         let folded = try board.projectsScreen()
         #expect(folded.rows.first { $0.title == "Окружение" }?.folded == true)
         #expect(!folded.rows.contains { $0.title == "Где знакомиться" })
+        // A card held over the folded row opens its branch, the choice staying.
+        #expect(folded.rows.first { $0.title == "Окружение" }?.unfoldsOnHover == true)
+        try board.unfoldProjectNode("project:Окружение")
+        let opened = try board.projectsScreen()
+        #expect(opened.rows.contains { $0.title == "Где знакомиться" })
+        #expect(opened.selected == "project:Окружение")
     }
 
     @Test func byStageGivesTheStagesAndEachCardsSubproject() throws {

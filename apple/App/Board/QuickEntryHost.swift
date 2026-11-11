@@ -321,7 +321,7 @@ final class QuickEntryHost {
     /// The ribbon turned to the place the core says shows `column` from where it stands; a place showing it stays.
     private func turn(to column: BoardColumn) {
         guard let model,
-              let key: String = model.ruleNow("rules.placeShowing", [.string(column.rawValue), .string(model.place.key)]),
+              let key: String = model.ruleNow("rules.placeOfList", [.string(column.rawValue), .string(model.place.key)]),
               let place = RibbonPlace(key: key), place != model.place else { return }
         turnedTo = place
         model.go(to: place)
@@ -374,15 +374,15 @@ final class QuickEntryHost {
 
     // MARK: The door
 
-    /// The lists each place of the ribbon shows, in order, as the core's `SHOWN_LISTS` has them.
+    /// The lists each place of the ribbon shows, in order, as the core says (`rules.shownLists`): Projects none.
     private func shown(at place: RibbonPlace) -> [String] {
-        if shownLists == nil, let constants: [String: JSONValue] = model?.ruleNow("rules.constants", []) {
-            shownLists = constants["SHOWN_LISTS"].flatMap { try? $0.decode([String: [String]].self) }
-        }
-        return shownLists?[place.key] ?? []
+        if let known = shownLists[place.key] { return known }
+        let found: [String] = model?.ruleNow("rules.shownLists", [.string(place.key)]) ?? []
+        shownLists[place.key] = found
+        return found
     }
 
-    @ObservationIgnored private var shownLists: [String: [String]]?
+    @ObservationIgnored private var shownLists: [String: [String]] = [:]
 
     /// The screen as the entry reads it: each list's cards and sections, which show sections, the day, and the lists the
     /// ribbon's place shows.

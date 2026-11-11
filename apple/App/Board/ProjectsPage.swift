@@ -199,7 +199,7 @@ private struct TreeRow: View {
     private var ink: Color {
         if lit { return Palette.accent(scheme) }
         if row.selected { return scheme == .dark ? .black : .white }
-        return row.waiting || row.kind == "none" || row.kind == "done" ? Palette.muted : .primary
+        return row.muted ? Palette.muted : .primary
     }
 
     @ViewBuilder private var ground: some View {
@@ -478,8 +478,10 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         guard let projects, let model else { return }
         if let payload, case .card = payload.kind {
             model.drag.hideLine()
-            let over = row(at: point).flatMap { $0.acceptsTask ? $0.node : nil }
+            let under = row(at: point)
+            let over = under.flatMap { $0.acceptsTask ? $0.node : nil }
             if projects.dropOn != over { projects.dropOn = over }
+            springLoad(under?.unfoldsOnHover == true ? under?.node : nil)
             return
         }
         aim(at: point, lifted: payload.flatMap { if case .project(let row) = $0.kind { row.node } else { nil } })
@@ -504,7 +506,28 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         model.drag.showLine(from: start, to: area.maxX - TreeMetrics.inset)
     }
 
+    /// The folded row a held card waits over, and the pause after which its branch opens, as a folder opens under a
+    /// carried file in Files.
+    private var waitingOver: String?
+    private var unfold: DispatchWorkItem?
+
+    private func springLoad(_ node: String?) {
+        guard node != waitingOver else { return }
+        unfold?.cancel()
+        unfold = nil
+        waitingOver = node
+        guard let node, let projects else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard self?.waitingOver == node else { return }
+            UISelectionFeedbackGenerator().selectionChanged()
+            Task { await projects.unfold(node) }
+        }
+        unfold = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + CarryMotion.springLoad, execute: work)
+    }
+
     func leave() {
+        springLoad(nil)
         projects?.dropOn = nil
         aimed = nil
         model?.drag.hideLine()

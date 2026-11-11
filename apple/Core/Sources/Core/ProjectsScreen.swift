@@ -14,8 +14,10 @@ public struct ProjectsRow: Decodable, Hashable, Sendable, Identifiable {
     public let depth: Int
     /// Drawn as a tile (depth 0), else as a line of text indented by its depth.
     public let tile: Bool
-    /// The name in grey: its open tasks only in Inbox and Backlog, or none yet.
+    /// The project waits: its open tasks only in Inbox and Backlog, or none yet.
     public let waiting: Bool
+    /// The name drawn grey: a waiting or done project, No project, Done.
+    public let muted: Bool
     public let selected: Bool
     public let hasBranch: Bool
     /// Its branch is folded: a tile shows a layer peeking out, a line an ellipsis.
@@ -31,7 +33,7 @@ public struct ProjectsRow: Decodable, Hashable, Sendable, Identifiable {
 
     public var id: String { node }
 
-    enum CodingKeys: String, CodingKey { case node, kind, title, depth, tile, waiting, selected, hasBranch, folded, project, acceptsTask, canLift, unfoldsOnHover }
+    enum CodingKeys: String, CodingKey { case node, kind, title, depth, tile, waiting, muted, selected, hasBranch, folded, project, acceptsTask, canLift, unfoldsOnHover }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -41,6 +43,7 @@ public struct ProjectsRow: Decodable, Hashable, Sendable, Identifiable {
         depth = try c.decode(Int.self, forKey: .depth)
         tile = try c.decode(Bool.self, forKey: .tile)
         waiting = try c.decode(Bool.self, forKey: .waiting)
+        muted = try c.decode(Bool.self, forKey: .muted)
         selected = try c.decode(Bool.self, forKey: .selected)
         hasBranch = try c.decode(Bool.self, forKey: .hasBranch)
         folded = try c.decode(Bool.self, forKey: .folded)
@@ -162,6 +165,11 @@ extension TaskBoard {
     /// A node chosen with the branches above it opened: a search hit's path, a card's folder.
     public func selectProjectNode(_ node: String) throws {
         _ = try screenCall("tasks.selectProjectNode", [.string(node)], over: try files())
+    }
+
+    /// A card held over a folded row: its branch opened, without choosing it (`unfoldsOnHover`).
+    public func unfoldProjectNode(_ node: String) throws {
+        _ = try screenCall("tasks.unfoldProjectNode", [.string(node)], over: try files())
     }
 
     /// The segment: `byProject` or `byStage`.
