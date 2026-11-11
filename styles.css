@@ -153,7 +153,6 @@ body {
 	--tc-seg-btn-h: 28px;
 	--tc-seg-icon: var(--tc-icon-m);
 	/* The switch is a wheel: a window two icons wide stands still in the middle of the screen, and the four icons roll under it; the track holds one neighbour on either side. */
-	--tc-seg-window: calc(2 * var(--tc-seg-btn-w));
 	/* Away from the window the wheel turns from the eye: per icon's width out, an icon shrinks and fades by these. */
 	--tc-seg-shrink: 0.14;
 	--tc-seg-dim: 0.28;
@@ -791,8 +790,8 @@ body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-ch
  */
 body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-stand)); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
-.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-wheel-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
-.tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad)); height: var(--tc-wheel); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-wheel); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
+.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-span) * var(--tc-seg-btn-w) / 2 - var(--tc-wheel-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
+.tc-seg { position: relative; width: calc((var(--tc-seg-span) + var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad)); height: var(--tc-wheel); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-wheel); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule, .task-calendar > button.tc-select-btn { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { right: var(--tc-space-16); touch-action: none; }
@@ -817,11 +816,11 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .task-calendar > .tc-plus-ring.is-cross.is-hot { color: var(--tc-accent); background: var(--tc-drop-bg); }
 .tc-seg-view { position: absolute; top: var(--tc-wheel-pad); left: var(--tc-wheel-pad); right: var(--tc-wheel-pad); height: var(--tc-wheel-btn-h); overflow: hidden; }
 /* The window: the pill stands still; the icons under it are a second copy of the wheel, dark on the pill. */
-.tc-seg-pill { position: absolute; top: var(--tc-wheel-pad); left: calc(var(--tc-wheel-pad) + var(--tc-seg-before) * var(--tc-seg-btn-w)); width: var(--tc-seg-window); height: var(--tc-wheel-btn-h); border-radius: var(--tc-radius-wheel-btn); background: var(--tc-ink-strong); overflow: hidden; }
-.tc-seg-reel { position: absolute; top: 0; left: calc((var(--tc-seg-before) - var(--tc-seg-pos)) * var(--tc-seg-btn-w)); display: flex; }
-.tc-seg-pill > .tc-seg-reel { left: calc(-1 * var(--tc-seg-pos) * var(--tc-seg-btn-w)); }
+.tc-seg-pill { position: absolute; top: var(--tc-wheel-pad); left: calc(var(--tc-wheel-pad) + var(--tc-seg-before) * var(--tc-seg-btn-w)); width: calc(var(--tc-seg-span) * var(--tc-seg-btn-w)); height: var(--tc-wheel-btn-h); border-radius: var(--tc-radius-wheel-btn); background: var(--tc-ink-strong); overflow: hidden; }
+.tc-seg-reel { position: absolute; top: 0; left: calc((var(--tc-seg-before) - var(--tc-seg-left)) * var(--tc-seg-btn-w)); display: flex; }
+.tc-seg-pill > .tc-seg-reel { left: calc(-1 * var(--tc-seg-left) * var(--tc-seg-btn-w)); }
 .tc-seg-icon { position: relative; width: var(--tc-seg-btn-w); height: var(--tc-wheel-btn-h); flex-shrink: 0; color: var(--tc-muted); display: flex; align-items: center; justify-content: center; transform: scale(calc(1 - var(--tc-seg-depth) * var(--tc-seg-shrink))); opacity: calc(1 - var(--tc-seg-depth) * var(--tc-seg-dim)); }
-.tc-seg-pill .tc-seg-icon { color: var(--tc-on-strong); opacity: var(--tc-seg-lens); }
+.tc-seg-pill .tc-seg-icon { color: var(--tc-on-strong); }
 .tc-seg-icon svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
 /* Let go, the wheel rolls on to its place, and the track's ends follow. */
 .task-calendar > .tc-seg.is-settling, .tc-seg.is-settling .tc-seg-pill { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out); }
@@ -1475,7 +1474,7 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 .task-calendar.is-switching > .tc-projects { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out); }
 .tc-projects-tree-title, .tc-projects-title { position: absolute; top: var(--tc-day-row-top); height: var(--tc-day-row); box-sizing: border-box; line-height: var(--tc-day-row); color: var(--tc-text); font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; overflow: hidden; }
 .tc-projects-tree-title { left: 0; width: var(--tc-tree-width); padding: 0 var(--tc-space-2) 0 calc(var(--tc-space-10) + var(--tc-space-4)); }
-.tc-projects-title { left: calc(var(--tc-tree-width) + var(--tc-divider)); right: 0; padding: 0 calc(var(--tc-space-10) + var(--tc-space-4)) 0 calc(var(--tc-space-2) + var(--tc-space-4)); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.tc-projects-title { left: calc(var(--tc-tree-width) + var(--tc-divider)); right: calc(var(--tc-space-10) + var(--tc-space-4)); padding: 0 0 0 calc(var(--tc-space-2) + var(--tc-space-4)); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .tc-projects-title.has-menu { cursor: pointer; }
 .tc-projects-seg { position: absolute; top: var(--tc-projects-top); left: calc(var(--tc-tree-width) + var(--tc-divider) + var(--tc-space-2)); right: var(--tc-space-10); height: var(--tc-seg); box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); display: flex; }
 .tc-projects-seg > button.tc-btn.tc-projects-seg-btn { flex: 1; min-width: 0; height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: transparent; color: var(--tc-ink-soft); font-size: var(--tc-projects-seg-font); font-weight: var(--tc-weight-semibold); white-space: nowrap; }
@@ -1513,7 +1512,7 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 body:not(.is-mobile) .tc-projects { --tc-projects-top: var(--tc-desk-projects-top); --tc-tree-width: var(--tc-desk-tree-width); }
 body:not(.is-mobile) :is(.tc-projects-tree-title, .tc-projects-title) { top: var(--tc-desk-projects-title-top); height: var(--tc-leading-desk-projects-title); line-height: var(--tc-leading-desk-projects-title); font-size: var(--tc-font-desk-projects-title); }
 body:not(.is-mobile) .tc-projects-tree-title { padding: 0 var(--tc-desk-projects-near) 0 var(--tc-desk-projects-side); }
-body:not(.is-mobile) .tc-projects-title { padding: 0 calc(var(--tc-desk-projects-seg-w) + var(--tc-desk-projects-side) + var(--tc-space-16)) 0 var(--tc-desk-projects-far); }
+body:not(.is-mobile) .tc-projects-title { right: calc(var(--tc-desk-projects-seg-w) + var(--tc-desk-projects-side) + var(--tc-space-16)); padding: 0 0 0 var(--tc-desk-projects-far); }
 body:not(.is-mobile) .tc-projects-seg { top: calc(var(--tc-desk-projects-title-top) + (var(--tc-leading-desk-projects-title) - var(--tc-seg)) / 2); left: auto; right: var(--tc-desk-projects-side); width: var(--tc-desk-projects-seg-w); }
 body:not(.is-mobile) .tc-projects-tree-column { padding: 0 var(--tc-desk-projects-near) 0 var(--tc-desk-projects-side); }
 body:not(.is-mobile) .tc-projects-tasks-column { top: var(--tc-projects-top); padding: 0 var(--tc-desk-projects-side) 0 var(--tc-desk-projects-far); }

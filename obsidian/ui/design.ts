@@ -81,15 +81,14 @@ export const PROPERTY = {
 	level: "--tc-level",
 	/** How many levels back from a subtask's card a line of a task further up passes it. */
 	pass: "--tc-pass",
-	/** Where the switch's wheel stands: -0.5 with the Projects folder alone in its window, 1 with Inbox and Soon, 3 with Now and the calendar, in between under a finger. */
-	wheel: "--tc-seg-pos",
 	/** How many icons' widths an icon of the wheel stands out of its window. */
 	depth: "--tc-seg-depth",
 	/** How much of a neighbour's place the track holds on each side of the window: none past the wheel's ends. */
 	before: "--tc-seg-before",
 	after: "--tc-seg-after",
-	/** How much of an icon the window shows: all of it, but at Projects and Done only the one in its middle. */
-	lens: "--tc-seg-lens",
+	/** The window's left edge, in icons' widths from the folder, and how many icons wide it is: one at Projects and Done, two from Inbox on. */
+	windowAt: "--tc-seg-left",
+	span: "--tc-seg-span",
 	/** The view's middle, top and height, which the desktop search panel hangs from. */
 	searchLeft: "--tc-search-left",
 	searchTop: "--tc-search-top",
