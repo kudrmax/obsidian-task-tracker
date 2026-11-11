@@ -1,11 +1,11 @@
-import { type CalendarAlert, type DropColumn, placeShowing, SCREEN_PLACES, type ScreenPlace } from "../../core/application/contracts";
+import { type CalendarAlert, type DropColumn, placeShowing } from "../../core/application/contracts";
 import type { RightMode } from "./viewSettings";
 import { CarefulPace } from "./CarefulPace";
 import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { icon } from "./kit/icons";
-import { type Place, placeIndex } from "./screens";
+import { type Place, placeIndex, WHEEL_END, SCREEN_PLACES, type ScreenPlace } from "./screens";
 import { labelMark } from "./sources/labelMark";
 
 export interface ColumnSwitchOptions {
@@ -20,29 +20,46 @@ export interface ColumnSwitchOptions {
 	readonly arbiter: GestureArbiter;
 }
 
-/** The wheel's icons: the columns of the strip, the day column as Now. */
-export type SwitchColumn = "inbox" | "soon" | "now" | "calendar";
+/** The wheel's icons: the Projects screen's folder, the columns of the strip, the day column as Now. */
+export type SwitchColumn = "projects" | "inbox" | "soon" | "now" | "calendar";
 
-const COLUMNS: readonly SwitchColumn[] = ["inbox", "soon", "now", "calendar"];
+const COLUMNS: readonly SwitchColumn[] = ["projects", "inbox", "soon", "now", "calendar"];
+
+const ICON_OF: Readonly<Record<SwitchColumn, "project" | "inbox" | "soon" | "now" | "calendar">> = { projects: "project", inbox: "inbox", soon: "soon", now: "now", calendar: "calendar" };
+const NAME_OF: Readonly<Record<SwitchColumn, string>> = { projects: "Projects", inbox: "Inbox", soon: "Soon", now: "Now", calendar: "Calendar" };
+
+/** How far out of the window's middle an icon stands before the window no longer holds it: half an icon. */
+const HALF = 0.5;
 
 const DRAG = "switch";
 
 const placeOf = (place: Place): number => placeIndex(place);
 
-/** The list each icon stands for; the calendar's icon is no list, and only the calendar's place shows it. */
-const LIST_OF: Readonly<Record<SwitchColumn, DropColumn | null>> = { inbox: "inbox", soon: "soon", now: "day", calendar: null };
+/** The list each icon stands for; the folder and the calendar are no list, and only their own places show them. */
+const LIST_OF: Readonly<Record<SwitchColumn, DropColumn | null>> = { projects: null, inbox: "inbox", soon: "soon", now: "day", calendar: null };
 
-/** The place a tap on an icon turns to: the one standing, when it shows the icon's column, else the nearest that does (from Done, as from Inbox, its neighbour). */
+/** The place a tap on an icon turns to: the one standing, when it shows the icon's column, else the nearest that does (from Done and Projects, as from Inbox, its neighbour). */
 function placeForIcon(column: SwitchColumn, from: Place): ScreenPlace {
 	const list = LIST_OF[column];
-	if (list === null) return "calendar";
-	return placeShowing(list, from === "done" ? "inbox" : from);
+	if (list === null) return column === "projects" ? "projects" : "calendar";
+	return placeShowing(list, from === "done" || from === "projects" ? "inbox" : from);
+}
+
+/** The place of the wheel's places a place counts as: Done as Inbox, its neighbour. */
+function wheelIndex(place: Place): number {
+	return SCREEN_PLACES.indexOf(place === "done" ? "inbox" : place);
+}
+
+/** The wheel's place nearest to where it stands. */
+function nearest(at: number): ScreenPlace {
+	return SCREEN_PLACES.reduce((best, place) => (Math.abs(placeIndex(place) - at) < Math.abs(placeIndex(best) - at) ? place : best));
 }
 
 interface Press {
 	readonly pointerId: number;
-	/** The place the wheel stood on when pressed. */
+	/** The wheel's place it stood on when pressed (`SCREEN_PLACES`), and where it stood. */
 	readonly start: number;
+	readonly startAt: number;
 	/** The wheel stands at `from` with the finger at `x`, and turns a place per icon's width the finger travels from there. */
 	x: number;
 	from: number;
@@ -87,7 +104,7 @@ export class ColumnSwitch {
 			const shift = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
 			if (shift === 0) return;
 			e.preventDefault();
-			const place = placeOf(this.opts.value()) + shift;
+			const place = wheelIndex(this.opts.value()) + shift;
 			if (place >= 0 && place < SCREEN_PLACES.length) this.show(SCREEN_PLACES[place]);
 		});
 		this.render();
@@ -98,9 +115,10 @@ export class ColumnSwitch {
 		for (const column of COLUMNS) {
 			const cell = el(reel, "span", "tc-seg-icon");
 			cell.dataset.column = column;
+			if (lens) cell.classList.add("is-lens");
 			if (lens) cell.setAttribute("aria-hidden", "true");
-			else cell.setAttribute("aria-label", column === "calendar" ? "Calendar" : column[0].toUpperCase() + column.slice(1));
-			cell.appendChild(icon(column));
+			else cell.setAttribute("aria-label", NAME_OF[column]);
+			cell.appendChild(icon(ICON_OF[column]));
 			if (column === "calendar") this.dots.push(el(cell, "span", "tc-dot"));
 			this.icons.push(cell);
 		}
@@ -111,9 +129,10 @@ export class ColumnSwitch {
 		this.swallowClick = false;
 		const step = this.icons[0].offsetWidth;
 		const hold = window.setTimeout(() => this.held(), this.opts.longPressMs());
-		const start = placeOf(this.opts.value());
+		const start = wheelIndex(this.opts.value());
+		const startAt = placeOf(this.opts.value());
 		const pace = new CarefulPace(e.clientX, e.timeStamp);
-		this.press = { pointerId: e.pointerId, start, x: e.clientX, from: start, lastX: e.clientX, step, hold, pace, dragging: false };
+		this.press = { pointerId: e.pointerId, start, startAt, x: e.clientX, from: startAt, lastX: e.clientX, step, hold, pace, dragging: false };
 	}
 
 	private held(): void {
@@ -150,8 +169,8 @@ export class ColumnSwitch {
 	/** Where the finger puts the wheel: a quick swipe reaches no further than the next place, a careful one anywhere. */
 	private under(press: Press, x: number): number {
 		const reach = press.pace.careful ? SCREEN_PLACES.length : 1;
-		const least = Math.max(0, press.start - reach);
-		const most = Math.min(SCREEN_PLACES.length - 1, press.start + reach);
+		const least = placeIndex(SCREEN_PLACES[Math.max(0, press.start - reach)]);
+		const most = placeIndex(SCREEN_PLACES[Math.min(SCREEN_PLACES.length - 1, press.start + reach)]);
 		return Math.min(most, Math.max(least, press.from - (x - press.x) / press.step));
 	}
 
@@ -167,7 +186,9 @@ export class ColumnSwitch {
 		if (!released) return this.show(this.opts.value());
 		press.pace.update(e.clientX, e.timeStamp);
 		const at = this.position();
-		this.show(SCREEN_PLACES[press.pace.careful ? Math.round(at) : press.start + Math.sign(at - press.start)]);
+		if (press.pace.careful) return this.show(nearest(at));
+		const way = Math.sign(at - press.startAt);
+		this.show(way === 0 ? this.opts.value() : SCREEN_PLACES[Math.min(SCREEN_PLACES.length - 1, Math.max(0, press.start + way))]);
 	}
 
 	private tap(target: EventTarget | null): void {
@@ -202,14 +223,21 @@ export class ColumnSwitch {
 	/**
 	 * Both copies of the wheel to one place: the window keeps its two icons whole, the rest shrink and fade by how far out
 	 * they stand. The track holds one neighbour on each side, and only where the wheel has one: past an end it stops at the window.
+	 * At Projects the window holds the folder alone in its middle: the half of the window it leaves empty counts as inside,
+	 * and the window shows no other icon (board Nav); Done, which has no icon, holds Inbox alone the same way.
 	 */
 	private turn(position: number): void {
 		this.el.style.setProperty(PROPERTY.wheel, String(position));
 		this.el.style.setProperty(PROPERTY.before, String(Math.max(0, Math.min(1, position))));
-		this.el.style.setProperty(PROPERTY.after, String(Math.min(1, SCREEN_PLACES.length - 1 - position)));
+		this.el.style.setProperty(PROPERTY.after, String(Math.max(0, Math.min(1, WHEEL_END - position))));
+		const middle = position + 1;
+		const spare = Math.max(0, Math.min(HALF, -position));
+		/** How sharply the window hides what is out of its middle: fully at Projects and Done, not at all from Inbox on. */
+		const alone = 2 * Math.max(0, Math.min(1, (placeIndex("inbox") - position) / HALF));
 		this.icons.forEach((cell, i) => {
-			const out = Math.max(0, Math.abs((i % COLUMNS.length) - position - 0.5) - 0.5);
-			cell.style.setProperty(PROPERTY.depth, String(out));
+			const off = Math.abs((i % COLUMNS.length) + HALF - middle);
+			cell.style.setProperty(PROPERTY.depth, String(Math.max(0, off - HALF - spare)));
+			if (cell.classList.contains("is-lens")) cell.style.setProperty(PROPERTY.lens, String(Math.max(0, Math.min(1, 1 - alone * Math.max(0, off - HALF)))));
 		});
 	}
 

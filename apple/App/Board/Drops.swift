@@ -19,12 +19,26 @@ protocol BoardTarget: AnyObject {
     func letGo(carrying payload: DragPayload?) -> CarryLanding?
     /// It takes this carry: a section only in its own list.
     func takes(_ payload: DragPayload?) -> Bool
+    /// Where the carried copy rides over it: aside of the finger where its target is the row or line under the finger,
+    /// which must stay seen.
+    func ride(_ payload: DragPayload?) -> CopyRide
+}
+
+/// Where the carried copy stands against the finger.
+enum CopyRide: Equatable {
+    /// Where the finger took it.
+    case held
+    /// Above the finger: the row under it stays seen.
+    case above
+    /// Below the finger: the line under it and the row above the line stay seen.
+    case below
 }
 
 extension BoardTarget {
-    func takes(_ payload: DragPayload?) -> Bool { payload?.isSection != true }
+    func takes(_ payload: DragPayload?) -> Bool { payload?.isSection != true && payload?.isProject != true }
     var priority: Int { 0 }
     var scrolls: UIScrollView? { nil }
+    func ride(_ payload: DragPayload?) -> CopyRide { .held }
 }
 
 /// The one routing of the board's carries: the target the point is in, else the nearest target of the column under the
@@ -76,6 +90,9 @@ final class BoardRoute {
         routed.target.hover(at: routed.point, carrying: payload)
         return true
     }
+
+    /// Where the place held now has the carried copy ride.
+    func ride(_ payload: DragPayload?) -> CopyRide { current?.ride(payload) ?? .held }
 
     /// What scrolls under the finger at `point`: the place held now, when the finger is over it or its column.
     func scrolled(at point: CGPoint) -> UIScrollView? {

@@ -12,6 +12,9 @@ struct SearchScreen: View {
     @State private var cards: [String: BoardCard] = [:]
     @State private var names: [String: String] = [:]
     @State private var focused = true
+    /// Opened from the Projects page: each find shows where it stands among the projects, so the same task in two
+    /// projects is seen side by side.
+    private var fromProjects: Bool { model.place == .projects }
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -40,7 +43,7 @@ struct SearchScreen: View {
             .task(id: query) {
                 try? await Task.sleep(for: .milliseconds(150))
                 guard !Task.isCancelled else { return }
-                let found: [SearchGroup] = (try? await model.read("tasks.search", [.string(query)] + (model.projectLink.map { [JSONValue.string($0)] } ?? []))) ?? []
+                let found: [SearchGroup] = (try? await model.read("tasks.search", [.string(query)])) ?? []
                 let drawn = await model.cards(found.flatMap(\.hits).map { ListRow(item: $0.item, level: 0) })
                 var named = names
                 for group in found where named[group.list] == nil {
@@ -59,7 +62,7 @@ struct SearchScreen: View {
     }
 
     private func row(_ hit: SearchHit) -> some View {
-        TaskCapsule(card: cards[hit.item.id] ?? BoardCard(item: hit.item, level: 0, branch: nil, due: nil, repeats: hit.item.repeats, paint: nil), found: hit)
+        TaskCapsule(card: cards[hit.item.id] ?? BoardCard(item: hit.item, level: 0, branch: nil, due: nil, repeats: hit.item.repeats, paint: nil), found: hit, path: fromProjects ? hit.projectPath : nil)
     }
 }
 

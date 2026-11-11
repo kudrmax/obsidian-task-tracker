@@ -20,8 +20,10 @@ describe("stepScreen", () => {
 		expect(stepScreen({ mode: "soon", date: TODAY }, -1, DAYS)).toEqual({ mode: "inbox", date: TODAY });
 	});
 
-	it("goes nowhere back from Inbox and Soon, the first screen", () => {
-		expect(stepScreen({ mode: "inbox", date: TODAY }, -1, DAYS)).toBeNull();
+	it("goes back from Inbox and Soon to Projects, the first screen: nowhere back from there, on to Inbox", () => {
+		expect(stepScreen({ mode: "inbox", date: TODAY }, -1, DAYS)).toEqual({ mode: "projects", date: TODAY });
+		expect(stepScreen({ mode: "projects", date: TODAY }, -1, DAYS)).toBeNull();
+		expect(stepScreen({ mode: "projects", date: TODAY }, 1, DAYS)).toEqual({ mode: "inbox", date: TODAY });
 	});
 
 	it("keeps the day the arrows chose while it moves between the lists and the calendar", () => {
@@ -34,10 +36,9 @@ describe("stepScreen", () => {
 		expect(stepScreen({ mode: "calendar", date: "2026-10-31" }, 1, DAYS)).toEqual({ mode: "calendar", date: TODAY });
 	});
 
-	it("goes from Done on to Inbox, and nothing leads back to Done", () => {
-		expect(placeIndex("done")).toBe(-1);
+	it("goes from Done, between Projects and Inbox, on to Inbox and back to Projects; nothing leads back to Done", () => {
+		expect(placeIndex("done")).toBeLessThan(placeIndex("inbox"));
 		expect(stepScreen({ mode: "done", date: TODAY }, 1, DAYS)).toEqual({ mode: "inbox", date: TODAY });
-		expect(stepScreen({ mode: "done", date: TODAY }, -1, DAYS)).toBeNull();
-		expect(stepScreen({ mode: "inbox", date: TODAY }, -1, DAYS)).toBeNull();
+		expect(stepScreen({ mode: "done", date: TODAY }, -1, DAYS)).toEqual({ mode: "projects", date: TODAY });
 	});
 });

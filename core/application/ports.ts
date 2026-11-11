@@ -1,5 +1,5 @@
 import type { TaskCalendarSettings } from "../settings";
-import type { GroupingState, ProjectNote } from "./contracts";
+import type { ProjectNote, ProjectsScreenState } from "./contracts";
 
 /** The tasks file as text. Implemented over the Obsidian vault; in tests, in memory. */
 export interface TaskFileStore {
@@ -47,43 +47,31 @@ export interface GoogleLogin {
 	logout(): Promise<void>;
 }
 
-/** The notes with the project tag (`projectNotesOf` reads them from the notes' tags): the Obsidian vault's; none on a host without notes. */
+/**
+ * The notes that had the project tag (`projectNotesOf` reads them from the notes' tags): the Obsidian vault's; none on a
+ * host without notes. Read only by the one move to projects, which attaches them to the projects of the tasks file.
+ */
 export interface Projects {
 	list(): readonly ProjectNote[];
+	/**
+	 * The host has read every note's tags (Obsidian: its metadata cache resolved): `list` is complete. The move waits for
+	 * it, since a note missing then would never be attached. Left out: complete at once.
+	 */
+	ready?(): boolean;
 	/** Fires when a project note comes, goes, is renamed or loses its tag. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
 }
 
-/**
- * The vault's notes as files, for «New project…»: the plugin's vault; none on a host that writes the note itself (the
- * phone's door gives the path and the text, the app writes them).
- */
-export interface NoteFiles {
-	/** Every file's path in the vault. */
-	paths(): readonly string[];
-	read(path: string): Promise<string>;
-	/** `text` into the note at `path`, made when it is not there. */
-	write(path: string, text: string): Promise<void>;
-}
-
-export const NO_NOTE_FILES: NoteFiles = {
-	paths: () => [],
-	read: async () => "",
-	write: async () => {
-		throw new Error("Task Calendar: no vault to write a project note to");
-	},
-};
-
-/** What this device keeps of the lists grouped by project, never synced (the plugin: Obsidian's local storage). */
-export interface GroupingStore {
-	get(): GroupingState;
-	set(state: GroupingState): void;
-}
-
 export const NO_PROJECTS: Projects = { list: () => [], onChange: () => () => undefined };
 
-/** A device's grouping kept in memory: for a host that keeps none, and for tests. */
-export function memoryGrouping(start: GroupingState = {}): GroupingStore {
+/** What this device keeps of the Projects screen, never synced (the plugin: Obsidian's local storage). */
+export interface ProjectsScreenStore {
+	get(): ProjectsScreenState;
+	set(state: ProjectsScreenState): void;
+}
+
+/** A device's Projects screen kept in memory: for a host that keeps none, and for tests. */
+export function memoryProjectsScreen(start: ProjectsScreenState = {}): ProjectsScreenStore {
 	let state = start;
 	return { get: () => state, set: (next) => (state = next) };
 }

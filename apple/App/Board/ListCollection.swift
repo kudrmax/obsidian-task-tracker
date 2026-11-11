@@ -9,6 +9,8 @@ final class DragPayload {
     enum Kind {
         case card(BoardCard)
         case section(BoardGroup)
+        /// A project lifted in the Projects page's tree.
+        case project(ProjectsRow)
     }
 
     let kind: Kind
@@ -26,16 +28,16 @@ final class DragPayload {
     var isSection: Bool {
         if case .section = kind { true } else { false }
     }
+
+    var isProject: Bool {
+        if case .project = kind { true } else { false }
+    }
 }
 
-/// A row of a list as drawn: a section's header or its No tasks plate, a project group's header, a card, a text typed and
-/// not written yet, the field it is typed in, or the room the plus held over the list opens.
+/// A row of a list as drawn: a section's header or its No tasks plate, a card, a text typed and not written yet, the field
+/// it is typed in, or the room the plus held over the list opens.
 enum DrawnRow: Hashable {
     case header(BoardGroup, String)
-    /// A project group's header in a list grouped by project.
-    case project(BoardProject)
-    /// The section named for the task being typed in a project's group, over the field.
-    case newHead(String)
     case plate(BoardGroup)
     case card(BoardCard)
     case pending(key: String, text: String, level: Int, branch: Branch?)
@@ -47,8 +49,6 @@ enum DrawnRow: Hashable {
     var id: String {
         switch self {
         case .header(let group, _): "\u{0}head/\(group.id)"
-        case .project(let project): "\u{0}project/\(project.id)"
-        case .newHead: "\u{0}newHead"
         case .plate(let group): "\u{0}plate/\(group.id)"
         case .card(let card): card.id
         case .pending(let key, _, _, _): key
@@ -62,14 +62,14 @@ enum DrawnRow: Hashable {
         switch self {
         case .card(let card): card.level
         case .pending(_, _, let level, _), .field(_, let level, _, _): level
-        case .header, .plate, .project, .newHead, .plusRoom: nil
+        case .header, .plate, .plusRoom: nil
         }
     }
 
     /// A header of some kind: it stands a section's gap below the row before it, and the row after it on its bottom.
     var heads: Bool {
         switch self {
-        case .header, .project, .newHead: true
+        case .header: true
         default: false
         }
     }
@@ -78,7 +78,7 @@ enum DrawnRow: Hashable {
     /// lines. The list lays a fixed row out at this height without measuring its content.
     var height: CGFloat? {
         switch self {
-        case .header, .project, .newHead: ColumnMetrics.groupHead
+        case .header: ColumnMetrics.groupHead
         case .card(let card): card.listHeight
         case .plate, .plusRoom: CardMetrics.height
         case .pending, .field: nil
@@ -385,15 +385,10 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
             typed = entry.pending.enumerated().map { .pending(key: keys[safe: $0.offset] ?? "\u{0}line/\($0.offset)", text: $0.element.text, level: $0.element.level, branch: nil) }
             // A card renamed gives its row to the field: the same row, its content now typed in, so nothing comes or goes.
             typed.append(.field(id: renaming ?? keys.last ?? "\u{0}field", level: entry.section ? 0 : entry.place.level, branch: nil, section: entry.section))
-            if let name = entry.newSection { typed.insert(.newHead(name), at: 0) }
         }
         var rows: [DrawnRow] = []
         if entry?.at.kind == "top" { rows += typed }
-        for part in moved(list.parts, of: list, column: column, model: model) {
-            guard case .section(let index) = part else {
-                if case .project(let project) = part { rows.append(.project(project)) }
-                continue
-            }
+        for index in moved(of: list, column: column, model: model) {
             let group = list.groups[index]
             let lifted = model.isLifted(group, in: column)
             if let header = group.header { rows.append(.header(group, header)) }
@@ -417,13 +412,15 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         return entry == nil && plusRoom == nil && !folded ? rows : branched(rows, model: model)
     }
 
-    /// The list's parts with a section let go moved where it was let go, until the read after its write draws it there.
-    private static func moved(_ parts: [BoardPart], of list: BoardList, column: BoardColumn, model: BoardModel) -> [BoardPart] {
-        guard let move = model.sectionMove, move.column == column, let index = list.groups.firstIndex(where: { $0.id == move.group }) else { return parts }
-        var parts = parts.filter { $0 != .section(index) }
-        let before = move.before.flatMap { id in list.groups.firstIndex { $0.id == id } }.flatMap { parts.firstIndex(of: .section($0)) }
-        parts.insert(.section(index), at: before ?? parts.count)
-        return parts
+    /// The list's sections in drawing order, a section let go moved where it was let go, until the read after its write
+    /// draws it there.
+    private static func moved(of list: BoardList, column: BoardColumn, model: BoardModel) -> [Int] {
+        var order = Array(list.groups.indices)
+        guard let move = model.sectionMove, move.column == column, let index = list.groups.firstIndex(where: { $0.id == move.group }) else { return order }
+        order.removeAll { $0 == index }
+        let before = move.before.flatMap { id in list.groups.firstIndex { $0.id == id } }.flatMap { order.firstIndex(of: $0) }
+        order.insert(index, at: before ?? order.count)
+        return order
     }
 
     /// The branch lines of every row while the field or the plus's room stands in the list, or a carry folds rows away, as
@@ -438,7 +435,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
             let branch = level > 0 ? branches[safe: at] ?? nil : nil
             switch row {
             case .card(let card) where card.branch != branch:
-                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, paint: card.paint, corner: card.corner, zone: card.zone, parts: card.parts, face: card.face))
+                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, paint: card.paint, corner: card.corner, parts: card.parts, face: card.face))
             case .pending(let key, let text, _, _): return .pending(key: key, text: text, level: level, branch: branch)
             case .field(let id, _, _, let section): return .field(id: id, level: level, branch: branch, section: section)
             default: return row
@@ -625,8 +622,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         return collection.convert(capsule(of: row, in: CGRect(origin: .zero, size: frame.size)).offsetBy(dx: frame.minX, dy: frame.minY), to: nil)
     }
 
-    /// Where a dropped card lands in this list as it is laid out now: its row, or the header of the folded project part it
-    /// went into (decision 56).
+    /// Where a dropped card lands in this list as it is laid out now: its row.
     /// What of the screen the list shows, in the window: a row outside it is not seen.
     var shown: CGRect? {
         guard let window = host.window else { return nil }
@@ -635,11 +631,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
 
     func landing(of landed: DropLanding) -> CarryLanding? {
         collection.layoutIfNeeded()
-        if let capsule = capsule(of: landed.id) { return CarryLanding(rect: capsule) }
-        guard let project = model?.foldedHeader(landed, in: column), let path = indexPath(of: DrawnRow.project(project).id),
-              let frame = collection.layoutAttributesForItem(at: path)?.frame else { return nil }
-        let header = CGRect(x: frame.minX, y: frame.maxY - ColumnMetrics.groupHead, width: frame.width, height: ColumnMetrics.groupHead)
-        return CarryLanding(rect: collection.convert(header, to: nil), folds: true)
+        return capsule(of: landed.id).map { CarryLanding(rect: $0) }
     }
 
     // A carry over the list, as the plugin's (approved, `docs/design/README.md`): no row moves under the finger; the
@@ -671,7 +663,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     private struct Standing {
         let key: StandingKey
         let cards: [(card: BoardCard, rect: CGRect)]
-        let heads: [(head: PlacedHead, part: (group: String?, zone: JSONValue?), rect: CGRect)]
+        let heads: [(head: PlacedHead, group: String?, rect: CGRect)]
         let placed: [PlacedCard]
     }
 
@@ -691,7 +683,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         let key = StandingKey(layout: (collection.collectionViewLayout as? FoldingListLayout)?.generation ?? 0, rows: rowsVersion, carried: carried, along: model?.carry?.group.count ?? 0)
         if let standingRead, standingRead.key == key { return standingRead }
         var cards: [(card: BoardCard, rect: CGRect)] = []
-        var heads: [(head: PlacedHead, part: (group: String?, zone: JSONValue?), rect: CGRect)] = []
+        var heads: [(head: PlacedHead, group: String?, rect: CGRect)] = []
         let listed = model?.drawing?.lists[column]?.cards ?? []
         for (index, row) in rows.enumerated() {
             guard let frame = collection.layoutAttributesForItem(at: IndexPath(item: index, section: 0))?.frame else { continue }
@@ -704,15 +696,12 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
                 if let card = listed.first(where: { $0.id == id }) { cards.append((card, CGRect(x: frame.minX, y: top, width: frame.width, height: CardMetrics.height))) }
             case .header(let group, _):
                 let rect = CGRect(x: frame.minX, y: top, width: frame.width, height: ColumnMetrics.groupHead)
-                heads.append((PlacedHead(group: group.place, firstCard: cards.count, top: Double(rect.minY), height: Double(rect.height)), (group.name, group.zone), rect))
-            case .project(let project):
-                let rect = CGRect(x: frame.minX, y: top, width: frame.width, height: ColumnMetrics.groupHead)
-                heads.append((PlacedHead(group: project.head, opens: true, firstCard: cards.count, top: Double(rect.minY), height: Double(rect.height)), (nil, project.zone), rect))
+                heads.append((PlacedHead(group: group.place, firstCard: cards.count, top: Double(rect.minY), height: Double(rect.height)), group.name, rect))
             default:
                 break
             }
         }
-        let placed = cards.map { PlacedCard(level: $0.card.level, group: $0.card.item.group, zone: $0.card.zone, top: Double($0.rect.minY), height: Double($0.rect.height)) }
+        let placed = cards.map { PlacedCard(level: $0.card.level, group: $0.card.item.group, top: Double($0.rect.minY), height: Double($0.rect.height)) }
         let read = Standing(key: key, cards: cards, heads: heads, placed: placed)
         standingRead = read
         return read
@@ -749,15 +738,14 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
             return CGPoint(x: x, y: top - CardMetrics.gap / 2)
         }
         let at = Int(place["index"].number ?? 0)
-        let group = place["group"].string, zone = place.field("project")
-        let inPart = { (card: BoardCard) in card.stands(in: group, zone: zone) }
+        let group = place["group"].string
+        let inPart = { (card: BoardCard) in card.stands(in: group) }
         let cards = standing.cards, heads = standing.heads
         if let next = cards[safe: at], inPart(next.card) {
             return CGPoint(x: x, y: next.rect.minY - CardMetrics.gap / 2)
         }
         let above = cards.prefix(at).last { inPart($0.card) }?.rect
-        let head = heads.last { $0.head.firstCard <= at && $0.part.group == group && $0.part.zone == zone }?.rect
-            ?? heads.last { $0.head.firstCard <= at && $0.head.opens && $0.part.zone == zone }?.rect
+        let head = heads.last { $0.head.firstCard <= at && $0.group == group }?.rect
         if let over = above ?? head { return CGPoint(x: x, y: over.maxY + CardMetrics.gap / 2) }
         // No card or header of its part drawn (an empty list): the line at the list's top, as the plugin's.
         return CGPoint(x: x, y: (heads.first?.rect.minY ?? cards.last?.rect.maxY ?? 0) - CardMetrics.gap / 2)
@@ -788,7 +776,8 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     private var plusRoom: Int?
 
     func takes(_ payload: DragPayload?) -> Bool {
-        guard let payload, payload.isSection else { return true }
+        guard let payload, !payload.isProject else { return payload == nil }
+        guard payload.isSection else { return true }
         return payload.from == column.rawValue
     }
 
@@ -973,12 +962,8 @@ struct ListRowContent: View {
             // Lifted, the section is its floating copy: its header keeps its place but is not drawn twice (the list hides
             // its row, `ListController.showHeaders`).
             SectionHeader(title: header, group: group, column: column, model: model)
-        case .project(let project):
-            ProjectHeader(project: project, column: column, model: model)
-        case .newHead(let name):
-            SectionTitle(title: name, muted: false)
         case .plate(let group):
-            EmptyPlate(hot: model.platesLit(column, group)) { model.entry.openIn(column, group.name, zone: group.zone) }
+            EmptyPlate(hot: model.platesLit(column, group)) { model.entry.openIn(column, group.name) }
         case .card(let card):
             CardRow(card: card, column: column, model: model)
         case .pending(_, let text, let level, let branch):

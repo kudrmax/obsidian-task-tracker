@@ -23,10 +23,6 @@ public enum VaultError: Error, Equatable {
     case tasksFileMissing(String)
     /// The plugin's settings name no tasks file.
     case noTasksFile
-    /// A note that is there could not be read (iCloud still bringing it, Sync writing it): nothing is written over it.
-    case unreadable(String)
-    /// A new note's file is there already (it came while the name was asked): it is never written over.
-    case exists(String)
 
     static let noTasksFileMessage = "No tasks file set in Task Calendar's settings"
 }
@@ -37,8 +33,6 @@ extension VaultError: LocalizedError {
         case .noAccess: "No access to the vault folder: choose it in the app"
         case .tasksFileMissing(let path): "No tasks file “\(path)” in the vault folder"
         case .noTasksFile: Self.noTasksFileMessage
-        case .unreadable(let path): "“\(path)” can't be read right now: nothing was written. Try again once it has synced."
-        case .exists(let path): "“\(path)” appeared in the vault meanwhile: nothing was written. Try again."
         }
     }
 }
@@ -72,29 +66,15 @@ public protocol TasksVault: Sendable {
     func save(_ data: Data, in folder: String, named name: String) throws -> String
     /// Every file of the vault but Obsidian's own folder and the trash (hidden ones), by path from its folder.
     func vaultFiles() -> [VaultFile]
-    /// A note that is there, read whole; throws `unreadable` rather than answer nothing, so it is never taken for empty.
-    func readNote(path: String) throws -> String
-    /// A new note, its folder made if missing; throws `exists` when a file is there already, which stays untouched.
-    func create(path: String, text: String) throws
 }
 
 public extension TasksVault {
     /// None where the vault cannot list its files.
     func vaultFiles() -> [VaultFile] { [] }
-
-    func readNote(path: String) throws -> String {
-        guard let text = read(path: path) else { throw VaultError.unreadable(path) }
-        return text
-    }
-
-    func create(path: String, text: String) throws {
-        if read(path: path) != nil { throw VaultError.exists(path) }
-        try write(path: path, text: text)
-    }
 }
 
 /// The Obsidian vault folder the app was given once, read and written through file coordination.
-public final class Vault: TasksVault, NoteFolder, @unchecked Sendable {
+public final class Vault: TasksVault, @unchecked Sendable {
     private let bookmarks: BookmarkStore
     private let rule: TasksFileRule
     /// A file changed this recently may still be being written: wait this long and read it again.
@@ -194,30 +174,6 @@ public final class Vault: TasksVault, NoteFolder, @unchecked Sendable {
         try? withFolder { folder in try coordinatedRead(folder.appendingPathComponent(path)) }
     }
 
-    public func readNote(path: String) throws -> String {
-        do {
-            return try withFolder { folder in try coordinatedRead(folder.appendingPathComponent(path)) }
-        } catch VaultError.noAccess {
-            throw VaultError.noAccess
-        } catch {
-            throw VaultError.unreadable(path)
-        }
-    }
-
-    public func create(path: String, text: String) throws {
-        try withFolder { folder in
-            let file = folder.appendingPathComponent(path)
-            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            var failure: Error?
-            var coordination: NSError?
-            coordinator().coordinate(writingItemAt: file, options: [], error: &coordination) { url in
-                guard !FileManager.default.fileExists(atPath: url.path) else { return failure = VaultError.exists(path) }
-                do { try Data(text.utf8).write(to: url, options: .withoutOverwriting) } catch { failure = error }
-            }
-            if let error = coordination ?? failure { throw error }
-        }
-    }
-
     public func write(path: String, text: String) throws {
         try withFolder { folder in
             let file = folder.appendingPathComponent(path)
@@ -230,45 +186,6 @@ public final class Vault: TasksVault, NoteFolder, @unchecked Sendable {
             if let error = coordination ?? failure { throw error }
             if path == (try? tasksFile(settings(in: folder))) { own.text = text }
         }
-    }
-
-    /// Every markdown note of the vault outside its hidden folders (`.obsidian`, `.trash`), in one pass of the folder with
-    /// the values the walk prefetches. The text of a note `wanted` names is read coordinated, as every read of the vault; a
-    /// note iCloud keeps only in the cloud is never read (nor downloaded): it is listed by its path alone, which still
-    /// counts for the names of the others.
-    public func scanNotes(wanted: (String, Date) -> Bool) throws -> [ScannedNote] {
-        try withFolder { folder in
-            let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey, .isDirectoryKey, .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey]
-            guard let walk = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: keys, options: [.skipsPackageDescendants]) else { return [] }
-            let root = folder.standardizedFileURL.path
-            var notes: [ScannedNote] = []
-            for case let file as URL in walk {
-                let name = file.lastPathComponent
-                let values = try? file.resourceValues(forKeys: Set(keys))
-                if name.hasPrefix(".") {
-                    if values?.isDirectory == true { walk.skipDescendants() }
-                    // An older iCloud keeps a note not downloaded as `.Name.md.icloud` beside where it will be.
-                    else if name.lowercased().hasSuffix(".md.icloud"), let placeholder = Self.relative(file, to: root) {
-                        let path = ((placeholder as NSString).deletingLastPathComponent as NSString).appendingPathComponent(String(name.dropFirst().dropLast(7)))
-                        notes.append(ScannedNote(path: path, modified: .distantPast, text: nil))
-                    }
-                    continue
-                }
-                guard file.pathExtension.lowercased() == "md", values?.isRegularFile == true, let path = Self.relative(file, to: root) else { continue }
-                let modified = values?.contentModificationDate ?? .distantPast
-                let local = values?.isUbiquitousItem != true || values?.ubiquitousItemDownloadingStatus == .current
-                let text = local && wanted(path, modified) ? try? coordinatedRead(file) : nil
-                notes.append(ScannedNote(path: path, modified: modified, text: text))
-            }
-            return notes
-        }
-    }
-
-    /// A note's path from the vault's folder in NFC, as Obsidian names files and the tasks file's links spell them: the
-    /// file system hands names decomposed («й» as «и» and a breve), which would make a project note's name another name.
-    private static func relative(_ file: URL, to root: String) -> String? {
-        let full = file.standardizedFileURL.path
-        return full.hasPrefix(root + "/") ? String(full.dropFirst(root.count + 1)).precomposedStringWithCanonicalMapping : nil
     }
 
     /// Tells `changed` whenever the tasks file is written through file coordination (iCloud, a reminder's button, another

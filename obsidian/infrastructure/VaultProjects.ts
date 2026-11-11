@@ -6,13 +6,17 @@ import { type NoteTags, projectNotesOf } from "../../core/application/projects";
 /** The vault's notes with their tags, and when any of them changes. */
 export interface NoteIndex {
 	notes(): readonly NoteTags[];
+	/** Every note's tags have been read (Obsidian's metadata cache resolved): `notes` is complete. */
+	ready(): boolean;
 	/** A note's tags, name or place changed, or a note came or went. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
 }
 
 /**
  * The notes with the project tag, read from the vault's notes and kept until one of them or the tag changes. Listeners
- * hear only a change of the list itself: an edit of a note's text that keeps its tags tells nobody.
+ * hear only a change of the list itself: an edit of a note's text that keeps its tags tells nobody. Until the index has
+ * read every note (`ready`), a list is read afresh each time and never kept: an incomplete first answer must not stay,
+ * and the listeners hear the complete one once the index is ready.
  */
 export class VaultProjects implements Projects {
 	private cached: readonly ProjectNote[] | null = null;
@@ -29,13 +33,18 @@ export class VaultProjects implements Projects {
 		private readonly onTagChange: (listener: () => void) => () => void,
 	) {}
 
+	ready(): boolean {
+		return this.index.ready();
+	}
+
 	list(): readonly ProjectNote[] {
-		if (!this.cached) {
-			this.readFor = this.tag();
-			this.cached = projectNotesOf(this.index.notes(), this.readFor);
-			this.shown = JSON.stringify(this.cached);
-		}
-		return this.cached;
+		if (this.cached) return this.cached;
+		this.readFor = this.tag();
+		const list = projectNotesOf(this.index.notes(), this.readFor);
+		if (!this.index.ready()) return list;
+		this.cached = list;
+		this.shown = JSON.stringify(list);
+		return list;
 	}
 
 	onChange(listener: () => void): () => void {
@@ -59,6 +68,7 @@ export class VaultProjects implements Projects {
 	}
 
 	private recheck(): void {
+		if (!this.index.ready()) return;
 		const before = this.cached ? this.shown : null;
 		this.cached = null;
 		this.list();
@@ -90,6 +100,21 @@ export class ObsidianNoteIndex implements NoteIndex {
 		private readonly app: App,
 		private readonly tasksFile: () => string,
 	) {}
+
+	/**
+	 * Obsidian has read every note's metadata: its first `resolved`, its internal `initialized` flag where it has one, or,
+	 * not leaning on that flag, every markdown note already holding its cache (a plugin loaded or updated through BRAT into
+	 * a vault Obsidian has indexed hears no `resolved` until a file changes). Once ready, it stays so.
+	 */
+	ready(): boolean {
+		if (this.resolved) return true;
+		const { metadataCache, vault } = this.app;
+		const indexed = (metadataCache as { initialized?: boolean }).initialized === true || vault.getMarkdownFiles().every((file) => metadataCache.getFileCache(file) !== null);
+		if (!indexed) return false;
+		this.resolved = true;
+		this.kept = null;
+		return true;
+	}
 
 	notes(): readonly NoteTags[] {
 		const { metadataCache } = this.app;

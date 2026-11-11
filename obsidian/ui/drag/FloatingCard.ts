@@ -26,6 +26,8 @@ export class FloatingCard implements Float {
 	readonly el: HTMLElement;
 	private readonly stack: HTMLElement[] = [];
 	private count: HTMLElement | null = null;
+	/** Over the Projects screen's tree: narrowed to its own width, above the finger; the width it had stretched kept to go back to. */
+	private above: { readonly width: string; readonly stretched: boolean } | null = null;
 
 	/** `count`: how many tasks are carried, this one among them; `fromWidth`: the lifted card's, which the copy narrows or widens from to its own. */
 	constructor(item: TaskItem, private readonly grab: Grab, day: LocalDate, count = 1, fromWidth?: number) {
@@ -66,16 +68,47 @@ export class FloatingCard implements Float {
 	}
 
 	/**
+	 * Where across the copy the finger holds it: where it held the card, or the copy's middle when it held a wide card
+	 * (a desktop list, the Projects screen's tasks) further right than the copy reaches, which would leave the copy far from the finger.
+	 */
+	private heldAt(): number {
+		const width = this.el.offsetWidth;
+		return width > 0 && this.grab.dx > width ? width / 2 : this.grab.dx;
+	}
+
+	/**
 	 * The card under the finger as it was grabbed; stretched further right than the window lets it, it is pulled back
 	 * inside the window's margin as the menu's copy is (`grownStart`), never past the card's own end under the finger.
 	 */
 	moveTo(x: number, y: number): void {
 		const room = windowRoom(this.el);
-		const left = grownStart(x - this.grab.dx, DESIGN.floatWidth, this.el.offsetWidth, room.width, room.margin);
-		const transform = `translate3d(${left}px, ${y - this.grab.dy}px, 0)`;
+		const width = this.el.offsetWidth;
+		const left = this.above ? Math.max(room.margin, Math.min(room.width - room.margin - width, x - width / 2)) : grownStart(x - this.heldAt(), DESIGN.floatWidth, width, room.width, room.margin);
+		const transform = `translate3d(${left}px, ${this.above ? y : y - this.grab.dy}px, 0)`;
 		this.el.style.transform = transform;
 		for (const layer of this.stack) layer.style.transform = transform;
 		if (this.count) this.count.style.transform = transform;
+	}
+
+	/**
+	 * Over a place whose target must stay seen under the finger (a row of the tree): the copy takes its own capsule's width,
+	 * its title fading, and rides above the finger, its middle over it (the stylesheet lifts it by its height and a gap).
+	 * Off it, it is the whole card held where it was grabbed again.
+	 */
+	rideAbove(on: boolean): void {
+		if (on === (this.above !== null)) return;
+		const parts = [this.el, ...this.stack, ...(this.count ? [this.count] : [])];
+		for (const part of parts) part.classList.toggle("is-aside", on);
+		if (on) {
+			this.above = { width: this.el.style.width, stretched: this.el.classList.contains("is-stretched") };
+			this.el.classList.remove("is-stretched");
+			this.el.style.width = px(DESIGN.floatWidth);
+		} else if (this.above) {
+			this.el.style.width = this.above.width;
+			this.el.classList.toggle("is-stretched", this.above.stretched);
+			this.above = null;
+		}
+		this.fitStack();
 	}
 
 	land(rect: DOMRect): Promise<void> {
@@ -84,6 +117,7 @@ export class FloatingCard implements Float {
 
 	/** Slides to the rect, taking its size and the look of a card at rest, its title fading at the edge again. */
 	async flyTo(rect: DOMRect): Promise<void> {
+		this.rideAbove(false);
 		for (const layer of this.stack) layer.classList.add("is-gone");
 		this.count?.classList.add("is-gone");
 		this.el.classList.remove("is-stretched");

@@ -77,20 +77,50 @@ describe("ColumnSwitch", () => {
 
 	it("turns the wheel so that its window shows the two columns on the screen, the icons out of it standing deeper", () => {
 		const calendar = setUp("calendar");
-		expect(calendar.lit()).toEqual([2, 3]);
-		expect([0, 1, 2, 3].map(calendar.depth)).toEqual(["2", "1", "0", "0"]);
-		expect(setUp("soon").lit()).toEqual([1, 2]);
+		expect(calendar.lit()).toEqual([3, 4]);
+		expect([0, 1, 2, 3, 4].map(calendar.depth)).toEqual(["3", "2", "1", "0", "0"]);
+		expect(setUp("soon").lit()).toEqual([2, 3]);
 		const inbox = setUp("inbox");
-		expect(inbox.lit()).toEqual([0, 1]);
-		expect([0, 1, 2, 3].map(inbox.depth)).toEqual(["0", "0", "1", "2"]);
+		expect(inbox.lit()).toEqual([1, 2]);
+		expect([0, 1, 2, 3, 4].map(inbox.depth)).toEqual(["1", "0", "0", "1", "2"]);
+	});
+
+	it("holds the Projects folder alone in the middle of its window, Inbox beside it unshrunk and kept out of the window (board Nav)", () => {
+		const projects = setUp("projects");
+		expect(projects.wheel()).toBe(-0.5);
+		expect([0, 1, 2, 3, 4].map(projects.depth)).toEqual(["0", "0", "1", "2", "3"]);
+		const lens = [...projects.control.el.querySelectorAll<HTMLElement>(".tc-seg-pill .tc-seg-icon")].map((icon) => icon.style.getPropertyValue("--tc-seg-lens"));
+		expect(lens).toEqual(["1", "0", "0", "0", "0"]);
+		const inbox = [...setUp("inbox").control.el.querySelectorAll<HTMLElement>(".tc-seg-pill .tc-seg-icon")].map((icon) => icon.style.getPropertyValue("--tc-seg-lens"));
+		expect(inbox).toEqual(["1", "1", "1", "1", "1"]);
+	});
+
+	it("turns to Projects for a tap on the folder, and from Projects to the place nearest Inbox for a list's icon", () => {
+		const s = setUp("calendar");
+		s.tap(0);
+		expect(s.changes).toEqual(["projects"]);
+		s.tap(2);
+		expect(s.changes).toEqual(["projects", "inbox"]);
+		const now = setUp("projects");
+		now.tap(3);
+		expect(now.changes).toEqual(["soon"]);
+	});
+
+	it("turns one place a quick swipe from Inbox back to Projects, and on to Inbox again", () => {
+		const s = setUp("inbox");
+		s.drag([100, 0], [140, 16], [200, 32], [260, 48]);
+		expect(s.changes).toEqual(["projects"]);
+		s.drag([100, 0], [80, 16], [40, 32], [0, 48]);
+		expect(s.changes).toEqual(["projects", "inbox"]);
 	});
 
 	it("holds a neighbour on each side of the window only where the wheel has one", () => {
 		const sides = (s: ReturnType<typeof setUp>) => ["--tc-seg-before", "--tc-seg-after"].map((name) => s.control.el.style.getPropertyValue(name));
-		expect(sides(setUp("inbox"))).toEqual(["0", "1"]);
+		expect(sides(setUp("projects"))).toEqual(["0", "1"]);
+		expect(sides(setUp("inbox"))).toEqual(["1", "1"]);
 		expect(sides(setUp("soon"))).toEqual(["1", "1"]);
 		expect(sides(setUp("calendar"))).toEqual(["1", "0"]);
-		const s = setUp("calendar");
+		const s = setUp("soon");
 		const at = s.creep(100, 1);
 		s.move(at.x + 50, at.t + 20);
 		expect(sides(s)).toEqual(["0.5", "1"]);
@@ -107,28 +137,28 @@ describe("ColumnSwitch", () => {
 
 	it("from Done, a tapped icon turns to the place nearest Inbox that shows its column", () => {
 		const s = setUp("done");
-		s.tap(0);
+		s.tap(1);
 		expect(s.changes).toEqual(["inbox"]);
 		const now = setUp("done");
-		now.tap(2);
+		now.tap(3);
 		expect(now.changes).toEqual(["soon"]);
 	});
 
 	it("moves to the nearest place that shows a tapped column, and stays for a column already shown", () => {
 		const s = setUp("calendar");
+		s.tap(4);
 		s.tap(3);
-		s.tap(2);
 		expect(s.changes).toEqual([]);
-		s.tap(1);
-		expect(s.changes).toEqual(["soon"]);
-		s.tap(0);
-		expect(s.changes).toEqual(["soon", "inbox"]);
 		s.tap(2);
-		expect(s.changes).toEqual(["soon", "inbox", "soon"]);
+		expect(s.changes).toEqual(["soon"]);
+		s.tap(1);
+		expect(s.changes).toEqual(["soon", "inbox"]);
 		s.tap(3);
+		expect(s.changes).toEqual(["soon", "inbox", "soon"]);
+		s.tap(4);
 		expect(s.changes).toEqual(["soon", "inbox", "soon", "calendar"]);
 		const far = setUp("calendar");
-		far.tap(0);
+		far.tap(1);
 		expect(far.changes).toEqual(["inbox"]);
 	});
 
@@ -136,16 +166,16 @@ describe("ColumnSwitch", () => {
 		const s = setUp("soon");
 		const at = s.creep(100, -1);
 		s.move(at.x - 12, at.t + 20);
-		expect(s.wheel()).toBe(1.5);
-		expect(s.depth(0)).toBe("1.5");
+		expect(s.wheel()).toBe(2.5);
+		expect(s.depth(1)).toBe("1.5");
 		s.move(at.x - 18, at.t + 40);
-		expect(s.lit()).toEqual([2, 3]);
+		expect(s.lit()).toEqual([3, 4]);
 		s.move(0, at.t + 60);
-		expect(s.wheel()).toBe(2);
+		expect(s.wheel()).toBe(3);
 		s.move(at.x + 42, at.t + 80);
-		expect(s.lit()).toEqual([0, 1]);
+		expect(s.lit()).toEqual([1, 2]);
 		s.move(300, at.t + 100);
-		expect(s.wheel()).toBe(0);
+		expect(s.wheel()).toBe(-0.5);
 		expect(s.changes).toEqual([]);
 	});
 
@@ -166,7 +196,7 @@ describe("ColumnSwitch", () => {
 		s.control.el.dispatchEvent(pointer("pointerdown", 100, 0));
 		s.move(160, 16);
 		s.move(220, 32);
-		expect(s.wheel()).toBe(1);
+		expect(s.wheel()).toBe(2);
 	});
 
 	it("turns freely once the finger goes slowly, and stays free when it speeds up again", () => {
@@ -183,9 +213,9 @@ describe("ColumnSwitch", () => {
 		s.control.el.dispatchEvent(pointer("pointerdown", 100, 0));
 		s.move(140, 16);
 		s.move(180, 32);
-		expect(s.wheel()).toBe(1);
+		expect(s.wheel()).toBe(2);
 		for (let i = 1; i <= 40; i++) s.move(180 + i * 1.2, 32 + i * 20);
-		expect(s.wheel()).toBeLessThan(0.5);
+		expect(s.wheel()).toBeLessThan(1.5);
 		s.release(228, 32 + 41 * 20);
 		expect(s.changes).toEqual(["inbox"]);
 	});
@@ -195,7 +225,7 @@ describe("ColumnSwitch", () => {
 		let at = s.creep(100, 1);
 		s.release(at.x, at.t + 20);
 		expect(s.changes).toEqual([]);
-		expect(s.wheel()).toBe(2);
+		expect(s.wheel()).toBe(3);
 		at = s.creep(100, 1);
 		s.move(at.x + 20, at.t + 200);
 		s.release(at.x + 20, at.t + 400);
@@ -215,14 +245,14 @@ describe("ColumnSwitch", () => {
 		arbiter.claim("swipe");
 		s.drag([100, 0], [180, 16]);
 		expect(s.changes).toEqual(["soon"]);
-		expect(s.wheel()).toBe(1);
+		expect(s.wheel()).toBe(2);
 	});
 
 	it("glides to a place the screen asks for, as after a tap", () => {
 		const s = setUp("soon");
 		s.control.show("calendar");
 		expect(s.changes).toEqual(["calendar"]);
-		expect(s.lit()).toEqual([2, 3]);
+		expect(s.lit()).toEqual([3, 4]);
 		expect(s.control.el.classList.contains("is-settling")).toBe(true);
 		s.control.show("calendar");
 		expect(s.changes).toEqual(["calendar"]);
@@ -251,12 +281,12 @@ describe("ColumnSwitch", () => {
 		expect([said("old"), said("broken"), said("none")]).toEqual(["Out of date", "Refresh failed", null]);
 	});
 
-	it("stands a step left of Inbox at Done, which it has no icon for, and turns on to Inbox and Soon from there", () => {
+	it("holds Inbox alone in its window at Done, which it has no icon for, and turns on to Inbox and Soon from there", () => {
 		const done = setUp("done");
-		expect(done.wheel()).toBe(-1);
+		expect(done.wheel()).toBe(0.5);
 		done.control.show("done");
 		expect(done.changes).toEqual([]);
-		done.tap(1);
+		done.tap(2);
 		expect(done.changes).toEqual(["inbox"]);
 	});
 });

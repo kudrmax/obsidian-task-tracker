@@ -1,4 +1,4 @@
-import type { DropColumn, DroppedTask, DropFrom, DropOrigin, DropTo, GroupedList, TaskItem } from "../../../core/application/contracts";
+import type { DropColumn, DroppedTask, DropFrom, DropOrigin, DropTo, GroupedList, ProjectsLanding, ProjectsNewTask, ProjectsNodeId, TaskItem } from "../../../core/application/contracts";
 import type { LocalDate } from "../types";
 
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon, and Inbox over Backlog. */
@@ -56,12 +56,29 @@ export interface NewTaskPayload {
 
 export type DragPayload = TaskDragPayload | NewTaskPayload;
 
-/** Where the task lands, as the target found it: what it means is the service's (`TaskService.drop`). */
-export type DropResult = DropTo;
+/**
+ * Where something is let go on the Projects screen: a card on a row of the tree (`TaskService.dropOnProject`), the plus
+ * at a gap of the tree (a new project there) or on the tasks (a new task where `newTask` says, its field after `after`).
+ */
+export type ProjectsDrop =
+	| { readonly kind: "projectRow"; readonly node: ProjectsNodeId }
+	| { readonly kind: "projectGap"; readonly gap: number; readonly landing: ProjectsLanding }
+	| { readonly kind: "projectTasks"; readonly newTask: ProjectsNewTask; readonly after: HTMLElement | null };
+
+/** Where the task lands, as the target found it: what it means is the service's (`TaskService.drop`), or the Projects screen's. */
+export type DropResult = DropTo | ProjectsDrop;
+
+const PROJECTS_DROPS: ReadonlySet<string> = new Set(["projectRow", "projectGap", "projectTasks"]);
+
+export function isProjectsDrop(result: DropResult): result is ProjectsDrop {
+	return PROJECTS_DROPS.has(result.kind);
+}
 
 /** Somewhere a dragged task may land: it previews while the pointer is over it and says what the drop means. */
 /** A place to drop on: a list, the timeline, the plus's cancel ring; or the slots among a list's sections for a lifted section (`P`, `R`). */
 export interface DropTarget<P = DragPayload, R = DropResult> {
+	/** What it shows under the finger (a row to land on and its fill) must stay in sight: the float rides above the finger over it. */
+	readonly clearsFinger?: boolean;
 	hitTest(x: number, y: number, drag: P): boolean;
 	preview(x: number, y: number, drag: P): void;
 	/** Where a new task carried on the plus comes to rest, in client pixels, while a preview shows. A task's card lands on its card as drawn after the drop. */
@@ -81,6 +98,8 @@ export interface HeldOut {
 /** The card under the finger. */
 export interface Float {
 	moveTo(x: number, y: number): void;
+	/** Over a target that `clearsFinger`: the float narrows to its own width and rides above the finger; off, it is held as grabbed again. */
+	rideAbove?(on: boolean): void;
 	/** Settles where the drop puts it. */
 	land(rect: DOMRect): Promise<void>;
 	/** Goes into `rect` and fades there: the drop is written into a part held out of sight under that header. */

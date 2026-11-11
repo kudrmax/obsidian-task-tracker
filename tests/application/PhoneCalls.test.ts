@@ -48,7 +48,7 @@ const FILE = [
 	"",
 	"## Backlog",
 	"",
-	"- [ ] 🎯 Someday",
+	"- [ ] Someday 🗂️ Окружение",
 	"",
 	"## Done",
 	"",
@@ -186,21 +186,28 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "renameGroup", args: () => ["now", "Errands", "Shopping"] },
 	{ method: "renameGroup", args: () => ["now", "Errands", "Errands"] },
 	{ method: "removeGroup", args: () => ["now", "Errands"] },
-	{ method: "renameGroup", args: () => ["now", "Errands", "Shopping", null] },
-	{ method: "removeGroup", args: () => ["now", "Errands", "Окружение"] },
 	{ method: "setProject", args: (s) => [[key(s, "Idea"), key(s, "Child one")], "Окружение"] },
 	{ method: "setProject", args: (s) => [[key(s, "Idea")], null] },
-	{ method: "projectNotes", args: () => [] },
-	{ method: "setResult", args: (s) => [key(s, "Parent"), true] },
-	{ method: "setResult", args: (s) => [key(s, "Parent"), false] },
-	{ method: "resultPage", args: (s) => [[key(s, "Shop")], ""] },
-	{ method: "resultPage", args: (s) => [[key(s, "Shop")], "some"] },
-	{ method: "addToResult", args: (s) => [[key(s, "Shop"), key(s, "Idea")], key(s, "Someday")] },
-	{ method: "newResult", args: (s) => [[key(s, "Shop")], "Errands done"] },
-	{ method: "newResult", args: (s) => [[key(s, "Shop")], "  "] },
-	{ method: "setGrouping", args: () => ["soon", true] },
-	{ method: "toggleFold", args: () => ["backlog", ""] },
-	{ method: "screen", args: () => [T, "Окружение"] },
+	{ method: "toggleProject", args: (s) => [[key(s, "Idea"), key(s, "Someday")], "Окружение"] },
+	{ method: "toggleProject", args: (s) => [[key(s, "Someday")], "Окружение"] },
+	{ method: "newProject", args: (s) => ["Дружба", [key(s, "Idea")]] },
+	{ method: "newProject", args: () => ["  ", []] },
+	{ method: "projectsScreen", args: () => [] },
+	{ method: "projects", args: () => [] },
+	{ method: "unfoldProjectNode", args: () => ["done"] },
+	{ method: "projectsScreen", args: () => [], text: null },
+	{ method: "tapProjectNode", args: () => ["project:Окружение"] },
+	{ method: "selectProjectNode", args: () => ["project:Окружение"] },
+	{ method: "setProjectsMode", args: () => ["byStage"] },
+	{ method: "createProject", args: () => ["Дружба", { parent: "Окружение", before: null }] },
+	{ method: "createProject", args: () => ["Окружение", { parent: null, before: null }] },
+	{ method: "moveProject", args: () => ["Окружение", { parent: null, before: null }] },
+	{ method: "renameProject", args: () => ["Окружение", "Сербия"] },
+	{ method: "renameProject", args: () => ["Окружение", " "] },
+	{ method: "setProjectNote", args: () => ["Окружение", "Заметки/Окружение"] },
+	{ method: "dropOnProject", args: (s) => [[{ key: key(s, "Someday"), from: "Окружение" }], "none"] },
+	{ method: "dropOnProject", args: (s) => [[{ key: key(s, "Idea"), from: null }], "project:Окружение"] },
+	{ method: "isBlankProjectName", args: () => [" 📅 "] },
 	{ method: "createSection", args: (s) => ["Evening", { kind: "day", date: T, group: null, before: key(s, "In progress") }] },
 	{ method: "applyAll", args: (s) => [[{ key: key(s, "Idea"), change: { kind: "moveToEnd", section: "soon" } }, { key: key(s, "Shop"), change: { kind: "status", status: "done" } }]] },
 	{ method: "drop", args: (s) => [[{ key: key(s, "Later"), from: "soon" }], { kind: "time", start: 660 }, T] },
@@ -216,9 +223,13 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "setStatus", args: (s) => [{ ...key(s, "Idea"), raw: "- [ ] Gone", id: undefined }, "done"] },
 ];
 
+/** The service's menus offer the projects of the file it read last; the door's, of the text it is handed: the plugin reads the screen before any menu. */
+const READ_FIRST: ReadonlySet<string> = new Set(["menu", "bulkMenu", "projects"]);
+
 /** What the service answers, and the text it leaves; an error by its code. */
 async function serviceAnswer(c: Case, screen: ScreenView): Promise<{ result: unknown; text: string | null; steps: boolean }> {
 	const { store, svc } = service(c.text === undefined ? FILE : c.text);
+	if (READ_FIRST.has(c.method) && store.text !== null) await svc.screen(T);
 	const before = store.text;
 	const history = (svc as unknown as { history: UndoHistory }).history;
 	try {
@@ -304,7 +315,7 @@ describe("the door's coverage", () => {
 
 	it("answers in no space no interface names", () => {
 		const spaces = new Set(Object.values(DOOR_COVERAGE).flatMap((c) => ("space" in c ? [c.space] : [])));
-		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline", "notes"];
+		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline", "notes", "projects"];
 		expect(new Set(doorMethods().map((m) => m.split(".")[0]))).toEqual(new Set([...spaces, ...own]));
 	});
 });
@@ -319,13 +330,19 @@ describe("the door's screen settings", () => {
 describe("the door's notes", () => {
 	const ok = (answer: DoorAnswer) => (answer as Extract<DoorAnswer, { ok: true }>).result;
 
-	it("finds the projects among the vault's notes by the settings' tag, and a task's project opens its note once they are handed in", () => {
+	it("finds the notes that were projects by their tag, and the first read moves them into the tree with their notes attached, a tidy", () => {
 		const vault = [{ path: "Clients/Acme.md", text: "---\ntags: [client]\n---\n" }, { path: "Home.md", text: "#project" }];
 		const projects = ok(callDoor("rules.projectNotes", [vault, "#client"], context()));
 		expect(projects).toEqual([{ name: "Acme", path: "Clients/Acme.md", link: "Acme" }]);
-		const text = "## Inbox\n- [ ] Call 🗂️ [[Acme]]\n";
-		const screen = ok(callDoor("tasks.screen", [T], context(text, { projects: projects as never }))) as { inbox: { project: unknown }[] };
-		expect(screen.inbox[0].project).toMatchObject({ name: "Acme", note: "Clients/Acme.md", canOpenNote: true });
+		const text = "## Inbox\n- [ ] Call 🗂️ [[Acme]]\n- [ ] Other\n";
+		const read = callDoor("tasks.screen", [T], context(text, { projects: projects as never })) as Extract<DoorAnswer, { ok: true }>;
+		expect((read.result as { inbox: { project: unknown }[] }).inbox[0].project).toMatchObject({ name: "Acme", note: "Acme", canOpenNote: true });
+		expect(read.tasks).toContain("- [ ] Call 🗂️ Acme\n- [ ] Other\n\n## Projects\n\n- Acme [[Acme]]\n");
+		expect(read.step).toBeUndefined();
+	});
+
+	it("opens a project's note in Obsidian by its link", () => {
+		expect(ok(callDoor("projects.noteUrl", ["Заметки/Дружба|друзья", "My Vault"], context()))).toBe("obsidian://open?vault=My%20Vault&file=%D0%97%D0%B0%D0%BC%D0%B5%D1%82%D0%BA%D0%B8%2F%D0%94%D1%80%D1%83%D0%B6%D0%B1%D0%B0");
 	});
 });
 
@@ -381,10 +398,6 @@ const SETTINGS_CASES: readonly (readonly [string, ...unknown[]])[] = [
 	["setCardGap", -1],
 	["setZoomLevels", " 40 , 80"],
 	["setZoomLevels", "28, x"],
-	["setResultMark", " ★ "],
-	["setResultMark", "two words"],
-	["setProjectTag", " проект "],
-	["setProjectTag", "two words"],
 	["renameLabel", 0, " Very fast "],
 	["recolourLabel", 0, "blue"],
 	["removeLabel", 0],
@@ -488,6 +501,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("days.relation", LATER),
 		plain("days.step", T, -3),
 		plain("days.stepScreen", { mode: "calendar", date: T }, 1),
+		plain("days.stepScreen", { mode: "inbox", date: T }, -1),
 		plain("days.boundary"),
 		plain("days.openAt", LATER),
 		...["startHour", "hourAt", "offsetOfHour"].map((m) => plain(`boundary.${m}`, 3)),
@@ -588,6 +602,8 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.branchOf", [0, 1, 1], 1),
 		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
 		plain("rules.placeShowing", "day", "inbox"),
+		plain("rules.shownLists", "projects"),
+		plain("rules.placeShowing", "day", "projects"),
 		plain("rules.swipeLanding", 120, 200, 0.1),
 		plain("rules.listWidths", 0.5, 390, 16),
 		plain("rules.listShareOf", 187, 390, 16),
@@ -607,10 +623,11 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("notes.insert", "Call [[Alp", { query: "Alp", from: 5, to: 10 }, "Alpha"),
 		plain("notes.open", "Alpha#Plan", [{ path: "Projects/Alpha.md" }]),
 		plain("notes.open", "Gone", [{ path: "Projects/Alpha.md" }]),
-		plain("notes.newProject", "Alpha", [{ path: "Projects/Alpha.md" }]),
-		plain("notes.newProject", "", []),
-		plain("notes.projectText", "Body\n"),
-		plain("notes.projectText", null),
+		plain("projects.noteUrl", "Дружба", "Vault"),
+		plain("rules.projectNodeOf", "Дружба"),
+		plain("rules.projectsLevels", [{ node: "all", kind: "all", depth: 0 }, { node: "project:A", kind: "project", depth: 0, title: "A" }, { node: "none", kind: "none", depth: 0 }], 2),
+		plain("rules.projectsGap", [{ node: "all", kind: "all", depth: 0 }, { node: "project:A", kind: "project", depth: 0, title: "A" }, { node: "none", kind: "none", depth: 0 }], 2, 1),
+		plain("rules.projectsDrop", [{ node: "all", kind: "all", depth: 0 }, { node: "project:A", kind: "project", depth: 0, title: "A" }, { node: "none", kind: "none", depth: 0 }], 2, 12),
 		...[
 			["openAtEnd", "soon"],
 			["openFromPlus"],

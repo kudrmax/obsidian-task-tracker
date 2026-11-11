@@ -32,6 +32,9 @@ struct TaskCapsule: View {
     /// A search's find: the found pieces picked out of the title, and the project's name or the description's line under
     /// it where the query was found there, as the plugin's search draws its cards.
     var found: SearchHit?
+    /// On a find from the Projects page: its first project's path in the tree, shown under the title as the project's
+    /// name is, unless the query was found in the description.
+    var path: [String]?
 
     @Environment(\.colorScheme) private var scheme
 
@@ -39,7 +42,13 @@ struct TaskCapsule: View {
     /// On the timeline the card's content stands at its top, the corner beside the title's first line.
     private var onTimeline: Bool { card.corner != nil || height != CardMetrics.height }
     /// The line a find shows under the title: the project's name when the query was found there, else the description's.
-    private var snippet: [FoundPart]? { found.flatMap { $0.project ?? $0.description } }
+    private var snippet: [FoundPart]? {
+        guard let found else { return nil }
+        if let path, found.description == nil || found.project != nil {
+            return [FoundPart(text: path.joined(separator: " › "), match: false)]
+        }
+        return found.project ?? found.description
+    }
 
     var body: some View {
         HStack(alignment: onTimeline || whole ? .top : .center, spacing: 6) {
@@ -74,7 +83,9 @@ struct TaskCapsule: View {
             if card.item.project?.mark == true { projectMark }
             if card.item.progress != nil || card.item.description != nil { meta }
             if let corner = card.corner { stackCorner(corner) }
-            if let due = card.due {
+            if let stage = card.stage {
+                stageMark(stage)
+            } else if let due = card.due {
                 dueCorner(due)
             } else if card.repeats {
                 repeatIcon.frame(minWidth: 24)
@@ -122,7 +133,7 @@ struct TaskCapsule: View {
                 .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, maxHeight: CardMetrics.titleLine)
                 .overlay(alignment: .leading) {
                     marked(hit.title.isEmpty ? [FoundPart(text: card.item.title, match: false)] : hit.title, size: CardMetrics.title)
-                        .font(.system(size: CardMetrics.title, weight: weight))
+                        .font(.system(size: CardMetrics.title))
                         .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
                         .strikethrough(card.item.closed, color: Palette.muted)
                         .lineLimit(1)
@@ -165,17 +176,15 @@ struct TaskCapsule: View {
     private var base: CGFloat { card.listHeight }
     /// The room over the title's lines (and under them on a menu's copy).
     private var edge: CGFloat { (base - CardMetrics.titleLine - (card.face.twoLines ? CardMetrics.overLine : 0)) / 2 }
-    /// The title's weight: semibold for a result drawn with its own title.
-    private var weight: Font.Weight { card.face.semibold ? .semibold : .regular }
 
-    /// A folded result's own title over its step (results, point 4): small, in the caption colour, after a target, on one
-    /// line fading out as a title does.
+    /// The small line over the title, in the caption colour, on one line fading out as a title does: a folded task's own
+    /// title over its next step, after a target; on the Projects page By stage, the task's subproject, after a folder.
     private func overLine(_ over: String) -> some View {
         Color.clear
             .frame(maxWidth: .infinity, minHeight: CardMetrics.overLine, maxHeight: CardMetrics.overLine)
             .overlay(alignment: .leading) {
                 HStack(spacing: 3) {
-                    Image(systemName: "scope").font(.system(size: CardMetrics.overFont, weight: .semibold))
+                    Image(systemName: card.face.overSymbol).font(.system(size: CardMetrics.overFont, weight: .semibold))
                     Text(verbatim: over).font(.system(size: CardMetrics.overFont))
                 }
                 .foregroundStyle(metaColor)
@@ -184,7 +193,7 @@ struct TaskCapsule: View {
             }
             .mask(fadeMask)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Result \(over)")
+            .accessibilityLabel(card.face.overSymbol == "folder" ? "Project \(over)" : "Task \(over)")
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onOver?($0) }
     }
 
@@ -196,7 +205,7 @@ struct TaskCapsule: View {
         parts.reduce(Text(verbatim: "")) { text, part in
             text + (part.isLink ? Text(verbatim: part.shown).foregroundColor(Palette.accent(scheme)) : Text(verbatim: part.shown))
         }
-        .font(.system(size: CardMetrics.title, weight: weight))
+        .font(.system(size: CardMetrics.title))
         .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
         .strikethrough(card.item.closed, color: Palette.muted)
     }
@@ -215,7 +224,7 @@ struct TaskCapsule: View {
             }
             .lineLimit(1)
             .fixedSize()
-            .font(.system(size: CardMetrics.title, weight: weight))
+            .font(.system(size: CardMetrics.title))
             .strikethrough(card.item.closed, color: Palette.muted)
             .onChange(of: linkFrames, initial: true) { onLinks?(Array(linkFrames.values)) }
         } else {
@@ -266,6 +275,16 @@ struct TaskCapsule: View {
             .frame(height: 18)
             .accessibilityLabel("Project \(card.item.project?.name ?? "")")
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onMark?($0) }
+    }
+
+    /// On the Projects page By project, where the task stands in the funnel, in the date's place and of its width: the
+    /// list's symbol in the caption colour.
+    private func stageMark(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(metaColor)
+            .frame(minWidth: 24)
+            .accessibilityLabel(StageWords.name(symbol))
     }
 
     /// A list card's corner: the due day over its month, the repeat mark beside the day; it grows with what it holds.
@@ -429,5 +448,18 @@ struct BranchLine: View {
         .frame(width: 11 + reach, height: height)
         .offset(x: -11 - reach, y: -4)
         .accessibilityHidden(true)
+    }
+}
+
+/// The words a stage's symbol is read out with.
+enum StageWords {
+    static func name(_ symbol: String) -> String {
+        switch symbol {
+        case "sun.max": "Today"
+        case "hourglass": "Soon"
+        case "tray": "Inbox"
+        case "archivebox": "Backlog"
+        default: "Done"
+        }
     }
 }

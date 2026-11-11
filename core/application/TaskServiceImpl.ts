@@ -24,8 +24,11 @@ import {
 	type GroupPlace,
 	type ListSection,
 	type ProjectRef,
-	type ProjectZone,
-	type ResultPage,
+	type ProjectsDrop,
+	type ProjectsMode,
+	type ProjectsNodeId,
+	type ProjectsScreenState,
+	type ProjectsView,
 	type NewTaskPlace,
 	type Placement,
 	type RepeatRule,
@@ -43,9 +46,10 @@ import {
 	type TaskStep,
 } from "./contracts";
 import type { SectionOffer } from "./sections";
-import { type Clock, type GroupingStore, memoryGrouping, NO_NOTE_FILES, NO_PROJECTS, type NoteFiles, type Projects, type SettingsStore, type TaskFileStore } from "./ports";
-import { newProjectNote, newProjectRef, pluginFiles, revealedGrouping, withFoldToggled, withGrouping } from "./projects";
-import { withProjectTag } from "../domain/NoteTags";
+import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type ProjectsScreenStore, type SettingsStore, type TaskFileStore } from "./ports";
+import { ProjectIndex, projectTreeOf } from "./projects";
+import { projectOfNode, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { ProjectTree, type TreePlace } from "../domain/ProjectTree";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -85,13 +89,12 @@ export class TaskServiceImpl implements TaskService {
 		private readonly settings: SettingsStore,
 		clock: Clock,
 		private readonly history: UndoHistory | null = null,
-		private readonly projects: Projects = NO_PROJECTS,
-		private readonly grouping: GroupingStore = memoryGrouping(),
+		private readonly legacyProjects: Projects = NO_PROJECTS,
+		private readonly projectsScreenStore: ProjectsScreenStore = memoryProjectsScreen(),
 		identity: TaskIdentity = new TaskIdentity(),
-		private readonly notes: NoteFiles = NO_NOTE_FILES,
 	) {
-		this.rules = new TaskRules(settings, clock, identity);
-		this.reads = new TaskReads(this.rules, settings, clock, { notes: () => projects.list(), grouping: () => grouping.get() });
+		this.rules = new TaskRules(settings, clock, identity, true, { list: () => legacyProjects.list(), ready: () => legacyProjects.ready?.() ?? true });
+		this.reads = new TaskReads(this.rules, settings, clock, { tree: () => this.lastTree(), screen: () => projectsScreenStore.get() });
 		this.writes = new TaskWrites(this.rules, this.reads);
 	}
 
@@ -119,57 +122,92 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.withPriority(text, prefix);
 	}
 
-	screen(date: LocalDate, project?: string): Promise<ScreenView> {
-		return this.ask(this.reads.screenRead(date, project));
+	screen(date: LocalDate): Promise<ScreenView> {
+		return this.ask(this.reads.screenRead(date));
 	}
 
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void> {
 		return this.run(this.writes.setProject(keys, project));
 	}
 
-	setResult(key: TaskKey, result: boolean): Promise<void> {
-		return this.run(this.writes.setResult(key, result));
+	toggleProject(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]> {
+		return this.run(this.writes.toggleProject(keys, name));
 	}
 
-	resultPage(keys: readonly TaskKey[], query: string): Promise<ResultPage> {
-		return this.ask(this.reads.resultPageRead(keys, query));
+	projects(): readonly ProjectRef[] {
+		return this.reads.projects();
 	}
 
-	addToResult(keys: readonly TaskKey[], result: TaskKey): Promise<void> {
-		return this.run(this.writes.addToResult(keys, result));
-	}
-
-	newResult(keys: readonly TaskKey[], name: string): Promise<CreatedTask | null> {
-		return this.run(this.writes.newResult(keys, name));
-	}
-
-	projectNotes(): readonly ProjectRef[] {
-		return this.reads.projectNotes();
+	async unfoldProjectNode(node: ProjectsNodeId): Promise<void> {
+		this.keepScreen(unfolded(this.projectsScreenStore.get(), node));
 	}
 
 	async newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null> {
-		const note = newProjectNote(name, this.notes.paths().map((path) => ({ path })), pluginFiles(this.settings.get()));
-		if (!note) return null;
-		const was = note.exists ? await this.notes.read(note.path) : null;
-		const text = withProjectTag(was, this.settings.get().projectTag);
-		if (text !== was) await this.notes.write(note.path, text);
-		if (keys.length > 0) await this.setProject(keys, note.link);
-		return newProjectRef(note);
+		return this.refOf(await this.run(this.writes.newProject(name, keys)));
 	}
 
-	async setGrouping(list: GroupedList, on: boolean): Promise<void> {
-		this.keepGrouping(withGrouping(this.grouping.get(), list, on));
+	projectsScreen(): Promise<ProjectsView> {
+		return this.ask(this.reads.projectsScreenRead());
 	}
 
-	async toggleFold(list: GroupedList, key: string): Promise<void> {
-		this.keepGrouping(withFoldToggled(this.grouping.get(), list, key));
+	async tapProjectNode(node: ProjectsNodeId): Promise<void> {
+		const s = await this.snapshotOrNull();
+		this.keepScreen(tapped(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, node));
 	}
 
-	/** The device's grouping changed: the screens draw their lists again. */
-	private keepGrouping(state: ReturnType<GroupingStore["get"]>): void {
-		if (state === this.grouping.get()) return;
-		this.grouping.set(state);
+	async selectProjectNode(node: ProjectsNodeId): Promise<void> {
+		const s = await this.snapshotOrNull();
+		this.keepScreen(selected(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, s?.doc ?? null, node));
+	}
+
+	async setProjectsMode(mode: ProjectsMode): Promise<void> {
+		this.keepScreen({ ...this.projectsScreenStore.get(), mode });
+	}
+
+	async createProject(name: string, place: TreePlace): Promise<ProjectRef | null> {
+		const made = await this.run(this.writes.createProject(name, place));
+		if (made !== null) await this.selectProjectNode(`project:${made}`);
+		return this.refOf(made);
+	}
+
+	moveProject(name: string, place: TreePlace): Promise<void> {
+		return this.run(this.writes.moveProject(name, place));
+	}
+
+	async renameProject(from: string, to: string): Promise<boolean> {
+		const renamed = await this.run(this.writes.renameProject(from, to));
+		if (renamed) this.keepScreen(renamedIn(this.projectsScreenStore.get(), from, this.rules.cleanName(to)!));
+		return renamed;
+	}
+
+	setProjectNote(name: string, link: string | null): Promise<void> {
+		return this.run(this.writes.setProjectNote(name, link));
+	}
+
+	dropOnProject(cards: readonly ProjectsDrop[], to: ProjectsNodeId): Promise<void> {
+		const target = to === "none" ? null : projectOfNode(to);
+		if (target === null && to !== "none") return Promise.resolve();
+		return this.run(this.writes.dropOnProject(cards, target));
+	}
+
+	isBlankProjectName(name: string): boolean {
+		return this.rules.cleanName(name) === null;
+	}
+
+	/** The device's Projects screen changed: the screens draw again. */
+	private keepScreen(state: ProjectsScreenState): void {
+		if (state === this.projectsScreenStore.get()) return;
+		this.projectsScreenStore.set(state);
 		this.emit();
+	}
+
+	/** The tree of the file read last, the tasks' own projects in it. */
+	private lastTree(): ProjectTree {
+		return this.normalized ? projectTreeOf(this.normalized.doc) : ProjectTree.EMPTY;
+	}
+
+	private refOf(name: string | null): ProjectRef | null {
+		return name === null ? null : new ProjectIndex(this.lastTree()).refOf(name, true);
 	}
 
 	async dayView(date: LocalDate): Promise<DayView> {
@@ -200,8 +238,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.doneView(await this.snapshot());
 	}
 
-	search(query: string, project?: string): Promise<readonly SearchGroup[]> {
-		return this.ask(this.reads.searchRead(query, project));
+	search(query: string): Promise<readonly SearchGroup[]> {
+		return this.ask(this.reads.searchRead(query));
 	}
 
 	async screenOf(item: TaskItem): Promise<TaskScreen> {
@@ -210,7 +248,6 @@ export class TaskServiceImpl implements TaskService {
 
 	async reveal(item: TaskItem): Promise<TaskScreen> {
 		await this.run(this.writes.revealUnfold(item));
-		this.keepGrouping(revealedGrouping(this.grouping.get(), item));
 		return this.screenOf(item);
 	}
 
@@ -458,12 +495,12 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.moveGroup(list, group, place));
 	}
 
-	async renameGroup(list: GroupedList, group: string, name: string, project?: ProjectZone): Promise<boolean> {
-		return this.run(await this.ask(this.writes.renameGroup(list, group, name, project)));
+	async renameGroup(list: GroupedList, group: string, name: string): Promise<boolean> {
+		return this.run(await this.ask(this.writes.renameGroup(list, group, name)));
 	}
 
-	removeGroup(list: GroupedList, group: string, project?: ProjectZone): Promise<void> {
-		return this.run(this.writes.removeGroup(list, group, project));
+	removeGroup(list: GroupedList, group: string): Promise<void> {
+		return this.run(this.writes.removeGroup(list, group));
 	}
 
 	createSection(name: string, place: SectionPlace): Promise<{ readonly list: GroupedList; readonly group: string } | null> {
@@ -478,12 +515,12 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(await this.ask(this.writes.drop(tasks, to, day)));
 	}
 
-	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Promise<readonly DropLanding[]> {
-		return this.ask(this.writes.landing(tasks, to, day, project));
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly DropLanding[]> {
+		return this.ask(this.writes.landing(tasks, to, day));
 	}
 
-	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Promise<DropPreview> {
-		return this.ask(this.writes.dropPreview(tasks, to, day, project));
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<DropPreview> {
+		return this.ask(this.writes.dropPreview(tasks, to, day));
 	}
 
 	async normalize(): Promise<void> {
@@ -501,7 +538,7 @@ export class TaskServiceImpl implements TaskService {
 		this.listeners.add(listener);
 		this.unsubscribeStore ??= this.store.onChange(() => this.emit());
 		this.unsubscribeSettings ??= this.watchReading();
-		this.unsubscribeProjects ??= this.projects.onChange(() => this.emit());
+		this.unsubscribeProjects ??= this.legacyProjects.onChange(() => this.emit());
 		return () => {
 			this.listeners.delete(listener);
 			if (this.listeners.size === 0) {

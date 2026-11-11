@@ -35,7 +35,7 @@ struct CardButton: UIViewRepresentable {
     var onFold: (() -> Void)?
     /// A tap on a link of the title: it opens, in place of the menu.
     var onLink: ((TextPart) -> Void)?
-    /// A tap on the project's folder mark: the project's note opens, in place of the menu.
+    /// A tap on the project's folder mark: the Projects page opens on the project, in place of the menu.
     var onProject: (() -> Void)?
     /// Select Tasks: a tap picks the card or lets it go, and a picked card lifted carries every picked task as a stack.
     var picking: Picking?
@@ -89,8 +89,8 @@ struct CardButton: UIViewRepresentable {
         control.from = from
         control.onFold = onFold
         control.onLink = onLink
-        // The folder mark opens the note only where the note can open, and never while tasks are being picked.
-        control.onProject = picking == nil && card.item.project?.mark == true && card.item.project?.canOpenNote == true ? onProject : nil
+        // The folder mark opens the Projects page on the project, never while tasks are being picked.
+        control.onProject = picking == nil && card.item.project?.mark == true ? onProject : nil
         control.picking = picking
         control.draggable = draggable
         control.carried = carried
@@ -526,7 +526,7 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
         }
     }
 
-    private static func shape(_ element: UIMenuElement) -> MenuShape {
+    static func shape(_ element: UIMenuElement) -> MenuShape {
         switch element {
         case let menu as UIMenu:
             return .page(title: menu.title, detail: "\(menu.subtitle ?? "")|\(menu.options.rawValue)", children: menu.children.map(shape))
@@ -537,7 +537,7 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
         }
     }
 
-    private static func page(at path: [Int], in menu: UIMenu) -> UIMenu? {
+    static func page(at path: [Int], in menu: UIMenu) -> UIMenu? {
         var page = menu
         for index in path {
             guard index < page.children.count, let child = page.children[index] as? UIMenu else { return nil }

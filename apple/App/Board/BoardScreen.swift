@@ -6,16 +6,7 @@ import UIKit
 /// places it stands at; the system tab bar under it only says where it stands and moves it there, and the plus beside
 /// the tab bar opens a new task.
 struct BoardScreen: View {
-    @State private var model: BoardModel
-    @Environment(\.dismiss) private var dismiss
-
-    /// `project`: that project's own view, as the plugin's block in its note.
-    /// `openOther`: a project's view shows another project in its place through the screen under it.
-    init(project: ProjectRef? = nil, openOther: ((ProjectRef) -> Void)? = nil) {
-        let model = BoardModel(project: project)
-        model.openOther = openOther
-        _model = State(initialValue: model)
-    }
+    @State private var model = BoardModel()
     @State private var router = CaptureRouter.shared
     @State private var sync = ObsidianSync.shared
     @State private var sheet: BoardSheet?
@@ -31,7 +22,7 @@ struct BoardScreen: View {
                 // it covers as room to scroll (`keyboardRoom`), so nothing is cut ahead of the keyboard's own motion.
                 .ignoresSafeArea(.keyboard, edges: .bottom)
                 .toolbar {
-                    if model.selecting { selectionBar } else if let project = model.project { projectBar(project) } else { mainBar }
+                    if model.selecting { selectionBar } else { mainBar }
                 }
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationDestination(for: TaskItem.self) { item in TaskFullScreen(item: item, model: model).id(item.id) }
@@ -56,9 +47,9 @@ struct BoardScreen: View {
         .sheet(item: Binding(get: { model.entry.sheet }, set: { model.entry.sheet = $0 }), onDismiss: { model.entry.resume() }) { sheet in
             entrySheet(sheet)
         }
-        // Only the screen on top opens it: a project's view over the main screen starts it with that project.
-        .sheet(isPresented: Binding(get: { router.capturing && model.projectShown == nil }, set: { router.capturing = $0 }), onDismiss: { Task { await model.reloadIfChanged() } }) {
-            CaptureView(focused: router.typing, project: model.snapshot?.screen.project?.link ?? model.projectLink)
+        .sheet(isPresented: Binding(get: { router.capturing }, set: { router.capturing = $0 }), onDismiss: { Task { await model.reloadIfChanged() } }) {
+            // On the Projects tab a new task gets the chosen node's project, as the plus writes it there.
+            CaptureView(focused: router.typing, project: model.place == .projects ? model.projects.view?.newTask?.project : nil)
         }
         // Settings may have renamed a list or changed a colour: the screen reads again when it closes.
         .sheet(item: $sheet, onDismiss: { Task { await model.reloadIfChanged() } }) { sheet in
@@ -69,10 +60,6 @@ struct BoardScreen: View {
             }
         }
         .boardSheets(model: model)
-        .fullScreenCover(item: $model.projectShown, onDismiss: { Task { await model.reloadIfChanged() } }) { shown in
-            BoardScreen(project: shown.project, openOther: { other in model.projectShown = BoardModel.ShownProject(project: other) })
-                .id(shown.id)
-        }
         .task { await model.reload() }
         .onChange(of: scene, initial: true) {
             // The tasks file changes outside the app too: back in front, the screen reads it again if it did or the clock
@@ -194,40 +181,6 @@ struct BoardScreen: View {
         }
     }
 
-    /// A project's view: Close, Undo, the project's name, and its note opened in Obsidian.
-    @ToolbarContentBuilder
-    private func projectBar(_ project: ProjectRef) -> some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Button("Close", systemImage: "xmark") { model.entry.blur(); dismiss() }
-                .tint(.primary)
-        }
-        ToolbarItem(placement: .topBarLeading) {
-            Button("Undo", systemImage: "arrow.uturn.backward") { Task { await model.undo() } }
-                .disabled(model.snapshot?.canUndo != true)
-                .tint(.primary)
-        }
-        ToolbarItem(placement: .principal) {
-            Label(project.name, systemImage: "folder").labelStyle(.titleAndIcon).font(.headline)
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-            if model.entry.isOpen {
-                Button("Done", systemImage: "checkmark") { model.entry.blur() }
-                    .buttonStyle(.glassProminent)
-                    .tint(Palette.accent(scheme))
-            } else {
-                Menu("More", systemImage: "ellipsis") {
-                    Button("Search", systemImage: "magnifyingglass") { sheet = .search }
-                    Button("Select Tasks", systemImage: "checkmark.circle") { model.startSelection() }
-                    if let note = project.note {
-                        Divider()
-                        Button("Open in Obsidian", systemImage: "arrow.up.forward.app") { model.openNote(note) }
-                    }
-                }
-                .tint(.primary)
-            }
-        }
-    }
-
     /// A menu badge has one colour in iOS: orange and red alike.
     private var calendarsAlerted: Bool { (model.snapshot?.calendarsAlert ?? CalendarAlert.none) != CalendarAlert.none }
 
@@ -307,14 +260,18 @@ struct Ribbon: View {
             // As the plugin's screen: Inbox and Soon split the screen in half wherever the divider stands; at Today the
             // divider sets the day list against the calendar, the list's edge gliding there from the half on the way
             // from Soon (`RibbonColumns`, tested: Max asked for this three times).
-            let columns = RibbonColumns(width: Double(width), list: Double(listWidth(width)), done: model.doneShown)
+            let columns = RibbonColumns(width: Double(width), list: Double(listWidth(width)), done: model.doneShown, projects: true)
             let half = CGFloat(columns.half)
             let list = CGFloat(columns.list)
             let dayList = CGFloat(columns.dayList(toToday: Double(toToday)))
-            let lead = CGFloat(columns.lead)
             let stops = columns.stops.map { CGFloat($0) }
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
+                    // The Projects page, its own place left of Inbox: the whole screen.
+                    ProjectsPage(model: model)
+                        .frame(width: width)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .id(RibbonPlace.projects)
                     if model.doneShown {
                         DoneColumn(model: model)
                             .frame(width: half)
@@ -359,18 +316,21 @@ struct Ribbon: View {
                 // At rest (a tab's scroll, the size changing) the ribbon stands where the next swipe starts; under the
                 // finger it goes no further than the next place either way, as the plugin's screen.
                 swipe.moved(within: stops)
-                let from = x - lead
                 toToday = CGFloat(columns.toToday(at: Double(x)))
-                // The selection moves along with a swipe; a tab's own scroll leaves it on the tab chosen.
-                guard phase == .interacting || phase == .decelerating else { return }
-                let near = nearest(from, soon: half, width: width)
+                // The selection moves along with the ribbon, whatever moves it; a tab's own scroll leaves it on the tab
+                // chosen until it arrives or a finger takes the ribbon.
+                if let target = swipe.tabTarget {
+                    if abs(x - target) < 0.5 { swipe.tabTarget = nil }
+                    return
+                }
+                let near = nearest(x, columns)
                 if near != model.place { model.place = near }
             }
             .onScrollPhaseChange { _, new in
                 phase = new
                 if new == .idle {
-                    // Off the Done column, onto Inbox or further: it closes until the next search, Inbox where it stood.
-                    if lead > 0, offset > lead / 2 {
+                    // Off the Done column, onto Inbox or Projects: it closes until the next search, the place where it stood.
+                    if model.doneShown, abs(offset - CGFloat(columns.doneStop)) > half / 2 {
                         var instant = Transaction()
                         instant.disablesAnimations = true
                         withTransaction(instant) {
@@ -382,10 +342,10 @@ struct Ribbon: View {
                     // A touch that stops a tab's scroll on its way leaves the ribbon between two places: it goes on to the
                     // nearer one, as a swipe would.
                     // At rest the tab bar names where the ribbon stands, whatever moved it there.
-                    let near = nearest(offset - lead, soon: half, width: width)
-                    let stop: CGFloat = switch near { case .inbox: 0; case .soon: half; case .today: width }
-                    if lead == 0, model.place != near { model.place = near }
-                    if lead == 0, abs(offset - stop) > 0.5 {
+                    let near = nearest(offset, columns)
+                    let stop = stopOf(near, columns)
+                    if !model.doneShown, model.place != near { model.place = near }
+                    if !model.doneShown, abs(offset - stop) > 0.5 {
                         withAnimation(.smooth) { position.scrollTo(id: near, anchor: .leading) }
                         return
                     }
@@ -402,19 +362,40 @@ struct Ribbon: View {
             .onChange(of: model.asked) {
                 guard let asked = model.asked else { return }
                 guard asked.done else {
-                    withAnimation(.smooth) { position.scrollTo(id: asked.place, anchor: .leading) }
+                    // A tab moves the ribbon by the scroll view's own animation, which a finger on the ribbon stops where
+                    // it is: a swipe begun while it runs starts from where the ribbon stands, never from a place an
+                    // animation still carries it to.
+                    let stop = stopOf(asked.place, columns)
+                    if let scroll = swipe.scroll {
+                        swipe.tabTarget = abs(scroll.contentOffset.x - stop) < 0.5 ? nil : stop
+                        scroll.setContentOffset(CGPoint(x: stop, y: scroll.contentOffset.y), animated: true)
+                    } else {
+                        withAnimation(.smooth) { position.scrollTo(id: asked.place, anchor: .leading) }
+                    }
                     return
                 }
                 // The Done column is laid out first, then the ribbon goes to it.
-                DispatchQueue.main.async { withAnimation(.smooth) { position.scrollTo(x: 0) } }
+                DispatchQueue.main.async { withAnimation(.smooth) { position.scrollTo(x: CGFloat(columns.doneStop)) } }
             }
         }
     }
 
-    /// The place nearest the ribbon's offset: the tab bar's selection moves along with a swipe.
-    private func nearest(_ x: CGFloat, soon: CGFloat, width: CGFloat) -> RibbonPlace {
-        let stops: [(RibbonPlace, CGFloat)] = [(.inbox, 0), (.soon, soon), (.today, width)]
+    /// The place nearest the ribbon's offset: the tab bar's selection moves along with a swipe. The Done column counts as
+    /// Inbox, beside it.
+    private func nearest(_ x: CGFloat, _ columns: RibbonColumns) -> RibbonPlace {
+        var stops: [(RibbonPlace, CGFloat)] = RibbonPlace.allCases.map { ($0, stopOf($0, columns)) }
+        if columns.done { stops.append((.inbox, CGFloat(columns.doneStop))) }
         return stops.min { abs($0.1 - x) < abs($1.1 - x) }?.0 ?? .today
+    }
+
+    /// Where a place's left edge stands in the ribbon.
+    private func stopOf(_ place: RibbonPlace, _ columns: RibbonColumns) -> CGFloat {
+        switch place {
+        case .projects: 0
+        case .inbox: CGFloat(columns.lead)
+        case .soon: CGFloat(columns.lead + columns.half)
+        case .today: CGFloat(columns.lead + columns.width)
+        }
     }
 
     /// The day list's width for its saved share of the screen, within the bounds the core gives (`rules.listWidths`).
@@ -481,16 +462,85 @@ struct BulkMenu<Label: View>: View {
 
     var body: some View {
         let items = model.pickedItems
-        Menu {
-            if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model).nodes, palette: { model.ink($0, dark: scheme == .dark) }) }
-        } label: {
-            label
+        // The label is drawn by SwiftUI (its glass); the menu is the system's UIKit menu over it, as a card's, so a page
+        // left open (the Project page's checks, a label set) is drawn again in place after each pick instead of closing
+        // back to the first page.
+        Button {} label: { label }
+            .allowsHitTesting(false)
+            .overlay {
+                BulkMenuButton(nodes: menu.map { TaskMenu(items: items, menu: $0, model: model).nodes } ?? [], palette: { model.ink($0, dark: scheme == .dark) })
+                    .accessibilityHidden(true)
+            }
+            .tint(.primary)
+            .disabled(items.isEmpty)
+            .task(id: BulkRead(picked: model.picked, file: model.snapshot?.tasksText)) { menu = items.isEmpty ? nil : await model.bulkMenu() }
+    }
+}
+
+/// The bulk menu's button: a clear UIKit button over the label, opening the menu on a tap; the menu, while up, drawn
+/// again in place on the page that shows (`MenuOpener.refresh`'s way), a row that opens a sheet run once it has gone.
+private struct BulkMenuButton: UIViewRepresentable {
+    let nodes: [MenuNode]
+    let palette: (String) -> UIColor?
+
+    func makeUIView(context: Context) -> MenuButton {
+        let button = MenuButton()
+        button.showsMenuAsPrimaryAction = true
+        button.preferredMenuElementOrder = .fixed
+        return button
+    }
+
+    func updateUIView(_ button: MenuButton, context: Context) {
+        button.isEnabled = !nodes.isEmpty
+        button.show(MenuNode.uiMenu(nodes, later: { [weak button] work in button?.later.append(work) }, palette: palette))
+    }
+
+    final class MenuButton: UIButton {
+        var later: [@MainActor () -> Void] = []
+        private var showing = false
+        /// The menu as last drawn, up or not: what a redraw compares with.
+        private var drawn: MenuShape?
+        /// The menu read while one was up: the button takes it once that one has gone. Setting the button's menu while it
+        /// is up puts the system's menu back on its first page under the finger.
+        private var pending: UIMenu?
+
+        func show(_ next: UIMenu) {
+            let shape = MenuOpener.shape(next)
+            let shown = drawn
+            drawn = shape
+            guard showing, let interaction = contextMenuInteraction else {
+                menu = next
+                return
+            }
+            pending = next
+            guard MenuShape.needsUpdate(shown: shown, next: shape) else { return }
+            interaction.updateVisibleMenu { visible in
+                guard let path = MenuShape.path(toPage: visible.title, in: shape) else { return visible }
+                return MenuOpener.page(at: path, in: next) ?? visible
+            }
         }
-        // The core's order, the plugin's, wherever the menu opens: Delete stays last even over the bottom bar.
-        .menuOrder(.fixed)
-        .tint(.primary)
-        .disabled(items.isEmpty)
-        .task(id: BulkRead(picked: model.picked, file: model.snapshot?.tasksText)) { menu = items.isEmpty ? nil : await model.bulkMenu() }
+
+        override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willDisplayMenuFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
+            super.contextMenuInteraction(interaction, willDisplayMenuFor: configuration, animator: animator)
+            showing = true
+        }
+
+        override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
+            super.contextMenuInteraction(interaction, willEndFor: configuration, animator: animator)
+            showing = false
+            if let pending {
+                menu = pending
+                self.pending = nil
+            }
+            let work = later
+            later = []
+            guard !work.isEmpty else { return }
+            if let animator {
+                animator.addCompletion { work.forEach { $0() } }
+            } else {
+                work.forEach { $0() }
+            }
+        }
     }
 }
 
@@ -620,8 +670,12 @@ final class RibbonSwipe: NSObject {
         scroll.panGestureRecognizer.addTarget(self, action: #selector(panned(_:)))
     }
 
+    /// Where a tab's scroll takes the ribbon, while it runs: the tab bar keeps the tab chosen meanwhile.
+    var tabTarget: CGFloat?
+
     @objc private func panned(_ pan: UIPanGestureRecognizer) {
         guard pan.state == .began, let scroll else { return }
+        tabTarget = nil
         from = paging.start(at: Double(scroll.contentOffset.x), gliding: scroll.isDecelerating ? headedTo : nil)
     }
 

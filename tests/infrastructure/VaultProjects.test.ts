@@ -3,10 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import { TFile } from "obsidian";
 import type { NoteTags } from "../../core/application/projects";
 import { type NoteIndex, ObsidianNoteIndex, VaultProjects } from "../../obsidian/infrastructure/VaultProjects";
-import { GROUPING_KEY, LocalGroupingStore } from "../../obsidian/infrastructure/LocalGroupingStore";
+import { PROJECTS_SCREEN_KEY, LocalProjectsScreenStore } from "../../obsidian/infrastructure/LocalProjectsScreenStore";
 
 class FakeIndex implements NoteIndex {
 	list: NoteTags[] = [];
+	resolved = true;
+
+	ready(): boolean {
+		return this.resolved;
+	}
 	private readonly listeners = new Set<() => void>();
 	reads = 0;
 
@@ -50,6 +55,26 @@ function setup() {
 }
 
 describe("VaultProjects", () => {
+	it("is ready once the index has read every note, keeps no list read before, and tells its listeners then", () => {
+		const { index, projects } = setup();
+		index.resolved = false;
+		index.list = [note("А", ["#project"])];
+		const heard = vi.fn();
+		projects.onChange(heard);
+		expect(projects.ready()).toBe(false);
+		expect(projects.list().map((p) => p.name)).toEqual(["А"]);
+		index.list = [note("А", ["#project"]), note("Б", ["#project"])];
+		expect(projects.list().map((p) => p.name)).toEqual(["А", "Б"]);
+		index.resolved = true;
+		index.change();
+		expect(projects.ready()).toBe(true);
+		expect(heard).toHaveBeenCalledTimes(1);
+		const reads = index.reads;
+		projects.list();
+		projects.list();
+		expect(index.reads).toBe(reads);
+	});
+
 	it("lists the notes with exactly the project tag, by name", () => {
 		const { index, projects } = setup();
 		index.list = [note("Б", ["#project"]), note("А", ["#Project"]), note("В", ["#project/sub"]), note("Г", [])];
@@ -90,19 +115,19 @@ describe("VaultProjects", () => {
 	});
 });
 
-describe("LocalGroupingStore", () => {
-	it("keeps the grouping in the device's storage and reads it back", () => {
+describe("LocalProjectsScreenStore", () => {
+	it("keeps the Projects screen in the device's storage and reads it back", () => {
 		const saved = new Map<string, unknown>();
 		const storage = { loadLocalStorage: (key: string) => saved.get(key) ?? null, saveLocalStorage: (key: string, data: unknown) => void saved.set(key, data) };
-		const store = new LocalGroupingStore(storage);
+		const store = new LocalProjectsScreenStore(storage);
 		expect(store.get()).toEqual({});
-		store.set({ on: { soon: true }, folded: { backlog: ["окружение"] } });
-		expect(new LocalGroupingStore(storage).get()).toEqual({ on: { soon: true }, folded: { backlog: ["окружение"] } });
-		expect(typeof saved.get(GROUPING_KEY)).toBe("string");
+		store.set({ selected: "project:Дружба", mode: "byStage", folded: ["project:Спорт"], doneOpen: true });
+		expect(new LocalProjectsScreenStore(storage).get()).toEqual({ selected: "project:Дружба", mode: "byStage", folded: ["project:Спорт"], doneOpen: true });
+		expect(typeof saved.get(PROJECTS_SCREEN_KEY)).toBe("string");
 	});
 
 	it("starts afresh from a spoiled entry", () => {
-		const store = new LocalGroupingStore({ loadLocalStorage: () => "{", saveLocalStorage: () => undefined });
+		const store = new LocalProjectsScreenStore({ loadLocalStorage: () => "{", saveLocalStorage: () => undefined });
 		expect(store.get()).toEqual({});
 	});
 });
@@ -122,6 +147,36 @@ describe("ObsidianNoteIndex", () => {
 		};
 		return { app: app as never, files, caches, fire: (name: string, ...args: unknown[]) => handlers.get(name)?.(...args), links: () => links };
 	}
+
+	it("is ready once Obsidian has read the vault's notes: at once when it had, else at its first resolved", () => {
+		const loaded = fakeApp();
+		(loaded.app as { metadataCache: { initialized?: boolean } }).metadataCache.initialized = true;
+		expect(new ObsidianNoteIndex(loaded.app, () => "TODOs Tasks.md").ready()).toBe(true);
+		const starting = fakeApp();
+		starting.caches.delete("B.md");
+		const index = new ObsidianNoteIndex(starting.app, () => "TODOs Tasks.md");
+		const heard = vi.fn();
+		index.onChange(heard);
+		expect(index.ready()).toBe(false);
+		vi.useFakeTimers();
+		starting.fire("resolved");
+		vi.runAllTimers();
+		vi.useRealTimers();
+		expect(index.ready()).toBe(true);
+		expect(heard).toHaveBeenCalledTimes(1);
+	});
+
+	it("without Obsidian's internal flag, is ready at once when every note already has its metadata: a plugin loaded or updated into an indexed vault", () => {
+		const indexed = fakeApp();
+		expect((indexed.app as { metadataCache: { initialized?: boolean } }).metadataCache.initialized).toBeUndefined();
+		expect(new ObsidianNoteIndex(indexed.app, () => "TODOs Tasks.md").ready()).toBe(true);
+		const reading = fakeApp();
+		reading.caches.delete("B.md");
+		const index = new ObsidianNoteIndex(reading.app, () => "TODOs Tasks.md");
+		expect(index.ready()).toBe(false);
+		reading.caches.set("B.md", {});
+		expect(index.ready()).toBe(true);
+	});
 
 	it("works out a note's link only when asked for it", () => {
 		const { app, links } = fakeApp();

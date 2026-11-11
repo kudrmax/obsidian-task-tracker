@@ -1,4 +1,4 @@
-import type { GroupName, MenuStatusId, ResultPage, TaskItem, TaskKey, TaskMenuModel } from "../../../core/application/contracts";
+import type { GroupName, MenuStatusId, TaskItem, TaskMenuModel } from "../../../core/application/contracts";
 import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
@@ -11,8 +11,7 @@ import { datePage } from "./DatePage";
 import { projectChooser, projectNamePage, sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
 import { moveTiles } from "./quickMoves";
-import { resultChooser, resultNamePage } from "./ResultChooser";
-import { type Asking, askLooks, type EditRowId, labelTiles, priorityTiles, statusTiles, withResultRows } from "./TaskMenu";
+import { type Asking, askLooks, type EditRowId, labelTiles, priorityTiles, statusTiles } from "./TaskMenu";
 
 /** "3 tasks". */
 export function countLabel(count: number): string {
@@ -29,16 +28,12 @@ export interface BulkActions {
 	postpone(date: LocalDate): Promise<void>;
 	removeDue(): Promise<void>;
 	toSection(name: GroupName): Promise<void>;
-	/** The tasks' project: a note's link, null for No project. */
+	/** No project: every project taken off the picked tasks. */
 	setProject(project: string | null): Promise<void>;
-	/** «New project…» named `name` (`TaskService.newProject`): the note made or tagged, and every picked task gets it. */
+	/** A project of the Project page tapped: on for every picked task, or off for all when all had it (`TaskService.toggleProject`); the tasks as they then stand, null once one is gone. */
+	toggleProject(name: string): Promise<readonly TaskItem[] | null>;
+	/** «New project…» named `name` (`TaskService.newProject`): a project at the tree's top, and every picked task gets it. */
 	newProject(name: string): Promise<void>;
-	/** The Add to result page for the picked tasks, `query` typed in its search field (`TaskService.resultPage`). */
-	resultPage(query: string): Promise<ResultPage>;
-	/** Every picked task to the end of `result`'s steps, in file order (`TaskService.addToResult`). */
-	addToResult(result: TaskKey): Promise<void>;
-	/** «New result…» named `name` (`TaskService.newResult`): the picked tasks its steps. */
-	newResult(name: string): Promise<void>;
 	remove(): Promise<void>;
 }
 
@@ -138,9 +133,8 @@ export class BulkMenu {
 		const rows: Partial<Record<EditRowId, MenuRowSpec>> = {
 			section: { label: "Section", icon: "section", onPick: () => this.showSections() },
 			project: { label: "Project", value: model.project.value, icon: "project", disabled: model.project.disabled, onPick: () => this.showProjects() },
-			addToResult: { label: model.result.label, value: model.result.value, icon: "target", onPick: () => void this.showResults() },
 		};
-		menuGroup(panel, withResultRows(model).flatMap((id) => rows[id] ?? []));
+		menuGroup(panel, model.edits.flatMap((id) => rows[id] ?? []));
 		const remove = model.remove;
 		if (this.asking === "delete") this.askGroup(panel, "delete");
 		else if (remove) menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
@@ -197,7 +191,7 @@ export class BulkMenu {
 		);
 	}
 
-	/** The Project page: every picked task gets the project picked; subtasks keep their parents'. */
+	/** The Project page: a project tapped is toggled on every picked task and the page stays, drawn again; No project takes them all off and closes. Subtasks keep their parents'. */
 	private showProjects(): void {
 		const { actions } = this.context;
 		this.asking = null;
@@ -205,11 +199,19 @@ export class BulkMenu {
 			projectChooser(panel, {
 				project: this.context.menu(this.context.items).project,
 				onBack: () => this.showMenu(),
-				onPick: (link) => this.pick(() => actions.setProject(link))(),
+				onPick: (name) => (name === null ? this.pick(() => actions.setProject(null))() : void this.toggleProject(name)),
 				onNew: () => this.showProjectName(),
 			}),
 			"projects",
 		);
+	}
+
+	private async toggleProject(name: string): Promise<void> {
+		const next = await this.context.actions.toggleProject(name);
+		if (this.overlay.isClosed) return;
+		if (!next) return this.close();
+		this.context = { ...this.context, items: next };
+		this.showProjects();
 	}
 
 	/** «New project…»: the name asked in place of the Project page; Enter makes the project and closes, Escape goes back to the page. */
@@ -232,52 +234,6 @@ export class BulkMenu {
 					},
 				}),
 			"projectName",
-		);
-	}
-
-	/** The Add to result page: every picked task goes to the result picked; «New result…» asks for a name. */
-	private async showResults(): Promise<void> {
-		const { actions } = this.context;
-		const title = this.context.menu(this.context.items).result.label;
-		const page = await actions.resultPage("");
-		if (this.overlay.isClosed) return;
-		this.asking = null;
-		this.panel.replace(
-			(panel) =>
-				resultChooser(panel, {
-					title,
-					page,
-					onBack: () => this.showMenu(),
-					find: (query) => actions.resultPage(query),
-					onPick: (result) => this.pick(() => actions.addToResult(result))(),
-					onNew: () => this.showResultName(page.namePlaceholder),
-					onChange: () => this.panel.changed(),
-				}),
-			"results",
-		);
-	}
-
-	/** «New result…»: the name asked in place of the Add to result page; Enter makes the result and closes, Escape goes back. */
-	private showResultName(placeholder: string): void {
-		const { actions } = this.context;
-		let asking = true;
-		const back = () => {
-			if (!asking) return;
-			asking = false;
-			void this.showResults();
-		};
-		this.panel.replace(
-			(panel) =>
-				resultNamePage(panel, {
-					placeholder,
-					onBack: back,
-					onDone: (name) => {
-						if (name === null) return back();
-						asking = false;
-						this.pick(() => actions.newResult(name))();
-					},
-				}),
-			"resultName",
 		);
 	}
 

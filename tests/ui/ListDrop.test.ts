@@ -74,7 +74,7 @@ function read(drop: ListDrop, sections: () => ColumnSections | null): ListDrop {
 	drop.drop = (x, y, drag) => {
 		const place = answer(x, y, drag);
 		expect(place === null || place.kind === "place").toBe(true);
-		return place && readDrop(place, () => sections());
+		return place && readDrop(place as DropTo, () => sections());
 	};
 	return drop;
 }
@@ -144,7 +144,7 @@ describe("ListDrop", () => {
 	});
 
 	describe("the column's title: a task carried onto it goes where the screen says, the title lit", () => {
-		const backlogTitle: DropTo = { kind: "title", list: "backlog", date: null, byProject: true };
+		const backlogTitle: DropTo = { kind: "title", list: "backlog", date: null };
 		function titled(drops: DropTo | null = backlogTitle, accepts = () => true) {
 			const { list } = setup([item("backlog", 0, "L", null)], "backlog", "backlog");
 			const area = list.el.parentElement!;

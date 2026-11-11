@@ -3,12 +3,14 @@ import SwiftUI
 import UIKit
 import os
 
-/// The three places of the ribbon the tab bar switches: two half-screen columns each.
+/// The places of the ribbon the tab bar switches: the Projects page, the whole screen, then three of two half-screen
+/// columns each. Projects' raw value keeps the places saved before it came.
 enum RibbonPlace: Int, Hashable, CaseIterable {
-    case inbox, soon, today
+    case projects = -1, inbox = 0, soon, today
 
     var title: LocalizedStringKey {
         switch self {
+        case .projects: "Projects"
         case .inbox: "Inbox"
         case .soon: "Soon"
         case .today: "Today"
@@ -18,15 +20,17 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
     /// The words the tab bar shows.
     var name: String {
         switch self {
+        case .projects: String(localized: "Projects")
         case .inbox: String(localized: "Inbox")
         case .soon: String(localized: "Soon")
         case .today: String(localized: "Today")
         }
     }
 
-    /// The core's name of the place (`SCREEN_PLACES`): Today is the calendar's.
+    /// The core's name of the place (`SCREEN_PLACES`): Today is the calendar's; Projects shows no list of the funnel.
     var key: String {
         switch self {
+        case .projects: "projects"
         case .inbox: "inbox"
         case .soon: "soon"
         case .today: "calendar"
@@ -38,22 +42,20 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
         self = place
     }
 
-    /// Where the ribbon stood when the app last showed it, on this device: Today the first time. A project's view keeps its
-    /// own, by its note, and opens on Inbox the first time, as the plugin's block.
-    static func remembered(for project: ProjectRef?) -> RibbonPlace {
-        UserDefaults.standard.object(forKey: key(project)).flatMap { $0 as? Int }.flatMap(RibbonPlace.init(rawValue:)) ?? (project == nil ? .today : .inbox)
+    /// Where the ribbon stood when the app last showed it, on this device: Today the first time.
+    static func remembered() -> RibbonPlace {
+        UserDefaults.standard.object(forKey: key).flatMap { $0 as? Int }.flatMap(RibbonPlace.init(rawValue:)) ?? .today
     }
 
-    func remember(for project: ProjectRef?) {
-        UserDefaults.standard.set(rawValue, forKey: Self.key(project))
+    func remember() {
+        UserDefaults.standard.set(rawValue, forKey: Self.key)
     }
 
-    private static func key(_ project: ProjectRef?) -> String {
-        project.map { "ribbonPlace/" + ($0.note ?? $0.link) } ?? "ribbonPlace"
-    }
+    private static let key = "ribbonPlace"
 
     var symbol: String {
         switch self {
+        case .projects: "folder"
         case .inbox: "tray"
         case .soon: "hourglass"
         case .today: "sun.max"
@@ -80,19 +82,15 @@ final class BoardModel {
 
     /// Typing tasks in place: the core's quick entry, driven for this screen.
     @ObservationIgnored let entry = QuickEntryHost()
+    /// The Projects page: the tree and the chosen node's tasks.
+    @ObservationIgnored let projects = ProjectsBoard()
     /// The timeline's zoom, kept across days.
     @ObservationIgnored let zoom = TimelineZoom()
 
-    /// The project whose own view this screen is, as the plugin's block at the end of a project's note: every list holds
-    /// only its tasks and every task written here gets it. `nil` for the main screen.
-    nonisolated let project: ProjectRef?
-    /// What `tasks.screen` takes for the project's view.
-    nonisolated var projectLink: String? { project?.link }
-
-    init(project: ProjectRef? = nil) {
-        self.project = project
-        place = RibbonPlace.remembered(for: project)
+    init() {
+        place = RibbonPlace.remembered()
         entry.model = self
+        projects.model = self
     }
 
     /// A screen the quick entry read after its write, drawn in the transaction the entry draws its own state in.
@@ -137,7 +135,7 @@ final class BoardModel {
     /// Where the ribbon stands, remembered on the device as the plugin's wheel is. A swipe sets it as the ribbon settles;
     /// `go(to:)` moves the ribbon there.
     var place: RibbonPlace {
-        didSet { if place != oldValue { place.remember(for: project) } }
+        didSet { if place != oldValue { place.remember() } }
     }
     /// The place a tap on a tab asked the ribbon to scroll to, each ask new.
     private(set) var asked: PlaceAsk?
@@ -190,8 +188,6 @@ final class BoardModel {
     var newSection: TaskItem?
     /// «New project…» picked on a Project page: the alert asks the name for these tasks or for the quick entry's field.
     var newProjectFor: NewProjectAsk?
-    /// The tasks whose Add to result page is open.
-    var resultFor: ResultAsk?
     var fullScreen: [TaskItem] = []
     /// The full screen opened by Description (Add description): its page opens with the caret in the description.
     var describing: String?
@@ -270,11 +266,10 @@ final class BoardModel {
             readAgain = false
             let day = shownDay
             let board = board
-            let link = projectLink
             readsStarted += 1
             let serial = readsStarted
             do {
-                let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline, project: link) }.value
+                let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
                 // Another day was asked for meanwhile (a turn that went on): this read is not drawn, the day asked is read.
                 guard shownDay == day else { readAgain = true; continue }
                 show(read, serial: serial)
@@ -369,25 +364,9 @@ final class BoardModel {
         readAgain = true
     }
 
-    /// The vault's project notes changed: the screen reads again, once a carry or the quick entry's writes let it.
-    func projectsChanged() async {
-        guard carried == nil, !entry.writing else {
-            readAfterCarry = true
-            projectsAsked = true
-            return
-        }
-        await reload()
-    }
-
-    /// The project notes changed while a carry or the quick entry held the read: it reads again whatever the file did.
-    @ObservationIgnored private var projectsAsked = false
-
     /// The tasks file and the plugin's settings watched while the screen shows: a write elsewhere (Obsidian, iCloud, a
     /// reminder's button) reads again, and a setting changed in Obsidian redraws the screen at once, as the plugin's.
     func watchFile() {
-        AppServices.shared.projects.changed = { [weak self] in
-            Task { @MainActor in await self?.projectsChanged() }
-        }
         let changed: @Sendable () -> Void = { [weak self] in
             Task { @MainActor in await self?.reloadIfChanged() }
         }
@@ -413,14 +392,13 @@ final class BoardModel {
         guard let shown = snapshot else { return }
         let board = board
         let day = shown.day
-        let link = projectLink
         Task {
             guard let previous: String = try? await read("days.step", [.string(day), -1]),
                   let next: String = try? await read("days.step", [.string(day), 1]) else { return }
             neighbours = (previous, next)
             for other in [previous, next] {
                 if let kept = ahead[other], kept.readAlike(shown) { continue }
-                if let read = try? await Task.detached(operation: { try board.snapshot(day: other, measures: CardMetrics.timeline, project: link) }).value {
+                if let read = try? await Task.detached(operation: { try board.snapshot(day: other, measures: CardMetrics.timeline) }).value {
                     ahead[other] = read
                 }
             }
@@ -464,7 +442,7 @@ final class BoardModel {
             return true
         }
         let kept = ahead[at.date].flatMap { $0.readAlike(snapshot) ? $0 : nil }
-        guard let peek = kept ?? (try? board.snapshot(day: at.date, measures: CardMetrics.timeline, project: projectLink)) else { return true }
+        guard let peek = kept ?? (try? board.snapshot(day: at.date, measures: CardMetrics.timeline)) else { return true }
         dayTurn = DayTurn(peek: peek, shift: shift)
         dayShare = 0
         return true
@@ -564,8 +542,7 @@ final class BoardModel {
         var peek = ahead[day].flatMap { shown in snapshot.map(shown.readAlike) == true ? shown : nil }
         if peek == nil {
             let board = board
-            let link = projectLink
-            peek = try? await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline, project: link) }.value
+            peek = try? await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
         }
         guard let peek, shownDay == day else { return await reload() }
         dayTurn = DayTurn(peek: peek, shift: motion)
@@ -729,7 +706,7 @@ final class BoardModel {
 
     var menuScreen: JSONValue {
         guard let snapshot else { return .null }
-        return ["today": .string(snapshot.today), "day": .string(snapshot.day), "offer": snapshot.screen.offer]
+        return snapshot.screen.menuScreen(today: snapshot.today, day: snapshot.day)
     }
 
     /// A task's menu: it reads no file, only the settings.
@@ -802,82 +779,29 @@ final class BoardModel {
         await write("tasks.setRepeat", [item.key.json, rule])
     }
 
-    /// A section's header menu: inside a project's group (`menu.project`) only that project's tasks move.
+    /// A section's header menu: Rename.
     func renameSection(_ column: BoardColumn, _ menu: GroupMenu, to name: String) async {
         guard let list = sectionList(column) else { return }
-        await write("tasks.renameGroup", [.string(list), .string(menu.section), .string(name)] + (menu.project.map { [$0] } ?? []))
+        await write("tasks.renameGroup", [.string(list), .string(menu.section), .string(name)])
     }
 
     func removeSection(_ column: BoardColumn, _ menu: GroupMenu) async {
         guard let list = sectionList(column) else { return }
-        await write("tasks.removeGroup", [.string(list), .string(menu.section)] + (menu.project.map { [$0] } ?? []))
+        await write("tasks.removeGroup", [.string(list), .string(menu.section)])
     }
 
     // MARK: Projects
 
-    /// The title's menu: the list groups its tasks by project, or stops.
-    func setGrouping(_ column: BoardColumn, _ on: Bool) async {
-        await group("tasks.setGrouping", [.string(column.rawValue), .bool(on)], column)
-    }
-
-    /// A project group's header tapped: it folds, or opens again.
-    func toggleFold(_ column: BoardColumn, _ key: String) async {
-        UISelectionFeedbackGenerator().selectionChanged()
-        await group("tasks.toggleFold", [.string(column.rawValue), .string(key)], column)
-    }
-
-    private func group(_ method: String, _ arguments: [JSONValue], _ column: BoardColumn) async {
-        let board = board
-        do {
-            try await Task.detached { try board.group(method, arguments) }.value
-        } catch {
-            problem = Self.words(error)
-            return await reload()
-        }
-        // A fold or a grouping changes only the screen's own state: drawn again over the files already read, at once.
-        guard let shown = snapshot else { return await reload() }
-        let link = projectLink
-        readsStarted += 1
-        let serial = readsStarted
-        if let drawn = try? await Task.detached(operation: { try board.redraw(shown, changing: column, measures: CardMetrics.timeline, project: link) }).value {
-            show(drawn, serial: serial)
-        } else {
-            await reload()
-        }
-    }
-
-    /// The Project page's pick: the tasks get the project (its link), or none.
-    func setProject(_ items: [TaskItem], _ link: String?) async {
-        await write("tasks.setProject", [keys(items), link.json])
+    /// The Project page's No project: the tasks' projects all go.
+    func setProject(_ items: [TaskItem], _ name: String?) async {
+        await write("tasks.setProject", [keys(items), name.json])
         endSelection()
     }
 
-    // MARK: Results
-
-    /// «Make result» or «Make task» (`MenuResult.toggle`).
-    func setResult(_ item: TaskItem, _ result: Bool) async {
-        await write("tasks.setResult", [item.key.json, .bool(result)])
-    }
-
-    /// The Add to result page for the tasks, the results whose title holds `query` (the core searches).
-    func resultPage(_ items: [TaskItem], query: String) async -> ResultPage? {
-        try? await read("tasks.resultPage", [keys(items), .string(query)])
-    }
-
-    /// A result picked on the page: the tasks become its last steps. The ticked one writes nothing, as the core says.
-    func addToResult(_ items: [TaskItem], _ option: ResultOption) async {
-        await write("tasks.addToResult", [keys(items), option.result.key.json])
-        endSelection()
-    }
-
-    /// A name New result… would write nothing for (the core's `tasks.isBlank`).
-    func isBlank(_ name: String) -> Bool { board.isBlank(name) }
-
-    /// «New result…» named `name`: the core writes it at the first task's place, the tasks its steps; a blank name writes
-    /// nothing.
-    func newResult(_ items: [TaskItem], _ name: String) async {
-        await write("tasks.newResult", [keys(items), .string(name)])
-        endSelection()
+    /// A project picked on the Project page: on for every task, or off for all when all had it. The page stays open for
+    /// the next pick, so the picked tasks stay picked, as with a label.
+    func toggleProject(_ items: [TaskItem], _ name: String) async {
+        await write("tasks.toggleProject", [keys(items), .string(name)])
     }
 
     /// «New project…» on a Project page: the name is asked; the quick entry's field keeps its keyboard's place meanwhile.
@@ -886,27 +810,24 @@ final class BoardModel {
         newProjectFor = NewProjectAsk(target: target)
     }
 
-    /// The name asked for «New project…»: its note written (`TaskBoard.newProject`), then the project given to the tasks or
-    /// the field; a name of nothing, or Cancel (`name` nil), changes nothing.
+    /// The name asked for «New project…»: a project at the tree's top (`tasks.newProject`), checked on the tasks, or the
+    /// quick entry's field given it; a taken name is that project; a blank one, or Cancel (`name` nil), changes nothing.
     func newProject(_ name: String?, for target: NewProjectAsk.Target) async {
         defer { if case .entry = target { entry.resume() } }
         guard let name else { return }
         let board = board
-        let link: String?
+        var keys: [TaskKey] = []
+        if case .tasks(let items) = target { keys = items.map(\.key) }
+        let made: ProjectRef?
         do {
-            link = try await Task.detached { try board.newProject(name) }.value
+            made = try await Task.detached { [keys] in try board.newProject(name, for: keys) }.value
         } catch {
             problem = Self.words(error)
             return
         }
-        guard let link else { return }
-        switch target {
-        case .tasks(let items): await setProject(items, link)
-        case .entry:
-            // The lists are drawn with the new project's group first: a list grouped by project takes the field to its end.
-            await reload()
-            entry.setProject(link)
-        }
+        await reload()
+        endSelection()
+        if case .entry = target, let made { entry.setProject(made.name) }
     }
 
     /// Apple's Calendar at an event, as the plugin opens it on the iPhone (`calshow:`, seconds from 2001): at its start.
@@ -916,7 +837,7 @@ final class BoardModel {
     }
 
     /// A note of the vault in Obsidian, by its path, through Advanced URI as every Open in Obsidian of the app: a title's
-    /// note link, and the project view's Open in Obsidian.
+    /// note link.
     func openNote(_ path: String) {
         guard let vault = UserDefaults.standard.string(forKey: "vaultFolderName") else { return }
         var link = URLComponents(string: "obsidian://advanced-uri")!
@@ -930,19 +851,17 @@ final class BoardModel {
         return (try? await Task.detached { try board.cards(rows) }.value) ?? []
     }
 
-    /// What a tap on a card's folder mark does: opens the project's view, the note's block, when it has a note.
+    /// What a tap on a card's folder mark does: the Projects page opens on the task's project, the branches above it open.
     func projectOpener(_ item: TaskItem) -> (() -> Void)? {
-        guard let project = item.project, project.canOpenNote else { return nil }
+        guard let project = item.project, project.mark else { return nil }
         return { [weak self] in self?.openProject(project) }
     }
 
-    /// The project's own view over the screen, as the plugin's block at the end of its note: a group's arrow and a card's
-    /// folder mark open it; its bar opens the note itself in Obsidian.
-    var projectShown: ShownProject?
-
-    struct ShownProject: Identifiable {
-        let project: ProjectRef
-        var id: String { project.link }
+    /// The Projects page on `project`: chosen, with the branches above it opened (`tasks.selectProjectNode`).
+    func openProject(_ project: ProjectRef) {
+        fullScreen = []
+        go(to: .projects)
+        Task { await projects.select(project.name) }
     }
 
     /// A card on the calendar lifted with its subtasks while a subtask is typed under it (Add Subtask there).
@@ -953,22 +872,6 @@ final class BoardModel {
         /// Where the card stands, on the screen.
         let frame: CGRect
     }
-
-    /// The project's own view. Inside a project's view, its own project stays (nothing to open) and another one takes the
-    /// view's place, through the screen under it (`openOther`).
-    func openProject(_ project: ProjectRef) {
-        guard let own = self.project else { return projectShown = ShownProject(project: project) }
-        if !isOwnProject(project, own) { openOther?(project) }
-    }
-
-    /// The project is this view's own: the same note, as the core names it in both (its link).
-    func isOwnProject(_ project: ProjectRef, _ own: ProjectRef? = nil) -> Bool {
-        guard let own = own ?? snapshot?.screen.project ?? self.project else { return false }
-        return project.link == own.link
-    }
-
-    /// A project's view asks the screen under it to show another project in its place.
-    @ObservationIgnored var openOther: ((ProjectRef) -> Void)?
 
     /// A link in a title tapped: an address opens as it is, a note in Obsidian, the file the core resolves it to.
     func openLink(_ part: TextPart) {
@@ -985,7 +888,7 @@ final class BoardModel {
     }
 
     /// The vault's files listed again, back in front: a note made, renamed or moved elsewhere is offered by `[[` and
-    /// opened by a link. The project notes look again on their own (`VaultProjects`), redrawing the screen when they change.
+    /// opened by a link.
     func refreshNotes() async {
         let board = board
         await Task.detached { board.refreshNotes() }.value
@@ -1173,6 +1076,14 @@ final class BoardModel {
         return token
     }
 
+    /// A project lifted in the tree by its row: carried among the tree's gaps, to reorder or nest it.
+    @discardableResult
+    func startTreeCarry(_ row: ProjectsRow) -> Int {
+        let token = begin()
+        withAnimation(CarryMotion.carry) { carry = Carry(token: token, id: row.node, item: nil, from: "tree") }
+        return token
+    }
+
     /// A section's header lifted: its tasks fold away and the list closes over them, as the plugin's.
     @discardableResult
     func startSectionCarry(_ column: BoardColumn, _ group: BoardGroup) -> Int? {
@@ -1213,12 +1124,7 @@ final class BoardModel {
     func readIfAsked() {
         guard readAfterCarry, carried == nil, !entry.writing else { return }
         readAfterCarry = false
-        if projectsAsked {
-            projectsAsked = false
-            Task { await reload() }
-        } else {
-            Task { await reloadIfChanged() }
-        }
+        Task { await reloadIfChanged() }
     }
 
     /// A press may lift `card` now, in a list or on the calendar alike: nothing else is carried, no text is being typed,
@@ -1434,8 +1340,7 @@ final class BoardModel {
         }
         let stays = anywhere && (meant == nil || meant == .null)
         let to: JSONValue? = stays ? nil : ["kind": "place", "column": .string(column.rawValue), "place": meant ?? .null]
-        let zone = place.field("project")
-        let plate = list.groups.first { $0.empty && $0.holds(group: place["group"].string, zone: zone) }?.id
+        let plate = list.groups.first { $0.empty && $0.holds(group: place["group"].string) }?.id
         let next = DropHover.list(column, place: place, plate: plate)
         if next != hover {
             if case .list(_, let shown, _) = hover, shown["index"] != place["index"] || shown["level"] != place["level"] || shown["group"] != place["group"] {
@@ -1507,7 +1412,7 @@ final class BoardModel {
         do {
             // Worked out while the carry was held there; else (let go the moment it came over the place) asked now.
             preview = try previews.take(PreviewKey(carry: carry, to: to, over: snapshot)).flatMap { try $0.get() }
-                ?? board.dropPreview(carry.dropped, to: to, over: snapshot, measures: CardMetrics.timeline, project: projectLink)
+                ?? board.dropPreview(carry.dropped, to: to, over: snapshot, measures: CardMetrics.timeline)
         } catch {
             problem = Self.words(error)
             return .refused
@@ -1546,9 +1451,9 @@ final class BoardModel {
     private func prefetch(_ to: JSONValue) {
         guard let carry, carry.item != nil, carry.section == nil, let snapshot else { return }
         let key = PreviewKey(carry: carry, to: to, over: snapshot)
-        let board = board, measures = CardMetrics.timeline, project = projectLink, tasks = carry.dropped
+        let board = board, measures = CardMetrics.timeline, tasks = carry.dropped
         previews.want(key) {
-            Result { try board.dropPreview(tasks, to: to, over: snapshot, measures: measures, project: project) }
+            Result { try board.dropPreview(tasks, to: to, over: snapshot, measures: measures) }
         }
     }
 
@@ -1638,7 +1543,7 @@ final class BoardModel {
     private(set) var sectionMove: SectionMove?
 
     /// Where the copy of a drop written in `column` goes, as the plugin's: the card the task is drawn as on the screen now,
-    /// in that list first, then any other list (its row, or the header of a folded part it went into), then the calendar;
+    /// in that list first, then any other list, then the calendar;
     /// where none shows (a past day's list sends the task to Soon, off the screen), the copy fades where it was let go,
     /// never back to where it was lifted from.
     func landingOnScreen(_ landed: DropLanding?, from column: BoardColumn) -> CarryLanding {
@@ -1654,12 +1559,6 @@ final class BoardModel {
             places.append((CarryLanding(rect: block, onCalendar: true), block, shown))
         }
         return LandingPick.first(places) ?? .away
-    }
-
-    /// The project part a card landed in folded, in `column`: the card is not drawn, its copy goes into the part's header.
-    func foldedHeader(_ landed: DropLanding, in column: BoardColumn) -> BoardProject? {
-        guard let part = landed.part, part.folded == true else { return nil }
-        return drawing?.lists[column]?.projects.first { $0.key == part.key }
     }
 
     /// The plus let go on a list's place: the field opens there.
@@ -1814,12 +1713,10 @@ final class BoardModel {
         guard carry?.group.isEmpty != false else { return nil }
         guard let cards = snapshot?.lists[column]?.cards, let index = cards.firstIndex(where: { $0.names(id) }) else { return nil }
         let card = cards[index]
-        var gap: [String: JSONValue] = ["kind": "gap", "index": .number(Double(index)), "level": .number(Double(card.level)), "group": card.item.group.json]
-        if let zone = card.zone { gap["project"] = zone }
-        return .object(gap)
+        return ["kind": "gap", "index": .number(Double(index)), "level": .number(Double(card.level)), "group": card.item.group.json]
     }
 
-    /// The cards as places in a list see them (`ListCard`): each in its section, and its project's part in a grouped list.
+    /// The cards as places in a list see them (`ListCard`): each in its section.
     static func listCards(_ cards: [BoardCard]) -> JSONValue {
         .array(cards.map(\.listCard))
     }
@@ -1866,7 +1763,7 @@ final class BoardModel {
     /// above it as for any task (point 8).
     func cardMenu(_ card: BoardCard, from: String = "list", over: Bool = false, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         let item = over ? card.item : card.face.step ?? card.item
-        guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] else { return nil }
+        guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] ?? projects.menus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
         let nodes = lead(item, stack: card.item, from: from) + TaskMenu(items: [item], menu: menu, model: self, selectsText: true).nodes
         return MenuNode.uiMenu(nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
@@ -2081,14 +1978,6 @@ final class BoardModel {
 
 extension Array {
     subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
-}
-
-/// The Add to result page asked for these tasks.
-struct ResultAsk: Identifiable {
-    let id = UUID()
-    let items: [TaskItem]
-    /// The menu row's words, the page's title: «Add to result».
-    let title: String
 }
 
 /// «New project…» asked: for which tasks, or for the quick entry's field.

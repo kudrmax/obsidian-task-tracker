@@ -8,11 +8,11 @@ import { DEFAULT_SETTINGS } from "../../core/settings";
 import { SETTINGS_FILE, type StoredSettings } from "../../obsidian/settingsFile";
 import { TaskCalendarSettingsTab } from "../../obsidian/ui/SettingsTab";
 
-type FileSettings = Omit<StoredSettings, "listShare" | "rightMode" | "zoom">;
+type FileSettings = Omit<StoredSettings, "listShare" | "rightMode" | "zoom" | "treeWidth">;
 
 /** What data.json holds of the settings: all but the device's part. */
 function fileOf(settings: StoredSettings): FileSettings {
-	const { listShare: _s, rightMode: _m, zoom: _z, ...file } = settings;
+	const { listShare: _s, rightMode: _m, zoom: _z, treeWidth: _t, ...file } = settings;
 	return file;
 }
 
@@ -176,13 +176,6 @@ describe("the settings tab: the tasks file", () => {
 			page("Tasks file");
 			await writes(() => type(input(label), "X"), { sections: { ...START.sections, [key]: "X" } });
 		}
-	});
-
-	it("writes the project tag with its #, on the Tasks file page", async () => {
-		await open();
-		page("Tasks file");
-		expect(input("Project tag").value).toBe("#project");
-		await writes(() => type(input("Project tag"), "goal"), { projectTag: "#goal" });
 	});
 
 	it("writes each marker as typed", async () => {
@@ -508,44 +501,5 @@ describe("the settings tab: the order", () => {
 		await open({ ...START, google: { ...START.google, clientId: "" } });
 		page("Calendars");
 		expect(description()).toContain("client id and secret below");
-	});
-});
-
-describe("the settings tab: the result mark", () => {
-	it("writes the mark once typed (Enter or leaving), never per key, and shows the saved one again when the core refuses", async () => {
-		await open();
-		const field = input("Result mark");
-		expect(field.value).toBe("🎯");
-		expect(field.placeholder).toBe("🎯");
-		type(field, "⭐");
-		await settled();
-		expect(settings.get().resultMark).toBe("🎯");
-		type(field, "⭐", "change");
-		await settled();
-		expect(settings.get().resultMark).toBe("⭐");
-		type(field, "two words", "change");
-		await settled();
-		expect(settings.get().resultMark).toBe("⭐");
-		expect(field.value).toBe("⭐");
-	});
-
-	/** Obsidian's text field tells a change of its value made by code as one typed: a refused mark once spun the test Obsidian, the correction answered as a new change without end. */
-	it("ends when the field tells its own correction as a change", async () => {
-		await open();
-		const field = input("Result mark");
-		const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!;
-		let changes = 0;
-		Object.defineProperty(field, "value", {
-			get: () => set.get!.call(field),
-			set: (v: string) => {
-				set.set!.call(field, v);
-				if (++changes < 50) queueMicrotask(() => field.dispatchEvent(new Event("change")));
-			},
-		});
-		type(field, "two words", "change");
-		await settled();
-		expect(changes).toBeLessThan(5);
-		expect(field.value).toBe("🎯");
-		expect(settings.get().resultMark).toBe("🎯");
 	});
 });

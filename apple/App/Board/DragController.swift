@@ -25,7 +25,7 @@ struct Lift {
 /// Where a let-go lands, in the window: the copy flies there and gives way to the card drawn there.
 struct CarryLanding {
     var rect: CGRect
-    /// Into a folded project part: the copy shrinks into the middle of its header and is gone.
+    /// Into a row of the Projects page's tree: the copy shrinks into the middle of it and is gone.
     var folds = false
     /// The plus taken by a place: the copy becomes the field that opens there.
     var opens = false
@@ -67,6 +67,8 @@ final class DragController {
         let home: () -> CGRect?
         var point: CGPoint
         var cancelling = false
+        /// Where the copy rides against the finger.
+        var ride = CopyRide.held
     }
 
     private var live: Live?
@@ -116,7 +118,6 @@ final class DragController {
     private func carry(to point: CGPoint) {
         guard var live, flow.move(live.carry) else { return }
         live.point = point
-        live.copy.center = CGPoint(x: point.x - live.grip.x, y: point.y - live.grip.y)
         let cancelling = cancelTarget?.area?.contains(point) == true
         if cancelling != live.cancelling { cancelTarget?.hold(cancelling) }
         live.cancelling = cancelling
@@ -126,10 +127,33 @@ final class DragController {
             hideLine()
             edges.stop()
             springs.leave()
+            follow(point)
             return
         }
         hold(point, carrying: live.payload)
         springs.hover(at: point)
+        follow(point)
+    }
+
+    /// The copy where the finger holds it; over the Projects page's tree a card rides above the finger, so the row lit
+    /// under it stays in sight, and a lifted project below it, so the line and the row above the line do. Going in and
+    /// out of such a place it glides there.
+    private func follow(_ point: CGPoint) {
+        guard var live else { return }
+        let ride = live.cancelling ? .held : route.ride(live.payload)
+        let center: CGPoint
+        switch ride {
+        case .above: center = CGPoint(x: point.x - live.grip.x, y: point.y - live.copy.bounds.height / 2 - CarryMotion.aboveFinger)
+        case .below: center = CGPoint(x: point.x - live.grip.x, y: point.y + live.copy.bounds.height / 2 + CarryMotion.aboveFinger)
+        case .held: center = CGPoint(x: point.x - live.grip.x, y: point.y - live.grip.y)
+        }
+        if ride != live.ride {
+            live.ride = ride
+            self.live = live
+            UIView.animate(springDuration: CarryMotion.rise, bounce: 0, options: [.allowUserInteraction, .beginFromCurrentState]) { live.copy.center = center }
+        } else {
+            live.copy.center = center
+        }
     }
 
     /// The place under the finger again, the finger still: the rows under it changed (a scroll, another day).
@@ -219,7 +243,7 @@ final class DragController {
             return FloatImage.view(TaskCapsule(card: card, height: rect.height).frame(width: rect.width, height: rect.height), like: live.copy, in: window)
         case .section(let group):
             return FloatImage.view(SectionTitle(title: group.header ?? "", muted: group.name == nil).frame(width: rect.width, height: rect.height), like: live.copy, in: window)
-        case nil:
+        case .project, nil:
             return nil
         }
     }

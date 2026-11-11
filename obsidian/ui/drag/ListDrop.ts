@@ -130,7 +130,7 @@ export class ListDrop implements DropTarget {
 		this.place = place;
 		if (fresh && (!before || !sameGap(before, place) || before.level !== place.level)) this.onNewPlace();
 		const home = this.isHome(place, frame);
-		const plate = home ? null : this.list.plateOf(place.group, place.project);
+		const plate = home ? null : this.list.plateOf(place.group);
 		this.light(plate);
 		if (plate) this.line.hide();
 		else if (!home) {
@@ -262,7 +262,7 @@ export class ListDrop implements DropTarget {
 				continue;
 			}
 			const header = this.list.headerAt(node);
-			if (header !== undefined) heads.push({ group: header, opens: node.classList.contains("is-project"), firstCard: cards.length, top: node.offsetTop - removed, height: node.offsetHeight });
+			if (header !== undefined) heads.push({ group: header, opens: false, firstCard: cards.length, top: node.offsetTop - removed, height: node.offsetHeight });
 		}
 		return { nodes, size, width, indent: tokenPx(this.list.el, INDENT), cards, heads, waiting };
 	}
@@ -296,7 +296,7 @@ export class ListDrop implements DropTarget {
 		const head = [...heads].reverse().find((h) => sameHeader(h.group, header));
 		const inGroup = (measured: { entry: ListEntry }) => {
 			const card = this.list.listCard(measured.entry);
-			return sameHeader(card.project === undefined ? card.group : { group: card.group, project: card.project }, header);
+			return sameHeader(card.group, header);
 		};
 		const top =
 			at && inGroup(at) ? at.rect.top
@@ -312,8 +312,8 @@ export class ListDrop implements DropTarget {
 		const at = all.findIndex((entry) => entry.card.classList.contains(LIFTED));
 		if (at < 0) return null;
 		const before = all.slice(0, at).filter((entry) => !entry.card.classList.contains(LIFTED)).length;
-		const { group, project } = this.list.listCard(all[at]);
-		return { kind: "gap", index: before, level: all[at].level, group, ...(project !== undefined && { project }) };
+		const { group } = this.list.listCard(all[at]);
+		return { kind: "gap", index: before, level: all[at].level, group };
 	}
 
 	/** A card carried along: the gap is picked by its middle, so it goes into the gap its middle is nearest to. */

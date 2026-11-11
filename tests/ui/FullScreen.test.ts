@@ -81,7 +81,7 @@ function setup(item = morning()) {
 		onUndo: vi.fn(),
 		menu: vi.fn(),
 		onClose: vi.fn(),
-		openNote: vi.fn(),
+		openProject: vi.fn(),
 		onError: vi.fn(),
 	};
 	const screen = FullScreen.open(deps, item, false);
@@ -107,18 +107,18 @@ describe("FullScreen", () => {
 		expect(surface.edit.mock.calls[0][1]).toBe("- Выйти в 8:40");
 	});
 
-	it("shows the task's project in a line under the title, which opens its note; none without a project", () => {
+	it("shows the task's project in a line under the title, which opens the Projects screen on it; none without a project", () => {
 		const plain = setup();
 		expect((plain.screen.el.querySelector(".tc-full-project") as HTMLElement).hidden).toBe(true);
 		plain.screen.close();
-		const project = { name: "Дружба", link: "[[Дружба]]", note: "Дружба.md", canOpenNote: true, mark: true };
+		const project = { name: "Дружба", path: ["Дружба"], note: "Дружба.md", canOpenNote: true, mark: true };
 		const { screen, deps } = setup({ ...morning(), project });
 		const line = screen.el.querySelector<HTMLButtonElement>(".tc-full-project");
 		expect(line?.hidden).toBe(false);
 		expect(line?.textContent).toBe("Дружба");
 		expect(screen.el.querySelector(".tc-full-title")?.nextElementSibling).toBe(line);
 		line?.click();
-		expect(deps.openNote).toHaveBeenCalledWith("Дружба.md");
+		expect(deps.openProject).toHaveBeenCalledWith("Дружба");
 	});
 
 	it("shows the subtasks of a subtask folded away in the list", () => {

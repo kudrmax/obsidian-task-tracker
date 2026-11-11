@@ -2,6 +2,7 @@ import { isOpen, type LocalDate, type ReminderKind, type Slot, type TaskStatus }
 import type { TaskDocument } from "../domain/TaskDocument";
 import type {
 	CreatedTask,
+	ProjectsDrop,
 	DroppedTask,
 	DropFrom,
 	DropLanding,
@@ -13,7 +14,6 @@ import type {
 	GroupPlace,
 	MenuStatusId,
 	NewTaskPlace,
-	ProjectZone,
 	RepeatRule,
 	SectionPlace,
 	TaskDraft,
@@ -28,6 +28,12 @@ import type { Operation, TaskRules } from "./TaskRules";
 import { droppedSpan } from "./TimelineSpans";
 import { landingOf } from "./landing";
 import { keyOf } from "./taskKeys";
+import type { TreePlace } from "../domain/ProjectTree";
+
+/** The project of the cleaned name `clean`, as the tree after a write has it; null when it has none. */
+function namedIn(change: DocChange | null, clean: string | null): string | null {
+	return clean === null || !change ? null : (change.after.projectTree().find(clean)?.node.name ?? null);
+}
 
 /** The document as normalized before and after an operation ran. */
 export interface DocChange {
@@ -139,23 +145,49 @@ export class TaskWrites {
 		return nothing(this.rules.setProject(keys, project));
 	}
 
-	setResult(key: TaskKey, result: boolean): Write<void> {
-		return nothing(this.rules.setResult(key, result));
-	}
-
-	addToResult(keys: readonly TaskKey[], result: TaskKey): Write<void> {
-		return nothing(this.rules.addToResult(keys, result));
-	}
-
-	/** The new result's key and id, as the file stands after the write. */
-	newResult(keys: readonly TaskKey[], name: string): Write<CreatedTask | null> {
+	/** Each task as it then stands, found by its id, in the order given; null for one gone. */
+	toggleProject(keys: readonly TaskKey[], name: string): Write<readonly (TaskItem | null)[]> {
 		return {
-			operation: this.rules.newResult(keys, name),
+			operation: this.rules.toggleProject(keys, name),
 			answer: (change) => {
-				const created = change?.after.insertedSince(change.before);
-				return created ? { key: keyOf(created), id: created.id } : null;
+				if (!change) return keys.map(() => null);
+				const today = this.rules.today();
+				return keys.map((key) => {
+					const entry = change.after.byId(this.rules.entryOf(change.before, key).id);
+					return entry ? this.reads.itemAt(change.after, entry, today) : null;
+				});
 			},
 		};
+	}
+
+	/** «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of nothing. */
+	newProject(name: string, keys: readonly TaskKey[]): Write<string | null> {
+		const operation = this.rules.newProject(name, keys);
+		return { operation, answer: (change) => (operation === null ? null : namedIn(change, this.rules.cleanName(name))) };
+	}
+
+	dropOnProject(cards: readonly ProjectsDrop[], to: string | null): Write<void> {
+		return nothing(this.rules.dropOnProject(cards, to));
+	}
+
+	/** The project made, as the tree has it; null when nothing was written. */
+	createProject(name: string, place: TreePlace): Write<string | null> {
+		const operation = this.rules.createProject(name, place);
+		return { operation, answer: (change) => (operation === null || !change || change.after.serialize() === change.before.serialize() ? null : namedIn(change, this.rules.cleanName(name))) };
+	}
+
+	moveProject(name: string, place: TreePlace): Write<void> {
+		return nothing(this.rules.moveProject(name, place));
+	}
+
+	/** Whether the rename wrote. */
+	renameProject(from: string, to: string): Write<boolean> {
+		const operation = this.rules.renameProject(from, to);
+		return { operation, answer: (change) => change !== null && change.after.serialize() !== change.before.serialize() };
+	}
+
+	setProjectNote(name: string, link: string | null): Write<void> {
+		return nothing(this.rules.setProjectNote(name, link));
 	}
 
 	setReminder(key: TaskKey, reminder: ReminderKind): Write<void> {
@@ -294,8 +326,8 @@ export class TaskWrites {
 		return nothing(this.rules.moveToEnd(key, section));
 	}
 
-	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate, project?: ProjectZone): Write<void> {
-		return nothing(this.rules.moveToGroup(key, list, group, before, date, project));
+	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate): Write<void> {
+		return nothing(this.rules.moveToGroup(key, list, group, before, date));
 	}
 
 	createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Write<void> {
@@ -320,8 +352,8 @@ export class TaskWrites {
 	}
 
 	/** Reads first only when there is a name to write: a blank one or the section's own answers false at once. */
-	renameGroup(list: GroupedList, group: string, name: string, project?: ProjectZone): Read<Write<boolean>> {
-		const operation = this.rules.renameGroup(list, group, name, project);
+	renameGroup(list: GroupedList, group: string, name: string): Read<Write<boolean>> {
+		const operation = this.rules.renameGroup(list, group, name);
 		return {
 			reads: operation !== null,
 			answer: (s) => {
@@ -331,8 +363,8 @@ export class TaskWrites {
 		};
 	}
 
-	removeGroup(list: GroupedList, group: string, project?: ProjectZone): Write<void> {
-		return nothing(this.rules.removeGroup(list, group, project));
+	removeGroup(list: GroupedList, group: string): Write<void> {
+		return nothing(this.rules.removeGroup(list, group));
 	}
 
 	createSection(name: string, place: SectionPlace): Write<{ readonly list: GroupedList; readonly group: string } | null> {
@@ -359,7 +391,7 @@ export class TaskWrites {
 		return {
 			reads: read.kind === "title" || (tasks.length === 1 && read.kind === "time"),
 			answer: (s) => {
-				const moves = dropMoves(tasks, read, day, (key) => (s ? this.rules.entryOf(s.doc, key).project : null));
+				const moves = dropMoves(tasks, read, day);
 				return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
 			},
 		};
@@ -369,13 +401,13 @@ export class TaskWrites {
 	 * Where `drop` would leave the tasks, writing nothing: its operation tried over the file as read, and the screen of
 	 * `day` read over the result by the same code as the screen.
 	 */
-	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Read<readonly DropLanding[]> {
-		const preview = this.dropPreview(tasks, to, day, project);
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Read<readonly DropLanding[]> {
+		const preview = this.dropPreview(tasks, to, day);
 		return { reads: true, answer: (s) => preview.answer(s).landings };
 	}
 
 	/** `landing`, with the whole screen the drop leaves and the text it is read from. */
-	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Read<DropPreview> {
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Read<DropPreview> {
 		const drop = this.drop(tasks, to, day);
 		return {
 			reads: true,
@@ -384,7 +416,7 @@ export class TaskWrites {
 				const write = drop.answer(s);
 				const after = write.operation ? this.rules.trial(s!.doc, write.operation).after : s!.doc;
 				const text = after.serialize();
-				const screen = this.reads.screen({ text, doc: after, today: s!.today, boundary: s!.boundary }, day, project);
+				const screen = this.reads.screen({ text, doc: after, today: s!.today, boundary: s!.boundary }, day);
 				const timeline = this.reads.timeline();
 				return { landings: ids.map((id) => landingOf(screen, id, day, timeline)), screen, tasks: text };
 			},
@@ -410,7 +442,7 @@ export class TaskWrites {
 			case "clearSlot":
 				return this.clearSlot(key, move.place);
 			case "moveToGroup":
-				return this.moveToGroup(key, move.list, move.group, move.before, move.date, move.project);
+				return this.moveToGroup(key, move.list, move.group, move.before, move.date);
 			case "nest":
 				return this.nest(key, move.parent, move.before);
 			case "moveBefore":

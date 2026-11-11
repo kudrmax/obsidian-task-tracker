@@ -3,7 +3,7 @@ import { CALENDAR_SOURCES } from "./calendarFile";
 import type { CalendarService, CalendarSource, DayService, TaskService, UndoService, WorkCalendarSetup } from "./contracts";
 import { DayServiceImpl } from "./DayServiceImpl";
 import type { EventFeed, EventFile } from "./EventSource";
-import type { Clock, GroupingStore, NoteFiles, Projects, SettingsStore, TaskFileStore, Ticker, Timers } from "./ports";
+import type { Clock, Projects, ProjectsScreenStore, SettingsStore, TaskFileStore, Ticker, Timers } from "./ports";
 import { TaskServiceImpl } from "./TaskServiceImpl";
 import { UndoHistory } from "./UndoHistory";
 import { TaskIdentity } from "./TaskIdentity";
@@ -23,12 +23,10 @@ export interface CorePorts {
 	readonly work: Pick<WorkCalendarSetup, "export">;
 	/** The host is the phone: only there do the phone's and Google's files meet, so only there the old choice of calendars is carried over. */
 	readonly isPhone: () => boolean;
-	/** The notes with the project tag; none when left out. */
+	/** The notes that had the project tag, which the one move to projects attaches; none when left out. */
 	readonly projects?: Projects;
-	/** How this device groups its lists by project; kept in memory when left out. */
-	readonly grouping?: GroupingStore;
-	/** The vault's notes as files, which «New project…» writes; none when left out (it then throws). */
-	readonly notes?: NoteFiles;
+	/** What this device keeps of the Projects screen; kept in memory when left out. */
+	readonly projectsScreen?: ProjectsScreenStore;
 }
 
 /** The services every frontend talks to. */
@@ -43,7 +41,7 @@ export interface Core {
 export function composeCore(ports: CorePorts): Core {
 	const identity = new TaskIdentity();
 	const undo = new UndoHistory(ports.tasksFile, identity);
-	const tasks = new TaskServiceImpl(ports.tasksFile, ports.settings, ports.clock, undo, ports.projects, ports.grouping, identity, ports.notes);
+	const tasks = new TaskServiceImpl(ports.tasksFile, ports.settings, ports.clock, undo, ports.projects, ports.projectsScreen, identity);
 	const files = CALENDAR_SOURCES.map((source) => ports.calendarFiles[source]);
 	return {
 		tasks,

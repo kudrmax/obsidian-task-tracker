@@ -20,7 +20,6 @@ private struct BoardSheets: ViewModifier {
                 if let items = model.dateFor { DateSheet(items: items, model: model) }
             }
             .sheet(item: $model.repeatFor) { item in RepeatSheet(item: item, model: model) }
-            .sheet(item: $model.resultFor) { ask in ResultSheet(ask: ask, model: model) }
             .alert("New Section", isPresented: present(\.newSection)) {
                 TextField("Name", text: $text)
                 Button("Cancel", role: .cancel) {}

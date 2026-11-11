@@ -21,6 +21,8 @@ export interface TaskDraft {
 	readonly labels?: readonly string[];
 	/** The rule the task repeats by, set as `setRepeat` sets it; null takes it off; undefined leaves the task's own (a new task has none). */
 	readonly repeat?: RepeatRule | null;
-	/** The task's project (its note's link text), null takes it off; undefined leaves the task's own (a new task has none). A subtask's is its parent's: it takes none. */
+	/** The task's projects by name, in order; undefined leaves the task's own (a new task has none). A subtask's are its parent's: it takes none. */
+	readonly projects?: readonly string[];
+	/** One project in place of all (null: none), when `projects` is left out: the quick entry's single choice. */
 	readonly project?: string | null;
 }

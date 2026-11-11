@@ -4,7 +4,7 @@ import { type Place, placeIndex, type Shift } from "./screens";
 import type { ScreenTrack } from "./ScreenPager";
 
 /** What stands on the strip and slides with it: the columns, the dividers between them and the headers over them. */
-const STRIP = [".tc-done", ".tc-inbox", ".tc-soon", ".tc-left", ".tc-right", ".tc-divider", ".tc-head"];
+const STRIP = [".tc-projects", ".tc-done", ".tc-inbox", ".tc-soon", ".tc-left", ".tc-right", ".tc-divider", ".tc-head"];
 
 export function stripParts(root: HTMLElement): HTMLElement[] {
 	return [...root.querySelectorAll<HTMLElement>(STRIP.map((part) => `:scope > ${part}`).join(", "))];
@@ -168,7 +168,7 @@ export class StripTrack implements ScreenTrack {
 	}
 
 	at(dx: number): void {
-		const share = this.distance > 0 ? Math.min(1, Math.max(0, (-this.way * dx) / this.distance)) : 0;
+		const share = this.distance > 0 ? Math.min(1, Math.max(0, (-Math.sign(this.way) * dx) / this.distance)) : 0;
 		for (const animation of this.animations) animation.currentTime = share * SCRUB_MS;
 		this.deps.turnWheel(this.fromPlace + this.way * share);
 	}

@@ -8,7 +8,6 @@ import { NO_PROJECT } from "./projects";
 import type { ColumnSections, DropColumn, MenuEditId, MenuGroupId, MenuFrom, MenuProject, ProjectRef, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
 import { type SectionOffer, sectionChoice } from "./sections";
 import { isUnder, keyId } from "./taskKeys";
-import { menuResult } from "./results";
 
 /** The tasks a priority may be set on: those without labels. */
 function priorityHolders(items: readonly TaskItem[]): readonly TaskItem[] {
@@ -136,13 +135,16 @@ function menuSections(items: readonly TaskItem[], offer: SectionOffer | null, of
 	return { choice, options: names.map((name) => ({ name, checked: shared && name === choice.current })), create: of.kind === "task" };
 }
 
-/**
- * The Project page: the project notes by name, then a task's project that is none of them; checked the one every task
- * has. Only subtasks: disabled, showing their parent's.
- */
-export function menuProject(items: readonly TaskItem[], known: readonly ProjectRef[]): MenuProject {
+/** A project the Project page offers, with its indent in the tree. */
+export interface ProjectChoice {
+	readonly project: ProjectRef;
+	readonly depth: number;
+}
+
+/** The Project page of these tasks: the tree's projects, each checked while every task has it. Only subtasks: disabled, showing their parent's. */
+export function menuProject(items: readonly TaskItem[], known: readonly ProjectChoice[]): MenuProject {
 	return projectPage(
-		items.map((item) => item.project),
+		items.map((item) => item.projects),
 		known,
 		items.every((item) => !item.can.setProject),
 	);
@@ -152,20 +154,22 @@ export function menuProject(items: readonly TaskItem[], known: readonly ProjectR
 export const NEW_PROJECT = "New project…";
 
 /**
- * A Project page for `chosen`, the project of each of the tasks or fields it is for (null: none): the project notes by
- * name, then a chosen project that is none of them, No project last; checked the one they all have.
+ * A Project page for `chosen`, the projects of each of the tasks or fields it is for: the tree's projects in its order,
+ * then a chosen one the tree lacks; each checked while all have it; No project checked while none has any.
  */
-export function projectPage(chosen: readonly (ProjectRef | null)[], known: readonly ProjectRef[], disabled = false): MenuProject {
-	const key = (ref: ProjectRef | null) => (ref ? projectKey(ref.name) : "");
-	const first = chosen[0] ?? null;
-	const shared = chosen.every((ref) => key(ref) === key(first));
+export function projectPage(chosen: readonly (readonly ProjectRef[])[], known: readonly ProjectChoice[], disabled = false): MenuProject {
+	const key = (ref: ProjectRef) => projectKey(ref.name);
 	const options = [...known];
-	for (const ref of chosen) if (ref && !options.some((option) => key(option) === key(ref))) options.push({ ...ref, mark: true });
-	const none = chosen.every((ref) => ref === null);
+	for (const refs of chosen) for (const ref of refs) if (!options.some((option) => key(option.project) === key(ref))) options.push({ project: { ...ref, mark: true }, depth: 0 });
+	const all = (ref: ProjectRef) => chosen.length > 0 && chosen.every((refs) => refs.some((r) => key(r) === key(ref)));
+	const first = chosen[0] ?? [];
+	const same = chosen.every((refs) => refs.length === first.length && refs.every((ref, i) => key(ref) === key(first[i])));
+	const none = chosen.every((refs) => refs.length === 0);
+	const shared = first.find(all) ?? null;
 	return {
-		value: shared && first ? first.name : none ? NO_PROJECT : "",
-		current: shared ? first : null,
-		options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
+		value: none ? NO_PROJECT : same ? (first.length === 1 ? first[0].name : `${first[0].name} +${first.length - 1}`) : "",
+		current: shared,
+		options: options.map(({ project, depth }) => ({ project, depth, checked: all(project) })),
 		none,
 		noneLabel: NO_PROJECT,
 		disabled,
@@ -177,7 +181,7 @@ export function projectPage(chosen: readonly (ProjectRef | null)[], known: reado
 export const MENU_GROUPS: readonly MenuGroupId[] = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
 
 /** The menu of one task or of several picked at once: what each group offers, what is on, what can't be pressed, what asks first. */
-export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD, projects: readonly ProjectRef[] = [], marksResults = true): TaskMenuModel {
+export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD, projects: readonly ProjectChoice[] = []): TaskMenuModel {
 	const sections = menuSections(items, offer, of);
 	const edits = menuEdits(items, of, sections);
 	return {
@@ -190,7 +194,6 @@ export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: r
 		dueDate: sharedDueDate(items),
 		sections,
 		project: menuProject(items, projects),
-		result: menuResult(items, of.kind === "bulk", marksResults),
 		edits,
 		reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
 		repeat: repeatRow(of.kind === "task" ? (items[0]?.repeat ?? null) : null),

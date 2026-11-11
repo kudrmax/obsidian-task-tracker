@@ -52,21 +52,20 @@ public struct TaskAbilities: Codable, Hashable, Sendable {
     public let addDescription: Bool
     public let fold: Bool
     public let resize: Bool
-    /// The task menu's Project row can be pressed: off on a subtask, whose project is its parent's.
+    /// The task menu's Project row can be pressed: off on a subtask, whose projects are its parent's.
     public let setProject: Bool
-    /// Made a result or a task again, and added to a result: an open task or subtask (`TaskMenuModel.result.rows`).
-    public let result: Bool
 }
 
-/// `ProjectRef`: a task's project as the screens show it.
+/// `ProjectRef`: a project of the `## Projects` tree as the screens show it.
 public struct ProjectRef: Codable, Hashable, Sendable {
+    /// Its name: what every project call takes.
     public let name: String
-    /// What a place and `tasks.setProject` take.
-    public let link: String
-    /// The note's path from the vault's folder; nil when no note with the project tag has that name.
+    /// The names from the top of the tree down to it, itself last («Дружба», «iPhone»).
+    public let path: [String]
+    /// The link of the note attached to it; nil without one.
     public let note: String?
     public let canOpenNote: Bool
-    /// The card shows the folder mark.
+    /// The card shows the folder mark: everywhere but on the Projects screen.
     public let mark: Bool
 }
 
@@ -101,17 +100,15 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
     public let collapsed: Bool
     public let description: String?
     public let parentKey: TaskKey?
-    /// The task's project; a subtask's is its parent's. `nil` for none.
+    /// The task's first project; a subtask's is its parent's. `nil` for none.
     public let project: ProjectRef?
+    /// All its projects, in its line's order; a subtask's are its parent's.
+    public let projects: [ProjectRef]
     /// The title of the task a subtask belongs to; `nil` for a task.
     public let parentText: String?
-    /// Its line starts with the result mark: a result, whose subtasks are the steps of one outcome.
-    public let isResult: Bool
-    /// The nearest result it is a step of; `nil` for none.
-    public let resultOf: ResultRef?
-    /// How a list's card draws it and whose menu its taps open: a folded result shows its next step.
+    /// How a list's card draws it and whose menu its taps open: a folded task with an open subtask shows its next step.
     public let card: TaskCard
-    /// How the timeline's block draws it and whose menu a tap opens: a result's next step, folded or not.
+    /// How the timeline's block draws it and whose menu a tap opens: a folded task's next step.
     public let block: TaskBlock
     public let json: JSONValue
 
@@ -121,8 +118,8 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, key, text, title, status, dueDate, slot, durationMin, reminder, open, repeatable, priority, labels, colors, group, list
-        case isSubtask, day, repeatDay, can, subtasks, allSubtasks, progress, collapsed, description, parentKey, project, parentText
-        case isResult, resultOf, card, block
+        case isSubtask, day, repeatDay, can, subtasks, allSubtasks, progress, collapsed, description, parentKey, project, projects, parentText
+        case card, block
         case repeatRule = "repeat"
     }
 
@@ -156,9 +153,8 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
         description = try c.decodeIfPresent(String.self, forKey: .description)
         parentKey = try c.decodeIfPresent(TaskKey.self, forKey: .parentKey)
         project = try c.decodeIfPresent(ProjectRef.self, forKey: .project)
+        projects = try c.decodeIfPresent([ProjectRef].self, forKey: .projects) ?? []
         parentText = try c.decodeIfPresent(String.self, forKey: .parentText)
-        isResult = try c.decode(Bool.self, forKey: .isResult)
-        resultOf = try c.decodeIfPresent(ResultRef.self, forKey: .resultOf)
         card = try c.decode(TaskCard.self, forKey: .card)
         block = try c.decode(TaskBlock.self, forKey: .block)
         json = try JSONValue(from: decoder)
@@ -168,17 +164,8 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
     public func hash(into hasher: inout Hasher) { hasher.combine(json) }
 }
 
-/// `ResultRef`: a result as a step's row and the Add to result page name it.
-public struct ResultRef: Decodable, Hashable, Sendable {
-    public let id: String
-    /// What `tasks.addToResult` takes.
-    public let key: TaskKey
-    /// Its title, without the result mark.
-    public let title: String
-}
-
-/// `TaskCard`: what a list's card draws and whose menu its taps open. A folded result with an open step is a card of two
-/// lines: `over`, the result's own title (a tap there opens the task's own menu), over the step's title (a tap anywhere
+/// `TaskCard`: what a list's card draws and whose menu its taps open. A folded task with an open subtask is a card of two
+/// lines: `over`, the task's own title (a tap there opens the task's own menu), over its next step's title (a tap anywhere
 /// else opens `step`'s menu).
 public struct TaskCard: Decodable, Hashable, Sendable {
     /// The title drawn, with its links: the step's on a card of two lines, else the task's own `text`.
@@ -186,25 +173,22 @@ public struct TaskCard: Decodable, Hashable, Sendable {
     public let title: String
     /// The small line over the title; `nil` for a card of one line.
     public let over: String?
-    /// The title in semibold: a result drawn with its own title.
-    public let semibold: Bool
     /// The step a tap on the card opens the menu of; `nil`: the task's own. Held in a list, as a value can't hold itself.
     private let steps: [TaskItem]
     public var step: TaskItem? { steps.first }
 
-    enum CodingKeys: String, CodingKey { case text, title, over, semibold, step }
+    enum CodingKeys: String, CodingKey { case text, title, over, step }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         text = try c.decode(String.self, forKey: .text)
         title = try c.decode(String.self, forKey: .title)
         over = try c.decodeIfPresent(String.self, forKey: .over)
-        semibold = try c.decode(Bool.self, forKey: .semibold)
         steps = try c.decodeIfPresent(TaskItem.self, forKey: .step).map { [$0] } ?? []
     }
 }
 
-/// `TaskBlock`: what the timeline's block draws and whose menu a tap opens: a result's next step, else the task's own.
+/// `TaskBlock`: what the timeline's block draws and whose menu a tap opens: a folded task's next step, else the task's own.
 public struct TaskBlock: Decodable, Hashable, Sendable {
     public let text: String
     public let title: String
@@ -256,52 +240,11 @@ public struct ScreenView: Decodable, Sendable {
     public let offer: JSONValue
     public let missing: Bool
     public let calendars: Bool
-    /// Each list's grouping by project, by the list's key.
-    public let projects: [String: ListGrouping]
-    /// The project whose view this is; `nil` for the main screen.
-    public let project: ProjectRef?
+    /// The tree's projects in its order (`ScreenView.projectTree`): handed back as `MenuScreen.projects`, so a menu's
+    /// Project page lists the whole tree while the menu reads no file.
+    public let projectTree: JSONValue
     /// What a drop on each column's title means (`DropTo`), handed back to `tasks.drop` as it is.
     public let titleDrops: [String: JSONValue]
-}
-
-/// `ListGrouping`: whether a list groups its tasks by project, and its groups while it does.
-public struct ListGrouping: Decodable, Sendable {
-    public let canGroup: Bool
-    public let on: Bool
-    public let groups: [ProjectGroup]
-}
-
-/// `ProjectGroup`: a project's group of a list grouped by project, or No project, last.
-public struct ProjectGroup: Decodable, Sendable {
-    /// What `tasks.toggleFold` takes.
-    public let key: String
-    public let project: ProjectRef?
-    public let title: String
-    public let folded: Bool
-    public let count: Int
-    public let canOpenNote: Bool
-    /// What its cards, headers, plates and places carry: the project's link, null for No project.
-    public let zone: JSONValue
-    public let titled: Bool
-    public let sections: [ListGroup]
-    /// What a drop on its header means, as a header passed (`{ group, project }`).
-    public let head: JSONValue
-
-    enum CodingKeys: String, CodingKey { case key, project, title, folded, count, canOpenNote, zone, titled, sections, head }
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        key = try c.decode(String.self, forKey: .key)
-        project = try c.decodeIfPresent(ProjectRef.self, forKey: .project)
-        title = try c.decode(String.self, forKey: .title)
-        folded = try c.decode(Bool.self, forKey: .folded)
-        count = try c.decode(Int.self, forKey: .count)
-        canOpenNote = try c.decode(Bool.self, forKey: .canOpenNote)
-        zone = try c.decode(JSONValue.self, forKey: .zone)
-        titled = try c.decode(Bool.self, forKey: .titled)
-        sections = try c.decode([ListGroup].self, forKey: .sections)
-        head = try c.decode(JSONValue.self, forKey: .head)
-    }
 }
 
 public struct ListRow: Decodable, Sendable {
@@ -318,18 +261,6 @@ public struct GroupMenu: Decodable, Hashable, Sendable {
     public let section: String
     public let rename: Bool
     public let remove: Bool
-    /// Inside a project's group, that group's zone (null for No project): `renameGroup` and `removeGroup` take it last.
-    public let project: JSONValue?
-
-    enum CodingKeys: String, CodingKey { case section, rename, remove, project }
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        section = try c.decode(String.self, forKey: .section)
-        rename = try c.decode(Bool.self, forKey: .rename)
-        remove = try c.decode(Bool.self, forKey: .remove)
-        project = c.contains(.project) ? try c.decode(JSONValue.self, forKey: .project) : nil
-    }
 }
 
 public struct ListGroup: Decodable, Sendable {
@@ -340,8 +271,6 @@ public struct ListGroup: Decodable, Sendable {
     public let empty: Bool
     public let menu: GroupMenu?
     public let reorder: Bool?
-    /// It draws a header: false for the tasks without a section inside a project's group.
-    public let header: Bool?
 }
 
 /// `ListView`: a list in its sections, and whether it shows their headers.
@@ -554,12 +483,15 @@ public struct Removal: Decodable, Hashable, Sendable {
     public let confirm: Bool
 }
 
+/// A project the Project page offers: the whole tree in its order, `depth` its indent, `checked` while every task has it.
 public struct MenuProjectOption: Decodable, Hashable, Sendable {
     public let project: ProjectRef
     public let checked: Bool
+    public let depth: Int
 }
 
-/// `MenuProject`: the Project row and its page; a pick writes `tasks.setProject` with its `link`, No project with null.
+/// `MenuProject`: the Project row and its page of checks: a pick writes `tasks.toggleProject` with its name, No project
+/// `tasks.setProject(keys, null)`, «New project…» `tasks.newProject(name, keys)`.
 public struct MenuProject: Decodable, Hashable, Sendable {
     public let current: ProjectRef?
     public let options: [MenuProjectOption]
@@ -567,11 +499,11 @@ public struct MenuProject: Decodable, Hashable, Sendable {
     public let none: Bool
     /// The No project row's words.
     public let noneLabel: String
-    /// The row's value: the shared project's name, «No project», or empty when they differ.
+    /// The row's value: «Дружба», «Дружба +1», «No project», or empty when the tasks differ.
     public let value: String
     /// Only subtasks: the row can't be pressed.
     public let disabled: Bool
-    /// The page's last row, «New project…»: it asks the name (`TaskBoard.newProject`).
+    /// The page's last row, «New project…»: it asks the name.
     public let newLabel: String
 }
 
@@ -606,49 +538,6 @@ public struct TaskMenuModel: Decodable, Hashable, Sendable {
     public let project: MenuProject
     /// The Repeat row's value.
     public let `repeat`: RepeatRow
-    /// The result rows, drawn right after Project in `result.rows`' order.
-    public let result: MenuResult
-}
-
-/// `MenuResult`: the menu's result rows: «Add to result» (`addToResult`), which opens the page `tasks.resultPage` reads,
-/// and «Make result» or «Make task» (`toggle`), which writes `tasks.setResult(key, toggle.result)`.
-public struct MenuResult: Decodable, Hashable, Sendable {
-    public let rows: [String]
-    /// «Add to result».
-    public let label: String
-    /// What the row shows on the right: the result the tasks are steps of, else empty.
-    public let value: String
-    public let current: ResultRef?
-    public let toggle: Toggle
-
-    public struct Toggle: Decodable, Hashable, Sendable {
-        public let label: String
-        public let result: Bool
-    }
-}
-
-/// `ResultOption`: an open result the Add to result page offers.
-public struct ResultOption: Decodable, Hashable, Sendable, Identifiable {
-    public let result: ResultRef
-    /// The list it stands in, drawn as that column's icon.
-    public let list: String
-    /// Its project's name, a small line under the title.
-    public let project: String?
-    /// The result the tasks are steps of: choosing it writes nothing.
-    public let checked: Bool
-
-    public var id: String { result.id }
-}
-
-/// `ResultPage`: the Add to result page: the open results the query finds, and the words of its field and its last row.
-public struct ResultPage: Decodable, Hashable, Sendable {
-    public let options: [ResultOption]
-    /// «Search results».
-    public let placeholder: String
-    /// «New result…».
-    public let newLabel: String
-    /// «Result name».
-    public let namePlaceholder: String
 }
 
 // MARK: Repeat
@@ -714,6 +603,8 @@ public struct SearchHit: Decodable, Hashable, Sendable {
     public let title: [FoundPart]
     /// The task's project's name in pieces, when the search found the query there.
     public let project: [FoundPart]?
+    /// Where the task stands among the projects: its first project's path in the tree; nil for none.
+    public let projectPath: [String]?
     public let description: [FoundPart]?
 }
 
@@ -750,11 +641,6 @@ public struct SettingsForm: Decodable, Sendable {
     public let sectionOrder: [String]
     public let priorities: [Mark]
     public let labelTag: String
-    public let projectTag: String
-    /// The word a result's line starts with (`settings.setResultMark`).
-    public let resultMark: String
-    /// The mark before any is set: the Result Mark field's placeholder.
-    public let defaultResultMark: String
     public let labels: [Mark]
     public let presets: [String]
     public let ungrouped: String

@@ -20,10 +20,9 @@ export function recurClosed(doc: TaskDocument, today: LocalDate, boundary: DayBo
 		if (!entry) return doc;
 		const { task } = entry;
 		const copy = newTask(task.text, {
-			result: task.result,
 			priority: task.priority,
 			labels: task.labels,
-			project: entry.project,
+			projects: entry.projects,
 			children: doc.freshChildren(entry),
 			dueDate: task.repeat!.next(dayOf(task, boundary), today),
 			repeat: task.repeat,
