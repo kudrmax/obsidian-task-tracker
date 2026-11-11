@@ -1063,14 +1063,15 @@ function placeChoices(place: Placement | null): readonly PlaceChoice[] {
 
 /** The Project button for a field (or the New Task sheet) whose project is `link`, null for none, among the `known` project notes. */
 export function entryProject(link: string | null, known: readonly ProjectRef[]): EntryProject {
-	return { page: projectPage([refOf(link, known)], known), lit: link !== null };
+	const ref = refOf(link, known);
+	return { page: projectPage([ref ? [ref] : []], known.map((project) => ({ project, depth: project.path.length - 1 }))), lit: link !== null };
 }
 
 /** The project of link `link` as the Project page shows it: the project note of that name, else the name alone. */
 function refOf(link: string | null, known: readonly ProjectRef[]): ProjectRef | null {
 	if (link === null) return null;
 	const name = projectName(link);
-	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link, note: null, canOpenNote: false, mark: true };
+	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link: name, path: [name], note: null, canOpenNote: false, mark: true };
 }
 
 /** The renamed task as its field stands: in the place of its result's card, that card's key and id. */

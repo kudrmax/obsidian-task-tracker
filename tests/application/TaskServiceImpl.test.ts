@@ -1399,8 +1399,8 @@ describe("TaskServiceImpl.screen", () => {
 			project: null,
 			titleDrops: screen.titleDrops,
 		});
-		expect(screen.projects.backlog).toMatchObject({ canGroup: true, on: true });
-		expect(screen.projects.soon).toEqual({ canGroup: true, on: false, groups: [] });
+		expect(screen.projects.backlog).toMatchObject({ canGroup: false, on: false, groups: [] });
+		expect(screen.projects.soon).toEqual({ canGroup: false, on: false, groups: [] });
 		expect(screen.done.map((t) => t.text)).toEqual(["Finished"]);
 		expect(screen.day.list.map((t) => t.text)).toEqual(["Later"]);
 	});

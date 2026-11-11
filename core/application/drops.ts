@@ -1,6 +1,5 @@
-import type { ProjectZone } from "../domain/Project";
 import type { LocalDate } from "../domain/Task";
-import type { ColumnSections, DropColumn, DroppedTask, DropFrom, DropOrigin, DropTo, TaskChange, TaskKey, TaskStep } from "./contracts";
+import type { ColumnSections, ProjectZone, DropColumn, DroppedTask, DropFrom, DropOrigin, DropTo, TaskChange, TaskKey, TaskStep } from "./contracts";
 import type { ListPlace } from "./nesting";
 
 /** A drop as the service reads it: a gap of a list column read as a list, a section of a list, or a place under a task. */

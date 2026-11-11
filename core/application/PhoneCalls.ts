@@ -32,6 +32,7 @@ import {
 	type GroupedList,
 	type GroupingState,
 	type ProjectNote,
+	type ProjectsScreenState,
 	StaleTaskError,
 	type SourceProblem,
 	type SourceStatus,
@@ -53,8 +54,10 @@ import { sectionNameEnd } from "./SectionNameEntry";
 import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
-import { newProjectNote, pluginFiles, projectNotesOfTexts, revealedGrouping, withFoldToggled, withGrouping } from "./projects";
-import { noteTags, withProjectTag } from "../domain/NoteTags";
+import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
+import { noteTags } from "../domain/NoteTags";
+import { ProjectTree } from "../domain/ProjectTree";
+import { projectNodeOf, projectOfNode, projectsGap, projectsLevels, renamedIn, selected, tapped } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -86,10 +89,15 @@ export interface DoorContext {
 	readonly fetched?: readonly CalendarSource[];
 	/** The steps of undo as the door last answered them; none before the first. */
 	readonly history?: UndoState;
-	/** The notes with the project tag (`ProjectNote`); none when left out: a task's project then comes from its own field alone. */
+	/**
+	 * The notes that had the project tag (`ProjectNote`), as `rules.projectNotes` answers them: read only by the one move to
+	 * projects (a file without `## Projects`), which attaches them to their projects. None when left out.
+	 */
 	readonly projects?: readonly ProjectNote[];
-	/** How this device groups its lists by project, as the door last answered it; the defaults when left out. */
+	/** Grouping went: ignored. Stub until the app drops it. */
 	readonly grouping?: GroupingState;
+	/** What this device keeps of the Projects screen, as the door last answered it; nothing chosen when left out. */
+	readonly projectsScreen?: ProjectsScreenState;
 	/** Who the tasks are (`TaskItem.id`), as the door last answered it; left out before the first: every task a new id. */
 	readonly ids?: TaskIdState;
 }
@@ -107,8 +115,10 @@ export type DoorAnswer =
 			readonly history?: UndoState;
 			/** The new `data.json` text: the host writes it. */
 			readonly settings?: string;
-			/** The device's grouping after this call: the host keeps it and hands it in again. */
+			/** Grouping went: never answered. Stub until the app drops it. */
 			readonly grouping?: GroupingState;
+			/** The device's Projects screen after this call: the host keeps it and hands it in again. */
+			readonly projectsScreen?: ProjectsScreenState;
 			/** Who the tasks are after this call: the host keeps it and hands it in again, so a task keeps its id. */
 			readonly ids?: TaskIdState;
 	  }
@@ -195,6 +205,7 @@ interface Effects {
 	history?: UndoState;
 	settings?: string;
 	grouping?: GroupingState;
+	projectsScreen?: ProjectsScreenState;
 	ids?: TaskIdState;
 }
 
@@ -228,8 +239,8 @@ class Call {
 		};
 		this.store = store;
 		this.identity = new TaskIdentity(context.ids);
-		this.rules = new TaskRules(store, clock, this.identity, context.ids !== undefined);
-		this.reads = new TaskReads(this.rules, store, clock, { notes: () => context.projects ?? [], grouping: () => this.grouping });
+		this.rules = new TaskRules(store, clock, this.identity, context.ids !== undefined, () => context.projects ?? []);
+		this.reads = new TaskReads(this.rules, store, clock, { tree: () => this.tree(), screen: () => this.projectsScreen });
 		this.writes = new TaskWrites(this.rules, this.reads);
 		this.text = context.tasks ?? null;
 	}
@@ -240,14 +251,19 @@ class Call {
 		return ids === (this.context.ids ?? NO_TASK_IDS) ? this.kept : Object.assign(this.kept, { ids });
 	}
 
-	/** The device's grouping as this call has it: handed in, with what the call changed. */
-	get grouping(): GroupingState {
-		return this.effects.grouping ?? this.context.grouping ?? {};
+	/** The device's Projects screen as this call has it: handed in, with what the call changed. */
+	get projectsScreen(): ProjectsScreenState {
+		return this.effects.projectsScreen ?? this.context.projectsScreen ?? {};
 	}
 
-	/** A change of the device's grouping: the answer carries it for the host to keep. */
-	keepGrouping(state: GroupingState): void {
-		if (state !== this.grouping) this.effects.grouping = state;
+	/** A change of the device's Projects screen: the answer carries it for the host to keep. */
+	keepProjectsScreen(state: ProjectsScreenState): void {
+		if (state !== this.projectsScreen) this.effects.projectsScreen = state;
+	}
+
+	/** The projects of the file as this call has it, the tasks' own in the tree; none without a file. */
+	tree(): ProjectTree {
+		return this.text === null ? ProjectTree.EMPTY : projectTreeOf(this.snapshot().doc);
 	}
 
 	get settings(): TaskCalendarSettings {
@@ -375,7 +391,6 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	screenOf: (c, [item]) => c.reads.screenOf(KEPT(c), item as A),
 	reveal: (c, [item]) => {
 		c.run(c.writes.revealUnfold(item as A));
-		c.keepGrouping(revealedGrouping(c.grouping, item as A));
 		return c.reads.screenOf(KEPT(c), item as A);
 	},
 	findIn: (c, [items, key]) => c.reads.findIn(items as A, key as A),
@@ -404,12 +419,39 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps as A)),
 	setProject: (c, [keys, project]) => c.run(c.writes.setProject(keys as A, (project ?? null) as string | null)),
 	projectNotes: (c) => c.reads.projectNotes(),
-	setResult: (c, [key, result]) => c.run(c.writes.setResult(key as A, result === true)),
-	resultPage: (c, [keys, query]) => c.ask(c.reads.resultPageRead(keys as A, (query ?? "") as string)),
-	addToResult: (c, [keys, result]) => c.run(c.writes.addToResult(keys as A, result as A)),
-	newResult: (c, [keys, name]) => c.run(c.writes.newResult(keys as A, name as string)),
-	setGrouping: (c, [list, on]) => c.keepGrouping(withGrouping(c.grouping, list as A, on as boolean)),
-	toggleFold: (c, [list, key]) => c.keepGrouping(withFoldToggled(c.grouping, list as A, key as string)),
+	toggleProject: (c, [keys, name]) => c.run(c.writes.toggleProject(keys as A, name as string)),
+	newProject: (c, [name, keys]) => {
+		const made = c.run(c.writes.newProject(name as string, (keys ?? []) as A));
+		return made === null ? null : new ProjectIndex(c.tree()).refOf(made);
+	},
+	setResult: () => null,
+	resultPage: (c) => c.reads.resultPage(),
+	addToResult: () => null,
+	newResult: () => null,
+	setGrouping: () => null,
+	toggleFold: () => null,
+	projectsScreen: (c) => c.ask(c.reads.projectsScreenRead()),
+	tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node as string)),
+	selectProjectNode: (c, [node]) => c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, node as string)),
+	setProjectsMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, mode: mode as A }),
+	createProject: (c, [name, place]) => {
+		const made = c.run(c.writes.createProject(name as string, place as A));
+		if (made === null) return null;
+		c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.snapshot().doc, projectNodeOf(made)));
+		return new ProjectIndex(c.tree()).refOf(made);
+	},
+	moveProject: (c, [name, place]) => c.run(c.writes.moveProject(name as string, place as A)),
+	renameProject: (c, [from, to]) => {
+		const renamed = c.run(c.writes.renameProject(from as string, to as string));
+		if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from as string, (to as string).trim()));
+		return renamed;
+	},
+	setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name as string, (link ?? null) as string | null)),
+	dropOnProject: (c, [keys, from, to]) => {
+		const target = to === "none" ? null : projectOfNode(to as string);
+		if (target === null && to !== "none") return null;
+		return c.run(c.writes.dropOnProject(keys as A, (from ?? null) as string | null, target));
+	},
 	setReminder: (c, [key, reminder]) => c.run(c.writes.setReminder(key as A, reminder as A)),
 	togglePriority: (c, [keys, prefix]) => c.run(c.ask(c.writes.togglePriority(keys as A, prefix as string))),
 	toggleLabel: (c, [keys, name]) => c.run(c.ask(c.writes.toggleLabel(keys as A, name as string))),
@@ -463,11 +505,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	},
 };
 
-/**
- * The TaskService methods the door leaves to the host: it is the host that watches its files, and that writes a project's
- * note (`notes.newProject` names it, `notes.projectText` gives its text, then `tasks.setProject`).
- */
-export const HOST_TASK_METHODS: readonly string[] = ["onChange", "newProject"];
+/** The TaskService methods the door leaves to the host: it is the host that watches its files. */
+export const HOST_TASK_METHODS: readonly string[] = ["onChange"];
 
 function boundaryOf(c: Call): DayBoundary {
 	return c.rules.moment().boundary;
@@ -734,6 +773,9 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	placesInGap,
 	noteTags,
 	projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
+	projectsGap: (rows, gap, depth, lifted) => projectsGap(rows, gap, depth, lifted ?? null),
+	projectsLevels: (rows, gap, lifted) => projectsLevels(rows, gap, lifted ?? null),
+	projectNodeOf,
 	shadesOf,
 	inkOf,
 	contrast,
@@ -887,11 +929,25 @@ const NOTES: Readonly<Record<string, Handler>> = {
 	suggest: (_c, [query, notes, limit]) => noteSuggestions(query as string, notes as VaultNote[], (limit ?? undefined) as number | undefined),
 	insert: (_c, [text, at, link]) => withNoteLink(text as string, at as LinkQuery, link as string),
 	open: (_c, [target, notes]) => noteOfLink(target as string, notes as VaultNote[]),
-	/** «New project…» named `name`: the note to write among the vault's `notes`, the one of that name or a new one at the root; null for a name of nothing. */
-	newProject: (c, [name, notes]) => newProjectNote(name as string, (notes ?? []) as VaultNote[], pluginFiles(c.settings)),
-	/** The project note's text with the settings' project tag in its properties: `text`, the note's as read (null: a new note); unchanged when it has the tag. */
-	projectText: (c, [text]) => withProjectTag((text ?? null) as string | null, c.settings.projectTag),
+	/** «New project…» writes no note any more (`tasks.newProject` makes the project): null. Stub until the app drops it. */
+	newProject: () => null,
+	/** No note is tagged any more: the text as it is. Stub until the app drops it. */
+	projectText: (_c, [text]) => (text ?? "") as string,
 };
+
+/**
+ * What the app does with a project's note: it sees only the tasks file, so it opens an attached note in Obsidian
+ * (`noteUrl(link, vault)`: `obsidian://open` of the vault named `vault` at the note's link) and attaches none.
+ */
+const PROJECTS: Readonly<Record<string, Handler>> = {
+	noteUrl: (_c, [link, vault]) => noteUrl(link as string, vault as string),
+};
+
+/** The `obsidian://open` of a note by its link (an alias or a heading of it left out) in the vault named `vault`. */
+export function noteUrl(link: string, vault: string): string {
+	const file = link.split("|")[0].split("#")[0].trim();
+	return `obsidian://open?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(file)}`;
+}
 
 const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	tasks: TASKS,
@@ -909,6 +965,7 @@ const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	capture: CAPTURE,
 	timeline: TIMELINE,
 	notes: NOTES,
+	projects: PROJECTS,
 	rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c: Call, args: unknown[]) => fn(...args)])), constants: () => CONSTANTS },
 };
 

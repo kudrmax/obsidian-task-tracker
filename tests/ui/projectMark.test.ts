@@ -5,7 +5,7 @@ import { onProjectMark, renderTaskCard, showMeta } from "../../obsidian/ui/TaskC
 import { NoteShownSettings, type NotePlace, type ShownSettings } from "../../obsidian/ui/viewSettings";
 import { onDay } from "../fakes/itemOnDay";
 
-const ENV = { name: "Окружение", link: "Окружение", note: "Окружение.md", canOpenNote: true, mark: true };
+const ENV = { name: "Окружение", path: ["Окружение"], link: "Окружение", note: "Окружение.md", canOpenNote: true, mark: true };
 const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: "2026-11-12", slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, group: null, subtasks: [], progress: null, parentText: null, description: null, list: "soon", isSubtask: false, ...extra }, "2026-11-07");
 const parts = (card: HTMLElement) => [...card.children].map((c) => c.classList[0]);
 

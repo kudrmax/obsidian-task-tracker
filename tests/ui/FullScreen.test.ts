@@ -111,7 +111,7 @@ describe("FullScreen", () => {
 		const plain = setup();
 		expect((plain.screen.el.querySelector(".tc-full-project") as HTMLElement).hidden).toBe(true);
 		plain.screen.close();
-		const project = { name: "Дружба", link: "[[Дружба]]", note: "Дружба.md", canOpenNote: true, mark: true };
+		const project = { name: "Дружба", path: ["Дружба"], link: "[[Дружба]]", note: "Дружба.md", canOpenNote: true, mark: true };
 		const { screen, deps } = setup({ ...morning(), project });
 		const line = screen.el.querySelector<HTMLButtonElement>(".tc-full-project");
 		expect(line?.hidden).toBe(false);
