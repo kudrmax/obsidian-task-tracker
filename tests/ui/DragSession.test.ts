@@ -296,12 +296,32 @@ describe("DragSession", () => {
 					order.push("put back");
 					place = 500;
 				},
+				letGo: () => order.push("screen free"),
 				onEnd: async () => void order.push("ended"),
 			});
 			s.move(300, 10);
 			await (end === "cancel" ? s.cancel() : s.release(300, 10));
-			expect(order).toEqual(["put back", "fly 500", "ended"]);
+			expect(order).toEqual(["put back", "screen free", "fly 500", "ended"]);
 		}
+	});
+
+	it("keeps the screen until the screen put back is drawn: no new drag starts on what it redraws", async () => {
+		let drawn: () => void = () => undefined;
+		const letGo = vi.fn();
+		const s = new DragSession({ payload, targets: [], float: new FakeFloat(), origin: () => rect(5, 500), beforeReturn: () => new Promise<void>((r) => (drawn = r)), letGo, onEnd: async () => undefined });
+		const ending = s.cancel();
+		await Promise.resolve();
+		expect(letGo).not.toHaveBeenCalled();
+		drawn();
+		await ending;
+		expect(letGo).toHaveBeenCalledTimes(1);
+	});
+
+	it("frees the screen at once when there is nothing to put back", () => {
+		const letGo = vi.fn();
+		const s = new DragSession({ payload, targets: [], float: new FakeFloat(), origin: () => rect(5, 500), beforeReturn: () => null, letGo, onEnd: async () => undefined });
+		void s.cancel();
+		expect(letGo).toHaveBeenCalledTimes(1);
 	});
 
 	it("puts nothing back when the drop is let go on a place", async () => {

@@ -240,6 +240,16 @@ export class TasksDrop implements DropTarget {
 	}
 }
 
+/** What the tasks' list drop reads of the screen. */
+export interface ProjectsListShown {
+	/** Whether the tasks shown take a card: the node's list reorders (`ProjectsView.reorders`) and no choice is still being drawn. */
+	reorders(): boolean;
+	/** Whether the core takes the carried cards at a place (`projectsTakes`). */
+	takesAt(place: ListPlace, drag: TaskDragPayload): boolean;
+	/** The node whose tasks are drawn. */
+	node(): ProjectsNodeId | null;
+}
+
 /**
  * The tasks as a list a card is dropped in, as a list column is (spec «Projects order» 1): the same lift, gap, drop line,
  * level and auto-scroll, over the parts as sections, each header opening its part as the core says
@@ -248,22 +258,33 @@ export class TasksDrop implements DropTarget {
  * while the node keeps its order (`ProjectsView.reorders`: Done and a done project).
  */
 export class ProjectsListDrop extends CardListDrop {
+	/** The node the place under the finger was read on: a place read on another node than the one let go on is no place. */
+	private readOn: ProjectsNodeId | null = null;
+
 	constructor(
 		tasks: ProjectTasks,
 		area: HTMLElement,
-		private readonly reorders: () => boolean,
-		/** Whether the core takes the carried cards at a place (`projectsTakes`). */
-		private readonly takesAt: (place: ListPlace, drag: TaskDragPayload) => boolean,
+		private readonly shown: ProjectsListShown,
 	) {
 		super(tasks, area);
 	}
 
 	protected takes(drag: DragPayload): boolean {
-		return drag.from !== "new" && this.reorders();
+		return drag.from !== "new" && this.shown.reorders();
 	}
 
 	protected override takesPlace(place: ListPlace, drag: DragPayload): boolean {
-		return drag.from !== "new" && this.takesAt(place, drag);
+		return drag.from !== "new" && this.shown.takesAt(place, drag);
+	}
+
+	override preview(x: number, y: number, drag: DragPayload): void {
+		this.readOn = this.shown.node();
+		super.preview(x, y, drag);
+	}
+
+	override drop(x: number, y: number, drag: DragPayload): DropResult | null {
+		if (this.readOn !== this.shown.node()) return null;
+		return super.drop(x, y, drag);
 	}
 
 	protected placesAnywhere(): boolean {

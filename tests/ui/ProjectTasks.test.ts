@@ -108,7 +108,7 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 
 	describe("as a place to drop", () => {
 		/** Rows stand 40 px apart from the list's top at 100. */
-		function placed(sections: readonly ProjectsSection[], reorders = true, takes: (place: ListPlace) => boolean = () => true) {
+		function placed(sections: readonly ProjectsSection[], reorders = true, takes: (place: ListPlace) => boolean = () => true, node: () => string | null = () => "project:P") {
 			document.body.innerHTML = "";
 			const tasks = list(sections);
 			tasks.elements.forEach((node, i) =>
@@ -122,11 +122,20 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 			const area = tasks.el.parentElement!;
 			area.getBoundingClientRect = () => new DOMRect(0, 100, 300, 600);
 			tasks.el.getBoundingClientRect = () => new DOMRect(0, 100, 300, 600);
-			return new ProjectsListDrop(tasks, area, () => reorders, (place) => takes(place));
+			return new ProjectsListDrop(tasks, area, { reorders: () => reorders, takesAt: (place) => takes(place), node });
 		}
 		const carried = (t: TaskItem) => ({ item: t, from: "soon" as const, grabPx: shownCardSize().height / 2 });
 		/** A carried card hangs by its middle: the finger at `y` is where its middle is. */
 		const middleAt = (y: number) => y;
+
+		it("lets go of nothing at a place read on another node than the one drawn now: the card flies back", () => {
+			let node = "project:P";
+			const drop = placed([section("s", "Soon", [cardOf(a, "s")]), section("t", "Today", [cardOf(b, "t")])], true, () => true, () => node);
+			const y = middleAt(100 + 3 * 40 + 5);
+			drop.preview(10, y, carried(a));
+			node = "project:Q";
+			expect(drop.drop(10, y, carried(a))).toBeNull();
+		});
 
 		it("takes a card between two cards of another part as a place in that part, for dropInProjects", () => {
 			const drop = placed([section("s", "Soon", [cardOf(a, "s")]), section("t", "Today", [cardOf(b, "t")])]);

@@ -11,9 +11,10 @@ export interface DragSessionOptions<P = DragPayload, R = DropResult> {
 	origin(): DOMRect;
 	/**
 	 * A drag let go nowhere or called off, before its copy flies back: the screen is put back as it stood at the lift (a
-	 * held card opened another project), so the copy flies to its place drawn again. Never rejects.
+	 * held card opened another project), so the copy flies to its place drawn again; the screen stays the drag's until it
+	 * is. Null: nothing to put back, the screen is free at once. Never rejects.
 	 */
-	beforeReturn?(): Promise<void>;
+	beforeReturn?(): Promise<void> | null;
 	/**
 	 * The finger let go, or the drag was called off: the screen is free from now on, so the next gesture starts while the
 	 * copy still flies.
@@ -79,10 +80,10 @@ export class DragSession<P = DragPayload, R = DropResult> {
 	async release(x: number, y: number): Promise<void> {
 		if (this.done) return;
 		this.done = true;
-		this.opts.letGo?.();
 		const target = this.current;
 		const result = target?.drop(x, y, this.opts.payload) ?? null;
 		if (!target || !result) return this.settleBack();
+		this.opts.letGo?.();
 		const line = target.landing();
 		DragSession.landing.add(this.land);
 		const card = await this.opts.onEnd(result);
@@ -122,15 +123,19 @@ export class DragSession<P = DragPayload, R = DropResult> {
 	async cancel(): Promise<void> {
 		if (this.done) return;
 		this.done = true;
-		this.opts.letGo?.();
 		await this.settleBack();
 	}
 
-	/** A cancelled drag: the copy flies back to the card's place first, and only then does the card show there, so the task is never seen twice. */
+	/**
+	 * A cancelled drag: the copy flies back to the card's place first, and only then does the card show there, so the task
+	 * is never seen twice. A screen to put back holds the screen until it is drawn: no new drag starts on what it redraws.
+	 */
 	private async settleBack(): Promise<void> {
 		this.clearAll();
 		DragSession.landing.add(this.land);
-		await this.opts.beforeReturn?.();
+		const back = this.opts.beforeReturn?.();
+		if (back) await back;
+		this.opts.letGo?.();
 		await this.opts.float.flyTo(this.opts.origin());
 		this.landed();
 		this.opts.float.remove();

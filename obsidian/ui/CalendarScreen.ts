@@ -19,6 +19,7 @@ import { GroupMenu, ProjectMenu } from "./menu/GroupMenu";
 import { NoteSearch } from "./projects/NoteSearch";
 import { ProjectsListDrop, TasksDrop, TreeDrop } from "./projects/ProjectDrops";
 import { ProjectsCarry } from "./projects/ProjectsCarry";
+import { ProjectsChoices } from "./projects/ProjectsChoices";
 import { TreeLift } from "./projects/TreeLift";
 import type { PlusAside } from "./quick/QuickEntryController";
 import { failureText } from "./failureText";
@@ -112,19 +113,25 @@ export class CalendarScreen extends Component {
 	/** The tree of the Projects screen as a place for a card or the plus, and its tasks as a place for the plus. */
 	private readonly treeDrop = new TreeDrop({
 		tree: () => this.projects?.treeShown ?? null,
-		hover: (node) => this.showProjects(() => this.deps.tasks.hoverProjectNode(node)),
+		hover: (node) => this.choices.hover(node),
 	});
 	private readonly tasksDrop = new TasksDrop(() => this.projects?.tasksShown ?? null);
 	/** The Projects screen's tasks as a list a card is dropped in, as a list column is. */
 	private projectsListDrop: ProjectsListDrop | null = null;
 	/** The rows each drag from the Projects screen carries and the node it was lifted on, read at the lift. */
+	/** The nodes a held card chooses, one after another, each drawn before the next. */
+	private readonly choices = new ProjectsChoices({
+		hover: (node) => this.deps.tasks.hoverProjectNode(node),
+		select: (node) => this.deps.tasks.selectProjectNode(node),
+		refresh: async () => this.projects?.refresh(),
+		selected: () => this.projects?.shown?.selected ?? null,
+		onError: (error) => this.reportFailure(error),
+	});
 	private readonly carry = new ProjectsCarry({
 		rowOf: (card) => this.projects?.tasksList.rowOf(card),
 		selected: () => this.projects?.shown?.selected ?? null,
 		carried: (item) => this.bulk.carried(item),
 	});
-	/** The last choice of a node under a held card, drawn once it resolves (`showProjects`). */
-	private projectsChoice: Promise<void> = Promise.resolve();
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
 	private soonEl: HTMLElement | null = null;
@@ -260,7 +267,7 @@ export class CalendarScreen extends Component {
 			},
 			onResult: (drag, result) => this.applyDrop(drag, result),
 			onLift: (drag, source) => this.carry.lift(drag, source),
-			putBack: (drag) => this.backToLiftedOn(drag),
+			putBack: (drag) => this.choices.backTo(this.carry.liftedOn(drag)),
 			stretch: (item, edge, minute) => this.deps.tasks.stretch(item, this.selectedDate, edge, minute),
 			onResize: async (item, edge, minute, minDurationMin) => {
 				let written = false;
@@ -389,9 +396,13 @@ export class CalendarScreen extends Component {
 			});
 		if (this.projects) {
 			const projects = this.projects;
-			this.projectsListDrop = new ProjectsListDrop(projects.tasksList, projects.tasksList.el.parentElement!, () => projects.shown?.reorders ?? false, (place, drag) => {
-				const view = projects.shown;
-				return view !== null && projectsTakes(view, this.projectsDrops(drag), place);
+			this.projectsListDrop = new ProjectsListDrop(projects.tasksList, projects.tasksList.el.parentElement!, {
+				reorders: () => !this.choices.choosing && (projects.shown?.reorders ?? false),
+				takesAt: (place, drag) => {
+					const view = projects.shown;
+					return view !== null && projectsTakes(view, this.projectsDrops(drag), place);
+				},
+				node: () => projects.shown?.selected ?? null,
 			});
 		}
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
@@ -1030,34 +1041,11 @@ export class CalendarScreen extends Component {
 		return this.carry.dropsOf(drag);
 	}
 
-	/** A drag from the Projects screen let go nowhere: the node it was lifted on is chosen again if a hover opened another (spec decision 6). */
-	private async backToLiftedOn(drag: TaskDragPayload): Promise<void> {
-		const start = this.carry.liftedOn(drag);
-		if (start === null) return;
-		await this.projectsChoice;
-		if (this.projects?.shown?.selected !== start) await this.showProjects(() => this.deps.tasks.selectProjectNode(start));
-	}
-
-	/**
-	 * A choice kept on the device (a node chosen or unfolded), the Projects screen drawn again after it; a failure is said,
-	 * never thrown. One after another: a drag let go just as a hover opens a node goes back only once that node is drawn.
-	 */
-	private showProjects(change: () => Promise<void>): Promise<void> {
-		this.projectsChoice = this.projectsChoice.then(async () => {
-			try {
-				await change();
-				await this.projects?.refresh();
-			} catch (error) {
-				this.reportFailure(error);
-			}
-		});
-		return this.projectsChoice;
-	}
-
 	/** Cards let go on a row of the tree: the project each was shown under gives way to the row's; its place in the funnel stays. */
 	private async dropOnTree(drag: TaskDragPayload, node: string): Promise<null> {
 		const cards = this.projectsDrops(drag);
 		this.bulk.dropping(drag);
+		await this.choices.settled();
 		if (cards.length > 0) await this.act(() => this.deps.tasks.dropOnProject(cards, node));
 		await this.projects?.refresh();
 		return null;
@@ -1071,6 +1059,7 @@ export class CalendarScreen extends Component {
 		const projects = this.projects;
 		const cards = this.projectsDrops(drag);
 		this.bulk.dropping(drag);
+		await this.choices.settled();
 		if (!projects || cards.length === 0) return null;
 		let landing: ProjectsDropLanding | null = null;
 		await this.act(async () => {

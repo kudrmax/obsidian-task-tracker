@@ -47,8 +47,11 @@ export interface DragControllerDeps {
 	onDragging(active: boolean): void;
 	/** `drag` lifted from `source`, before any target reads it: what the drop will hand the core is read now, as the screen stands. */
 	onLift?(drag: TaskDragPayload, source: HTMLElement): void;
-	/** `drag` let go nowhere or called off: the screen put back as it stood at the lift, before the copy flies home. Never rejects. */
-	putBack?(drag: TaskDragPayload): Promise<void>;
+	/**
+	 * `drag` let go nowhere or called off: the screen put back as it stood at the lift, before the copy flies home and
+	 * before the screen is free for another drag; null when there is nothing to put back. Never rejects.
+	 */
+	putBack?(drag: TaskDragPayload): Promise<void> | null;
 	/** Writes the drop and draws it: gives the dropped task's card as drawn now, null when none shows. */
 	onResult(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | HeldOut | null>;
 	/** The card of `item` while its `edge` dot is held at `minute` of the shown day. */
@@ -319,7 +322,7 @@ export class DragController {
 					targets: this.deps.targets(payload),
 					float,
 					origin: () => (source.isConnected && source.getClientRects().length > 0 ? source.getBoundingClientRect() : origin),
-					beforeReturn: () => this.deps.putBack?.(payload) ?? Promise.resolve(),
+					beforeReturn: () => this.deps.putBack?.(payload) ?? null,
 					carries: payload.item.id,
 					letGo: () => {
 						detach();

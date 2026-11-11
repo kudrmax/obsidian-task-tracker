@@ -90,6 +90,16 @@ Follows `2026-11-11-projects-screen-design.md` and `2026-11-11-projects-order-de
    failure is shown as any failure and never stops the drag.
 7. **Docs**: `docs/plugin/tasks.md` («Экран Projects») tells the hover; `docs/plugin/app.md` is left as it is (the app's
    tree keeps its unfold until its in-list drop, decision 7).
+8. **Choices one after another, nothing let go on a node not drawn yet** (`ProjectsChoices`). The core is asked to choose
+   only while the card still waits over the row (the wait stops the moment it leaves); a choice once asked is drawn, and
+   every later choice, put-back and drop waits for it. While a choice is not drawn yet the tasks on the screen are another
+   node's, so they take no card (no line, let go there it flies back). A place read on one node and let go on another
+   (`ProjectsListDrop` keeps the node it read the place on) is no place: the card flies back, nothing is written into a
+   node Max did not see.
+9. **A put-back holds the screen until it is drawn**: let go nowhere, the screen stays the drag's until the node it was
+   lifted on is drawn again (`DragSession.beforeReturn`, then `letGo`), so a new lift never starts on a list the old
+   drag's put-back is about to redraw. With nothing to put back (no hover opened another node, a drag from elsewhere)
+   the screen is free at once, as before. A real drop, on a row or in the list, puts nothing back.
 
 ### iPhone app
 

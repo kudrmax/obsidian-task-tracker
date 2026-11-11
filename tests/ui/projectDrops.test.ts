@@ -61,9 +61,10 @@ describe("a card held over a row of the tree", () => {
 	const hovered = (rows: readonly ProjectsRow[]) => {
 		vi.useFakeTimers();
 		const hover = vi.fn(async () => undefined);
-		const tree = shown(rows);
+		const filled: (string | null)[] = [];
+		const tree = { ...shown(rows), showDropOn: (node: string | null) => void filled.push(node) };
 		tree.el.getClientRects = () => [tree.el.getBoundingClientRect()] as unknown as DOMRectList;
-		return { drop: new TreeDrop({ tree: () => tree, hover }), hover };
+		return { drop: new TreeDrop({ tree: () => tree, hover }), hover, filled };
 	};
 	const opens = (r: ProjectsRow): ProjectsRow => ({ ...r, opensOnHover: true });
 	const unfolds = (r: ProjectsRow): ProjectsRow => ({ ...r, unfoldsOnHover: true });
@@ -114,6 +115,27 @@ describe("a card held over a row of the tree", () => {
 		drop.preview(20, 5, card);
 		vi.advanceTimersByTime(PROJECTS_HOVER_MS);
 		expect(hover.mock.calls).toEqual([["project:B"], ["project:A"]]);
+	});
+
+	it("fills the row it still waits over again once the screen is drawn anew", async () => {
+		const { drop, filled } = hovered([opens(row("project:A", "project", 0))]);
+		drop.preview(20, 5, card);
+		filled.length = 0;
+		await vi.advanceTimersByTimeAsync(PROJECTS_HOVER_MS);
+		expect(filled).toEqual(["project:A"]);
+	});
+
+	it("fills nothing again once the card has left the tree before the screen is drawn", async () => {
+		const { drop, filled, hover } = hovered([opens(row("project:A", "project", 0))]);
+		let drawn: () => void = () => undefined;
+		hover.mockImplementation(() => new Promise<undefined>((r) => (drawn = () => r(undefined))));
+		drop.preview(20, 5, card);
+		vi.advanceTimersByTime(PROJECTS_HOVER_MS);
+		drop.leave();
+		filled.length = 0;
+		drawn();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(filled).toEqual([]);
 	});
 
 	it("never opens a row under the plus", () => {
