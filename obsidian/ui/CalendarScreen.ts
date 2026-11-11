@@ -18,6 +18,8 @@ import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu, ProjectMenu } from "./menu/GroupMenu";
 import { NoteSearch } from "./projects/NoteSearch";
 import { ProjectsListDrop, TreeDrop } from "./projects/ProjectDrops";
+import { ProjectsCarry } from "./projects/ProjectsCarry";
+import { ProjectsChoices } from "./projects/ProjectsChoices";
 import { TreeLift } from "./projects/TreeLift";
 import type { PlusAside } from "./quick/QuickEntryController";
 import { failureText } from "./failureText";
@@ -111,14 +113,24 @@ export class CalendarScreen extends Component {
 	/** The tree of the Projects screen as a place for a card or the plus. */
 	private readonly treeDrop = new TreeDrop({
 		tree: () => this.projects?.treeShown ?? null,
-		unfold: (node) => void this.act(() => this.deps.tasks.unfoldProjectNode(node)).then(() => this.projects?.refreshTree()),
+		hover: (node) => this.choices.hover(node),
 	});
 	/** The Projects screen's tasks as a list a card or the plus is dropped in, as a list column is. */
 	private projectsListDrop: ProjectsListDrop | null = null;
-	/** The Projects row pressed last: a drop of it hands the core this very row's `drop` (a task of two parts is two cards). */
-	private pressedProjectsRow: ProjectsListRow | null = null;
-	/** The rows each drag carries, as the core takes them (`projectsDrops`). */
-	private readonly carriedRows = new WeakMap<TaskDragPayload, readonly ProjectsDrop[]>();
+	/** The nodes a held card chooses, one after another, each drawn before the next. */
+	private readonly choices = new ProjectsChoices({
+		hover: (node) => this.deps.tasks.hoverProjectNode(node),
+		select: (node) => this.deps.tasks.selectProjectNode(node),
+		refresh: async () => this.projects?.refresh(),
+		selected: () => this.projects?.shown?.selected ?? null,
+		onError: (error) => this.reportFailure(error),
+	});
+	/** The rows each drag from the Projects screen carries and the node it was lifted on, read at the lift. */
+	private readonly carry = new ProjectsCarry({
+		rowOf: (card) => this.projects?.tasksList.rowOf(card),
+		selected: () => this.projects?.shown?.selected ?? null,
+		carried: (item) => this.bulk.carried(item),
+	});
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
 	private soonEl: HTMLElement | null = null;
@@ -253,6 +265,8 @@ export class CalendarScreen extends Component {
 				this.contentEl.classList.toggle("is-dragging", active);
 			},
 			onResult: (drag, result) => this.applyDrop(drag, result),
+			onLift: (drag, source) => this.carry.lift(drag, source),
+			putBack: (drag) => this.choices.backTo(this.carry.liftedOn(drag)),
 			stretch: (item, edge, minute) => this.deps.tasks.stretch(item, this.selectedDate, edge, minute),
 			onResize: async (item, edge, minute, minDurationMin) => {
 				let written = false;
@@ -387,10 +401,13 @@ export class CalendarScreen extends Component {
 			this.projectsListDrop = new ProjectsListDrop(
 				projects.tasksList,
 				projects.tasksList.el.parentElement!,
-				() => projects.shown?.reorders ?? false,
-				(place, drag) => {
-					const view = projects.shown;
-					return view !== null && projectsTakes(view, this.projectsDrops(drag), place);
+				{
+					reorders: () => !this.choices.choosing && (projects.shown?.reorders ?? false),
+					takesAt: (place, drag) => {
+						const view = projects.shown;
+						return view !== null && projectsTakes(view, this.projectsDrops(drag), place);
+					},
+					node: () => projects.shown?.selected ?? null,
 				},
 				() => this.haptics.tap(),
 			);
@@ -1014,7 +1031,6 @@ export class CalendarScreen extends Component {
 		const item = row.item;
 		card.dataset.menuFrom = owner.menuFrom;
 		card.dataset.card = row.id;
-		card.addEventListener("pointerdown", () => (this.pressedProjectsRow = row), { capture: true, signal });
 		this.found.attach(card, item);
 		if (owner.canDrop) {
 			/** The drag's origin is only what the lists read; the Projects screen takes the row's own `drop`. An open task's card is of a list. */
@@ -1027,26 +1043,16 @@ export class CalendarScreen extends Component {
 		}, { signal });
 	}
 
-	/**
-	 * What the core takes for the rows a drag carries on the Projects screen: the one pressed, then the picked ones carried
-	 * along. Read once a drag.
-	 */
+	/** What the core takes for the rows a drag carries on the Projects screen, as read at the lift. */
 	private projectsDrops(drag: TaskDragPayload): readonly ProjectsDrop[] {
-		const known = this.carriedRows.get(drag);
-		if (known) return known;
-		const tasks = this.projects?.tasksList;
-		const pressed = this.pressedProjectsRow;
-		if (!tasks || !pressed) return [];
-		const carried = this.bulk.carried(drag.item).flatMap((picked) => tasks.rowOf(picked.card)?.drop ?? []);
-		const drops = [pressed.drop, ...carried];
-		this.carriedRows.set(drag, drops);
-		return drops;
+		return this.carry.dropsOf(drag);
 	}
 
 	/** Cards let go on a row of the tree: the project each was shown under gives way to the row's; its place in the funnel stays. */
 	private async dropOnTree(drag: TaskDragPayload, node: string): Promise<null> {
 		const cards = this.projectsDrops(drag);
 		this.bulk.dropping(drag);
+		await this.choices.settled();
 		if (cards.length > 0) await this.act(() => this.deps.tasks.dropOnProject(cards, node));
 		await this.projects?.refresh();
 		return null;
@@ -1060,6 +1066,7 @@ export class CalendarScreen extends Component {
 		const projects = this.projects;
 		const cards = this.projectsDrops(drag);
 		this.bulk.dropping(drag);
+		await this.choices.settled();
 		if (!projects || cards.length === 0) return null;
 		let landing: ProjectsDropLanding | null = null;
 		await this.act(async () => {

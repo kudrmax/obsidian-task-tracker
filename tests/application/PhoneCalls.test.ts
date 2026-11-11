@@ -198,6 +198,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "projectsScreen", args: () => [], text: null },
 	{ method: "tapProjectNode", args: () => ["project:Окружение"] },
 	{ method: "selectProjectNode", args: () => ["project:Окружение"] },
+	{ method: "hoverProjectNode", args: () => ["project:Окружение"] },
 	{ method: "setProjectsMode", args: () => ["byStage"] },
 	{ method: "createProject", args: () => ["Дружба", { parent: "Окружение", before: null }] },
 	{ method: "createProject", args: () => ["Окружение", { parent: null, before: null }] },

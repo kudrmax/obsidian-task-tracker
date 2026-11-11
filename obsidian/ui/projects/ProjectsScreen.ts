@@ -148,15 +148,6 @@ export class ProjectsScreen {
 		if (reading === this.reading) this.render(view);
 	}
 
-	/** The tree alone read again and drawn, the tasks left as they stand: a branch opened under a card still carried from them. */
-	async refreshTree(): Promise<void> {
-		const reading = ++this.reading;
-		const view = await this.deps.source.projectsScreen();
-		if (reading !== this.reading || !this.view) return;
-		this.view = { ...this.view, rows: view.rows };
-		this.tree.render(view.rows);
-	}
-
 	render(view: ProjectsView): void {
 		const sameNode = this.view?.selected === view.selected;
 		this.view = view;

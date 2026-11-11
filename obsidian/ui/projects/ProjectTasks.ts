@@ -35,6 +35,10 @@ const STAGES: Readonly<Record<Exclude<ProjectsStage["kind"], "date">, { readonly
 	done: { icon: "done", name: "Done" },
 };
 
+/** A card a drag carries, waiting where it stood (`DragController`). */
+const LIFTED = "is-lifted";
+const HIDDEN = "tc-hidden";
+
 function plateKey(name: GroupName): string {
 	return JSON.stringify(name);
 }
@@ -65,6 +69,8 @@ export class ProjectTasks implements DropList {
 	private rowsByCard = new Map<HTMLElement, ProjectsListRow>();
 	private cardsByRow = new Map<string, HTMLElement>();
 	private opening = new Map<HTMLElement, boolean>();
+	/** The rows of carried cards another node's drawing does not show, kept out of sight (see `render`). */
+	private away = new Map<string, HTMLElement>();
 
 	constructor(
 		parent: HTMLElement,
@@ -157,12 +163,17 @@ export class ProjectTasks implements DropList {
 		return row?.[0] ?? null;
 	}
 
-	/** `moving`: the same node drawn again, its rows sliding to their new places; another node is drawn at once, from the top. */
+	/**
+	 * `moving`: the same node drawn again, its rows sliding to their new places; another node is drawn at once, from the top.
+	 * A card still carried (a held card opened another node) stays in the page out of sight while the drawing does not show
+	 * it: the finger's pointer stays with it, and the node it was lifted on, drawn again, has it back as its waiting place.
+	 */
 	render(view: ProjectsView, moving: boolean): void {
 		const look = projectsEntryLook(view);
 		const entry = this.deps.entry?.(look) ?? null;
 		if (moving) this.hold.keep();
 		else this.el.scrollTop = 0;
+		const carried = [...this.cardsByRow, ...this.away].filter(([, node]) => node.classList.contains(LIFTED));
 		const drawing = this.keyed.begin(moving);
 		this.entryRows.begin(drawing, this.deps.renaming?.() ?? null);
 		this.look = look;
@@ -214,6 +225,7 @@ export class ProjectTasks implements DropList {
 				enterAt(part);
 				const key = `row:${row.id}`;
 				const { node, signal } = drawing.take(key, () => el(null, "div", "tc-card"), this.entryRows.heirOf(row.item.id, key));
+				node.classList.remove(HIDDEN);
 				node.replaceChildren();
 				if (row.card) {
 					fillCard(node, row.item, { day: null, over: row.card.over, corner: row.card.stage === null });
@@ -239,6 +251,13 @@ export class ProjectTasks implements DropList {
 			const lines = branchOf(rows.map((r) => r.level), i);
 			if (lines) branch(row.node, lines.through, lines.last);
 		});
+		this.away = new Map();
+		for (const [id] of carried) {
+			if (this.cardsByRow.has(id)) continue;
+			const { node } = drawing.take(`row:${id}`, () => el(null, "div", "tc-card"));
+			node.classList.add(HIDDEN);
+			this.away.set(id, node);
+		}
 		drawing.finish();
 		this.edges.update();
 	}

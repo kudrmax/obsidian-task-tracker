@@ -27,6 +27,7 @@ import type {
 } from "./contracts";
 import { dueLabel } from "./dayLabels";
 import { NO_PROJECT, refOfPlaced } from "./projects";
+import { dropOf } from "./projectsLift";
 
 /** The words of the Projects screen, the same in every frontend. */
 export const PROJECTS_WORDS = {
@@ -136,7 +137,7 @@ export function projectsView(input: ProjectsInput): ProjectsView {
 	const statusOf = (name: string): ProjectStatus => statuses.get(projectKey(name)) ?? "waiting";
 	const selected = selectedNode(state, tree);
 	const mode: ProjectsMode = state.mode ?? "byProject";
-	const rows = treeRows(tree, state, selected, statusOf);
+	const rows = treeRows(tree, state, selected, statusOf, (node) => input.doc !== null && nodeReorders(node, statusOf));
 	const parts = input.doc ? sectionsOf(input, input.doc, selected, mode, statusOf) : [];
 	const name = projectOfNode(selected);
 	const placed = name === null ? null : tree.find(name);
@@ -154,8 +155,14 @@ export function projectsView(input: ProjectsInput): ProjectsView {
 		newTask: selected === "done" || (placed !== null && (placed.node.folder || statusOf(placed.node.name) === "done")) ? null : inInbox(placed?.node.name ?? null),
 		emptyLabel: PROJECTS_WORDS.noTasks,
 		missing: input.doc === null,
-		reorders: input.doc !== null && selected !== "done" && !(placed !== null && statusOf(placed.node.name) === "done"),
+		reorders: input.doc !== null && nodeReorders(selected, statusOf),
 	};
+}
+
+/** A node's list takes drops: every node but Done and a done project, whose closed tasks stay. */
+function nodeReorders(node: ProjectsNodeId, statusOf: (name: string) => ProjectStatus): boolean {
+	const name = projectOfNode(node);
+	return node !== "done" && !(name !== null && statusOf(name) === "done");
 }
 
 /** The project menu; `ownTasks`: the project has tasks of its own, so it can't be made a folder. */
@@ -184,9 +191,14 @@ function inInbox(project: string | null): ProjectsNewTask {
 	return { place: { kind: "list", list: "inbox", group: null, before: null }, project };
 }
 
-/** The rows of the tree: All, the live projects (a folded branch left out), No project, Done and, open, the done projects. */
-function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: ProjectsNodeId, statusOf: (name: string) => ProjectStatus): ProjectsRow[] {
-	const rows: ProjectsRow[] = [fixedRow("all", PROJECTS_WORDS.all, selected, false, false)];
+/**
+ * The rows of the tree: All, the live projects (a folded branch left out), No project, Done and, open, the done projects.
+ * `reorders` says whether a node's list takes drops: a row opens under a held card when it takes the card, its list takes
+ * drops and it is not chosen.
+ */
+function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: ProjectsNodeId, statusOf: (name: string) => ProjectStatus, reorders: (node: ProjectsNodeId) => boolean): ProjectsRow[] {
+	const row = (fields: Omit<ProjectsRow, "opensOnHover">): ProjectsRow => ({ ...fields, opensOnHover: fields.acceptsTask && !fields.selected && reorders(fields.node) });
+	const rows: ProjectsRow[] = [row(fixedRow("all", PROJECTS_WORDS.all, selected, false, false))];
 	const walk = (nodes: readonly ProjectNode[], path: readonly string[], depth: number, done: boolean) => {
 		for (const node of nodes) {
 			if ((statusOf(node.name) === "done") !== done) continue;
@@ -194,7 +206,7 @@ function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: Proje
 			const folded = branch.length > 0 && isFolded(state, node.name);
 			const own = [...path, node.name];
 			const status = statusOf(node.name);
-			rows.push({
+			rows.push(row({
 				node: projectNodeOf(node.name),
 				kind: "project",
 				title: node.name,
@@ -210,16 +222,16 @@ function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: Proje
 				acceptsTask: !node.folder,
 				canLift: !done,
 				unfoldsOnHover: folded,
-			});
+			}));
 			if (!folded) walk(node.children, own, depth + 1, done);
 		}
 	};
 	walk(tree.roots, [], 0, false);
-	rows.push(fixedRow("none", PROJECTS_WORDS.none, selected, false, true));
+	rows.push(row(fixedRow("none", PROJECTS_WORDS.none, selected, false, true)));
 	const doneTops = doneRoots(tree, statusOf);
 	const open = state.doneOpen === true;
-	rows.push({ ...fixedRow("done", PROJECTS_WORDS.done, selected, doneTops.length > 0, false), folded: doneTops.length > 0 && !open });
-	if (open) for (const top of doneTops) walkDone(top, rows, state, selected, statusOf, 1);
+	rows.push(row({ ...fixedRow("done", PROJECTS_WORDS.done, selected, doneTops.length > 0, false), folded: doneTops.length > 0 && !open }));
+	if (open) for (const top of doneTops) walkDone(top, rows, state, selected, statusOf, 1, row);
 	return rows;
 }
 
@@ -232,10 +244,10 @@ function doneRoots(tree: ProjectTree, statusOf: (name: string) => ProjectStatus)
 	});
 }
 
-function walkDone(placed: PlacedProject, rows: ProjectsRow[], state: ProjectsScreenState, selected: ProjectsNodeId, statusOf: (name: string) => ProjectStatus, depth: number): void {
+function walkDone(placed: PlacedProject, rows: ProjectsRow[], state: ProjectsScreenState, selected: ProjectsNodeId, statusOf: (name: string) => ProjectStatus, depth: number, row: (fields: Omit<ProjectsRow, "opensOnHover">) => ProjectsRow): void {
 	const { node, path } = placed;
 	const folded = node.children.length > 0 && isFolded(state, node.name);
-	rows.push({
+	rows.push(row({
 		node: projectNodeOf(node.name),
 		kind: "project",
 		title: node.name,
@@ -251,11 +263,11 @@ function walkDone(placed: PlacedProject, rows: ProjectsRow[], state: ProjectsScr
 		acceptsTask: !node.folder,
 		canLift: false,
 		unfoldsOnHover: folded,
-	});
-	if (!folded) for (const child of node.children) walkDone({ node: child, path: [...path, child.name] }, rows, state, selected, statusOf, depth + 1);
+	}));
+	if (!folded) for (const child of node.children) walkDone({ node: child, path: [...path, child.name] }, rows, state, selected, statusOf, depth + 1, row);
 }
 
-function fixedRow(node: "all" | "none" | "done", title: string, selected: ProjectsNodeId, hasBranch: boolean, acceptsTask: boolean): ProjectsRow {
+function fixedRow(node: "all" | "none" | "done", title: string, selected: ProjectsNodeId, hasBranch: boolean, acceptsTask: boolean): Omit<ProjectsRow, "opensOnHover"> {
 	return { node, kind: node, title, depth: 0, tile: true, waiting: false, muted: node !== "all", status: null, selected: selected === node, hasBranch, folded: false, project: null, acceptsTask, canLift: false, unfoldsOnHover: false };
 }
 
@@ -302,7 +314,7 @@ function cardOf(input: ProjectsInput, entry: TaskEntry, mode: ProjectsMode, from
 		stage: mode === "byProject" ? stageMark(entry, input.today, input.boundary) : null,
 		over: mode === "byStage" ? over : null,
 		from,
-		drop: { key: item.key, from },
+		drop: dropOf(item, from),
 		menuFrom: menuFromOf(entry),
 		canDrop: item.open,
 	};
@@ -411,7 +423,7 @@ function projectPart(key: string, placed: PlacedProject & { readonly title?: nul
 /** A task's open subtasks as rows a level deeper, each before its own, unless they are folded away. */
 function subtaskRows(key: string, item: TaskItem, level: number, from: string | null): ProjectsListRow[] {
 	if (item.collapsed) return [];
-	return item.subtasks.flatMap((sub) => [{ id: `${key}/${sub.id}`, item: sub, level, card: null, drop: { key: sub.key, from } }, ...subtaskRows(key, sub, level + 1, from)]);
+	return item.subtasks.flatMap((sub) => [{ id: `${key}/${sub.id}`, item: sub, level, card: null, drop: dropOf(sub, from) }, ...subtaskRows(key, sub, level + 1, from)]);
 }
 
 /**
@@ -441,6 +453,17 @@ export function unfolded(state: ProjectsScreenState, node: ProjectsNodeId): Proj
 	if (node === "done") return state.doneOpen ? state : { ...state, doneOpen: true };
 	const name = projectOfNode(node);
 	return name === null || !isFolded(state, name) ? state : withFold(state, name, false);
+}
+
+/**
+ * A card held over `node`'s row of `rows`, the tree as drawn: its branch unfolded when it unfolds on hover, and it chosen
+ * when it opens on hover, so the rule is the one the row was drawn with. A node without a row stays as it is.
+ */
+export function hovered(state: ProjectsScreenState, tree: ProjectTree, doc: TaskDocument | null, rows: readonly ProjectsRow[], node: ProjectsNodeId): ProjectsScreenState {
+	const row = rows.find((r) => sameNode(r.node, node));
+	if (!row) return state;
+	const open = row.unfoldsOnHover ? unfolded(state, row.node) : state;
+	return row.opensOnHover ? selected(open, tree, doc, row.node) : open;
 }
 
 /** The node chosen with every branch above it open, so its row shows. */
@@ -513,7 +536,7 @@ export function projectsGap(rows: readonly ProjectsRow[], gap: number, depth: nu
 	return { place, depth: level };
 }
 
-/** How long a held card waits over a folded row before its branch opens, ms. */
+/** How long a held card waits over a row before it unfolds or opens (`hovered`), ms. */
 export const PROJECTS_HOVER_MS = 600;
 
 /** The indent of one step of the tree, px (pt): a finger's sideways way of one step changes a lifted row's depth by one. */
