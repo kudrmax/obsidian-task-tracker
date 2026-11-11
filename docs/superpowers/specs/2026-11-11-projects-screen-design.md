@@ -307,8 +307,14 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md Â«AgentsÂ
 54. **Review round (app).** A task shown in two parts is two cards keyed by `ProjectsCard.id`, each dropped by its own
     `ProjectsCard.drop` (`tasks.dropOnProject([card.drop], node)`); `canDrop` is the core's alone. The tree's depth is
     `rules.projectsDrop` with the finger's sideways way: since the lift for a lifted project (it keeps its depth until
-    the finger shifts a `PROJECTS_INDENT`, 12 pt), from the row above the gap's depth for the plus (the depth the finger
-    stands at). A held card opens a folded row after `PROJECTS_HOVER_MS` (600). This replaces the 24 pt steps of 45.
+    the finger shifts a `PROJECTS_INDENT`, 12 pt); for the plus, from the start of the row above the gap (its depth's
+    indent from the tree's left edge), so the plus takes the depth where the finger stands, a step per 12 pt from the
+    tree's left edge, as the plugin's 33. A held card opens a folded row after `PROJECTS_HOVER_MS` (600). The constants
+    come from the core; without them the app stops loudly rather than guess. This replaces the 24 pt steps of 45. A
+    project toggled on the Project page keeps the picked tasks picked (Select Tasks stays), the page being still open.
+    The bulk menu is the system's UIKit menu over the bar's SwiftUI label (as a card's menu), redrawn in place on the
+    page that shows: a SwiftUI `Menu` closed back to its first page on every redraw, so the Project page and the labels
+    could not stay open there.
 55. **A lifted project rides 16 pt below the finger** (cards still above it over the tree), as the plugin's 39: its line
     and the row above the line stay seen. Replaces the lifted-project half of 52.
 56. **The plus held over the tasks shows the drop line** after the last card of the part under the finger (over the

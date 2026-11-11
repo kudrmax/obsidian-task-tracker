@@ -15,6 +15,17 @@ indirect enum MenuNode {
     /// A row whose page is read when it opens: a subtask's own menu.
     case deferred(title: String, symbol: String, subtitle: String?, load: @MainActor () async -> [MenuNode])
 
+    /// What the row is, the same through a redraw of its menu: its title, or a group by its first row's.
+    var key: String {
+        switch self {
+        case .action(let title, _, _, _, _, _, _, _, _, _): "a:" + title
+        case .submenu(let title, _, _, _, _): "s:" + title
+        case .group(_, let children): "g:" + (children.first?.key ?? "")
+        case .question(let question, _): "q:" + question
+        case .deferred(let title, _, _, _): "d:" + title
+        }
+    }
+
     var keepsOpen: Bool {
         if case .action(_, _, _, _, _, _, let keepsOpen, _, _, _) = self { return keepsOpen }
         return false
@@ -244,7 +255,9 @@ struct MenuNodes: View {
     let palette: (String) -> UIColor?
 
     var body: some View {
-        ForEach(Array(nodes.enumerated()), id: \.offset) { _, node in
+        // Each row keyed by what it is, not by its place: a menu drawn again after a pick (the Project page's checks)
+        // keeps the page that is open.
+        ForEach(Array(nodes.enumerated()), id: \.element.key) { _, node in
             switch node {
             case .action(let title, let symbol, let subtitle, let tint, let destructive, let checked, let keepsOpen, _, let disabled, let run):
                 let button = Button(role: destructive ? .destructive : nil) { run() } label: {

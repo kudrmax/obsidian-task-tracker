@@ -222,7 +222,10 @@ extension TaskBoard {
     /// The tree's sideways step and how long a held card waits over a folded row (`PROJECTS_INDENT`, `PROJECTS_HOVER_MS`).
     public func projectsMeasures() throws -> (indent: Double, hoverMs: Double) {
         let constants: JSONValue = try rule("rules.constants")
-        return (constants["PROJECTS_INDENT"].number ?? 12, constants["PROJECTS_HOVER_MS"].number ?? 600)
+        guard let indent = constants["PROJECTS_INDENT"].number, let hover = constants["PROJECTS_HOVER_MS"].number else {
+            throw BoardError.failed("rules.constants gives no PROJECTS_INDENT or PROJECTS_HOVER_MS")
+        }
+        return (indent, hover)
     }
 
     /// A name «New project…», the plus in the tree or Rename would write nothing for: the Create button is off for it.

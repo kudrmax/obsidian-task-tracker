@@ -798,10 +798,10 @@ final class BoardModel {
         endSelection()
     }
 
-    /// A project picked on the Project page: on for every task, or off for all when all had it.
+    /// A project picked on the Project page: on for every task, or off for all when all had it. The page stays open for
+    /// the next pick, so the picked tasks stay picked, as with a label.
     func toggleProject(_ items: [TaskItem], _ name: String) async {
         await write("tasks.toggleProject", [keys(items), .string(name)])
-        endSelection()
     }
 
     /// «New project…» on a Project page: the name is asked; the quick entry's field keeps its keyboard's place meanwhile.

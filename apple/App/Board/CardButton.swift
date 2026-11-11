@@ -526,7 +526,7 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
         }
     }
 
-    private static func shape(_ element: UIMenuElement) -> MenuShape {
+    static func shape(_ element: UIMenuElement) -> MenuShape {
         switch element {
         case let menu as UIMenu:
             return .page(title: menu.title, detail: "\(menu.subtitle ?? "")|\(menu.options.rawValue)", children: menu.children.map(shape))
@@ -537,7 +537,7 @@ final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
         }
     }
 
-    private static func page(at path: [Int], in menu: UIMenu) -> UIMenu? {
+    static func page(at path: [Int], in menu: UIMenu) -> UIMenu? {
         var page = menu
         for index in path {
             guard index < page.children.count, let child = page.children[index] as? UIMenu else { return nil }

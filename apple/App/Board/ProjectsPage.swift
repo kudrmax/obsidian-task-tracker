@@ -521,7 +521,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
             shift = point.x - from
         } else {
             let above = gap > 0 ? CGFloat(framed[gap - 1].0.depth) : 0
-            shift = point.x - left - above * indent - indent / 2
+            shift = point.x - left - above * indent
         }
         guard let landing = projects.landing(gap: gap, shift: Double(shift), lifted: lifted) else {
             aimed = nil
