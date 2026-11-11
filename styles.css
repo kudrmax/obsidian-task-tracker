@@ -237,6 +237,13 @@ body {
 	/* The rounded ends eat into the text: a card keeps its title and its time further from them. */
 	--tc-card-pad-start: 14px;
 	--tc-card-pad-end: 10px;
+	/* A folded result's card (a result with an open step): its own title on a small line over the step's, the card grown by that line (44 px at the default 35 px card), its symbol as tall as the line's type. */
+	--tc-card-over-grow: 9px;
+	--tc-card-two-h: calc(var(--tc-card-h) + var(--tc-card-over-grow));
+	--tc-font-card-over: var(--tc-text-11);
+	--tc-leading-card-over: 13px;
+	--tc-card-over-gap: var(--tc-space-4);
+	--tc-stroke-card-over: var(--tc-stroke-2-2);
 	--tc-due-w: 24px;
 	--tc-due-gap: 1px;
 	--tc-due-repeat-size: 10px;
@@ -955,6 +962,16 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-progress-dot { position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; }
 [data-priority] .tc-progress-dot, .tc-quick-row:has(> [data-priority]) > .tc-progress-dot { background: var(--tc-priority-meta); }
 .tc-card-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+/* A folded result: the card takes the two-line height everywhere it is drawn (a list, the menu's copy, the card under the finger), a capsule still; the result's own title small over the step's. A tap on the small line, from the card's top edge down, opens the result's menu. */
+.is-two-line { --tc-card-h: var(--tc-card-two-h); --tc-radius-card: calc(var(--tc-card-h) / 2); --tc-float-h: calc(var(--tc-card-h) + var(--tc-float-grow)); --tc-radius-float: calc(var(--tc-float-h) / 2); }
+.tc-card-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.tc-card-lines > .tc-card-title { flex: none; line-height: var(--tc-leading-card); }
+.tc-card-over { position: relative; display: flex; align-items: center; gap: var(--tc-card-over-gap); min-width: 0; height: var(--tc-leading-card-over); font-size: var(--tc-font-card-over); line-height: var(--tc-leading-card-over); color: var(--tc-muted); white-space: nowrap; }
+.tc-card-over::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; top: calc((var(--tc-leading-card-over) + var(--tc-leading-card) - var(--tc-card-h)) / 2); }
+.tc-card-over svg { width: var(--tc-font-card-over); height: var(--tc-font-card-over); flex-shrink: 0; stroke-width: var(--tc-stroke-card-over); }
+.tc-card-over-text { min-width: 0; overflow: hidden; -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+[data-priority] .tc-card-over { color: var(--tc-priority-meta); }
+.is-result > .tc-card-title { font-weight: var(--tc-weight-semibold); }
 .tc-due { width: var(--tc-due-w); flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: var(--tc-due-gap); }
 .tc-due-day { font-size: var(--tc-font-due-day); line-height: var(--tc-leading-due-day); font-weight: var(--tc-weight-bold); color: var(--tc-ink-strong); font-variant-numeric: tabular-nums; }
 .tc-due-top { display: flex; align-items: center; justify-content: center; gap: var(--tc-due-repeat-gap); height: var(--tc-leading-due-day); }
@@ -1086,6 +1103,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .is-stretched .tc-card-title, .is-whole .tc-card-title { -webkit-mask-image: none; mask-image: none; }
 .tc-lifted.is-whole { max-width: calc(100% - 2 * var(--tc-whole-margin)); align-items: flex-start; }
 .tc-lifted.is-whole:not(.is-block) { padding-top: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); }
+.tc-lifted.is-whole.is-two-line { padding-top: calc((var(--tc-card-h) - var(--tc-leading-card-over) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card-over) - var(--tc-leading-card)) / 2); }
 .tc-lifted.is-whole .tc-block-card { padding-bottom: var(--tc-block-pad-top); }
 .is-whole .tc-card-title { white-space: normal; overflow-wrap: anywhere; line-height: var(--tc-leading-card); }
 .is-whole .tc-event .tc-item-title { white-space: normal; overflow-wrap: anywhere; -webkit-mask-image: none; mask-image: none; }
@@ -1198,7 +1216,10 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel .tc-menu-row.is-apart { border-top: var(--tc-band); }
 .tc-panel > .tc-menu-row.is-apart:first-child { border-top: 0; }
 .tc-menu-label { flex: 1; min-width: 0; }
-.tc-menu-value { font-size: var(--tc-font-value); color: var(--tc-muted); }
+.tc-menu-value { min-width: 0; overflow: hidden; white-space: nowrap; font-size: var(--tc-font-value); color: var(--tc-muted); }
+/* A row's own word stays whole; a value too long for the rest of the row (a result's or a project's name) gives way and fades out. */
+.tc-menu-row:not(.is-choice) > .tc-menu-label { flex: 1 0 auto; }
+.tc-menu-value.is-long { -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .tc-menu-week { display: flex; gap: var(--tc-menu-week-gap); }
 .tc-menu-weekday { width: var(--tc-menu-weekday-w); text-align: center; font-size: var(--tc-font-caption); font-weight: var(--tc-weight-semibold); color: var(--tc-ink-dim); }
 .tc-menu-weekday.is-on { color: var(--tc-text); }
@@ -1226,6 +1247,12 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel .tc-menu-row.is-quiet { color: var(--tc-muted); }
 .tc-menu-row.is-choice svg { color: var(--tc-accent-ui); stroke-width: var(--tc-stroke-check); }
 .tc-menu-row.is-add svg { color: var(--tc-accent-ui); stroke-width: var(--tc-stroke-add); }
+/* Add to result: the search field on top, as the search window's, on a tile's ground; each open result with its column's icon, its title and its project's name under it, the one the tasks are in ticked. */
+.tc-panel .tc-result-search { padding: var(--tc-space-12); }
+.tc-result-search .tc-search-field { background: var(--tc-menu-tile-bg); }
+.tc-menu-row.tc-result-option svg.tc-result-place { color: var(--tc-muted); stroke-width: var(--tc-stroke-menu); }
+.tc-result-text { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; white-space: nowrap; -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.tc-result-project { font-size: var(--tc-font-sub); color: var(--tc-muted); }
 .tc-menu-ask { padding: var(--tc-space-8); display: flex; flex-direction: column; gap: var(--tc-space-8); }
 .tc-panel > * + .tc-menu-ask, .tc-menu-ask + .tc-menu-tiles, .tc-menu-ask + .tc-menu-group { border-top: var(--tc-band); }
 .tc-menu-ask-question { padding: 0 var(--tc-space-8); display: flex; font-size: var(--tc-font-ask); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); white-space: nowrap; }
@@ -1414,7 +1441,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-search-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-search-bottom); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); background: var(--tc-bg); display: flex; align-items: center; gap: var(--tc-space-8); }
 .tc-search-field { flex: 1; min-width: 0; height: var(--tc-bar-btn-h); box-sizing: border-box; padding: 0 var(--tc-search-field-pad); border-radius: var(--tc-radius-bar-btn); background: var(--tc-card-bg); color: var(--tc-muted); display: flex; align-items: center; gap: var(--tc-space-6); }
 .tc-search-field svg { width: var(--tc-icon-m); height: var(--tc-icon-m); flex-shrink: 0; stroke: currentColor; stroke-width: var(--tc-stroke-ring); }
-.task-calendar input[type="text"].tc-search-input, .tc-search.is-desk input[type="text"].tc-search-input { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); color: var(--tc-text); caret-color: var(--tc-accent); -webkit-user-select: text; user-select: text; }
+.task-calendar input[type="text"].tc-search-input, .tc-search.is-desk input[type="text"].tc-search-input, .tc-panel input[type="text"].tc-search-input { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); color: var(--tc-text); caret-color: var(--tc-accent); -webkit-user-select: text; user-select: text; }
 .tc-search-bar > button.tc-search-cancel { height: var(--tc-bar-btn-h); flex-shrink: 0; color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
 .tc-search-empty { margin: auto 0; text-align: center; color: var(--tc-muted); font-size: var(--tc-font-body); }
 .tc-search.is-desk { position: fixed; z-index: var(--tc-layer-panel); left: var(--tc-search-left); top: calc(var(--tc-search-top) + var(--tc-space-16)); width: var(--tc-search-w); max-height: calc(var(--tc-search-room) - 2 * var(--tc-space-16)); margin-left: calc(-1 * var(--tc-search-w) / 2); box-sizing: border-box; padding: var(--tc-space-8); border-radius: var(--tc-radius-panel); background: var(--tc-panel-bg); box-shadow: var(--tc-shadow-panel); color: var(--tc-text); font-family: var(--tc-font-ui); display: flex; flex-direction: column; gap: var(--tc-space-8); opacity: 0; transform-origin: 50% 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }

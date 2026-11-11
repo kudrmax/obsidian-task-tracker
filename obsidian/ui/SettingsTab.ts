@@ -168,6 +168,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		new Setting(group)
 			.setDesc("A task whose text starts with the prefix gets its colour. Pick one of the six, open the last circle to choose any colour, or type its code. Drag a level by its grip: levels show in this order in the task menu and in the bar shown while a task is typed.")
 			.addButton((b) => b.setButtonText("Add priority").onClick(() => void this.redrawn(this.service.addLevel())));
+		this.text(group, "Result mark", "A task whose text starts with this word is a result: its steps are its subtasks, and its card shows the next one. One word, not a priority's prefix. Lines already in the file are not rewritten.", this.settings.resultMark, (mark) => this.service.setResultMark(mark));
 	}
 
 	/** The labels' rows, as the priorities', the name shown with spaces; how a card of several is painted. */

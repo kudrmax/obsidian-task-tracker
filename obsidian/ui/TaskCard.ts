@@ -10,6 +10,8 @@ import { RenamedTexts } from "./RenamedTexts";
 export interface TaskCardOptions {
 	/** The day the card is shown on: a due date on that day goes without saying. */
 	readonly day: LocalDate | null;
+	/** The task's own title on one line, never a folded result's step: a found task, whose title the search picks words out of. */
+	readonly own?: boolean;
 }
 
 /** A card of the list: the dot of a task in progress, the title fading out on the right, the subtask counter over the description mark, the due date; a card peeking out under it while its subtasks are folded away. */
@@ -46,7 +48,7 @@ export function fillCard(card: HTMLElement, task: TaskItem, opts: TaskCardOption
 	markColours(card, item);
 	card.classList.toggle("is-collapsed", item.collapsed);
 	showProgressDot(card, item);
-	fillTitle(el(card, "div", "tc-card-title"), item.text);
+	fillFace(card, task, item, opts.own === true);
 	renderProjectMark(card, item);
 	renderMeta(card, item);
 	const corner = cardDue(item, opts.day);
@@ -58,6 +60,42 @@ export function fillCard(card: HTMLElement, task: TaskItem, opts: TaskCardOption
 	if (date) el(top, "span", "tc-due-day", dayOfMonth(date));
 	if (repeats) top.appendChild(icon("repeat")).classList.add("tc-due-repeat");
 	if (date) el(due, "span", "tc-due-mon", monthAbbreviation(date));
+}
+
+/**
+ * The card's title as the core draws it (`TaskItem.card`): a folded result with an open step on two lines, the result's
+ * own title small over a target symbol and the step's title under it; any other card its own title on one line, a
+ * result's in semibold. A rename waiting to be written shows on whichever line it renames.
+ */
+function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, own: boolean): void {
+	const face = task.card;
+	const step = own ? null : face.step;
+	card.classList.toggle("is-two-line", step !== null);
+	card.classList.toggle("is-result", own ? task.isResult : face.semibold);
+	if (!step) {
+		fillTitle(el(card, "div", "tc-card-title"), shown.text);
+		return;
+	}
+	const lines = el(card, "div", "tc-card-lines");
+	const over = el(lines, "div", "tc-card-over");
+	over.appendChild(icon("target"));
+	el(over, "span", "tc-card-over-text", shown === task ? face.over ?? "" : shown.title);
+	fillTitle(el(lines, "div", "tc-card-title"), RenamedTexts.shown(step).text);
+}
+
+/** Whose menu a tap on a list's card opens where `pressed` is: a folded result's on its small line, its shown step's anywhere else. */
+export function cardMenuTask(item: TaskItem, pressed: EventTarget | null): TaskItem {
+	const step = item.card.step;
+	return step && !onOver(pressed) ? step : item;
+}
+
+/** Whose menu a tap on a timeline's block opens: a result's next step, else the task's own (`TaskItem.block`). */
+export function blockMenuTask(item: TaskItem): TaskItem {
+	return item.block.step ?? item;
+}
+
+function onOver(target: EventTarget | null): boolean {
+	return target instanceof Element && target.closest(".tc-card-over") !== null;
 }
 
 /**
@@ -73,7 +111,7 @@ export function renderMeta(card: HTMLElement, item: TaskItem): void {
 export function showMeta(card: HTMLElement, item: TaskItem): void {
 	card.querySelector(":scope > .tc-meta")?.remove();
 	const meta = metaOf(item);
-	if (meta) (card.querySelector(":scope > .tc-project-mark") ?? card.querySelector(":scope > .tc-card-title"))?.after(meta);
+	if (meta) (card.querySelector(":scope > .tc-project-mark") ?? card.querySelector(":scope > .tc-card-lines, :scope > .tc-card-title"))?.after(meta);
 }
 
 /**

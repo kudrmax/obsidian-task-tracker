@@ -12,6 +12,9 @@ const INDENT = "--tc-subtask-indent";
 const LIFTED = "is-lifted";
 /** A lifted card that stays where it stood as a dashed place; the other lifted ones, its subtasks, fold away under it. */
 const WAITING = "is-waiting";
+/** A folded result's card, taller by its small line (`--tc-card-over-grow`). */
+const TWO_LINE = "is-two-line";
+const OVER_GROW = "--tc-card-over-grow";
 /** An empty section's plate under the card, or the column's title under a task carried onto it. */
 const HOT = "is-hot";
 
@@ -248,7 +251,7 @@ export class ListDrop implements DropTarget {
 		const entries = new Map(this.list.cards.map((entry) => [entry.card, entry]));
 		for (const node of nodes) {
 			if (node.classList.contains(LIFTED)) {
-				if (!node.classList.contains(WAITING)) removed += step;
+				if (!node.classList.contains(WAITING)) removed += step + (node.classList.contains(TWO_LINE) ? tokenPx(node, OVER_GROW) : 0);
 				else waiting ??= { top: node.offsetTop - removed, height: node.offsetHeight };
 				continue;
 			}

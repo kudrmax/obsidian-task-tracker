@@ -673,7 +673,7 @@ export class Timeline {
 		return { el: block, event, ...span, level };
 	}
 
-	/** The card of the list on the timeline: the dot of a task in progress, the title fading out, the small time or duration on the right. */
+	/** The card of the list on the timeline: the dot of a task in progress, the title fading out (a result's next step's, `TaskItem.block`), the small time or duration on the right. */
 	private placeTask(taken: Block, item: TaskItem): PlacedTask {
 		const block = taken.el;
 		block.classList.add("tc-block");
@@ -681,7 +681,7 @@ export class Timeline {
 		const card = el(block, "div", "tc-block-card");
 		markColours(card, item);
 		showProgressDot(card, item);
-		fillTitle(el(card, "div", "tc-card-title"), RenamedTexts.shown(item).text);
+		fillTitle(el(card, "div", "tc-card-title"), RenamedTexts.shown(item.block.step ?? item).text);
 		renderProjectMark(card, item);
 		renderMeta(card, item);
 		const meta = el(card, "span", "tc-block-meta is-hidden");

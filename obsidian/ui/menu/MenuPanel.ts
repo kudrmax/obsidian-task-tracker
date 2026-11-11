@@ -164,9 +164,9 @@ export function backRow(parent: HTMLElement, title: string, onBack: () => void):
 	return menuRow(parent, { label: title, icon: "chevronLeft", root: "tc-menu-back", iconSide: "start", onPick: onBack });
 }
 
-/** A tile's label too long for its tile, and a question's task name too long for its line, is marked, all in one layout once the panel is built: tiles mark no label as they are made. */
+/** A tile's label too long for its tile, a question's task name too long for its line, and a row's value too long for its row, is marked, all in one layout once the panel is built: tiles mark no label as they are made. */
 export function markLongLabels(panel: HTMLElement): void {
-	const labels = [...panel.querySelectorAll<HTMLElement>(".tc-menu-tile-label, .tc-menu-ask-title")];
+	const labels = [...panel.querySelectorAll<HTMLElement>(".tc-menu-tile-label, .tc-menu-ask-title, .tc-menu-value")];
 	const long = labels.map((label) => label.scrollWidth > label.clientWidth);
 	labels.forEach((label, i) => label.classList.toggle("is-long", long[i]));
 }
