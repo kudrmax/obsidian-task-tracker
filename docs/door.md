@@ -187,8 +187,10 @@ as one tree, the first name winning, and is written back as one under the first 
   own part (`ProjectsSection.takes` false, `newTask` null, no plate; an empty one is left out, so the first subproject's
   header opens), its stages By stage and the view's `newTask` (null); `rules.projectsTakes` is false in a part that
   takes nothing and under a task of it. `tasks.toggleProject` putting a folder on, `tasks.setProject`,
-  `tasks.dropOnProject` onto a folder and `tasks.newProject` with a folder's name write no task; `tasks.createInPlace`
-  with a folder makes the task without it. A task given a folder by hand is read and shown as it is.
+  `tasks.dropOnProject` onto a folder write nothing; `tasks.newProject` with a folder's name answers `null` and writes
+  nothing, so «New project…» in the quick entry or the New Task sheet picks nothing; `tasks.createInPlace`, `tasks.create`
+  and `tasks.edit` leave off a folder the task doesn't carry already; `entry.setProject(folder)` leaves the field's
+  project as it was (unless the renamed task carries that folder), and `capture.project(folder)` reads as none. A task given a folder by hand is read and shown as it is.
 - **Grey names.** `ProjectsRow.status` is `active` while the project's branch (it and its subprojects) has an open task
   in any stage, `waiting` (`waiting` and `muted` true: the name grey) while it has none and a project of it has no task
   yet, `done` when every task of the branch is closed.
@@ -269,7 +271,8 @@ as one tree, the first name winning, and is written back as one under the first 
   row's page, several checks: `options` the whole tree, each `{ project, checked, depth, disabled }` (`disabled`: a folder a pick would give the tasks); a pick writes
   `tasks.toggleProject(keys, name)` (on for all, off for all when all have it; answers each task as it then stands, as
   `tasks.toggleLabel`), No project `tasks.setProject(keys, null)`,
-  «New project…» `tasks.newProject(name, keys)` (a project at the tree's top, checked; answers its `ProjectRef`).
+  «New project…» `tasks.newProject(name, keys)` (a project at the tree's top, checked; answers its `ProjectRef`, or
+  `null`, writing nothing, for a blank name or a folder's: an answer is always a project to pick).
   `value`: «Дружба», «Дружба +1», «No project», or empty when the tasks differ. The same in the bulk menu. A menu reads
   no tasks file: its `MenuScreen` carries `projects`, the `screen.projectTree` of the screen it is opened over (the
   tree's projects in its order), and the page offers exactly those. `tasks.menu(item, "inbox", { today, day, offer:
@@ -384,7 +387,8 @@ quick entry, which writes nothing for it. `project`, the sheet's Project (its na
 goes on the line as `🗂️ Name`, the task still last in its list: `add("inbox", "Call Anna", null, "", "Дружба")` →
 `- [ ] Call Anna 🗂️ Дружба`.
 
-`project(chosen)`: the sheet's Project row for the project chosen (`link`, null for none), `EntryProject`
+`project(chosen)`: the sheet's Project row for the project chosen (`link`, null for none; a folder reads as none, and
+`add` leaves a folder off), `EntryProject`
 `{ page, lit }`: `page` the task menu's Project page (`MenuProject`, «New project…» last), `lit` whether one is chosen.
 The sheet starts with none; a pick on the page is the new `chosen`. `project("Дружба")` → `{ lit: true, page: { current: { name: "Дружба", … },
 value: "Дружба", … } }`.

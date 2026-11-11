@@ -127,8 +127,7 @@ describe("a folder takes no task", () => {
 		const [same] = await svc.toggleProject([item.key], "Работа");
 		expect(same?.project).toBeNull();
 		await svc.setProject([item.key], "работа");
-		const ref = await svc.newProject("Работа", [item.key]);
-		expect(ref).toMatchObject({ name: "Работа", folder: true });
+		expect(await svc.newProject("Работа", [item.key])).toBeNull();
 		const view = await svc.projectsScreen();
 		await svc.dropOnProject([cardIn(part(view, "Дружба"), "Позвонить").drop], "project:Работа");
 		expect(store.text).toBe(before);
@@ -196,6 +195,20 @@ describe("a folder's Projects list", () => {
 		const card = cardIn(part(view, "Backlog"), "Резюме");
 		await svc.dropInProjects([card.drop], { kind: "task", group: "inbox", before: null });
 		expect(store.text).toContain("- [ ] Отчёт за октябрь 🗂️ Отчёты\n- [ ] Резюме 🗂️ Найм\n");
+	});
+
+	it("By stage, nothing nests under a task that has the folder by hand, nor under its subtasks", async () => {
+		const text = FILE.replace("- [ ] Без проекта", "- [ ] Без проекта 🗂️ Работа\n\t- [ ] Шаг");
+		const { svc, store, view } = await chosen("project:Работа", "byStage", text);
+		const inbox = part(view, "Inbox");
+		const card = cardIn(part(view, "Backlog"), "Резюме");
+		const under = (title: string) => ({ kind: "subtask", parent: inbox.rows.find((r) => r.item.title === title)!.item.key, before: null }) as const;
+		expect(projectsTakes(view, [card.drop], under("Без проекта"))).toBe(false);
+		expect(projectsTakes(view, [card.drop], under("Шаг"))).toBe(false);
+		expect(projectsTakes(view, [card.drop], under("Отчёт за октябрь"))).toBe(true);
+		const before = store.text;
+		await svc.dropInProjects([card.drop], under("Без проекта"));
+		expect(store.text).toBe(before);
 	});
 
 	it("All By project: an empty folder's part is left out; one with a task of its own by hand takes nothing", async () => {

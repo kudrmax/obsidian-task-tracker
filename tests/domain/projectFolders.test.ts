@@ -48,6 +48,18 @@ describe("a folder in ## Projects", () => {
 		]);
 	});
 
+	it("is read only outside the note's link, and leaves the name's own spaces as typed", () => {
+		const tree = readTree(["## Projects", "- Работа [[Мои 🗃️ заметки]]", "- Box  two 🗃️", "- A 🗃️ B"]);
+		expect(tree.all().map((p) => [p.node.name, p.node.note, p.node.folder])).toEqual([
+			["Работа", "Мои 🗃️ заметки", false],
+			["Box  two", null, true],
+			["A B", null, true],
+		]);
+		expect(treeLines(tree, "\t")).toEqual(["- Работа [[Мои 🗃️ заметки]]", "- Box  two 🗃️", "- A B 🗃️"]);
+		const doc = parse("## Inbox\n\n- [ ] T 🗂️ Box  two\n\n## Projects\n\n- Box  two 🗃️\n");
+		expect(withTasksInTree(doc)).toBe(doc);
+	});
+
 	it("is written right after the name, before the note's link", () => {
 		const tree = readTree(["## Projects", "- 🗃️ Работа", "\t- Отчёты", "- Дача [[Дача]] 🗃️"]);
 		expect(treeLines(tree, "\t")).toEqual(["- Работа 🗃️", "\t- Отчёты", "- Дача 🗃️ [[Дача]]"]);

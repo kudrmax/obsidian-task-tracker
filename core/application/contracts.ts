@@ -1121,7 +1121,8 @@ export interface TaskService {
 	/**
 	 * «New project…» named `name` (`cleanProjectName`): a project at the top of the tree, last, and `keys` get it, in one
 	 * write (none: only the project, for the quick entry's field). A name the tree has gives that project to `keys`. The
-	 * project, or null for a name of nothing, which writes nothing. A folder's name gives it to no task.
+	 * project, or null for a name of nothing and for a folder's name (no task may be given a folder), which write nothing:
+	 * an answer is always a project to pick.
 	 */
 	newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null>;
 

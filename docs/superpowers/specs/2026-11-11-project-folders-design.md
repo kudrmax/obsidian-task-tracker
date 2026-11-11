@@ -72,3 +72,25 @@ task can be put straight into it.
    it has none and is not done (a project of it with no task yet); `done` as before. `ProjectsRow.waiting` and `muted`
    follow it, so a frontend that only reads them follows without code of its own. A folder with no task in its branch
    is grey.
+9. **«New project…» with a folder's name answers nothing to pick** (review). `newProject` answers `null` for a folder's
+   name as for a blank one and writes nothing, so a frontend that picks what it answers (the quick entry's
+   `entry.setProject(made.name)`, the app's New Task sheet) picks nothing; no new contract. On top, at the root:
+   `QuickEntry.setProject` keeps the field's project when given a folder (unless the renamed task carries that folder
+   already), `capture.project(folder)` reads as none, and `create`, `edit` and `createInPlace` leave off a folder the task
+   doesn't carry (`draftProjects`): a task given one by hand keeps it through an edit.
+10. **Nothing nests under a task that carries a folder**, in whatever part draws it (By stage too) and under its
+    subtasks: `projectsTakes` false and `dropInProjects` writes nothing.
+11. **The mark is read only outside the note's link** (`- Работа [[Мои 🗃️ заметки]]` is no folder; the link stays
+    whole), and taken out with the space before it, the rest of the line as typed: `- Box  two 🗃️` is «Box  two», so a
+    task's `🗂️ Box  two` still names it.
+9. **«New project…» with a folder's name answers nothing to pick** (review). `newProject` answers `null` for a folder's
+   name as for a blank one and writes nothing, so a frontend that picks what it answers (the quick entry's
+   `entry.setProject(made.name)`, the app's New Task sheet) picks nothing; no new contract. On top, at the root:
+   `QuickEntry.setProject` keeps the field's project when given a folder (unless the renamed task carries that folder
+   already), `capture.project(folder)` reads as none, and `create`, `edit` and `createInPlace` leave off a folder the task
+   doesn't carry (`draftProjects`): a task given one by hand keeps it through an edit.
+10. **Nothing nests under a task that carries a folder**, in whatever part draws it (By stage too) and under its
+    subtasks: `projectsTakes` false and `dropInProjects` writes nothing.
+11. **The mark is read only outside the note's link** (`- Работа [[Мои 🗃️ заметки]]` is no folder; the link stays
+    whole), and taken out with the space before it, the rest of the line as typed: `- Box  two 🗃️` is «Box  two», so a
+    task's `🗂️ Box  two` still names it.
