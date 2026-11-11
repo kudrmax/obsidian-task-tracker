@@ -18,8 +18,9 @@ The funnel (Inbox / Backlog → Soon → Today → calendar) answers «when» an
    in Backlog and Inbox (grey name); done — every task done, the project goes to Done, a new task brings it back; a new
    empty project waits until its first task.
 4. **Inbox and project are independent.** A task in Inbox may already have a project.
-5. **A folded task with subtasks shows its next open subtask** — every such task, as a result does today. `🎯`, Make
-   result / Make task, the Add to result page and the Result mark setting go.
+5. **A folded task with subtasks shows its next open subtask** — every such task, at any depth (a subtask with subtasks
+   too), as a result does today. Results go entirely: `🎯`, Make result / Make task, the Add to result page and the
+   Result mark setting.
 6. **Grouping by project inside the funnel's columns goes** (groups in Backlog and Soon, Group by project). The folder mark
    on the card stays.
 7. **The Projects screen** exactly as Max's spec and the boards: wheel position left of Inbox (plugin), a Projects tab left
