@@ -33,25 +33,26 @@ Done when: each item works in the plugin (phone view and desktop, light and dark
 
 Constraint: `TODOs Tasks.md` stays the only truth, everything works by hand and offline (the app reads only that file).
 
-- **The tree is a heading of the tasks file, `## Projects`, a nested list of links**, after Inbox:
+- **The tree is a heading of the tasks file, `## Projects`, a nested list of plain names**, after Inbox:
 
   ```
   ## Projects
-  - [[Окружение в Сербии]]
-    - [[Где знакомиться]]
-      - [[Приложения для знакомств]]
-    - [[Свидание]]
-  - [[Дружба]]
-    - [[Small talk]]
+  - Окружение в Сербии
+    - Где знакомиться
+      - Приложения для знакомств
+    - Свидание
+  - Дружба [[Моя заметка о дружбе]]
+    - Small talk
   ```
 
-  Order of lines = the manual order; indent (two spaces or a tab) = nesting. A line is a plain list item, not a task, so
-  no other parser takes it for a task. Links, so a project with a note opens it, and Obsidian renames the tree line and
-  every task's field together when the note is renamed; without a note the link is simply unresolved.
+  Order of lines = the manual order; indent (two spaces or a tab) = nesting. A line is a plain list item, not a task.
+  **A project is not a file.** Its name is plain text, never a wikilink (`[[…]]` is a note in Obsidian). Only a project
+  Max attached a note to carries that note's link after its name, on its tree line alone; tasks never carry links.
 - **Names are unique in the tree** (case and Unicode composition aside, as today's `projectKey`). The task names its
   project by name only; the path comes from the tree. «New project…» with a taken name offers that project.
-- **A task's projects: one `🗂️` field per project**, `🗂️ [[Дружба]] 🗂️ [[Small talk]]`, written in the field's place
-  today. Today's lines read unchanged (one field = one project). A subtask's projects are its parent's, as today.
+- **A task's projects: one `🗂️` field per project**, `🗂️ Дружба 🗂️ Small talk`, written in the field's place today. A
+  name runs to the next field's mark or the line's end. Today's `🗂️ [[Дружба]]` is read as `Дружба` and rewritten plain
+  by the one-time move. A subtask's projects are its parent's, as today.
 - **A task's project missing from the tree** (typed by hand) is shown as a top-level project at the tree's end and written
   into the tree on the next write the app makes anyway; nothing is lost.
 - **Status, Done, waiting** are computed from the tasks every time; nothing about them is stored.
@@ -61,7 +62,8 @@ Constraint: `TODOs Tasks.md` stays the only truth, everything works by hand and 
 Nothing of the old model stays, in the core, the plugin, the app or docs/plugin:
 
 - the project tag and the Project tag setting; projects found from notes (the `Projects` port, the metadata cache);
-- «New project…» making or tagging a note; a project is a line of the tree, a note only by the same name;
+- «New project…» making or tagging a note, and a project being a note at all: a project is a name in the tree; a note
+  is attached only by its link on the tree line;
 - the block at the end of a project note (the screen filtered to the project) and the app's project view: the Projects
   screen is the one place of a project;
 - the groups by project in Backlog and Soon, Group by project, the drop on a column title «by project», the per-project
