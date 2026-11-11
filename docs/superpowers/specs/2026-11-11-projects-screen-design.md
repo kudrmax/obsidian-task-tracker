@@ -184,3 +184,7 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md Â«AgentsÂ
     plugin's (its note search, then `setProjectNote(name, link)`); a link typed with `[[ ]]` is taken without them.
 18. **The old settings** `projectTag` and `resultMark` stay in `data.json`, read only by the move; the settings form's
     fields and `setProjectTag`/`setResultMark` are stubs that write nothing until the frontends drop them.
+22. **A menu's Project page reads no file.** `ScreenView.projectTree` is the tree's projects in its order; a frontend
+    hands it in as `MenuScreen.projects` with every `tasks.menu` and `tasks.bulkMenu`, the plugin and the app alike, so the
+    app's menus stay asked over the settings alone. Left out, the plugin's service takes the tree of the file it read
+    last and the door the tree of `tasks` when handed in.

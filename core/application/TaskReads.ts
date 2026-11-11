@@ -208,6 +208,7 @@ export class TaskReads {
 			calendars: true,
 			projects,
 			project: null,
+			projectTree: new ProjectIndex(projectTreeOf(doc)).known(),
 			titleDrops: this.titleDrops(date, projects),
 		};
 	}
@@ -240,6 +241,7 @@ export class TaskReads {
 			calendars: false,
 			projects: off,
 			project: null,
+			projectTree: [],
 			titleDrops: this.titleDrops(date, off),
 		};
 	}
@@ -415,12 +417,12 @@ export class TaskReads {
 
 	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel {
 		const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectChoices());
+		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectChoices(screen));
 	}
 
 	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel {
 		const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices());
+		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices(screen));
 	}
 
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[] {
@@ -464,9 +466,10 @@ export class TaskReads {
 		return itemLevels(usableLevels(settings.priorities), usableLabels(settings.labels), (name) => index.refOf(name, mark)!);
 	}
 
-	/** The projects the Project page offers: the tree read last, each with its depth. */
-	private projectChoices(): readonly { readonly project: ProjectRef; readonly depth: number }[] {
-		return new ProjectIndex(this.source.tree()).known().map((project) => ({ project, depth: project.path.length - 1 }));
+	/** The projects the Project page offers, each with its depth: the screen's when it gives them, else the tree read last. */
+	private projectChoices(screen?: MenuScreen): readonly { readonly project: ProjectRef; readonly depth: number }[] {
+		const known = screen?.projects ?? new ProjectIndex(this.source.tree()).known();
+		return known.map((project) => ({ project, depth: project.path.length - 1 }));
 	}
 
 	private today(): LocalDate {

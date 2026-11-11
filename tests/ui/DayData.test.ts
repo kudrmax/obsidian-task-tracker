@@ -26,7 +26,7 @@ const event = (title: string): CalendarEvent => ({
 const noFile = async (date: LocalDate): Promise<ScreenView> => {
 	const none = { inbox: [], backlog: [], soon: [], now: [] };
 	const off = { canGroup: false, on: false, groups: [] };
-	return { day: { date, list: [], slotted: [] }, soon: [], inbox: [], backlog: [], done: [], sections: none, offer: { lists: none, ungrouped: "" }, missing: true, calendars: false, projects: { inbox: off, backlog: off, soon: off, now: off }, project: null, titleDrops: { day: { kind: "list", column: "day", before: null }, soon: { kind: "title", list: "soon", date: null, byProject: false }, inbox: { kind: "title", list: "inbox", date: null, byProject: false }, backlog: { kind: "title", list: "backlog", date: null, byProject: false } } };
+	return { day: { date, list: [], slotted: [] }, soon: [], inbox: [], backlog: [], done: [], sections: none, offer: { lists: none, ungrouped: "" }, missing: true, calendars: false, projects: { inbox: off, backlog: off, soon: off, now: off }, project: null, projectTree: [], titleDrops: { day: { kind: "list", column: "day", before: null }, soon: { kind: "title", list: "soon", date: null, byProject: false }, inbox: { kind: "title", list: "inbox", date: null, byProject: false }, backlog: { kind: "title", list: "backlog", date: null, byProject: false } } };
 };
 
 class SlowCalendars implements CalendarService {

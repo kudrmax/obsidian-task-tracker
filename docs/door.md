@@ -217,7 +217,11 @@ name gets the note), the old fields are written plain, `🎯` goes off the lines
   `tasks.toggleProject(keys, name)` (on for all, off for all when all have it; answers each task as it then stands, as
   `tasks.toggleLabel`), No project `tasks.setProject(keys, null)`,
   «New project…» `tasks.newProject(name, keys)` (a project at the tree's top, checked; answers its `ProjectRef`).
-  `value`: «Дружба», «Дружба +1», «No project», or empty when the tasks differ. The same in the bulk menu.
+  `value`: «Дружба», «Дружба +1», «No project», or empty when the tasks differ. The same in the bulk menu. A menu reads
+  no tasks file: its `MenuScreen` carries `projects`, the `screen.projectTree` of the screen it is opened over (the
+  tree's projects in its order), and the page offers exactly those. `tasks.menu(item, "inbox", { today, day, offer:
+  screen.offer, projects: screen.projectTree })` over the settings alone lists the whole tree. Left out, the door takes
+  the tree of `tasks` when it is handed in (none without), the plugin of the file it read last.
 - `tasks.setProject(keys, name | null)`: the tasks' projects become that one alone. `tasks.projects()`: the tree's
   projects in its order (the quick entry's Project button and `capture.project`; `tasks.projectNotes()` is its old name).
 - `tasks.search(query)`: each `SearchHit` carries `projectPath`, the task's first project's path, `null` for none.
