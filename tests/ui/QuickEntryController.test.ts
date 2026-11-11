@@ -1372,7 +1372,7 @@ describe("QuickEntryController: the Projects list is a list the field stands in 
 			{ id: card.id, item: card.item, level: 0, card, drop: card.drop },
 			...card.item.subtasks.map((s) => ({ id: `${name}/${s.id}`, item: s, level: 1, card: null, drop: { key: s.key, from: name } })),
 		]);
-		return { key: name, group: name, title, header: true, opens: true, empty: tasks.length === 0, plate: tasks.length === 0, path: [], depth: 0, cards, rows, newTask: { place: { kind: "list", list, group: null, before: null }, project: "P" } };
+		return { key: name, group: name, title, header: true, opens: true, takes: true, empty: tasks.length === 0, plate: tasks.length === 0, path: [], depth: 0, cards, rows, newTask: { place: { kind: "list", list, group: null, before: null }, project: "P" } };
 	}
 
 	const view = () => projectsView([part("s", "Soon", [a], "soon"), part("t", "Today", [b], "now"), part("i", "Inbox", [], "inbox")]);
