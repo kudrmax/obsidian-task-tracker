@@ -16,8 +16,6 @@ export interface ListEntryInput {
 	readonly pending: readonly PendingText[];
 	/** The field writes a section's name: it stands as the new header does, apart from the group above, whose plate stays. */
 	readonly section?: boolean;
-	/** The section named in a project's part for the task being typed: its header stands over the field. */
-	readonly newSection?: string | null;
 	/** Draws the field into `parent`, the row that stands in the list; gives the field's element. */
 	field(parent: HTMLElement): HTMLElement;
 }
@@ -274,7 +272,6 @@ export class TaskList {
 			fillUnwrittenCard(node, text);
 			put(node, level);
 		});
-		if (entry.newSection) this.namedHeader(drawing, entry.newSection);
 		const row = drawing.take(ENTRY, () => el(null, "div", QUICK_ROW)).node;
 		if (this.renamingNow) drawing.standIn(row);
 		else if (typed) drawing.regrow(row);
@@ -283,14 +280,6 @@ export class TaskList {
 		row.classList.toggle("is-section", entry.section === true);
 		put(row, entry.level);
 		return row;
-	}
-
-	/** The header of the section named for the task being typed, over the field, as a section's header looks. */
-	private namedHeader(drawing: RowsDrawing, name: string): HTMLElement {
-		const head = drawing.take("named", () => el(null, "div", "tc-group-head is-named")).node;
-		head.replaceChildren();
-		el(head, "span", "tc-group-name", name);
-		return head;
 	}
 
 	/** A task the field has just written takes over the row of the text it was typed as; it stops being awaited then. */

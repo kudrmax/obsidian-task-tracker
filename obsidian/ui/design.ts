@@ -25,6 +25,8 @@ export const DESIGN = {
 	barHeight: 44,
 	/** On the desktop the bar is a capsule next to the field, this far from it; its panels stand as far from it. */
 	deskBarGap: 8,
+	/** A step of the Projects screen's tree: the core's `PROJECTS_INDENT`, a drag's sideways step too. */
+	treeIndent: 12,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -43,6 +45,7 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	itemGap: "--tc-item-gap",
 	barHeight: "--tc-bar-h",
 	deskBarGap: "--tc-desk-bar-gap",
+	treeIndent: "--tc-tree-indent",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */

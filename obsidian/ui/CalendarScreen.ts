@@ -63,8 +63,6 @@ import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
 
 const MINUTE_MS = 60_000;
-/** The lists a card is carried from: a Projects card of one of them is carried onto the tree. */
-const LIST_COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox", "backlog"];
 /** The place of the screens a list stands at: Backlog under Inbox, Done left of it. */
 const PLACE_OF_LIST: Readonly<Record<Extract<TaskScreen, { kind: "list" }>["list"], Place>> = { done: "done", inbox: "inbox", backlog: "inbox", soon: "soon" };
 
@@ -113,12 +111,11 @@ export class CalendarScreen extends Component {
 	/** The tree of the Projects screen as a place for a card or the plus, and its tasks as a place for the plus. */
 	private readonly treeDrop = new TreeDrop({
 		tree: () => this.projects?.treeShown ?? null,
-		hoverMs: () => this.settings.longPressMs,
 		unfold: (node) => void this.act(() => this.deps.tasks.unfoldProjectNode(node)).then(() => this.projects?.refreshTree()),
 	});
 	private readonly tasksDrop = new TasksDrop(() => this.projects?.tasksShown ?? null);
-	/** The project each Projects card is shown under (`ProjectsCard.from`), by its task's id: what a drop on the tree replaces. */
-	private readonly projectsFrom = new Map<string, string | null>();
+	/** The Projects card pressed last: a drop of it on the tree hands the core this very card's `drop` (a task of two parts is two cards). */
+	private pressedProjectsCard: ProjectsCard | null = null;
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
 	private soonEl: HTMLElement | null = null;
@@ -995,10 +992,11 @@ export class CalendarScreen extends Component {
 	private attachProjectsCard(card: HTMLElement, model: ProjectsCard, signal: AbortSignal): void {
 		const item = model.item;
 		card.dataset.menuFrom = model.menuFrom;
-		this.projectsFrom.set(item.id, model.from);
+		card.dataset.card = model.id;
+		card.addEventListener("pointerdown", () => (this.pressedProjectsCard = model), { capture: true, signal });
 		this.found.attach(card, item);
-		const from = LIST_COLUMNS.find((column) => column === model.menuFrom) ?? null;
-		if (model.canDrop && from) return this.drag.attachCard(card, item, from, [], signal);
+		/** The drag's origin is only what the lists read; the tree takes the card's own `drop`. An open task's card is of a list. */
+		if (model.canDrop) return this.drag.attachCard(card, item, model.menuFrom as ListColumn, [], signal);
 		card.addEventListener("click", (e) => {
 			if (!this.fold(item, e.target)) this.showMenu(cardMenuTask(item, e.target), card, undefined, undefined, undefined, undefined, item);
 		}, { signal });
@@ -1007,8 +1005,8 @@ export class CalendarScreen extends Component {
 	/** A card let go on a row of the tree: the project it was shown under gives way to the row's; its place in the funnel stays. */
 	private async dropOnTree(drag: TaskDragPayload, node: string): Promise<null> {
 		this.bulk.dropping(drag);
-		const keys = droppedTasks(drag).map((task) => task.key);
-		await this.act(() => this.deps.tasks.dropOnProject(keys.map((key) => ({ key, from: this.projectsFrom.get(drag.item.id) ?? null })), node));
+		const card = this.pressedProjectsCard;
+		if (card) await this.act(() => this.deps.tasks.dropOnProject([card.drop], node));
 		await this.projects?.refresh();
 		return null;
 	}

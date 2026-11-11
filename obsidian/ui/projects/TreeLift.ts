@@ -1,11 +1,11 @@
-import { projectsGap, type ProjectsRow, type TreePlace } from "../../../core/application/contracts";
+import type { ProjectsRow, TreePlace } from "../../../core/application/contracts";
 import { px } from "../dom";
 import { windowRoom } from "../wholeCard";
 import { DropLine } from "../drag/DropLine";
 import { LongPress } from "../drag/LongPress";
 import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
-import { showGapLine, treeGap, type TreeShown } from "./ProjectDrops";
+import { liftLanding, showGapLine, type TreeLanding, type TreeShown } from "./ProjectDrops";
 
 export interface TreeLiftDeps {
 	readonly arbiter: GestureArbiter;
@@ -51,11 +51,11 @@ export class TreeLift {
 		/** The row stays inside the window, as a carried card does. */
 		const margin = windowRoom(row).margin;
 		row.classList.add("is-lifted");
-		let at: { readonly gap: number; readonly depth: number } | null = null;
+		let at: TreeLanding | null = null;
 		const move = (x: number, y: number): void => {
 			float.style.transform = `translate3d(${px(Math.max(margin, Math.min(window.innerWidth - margin - rect.width, x - grab.x)))}, ${px(y)}, 0)`;
-			at = treeGap(tree, x, y, model.node, { depth: model.depth, x: e.clientX });
-			if (at) showGapLine(line, tree, at.gap, at.depth, null);
+			at = liftLanding(tree, y, x - e.clientX, model.node);
+			if (at) showGapLine(line, tree, at.gap, at.landing.depth, null);
 			else line.hide();
 		};
 		const moved = (m: PointerEvent): void => move(m.clientX, m.clientY);
@@ -67,7 +67,7 @@ export class TreeLift {
 			line.hide();
 			row.classList.remove("is-lifted");
 			this.deps.arbiter.release(LIFT);
-			if (keep && at) this.deps.onMove(model.title, projectsGap(tree.rows, at.gap, at.depth, model.node).place);
+			if (keep && at) this.deps.onMove(model.title, at.landing.place);
 		};
 		const up = (): void => end(true);
 		const cancel = (): void => end(false);
