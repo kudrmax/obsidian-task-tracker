@@ -2,16 +2,18 @@ import Foundation
 import Testing
 @testable import Core
 
-/// A task of a project (`🗂️ [[Note]]`) through the calls the app makes, in JavaScriptCore: the field stays on the line,
-/// no title shows it, and the screen looks as it did before projects.
+/// A task of a project (`🗂️ Name`, the name a project of `## Projects`) through the calls the app makes, in
+/// JavaScriptCore: the field stays on the line, no title shows it, and the lists draw no project groups.
 @Suite struct ProjectTaskTests {
     static let day = "2030-01-07"
     static let later = "2030-01-09"
     static let project = "Окружение в новой стране"
-    static let field = "🗂️ [[Окружение в новой стране]]"
+    static let field = "🗂️ Окружение в новой стране"
     static let exchange = "Сходить на языковой обмен"
     static let file = [
         "## Inbox", "",
+        "## Projects", "",
+        "- \(project)", "",
         "## Now", "",
         "## Soon", "",
         "- [ ] \(exchange) \(field) 📅 2030-01-07",
@@ -27,10 +29,7 @@ import Testing
 
     let core = try! PhoneCore(script: Fixtures.phoneScript)
     let at = Fixtures.date(7, 9)
-    /// This device shows every list ungrouped: the lists as they were before projects, each action seen in plain sections.
-    static let plain = #"{"on":{"backlog":false,"soon":false}}"#
-
-    func board(_ vault: FakeVault) -> TaskBoard { TaskBoard(core: core, vault: vault, grouping: MemoryText(Self.plain)) }
+    func board(_ vault: FakeVault) -> TaskBoard { TaskBoard(core: core, vault: vault) }
 
     // MARK: Reading
 
@@ -42,36 +41,28 @@ import Testing
         #expect(snapshot.timeline.slots.map(\.card.item.title) == ["Позвонить"])
     }
 
-    /// A device that turned grouping off: Backlog keeps its sections, and a card's Section menu offers the whole list's sections.
-    @Test func backlogUngroupedLooksAsBeforeProjects() throws {
+    /// The lists draw no project groups any more: Backlog keeps its sections, and a card's Section menu offers the whole
+    /// list's sections.
+    @Test func backlogShowsItsSectionsAndNoProjectGroups() throws {
         let snapshot = try snapshot(FakeVault(Self.file))
         let backlog = try #require(snapshot.lists[.backlog])
         #expect(backlog.groups.map(\.header) == ["No section", "Дальний"])
         #expect(backlog.groups.map { $0.cards.map(\.item.title) } == [["Someday", "Free"], ["Far"]])
-        #expect(snapshot.screen.offer["projects"].isNull)
         let someday = try item("Someday", in: snapshot)
         let menu = try #require(snapshot.menus[someday.id])
         #expect(menu.sections?.choice.names.contains("Дальний") == true)
     }
 
-    /// By the door's defaults the board groups Backlog by project, as the plugin does: its groups come with the screen, and
-    /// a card's Section menu offers its project's sections.
-    @Test func byDefaultBacklogIsGroupedByProject() throws {
-        let snapshot = try TaskBoard(core: core, vault: FakeVault(Self.file)).snapshot(day: Self.day, measures: Self.measures, now: at)
-        let backlog = try #require(snapshot.screen.projects["backlog"])
-        #expect(backlog.canGroup && backlog.on)
-        #expect(backlog.groups.map(\.title) == [Self.project, "No project"])
-        #expect(backlog.groups[0].zone == .string(Self.project))
-        #expect(backlog.groups[0].sections.flatMap { $0.rows.map(\.item.title) } == ["Someday"])
-        #expect(snapshot.screen.projects["soon"]?.on == false)
-        let someday = try item("Someday", in: snapshot)
-        #expect(snapshot.menus[someday.id]?.sections?.choice.names.contains("Дальний") == false)
-    }
-
-    @Test func withTheDoorsDefaultsBacklogWouldBeGroupedAndItsMenuCutToTheProject() throws {
-        let screen = try #require(try core.call("tasks.screen", [Self.day], context: DoorContext(tasks: Self.file, now: at)).result as? [String: Any])
-        let offer = try #require(screen["offer"] as? [String: Any])
-        #expect(offer["projects"] != nil)
+    /// A task of two projects shows both, its first as its project, each with its path in the tree.
+    @Test func aTaskOfTwoProjectsShowsBoth() throws {
+        let file = Self.file
+            .replacingOccurrences(of: "- \(Self.project)\n", with: "- \(Self.project)\n  - Клубы\n")
+            .replacingOccurrences(of: "- [ ] Free", with: "- [ ] Free \(Self.field) 🗂️ Клубы")
+        let free = try item("Free", in: snapshot(FakeVault(file)))
+        #expect(free.title == "Free")
+        #expect(free.projects.map(\.name) == [Self.project, "Клубы"])
+        #expect(free.projects.map(\.path) == [[Self.project], [Self.project, "Клубы"]])
+        #expect(free.project?.name == Self.project)
     }
 
     @Test func searchFullScreenAndFindShowTheTitleAlone() throws {
@@ -80,6 +71,7 @@ import Testing
         let groups: [SearchGroup] = try board.read("tasks.search", ["языковой"], over: files)
         let hit = try #require(groups.flatMap(\.hits).first)
         #expect(hit.item.title == Self.exchange)
+        #expect(hit.projectPath == [Self.project])
         #expect(hit.title.map(\.text).joined() == Self.exchange)
         let found: TaskItem = try board.read("tasks.find", [hit.item.key.json, .string(hit.item.text)], over: files)
         #expect(found.title == Self.exchange)
@@ -91,7 +83,6 @@ import Testing
 
     // MARK: Moves
 
-    /// In Backlog's sections, as a device that groups it not by project draws them.
     @Test func aDragIntoAnotherSectionKeepsTheField() throws {
         let vault = FakeVault(Self.file)
         let board = board(vault)
@@ -190,6 +181,19 @@ import Testing
         #expect(line("Позвонить", in: snoozed)?.contains(Self.field) == true)
         guard case .changed(let completed) = try core.complete(id: id, text: Self.file, settingsJSON: "", now: at) else { Issue.record("stale"); return }
         #expect(completed.contains("- [x] Позвонить \(Self.field)"))
+    }
+
+    /// A file of the old format moves once, on the first write: the field written plain, the tree made after Inbox.
+    @Test func theOldFieldIsWrittenPlainOnTheFirstWrite() throws {
+        let old = Self.file
+            .replacingOccurrences(of: "## Projects\n\n- \(Self.project)\n\n", with: "")
+            .replacingOccurrences(of: Self.field, with: "🗂️ [[\(Self.project)]]")
+        let vault = FakeVault(old)
+        let board = board(vault)
+        try board.write("tasks.pickStatus", [.array([try item("Free", in: snapshot(vault)).key.json]), "done"])
+        #expect(!vault.text.contains("[[\(Self.project)]]"))
+        #expect(vault.text.contains("## Projects\n\n- \(Self.project)\n"))
+        try keepsLine(vault, "Someday")
     }
 
     @Test func quickEntryWritesNoProject() throws {

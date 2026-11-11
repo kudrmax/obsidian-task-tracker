@@ -239,3 +239,40 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
     line stay in sight under the finger. Back over the tasks it is the whole card held where it was grabbed. A lifted
     project rides 16 px below the finger instead: its drop line sits between rows, and the row above the line is the one
     it would nest under, so that row and the line stay seen. The plus already stands aside of the finger and keeps doing so.
+
+### iPhone app (frontend-swift)
+
+41. **(Obsolete since Decision 22: menus carry `projects`.)** **The Project page is read over the tasks file when it opens.** The app draws a card's menu over the settings alone
+    (no file per card), and such a menu's `project.options` hold only the task's own projects. The Project row is drawn
+    from that menu (its value is right), and its page is asked again, over the file, as it opens (`tasks.bulkMenu` of the
+    tasks) — the whole tree. The New Task sheet's `capture.project` is read over the file too.
+42. **A subproject on a Project page in the app's menus** shows its parent's name as the row's subtitle, not an indent:
+    an iOS menu row has no indent, and one faked with spaces wraps a long name back under its parent.
+43. **No vault scan on the phone.** The app hands the door no `context.projects`: projects are the tree, and the one
+    move made by the app (if it writes first) makes each `🗂️ [[Note]]` a project without its note attached; the plugin,
+    which knows the notes, attaches them when it moves first. Max's plugin is released first, so the move is its.
+44. **The Projects tab** is the ribbon's first place, the whole screen wide, left of Inbox: a swipe right from Inbox
+    goes there, one place as every swipe (`RibbonColumns(projects:)`; Inbox and Soon still split the screen in half). A
+    tab moves the ribbon by the scroll view's own animation, which a finger stops where it is, and the tab bar follows
+    the ribbon whatever moves it.
+45. **The plus on the Projects page** asks a name in an alert, as New Section and New Project do: let go on the tasks,
+    «New Task» for the part it is let go in (`newTask` of that part, else the view's); let go in the tree, «New
+    Project» for the gap the line shows, at the depth the finger stands at, one level per 24 points past the tree's edge.
+    A lifted project keeps its own depth until the finger shifts, a level per 24 points either way. Both are kept
+    within `projectsLevels`. The app's typed-in-place field belongs to the funnel's lists.
+46. **The project menu in the app** (Decision 1): Rename; with a note, a «Note» group holding the note's name (opens it
+    in Obsidian, `projects.noteUrl`) and Detach; without one, Rename alone, as the app cannot attach.
+47. **By stage on the app's card**: the subproject small over the title after a folder (`ProjectsCard.over`); on a folded
+    task it takes the small line's place, the next step's title staying the title.
+48. **The stage's symbol** on a card By project is the tab bar's: sun Today, hourglass Soon, tray Inbox, an archive box
+    Backlog; a date is the usual date corner.
+49. **A card's folder mark and the full screen's project line** open the Projects tab on that project
+    (`tasks.selectProjectNode`).
+50. **Search opened from the Projects tab** shows each find's `projectPath` under its title, «Дружба › iPhone», in the
+    line where the project's name stands otherwise.
+51. **The tree's width** is the divider's, kept on the device, within the bounds the core gives a list beside the
+    calendar (`rules.listWidths`), as Today's divider.
+52. **Over the tree the carried copy rides above the finger** (16 points over it, gliding there as the finger enters
+    the tree and back as it leaves): a card's target is the row under the finger, lit in the drop's colour, and a lifted
+    project's or the plus's is the line under it; neither may be covered. Elsewhere the copy stays where the finger took
+    it. The card keeps its own width; a lifted project's own row stays as its faded place.

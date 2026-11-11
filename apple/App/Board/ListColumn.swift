@@ -112,15 +112,6 @@ struct ColumnTitle: View {
             if dayArrows {
                 Button { Task { await model.showToday() } } label: { litText.frame(height: ColumnMetrics.titleRow).contentShape(.rect) }
                     .accessibilityHint("Back to today")
-            } else if let list, list.canGroup {
-                Menu {
-                    Toggle(isOn: Binding(get: { list.grouped }, set: { on in Task { await model.setGrouping(list.column, on) } })) {
-                        Label("Group by Project", systemImage: "folder")
-                    }
-                } label: {
-                    litText.frame(height: ColumnMetrics.titleRow).contentShape(.rect)
-                }
-                .accessibilityAddTraits(.isHeader)
             } else {
                 litText.accessibilityAddTraits(.isHeader)
             }
@@ -180,70 +171,8 @@ struct SectionTitle: View {
     }
 }
 
-/// A project's group header, the section header with two additions (board Proj1): a chevron before the title, turned down
-/// while the group is open, which a tap on the header folds; folded, the count of its tasks after the title; and the arrow
-/// that opens the project's note. «No project» is muted and has no arrow.
-struct ProjectHeader: View {
-    let project: BoardProject
-    let column: BoardColumn
-    @Bindable var model: BoardModel
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .bold))
-                .rotationEffect(.degrees(project.folded ? 0 : 90))
-                .frame(width: 16, height: ColumnMetrics.groupLeading)
-                .padding(.leading, -6)
-            Text(project.title)
-                .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
-                .lineLimit(1)
-                .frame(height: ColumnMetrics.groupLeading)
-            if project.folded {
-                // A card dropped into the folded part: the old number fades out and the new one in (decision 56).
-                ZStack {
-                    Text(verbatim: "\(project.count)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(Palette.muted)
-                        .id(project.count)
-                        .transition(.opacity)
-                }
-                .frame(height: ColumnMetrics.groupLeading)
-                .animation(.easeInOut(duration: 0.25), value: project.count)
-            }
-            if project.canOpenNote, let ref = project.project {
-                Button { model.openProject(ref) } label: {
-                    Image(systemName: "arrow.up.forward.app")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 28, height: ColumnMetrics.groupHead)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, -6)
-                .accessibilityLabel("Open \(project.title)")
-            }
-            Spacer(minLength: 0)
-        }
-        // The fold in the rows' own time, not in one frame: the chevron turns, the count fades in or out and the arrow
-        // slides beside it as the rows fold.
-        .animation(CarryMotion.dropAnimation, value: project.folded)
-        .foregroundStyle(project.zone.isNull ? Palette.muted : Palette.pullInk(scheme))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-        .padding(.leading, CardMetrics.leading)
-        .padding(.trailing, 4)
-        .frame(height: ColumnMetrics.groupHead)
-        .contentShape(.rect)
-        .onTapGesture { Task { await model.toggleFold(column, project.key) } }
-        .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityValue(project.folded ? "Collapsed, \(project.count) tasks" : "Expanded")
-    }
-}
-
-/// A section's heading in a list: a tap opens its menu, which renames or removes it as the core offers (inside a
-/// project's group, only that project's tasks); a long press lifts it, as the plugin's.
+/// A section's heading in a list: a tap opens its menu, which renames or removes it as the core offers; a long press lifts
+/// it, as the plugin's.
 struct SectionHeader: View {
     let title: String
     let group: BoardGroup

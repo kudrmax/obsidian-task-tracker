@@ -94,3 +94,31 @@ import Testing
         #expect(columns.toToday(at: 600) == 1)
     }
 }
+
+/// The Projects page stands left of Inbox as its own place, the whole screen wide: Inbox and Soon still split the screen in
+/// half, and Today's divider still sets only the day list.
+@Suite struct RibbonProjectsPlaceTests {
+    @Test func theProjectsPageIsAWholeScreenLeftOfInbox() {
+        let columns = RibbonColumns(width: 400, list: 300, done: false, projects: true)
+        #expect(columns.stops == [0, 400, 600, 800])
+        #expect(columns.half == 200)
+        #expect(columns.toToday(at: 600) == 0)
+        #expect(columns.toToday(at: 800) == 1)
+        #expect(columns.dayList(toToday: 1) == 300)
+    }
+
+    @Test func theDoneColumnStandsBetweenProjectsAndInbox() {
+        let columns = RibbonColumns(width: 400, list: 120, done: true, projects: true)
+        #expect(columns.doneStop == 400)
+        #expect(columns.stops == [0, 400, 600, 800, 1000])
+    }
+
+    @Test func aSwipeFromInboxGoesOnePlaceToProjects() {
+        let paging = RibbonPaging(stops: RibbonColumns(width: 400, list: 300, done: false, projects: true).stops)
+        let rule: (Double, Double, Double) -> Int = { moved, distance, _ in abs(moved) > distance / 2 ? (moved > 0 ? 1 : -1) : 0 }
+        #expect(paging.landing(from: 1, offset: 100, speed: 0, rule: rule) == 0)
+        #expect(paging.clamp(-50, from: 1) == 0)
+        #expect(paging.clamp(900, from: 1) == 600)
+    }
+}
+

@@ -6,7 +6,7 @@ import UIKit
 struct CaptureView: View {
     /// Opened from the plus: the field takes the keyboard as the sheet rises.
     var focused = false
-    /// The project of the view the sheet was opened from (`ScreenView.project?.link`); nil on the main screen.
+    /// The project the sheet opens with; nil for none.
     var project: String?
     /// The Project row's choice and its page (`capture.project`).
     @State private var chosen: String?
@@ -134,11 +134,11 @@ struct CaptureView: View {
         projectRow = try? await Task.detached { try AppServices.shared.board.captureProject(chosen) }.value
     }
 
-    /// «New project…»: the note written, the project chosen.
+    /// «New project…»: the project made in the tree, then chosen.
     private func newProject(_ name: String) async {
         do {
-            guard let link = try await Task.detached(operation: { try AppServices.shared.board.newProject(name) }).value else { return }
-            chosen = link
+            guard let made = try await Task.detached(operation: { try AppServices.shared.board.newProject(name) }).value else { return }
+            chosen = made.name
         } catch {
             failure = error.localizedDescription
         }

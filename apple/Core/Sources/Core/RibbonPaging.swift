@@ -43,7 +43,8 @@ public struct RibbonPaging: Sendable, Equatable {
 /// The widths of the ribbon's columns, as the plugin's screen: at Inbox and at Soon the two columns shown split the
 /// screen in half; only at Today the divider sets the day list's width (`list`) against the calendar. Between Soon and
 /// Today the day list's edge glides from the half to the divider with the ribbon (`toToday`); the calendar keeps its
-/// width and slides along, so it never reflows.
+/// width and slides along, so it never reflows. Left of them, while the ribbon has it, the Projects page takes the whole
+/// screen, its own place.
 public struct RibbonColumns: Sendable, Equatable {
     /// The screen's width.
     public let width: Double
@@ -51,19 +52,27 @@ public struct RibbonColumns: Sendable, Equatable {
     public let list: Double
     /// Whether the Done column the search opens stands left of Inbox.
     public let done: Bool
+    /// Whether the Projects page stands first, left of everything.
+    public let projects: Bool
 
-    public init(width: Double, list: Double, done: Bool) {
+    public init(width: Double, list: Double, done: Bool, projects: Bool = false) {
         self.width = width
         self.list = list
         self.done = done
+        self.projects = projects
     }
+
+    /// Where the Projects page stands (the ribbon's start) and how wide it is: the whole screen, or nothing without it.
+    public var projectsPage: Double { projects ? width : 0 }
+    /// Where the Done column stands while shown: right after the Projects page.
 
     /// Inbox's, Soon's and Done's width: half the screen, whatever the divider.
     public var half: Double { width / 2 }
-    /// How far every place stands right of the ribbon's start: the Done column's width while it is shown.
-    public var lead: Double { done ? half : 0 }
-    /// Where each place's left edge stands: Done (while shown), Inbox, Soon, Today.
-    public var stops: [Double] { (done ? [0] : []) + [lead, lead + half, lead + width] }
+    public var doneStop: Double { projectsPage }
+    /// How far Inbox stands right of the ribbon's start: the Projects page's width and the Done column's while shown.
+    public var lead: Double { projectsPage + (done ? half : 0) }
+    /// Where each place's left edge stands: Projects (while the ribbon has it), Done (while shown), Inbox, Soon, Today.
+    public var stops: [Double] { (projects ? [0] : []) + (done ? [doneStop] : []) + [lead, lead + half, lead + width] }
     /// The calendar's width: the screen less the divider's list.
     public var calendar: Double { width - list }
 
