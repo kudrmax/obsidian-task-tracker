@@ -102,6 +102,7 @@ struct TaskMenu {
                 if let section = sectionPage { rows.append(section) }
             case "project":
                 rows.append(projectPage)
+                rows += resultRows
             case "subtask" where single:
                 rows.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } })
             default: break
@@ -128,6 +129,23 @@ struct TaskMenu {
         }
         let rows = ProjectPage.nodes(page, pick: { link in Task { await model.setProject(items, link) } }, new: { model.askNewProject(.tasks(items)) })
         return .submenu(title: "Project", symbol: "folder", subtitle: subtitle, children: rows)
+    }
+
+    /// The result rows, right after Project in the core's order (`menu.result.rows`): Add to result, its value the result
+    /// the tasks are steps of, opening the page in place of the menu; Make result or Make task.
+    private var resultRows: [MenuNode] {
+        let result = menu.result, items = items, model = model
+        return result.rows.compactMap { row in
+            switch row {
+            case "addToResult":
+                return .action(title: result.label, symbol: "scope", subtitle: result.value.isEmpty ? nil : result.value, opens: true) { model.resultFor = ResultAsk(items: items, title: result.label) }
+            case "toggle":
+                guard let item = items.first else { return nil }
+                return .action(title: result.toggle.label, symbol: result.toggle.result ? "target" : "circle.dashed") { Task { await model.setResult(item, result.toggle.result) } }
+            default:
+                return nil
+            }
+        }
     }
 
     private var sectionPage: MenuNode? {

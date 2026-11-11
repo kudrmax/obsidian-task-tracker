@@ -36,6 +36,43 @@ public struct CardPaint: Sendable, Hashable {
     }
 }
 
+/// What a card's face shows and whose menu its taps open, as the core gives it for where the card is drawn: a list's card
+/// (`TaskItem.card`), the timeline's block (`TaskItem.block`), or the task's own title (the full screen, a search).
+public struct CardFace: Sendable, Hashable {
+    /// The title drawn, with its links.
+    public let text: String
+    /// The small line over the title, with the target symbol; nil for a card of one line.
+    public let over: String?
+    public let semibold: Bool
+    /// Whose menu a tap on the card (but on `over`) opens; nil: the card's own task.
+    private let steps: [TaskItem]
+    public var step: TaskItem? { steps.first }
+
+    public init(text: String, over: String? = nil, semibold: Bool = false, step: TaskItem? = nil) {
+        self.text = text
+        self.over = over
+        self.semibold = semibold
+        self.steps = step.map { [$0] } ?? []
+    }
+
+    /// The task's own title, as the full screen and a search draw it: a result's in semibold, as a result drawn with its
+    /// own title is (results, backend decision 4).
+    public static func own(_ item: TaskItem) -> CardFace { CardFace(text: item.text, semibold: item.isResult) }
+
+    /// A list's card (`TaskItem.card`).
+    public static func list(_ item: TaskItem) -> CardFace {
+        CardFace(text: item.card.text, over: item.card.over, semibold: item.card.semibold, step: item.card.step)
+    }
+
+    /// The timeline's block (`TaskItem.block`): no line over it, and regular weight, as a block has no room for marks.
+    public static func block(_ item: TaskItem) -> CardFace {
+        CardFace(text: item.block.text, step: item.block.step)
+    }
+
+    /// Two lines: the result's title over its step.
+    public var twoLines: Bool { over != nil }
+}
+
 /// A card as a column draws it: its task, how deep it stands, the corner, and its colours.
 public struct BoardCard: Sendable, Hashable, Identifiable {
     public let item: TaskItem
@@ -57,6 +94,8 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     public let zone: JSONValue?
     /// Its title in pieces (`rules.textParts`): text, and links drawn in the accent that a tap opens.
     public let parts: [TextPart]
+    /// What its face shows: the task's own title, or a result's next step under the result's title.
+    public let face: CardFace
 
     /// The card shows the task `id`.
     public func names(_ id: String) -> Bool { item.id == id }
@@ -71,9 +110,11 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
         return .object(card)
     }
 
-    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, paint: CardPaint?, corner: [String]? = nil, zone: JSONValue? = nil, parts: [TextPart]? = nil) {
+    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, paint: CardPaint?, corner: [String]? = nil, zone: JSONValue? = nil, parts: [TextPart]? = nil, face: CardFace? = nil) {
+        let face = face ?? .own(item)
+        self.face = face
         self.zone = zone
-        self.parts = parts ?? [TextPart(text: item.text)]
+        self.parts = parts ?? [TextPart(text: face.text)]
         self.corner = corner
         self.item = item
         self.level = level
@@ -584,10 +625,17 @@ extension TaskBoard {
             if let shown, let kept = shown.menus[item.id], shown.item(item.id) == item, shown.column(of: item.id) == from { return kept }
             return try read("tasks.menu", [item.json, .string(from), menuScreen], over: settingsOnly)
         }
+        // A result's card shows its next step, whose menu a tap on the card opens: asked from where the card stands.
         for (column, list) in lists {
-            for card in list.cards { menus[card.item.id] = try menu(card.item, column.rawValue) }
+            for card in list.cards {
+                menus[card.item.id] = try menu(card.item, column.rawValue)
+                if let step = card.face.step { menus[step.id] = try menu(step, column.rawValue) }
+            }
         }
-        for slot in timeline.slots { menus[slot.card.item.id] = try menu(slot.card.item, "timeline") }
+        for slot in timeline.slots {
+            menus[slot.card.item.id] = try menu(slot.card.item, "timeline")
+            if let step = slot.card.face.step { menus[step.id] = try menu(step, "timeline") }
+        }
         return BoardSnapshot(
             today: today,
             day: day,
@@ -610,16 +658,18 @@ extension TaskBoard {
 
     /// Cards for rows drawn outside the screen's lists (a full screen's subtasks, a search's finds), coloured and dated as
     /// a list draws them: `corner` the day whose date a card leaves out, none for a list of no day.
-    public func cards(_ rows: [ListRow], corner day: String? = nil) throws -> [BoardCard] {
+    /// `asList`: drawn as a list's cards (`TaskItem.card`, Done's list); else each with its own title.
+    public func cards(_ rows: [ListRow], corner day: String? = nil, asList: Bool = false) throws -> [BoardCard] {
         let look: ScreenSettings = try read("screenSettings.get", over: settingsOnly())
         var painter = Painter(board: self, blend: look.labelPaint == "blend")
-        return try cards(rows, corner: day.json, zone: nil, painter: &painter)
+        return try cards(rows, corner: day.json, zone: nil, painter: &painter, asList: asList)
     }
 
-    private func cards(_ rows: [ListRow], corner: JSONValue, zone: JSONValue?, painter: inout Painter) throws -> [BoardCard] {
+    private func cards(_ rows: [ListRow], corner: JSONValue, zone: JSONValue?, painter: inout Painter, asList: Bool = true) throws -> [BoardCard] {
         let levels = JSONValue.array(rows.map { .number(Double($0.level)) })
         return try rows.enumerated().map { index, row in
             let due: CardDue? = try painter.rule("rules.cardDue", [row.item.json, corner])
+            let face: CardFace = asList ? .list(row.item) : .own(row.item)
             return BoardCard(
                 item: row.item,
                 level: row.level,
@@ -628,7 +678,8 @@ extension TaskBoard {
                 repeats: due?.repeats ?? false,
                 paint: try painter.paint(row.item),
                 zone: zone,
-                parts: try painter.parts(row.item))
+                parts: try painter.parts(face.text),
+                face: face)
         }
     }
 
@@ -663,7 +714,8 @@ extension TaskBoard {
         let slots = try zip(shown, boxes).map { pair, box -> BoardSlot in
             let start = pair.0.slot?.start ?? pair.1.start
             let corner = try self.corner(box, start: start, pair.1.start, pair.1.end, pure: painter.pure)
-            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, paint: try painter.paint(pair.0), corner: corner, parts: try painter.parts(pair.0))
+            let face = CardFace.block(pair.0)
+            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, paint: try painter.paint(pair.0), corner: corner, parts: try painter.parts(face.text), face: face)
             return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, slotStart: start, box: box)
         }
         let now: Int? = day == today ? try read("boundary.offsetOf", [.string(day), .number((files.now.timeIntervalSince1970 * 1000).rounded())], over: files) : nil
@@ -693,7 +745,7 @@ extension TaskBoard {
         let boxes: [StackBox] = try pure ? rule("rules.stackTasks", arguments) : readRule("rules.stackTasks", arguments)
         return try zip(timeline.slots, boxes).map { slot, box in
             let old = slot.card
-            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, paint: old.paint, corner: try corner(box, start: slot.slotStart, slot.start, slot.end, pure: pure), parts: old.parts)
+            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, paint: old.paint, corner: try corner(box, start: slot.slotStart, slot.start, slot.end, pure: pure), parts: old.parts, face: old.face)
             return BoardSlot(card: card, start: slot.start, end: slot.end, slotStart: slot.slotStart, box: box)
         }
     }
@@ -840,10 +892,10 @@ struct Painter {
     }
 
     /// A title's pieces, asked once per title.
-    mutating func parts(_ item: TaskItem) throws -> [TextPart] {
-        if let known = partsByText[item.text] { return known }
-        let parts: [TextPart] = try rule("rules.textParts", [.string(item.text)])
-        partsByText[item.text] = parts
+    mutating func parts(_ text: String) throws -> [TextPart] {
+        if let known = partsByText[text] { return known }
+        let parts: [TextPart] = try rule("rules.textParts", [.string(text)])
+        partsByText[text] = parts
         return parts
     }
 
