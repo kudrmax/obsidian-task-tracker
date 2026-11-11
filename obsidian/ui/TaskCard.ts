@@ -10,6 +10,10 @@ import { RenamedTexts } from "./RenamedTexts";
 export interface TaskCardOptions {
 	/** The day the card is shown on: a due date on that day goes without saying. */
 	readonly day: LocalDate | null;
+	/** The Projects screen's By stage: the subproject, small over the title with the folder mark, in place of a folded task's own title. */
+	readonly over?: string | null;
+	/** The corner shows the due date; the Projects screen's By project puts the stage's mark there instead. */
+	readonly corner?: boolean;
 }
 
 /** A card of the list: the dot of a task in progress, the title fading out on the right, the subtask counter over the description mark, the due date; a card peeking out under it while its subtasks are folded away. */
@@ -46,12 +50,15 @@ export function fillCard(card: HTMLElement, task: TaskItem, opts: TaskCardOption
 	markColours(card, item);
 	card.classList.toggle("is-collapsed", item.collapsed);
 	showProgressDot(card, item);
-	fillFace(card, task, item);
+	fillFace(card, task, item, opts.over ?? null);
 	renderProjectMark(card, item);
 	renderMeta(card, item);
-	const corner = cardDue(item, opts.day);
-	if (!corner) return;
-	const { date, repeats } = corner;
+	const corner = opts.corner === false ? null : cardDue(item, opts.day);
+	if (corner) renderDue(card, corner.date, corner.repeats);
+}
+
+/** The date in a card's corner, its day over its month, the repeat's mark beside the day; a repeat with no date its mark alone. */
+export function renderDue(card: HTMLElement, date: LocalDate | null, repeats: boolean): void {
 	const due = el(card, "span", "tc-due");
 	due.classList.toggle("is-repeat-only", date === null);
 	const top = repeats ? el(due, "span", "tc-due-top") : due;
@@ -65,20 +72,20 @@ export function fillCard(card: HTMLElement, task: TaskItem, opts: TaskCardOption
  * own title small over a target symbol and the step's title under it; any other card its own title on one line, a
  * result's in semibold. A rename waiting to be written shows on whichever line it renames.
  */
-function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem): void {
+function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: string | null): void {
 	const face = task.card;
 	const step = face.step;
-	card.classList.toggle("is-two-line", step !== null);
+	card.classList.toggle("is-two-line", step !== null || project !== null);
 	card.classList.toggle("is-result", face.semibold);
-	if (!step) {
+	if (!step && project === null) {
 		fillTitle(el(card, "div", "tc-card-title"), shown.text);
 		return;
 	}
 	const lines = el(card, "div", "tc-card-lines");
 	const over = el(lines, "div", "tc-card-over");
-	over.appendChild(icon("target"));
-	el(over, "span", "tc-card-over-text", shown === task ? face.over ?? "" : shown.title);
-	fillTitle(el(lines, "div", "tc-card-title"), RenamedTexts.shown(step).text);
+	over.appendChild(icon(project === null ? "target" : "project"));
+	el(over, "span", "tc-card-over-text", project ?? (shown === task ? face.over ?? "" : shown.title));
+	fillTitle(el(lines, "div", "tc-card-title"), step ? RenamedTexts.shown(step).text : shown.text);
 }
 
 /** Whose menu a tap on a list's card opens where `pressed` is: a folded result's on its small line, its shown step's anywhere else. */

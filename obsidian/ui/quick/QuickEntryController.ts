@@ -1,4 +1,5 @@
-import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, placeShowing, type ProjectZone, QuickEntrySession, type QuickEntryTasks, SHOWN_LISTS, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
+import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, type ProjectZone, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
+import { placeOfList, shownLists } from "../screens";
 import type { RightMode } from "../viewSettings";
 import type { EntryPart } from "./EntryPart";
 import { DURATION, EASING, LAYOUT, tokenMs } from "../design";
@@ -157,7 +158,7 @@ export class QuickEntryController {
 				sectioned: (column) => deps.sectioned(column),
 				day: () => deps.day(),
 				today: () => deps.today(),
-				shown: () => SHOWN_LISTS[deps.mode()],
+				shown: () => shownLists(deps.mode()),
 				project: () => deps.project?.(),
 				fresh: (beforeShow) => this.fresh(beforeShow),
 				onChange: (state, drawnNext) => this.changed(state, drawnNext),
@@ -627,7 +628,7 @@ export class QuickEntryController {
 		if (!move) return;
 		this.turning = true;
 		try {
-			this.deps.turnTo(placeShowing(move.column, this.deps.mode()));
+			this.deps.turnTo(placeOfList(move.column, this.deps.mode()));
 		} finally {
 			this.turning = false;
 		}

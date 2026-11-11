@@ -35,7 +35,7 @@ describe("stepScreen", () => {
 	});
 
 	it("goes from Done on to Inbox, and nothing leads back to Done", () => {
-		expect(placeIndex("done")).toBe(-1);
+		expect(placeIndex("done")).toBeLessThan(placeIndex("inbox"));
 		expect(stepScreen({ mode: "done", date: TODAY }, 1, DAYS)).toEqual({ mode: "inbox", date: TODAY });
 		expect(stepScreen({ mode: "done", date: TODAY }, -1, DAYS)).toBeNull();
 		expect(stepScreen({ mode: "inbox", date: TODAY }, -1, DAYS)).toBeNull();

@@ -47,7 +47,9 @@ import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
 import { settingsEffect } from "./settingsEffect";
 import { StatusBarRoom } from "./StatusBarRoom";
-import { type Place, type Shift } from "./screens";
+import { type Place, type Shift, stepWithProjects } from "./screens";
+import { ProjectsScreen } from "./projects/ProjectsScreen";
+import type { ProjectsSource } from "./projects/projectsView";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
@@ -75,6 +77,8 @@ export interface ViewDeps {
 	readonly calendars: CalendarService;
 	readonly settings: ShownSettingsSource;
 	readonly clock: Clock;
+	/** The Projects screen's data: until the core gives it (`TaskService.projectsScreen`), only the demo build has one. */
+	readonly projects?: ProjectsSource;
 	/** Apple's Calendar at the event. */
 	openInCalendar(event: CalendarEvent): void;
 }
@@ -103,6 +107,8 @@ export class CalendarScreen extends Component {
 	private missedTick = false;
 	private headers: ColumnHeaders | null = null;
 	private switcher: ColumnSwitch | null = null;
+	/** The Projects screen, left of Inbox: in the plugin's own view, once the core gives its data. */
+	private projects: ProjectsScreen | null = null;
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
 	private soonEl: HTMLElement | null = null;
@@ -356,6 +362,16 @@ export class CalendarScreen extends Component {
 			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "soon", subtree, signal),
 		});
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (origins) => acceptsDrop("soon", origins), () => this.sectionsOf("soon"), true, () => this.haptics.tap(), this.columnTitle("soon"));
+		const projectsSource = this.deps.projects;
+		if (projectsSource && this.where.view)
+			this.projects = new ProjectsScreen(root, {
+				source: projectsSource,
+				arbiter: this.arbiter,
+				treeWidth: () => this.settings.treeWidth,
+				setTreeWidth: (width) => void this.deps.settings.set({ treeWidth: width }),
+				onSnap: () => this.haptics.tap(),
+				onError: (error) => this.reportFailure(error),
+			});
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
@@ -627,7 +643,7 @@ export class CalendarScreen extends Component {
 		this.landed();
 		const root = this.contentEl;
 		const from = { mode: this.place(), date: this.selectedDate };
-		const to = this.deps.days.stepScreen(from, shift);
+		const to = stepWithProjects(from, shift, (at, way) => this.deps.days.stepScreen(at, way));
 		if (!to) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		if (to.mode !== from.mode) {
 			window.clearTimeout(this.switching);
@@ -773,8 +789,9 @@ export class CalendarScreen extends Component {
 
 	private showPlace(place: Place): void {
 		this.contentEl.classList.toggle("is-lists", place === "soon");
-		this.contentEl.classList.toggle("is-inbox", place === "inbox" || place === "done");
+		this.contentEl.classList.toggle("is-inbox", place === "inbox" || place === "done" || place === "projects");
 		this.contentEl.classList.toggle("is-done", place === "done");
+		this.contentEl.classList.toggle("is-projects", place === "projects");
 	}
 
 	/** A Done card has no drag: a tap, a right click open its menu, as anywhere. */
@@ -952,6 +969,7 @@ export class CalendarScreen extends Component {
 			calendar: [this.timelineDrop, this.leftDrop],
 			soon: [this.soonDrop, this.leftDrop],
 			inbox: [this.inboxDrop, this.backlogDrop, this.soonDrop],
+			projects: [],
 		};
 		return shown[this.mode()].filter((target) => target !== null);
 	}
@@ -1285,6 +1303,7 @@ export class CalendarScreen extends Component {
 			this.headers.render();
 			this.backlogList.render(moving);
 			this.doneList.render(moving);
+			void this.projects?.refresh().catch((error: unknown) => this.reportFailure(error));
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
 		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.allDay, this.theme(), (event) => this.deps.calendars.isPast(event));

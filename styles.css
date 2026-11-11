@@ -332,6 +332,53 @@ body {
 	/* Pressed, a card shows its whole title: it stretches to the right past its column, up to this far from the window's edges. */
 	--tc-whole-margin: var(--tc-space-10);
 
+	/*
+	 * Sizes: the Projects screen (boards in docs/design/canvas/projects-screen/), the strip's place left of Inbox. The tree
+	 * and the tasks start a step lower than the lists, under the title row; the tree is as wide as a half column until its
+	 * divider is dragged. A project at the top is a tile, a subproject a line of text a step further in per level, a thin
+	 * line running beside an open branch's rows, short of its first and last by the inset.
+	 */
+	--tc-projects-top: calc(var(--tc-day-row) + var(--tc-space-12));
+	--tc-projects-seg-gap: var(--tc-space-8);
+	--tc-tree-width: var(--tc-half-column);
+	--tc-tree-gap: var(--tc-space-2);
+	--tc-tree-tile-h: 38px;
+	--tc-tree-tile-pad: 0 var(--tc-space-12);
+	--tc-radius-tree-tile: 10px;
+	--tc-tree-line-h: 30px;
+	--tc-tree-line-pad: 0 var(--tc-space-8);
+	--tc-radius-tree-line: var(--tc-radius-pill);
+	--tc-tree-indent: 12px;
+	--tc-tree-branch-x: calc(var(--tc-tree-indent) / 2);
+	--tc-tree-branch-inset: var(--tc-space-4);
+	/* After an open branch the next tile stands as far down as after a folded one, under its peeking layer. */
+	--tc-tree-branch-after: var(--tc-stack-step-y);
+	/* All stands apart from the projects, No project and Done below them. */
+	--tc-tree-group-gap: var(--tc-space-8);
+	--tc-font-tree-tile: var(--tc-font-body);
+	--tc-font-tree-line: var(--tc-text-14);
+	--tc-leading-tree: 20px;
+	--tc-font-tree-more: var(--tc-text-12);
+	--tc-tree-more-gap: var(--tc-space-4);
+	/* The stage's mark on a card in By project: in the date's place and of its width. */
+	--tc-stage-mark-w: var(--tc-due-w);
+	--tc-stroke-stage-mark: var(--tc-stroke-2);
+	/* The segment over the tasks: the wheel's capsule, a step lower. */
+	--tc-projects-seg-font: var(--tc-font-caption);
+	/*
+	 * On the desktop (DeskProj, DeskAll): the titles larger, the segment in their row at the right, the tree a column of its
+	 * own width, the sides of the view further in than on the phone.
+	 */
+	--tc-desk-projects-title-top: 18px;
+	--tc-font-desk-projects-title: var(--tc-text-28);
+	--tc-leading-desk-projects-title: 34px;
+	--tc-desk-projects-top: 72px;
+	--tc-desk-tree-width: 336px;
+	--tc-desk-projects-side: var(--tc-space-20);
+	--tc-desk-projects-near: var(--tc-space-16);
+	--tc-desk-projects-far: var(--tc-space-8);
+	--tc-desk-projects-seg-w: 240px;
+
 	/* Sizes: the task menu, its due submenu and the month picker */
 	--tc-backdrop-blur: 8px;
 	/* The menu panel grows out from the card it belongs to. */
@@ -516,11 +563,13 @@ body {
 	--tc-text-11: 11px;
 	--tc-text-12: 12px;
 	--tc-text-13: 13px;
+	--tc-text-14: 14px;
 	--tc-text-15: 15px;
 	--tc-text-16: 16px;
 	--tc-text-17: 17px;
 	--tc-text-20: 20px;
 	--tc-text-22: 22px;
+	--tc-text-28: 28px;
 	--tc-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
 	--tc-font-inherit: inherit;
 	--tc-font-title: var(--tc-text-20);
@@ -793,7 +842,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-seg-reel { position: absolute; top: 0; left: calc((var(--tc-seg-before) - var(--tc-seg-pos)) * var(--tc-seg-btn-w)); display: flex; }
 .tc-seg-pill > .tc-seg-reel { left: calc(-1 * var(--tc-seg-pos) * var(--tc-seg-btn-w)); }
 .tc-seg-icon { position: relative; width: var(--tc-seg-btn-w); height: var(--tc-wheel-btn-h); flex-shrink: 0; color: var(--tc-muted); display: flex; align-items: center; justify-content: center; transform: scale(calc(1 - var(--tc-seg-depth) * var(--tc-seg-shrink))); opacity: calc(1 - var(--tc-seg-depth) * var(--tc-seg-dim)); }
-.tc-seg-pill .tc-seg-icon { color: var(--tc-on-strong); }
+.tc-seg-pill .tc-seg-icon { color: var(--tc-on-strong); opacity: var(--tc-seg-lens); }
 .tc-seg-icon svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
 /* Let go, the wheel rolls on to its place, and the track's ends follow. */
 .task-calendar > .tc-seg.is-settling, .tc-seg.is-settling .tc-seg-pill { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out); }
@@ -1461,3 +1510,56 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 .setting-item.tc-settings-link { cursor: pointer; }
 /* On its page the rows stand flat, not in Obsidian's cards: a heading starts on their edge. */
 .tc-settings-page .setting-item-heading { padding-inline: 0; }
+
+/*
+ * The Projects screen: the strip's place left of Inbox, a whole window wide. Standing there, every part of the strip
+ * moves a window and a divider to the right; Done, which waits left of Inbox for the search, is seen only at its own place.
+ */
+.tc-projects { position: absolute; top: 0; bottom: 0; left: calc(-1 * (100% + var(--tc-divider))); width: 100%; }
+.task-calendar.is-projects > :is(.tc-projects, .tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-right, .tc-divider, .tc-head) { margin-left: calc(100% + var(--tc-divider)); }
+.task-calendar:is(:not(.is-done, .is-switching), .is-projects) > :is(.tc-done, .tc-head.is-done, .tc-divider.is-done), .task-calendar.is-done > .tc-projects { visibility: hidden; }
+.task-calendar.is-switching > .tc-projects { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out); }
+.tc-projects-tree-title, .tc-projects-title { position: absolute; top: var(--tc-day-row-top); height: var(--tc-day-row); box-sizing: border-box; line-height: var(--tc-day-row); color: var(--tc-text); font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; overflow: hidden; }
+.tc-projects-tree-title { left: 0; width: var(--tc-tree-width); padding: 0 var(--tc-space-2) 0 calc(var(--tc-space-10) + var(--tc-space-4)); }
+.tc-projects-title { left: calc(var(--tc-tree-width) + var(--tc-divider)); right: 0; padding: 0 calc(var(--tc-space-10) + var(--tc-space-4)) 0 calc(var(--tc-space-2) + var(--tc-space-4)); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.tc-projects-title.has-menu { cursor: pointer; }
+.tc-projects-seg { position: absolute; top: var(--tc-projects-top); left: calc(var(--tc-tree-width) + var(--tc-divider) + var(--tc-space-2)); right: var(--tc-space-10); height: var(--tc-seg); box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); display: flex; }
+.tc-projects-seg > button.tc-btn.tc-projects-seg-btn { flex: 1; min-width: 0; height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: transparent; color: var(--tc-ink-soft); font-size: var(--tc-projects-seg-font); font-weight: var(--tc-weight-semibold); white-space: nowrap; }
+.tc-projects-seg > button.tc-btn.tc-projects-seg-btn.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
+.tc-projects-tree-column, .tc-projects-tasks-column { position: absolute; bottom: 0; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
+.tc-projects-tree-column { left: 0; top: var(--tc-projects-top); width: var(--tc-tree-width); padding: var(--tc-column-pad-near); }
+.tc-projects-tasks-column { left: calc(var(--tc-tree-width) + var(--tc-divider)); right: 0; top: calc(var(--tc-projects-top) + var(--tc-seg) + var(--tc-projects-seg-gap)); padding: var(--tc-column-pad-far); }
+.task-calendar .tc-projects > .tc-divider { left: var(--tc-tree-width); top: var(--tc-projects-top); }
+.tc-projects.is-missing :is(.tc-projects-seg, .tc-projects-tasks-column) { visibility: hidden; }
+
+/* The tree (board TreeC, variant В). */
+.tc-tree { position: relative; flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: none; display: flex; flex-direction: column; gap: var(--tc-tree-gap); }
+.tc-tree::-webkit-scrollbar { display: none; }
+.tc-tree::after { content: ""; flex-shrink: 0; height: var(--tc-foot-fade-day); }
+.tc-tree-row { flex-shrink: 0; box-sizing: border-box; display: flex; align-items: center; gap: var(--tc-tree-more-gap); color: var(--tc-text); cursor: pointer; touch-action: pan-y; }
+.tc-tree-row.is-tile { height: var(--tc-tree-tile-h); padding: var(--tc-tree-tile-pad); border-radius: var(--tc-radius-tree-tile); background: var(--tc-card-bg); font-size: var(--tc-font-tree-tile); font-weight: var(--tc-weight-semibold); }
+.tc-tree-row.is-line { height: var(--tc-tree-line-h); padding: var(--tc-tree-line-pad); border-radius: var(--tc-radius-tree-line); font-size: var(--tc-font-tree-line); font-weight: var(--tc-weight-normal); }
+.tc-tree-row.is-tile.is-folded { margin-bottom: var(--tc-stack-step-y); box-shadow: var(--tc-shadow-fold); }
+.tc-tree-row.is-all { margin-bottom: calc(var(--tc-tree-group-gap) - var(--tc-tree-gap)); }
+.tc-tree-row.is-none { margin-top: var(--tc-tree-group-gap); }
+.tc-tree-row.is-waiting { color: var(--tc-muted); }
+.tc-tree-row.is-selected { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
+.tc-tree-row.is-drop { background: var(--tc-drop-bg); color: var(--tc-accent); }
+.tc-tree-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; line-height: var(--tc-leading-tree); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.tc-tree-more { flex-shrink: 0; font-size: var(--tc-font-tree-more); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); }
+.tc-tree-branch { position: relative; flex-shrink: 0; margin-left: var(--tc-tree-indent); display: flex; flex-direction: column; }
+.tc-tree-branch::before { content: ""; position: absolute; left: calc(-1 * var(--tc-tree-branch-x)); top: var(--tc-tree-branch-inset); bottom: var(--tc-tree-branch-inset); width: var(--tc-branch-w); background: var(--tc-branch); }
+.tc-tree > .tc-tree-branch { margin-bottom: calc(var(--tc-tree-branch-after) - var(--tc-tree-gap)); }
+
+/* The tasks: a list's cards, the stage's mark in the date's place. */
+.tc-stage-mark { width: var(--tc-stage-mark-w); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--tc-muted); }
+.tc-stage-mark svg { width: var(--tc-icon-s); height: var(--tc-icon-s); stroke-width: var(--tc-stroke-stage-mark); }
+
+/* The desktop board: larger titles, the segment in their row, the sides further in. */
+body:not(.is-mobile) .tc-projects { --tc-projects-top: var(--tc-desk-projects-top); --tc-tree-width: var(--tc-desk-tree-width); }
+body:not(.is-mobile) :is(.tc-projects-tree-title, .tc-projects-title) { top: var(--tc-desk-projects-title-top); height: var(--tc-leading-desk-projects-title); line-height: var(--tc-leading-desk-projects-title); font-size: var(--tc-font-desk-projects-title); }
+body:not(.is-mobile) .tc-projects-tree-title { padding: 0 var(--tc-desk-projects-near) 0 var(--tc-desk-projects-side); }
+body:not(.is-mobile) .tc-projects-title { padding: 0 calc(var(--tc-desk-projects-seg-w) + var(--tc-desk-projects-side) + var(--tc-space-16)) 0 var(--tc-desk-projects-far); }
+body:not(.is-mobile) .tc-projects-seg { top: calc(var(--tc-desk-projects-title-top) + (var(--tc-leading-desk-projects-title) - var(--tc-seg)) / 2); left: auto; right: var(--tc-desk-projects-side); width: var(--tc-desk-projects-seg-w); }
+body:not(.is-mobile) .tc-projects-tree-column { padding: 0 var(--tc-desk-projects-near) 0 var(--tc-desk-projects-side); }
+body:not(.is-mobile) .tc-projects-tasks-column { top: var(--tc-projects-top); padding: 0 var(--tc-desk-projects-side) 0 var(--tc-desk-projects-far); }

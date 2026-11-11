@@ -1,10 +1,11 @@
-import type { ScreenPlace, ScreenSettings, ScreenSettingsStore } from "../../core/application/contracts";
+import type { ScreenSettings, ScreenSettingsStore } from "../../core/application/contracts";
+import type { WheelPlace } from "./screens";
 
 /**
  * Which pair of neighbouring lists the window shows: Inbox and Soon, Soon and the day's list, or the day's list and the
- * calendar. The window's own layout: the services hear only which lists show (`SHOWN_LISTS`).
+ * calendar; or the Projects screen. The window's own layout: the services hear only which lists show (`SHOWN_LISTS`).
  */
-export type RightMode = ScreenPlace;
+export type RightMode = WheelPlace;
 
 /**
  * The settings of this frontend alone: how Obsidian's screen is laid out, zoomed and painted. They are kept in the
@@ -22,18 +23,21 @@ export interface ViewSettings {
 	readonly rightMode: RightMode;
 	/** The zoom a pinch last settled on: the timeline opens at it. */
 	readonly zoom: Zoom;
+	/** The Projects screen's tree, px, as its divider was last let go; null for the design's width. */
+	readonly treeWidth: number | null;
 }
 
 export const VIEW_DEFAULTS: ViewSettings = {
 	listShare: 0.5,
 	rightMode: "calendar",
 	zoom: DEFAULT_ZOOM_HOUR,
+	treeWidth: null,
 };
 
 const VIEW_KEYS = Object.keys(VIEW_DEFAULTS) as (keyof ViewSettings)[];
 
-/** What belongs to the device, not the vault: the divider's place, the column shown and the zoom are set by hand on each screen, and must not travel through Sync. */
-export const DEVICE_KEYS = ["listShare", "rightMode", "zoom"] as const satisfies readonly (keyof ViewSettings)[];
+/** What belongs to the device, not the vault: the dividers' places, the column shown and the zoom are set by hand on each screen, and must not travel through Sync. */
+export const DEVICE_KEYS = ["listShare", "rightMode", "zoom", "treeWidth"] as const satisfies readonly (keyof ViewSettings)[];
 
 
 /** The view's settings of what was saved, the defaults for any it lacks. */
