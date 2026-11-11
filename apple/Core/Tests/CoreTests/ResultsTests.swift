@@ -57,11 +57,21 @@ import Testing
         #expect(snapshot.menus[step.id] != nil)
     }
 
-    @Test func theFullScreenAndASearchDrawTheResultsOwnTitle() throws {
+    @Test func aSearchDrawsTheResultsOwnTitleInSemibold() throws {
         let board = board(FakeVault(Self.file))
-        let result = try card(try snapshot(board), "Компания")
-        let own = try #require(try board.cards([ListRow(item: result.item, level: 0)]).first)
-        #expect(own.face.over == nil && own.face.text == "Компания" && own.face.semibold)
+        let found: [SearchGroup] = try board.read("tasks.search", ["Компания"], over: try board.files())
+        let hit = try #require(found.flatMap(\.hits).first { $0.item.isResult })
+        let own = try #require(try board.cards([ListRow(item: hit.item, level: 0)]).first)
+        #expect(own.face.over == nil && own.face.text == "Компания" && own.face.semibold && own.face.step == nil)
+    }
+
+    @Test func newResultsCreateIsOffForTheMarkAlone() throws {
+        let board = board(FakeVault(Self.file))
+        #expect(board.isBlank("🎯"))
+        #expect(board.isBlank("  "))
+        #expect(!board.isBlank("Bank"))
+        let form: SettingsForm = try board.read("settings.form", over: board.settingsOnly())
+        #expect(form.defaultResultMark == "🎯")
     }
 
     @Test func theMenuOffersAddToResultAndMakeResultAfterProject() throws {

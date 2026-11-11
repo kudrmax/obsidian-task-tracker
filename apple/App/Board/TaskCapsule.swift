@@ -7,6 +7,8 @@ struct TaskCapsule: View {
     let card: BoardCard
     /// Drawn instead of the task's text: its new text while its rename is written.
     var text: String?
+    /// Drawn instead of a folded result's own title in its small line: its new title while its rename is written.
+    var overText: String?
     var selecting = false
     var picked = false
     var ringed = false
@@ -45,7 +47,7 @@ struct TaskCapsule: View {
             if whole {
                 // The copy over a menu shows the whole title, on as many lines as the width it was given needs.
                 VStack(alignment: .leading, spacing: 0) {
-                    if let over = card.face.over { overLine(over) }
+                    if let over = card.face.over { overLine(overText ?? over) }
                     Group {
                         if selectable {
                             SelectableTitle(parts: parts, closed: card.item.closed, onCopied: onCopied)
@@ -59,7 +61,7 @@ struct TaskCapsule: View {
                 foundTitle(found)
             } else {
                 VStack(alignment: .leading, spacing: 0) {
-                    if let over = card.face.over { overLine(over) }
+                    if let over = card.face.over { overLine(overText ?? over) }
                     // The title never widens the card: it runs on past the room and fades out over its last points.
                     Color.clear
                         .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, maxHeight: CardMetrics.titleLine)

@@ -201,8 +201,8 @@ screen, undo, multi-select). No new logic beyond the three points below.
    `timeline`), precomputed with the screen as every card's menu is; it offers Add Subtask, no Section (a subtask).
 5. **The timeline.** A tap on a result's block opens the shown step's menu with the result's open subtasks stacked over
    it (Obsidian 5); the block's title is regular weight, never semibold. A long press stays the drag, as for any block.
-6. **Own titles.** The full screen and a search draw a result with its own title, never its step, in semibold (backend
-   decision 4, Obsidian 6); Done's list draws the core's `card` (a closed result: its own title, semibold).
+6. **Own titles.** Every card draws the core's `TaskItem.card` (`CardFace(item.card)`): the full screen's and a search's
+   items carry their own title, semibold for a result, never a step (backend 17); Done's a closed result's own title.
 7. **The rows' symbols.** Add to result: `scope` (the card's). Make result: `target`; Make task: `circle.dashed`. The
    row words are the core's (`MenuResult.label`, `toggle.label`), Add to result's value its subtitle, which the system
    menu truncates at its end.
@@ -215,9 +215,17 @@ screen, undo, multi-select). No new logic beyond the three points below.
    «New result…» alone, no empty-state words (Obsidian 9). A pick closes the sheet and writes `tasks.addToResult`, the
    ticked one too (the core writes nothing).
 9. **New result…** asks as New project… does: an alert «New Result» with a field (the core's `namePlaceholder`),
-   Cancel and Create (Create off while the name is blank); Create closes the page and writes `tasks.newResult`.
-10. **Result mark** is its own group right under Priorities on the Settings sheet (a text row «Result Mark», the default
+   Cancel and Create (Create off while the core's `tasks.isBlank(name)` says so: empty, the mark alone, a priority's prefix alone; backend 18); Create closes the page and writes `tasks.newResult`.
+10. **Result mark** is its own group right under Priorities on the Settings sheet (a text row «Result Mark», the core's `defaultResultMark`
     as its placeholder, saved on Return and on leaving, as Project Tag is; a mark the core refuses puts the saved one
     back), with a footer saying what it does and that existing lines aren't rewritten. iOS groups unlike rows apart, so
     it is not a row inside the Priorities list (Obsidian 11 puts it in the plugin's Priorities group).
 11. **The bulk menu** draws `result.rows` after Project as one task's menu does; its Add to result opens the same page.
+12. **A hidden step's rename** (backend 13). The field stands in the result card's place as the core says; once
+    entered and until written, the two-line card's title draws the step's pending text (`renamed` by the step's id) and
+    its small line the result's own (by the result's id); a block draws the step's. Add Subtask on a step (backend 14)
+    runs the core's `unfoldAbove` job as any entry job: written, the lists read again, the field under the step.
+13. **A nested folded result in the calendar's stack** follows the two taps (Obsidian's `cardMenuTask`): its row is its
+    step, titled by the step with the result's title under it, and opens the step's menu, which starts with the result's
+    own row (`scope`), opening the result's menu. A menu row can't hold two targets, so the result's is the first row of
+    the step's page.

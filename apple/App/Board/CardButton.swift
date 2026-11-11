@@ -14,6 +14,8 @@ struct CardButton: UIViewRepresentable {
     let card: BoardCard
     /// The task's new text while its rename is written: drawn instead of the text as read.
     var renamedText: String?
+    /// A folded result's own new title while its rename is written: drawn in its small line over the step.
+    var renamedOver: String?
     /// The card's menu; `later` holds a row that opens a sheet or a page until the menu has gone.
     let menu: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?
     /// A folded result's own menu, which a tap on its line over the step opens (`CardFace.over`); the rest of the card
@@ -54,7 +56,7 @@ struct CardButton: UIViewRepresentable {
     private func configuration(control: CardControl?) -> UIHostingConfiguration<TaskCapsule, EmptyView> {
         UIHostingConfiguration {
             TaskCapsule(
-                card: card, text: renamedText, ringed: ringed, height: height,
+                card: card, text: renamedText, overText: renamedOver, ringed: ringed, height: height,
                 onCounter: { [weak control] in control?.counterFrame = $0 },
                 onTitle: { [weak control] in control?.titleFrame = $0 },
                 onLinks: { [weak control] in control?.links = $0 },
@@ -74,7 +76,7 @@ struct CardButton: UIViewRepresentable {
 
     private func update(_ control: CardControl) {
         control.id = card.id
-        let look = CardControl.Look(card: card, text: renamedText, ringed: ringed, height: height)
+        let look = CardControl.Look(card: card, text: renamedText, over: renamedOver, ringed: ringed, height: height)
         control.menuMaker = menu
         control.overMenuMaker = card.face.twoLines ? overMenu : nil
         if control.look != look {
@@ -130,6 +132,7 @@ final class CardControl: UIControl {
     struct Look: Equatable {
         let card: BoardCard
         let text: String?
+        let over: String?
         let ringed: Bool
         let height: CGFloat
     }
@@ -258,7 +261,7 @@ final class CardControl: UIControl {
     private func redrawn(_ look: Look) {
         if self.look != look {
             self.look = look
-            content.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, ringed: look.ringed, height: look.height) }.margins(.all, 0)
+            content.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, overText: look.over, ringed: look.ringed, height: look.height) }.margins(.all, 0)
         }
         if let menu = maker({ [weak self] run in self?.afterMenu = run }) { opener.refresh(menu) }
         if let shownWhole, let image = wholeTitle(look)?.image { shownWhole.show(image) }
@@ -317,7 +320,7 @@ final class CardControl: UIControl {
     /// whole title (the menu lifts the card itself).
     private func wholeTitle(_ look: Look) -> UIImageView? {
         guard let window, let (_, frame) = grownCopy(selectable: false, always: false) else { return nil }
-        return FloatImage.view(TaskCapsule(card: look.card, text: look.text, whole: true).frame(width: frame.width, height: frame.height), like: self, in: window)
+        return FloatImage.view(TaskCapsule(card: look.card, text: look.text, overText: look.over, whole: true).frame(width: frame.width, height: frame.height), like: self, in: window)
     }
 
     /// The menu's whole-title preview while it shows: a label set from the menu redraws it.
@@ -349,7 +352,7 @@ final class CardControl: UIControl {
         let width = grown.map { CGFloat($0.width) } ?? bounds.width
         // Laid out by its title, as a card: a tall calendar block's copy is its title, not a tall box with the title on top.
         let copy = UIHostingConfiguration {
-            TaskCapsule(card: look.card, text: look.text, whole: true, selectable: selectable, onCopied: onCopied)
+            TaskCapsule(card: look.card, text: look.text, overText: look.over, whole: true, selectable: selectable, onCopied: onCopied)
         }
         .margins(.all, 0)
         .makeContentView()
