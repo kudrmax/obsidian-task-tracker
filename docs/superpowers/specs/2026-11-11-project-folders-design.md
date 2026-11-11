@@ -72,3 +72,13 @@ task can be put straight into it.
    it has none and is not done (a project of it with no task yet); `done` as before. `ProjectsRow.waiting` and `muted`
    follow it, so a frontend that only reads them follows without code of its own. A folder with no task in its branch
    is grey.
+
+### Obsidian frontend
+
+1. **Folder is a switch row in Rename's group, right under Rename**, before the note's rows (`menuSwitch`, `.tc-menu-row.is-switch`, `role="switch"`). The switch is built from the segmented control's measures: track `--tc-seg` high with `--tc-seg-pad`, knob `--tc-seg-btn-h`, 52 px wide (`--tc-menu-switch-*`); off the dim ink, on the accent, the knob white (`--tc-on-accent`), sliding in `--tc-duration-snap`. The row stays 44 px without a reason.
+2. **Disabled**: the row isn't pressed; «Folder» goes muted, the core's `reason` stands under it as a caption (`--tc-font-sub`, muted), the switch dims to `--tc-tile-off-opacity`. The reason stays readable: the row itself is not dimmed, unlike a disabled menu row.
+3. **A tap slides the knob at once, then the menu closes and `setProjectFolder(name, !on)` is written** (as every pick of the menu: closed first, then written). One Undo takes it back.
+4. **No folder icon on the row** (the iPhone's decision 1 has one): a plugin menu row has one mark at its end, and here it is the switch; Rename's group keeps its pencil, the note's rows their marks. Everything else of the iPhone's decision 1 is taken.
+5. **A folder on the Project page and the quick entry's panel is a plain disabled row** (`MenuProjectOption.disabled` → the row's `disabled`), at the tile-off opacity, no extra icon; its subprojects stay checkable under it (= the iPhone's decision 2).
+6. **The plus over a folder's tasks shows no drop line where letting go writes nothing**: already so, `TasksDrop` draws the line only where the part's `newTask` (else the list's) is given (= the iPhone's decision 3). A tap on the plus with a folder chosen does nothing, as with Done. A folder's By stage plates show and do nothing (Backend 5), as Done's.
+7. **The tree draws a folder as any project**: no mark of its own on its row. What tells it is the Folder switch in its menu and the refusals; the grey name follows `muted` only.

@@ -178,6 +178,38 @@ export function askQuestion(parent: HTMLElement, spec: MenuQuestionSpec): HTMLEl
 	return group;
 }
 
+/** A row that turns something on or off: its label, a line under it saying why it can't be turned, the switch on the right. */
+export interface MenuSwitchSpec {
+	readonly label: string;
+	readonly on: boolean;
+	/** It can't be turned: the switch dims, `reason` under the label says why. */
+	readonly disabled: boolean;
+	readonly reason: string | null;
+	/** A tap: the switch slides to its other side, then this runs with the value it slid to. */
+	readonly onToggle: (on: boolean) => void;
+}
+
+/** A switch row, as a row of the panel: the knob slides at the tap, before what it turns is written. */
+export function menuSwitch(parent: HTMLElement, spec: MenuSwitchSpec): HTMLButtonElement {
+	const row = el(parent, "button", "tc-btn tc-menu-row is-switch");
+	row.setAttribute("role", "switch");
+	row.setAttribute("aria-checked", String(spec.on));
+	const text = el(row, "span", "tc-menu-label");
+	el(text, "span", "tc-menu-switch-label", spec.label);
+	if (spec.reason !== null) el(text, "span", "tc-menu-switch-reason", spec.reason);
+	const track = el(row, "span", "tc-menu-switch");
+	track.classList.toggle("is-on", spec.on);
+	el(track, "span", "tc-menu-switch-knob");
+	row.disabled = spec.disabled;
+	row.addEventListener("click", () => {
+		const on = !spec.on;
+		track.classList.toggle("is-on", on);
+		row.setAttribute("aria-checked", String(on));
+		spec.onToggle(on);
+	});
+	return row;
+}
+
 /** A group of rows; groups stand apart by a thick dark line. */
 export function menuGroup(parent: HTMLElement, rows: readonly MenuRowSpec[]): HTMLElement {
 	const group = el(parent, "div", "tc-menu-group");

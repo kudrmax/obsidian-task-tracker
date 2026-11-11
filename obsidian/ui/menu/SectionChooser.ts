@@ -33,15 +33,16 @@ export interface ProjectChooserSpec {
 
 /**
  * The Project page: the way back (none on the quick bar's panel, which is the page itself), the tree's projects in its
- * order, each a step further in per level, a check on each the tasks have, No project last; «New project…» apart under
+ * order, each a step further in per level, a check on each the tasks have, a folder shown but not pressed (its
+ * subprojects under it are), No project last; «New project…» apart under
  * them, as New section is.
  */
 export function projectChooser(panel: HTMLElement, spec: ProjectChooserSpec & { readonly back?: boolean }): void {
 	const { options, none, noneLabel, newLabel } = spec.project;
 	if (spec.back !== false) backRow(panel, "Project", () => spec.onBack());
 	const group = menuGroup(panel, []);
-	for (const { project, checked, depth } of options) {
-		const row = menuRow(group, { label: project.name, icon: checked ? "check" : undefined, choice: true, onPick: () => spec.onPick(project.name) });
+	for (const { project, checked, depth, disabled } of options) {
+		const row = menuRow(group, { label: project.name, icon: checked ? "check" : undefined, choice: true, disabled, onPick: () => spec.onPick(project.name) });
 		row.style.setProperty(PROPERTY.level, String(depth));
 		row.classList.add("tc-project-option");
 	}
