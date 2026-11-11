@@ -72,6 +72,17 @@ task can be put straight into it.
    it has none and is not done (a project of it with no task yet); `done` as before. `ProjectsRow.waiting` and `muted`
    follow it, so a frontend that only reads them follows without code of its own. A folder with no task in its branch
    is grey.
+9. **«New project…» with a folder's name answers nothing to pick** (review). `newProject` answers `null` for a folder's
+   name as for a blank one and writes nothing, so a frontend that picks what it answers (the quick entry's
+   `entry.setProject(made.name)`, the app's New Task sheet) picks nothing; no new contract. On top, at the root:
+   `QuickEntry.setProject` keeps the field's project when given a folder (unless the renamed task carries that folder
+   already), `capture.project(folder)` reads as none, and `create`, `edit` and `createInPlace` leave off a folder the task
+   doesn't carry (`draftProjects`): a task given one by hand keeps it through an edit.
+10. **Nothing nests under a task that carries a folder**, in whatever part draws it (By stage too) and under its
+    subtasks: `projectsTakes` false and `dropInProjects` writes nothing.
+11. **The mark is read only outside the note's link** (`- Работа [[Мои 🗃️ заметки]]` is no folder; the link stays
+    whole), and taken out with the space before it, the rest of the line as typed: `- Box  two 🗃️` is «Box  two», so a
+    task's `🗂️ Box  two` still names it.
 
 ### Obsidian frontend
 
@@ -82,6 +93,7 @@ task can be put straight into it.
 5. **A folder on the Project page and the quick entry's panel is a plain disabled row** (`MenuProjectOption.disabled` → the row's `disabled`), at the tile-off opacity, no extra icon; its subprojects stay checkable under it (= the iPhone's decision 2).
 6. **The plus over a folder's tasks shows no drop line where letting go writes nothing**: already so, `TasksDrop` draws the line only where the part's `newTask` (else the list's) is given (= the iPhone's decision 3). A tap on the plus with a folder chosen does nothing, as with Done. A folder's By stage plates show and do nothing (Backend 5), as Done's.
 7. **The tree draws a folder as any project**: no mark of its own on its row. What tells it is the Folder switch in its menu and the refusals; the grey name follows `muted` only.
+
 ### iPhone app
 
 1. **Folder is a stock `Toggle` in the project menu, right under Rename**, in Rename's group (both act on the project
@@ -99,28 +111,6 @@ task can be put straight into it.
 4. `ProjectsSection.takes` is decoded but drives nothing yet: the app's Projects list takes no card drops between cards
    (only the tree takes a card, by `acceptsTask`), so the part's refusal is already the core's `newTask` null and
    `plate` false.
-9. **«New project…» with a folder's name answers nothing to pick** (review). `newProject` answers `null` for a folder's
-   name as for a blank one and writes nothing, so a frontend that picks what it answers (the quick entry's
-   `entry.setProject(made.name)`, the app's New Task sheet) picks nothing; no new contract. On top, at the root:
-   `QuickEntry.setProject` keeps the field's project when given a folder (unless the renamed task carries that folder
-   already), `capture.project(folder)` reads as none, and `create`, `edit` and `createInPlace` leave off a folder the task
-   doesn't carry (`draftProjects`): a task given one by hand keeps it through an edit.
-10. **Nothing nests under a task that carries a folder**, in whatever part draws it (By stage too) and under its
-    subtasks: `projectsTakes` false and `dropInProjects` writes nothing.
-11. **The mark is read only outside the note's link** (`- Работа [[Мои 🗃️ заметки]]` is no folder; the link stays
-    whole), and taken out with the space before it, the rest of the line as typed: `- Box  two 🗃️` is «Box  two», so a
-    task's `🗂️ Box  two` still names it.
-9. **«New project…» with a folder's name answers nothing to pick** (review). `newProject` answers `null` for a folder's
-   name as for a blank one and writes nothing, so a frontend that picks what it answers (the quick entry's
-   `entry.setProject(made.name)`, the app's New Task sheet) picks nothing; no new contract. On top, at the root:
-   `QuickEntry.setProject` keeps the field's project when given a folder (unless the renamed task carries that folder
-   already), `capture.project(folder)` reads as none, and `create`, `edit` and `createInPlace` leave off a folder the task
-   doesn't carry (`draftProjects`): a task given one by hand keeps it through an edit.
-10. **Nothing nests under a task that carries a folder**, in whatever part draws it (By stage too) and under its
-    subtasks: `projectsTakes` false and `dropInProjects` writes nothing.
-11. **The mark is read only outside the note's link** (`- Работа [[Мои 🗃️ заметки]]` is no folder; the link stays
-    whole), and taken out with the space before it, the rest of the line as typed: `- Box  two 🗃️` is «Box  two», so a
-    task's `🗂️ Box  two` still names it.
 5. **A tap on the plus with a folder, Done or a done project chosen does nothing** (lead, from the Obsidian frontend's
    Decision 6): it opens New Task only while the Projects list has a `newTask`; elsewhere in the app, and before the
    Projects page is read, it opens as always.
