@@ -85,8 +85,47 @@ import Testing
         try board.selectProjectNode("project:Окружение")
         let card = try #require(try board.projectsScreen().sections[1].cards.first)
         #expect(card.from == "Где знакомиться" && card.canDrop)
-        try board.dropOnProject([card.item.key], from: card.from, to: "project:Small talk")
+        try board.dropOnProject([card], to: "project:Small talk")
         #expect(vault.text.contains("## Backlog\n\n- [ ] Активности 🗂️ Small talk\n"))
+    }
+
+    /// A task of two parts is two cards, each with its own id and drop: let go on the tree, each replaces its own project.
+    @Test func aTaskOfTwoPartsIsTwoCardsEachDroppedByItsOwnProject() throws {
+        let file = Self.file.replacingOccurrences(of: "- [ ] Активности 🗂️ Где знакомиться", with: "- [ ] Активности 🗂️ Где знакомиться 🗂️ Свидание")
+        let vault = FakeVault(file)
+        let board = board(vault)
+        try board.selectProjectNode("project:Окружение")
+        let view = try board.projectsScreen()
+        let cards = view.sections.flatMap(\.cards).filter { $0.item.title == "Активности" }
+        #expect(cards.count == 2)
+        #expect(Set(cards.map(\.id)).count == 2)
+        let fromDate = try #require(cards.first { $0.from == "Свидание" })
+        try board.dropOnProject([fromDate], to: "project:Small talk")
+        #expect(vault.text.contains("- [ ] Активности 🗂️ Где знакомиться 🗂️ Small talk\n"))
+        try board.selectProjectNode("project:Окружение")
+        let again = try #require(try board.projectsScreen().sections.flatMap(\.cards).first { $0.item.title == "Активности" && $0.from == "Где знакомиться" })
+        try board.dropOnProject([again], to: "none")
+        #expect(vault.text.contains("- [ ] Активности 🗂️ Small talk\n"))
+    }
+
+    @Test func aClosedTaskCannotBeDropped() throws {
+        let board = board(FakeVault(Self.file.replacingOccurrences(of: "- Спорт\n", with: "- Спорт\n- Архив\n").replacingOccurrences(of: "## Done\n", with: "## Done\n\n- [x] Old 🗂️ Архив\n")))
+        try board.selectProjectNode("done")
+        let closed = board.projectsScreenCards().first { $0.item.title == "Old" }
+        #expect(closed?.canDrop == false)
+    }
+
+    @Test func aLiftedProjectKeepsItsDepthUntilTheFingerShiftsAStep() throws {
+        let board = board(FakeVault(Self.file))
+        let view = try board.projectsScreen()
+        let measures = try board.projectsMeasures()
+        #expect(measures.indent == 12 && measures.hoverMs == 600)
+        // «Свидание» (depth 1) lifted and let go in its own gap, before «Дружба» (row 4).
+        #expect(try board.projectsDrop(view.rowsJSON, gap: 4, shift: 0, lifted: "project:Свидание")?.depth == 1)
+        #expect(try board.projectsDrop(view.rowsJSON, gap: 4, shift: -12, lifted: "project:Свидание")?.depth == 0)
+        #expect(try board.projectsDrop(view.rowsJSON, gap: 4, shift: 5, lifted: "project:Свидание")?.depth == 1)
+        #expect(board.isBlankProjectName("  "))
+        #expect(!board.isBlankProjectName("Клубы"))
     }
 
     @Test func thePlusInTheTreeMakesAProjectWhereTheGapSays() throws {
@@ -147,5 +186,12 @@ import Testing
         let none = try board.projectsScreen()
         #expect(none.sections.flatMap(\.cards).map(\.item.title) == ["Loose"])
         #expect(none.menu == nil)
+    }
+}
+
+extension TaskBoard {
+    /// Every card of the Projects screen as it reads now.
+    func projectsScreenCards() -> [ProjectsCard] {
+        (try? projectsScreen().sections.flatMap(\.cards)) ?? []
     }
 }

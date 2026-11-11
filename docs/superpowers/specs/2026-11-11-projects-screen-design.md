@@ -296,3 +296,20 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
     the tree and back as it leaves): a card's target is the row under the finger, lit in the drop's colour, and a lifted
     project's or the plus's is the line under it; neither may be covered. Elsewhere the copy stays where the finger took
     it. The card keeps its own width; a lifted project's own row stays as its faded place.
+54. **Review round (app).** A task shown in two parts is two cards keyed by `ProjectsCard.id`, each dropped by its own
+    `ProjectsCard.drop` (`tasks.dropOnProject([card.drop], node)`); `canDrop` is the core's alone. The tree's depth is
+    `rules.projectsDrop` with the finger's sideways way: since the lift for a lifted project (it keeps its depth until
+    the finger shifts a `PROJECTS_INDENT`, 12 pt), from the row above the gap's depth for the plus (the depth the finger
+    stands at). A held card opens a folded row after `PROJECTS_HOVER_MS` (600). This replaces the 24 pt steps of 45.
+55. **A lifted project rides 16 pt below the finger** (cards still above it over the tree), as the plugin's 39: its line
+    and the row above the line stay seen. Replaces the lifted-project half of 52.
+56. **The plus held over the tasks shows the drop line** after the last card of the part under the finger (over the
+    first part above them all), as the plugin's; let go, the alert asks the task's name for that part.
+57. **The plus held in the tree** finds gaps only from before the first project to before No project: never above All
+    nor among Done's rows.
+58. **A tap on the plus on the Projects tab** opens the New Task sheet with the chosen node's project
+    (`ProjectsView.newTask.project`), as the plugin's tap writes it there.
+59. **The Project page of a task's menu stays open after a pick**, drawn again with the new checks; No project and «New
+    project…» close it, as the plugin's 30. The quick entry's button and the New Task sheet pick one project and close.
+60. **Blank names** follow the core: the alert's Add is off for `tasks.isBlankProjectName` (a project, a rename) or
+    `tasks.isBlank` (a task), never the app's own trim.

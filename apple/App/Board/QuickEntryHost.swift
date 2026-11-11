@@ -66,8 +66,6 @@ struct ListEntryView: Decodable, Equatable {
     let place: Place
     let pending: [EntryView.Pending]
     let section: Bool
-    /// The section named for the task being typed in a project's group, drawn as its header over the field.
-    let newSection: String?
     let at: At
 }
 

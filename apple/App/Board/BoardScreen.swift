@@ -48,7 +48,8 @@ struct BoardScreen: View {
             entrySheet(sheet)
         }
         .sheet(isPresented: Binding(get: { router.capturing }, set: { router.capturing = $0 }), onDismiss: { Task { await model.reloadIfChanged() } }) {
-            CaptureView(focused: router.typing)
+            // On the Projects tab a new task gets the chosen node's project, as the plus writes it there.
+            CaptureView(focused: router.typing, project: model.place == .projects ? model.projects.view?.newTask?.project : nil)
         }
         // Settings may have renamed a list or changed a colour: the screen reads again when it closes.
         .sheet(item: $sheet, onDismiss: { Task { await model.reloadIfChanged() } }) { sheet in
