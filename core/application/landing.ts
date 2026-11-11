@@ -1,4 +1,4 @@
-import type { DropLanding, GroupedList, LandingColumn, LandingPart, ScreenView, TaskItem } from "./contracts";
+import type { DropLanding, LandingColumn, ScreenView, TaskItem } from "./contracts";
 import type { LocalDate } from "../domain/Task";
 import type { TimelineSpans } from "./TimelineSpans";
 
@@ -14,30 +14,13 @@ export function landingOf(screen: ScreenView, id: string, day: LocalDate, timeli
 	const columns: readonly [LandingColumn, readonly TaskItem[]][] = [["day", screen.day.list], ["soon", screen.soon], ["inbox", screen.inbox], ["backlog", screen.backlog], ["done", screen.done]];
 	for (const [column, items] of columns) {
 		const card = items.find((item) => item.id === id);
-		if (card) {
-			const part = partOf(screen, column, id);
-			return { kind: "list", id, item: card, column, group: card.group, index: items.filter((item) => item.group === card.group).indexOf(card), ...(part && { part }) };
-		}
+		if (card) return { kind: "list", id, item: card, column, group: card.group, index: items.filter((item) => item.group === card.group).indexOf(card) };
 		for (const top of items) {
 			const under = subtaskOf(top, id);
 			if (under) return under;
 		}
 	}
 	return { kind: "away", id, item: null };
-}
-
-/** The project part of `column` the card `id` is drawn in, while the column draws parts; null otherwise. */
-function partOf(screen: ScreenView, column: LandingColumn, id: string): LandingPart | null {
-	if (column === "done") return null;
-	const list: GroupedList = column === "day" ? "now" : column;
-	const grouping = screen.projects[list];
-	if (!grouping.on) return null;
-	for (const group of grouping.groups)
-		for (const section of group.sections) {
-			const index = section.items.findIndex((item) => item.id === id);
-			if (index >= 0) return { key: group.key, zone: group.zone, section: section.name, index, folded: group.folded };
-		}
-	return null;
 }
 
 /** The task `id` among the open subtasks of `parent`, at any depth. */

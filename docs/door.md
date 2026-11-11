@@ -52,7 +52,6 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 | `history` | the undo steps as the last answer gave them; left out before the first |
 | `projects` | the notes that had the project tag, `ProjectNote` `{ name, path, link }`, as `rules.projectNotes` answers them over the vault's notes: read only by the one move to projects (the first write to a file without `## Projects` makes each of them a project with its note attached). Left out: none |
 | `projectsScreen` | `ProjectsScreenState`, what this device keeps of the Projects screen (the node chosen, the segment, the folded branches), as the last answer gave it; left out: All chosen, By project, nothing folded |
-| `grouping` | grouping by project went: ignored. Stub until the app drops it |
 | `ids` | `TaskIdState`, who the tasks and sections are, as the last answer gave it; left out before the first (every task and section then gets a new id) |
 
 **Answer** (`DoorAnswer`):
@@ -74,7 +73,7 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
   over, once). The host writes this text as `data.json`; every key it does not know is kept.
 - `projectsScreen`: the call changed what this device keeps of the Projects screen (`tasks.tapProjectNode`,
   `tasks.selectProjectNode`, `tasks.setProjectsMode`, `tasks.createProject`, `tasks.renameProject`). The host keeps it on
-  the device, never synced, and hands it in again. (`grouping` is never answered any more.)
+  the device, never synced, and hands it in again.
 - `ids`: who the tasks and sections are after the call (`TaskIdState` in `core/application/TaskIdentity.ts`: the
   headings and task lines of the file as read, tidied for today, with their ids, and where new ids go on from). The ids
   are the same whether the host hands in the file as the door tidied it or as it still is on disk. It comes whenever it changed: after a write, an
@@ -114,10 +113,9 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   `days` the weekdays (0 Monday) the row lights among the week's letters (`REPEAT_WORDS.weekdays[i].letter`); empty and
   null for no rule and in the bulk menu.
 - `tasks.createInPlace(text, priority, place, repeat?, labels?, project?)` and `tasks.createWithId(…, project?)`:
-  `project` is the task's own (`ProjectRef.link`, `null` for none), written whatever the place's `project` says, which
-  then only decides where it goes; a subtask's place takes none. The quick entry's `entry.call` hands it as the sixth
-  argument for a task of the top level: `["Meet", null, { kind: "list", list: "soon", group: null, before: null }, null,
-  [], "Дружба"]` writes `- [ ] Meet 🗂️ [[Дружба]]` last in Soon.
+  `project` is the task's own project (its name, `null` for none); a subtask's place takes none. The quick entry's
+  `entry.call` hands it as the sixth argument for a task of the top level: `["Meet", null, { kind: "list", list: "soon",
+  group: null, before: null }, null, [], "Дружба"]` writes `- [ ] Meet 🗂️ Дружба` last in Soon.
 - `tasks.createWithId(text, priority, place, repeat?, labels?)`: `tasks.createInPlace`, answering `CreatedTask`
   `{ key, id }` (null when nothing was created) instead of the key alone. The key names the new task as the file stands
   right after this write; the id names it whatever is written before the screen draws it. `tasks.createInPlace` answers
@@ -128,10 +126,9 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   (`rules.placeOfDrop`), or `null` at the end of a column that places nothing in a gap (`rules.placesInGap`). The door
   reads it by whose sections the column shows on `day`; the host never builds `list`, `group` or `nest` itself.
   A drop on a column's title is `screen.titleDrops[column]` (`day`, `soon`, `inbox`, `backlog`) handed back as it is:
-  `{ kind: "title", list, date, byProject }` puts each task at the end of the list's part without a section, its
-  project kept (where the list groups by project, `byProject`, at the end of its own project's part there), e.g.
+  `{ kind: "title", list, date }` puts each task at the end of the list's part without a section, its projects kept, e.g.
   `tasks.drop([{ key, from: "soon" }], screen.titleDrops.backlog, day)`.
-- `tasks.landing(tasks, to, day, project?)`: where `tasks.drop` with the same arguments would leave each task, in
+- `tasks.landing(tasks, to, day)`: where `tasks.drop` with the same arguments would leave each task, in
   their order, writing nothing (no `tasks` in the answer): the drop's own operation tried over the file, the screen of
   `day` read over the result by the screen's own code. Ask it at the moment of the drop, before `tasks.drop`, and fly
   the copy there. Each answer is a `DropLanding` with the task's `id` and `item` (the task as the next screen reads it):
@@ -139,18 +136,14 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
     the day, as `tasks.shownSpan` gives them); `ridesNow`, a past time of today: the block rides the now line; `slotted`,
     every block of the day after the drop (`{ id, span }`, in the screen's order) to lay the stack out with
     `rules.stackTasks` and find the card's box.
-  - `{ kind: "list", column, group, index, part? }`: a card of `column` (`day`, `soon`, `inbox`, `backlog`, `done`), in
-    section `group`, `index` among that section's cards there in the file's order. In a list the screen draws in project
-    parts (`screen.projects[list].on`: grouped by project, or a project's own view), `part` (`LandingPart`
-    `{ key, zone, section, index }`) says where it is drawn: the part (`ProjectGroup.key`, its `zone`), the section in
-    it, and `index` among that section's cards in the part, and `folded`: the part is folded, its cards not drawn, so
-    fly to the part's header. Fly to `part` when it is there.
+  - `{ kind: "list", column, group, index }`: a card of `column` (`day`, `soon`, `inbox`, `backlog`, `done`), in
+    section `group`, `index` among that section's cards there in the file's order.
   - `{ kind: "subtask", parent, index }`: under the task `parent` (its id), `index` among its open subtasks.
-  - `{ kind: "away" }`: not on this screen (another day, out of this project's view).
+  - `{ kind: "away" }`: not on this screen (another day).
   It needs the tasks file, so it is a `tasks.*` method; `rules.*` are the rules that need no file.
-- `tasks.dropPreview(tasks, to, day, project?)`: `tasks.landing` with the whole next screen, writing nothing (no `tasks`,
+- `tasks.dropPreview(tasks, to, day)`: `tasks.landing` with the whole next screen, writing nothing (no `tasks`,
   `history` or `ids` in the answer): `{ landings, screen, tasks }`. `landings` are `tasks.landing`'s with the same
-  arguments; `screen` is the `ScreenView` that `tasks.screen(day, project?)` reads after `tasks.drop` with the same
+  arguments; `screen` is the `ScreenView` that `tasks.screen(day)` reads after `tasks.drop` with the same
   arguments and the same `ids` and `history` handed in, every task with the id it will have; `tasks` is the file's text
   as the drop leaves it, the text that screen is read from (the file as it is, tidied for today, when the drop writes
   nothing). Ask it at the moment of the drop and draw the next screen at once: everything else a screen is built from
@@ -176,8 +169,8 @@ them. The move to projects is part of tidying: any read of a file that still awa
 `step`, before any action: the notes of `context.projects` become projects with their notes attached (a project of that
 name gets the note), the old fields are written plain, `🎯` goes off the lines.
 
-- `TaskItem.project` (the first, or `null`) and `TaskItem.projects`: `ProjectRef` `{ name, link, path, note,
-  canOpenNote, mark }`; `name` is what every call takes (`link` is the name again, a stub), `path` the names from the top
+- `TaskItem.project` (the first, or `null`) and `TaskItem.projects`: `ProjectRef` `{ name, path, note,
+  canOpenNote, mark }`; `name` is what every call takes, `path` the names from the top
   of the tree («Дружба», «iPhone»), `note` the attached note's link, `mark` the card's folder icon (off on the Projects
   screen). `item.can.setProject` is false on a subtask.
 - `tasks.projectsScreen()`: `ProjectsView` `{ rows, selected, mode, modes, title, menu, sections, newTask, emptyLabel,
@@ -223,28 +216,24 @@ name gets the note), the old fields are written plain, `🎯` goes off the lines
   screen.offer, projects: screen.projectTree })` over the settings alone lists the whole tree. Left out, the door takes
   the tree of `tasks` when it is handed in (none without), the plugin of the file it read last.
 - `tasks.setProject(keys, name | null)`: the tasks' projects become that one alone. `tasks.projects()`: the tree's
-  projects in its order (the quick entry's Project button and `capture.project`; `tasks.projectNotes()` is its old name).
+  projects in its order (the quick entry's Project button and `capture.project`).
 - `tasks.search(query)`: each `SearchHit` carries `projectPath`, the task's first project's path, `null` for none.
 - `tasks.fullTree(item).project`: the task's first project; a tap opens the Projects screen on it
   (`tasks.selectProjectNode(rules.projectNodeOf(name))`).
-- Stubs until the app drops them: `tasks.setGrouping`, `tasks.toggleFold` do nothing; `screen.projects` is every list
-  ungrouped and `screen.project` null; `tasks.screen(date, project)`, `tasks.search(query, project)` ignore `project`;
-  `titleDrops` say `byProject: false`.
 
 #### A folded task's next step
 
 Every task with an open subtask, at any depth, drawn folded shows its next open subtask: `TaskItem.card` `{ text,
-title, over, step, semibold }` has the step's title in `text`, the task's own in `over`, the step's `TaskItem` in
+title, over, step }` has the step's title in `text`, the task's own in `over`, the step's `TaskItem` in
 `step` (a tap on `over` opens the task's menu, anywhere else the step's); `TaskItem.block` `{ text, title, step }` the
 same on the timeline; `TaskItem.drawnOn` `{ key, slot }` on such a step (the folded task's key and slot), where the
-quick entry renames it. `semibold` is always false.
+quick entry renames it.
 
 #### Results went
 
-`🎯`, Make result / Make task, Add to result and New result… went (the move takes `🎯` off the lines). Stubs until the
-app drops them: `tasks.setResult`, `tasks.addToResult` write nothing, `tasks.newResult` answers `null`,
-`tasks.resultPage` an empty page; `TaskItem.isResult` false, `resultOf` null, `can.result` false; a menu's `result.rows`
-empty; `settings.setResultMark` and `settings.setProjectTag` write nothing.
+`🎯`, Make result / Make task, Add to result and New result… went, with their calls and fields (the move takes `🎯`
+off the lines). So did grouping by project in the lists, a project's own view and the project parts of places, the
+Project tag and Result mark settings, and the notes «New project…» once wrote (`notes.newProject`, `notes.projectText`).
 
 #### Ids: who a task or a section is
 
@@ -255,20 +244,18 @@ empty; `settings.setResultMark` and `settings.setProjectTag` write nothing.
   the timeline and back, several at once), through `history.undo`/`redo`, and through an edit elsewhere that leaves its
   line in place (or edits that one line in place). A task made gets a new id; a removed task's id is gone; a task added
   elsewhere gets a new one. A view keys its card by `id`; `key` stays what an action names (the task as read).
-- `ListSection.id` (`tasks.screen`'s `sections`, `tasks.listSections`) and `ListGroup.id` (a column's groups, each
-  `ProjectGroup.sections`): who a section is, the same through `tasks.renameGroup`, `tasks.moveGroup`, the writes to its
-  tasks and undo; a section made gets a new one; No section's is `"none"` in every list. A section shown in several
-  project groups has its one id in each. A header is keyed by it, never by its name.
+- `ListSection.id` (`tasks.screen`'s `sections`, `tasks.listSections`) and `ListGroup.id` (a column's groups): who a
+  section is, the same through `tasks.renameGroup`, `tasks.moveGroup`, the writes to its tasks and undo; a section made
+  gets a new one; No section's is `"none"` in every list. A header is keyed by it, never by its name.
 - A project is named by its name (`ProjectsRow.node`, `"project:<name>"`); `tasks.renameProject` carries the device's
   `projectsScreen` over to the new name.
 - Twins (two identical lines) are two tasks with two ids: the door knows which line a write made of which.
 
 ### `days.*`: `DayService`
 
-`today()`, `relation(date)`, `step(date, days)`, `stepScreen({mode, date}, shift)` (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends),
-`stepWheel({mode, date}, shift)` (the same with Projects first: back from Inbox and Soon, or from Done, to
-`{ mode: "projects" }`; on from Projects to Inbox; null back from Projects; `rules.swipeLanding` still makes one swipe one
-step), `boundary()` (`{ startHour }`), `openAt(date)`: where the day's
+`today()`, `relation(date)`, `step(date, days)`, `stepScreen({mode, date}, shift)` (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends;
+Projects first: back from Inbox and Soon, or from Done, to `{ mode: "projects" }`, on from Projects to Inbox, null back
+from Projects; `rules.swipeLanding` still makes one swipe one step), `boundary()` (`{ startHour }`), `openAt(date)`: where the day's
 timeline opens, minutes from the day's start: `{ kind: "now", minute }` for today (the now line, which the plugin holds
 at half the height), `{ kind: "hour", minute }` for another day (the settings' `scrollToHour`, at the top). `onDayChange` and `catchUp` are the
 host's: it checks the clock (once a minute while a screen is open), and when `days.today` answers another day it calls
@@ -333,14 +320,13 @@ puts it, on one line; in Now with today's date. The title is the words typed, th
 name as the host saved it, `null` for none), then the tag (as typed in the app's settings, with or without its `#`;
 blank for none), which goes only with a recording. No words and no recording answer `blank`. A title that is only a
 priority prefix (`p1`) is written as the task's text: the phone's capture writes what it was told, unlike the plugin's
-quick entry, which writes nothing for it. `project`, the sheet's Project (`ProjectRef.link`; null or left out: none),
-goes on the line as `🗂️ [[link]]`, the task still last in its list: `add("inbox", "Call Anna", null, "", "Дружба")` →
-`- [ ] Call Anna 🗂️ [[Дружба]]`.
+quick entry, which writes nothing for it. `project`, the sheet's Project (its name; null or left out: none),
+goes on the line as `🗂️ Name`, the task still last in its list: `add("inbox", "Call Anna", null, "", "Дружба")` →
+`- [ ] Call Anna 🗂️ Дружба`.
 
 `project(chosen)`: the sheet's Project row for the project chosen (`link`, null for none), `EntryProject`
 `{ page, lit }`: `page` the task menu's Project page (`MenuProject`, «New project…» last), `lit` whether one is chosen.
-The sheet starts with the project of the view it was opened from (`ScreenView.project?.link`, null on the main screen);
-a pick on the page is the new `chosen`. `project("Дружба")` → `{ lit: true, page: { current: { name: "Дружба", … },
+The sheet starts with none; a pick on the page is the new `chosen`. `project("Дружба")` → `{ lit: true, page: { current: { name: "Дружба", … },
 value: "Дружба", … } }`.
 
 `lists()`: the lists a new task goes into, `{ list, name }`, `name` the heading's name by the settings, in the order the
@@ -352,11 +338,11 @@ The settings screen, every read and write but one, answered by the plugin's own 
 `context.settings`: `form()` (`SettingsForm`, the fields as the screen shows them), `setTasksFile(path)`,
 `setSection(key, name)`, `setMarker(marker, text)`, `setCount(field, text)`, `setDayStartHour(hour)`,
 `renameLevel(index, prefix)`, `recolourLevel(index, color)`, `removeLevel(index)`, `addLevel()`, `moveLevel(from, to)`,
-`setResultMark(mark)` (results went: writes nothing, a stub), `setLabelTag(tag)`, `setLabelPaint(paint)` (how a card of several labels is painted: one of the form's `labelPaints`,
+`setLabelTag(tag)`, `setLabelPaint(paint)` (how a card of several labels is painted: one of the form's `labelPaints`,
 `"stripes"` or `"blend"`; anything else writes nothing), `setCardHeight(px)` and `setCardGap(px)` (Cards: written rounded
 while within the form's `cardHeights` `{ min: 28, max: 40 }` and `cardGaps` `{ min: 0, max: 10 }`, else nothing), `setZoomLevels(text)` (Zoom
 levels as typed, the hour's heights: `"40, 80"` writes `[{ hourPx: 40 }, { hourPx: 80 }]`, the old `"28:60, 56:30"` reads
-too; text that is no list of positive whole numbers writes nothing), `setProjectTag(tag)` (projects live in the tasks file: writes nothing, a stub), `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
+too; text that is no list of positive whole numbers writes nothing), `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
 `moveLabel(from, to)`, `colourOf(text, shades)` (the preset a typed code is, by the shades the host draws presets in),
 `renamePreset(index, name)`, `removePreset(index)`, `addPreset()`, `movePreset(from, to)`, `setUngrouped(name)`,
 `setGoogleClientId(id)`, `setWorkCalendarFile(path)`, `typedColour(of, index, text, shades)` (a colour code typed for a
@@ -412,8 +398,6 @@ vault folder (`Projects/Alpha.md`); caret offsets count UTF-16 code units, as `N
   `{ text, caret }`.
 - `open(target, notes)`: the file a note link in a title opens (`textParts`' `target`): by its path, else its name, as
   Obsidian resolves it, a heading after `#` left aside; `{ name, path, link }`, `null` for none.
-- `newProject(name, notes)` and `projectText(text)`: «New project…» writes no note any more (`tasks.newProject` makes
-  the project in the tasks file). Stubs until the app drops them: `null`, and the text as it is.
 
 ### `history.*`: undo
 
@@ -599,12 +583,11 @@ max: 280 }`), `DIVIDER_SNAP` (`{ distance: 8, slowSpeed: 0.08 }`), `MOST_CARD_CO
 `every` `"Every"`, `units` `{ day: "days", week: "weeks", month: "months" }`, `weekdays` Monday first `{ short: "Mon",
 name: "Monday", letter: "M" }`, `remove` `"Remove repeat"`),
 `NO_DAY_EVENTS` (a day before any calendar file was read, as `calendars.events` answers it: no events, no statuses, `alert` `"none"`, its `words`),
-`SCREEN_PLACES` (`["inbox", "soon", "calendar"]`, left to right) and `SHOWN_LISTS` (the lists each place shows, in its
-order: `{ inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] }`; the quick entry's
-`look.shown`), `WHEEL_PLACES` (`["projects", "inbox", "soon", "calendar"]`: the wheel's places, Projects a place of its
-own left of Inbox, its window holding the folder alone). `rules.shownLists(place)` the funnel's lists a wheel's place
-shows (`"projects"` → `[]`), `rules.placeOfList(column, place)` the funnel's place that shows a list from a wheel's place
-(from Projects as from Inbox: `placeOfList("day", "projects")` → `"soon"`). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
+`SCREEN_PLACES` (`["projects", "inbox", "soon", "calendar"]`, left to right: Projects a place of its own, the wheel's
+window holding its folder alone) and `SHOWN_LISTS` (the funnel's lists each place shows, in its order: `{ projects: [],
+inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] }`, also `rules.shownLists(place)`; the
+quick entry's `look.shown`); `rules.placeShowing(column, "projects")` turns as from Inbox (`placeShowing("day",
+"projects")` → `"soon"`). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.
 
 ## What the door leaves to the host
@@ -651,15 +634,13 @@ JavaScriptCore of its own set to that zone (`osascript -l JavaScript`: a process
 - `CalendarExport.path`, `CalendarExport.text(...)` and `CalendarExport.adds`: `iphoneCalendarFile()`,
   `iphoneCalendarText(...)` and `iphoneCalendarAdds(...)`.
 - `Vault.settingsPath`: `settingsFile()`.
-- `NoteTags.of(text)` and `VaultProjects.projects(...)`: `rules.noteTags(text)` and `rules.projectNotes(notes, tag)`.
+- `NoteTags.of(text)`: `rules.noteTags(text)`; the notes that were projects, for the one move: `rules.projectNotes(notes, tag)`.
 - The task's title from the words, the recording and the tag, and what is blank: `capture.add`.
 - The old functions: the app calls `reminders.*`, `capture.add`, `calendars.sources`, `calendars.meetings` through
   `call`, by their error codes (`staleTask`, `blank`).
 - `TaskCapture.oneLine`: `capture` writes the title on one line already; `oneLine` where the app shows it before.
 - `CaptureList`'s cases and their titles: `capture.lists()`, by the headings' names.
 - `CardControl.grownStart` and the width a pressed card's copy grows to: `rules.wholeWidth` and `rules.grownStart`.
-- Grouping forced off (`TaskBoard.ungrouped`): the device's own `grouping`, kept as the door answers it, and the vault's
-  projects in `context.projects` (`rules.projectNotes`).
 - A card's fixed 35 and 2 points: `screenSettings.get()`'s `cardHeight` and `cardGap`; the list's width bounds
   (`BoardScreen.minList`, `maxList`): `rules.listWidths`.
 - The Repeat row's and the repeat page's words (`BoardSheets.unit`, the weekday letters): the menu's `repeat` and
@@ -668,13 +649,9 @@ JavaScriptCore of its own set to that zone (`osascript -l JavaScript`: a process
 
 ### The bridge in `apple/Core`
 
-`TaskBoard` hands in with every call the device's grouping (a `DeviceText`: `UserDefaultsText` in the app, kept as each
-answer's `grouping` gives it) and the vault's projects (a `ProjectSource`: `VaultProjects` scans the vault's markdown
-notes through `Vault.scanNotes`, each note's tags read by `rules.noteTags` once and again only when it changed, kept on
-the device; the list is `rules.projectNotes`, looked at again at most every few seconds on its own core, and `changed`
-redraws the screen). Its own calls: `group(method, arguments)` for `tasks.setGrouping` and `tasks.toggleFold`,
-`titleParts(text)`, `noteToOpen(target)`, `linkQuery(in:caret:)`, `suggestNotes(query)`, `insertLink(note, in:at:)`
+`TaskBoard` hands in with every call the device's Projects screen (a `DeviceText`: `UserDefaultsText` in the app, kept as
+each answer's `projectsScreen` gives it). Its own calls: `titleParts(text)`, `noteToOpen(target)`, `linkQuery(in:caret:)`, `suggestNotes(query)`, `insertLink(note, in:at:)`
 (`notes.*` over `Vault.vaultFiles()`, every file of the vault, listed again by `refreshNotes()`), `screenSettings()`,
 `listWidths(share:viewWidth:dividerWidth:)`, `repeatWords()`. The answers decode as `ProjectRef`, `ProjectNote`,
-`ProjectGroup`, `ListGrouping`, `MenuProject`, `RepeatRow`, `SourceWords`, `ScreenSettings`, `SizeBounds`, `TextPart`,
+`ProjectsView`, `MenuProject`, `RepeatRow`, `SourceWords`, `ScreenSettings`, `SizeBounds`, `TextPart`,
 `LinkQuery`, `LinkInsert`, `ListWidths`, `RepeatWords` (`BoardModels.swift`, `NoteModels.swift`, `Projects.swift`).

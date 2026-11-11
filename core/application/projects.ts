@@ -3,13 +3,10 @@ import { projectKey } from "../domain/Project";
 import { type PlacedProject, type ProjectTree } from "../domain/ProjectTree";
 import { taskProjects } from "../domain/ProjectWrites";
 import type { TaskDocument } from "../domain/TaskDocument";
-import type { ListGrouping, ProjectNote, ProjectRef } from "./contracts";
+import type { ProjectNote, ProjectRef } from "./contracts";
 
 /** The title of the tasks without a project. */
 export const NO_PROJECT = "No project";
-
-/** A list never grouped by project: grouping went. */
-export const NO_GROUPING: ListGrouping = { canGroup: false, on: false, groups: [] };
 
 /** The projects the screens know: the file's tree, and each project a task names that the tree lacks, last at the top. */
 export function projectTreeOf(doc: TaskDocument): ProjectTree {
@@ -28,7 +25,7 @@ export class ProjectIndex {
 	refOf(name: string | null, mark = true): ProjectRef | null {
 		if (name === null) return null;
 		const placed = this.byKey.get(projectKey(name));
-		if (!placed) return { name, link: name, path: [name], note: null, canOpenNote: false, mark };
+		if (!placed) return { name, path: [name], note: null, canOpenNote: false, mark };
 		return refOfPlaced(placed, mark);
 	}
 
@@ -44,7 +41,7 @@ export class ProjectIndex {
 
 export function refOfPlaced(placed: PlacedProject, mark = true): ProjectRef {
 	const { name, note } = placed.node;
-	return { name, link: name, path: placed.path, note, canOpenNote: note !== null, mark };
+	return { name, path: placed.path, note, canOpenNote: note !== null, mark };
 }
 
 /** A note's tags, as the host reads them from its properties and its body: what the one move to projects reads. */

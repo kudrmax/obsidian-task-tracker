@@ -182,8 +182,17 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
 17. **The note.** The menu's `note` names the attached note by its link's last part; the app opens it with
     `projects.noteUrl(link, vault)` (`obsidian://open?vault=…&file=…`, an alias or heading left out). Attaching is the
     plugin's (its note search, then `setProjectNote(name, link)`); a link typed with `[[ ]]` is taken without them.
-18. **The old settings** `projectTag` and `resultMark` stay in `data.json`, read only by the move; the settings form's
-    fields and `setProjectTag`/`setResultMark` are stubs that write nothing until the frontends drop them.
+18. **The old settings** `projectTag` and `resultMark` stay in `data.json`, read only by the move; the settings form has
+    neither field and the door neither setter (removed in the final pass, with every other stub of the old model).
+19. **The wheel** is `SCREEN_PLACES` with Projects first, left of Inbox, a place of its own (`SHOWN_LISTS.projects` `[]`),
+    and `stepScreen` walks it: back from Inbox and Soon, or from Done, to Projects; on from Projects to Inbox. While the
+    frontends were built it stood apart as `WHEEL_PLACES`/`stepWheel`; the final pass folded it in. `swipeLanding` is
+    untouched.
+20. **A card held over a folded row** opens it by `unfoldProjectNode`, the choice kept. A tap reads the file first, so a
+    tap before any screen was read still folds the chosen node.
+21. **Grey rows**: `ProjectsRow.muted` for a waiting project, a done one, No project and Done; All and an active project
+    are not. **`projects()`** is the tree's projects for the quick entry's button. **`toggleProject`** answers the tasks as
+    they then stand, found by their ids.
 22. **A menu's Project page reads no file.** `ScreenView.projectTree` is the tree's projects in its order; a frontend
     hands it in as `MenuScreen.projects` with every `tasks.menu` and `tasks.bulkMenu`, the plugin and the app alike, so the
     app's menus stay asked over the settings alone. Left out, the plugin's service takes the tree of the file it read

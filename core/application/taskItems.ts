@@ -54,12 +54,12 @@ function itemWithId(items: readonly TaskItem[], id: string): TaskItem | null {
 
 /** A card of one line: the task's own title. */
 export function ownCard(item: Pick<TaskItem, "text" | "title">): TaskCard {
-	return { text: item.text, title: item.title, over: null, step: null, semibold: false };
+	return { text: item.text, title: item.title, over: null, step: null };
 }
 
 /** The card of a task: a folded task's next step under its own title, small; any other task's own title. */
 function cardOf(item: Pick<TaskItem, "text" | "title">, step: TaskItem | null): TaskCard {
-	return step ? { text: step.text, title: step.title, over: item.title, step, semibold: false } : ownCard(item);
+	return step ? { text: step.text, title: step.title, over: item.title, step } : ownCard(item);
 }
 
 /** The timeline's block of a task: a folded task's next step, else its own title. */
@@ -122,10 +122,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 			fold: hasOpenSubtask(entry),
 			resize: entry.task.slot !== null,
 			setProject: entry.path.length === 0,
-			result: false,
 		},
-		isResult: false,
-		resultOf: null,
 		card: cardOf(own, step),
 		block: blockOf(own, step),
 		drawnOn: drawn?.id === entry.id ? { key: keyOf(drawn.on), slot: drawn.on.task.slot } : null,

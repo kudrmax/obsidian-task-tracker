@@ -42,8 +42,6 @@ export class SettingsServiceImpl implements SettingsService {
 				collapsedMarker: s.collapsedMarker,
 			},
 			priorities: s.priorities,
-			resultMark: s.resultMark,
-			defaultResultMark: DEFAULT_SETTINGS.resultMark,
 			labelTag: s.labelTag,
 			labels: s.labels,
 			labelPaint: s.labelPaint,
@@ -53,7 +51,6 @@ export class SettingsServiceImpl implements SettingsService {
 			cardHeights: CARD_HEIGHTS,
 			cardGaps: CARD_GAPS,
 			zoomLevels: formatZoomLevels(s.zoomLevels),
-			projectTag: s.projectTag,
 			presets: s.groups.presets,
 			ungrouped: s.groups.ungrouped,
 			longPressMs: s.longPressMs,
@@ -138,13 +135,6 @@ export class SettingsServiceImpl implements SettingsService {
 	async setZoomLevels(text: string): Promise<void> {
 		const zoomLevels = parseZoomLevels(text);
 		if (zoomLevels) await this.store.update({ zoomLevels });
-	}
-
-	/** Results went: writes nothing. Stub until the frontends drop the field. */
-	async setResultMark(_mark: string): Promise<void> {}
-
-	/** The project tag is no setting any more (projects live in the tasks file): writes nothing. Stub until the frontends drop the field. */
-	async setProjectTag(_tag: string): Promise<void> {
 	}
 
 	renameLabel(index: number, title: string): Promise<void> {

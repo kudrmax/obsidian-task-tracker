@@ -3,7 +3,7 @@ import { CALENDAR_SOURCES } from "./calendarFile";
 import type { CalendarService, CalendarSource, DayService, TaskService, UndoService, WorkCalendarSetup } from "./contracts";
 import { DayServiceImpl } from "./DayServiceImpl";
 import type { EventFeed, EventFile } from "./EventSource";
-import type { Clock, GroupingStore, NoteFiles, Projects, ProjectsScreenStore, SettingsStore, TaskFileStore, Ticker, Timers } from "./ports";
+import type { Clock, Projects, ProjectsScreenStore, SettingsStore, TaskFileStore, Ticker, Timers } from "./ports";
 import { TaskServiceImpl } from "./TaskServiceImpl";
 import { UndoHistory } from "./UndoHistory";
 import { TaskIdentity } from "./TaskIdentity";
@@ -25,10 +25,6 @@ export interface CorePorts {
 	readonly isPhone: () => boolean;
 	/** The notes that had the project tag, which the one move to projects attaches; none when left out. */
 	readonly projects?: Projects;
-	/** Grouping went: stub until the frontends drop it. */
-	readonly grouping?: GroupingStore;
-	/** Unused: stub until the frontends drop it. */
-	readonly notes?: NoteFiles;
 	/** What this device keeps of the Projects screen; kept in memory when left out. */
 	readonly projectsScreen?: ProjectsScreenStore;
 }

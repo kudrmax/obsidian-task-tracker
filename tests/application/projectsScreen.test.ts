@@ -193,7 +193,7 @@ describe("a folded task with subtasks", () => {
 		const { svc } = setup();
 		const screen = await svc.screen(T);
 		const card = screen.backlog.find((i) => i.title === "Шаги")!.card;
-		expect(card).toMatchObject({ title: "Первый шаг", over: "Шаги", semibold: false });
+		expect(card).toMatchObject({ title: "Первый шаг", over: "Шаги" });
 	});
 });
 

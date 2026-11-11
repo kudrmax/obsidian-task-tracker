@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acceptsDrop, type DropColumn, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, placesInGap, type ProjectNote, type ScreenView, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import { acceptsDrop, type DropColumn, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, placesInGap, type ProjectNote, type TaskItem, type TaskKey } from "../../core/application/contracts";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
@@ -154,19 +154,6 @@ describe("which drops a target takes", () => {
 	});
 });
 
-/** The part of a list grouped by project the card `id` is drawn in, and its place among that part's section's cards; nothing in a list not grouped. */
-function partOf(screen: ScreenView, column: string, id: string): { part?: unknown } {
-	if (column === "done") return {};
-	const grouping = screen.projects[(column === "day" ? "now" : column) as keyof ScreenView["projects"]];
-	if (!grouping.on) return {};
-	for (const group of grouping.groups)
-		for (const section of group.sections) {
-			const index = section.items.findIndex((i) => i.id === id);
-			if (index >= 0) return { part: { key: group.key, zone: group.zone, section: section.name, index, folded: group.folded } };
-		}
-	return {};
-}
-
 /** Where the task `id` stands on the screen of `day` as read after a write, found the plain way: by looking. */
 async function placeAfter(svc: Svc, id: string, day: string): Promise<unknown> {
 	const screen = await svc.screen(day);
@@ -175,7 +162,7 @@ async function placeAfter(svc: Svc, id: string, day: string): Promise<unknown> {
 	const columns = { day: screen.day.list, soon: screen.soon, inbox: screen.inbox, backlog: screen.backlog, done: screen.done };
 	for (const [column, items] of Object.entries(columns)) {
 		const card = items.find((i) => i.id === id);
-		if (card) return { kind: "list", item: card, column, group: card.group, index: items.filter((i) => i.group === card.group).indexOf(card), ...partOf(screen, column, id) };
+		if (card) return { kind: "list", item: card, column, group: card.group, index: items.filter((i) => i.group === card.group).indexOf(card) };
 		const parent = items.flatMap(function walk(i: TaskItem): TaskItem[] {
 			return [i, ...i.subtasks.flatMap(walk)];
 		}).find((i) => i.subtasks.some((s) => s.id === id));
@@ -188,15 +175,15 @@ async function placeAfter(svc: Svc, id: string, day: string): Promise<unknown> {
  * `dropPreview` against the drop itself: it writes nothing, its landings are `landing`'s, and its screen and text are the
  * screen and the file the drop then gives, ids included.
  */
-async function previewIsTheDrop(store: InMemoryTaskFileStore, svc: Svc, tasks: readonly DroppedTask[], to: DropTo, day: string, project?: string): Promise<void> {
+async function previewIsTheDrop(store: InMemoryTaskFileStore, svc: Svc, tasks: readonly DroppedTask[], to: DropTo, day: string): Promise<void> {
 	const before = store.text;
 	const writes = store.writes;
-	const preview = await svc.dropPreview(tasks, to, day, project);
+	const preview = await svc.dropPreview(tasks, to, day);
 	expect(store.text).toBe(before);
 	expect(store.writes).toBe(writes);
-	expect(preview.landings).toEqual(await svc.landing(tasks, to, day, project));
+	expect(preview.landings).toEqual(await svc.landing(tasks, to, day));
 	await svc.drop(tasks, to, day);
-	expect(preview.screen).toEqual(await svc.screen(day, project));
+	expect(preview.screen).toEqual(await svc.screen(day));
 	expect(preview.tasks).toBe(store.text);
 }
 
@@ -246,7 +233,7 @@ describe("landing on a column's title: where the drop leaves the task, before it
 	];
 	const PROJECTS = ["## Inbox", "- [ ] I1", "## Now", "- [ ] N1 🗂️ [[A]]", "## Soon", "- [ ] S1 🗂️ [[A]]", "\t- [ ] S1a", "- [ ] S2 🗂️ [[B]]", "- [ ] S3", "## Backlog", "- [ ] BA1 🗂️ [[A]]", "- [ ] BB1 🗂️ [[B]]", "- [ ] BN", "### Later", "- [ ] BA3 🗂️ [[A]]", "## Done", ""].join("\n");
 
-	/** The plain file of this suite, or one of projects with Soon and Backlog grouped by project. */
+	/** The plain file of this suite, or one of tasks with projects. */
 	function service(byProject: boolean) {
 		if (!byProject) return setup();
 		const store = new InMemoryTaskFileStore(PROJECTS);
@@ -270,9 +257,9 @@ describe("landing on a column's title: where the drop leaves the task, before it
 		{ name: "Backlog → Inbox's title", byProject: false, day: T, column: "inbox", tasks: [["B2", "backlog"]] },
 		{ name: "Inbox → Backlog's title", byProject: false, day: T, column: "backlog", tasks: [["I1", "inbox"]] },
 		{ name: "several → Backlog's title", byProject: false, day: T, column: "backlog", tasks: [["I1", "inbox"], ["S2", "soon"]] },
-		{ name: "Inbox → Backlog's title grouped by project", byProject: true, day: T, column: "backlog", tasks: [["I1", "inbox"]] },
-		{ name: "a project's task → Backlog's title grouped by project: to its project's part", byProject: true, day: T, column: "backlog", tasks: [["S2", "soon"]] },
-		{ name: "Backlog → Soon's title grouped by project", byProject: true, day: T, column: "soon", tasks: [["BA1", "backlog"], ["BN", "backlog"]] },
+		{ name: "Inbox → Backlog's title with projects", byProject: true, day: T, column: "backlog", tasks: [["I1", "inbox"]] },
+		{ name: "a project's task → Backlog's title with projects: to its project's part", byProject: true, day: T, column: "backlog", tasks: [["S2", "soon"]] },
+		{ name: "Backlog → Soon's title with projects", byProject: true, day: T, column: "soon", tasks: [["BA1", "backlog"], ["BN", "backlog"]] },
 		{ name: "a project's task → today's title", byProject: true, day: T, column: "day", tasks: [["BB1", "backlog"]] },
 		{ name: "a project's task → Inbox's title", byProject: true, day: T, column: "inbox", tasks: [["S1", "soon"]] },
 	];
@@ -280,7 +267,6 @@ describe("landing on a column's title: where the drop leaves the task, before it
 	for (const c of CASES) {
 		it(`is where the write leaves it: ${c.name}`, async () => {
 			const { store, svc } = service(c.byProject);
-			if (c.byProject) await svc.setGrouping("soon", true);
 			const screen = await svc.screen(c.day);
 			const items = await itemsOf(svc);
 			const byText = (text: string) => items.get(text) ?? [...screen.inbox, ...screen.backlog, ...screen.soon, ...screen.day.list, ...screen.day.slotted].find((i) => i.text === text || i.title === text)!;
@@ -300,7 +286,6 @@ describe("landing on a column's title: where the drop leaves the task, before it
 
 		it(`dropPreview gives the screen the drop leaves: ${c.name}`, async () => {
 			const { store, svc } = service(c.byProject);
-			if (c.byProject) await svc.setGrouping("soon", true);
 			const screen = await svc.screen(c.day);
 			const items = await itemsOf(svc);
 			const byText = (text: string) => items.get(text) ?? [...screen.inbox, ...screen.backlog, ...screen.soon, ...screen.day.list, ...screen.day.slotted].find((i) => i.text === text || i.title === text)!;
@@ -308,11 +293,6 @@ describe("landing on a column's title: where the drop leaves the task, before it
 		});
 	}
 
-	it("dropPreview in a project's own view gives that view after the drop", async () => {
-		const { store, svc } = service(true);
-		const screen = await svc.screen(T, "A");
-		const s1 = screen.soon.find((i) => i.title === "S1")!;
-		await previewIsTheDrop(store, svc, [{ key: s1.key, from: "soon" }], screen.titleDrops.backlog, T, "A");
-	});
+
 });
 

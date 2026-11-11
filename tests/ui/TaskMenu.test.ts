@@ -908,8 +908,8 @@ describe("the parts over the blur, raised over the keyboard", () => {
 
 
 describe("the Project row", () => {
-	const ENV = { name: "Окружение", path: ["Окружение"], link: "Окружение", note: "Окружение.md", canOpenNote: true, mark: true };
-	const HAPPY = { name: "Стать счастливым", path: ["Стать счастливым"], link: "Стать счастливым", note: "Стать счастливым.md", canOpenNote: true, mark: true };
+	const ENV = { name: "Окружение", path: ["Окружение"], note: "Окружение.md", canOpenNote: true, mark: true };
+	const HAPPY = { name: "Стать счастливым", path: ["Стать счастливым"], note: "Стать счастливым.md", canOpenNote: true, mark: true };
 	const withProjects = (task: TaskItem): TaskMenuModel => taskMenu([task], "2026-11-01", [], [], null, { kind: "task", from: "day" }, [ENV, HAPPY].map((project) => ({ project, depth: 0 })));
 
 	const projectRow = (task: TaskItem) => editRows(task, withProjects(task)).find((row) => row.id === "project")!;

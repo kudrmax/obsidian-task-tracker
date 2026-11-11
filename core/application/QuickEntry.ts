@@ -5,7 +5,7 @@ import { repeatDay } from "../domain/RepeatDraft";
 import type { GroupedList } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
 import { samePlacement } from "../domain/operations";
-import type { CreatedTask, DraftMarks, DropColumn, DropTo, MenuProject, NewTaskPlace, ProjectRef, ProjectZone, TaskItem, TaskKey, TaskService } from "./contracts";
+import type { CreatedTask, DraftMarks, DropColumn, DropTo, MenuProject, NewTaskPlace, ProjectRef, TaskItem, TaskKey, TaskService } from "./contracts";
 import { inProject, projectKey, projectName } from "../domain/Project";
 import { projectPage } from "./menus";
 import { fitLevel, type GapPlace, gapOfPlace, type Header, type LevelCard, type ListCard, type ListPlace, placeOfGap, shiftLevel } from "./nesting";
@@ -28,27 +28,13 @@ export type EntrySpot =
 /** What a list is about to draw: its cards in order, and the sections it draws, in order. */
 export interface EntryDrawing {
 	readonly cards: readonly ListCard[];
-	/** In a list grouped by project, each section of each group (`{ group, project }`), the part without a section too. */
+	/** The sections the list draws, in order (null: the part without a section). */
 	readonly sections: readonly Header[];
 }
 
-/** A section a card or a place stands in, with its project's part in a grouped list. */
-interface Zone {
-	readonly group: GroupName;
-	readonly project?: ProjectZone;
-}
-
-function zoneOf(header: Header): Zone {
-	return header !== null && typeof header === "object" ? header : { group: header };
-}
-
-function sameZone(a: Zone, b: Zone): boolean {
-	return a.group === b.group && a.project === b.project;
-}
-
 /** Where a header stands among `sections`: -1 when none is it. */
-function zoneIndex(sections: readonly Header[], zone: Zone): number {
-	return sections.findIndex((header) => sameZone(zoneOf(header), zone));
+function zoneIndex(sections: readonly Header[], zone: { readonly group: GroupName }): number {
+	return sections.indexOf(zone.group);
 }
 
 /**
@@ -80,11 +66,11 @@ export function entryAt(drawing: EntryDrawing, place: GapPlace, section: boolean
 	const { cards, sections } = drawing;
 	if (!sections.some((name) => name !== null)) return place.index <= cards.length ? { kind: "in", section: 0, card: place.index, keepsPlate: true } : { kind: "end" };
 	const at = zoneIndex(sections, place);
-	if (at < 0) return place.group === null && place.project === undefined ? { kind: "top" } : { kind: "end" };
+	if (at < 0) return place.group === null ? { kind: "top" } : { kind: "end" };
 	const start = cards.findIndex((card) => zoneIndex(sections, card) >= at);
 	const from = start < 0 ? cards.length : start;
 	let end = from;
-	while (end < cards.length && sameZone(cards[end], place)) end++;
+	while (end < cards.length && cards[end].group === place.group) end++;
 	const card = place.index >= from && place.index <= end ? place.index : end;
 	return { kind: "in", section: at, card, keepsPlate: section };
 }
@@ -209,7 +195,7 @@ export interface PlaceMove {
 }
 
 /** What the entry reads of the service, all synchronous: the marks, the places, and the project notes its Project page offers (none without them). */
-export type EntryTasks = Pick<TaskService, "placementOf" | "placementOfDay" | "dayOfPlacement" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks" | "newSlot"> & Partial<Pick<TaskService, "projects" | "projectNotes">>;
+export type EntryTasks = Pick<TaskService, "placementOf" | "placementOfDay" | "dayOfPlacement" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks" | "newSlot"> & Partial<Pick<TaskService, "projects">>;
 
 /**
  * What the entry reads of the screen, as it stands now: its lists' cards and sections, the day it shows, and which of
@@ -230,8 +216,6 @@ export interface EntryLook {
 	 * Inbox, Backlog); the plus opens the field in the day's list while it shows, else in Inbox.
 	 */
 	shown(): readonly DropColumn[];
-	/** The project whose own view this is (`ProjectRef.link`): every task written here gets it. None on the main screen. */
-	project?(): string | undefined;
 }
 
 /** A line entered: its text, the level it was entered at, and its marks. */
@@ -239,7 +223,7 @@ export interface EntryLine extends PendingText {
 	readonly priority: string | null;
 	readonly labels: readonly string[];
 	readonly repeat: RepeatRule | null;
-	/** The field's project as it was when the line was entered (`ProjectRef.link`), null for none. */
+	/** The field's project as it was when the line was entered (its name), null for none. */
 	readonly project?: string | null;
 }
 
@@ -381,7 +365,7 @@ export class QuickEntry {
 	}
 
 	private projectButton(link: string | null): EntryProject {
-		return entryProject(link, this.tasks.projects?.() ?? this.tasks.projectNotes?.() ?? []);
+		return entryProject(link, this.tasks.projects?.() ?? []);
 	}
 
 	/** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */
@@ -402,7 +386,6 @@ export class QuickEntry {
 	 */
 	listEntry(column: DropColumn, drawn?: EntryDrawing): ListEntry | null {
 		const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
-		this.follow(column, drawing);
 		const state = this.state;
 		const list = state && listSpot(state.spot);
 		if (!state || !list || list.column !== column) return null;
@@ -430,10 +413,10 @@ export class QuickEntry {
 		this.openAtEnd(this.look.shown().includes("day") ? "day" : "inbox");
 	}
 
-	/** The No tasks plate of empty section `group` tapped (in a list grouped by project, of the part `project`): the field of a new task in it. */
-	openIn(column: DropColumn, group: GroupName, project?: ProjectZone): void {
+	/** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
+	openIn(column: DropColumn, group: GroupName): void {
 		const cards = this.look.cards(column);
-		const place = { kind: "task" as const, group, before: null, ...(project !== undefined && { project }) };
+		const place = { kind: "task" as const, group, before: null };
 		this.open({ kind: "list", column, place: { ...gapOfPlace(cards, place), level: 0 } });
 	}
 
@@ -472,7 +455,7 @@ export class QuickEntry {
 		const found = this.find(item.key) ?? (inStack ? null : this.holder(item.key));
 		if (found) {
 			const card = this.look.cards(found.column)[found.index];
-			return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group, ...(card.project !== undefined && { project: card.project }) } };
+			return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group } };
 		}
 		if (inStack) return { kind: "stack", parent: item.key };
 		const slot = item.slot ?? item.drawnOn?.slot ?? null;
@@ -514,29 +497,16 @@ export class QuickEntry {
 		const spot: EntrySpot = given.kind === "list" ? { kind: "list", column: given.column, place: given.place } : given;
 		const face = renaming ? this.faceOf(renaming, spot) : undefined;
 		const rename = renaming ? { item: renaming, home: this.newRun(spot), moved: false, ...(face && { face }) } : null;
-		const project = renaming ? (renaming.project?.link ?? null) : this.projectAt(spot);
+		const project = renaming ? (renaming.project?.name ?? null) : null;
 		const run = this.newRun(spot);
 		this.reset({ run, text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename, section: false, project });
 		if (unfold) this.queue(run, { id: this.jobId(), kind: "unfold", run, key: unfold });
 	}
 
-	/** The project a field opened at `spot` starts with: its project's part in a list drawn by project, else the view's own. */
-	private projectAt(spot: EntrySpot): string | null {
-		if (spot.kind === "list" && spot.place.project !== undefined) return spot.place.project;
-		return this.look.project?.() ?? null;
-	}
-
-	/**
-	 * A project picked on the Project button (null: No project). In a list drawn by project the field goes to the end of
-	 * that project's part where the list draws one; a rename's field stays, its task keeping its place in the lane.
-	 */
-	setProject(link: string | null): void {
+	/** A project picked on the Project button (its name; null: No project); the field stays where it is. */
+	setProject(name: string | null): void {
 		const field = this.session.field;
-		if (!field) return;
-		const list = listSpot(this.run(field.run).spot);
-		const moves = !field.rename && list !== null && list.place.level === 0 && list.place.project !== undefined && !inProject(link, list.place.project);
-		const part = moves ? this.partEnd(list.column, link) : null;
-		this.reset({ ...field, project: link, ...(part && { run: this.newRun(part) }) }, part === null);
+		if (field) this.reset({ ...field, project: name }, true);
 	}
 
 	type(text: string): void {
@@ -597,8 +567,7 @@ export class QuickEntry {
 		if (!field || !list || !this.maySection(field)) return;
 		const section = !field.section;
 		const run = section && list.place.level > 0 ? this.newRun({ ...list, place: this.topLevelAfter(list.column, list.place) }) : field.run;
-		const { newSection: _dropped, ...rest } = field;
-		this.reset({ ...rest, run, section });
+		this.reset({ ...field, run, section });
 	}
 
 	enter(): void {
@@ -635,7 +604,7 @@ export class QuickEntry {
 		if (shown && samePlacement(shown, placement)) return null;
 		const column: DropColumn = placement.kind === "now" || placement.kind === "date" ? "day" : placement.kind;
 		const rename = field.rename && { ...field.rename, moved: true };
-		this.reset({ ...field, rename, run: this.newRun(this.endOf(column, field.project ?? null)) });
+		this.reset({ ...field, rename, run: this.newRun(this.endOf(column)) });
 		const day = this.tasks.dayOfPlacement(placement);
 		return { column, day: day === null || day === this.look.day() ? null : day };
 	}
@@ -643,23 +612,20 @@ export class QuickEntry {
 	/** The field, its text and marks, at the end of `column`; what was entered at the old spot is still written there. */
 	moveToEnd(column: DropColumn): void {
 		const field = this.session.field;
-		if (field) this.reset({ ...field, run: this.newRun(this.endOf(column, field.project ?? null)) });
+		if (field) this.reset({ ...field, run: this.newRun(this.endOf(column)) });
 	}
 
 	/** Where a task written in `column` goes: a list's place, or the day column's on the day it shows. */
-	placeOf(column: DropColumn, result: ListPlace, section?: string): NewTaskPlace {
+	placeOf(column: DropColumn, result: ListPlace): NewTaskPlace {
 		if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
 		const { group, before } = result;
-		const project = result.project !== undefined ? result.project : this.look.project?.();
-		const zone = { ...(project !== undefined && { project }), ...(section !== undefined && { section }) };
-		if (column !== "day") return { kind: "list", list: column, group, before, ...zone };
-		return { kind: "day", date: this.look.day(), group, before, ...zone };
+		if (column !== "day") return { kind: "list", list: column, group, before };
+		return { kind: "day", date: this.look.day(), group, before };
 	}
 
-	/** A slot of the field: the project's own view writes its project there too. */
+	/** A slot of the field. */
 	private slotPlace(slot: Slot): NewTaskPlace {
-		const project = this.look.project?.();
-		return project === undefined ? { kind: "slot", slot } : { kind: "slot", slot, project };
+		return { kind: "slot", slot };
 	}
 
 	job(id: string): EntryJob {
@@ -690,7 +656,7 @@ export class QuickEntry {
 						const cards = this.look.cards(spot.column);
 						const place = fitLevel(cards, { ...spot.place, level: line.level });
 						job.landing = spot.column;
-						const at = this.placeOf(spot.column, placeOfGap(cards, place), job.newSection);
+						const at = this.placeOf(spot.column, placeOfGap(cards, place));
 							return { method: "createInPlace", args: at.kind === "subtask" ? [line.text, line.priority, at, line.repeat, line.labels] : [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null] };
 					}
 				}
@@ -722,7 +688,6 @@ export class QuickEntry {
 		this.run(job.run).pending.shift();
 		job.shown = true;
 		this.shifts = null;
-		if (job.landing) this.follow(job.landing, { cards: coming(job.landing), sections: this.look.sections(job.landing) });
 		const now = this.session.field?.run ?? null;
 		if (held !== null && (held === job.run || now !== held || this.run(held)?.spot !== was)) this.emit(this.state, true);
 	}
@@ -788,7 +753,7 @@ export class QuickEntry {
 	private topLevelAfter(column: DropColumn, place: GapPlace): GapPlace {
 		const cards = this.look.cards(column);
 		let index = place.index;
-		while (index < cards.length && sameZone(cards[index], place) && cards[index].level > 0) index++;
+		while (index < cards.length && cards[index].group === place.group && cards[index].level > 0) index++;
 		return { ...place, index, level: 0 };
 	}
 
@@ -825,53 +790,10 @@ export class QuickEntry {
 	}
 
 	/** After the last card, in the last section, at the top level; with `project`, of that project's part where the list draws one. */
-	private endOf(column: DropColumn, project?: string | null): EntrySpot {
-		const part = project === undefined ? null : this.partEnd(column, project);
-		if (part) return part;
+	private endOf(column: DropColumn): EntrySpot {
 		const sections = this.look.sections(column);
-		const last = sections.length > 0 ? zoneOf(sections[sections.length - 1]) : { group: null };
-		return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, ...last } };
-	}
-
-	/**
-	 * The end of `project`'s part (null: No project's) in a list drawn by project, as `drawing` shows it (the look's when
-	 * left out): its last section's last task; with no header of it yet, right after its last card (a part its first task
-	 * just made, the headers not yet read); null where the list draws none.
-	 */
-	private partEnd(column: DropColumn, project: string | null, drawing?: EntryDrawing): EntrySpot | null {
-		const cards = drawing?.cards ?? this.look.cards(column);
-		const sections = drawing?.sections ?? this.look.sections(column);
-		const parts = sections.map(zoneOf).filter((zone) => zone.project !== undefined && inProject(project, zone.project));
-		const last = parts[parts.length - 1];
-		if (last) return { kind: "list", column, place: { ...gapOfPlace(cards, { kind: "task", group: last.group, before: null, project: last.project }), level: 0 } };
-		let index = cards.length - 1;
-		while (index >= 0 && !(cards[index].project !== undefined && inProject(project, cards[index].project!))) index--;
-		if (index < 0) return null;
-		const card = cards[index];
-		let end = index + 1;
-		while (end < cards.length && cards[end].level > card.level) end++;
-		return { kind: "list", column, place: { kind: "gap", index: end, level: 0, group: card.group, project: card.project } };
-	}
-
-	/**
-	 * A new task's field whose project has no part where it stands (none was drawn when it was picked, or Place took it
-	 * there) goes to the end of that project's part once `column`'s drawing has one: after its first task is drawn, a
-	 * project's group appearing, any drawing. Not while a line entered there still waits to be drawn, nor a rename's field.
-	 */
-	private follow(column: DropColumn, drawing: EntryDrawing): void {
-		const field = this.session.field;
-		if (!field || field.rename || field.section || field.project === undefined) return;
-		const run = this.run(field.run);
-		const list = listSpot(run.spot);
-		if (!list || list.column !== column || list.place.level !== 0 || list.place.project === undefined || run.pending.length > 0) return;
-		if (inProject(field.project, list.place.project)) return;
-		const part = this.partEnd(column, field.project, drawing);
-		if (!part) return;
-		const next = this.newRun(part);
-		this.hold(next);
-		this.release(field.run);
-		this.session.field = { ...field, run: next };
-		this.shifts = null;
+		const group = sections.length > 0 ? sections[sections.length - 1] : null;
+		return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, group } };
 	}
 
 	private find(key: TaskKey): { readonly column: DropColumn; readonly index: number } | null {
@@ -890,21 +812,12 @@ export class QuickEntry {
 		else {
 			this.saveRename(field, rename);
 			const under = list && !rename.face && this.under(list, rename.item);
-			this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: this.projectAt(under) } : null);
+			this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: null } : null);
 		}
 	}
 
-	/**
-	 * The section goes to the queue and the field closes; a blank name writes nothing. In a project's part no empty section
-	 * is made: the field asks for its first task, and the two are written together.
-	 */
+	/** The section goes to the queue and the field closes; a blank name writes nothing. */
 	private enterSection(field: EntryField): void {
-		const name = field.text.trim();
-		const list = listSpot(this.run(field.run).spot);
-		if (list && list.place.project !== undefined) {
-			this.reset(name === "" ? null : { ...field, text: "", section: false, newSection: name });
-			return;
-		}
 		this.createSection(field);
 		this.reset(null);
 	}
@@ -942,7 +855,7 @@ export class QuickEntry {
 
 	/** Edits by the key the lists give the task when the job runs: the one read at the open may have gone stale. The task's own rule and labels, the same in the field, are left as the file has them. */
 	private saveRename(field: EntryField, { item, home }: EntryRename): void {
-		const project = field.project === undefined || inProject(item.project?.link ?? null, field.project) ? {} : { project: field.project };
+		const project = field.project === undefined || inProject(item.project?.name ?? null, field.project) ? {} : { project: field.project };
 		const draft: TaskDraft = { text: field.text, placement: this.placement(field), priority: field.priority, ...(!sameNames(field.labels, item.labels.map((l) => l.name)) && { labels: field.labels }), ...(!sameRule(field.repeat, item.repeat) && { repeat: field.repeat }), ...project };
 		this.queue(home, { id: this.jobId(), kind: "rename", home, item, draft });
 	}
@@ -1024,7 +937,7 @@ export class QuickEntry {
 		const list = listSpot(run.spot);
 		if (!list) return null;
 		const { place } = list;
-		const unwritten = run.pending.map((line): LevelCard => ({ level: line.level, group: place.group, ...(place.project !== undefined && { project: place.project }) }));
+		const unwritten = run.pending.map((line): LevelCard => ({ level: line.level, group: place.group }));
 		const shown: LevelCard[] = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
 		const shifted = shiftLevel(shown, { ...place, index: place.index + unwritten.length }, delta);
 		return shifted && { ...place, level: shifted.level };
@@ -1045,7 +958,7 @@ function placeOfDrop(result: DropTo): ListPlace | null {
 		case "list":
 			return { kind: "task", group: null, before: result.before };
 		case "group":
-			return { kind: "task", group: result.group, before: result.before, ...(result.project !== undefined && { project: result.project }) };
+			return { kind: "task", group: result.group, before: result.before };
 		case "nest":
 			return { kind: "subtask", parent: result.parent, before: result.before };
 		case "place":
@@ -1071,7 +984,7 @@ export function entryProject(link: string | null, known: readonly ProjectRef[]):
 function refOf(link: string | null, known: readonly ProjectRef[]): ProjectRef | null {
 	if (link === null) return null;
 	const name = projectName(link);
-	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link: name, path: [name], note: null, canOpenNote: false, mark: true };
+	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, path: [name], note: null, canOpenNote: false, mark: true };
 }
 
 /** The renamed task as its field stands: in the place of its result's card, that card's key and id. */

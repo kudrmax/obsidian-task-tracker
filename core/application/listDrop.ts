@@ -39,14 +39,14 @@ export function carriedMiddle(y: number, grabPx: number, cardHeight: number): nu
 	return y - grabPx + cardHeight / 2;
 }
 
-/** A gap under a header, which `sameGap` weighs by its section and project's part alone. */
+/** A gap under a header, which `sameGap` weighs by its section alone. */
 function gapUnder(header: Header): GapPlace {
-	return { kind: "gap", index: 0, level: 0, ...(header !== null && typeof header === "object" ? header : { group: header }) };
+	return { kind: "gap", index: 0, level: 0, group: header };
 }
 
-/** The header a place's section and project's part are drawn under. */
+/** The header a place's section is drawn under. */
 function headerOfPlace(place: GapPlace): Header {
-	return place.project === undefined ? place.group : { group: place.group, project: place.project };
+	return place.group;
 }
 
 /** The order of a section among the headers; -1 for the tasks outside any while they show no header. */

@@ -163,13 +163,6 @@ export function withProject(projects: readonly string[], name: string, on: boole
 	return on ? [...others, ...(namesProject(projects, name) ? [projects.find((p) => projectKey(p) === projectKey(name))!] : [name])] : others;
 }
 
-/** A place's project, one a task in a list takes there: null takes them all off; undefined keeps its own. */
-export type PlaceProject = string | null | undefined;
-
-function projectsAt(zone: PlaceProject, own: readonly string[]): readonly string[] {
-	return zone === undefined ? own : zone === null ? [] : [zone];
-}
-
 export function setReminder(doc: TaskDocument, entry: TaskEntry, reminder: ReminderKind): TaskDocument {
 	return patch(doc, entry, { reminder });
 }
@@ -399,14 +392,12 @@ function enteringList(list: GroupedList, today: LocalDate, date: LocalDate | nul
 
 /**
  * `before`: a task of `list` the card goes right before; one of another list (a later day's column shows Now's tasks too)
- * puts it at the end of `group`. `date`: the day of the column dropped on. `project`: the project the task takes there
- * (null: none), its own kept when undefined.
+ * puts it at the end of `group`. `date`: the day of the column dropped on. A subtask taken out keeps its parent's projects.
  */
-export function moveToGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, group: GroupName, before: TaskEntry | null, today: LocalDate, date: LocalDate | null = null, project?: PlaceProject): TaskDocument {
-	if (before !== null && entry.path.length === 0 && before.section === entry.section && before.index === entry.index && project === undefined) return doc;
+export function moveToGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, group: GroupName, before: TaskEntry | null, today: LocalDate, date: LocalDate | null = null): TaskDocument {
+	if (before !== null && entry.path.length === 0 && before.section === entry.section && before.index === entry.index) return doc;
 	const entered = patch(doc, entry, enteringList(list, today, date));
-	const own = entry.path.length > 0 ? entry.projects : entry.task.projects;
-	return entered.moveEntry(sameEntryIn(entered, entry), list, positionIn(entered, list, group, before), projectsAt(project, own));
+	return entered.moveEntry(sameEntryIn(entered, entry), list, positionIn(entered, list, group, before));
 }
 
 /** Right before `before` when it is one of `list`'s tasks, else at the end of `group`. */
@@ -420,9 +411,9 @@ function positionIn(doc: TaskDocument, list: GroupedList, group: GroupName, befo
  * of `parent` before its subtask `before` or last, or in a time slot. `date`: the day of the column typed in.
  */
 export type CreatePlace =
-	| { kind: "list"; list: GroupedList; group: GroupName; before: TaskEntry | null; date: LocalDate | null; project?: PlaceProject; section?: string }
+	| { kind: "list"; list: GroupedList; group: GroupName; before: TaskEntry | null; date: LocalDate | null }
 	| { kind: "subtask"; parent: TaskEntry; before: TaskEntry | null }
-	| { kind: "slot"; slot: Slot; project?: PlaceProject };
+	| { kind: "slot"; slot: Slot };
 
 /**
  * A new task at `place`; `repeat` is set as `setRepeat` sets it, on a task or a subtask; a slot takes none. A priority,
@@ -430,30 +421,21 @@ export type CreatePlace =
  */
 export function createInPlace(doc: TaskDocument, typedText: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary, repeat?: RepeatRule | null, labels: readonly string[] = [], own?: readonly string[]): TaskDocument {
 	const { text, ...marks } = typed(doc, typedText, priority, labels);
-	const projectOf = (zone: PlaceProject): readonly string[] => uniqueNames(own ?? projectsAt(zone, []));
+	const projects = uniqueNames(own ?? []);
 	switch (place.kind) {
 		case "subtask":
 			return intoUnfolded(doc, place.parent, (d, same) =>
 				d.insertUnder(same(place.parent), withRepeat(newTask(text, marks), repeat, today, boundary), place.before && same(place.before)),
 			);
 		case "slot":
-			return createInSlot(doc, place.slot, text, { ...marks, projects: projectOf(place.project) }, today, boundary);
+			return createInSlot(doc, place.slot, text, { ...marks, projects }, today, boundary);
 		case "list": {
-			const { list, before, project } = place;
+			const { list, before } = place;
 			const dueDate = list === "now" ? (place.date ?? today) : enteringList(list, today, place.date).dueDate;
-			const task = withRepeat(newTask(text, { dueDate, ...marks, projects: projectOf(project) }), repeat, today, boundary);
-			if (place.section !== undefined) return intoNewSection(doc, list, place.group, place.section, task);
+			const task = withRepeat(newTask(text, { dueDate, ...marks, projects }), repeat, today, boundary);
 			return doc.insert(list, positionIn(doc, list, place.group, before), task);
 		}
 	}
-}
-
-/** A task written with a section named for it: at the end of `name` when the list has it, else under a new `### name` right after `group`. */
-function intoNewSection(doc: TaskDocument, list: GroupedList, group: GroupName, name: string, task: Task): TaskDocument {
-	const index = groupIndex(doc, list, name);
-	if (index >= 0) return doc.insert(list, { endOf: index }, task);
-	const at = Math.max(1, groupIndex(doc, list, group) + 1);
-	return doc.addGroup(list, name, at).insert(list, { endOf: at }, task);
 }
 
 export function createGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, name: string, groups: GroupSettings, today: LocalDate, date: LocalDate | null = null): TaskDocument {

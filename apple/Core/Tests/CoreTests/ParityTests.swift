@@ -145,7 +145,6 @@ import Testing
         #expect(backlog.groups.count == 1)
         #expect(backlog.cards.map(\.item.title) == ["Draft the offer", "Free"])
         #expect(backlog.cards.allSatisfy { $0.listCard["project"].isNull })
-        #expect(snapshot.screen.titleDrops["backlog"]?["byProject"] == false)
     }
 
     @Test func aDropKeepsTheTasksProject() throws {

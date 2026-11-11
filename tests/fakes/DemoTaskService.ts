@@ -1,4 +1,4 @@
-import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ResultPage } from "../../core/application/contracts";
+import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView } from "../../core/application/contracts";
 import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
 import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
@@ -181,11 +181,9 @@ export class DemoTaskService implements TaskService {
 			isSubtask: false,
 			day: dayOfTask(section, t, this.today()),
 			repeatDay: t.dueDate ?? t.slot?.date ?? this.today(),
-			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false, resize: t.slot != null, setProject: true, result: t.status === "todo" || t.status === "inProgress" },
-			isResult: false,
-			resultOf: null,
+			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false, resize: t.slot != null, setProject: true },
 			drawnOn: null,
-			card: { text: t.text, title: plainText(t.text), over: null, step: null, semibold: false },
+			card: { text: t.text, title: plainText(t.text), over: null, step: null },
 			block: { text: t.text, title: plainText(t.text), step: null },
 		};
 	}
@@ -213,8 +211,7 @@ export class DemoTaskService implements TaskService {
 	async screen(date: LocalDate): Promise<ScreenView> {
 		await this.normalize();
 		const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([this.dayView(date), this.soonWithoutDateView(), this.inboxView(), this.backlogView(), this.doneView(), this.listSections(), this.sectionOffer()]);
-		const off = { canGroup: false, on: false, groups: [] };
-		return { day, soon, inbox, backlog, done, sections, offer, missing: false, calendars: true, projects: { inbox: off, backlog: off, soon: off, now: off }, project: null, projectTree: [], titleDrops: { day: { kind: "list", column: "day", before: null }, soon: { kind: "title", list: "soon", date: null, byProject: false }, inbox: { kind: "title", list: "inbox", date: null, byProject: false }, backlog: { kind: "title", list: "backlog", date: null, byProject: false } } };
+		return { day, soon, inbox, backlog, done, sections, offer, missing: false, calendars: true, projectTree: [], titleDrops: { day: { kind: "list", column: "day", before: null }, soon: { kind: "title", list: "soon", date: null }, inbox: { kind: "title", list: "inbox", date: null }, backlog: { kind: "title", list: "backlog", date: null } } };
 	}
 
 	async dayView(date: LocalDate): Promise<DayView> {
@@ -419,29 +416,9 @@ export class DemoTaskService implements TaskService {
 	/** The board has no projects. */
 	async setProject(): Promise<void> {}
 
-	projectNotes(): readonly [] {
-		return [];
-	}
-
 	async newProject(): Promise<null> {
 		return null;
 	}
-
-	async setResult(): Promise<void> {}
-
-	async resultPage(): Promise<ResultPage> {
-		return { options: [], placeholder: "Search results", newLabel: "New result…", namePlaceholder: "Result name" };
-	}
-
-	async addToResult(): Promise<void> {}
-
-	async newResult(): Promise<null> {
-		return null;
-	}
-
-	async setGrouping(): Promise<void> {}
-
-	async toggleFold(): Promise<void> {}
 
 	async toggleProject(): Promise<readonly null[]> {
 		return [];

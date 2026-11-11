@@ -1893,9 +1893,6 @@
     const others = projects.filter((p) => projectKey(p) !== projectKey(name));
     return on ? [...others, ...namesProject(projects, name) ? [projects.find((p) => projectKey(p) === projectKey(name))] : [name]] : others;
   }
-  function projectsAt(zone, own) {
-    return zone === void 0 ? own : zone === null ? [] : [zone];
-  }
   function setReminder(doc, entry, reminder) {
     return patch(doc, entry, { reminder });
   }
@@ -2049,11 +2046,10 @@
     if (list === "now") return { dueDate: today, slot: null };
     return { dueDate: list === "soon" && date !== null && date > today ? date : null, slot: null };
   }
-  function moveToGroup(doc, entry, list, group, before, today, date = null, project) {
-    if (before !== null && entry.path.length === 0 && before.section === entry.section && before.index === entry.index && project === void 0) return doc;
+  function moveToGroup(doc, entry, list, group, before, today, date = null) {
+    if (before !== null && entry.path.length === 0 && before.section === entry.section && before.index === entry.index) return doc;
     const entered = patch(doc, entry, enteringList(list, today, date));
-    const own = entry.path.length > 0 ? entry.projects : entry.task.projects;
-    return entered.moveEntry(sameEntryIn(entered, entry), list, positionIn(entered, list, group, before), projectsAt(project, own));
+    return entered.moveEntry(sameEntryIn(entered, entry), list, positionIn(entered, list, group, before));
   }
   function positionIn(doc, list, group, before) {
     if (before !== null && before.section === list) return before.index;
@@ -2061,7 +2057,7 @@
   }
   function createInPlace(doc, typedText, priority, place, today, boundary, repeat, labels = [], own) {
     const { text, ...marks } = typed(doc, typedText, priority, labels);
-    const projectOf = (zone) => uniqueNames(own ?? projectsAt(zone, []));
+    const projects = uniqueNames(own ?? []);
     switch (place.kind) {
       case "subtask":
         return intoUnfolded(
@@ -2070,21 +2066,14 @@
           (d, same) => d.insertUnder(same(place.parent), withRepeat(newTask(text, marks), repeat, today, boundary), place.before && same(place.before))
         );
       case "slot":
-        return createInSlot(doc, place.slot, text, { ...marks, projects: projectOf(place.project) }, today, boundary);
+        return createInSlot(doc, place.slot, text, { ...marks, projects }, today, boundary);
       case "list": {
-        const { list, before, project } = place;
+        const { list, before } = place;
         const dueDate = list === "now" ? place.date ?? today : enteringList(list, today, place.date).dueDate;
-        const task = withRepeat(newTask(text, { dueDate, ...marks, projects: projectOf(project) }), repeat, today, boundary);
-        if (place.section !== void 0) return intoNewSection(doc, list, place.group, place.section, task);
+        const task = withRepeat(newTask(text, { dueDate, ...marks, projects }), repeat, today, boundary);
         return doc.insert(list, positionIn(doc, list, place.group, before), task);
       }
     }
-  }
-  function intoNewSection(doc, list, group, name, task) {
-    const index = groupIndex(doc, list, name);
-    if (index >= 0) return doc.insert(list, { endOf: index }, task);
-    const at = Math.max(1, groupIndex(doc, list, group) + 1);
-    return doc.addGroup(list, name, at).insert(list, { endOf: at }, task);
   }
   function createGroup(doc, entry, list, name, groups, today, date = null) {
     const trimmed = name.trim();
@@ -3386,34 +3375,24 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/nesting.ts
-  function sameZone(a, b) {
-    return a.group === b.group && a.project === b.project;
-  }
-  function zoneOf(header) {
-    return header !== null && typeof header === "object" ? header : { group: header };
-  }
-  function withProject2(place, project) {
-    return project === void 0 ? place : { ...place, project };
-  }
-  function levelRange(cards, index, group, project) {
-    const zone = withProject2({ group }, project);
-    const prev = cards[index - 1] && sameZone(cards[index - 1], zone) ? cards[index - 1] : void 0;
-    const next = cards[index] && sameZone(cards[index], zone) ? cards[index] : void 0;
+  function levelRange(cards, index, group) {
+    const prev = cards[index - 1] && cards[index - 1].group === group ? cards[index - 1] : void 0;
+    const next = cards[index] && cards[index].group === group ? cards[index] : void 0;
     return { min: next?.level ?? 0, max: prev ? prev.level + 1 : 0 };
   }
   function fitLevel(cards, place) {
-    const { min, max } = levelRange(cards, place.index, place.group, place.project);
+    const { min, max } = levelRange(cards, place.index, place.group);
     return { ...place, level: Math.max(min, Math.min(max, place.level)) };
   }
   function shiftLevel(cards, place, delta) {
     const level = place.level + delta;
-    const { min, max } = levelRange(cards, place.index, place.group, place.project);
+    const { min, max } = levelRange(cards, place.index, place.group);
     return level >= min && level <= max ? { ...place, level } : null;
   }
   function placeOfGap(cards, place) {
-    const next = cards[place.index] && sameZone(cards[place.index], place) ? cards[place.index] : void 0;
+    const next = cards[place.index] && cards[place.index].group === place.group ? cards[place.index] : void 0;
     const before = next && next.level === place.level ? next.key : null;
-    if (place.level === 0) return withProject2({ kind: "task", group: place.group, before }, place.project);
+    if (place.level === 0) return { kind: "task", group: place.group, before };
     let parent = place.index - 1;
     while (cards[parent].level !== place.level - 1) parent--;
     return { kind: "subtask", parent: cards[parent].key, before };
@@ -3421,26 +3400,25 @@ ${key.title}`.toLowerCase();
   function gapOfPlace(cards, place) {
     const at = (key) => cards.findIndex((card) => samePlace2(card.key, key));
     const before = place.before ? at(place.before) : -1;
-    if (before >= 0) return withProject2({ kind: "gap", index: before, level: cards[before].level, group: cards[before].group }, cards[before].project);
+    if (before >= 0) return { kind: "gap", index: before, level: cards[before].level, group: cards[before].group };
     const parent = place.kind === "subtask" ? at(place.parent) : -1;
     if (parent >= 0) {
       let end = parent + 1;
       while (end < cards.length && cards[end].level > cards[parent].level) end++;
-      return withProject2({ kind: "gap", index: end, level: cards[parent].level + 1, group: cards[parent].group }, cards[parent].project);
+      return { kind: "gap", index: end, level: cards[parent].level + 1, group: cards[parent].group };
     }
-    const zone = place.kind === "task" ? withProject2({ group: place.group }, place.project) : { group: null };
+    const group = place.kind === "task" ? place.group : null;
     let last = cards.length - 1;
-    while (last >= 0 && !sameZone(cards[last], zone)) last--;
-    const first = zone.group === null && zone.project === void 0;
-    return withProject2({ kind: "gap", index: last >= 0 ? last + 1 : first ? 0 : cards.length, level: 0, group: zone.group }, zone.project);
+    while (last >= 0 && cards[last].group !== group) last--;
+    return { kind: "gap", index: last >= 0 ? last + 1 : group === null ? 0 : cards.length, level: 0, group };
   }
   function sameGap(a, b) {
-    return a.index === b.index && sameZone(a, b);
+    return a.index === b.index && a.group === b.group;
   }
   function gapAt(cards, index, level, passed, headers) {
-    const above = index > 0 ? cards[index - 1] : headers ? { group: null } : cards[0] ?? { group: null };
-    const zone = passed.length > 0 ? zoneOf(passed[passed.length - 1]) : above;
-    return fitLevel(cards, withProject2({ kind: "gap", index, level: Math.round(level), group: zone.group }, zone.project));
+    const above = index > 0 ? cards[index - 1].group : headers ? null : cards[0]?.group ?? null;
+    const group = passed.length > 0 ? passed[passed.length - 1] : above;
+    return fitLevel(cards, { kind: "gap", index, level: Math.round(level), group });
   }
   function placeOfDrop(cards, place, home) {
     if (home && sameGap(place, home) && place.level === home.level) return null;
@@ -3604,7 +3582,6 @@ ${key.title}`.toLowerCase();
 
   // core/application/projects.ts
   var NO_PROJECT = "No project";
-  var NO_GROUPING = { canGroup: false, on: false, groups: [] };
   function projectTreeOf(doc) {
     return doc.projectTree().withMissing(taskProjects(doc));
   }
@@ -3617,7 +3594,7 @@ ${key.title}`.toLowerCase();
     refOf(name, mark = true) {
       if (name === null) return null;
       const placed = this.byKey.get(projectKey(name));
-      if (!placed) return { name, link: name, path: [name], note: null, canOpenNote: false, mark };
+      if (!placed) return { name, path: [name], note: null, canOpenNote: false, mark };
       return refOfPlaced(placed, mark);
     }
     /** Every project of the tree, in its order. */
@@ -3630,7 +3607,7 @@ ${key.title}`.toLowerCase();
   };
   function refOfPlaced(placed, mark = true) {
     const { name, note } = placed.node;
-    return { name, link: name, path: placed.path, note, canOpenNote: note !== null, mark };
+    return { name, path: placed.path, note, canOpenNote: note !== null, mark };
   }
   function bareTag(tag) {
     return tag.trim().replace(/^#/, "").toLowerCase();
@@ -3716,13 +3693,7 @@ ${key.title}`.toLowerCase();
     const first = tasks[0];
     const list = first?.list;
     if (!first || list === "done" || tasks.some((task) => task.isSubtask || task.list !== list)) return null;
-    const byProject = offer.projects?.[list];
-    const key = groupKeyOf(first);
-    const names = byProject && tasks.every((task) => groupKeyOf(task) === key) ? byProject[key] ?? offer.lists[list] : offer.lists[list];
-    return { names, current: first.group, ungrouped: offer.ungrouped };
-  }
-  function groupKeyOf(item) {
-    return item.project ? projectKey(item.project.name) : "";
+    return { names: offer.lists[list], current: first.group, ungrouped: offer.ungrouped };
   }
 
   // core/application/menus.ts
@@ -3842,7 +3813,6 @@ ${key.title}`.toLowerCase();
       newLabel: NEW_PROJECT
     };
   }
-  var NO_RESULT_ROWS = { rows: [], label: "", value: "", current: null, toggle: { label: "", result: false } };
   var MENU_GROUPS = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
   function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = []) {
     const sections = menuSections(items, offer, of);
@@ -3857,7 +3827,6 @@ ${key.title}`.toLowerCase();
       dueDate: sharedDueDate(items),
       sections,
       project: menuProject(items, projects),
-      result: NO_RESULT_ROWS,
       edits,
       reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
       repeat: repeatRow(of.kind === "task" ? items[0]?.repeat ?? null : null),
@@ -3902,10 +3871,10 @@ ${key.title}`.toLowerCase();
     return null;
   }
   function ownCard(item) {
-    return { text: item.text, title: item.title, over: null, step: null, semibold: false };
+    return { text: item.text, title: item.title, over: null, step: null };
   }
   function cardOf(item, step) {
-    return step ? { text: step.text, title: step.title, over: item.title, step, semibold: false } : ownCard(item);
+    return step ? { text: step.text, title: step.title, over: item.title, step } : ownCard(item);
   }
   function blockOf(item, step) {
     return step ? { text: step.text, title: step.title, step } : { text: item.text, title: item.title, step: null };
@@ -3957,11 +3926,8 @@ ${key.title}`.toLowerCase();
         addDescription: description === null,
         fold: hasOpenSubtask(entry),
         resize: entry.task.slot !== null,
-        setProject: entry.path.length === 0,
-        result: false
+        setProject: entry.path.length === 0
       },
-      isResult: false,
-      resultOf: null,
       card: cardOf(own, step),
       block: blockOf(own, step),
       drawnOn: drawn?.id === entry.id ? { key: keyOf(drawn.on), slot: drawn.on.task.slot } : null,
@@ -3995,24 +3961,18 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/QuickEntry.ts
-  function zoneOf2(header) {
-    return header !== null && typeof header === "object" ? header : { group: header };
-  }
-  function sameZone2(a, b) {
-    return a.group === b.group && a.project === b.project;
-  }
   function zoneIndex(sections, zone) {
-    return sections.findIndex((header) => sameZone2(zoneOf2(header), zone));
+    return sections.indexOf(zone.group);
   }
   function entryAt(drawing, place, section) {
     const { cards, sections } = drawing;
     if (!sections.some((name) => name !== null)) return place.index <= cards.length ? { kind: "in", section: 0, card: place.index, keepsPlate: true } : { kind: "end" };
     const at = zoneIndex(sections, place);
-    if (at < 0) return place.group === null && place.project === void 0 ? { kind: "top" } : { kind: "end" };
+    if (at < 0) return place.group === null ? { kind: "top" } : { kind: "end" };
     const start = cards.findIndex((card2) => zoneIndex(sections, card2) >= at);
     const from = start < 0 ? cards.length : start;
     let end = from;
-    while (end < cards.length && sameZone2(cards[end], place)) end++;
+    while (end < cards.length && cards[end].group === place.group) end++;
     const card = place.index >= from && place.index <= end ? place.index : end;
     return { kind: "in", section: at, card, keepsPlate: section };
   }
@@ -4086,7 +4046,7 @@ ${key.title}`.toLowerCase();
       return spot.kind === "slot" || spot.place.level === 0;
     }
     projectButton(link) {
-      return entryProject(link, this.tasks.projects?.() ?? this.tasks.projectNotes?.() ?? []);
+      return entryProject(link, this.tasks.projects?.() ?? []);
     }
     /** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */
     get renamed() {
@@ -4104,7 +4064,6 @@ ${key.title}`.toLowerCase();
      */
     listEntry(column, drawn) {
       const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
-      this.follow(column, drawing);
       const state = this.state;
       const list = state && listSpot(state.spot);
       if (!state || !list || list.column !== column) return null;
@@ -4127,10 +4086,10 @@ ${key.title}`.toLowerCase();
     openFromPlus() {
       this.openAtEnd(this.look.shown().includes("day") ? "day" : "inbox");
     }
-    /** The No tasks plate of empty section `group` tapped (in a list grouped by project, of the part `project`): the field of a new task in it. */
-    openIn(column, group, project) {
+    /** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
+    openIn(column, group) {
       const cards = this.look.cards(column);
-      const place = { kind: "task", group, before: null, ...project !== void 0 && { project } };
+      const place = { kind: "task", group, before: null };
       this.open({ kind: "list", column, place: { ...gapOfPlace(cards, place), level: 0 } });
     }
     /** A long tap on the timeline's free room let go: the field of a new task in that slot. */
@@ -4165,7 +4124,7 @@ ${key.title}`.toLowerCase();
       const found = this.find(item.key) ?? (inStack ? null : this.holder(item.key));
       if (found) {
         const card = this.look.cards(found.column)[found.index];
-        return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group, ...card.project !== void 0 && { project: card.project } } };
+        return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group } };
       }
       if (inStack) return { kind: "stack", parent: item.key };
       const slot = item.slot ?? item.drawnOn?.slot ?? null;
@@ -4204,27 +4163,15 @@ ${key.title}`.toLowerCase();
       const spot = given.kind === "list" ? { kind: "list", column: given.column, place: given.place } : given;
       const face = renaming ? this.faceOf(renaming, spot) : void 0;
       const rename2 = renaming ? { item: renaming, home: this.newRun(spot), moved: false, ...face && { face } } : null;
-      const project = renaming ? renaming.project?.link ?? null : this.projectAt(spot);
+      const project = renaming ? renaming.project?.name ?? null : null;
       const run = this.newRun(spot);
       this.reset({ run, text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename: rename2, section: false, project });
       if (unfold) this.queue(run, { id: this.jobId(), kind: "unfold", run, key: unfold });
     }
-    /** The project a field opened at `spot` starts with: its project's part in a list drawn by project, else the view's own. */
-    projectAt(spot) {
-      if (spot.kind === "list" && spot.place.project !== void 0) return spot.place.project;
-      return this.look.project?.() ?? null;
-    }
-    /**
-     * A project picked on the Project button (null: No project). In a list drawn by project the field goes to the end of
-     * that project's part where the list draws one; a rename's field stays, its task keeping its place in the lane.
-     */
-    setProject(link) {
+    /** A project picked on the Project button (its name; null: No project); the field stays where it is. */
+    setProject(name) {
       const field = this.session.field;
-      if (!field) return;
-      const list = listSpot(this.run(field.run).spot);
-      const moves = !field.rename && list !== null && list.place.level === 0 && list.place.project !== void 0 && !inProject(link, list.place.project);
-      const part2 = moves ? this.partEnd(list.column, link) : null;
-      this.reset({ ...field, project: link, ...part2 && { run: this.newRun(part2) } }, part2 === null);
+      if (field) this.reset({ ...field, project: name }, true);
     }
     type(text) {
       const field = this.session.field;
@@ -4277,8 +4224,7 @@ ${key.title}`.toLowerCase();
       if (!field || !list || !this.maySection(field)) return;
       const section = !field.section;
       const run = section && list.place.level > 0 ? this.newRun({ ...list, place: this.topLevelAfter(list.column, list.place) }) : field.run;
-      const { newSection: _dropped, ...rest } = field;
-      this.reset({ ...rest, run, section });
+      this.reset({ ...field, run, section });
     }
     enter() {
       const field = this.session.field;
@@ -4311,28 +4257,25 @@ ${key.title}`.toLowerCase();
       if (shown && samePlacement(shown, placement)) return null;
       const column = placement.kind === "now" || placement.kind === "date" ? "day" : placement.kind;
       const rename2 = field.rename && { ...field.rename, moved: true };
-      this.reset({ ...field, rename: rename2, run: this.newRun(this.endOf(column, field.project ?? null)) });
+      this.reset({ ...field, rename: rename2, run: this.newRun(this.endOf(column)) });
       const day = this.tasks.dayOfPlacement(placement);
       return { column, day: day === null || day === this.look.day() ? null : day };
     }
     /** The field, its text and marks, at the end of `column`; what was entered at the old spot is still written there. */
     moveToEnd(column) {
       const field = this.session.field;
-      if (field) this.reset({ ...field, run: this.newRun(this.endOf(column, field.project ?? null)) });
+      if (field) this.reset({ ...field, run: this.newRun(this.endOf(column)) });
     }
     /** Where a task written in `column` goes: a list's place, or the day column's on the day it shows. */
-    placeOf(column, result, section) {
+    placeOf(column, result) {
       if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
       const { group, before } = result;
-      const project = result.project !== void 0 ? result.project : this.look.project?.();
-      const zone = { ...project !== void 0 && { project }, ...section !== void 0 && { section } };
-      if (column !== "day") return { kind: "list", list: column, group, before, ...zone };
-      return { kind: "day", date: this.look.day(), group, before, ...zone };
+      if (column !== "day") return { kind: "list", list: column, group, before };
+      return { kind: "day", date: this.look.day(), group, before };
     }
-    /** A slot of the field: the project's own view writes its project there too. */
+    /** A slot of the field. */
     slotPlace(slot) {
-      const project = this.look.project?.();
-      return project === void 0 ? { kind: "slot", slot } : { kind: "slot", slot, project };
+      return { kind: "slot", slot };
     }
     job(id) {
       const job = this.session.jobs.find((j) => j.id === id);
@@ -4361,7 +4304,7 @@ ${key.title}`.toLowerCase();
               const cards = this.look.cards(spot.column);
               const place = fitLevel(cards, { ...spot.place, level: line.level });
               job.landing = spot.column;
-              const at = this.placeOf(spot.column, placeOfGap(cards, place), job.newSection);
+              const at = this.placeOf(spot.column, placeOfGap(cards, place));
               return { method: "createInPlace", args: at.kind === "subtask" ? [line.text, line.priority, at, line.repeat, line.labels] : [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null] };
             }
           }
@@ -4392,7 +4335,6 @@ ${key.title}`.toLowerCase();
       this.run(job.run).pending.shift();
       job.shown = true;
       this.shifts = null;
-      if (job.landing) this.follow(job.landing, { cards: coming(job.landing), sections: this.look.sections(job.landing) });
       const now = this.session.field?.run ?? null;
       if (held !== null && (held === job.run || now !== held || this.run(held)?.spot !== was)) this.emit(this.state, true);
     }
@@ -4449,7 +4391,7 @@ ${key.title}`.toLowerCase();
     topLevelAfter(column, place) {
       const cards = this.look.cards(column);
       let index = place.index;
-      while (index < cards.length && sameZone2(cards[index], place) && cards[index].level > 0) index++;
+      while (index < cards.length && cards[index].group === place.group && cards[index].level > 0) index++;
       return { ...place, index, level: 0 };
     }
     mayShift(field) {
@@ -4481,51 +4423,10 @@ ${key.title}`.toLowerCase();
       return column === "day" ? this.tasks.placementOfDay(this.look.day()) : { kind: column };
     }
     /** After the last card, in the last section, at the top level; with `project`, of that project's part where the list draws one. */
-    endOf(column, project) {
-      const part2 = project === void 0 ? null : this.partEnd(column, project);
-      if (part2) return part2;
+    endOf(column) {
       const sections = this.look.sections(column);
-      const last = sections.length > 0 ? zoneOf2(sections[sections.length - 1]) : { group: null };
-      return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, ...last } };
-    }
-    /**
-     * The end of `project`'s part (null: No project's) in a list drawn by project, as `drawing` shows it (the look's when
-     * left out): its last section's last task; with no header of it yet, right after its last card (a part its first task
-     * just made, the headers not yet read); null where the list draws none.
-     */
-    partEnd(column, project, drawing) {
-      const cards = drawing?.cards ?? this.look.cards(column);
-      const sections = drawing?.sections ?? this.look.sections(column);
-      const parts = sections.map(zoneOf2).filter((zone) => zone.project !== void 0 && inProject(project, zone.project));
-      const last = parts[parts.length - 1];
-      if (last) return { kind: "list", column, place: { ...gapOfPlace(cards, { kind: "task", group: last.group, before: null, project: last.project }), level: 0 } };
-      let index = cards.length - 1;
-      while (index >= 0 && !(cards[index].project !== void 0 && inProject(project, cards[index].project))) index--;
-      if (index < 0) return null;
-      const card = cards[index];
-      let end = index + 1;
-      while (end < cards.length && cards[end].level > card.level) end++;
-      return { kind: "list", column, place: { kind: "gap", index: end, level: 0, group: card.group, project: card.project } };
-    }
-    /**
-     * A new task's field whose project has no part where it stands (none was drawn when it was picked, or Place took it
-     * there) goes to the end of that project's part once `column`'s drawing has one: after its first task is drawn, a
-     * project's group appearing, any drawing. Not while a line entered there still waits to be drawn, nor a rename's field.
-     */
-    follow(column, drawing) {
-      const field = this.session.field;
-      if (!field || field.rename || field.section || field.project === void 0) return;
-      const run = this.run(field.run);
-      const list = listSpot(run.spot);
-      if (!list || list.column !== column || list.place.level !== 0 || list.place.project === void 0 || run.pending.length > 0) return;
-      if (inProject(field.project, list.place.project)) return;
-      const part2 = this.partEnd(column, field.project, drawing);
-      if (!part2) return;
-      const next = this.newRun(part2);
-      this.hold(next);
-      this.release(field.run);
-      this.session.field = { ...field, run: next };
-      this.shifts = null;
+      const group = sections.length > 0 ? sections[sections.length - 1] : null;
+      return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, group } };
     }
     find(key) {
       const shown = this.look.shown();
@@ -4542,20 +4443,11 @@ ${key.title}`.toLowerCase();
       else {
         this.saveRename(field, rename2);
         const under = list && !rename2.face && this.under(list, rename2.item);
-        this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: this.projectAt(under) } : null);
+        this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: null } : null);
       }
     }
-    /**
-     * The section goes to the queue and the field closes; a blank name writes nothing. In a project's part no empty section
-     * is made: the field asks for its first task, and the two are written together.
-     */
+    /** The section goes to the queue and the field closes; a blank name writes nothing. */
     enterSection(field) {
-      const name = field.text.trim();
-      const list = listSpot(this.run(field.run).spot);
-      if (list && list.place.project !== void 0) {
-        this.reset(name === "" ? null : { ...field, text: "", section: false, newSection: name });
-        return;
-      }
       this.createSection(field);
       this.reset(null);
     }
@@ -4588,7 +4480,7 @@ ${key.title}`.toLowerCase();
     }
     /** Edits by the key the lists give the task when the job runs: the one read at the open may have gone stale. The task's own rule and labels, the same in the field, are left as the file has them. */
     saveRename(field, { item, home }) {
-      const project = field.project === void 0 || inProject(item.project?.link ?? null, field.project) ? {} : { project: field.project };
+      const project = field.project === void 0 || inProject(item.project?.name ?? null, field.project) ? {} : { project: field.project };
       const draft = { text: field.text, placement: this.placement(field), priority: field.priority, ...!sameNames(field.labels, item.labels.map((l) => l.name)) && { labels: field.labels }, ...!sameRule(field.repeat, item.repeat) && { repeat: field.repeat }, ...project };
       this.queue(home, { id: this.jobId(), kind: "rename", home, item, draft });
     }
@@ -4661,7 +4553,7 @@ ${key.title}`.toLowerCase();
       const list = listSpot(run.spot);
       if (!list) return null;
       const { place } = list;
-      const unwritten = run.pending.map((line) => ({ level: line.level, group: place.group, ...place.project !== void 0 && { project: place.project } }));
+      const unwritten = run.pending.map((line) => ({ level: line.level, group: place.group }));
       const shown = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
       const shifted = shiftLevel(shown, { ...place, index: place.index + unwritten.length }, delta);
       return shifted && { ...place, level: shifted.level };
@@ -4678,7 +4570,7 @@ ${key.title}`.toLowerCase();
       case "list":
         return { kind: "task", group: null, before: result.before };
       case "group":
-        return { kind: "task", group: result.group, before: result.before, ...result.project !== void 0 && { project: result.project } };
+        return { kind: "task", group: result.group, before: result.before };
       case "nest":
         return { kind: "subtask", parent: result.parent, before: result.before };
       case "place":
@@ -4698,7 +4590,7 @@ ${key.title}`.toLowerCase();
   function refOf(link, known) {
     if (link === null) return null;
     const name = projectName(link);
-    return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, link: name, path: [name], note: null, canOpenNote: false, mark: true };
+    return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, path: [name], note: null, canOpenNote: false, mark: true };
   }
   function faced(rename2) {
     const { item, face } = rename2;
@@ -4780,10 +4672,10 @@ ${key.title}`.toLowerCase();
     return y - grabPx + cardHeight / 2;
   }
   function gapUnder(header) {
-    return { kind: "gap", index: 0, level: 0, ...header !== null && typeof header === "object" ? header : { group: header } };
+    return { kind: "gap", index: 0, level: 0, group: header };
   }
   function headerOfPlace(place) {
-    return place.project === void 0 ? place.group : { group: place.group, project: place.project };
+    return place.group;
   }
   function orderOf(heads, group) {
     return heads.findIndex((h) => sameGap(gapUnder(h.group), gapUnder(group)));
@@ -4829,7 +4721,7 @@ ${key.title}`.toLowerCase();
   function listDrop(column, place, sections) {
     if (!place) return { kind: "list", column, before: null };
     if (place.kind === "subtask") return { kind: "nest", parent: place.parent, before: place.before };
-    if (sections) return { kind: "group", list: sections.list, date: sections.date, group: place.group, before: place.before, ...place.project !== void 0 && { project: place.project } };
+    if (sections) return { kind: "group", list: sections.list, date: sections.date, group: place.group, before: place.before };
     return { kind: "list", column, before: place.before };
   }
   function acceptsDrop(target, origins) {
@@ -4848,16 +4740,16 @@ ${key.title}`.toLowerCase();
   function placesInGap(column, from, grouped) {
     return from === "new" || from === column || grouped;
   }
-  function dropMove(from, to, day, project) {
+  function dropMove(from, to, day) {
     switch (to.kind) {
       case "time":
         return { kind: "toTime", from, start: to.start, day };
       case "clearSlot":
         return { kind: "clearSlot" };
       case "group":
-        return { kind: "moveToGroup", list: to.list, group: to.group, before: to.before, date: to.date ?? void 0, ...to.project !== void 0 && { project: to.project } };
+        return { kind: "moveToGroup", list: to.list, group: to.group, before: to.before, date: to.date ?? void 0 };
       case "title":
-        return { kind: "moveToGroup", list: to.list, group: null, before: null, date: to.date ?? void 0, ...to.byProject && { project } };
+        return { kind: "moveToGroup", list: to.list, group: null, before: null, date: to.date ?? void 0 };
       case "nest":
         return { kind: "nest", parent: to.parent, before: to.before };
       case "list":
@@ -4867,10 +4759,10 @@ ${key.title}`.toLowerCase();
         return from === "day" ? { kind: "moveToSoon", date: day } : { kind: "moveToEnd", section: to.column };
     }
   }
-  function dropMoves(tasks, to, day, projectOf = () => null) {
-    if (tasks.length === 1) return { kind: "one", key: tasks[0].key, move: dropMove(tasks[0].from, to, day, projectOf(tasks[0].key)) };
+  function dropMoves(tasks, to, day) {
+    if (tasks.length === 1) return { kind: "one", key: tasks[0].key, move: dropMove(tasks[0].from, to, day) };
     const steps = tasks.flatMap(({ key, from }) => {
-      const move = dropMove(from, to, day, projectOf(key));
+      const move = dropMove(from, to, day);
       return move.kind === "toTime" || move.kind === "clearSlot" ? [] : [{ key, change: move }];
     });
     return { kind: "many", steps };
@@ -5344,8 +5236,6 @@ ${key.title}`.toLowerCase();
           collapsedMarker: s.collapsedMarker
         },
         priorities: s.priorities,
-        resultMark: s.resultMark,
-        defaultResultMark: DEFAULT_SETTINGS.resultMark,
         labelTag: s.labelTag,
         labels: s.labels,
         labelPaint: s.labelPaint,
@@ -5355,7 +5245,6 @@ ${key.title}`.toLowerCase();
         cardHeights: CARD_HEIGHTS,
         cardGaps: CARD_GAPS,
         zoomLevels: formatZoomLevels(s.zoomLevels),
-        projectTag: s.projectTag,
         presets: s.groups.presets,
         ungrouped: s.groups.ungrouped,
         longPressMs: s.longPressMs,
@@ -5425,12 +5314,6 @@ ${key.title}`.toLowerCase();
     async setZoomLevels(text) {
       const zoomLevels = parseZoomLevels(text);
       if (zoomLevels) await this.store.update({ zoomLevels });
-    }
-    /** Results went: writes nothing. Stub until the frontends drop the field. */
-    async setResultMark(_mark) {
-    }
-    /** The project tag is no setting any more (projects live in the tasks file): writes nothing. Stub until the frontends drop the field. */
-    async setProjectTag(_tag) {
     }
     renameLabel(index, title) {
       return this.patchLabel(index, { name: labelNameOf(title) });
@@ -5734,10 +5617,6 @@ ${key.title}`.toLowerCase();
     projects() {
       return this.projectNotes();
     }
-    /** Grouping went: none. Stub until the frontends drop it. */
-    grouping() {
-      return {};
-    }
     /** The Projects screen as this device shows it; without a file, the tree's fixed rows alone. */
     projectsScreenRead() {
       return { reads: true, tidies: true, missing: () => this.projectsScreen(null), answer: (s) => this.projectsScreen(s) };
@@ -5779,17 +5658,16 @@ ${key.title}`.toLowerCase();
       return withPriority(text, prefix, this.priorityLevels().map((l) => l.prefix));
     }
     /** The screen of `date`: the file tidied for today first; without a file, the empty screen. */
-    screenRead(date, _project) {
+    screenRead(date) {
       return { reads: true, tidies: true, missing: () => this.missingScreen(date), answer: (s) => this.screen(s, date) };
     }
-    /** The screen of `date`. `_project`: a project's view went; ignored. */
-    screen(s, date, _project) {
+    /** The screen of `date`. */
+    screen(s, date) {
       const { doc, today, boundary } = s;
       const item = this.itemOf(today, doc);
       const day = { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
       const sections = this.listSections(s);
       const view = { soon: soonWithoutDate(doc).map(item), inbox: inboxList(doc).map(item), backlog: backlogList(doc).map(item) };
-      const projects = { inbox: NO_GROUPING, backlog: NO_GROUPING, soon: NO_GROUPING, now: NO_GROUPING };
       return {
         day,
         ...view,
@@ -5798,27 +5676,24 @@ ${key.title}`.toLowerCase();
         offer: this.offerOf(s, date, sections),
         missing: false,
         calendars: true,
-        projects,
-        project: null,
         projectTree: new ProjectIndex(projectTreeOf(doc)).known(),
-        titleDrops: this.titleDrops(date, projects)
+        titleDrops: this.titleDrops(date)
       };
     }
-    /** What a drop on each column's title means: into its list, by project where the list groups by it; a day without sections, its end. */
-    titleDrops(date, projects) {
-      const title = (list, day2, grouping) => ({ kind: "title", list, date: day2, byProject: grouping.on });
+    /** What a drop on each column's title means: into its list; a day without sections, its end. */
+    titleDrops(date) {
+      const title = (list, day2) => ({ kind: "title", list, date: day2 });
       const day = this.columnSections("day", date);
       return {
-        day: day ? title(day.list, day.date, projects.now) : { kind: "list", column: "day", before: null },
-        soon: title("soon", null, projects.soon),
-        inbox: title("inbox", null, projects.inbox),
-        backlog: title("backlog", null, projects.backlog)
+        day: day ? title(day.list, day.date) : { kind: "list", column: "day", before: null },
+        soon: title("soon", null),
+        inbox: title("inbox", null),
+        backlog: title("backlog", null)
       };
     }
     /** The screen without a tasks file: nothing in any list, and no calendars beside nothing. */
     missingScreen(date) {
       const none = { inbox: [], backlog: [], soon: [], now: [] };
-      const off = { inbox: NO_GROUPING, backlog: NO_GROUPING, soon: NO_GROUPING, now: NO_GROUPING };
       return {
         day: { date, list: [], slotted: [] },
         soon: [],
@@ -5829,10 +5704,8 @@ ${key.title}`.toLowerCase();
         offer: { lists: none, ungrouped: this.settings.get().groups.ungrouped },
         missing: true,
         calendars: false,
-        projects: off,
-        project: null,
         projectTree: [],
-        titleDrops: this.titleDrops(date, off)
+        titleDrops: this.titleDrops(date)
       };
     }
     dayView({ doc, today, boundary }, date) {
@@ -5865,11 +5738,11 @@ ${key.title}`.toLowerCase();
       return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf2(doc, list)]));
     }
     /** A query that finds nothing reads no file. */
-    searchRead(query, _project) {
+    searchRead(query) {
       return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query) };
     }
-    /** Every task the query finds, each with its project's path. `_project`: a project's view went; ignored. */
-    search(s, query, _project) {
+    /** Every task the query finds, each with its project's path. */
+    search(s, query) {
       const fuzzy = FuzzyQuery.of(query);
       if (!fuzzy || !s) return [];
       const { doc, today } = s;
@@ -5903,10 +5776,6 @@ ${key.title}`.toLowerCase();
         if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
       }
       return groups;
-    }
-    /** Results went: an empty page. Stub until the frontends drop it. */
-    resultPage() {
-      return { options: [], placeholder: "", newLabel: "", namePlaceholder: "" };
     }
     screenOf({ doc, today }, item) {
       const top = item.isSubtask ? doc.find(item.key.section, item.key.index, []) : void 0;
@@ -6096,9 +5965,6 @@ ${key.title}`.toLowerCase();
     if (place.list === "now") return { kind: "day", date: place.date ?? today };
     if (place.list === "soon" && place.date !== void 0 && place.date > today) return { kind: "day", date: place.date };
     return { kind: place.list };
-  }
-  function zoneOf3(place) {
-    return { ...place.project !== void 0 && { project: place.project }, ...place.section !== void 0 && place.section.trim() !== "" && { section: place.section.trim() } };
   }
   function blankName(name) {
     return name.trim() === "";
@@ -6451,10 +6317,10 @@ ${key.title}`.toLowerCase();
     moveToEnd(key, section) {
       return (doc) => moveToEnd(doc, this.entryOf(doc, key), section);
     }
-    moveToGroup(key, list, group, before, date, project) {
+    moveToGroup(key, list, group, before, date) {
       return (doc, today) => {
         this.groupOf(doc, list, group);
-        return moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today, date ?? null, project);
+        return moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today, date ?? null);
       };
     }
     createGroup(key, list, name, date) {
@@ -6469,25 +6335,22 @@ ${key.title}`.toLowerCase();
       };
     }
     /** Null for a blank name or the section's own: nothing to write. */
-    /** Null for a blank name or the section's own: nothing to write. `_project`: a project's part went; ignored. */
-    renameGroup(list, group, name, _project) {
+    /** Null for a blank name or the section's own: nothing to write. */
+    renameGroup(list, group, name) {
       if (blankName(name) || name.trim() === group) return null;
       return (doc, _today, settings) => {
         this.groupOf(doc, list, group);
         return renameGroup(doc, list, group, name, settings.groups.ungrouped);
       };
     }
-    /** `_project`: a project's part went; ignored. */
-    removeGroup(list, group, _project) {
+    removeGroup(list, group) {
       return (doc) => {
         this.groupOf(doc, list, group);
         return removeGroup(doc, list, group);
       };
     }
     /**
-     * A new section `name` at `place`, and the list it goes in; null when the name can't make one there. A place in a
-     * project's part makes none: there a section is born with its first task (`NewTaskPlace.section`), so no other
-     * project's task moves and no empty heading is written.
+     * A new section `name` at `place`, and the list it goes in; null when the name can't make one there.
      */
     createSection(name, place) {
       const group = name.trim();
@@ -6495,7 +6358,6 @@ ${key.title}`.toLowerCase();
       const column = columnOfPlace(place, today);
       const list = columnList(column, today);
       if (list === null || group === "" || group === this.settings.get().groups.ungrouped || group === place.group) return null;
-      if (place.project !== void 0) return null;
       const operation = (doc, today2, settings, boundary) => {
         this.groupOf(doc, list, place.group);
         const before = place.before ? this.entryOf(doc, place.before) : null;
@@ -6558,7 +6420,7 @@ ${key.title}`.toLowerCase();
           return moveToEnd(doc, entry, change.section);
         case "moveToGroup":
           this.groupOf(doc, change.list, change.group);
-          return moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null, change.project);
+          return moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null);
         case "createGroup":
           return blankName(change.name) ? doc : createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
         case "nest":
@@ -6570,11 +6432,11 @@ ${key.title}`.toLowerCase();
       switch (place.kind) {
         case "list":
           this.groupOf(doc, place.list, place.group);
-          return { kind: "list", list: place.list, group: place.group, before: before(place.before), date: place.date ?? null, ...zoneOf3(place) };
+          return { kind: "list", list: place.list, group: place.group, before: before(place.before), date: place.date ?? null };
         case "day": {
           const { list, date } = dayColumn(place.date, today);
           this.groupOf(doc, list, place.group);
-          return { kind: "list", list, group: place.group, before: before(place.before), date, ...zoneOf3(place) };
+          return { kind: "list", list, group: place.group, before: before(place.before), date };
         }
         case "subtask":
           return { kind: "subtask", parent: this.entryOf(doc, place.parent), before: before(place.before) };
@@ -6663,28 +6525,13 @@ ${key.title}`.toLowerCase();
     const columns = [["day", screen.day.list], ["soon", screen.soon], ["inbox", screen.inbox], ["backlog", screen.backlog], ["done", screen.done]];
     for (const [column, items] of columns) {
       const card = items.find((item) => item.id === id);
-      if (card) {
-        const part2 = partOf(screen, column, id);
-        return { kind: "list", id, item: card, column, group: card.group, index: items.filter((item) => item.group === card.group).indexOf(card), ...part2 && { part: part2 } };
-      }
+      if (card) return { kind: "list", id, item: card, column, group: card.group, index: items.filter((item) => item.group === card.group).indexOf(card) };
       for (const top of items) {
         const under = subtaskOf(top, id);
         if (under) return under;
       }
     }
     return { kind: "away", id, item: null };
-  }
-  function partOf(screen, column, id) {
-    if (column === "done") return null;
-    const list = column === "day" ? "now" : column;
-    const grouping = screen.projects[list];
-    if (!grouping.on) return null;
-    for (const group of grouping.groups)
-      for (const section of group.sections) {
-        const index = section.items.findIndex((item) => item.id === id);
-        if (index >= 0) return { key: group.key, zone: group.zone, section: section.name, index, folded: group.folded };
-      }
-    return null;
   }
   function subtaskOf(parent, id) {
     const index = parent.subtasks.findIndex((sub) => sub.id === id);
@@ -6924,8 +6771,8 @@ ${key.title}`.toLowerCase();
     moveToEnd(key, section) {
       return nothing(this.rules.moveToEnd(key, section));
     }
-    moveToGroup(key, list, group, before, date, project) {
-      return nothing(this.rules.moveToGroup(key, list, group, before, date, project));
+    moveToGroup(key, list, group, before, date) {
+      return nothing(this.rules.moveToGroup(key, list, group, before, date));
     }
     createGroup(key, list, name, date) {
       return nothing(this.rules.createGroup(key, list, name, date));
@@ -6946,8 +6793,8 @@ ${key.title}`.toLowerCase();
       return nothing(this.rules.moveGroup(list, group, place));
     }
     /** Reads first only when there is a name to write: a blank one or the section's own answers false at once. */
-    renameGroup(list, group, name, project) {
-      const operation = this.rules.renameGroup(list, group, name, project);
+    renameGroup(list, group, name) {
+      const operation = this.rules.renameGroup(list, group, name);
       return {
         reads: operation !== null,
         answer: (s) => {
@@ -6956,8 +6803,8 @@ ${key.title}`.toLowerCase();
         }
       };
     }
-    removeGroup(list, group, project) {
-      return nothing(this.rules.removeGroup(list, group, project));
+    removeGroup(list, group) {
+      return nothing(this.rules.removeGroup(list, group));
     }
     createSection(name, place) {
       const made = this.rules.createSection(name, place);
@@ -6981,7 +6828,7 @@ ${key.title}`.toLowerCase();
       return {
         reads: read.kind === "title" || tasks.length === 1 && read.kind === "time",
         answer: (s) => {
-          const moves = dropMoves(tasks, read, day, (key) => s ? this.rules.entryOf(s.doc, key).projects[0] ?? null : null);
+          const moves = dropMoves(tasks, read, day);
           return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
         }
       };
@@ -6990,12 +6837,12 @@ ${key.title}`.toLowerCase();
      * Where `drop` would leave the tasks, writing nothing: its operation tried over the file as read, and the screen of
      * `day` read over the result by the same code as the screen.
      */
-    landing(tasks, to, day, project) {
-      const preview = this.dropPreview(tasks, to, day, project);
+    landing(tasks, to, day) {
+      const preview = this.dropPreview(tasks, to, day);
       return { reads: true, answer: (s) => preview.answer(s).landings };
     }
     /** `landing`, with the whole screen the drop leaves and the text it is read from. */
-    dropPreview(tasks, to, day, project) {
+    dropPreview(tasks, to, day) {
       const drop = this.drop(tasks, to, day);
       return {
         reads: true,
@@ -7004,7 +6851,7 @@ ${key.title}`.toLowerCase();
           const write = drop.answer(s);
           const after = write.operation ? this.rules.trial(s.doc, write.operation).after : s.doc;
           const text = after.serialize();
-          const screen = this.reads.screen({ text, doc: after, today: s.today, boundary: s.boundary }, day, project);
+          const screen = this.reads.screen({ text, doc: after, today: s.today, boundary: s.boundary }, day);
           const timeline = this.reads.timeline();
           return { landings: ids.map((id) => landingOf(screen, id, day, timeline)), screen, tasks: text };
         }
@@ -7028,7 +6875,7 @@ ${key.title}`.toLowerCase();
         case "clearSlot":
           return this.clearSlot(key, move.place);
         case "moveToGroup":
-          return this.moveToGroup(key, move.list, move.group, move.before, move.date, move.project);
+          return this.moveToGroup(key, move.list, move.group, move.before, move.date);
         case "nest":
           return this.nest(key, move.parent, move.before);
         case "moveBefore":
@@ -7350,9 +7197,6 @@ ${key.title}`.toLowerCase();
     }
   };
   var KEPT = (call) => call.snapshot();
-  function scopeOf(args, at) {
-    return args.length > at ? args[at] ?? null : void 0;
-  }
   var TASKS = {
     priorityLevels: (c) => c.reads.priorityLevels(),
     labelLevels: (c) => c.reads.labelLevels(),
@@ -7360,13 +7204,13 @@ ${key.title}`.toLowerCase();
     isBlank: (c, [text]) => c.reads.isBlank(text),
     withPriority: (c, [text, prefix]) => c.reads.withPriority(text, prefix ?? null),
     draftMarks: (c, [text, priority, labels]) => c.reads.draftMarks(text, priority ?? null, labels ?? []),
-    screen: (c, [date, project]) => c.ask(c.reads.screenRead(date, project ?? void 0)),
+    screen: (c, [date]) => c.ask(c.reads.screenRead(date)),
     dayView: (c, [date]) => c.reads.dayView(KEPT(c), date),
     soonWithoutDateView: (c) => c.reads.soonWithoutDateView(KEPT(c)),
     inboxView: (c) => c.reads.inboxView(KEPT(c)),
     backlogView: (c) => c.reads.backlogView(KEPT(c)),
     doneView: (c) => c.reads.doneView(KEPT(c)),
-    search: (c, [query, project]) => c.ask(c.reads.searchRead(query, project ?? void 0)),
+    search: (c, [query]) => c.ask(c.reads.searchRead(query)),
     screenOf: (c, [item]) => c.reads.screenOf(KEPT(c), item),
     reveal: (c, [item]) => {
       c.run(c.writes.revealUnfold(item));
@@ -7397,20 +7241,13 @@ ${key.title}`.toLowerCase();
     setLabels: (c, [key, labels]) => c.run(c.writes.setLabels(key, labels)),
     setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps)),
     setProject: (c, [keys, project]) => c.run(c.writes.setProject(keys, project ?? null)),
-    projectNotes: (c) => c.reads.projectNotes(),
-    projects: (c) => c.reads.projectNotes(),
+    projects: (c) => c.reads.projects(),
     unfoldProjectNode: (c, [node]) => c.keepProjectsScreen(unfolded2(c.projectsScreen, node)),
     toggleProject: (c, [keys, name]) => c.run(c.writes.toggleProject(keys, name)),
     newProject: (c, [name, keys]) => {
       const made = c.run(c.writes.newProject(name, keys ?? []));
       return made === null ? null : new ProjectIndex(c.tree()).refOf(made);
     },
-    setResult: () => null,
-    resultPage: (c) => c.reads.resultPage(),
-    addToResult: () => null,
-    newResult: () => null,
-    setGrouping: () => null,
-    toggleFold: () => null,
     projectsScreen: (c) => c.ask(c.reads.projectsScreenRead()),
     tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node)),
     selectProjectNode: (c, [node]) => c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, node)),
@@ -7472,13 +7309,13 @@ ${key.title}`.toLowerCase();
     createGroup: (c, [key, list, name, date]) => c.run(c.writes.createGroup(key, list, name, date ?? void 0)),
     toSection: (c, [keys, name]) => c.run(c.writes.toSection(KEPT(c), keys, name ?? null)),
     moveGroup: (c, [list, group, place]) => c.run(c.writes.moveGroup(list, group ?? null, place)),
-    renameGroup: (c, args) => c.run(c.ask(c.writes.renameGroup(args[0], args[1], args[2], scopeOf(args, 3)))),
-    removeGroup: (c, args) => c.run(c.writes.removeGroup(args[0], args[1], scopeOf(args, 2))),
+    renameGroup: (c, [list, group, name]) => c.run(c.ask(c.writes.renameGroup(list, group, name))),
+    removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list, group)),
     createSection: (c, [name, place]) => c.run(c.writes.createSection(name, place)),
     applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps)),
     drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks, to, day))),
-    landing: (c, [tasks, to, day, project]) => c.ask(c.writes.landing(tasks, to, day, project ?? void 0)),
-    dropPreview: (c, [tasks, to, day, project]) => c.ask(c.writes.dropPreview(tasks, to, day, project ?? void 0)),
+    landing: (c, [tasks, to, day]) => c.ask(c.writes.landing(tasks, to, day)),
+    dropPreview: (c, [tasks, to, day]) => c.ask(c.writes.dropPreview(tasks, to, day)),
     normalize: (c) => c.normalize(),
     createFile: (c) => {
       if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -7584,13 +7421,11 @@ ${key.title}`.toLowerCase();
     "removeLevel",
     "addLevel",
     "moveLevel",
-    "setResultMark",
     "setLabelTag",
     "setLabelPaint",
     "setCardHeight",
     "setCardGap",
     "setZoomLevels",
-    "setProjectTag",
     "renameLabel",
     "recolourLabel",
     "removeLabel",
@@ -7749,8 +7584,7 @@ ${key.title}`.toLowerCase();
       sectioned: (column) => look.sectioned?.[column] ?? false,
       day: () => look.day,
       today: () => c.rules.today(),
-      shown: () => look.shown,
-      project: () => look.project ?? void 0
+      shown: () => look.shown
     };
   }
   var ENTRY_METHODS = [
@@ -7818,11 +7652,7 @@ ${key.title}`.toLowerCase();
     linkQuery: (_c, [text, caret]) => linkQuery(text, caret),
     suggest: (_c, [query, notes, limit]) => noteSuggestions(query, notes, limit ?? void 0),
     insert: (_c, [text, at, link]) => withNoteLink(text, at, link),
-    open: (_c, [target, notes]) => noteOfLink(target, notes),
-    /** «New project…» writes no note any more (`tasks.newProject` makes the project): null. Stub until the app drops it. */
-    newProject: () => null,
-    /** No note is tagged any more: the text as it is. Stub until the app drops it. */
-    projectText: (_c, [text]) => text ?? ""
+    open: (_c, [target, notes]) => noteOfLink(target, notes)
   };
   var PROJECTS = {
     noteUrl: (_c, [link, vault]) => noteUrl(link, vault)

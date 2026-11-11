@@ -27,8 +27,7 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
         }
     }
 
-    /// The core's name of the place (`SCREEN_PLACES`): Today is the calendar's. Projects is none of the core's places: it
-    /// shows no list of the funnel.
+    /// The core's name of the place (`SCREEN_PLACES`): Today is the calendar's; Projects shows no list of the funnel.
     var key: String {
         switch self {
         case .projects: "projects"
@@ -435,7 +434,7 @@ final class BoardModel {
         swipeSign = 1
         swipeBase = 0
         let from: JSONValue = ["mode": "calendar", "date": .string(snapshot.day)]
-        guard let at = try? board.read("days.stepWheel", [from, .number(Double(shift))], over: board.settingsOnly()).decode(ScreenAt.self),
+        guard let at = try? board.read("days.stepScreen", [from, .number(Double(shift))], over: board.settingsOnly()).decode(ScreenAt.self),
               at.mode == "calendar" else { return false }
         // A text being typed is finished first, written for the day it was typed on, as before the arrows turn the day.
         if entry.isOpen || entry.writing {

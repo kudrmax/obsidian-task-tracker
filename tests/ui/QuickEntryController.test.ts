@@ -131,7 +131,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			unfoldAbove: async () => {},
 			newProject: async (name, keys) => {
 				newProjects.push({ name, keys });
-				return { name, path: [name], link: name, note: `${name}.md`, canOpenNote: true, mark: true };
+				return { name, path: [name], note: `${name}.md`, canOpenNote: true, mark: true };
 			},
 			createWithId: async (text, priority, place, repeat, _labels, project) => {
 				created.push({ text, priority, place, ...(repeat ? { repeat } : {}), ...(project ? { project } : {}) });
@@ -458,8 +458,8 @@ describe("QuickEntryController", () => {
 
 	describe("the Project button", () => {
 		const KNOWN: readonly ProjectRef[] = [
-			{ name: "Дружба", path: ["Дружба"], link: "Дружба", note: "Дружба.md", canOpenNote: true, mark: true },
-			{ name: "Окружение", path: ["Окружение"], link: "Окружение", note: "Окружение.md", canOpenNote: true, mark: true },
+			{ name: "Дружба", path: ["Дружба"], note: "Дружба.md", canOpenNote: true, mark: true },
+			{ name: "Окружение", path: ["Окружение"], note: "Окружение.md", canOpenNote: true, mark: true },
 		];
 		const rows = () => [...document.querySelectorAll<HTMLButtonElement>(".tc-quick-panel .tc-menu-row")];
 

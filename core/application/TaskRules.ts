@@ -16,7 +16,6 @@ import {
 	type GroupName,
 	type GroupPlace,
 	type NewTaskPlace,
-	type ProjectZone,
 	type RepeatRule,
 	type SectionPlace,
 	type TaskChange,
@@ -85,11 +84,6 @@ function columnOfPlace(place: SectionPlace, today: LocalDate): Column {
 	if (place.list === "now") return { kind: "day", date: place.date ?? today };
 	if (place.list === "soon" && place.date !== undefined && place.date > today) return { kind: "day", date: place.date };
 	return { kind: place.list };
-}
-
-/** A place's project and section named for its task, only where it has them. */
-function zoneOf(place: { readonly project?: ProjectZone; readonly section?: string }): { project?: ProjectZone; section?: string } {
-	return { ...(place.project !== undefined && { project: place.project }), ...(place.section !== undefined && place.section.trim() !== "" && { section: place.section.trim() }) };
 }
 
 /** A section's name of nothing: unlike a title, a level's prefix alone names a section. */
@@ -516,10 +510,10 @@ export class TaskRules {
 		return (doc) => ops.moveToEnd(doc, this.entryOf(doc, key), section);
 	}
 
-	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate, project?: ProjectZone): Operation {
+	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate): Operation {
 		return (doc, today) => {
 			this.groupOf(doc, list, group);
-			return ops.moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today, date ?? null, project);
+			return ops.moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today, date ?? null);
 		};
 	}
 
@@ -537,8 +531,8 @@ export class TaskRules {
 	}
 
 	/** Null for a blank name or the section's own: nothing to write. */
-	/** Null for a blank name or the section's own: nothing to write. `_project`: a project's part went; ignored. */
-	renameGroup(list: GroupedList, group: string, name: string, _project?: ProjectZone): Operation | null {
+	/** Null for a blank name or the section's own: nothing to write. */
+	renameGroup(list: GroupedList, group: string, name: string): Operation | null {
 		if (blankName(name) || name.trim() === group) return null;
 		return (doc, _today, settings) => {
 			this.groupOf(doc, list, group);
@@ -546,8 +540,7 @@ export class TaskRules {
 		};
 	}
 
-	/** `_project`: a project's part went; ignored. */
-	removeGroup(list: GroupedList, group: string, _project?: ProjectZone): Operation {
+	removeGroup(list: GroupedList, group: string): Operation {
 		return (doc) => {
 			this.groupOf(doc, list, group);
 			return ops.removeGroup(doc, list, group);
@@ -555,9 +548,7 @@ export class TaskRules {
 	}
 
 	/**
-	 * A new section `name` at `place`, and the list it goes in; null when the name can't make one there. A place in a
-	 * project's part makes none: there a section is born with its first task (`NewTaskPlace.section`), so no other
-	 * project's task moves and no empty heading is written.
+	 * A new section `name` at `place`, and the list it goes in; null when the name can't make one there.
 	 */
 	createSection(name: string, place: SectionPlace): { readonly operation: Operation; readonly list: GroupedList; readonly group: string } | null {
 		const group = name.trim();
@@ -565,7 +556,6 @@ export class TaskRules {
 		const column = columnOfPlace(place, today);
 		const list = columnList(column, today);
 		if (list === null || group === "" || group === this.settings.get().groups.ungrouped || group === place.group) return null;
-		if (place.project !== undefined) return null;
 		const operation: Operation = (doc, today, settings, boundary) => {
 			this.groupOf(doc, list, place.group);
 			const before = place.before ? this.entryOf(doc, place.before) : null;
@@ -633,7 +623,7 @@ export class TaskRules {
 				return ops.moveToEnd(doc, entry, change.section);
 			case "moveToGroup":
 				this.groupOf(doc, change.list, change.group);
-				return ops.moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null, change.project);
+				return ops.moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null);
 			case "createGroup":
 				return blankName(change.name) ? doc : ops.createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
 			case "nest":
@@ -646,11 +636,11 @@ export class TaskRules {
 		switch (place.kind) {
 			case "list":
 				this.groupOf(doc, place.list, place.group);
-				return { kind: "list", list: place.list, group: place.group, before: before(place.before), date: place.date ?? null, ...zoneOf(place) };
+				return { kind: "list", list: place.list, group: place.group, before: before(place.before), date: place.date ?? null };
 			case "day": {
 				const { list, date } = dayColumn(place.date, today);
 				this.groupOf(doc, list, place.group);
-				return { kind: "list", list, group: place.group, before: before(place.before), date, ...zoneOf(place) };
+				return { kind: "list", list, group: place.group, before: before(place.before), date };
 			}
 			case "subtask":
 				return { kind: "subtask", parent: this.entryOf(doc, place.parent), before: before(place.before) };

@@ -177,9 +177,6 @@ export function projectPage(chosen: readonly (readonly ProjectRef[])[], known: r
 	};
 }
 
-/** Results went: no rows. Stub until the frontends drop it. */
-const NO_RESULT_ROWS = { rows: [], label: "", value: "", current: null, toggle: { label: "", result: false } } as const;
-
 /** The menu's groups top to bottom, the same in every frontend. */
 export const MENU_GROUPS: readonly MenuGroupId[] = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
 
@@ -197,7 +194,6 @@ export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: r
 		dueDate: sharedDueDate(items),
 		sections,
 		project: menuProject(items, projects),
-		result: NO_RESULT_ROWS,
 		edits,
 		reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
 		repeat: repeatRow(of.kind === "task" ? (items[0]?.repeat ?? null) : null),

@@ -186,20 +186,8 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "renameGroup", args: () => ["now", "Errands", "Shopping"] },
 	{ method: "renameGroup", args: () => ["now", "Errands", "Errands"] },
 	{ method: "removeGroup", args: () => ["now", "Errands"] },
-	{ method: "renameGroup", args: () => ["now", "Errands", "Shopping", null] },
-	{ method: "removeGroup", args: () => ["now", "Errands", "Окружение"] },
 	{ method: "setProject", args: (s) => [[key(s, "Idea"), key(s, "Child one")], "Окружение"] },
 	{ method: "setProject", args: (s) => [[key(s, "Idea")], null] },
-	{ method: "projectNotes", args: () => [] },
-	{ method: "setResult", args: (s) => [key(s, "Parent"), true] },
-	{ method: "setResult", args: (s) => [key(s, "Parent"), false] },
-	{ method: "resultPage", args: (s) => [[key(s, "Shop")], ""] },
-	{ method: "resultPage", args: (s) => [[key(s, "Shop")], "some"] },
-	{ method: "addToResult", args: (s) => [[key(s, "Shop"), key(s, "Idea")], key(s, "Someday")] },
-	{ method: "newResult", args: (s) => [[key(s, "Shop")], "Errands done"] },
-	{ method: "newResult", args: (s) => [[key(s, "Shop")], "  "] },
-	{ method: "setGrouping", args: () => ["soon", true] },
-	{ method: "toggleFold", args: () => ["backlog", ""] },
 	{ method: "toggleProject", args: (s) => [[key(s, "Idea"), key(s, "Someday")], "Окружение"] },
 	{ method: "toggleProject", args: (s) => [[key(s, "Someday")], "Окружение"] },
 	{ method: "newProject", args: (s) => ["Дружба", [key(s, "Idea")]] },
@@ -219,7 +207,6 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "setProjectNote", args: () => ["Окружение", "Заметки/Окружение"] },
 	{ method: "dropOnProject", args: (s) => [[key(s, "Someday")], "Окружение", "none"] },
 	{ method: "dropOnProject", args: (s) => [[key(s, "Idea")], null, "project:Окружение"] },
-	{ method: "screen", args: () => [T, "Окружение"] },
 	{ method: "createSection", args: (s) => ["Evening", { kind: "day", date: T, group: null, before: key(s, "In progress") }] },
 	{ method: "applyAll", args: (s) => [[{ key: key(s, "Idea"), change: { kind: "moveToEnd", section: "soon" } }, { key: key(s, "Shop"), change: { kind: "status", status: "done" } }]] },
 	{ method: "drop", args: (s) => [[{ key: key(s, "Later"), from: "soon" }], { kind: "time", start: 660 }, T] },
@@ -236,7 +223,7 @@ const TASK_CASES: readonly Case[] = [
 ];
 
 /** The service's menus offer the projects of the file it read last; the door's, of the text it is handed: the plugin reads the screen before any menu. */
-const READ_FIRST: ReadonlySet<string> = new Set(["menu", "bulkMenu", "projectNotes", "projects"]);
+const READ_FIRST: ReadonlySet<string> = new Set(["menu", "bulkMenu", "projects"]);
 
 /** What the service answers, and the text it leaves; an error by its code. */
 async function serviceAnswer(c: Case, screen: ScreenView): Promise<{ result: unknown; text: string | null; steps: boolean }> {
@@ -410,10 +397,6 @@ const SETTINGS_CASES: readonly (readonly [string, ...unknown[]])[] = [
 	["setCardGap", -1],
 	["setZoomLevels", " 40 , 80"],
 	["setZoomLevels", "28, x"],
-	["setResultMark", " ★ "],
-	["setResultMark", "two words"],
-	["setProjectTag", " проект "],
-	["setProjectTag", "two words"],
 	["renameLabel", 0, " Very fast "],
 	["recolourLabel", 0, "blue"],
 	["removeLabel", 0],
@@ -639,10 +622,6 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("notes.insert", "Call [[Alp", { query: "Alp", from: 5, to: 10 }, "Alpha"),
 		plain("notes.open", "Alpha#Plan", [{ path: "Projects/Alpha.md" }]),
 		plain("notes.open", "Gone", [{ path: "Projects/Alpha.md" }]),
-		plain("notes.newProject", "Alpha", [{ path: "Projects/Alpha.md" }]),
-		plain("notes.newProject", "", []),
-		plain("notes.projectText", "Body\n"),
-		plain("notes.projectText", null),
 		plain("projects.noteUrl", "Дружба", "Vault"),
 		plain("rules.projectNodeOf", "Дружба"),
 		plain("rules.projectsLevels", [{ node: "all", kind: "all", depth: 0 }, { node: "project:A", kind: "project", depth: 0, title: "A" }, { node: "none", kind: "none", depth: 0 }], 2),

@@ -42,8 +42,8 @@ import { type ItemLevels, itemLevels, ownCard, toItem } from "./taskItems";
 import type { TaskRules } from "./TaskRules";
 import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
 import type { Clock, SettingsStore } from "./ports";
-import { NO_GROUPING, ProjectIndex, projectTreeOf } from "./projects";
-import type { DropTo, GroupingState, ListGrouping, ProjectNote, ProjectRef, ProjectsScreenState, ProjectsView, ResultPage } from "./contracts";
+import { ProjectIndex, projectTreeOf } from "./projects";
+import type { DropTo, ProjectNote, ProjectRef, ProjectsScreenState, ProjectsView } from "./contracts";
 import { ProjectTree } from "../domain/ProjectTree";
 import { projectsView } from "./projectsScreen";
 
@@ -132,11 +132,6 @@ export class TaskReads {
 		return this.projectNotes();
 	}
 
-	/** Grouping went: none. Stub until the frontends drop it. */
-	grouping(): GroupingState {
-		return {};
-	}
-
 	/** The Projects screen as this device shows it; without a file, the tree's fixed rows alone. */
 	projectsScreenRead(): Read<ProjectsView> {
 		return { reads: true, tidies: true, missing: () => this.projectsScreen(null), answer: (s) => this.projectsScreen(s) };
@@ -186,18 +181,17 @@ export class TaskReads {
 	}
 
 	/** The screen of `date`: the file tidied for today first; without a file, the empty screen. */
-	screenRead(date: LocalDate, _project?: string): Read<ScreenView> {
+	screenRead(date: LocalDate): Read<ScreenView> {
 		return { reads: true, tidies: true, missing: () => this.missingScreen(date), answer: (s) => this.screen(s!, date) };
 	}
 
-	/** The screen of `date`. `_project`: a project's view went; ignored. */
-	screen(s: Snapshot, date: LocalDate, _project?: string): ScreenView {
+	/** The screen of `date`. */
+	screen(s: Snapshot, date: LocalDate): ScreenView {
 		const { doc, today, boundary } = s;
 		const item = this.itemOf(today, doc);
 		const day = { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
 		const sections = this.listSections(s);
 		const view = { soon: soonWithoutDate(doc).map(item), inbox: inboxList(doc).map(item), backlog: backlogList(doc).map(item) };
-		const projects = { inbox: NO_GROUPING, backlog: NO_GROUPING, soon: NO_GROUPING, now: NO_GROUPING };
 		return {
 			day,
 			...view,
@@ -206,29 +200,26 @@ export class TaskReads {
 			offer: this.offerOf(s, date, sections),
 			missing: false,
 			calendars: true,
-			projects,
-			project: null,
 			projectTree: new ProjectIndex(projectTreeOf(doc)).known(),
-			titleDrops: this.titleDrops(date, projects),
+			titleDrops: this.titleDrops(date),
 		};
 	}
 
-	/** What a drop on each column's title means: into its list, by project where the list groups by it; a day without sections, its end. */
-	private titleDrops(date: LocalDate, projects: Readonly<Record<GroupedList, ListGrouping>>): Readonly<Record<DropColumn, DropTo>> {
-		const title = (list: GroupedList, day: LocalDate | null, grouping: ListGrouping): DropTo => ({ kind: "title", list, date: day, byProject: grouping.on });
+	/** What a drop on each column's title means: into its list; a day without sections, its end. */
+	private titleDrops(date: LocalDate): Readonly<Record<DropColumn, DropTo>> {
+		const title = (list: GroupedList, day: LocalDate | null): DropTo => ({ kind: "title", list, date: day });
 		const day = this.columnSections("day", date);
 		return {
-			day: day ? title(day.list, day.date, projects.now) : { kind: "list", column: "day", before: null },
-			soon: title("soon", null, projects.soon),
-			inbox: title("inbox", null, projects.inbox),
-			backlog: title("backlog", null, projects.backlog),
+			day: day ? title(day.list, day.date) : { kind: "list", column: "day", before: null },
+			soon: title("soon", null),
+			inbox: title("inbox", null),
+			backlog: title("backlog", null),
 		};
 	}
 
 	/** The screen without a tasks file: nothing in any list, and no calendars beside nothing. */
 	missingScreen(date: LocalDate): ScreenView {
 		const none = { inbox: [], backlog: [], soon: [], now: [] };
-		const off = { inbox: NO_GROUPING, backlog: NO_GROUPING, soon: NO_GROUPING, now: NO_GROUPING };
 		return {
 			day: { date, list: [], slotted: [] },
 			soon: [],
@@ -239,10 +230,8 @@ export class TaskReads {
 			offer: { lists: none, ungrouped: this.settings.get().groups.ungrouped },
 			missing: true,
 			calendars: false,
-			projects: off,
-			project: null,
 			projectTree: [],
-			titleDrops: this.titleDrops(date, off),
+			titleDrops: this.titleDrops(date),
 		};
 	}
 
@@ -284,12 +273,12 @@ export class TaskReads {
 	}
 
 	/** A query that finds nothing reads no file. */
-	searchRead(query: string, _project?: string): Read<readonly SearchGroup[]> {
+	searchRead(query: string): Read<readonly SearchGroup[]> {
 		return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query) };
 	}
 
-	/** Every task the query finds, each with its project's path. `_project`: a project's view went; ignored. */
-	search(s: Snapshot | null, query: string, _project?: string): readonly SearchGroup[] {
+	/** Every task the query finds, each with its project's path. */
+	search(s: Snapshot | null, query: string): readonly SearchGroup[] {
 		const fuzzy = FuzzyQuery.of(query);
 		if (!fuzzy || !s) return [];
 		const { doc, today } = s;
@@ -323,11 +312,6 @@ export class TaskReads {
 			if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
 		}
 		return groups;
-	}
-
-	/** Results went: an empty page. Stub until the frontends drop it. */
-	resultPage(): ResultPage {
-		return { options: [], placeholder: "", newLabel: "", namePlaceholder: "" };
 	}
 
 	screenOf({ doc, today }: Snapshot, item: TaskItem): TaskScreen {

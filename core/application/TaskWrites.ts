@@ -13,7 +13,6 @@ import type {
 	GroupPlace,
 	MenuStatusId,
 	NewTaskPlace,
-	ProjectZone,
 	RepeatRule,
 	SectionPlace,
 	TaskDraft,
@@ -328,8 +327,8 @@ export class TaskWrites {
 		return nothing(this.rules.moveToEnd(key, section));
 	}
 
-	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate, project?: ProjectZone): Write<void> {
-		return nothing(this.rules.moveToGroup(key, list, group, before, date, project));
+	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate): Write<void> {
+		return nothing(this.rules.moveToGroup(key, list, group, before, date));
 	}
 
 	createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Write<void> {
@@ -354,8 +353,8 @@ export class TaskWrites {
 	}
 
 	/** Reads first only when there is a name to write: a blank one or the section's own answers false at once. */
-	renameGroup(list: GroupedList, group: string, name: string, project?: ProjectZone): Read<Write<boolean>> {
-		const operation = this.rules.renameGroup(list, group, name, project);
+	renameGroup(list: GroupedList, group: string, name: string): Read<Write<boolean>> {
+		const operation = this.rules.renameGroup(list, group, name);
 		return {
 			reads: operation !== null,
 			answer: (s) => {
@@ -365,8 +364,8 @@ export class TaskWrites {
 		};
 	}
 
-	removeGroup(list: GroupedList, group: string, project?: ProjectZone): Write<void> {
-		return nothing(this.rules.removeGroup(list, group, project));
+	removeGroup(list: GroupedList, group: string): Write<void> {
+		return nothing(this.rules.removeGroup(list, group));
 	}
 
 	createSection(name: string, place: SectionPlace): Write<{ readonly list: GroupedList; readonly group: string } | null> {
@@ -393,7 +392,7 @@ export class TaskWrites {
 		return {
 			reads: read.kind === "title" || (tasks.length === 1 && read.kind === "time"),
 			answer: (s) => {
-				const moves = dropMoves(tasks, read, day, (key) => (s ? (this.rules.entryOf(s.doc, key).projects[0] ?? null) : null));
+				const moves = dropMoves(tasks, read, day);
 				return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
 			},
 		};
@@ -403,13 +402,13 @@ export class TaskWrites {
 	 * Where `drop` would leave the tasks, writing nothing: its operation tried over the file as read, and the screen of
 	 * `day` read over the result by the same code as the screen.
 	 */
-	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Read<readonly DropLanding[]> {
-		const preview = this.dropPreview(tasks, to, day, project);
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Read<readonly DropLanding[]> {
+		const preview = this.dropPreview(tasks, to, day);
 		return { reads: true, answer: (s) => preview.answer(s).landings };
 	}
 
 	/** `landing`, with the whole screen the drop leaves and the text it is read from. */
-	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Read<DropPreview> {
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Read<DropPreview> {
 		const drop = this.drop(tasks, to, day);
 		return {
 			reads: true,
@@ -418,7 +417,7 @@ export class TaskWrites {
 				const write = drop.answer(s);
 				const after = write.operation ? this.rules.trial(s!.doc, write.operation).after : s!.doc;
 				const text = after.serialize();
-				const screen = this.reads.screen({ text, doc: after, today: s!.today, boundary: s!.boundary }, day, project);
+				const screen = this.reads.screen({ text, doc: after, today: s!.today, boundary: s!.boundary }, day);
 				const timeline = this.reads.timeline();
 				return { landings: ids.map((id) => landingOf(screen, id, day, timeline)), screen, tasks: text };
 			},
@@ -444,7 +443,7 @@ export class TaskWrites {
 			case "clearSlot":
 				return this.clearSlot(key, move.place);
 			case "moveToGroup":
-				return this.moveToGroup(key, move.list, move.group, move.before, move.date, move.project);
+				return this.moveToGroup(key, move.list, move.group, move.before, move.date);
 			case "nest":
 				return this.nest(key, move.parent, move.before);
 			case "moveBefore":

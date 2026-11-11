@@ -1,5 +1,5 @@
 import type { TaskCalendarSettings } from "../settings";
-import type { GroupingState, ProjectNote, ProjectsScreenState } from "./contracts";
+import type { ProjectNote, ProjectsScreenState } from "./contracts";
 
 /** The tasks file as text. Implemented over the Obsidian vault; in tests, in memory. */
 export interface TaskFileStore {
@@ -57,36 +57,7 @@ export interface Projects {
 	onChange(listener: () => void): () => void;
 }
 
-/** The vault's notes as files. «New project…» writes no note any more: stub until the frontends drop the port. */
-export interface NoteFiles {
-	/** Every file's path in the vault. */
-	paths(): readonly string[];
-	read(path: string): Promise<string>;
-	/** `text` into the note at `path`, made when it is not there. */
-	write(path: string, text: string): Promise<void>;
-}
-
-export const NO_NOTE_FILES: NoteFiles = {
-	paths: () => [],
-	read: async () => "",
-	write: async () => {
-		throw new Error("Task Calendar: no vault to write a project note to");
-	},
-};
-
-/** Grouping by project went: stub until the frontends drop the port. */
-export interface GroupingStore {
-	get(): GroupingState;
-	set(state: GroupingState): void;
-}
-
 export const NO_PROJECTS: Projects = { list: () => [], onChange: () => () => undefined };
-
-/** A device's grouping kept in memory: for a host that keeps none, and for tests. */
-export function memoryGrouping(start: GroupingState = {}): GroupingStore {
-	let state = start;
-	return { get: () => state, set: (next) => (state = next) };
-}
 
 /** What this device keeps of the Projects screen, never synced (the plugin: Obsidian's local storage). */
 export interface ProjectsScreenStore {

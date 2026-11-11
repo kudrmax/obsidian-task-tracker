@@ -24,12 +24,10 @@ import {
 	type GroupPlace,
 	type ListSection,
 	type ProjectRef,
-	type ProjectZone,
 	type ProjectsMode,
 	type ProjectsNodeId,
 	type ProjectsScreenState,
 	type ProjectsView,
-	type ResultPage,
 	type NewTaskPlace,
 	type Placement,
 	type RepeatRule,
@@ -123,8 +121,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.withPriority(text, prefix);
 	}
 
-	screen(date: LocalDate, project?: string): Promise<ScreenView> {
-		return this.ask(this.reads.screenRead(date, project));
+	screen(date: LocalDate): Promise<ScreenView> {
+		return this.ask(this.reads.screenRead(date));
 	}
 
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void> {
@@ -135,24 +133,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.toggleProject(keys, name));
 	}
 
-	async setResult(_key: TaskKey, _result: boolean): Promise<void> {}
-
-	async resultPage(_keys: readonly TaskKey[], _query: string): Promise<ResultPage> {
-		return this.reads.resultPage();
-	}
-
-	async addToResult(_keys: readonly TaskKey[], _result: TaskKey): Promise<void> {}
-
-	async newResult(_keys: readonly TaskKey[], _name: string): Promise<CreatedTask | null> {
-		return null;
-	}
-
 	projects(): readonly ProjectRef[] {
 		return this.reads.projectNotes();
-	}
-
-	projectNotes(): readonly ProjectRef[] {
-		return this.projects();
 	}
 
 	async unfoldProjectNode(node: ProjectsNodeId): Promise<void> {
@@ -162,10 +144,6 @@ export class TaskServiceImpl implements TaskService {
 	async newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null> {
 		return this.refOf(await this.run(this.writes.newProject(name, keys)));
 	}
-
-	async setGrouping(_list: GroupedList, _on: boolean): Promise<void> {}
-
-	async toggleFold(_list: GroupedList, _key: string): Promise<void> {}
 
 	projectsScreen(): Promise<ProjectsView> {
 		return this.ask(this.reads.projectsScreenRead());
@@ -255,8 +233,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.doneView(await this.snapshot());
 	}
 
-	search(query: string, project?: string): Promise<readonly SearchGroup[]> {
-		return this.ask(this.reads.searchRead(query, project));
+	search(query: string): Promise<readonly SearchGroup[]> {
+		return this.ask(this.reads.searchRead(query));
 	}
 
 	async screenOf(item: TaskItem): Promise<TaskScreen> {
@@ -512,12 +490,12 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.moveGroup(list, group, place));
 	}
 
-	async renameGroup(list: GroupedList, group: string, name: string, project?: ProjectZone): Promise<boolean> {
-		return this.run(await this.ask(this.writes.renameGroup(list, group, name, project)));
+	async renameGroup(list: GroupedList, group: string, name: string): Promise<boolean> {
+		return this.run(await this.ask(this.writes.renameGroup(list, group, name)));
 	}
 
-	removeGroup(list: GroupedList, group: string, project?: ProjectZone): Promise<void> {
-		return this.run(this.writes.removeGroup(list, group, project));
+	removeGroup(list: GroupedList, group: string): Promise<void> {
+		return this.run(this.writes.removeGroup(list, group));
 	}
 
 	createSection(name: string, place: SectionPlace): Promise<{ readonly list: GroupedList; readonly group: string } | null> {
@@ -532,12 +510,12 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(await this.ask(this.writes.drop(tasks, to, day)));
 	}
 
-	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Promise<readonly DropLanding[]> {
-		return this.ask(this.writes.landing(tasks, to, day, project));
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly DropLanding[]> {
+		return this.ask(this.writes.landing(tasks, to, day));
 	}
 
-	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Promise<DropPreview> {
-		return this.ask(this.writes.dropPreview(tasks, to, day, project));
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<DropPreview> {
+		return this.ask(this.writes.dropPreview(tasks, to, day));
 	}
 
 	async normalize(): Promise<void> {

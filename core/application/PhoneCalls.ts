@@ -30,7 +30,6 @@ import {
 	type DayWords,
 	type DropColumn,
 	type GroupedList,
-	type GroupingState,
 	type ProjectNote,
 	type ProjectsScreenState,
 	StaleTaskError,
@@ -94,8 +93,6 @@ export interface DoorContext {
 	 * projects (a file without `## Projects`), which attaches them to their projects. None when left out.
 	 */
 	readonly projects?: readonly ProjectNote[];
-	/** Grouping went: ignored. Stub until the app drops it. */
-	readonly grouping?: GroupingState;
 	/** What this device keeps of the Projects screen, as the door last answered it; nothing chosen when left out. */
 	readonly projectsScreen?: ProjectsScreenState;
 	/** Who the tasks are (`TaskItem.id`), as the door last answered it; left out before the first: every task a new id. */
@@ -115,8 +112,6 @@ export type DoorAnswer =
 			readonly history?: UndoState;
 			/** The new `data.json` text: the host writes it. */
 			readonly settings?: string;
-			/** Grouping went: never answered. Stub until the app drops it. */
-			readonly grouping?: GroupingState;
 			/** The device's Projects screen after this call: the host keeps it and hands it in again. */
 			readonly projectsScreen?: ProjectsScreenState;
 			/** Who the tasks are after this call: the host keeps it and hands it in again, so a task keeps its id. */
@@ -180,8 +175,6 @@ export interface WireLook {
 	readonly day: string;
 	/** The lists the screen shows, in its order. */
 	readonly shown: readonly DropColumn[];
-	/** The project whose own view the screen is (`ProjectRef.link`); left out for the main screen. */
-	readonly project?: string;
 }
 
 class DoorError extends Error {
@@ -204,7 +197,6 @@ interface Effects {
 	step?: boolean;
 	history?: UndoState;
 	settings?: string;
-	grouping?: GroupingState;
 	projectsScreen?: ProjectsScreenState;
 	ids?: TaskIdState;
 }
@@ -368,11 +360,6 @@ type A = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const KEPT = (call: Call): Snapshot => call.snapshot();
 
-/** An optional project's part: left out, the whole list; `null`, the tasks of no project. */
-function scopeOf(args: readonly unknown[], at: number): string | null | undefined {
-	return args.length > at ? ((args[at] ?? null) as string | null) : undefined;
-}
-
 /** Every TaskService method a frontend calls, by name, over the call's text. */
 const TASKS: Readonly<Record<string, Handler>> = {
 	priorityLevels: (c) => c.reads.priorityLevels(),
@@ -381,13 +368,13 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	isBlank: (c, [text]) => c.reads.isBlank(text as string),
 	withPriority: (c, [text, prefix]) => c.reads.withPriority(text as string, (prefix ?? null) as string | null),
 	draftMarks: (c, [text, priority, labels]) => c.reads.draftMarks(text as string, (priority ?? null) as string | null, (labels ?? []) as string[]),
-	screen: (c, [date, project]) => c.ask(c.reads.screenRead(date as string, (project ?? undefined) as string | undefined)),
+	screen: (c, [date]) => c.ask(c.reads.screenRead(date as string)),
 	dayView: (c, [date]) => c.reads.dayView(KEPT(c), date as string),
 	soonWithoutDateView: (c) => c.reads.soonWithoutDateView(KEPT(c)),
 	inboxView: (c) => c.reads.inboxView(KEPT(c)),
 	backlogView: (c) => c.reads.backlogView(KEPT(c)),
 	doneView: (c) => c.reads.doneView(KEPT(c)),
-	search: (c, [query, project]) => c.ask(c.reads.searchRead(query as string, (project ?? undefined) as string | undefined)),
+	search: (c, [query]) => c.ask(c.reads.searchRead(query as string)),
 	screenOf: (c, [item]) => c.reads.screenOf(KEPT(c), item as A),
 	reveal: (c, [item]) => {
 		c.run(c.writes.revealUnfold(item as A));
@@ -418,20 +405,13 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	setLabels: (c, [key, labels]) => c.run(c.writes.setLabels(key as A, labels as A)),
 	setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps as A)),
 	setProject: (c, [keys, project]) => c.run(c.writes.setProject(keys as A, (project ?? null) as string | null)),
-	projectNotes: (c) => c.reads.projectNotes(),
-	projects: (c) => c.reads.projectNotes(),
+	projects: (c) => c.reads.projects(),
 	unfoldProjectNode: (c, [node]) => c.keepProjectsScreen(unfolded(c.projectsScreen, node as string)),
 	toggleProject: (c, [keys, name]) => c.run(c.writes.toggleProject(keys as A, name as string)),
 	newProject: (c, [name, keys]) => {
 		const made = c.run(c.writes.newProject(name as string, (keys ?? []) as A));
 		return made === null ? null : new ProjectIndex(c.tree()).refOf(made);
 	},
-	setResult: () => null,
-	resultPage: (c) => c.reads.resultPage(),
-	addToResult: () => null,
-	newResult: () => null,
-	setGrouping: () => null,
-	toggleFold: () => null,
 	projectsScreen: (c) => c.ask(c.reads.projectsScreenRead()),
 	tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node as string)),
 	selectProjectNode: (c, [node]) => c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, node as string)),
@@ -493,13 +473,13 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	createGroup: (c, [key, list, name, date]) => c.run(c.writes.createGroup(key as A, list as A, name as string, (date ?? undefined) as A)),
 	toSection: (c, [keys, name]) => c.run(c.writes.toSection(KEPT(c), keys as A, (name ?? null) as A)),
 	moveGroup: (c, [list, group, place]) => c.run(c.writes.moveGroup(list as A, (group ?? null) as A, place as A)),
-	renameGroup: (c, args) => c.run(c.ask(c.writes.renameGroup(args[0] as A, args[1] as string, args[2] as string, scopeOf(args, 3)))),
-	removeGroup: (c, args) => c.run(c.writes.removeGroup(args[0] as A, args[1] as string, scopeOf(args, 2))),
+	renameGroup: (c, [list, group, name]) => c.run(c.ask(c.writes.renameGroup(list as A, group as string, name as string))),
+	removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list as A, group as string)),
 	createSection: (c, [name, place]) => c.run(c.writes.createSection(name as string, place as A)),
 	applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps as A)),
 	drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks as A, to as A, day as string))),
-	landing: (c, [tasks, to, day, project]) => c.ask(c.writes.landing(tasks as A, to as A, day as string, (project ?? undefined) as string | undefined)),
-	dropPreview: (c, [tasks, to, day, project]) => c.ask(c.writes.dropPreview(tasks as A, to as A, day as string, (project ?? undefined) as string | undefined)),
+	landing: (c, [tasks, to, day]) => c.ask(c.writes.landing(tasks as A, to as A, day as string)),
+	dropPreview: (c, [tasks, to, day]) => c.ask(c.writes.dropPreview(tasks as A, to as A, day as string)),
 	normalize: (c) => c.normalize(),
 	createFile: (c) => {
 		if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -641,13 +621,11 @@ const SETTINGS_METHODS: readonly string[] = [
 	"removeLevel",
 	"addLevel",
 	"moveLevel",
-	"setResultMark",
 	"setLabelTag",
 	"setLabelPaint",
 	"setCardHeight",
 	"setCardGap",
 	"setZoomLevels",
-	"setProjectTag",
 	"renameLabel",
 	"recolourLabel",
 	"removeLabel",
@@ -838,7 +816,6 @@ function lookOf(c: Call, look: WireLook): EntryLook {
 		day: () => look.day,
 		today: () => c.rules.today(),
 		shown: () => look.shown,
-		project: () => look.project ?? undefined,
 	};
 }
 
@@ -932,10 +909,6 @@ const NOTES: Readonly<Record<string, Handler>> = {
 	suggest: (_c, [query, notes, limit]) => noteSuggestions(query as string, notes as VaultNote[], (limit ?? undefined) as number | undefined),
 	insert: (_c, [text, at, link]) => withNoteLink(text as string, at as LinkQuery, link as string),
 	open: (_c, [target, notes]) => noteOfLink(target as string, notes as VaultNote[]),
-	/** «New project…» writes no note any more (`tasks.newProject` makes the project): null. Stub until the app drops it. */
-	newProject: () => null,
-	/** No note is tagged any more: the text as it is. Stub until the app drops it. */
-	projectText: (_c, [text]) => (text ?? "") as string,
 };
 
 /**

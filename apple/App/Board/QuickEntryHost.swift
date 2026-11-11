@@ -321,7 +321,7 @@ final class QuickEntryHost {
     /// The ribbon turned to the place the core says shows `column` from where it stands; a place showing it stays.
     private func turn(to column: BoardColumn) {
         guard let model,
-              let key: String = model.ruleNow("rules.placeOfList", [.string(column.rawValue), .string(model.place.key)]),
+              let key: String = model.ruleNow("rules.placeShowing", [.string(column.rawValue), .string(model.place.key)]),
               let place = RibbonPlace(key: key), place != model.place else { return }
         turnedTo = place
         model.go(to: place)
