@@ -4,7 +4,10 @@ import { ProjectMenu } from "../../obsidian/ui/menu/GroupMenu";
 
 const DELETE = { label: "Delete project", title: "Delete “Сербия”?", message: "Its tasks stay; they just lose this project.", confirm: "Delete", cancel: "Cancel", destructive: true } as const;
 
-function open() {
+type Folder = { readonly label: string; readonly on: boolean; readonly disabled: boolean; readonly reason: string | null };
+const OFF: Folder = { label: "Folder", on: false, disabled: false, reason: null };
+
+function open(folder: Folder = OFF) {
 	document.body.innerHTML = "";
 	const title = document.body.appendChild(document.createElement("div"));
 	const picked: string[] = [];
@@ -14,6 +17,8 @@ function open() {
 		note: null,
 		attachLabel: "Attach note…",
 		detachLabel: "Detach",
+		folder,
+		onFolder: (on) => picked.push(`folder:${on}`),
 		delete: DELETE,
 		onRename: () => picked.push("rename"),
 		onAttach: () => picked.push("attach"),
@@ -62,5 +67,47 @@ describe("the project menu's Delete project (spec «Projects order» 7)", () => 
 		expect(document.querySelector(".tc-panel .tc-menu-ask")).toBeNull();
 		expect(row("Delete project")).toBeDefined();
 		expect(picked).toEqual([]);
+	});
+});
+
+describe("the project menu's Folder (spec «Project folders» 1)", () => {
+	const folderRow = () => document.querySelector<HTMLButtonElement>(".tc-panel .tc-menu-row.is-switch")!;
+
+	it("a switch row right under Rename, in the first group, off as the core says", () => {
+		open();
+		const rows = Array.from(document.querySelectorAll(".tc-panel .tc-menu-group")[0].querySelectorAll(".tc-menu-row"));
+		expect(rows.map((r) => r.textContent)).toEqual(["Rename", "Folder", "Attach note…"]);
+		expect(folderRow().getAttribute("role")).toBe("switch");
+		expect(folderRow().getAttribute("aria-checked")).toBe("false");
+		expect(folderRow().querySelector(".tc-menu-switch")?.classList.contains("is-on")).toBe(false);
+	});
+
+	it("a tap slides it on, writes the opposite of the core's value and closes the menu", () => {
+		const { picked } = open();
+		folderRow().click();
+		expect(folderRow().querySelector(".tc-menu-switch")?.classList.contains("is-on")).toBe(true);
+		expect(picked).toEqual(["folder:true"]);
+		expect(document.querySelector(".tc-panel")?.classList.contains("is-closing")).toBe(true);
+	});
+
+	it("on, a tap turns it off", () => {
+		const { picked } = open({ ...OFF, on: true });
+		expect(folderRow().getAttribute("aria-checked")).toBe("true");
+		folderRow().click();
+		expect(picked).toEqual(["folder:false"]);
+	});
+
+	it("disabled: not pressed, the core's reason under the label", () => {
+		const { picked } = open({ ...OFF, disabled: true, reason: "Has tasks of its own" });
+		expect(folderRow().disabled).toBe(true);
+		expect(folderRow().querySelector(".tc-menu-switch-label")?.textContent).toBe("Folder");
+		expect(folderRow().querySelector(".tc-menu-switch-reason")?.textContent).toBe("Has tasks of its own");
+		folderRow().click();
+		expect(picked).toEqual([]);
+	});
+
+	it("no reason line while it can be turned", () => {
+		open();
+		expect(folderRow().querySelector(".tc-menu-switch-reason")).toBeNull();
 	});
 });

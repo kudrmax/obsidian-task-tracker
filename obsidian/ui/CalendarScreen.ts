@@ -1187,7 +1187,7 @@ export class CalendarScreen extends Component {
 		return true;
 	}
 
-	/** The chosen project's menu, its title tapped (spec decision 1): Rename in place, and its note attached, opened or detached. */
+	/** The chosen project's menu, its title tapped (spec decision 1): Rename in place, Folder turned, its note attached, opened or detached. */
 	private showProjectMenu(title: HTMLElement, view: ProjectsView): void {
 		const menu = view.menu;
 		const projects = this.projects;
@@ -1214,6 +1214,8 @@ export class CalendarScreen extends Component {
 				if (menu.note) void this.app.workspace.openLinkText(menu.note.link, this.settings.tasksFile, "tab");
 			},
 			onDetach: () => changed(() => tasks.setProjectNote(name, null)),
+			folder: menu.folder,
+			onFolder: (on) => changed(() => tasks.setProjectFolder(name, on)),
 			delete: menu.delete,
 			onDelete: () => changed(() => tasks.deleteProject(name)),
 		});

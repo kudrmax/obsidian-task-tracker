@@ -169,7 +169,10 @@ export function projectPage(chosen: readonly (readonly ProjectRef[])[], known: r
 	return {
 		value: none ? NO_PROJECT : same ? (first.length === 1 ? first[0].name : `${first[0].name} +${first.length - 1}`) : "",
 		current: shared,
-		options: options.map(({ project, depth }) => ({ project, depth, checked: all(project) })),
+		options: options.map(({ project, depth }) => {
+			const checked = all(project);
+			return { project, depth, checked, disabled: project.folder && !checked };
+		}),
 		none,
 		noneLabel: NO_PROJECT,
 		disabled,

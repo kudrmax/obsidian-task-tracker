@@ -493,10 +493,16 @@ export class QuickEntry {
 		if (unfold) this.queue(run, { id: this.jobId(), kind: "unfold", run, key: unfold });
 	}
 
-	/** A project picked on the Project button (its name; null: No project); the field stays where it is. */
+	/**
+	 * A project picked on the Project button (its name; null: No project); the field stays where it is. A folder is not
+	 * taken (the field keeps its project), unless the renamed task carries it already.
+	 */
 	setProject(name: string | null): void {
 		const field = this.session.field;
-		if (field) this.reset({ ...field, project: name }, true);
+		if (!field) return;
+		const held = field.rename?.item.projects.some((p) => inProject(p.name, name)) ?? false;
+		if (!held && isFolderRef(name, this.tasks.projects?.() ?? [])) return;
+		this.reset({ ...field, project: name }, true);
 	}
 
 	type(text: string): void {
@@ -969,11 +975,16 @@ export function entryProject(link: string | null, known: readonly ProjectRef[]):
 	return { page: projectPage([ref ? [ref] : []], known.map((project) => ({ project, depth: project.path.length - 1 }))), lit: link !== null };
 }
 
+/** A folder among the `known` projects: nothing may give a task it. */
+export function isFolderRef(name: string | null, known: readonly ProjectRef[]): boolean {
+	return name !== null && known.some((ref) => ref.folder && projectKey(ref.name) === projectKey(name));
+}
+
 /** The project of link `link` as the Project page shows it: the project note of that name, else the name alone. */
 function refOf(link: string | null, known: readonly ProjectRef[]): ProjectRef | null {
 	if (link === null) return null;
 	const name = projectName(link);
-	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, path: [name], note: null, canOpenNote: false, mark: true };
+	return known.find((ref) => projectKey(ref.name) === projectKey(name)) ?? { name, path: [name], note: null, canOpenNote: false, mark: true, folder: false };
 }
 
 /** The renamed task as its field stands: in the place of its result's card, that card's key and id. */

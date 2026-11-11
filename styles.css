@@ -424,6 +424,16 @@ body {
 	--tc-menu-weekday-w: 12px;
 	--tc-menu-week-gap: var(--tc-hairline);
 	/*
+	 * A switch row of a menu (the project menu's Folder): the segmented track's height, padding and knob, a white knob on
+	 * the dim ink off and on the accent on; dimmed as a tile that can't be pressed, its reason a caption under the label.
+	 */
+	--tc-menu-switch-w: 52px;
+	--tc-menu-switch-h: var(--tc-seg);
+	--tc-menu-switch-pad: var(--tc-seg-pad);
+	--tc-menu-switch-knob: var(--tc-seg-btn-h);
+	--tc-radius-menu-switch: calc(var(--tc-menu-switch-h) / 2);
+	--tc-menu-switch-travel: calc(var(--tc-menu-switch-w) - var(--tc-menu-switch-knob) - 2 * var(--tc-menu-switch-pad));
+	/*
 	 * The quick bar over the keyboard, on the view's own ground: the shift buttons in one pill, the priority flag, the repeat
 	 * and the place button in pills of the wheel's track; its panels use the menu's. The repeat's icon is the flag's size.
 	 */
@@ -1254,6 +1264,16 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel .tc-menu-row.is-quiet { color: var(--tc-muted); }
 .tc-menu-row.is-choice svg { color: var(--tc-accent-ui); stroke-width: var(--tc-stroke-check); }
 .tc-menu-row.is-add svg { color: var(--tc-accent-ui); stroke-width: var(--tc-stroke-add); }
+.tc-panel button.tc-menu-row.is-switch { height: auto; min-height: var(--tc-row); padding-top: var(--tc-space-6); padding-bottom: var(--tc-space-6); }
+.tc-panel button.tc-menu-row.is-switch:disabled { opacity: 1; }
+.tc-menu-row.is-switch > .tc-menu-label { display: flex; flex-direction: column; }
+.tc-menu-row.is-switch:disabled .tc-menu-switch-label { color: var(--tc-muted); }
+.tc-menu-switch-reason { font-size: var(--tc-font-sub); line-height: var(--tc-leading-card); color: var(--tc-muted); }
+.tc-menu-switch { width: var(--tc-menu-switch-w); height: var(--tc-menu-switch-h); flex-shrink: 0; box-sizing: border-box; padding: var(--tc-menu-switch-pad); border-radius: var(--tc-radius-menu-switch); background: var(--tc-ink-dim); transition: background-color var(--tc-duration-snap) var(--tc-ease-out); }
+.tc-menu-switch.is-on { background: var(--tc-accent-ui); }
+.tc-menu-switch-knob { display: block; width: var(--tc-menu-switch-knob); height: var(--tc-menu-switch-knob); border-radius: var(--tc-radius-circle); background: var(--tc-on-accent); transition: transform var(--tc-duration-snap) var(--tc-ease-out); }
+.tc-menu-switch.is-on > .tc-menu-switch-knob { transform: translateX(var(--tc-menu-switch-travel)); }
+.tc-menu-row.is-switch:disabled .tc-menu-switch { opacity: var(--tc-tile-off-opacity); }
 /* Add to result: the search field on top, as the search window's, on a tile's ground; each open result with its column's icon, its title and its project's name under it, the one the tasks are in ticked. */
 .tc-menu-ask { padding: var(--tc-space-8); display: flex; flex-direction: column; gap: var(--tc-space-8); }
 .tc-panel > * + .tc-menu-ask, .tc-menu-ask + .tc-menu-tiles, .tc-menu-ask + .tc-menu-group { border-top: var(--tc-band); }

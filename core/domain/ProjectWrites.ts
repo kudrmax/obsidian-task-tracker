@@ -137,6 +137,31 @@ export function moveProject(doc: TaskDocument, name: string, place: TreePlace): 
 	return moved === tree ? doc : doc.withProjectTree(moved);
 }
 
+/**
+ * The project has tasks of its own: a task (open or done, not a subtask, whose `🗂️` is its parent's) names it. Its
+ * subprojects' tasks don't count.
+ */
+export function hasOwnTasks(doc: TaskDocument, name: string): boolean {
+	const key = projectKey(name);
+	return doc.allTasks().some((entry) => entry.task.projects.some((p) => projectKey(p) === key));
+}
+
+/** The project of that name is a folder: nothing gives a task it. */
+export function isFolder(doc: TaskDocument, name: string | null): boolean {
+	return name !== null && (doc.projectTree().find(name)?.node.folder ?? false);
+}
+
+/**
+ * The project made a folder (`🗃️` on its tree line), only while it has no task of its own (`hasOwnTasks`), or a project
+ * again, always. A name the tree lacks, or the state it has: nothing.
+ */
+export function setProjectFolder(doc: TaskDocument, name: string, folder: boolean): TaskDocument {
+	if (folder && hasOwnTasks(doc, name)) return doc;
+	const tree = doc.projectTree().withMissing(taskProjects(doc));
+	const changed = tree.withFolder(name, folder);
+	return changed === tree ? doc : doc.withProjectTree(changed);
+}
+
 /** The note attached to the project by its link, or taken off with null; the note's file is never touched. */
 export function setProjectNote(doc: TaskDocument, name: string, note: string | null): TaskDocument {
 	const tree = doc.projectTree().withMissing(taskProjects(doc));

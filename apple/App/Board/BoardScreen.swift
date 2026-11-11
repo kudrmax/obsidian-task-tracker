@@ -90,7 +90,7 @@ struct BoardScreen: View {
                 model.route.floor = $0.minY
             })
             if let slot = plusSlot {
-                CarriedPlus(model: model, accent: Palette.accent(scheme)) { router.openTyping() }
+                CarriedPlus(model: model, accent: Palette.accent(scheme)) { if model.place != .projects || model.projects.plusTaps { router.openTyping() } }
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }

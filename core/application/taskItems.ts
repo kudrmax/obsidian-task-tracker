@@ -34,7 +34,7 @@ export interface ItemLevels {
 const NO_LEVELS: ItemLevels = { levelOf: () => null, labelsOf: () => [], projectsOf: () => [] };
 
 /** The levels and labels in the settings' order, a level only by a usable prefix, a label by a usable name. */
-export function itemLevels(levels: readonly PriorityLevel[], labels: readonly LabelLevel[], projectOf: (name: string) => ProjectRef = (name) => ({ name, path: [name], note: null, canOpenNote: false, mark: true })): ItemLevels {
+export function itemLevels(levels: readonly PriorityLevel[], labels: readonly LabelLevel[], projectOf: (name: string) => ProjectRef = (name) => ({ name, path: [name], note: null, canOpenNote: false, mark: true, folder: false })): ItemLevels {
 	return {
 		levelOf: (prefix) => levels.find((l) => l.prefix === prefix) ?? null,
 		labelsOf: (names) => labels.filter((l) => names.includes(l.name)),

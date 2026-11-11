@@ -196,7 +196,7 @@ private struct TreeRow: View {
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(row.selected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityValue(row.folded ? "Collapsed" : row.waiting ? "Waiting" : "")
+        .accessibilityValue(row.folded ? "Collapsed" : row.waiting ? "No open tasks" : "")
     }
 
     private var ink: Color {
@@ -319,6 +319,7 @@ struct ProjectTasks: View {
         if let menu = view?.menu {
             Menu {
                 Button(menu.renameLabel, systemImage: "pencil") { model.projects.asking = .rename(menu.project.name) }
+                FolderToggle(menu: menu, projects: model.projects)
                 if let note = menu.note {
                     Section(menu.noteLabel) {
                         Button(note.name, systemImage: "doc.text") { model.projects.openNote(note.link) }
@@ -347,6 +348,22 @@ struct ProjectTasks: View {
         } else {
             text
         }
+    }
+}
+
+/// Folder in the project menu, a stock switch next to Rename: on for a folder; while the core can't turn it on (the
+/// project has tasks of its own) it is drawn disabled with the core's reason under its label.
+private struct FolderToggle: View {
+    let menu: ProjectMenu
+    let projects: ProjectsBoard
+
+    var body: some View {
+        let name = menu.project.name
+        Toggle(isOn: Binding(get: { menu.folder.on }, set: { on in Task { await projects.setFolder(name, on) } })) {
+            Label(menu.folder.label, systemImage: "folder")
+            if let reason = menu.folder.reason { Text(reason) }
+        }
+        .disabled(menu.folder.disabled)
     }
 }
 
@@ -697,7 +714,8 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     /// the part under the finger (the last whose header or card stands above it), or over the first part above them all.
     func hover(at point: CGPoint, carrying payload: DragPayload?) {
         held = point
-        guard let model, let area, let line = target(at: point.y).line else { return model?.drag.hideLine() ?? () }
+        let aimed = target(at: point.y)
+        guard let model, let area, let line = aimed.line, newTask(in: aimed.part) != nil else { return model?.drag.hideLine() ?? () }
         model.drag.showLine(from: CGPoint(x: area.minX + CardMetrics.columnInset, y: line), to: area.maxX - CardMetrics.columnInset)
     }
 
@@ -722,14 +740,21 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         return (nil, firstTop.map { $0 - CardMetrics.gap / 2 } ?? area.map { $0.minY + 4 })
     }
 
+    /// What the plus let go in `part` writes, the core's: the part's own when one is aimed at, the list's only above them
+    /// all; nil where it writes nothing (a folder's tasks, Done), and then no line is shown either.
+    private func newTask(in part: ProjectsBoard.Part?) -> ProjectsNewTask? {
+        guard let part else { return model?.projects.view?.newTask }
+        return part.section.newTask
+    }
+
     /// The part let go in, as the line showed it; above them all, the node's own.
     func letGo(carrying payload: DragPayload?) -> CarryLanding? {
-        guard payload == nil, let projects = model?.projects, let view = projects.view else { return nil }
+        guard payload == nil, let projects = model?.projects, projects.view != nil else { return nil }
         let at = held
         let part = target(at: at?.y ?? 0).part
         held = nil
         model?.drag.hideLine()
-        guard let new = part?.section.newTask ?? view.newTask else { return nil }
+        guard let new = newTask(in: part) else { return nil }
         projects.asking = .task(new)
         return CarryLanding(rect: at.map { CGRect(x: $0.x - 4, y: $0.y - 4, width: 8, height: 8) } ?? .null, folds: true)
     }
