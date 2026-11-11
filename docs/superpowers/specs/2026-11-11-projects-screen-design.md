@@ -165,25 +165,16 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
     top-level project last and checks it (a taken name: that project). The row's value: «Дружба», «Дружба +1», «No
     project», or empty when the tasks differ. The quick entry's button stays one project: a rename writes it only when
     the button was touched, then the task's projects become that one.
-13. **The one move** runs on any action's write to a file that still awaits it, judged on the file as read before the
-    write: an old `🗂️ [[…]]` field or a `🎯` line anywhere (a `## Projects` written by hand stops nothing), or no
-    `## Projects` while a note that was a project or a task's project waits to go in it. It runs over what the write
-    made, whatever it is (a project made in the tree first included): the notes the host knows (the plugin's `Projects`
-    port by the old Project tag, the app's `context.projects`) by name, a project of that name in the tree getting the
-    note, then each name a task gives; only the lines with an old field or the mark are rewritten; the mark is the
-    settings' old `resultMark` (`🎯`), a priority after it read as the priority. The notes come after anything the write
-    itself put in the tree. A tidy-only write moves nothing. Undoing that write undoes the move; the next write makes it
-    again. A `🗂️ [[…]]` typed by hand later runs it again (its notes go only where the tree lacks them).
-19. **The wheel** (`WHEEL_PLACES`, `WheelPlace`, `WheelSpot`, `WheelAt`, `stepWheel`, `shownLists`, `placeOfList`) holds
-    Projects left of Inbox as a place of its own. `SCREEN_PLACES`, `ScreenSpot` and `stepScreen` stay the funnel's, so
-    the plugin of master and the app keep compiling and working until they move to the wheel's names; the stub pass
-    then folds them into one. `swipeLanding` is untouched. Done stands between Projects and Inbox: on to Inbox, back to
-    Projects.
-20. **A card held over a folded row** opens it by `unfoldProjectNode`, the choice kept. A tap reads the file first, so a
-    tap before any screen was read still folds the chosen node.
-21. **Grey rows**: `ProjectsRow.muted` for a waiting project, a done one, No project and Done; All and an active project
-    are not. **`projects()`** is the tree's projects for the quick entry's button (the entry still reads `projectNotes`
-    from a host that gives only that). **`toggleProject`** answers the tasks as they then stand, found by their ids.
+13. **The one move is a write of its own, as tidying is.** Whenever the core reads the file (the plugin's start, a change
+    from outside, every screen, the door's reads) and the file awaits the move (an old `🗂️ [[…]]` field or a `🎯` line
+    anywhere, a `## Projects` written by hand stopping nothing; or no `## Projects` while a note that was a project or a
+    task's project waits to go in it), the move is part of today's tidying: written at once, before any action, and no
+    step of undo (Max can't take the migration back by Cmd+Z). So every action, and every key the screen hands out, works
+    on the moved file. The move: the notes the host knows (the plugin's `Projects` port by the old Project tag, the app's
+    `context.projects`) by name, a project of that name already in the tree getting the note, then each name a task
+    gives; only the lines with an old field or the mark are rewritten; the mark is the settings' old `resultMark` (`🎯`),
+    a priority after it read as the priority. A `🗂️ [[…]]` typed by hand later is moved at the next read the same way
+    (its notes go only where the tree lacks them).
 14. **Every action's write puts the tasks' projects in the tree**, one the tree lacks last at its top.
 15. **The next step** is any folded task's with an open subtask, on its card and its timeline block (the block now only
     while folded, as the card); `semibold` is always false.

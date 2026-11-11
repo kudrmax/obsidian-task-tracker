@@ -171,10 +171,10 @@ order of lines the manual order, `[[note]]` after a name only when a note is att
 one `🗂️ Name` field each, right after its title (before its labels and other fields); a name runs to the next field's
 mark. A subtask's projects are its parent's. The old `🗂️ [[Note]]` reads as `Note`. A project a task names that the tree
 lacks shows at the tree's end and is written into it on the next write. Every write keeps the fields, and no title holds
-them. The move to projects runs on any write to a file that still awaits it (an old `🗂️ [[…]]` field or a `🎯` line
-anywhere, or no `## Projects` while there is something to put in it), whatever the write is: the notes of
-`context.projects` become projects with their notes attached (a project of that name gets the note), the old fields are
-written plain, `🎯` goes off the lines.
+them. The move to projects is part of tidying: any read of a file that still awaits it (an old `🗂️ [[…]]` field or a
+`🎯` line anywhere, or no `## Projects` while there is something to put in it) answers the moved text in `tasks`, with no
+`step`, before any action: the notes of `context.projects` become projects with their notes attached (a project of that
+name gets the note), the old fields are written plain, `🎯` goes off the lines.
 
 - `TaskItem.project` (the first, or `null`) and `TaskItem.projects`: `ProjectRef` `{ name, link, path, note,
   canOpenNote, mark }`; `name` is what every call takes (`link` is the name again, a stub), `path` the names from the top
