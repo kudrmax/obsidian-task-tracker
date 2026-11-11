@@ -1008,7 +1008,7 @@ export class CalendarScreen extends Component {
 	private async dropOnTree(drag: TaskDragPayload, node: string): Promise<null> {
 		this.bulk.dropping(drag);
 		const keys = droppedTasks(drag).map((task) => task.key);
-		await this.act(() => this.deps.tasks.dropOnProject(keys, this.projectsFrom.get(drag.item.id) ?? null, node));
+		await this.act(() => this.deps.tasks.dropOnProject(keys.map((key) => ({ key, from: this.projectsFrom.get(drag.item.id) ?? null })), node));
 		await this.projects?.refresh();
 		return null;
 	}

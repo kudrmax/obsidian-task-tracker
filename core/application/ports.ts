@@ -53,6 +53,11 @@ export interface GoogleLogin {
  */
 export interface Projects {
 	list(): readonly ProjectNote[];
+	/**
+	 * The host has read every note's tags (Obsidian: its metadata cache resolved): `list` is complete. The move waits for
+	 * it, since a note missing then would never be attached. Left out: complete at once.
+	 */
+	ready?(): boolean;
 	/** Fires when a project note comes, goes, is renamed or loses its tag. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
 }

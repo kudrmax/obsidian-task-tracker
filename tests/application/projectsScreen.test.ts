@@ -202,7 +202,7 @@ describe("the writes", () => {
 		const { svc, store } = setup();
 		await svc.selectProjectNode("project:Дружба");
 		const card = (await svc.projectsScreen()).sections[0].cards.find((c) => c.item.title === "Найти мероприятия для друзей")!;
-		await svc.dropOnProject([card.item.key], card.from, "project:Small talk");
+		await svc.dropOnProject([card.drop], "project:Small talk");
 		expect(store.text).toContain("## Soon\n\n- [ ] Брейншторм плана с Клодом 🗂️ Окружение в Сербии\n- [ ] Найти мероприятия для друзей 🗂️ Где знакомиться 🗂️ Small talk\n");
 	});
 
@@ -210,7 +210,7 @@ describe("the writes", () => {
 		const { svc, store } = setup();
 		const view = await svc.projectsScreen();
 		const card = view.sections.find((s) => s.title === "Где знакомиться")!.cards[0];
-		await svc.dropOnProject([card.item.key], card.from, "none");
+		await svc.dropOnProject([card.drop], "none");
 		expect(store.text).toContain("- [ ] Найти мероприятия для друзей 🗂️ Дружба\n");
 	});
 
@@ -333,11 +333,11 @@ describe("the one move to projects, whatever the first write is", () => {
 		expect(store.text).toBe(["## Inbox", "", "- [ ] Позвонить 🗂️ Дружба", "- [ ] iPhone", "\t- [ ] План", "", "## Projects", "", "- Дружба [[Дружба]]", "- Спорт [[Спорт]]", "- Новый", "", "## Now", "", "## Soon", "", "## Backlog", "", "## Done", ""].join("\n"));
 	});
 
-	it("is not stopped by a ## Projects written by hand: old fields and 🎯 lines are moved on the next write", async () => {
+	it("is not stopped by a ## Projects written by hand: old fields and 🎯 lines are moved, only the notes the old fields name attached", async () => {
 		const { store, svc } = service(OLD.replace("## Now", "## Projects\n\n- Дружба\n\n## Now"));
 		await svc.setStatus((await svc.screen(T)).inbox[0].key, "inProgress");
 		expect(store.text).toContain("- [/] Позвонить 🗂️ Дружба\n- [ ] iPhone\n");
-		expect(store.text).toContain("## Projects\n\n- Дружба [[Дружба]]\n- Спорт [[Спорт]]\n\n## Now");
+		expect(store.text).toContain("## Projects\n\n- Дружба [[Дружба]]\n\n## Now");
 	});
 
 	it("leaves a moved file's plain lines as they are", async () => {

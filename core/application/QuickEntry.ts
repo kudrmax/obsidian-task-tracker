@@ -52,8 +52,6 @@ export interface ListEntry {
 	readonly place: GapPlace;
 	readonly pending: readonly PendingText[];
 	readonly section: boolean;
-	/** The section named for the task being typed, drawn as its header above the field: a section in a project's part is born with its first task. */
-	readonly newSection: string | null;
 	readonly at: EntryAt;
 }
 
@@ -151,11 +149,6 @@ export interface EntryState {
 	readonly canOutdent: boolean;
 	/** The field writes a section's name; null where it cannot (a rename, a slot, a stack, a column without sections). */
 	readonly section: boolean | null;
-	/**
-	 * The section the task being typed goes into, named first in a project's part (where an empty section is not made):
-	 * its header stands over the field; Escape or an empty Enter drops both.
-	 */
-	readonly newSection: string | null;
 	/** The priority and labels the task is written with, and what may still be chosen: the service's answer for the field. A section's name has no tint. */
 	readonly marks: DraftMarks;
 	/** The flag shows: there is a level or a label to choose, and the field writes a task, not a section's name. */
@@ -261,8 +254,6 @@ export interface EntryField {
 	readonly project?: string | null;
 	/** The field writes a section's name (empty sections spec §4). */
 	readonly section: boolean;
-	/** The section named in a project's part, which the task being typed is written into. */
-	readonly newSection?: string;
 }
 
 /**
@@ -270,7 +261,7 @@ export interface EntryField {
  * which call of the task service it is. `landing`, of a task written in a list: the column its card lands in.
  */
 export type EntryJob =
-	| { readonly id: string; readonly kind: "create"; readonly run: string; readonly line: EntryLine; readonly newSection?: string; landing?: DropColumn | null; shown?: boolean }
+	| { readonly id: string; readonly kind: "create"; readonly run: string; readonly line: EntryLine; landing?: DropColumn | null; shown?: boolean }
 	| { readonly id: string; readonly kind: "rename"; readonly home: string; readonly item: TaskItem; readonly draft: TaskDraft }
 	| { readonly id: string; readonly kind: "section"; readonly run: string; readonly name: string; readonly column: DropColumn; readonly place: GapPlace }
 	/** The tasks `key` is folded away under show their subtasks, so the field typing its subtask stands in the list. */
@@ -344,7 +335,6 @@ export class QuickEntry {
 			indents: task && listSpot(run.spot) !== null,
 			...this.mayShift(field),
 			section: this.maySection(field) ? field.section : null,
-			newSection: field.newSection ?? null,
 			marks,
 			markable: task && marks.tiles.levels.length + marks.tiles.labels.length > 0,
 			place,
@@ -390,7 +380,7 @@ export class QuickEntry {
 		const list = state && listSpot(state.spot);
 		if (!state || !list || list.column !== column) return null;
 		const section = state.section === true;
-		return { place: list.place, pending: state.pending, section, newSection: state.newSection, at: entryAt(drawing, list.place, section || state.newSection !== null) };
+		return { place: list.place, pending: state.pending, section, at: entryAt(drawing, list.place, section) };
 	}
 
 	/** Where `task`'s full screen draws the field: none unless it stands in the stack of `task` or one of its subtasks. */
@@ -822,17 +812,16 @@ export class QuickEntry {
 		this.reset(null);
 	}
 
-	/** As in Obsidian: a level shallower, and the end of the entry where it can go no shallower; a section named for a task not typed goes with it. */
+	/** As in Obsidian: a level shallower, and the end of the entry where it can go no shallower. */
 	private enterBlank(): void {
-		if (this.session.field?.newSection !== undefined) this.reset(null);
-		else if (this.shifted(-1)) this.indent(-1);
+		if (this.shifted(-1)) this.indent(-1);
 		else this.reset(null);
 	}
 
 	/** The task goes to the queue; the next field opens at once, without a priority, labels or a repeat. A slot takes one task only. */
 	private enterTask(field: EntryField): void {
 		this.create(field);
-		const ends = this.run(field.run).spot.kind === "slot" || field.newSection !== undefined;
+		const ends = this.run(field.run).spot.kind === "slot";
 		this.reset(ends ? null : { ...field, text: "", priority: null, labels: [], repeat: null });
 	}
 
@@ -882,7 +871,7 @@ export class QuickEntry {
 		const run = this.run(field.run);
 		const line: EntryLine = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0, project: field.project ?? null };
 		run.pending.push(line);
-		this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line, ...(field.newSection !== undefined && { newSection: field.newSection }) });
+		this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line });
 	}
 
 	/** A job for `run`, which keeps following the cards that land until the job is done. */

@@ -122,14 +122,9 @@ export class TaskReads {
 		private readonly source: ProjectSource = NO_PROJECT_SOURCE,
 	) {}
 
-	/** The projects of the tree read last, in its order: what the Project page offers. */
-	projectNotes(): readonly ProjectRef[] {
-		return new ProjectIndex(this.source.tree()).known();
-	}
-
-	/** The projects of the tree read last, in its order: the quick entry's Project button. */
+	/** The projects of the tree read last, in its order: the Project page and the quick entry's Project button. */
 	projects(): readonly ProjectRef[] {
-		return this.projectNotes();
+		return new ProjectIndex(this.source.tree()).known();
 	}
 
 	/** The Projects screen as this device shows it; without a file, the tree's fixed rows alone. */
@@ -291,8 +286,10 @@ export class TaskReads {
 			const descriptionText = markdown === null ? "" : plainDescription(markdown);
 			const description = descriptionText === "" ? null : fuzzy.matchWords(descriptionText);
 			const found = item(entry);
-			const projectText = entry.path.length > 0 ? "" : (found.project?.name ?? "");
-			const project = projectText === "" ? null : fuzzy.matchWords(projectText);
+			const named = entry.path.length > 0 ? [] : found.projects.map((p) => ({ text: p.name, match: fuzzy.matchWords(p.name) }));
+			const hitProject = named.find((p) => p.match !== null) ?? null;
+			const projectText = hitProject?.text ?? "";
+			const project = hitProject?.match ?? null;
 			if (title || description || project) {
 				const hit: SearchHit = {
 					item: { ...found, card: ownCard(found) },

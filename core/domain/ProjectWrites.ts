@@ -1,5 +1,5 @@
 import { priorityOfText } from "./Priority";
-import { projectKey, uniqueNames } from "./Project";
+import { projectKey, projectName, uniqueNames } from "./Project";
 import { type ProjectTree, type TreePlace } from "./ProjectTree";
 import { flatten, type TaskDocument, type TaskEntry } from "./TaskDocument";
 
@@ -29,6 +29,19 @@ export function withTasksInTree(doc: TaskDocument): TaskDocument {
 	return doc.hasProjectTree() && full === tree ? doc : doc.withProjectTree(full);
 }
 
+/**
+ * The notes a file that has its tree already still takes: those an old field being moved names, none whose link a tree
+ * line holds already (a project renamed since keeps its note, and no duplicate comes back).
+ */
+function notesOfOldFields(doc: TaskDocument, notes: readonly LegacyProjectNote[], resultMark: string): readonly LegacyProjectNote[] {
+	const named = new Set(oldLines(doc, resultMark).flatMap((entry) => [...entry.raw.matchAll(OLD_LINK_RE)].map((m) => projectKey(projectName(m[1])))));
+	const linked = new Set(doc.projectTree().all().flatMap((p) => (p.node.note === null ? [] : [projectKey(projectName(p.node.note.split("|")[0].split("#")[0]))])));
+	return notes.filter((note) => named.has(projectKey(note.name)) && !linked.has(projectKey(projectName(note.link))));
+}
+
+/** An old field's link on a line. */
+const OLD_LINK_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[([^[\]|#]+)/gu;
+
 /** A task line still in the old format: a `🗂️ [[Note]]` field. */
 const OLD_FIELD_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[/u;
 
@@ -54,7 +67,8 @@ export function awaitsMove(doc: TaskDocument, notes: readonly LegacyProjectNote[
  * result mark loses it. Run on a file that `awaitsMove` (looked at before the write that brings it), whatever else that
  * write did: a project it made in the tree stops nothing. Lines already plain are left as they are.
  */
-export function movedToProjects(doc: TaskDocument, notes: readonly LegacyProjectNote[], resultMark: string = LEGACY_RESULT_MARK): TaskDocument {
+export function movedToProjects(doc: TaskDocument, given: readonly LegacyProjectNote[], resultMark: string = LEGACY_RESULT_MARK): TaskDocument {
+	const notes = doc.hasProjectTree() ? notesOfOldFields(doc, given, resultMark) : given;
 	const byName = [...notes].sort((a, b) => (projectKey(a.name) < projectKey(b.name) ? -1 : projectKey(a.name) > projectKey(b.name) ? 1 : 0));
 	let tree: ProjectTree = doc.projectTree();
 	for (const note of byName) {

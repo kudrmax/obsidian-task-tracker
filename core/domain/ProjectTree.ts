@@ -17,11 +17,17 @@ export interface TreePlace {
 	readonly before: string | null;
 }
 
-/** The section as the file has it: the heading's line, where the section ends, the lines of its list, and its indent. */
+/**
+ * The sections as the file has them: the first heading's line and where its section ends, the lines of the list in every
+ * `## Projects` (Sync may merge two), those of the first alone (`own`), the other sections (`extra`: a heading, where its
+ * section ends, and whether it holds nothing but the list and blank lines), and the list's indent.
+ */
 export interface TreeSpan {
 	readonly heading: number | null;
 	readonly end: number;
 	readonly items: readonly number[];
+	readonly own: readonly number[];
+	readonly extra: readonly { readonly heading: number; readonly end: number; readonly bare: boolean }[];
 	readonly unit: string;
 }
 
@@ -38,13 +44,23 @@ function widthOf(indent: string): number {
 
 /** The section of the projects in `lines`: none when the file has no `## Projects`. */
 export function treeSpan(lines: readonly string[]): TreeSpan {
-	const heading = lines.findIndex((line) => HEADING_RE.exec(line)?.[1] === PROJECTS_HEADING);
-	if (heading < 0) return { heading: null, end: lines.length, items: [], unit: DEFAULT_UNIT };
-	let end = heading + 1;
-	while (end < lines.length && !LIST_END_RE.test(lines[end])) end++;
-	const items: number[] = [];
-	for (let i = heading + 1; i < end; i++) if (ITEM_RE.test(lines[i]) && !isTaskLine(lines[i])) items.push(i);
-	return { heading, end, items, unit: unitOf(items.map((i) => ITEM_RE.exec(lines[i])![1])) };
+	const sections: { heading: number; end: number; items: number[]; bare: boolean }[] = [];
+	lines.forEach((line, heading) => {
+		if (HEADING_RE.exec(line)?.[1] !== PROJECTS_HEADING) return;
+		let end = heading + 1;
+		while (end < lines.length && !LIST_END_RE.test(lines[end])) end++;
+		const items: number[] = [];
+		let bare = true;
+		for (let i = heading + 1; i < end; i++) {
+			if (ITEM_RE.test(lines[i]) && !isTaskLine(lines[i])) items.push(i);
+			else if (lines[i].trim() !== "") bare = false;
+		}
+		sections.push({ heading, end, items, bare });
+	});
+	if (sections.length === 0) return { heading: null, end: lines.length, items: [], own: [], extra: [], unit: DEFAULT_UNIT };
+	const [first, ...extra] = sections;
+	const items = sections.flatMap((s) => s.items);
+	return { heading: first.heading, end: first.end, items, own: first.items, extra: extra.map(({ heading, end, bare }) => ({ heading, end, bare })), unit: unitOf(items.map((i) => ITEM_RE.exec(lines[i])![1])) };
 }
 
 /** The indent the list steps by: its first deeper line's step over the line above it, else a tab. */

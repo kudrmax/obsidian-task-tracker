@@ -281,19 +281,26 @@ export class TaskDocument {
 	 */
 	withProjectTree(tree: ProjectTree): TaskDocument {
 		const span = treeSpan(this.lines);
-		if (span.heading !== null && tree.same(readTree(this.lines))) return this;
+		if (span.heading !== null && span.extra.length === 0 && tree.same(readTree(this.lines))) return this;
 		const mint = this.mint();
 		const lines = mint.rows(treeLines(tree, span.unit));
 		if (span.heading === null) return this.withRows(this.newTreeRows(lines, mint), mint);
-		const rows = this.rows.filter((_, i) => !span.items.includes(i));
-		let at = span.items.length > 0 ? span.items[0] : span.heading + 1;
-		if (span.items.length === 0) {
+		const gone = new Set(span.items);
+		for (const extra of span.extra) {
+			if (!extra.bare) continue;
+			for (let i = extra.heading; i < extra.end; i++) gone.add(i);
+		}
+		const kept = this.rows.map((row, i) => ({ row, i })).filter(({ i }) => !gone.has(i));
+		const rows = kept.map(({ row }) => row);
+		const firstOwn = span.own.length > 0 ? kept.findIndex(({ i }) => i > span.own[0]) : -1;
+		let at = span.own.length > 0 ? (firstOwn < 0 ? rows.length : firstOwn) : kept.findIndex(({ i }) => i === span.heading) + 1;
+		if (span.own.length === 0) {
 			if (at < rows.length && rows[at].line.trim() === "") at++;
 			else rows.splice(at++, 0, ...mint.rows([""]));
 		}
 		rows.splice(at, 0, ...lines);
 		const after = at + lines.length;
-		if (span.items.length === 0 && after < rows.length && rows[after].line.trim() !== "") rows.splice(after, 0, ...mint.rows([""]));
+		if (span.own.length === 0 && after < rows.length && rows[after].line.trim() !== "") rows.splice(after, 0, ...mint.rows([""]));
 		return this.withRows(rows, mint);
 	}
 

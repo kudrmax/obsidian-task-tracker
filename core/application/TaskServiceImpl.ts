@@ -24,6 +24,7 @@ import {
 	type GroupPlace,
 	type ListSection,
 	type ProjectRef,
+	type ProjectsDrop,
 	type ProjectsMode,
 	type ProjectsNodeId,
 	type ProjectsScreenState,
@@ -47,7 +48,8 @@ import {
 import type { SectionOffer } from "./sections";
 import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type ProjectsScreenStore, type SettingsStore, type TaskFileStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
-import { renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { projectOfNode, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { cleanProjectName } from "../domain/Project";
 import { ProjectTree, type TreePlace } from "../domain/ProjectTree";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
@@ -92,7 +94,7 @@ export class TaskServiceImpl implements TaskService {
 		private readonly projectsScreenStore: ProjectsScreenStore = memoryProjectsScreen(),
 		identity: TaskIdentity = new TaskIdentity(),
 	) {
-		this.rules = new TaskRules(settings, clock, identity, true, () => legacyProjects.list());
+		this.rules = new TaskRules(settings, clock, identity, true, { list: () => legacyProjects.list(), ready: () => legacyProjects.ready?.() ?? true });
 		this.reads = new TaskReads(this.rules, settings, clock, { tree: () => this.lastTree(), screen: () => projectsScreenStore.get() });
 		this.writes = new TaskWrites(this.rules, this.reads);
 	}
@@ -134,7 +136,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	projects(): readonly ProjectRef[] {
-		return this.reads.projectNotes();
+		return this.reads.projects();
 	}
 
 	async unfoldProjectNode(node: ProjectsNodeId): Promise<void> {
@@ -175,7 +177,7 @@ export class TaskServiceImpl implements TaskService {
 
 	async renameProject(from: string, to: string): Promise<boolean> {
 		const renamed = await this.run(this.writes.renameProject(from, to));
-		if (renamed) this.keepScreen(renamedIn(this.projectsScreenStore.get(), from, to.trim()));
+		if (renamed) this.keepScreen(renamedIn(this.projectsScreenStore.get(), from, cleanProjectName(to)!));
 		return renamed;
 	}
 
@@ -183,10 +185,14 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.setProjectNote(name, link));
 	}
 
-	dropOnProject(keys: readonly TaskKey[], from: string | null, to: ProjectsNodeId): Promise<void> {
-		const target = to === "none" ? null : to.startsWith("project:") ? to.slice("project:".length) : undefined;
-		if (target === undefined) return Promise.resolve();
-		return this.run(this.writes.dropOnProject(keys, from, target));
+	dropOnProject(cards: readonly ProjectsDrop[], to: ProjectsNodeId): Promise<void> {
+		const target = to === "none" ? null : projectOfNode(to);
+		if (target === null && to !== "none") return Promise.resolve();
+		return this.run(this.writes.dropOnProject(cards, target));
+	}
+
+	isBlankProjectName(name: string): boolean {
+		return cleanProjectName(name) === null;
 	}
 
 	/** The device's Projects screen changed: the screens draw again. */

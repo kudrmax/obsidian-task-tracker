@@ -89,6 +89,7 @@ export function projectName(link: string): string {
 export function cleanProjectName(typed: string): string | null {
 	const name = typed
 		.replace(/\u{1F5C2}\u{FE0F}?/gu, " ")
+		.replace(/(^|\s)(?:📅|⏰|🚨|📌|🔕|🔁|📁)(?=\s|$)/gu, "$1")
 		.replace(/[[\]]/g, "")
 		.replace(/(^|\s)#(?=\S)/g, "$1")
 		.replace(/\s+/g, " ")
@@ -107,8 +108,8 @@ export function namesProject(names: readonly string[], name: string): boolean {
 	return names.some((n) => projectKey(n) === key);
 }
 
-/** A task of project `name` (null: of none) belongs to `zone`: the same project by name, or both none. */
+/** The same project, or both none: names compared case and composition aside. */
 export function inProject(name: string | null, zone: string | null): boolean {
 	if (name === null || zone === null) return name === zone;
-	return projectKey(projectName(name)) === projectKey(projectName(zone));
+	return projectKey(name) === projectKey(zone);
 }

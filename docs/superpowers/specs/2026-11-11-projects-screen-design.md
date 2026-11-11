@@ -173,11 +173,15 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
     on the moved file. The move: the notes the host knows (the plugin's `Projects` port by the old Project tag, the app's
     `context.projects`) by name, a project of that name already in the tree getting the note, then each name a task
     gives; only the lines with an old field or the mark are rewritten; the mark is the settings' old `resultMark` (`🎯`),
-    a priority after it read as the priority. A `🗂️ [[…]]` typed by hand later is moved at the next read the same way
-    (its notes go only where the tree lacks them).
+    a priority after it read as the priority. The move waits until the host's notes are complete (the `Projects` port's
+    `ready()`: the plugin's metadata cache resolved; the door takes `context.projects` as complete), since a note missing
+    then would never be attached. To a file with a tree already (old fields written later: by hand, or the app of 0.4.189)
+    it attaches only the notes an old field names, never a note a tree line holds already, so a renamed project gets no
+    empty twin. Every `## Projects` of the file (Sync may merge two) reads as one tree, the first name winning, and is
+    written back as one under the first heading.
 14. **Every action's write puts the tasks' projects in the tree**, one the tree lacks last at its top.
 15. **The next step** is any folded task's with an open subtask, on its card and its timeline block (the block now only
-    while folded, as the card); `semibold` is always false.
+    while folded, as the card); `TaskCard.semibold` went with results.
 16. **Search** gives each hit `projectPath`, its first project's path in the tree.
 17. **The note.** The menu's `note` names the attached note by its link's last part; the app opens it with
     `projects.noteUrl(link, vault)` (`obsidian://open?vault=…&file=…`, an alias or heading left out). Attaching is the
@@ -198,6 +202,13 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
     app's menus stay asked over the settings alone. Left out, the plugin's service takes the tree of the file it read
     last and the door the tree of `tasks` when handed in.
 
+53. **Review round (core).** A task of two parts is two cards: `ProjectsCard.id` is unique per drawn card and
+    `ProjectsCard.drop` (`{ key, from }`) is what `dropOnProject(cards, to)` takes, so a drop replaces the project of the
+    very card let go. `canDrop` is false for a closed task (under Done). The hover delay over a folded row is
+    `PROJECTS_HOVER_MS` (600: the core had no hold delay of the day arrows to reuse), a sideways step `PROJECTS_INDENT`
+    (12), and `projectsDrop(rows, gap, shift, lifted?)` keeps a lifted project's own depth until the finger shifts a step.
+    A typed name loses the field marks standing as words; `isBlankProjectName` is the Create button's rule. Search finds
+    a task by any of its projects.
 
 ### Obsidian frontend
 

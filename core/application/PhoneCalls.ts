@@ -55,8 +55,9 @@ import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
 import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
+import { cleanProjectName } from "../domain/Project";
 import { ProjectTree } from "../domain/ProjectTree";
-import { projectNodeOf, projectOfNode, projectsGap, projectsLevels, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -231,7 +232,7 @@ class Call {
 		};
 		this.store = store;
 		this.identity = new TaskIdentity(context.ids);
-		this.rules = new TaskRules(store, clock, this.identity, context.ids !== undefined, () => context.projects ?? []);
+		this.rules = new TaskRules(store, clock, this.identity, context.ids !== undefined, { list: () => context.projects ?? [], ready: () => true });
 		this.reads = new TaskReads(this.rules, store, clock, { tree: () => this.tree(), screen: () => this.projectsScreen });
 		this.writes = new TaskWrites(this.rules, this.reads);
 		this.text = context.tasks ?? null;
@@ -425,15 +426,16 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	moveProject: (c, [name, place]) => c.run(c.writes.moveProject(name as string, place as A)),
 	renameProject: (c, [from, to]) => {
 		const renamed = c.run(c.writes.renameProject(from as string, to as string));
-		if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from as string, (to as string).trim()));
+		if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from as string, cleanProjectName(to as string)!));
 		return renamed;
 	},
 	setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name as string, (link ?? null) as string | null)),
-	dropOnProject: (c, [keys, from, to]) => {
+	dropOnProject: (c, [cards, to]) => {
 		const target = to === "none" ? null : projectOfNode(to as string);
 		if (target === null && to !== "none") return null;
-		return c.run(c.writes.dropOnProject(keys as A, (from ?? null) as string | null, target));
+		return c.run(c.writes.dropOnProject(cards as A, target));
 	},
+	isBlankProjectName: (_c, [name]) => cleanProjectName(name as string) === null,
 	setReminder: (c, [key, reminder]) => c.run(c.writes.setReminder(key as A, reminder as A)),
 	togglePriority: (c, [keys, prefix]) => c.run(c.ask(c.writes.togglePriority(keys as A, prefix as string))),
 	toggleLabel: (c, [keys, name]) => c.run(c.ask(c.writes.toggleLabel(keys as A, name as string))),
@@ -706,7 +708,7 @@ const CAPTURE: Readonly<Record<string, Handler>> = {
 		c.write((text) => c.rules.change(text, c.rules.placeNew(title, null, { kind: "list", list: list as GroupedList, group: null, before: null }, null, [], (project ?? null) as string | null)).text);
 	},
 	/** The New Task sheet's Project row for the project chosen (null: none; at the start, the view's `ScreenView.project`): the quick entry's Project button, its page and whether it is lit. */
-	project: (c, [chosen]) => entryProject((chosen ?? null) as string | null, c.reads.projectNotes()),
+	project: (c, [chosen]) => entryProject((chosen ?? null) as string | null, c.reads.projects()),
 	lists: (c) => CAPTURE_LISTS.map((list) => ({ list, name: c.settings.sections[list] })),
 };
 
@@ -755,6 +757,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
 	projectsGap: (rows, gap, depth, lifted) => projectsGap(rows, gap, depth, lifted ?? null),
 	projectsLevels: (rows, gap, lifted) => projectsLevels(rows, gap, lifted ?? null),
+	projectsDrop: (rows, gap, shift, lifted) => projectsDrop(rows, gap, shift, lifted ?? null),
 	projectNodeOf,
 	shadesOf,
 	inkOf,
@@ -800,7 +803,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+const CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {

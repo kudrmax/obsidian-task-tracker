@@ -50,7 +50,7 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 | `calendars` | `{ google?, iphone?, work? }`: each calendar file's text, `null` or left out for none (`calendarFiles` says where they are) |
 | `fetched` | the calendar sources the host fetches itself (a status names no device for them); `["google"]` when left out |
 | `history` | the undo steps as the last answer gave them; left out before the first |
-| `projects` | the notes that had the project tag, `ProjectNote` `{ name, path, link }`, as `rules.projectNotes` answers them over the vault's notes: read only by the one move to projects (the first write to a file without `## Projects` makes each of them a project with its note attached). Left out: none |
+| `projects` | the notes that had the project tag, `ProjectNote` `{ name, path, link }`, as `rules.projectNotes` answers them over the vault's notes: read only by the one move to projects (at the first read of a file without `## Projects`, and whenever old `🗂️ [[…]]` fields appear: see «Projects»). The door takes them as complete. Left out: none |
 | `projectsScreen` | `ProjectsScreenState`, what this device keeps of the Projects screen (the node chosen, the segment, the folded branches), as the last answer gave it; left out: All chosen, By project, nothing folded |
 | `ids` | `TaskIdState`, who the tasks and sections are, as the last answer gave it; left out before the first (every task and section then gets a new id) |
 
@@ -166,8 +166,11 @@ mark. A subtask's projects are its parent's. The old `🗂️ [[Note]]` reads as
 lacks shows at the tree's end and is written into it on the next write. Every write keeps the fields, and no title holds
 them. The move to projects is part of tidying: any read of a file that still awaits it (an old `🗂️ [[…]]` field or a
 `🎯` line anywhere, or no `## Projects` while there is something to put in it) answers the moved text in `tasks`, with no
-`step`, before any action: the notes of `context.projects` become projects with their notes attached (a project of that
-name gets the note), the old fields are written plain, `🎯` goes off the lines.
+`step`, before any action: the old fields are written plain, `🎯` goes off the lines, and the notes of `context.projects`
+are attached: all of them, as top-level projects (a project of that name gets the note), to a file without a tree; to a
+file with one, only those an old field names, never a note a tree line holds already. In the plugin the move waits until
+the `Projects` port says its notes are complete (`ready()`). Every `## Projects` of the file (Sync may merge two) reads
+as one tree, the first name winning, and is written back as one under the first heading.
 
 - `TaskItem.project` (the first, or `null`) and `TaskItem.projects`: `ProjectRef` `{ name, path, note,
   canOpenNote, mark }`; `name` is what every call takes, `path` the names from the top
@@ -182,7 +185,9 @@ name gets the note), the old fields are written plain, `🎯` goes off the lines
   branch with no task yet; `waiting` draws the name grey), `done` (every task of its branch closed, every subproject
   done). `sections`: the chosen node's tasks, `ProjectsSection` `{ key, title, path, depth, cards, newTask }`; By
   project the node's own first (`title` null), then each subproject's at any depth; By stage Today, Soon, Inbox,
-  Backlog (Done for a done node). Each `ProjectsCard` `{ item, stage, over, from, menuFrom, canDrop }`: `stage` (By
+  Backlog (Done for a done node). Each `ProjectsCard` `{ id, item, stage, over, from, drop, menuFrom, canDrop }`: `id`
+  unique per drawn card (a task of two parts is two cards: key a card by it, never by `item.id`), `drop` what
+  `tasks.dropOnProject` takes for that very card, `canDrop` an open task (a closed one under Done stays); `stage` (By
   project) `{ kind: "today" | "soon" | "inbox" | "backlog" | "done" }` or `{ kind: "date", date, label }`; `over` (By
   stage) the subproject the card stands in; `from` the project it is shown under; `menuFrom` what `tasks.menu` takes.
   `menu`: `ProjectMenu` `{ project, renameLabel, noteLabel, note, attachLabel, detachLabel }` for a project, `null` for
@@ -196,12 +201,18 @@ name gets the note), the old fields are written plain, `🎯` goes off the lines
   The place comes from `rules.projectsGap(rows, gap, depth, lifted?)` → `{ place, depth }` (`gap` before row `gap`, the
   depth from the finger's shift, kept within `rules.projectsLevels(rows, gap, lifted?)` → `{ min, max }`).
   `rules.projectsGap(view.rows, 4, 2)` → `{ place: { parent: "Где знакомиться", before: null }, depth: 2 }`.
+  `rules.projectsDrop(rows, gap, shift, lifted?)` takes the finger's sideways way `shift` (px or pt) since the lift: a
+  step per `PROJECTS_INDENT` (12) from the lifted project's own depth (the plus: the row above the gap's), so a lifted
+  project keeps its depth until the finger shifts. A held card waits `PROJECTS_HOVER_MS` (600) over a folded row
+  (`unfoldsOnHover`) before `tasks.unfoldProjectNode`. Both constants are in `rules.constants`.
+  `tasks.isBlankProjectName(name)`: the Create button of New project… is off for it (`createProject` writes nothing then).
 - `tasks.renameProject(from, to)`: the tree's line and every task's field; `false` for a blank name or another
   project's. `tasks.setProjectNote(name, link | null)`: attach or detach a note (the app only detaches: it can't list
   notes). `projects.noteUrl(link, vault)` → `"obsidian://open?vault=…&file=…"`, what a tap on the attached note opens.
-- `tasks.dropOnProject(keys, card.from, row.node)`: a card let go on a row (`acceptsTask`): `from` gives way to the
-  row's project (No project: taken off), the others and the place in the funnel stay. `tasks.dropOnProject([key],
-  "Где знакомиться", "project:Small talk")` turns `🗂️ Где знакомиться 🗂️ Дружба` into `🗂️ Дружба 🗂️ Small talk`.
+- `tasks.dropOnProject(cards, row.node)`, each card's `drop` (`ProjectsDrop` `{ key, from }`): cards let go on a row
+  (`acceptsTask`): each card's `from` gives way to the row's project (No project: taken off), the others and the place in
+  the funnel stay. `tasks.dropOnProject([{ key, from: "Где знакомиться" }], "project:Small talk")` turns `🗂️ Где
+  знакомиться 🗂️ Дружба` into `🗂️ Дружба 🗂️ Small talk`.
 - The plus let go on the tasks writes `tasks.createInPlace(text, priority, newTask.place, null, [], newTask.project)`
   with the section's `newTask` (By project: Inbox with that subproject; By stage: that stage's list with the node's
   project), or the view's `newTask` outside any section.
@@ -217,7 +228,7 @@ name gets the note), the old fields are written plain, `🎯` goes off the lines
   the tree of `tasks` when it is handed in (none without), the plugin of the file it read last.
 - `tasks.setProject(keys, name | null)`: the tasks' projects become that one alone. `tasks.projects()`: the tree's
   projects in its order (the quick entry's Project button and `capture.project`).
-- `tasks.search(query)`: each `SearchHit` carries `projectPath`, the task's first project's path, `null` for none.
+- `tasks.search(query)`: finds a task by any of its projects' names; each `SearchHit` carries `projectPath`, the task's first project's path, `null` for none.
 - `tasks.fullTree(item).project`: the task's first project; a tap opens the Projects screen on it
   (`tasks.selectProjectNode(rules.projectNodeOf(name))`).
 

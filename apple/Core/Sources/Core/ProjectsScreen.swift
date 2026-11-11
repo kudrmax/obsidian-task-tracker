@@ -201,7 +201,7 @@ extension TaskBoard {
 
     /// Cards let go on a row: `from` gives way to the row's project (No project: taken off); the place in the funnel stays.
     public func dropOnProject(_ keys: [TaskKey], from: String?, to node: String) throws {
-        try write("tasks.dropOnProject", [.array(keys.map(\.json)), from.json, .string(node)])
+        try write("tasks.dropOnProject", [.array(keys.map { .object(["key": $0.json, "from": from.json]) }), .string(node)])
     }
 
     /// Where a project lifted (or the plus) let go at `gap`, at `depth`, lands; nil where nothing lands.

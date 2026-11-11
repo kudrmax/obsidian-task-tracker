@@ -27,7 +27,13 @@ import { boundaryOf, parseText, readingKey, sectionNames } from "./documentText"
 import * as projectWrites from "../domain/ProjectWrites";
 import { cleanProjectName, namesProject, uniqueNames } from "../domain/Project";
 import type { TreePlace } from "../domain/ProjectTree";
-import type { ProjectNote } from "./contracts";
+import type { ProjectNote, ProjectsDrop } from "./contracts";
+
+/** The notes that had the project tag, which the one move attaches, and whether the host has read them all. */
+export interface LegacyNotes {
+	list(): readonly ProjectNote[];
+	ready(): boolean;
+}
 import type { Clock, SettingsStore } from "./ports";
 import type { TaskIdentity } from "./TaskIdentity";
 import { isUnder, keyOf, sameLine, samePlace } from "./taskKeys";
@@ -107,13 +113,13 @@ export class TaskRules {
 		private readonly clock: Clock,
 		private readonly identity: TaskIdentity | null = null,
 		private readonly keysById = identity !== null,
-		private readonly legacyNotes: () => readonly ProjectNote[] = () => [],
+		private readonly legacy: LegacyNotes = { list: () => [], ready: () => true },
 	) {}
 
 	moment(): Moment {
 		const settings = this.settings.get();
 		const boundary = boundaryOf(settings);
-		return { settings, boundary, today: boundary.dayOf(this.clock.now()), reading: JSON.stringify([readingKey(settings), settings.dayStartHour]) };
+		return { settings, boundary, today: boundary.dayOf(this.clock.now()), reading: JSON.stringify([readingKey(settings), settings.dayStartHour, this.legacy.ready()]) };
 	}
 
 	today(): LocalDate {
@@ -181,13 +187,14 @@ export class TaskRules {
 	}
 
 	/**
-	 * A document as today's tidying leaves it: the one move to projects first while the file awaits it, so it is written
-	 * as soon as the file is read (a tidy, no step of undo) and every action runs on a moved file.
+	 * A document as today's tidying leaves it: the one move to projects first while the file awaits it and the host's notes
+	 * are complete, so it is written as soon as the file is read once they are (a tidy, no step of undo) and every action
+	 * runs on a moved file.
 	 */
 	private tidied(doc: TaskDocument, at: Moment): TaskDocument {
-		const notes = this.legacyNotes();
+		const notes = this.legacy.list();
 		const mark = at.settings.resultMark;
-		const moved = projectWrites.awaitsMove(doc, notes, mark) ? projectWrites.withTasksInTree(projectWrites.movedToProjects(doc, notes, mark)) : doc;
+		const moved = this.legacy.ready() && projectWrites.awaitsMove(doc, notes, mark) ? projectWrites.withTasksInTree(projectWrites.movedToProjects(doc, notes, mark)) : doc;
 		return normalize(moved, at.today, at.boundary, ops.usablePresets(at.settings.groups.presets));
 	}
 
@@ -366,13 +373,19 @@ export class TaskRules {
 		};
 	}
 
-	/** A card let go on the tree: `from` gives way to `to` (null: taken off), the others kept. */
-	dropOnProject(keys: readonly TaskKey[], from: string | null, to: string | null): Operation | null {
-		if (keys.length === 0) return null;
-		return this.withProjects(keys, (projects) => {
-			const without = from === null ? projects : ops.withProject(projects, from, false);
-			return to === null ? without : ops.withProject(without, to, true);
-		});
+	/** Cards let go on the tree: each one's `from` gives way to `to` (null: taken off), the others kept; a task's cards in turn. */
+	dropOnProject(cards: readonly ProjectsDrop[], to: string | null): Operation | null {
+		if (cards.length === 0) return null;
+		return (doc) => {
+			const changed = new Map<string, { entry: TaskEntry; projects: readonly string[] }>();
+			for (const card of cards) {
+				const entry = projectWrites.projectHolder(doc, this.entryOf(doc, card.key));
+				const projects = changed.get(entry.id)?.projects ?? entry.task.projects;
+				const without = card.from === null ? projects : ops.withProject(projects, card.from, false);
+				changed.set(entry.id, { entry, projects: to === null ? without : ops.withProject(without, to, true) });
+			}
+			return doc.replaceAll([...changed.values()].map(({ entry, projects }) => [entry, { ...entry.task, projects: uniqueNames(projects) }] as const));
+		};
 	}
 
 	/** A project made at `place` of the tree; null for a name of nothing. */
@@ -652,10 +665,14 @@ export class TaskRules {
 	/**
 	 * A written document with its projects in its tree: when the file as read still awaited the move to projects (old
 	 * fields, the result mark, or no `## Projects`), the move first, whatever the write did; then every project a task names.
+	 * While the host's notes are not complete, a file that awaits the move is written without either: the move comes
+	 * once they are.
 	 */
 	private projected(before: TaskDocument, after: TaskDocument, settings: TaskCalendarSettings): TaskDocument {
-		const notes = this.legacyNotes();
-		const moved = projectWrites.awaitsMove(before, notes, settings.resultMark) ? projectWrites.movedToProjects(after, notes, settings.resultMark) : after;
+		const notes = this.legacy.list();
+		const mark = settings.resultMark;
+		if (!this.legacy.ready()) return projectWrites.awaitsMove(after, notes, mark) ? after : projectWrites.withTasksInTree(after);
+		const moved = projectWrites.awaitsMove(before, notes, mark) ? projectWrites.movedToProjects(after, notes, mark) : after;
 		return projectWrites.withTasksInTree(moved);
 	}
 

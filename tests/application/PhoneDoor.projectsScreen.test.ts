@@ -24,7 +24,7 @@ describe("the door's Projects screen", () => {
 	it("drops a card on a row and makes, moves, renames a project, each a step of undo", () => {
 		const view = call("tasks.projectsScreen", []).result as ProjectsView;
 		const voice = view.sections.flatMap((s) => s.cards).find((c) => c.item.title === "Voice")!;
-		const dropped = call("tasks.dropOnProject", [[voice.item.key], voice.from, "project:Дружба"]);
+		const dropped = call("tasks.dropOnProject", [[voice.drop], "project:Дружба"]);
 		expect(dropped.step).toBe(true);
 		expect(dropped.tasks).toContain("- [ ] Voice 🗂️ Дружба\n");
 		const made = call("tasks.createProject", ["Старые друзья", { parent: "Дружба", before: null }]);

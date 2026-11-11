@@ -454,6 +454,10 @@ export class DemoTaskService implements TaskService {
 
 	async dropOnProject(): Promise<void> {}
 
+	isBlankProjectName(name: string): boolean {
+		return name.trim() === "";
+	}
+
 	snap(minute: number, hourPx: number, tolerancePx: number): number {
 		return snapMinute(minute, hourPx, tolerancePx);
 	}

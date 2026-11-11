@@ -2,6 +2,7 @@ import { isOpen, type LocalDate, type ReminderKind, type Slot, type TaskStatus }
 import type { TaskDocument } from "../domain/TaskDocument";
 import type {
 	CreatedTask,
+	ProjectsDrop,
 	DroppedTask,
 	DropFrom,
 	DropLanding,
@@ -167,8 +168,8 @@ export class TaskWrites {
 		return { operation, answer: (change) => (operation === null ? null : namedIn(change, name)) };
 	}
 
-	dropOnProject(keys: readonly TaskKey[], from: string | null, to: string | null): Write<void> {
-		return nothing(this.rules.dropOnProject(keys, from, to));
+	dropOnProject(cards: readonly ProjectsDrop[], to: string | null): Write<void> {
+		return nothing(this.rules.dropOnProject(cards, to));
 	}
 
 	/** The project made, as the tree has it; null when nothing was written. */

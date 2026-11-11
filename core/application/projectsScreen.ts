@@ -275,14 +275,19 @@ function byStage(entries: readonly TaskEntry[]): TaskEntry[] {
 	return entries.map((entry, i) => ({ entry, i })).sort((a, b) => rank(a.entry) - rank(b.entry) || a.i - b.i).map(({ entry }) => entry);
 }
 
-function cardOf(input: ProjectsInput, entry: TaskEntry, mode: ProjectsMode, from: string | null, over: string | null): ProjectsCard {
+/** A card before its part names it (`part` gives it its id). */
+type PartCard = Omit<ProjectsCard, "id">;
+
+function cardOf(input: ProjectsInput, entry: TaskEntry, mode: ProjectsMode, from: string | null, over: string | null): PartCard {
+	const item = input.item(entry);
 	return {
-		item: input.item(entry),
+		item,
 		stage: mode === "byProject" ? stageMark(entry, input.today, input.boundary) : null,
 		over: mode === "byStage" ? over : null,
 		from,
+		drop: { key: item.key, from },
 		menuFrom: menuFromOf(entry),
-		canDrop: true,
+		canDrop: item.open,
 	};
 }
 
@@ -355,8 +360,8 @@ function stageSections(input: ProjectsInput, shown: readonly { entry: TaskEntry;
 	);
 }
 
-function part(key: string, title: string | null, path: readonly string[], depth: number, cards: readonly ProjectsCard[], newTask: ProjectsNewTask | null): ProjectsSection {
-	return { key, title, path, depth, cards, newTask };
+function part(key: string, title: string | null, path: readonly string[], depth: number, cards: readonly PartCard[], newTask: ProjectsNewTask | null): ProjectsSection {
+	return { key, title, path, depth, cards: cards.map((card) => ({ id: `${key}/${card.item.id}`, ...card })), newTask };
 }
 
 function filled(sections: readonly ProjectsSection[]): ProjectsSection[] {
@@ -448,4 +453,23 @@ export function projectsGap(rows: readonly ProjectsRow[], gap: number, depth: nu
 	const below = live.rows[i];
 	const place: TreePlace = { parent, before: below && below.depth === level ? below.title : null };
 	return { place, depth: level };
+}
+
+/** How long a held card waits over a folded row before its branch opens, ms. */
+export const PROJECTS_HOVER_MS = 600;
+
+/** The indent of one step of the tree, px (pt): a finger's sideways way of one step changes a lifted row's depth by one. */
+export const PROJECTS_INDENT = 12;
+
+/**
+ * Where a project lifted in the tree (`lifted`), or the plus, lands at `gap`: its depth its own (the plus: the row above
+ * the gap's, 0 at the top) shifted a step per `PROJECTS_INDENT` of the finger's sideways way `shift` since the lift,
+ * rounded, kept within the gap's depths.
+ */
+export function projectsDrop(rows: readonly ProjectsRow[], gap: number, shift: number, lifted?: ProjectsNodeId | null): ProjectsLanding {
+	const own = lifted ? rows.find((row) => sameNode(row.node, lifted))?.depth : undefined;
+	const live = liveRows(rows, lifted);
+	const above = live.rows[live.at(gap) - 1];
+	const base = own ?? above?.depth ?? 0;
+	return projectsGap(rows, gap, base + Math.round(shift / PROJECTS_INDENT), lifted);
 }

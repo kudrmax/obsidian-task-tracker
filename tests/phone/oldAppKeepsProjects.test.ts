@@ -108,3 +108,33 @@ describe("the app of master 0.4.189 on a file of the new projects", () => {
 		expect(after).toContain("- [ ] Call 🗂️ Дружба 🗂️ Small talk #label/Fast ⏰ 2026-11-04 15:00-16:00");
 	});
 });
+
+describe("an old field and a 🎯 the app of 0.4.189 writes into the new file", () => {
+	it("are moved at the new core's next read: plain, the mark gone, the note attached only to what the field names, no duplicate", async () => {
+		const { TaskServiceImpl } = await import("../../core/application/TaskServiceImpl");
+		const { InMemoryTaskFileStore } = await import("../fakes/InMemoryTaskFileStore");
+		const { FakeSettingsStore } = await import("../fakes/FakeSettingsStore");
+		const { settingsFrom } = await import("../../core/settings");
+		const plain = "- [ ] Plain";
+		const withField = run(FILE, "tasks.setProject", [key("backlog", 1, plain)], "Спорт");
+		expect(withField).toContain("- [ ] Plain 🗂️ [[Спорт]]");
+		const marked = run(withField, "tasks.setResult", key("backlog", 0, "- [ ] Активности как ЛШ 🗂️ Где знакомиться"), true);
+		expect(marked).toContain("- [ ] 🎯 Активности как ЛШ 🗂️ Где знакомиться");
+		const notes = [
+			{ name: "Моя заметка о дружбе", path: "Моя заметка о дружбе.md", link: "Моя заметка о дружбе" },
+			{ name: "Спорт", path: "Спорт.md", link: "Спорт" },
+			{ name: "Музыка", path: "Музыка.md", link: "Музыка" },
+		];
+		const store = new InMemoryTaskFileStore(marked);
+		const svc = new TaskServiceImpl(store, new FakeSettingsStore(settingsFrom(JSON.parse(SETTINGS))), { now: () => new Date(NOW) }, null, { list: () => notes, ready: () => true, onChange: () => () => undefined });
+		await svc.screen("2026-11-04");
+		const text = store.text!;
+		expect(text).toContain("- [ ] Plain 🗂️ Спорт\n");
+		expect(text).toContain("- [ ] Активности как ЛШ 🗂️ Где знакомиться\n");
+		expect(text).not.toContain("🎯");
+		expect(treeOf(text)).toEqual(TREE);
+		expect(text).toContain("\t- Small talk\n- Спорт [[Спорт]]\n");
+		expect(text.match(/Моя заметка о дружбе/g)).toHaveLength(1);
+		expect(text).not.toContain("Музыка");
+	});
+});

@@ -562,7 +562,7 @@
     return last.replace(/\.md$/i, "").trim();
   }
   function cleanProjectName(typed2) {
-    const name = typed2.replace(/\u{1F5C2}\u{FE0F}?/gu, " ").replace(/[[\]]/g, "").replace(/(^|\s)#(?=\S)/g, "$1").replace(/\s+/g, " ").trim();
+    const name = typed2.replace(/\u{1F5C2}\u{FE0F}?/gu, " ").replace(/(^|\s)(?:📅|⏰|🚨|📌|🔕|🔁|📁)(?=\s|$)/gu, "$1").replace(/[[\]]/g, "").replace(/(^|\s)#(?=\S)/g, "$1").replace(/\s+/g, " ").trim();
     return name === "" ? null : name;
   }
   function projectKey(name) {
@@ -574,7 +574,7 @@
   }
   function inProject(name, zone) {
     if (name === null || zone === null) return name === zone;
-    return projectKey(projectName(name)) === projectKey(projectName(zone));
+    return projectKey(name) === projectKey(zone);
   }
 
   // core/domain/TaskLine.ts
@@ -960,13 +960,23 @@
     return indent.replace(/\t/g, "  ").length;
   }
   function treeSpan(lines) {
-    const heading = lines.findIndex((line) => HEADING_RE.exec(line)?.[1] === PROJECTS_HEADING);
-    if (heading < 0) return { heading: null, end: lines.length, items: [], unit: DEFAULT_UNIT };
-    let end = heading + 1;
-    while (end < lines.length && !LIST_END_RE.test(lines[end])) end++;
-    const items = [];
-    for (let i = heading + 1; i < end; i++) if (ITEM_RE.test(lines[i]) && !isTaskLine(lines[i])) items.push(i);
-    return { heading, end, items, unit: unitOf(items.map((i) => ITEM_RE.exec(lines[i])[1])) };
+    const sections = [];
+    lines.forEach((line, heading) => {
+      if (HEADING_RE.exec(line)?.[1] !== PROJECTS_HEADING) return;
+      let end = heading + 1;
+      while (end < lines.length && !LIST_END_RE.test(lines[end])) end++;
+      const items2 = [];
+      let bare = true;
+      for (let i = heading + 1; i < end; i++) {
+        if (ITEM_RE.test(lines[i]) && !isTaskLine(lines[i])) items2.push(i);
+        else if (lines[i].trim() !== "") bare = false;
+      }
+      sections.push({ heading, end, items: items2, bare });
+    });
+    if (sections.length === 0) return { heading: null, end: lines.length, items: [], own: [], extra: [], unit: DEFAULT_UNIT };
+    const [first, ...extra] = sections;
+    const items = sections.flatMap((s) => s.items);
+    return { heading: first.heading, end: first.end, items, own: first.items, extra: extra.map(({ heading, end, bare }) => ({ heading, end, bare })), unit: unitOf(items.map((i) => ITEM_RE.exec(lines[i])[1])) };
   }
   function unitOf(indents) {
     for (let i = 1; i < indents.length; i++) {
@@ -1226,19 +1236,26 @@
      */
     withProjectTree(tree) {
       const span = treeSpan(this.lines);
-      if (span.heading !== null && tree.same(readTree(this.lines))) return this;
+      if (span.heading !== null && span.extra.length === 0 && tree.same(readTree(this.lines))) return this;
       const mint = this.mint();
       const lines = mint.rows(treeLines(tree, span.unit));
       if (span.heading === null) return this.withRows(this.newTreeRows(lines, mint), mint);
-      const rows = this.rows.filter((_, i) => !span.items.includes(i));
-      let at = span.items.length > 0 ? span.items[0] : span.heading + 1;
-      if (span.items.length === 0) {
+      const gone = new Set(span.items);
+      for (const extra of span.extra) {
+        if (!extra.bare) continue;
+        for (let i = extra.heading; i < extra.end; i++) gone.add(i);
+      }
+      const kept = this.rows.map((row, i) => ({ row, i })).filter(({ i }) => !gone.has(i));
+      const rows = kept.map(({ row }) => row);
+      const firstOwn = span.own.length > 0 ? kept.findIndex(({ i }) => i > span.own[0]) : -1;
+      let at = span.own.length > 0 ? firstOwn < 0 ? rows.length : firstOwn : kept.findIndex(({ i }) => i === span.heading) + 1;
+      if (span.own.length === 0) {
         if (at < rows.length && rows[at].line.trim() === "") at++;
         else rows.splice(at++, 0, ...mint.rows([""]));
       }
       rows.splice(at, 0, ...lines);
       const after = at + lines.length;
-      if (span.items.length === 0 && after < rows.length && rows[after].line.trim() !== "") rows.splice(after, 0, ...mint.rows([""]));
+      if (span.own.length === 0 && after < rows.length && rows[after].line.trim() !== "") rows.splice(after, 0, ...mint.rows([""]));
       return this.withRows(rows, mint);
     }
     /** The rows with a new `## Projects` holding `lines`, right after Inbox, apart from what is around it by blank lines. */
@@ -3525,6 +3542,12 @@ ${key.title}`.toLowerCase();
     const full = tree.withMissing(named);
     return doc.hasProjectTree() && full === tree ? doc : doc.withProjectTree(full);
   }
+  function notesOfOldFields(doc, notes, resultMark) {
+    const named = new Set(oldLines(doc, resultMark).flatMap((entry) => [...entry.raw.matchAll(OLD_LINK_RE)].map((m) => projectKey(projectName(m[1])))));
+    const linked = new Set(doc.projectTree().all().flatMap((p) => p.node.note === null ? [] : [projectKey(projectName(p.node.note.split("|")[0].split("#")[0]))]));
+    return notes.filter((note) => named.has(projectKey(note.name)) && !linked.has(projectKey(projectName(note.link))));
+  }
+  var OLD_LINK_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[([^[\]|#]+)/gu;
   var OLD_FIELD_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[/u;
   function oldLines(doc, resultMark) {
     return flatten(doc.allTasks()).filter((entry) => OLD_FIELD_RE.test(entry.raw) || startsWithMark(entry.task.text, resultMark));
@@ -3533,7 +3556,8 @@ ${key.title}`.toLowerCase();
     if (oldLines(doc, resultMark).length > 0) return true;
     return !doc.hasProjectTree() && (notes.length > 0 || taskProjects(doc).length > 0);
   }
-  function movedToProjects(doc, notes, resultMark = LEGACY_RESULT_MARK) {
+  function movedToProjects(doc, given, resultMark = LEGACY_RESULT_MARK) {
+    const notes = doc.hasProjectTree() ? notesOfOldFields(doc, given, resultMark) : given;
     const byName2 = [...notes].sort((a, b) => projectKey(a.name) < projectKey(b.name) ? -1 : projectKey(a.name) > projectKey(b.name) ? 1 : 0);
     let tree = doc.projectTree();
     for (const note of byName2) {
@@ -3855,7 +3879,7 @@ ${key.title}`.toLowerCase();
     return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
   }
   var NO_LEVELS = { levelOf: () => null, labelsOf: () => [], projectsOf: () => [] };
-  function itemLevels(levels, labels, projectOf = (name) => ({ name, link: name, path: [name], note: null, canOpenNote: false, mark: true })) {
+  function itemLevels(levels, labels, projectOf = (name) => ({ name, path: [name], note: null, canOpenNote: false, mark: true })) {
     return {
       levelOf: (prefix) => levels.find((l) => l.prefix === prefix) ?? null,
       labelsOf: (names) => labels.filter((l) => names.includes(l.name)),
@@ -4027,7 +4051,6 @@ ${key.title}`.toLowerCase();
         indents: task && listSpot(run.spot) !== null,
         ...this.mayShift(field),
         section: this.maySection(field) ? field.section : null,
-        newSection: field.newSection ?? null,
         marks,
         markable: task && marks.tiles.levels.length + marks.tiles.labels.length > 0,
         place,
@@ -4068,7 +4091,7 @@ ${key.title}`.toLowerCase();
       const list = state && listSpot(state.spot);
       if (!state || !list || list.column !== column) return null;
       const section = state.section === true;
-      return { place: list.place, pending: state.pending, section, newSection: state.newSection, at: entryAt(drawing, list.place, section || state.newSection !== null) };
+      return { place: list.place, pending: state.pending, section, at: entryAt(drawing, list.place, section) };
     }
     /** Where `task`'s full screen draws the field: none unless it stands in the stack of `task` or one of its subtasks. */
     stackEntry(task) {
@@ -4451,16 +4474,15 @@ ${key.title}`.toLowerCase();
       this.createSection(field);
       this.reset(null);
     }
-    /** As in Obsidian: a level shallower, and the end of the entry where it can go no shallower; a section named for a task not typed goes with it. */
+    /** As in Obsidian: a level shallower, and the end of the entry where it can go no shallower. */
     enterBlank() {
-      if (this.session.field?.newSection !== void 0) this.reset(null);
-      else if (this.shifted(-1)) this.indent(-1);
+      if (this.shifted(-1)) this.indent(-1);
       else this.reset(null);
     }
     /** The task goes to the queue; the next field opens at once, without a priority, labels or a repeat. A slot takes one task only. */
     enterTask(field) {
       this.create(field);
-      const ends = this.run(field.run).spot.kind === "slot" || field.newSection !== void 0;
+      const ends = this.run(field.run).spot.kind === "slot";
       this.reset(ends ? null : { ...field, text: "", priority: null, labels: [], repeat: null });
     }
     /** The field becomes `field` (none: closed); the runs it stands on are held while it does. `sameShifts`: only its text or marks changed. */
@@ -4504,7 +4526,7 @@ ${key.title}`.toLowerCase();
       const run = this.run(field.run);
       const line = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0, project: field.project ?? null };
       run.pending.push(line);
-      this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line, ...field.newSection !== void 0 && { newSection: field.newSection } });
+      this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line });
     }
     /** A job for `run`, which keeps following the cards that land until the job is done. */
     queue(run, job) {
@@ -4958,13 +4980,15 @@ ${key.title}`.toLowerCase();
     return entries.map((entry, i) => ({ entry, i })).sort((a, b) => rank(a.entry) - rank(b.entry) || a.i - b.i).map(({ entry }) => entry);
   }
   function cardOf2(input, entry, mode, from, over) {
+    const item = input.item(entry);
     return {
-      item: input.item(entry),
+      item,
       stage: mode === "byProject" ? stageMark(entry, input.today, input.boundary) : null,
       over: mode === "byStage" ? over : null,
       from,
+      drop: { key: item.key, from },
       menuFrom: menuFromOf(entry),
-      canDrop: true
+      canDrop: item.open
     };
   }
   function sectionsOf(input, doc, selected2, mode, statusOf2) {
@@ -5029,7 +5053,7 @@ ${key.title}`.toLowerCase();
     );
   }
   function part(key, title, path, depth, cards, newTask2) {
-    return { key, title, path, depth, cards, newTask: newTask2 };
+    return { key, title, path, depth, cards: cards.map((card) => ({ id: `${key}/${card.item.id}`, ...card })), newTask: newTask2 };
   }
   function filled(sections) {
     return sections.filter((s) => s.cards.length > 0);
@@ -5105,6 +5129,15 @@ ${key.title}`.toLowerCase();
     const below = live.rows[i];
     const place = { parent, before: below && below.depth === level ? below.title : null };
     return { place, depth: level };
+  }
+  var PROJECTS_HOVER_MS = 600;
+  var PROJECTS_INDENT = 12;
+  function projectsDrop(rows, gap, shift, lifted) {
+    const own = lifted ? rows.find((row) => sameNode(row.node, lifted))?.depth : void 0;
+    const live = liveRows(rows, lifted);
+    const above = live.rows[live.at(gap) - 1];
+    const base = own ?? above?.depth ?? 0;
+    return projectsGap(rows, gap, base + Math.round(shift / PROJECTS_INDENT), lifted);
   }
 
   // core/application/contracts.ts
@@ -5609,13 +5642,9 @@ ${key.title}`.toLowerCase();
       this.clock = clock;
       this.source = source;
     }
-    /** The projects of the tree read last, in its order: what the Project page offers. */
-    projectNotes() {
-      return new ProjectIndex(this.source.tree()).known();
-    }
-    /** The projects of the tree read last, in its order: the quick entry's Project button. */
+    /** The projects of the tree read last, in its order: the Project page and the quick entry's Project button. */
     projects() {
-      return this.projectNotes();
+      return new ProjectIndex(this.source.tree()).known();
     }
     /** The Projects screen as this device shows it; without a file, the tree's fixed rows alone. */
     projectsScreenRead() {
@@ -5755,8 +5784,10 @@ ${key.title}`.toLowerCase();
         const descriptionText = markdown === null ? "" : plainDescription(markdown);
         const description = descriptionText === "" ? null : fuzzy.matchWords(descriptionText);
         const found = item(entry);
-        const projectText = entry.path.length > 0 ? "" : found.project?.name ?? "";
-        const project = projectText === "" ? null : fuzzy.matchWords(projectText);
+        const named = entry.path.length > 0 ? [] : found.projects.map((p) => ({ text: p.name, match: fuzzy.matchWords(p.name) }));
+        const hitProject = named.find((p) => p.match !== null) ?? null;
+        const projectText = hitProject?.text ?? "";
+        const project = hitProject?.match ?? null;
         if (title || description || project) {
           const hit = {
             item: { ...found, card: ownCard(found) },
@@ -5975,17 +6006,17 @@ ${key.title}`.toLowerCase();
      * service's; the door's when the host hands its ids back), so a key's task is found by its id. Otherwise an id means
      * nothing here and a key names its task by place and line alone.
      */
-    constructor(settings, clock, identity = null, keysById = identity !== null, legacyNotes = () => []) {
+    constructor(settings, clock, identity = null, keysById = identity !== null, legacy = { list: () => [], ready: () => true }) {
       this.settings = settings;
       this.clock = clock;
       this.identity = identity;
       this.keysById = keysById;
-      this.legacyNotes = legacyNotes;
+      this.legacy = legacy;
     }
     moment() {
       const settings = this.settings.get();
       const boundary = boundaryOf(settings);
-      return { settings, boundary, today: boundary.dayOf(this.clock.now()), reading: JSON.stringify([readingKey(settings), settings.dayStartHour]) };
+      return { settings, boundary, today: boundary.dayOf(this.clock.now()), reading: JSON.stringify([readingKey(settings), settings.dayStartHour, this.legacy.ready()]) };
     }
     today() {
       return this.moment().today;
@@ -6041,13 +6072,14 @@ ${key.title}`.toLowerCase();
       return this.identity?.of(text, () => this.tidied(parseText(text, this.settings.get()).ensureSections(sectionNames(this.settings.get())), this.moment()));
     }
     /**
-     * A document as today's tidying leaves it: the one move to projects first while the file awaits it, so it is written
-     * as soon as the file is read (a tidy, no step of undo) and every action runs on a moved file.
+     * A document as today's tidying leaves it: the one move to projects first while the file awaits it and the host's notes
+     * are complete, so it is written as soon as the file is read once they are (a tidy, no step of undo) and every action
+     * runs on a moved file.
      */
     tidied(doc, at) {
-      const notes = this.legacyNotes();
+      const notes = this.legacy.list();
       const mark = at.settings.resultMark;
-      const moved2 = awaitsMove(doc, notes, mark) ? withTasksInTree(movedToProjects(doc, notes, mark)) : doc;
+      const moved2 = this.legacy.ready() && awaitsMove(doc, notes, mark) ? withTasksInTree(movedToProjects(doc, notes, mark)) : doc;
       return normalize(moved2, at.today, at.boundary, usablePresets(at.settings.groups.presets));
     }
     /** The document after `operation` on `doc`, already read and normalized at `at`, normalized again. */
@@ -6201,13 +6233,19 @@ ${key.title}`.toLowerCase();
         return this.rewrite(named, moved2, (projects) => withProject(projects, found, true));
       };
     }
-    /** A card let go on the tree: `from` gives way to `to` (null: taken off), the others kept. */
-    dropOnProject(keys, from, to) {
-      if (keys.length === 0) return null;
-      return this.withProjects(keys, (projects) => {
-        const without = from === null ? projects : withProject(projects, from, false);
-        return to === null ? without : withProject(without, to, true);
-      });
+    /** Cards let go on the tree: each one's `from` gives way to `to` (null: taken off), the others kept; a task's cards in turn. */
+    dropOnProject(cards, to) {
+      if (cards.length === 0) return null;
+      return (doc) => {
+        const changed2 = /* @__PURE__ */ new Map();
+        for (const card of cards) {
+          const entry = projectHolder(doc, this.entryOf(doc, card.key));
+          const projects = changed2.get(entry.id)?.projects ?? entry.task.projects;
+          const without = card.from === null ? projects : withProject(projects, card.from, false);
+          changed2.set(entry.id, { entry, projects: to === null ? without : withProject(without, to, true) });
+        }
+        return doc.replaceAll([...changed2.values()].map(({ entry, projects }) => [entry, { ...entry.task, projects: uniqueNames(projects) }]));
+      };
     }
     /** A project made at `place` of the tree; null for a name of nothing. */
     createProject(name, place) {
@@ -6447,10 +6485,14 @@ ${key.title}`.toLowerCase();
     /**
      * A written document with its projects in its tree: when the file as read still awaited the move to projects (old
      * fields, the result mark, or no `## Projects`), the move first, whatever the write did; then every project a task names.
+     * While the host's notes are not complete, a file that awaits the move is written without either: the move comes
+     * once they are.
      */
     projected(before, after, settings) {
-      const notes = this.legacyNotes();
-      const moved2 = awaitsMove(before, notes, settings.resultMark) ? movedToProjects(after, notes, settings.resultMark) : after;
+      const notes = this.legacy.list();
+      const mark = settings.resultMark;
+      if (!this.legacy.ready()) return awaitsMove(after, notes, mark) ? after : withTasksInTree(after);
+      const moved2 = awaitsMove(before, notes, mark) ? movedToProjects(after, notes, mark) : after;
       return withTasksInTree(moved2);
     }
     written(doc, operation, at, writes = true) {
@@ -6643,8 +6685,8 @@ ${key.title}`.toLowerCase();
       const operation = this.rules.newProject(name, keys);
       return { operation, answer: (change) => operation === null ? null : namedIn(change, name) };
     }
-    dropOnProject(keys, from, to) {
-      return nothing(this.rules.dropOnProject(keys, from, to));
+    dropOnProject(cards, to) {
+      return nothing(this.rules.dropOnProject(cards, to));
     }
     /** The project made, as the tree has it; null when nothing was written. */
     createProject(name, place) {
@@ -7089,7 +7131,7 @@ ${key.title}`.toLowerCase();
       };
       this.store = store;
       this.identity = new TaskIdentity(context.ids);
-      this.rules = new TaskRules(store, clock, this.identity, context.ids !== void 0, () => context.projects ?? []);
+      this.rules = new TaskRules(store, clock, this.identity, context.ids !== void 0, { list: () => context.projects ?? [], ready: () => true });
       this.reads = new TaskReads(this.rules, store, clock, { tree: () => this.tree(), screen: () => this.projectsScreen });
       this.writes = new TaskWrites(this.rules, this.reads);
       this.text = context.tasks ?? null;
@@ -7261,15 +7303,16 @@ ${key.title}`.toLowerCase();
     moveProject: (c, [name, place]) => c.run(c.writes.moveProject(name, place)),
     renameProject: (c, [from, to]) => {
       const renamed = c.run(c.writes.renameProject(from, to));
-      if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from, to.trim()));
+      if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from, cleanProjectName(to)));
       return renamed;
     },
     setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name, link ?? null)),
-    dropOnProject: (c, [keys, from, to]) => {
+    dropOnProject: (c, [cards, to]) => {
       const target = to === "none" ? null : projectOfNode(to);
       if (target === null && to !== "none") return null;
-      return c.run(c.writes.dropOnProject(keys, from ?? null, target));
+      return c.run(c.writes.dropOnProject(cards, target));
     },
+    isBlankProjectName: (_c, [name]) => cleanProjectName(name) === null,
     setReminder: (c, [key, reminder]) => c.run(c.writes.setReminder(key, reminder)),
     togglePriority: (c, [keys, prefix]) => c.run(c.ask(c.writes.togglePriority(keys, prefix))),
     toggleLabel: (c, [keys, name]) => c.run(c.ask(c.writes.toggleLabel(keys, name))),
@@ -7484,7 +7527,7 @@ ${key.title}`.toLowerCase();
       c.write((text) => c.rules.change(text, c.rules.placeNew(title, null, { kind: "list", list, group: null, before: null }, null, [], project ?? null)).text);
     },
     /** The New Task sheet's Project row for the project chosen (null: none; at the start, the view's `ScreenView.project`): the quick entry's Project button, its page and whether it is lit. */
-    project: (c, [chosen]) => entryProject(chosen ?? null, c.reads.projectNotes()),
+    project: (c, [chosen]) => entryProject(chosen ?? null, c.reads.projects()),
     lists: (c) => CAPTURE_LISTS.map((list) => ({ list, name: c.settings.sections[list] }))
   };
   var HISTORY = {
@@ -7530,6 +7573,7 @@ ${key.title}`.toLowerCase();
     projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
     projectsGap: (rows, gap, depth, lifted) => projectsGap(rows, gap, depth, lifted ?? null),
     projectsLevels: (rows, gap, lifted) => projectsLevels(rows, gap, lifted ?? null),
+    projectsDrop: (rows, gap, shift, lifted) => projectsDrop(rows, gap, shift, lifted ?? null),
     projectNodeOf,
     shadesOf,
     inkOf,
@@ -7573,7 +7617,7 @@ ${key.title}`.toLowerCase();
     onTheDay,
     canPick
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+  var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };
