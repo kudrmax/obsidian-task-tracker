@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type MenuFrom, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ListPlace, projectsTakes, type ProjectsView, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, type ZoomLevel } from "../../core/application/contracts";
+import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type MenuFrom, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ListPlace, projectsPlusTakes, projectsTakes, type ProjectsView, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, type ZoomLevel } from "../../core/application/contracts";
 import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -406,6 +406,10 @@ export class CalendarScreen extends Component {
 					takesAt: (place, drag) => {
 						const view = projects.shown;
 						return view !== null && projectsTakes(view, this.projectsDrops(drag), place);
+					},
+					plusTakesAt: (place) => {
+						const view = projects.shown;
+						return view !== null && projectsPlusTakes(view, place);
 					},
 					node: () => projects.shown?.selected ?? null,
 				},

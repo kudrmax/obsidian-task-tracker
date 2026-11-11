@@ -103,11 +103,6 @@ export class ProjectTasks implements DropList {
 		return this.writing.size > 0;
 	}
 
-	/** Part `group` writes a new task typed in it, as the core says (`EntryPart.newTask`): Done's writes none. */
-	writesIn(group: GroupName): boolean {
-		return this.writing.has(plateKey(group));
-	}
-
 	/** The cards the list is about to draw from the view the screen is to show now, as `listCards` gives them once it has. */
 	get comingCards(): readonly ListCard[] {
 		const coming = this.deps.coming?.();
