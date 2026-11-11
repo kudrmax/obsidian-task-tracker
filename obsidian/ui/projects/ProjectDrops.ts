@@ -1,5 +1,4 @@
-import { projectsGap, type ProjectsNodeId, type ProjectsRow } from "../../../core/application/contracts";
-import { tokenPx } from "../design";
+import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectsDrop, type ProjectsLanding, type ProjectsNodeId, type ProjectsRow } from "../../../core/application/contracts";
 import { DropLine } from "../drag/DropLine";
 import type { DragPayload, DropResult, DropTarget, ProjectsDrop } from "../drag/DropTarget";
 import { readFrame } from "../drag/listFrame";
@@ -32,36 +31,38 @@ export function rowUnder(tree: TreeShown, y: number): ProjectsRow | null {
 	return null;
 }
 
-/** A lifted project's own depth and where the finger stood when it was lifted: its depth changes only with the finger's sideways shift. */
-export interface ShiftFrom {
-	readonly depth: number;
-	readonly x: number;
+/** A gap of the tree and where a project let go there lands. */
+export interface TreeLanding {
+	readonly gap: number;
+	readonly landing: ProjectsLanding;
 }
 
-/**
- * The gap a point of the tree stands at, among the projects (All above them and No project below closing the run): the
- * row whose middle is under the point, and its depth. The plus takes the depth of where the finger stands, a step per
- * indent from the tree's left edge; a lifted project (`from`) keeps its own depth until the finger shifts sideways, a
- * level per indent either way.
- */
-export function treeGap(tree: TreeShown, x: number, y: number, lifted?: ProjectsNodeId | null, from?: ShiftFrom): { readonly gap: number; readonly depth: number } | null {
+/** The gap a height of the tree stands at, among the projects (All above them, No project below closing the run): before the row whose middle is under it. */
+function gapAt(tree: TreeShown, y: number): number | null {
 	const rows = tree.rows;
 	const first = rows.findIndex((row) => row.kind === "project" || row.kind === "none");
 	const last = rows.findIndex((row) => row.kind === "none");
 	if (first < 0 || last < 0) return null;
-	let gap = last;
 	for (let i = first; i < last; i++) {
 		const r = rectOf(tree, i);
-		if (r && y < r.top + r.height / 2) {
-			gap = i;
-			break;
-		}
+		if (r && y < r.top + r.height / 2) return i;
 	}
-	const left = rectOf(tree, first)?.left ?? tree.el.getBoundingClientRect().left;
-	const indent = tokenPx(tree.el, "--tc-tree-indent") || 1;
-	const depth = Math.max(0, from ? from.depth + Math.round((x - from.x) / indent) : Math.round((x - left) / indent - 0.5));
-	const landing = projectsGap(rows, gap, depth, lifted);
-	return { gap, depth: landing.depth };
+	return last;
+}
+
+/** A lifted project at the height `y`, the finger `shift` px sideways since the lift: its own depth kept until the shift makes a step (`projectsDrop`). */
+export function liftLanding(tree: TreeShown, y: number, shift: number, lifted: ProjectsNodeId): TreeLanding | null {
+	const gap = gapAt(tree, y);
+	return gap === null ? null : { gap, landing: projectsDrop(tree.rows, gap, shift, lifted) };
+}
+
+/** The plus at a point of the tree: the depth of where the finger stands, the row above's and a step per tree step right of that row's start (`projectsDrop`). */
+export function plusLanding(tree: TreeShown, x: number, y: number): TreeLanding | null {
+	const gap = gapAt(tree, y);
+	if (gap === null) return null;
+	const above = gap > 0 && tree.rows[gap - 1].kind === "project" ? rectOf(tree, gap - 1) : null;
+	const start = above?.left ?? tree.el.getBoundingClientRect().left;
+	return { gap, landing: projectsDrop(tree.rows, gap, x - start) };
 }
 
 /** The drop line of a gap of the tree: under the row above it (or over the row below), from its depth's indent to the right edge. */
@@ -70,15 +71,13 @@ export function showGapLine(line: DropLine, tree: TreeShown, gap: number, depth:
 	const below = rectOf(tree, gap);
 	const frame = readFrame(tree.el);
 	const y = above && below ? (above.bottom + below.top) / 2 : above ? above.bottom : (below?.top ?? frame.box.top);
-	const left = (rectOf(tree, tree.rows.findIndex((row) => row.kind === "project" || row.kind === "none"))?.left ?? frame.box.left) + depth * tokenPx(tree.el, "--tc-tree-indent");
+	const left = (rectOf(tree, tree.rows.findIndex((row) => row.kind === "project" || row.kind === "none"))?.left ?? frame.box.left) + depth * PROJECTS_INDENT;
 	line.show(left, frame.box.right, y, frame, finger);
 }
 
 /** What the tree's drop asks of the screen: how long a card waits over a folded row, and that row opened. */
 export interface TreeDropDeps {
 	tree(): TreeShown | null;
-	/** How long a card held still over a folded row waits before its branch opens: a long press's time. */
-	hoverMs(): number;
 	/** A folded row's branch opened under a held card (`TaskService.unfoldProjectNode`), the tree drawn again. */
 	unfold(node: ProjectsNodeId): void;
 }
@@ -116,7 +115,7 @@ export class TreeDrop implements DropTarget {
 		this.stopHover();
 		if (!row?.unfoldsOnHover) return;
 		const node = row.node;
-		this.hover = { node, timer: window.setTimeout(() => this.deps.unfold(node), this.deps.hoverMs()) };
+		this.hover = { node, timer: window.setTimeout(() => this.deps.unfold(node), PROJECTS_HOVER_MS) };
 	}
 
 	private stopHover(): void {
@@ -140,10 +139,10 @@ export class TreeDrop implements DropTarget {
 			this.result = node === null ? null : { kind: "projectRow", node };
 			return;
 		}
-		const at = treeGap(tree, x, y);
+		const at = plusLanding(tree, x, y);
 		if (!at) return this.leave();
-		this.result = { kind: "projectGap", gap: at.gap, landing: projectsGap(tree.rows, at.gap, at.depth) };
-		showGapLine(this.line, tree, at.gap, at.depth, { x, y });
+		this.result = { kind: "projectGap", gap: at.gap, landing: at.landing };
+		showGapLine(this.line, tree, at.gap, at.landing.depth, { x, y });
 	}
 
 	landing(): DOMRect | null {

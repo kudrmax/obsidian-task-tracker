@@ -2,7 +2,7 @@ import { clear, el } from "../dom";
 import { icon, type IconName } from "../kit/icons";
 import { ScrollEdges } from "../ScrollEdges";
 import { fillCard, renderDue } from "../TaskCard";
-import type { ProjectsCard, ProjectsNewTask, ProjectsStage, ProjectsView } from "../../../core/application/contracts";
+import { cardDue, type ProjectsCard, type ProjectsNewTask, type ProjectsStage, type ProjectsView, type TaskItem } from "../../../core/application/contracts";
 
 /** A part of the tasks as drawn: where a new task let go in it is written, and the last row it holds. */
 export interface DrawnPart {
@@ -79,14 +79,15 @@ export class ProjectTasks {
 	private card(model: ProjectsCard, signal: AbortSignal): HTMLElement {
 		const card = el(this.el, "div", "tc-card");
 		fillCard(card, model.item, { day: null, over: model.over, corner: model.stage === null });
-		if (model.stage) renderStage(card, model.stage);
+		if (model.stage) renderStage(card, model.item, model.stage);
 		this.deps.onCard?.(card, model, signal);
 		return card;
 	}
 }
 
-function renderStage(card: HTMLElement, stage: ProjectsStage): void {
-	if (stage.kind === "date") return renderDue(card, stage.date, false);
+/** The stage's mark, or for a dated card its date with the repeat's mark beside it, as any card's corner shows them. */
+function renderStage(card: HTMLElement, item: TaskItem, stage: ProjectsStage): void {
+	if (stage.kind === "date") return renderDue(card, stage.date, cardDue(item, null)?.repeats ?? false);
 	const mark = el(card, "span", "tc-stage-mark");
 	const shown = STAGES[stage.kind];
 	mark.setAttribute("aria-label", shown.name);

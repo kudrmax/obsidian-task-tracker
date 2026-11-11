@@ -7,6 +7,11 @@ import { PROJECTS_SCREEN_KEY, LocalProjectsScreenStore } from "../../obsidian/in
 
 class FakeIndex implements NoteIndex {
 	list: NoteTags[] = [];
+	resolved = true;
+
+	ready(): boolean {
+		return this.resolved;
+	}
 	private readonly listeners = new Set<() => void>();
 	reads = 0;
 
@@ -50,6 +55,26 @@ function setup() {
 }
 
 describe("VaultProjects", () => {
+	it("is ready once the index has read every note, keeps no list read before, and tells its listeners then", () => {
+		const { index, projects } = setup();
+		index.resolved = false;
+		index.list = [note("А", ["#project"])];
+		const heard = vi.fn();
+		projects.onChange(heard);
+		expect(projects.ready()).toBe(false);
+		expect(projects.list().map((p) => p.name)).toEqual(["А"]);
+		index.list = [note("А", ["#project"]), note("Б", ["#project"])];
+		expect(projects.list().map((p) => p.name)).toEqual(["А", "Б"]);
+		index.resolved = true;
+		index.change();
+		expect(projects.ready()).toBe(true);
+		expect(heard).toHaveBeenCalledTimes(1);
+		const reads = index.reads;
+		projects.list();
+		projects.list();
+		expect(index.reads).toBe(reads);
+	});
+
 	it("lists the notes with exactly the project tag, by name", () => {
 		const { index, projects } = setup();
 		index.list = [note("Б", ["#project"]), note("А", ["#Project"]), note("В", ["#project/sub"]), note("Г", [])];
@@ -122,6 +147,23 @@ describe("ObsidianNoteIndex", () => {
 		};
 		return { app: app as never, files, caches, fire: (name: string, ...args: unknown[]) => handlers.get(name)?.(...args), links: () => links };
 	}
+
+	it("is ready once Obsidian has read the vault's notes: at once when it had, else at its first resolved", () => {
+		const loaded = fakeApp();
+		(loaded.app as { metadataCache: { initialized?: boolean } }).metadataCache.initialized = true;
+		expect(new ObsidianNoteIndex(loaded.app, () => "TODOs Tasks.md").ready()).toBe(true);
+		const starting = fakeApp();
+		const index = new ObsidianNoteIndex(starting.app, () => "TODOs Tasks.md");
+		const heard = vi.fn();
+		index.onChange(heard);
+		expect(index.ready()).toBe(false);
+		vi.useFakeTimers();
+		starting.fire("resolved");
+		vi.runAllTimers();
+		vi.useRealTimers();
+		expect(index.ready()).toBe(true);
+		expect(heard).toHaveBeenCalledTimes(1);
+	});
 
 	it("works out a note's link only when asked for it", () => {
 		const { app, links } = fakeApp();

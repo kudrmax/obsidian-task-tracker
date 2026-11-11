@@ -239,10 +239,10 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
 32. **The plus on the Projects screen** has no quick bar: it opens the section name's capsule — at the gap of the tree
     («Project name»), or after the part's last card among the tasks («New task»; a priority's prefix typed first still
     sets it). A tap on the plus there opens the task field at the end of the tasks (`ProjectsView.newTask`).
-33. **The depth of a gap in the tree.** The plus takes the depth of where the finger stands, a step per tree indent
-    (12 px) from the tree's left edge. A lifted project keeps its own depth until the finger shifts sideways, a level per
-    indent either way: let go where it was lifted, it stays where it was (it used to nest a level deeper). Both within
-    `projectsLevels`.
+33. **The depth of a gap in the tree** is the core's `projectsDrop(rows, gap, shift, lifted?)` (Decision 53): the plus's
+    shift is the finger's way right of the start of the row above the gap, a lifted project's the finger's sideways way
+    since the lift, a step per `PROJECTS_INDENT` (12 px, the tree's own indent, `DESIGN.treeIndent`) rounded. A lifted
+    project let go where it was lifted stays at its depth.
 34. **A lifted project** is its row on the float's ground with the lift shadow; its place in the tree dims.
 35. **The search path** shows only in a search opened from the Projects screen, on the card's small line after the
     folder mark, the names joined by « › »; the card's folder mark is left out there (the path says it), and so is the
@@ -251,14 +251,20 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
     (`selectProjectNode`), the wheel turning there.
 37. **A wide card held by its far side** (a desktop list, the tasks of the Projects screen): the float under the finger is
     held by its middle once the grab lies further right than the float reaches; it used to hang far left of the finger.
-38. **A card held over a folded row** opens it after a long press's time (the Long press setting), the tree alone drawn
-    again so the card carried from the tasks stays under the finger; leaving the row before then opens nothing.
+38. **A card held over a folded row** opens it after the core's `PROJECTS_HOVER_MS` (600 ms), the tree alone drawn again
+    so the card carried from the tasks stays under the finger; leaving the row before then opens nothing.
 39. **Over the tree the carried card rides above the finger.** Held over the tree, the card leaves its stretched,
     whole-title look for its own capsule (the float's 190 px, the title fading) and stands 16 px above the finger, its
     middle over it, so the row it will land on, filled with the drop's colour, and the plus's or a lifted project's drop
     line stay in sight under the finger. Back over the tasks it is the whole card held where it was grabbed. A lifted
     project rides 16 px below the finger instead: its drop line sits between rows, and the row above the line is the one
     it would nest under, so that row and the line stay seen. The plus already stands aside of the finger and keeps doing so.
+
+40. **Parity of the tree's drags, the plugin and the app alike** (review round): over the tree a carried card rides above
+    the finger and a lifted project below it (39); a sideways step is `PROJECTS_INDENT`, 12, rounded, and a lifted project
+    keeps its depth until the finger shifts (33); a folded row opens after `PROJECTS_HOVER_MS`, 600 ms (38); the plus
+    over the tasks shows the drop line at the end of the part it would write into. A drop on the tree hands the core the
+    very card let go (`ProjectsCard.drop`), and only `canDrop` says which cards can be carried there.
 
 ### iPhone app (frontend-swift)
 
