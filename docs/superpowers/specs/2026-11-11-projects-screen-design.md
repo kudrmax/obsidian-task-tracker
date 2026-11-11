@@ -75,8 +75,12 @@ Only the data carries over, by the one-time move below.
 
 ## Moving to the new model (once, by the core, on the first write)
 
-- Today's projects (notes with `#project`, and the names in tasks' `🗂️`) become the top level of `## Projects`, by name;
-  nothing is written into the notes.
+- Today's projects are notes, and the notes stay: each becomes a top-level project of `## Projects` with its note
+  attached, `- Дружба [[Дружба]]`. The project takes the note's name once; from then on they are two names: renaming the
+  project leaves the note's file as it is, renaming the file (Obsidian fixes the link on the tree line) leaves the
+  project's name. Nothing is written into the notes.
+- Tasks' `🗂️ [[Дружба]]` become `🗂️ Дружба`: a task names its project, and the note hangs on the project.
+- A name in a task's `🗂️ [[…]]` with no note behind it becomes a project without a note.
 - The two `🎯` lines in Max's file (`МТС`, `iPhone`) lose the mark and stay tasks with subtasks: under item 5 they show
   their next step as before. They don't become projects: a result was a task, and the spec makes a task with subtasks
   show its next step anyway. Max moves one into the tree by hand if he wants it as a project.
