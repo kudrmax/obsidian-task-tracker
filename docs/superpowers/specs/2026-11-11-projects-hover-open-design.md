@@ -40,6 +40,9 @@ Follows `2026-11-11-projects-screen-design.md` and `2026-11-11-projects-order-de
    under a held card would show tasks the card cannot be let go among. The app gets the hover open together with its
    in-list drop, from the same contract (`opensOnHover`, `hoverProjectNode`); until then its spring-loaded unfold stays
    as is. The Swift row decodes the new field so the contract is mirrored.
+8. **A nest under a task of the opened project swaps no project** (lead, review): a subtask belongs to its task's
+   projects (`docs/plugin/file.md`), so a task nested under one of P's tasks is P's through it; its own `🗂️` on the
+   subtask line does not count, as for any subtask.
 
 (the agents add theirs below)
 
