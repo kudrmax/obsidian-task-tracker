@@ -144,12 +144,17 @@ export function setProjectNote(doc: TaskDocument, name: string, note: string | n
 	return changed === tree ? doc : doc.withProjectTree(changed);
 }
 
-/** A task's projects with `from` giving way to `to` (null `from`: `to` added; null `to`: `from` taken off), the others kept in order. */
+/**
+ * A task's projects with `from` giving way to `to` in `from`'s place in their order (`to` there already: `from` only
+ * taken off; null `to`: `from` taken off; null `from`, or one the task lacks: `to` added last), the others kept, so the
+ * task's first project changes only when `from` was first.
+ */
 export function swappedProjects(projects: readonly string[], from: string | null, to: string | null): readonly string[] {
-	const without = from === null ? projects : projects.filter((p) => projectKey(p) !== projectKey(from));
-	if (to === null) return uniqueNames(without);
-	const kept = without.filter((p) => projectKey(p) !== projectKey(to));
-	return uniqueNames([...kept, projects.find((p) => projectKey(p) === projectKey(to)) ?? to]);
+	const at = from === null ? -1 : projects.findIndex((p) => projectKey(p) === projectKey(from));
+	const has = to !== null && projects.some((p) => projectKey(p) === projectKey(to));
+	if (at < 0) return uniqueNames(to === null || has ? projects : [...projects, to]);
+	const swapped = projects.flatMap((p, i) => (i !== at ? [p] : to === null || has ? [] : [to]));
+	return uniqueNames(swapped);
 }
 
 /** The top-level task a project change of `entry` writes: a subtask's projects are its top task's. */
