@@ -316,8 +316,12 @@ struct Ribbon: View {
                 // finger it goes no further than the next place either way, as the plugin's screen.
                 swipe.moved(within: stops)
                 toToday = CGFloat(columns.toToday(at: Double(x)))
-                // The selection moves along with a swipe; a tab's own scroll leaves it on the tab chosen.
-                guard phase == .interacting || phase == .decelerating else { return }
+                // The selection moves along with the ribbon, whatever moves it; a tab's own scroll leaves it on the tab
+                // chosen until it arrives or a finger takes the ribbon.
+                if let target = swipe.tabTarget {
+                    if abs(x - target) < 0.5 { swipe.tabTarget = nil }
+                    return
+                }
                 let near = nearest(x, columns)
                 if near != model.place { model.place = near }
             }
@@ -357,7 +361,16 @@ struct Ribbon: View {
             .onChange(of: model.asked) {
                 guard let asked = model.asked else { return }
                 guard asked.done else {
-                    withAnimation(.smooth) { position.scrollTo(id: asked.place, anchor: .leading) }
+                    // A tab moves the ribbon by the scroll view's own animation, which a finger on the ribbon stops where
+                    // it is: a swipe begun while it runs starts from where the ribbon stands, never from a place an
+                    // animation still carries it to.
+                    let stop = stopOf(asked.place, columns)
+                    if let scroll = swipe.scroll {
+                        swipe.tabTarget = abs(scroll.contentOffset.x - stop) < 0.5 ? nil : stop
+                        scroll.setContentOffset(CGPoint(x: stop, y: scroll.contentOffset.y), animated: true)
+                    } else {
+                        withAnimation(.smooth) { position.scrollTo(id: asked.place, anchor: .leading) }
+                    }
                     return
                 }
                 // The Done column is laid out first, then the ribbon goes to it.
@@ -587,8 +600,12 @@ final class RibbonSwipe: NSObject {
         scroll.panGestureRecognizer.addTarget(self, action: #selector(panned(_:)))
     }
 
+    /// Where a tab's scroll takes the ribbon, while it runs: the tab bar keeps the tab chosen meanwhile.
+    var tabTarget: CGFloat?
+
     @objc private func panned(_ pan: UIPanGestureRecognizer) {
         guard pan.state == .began, let scroll else { return }
+        tabTarget = nil
         from = paging.start(at: Double(scroll.contentOffset.x), gliding: scroll.isDecelerating ? headedTo : nil)
     }
 

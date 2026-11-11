@@ -401,7 +401,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     private let press = UILongPressGestureRecognizer()
     private var pressed: ProjectsRow?
     /// The gap shown under a carried project or the plus: where it goes, and the row it was asked before.
-    private var aimed: (landing: ProjectsLanding, gap: Int)?
+    private var aimed: (landing: ProjectsLanding, gap: Int, line: CGPoint)?
 
     override init() {
         super.init()
@@ -496,11 +496,12 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
             aimed = nil
             return model.drag.hideLine()
         }
-        aimed = (landing, gap)
         let above = gap > 0 ? framed[gap - 1].1.maxY : framed.first?.1.minY ?? area.minY
         let below = gap < framed.count ? framed[gap].1.minY : above + 4
         let y = gap == 0 ? (framed.first?.1.minY ?? area.minY) - 2 : (above + below) / 2
-        model.drag.showLine(from: CGPoint(x: left + CGFloat(landing.depth) * TreeMetrics.indent, y: y), to: area.maxX - TreeMetrics.inset)
+        let start = CGPoint(x: left + CGFloat(landing.depth) * TreeMetrics.indent, y: y)
+        aimed = (landing, gap, start)
+        model.drag.showLine(from: start, to: area.maxX - TreeMetrics.inset)
     }
 
     func leave() {
@@ -519,22 +520,23 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
             return CarryLanding(rect: frame, folds: true)
         case .project(let row):
             guard let aimed, let name = row.project?.name else { return nil }
+            let rect = lineRect
             Task { await projects.move(name, to: aimed.landing.place) }
-            return CarryLanding(rect: lineRect, folds: true)
+            return CarryLanding(rect: rect, folds: true)
         case .section:
             return nil
         case nil:
             guard let aimed else { return nil }
+            let rect = lineRect
             projects.asking = .project(aimed.landing.place)
-            _ = model
-            return CarryLanding(rect: lineRect, folds: true)
+            return CarryLanding(rect: rect, folds: true)
         }
     }
 
-    /// Where the line stands, as a small box the copy shrinks into.
+    /// Where the line stands, as a small box at its dot the copy shrinks into.
     private var lineRect: CGRect {
-        guard let area else { return .null }
-        return CGRect(x: area.minX + TreeMetrics.inset, y: area.minY, width: 8, height: 8)
+        guard let line = aimed?.line else { return .null }
+        return CGRect(x: line.x, y: line.y - 4, width: 8, height: 8)
     }
 }
 
@@ -642,9 +644,10 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
             let tops = ([geometry.parts[candidate.id]] + candidate.cards.map { geometry.cards[candidate.id + "/" + $0.id] }).compactMap { $0?.minY }
             if let top = tops.min(), top <= y { part = candidate }
         }
+        let at = held
         held = nil
         guard let new = part?.section.newTask ?? view.newTask else { return nil }
         projects.asking = .task(new)
-        return CarryLanding(rect: area.map { CGRect(x: $0.midX - 4, y: $0.minY + 4, width: 8, height: 8) } ?? .null, folds: true)
+        return CarryLanding(rect: at.map { CGRect(x: $0.x - 4, y: $0.y - 4, width: 8, height: 8) } ?? .null, folds: true)
     }
 }

@@ -32,6 +32,9 @@ struct TaskCapsule: View {
     /// A search's find: the found pieces picked out of the title, and the project's name or the description's line under
     /// it where the query was found there, as the plugin's search draws its cards.
     var found: SearchHit?
+    /// On a find from the Projects page: its first project's path in the tree, shown under the title as the project's
+    /// name is, unless the query was found in the description.
+    var path: [String]?
 
     @Environment(\.colorScheme) private var scheme
 
@@ -39,7 +42,13 @@ struct TaskCapsule: View {
     /// On the timeline the card's content stands at its top, the corner beside the title's first line.
     private var onTimeline: Bool { card.corner != nil || height != CardMetrics.height }
     /// The line a find shows under the title: the project's name when the query was found there, else the description's.
-    private var snippet: [FoundPart]? { found.flatMap { $0.project ?? $0.description } }
+    private var snippet: [FoundPart]? {
+        guard let found else { return nil }
+        if let path, found.description == nil || found.project != nil {
+            return [FoundPart(text: path.joined(separator: " › "), match: false)]
+        }
+        return found.project ?? found.description
+    }
 
     var body: some View {
         HStack(alignment: onTimeline || whole ? .top : .center, spacing: 6) {

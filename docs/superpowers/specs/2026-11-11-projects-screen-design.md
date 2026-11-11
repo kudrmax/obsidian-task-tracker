@@ -191,3 +191,23 @@ Each stage ends in tests, an on-screen check and a merge, as CLAUDE.md «Agents�
 21. **No vault scan on the phone.** The app hands the door no `context.projects`: projects are the tree, and the one
     move made by the app (if it writes first) makes each `🗂️ [[Note]]` a project without its note attached; the plugin,
     which knows the notes, attaches them when it moves first. Max's plugin is released first, so the move is its.
+22. **The Projects tab** is the ribbon's first place, the whole screen wide, left of Inbox: a swipe right from Inbox
+    goes there, one place as every swipe (`RibbonColumns(projects:)`; Inbox and Soon still split the screen in half). A
+    tab moves the ribbon by the scroll view's own animation, which a finger stops where it is, and the tab bar follows
+    the ribbon whatever moves it.
+23. **The plus on the Projects page** asks a name in an alert, as New Section and New Project do: let go on the tasks,
+    «New Task» for the part it is let go in (`newTask` of that part, else the view's); let go in the tree, «New
+    Project» for the gap the line shows. The finger's shift right nests: one level per 24 points past the tree's edge,
+    kept within `projectsLevels`. The app's typed-in-place field belongs to the funnel's lists.
+24. **The project menu in the app** (Decision 1): Rename; with a note, a «Note» group holding the note's name (opens it
+    in Obsidian, `projects.noteUrl`) and Detach; without one, Rename alone, as the app cannot attach.
+25. **By stage on the app's card**: the subproject small over the title after a folder (`ProjectsCard.over`); on a folded
+    task it takes the small line's place, the next step's title staying the title.
+26. **The stage's symbol** on a card By project is the tab bar's: sun Today, hourglass Soon, tray Inbox, an archive box
+    Backlog; a date is the usual date corner.
+27. **A card's folder mark and the full screen's project line** open the Projects tab on that project
+    (`tasks.selectProjectNode`).
+28. **Search opened from the Projects tab** shows each find's `projectPath` under its title, «Дружба › iPhone», in the
+    line where the project's name stands otherwise.
+29. **The tree's width** is the divider's, kept on the device, within the bounds the core gives a list beside the
+    calendar (`rules.listWidths`), as Today's divider.
