@@ -38,3 +38,16 @@ describe("the door's Projects screen", () => {
 		expect(call("projects.noteUrl", [view.menu!.note!.link, "Obsidian"]).result).toBe("obsidian://open?vault=Obsidian&file=%D0%9C%D0%BE%D1%8F%20%D0%B7%D0%B0%D0%BC%D0%B5%D1%82%D0%BA%D0%B0");
 	});
 });
+
+describe("the Project page of a menu read over the settings alone", () => {
+	it("offers the whole tree the screen it is opened over gives (`screen.projectTree` handed in as the menu's `projects`)", () => {
+		const screen = call("tasks.screen", ["2026-11-11"]).result as { projectTree: unknown[]; inbox: { json?: unknown }[]; offer: unknown };
+		expect((screen.projectTree as { name: string }[]).map((p) => p.name)).toEqual(["Дружба", "Small talk"]);
+		const item = (screen.inbox as unknown[])[0];
+		const menu = callDoor("tasks.menu", [item, "inbox", { today: "2026-11-11", day: "2026-11-11", offer: screen.offer, projects: screen.projectTree }], { tasks: null, nowMs }) as Ok;
+		expect((menu.result as { project: { options: { project: { name: string }; depth: number; checked: boolean }[] } }).project.options.map((o) => [o.project.name, o.depth, o.checked])).toEqual([
+			["Дружба", 0, false],
+			["Small talk", 1, true],
+		]);
+	});
+});

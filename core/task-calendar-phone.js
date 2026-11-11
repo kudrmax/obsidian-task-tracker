@@ -5811,6 +5811,7 @@ ${key.title}`.toLowerCase();
         calendars: true,
         projects,
         project: null,
+        projectTree: new ProjectIndex(projectTreeOf(doc)).known(),
         titleDrops: this.titleDrops(date, projects)
       };
     }
@@ -5841,6 +5842,7 @@ ${key.title}`.toLowerCase();
         calendars: false,
         projects: off,
         project: null,
+        projectTree: [],
         titleDrops: this.titleDrops(date, off)
       };
     }
@@ -5990,11 +5992,11 @@ ${key.title}`.toLowerCase();
     }
     menu(item, from, screen) {
       const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-      return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectChoices());
+      return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectChoices(screen));
     }
     bulkMenu(picked, screen) {
       const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-      return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices());
+      return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices(screen));
     }
     carried(lifted, picked) {
       return carriedWith(lifted, picked);
@@ -6028,9 +6030,10 @@ ${key.title}`.toLowerCase();
       const settings = this.settings.get();
       return itemLevels(usableLevels(settings.priorities), usableLabels(settings.labels), (name) => index.refOf(name, mark));
     }
-    /** The projects the Project page offers: the tree read last, each with its depth. */
-    projectChoices() {
-      return new ProjectIndex(this.source.tree()).known().map((project) => ({ project, depth: project.path.length - 1 }));
+    /** The projects the Project page offers, each with its depth: the screen's when it gives them, else the tree read last. */
+    projectChoices(screen) {
+      const known = screen?.projects ?? new ProjectIndex(this.source.tree()).known();
+      return known.map((project) => ({ project, depth: project.path.length - 1 }));
     }
     today() {
       return this.rules.today();
