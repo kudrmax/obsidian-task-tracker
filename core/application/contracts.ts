@@ -797,12 +797,17 @@ export interface ProjectsSection {
 	readonly key: string;
 	/**
 	 * What the list's drop machinery knows the part by (`ListCard.group`, `PlacedHead.group`, `ListPlace.group`): null for
-	 * the untitled part (the node's own, No project's), else `key`. Every titled part's header opens its part
-	 * (`PlacedHead.opens`), so the gap above the first header is that part's.
+	 * the untitled part (the node's own, No project's), else `key`.
 	 */
 	readonly group: GroupName;
 	/** It draws a header (`title`): every part but the untitled one. */
 	readonly header: boolean;
+	/**
+	 * Its header's `PlacedHead.opens`, passed through as it is: a header opens its part unless the untitled part stands above
+	 * it. So under the own part's last card the gap is the own part's, and above the first header of an empty own part a
+	 * card goes into the own part; with no untitled part (By stage, All), the list's top is the first part's.
+	 */
+	readonly opens: boolean;
 	/** No card in it: shown so a card can be dropped there (a stage By stage, a subproject By project). */
 	readonly empty: boolean;
 	/** The No tasks plate under it: an empty part with a header, or the only part. The node's own part, empty, draws nothing. */

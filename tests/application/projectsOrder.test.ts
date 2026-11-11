@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { StaleTaskError, type ListPlace, type ProjectsSection, type ProjectsView } from "../../core/application/contracts";
+import { placeAt, StaleTaskError, type ListPlace, type PlacedCard, type PlacedHead, type ProjectsSection, type ProjectsView } from "../../core/application/contracts";
 import { callDoor, type DoorAnswer } from "../../core/application/PhoneCalls";
 import { memoryProjectsScreen, type Clock } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
@@ -98,6 +98,61 @@ describe("the order of the Projects screen", () => {
 		const { svc } = await setup("project:P", "byProject", FILE.replace("- [ ] Inbox A 🗂️ P", "- [ ] Inbox A").replace(/ 🗂️ P/gu, ""));
 		const own = (await svc.projectsScreen()).sections[0];
 		expect([own.title, own.group, own.empty, own.plate]).toEqual([null, null, true, false]);
+	});
+});
+
+/** The list laid out as a frontend draws it, each part's head passed through as the core gives it: headers 30 high, rows 40. */
+function laidOut(view: ProjectsView): { cards: PlacedCard[]; heads: PlacedHead[] } {
+	const cards: PlacedCard[] = [];
+	const heads: PlacedHead[] = [];
+	let y = 0;
+	for (const section of view.sections) {
+		if (section.header) {
+			heads.push({ group: section.group, opens: section.opens, firstCard: cards.length, top: y, height: 30 });
+			y += 30;
+		}
+		for (const row of section.rows) {
+			cards.push({ level: row.level, group: section.group, top: y, height: 40 });
+			y += 40;
+		}
+	}
+	return { cards, heads };
+}
+
+describe("the parts as the lists' drop machinery takes them", () => {
+	it("a header opens its part only with no untitled part above it", async () => {
+		const byProject = await (await setup()).svc.projectsScreen();
+		expect(byProject.sections.map((s) => [s.title, s.opens])).toEqual([
+			[null, false],
+			["Sub", false],
+			["Empty", false],
+		]);
+		const byStage = await (await setup("project:P", "byStage")).svc.projectsScreen();
+		expect(byStage.sections.every((s) => s.opens)).toBe(true);
+	});
+
+	it("the gap under the own part's last card is the own part's; past the first header, the subproject's", async () => {
+		const view = await (await setup()).svc.projectsScreen();
+		const { cards, heads } = laidOut(view);
+		const own = view.sections[0].rows.length;
+		const bottom = own * 40;
+		expect(placeAt(cards, bottom - 5, 0, 0, null, heads)).toMatchObject({ index: own, group: null });
+		expect(placeAt(cards, bottom + 5, 0, 0, null, heads)).toMatchObject({ index: own, group: null });
+		expect(placeAt(cards, bottom + 31, 0, 0, null, heads)).toMatchObject({ index: own, group: "project:Sub" });
+	});
+
+	it("an empty own part above subprojects is the place above the first header", async () => {
+		const view = await (await setup("project:P", "byProject", FILE.replace(/ 🗂️ P/gu, ""))).svc.projectsScreen();
+		expect(view.sections[0]).toMatchObject({ group: null, empty: true, plate: false });
+		const { cards, heads } = laidOut(view);
+		expect(placeAt(cards, 10, 0, 0, null, heads)).toMatchObject({ index: 0, group: null });
+		expect(placeAt(cards, 35, 0, 0, null, heads)).toMatchObject({ index: 0, group: "project:Sub" });
+	});
+
+	it("By stage, the top of the list is the first stage's", async () => {
+		const view = await (await setup("project:P", "byStage")).svc.projectsScreen();
+		const { cards, heads } = laidOut(view);
+		expect(placeAt(cards, 1, 0, 0, null, heads)).toMatchObject({ index: 0, group: "inbox" });
 	});
 });
 

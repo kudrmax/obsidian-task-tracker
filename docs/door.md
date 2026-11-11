@@ -183,8 +183,8 @@ as one tree, the first name winning, and is written back as one under the first 
   `"done"` or `"project:<name>"` (`rules.projectNodeOf(name)`). `status` is computed: `active` (an open task of its
   branch in Now or Soon, or with a date or a time), `waiting` (open tasks only in Inbox and Backlog, or a project of its
   branch with no task yet; `waiting` draws the name grey), `done` (every task of its branch closed, every subproject
-  done). `sections`: the chosen node's tasks, `ProjectsSection` `{ key, group, title, header, empty, plate, path, depth,
-  cards, rows, newTask }`; By project the node's own first (`title` null), then each subproject's at any depth, each
+  done). `sections`: the chosen node's tasks, `ProjectsSection` `{ key, group, title, header, opens, empty, plate, path,
+  depth, cards, rows, newTask }`; By project the node's own first (`title` null), then each subproject's at any depth, each
   in stage order (Inbox, Backlog, Soon, Today), then the file's; By stage Inbox, Backlog, Soon, Today (Done last, only
   under Done). Where cards can be dropped (`reorders`: every node but Done and a done project) every part a drop can go
   to shows, empty too (`empty`; `plate`: the No tasks plate, under an empty part with a header or the only part; the
@@ -192,8 +192,9 @@ as one tree, the first name winning, and is written back as one under the first 
   `{ id, item, level, card, drop }`: each card (level 0, `card` its `ProjectsCard`), then its open subtasks a level
   deeper unless folded (`item.collapsed`; the folded card shows its next step); branch lines by `rules.branchOf` over
   the levels; the fold is `tasks.toggleCollapsed(item.key)` as in the lists. `group` is the part as the list's drop
-  machinery knows it (`ListCard.group`, `PlacedHead.group` with `opens: true` for every header): null for the untitled
-  part, else `key`. Each `ProjectsCard` `{ id, item, stage, over, from, drop, menuFrom, canDrop }`: `id`
+  machinery knows it (`ListCard.group`, `PlacedHead.group`): null for the untitled part, else `key`; `opens` is its
+  header's `PlacedHead.opens`, passed through: false while the untitled part stands above it, so the gap under the own
+  part's last card (and, the own part empty, the place above the first header) is the own part's. Each `ProjectsCard` `{ id, item, stage, over, from, drop, menuFrom, canDrop }`: `id`
   unique per drawn card (a task of two parts is two cards: key a card by it, never by `item.id`), `drop` what
   `tasks.dropOnProject` takes for that very card, `canDrop` an open task (a closed one under Done stays); `stage` (By
   project) `{ kind: "today" | "soon" | "inbox" | "backlog" | "done" }` or `{ kind: "date", date, label }`; `over` (By

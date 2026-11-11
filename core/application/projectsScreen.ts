@@ -392,7 +392,7 @@ function part(key: string, title: string | null, path: readonly string[], depth:
 	const drawn = cards.map((card) => ({ id: `${key}/${card.item.id}`, ...card }));
 	const rows = drawn.flatMap((card): ProjectsListRow[] => [{ id: card.id, item: card.item, level: 0, card, drop: card.drop }, ...subtaskRows(key, card.item, 1, card.from)]);
 	const header = title !== null;
-	return { key, group: header ? key : null, title, header, empty: drawn.length === 0, plate: false, path, depth, cards: drawn, rows, newTask };
+	return { key, group: header ? key : null, title, header, opens: header, empty: drawn.length === 0, plate: false, path, depth, cards: drawn, rows, newTask };
 }
 
 /** A task's open subtasks as rows a level deeper, each before its own, unless they are folded away. */
@@ -401,10 +401,14 @@ function subtaskRows(key: string, item: TaskItem, level: number, from: string | 
 	return item.subtasks.flatMap((sub) => [{ id: `${key}/${sub.id}`, item: sub, level, card: null, drop: { key: sub.key, from } }, ...subtaskRows(key, sub, level + 1, from)]);
 }
 
-/** The parts shown: all of them where a drop may go (`open`), else those with a card; the plate under an empty one with a header, or the only one. */
+/**
+ * The parts shown: all of them where a drop may go (`open`), else those with a card; the plate under an empty one with a
+ * header, or the only one; a header opens its part unless the untitled part stands above it.
+ */
 function shown(sections: readonly ProjectsSection[], open: boolean): ProjectsSection[] {
 	const kept = open ? sections : sections.filter((s) => !s.empty);
-	return kept.map((s) => ({ ...s, plate: s.empty && (s.header || kept.length === 1) }));
+	const untitledAbove = (i: number) => kept.slice(0, i).some((s) => !s.header);
+	return kept.map((s, i) => ({ ...s, plate: s.empty && (s.header || kept.length === 1), opens: s.header && !untitledAbove(i) }));
 }
 
 /** A tap on a row: the node chosen; the chosen one's branch folded or unfolded. */

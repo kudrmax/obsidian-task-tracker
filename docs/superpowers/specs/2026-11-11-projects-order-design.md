@@ -58,7 +58,7 @@ The plugin comes first (Max: «плагин в приоритете»); the iPho
    empty part is still left out, and `ProjectsView.reorders` is false there: closed tasks are not reordered. This
    replaces «an empty part left out» of the parent spec's decision 8 for live nodes.
 3. **One mechanism with the lists.** The gesture is the lists' own: a part is a section (`ProjectsSection.group`, null
-   for the untitled part, `PlacedHead.opens` true for every header), its `rows` (`ProjectsListRow` `{ id, item, level,
+   for the untitled part; `PlacedHead.opens` is `ProjectsSection.opens`, decision 9), its `rows` (`ProjectsListRow` `{ id, item, level,
    card, drop }`) are what `ListGroup.rows` are, so `placeAt`, `placeOfDrop`, `branchOf` and `gapBranch` run unchanged.
    The write is the funnel's own moves (`moveToGroup`, `nest`) run through `applyAll`, plus a `swapProject` step. The
    call is `tasks.dropInProjects(cards, place)` with `projectsDropPreview(cards, place)` (`{ landings, view, tasks }`)
@@ -78,3 +78,10 @@ The plugin comes first (Max: «плагин в приоритете»); the iPho
 7. **A part the screen no longer has** (or a list that takes no drop) rejects with StaleTaskError, writing nothing.
 8. **The landing** prefers the part the card was dropped in when the task shows in two; a nested card lands as a
    `subtask` of its new parent.
+9. **A header's `opens` is the core's** (the plugin's Obsidian decision 1, moved into the core). `ProjectsSection.opens:
+   boolean`, which a frontend passes as `PlacedHead.opens` unmapped: a header opens its part unless the untitled part
+   (the node's own, By project) stands above it. So the gap under the own part's last card is the own part's, and only
+   past the first subproject's header does a card go to that subproject. An empty own part, drawn as nothing, is still a
+   place: a card let go above the first header goes into the node's own part (the plugin's rule had opened that header,
+   leaving no way into an empty own part from the list). With no untitled part (By stage, All) every header opens, so the
+   list's top is the first part's.

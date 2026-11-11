@@ -10,7 +10,7 @@ const card = (task: TaskItem, stage: ProjectsCard["stage"]): ProjectsCard => ({ 
 
 function drawn(model: ProjectsCard): HTMLElement {
 	const tasks = new ProjectTasks(document.body.appendChild(document.createElement("div")), {});
-	tasks.render({ sections: [{ key: "own", group: null, title: null, header: false, empty: false, plate: false, path: [], depth: 0, cards: [model], rows: [{ id: model.id, item: model.item, level: 0, card: model, drop: model.drop }], newTask: null }], emptyLabel: "No tasks", newTask: null }, false);
+	tasks.render({ sections: [{ key: "own", group: null, title: null, header: false, opens: false, empty: false, plate: false, path: [], depth: 0, cards: [model], rows: [{ id: model.id, item: model.item, level: 0, card: model, drop: model.drop }], newTask: null }], emptyLabel: "No tasks", newTask: null }, false);
 	return tasks.el.querySelector(".tc-card")!;
 }
 
