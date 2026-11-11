@@ -177,21 +177,53 @@ as one tree, the first name winning, and is written back as one under the first 
   of the tree («Дружба», «iPhone»), `note` the attached note's link, `mark` the card's folder icon (off on the Projects
   screen). `item.can.setProject` is false on a subtask.
 - `tasks.projectsScreen()`: `ProjectsView` `{ rows, selected, mode, modes, title, menu, sections, newTask, emptyLabel,
-  missing }`. `rows`: the tree top to bottom, each `ProjectsRow` `{ node, kind, title, depth, tile, waiting, status,
+  missing, reorders }`. `rows`: the tree top to bottom, each `ProjectsRow` `{ node, kind, title, depth, tile, waiting, status,
   selected, hasBranch, folded, project, acceptsTask, canLift, unfoldsOnHover }`: All, the active and waiting projects (a
   folded branch left out), No project, Done and, once tapped open, the done projects. `node` is `"all"`, `"none"`,
   `"done"` or `"project:<name>"` (`rules.projectNodeOf(name)`). `status` is computed: `active` (an open task of its
   branch in Now or Soon, or with a date or a time), `waiting` (open tasks only in Inbox and Backlog, or a project of its
   branch with no task yet; `waiting` draws the name grey), `done` (every task of its branch closed, every subproject
-  done). `sections`: the chosen node's tasks, `ProjectsSection` `{ key, title, path, depth, cards, newTask }`; By
-  project the node's own first (`title` null), then each subproject's at any depth; By stage Today, Soon, Inbox,
-  Backlog (Done for a done node). Each `ProjectsCard` `{ id, item, stage, over, from, drop, menuFrom, canDrop }`: `id`
+  done). `sections`: the chosen node's tasks, `ProjectsSection` `{ key, group, title, header, opens, empty, plate, path,
+  depth, cards, rows, newTask }`; By project the node's own first (`title` null), then each subproject's at any depth, each
+  in stage order (Inbox, Backlog, Soon, Today), then the file's; By stage Inbox, Backlog, Soon, Today (Done last, only
+  under Done). Where cards can be dropped (`reorders`: every node but Done and a done project) every part a drop can go
+  to shows, empty too (`empty`; `plate`: the No tasks plate, under an empty part with a header or the only part; the
+  node's own part, empty under subprojects, draws nothing). `rows`: what a list column draws, `ProjectsListRow`
+  `{ id, item, level, card, drop }`: each card (level 0, `card` its `ProjectsCard`), then its open subtasks a level
+  deeper unless folded (`item.collapsed`; the folded card shows its next step); branch lines by `rules.branchOf` over
+  the levels; the fold is `tasks.toggleCollapsed(item.key)` as in the lists. `group` is the part as the list's drop
+  machinery knows it (`ListCard.group`, `PlacedHead.group`): null for the untitled part, else `key`; `opens` is its
+  header's `PlacedHead.opens`, passed through: false while the untitled part stands above it, so the gap under the own
+  part's last card (and, the own part empty, the place above the first header) is the own part's. Each `ProjectsCard` `{ id, item, stage, over, from, drop, menuFrom, canDrop }`: `id`
   unique per drawn card (a task of two parts is two cards: key a card by it, never by `item.id`), `drop` what
   `tasks.dropOnProject` takes for that very card, `canDrop` an open task (a closed one under Done stays); `stage` (By
   project) `{ kind: "today" | "soon" | "inbox" | "backlog" | "done" }` or `{ kind: "date", date, label }`; `over` (By
   stage) the subproject the card stands in; `from` the project it is shown under; `menuFrom` what `tasks.menu` takes.
-  `menu`: `ProjectMenu` `{ project, renameLabel, noteLabel, note, attachLabel, detachLabel }` for a project, `null` for
-  All, No project, Done.
+  `menu`: `ProjectMenu` `{ project, renameLabel, noteLabel, note, attachLabel, detachLabel, delete }` for a project,
+  `null` for All, No project, Done. `delete`: `{ label, title, message, confirm, cancel, destructive }`, «Delete
+  project», asked as «Delete “Дружба”?» / «Its tasks stay; they just lose this project.» before
+  `tasks.deleteProject(name)`.
+- `tasks.deleteProject(name)`: the project's tree line goes, its subprojects lifted a level into its place in order,
+  and its `🗂️ Name` field goes from every task line that has it (Done and subtask lines too). No task is removed, closed
+  or moved; one left without a project shows under No project; an attached note's file is untouched. One step of undo.
+  `tasks.deleteProject("Дружба")` turns `- [ ] Встретиться 🗂️ Дружба 🗂️ Спорт` into `- [ ] Встретиться 🗂️ Спорт`.
+- `tasks.dropInProjects(cards, place)`: cards dropped in the Projects list, each its row's `drop`; `place` the
+  `ListPlace` the list's own machinery gives (`rules.placeAt` over the rows as `PlacedCard`s with `group` and the
+  headers, then `rules.placeOfDrop`, null: nothing to write). A place under a task nests there as in the lists. Between
+  cards, the card above says where (the card below at a part's top, or when the card above's stage would refuse the
+  cards): a card already in that card's stage only moves among its list's tasks, right after it (before it), nothing on
+  its line changed (a time, a date, a reminder stay); a card from another stage moves as a drop on that stage's column
+  writes it (Today: into Now, dated today; Soon from Today: undated). An empty part: By stage the end of that stage's
+  list, as the column; By project nothing moves. By project the part's project then takes the place of the card's
+  `from` in the line's order, the others stay. Where a stage's column would refuse a card (`rules.acceptsDrop`: Inbox
+  and Backlog no dated or timed task, Soon no timed one) the place takes no drop: `rules.projectsTakes(view, cards,
+  place)` is false, the host shows no drop line and lets go of nothing, and `dropInProjects` writes nothing. One write;
+  answers the tasks' keys as the file now has them; `staleTask` for a part the screen no longer has.
+  `tasks.dropInProjects([card.drop], { kind: "task", group: "today", before: null })` puts a Soon card into Now.
+- `tasks.projectsDropPreview(cards, place)`: the same, writing nothing: `{ landings, view, tasks }`, `view` the
+  `ProjectsView` the drop leaves (equal to the next `projectsScreen`), each landing `{ kind: "card", id, item, card,
+  section, index }` (the part it was dropped in first), `{ kind: "subtask", id, item, parent, index }` or
+  `{ kind: "away", id, item: null }`.
 - `tasks.tapProjectNode(node)`: a node not chosen is chosen; the chosen one folds or unfolds its branch (Done opens its
   done projects). `tasks.unfoldProjectNode(node)`: the branch opened without choosing it, for a card held over a folded
   row (`unfoldsOnHover`). `ProjectsRow.muted`: the name drawn grey (a waiting or done project, No project, Done). `tasks.selectProjectNode(node)`: chosen, the branches above it opened (a search hit's path, a card's
@@ -212,7 +244,8 @@ as one tree, the first name winning, and is written back as one under the first 
 - `tasks.dropOnProject(cards, row.node)`, each card's `drop` (`ProjectsDrop` `{ key, from }`): cards let go on a row
   (`acceptsTask`): each card's `from` gives way to the row's project (No project: taken off), the others and the place in
   the funnel stay. `tasks.dropOnProject([{ key, from: "Где знакомиться" }], "project:Small talk")` turns `🗂️ Где
-  знакомиться 🗂️ Дружба` into `🗂️ Дружба 🗂️ Small talk`.
+  знакомиться 🗂️ Дружба` into `🗂️ Small talk 🗂️ Дружба`: the new project takes the old one's place in the line (one
+  the task has already: the old one only goes), so the first project changes only when the old one was first.
 - The plus let go on the tasks writes `tasks.createInPlace(text, priority, newTask.place, null, [], newTask.project)`
   with the section's `newTask` (By project: Inbox with that subproject; By stage: that stage's list with the node's
   project), or the view's `newTask` outside any section.

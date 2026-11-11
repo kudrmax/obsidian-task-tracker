@@ -5,10 +5,13 @@ import { GroupNameField } from "../GroupNameField";
 import type { GestureArbiter } from "../gestures";
 import { centeredListWidth, listWidthMax } from "../listWidth";
 import { ProjectsSegment } from "./ProjectsSegment";
-import { ProjectTasks } from "./ProjectTasks";
+import { PLATE } from "../TaskList";
+import { ProjectTasks, type ProjectTasksDeps } from "./ProjectTasks";
 import type { TasksShown, TreeShown } from "./ProjectDrops";
 import { ProjectTree } from "./ProjectTree";
-import { LIST_WIDTHS, type ProjectsCard, type ProjectsNodeId, type ProjectsRow, type ProjectsView, type TaskService } from "../../../core/application/contracts";
+import { LIST_WIDTHS, type ProjectsNodeId, type ProjectsRow, type ProjectsView, type TaskService } from "../../../core/application/contracts";
+
+const HIDDEN = "tc-hidden";
 
 /** What the screen asks the core. */
 export type ProjectsSource = Pick<TaskService, "projectsScreen" | "tapProjectNode" | "setProjectsMode">;
@@ -22,7 +25,8 @@ export interface ProjectsScreenDeps {
 	onSnap(): void;
 	/** The chosen project's title tapped: its menu, Rename and Note. */
 	onMenu?(title: HTMLElement, view: ProjectsView): void;
-	onCard?(card: HTMLElement, model: ProjectsCard, signal: AbortSignal): void;
+	onCard?: ProjectTasksDeps["onCard"];
+	onPlate?: ProjectTasksDeps["onPlate"];
 	onRow?(row: HTMLElement, model: ProjectsRow, signal: AbortSignal): void;
 	onError(error: unknown): void;
 }
@@ -64,7 +68,7 @@ export class ProjectsScreen {
 			onSnap: () => deps.onSnap(),
 			arbiter: deps.arbiter,
 		});
-		this.tasks = new ProjectTasks(el(this.el, "div", "tc-projects-tasks-column"), { onCard: deps.onCard });
+		this.tasks = new ProjectTasks(el(this.el, "div", "tc-projects-tasks-column"), { onCard: deps.onCard, onPlate: deps.onPlate });
 	}
 
 	/** Rename: the name typed where the title stands, the caret at its end; Enter gives the name, anything else null. */
@@ -88,6 +92,11 @@ export class ProjectsScreen {
 		return { el: tree.el, rows: tree.rows, elementOf: (i) => tree.elementOf(i), showDropOn: (node) => tree.showDropOn(node) };
 	}
 
+	/** The tasks as drawn: the list a card is dropped in. */
+	get tasksList(): ProjectTasks {
+		return this.tasks;
+	}
+
 	/** The tasks as their drop target reads them. */
 	get tasksShown(): TasksShown {
 		return { el: this.tasks.el, parts: this.tasks.parts, endTask: this.tasks.endTask };
@@ -108,12 +117,17 @@ export class ProjectsScreen {
 		return this.ask(slot, "Project name");
 	}
 
-	/** A new task's text typed after `after` among the tasks (first when null); resolves with the text, or null for nothing typed. */
+	/**
+	 * A new task's text typed after `after` among the tasks (first when null); a No tasks plate gives the field its place
+	 * while it is open. Resolves with the text, or null for nothing typed.
+	 */
 	askTaskText(after: HTMLElement | null): Promise<string | null> {
 		const slot = el(null, "div", "tc-projects-task-field");
 		if (after?.isConnected) after.after(slot);
 		else this.tasks.el.prepend(slot);
-		return this.ask(slot, "New task");
+		const plate = after?.classList.contains(PLATE) ? after : null;
+		plate?.classList.add(HIDDEN);
+		return this.ask(slot, "New task").finally(() => plate?.classList.remove(HIDDEN));
 	}
 
 	private ask(slot: HTMLElement, placeholder: string): Promise<string | null> {

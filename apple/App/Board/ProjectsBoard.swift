@@ -26,6 +26,8 @@ final class ProjectsBoard {
     var dropOn: String?
     /// The name asked: a task typed for the plus let go on the tasks, a project for the plus in the tree, a rename.
     var asking: Ask?
+    /// The project Delete project was chosen for, its question shown before anything is written.
+    var deleting: ProjectMenu?
 
     struct Part: Identifiable {
         let section: ProjectsSection
@@ -114,6 +116,11 @@ final class ProjectsBoard {
         }
     }
 
+    /// Something stands on the page above part `index`: a header, a card or a plate (an empty own part draws nothing).
+    func drawsAnything(before index: Int) -> Bool {
+        parts.prefix(index).contains { $0.section.header || !$0.cards.isEmpty || $0.section.plate }
+    }
+
     // MARK: The tree
 
     /// A tap on a row: chosen, or, chosen already, its branch folds or unfolds.
@@ -179,6 +186,11 @@ final class ProjectsBoard {
             fatalError("The core gives no Projects tree measures: \(error)")
         }
     }()
+
+    /// Delete project, confirmed: the project goes from the tree and from its tasks; every task stays.
+    func delete(_ name: String) async {
+        await write { try $0.deleteProject(name) }
+    }
 
     /// Detach: the note's link taken off the project; the note stays in the vault.
     func detach(_ name: String) async {

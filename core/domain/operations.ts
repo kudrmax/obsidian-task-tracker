@@ -400,6 +400,18 @@ export function moveToGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedLi
 	return entered.moveEntry(sameEntryIn(entered, entry), list, positionIn(entered, list, group, before));
 }
 
+/**
+ * The task moved among its own list's tasks (a subtask: its task's list, out of its task), into `group` right before
+ * `before` (one of that list's tasks; else at the end of `group`). Nothing on its line changes: its date, time,
+ * reminder and fields stay.
+ */
+export function reorder(doc: TaskDocument, entry: TaskEntry, group: GroupName, before: TaskEntry | null): TaskDocument {
+	if (before !== null && samePlace(before, entry)) return doc;
+	const list = entry.section;
+	if (list === "done") return doc;
+	return doc.moveEntry(entry, list, positionIn(doc, list, group, before));
+}
+
 /** Right before `before` when it is one of `list`'s tasks, else at the end of `group`. */
 function positionIn(doc: TaskDocument, list: GroupedList, group: GroupName, before: TaskEntry | null): InsertPosition {
 	if (before !== null && before.section === list) return before.index;

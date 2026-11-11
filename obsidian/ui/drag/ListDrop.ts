@@ -1,7 +1,7 @@
-import { carriedMiddle, type DropTo, type GapPlace, levelAt, placeOfDrop, placesInGap, sameGap } from "../../../core/application/contracts";
+import { carriedMiddle, type DropTo, type GapPlace, type GroupName, type Header, type ListCard, type ListPlace, levelAt, placeOfDrop, placesInGap, sameGap } from "../../../core/application/contracts";
 import { type CardSize, shownCardSize } from "../cardSize";
 import { DESIGN, LAYOUT, tokenPx } from "../design";
-import { type ListEntry, PLATE, type TaskList } from "../TaskList";
+import { type ListEntry, PLATE } from "../TaskList";
 import { AutoScroll } from "./AutoScroll";
 import { carriesMany, type ColumnSections, type DragOrigin, type DragPayload, type DropResult, type DropTarget, type ListColumn, originsOf } from "./DropTarget";
 import { DropLine } from "./DropLine";
@@ -9,6 +9,7 @@ import { type ListFrame, readFrame, toClient } from "./listFrame";
 import { headerOfPlace, type PlacedCard, type PlacedHead, placeAt, sameHeader } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
+const DOT = "--tc-drop-dot";
 const LIFTED = "is-lifted";
 /** A lifted card that stays where it stood as a dashed place; the other lifted ones, its subtasks, fold away under it. */
 const WAITING = "is-waiting";
@@ -42,11 +43,28 @@ interface Layout {
 	readonly size: CardSize;
 	readonly width: number;
 	readonly indent: number;
+	/** The drop line's dot across. */
+	readonly dot: number;
 	readonly cards: readonly Measured[];
 	/** Their `top` in content pixels too. */
 	readonly heads: readonly PlacedHead[];
 	/** The first dashed place, where a card carried alone was lifted from: its top and height in content pixels. */
 	readonly waiting: { readonly top: number; readonly height: number } | null;
+}
+
+/** What a list's drop reads of the list as drawn: a list column (`TaskList`), or the Projects screen's tasks. */
+export interface DropList {
+	readonly el: HTMLElement;
+	/** Headers, plates and cards in the order they stand; the same array until the list is drawn again. */
+	readonly elements: readonly HTMLElement[];
+	readonly cards: readonly ListEntry[];
+	listCard(entry: ListEntry): ListCard;
+	/** What a header drawn means for a place: undefined for any other node. */
+	headerAt(node: HTMLElement): Header | undefined;
+	/** The No tasks plate of empty section `name`; null when none is drawn. */
+	plateOf(name: GroupName): HTMLElement | null;
+	/** Whether a header drawn opens its part (`PlacedHead.opens`); none for a list whose headers don't. */
+	headerOpens?(node: HTMLElement): boolean;
 }
 
 /**
@@ -57,7 +75,7 @@ interface Layout {
  * ticks under the finger. A list that shows sections takes a card from
  * anywhere this way, into the section of the gap; another list takes a card from elsewhere at its end.
  */
-export class ListDrop implements DropTarget {
+export abstract class CardListDrop implements DropTarget {
 	/** What a drop means now. */
 	private place: GapPlace | null = null;
 	private layout: Layout | null = null;
@@ -70,19 +88,10 @@ export class ListDrop implements DropTarget {
 	private readonly scroll: AutoScroll;
 
 	constructor(
-		private readonly list: TaskList,
-		private readonly area: HTMLElement,
-		readonly column: ListColumn,
-		/** Whether the list takes tasks carried from these places, the one under the finger first (`acceptsDrop`). */
-		private readonly accepts: (origins: readonly DragOrigin[]) => boolean,
-		/** Whose sections the column shows; null for a past day's column. */
-		private readonly sections: () => ColumnSections | null = () => null,
-		/** The list's title stands over its area, as a column's does; Backlog's stands in its own area, under Inbox. */
-		private readonly titleOver = true,
+		protected readonly list: DropList,
+		protected readonly area: HTMLElement,
 		/** A new task's place moved to another gap or level. */
 		private readonly onNewPlace: () => void = () => undefined,
-		/** The column's title: a task carried onto it goes into the list as the core says, the title lit as an empty section's plate is. */
-		private readonly title: ColumnTitle | null = null,
 	) {
 		this.line = new DropLine(() => this.list.el);
 		this.scroll = new AutoScroll(
@@ -91,12 +100,47 @@ export class ListDrop implements DropTarget {
 		);
 	}
 
+	/** Whether the list takes the card under the finger and every card carried along with it. */
+	protected abstract takes(drag: DragPayload): boolean;
+
+	/** Whether the gap under the finger is the place, or the list's end is. */
+	protected abstract placesAnywhere(drag: DragPayload): boolean;
+
+	/** Whether the list shows sections, whose headers break nesting and pick the section of a gap. */
+	protected abstract showsSections(): boolean;
+
+	/** What a drop at `place` means; null for the list's end, in a list that takes the card there only. */
+	protected abstract resultOf(place: ListPlace | null): DropResult | null;
+
+	/**
+	 * Whether the list takes the carried cards at this place: a place it refuses is as a list that does not take them, no
+	 * line or plate shown and nothing let go there.
+	 */
+	protected takesPlace(_place: ListPlace, _drag: DragPayload): boolean {
+		return true;
+	}
+
+	/** How far over the area the list still takes a finger: a column's title stands there. */
+	protected reachAbove(): number {
+		return 0;
+	}
+
+	/** The title under a task carried onto it, while it means a drop; none for a list with no such title. */
+	protected titleAt(_x: number, _y: number, _drag: DragPayload): HTMLElement | null {
+		return null;
+	}
+
+	/** What a drop on the title means. */
+	protected titleDrop(): DropResult | null {
+		return null;
+	}
+
 	/** The list and its title: a finger carried up past the list puts the card on its top. Under the list nothing is it. */
 	hitTest(x: number, y: number, drag: DragPayload): boolean {
 		if (!this.takes(drag)) return false;
 		const r = this.area.getBoundingClientRect();
 		const bottom = Math.min(r.bottom, this.list.el.getBoundingClientRect().bottom);
-		return x >= r.left && x < r.right && y >= r.top - (this.titleOver ? DESIGN.columnsTop : 0) && y < bottom;
+		return x >= r.left && x < r.right && y >= r.top - this.reachAbove() && y < bottom;
 	}
 
 	preview(x: number, y: number, drag: DragPayload): void {
@@ -123,13 +167,20 @@ export class ListDrop implements DropTarget {
 					this.levelAt(x, frame),
 					0,
 					null,
-					this.sections() ? this.placedHeads(frame) : [],
+					this.showsSections() ? this.placedHeads(frame) : [],
 					this.place ?? this.liftedFrom(),
 					LAYOUT.dropHysteresis,
 				);
 		this.place = place;
 		if (fresh && (!before || !sameGap(before, place) || before.level !== place.level)) this.onNewPlace();
-		const home = this.isHome(place, frame);
+		const where = placeOfDrop(this.placed(frame), place, this.home());
+		const home = where === null;
+		if (where !== null && !this.takesPlace(where, drag)) {
+			this.light(null);
+			this.line.hide();
+			this.scroll.follow(y, frame.box);
+			return;
+		}
 		const plate = home ? null : this.list.plateOf(place.group);
 		this.light(plate);
 		if (plate) this.line.hide();
@@ -168,16 +219,6 @@ export class ListDrop implements DropTarget {
 		this.plate = plate;
 	}
 
-	/** The title under a task carried onto it (never under the plus: a new task's place is a gap), while it means a drop. */
-	private titleAt(x: number, y: number, drag: DragPayload): HTMLElement | null {
-		if (drag.from === "new" || !this.title?.drop()) return null;
-		const title = this.title.el();
-		if (!title) return null;
-		const t = title.getBoundingClientRect();
-		const r = this.area.getBoundingClientRect();
-		return t.height > 0 && x >= r.left && x < r.right && y >= t.top && y < t.bottom ? title : null;
-	}
-
 	private lightTitle(title: HTMLElement | null): void {
 		if (title === this.litTitle) return;
 		this.litTitle?.classList.remove(HOT);
@@ -195,12 +236,12 @@ export class ListDrop implements DropTarget {
 
 	drop(x: number, y: number, drag: DragPayload): DropResult | null {
 		if (!this.takes(drag)) return null;
-		if (this.titleAt(x, y, drag)) return this.title?.drop() ?? null;
-		if (!this.placesAnywhere(drag)) return { kind: "place", column: this.column, place: null };
+		if (this.titleAt(x, y, drag)) return this.titleDrop();
+		if (!this.placesAnywhere(drag)) return this.resultOf(null);
 		if (!this.place) this.preview(x, y, drag);
 		if (!this.place) return null;
 		const place = placeOfDrop(this.placed(readFrame(this.list.el)), this.place, this.home());
-		return place && { kind: "place", column: this.column, place };
+		return place && this.takesPlace(place, drag) ? this.resultOf(place) : null;
 	}
 
 	/** The place a card carried alone was lifted from, at its level; several cards carried have none. */
@@ -208,23 +249,8 @@ export class ListDrop implements DropTarget {
 		return this.carriesMany() ? null : this.liftedFrom();
 	}
 
-	/** The card goes back where it was lifted from: the drop would change nothing, so no line or plate shows. */
-	private isHome(place: GapPlace, frame: ListFrame): boolean {
-		return placeOfDrop(this.placed(frame), place, this.home()) === null;
-	}
-
 	private carriesMany(): boolean {
 		return this.last !== null && carriesMany(this.last.drag);
-	}
-
-	/** The list takes the card under the finger and every card carried along with it. */
-	private takes(drag: DragPayload): boolean {
-		return this.accepts(originsOf(drag));
-	}
-
-	/** Whether the gap under the finger is the place, or the list's end is (`placesInGap`). */
-	private placesAnywhere(drag: DragPayload): boolean {
-		return placesInGap(this.column, drag.from, this.sections() !== null);
 	}
 
 	/** The layout measured for this drag, measured again only once the list is drawn anew or changes its card size or width. */
@@ -262,9 +288,11 @@ export class ListDrop implements DropTarget {
 				continue;
 			}
 			const header = this.list.headerAt(node);
-			if (header !== undefined) heads.push({ group: header, opens: false, firstCard: cards.length, top: node.offsetTop - removed, height: node.offsetHeight });
+			if (header !== undefined) heads.push({ group: header, opens: this.list.headerOpens?.(node) ?? false, firstCard: cards.length, top: node.offsetTop - removed, height: node.offsetHeight });
 		}
-		return { nodes, size, width, indent: tokenPx(this.list.el, INDENT), cards, heads, waiting };
+		const tokens = getComputedStyle(this.list.el);
+		const read = (token: string) => parseFloat(tokens.getPropertyValue(token)) || 0;
+		return { nodes, size, width, indent: read(INDENT), dot: read(DOT), cards, heads, waiting };
 	}
 
 	/** A measured card in client pixels. */
@@ -335,7 +363,12 @@ export class ListDrop implements DropTarget {
 			const over = toClient(frame, 0, layout.waiting.top - layout.size.gap / 2).y;
 			return new DOMRect(gap.left, over, gap.width, 0);
 		}
-		return new DOMRect(gap.left, gap.top - layout.size.gap / 2, gap.width, 0);
+		return new DOMRect(gap.left, Math.max(gap.top - layout.size.gap / 2, this.topmostLine(frame)), gap.width, 0);
+	}
+
+	/** The highest the line stands: its dot whole under the list's top, where a part drawn as nothing (an empty own part) takes it. */
+	private topmostLine(frame: ListFrame): number {
+		return toClient(frame, 0, 0).y + this.layoutFor(frame).dot / 2;
 	}
 
 	/** Where a task's card starts: a subtask's stands its levels further in. */
@@ -343,5 +376,63 @@ export class ListDrop implements DropTarget {
 		const layout = this.layoutFor(frame);
 		const first = layout.cards[0];
 		return first ? toClient(frame, first.left, 0).x - first.entry.level * layout.indent : frame.box.left;
+	}
+}
+
+/**
+ * A list column of the funnel as a place to drop: what a drop means is the service's (`TaskService.drop`), a place in the
+ * column; its title, a place too.
+ */
+export class ListDrop extends CardListDrop {
+	constructor(
+		list: DropList,
+		area: HTMLElement,
+		readonly column: ListColumn,
+		/** Whether the list takes tasks carried from these places, the one under the finger first (`acceptsDrop`). */
+		private readonly accepts: (origins: readonly DragOrigin[]) => boolean,
+		/** Whose sections the column shows; null for a past day's column. */
+		private readonly sections: () => ColumnSections | null = () => null,
+		/** The list's title stands over its area, as a column's does; Backlog's stands in its own area, under Inbox. */
+		private readonly titleOver = true,
+		onNewPlace: () => void = () => undefined,
+		/** The column's title: a task carried onto it goes into the list as the core says, the title lit as an empty section's plate is. */
+		private readonly title: ColumnTitle | null = null,
+	) {
+		super(list, area, onNewPlace);
+	}
+
+	protected takes(drag: DragPayload): boolean {
+		return this.accepts(originsOf(drag));
+	}
+
+	/** `placesInGap`. */
+	protected placesAnywhere(drag: DragPayload): boolean {
+		return placesInGap(this.column, drag.from, this.sections() !== null);
+	}
+
+	protected showsSections(): boolean {
+		return this.sections() !== null;
+	}
+
+	protected resultOf(place: ListPlace | null): DropResult {
+		return { kind: "place", column: this.column, place };
+	}
+
+	protected override reachAbove(): number {
+		return this.titleOver ? DESIGN.columnsTop : 0;
+	}
+
+	/** The title under a task carried onto it (never under the plus: a new task's place is a gap), while it means a drop. */
+	protected override titleAt(x: number, y: number, drag: DragPayload): HTMLElement | null {
+		if (drag.from === "new" || !this.title?.drop()) return null;
+		const title = this.title.el();
+		if (!title) return null;
+		const t = title.getBoundingClientRect();
+		const r = this.area.getBoundingClientRect();
+		return t.height > 0 && x >= r.left && x < r.right && y >= t.top && y < t.bottom ? title : null;
+	}
+
+	protected override titleDrop(): DropResult | null {
+		return this.title?.drop() ?? null;
 	}
 }

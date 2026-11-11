@@ -403,6 +403,13 @@ export type TaskChange =
 	| { readonly kind: "moveToGroup"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate }
 	/** The task's projects become this one alone (its name), null for none; a subtask keeps its parent's. */
 	| { readonly kind: "project"; readonly project: string | null }
+	/**
+	 * The task moved among its own list's tasks into `group` right before `before` (else that section's end), nothing on
+	 * its line changed: a drop that leaves a task in its own stage.
+	 */
+	| { readonly kind: "reorder"; readonly group: GroupName; readonly before: TaskKey | null }
+	/** The project `from` gives way to `to` in `from`'s place in the line's order (null `to`: `from` taken off; null `from`: `to` added last), the others kept, as a drop on the tree's row; a subtask's names its top task. */
+	| { readonly kind: "swapProject"; readonly from: string | null; readonly to: string | null }
 	| { readonly kind: "createGroup"; readonly list: GroupedList; readonly name: string; readonly date?: LocalDate }
 	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null };
 
@@ -773,9 +780,45 @@ export interface ProjectsNewTask {
 	readonly project: string | null;
 }
 
+/**
+ * A row of a part of the Projects screen's tasks, as a list column draws its rows (`ListGroup.rows`): each task, then its
+ * open subtasks a level deeper unless they are folded away (a folded task's card shows its next step). Branch lines as
+ * the lists draw them (`branchOf` over the rows' levels).
+ */
+export interface ProjectsListRow {
+	/** Unique on the screen: a task of two parts is two rows, and so are its subtasks. */
+	readonly id: string;
+	readonly item: TaskItem;
+	/** 0 for a task, one more for each task above a subtask. */
+	readonly level: number;
+	/** The part's card for a task (level 0); null for a subtask. */
+	readonly card: ProjectsCard | null;
+	/** What `dropInProjects` takes for this row: its task, and the project its card is shown under (a subtask: its task's card's). */
+	readonly drop: ProjectsDrop;
+}
+
 /** A part of the chosen node's tasks: By project a subproject's (the node's own first, untitled), By stage a stage's. */
 export interface ProjectsSection {
 	readonly key: string;
+	/**
+	 * What the list's drop machinery knows the part by (`ListCard.group`, `PlacedHead.group`, `ListPlace.group`): null for
+	 * the untitled part (the node's own, No project's), else `key`.
+	 */
+	readonly group: GroupName;
+	/** It draws a header (`title`): every part but the untitled one. */
+	readonly header: boolean;
+	/**
+	 * Its header's `PlacedHead.opens`, passed through as it is: a header opens its part unless the untitled part stands above
+	 * it. So under the own part's last card the gap is the own part's, and above the first header of an empty own part a
+	 * card goes into the own part; with no untitled part (By stage, All), the list's top is the first part's.
+	 */
+	readonly opens: boolean;
+	/** No card in it: shown so a card can be dropped there (a stage By stage, a subproject By project). */
+	readonly empty: boolean;
+	/** The No tasks plate under it: an empty part with a header, or the only part. The node's own part, empty, draws nothing. */
+	readonly plate: boolean;
+	/** The rows the list draws, cards and their open subtasks: what a list column's rows are (`ProjectsListRow`). */
+	readonly rows: readonly ProjectsListRow[];
 	/** The header: the subproject's name or the stage's (Today, Soon, Inbox, Backlog, Done); null for the node's own tasks. */
 	readonly title: string | null;
 	/** By project: the subproject's path below the chosen node; empty for the node's own and in By stage. */
@@ -800,6 +843,22 @@ export interface ProjectMenu {
 	readonly attachLabel: string;
 	/** «Detach»: takes the link off, `setProjectNote(name, null)`; the file stays. */
 	readonly detachLabel: string;
+	/** «Delete project», destructive, asked first with these words; a confirm writes `deleteProject(name)`. */
+	readonly delete: ProjectDelete;
+}
+
+/** Delete project in the project menu: its row, and the question asked before it writes, which says the tasks stay. */
+export interface ProjectDelete {
+	/** «Delete project». */
+	readonly label: string;
+	/** «Delete “Name”?» */
+	readonly title: string;
+	/** «Its tasks stay; they just lose this project.» */
+	readonly message: string;
+	readonly confirm: string;
+	readonly cancel: string;
+	/** Drawn as a destructive action. */
+	readonly destructive: true;
 }
 
 /** The Projects screen: the tree on the left, the chosen node's tasks on the right. */
@@ -821,6 +880,29 @@ export interface ProjectsView {
 	readonly emptyLabel: string;
 	/** No tasks file: the tree holds only All, No project and Done. */
 	readonly missing: boolean;
+	/**
+	 * The task list is a list cards are dropped in (`dropInProjects`), as a list column is: every node but Done and a done
+	 * project, whose closed tasks stay.
+	 */
+	readonly reorders: boolean;
+}
+
+/**
+ * Where a card dropped in the Projects list stands once the drop is written, on the Projects screen it leaves
+ * (`TaskService.projectsDropPreview`): `card`, a card (`ProjectsCard.id`) of part `section`, `index` among that part's
+ * cards (the part it was dropped in when the task shows in two); `subtask`, under the task `parent` (its id), `index` among
+ * its open subtasks; `away`, not on the screen.
+ */
+export type ProjectsDropLanding =
+	| { readonly kind: "card"; readonly id: string; readonly item: TaskItem; readonly card: string; readonly section: string; readonly index: number }
+	| { readonly kind: "subtask"; readonly id: string; readonly item: TaskItem; readonly parent: string; readonly index: number }
+	| { readonly kind: "away"; readonly id: string; readonly item: null };
+
+/** A drop in the Projects list before it is written: where each card lands, the Projects screen it leaves (ids as the next read gives them), and the file's text. */
+export interface ProjectsDropPreview {
+	readonly landings: readonly ProjectsDropLanding[];
+	readonly view: ProjectsView;
+	readonly tasks: string;
 }
 
 /** Where a project lifted in the tree, or the plus, lands at a gap: the place the call takes, and the depth the gap is drawn at. */
@@ -840,6 +922,13 @@ export { projectsGap, projectsLevels } from "./projectsScreen";
  * row above's), kept within the gap's depths.
  */
 export { projectsDrop } from "./projectsScreen";
+/**
+ * Whether the Projects list takes these cards at a place (`projectsTakes(view, cards, place)`, each card its row's
+ * `drop`, `place` from `placeOfDrop`): false where a card would change stage into a column that refuses it, as the
+ * funnel's columns refuse it (`acceptsDrop`: Inbox and Backlog no dated or timed task, Soon no timed one). A frontend
+ * shows no drop line there and lets go of nothing, as over a list that does not take the card.
+ */
+export { projectsTakes } from "./projectsDrop";
 /** How long a held card waits over a folded row before its branch opens (`unfoldProjectNode`), ms; the indent of a tree's step, px (pt). */
 export { PROJECTS_HOVER_MS, PROJECTS_INDENT } from "./projectsScreen";
 
@@ -1039,6 +1128,13 @@ export interface TaskService {
 	 * project has writes nothing: false.
 	 */
 	renameProject(from: string, to: string): Promise<boolean>;
+	/**
+	 * The project menu's Delete project: its line goes from the tree, its subprojects lifted a level into its place in
+	 * order, and its `🗂️` field goes from every task line that has it. No task is removed, closed or moved; one left
+	 * without a project shows under No project; an attached note's file is never touched. One write, one step of undo. A
+	 * name the tree lacks writes nothing.
+	 */
+	deleteProject(name: string): Promise<void>;
 	/** The project menu's Note: the note `link` attached (its `[[link]]` on the tree line), or taken off with null. The note's file is never touched. */
 	setProjectNote(name: string, link: string | null): Promise<void>;
 	/**
@@ -1047,6 +1143,21 @@ export interface TaskService {
 	 * stay. A subtask's key names its top task. One write.
 	 */
 	dropOnProject(cards: readonly ProjectsDrop[], to: ProjectsNodeId): Promise<void>;
+	/**
+	 * Cards dropped in the Projects list (`ProjectsView.reorders`), each its row's `drop`, at `place` as the list's drop
+	 * machinery found it (`placeAt`, then `placeOfDrop` over the rows, a part's `group` as the section). One write, one
+	 * step of undo. A place under a task nests there, as in the lists. Between cards the card above says where (the card
+	 * below at a part's top, or where the card above's stage refuses the cards): a card in that card's stage only moves
+	 * among its list's tasks next to it, nothing on its line changed; a card from another stage moves as a drop on that
+	 * stage's column writes it (Today is Now, dated today). An empty part: By stage that stage's list's end; By project
+	 * nothing moves. By project the part's project then takes the place of the one the card was shown under
+	 * (`ProjectsDrop.from`) in the line's order, as a drop on the tree's row does. Where a stage's column refuses a card
+	 * (`projectsTakes` false) it writes nothing. Gives the tasks' keys as the file now has them. Rejects with
+	 * StaleTaskError, writing nothing, for a part the screen no longer has.
+	 */
+	dropInProjects(cards: readonly ProjectsDrop[], place: ListPlace): Promise<readonly TaskKey[]>;
+	/** `dropInProjects` writing nothing: where each card lands and the Projects screen the drop leaves, equal to the next `projectsScreen()` after it. */
+	projectsDropPreview(cards: readonly ProjectsDrop[], place: ListPlace): Promise<ProjectsDropPreview>;
 	/** A project's name of nothing, as typed (`cleanProjectName`): the Create button of New project… is off for it. */
 	isBlankProjectName(name: string): boolean;
 	/** The task's labels become these names, written as tags; a task with a priority keeps none. The task as it now stands, its key fresh; null once it is gone. */

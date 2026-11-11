@@ -127,18 +127,19 @@ describe("the tree", () => {
 });
 
 describe("a project's tasks", () => {
-	it("By project: its own first, untitled, then each subproject's at any depth; each card's stage or date", async () => {
+	it("By project: its own first, untitled, then each subproject's at any depth, an empty one too; each card's stage or date", async () => {
 		const { svc } = setup();
 		await svc.selectProjectNode("project:Окружение в Сербии");
 		const view = await svc.projectsScreen();
 		expect(view.title).toBe("Окружение в Сербии");
 		expect(view.sections.map((s) => [s.title, s.depth, titles(s.cards)])).toEqual([
-			[null, 0, ["Самолет: чекнуть отмену", "Брейншторм плана с Клодом"]],
-			["Где знакомиться", 1, ["Найти мероприятия для друзей", "Активности как ЛШ"]],
+			[null, 0, ["Брейншторм плана с Клодом", "Самолет: чекнуть отмену"]],
+			["Где знакомиться", 1, ["Активности как ЛШ", "Найти мероприятия для друзей"]],
+			["Приложения для знакомств", 2, []],
 			["Свидание", 1, ["Свидание: в каком формате искать"]],
 		]);
-		expect(view.sections[0].cards.map((c) => c.stage)).toEqual([{ kind: "today" }, { kind: "soon" }]);
-		expect(view.sections[2].cards[0]).toMatchObject({ stage: { kind: "inbox" }, from: "Свидание", menuFrom: "inbox", over: null });
+		expect(view.sections[0].cards.map((c) => c.stage)).toEqual([{ kind: "soon" }, { kind: "today" }]);
+		expect(view.sections[3].cards[0]).toMatchObject({ stage: { kind: "inbox" }, from: "Свидание", menuFrom: "inbox", over: null });
 		expect(view.sections[1].newTask).toEqual({ place: { kind: "list", list: "inbox", group: null, before: null }, project: "Где знакомиться" });
 		expect(view.sections[0].cards[0].item.project).toMatchObject({ name: "Окружение в Сербии", mark: false });
 	});
@@ -151,25 +152,25 @@ describe("a project's tasks", () => {
 		expect(card.stage).toEqual({ kind: "date", date: "2026-11-14", label: { day: "14", month: "NOV" } });
 	});
 
-	it("By stage: Today, Soon, Inbox, Backlog, each card with the subproject it is in", async () => {
+	it("By stage: Inbox, Backlog, Soon, Today, each card with the subproject it is in", async () => {
 		const { svc } = setup();
 		await svc.selectProjectNode("project:Окружение в Сербии");
 		await svc.setProjectsMode("byStage");
 		const view = await svc.projectsScreen();
 		expect(view.sections.map((s) => [s.title, s.cards.map((c) => [c.item.title, c.over])])).toEqual([
-			["Today", [["Самолет: чекнуть отмену", null]]],
-			["Soon", [["Брейншторм плана с Клодом", null], ["Найти мероприятия для друзей", "Где знакомиться"]]],
 			["Inbox", [["Свидание: в каком формате искать", "Свидание"]]],
 			["Backlog", [["Активности как ЛШ", "Где знакомиться"]]],
+			["Soon", [["Брейншторм плана с Клодом", null], ["Найти мероприятия для друзей", "Где знакомиться"]]],
+			["Today", [["Самолет: чекнуть отмену", null]]],
 		]);
-		expect(view.sections[0].newTask).toEqual({ place: { kind: "list", list: "now", group: null, before: null }, project: "Окружение в Сербии" });
+		expect(view.sections[3].newTask).toEqual({ place: { kind: "list", list: "now", group: null, before: null }, project: "Окружение в Сербии" });
 	});
 
 	it("All By stage gives each card its project; No project its tasks without one; Done the done projects' tasks", async () => {
 		const { svc } = setup();
 		await svc.setProjectsMode("byStage");
 		const all = await svc.projectsScreen();
-		expect(all.sections[0].cards.map((c) => c.over)).toEqual(["Окружение в Сербии"]);
+		expect(all.sections[3].cards.map((c) => c.over)).toEqual(["Окружение в Сербии"]);
 		await svc.tapProjectNode("none");
 		expect((await svc.projectsScreen()).sections.flatMap((s) => titles(s.cards))).toEqual(["Без проекта"]);
 		await svc.setProjectsMode("byProject");
@@ -209,7 +210,7 @@ describe("the writes", () => {
 	it("dropped on No project, it loses that project only", async () => {
 		const { svc, store } = setup();
 		const view = await svc.projectsScreen();
-		const card = view.sections.find((s) => s.title === "Где знакомиться")!.cards[0];
+		const card = view.sections.find((s) => s.title === "Где знакомиться")!.cards.find((c) => c.item.title === "Найти мероприятия для друзей")!;
 		await svc.dropOnProject([card.drop], "none");
 		expect(store.text).toContain("- [ ] Найти мероприятия для друзей 🗂️ Дружба\n");
 	});

@@ -1091,6 +1091,12 @@
       if (!found || found.node.note === note) return this;
       return new _ProjectTree(mapped(this.roots, found.node.name, (node) => ({ ...node, note })));
     }
+    /** The project gone from the tree, its subprojects lifted a level into its place, in their order. */
+    deleted(name) {
+      const found = this.find(name);
+      if (!found) return this;
+      return new _ProjectTree(lifted(this.roots, found.node.name));
+    }
     same(other) {
       return treeLines(this, "	").join("\n") === treeLines(other, "	").join("\n");
     }
@@ -1103,6 +1109,9 @@
   };
   function removed(nodes, name) {
     return nodes.filter((n) => n.name !== name).map((n) => ({ ...n, children: removed(n.children, name) }));
+  }
+  function lifted(nodes, name) {
+    return nodes.flatMap((n) => n.name === name ? n.children : [{ ...n, children: lifted(n.children, name) }]);
   }
   function inserted(nodes, node, place) {
     if (place.parent === null) return into(nodes, node, place.before);
@@ -1508,11 +1517,11 @@
       const mint = this.mint();
       for (const heading of headings) {
         const current = rows ?? this.rows;
-        let filled2 = heading + 1;
-        while (filled2 < current.length && current[filled2].line.trim() === "") filled2++;
-        if (filled2 === current.length || filled2 === heading + 2 && current[heading + 1].line === "") continue;
+        let filled = heading + 1;
+        while (filled < current.length && current[filled].line.trim() === "") filled++;
+        if (filled === current.length || filled === heading + 2 && current[heading + 1].line === "") continue;
         rows ??= [...this.rows];
-        rows.splice(heading + 1, filled2 - heading - 1, ...mint.rows([""]));
+        rows.splice(heading + 1, filled - heading - 1, ...mint.rows([""]));
       }
       return rows ? this.withRows(rows, mint) : this;
     }
@@ -1778,8 +1787,8 @@
     return [...doc.tasks("now"), ...doc.tasks("soon")];
   }
   function dayList(doc, date, today, boundary = DayBoundary.MIDNIGHT) {
-    const shown = (e) => date === today ? e.section === "now" || e.task.dueDate === date : e.task.dueDate === date;
-    return listed(doc).filter((e) => shown(e) && !slottedOnDate(e, date, boundary));
+    const shown2 = (e) => date === today ? e.section === "now" || e.task.dueDate === date : e.task.dueDate === date;
+    return listed(doc).filter((e) => shown2(e) && !slottedOnDate(e, date, boundary));
   }
   function slottedOn(doc, date, boundary = DayBoundary.MIDNIGHT) {
     return listed(doc).filter((e) => slottedOnDate(e, date, boundary));
@@ -1807,11 +1816,11 @@
   function columnGroups(doc, column, today, boundary = DayBoundary.MIDNIGHT) {
     const list = columnList(column, today);
     if (list === null) return [];
-    const shown = column.kind === "day" ? dayList(doc, column.date, today, boundary) : column.kind === "soon" ? soonWithoutDate(doc) : doc.tasks(list);
+    const shown2 = column.kind === "day" ? dayList(doc, column.date, today, boundary) : column.kind === "soon" ? soonWithoutDate(doc) : doc.tasks(list);
     const groups = doc.groups(list);
     const ungrouped = ungroupedIndex(groups);
-    const others = shown.filter((e) => e.section !== list);
-    return groups.map((g) => ({ list, index: g.index, name: g.name, entries: [...g.index === ungrouped ? others : [], ...shown.filter((e) => e.section === list && g.entries.includes(e))] })).filter((g, i) => g.entries.length > 0 || groups[i].heading && g.name !== null && groups[i].entries.length === 0);
+    const others = shown2.filter((e) => e.section !== list);
+    return groups.map((g) => ({ list, index: g.index, name: g.name, entries: [...g.index === ungrouped ? others : [], ...shown2.filter((e) => e.section === list && g.entries.includes(e))] })).filter((g, i) => g.entries.length > 0 || groups[i].heading && g.name !== null && groups[i].entries.length === 0);
   }
 
   // core/domain/operations.ts
@@ -2071,6 +2080,12 @@
     const entered = patch(doc, entry, enteringList(list, today, date));
     return entered.moveEntry(sameEntryIn(entered, entry), list, positionIn(entered, list, group, before));
   }
+  function reorder(doc, entry, group, before) {
+    if (before !== null && samePlace(before, entry)) return doc;
+    const list = entry.section;
+    if (list === "done") return doc;
+    return doc.moveEntry(entry, list, positionIn(doc, list, group, before));
+  }
   function positionIn(doc, list, group, before) {
     if (before !== null && before.section === list) return before.index;
     return group === null ? "end" : { endOf: groupIndex(doc, list, group) };
@@ -2109,10 +2124,10 @@
     const list = columnList(column, today);
     const trimmed = name.trim();
     if (list === null || trimmed === "" || trimmed === groups.ungrouped || trimmed === group) return doc;
-    const shown = columnGroups(doc, column, today, boundary).find((g) => g.name === group)?.entries ?? [];
-    const at = before === null ? shown.length : shown.findIndex((e) => samePlace(e, before));
+    const shown2 = columnGroups(doc, column, today, boundary).find((g) => g.name === group)?.entries ?? [];
+    const at = before === null ? shown2.length : shown2.findIndex((e) => samePlace(e, before));
     if (at < 0) throw new Error(`Not a task the column shows in its group: ${before.raw}`);
-    const below = shown.slice(at);
+    const below = shown2.slice(at);
     const own = below.filter((e) => e.section === list);
     const index = groupIndex(doc, list, group);
     const twin = groupIndex(doc, list, trimmed) >= 0;
@@ -3017,8 +3032,8 @@ ${key.title}`.toLowerCase();
     events(date) {
       const chosen = this.shown().days().day(date);
       const events = chosen.events;
-      const shown = (name) => events.filter((e) => e.source === name).length;
-      const statuses = [...this.reading.sources].sort((a, b) => WINDOW_ORDER.indexOf(a) - WINDOW_ORDER.indexOf(b)).map((source) => this.status(source, shown(source), chosen.used.has(source)));
+      const shown2 = (name) => events.filter((e) => e.source === name).length;
+      const statuses = [...this.reading.sources].sort((a, b) => WINDOW_ORDER.indexOf(a) - WINDOW_ORDER.indexOf(b)).map((source) => this.status(source, shown2(source), chosen.used.has(source)));
       const inUse = statuses.filter((s) => s.used);
       const alert = inUse.map((s) => alertOf(s.tone)).reduce((worst, a) => ALERTS.indexOf(a) > ALERTS.indexOf(worst) ? a : worst, "none");
       return {
@@ -3045,9 +3060,9 @@ ${key.title}`.toLowerCase();
       return this.shown().known().map((c) => ({ account: c.key.account, title: c.key.title, accountName: c.accountName, name: c.name, color: c.color, shown: !hidden.has(keyText(c.key)) }));
     }
     /** The settings that show or hide one calendar. */
-    shownChange(account, title, shown) {
+    shownChange(account, title, shown2) {
       const others = this.hidden().filter((k) => k.account !== account || k.title !== title);
-      return { hiddenCalendars: shown ? others : [...others, { account, title }], calendarsMigrated: true };
+      return { hiddenCalendars: shown2 ? others : [...others, { account, title }], calendarsMigrated: true };
     }
     /** On the phone, once both Google's and the phone's files are there: the old choice becomes the list of hidden calendars; null when not now. */
     carryOver(canMigrate) {
@@ -3062,7 +3077,7 @@ ${key.title}`.toLowerCase();
     shown() {
       return new ShownCalendars(this.reading.files, this.settings, this.now);
     }
-    status(source, shown, used) {
+    status(source, shown2, used) {
       const problem = this.problem(source);
       const file = this.reading.files.get(source);
       const updatedAt = file?.exportedAt ?? null;
@@ -3078,7 +3093,7 @@ ${key.title}`.toLowerCase();
         detail: this.reading.fed(source) ? null : file?.device ?? null,
         tone
       };
-      return { ...facts, events: shown, stale: problem !== null || old, used, words: sourceWords(facts) };
+      return { ...facts, events: shown2, stale: problem !== null || old, used, words: sourceWords(facts) };
     }
     /** Google logged out says so, whatever its file: there is none to fetch, or what is left of an old login. */
     problem(source) {
@@ -3444,8 +3459,8 @@ ${key.title}`.toLowerCase();
     if (home && sameGap(place, home) && place.level === home.level) return null;
     return placeOfGap(cards, place);
   }
-  function groupPlaceOf(groups, lifted, slot) {
-    if (slot === lifted || slot === lifted + 1) return null;
+  function groupPlaceOf(groups, lifted2, slot) {
+    if (slot === lifted2 || slot === lifted2 + 1) return null;
     return slot >= groups.length ? "end" : { before: groups[slot] };
   }
 
@@ -3591,6 +3606,15 @@ ${key.title}`.toLowerCase();
     const rewritten = doc.replaceAll(named.map((entry) => [entry, { ...entry.task, projects: uniqueNames(entry.task.projects.map((p) => projectKey(p) === key ? to : p)) }]));
     return rewritten.withProjectTree(renamed);
   }
+  function deleteProject(doc, name) {
+    const tree = doc.projectTree().withMissing(taskProjects(doc));
+    const deleted = tree.deleted(name);
+    if (deleted === tree) return doc;
+    const key = projectKey(name);
+    const named = flatten(doc.allTasks()).filter((entry) => entry.task.projects.some((p) => projectKey(p) === key));
+    const rewritten = doc.replaceAll(named.map((entry) => [entry, { ...entry.task, projects: entry.task.projects.filter((p) => projectKey(p) !== key) }]));
+    return rewritten.withProjectTree(deleted);
+  }
   function addProject(doc, name, place) {
     const tree = doc.projectTree().withMissing(taskProjects(doc));
     const added = tree.added(name, place);
@@ -3605,6 +3629,13 @@ ${key.title}`.toLowerCase();
     const tree = doc.projectTree().withMissing(taskProjects(doc));
     const changed2 = tree.withNote(name, note);
     return changed2 === tree ? doc : doc.withProjectTree(changed2);
+  }
+  function swappedProjects(projects, from, to) {
+    const at = from === null ? -1 : projects.findIndex((p) => projectKey(p) === projectKey(from));
+    const has = to !== null && projects.some((p) => projectKey(p) === projectKey(to));
+    if (at < 0) return uniqueNames(to === null || has ? projects : [...projects, to]);
+    const swapped = projects.flatMap((p, i) => i !== at ? [p] : to === null || has ? [] : [to]);
+    return uniqueNames(swapped);
   }
   function projectHolder(doc, entry) {
     return entry.path.length === 0 ? entry : doc.find(entry.section, entry.index, []);
@@ -3712,8 +3743,8 @@ ${key.title}`.toLowerCase();
     return drawn;
   }
   function shownSections(groups, sections) {
-    const shown = groups.reduce((all, name) => all.some((g) => g.name === name) ? all : [...all, groupOf(name, [])], []);
-    return withEmptySections(shown, sections).map((g) => g.name);
+    const shown2 = groups.reduce((all, name) => all.some((g) => g.name === name) ? all : [...all, groupOf(name, [])], []);
+    return withEmptySections(shown2, sections).map((g) => g.name);
   }
   function offeredNames(groups, presets, ungrouped) {
     const names = [...groups.flatMap((group) => group === null ? [] : [group]), ...presets.map((preset) => preset.trim())];
@@ -3777,8 +3808,8 @@ ${key.title}`.toLowerCase();
     return COLUMNS.has(from);
   }
   function menuOffer(froms, screen, columnSections) {
-    const shown = froms.every((from) => COLUMNS.has(from) && columnSections(from, screen.day) !== null);
-    return shown ? screen.offer : null;
+    const shown2 = froms.every((from) => COLUMNS.has(from) && columnSections(from, screen.day) !== null);
+    return shown2 ? screen.offer : null;
   }
   function tileStatus(id) {
     const statuses = { done: "done", inProgress: "inProgress", stopProgress: "todo", wontDo: "cancelled", stop: null };
@@ -3863,8 +3894,8 @@ ${key.title}`.toLowerCase();
       remove: { confirm: of.kind === "task" }
     };
   }
-  function carriedWith(lifted, picked) {
-    const id = keyId(lifted);
+  function carriedWith(lifted2, picked) {
+    const id = keyId(lifted2);
     return picked.filter((key) => keyId(key) !== id && !picked.some((other) => other !== key && isUnder(key, other)));
   }
 
@@ -3916,11 +3947,11 @@ ${key.title}`.toLowerCase();
     const labels = levels.labelsOf(marks.labels);
     const open = isOpen(entry.task.status);
     const collapsed = entry.task.collapsed && hasOpenSubtask(entry);
-    const shown = collapsed && open ? nextStep(entry) : null;
-    const drawnBelow = shown ? { id: shown.id, on: entry } : drawn;
+    const shown2 = collapsed && open ? nextStep(entry) : null;
+    const drawnBelow = shown2 ? { id: shown2.id, on: entry } : drawn;
     const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary, drawnBelow));
     const description = descriptionMarkdown(entry);
-    const step = shown && itemWithId(allSubtasks, shown.id);
+    const step = shown2 && itemWithId(allSubtasks, shown2.id);
     const own = { text: entry.task.text, title: plainText(entry.task.text) };
     const projects = levels.projectsOf(entry.projects);
     return {
@@ -4164,9 +4195,9 @@ ${key.title}`.toLowerCase();
      * (a folded result's, whose card shows its step).
      */
     holder(key) {
-      const shown = this.look.shown();
+      const shown2 = this.look.shown();
       let best = null;
-      for (const column of [...shown, ...ALL_COLUMNS.filter((c) => !shown.includes(c))]) {
+      for (const column of [...shown2, ...ALL_COLUMNS.filter((c) => !shown2.includes(c))]) {
         this.look.cards(column).forEach((card, index) => {
           const k = card.key;
           const holds = k.section === key.section && k.index === key.index && k.path.length < key.path.length && k.path.every((i, n) => key.path[n] === i);
@@ -4282,8 +4313,8 @@ ${key.title}`.toLowerCase();
     choosePlace(placement) {
       const field = this.session.field;
       if (!field) return null;
-      const shown = this.shownPlace(field);
-      if (shown && samePlacement(shown, placement)) return null;
+      const shown2 = this.shownPlace(field);
+      if (shown2 && samePlacement(shown2, placement)) return null;
       const column = placement.kind === "now" || placement.kind === "date" ? "day" : placement.kind;
       const rename2 = field.rename && { ...field.rename, moved: true };
       this.reset({ ...field, rename: rename2, run: this.newRun(this.endOf(column)) });
@@ -4458,8 +4489,8 @@ ${key.title}`.toLowerCase();
       return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, group } };
     }
     find(key) {
-      const shown = this.look.shown();
-      for (const column of [...shown, ...ALL_COLUMNS.filter((c) => !shown.includes(c))]) {
+      const shown2 = this.look.shown();
+      for (const column of [...shown2, ...ALL_COLUMNS.filter((c) => !shown2.includes(c))]) {
         const index = this.look.cards(column).findIndex((card) => samePlace2(card.key, key));
         if (index >= 0) return { column, index };
       }
@@ -4565,8 +4596,8 @@ ${key.title}`.toLowerCase();
     /** Right under a renamed task at its level, or its first subtask when it shows some: nothing may stand between a task and them. */
     under(spot, item) {
       const { place } = spot;
-      const shown = item.subtasks.length > 0 && !item.collapsed;
-      return { ...spot, place: { ...place, index: place.index + 1, level: place.level + (shown ? 1 : 0) } };
+      const shown2 = item.subtasks.length > 0 && !item.collapsed;
+      return { ...spot, place: { ...place, index: place.index + 1, level: place.level + (shown2 ? 1 : 0) } };
     }
     /** The field's place a level deeper or shallower; null when the cards around forbid it, or the field does not move (a rename, a slot, a stack). */
     shifted(delta) {
@@ -4582,8 +4613,8 @@ ${key.title}`.toLowerCase();
       if (!list) return null;
       const { place } = list;
       const unwritten = run.pending.map((line) => ({ level: line.level, group: place.group }));
-      const shown = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
-      const shifted = shiftLevel(shown, { ...place, index: place.index + unwritten.length }, delta);
+      const shown2 = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
+      const shifted = shiftLevel(shown2, { ...place, index: place.index + unwritten.length }, delta);
       return shifted && { ...place, level: shifted.level };
     }
     blank(text) {
@@ -4808,7 +4839,11 @@ ${key.title}`.toLowerCase();
     rename: "Rename",
     note: "Note",
     attach: "Attach note…",
-    detach: "Detach"
+    detach: "Detach",
+    deleteProject: "Delete project",
+    deleteMessage: "Its tasks stay; they just lose this project.",
+    deleteConfirm: "Delete",
+    deleteCancel: "Cancel"
   };
   var PROJECT_PREFIX = "project:";
   function projectNodeOf(name) {
@@ -4878,7 +4913,8 @@ ${key.title}`.toLowerCase();
       sections: parts,
       newTask: selected2 === "done" || placed !== null && statusOf2(placed.node.name) === "done" ? null : inInbox(placed?.node.name ?? null),
       emptyLabel: PROJECTS_WORDS.noTasks,
-      missing: input.doc === null
+      missing: input.doc === null,
+      reorders: input.doc !== null && selected2 !== "done" && !(placed !== null && statusOf2(placed.node.name) === "done")
     };
   }
   function projectMenu(project) {
@@ -4888,7 +4924,15 @@ ${key.title}`.toLowerCase();
       noteLabel: PROJECTS_WORDS.note,
       note: project.note === null ? null : { link: project.note, name: projectName(project.note.split("|")[0].split("#")[0]) },
       attachLabel: PROJECTS_WORDS.attach,
-      detachLabel: PROJECTS_WORDS.detach
+      detachLabel: PROJECTS_WORDS.detach,
+      delete: {
+        label: PROJECTS_WORDS.deleteProject,
+        title: `Delete “${project.name}”?`,
+        message: PROJECTS_WORDS.deleteMessage,
+        confirm: PROJECTS_WORDS.deleteConfirm,
+        cancel: PROJECTS_WORDS.deleteCancel,
+        destructive: true
+      }
     };
   }
   function inInbox(project) {
@@ -4963,7 +5007,7 @@ ${key.title}`.toLowerCase();
   function fixedRow(node, title, selected2, hasBranch, acceptsTask) {
     return { node, kind: node, title, depth: 0, tile: true, waiting: false, muted: node !== "all", status: null, selected: selected2 === node, hasBranch, folded: false, project: null, acceptsTask, canLift: false, unfoldsOnHover: false };
   }
-  var STAGES = ["today", "soon", "inbox", "backlog"];
+  var STAGE_ORDER = ["inbox", "backlog", "soon", "today", "done"];
   function stageOf(entry) {
     if (!isOpen(entry.task.status) || entry.section === "done") return "done";
     return entry.section === "now" ? "today" : entry.section;
@@ -4982,7 +5026,7 @@ ${key.title}`.toLowerCase();
     return tasksOf(doc).filter((entry) => namesProject(entry.task.projects, name) && (closed ? stageOf(entry) === "done" : stageOf(entry) !== "done"));
   }
   function byStage(entries) {
-    const rank = (entry) => ["today", "soon", "inbox", "backlog", "done"].indexOf(stageOf(entry));
+    const rank = (entry) => STAGE_ORDER.indexOf(stageOf(entry));
     return entries.map((entry, i) => ({ entry, i })).sort((a, b) => rank(a.entry) - rank(b.entry) || a.i - b.i).map(({ entry }) => entry);
   }
   function cardOf2(input, entry, mode, from, over) {
@@ -5004,18 +5048,19 @@ ${key.title}`.toLowerCase();
     if (selected2 === "done") return doneSections(input, doc, mode, statusOf2);
     if (selected2 === "none") {
       const loose = tasksOf(doc).filter((entry) => entry.task.projects.length === 0 && stageOf(entry) !== "done");
-      return mode === "byProject" ? filled([part("none", null, [], 0, byStage(loose).map((e) => cardOf2(input, e, mode, null, null)), inInbox(null))]) : stageSections(input, loose.map((entry) => ({ entry, from: null, over: null })), null);
+      return mode === "byProject" ? shown([part("none", null, [], 0, byStage(loose).map((e) => cardOf2(input, e, mode, null, null)), inInbox(null))], true) : stageSections(input, loose.map((entry) => ({ entry, from: null, over: null })), null, true);
     }
     const live = input.tree.all().filter((p) => statusOf2(p.node.name) !== "done");
-    if (mode === "byProject") return filled(live.map((p) => part(`project:${p.node.name}`, p.node.name, p.path, p.path.length, byStage(tasksNaming(doc, p.node.name, false)).map((e) => cardOf2(input, e, mode, p.node.name, null)), inInbox(p.node.name))));
-    const shown = tasksOf(doc).filter((entry) => entry.task.projects.length > 0 && stageOf(entry) !== "done");
+    if (mode === "byProject") return shown(live.map((p) => part(`project:${p.node.name}`, p.node.name, p.path, p.path.length, byStage(tasksNaming(doc, p.node.name, false)).map((e) => cardOf2(input, e, mode, p.node.name, null)), inInbox(p.node.name))), true);
+    const tasks = tasksOf(doc).filter((entry) => entry.task.projects.length > 0 && stageOf(entry) !== "done");
     return stageSections(
       input,
-      shown.map((entry) => {
+      tasks.map((entry) => {
         const first = input.tree.find(entry.task.projects[0])?.node.name ?? entry.task.projects[0];
         return { entry, from: first, over: first };
       }),
-      null
+      null,
+      true
     );
   }
   function projectSections(input, doc, placed, mode, statusOf2) {
@@ -5024,45 +5069,56 @@ ${key.title}`.toLowerCase();
     const branch = input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf2(p.node.name) !== "done"));
     const write = (project) => closed ? null : inInbox(project);
     if (mode === "byProject") {
-      const own = part("own", null, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf2(input, e, mode, placed.node.name, null)), write(placed.node.name));
+      const own = part(OWN, null, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf2(input, e, mode, placed.node.name, null)), write(placed.node.name));
       const subs = branch.map((p) => part(`project:${p.node.name}`, p.node.name, p.path.slice(top), p.path.length - top, byStage(tasksNaming(doc, p.node.name, closed)).map((e) => cardOf2(input, e, mode, p.node.name, null)), write(p.node.name)));
-      return filled([own, ...subs]);
+      return shown([own, ...subs], !closed);
     }
     const seen = /* @__PURE__ */ new Set();
-    const shown = [];
+    const tasks = [];
     for (const p of [placed, ...branch]) {
       for (const entry of tasksNaming(doc, p.node.name, closed)) {
         if (seen.has(entry.id)) continue;
         seen.add(entry.id);
         const own = namesProject(entry.task.projects, placed.node.name);
-        shown.push({ entry, from: own ? placed.node.name : p.node.name, over: own ? null : p.node.name });
+        tasks.push({ entry, from: own ? placed.node.name : p.node.name, over: own ? null : p.node.name });
       }
     }
-    return stageSections(input, shown, closed ? null : placed.node.name);
+    return stageSections(input, tasks, closed ? null : placed.node.name, !closed);
   }
   function doneSections(input, doc, mode, statusOf2) {
     const done = input.tree.all().filter((p) => statusOf2(p.node.name) === "done");
-    if (mode === "byProject") return filled(done.map((p) => part(`project:${p.node.name}`, p.node.name, p.path, p.path.length, tasksNaming(doc, p.node.name, true).map((e) => cardOf2(input, e, mode, p.node.name, null)), null)));
+    if (mode === "byProject") return shown(done.map((p) => part(`project:${p.node.name}`, p.node.name, p.path, p.path.length, tasksNaming(doc, p.node.name, true).map((e) => cardOf2(input, e, mode, p.node.name, null)), null)), false);
     const seen = /* @__PURE__ */ new Set();
-    const shown = done.flatMap((p) => tasksNaming(doc, p.node.name, true).filter((e) => !seen.has(e.id) && (seen.add(e.id), true)).map((entry) => ({ entry, from: p.node.name, over: p.node.name })));
-    return stageSections(input, shown, null);
+    const tasks = done.flatMap((p) => tasksNaming(doc, p.node.name, true).filter((e) => !seen.has(e.id) && (seen.add(e.id), true)).map((entry) => ({ entry, from: p.node.name, over: p.node.name })));
+    return stageSections(input, tasks, null, false);
   }
-  function stageSections(input, shown, project) {
-    const stages = [...STAGES, "done"];
-    return filled(
-      stages.map((stage) => {
-        const here = shown.filter((s) => stageOf(s.entry) === stage);
-        const title = stage === "today" ? PROJECTS_WORDS.today : stage === "done" ? PROJECTS_WORDS.done : input.listName(stage);
-        const place = stage === "done" ? null : { kind: "list", list: stage === "today" ? "now" : stage, group: null, before: null };
-        return part(stage, title, [], 0, here.map((s) => cardOf2(input, s.entry, "byStage", s.from, s.over)), place && { place, project });
-      })
-    );
+  function stageSections(input, tasks, project, open) {
+    const parts = STAGE_ORDER.map((stage) => {
+      const here = tasks.filter((s) => stageOf(s.entry) === stage).sort((a, b) => fileOrder(a.entry, b.entry));
+      const title = stage === "today" ? PROJECTS_WORDS.today : stage === "done" ? PROJECTS_WORDS.done : input.listName(stage);
+      const place = stage === "done" ? null : { kind: "list", list: stage === "today" ? "now" : stage, group: null, before: null };
+      return part(stage, title, [], 0, here.map((s) => cardOf2(input, s.entry, "byStage", s.from, s.over)), place && { place, project });
+    });
+    return shown(parts, open).filter((s) => s.key !== "done" || !s.empty);
   }
+  function fileOrder(a, b) {
+    return a.section === b.section ? a.index - b.index : 0;
+  }
+  var OWN = "own";
   function part(key, title, path, depth, cards, newTask2) {
-    return { key, title, path, depth, cards: cards.map((card) => ({ id: `${key}/${card.item.id}`, ...card })), newTask: newTask2 };
+    const drawn = cards.map((card) => ({ id: `${key}/${card.item.id}`, ...card }));
+    const rows = drawn.flatMap((card) => [{ id: card.id, item: card.item, level: 0, card, drop: card.drop }, ...subtaskRows(key, card.item, 1, card.from)]);
+    const header = title !== null;
+    return { key, group: header ? key : null, title, header, opens: header, empty: drawn.length === 0, plate: false, path, depth, cards: drawn, rows, newTask: newTask2 };
   }
-  function filled(sections) {
-    return sections.filter((s) => s.cards.length > 0);
+  function subtaskRows(key, item, level, from) {
+    if (item.collapsed) return [];
+    return item.subtasks.flatMap((sub) => [{ id: `${key}/${sub.id}`, item: sub, level, card: null, drop: { key: sub.key, from } }, ...subtaskRows(key, sub, level + 1, from)]);
+  }
+  function shown(sections, open) {
+    const kept = open ? sections : sections.filter((s) => !s.empty);
+    const untitledAbove = (i) => kept.slice(0, i).some((s) => !s.header);
+    return kept.map((s, i) => ({ ...s, plate: s.empty && (s.header || kept.length === 1), opens: s.header && !untitledAbove(i) }));
   }
   function tapped(state, tree, node) {
     const selected2 = selectedNode(state, tree);
@@ -5095,7 +5151,7 @@ ${key.title}`.toLowerCase();
     const carry = (node) => sameNode(node, projectNodeOf(from)) ? projectNodeOf(to) : node;
     return { ...state, ...state.selected !== void 0 && { selected: carry(state.selected) }, ...state.folded && { folded: state.folded.map(carry) } };
   }
-  function liveRows(rows, lifted) {
+  function liveRows(rows, lifted2) {
     const none = rows.findIndex((row) => row.kind === "none");
     const end = none < 0 ? rows.length : none;
     const kept = [];
@@ -5105,7 +5161,7 @@ ${key.title}`.toLowerCase();
       if (row.kind !== "project") continue;
       if (skipping !== null && row.depth > skipping) continue;
       skipping = null;
-      if (lifted && sameNode(row.node, lifted)) {
+      if (lifted2 && sameNode(row.node, lifted2)) {
         skipping = row.depth;
         continue;
       }
@@ -5113,17 +5169,17 @@ ${key.title}`.toLowerCase();
     }
     return { rows: kept.map((k) => k.row), at: (gap) => kept.filter((k) => k.index < Math.min(gap, end)).length };
   }
-  function projectsLevels(rows, gap, lifted) {
-    const live = liveRows(rows, lifted);
+  function projectsLevels(rows, gap, lifted2) {
+    const live = liveRows(rows, lifted2);
     const i = live.at(gap);
     const above = live.rows[i - 1];
     const below = live.rows[i];
     return { min: below ? below.depth : 0, max: above ? above.depth + 1 : 0 };
   }
-  function projectsGap(rows, gap, depth, lifted) {
-    const live = liveRows(rows, lifted);
+  function projectsGap(rows, gap, depth, lifted2) {
+    const live = liveRows(rows, lifted2);
     const i = live.at(gap);
-    const { min, max } = projectsLevels(rows, gap, lifted);
+    const { min, max } = projectsLevels(rows, gap, lifted2);
     const level = Math.max(min, Math.min(max, Math.round(depth)));
     let parent = null;
     for (let k = i - 1; k >= 0 && level > 0; k--) {
@@ -5138,12 +5194,115 @@ ${key.title}`.toLowerCase();
   }
   var PROJECTS_HOVER_MS = 600;
   var PROJECTS_INDENT = 12;
-  function projectsDrop(rows, gap, shift, lifted) {
-    const own = lifted ? rows.find((row) => sameNode(row.node, lifted))?.depth : void 0;
-    const live = liveRows(rows, lifted);
+  function projectsDrop(rows, gap, shift, lifted2) {
+    const own = lifted2 ? rows.find((row) => sameNode(row.node, lifted2))?.depth : void 0;
+    const live = liveRows(rows, lifted2);
     const above = live.rows[live.at(gap) - 1];
     const base = own ?? above?.depth ?? 0;
-    return projectsGap(rows, gap, base + Math.round(shift / PROJECTS_INDENT), lifted);
+    return projectsGap(rows, gap, base + Math.round(shift / PROJECTS_INDENT), lifted2);
+  }
+
+  // core/application/projectsDrop.ts
+  var COLUMN_OF = { now: "day", soon: "soon", inbox: "inbox", backlog: "backlog" };
+  function listOf2(item) {
+    return item.list === "done" ? null : item.list;
+  }
+  function originOf(item) {
+    if (item.slot !== null) return "timeline";
+    if (item.list === "now" || item.list === "soon" && item.dueDate !== null) return "day";
+    return item.list;
+  }
+  function itemOf2(view, key) {
+    for (const section of view.sections) for (const row of section.rows) if (samePlace2(row.item.key, key)) return row.item;
+    throw new StaleTaskError();
+  }
+  function sameTask2(a, b) {
+    return a.id === b.id;
+  }
+  function planOf(view, carried, place) {
+    const section = view.sections.find((s) => s.group === place.group);
+    if (!section) throw new StaleTaskError();
+    const at = place.before === null ? section.cards.length : section.cards.findIndex((card) => samePlace2(card.item.key, place.before));
+    if (at < 0) throw new StaleTaskError();
+    const kept = (card) => !carried.some((item) => sameTask2(item, card.item));
+    const above = section.cards.slice(0, at).filter(kept).pop();
+    const below = section.cards.slice(at).find(kept);
+    const anchors = [...above ? [{ kind: "after", item: above.item }] : [], ...below ? [{ kind: "before", item: below.item }] : []];
+    const anchor = anchors.find((a) => enters(carried, targetList(a))) ?? anchors[0] ?? { kind: "empty", list: view.mode === "byStage" ? stageList(section) : null };
+    return { anchor, project: view.mode === "byProject" ? partProject(view, section) : void 0 };
+  }
+  function enters(carried, target) {
+    if (target === null) return true;
+    const moving2 = carried.filter((item) => listOf2(item) !== target);
+    return moving2.length === 0 || acceptsDrop(COLUMN_OF[target], moving2.map(originOf));
+  }
+  function stageList(section) {
+    const place = section.newTask?.place;
+    return place && place.kind === "list" ? place.list : null;
+  }
+  function targetList(anchor) {
+    return anchor.kind === "empty" ? anchor.list : listOf2(anchor.item);
+  }
+  function projectsTakes(view, cards, place) {
+    if (!view.reorders) return false;
+    if (place.kind === "subtask") return true;
+    const carried = cards.map((card) => itemOf2(view, card.key));
+    return enters(carried, targetList(planOf(view, carried, place).anchor));
+  }
+  function projectsDropSteps(view, doc, entryOf, cards, place, today) {
+    if (!view.reorders) throw new StaleTaskError();
+    if (place.kind === "subtask") return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
+    if (!projectsTakes(view, cards, place)) return [];
+    const carried = cards.map((card) => itemOf2(view, card.key));
+    const { anchor, project } = planOf(view, carried, place);
+    const target = targetList(anchor);
+    const dropped = new Set(cards.map((card) => entryOf(card.key).id));
+    const spot = target === null ? null : spotOf(doc, anchor, target, entryOf, dropped);
+    return cards.flatMap((card, i) => {
+      const item = carried[i];
+      const moves = [];
+      if (spot !== null && target !== null) {
+        if (listOf2(item) === target) moves.push({ key: card.key, change: { kind: "reorder", group: spot.group, before: spot.before } });
+        else {
+          const move = dropMove(originOf(item), { kind: "group", list: target, date: null, group: spot.group, before: spot.before }, today);
+          if (move.kind === "toTime" || move.kind === "clearSlot") throw new StaleTaskError();
+          moves.push({ key: card.key, change: move });
+        }
+      }
+      if (project !== void 0 && !sameProject(card.from, project)) moves.push({ key: card.key, change: { kind: "swapProject", from: card.from, to: project } });
+      return moves;
+    });
+  }
+  function spotOf(doc, anchor, list, entryOf, dropped) {
+    if (anchor.kind === "empty") return { group: null, before: null };
+    const entry = entryOf(anchor.item.key);
+    if (anchor.kind === "before") return { group: entry.group, before: keyOf(entry) };
+    const next = doc.tasks(list).find((other) => other.index > entry.index && other.group === entry.group && !dropped.has(other.id));
+    return { group: entry.group, before: next ? keyOf(next) : null };
+  }
+  function partProject(view, section) {
+    return section.group === null ? projectOfNode(view.selected) : projectOfNode(section.key);
+  }
+  function sameProject(a, b) {
+    return a === null || b === null ? a === b : projectKey(a) === projectKey(b);
+  }
+  function projectsLandingOf(view, id, group) {
+    const parts = [...view.sections.filter((s) => group !== void 0 && s.group === group), ...view.sections.filter((s) => group === void 0 || s.group !== group)];
+    for (const section of parts) {
+      const index = section.cards.findIndex((card) => card.item.id === id);
+      if (index >= 0) {
+        const card = section.cards[index];
+        return { kind: "card", id, item: card.item, card: card.id, section: section.key, index };
+      }
+    }
+    for (const section of parts) {
+      const rowAt = section.rows.findIndex((row2) => row2.level > 0 && row2.item.id === id);
+      if (rowAt < 0) continue;
+      const row = section.rows[rowAt];
+      const parent = section.rows.slice(0, rowAt).reverse().find((r) => r.level === row.level - 1);
+      return { kind: "subtask", id, item: row.item, parent: parent.item.id, index: parent.item.subtasks.findIndex((sub) => sub.id === id) };
+    }
+    return { kind: "away", id, item: null };
   }
 
   // core/application/contracts.ts
@@ -5599,9 +5758,9 @@ ${key.title}`.toLowerCase();
      * than the day nor past the end, and on a task without a duration no later than its start, which becomes the end.
      */
     stretched(task, day, edge, minute) {
-      const shown = this.shown(task, day);
-      if (edge === "end") return { start: shown.start, end: Math.min(MINUTES_PER_DAY, Math.max(shown.start, minute)) };
-      const end = shown.end ?? shown.start;
+      const shown2 = this.shown(task, day);
+      if (edge === "end") return { start: shown2.start, end: Math.min(MINUTES_PER_DAY, Math.max(shown2.start, minute)) };
+      const end = shown2.end ?? shown2.start;
       return { start: Math.max(0, Math.min(minute, end)), end };
     }
     /**
@@ -5611,12 +5770,12 @@ ${key.title}`.toLowerCase();
      * its own start; the top dot is a new start and writes it.
      */
     resized(task, day, edge, minute, minDurationMin) {
-      const shown = this.shown(task, day);
+      const shown2 = this.shown(task, day);
       const held = this.stretched(task, day, edge, minute);
       const keepsDuration = held.end - held.start > minDurationMin;
-      const unmoved = edge === "start" && shown.end === null;
-      const next = keepsDuration ? held : { start: unmoved ? shown.start : held.start, end: null };
-      if (next.start === shown.start && next.end === shown.end) return null;
+      const unmoved = edge === "start" && shown2.end === null;
+      const next = keepsDuration ? held : { start: unmoved ? shown2.start : held.start, end: null };
+      if (next.start === shown2.start && next.end === shown2.end) return null;
       if (edge === "start") return this.boundary.slotAt(day, next.start, next.end);
       const start = this.boundary.spanOf(task.slot, day).start;
       return this.boundary.slotAt(day, start, next.end === null ? null : start + next.end - next.start);
@@ -5765,8 +5924,8 @@ ${key.title}`.toLowerCase();
     /** The sections the menus offer on the screen. */
     offerOf({ doc, today, boundary }, date, sections) {
       const { presets, ungrouped } = this.settings.get().groups;
-      const shown = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
-      const names = (list) => offeredNames(shownSections(shown.filter((entry) => entry.section === list).map((entry) => entry.group), sections[list]), presets, ungrouped);
+      const shown2 = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
+      const names = (list) => offeredNames(shownSections(shown2.filter((entry) => entry.section === list).map((entry) => entry.group), sections[list]), presets, ungrouped);
       return { lists: { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") }, ungrouped };
     }
     listSections({ doc }) {
@@ -5893,8 +6052,8 @@ ${key.title}`.toLowerCase();
       const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
       return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices(screen));
     }
-    carried(lifted, picked) {
-      return carriedWith(lifted, picked);
+    carried(lifted2, picked) {
+      return carriedWith(lifted2, picked);
     }
     fullTree(item) {
       return fullTree(item);
@@ -5983,14 +6142,14 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/TaskRules.ts
-  var MOVES = /* @__PURE__ */ new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest"]);
+  var MOVES = /* @__PURE__ */ new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest", "reorder"]);
   function refsOf(change) {
-    if (change.kind === "moveBefore" || change.kind === "moveToGroup") return [change.before];
+    if (change.kind === "moveBefore" || change.kind === "moveToGroup" || change.kind === "reorder") return [change.before];
     if (change.kind === "nest") return [change.parent, change.before];
     return [];
   }
   function freshChange(change, fresh) {
-    if (change.kind === "moveBefore" || change.kind === "moveToGroup") return { ...change, before: fresh(change.before) };
+    if (change.kind === "moveBefore" || change.kind === "moveToGroup" || change.kind === "reorder") return { ...change, before: fresh(change.before) };
     if (change.kind === "nest") return { ...change, parent: fresh(change.parent), before: fresh(change.before) };
     return change;
   }
@@ -6247,8 +6406,7 @@ ${key.title}`.toLowerCase();
         for (const card of cards) {
           const entry = projectHolder(doc, this.entryOf(doc, card.key));
           const projects = changed2.get(entry.id)?.projects ?? entry.task.projects;
-          const without = card.from === null ? projects : withProject(projects, card.from, false);
-          changed2.set(entry.id, { entry, projects: to === null ? without : withProject(without, to, true) });
+          changed2.set(entry.id, { entry, projects: swappedProjects(projects, card.from, to) });
         }
         return doc.replaceAll([...changed2.values()].map(({ entry, projects }) => [entry, { ...entry.task, projects: uniqueNames(projects) }]));
       };
@@ -6271,6 +6429,9 @@ ${key.title}`.toLowerCase();
       const clean = this.cleanName(to);
       if (clean === null || clean === from) return null;
       return (doc) => renameProject(doc, from, clean);
+    }
+    deleteProject(name) {
+      return (doc) => deleteProject(doc, name);
     }
     setProjectNote(name, link) {
       const note = link === null ? null : link.replace(/^\[\[|\]\]$/g, "").trim() || null;
@@ -6409,8 +6570,8 @@ ${key.title}`.toLowerCase();
       const operation = (doc, today2, settings, boundary) => {
         this.groupOf(doc, list, place.group);
         const before = place.before ? this.entryOf(doc, place.before) : null;
-        const shown = columnGroups(doc, column, today2, boundary).find((g) => g.name === place.group)?.entries ?? [];
-        if (before && !shown.some((e) => e.section === before.section && e.index === before.index && e.path.length === 0)) throw new StaleTaskError();
+        const shown2 = columnGroups(doc, column, today2, boundary).find((g) => g.name === place.group)?.entries ?? [];
+        if (before && !shown2.some((e) => e.section === before.section && e.index === before.index && e.path.length === 0)) throw new StaleTaskError();
         return createSection(doc, column, place.group, before, group, settings.groups, today2, boundary);
       };
       return { operation, list, group };
@@ -6450,6 +6611,12 @@ ${key.title}`.toLowerCase();
           return setLabels(doc, entry, change.labels);
         case "project":
           return setProjects(doc, entry, change.project === null ? [] : [change.project]);
+        case "reorder":
+          return reorder(doc, entry, change.group, first);
+        case "swapProject": {
+          const holder = projectHolder(doc, entry);
+          return doc.replace(holder, { ...holder.task, projects: swappedProjects(holder.task.projects, change.from, change.to) });
+        }
         case "dueDate":
           return setDueDate(doc, entry, change.date);
         case "postpone":
@@ -6571,8 +6738,8 @@ ${key.title}`.toLowerCase();
     const block = screen.day.slotted.find((item) => item.id === id);
     if (block) {
       const own = timeline.shown({ slot: block.slot, open: false }, day);
-      const shown = span(block);
-      return { kind: "timeline", id, item: block, span: shown, ridesNow: shown.start !== own.start, slotted: screen.day.slotted.map((item) => ({ id: item.id, span: span(item) })) };
+      const shown2 = span(block);
+      return { kind: "timeline", id, item: block, span: shown2, ridesNow: shown2.start !== own.start, slotted: screen.day.slotted.map((item) => ({ id: item.id, span: span(item) })) };
     }
     const columns = [["day", screen.day.list], ["soon", screen.soon], ["inbox", screen.inbox], ["backlog", screen.backlog], ["done", screen.done]];
     for (const [column, items] of columns) {
@@ -6709,6 +6876,9 @@ ${key.title}`.toLowerCase();
     renameProject(from, to) {
       const operation = this.rules.renameProject(from, to);
       return { operation, answer: (change) => change !== null && change.after.serialize() !== change.before.serialize() };
+    }
+    deleteProject(name) {
+      return nothing(this.rules.deleteProject(name));
     }
     setProjectNote(name, link) {
       return nothing(this.rules.setProjectNote(name, link));
@@ -6905,6 +7075,31 @@ ${key.title}`.toLowerCase();
           const screen = this.reads.screen({ text, doc: after, today: s.today, boundary: s.boundary }, day);
           const timeline = this.reads.timeline();
           return { landings: ids.map((id) => landingOf(screen, id, day, timeline)), screen, tasks: text };
+        }
+      };
+    }
+    /** A drop in the Projects list: the funnel's moves the screen as read gives it (`projectsDropSteps`), one write. */
+    dropInProjects(cards, place) {
+      return {
+        reads: true,
+        answer: (s) => {
+          const steps = projectsDropSteps(this.reads.projectsScreen(s), s.doc, (key) => this.rules.entryOf(s.doc, key), cards, place, s.today);
+          return this.landed(cards, this.applyAll(steps));
+        }
+      };
+    }
+    /** `dropInProjects` tried over the file as read: where each card lands on the Projects screen it leaves. */
+    projectsDropPreview(cards, place) {
+      const drop = this.dropInProjects(cards, place);
+      return {
+        reads: true,
+        answer: (s) => {
+          const ids = cards.map((card) => this.rules.entryOf(s.doc, card.key).id);
+          const write = drop.answer(s);
+          const after = write.operation ? this.rules.trial(s.doc, write.operation).after : s.doc;
+          const text = after.serialize();
+          const view = this.reads.projectsScreen({ text, doc: after, today: s.today, boundary: s.boundary });
+          return { landings: ids.map((id) => projectsLandingOf(view, id, place.kind === "task" ? place.group : void 0)), view, tasks: text };
         }
       };
     }
@@ -7315,6 +7510,9 @@ ${key.title}`.toLowerCase();
       if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from, c.rules.cleanName(to)));
       return renamed;
     },
+    dropInProjects: (c, [cards, place]) => c.run(c.ask(c.writes.dropInProjects(cards, place))),
+    projectsDropPreview: (c, [cards, place]) => c.ask(c.writes.projectsDropPreview(cards, place)),
+    deleteProject: (c, [name]) => c.run(c.writes.deleteProject(name)),
     setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name, link ?? null)),
     dropOnProject: (c, [cards, to]) => {
       const target = to === "none" ? null : projectOfNode(to);
@@ -7331,7 +7529,7 @@ ${key.title}`.toLowerCase();
     pickStatus: (c, [keys, id]) => c.run(c.writes.pickStatus(keys, id)),
     postponeAll: (c, [keys, date]) => c.run(c.writes.postponeAll(KEPT(c), keys, date)),
     removeAll: (c, [keys]) => c.run(c.writes.removeAll(keys)),
-    carried: (c, [lifted, picked]) => c.reads.carried(lifted, picked),
+    carried: (c, [lifted2, picked]) => c.reads.carried(lifted2, picked),
     setCollapsed: (c, [key, collapsed]) => c.run(c.writes.setCollapsed(key, collapsed)),
     toggleCollapsed: (c, [key]) => c.run(c.writes.toggleCollapsed(key)),
     unfoldAbove: (c, [key]) => c.run(c.writes.unfoldAbove(key)),
@@ -7448,8 +7646,8 @@ ${key.title}`.toLowerCase();
     },
     isPast: (c, [event]) => new CalendarDay(readingOf(c), c.settings, c.now).isPast({ end: new Date(event.endMs) }),
     known: (c) => calendarDay(c).known(),
-    setShown: (c, [account, title, shown]) => {
-      c.saveSettings(calendarDay(c).shownChange(account, title, shown));
+    setShown: (c, [account, title, shown2]) => {
+      c.saveSettings(calendarDay(c).shownChange(account, title, shown2));
     },
     files: (c) => calendarFiles(c),
     sources: (c) => CALENDAR_SOURCES.map((source) => ({ source, path: calendarPath(source, c.settings) })),
@@ -7580,9 +7778,10 @@ ${key.title}`.toLowerCase();
     placesInGap,
     noteTags,
     projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
-    projectsGap: (rows, gap, depth, lifted) => projectsGap(rows, gap, depth, lifted ?? null),
-    projectsLevels: (rows, gap, lifted) => projectsLevels(rows, gap, lifted ?? null),
-    projectsDrop: (rows, gap, shift, lifted) => projectsDrop(rows, gap, shift, lifted ?? null),
+    projectsTakes: (view, cards, place) => projectsTakes(view, cards, place),
+    projectsGap: (rows, gap, depth, lifted2) => projectsGap(rows, gap, depth, lifted2 ?? null),
+    projectsLevels: (rows, gap, lifted2) => projectsLevels(rows, gap, lifted2 ?? null),
+    projectsDrop: (rows, gap, shift, lifted2) => projectsDrop(rows, gap, shift, lifted2 ?? null),
     projectNodeOf,
     shadesOf,
     inkOf,

@@ -201,6 +201,13 @@ export class ProjectTree {
 		return new ProjectTree(mapped(this.roots, found.node.name, (node) => ({ ...node, note })));
 	}
 
+	/** The project gone from the tree, its subprojects lifted a level into its place, in their order. */
+	deleted(name: string): ProjectTree {
+		const found = this.find(name);
+		if (!found) return this;
+		return new ProjectTree(lifted(this.roots, found.node.name));
+	}
+
 	same(other: ProjectTree): boolean {
 		return treeLines(this, "\t").join("\n") === treeLines(other, "\t").join("\n");
 	}
@@ -215,6 +222,10 @@ export class ProjectTree {
 
 function removed(nodes: readonly ProjectNode[], name: string): ProjectNode[] {
 	return nodes.filter((n) => n.name !== name).map((n) => ({ ...n, children: removed(n.children, name) }));
+}
+
+function lifted(nodes: readonly ProjectNode[], name: string): ProjectNode[] {
+	return nodes.flatMap((n) => (n.name === name ? n.children : [{ ...n, children: lifted(n.children, name) }]));
 }
 
 function inserted(nodes: readonly ProjectNode[], node: ProjectNode, place: TreePlace): ProjectNode[] {

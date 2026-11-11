@@ -9,6 +9,8 @@ import type {
 	DropPreview,
 	DropTo,
 	EndList,
+	ListPlace,
+	ProjectsDropPreview,
 	GroupedList,
 	GroupName,
 	GroupPlace,
@@ -27,6 +29,7 @@ import type { Read, Snapshot, TaskReads } from "./TaskReads";
 import type { Operation, TaskRules } from "./TaskRules";
 import { droppedSpan } from "./TimelineSpans";
 import { landingOf } from "./landing";
+import { projectsDropSteps, projectsLandingOf } from "./projectsDrop";
 import { keyOf } from "./taskKeys";
 import type { TreePlace } from "../domain/ProjectTree";
 
@@ -184,6 +187,10 @@ export class TaskWrites {
 	renameProject(from: string, to: string): Write<boolean> {
 		const operation = this.rules.renameProject(from, to);
 		return { operation, answer: (change) => change !== null && change.after.serialize() !== change.before.serialize() };
+	}
+
+	deleteProject(name: string): Write<void> {
+		return nothing(this.rules.deleteProject(name));
 	}
 
 	setProjectNote(name: string, link: string | null): Write<void> {
@@ -423,8 +430,35 @@ export class TaskWrites {
 		};
 	}
 
+	/** A drop in the Projects list: the funnel's moves the screen as read gives it (`projectsDropSteps`), one write. */
+	dropInProjects(cards: readonly ProjectsDrop[], place: ListPlace): Read<Write<readonly TaskKey[]>> {
+		return {
+			reads: true,
+			answer: (s) => {
+				const steps = projectsDropSteps(this.reads.projectsScreen(s), s!.doc, (key) => this.rules.entryOf(s!.doc, key), cards, place, s!.today);
+				return this.landed(cards, this.applyAll(steps));
+			},
+		};
+	}
+
+	/** `dropInProjects` tried over the file as read: where each card lands on the Projects screen it leaves. */
+	projectsDropPreview(cards: readonly ProjectsDrop[], place: ListPlace): Read<ProjectsDropPreview> {
+		const drop = this.dropInProjects(cards, place);
+		return {
+			reads: true,
+			answer: (s) => {
+				const ids = cards.map((card) => this.rules.entryOf(s!.doc, card.key).id);
+				const write = drop.answer(s);
+				const after = write.operation ? this.rules.trial(s!.doc, write.operation).after : s!.doc;
+				const text = after.serialize();
+				const view = this.reads.projectsScreen({ text, doc: after, today: s!.today, boundary: s!.boundary });
+				return { landings: ids.map((id) => projectsLandingOf(view, id, place.kind === "task" ? place.group : undefined)), view, tasks: text };
+			},
+		};
+	}
+
 	/** The dropped tasks where `write` left them. */
-	private landed(tasks: readonly DroppedTask[], write: Write<void>): Write<readonly TaskKey[]> {
+	private landed(tasks: readonly { readonly key: TaskKey }[], write: Write<void>): Write<readonly TaskKey[]> {
 		return {
 			operation: write.operation,
 			answer: (change) => {

@@ -1,4 +1,4 @@
-import type { DropColumn, DroppedTask, DropFrom, DropOrigin, DropTo, GroupedList, ProjectsLanding, ProjectsNewTask, ProjectsNodeId, TaskItem } from "../../../core/application/contracts";
+import type { DropColumn, DroppedTask, ListPlace, DropFrom, DropOrigin, DropTo, GroupedList, ProjectsLanding, ProjectsNewTask, ProjectsNodeId, TaskItem } from "../../../core/application/contracts";
 import type { LocalDate } from "../types";
 
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon, and Inbox over Backlog. */
@@ -57,18 +57,21 @@ export interface NewTaskPayload {
 export type DragPayload = TaskDragPayload | NewTaskPayload;
 
 /**
- * Where something is let go on the Projects screen: a card on a row of the tree (`TaskService.dropOnProject`), the plus
- * at a gap of the tree (a new project there) or on the tasks (a new task where `newTask` says, its field after `after`).
+ * Where something is let go on the Projects screen: a card on a row of the tree (`TaskService.dropOnProject`) or between
+ * the tasks' cards, the plus at a gap of the tree (a new project there) or on the tasks (a new task where `newTask` says,
+ * its field after `after`).
  */
 export type ProjectsDrop =
 	| { readonly kind: "projectRow"; readonly node: ProjectsNodeId }
 	| { readonly kind: "projectGap"; readonly gap: number; readonly landing: ProjectsLanding }
-	| { readonly kind: "projectTasks"; readonly newTask: ProjectsNewTask; readonly after: HTMLElement | null };
+	| { readonly kind: "projectTasks"; readonly newTask: ProjectsNewTask; readonly after: HTMLElement | null }
+	/** Cards let go between the tasks' cards, at the place the lists' own drop machinery found (`TaskService.dropInProjects`). */
+	| { readonly kind: "projectsPlace"; readonly place: ListPlace };
 
 /** Where the task lands, as the target found it: what it means is the service's (`TaskService.drop`), or the Projects screen's. */
 export type DropResult = DropTo | ProjectsDrop;
 
-const PROJECTS_DROPS: ReadonlySet<string> = new Set(["projectRow", "projectGap", "projectTasks"]);
+const PROJECTS_DROPS: ReadonlySet<string> = new Set(["projectRow", "projectGap", "projectTasks", "projectsPlace"]);
 
 export function isProjectsDrop(result: DropResult): result is ProjectsDrop {
 	return PROJECTS_DROPS.has(result.kind);

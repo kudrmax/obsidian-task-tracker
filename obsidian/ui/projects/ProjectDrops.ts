@@ -1,8 +1,9 @@
-import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectsDrop, type ProjectsLanding, type ProjectsNodeId, type ProjectsRow } from "../../../core/application/contracts";
+import { type ListPlace, PROJECTS_HOVER_MS, PROJECTS_INDENT, projectsDrop, type ProjectsLanding, type ProjectsNodeId, type ProjectsRow } from "../../../core/application/contracts";
 import { DropLine } from "../drag/DropLine";
-import type { DragPayload, DropResult, DropTarget, ProjectsDrop } from "../drag/DropTarget";
+import { CardListDrop } from "../drag/ListDrop";
+import type { DragPayload, DropResult, DropTarget, ProjectsDrop, TaskDragPayload } from "../drag/DropTarget";
 import { readFrame } from "../drag/listFrame";
-import type { DrawnPart } from "./ProjectTasks";
+import type { DrawnPart, ProjectTasks } from "./ProjectTasks";
 
 /** What the tree's targets read of the tree as drawn. */
 export interface TreeShown {
@@ -222,5 +223,44 @@ export class TasksDrop implements DropTarget {
 		const result = this.result;
 		this.leave();
 		return result;
+	}
+}
+
+/**
+ * The tasks as a list a card is dropped in, as a list column is (spec «Projects order» 1): the same lift, gap, drop line,
+ * level and auto-scroll, over the parts as sections, each header opening its part as the core says
+ * (`ProjectsSection.opens`); a place the core refuses (`projectsTakes`) is as a list that does not take the card. Let
+ * go, the place goes to `dropInProjects`. A card only: the plus has its own place on the tasks (`TasksDrop`). Nothing
+ * while the node keeps its order (`ProjectsView.reorders`: Done and a done project).
+ */
+export class ProjectsListDrop extends CardListDrop {
+	constructor(
+		tasks: ProjectTasks,
+		area: HTMLElement,
+		private readonly reorders: () => boolean,
+		/** Whether the core takes the carried cards at a place (`projectsTakes`). */
+		private readonly takesAt: (place: ListPlace, drag: TaskDragPayload) => boolean,
+	) {
+		super(tasks, area);
+	}
+
+	protected takes(drag: DragPayload): boolean {
+		return drag.from !== "new" && this.reorders();
+	}
+
+	protected override takesPlace(place: ListPlace, drag: DragPayload): boolean {
+		return drag.from !== "new" && this.takesAt(place, drag);
+	}
+
+	protected placesAnywhere(): boolean {
+		return true;
+	}
+
+	protected showsSections(): boolean {
+		return true;
+	}
+
+	protected resultOf(place: ListPlace | null): DropResult | null {
+		return place && { kind: "projectsPlace", place };
 	}
 }

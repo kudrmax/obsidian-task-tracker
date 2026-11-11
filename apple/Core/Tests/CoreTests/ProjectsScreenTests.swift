@@ -74,9 +74,9 @@ import Testing
         try board.setProjectsMode("byStage")
         let view = try board.projectsScreen()
         #expect(view.mode == "byStage")
-        #expect(view.sections.map(\.title) == ["Soon", "Inbox", "Backlog"])
-        #expect(view.sections[1].cards.first?.over == "Свидание")
-        #expect(view.sections[0].cards.first?.over == nil)
+        #expect(view.sections.map(\.title) == ["Inbox", "Backlog", "Soon", "Today"])
+        #expect(view.sections[0].cards.first?.over == "Свидание")
+        #expect(view.sections[2].cards.first?.over == nil)
     }
 
     @Test func aCardDroppedOnTheTreeChangesThatProjectAndStaysInTheFunnel() throws {
@@ -186,6 +186,70 @@ import Testing
         let none = try board.projectsScreen()
         #expect(none.sections.flatMap(\.cards).map(\.item.title) == ["Loose"])
         #expect(none.menu == nil)
+    }
+
+    /// By stage every stage shows, an empty one under its header with the No tasks plate, so a card can go there.
+    @Test func byStageShowsEveryStageAnEmptyOneWithItsPlate() throws {
+        let board = board(FakeVault(Self.file))
+        try board.selectProjectNode("project:Спорт")
+        try board.setProjectsMode("byStage")
+        let view = try board.projectsScreen()
+        #expect(view.sections.map(\.title) == ["Inbox", "Backlog", "Soon", "Today"])
+        #expect(view.sections.map(\.header) == [true, true, true, true])
+        #expect(view.sections.map(\.empty) == [true, false, true, true])
+        #expect(view.sections.map(\.plate) == [true, false, true, true])
+        #expect(view.sections.map(\.opens) == [true, true, true, true])
+        #expect(view.sections[1].group == view.sections[1].key)
+        #expect(view.reorders)
+    }
+
+    /// By project the node's own part, empty above subprojects, draws nothing; a subproject with no task shows its plate.
+    @Test func byProjectAnEmptyOwnPartDrawsNothingAndAnEmptySubprojectItsPlate() throws {
+        let board = board(FakeVault(Self.file.replacingOccurrences(of: "  - Small talk\n", with: "  - Small talk\n  - Тихо\n")))
+        try board.selectProjectNode("project:Дружба")
+        let view = try board.projectsScreen()
+        #expect(view.sections.map(\.title) == [nil, "Small talk", "Тихо"])
+        let own = view.sections[0]
+        #expect(own.group == nil && !own.header && own.empty && !own.plate)
+        #expect(view.sections[1].header && !view.sections[1].empty && !view.sections[1].plate)
+        #expect(!view.sections[1].opens)
+        #expect(view.sections[2].header && view.sections[2].empty && view.sections[2].plate)
+    }
+
+    /// A project with no task at all is one part, untitled, with the No tasks plate: never a blank pane.
+    @Test func aProjectWithNoTaskShowsTheNoTasksPlate() throws {
+        let board = board(FakeVault(Self.file.replacingOccurrences(of: "- Спорт\n", with: "- Спорт\n- Пусто\n")))
+        try board.selectProjectNode("project:Пусто")
+        let view = try board.projectsScreen()
+        #expect(view.sections.count == 1)
+        let only = try #require(view.sections.first)
+        #expect(!only.header && only.empty && only.plate && only.cards.isEmpty)
+        #expect(view.emptyLabel == "No tasks")
+    }
+
+    @Test func doneTakesNoReorder() throws {
+        let board = board(FakeVault(Self.file))
+        try board.selectProjectNode("done")
+        #expect(try board.projectsScreen().reorders == false)
+    }
+
+    /// Delete project asks with the core's words, then the project goes from the tree and from every task; no task goes.
+    @Test func deleteProjectAsksFirstAndKeepsEveryTask() throws {
+        let vault = FakeVault(Self.file)
+        let board = board(vault)
+        try board.selectProjectNode("project:Окружение")
+        let delete = try #require(try board.projectsScreen().menu?.delete)
+        #expect(delete.label == "Delete project")
+        #expect(delete.title == "Delete \u{201C}Окружение\u{201D}?")
+        #expect(delete.message == "Its tasks stay; they just lose this project.")
+        #expect(delete.confirm == "Delete" && delete.cancel == "Cancel" && delete.destructive)
+        let before = vault.text.components(separatedBy: "- [ ]").count
+        try board.deleteProject("Окружение")
+        #expect(vault.text.contains("## Projects\n\n- Где знакомиться\n- Свидание\n- Дружба"))
+        #expect(vault.text.contains("- [ ] Брейншторм\n"))
+        #expect(!vault.text.contains("🗂️ Окружение"))
+        #expect(vault.text.components(separatedBy: "- [ ]").count == before)
+        #expect(try board.projectsScreen().selected == "all")
     }
 }
 

@@ -56,6 +56,7 @@ import { listView, sectionChoice } from "./sections";
 import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
+import { projectsTakes } from "./projectsDrop";
 import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
@@ -428,6 +429,9 @@ const TASKS: Readonly<Record<string, Handler>> = {
 		if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from as string, c.rules.cleanName(to as string)!));
 		return renamed;
 	},
+	dropInProjects: (c, [cards, place]) => c.run(c.ask(c.writes.dropInProjects(cards as A, place as A))),
+	projectsDropPreview: (c, [cards, place]) => c.ask(c.writes.projectsDropPreview(cards as A, place as A)),
+	deleteProject: (c, [name]) => c.run(c.writes.deleteProject(name as string)),
 	setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name as string, (link ?? null) as string | null)),
 	dropOnProject: (c, [cards, to]) => {
 		const target = to === "none" ? null : projectOfNode(to as string);
@@ -754,6 +758,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	placesInGap,
 	noteTags,
 	projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
+	projectsTakes: (view, cards, place) => projectsTakes(view as A, cards as A, place as A),
 	projectsGap: (rows, gap, depth, lifted) => projectsGap(rows, gap, depth, lifted ?? null),
 	projectsLevels: (rows, gap, lifted) => projectsLevels(rows, gap, lifted ?? null),
 	projectsDrop: (rows, gap, shift, lifted) => projectsDrop(rows, gap, shift, lifted ?? null),

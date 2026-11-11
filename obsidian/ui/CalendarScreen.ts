@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type MenuFrom, projectNodeOf, type ProjectsCard, type ProjectsLanding, type ProjectsNewTask, type ProjectsView, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, type ZoomLevel } from "../../core/application/contracts";
+import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type MenuFrom, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ListPlace, projectsTakes, type ProjectsNewTask, type ProjectsView, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, type ZoomLevel } from "../../core/application/contracts";
 import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -17,7 +17,7 @@ import { type ColumnSections, type DropResult, droppedTasks, type HeldOut, isPro
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu, ProjectMenu } from "./menu/GroupMenu";
 import { NoteSearch } from "./projects/NoteSearch";
-import { TasksDrop, TreeDrop } from "./projects/ProjectDrops";
+import { ProjectsListDrop, TasksDrop, TreeDrop } from "./projects/ProjectDrops";
 import { TreeLift } from "./projects/TreeLift";
 import type { PlusAside } from "./quick/QuickEntryController";
 import { failureText } from "./failureText";
@@ -114,8 +114,12 @@ export class CalendarScreen extends Component {
 		unfold: (node) => void this.act(() => this.deps.tasks.unfoldProjectNode(node)).then(() => this.projects?.refreshTree()),
 	});
 	private readonly tasksDrop = new TasksDrop(() => this.projects?.tasksShown ?? null);
-	/** The Projects card pressed last: a drop of it on the tree hands the core this very card's `drop` (a task of two parts is two cards). */
-	private pressedProjectsCard: ProjectsCard | null = null;
+	/** The Projects screen's tasks as a list a card is dropped in, as a list column is. */
+	private projectsListDrop: ProjectsListDrop | null = null;
+	/** The Projects row pressed last: a drop of it hands the core this very row's `drop` (a task of two parts is two cards). */
+	private pressedProjectsRow: ProjectsListRow | null = null;
+	/** The rows each drag carries, as the core takes them (`projectsDrops`). */
+	private readonly carriedRows = new WeakMap<TaskDragPayload, readonly ProjectsDrop[]>();
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
 	private soonEl: HTMLElement | null = null;
@@ -218,7 +222,7 @@ export class CalendarScreen extends Component {
 			},
 			removeDue: (keys) => this.act(() => this.deps.tasks.removeDue(keys)),
 			carried: (lifted, picked) => this.deps.tasks.carried(lifted, picked),
-			cards: (column) => this.listOf(column)?.cards.map((entry) => entry.card) ?? [],
+			cards: (picked) => (this.projects?.tasksList.rowOf(picked.card) ? this.projects.tasksList.cards : (this.listOf(picked.column)?.cards ?? [])).map((entry) => entry.card),
 			toSection: (keys, name) => this.act(() => this.deps.tasks.toSection(keys, name)),
 			setProject: (keys, project) => this.act(() => this.deps.tasks.setProject(keys, project)),
 			newProject: (keys, name) => this.act(async () => (await this.deps.tasks.newProject(name, keys)) !== null),
@@ -371,10 +375,18 @@ export class CalendarScreen extends Component {
 				setTreeWidth: (width) => void this.deps.settings.set({ treeWidth: width }),
 				onSnap: () => this.haptics.tap(),
 				onMenu: (title, view) => this.showProjectMenu(title, view),
-				onCard: (card, model, signal) => this.attachProjectsCard(card, model, signal),
+				onCard: (card, row, owner, subtree, signal) => this.attachProjectsCard(card, row, owner, subtree, signal),
+				onPlate: (plate, newTask, signal) => plate.addEventListener("click", () => void this.newProjectsTask(newTask, plate), { signal }),
 				onRow: (row, model, signal) => treeLift.attach(row, model, signal),
 				onError: (error) => this.reportFailure(error),
 			});
+		if (this.projects) {
+			const projects = this.projects;
+			this.projectsListDrop = new ProjectsListDrop(projects.tasksList, projects.tasksList.el.parentElement!, () => projects.shown?.reorders ?? false, (place, drag) => {
+				const view = projects.shown;
+				return view !== null && projectsTakes(view, this.projectsDrops(drag), place);
+			});
+		}
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
@@ -967,12 +979,12 @@ export class CalendarScreen extends Component {
 	}
 
 	/** The two columns the window shows, as places to drop. */
-	private shownDrops(): (ListDrop | TimelineDrop | TreeDrop)[] {
-		const shown: Record<RightMode, (ListDrop | TimelineDrop | TreeDrop | null)[]> = {
+	private shownDrops(): (ListDrop | TimelineDrop | TreeDrop | ProjectsListDrop)[] {
+		const shown: Record<RightMode, (ListDrop | TimelineDrop | TreeDrop | ProjectsListDrop | null)[]> = {
 			calendar: [this.timelineDrop, this.leftDrop],
 			soon: [this.soonDrop, this.leftDrop],
 			inbox: [this.inboxDrop, this.backlogDrop, this.soonDrop],
-			projects: [this.treeDrop],
+			projects: [this.treeDrop, this.projectsListDrop],
 		};
 		return shown[this.mode()].filter((target) => target !== null);
 	}
@@ -986,29 +998,70 @@ export class CalendarScreen extends Component {
 	}
 
 	/**
-	 * A card of the Projects screen: a tap opens its menu (its list's, `ProjectsCard.menuFrom`), its counter folds it, and a
-	 * task of the funnel is carried onto the tree (`canDrop`).
+	 * A row of the Projects screen, a task's card or a subtask's: a tap opens its menu (its list's, `ProjectsCard.menuFrom`
+	 * of the card it belongs to), its counter folds it, and an open task is carried onto the tree or among the tasks
+	 * (`canDrop`), picked with others as a list card is.
 	 */
-	private attachProjectsCard(card: HTMLElement, model: ProjectsCard, signal: AbortSignal): void {
-		const item = model.item;
-		card.dataset.menuFrom = model.menuFrom;
-		card.dataset.card = model.id;
-		card.addEventListener("pointerdown", () => (this.pressedProjectsCard = model), { capture: true, signal });
+	private attachProjectsCard(card: HTMLElement, row: ProjectsListRow, owner: ProjectsCard, subtree: readonly HTMLElement[], signal: AbortSignal): void {
+		const item = row.item;
+		card.dataset.menuFrom = owner.menuFrom;
+		card.dataset.card = row.id;
+		card.addEventListener("pointerdown", () => (this.pressedProjectsRow = row), { capture: true, signal });
 		this.found.attach(card, item);
-		/** The drag's origin is only what the lists read; the tree takes the card's own `drop`. An open task's card is of a list. */
-		if (model.canDrop) return this.drag.attachCard(card, item, model.menuFrom as ListColumn, [], signal);
+		if (owner.canDrop) {
+			/** The drag's origin is only what the lists read; the Projects screen takes the row's own `drop`. An open task's card is of a list. */
+			const column = owner.menuFrom as ListColumn;
+			this.bulk.attach({ item, card, column, subtree });
+			return this.drag.attachCard(card, item, column, subtree, signal);
+		}
 		card.addEventListener("click", (e) => {
 			if (!this.fold(item, e.target)) this.showMenu(cardMenuTask(item, e.target), card, undefined, undefined, undefined, undefined, item);
 		}, { signal });
 	}
 
-	/** A card let go on a row of the tree: the project it was shown under gives way to the row's; its place in the funnel stays. */
+	/**
+	 * What the core takes for the rows a drag carries on the Projects screen: the one pressed, then the picked ones carried
+	 * along. Read once a drag.
+	 */
+	private projectsDrops(drag: TaskDragPayload): readonly ProjectsDrop[] {
+		const known = this.carriedRows.get(drag);
+		if (known) return known;
+		const tasks = this.projects?.tasksList;
+		const pressed = this.pressedProjectsRow;
+		if (!tasks || !pressed) return [];
+		const carried = this.bulk.carried(drag.item).flatMap((picked) => tasks.rowOf(picked.card)?.drop ?? []);
+		const drops = [pressed.drop, ...carried];
+		this.carriedRows.set(drag, drops);
+		return drops;
+	}
+
+	/** Cards let go on a row of the tree: the project each was shown under gives way to the row's; its place in the funnel stays. */
 	private async dropOnTree(drag: TaskDragPayload, node: string): Promise<null> {
+		const cards = this.projectsDrops(drag);
 		this.bulk.dropping(drag);
-		const card = this.pressedProjectsCard;
-		if (card) await this.act(() => this.deps.tasks.dropOnProject([card.drop], node));
+		if (cards.length > 0) await this.act(() => this.deps.tasks.dropOnProject(cards, node));
 		await this.projects?.refresh();
 		return null;
+	}
+
+	/**
+	 * Cards let go between the Projects screen's cards: written as the core says (`dropInProjects`), and the card the one
+	 * under the finger lands on (`projectsDropPreview`) hidden until the float is down on it.
+	 */
+	private async dropInProjectsList(drag: TaskDragPayload, place: ListPlace): Promise<HTMLElement | null> {
+		const projects = this.projects;
+		const cards = this.projectsDrops(drag);
+		this.bulk.dropping(drag);
+		if (!projects || cards.length === 0) return null;
+		let landing: ProjectsDropLanding | null = null;
+		await this.act(async () => {
+			landing = (await this.deps.tasks.projectsDropPreview(cards, place)).landings[0] ?? null;
+			await this.deps.tasks.dropInProjects(cards, place);
+		});
+		await projects.refresh();
+		const card = landing ? projects.tasksList.cardOf(landing) : null;
+		if (card) this.arriving.hold(card);
+		return card;
 	}
 
 	/** The plus at the Projects screen: carried onto the tree or the tasks; tapped, a new task at the end of the chosen node's tasks. */
@@ -1051,7 +1104,10 @@ export class CalendarScreen extends Component {
 	/** A drop: the service says what it means for the file (spec §5.1), for the card under the finger and those carried along. */
 	/** The drop written and drawn: the card the dragged task stands on now, hidden until the float lands on it. */
 	private async applyDrop(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | HeldOut | null> {
-		if (isProjectsDrop(result)) return result.kind === "projectRow" ? this.dropOnTree(drag, result.node) : null;
+		if (isProjectsDrop(result)) {
+			if (result.kind === "projectRow") return this.dropOnTree(drag, result.node);
+			return result.kind === "projectsPlace" ? this.dropInProjectsList(drag, result.place) : null;
+		}
 		this.bulk.dropping(drag);
 		this.arriving.dropping(drag.item);
 		await this.act(async () => void (await this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate)));
@@ -1158,6 +1214,8 @@ export class CalendarScreen extends Component {
 				if (menu.note) void this.app.workspace.openLinkText(menu.note.link, this.settings.tasksFile, "tab");
 			},
 			onDetach: () => changed(() => tasks.setProjectNote(name, null)),
+			delete: menu.delete,
+			onDelete: () => changed(() => tasks.deleteProject(name)),
 		});
 	}
 

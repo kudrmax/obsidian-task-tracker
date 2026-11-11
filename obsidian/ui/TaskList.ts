@@ -405,7 +405,7 @@ export class TaskList {
 }
 
 /** A subtask's branch from its task, bending in if it is the last; and the lines of the tasks further up that go on past it. */
-function branch(card: HTMLElement, through: readonly boolean[], last: boolean): void {
+export function branch(card: HTMLElement, through: readonly boolean[], last: boolean): void {
 	el(card, "span", last ? "tc-branch is-last" : "tc-branch");
 	through.forEach((goesOn, i) => {
 		if (goesOn) el(card, "span", "tc-branch-pass").style.setProperty(PROPERTY.pass, String(through.length - i));

@@ -2,7 +2,8 @@ import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel } from "../kit/Panel";
-import { menuGroup, menuRoom, placePanel } from "./MenuPanel";
+import { askQuestion, menuGroup, menuRoom, placePanel } from "./MenuPanel";
+import type { ProjectDelete } from "../../../core/application/contracts";
 import { Overlay } from "./Overlay";
 
 export interface GroupMenuOptions {
@@ -42,16 +43,21 @@ export interface ProjectMenuOptions {
 	readonly note: string | null;
 	readonly attachLabel: string;
 	readonly detachLabel: string;
+	/** Delete project: its row and the question asked before it. */
+	readonly delete: ProjectDelete;
 	onRename(): void;
 	onAttach(): void;
 	onOpenNote(): void;
 	onDetach(): void;
+	/** Delete project, confirmed. */
+	onDelete(): void;
 }
 
 /**
  * The project's menu, a tap on the chosen project's name over its tasks, as a section header's: the title stays over the
  * blur, the panel under it holds Rename, then the note: «Attach note…» without one; with one, the note's name, which opens
- * it, and Detach, which takes the link off and leaves the file.
+ * it, and Detach, which takes the link off and leaves the file. Apart at its foot, Delete project in the danger colour,
+ * which asks first in its own place, as a task's Delete does.
  */
 export const ProjectMenu = {
 	open(title: HTMLElement, opts: ProjectMenuOptions): { close(): void } {
@@ -61,17 +67,32 @@ export const ProjectMenu = {
 		el(copy.el, "span", "tc-lifted-title", opts.title);
 		copy.pin(rect, { width: true, height: true });
 		const panel = Panel.over(overlay, { root: "tc-panel", place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
-		panel.replace((p) => {
-			const rows = [{ label: opts.renameLabel, icon: "rename", onPick: panel.pickNow(() => opts.onRename()) } as const];
-			const note =
-				opts.note === null
-					? [{ label: opts.attachLabel, icon: "plus", onPick: panel.pickNow(() => opts.onAttach()) } as const]
-					: [
-							{ label: opts.note, icon: "openFile", onPick: panel.pick(() => opts.onOpenNote()) } as const,
-							{ label: opts.detachLabel, icon: "cross", onPick: panel.pick(() => opts.onDetach()) } as const,
-						];
-			return menuGroup(p, [...rows, ...note]);
-		});
+		const remove = opts.delete;
+		/** The menu, with Delete project apart at its foot; asking, the question takes that row's place. */
+		const show = (asking: boolean) =>
+			panel.replace((p) => {
+				const rows = [{ label: opts.renameLabel, icon: "rename", onPick: panel.pickNow(() => opts.onRename()) } as const];
+				const note =
+					opts.note === null
+						? [{ label: opts.attachLabel, icon: "plus", onPick: panel.pickNow(() => opts.onAttach()) } as const]
+						: [
+								{ label: opts.note, icon: "openFile", onPick: panel.pick(() => opts.onOpenNote()) } as const,
+								{ label: opts.detachLabel, icon: "cross", onPick: panel.pick(() => opts.onDetach()) } as const,
+							];
+				menuGroup(p, [...rows, ...note]);
+				if (!asking) return void menuGroup(p, [{ label: remove.label, icon: "delete", danger: remove.destructive, onPick: () => show(true) }]);
+				askQuestion(p, {
+					question: remove.title,
+					message: remove.message,
+					cancel: remove.cancel,
+					confirm: remove.confirm,
+					icon: "delete",
+					danger: remove.destructive,
+					onCancel: () => show(false),
+					onConfirm: panel.pick(() => opts.onDelete()),
+				});
+			});
+		show(false);
 		overlay.show();
 		return { close: () => void overlay.close() };
 	},

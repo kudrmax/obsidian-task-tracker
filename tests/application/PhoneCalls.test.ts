@@ -207,6 +207,9 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "setProjectNote", args: () => ["Окружение", "Заметки/Окружение"] },
 	{ method: "dropOnProject", args: (s) => [[{ key: key(s, "Someday"), from: "Окружение" }], "none"] },
 	{ method: "dropOnProject", args: (s) => [[{ key: key(s, "Idea"), from: null }], "project:Окружение"] },
+	{ method: "dropInProjects", args: (s) => [[{ key: key(s, "Idea"), from: null }], { kind: "task", group: "project:Окружение", before: null }] },
+	{ method: "projectsDropPreview", args: (s) => [[{ key: key(s, "Idea"), from: null }], { kind: "task", group: "project:Окружение", before: null }] },
+	{ method: "deleteProject", args: () => ["Окружение"] },
 	{ method: "isBlankProjectName", args: () => [" 📅 "] },
 	{ method: "createSection", args: (s) => ["Evening", { kind: "day", date: T, group: null, before: key(s, "In progress") }] },
 	{ method: "applyAll", args: (s) => [[{ key: key(s, "Idea"), change: { kind: "moveToEnd", section: "soon" } }, { key: key(s, "Shop"), change: { kind: "status", status: "done" } }]] },
@@ -627,6 +630,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.projectNodeOf", "Дружба"),
 		plain("rules.projectsLevels", [{ node: "all", kind: "all", depth: 0 }, { node: "project:A", kind: "project", depth: 0, title: "A" }, { node: "none", kind: "none", depth: 0 }], 2),
 		plain("rules.projectsGap", [{ node: "all", kind: "all", depth: 0 }, { node: "project:A", kind: "project", depth: 0, title: "A" }, { node: "none", kind: "none", depth: 0 }], 2, 1),
+		plain("rules.projectsTakes", { reorders: false, mode: "byProject", selected: "all", sections: [] }, [], { kind: "task", group: null, before: null }),
 		plain("rules.projectsDrop", [{ node: "all", kind: "all", depth: 0 }, { node: "project:A", kind: "project", depth: 0, title: "A" }, { node: "none", kind: "none", depth: 0 }], 2, 12),
 		...[
 			["openAtEnd", "soon"],
