@@ -205,6 +205,8 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "newProject", args: (s) => ["Дружба", [key(s, "Idea")]] },
 	{ method: "newProject", args: () => ["  ", []] },
 	{ method: "projectsScreen", args: () => [] },
+	{ method: "projects", args: () => [] },
+	{ method: "unfoldProjectNode", args: () => ["done"] },
 	{ method: "projectsScreen", args: () => [], text: null },
 	{ method: "tapProjectNode", args: () => ["project:Окружение"] },
 	{ method: "selectProjectNode", args: () => ["project:Окружение"] },
@@ -234,7 +236,7 @@ const TASK_CASES: readonly Case[] = [
 ];
 
 /** The service's menus offer the projects of the file it read last; the door's, of the text it is handed: the plugin reads the screen before any menu. */
-const READ_FIRST: ReadonlySet<string> = new Set(["menu", "bulkMenu", "projectNotes"]);
+const READ_FIRST: ReadonlySet<string> = new Set(["menu", "bulkMenu", "projectNotes", "projects"]);
 
 /** What the service answers, and the text it leaves; an error by its code. */
 async function serviceAnswer(c: Case, screen: ScreenView): Promise<{ result: unknown; text: string | null; steps: boolean }> {

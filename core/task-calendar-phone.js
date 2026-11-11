@@ -3561,18 +3561,24 @@ ${key.title}`.toLowerCase();
     const full = tree.withMissing(named);
     return doc.hasProjectTree() && full === tree ? doc : doc.withProjectTree(full);
   }
+  var OLD_FIELD_RE = /(?:^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[/u;
+  function oldLines(doc, resultMark) {
+    return flatten(doc.allTasks()).filter((entry) => OLD_FIELD_RE.test(entry.raw) || startsWithMark(entry.task.text, resultMark));
+  }
+  function awaitsMove(doc, notes, resultMark = LEGACY_RESULT_MARK) {
+    if (oldLines(doc, resultMark).length > 0) return true;
+    return !doc.hasProjectTree() && (notes.length > 0 || taskProjects(doc).length > 0);
+  }
   function movedToProjects(doc, notes, resultMark = LEGACY_RESULT_MARK) {
-    if (doc.hasProjectTree()) return doc;
-    const all = flatten(doc.allTasks());
-    const marked = all.filter((entry) => startsWithMark(entry.task.text, resultMark));
-    const fielded = all.filter((entry) => entry.task.projects.length > 0);
-    if (notes.length === 0 && marked.length === 0 && fielded.length === 0) return doc;
     const byName2 = [...notes].sort((a, b) => projectKey(a.name) < projectKey(b.name) ? -1 : projectKey(a.name) > projectKey(b.name) ? 1 : 0);
     let tree = doc.projectTree();
-    for (const note of byName2) tree = tree.added(note.name, { parent: null, before: null }, note.link);
+    for (const note of byName2) {
+      const found = tree.find(note.name);
+      tree = found ? found.node.note === null ? tree.withNote(found.node.name, note.link) : tree : tree.added(note.name, { parent: null, before: null }, note.link);
+    }
     tree = tree.withMissing(taskProjects(doc));
     const prefixes = doc.priorityPrefixes();
-    const rewritten = doc.rewrittenLines([.../* @__PURE__ */ new Set([...marked, ...fielded])], (task) => {
+    const rewritten = doc.rewrittenLines(oldLines(doc, resultMark), (task) => {
       if (!startsWithMark(task.text, resultMark)) return task;
       const rest = task.text.slice(resultMark.length).trimStart();
       return task.priority === null ? { ...task, ...priorityOfText(rest, prefixes) } : { ...task, text: rest };
@@ -4094,7 +4100,7 @@ ${key.title}`.toLowerCase();
       return spot.kind === "slot" || spot.place.level === 0;
     }
     projectButton(link) {
-      return entryProject(link, this.tasks.projectNotes?.() ?? []);
+      return entryProject(link, this.tasks.projects?.() ?? this.tasks.projectNotes?.() ?? []);
     }
     /** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */
     get renamed() {
@@ -4998,6 +5004,7 @@ ${key.title}`.toLowerCase();
           depth,
           tile: depth === 0,
           waiting: status === "waiting",
+          muted: status !== "active",
           status,
           selected: sameNode(selected2, projectNodeOf(node.name)),
           hasBranch: branch.length > 0,
@@ -5010,8 +5017,7 @@ ${key.title}`.toLowerCase();
         if (!folded2) walk(node.children, own, depth + 1, done);
       }
     };
-    const liveRoots = (nodes) => nodes;
-    walk(liveRoots(tree.roots), [], 0, false);
+    walk(tree.roots, [], 0, false);
     rows.push(fixedRow("none", PROJECTS_WORDS.none, selected2, false, true));
     const doneTops = doneRoots(tree, statusOf2);
     const open = state.doneOpen === true;
@@ -5036,6 +5042,7 @@ ${key.title}`.toLowerCase();
       depth,
       tile: false,
       waiting: false,
+      muted: true,
       status: statusOf2(node.name),
       selected: sameNode(selected2, projectNodeOf(node.name)),
       hasBranch: node.children.length > 0,
@@ -5048,7 +5055,7 @@ ${key.title}`.toLowerCase();
     if (!folded2) for (const child of node.children) walkDone({ node: child, path: [...path, child.name] }, rows, state, selected2, statusOf2, depth + 1);
   }
   function fixedRow(node, title, selected2, hasBranch, acceptsTask) {
-    return { node, kind: node, title, depth: 0, tile: true, waiting: false, status: null, selected: selected2 === node, hasBranch, folded: false, project: null, acceptsTask, canLift: false, unfoldsOnHover: false };
+    return { node, kind: node, title, depth: 0, tile: true, waiting: false, muted: node !== "all", status: null, selected: selected2 === node, hasBranch, folded: false, project: null, acceptsTask, canLift: false, unfoldsOnHover: false };
   }
   var STAGES = ["today", "soon", "inbox", "backlog"];
   function stageOf(entry) {
@@ -5156,6 +5163,11 @@ ${key.title}`.toLowerCase();
     const name = projectOfNode(node);
     if (name === null || !tree.find(name)?.node.children.length) return state;
     return withFold(state, name, !isFolded(state, name));
+  }
+  function unfolded2(state, node) {
+    if (node === "done") return state.doneOpen ? state : { ...state, doneOpen: true };
+    const name = projectOfNode(node);
+    return name === null || !isFolded(state, name) ? state : withFold(state, name, false);
   }
   function selected(state, tree, doc, node) {
     const name = projectOfNode(node);
@@ -5722,15 +5734,19 @@ ${key.title}`.toLowerCase();
     return { slot: item.slot, open: item.open };
   }
   var TaskReads = class {
-    constructor(rules, settings, clock, projects = NO_PROJECT_SOURCE) {
+    constructor(rules, settings, clock, source = NO_PROJECT_SOURCE) {
       this.rules = rules;
       this.settings = settings;
       this.clock = clock;
-      this.projects = projects;
+      this.source = source;
     }
     /** The projects of the tree read last, in its order: what the Project page offers. */
     projectNotes() {
-      return new ProjectIndex(this.projects.tree()).known();
+      return new ProjectIndex(this.source.tree()).known();
+    }
+    /** The projects of the tree read last, in its order: the quick entry's Project button. */
+    projects() {
+      return this.projectNotes();
     }
     /** Grouping went: none. Stub until the frontends drop it. */
     grouping() {
@@ -5750,7 +5766,7 @@ ${key.title}`.toLowerCase();
         tree,
         today,
         boundary,
-        state: this.projects.screen(),
+        state: this.source.screen(),
         item: (entry) => toItem(entry, today, levels, null, boundary),
         listName: (list) => this.listName(list)
       });
@@ -6017,7 +6033,7 @@ ${key.title}`.toLowerCase();
     }
     /** The projects the Project page offers: the tree read last, each with its depth. */
     projectChoices() {
-      return new ProjectIndex(this.projects.tree()).known().map((project) => ({ project, depth: project.path.length - 1 }));
+      return new ProjectIndex(this.source.tree()).known().map((project) => ({ project, depth: project.path.length - 1 }));
     }
     today() {
       return this.rules.today();
@@ -6574,17 +6590,18 @@ ${key.title}`.toLowerCase();
       }
     }
     /**
-     * A written document with its projects in its tree: on a file still without `## Projects`, the one move to projects
-     * first (the notes that were projects, the result mark of the settings), then every project a task names.
+     * A written document with its projects in its tree: when the file as read still awaited the move to projects (old
+     * fields, the result mark, or no `## Projects`), the move first, whatever the write did; then every project a task names.
      */
-    projected(doc, settings) {
-      const moved2 = movedToProjects(doc, this.legacyNotes(), settings.resultMark);
+    projected(before, after, settings) {
+      const notes = this.legacyNotes();
+      const moved2 = awaitsMove(before, notes, settings.resultMark) ? movedToProjects(after, notes, settings.resultMark) : after;
       return withTasksInTree(moved2);
     }
     written(doc, operation, at, writes = true) {
       const { settings, today, boundary } = at;
       const changed2 = operation(doc, today, settings, boundary);
-      const projected = changed2 === doc ? changed2 : this.projected(changed2, settings);
+      const projected = changed2 === doc ? changed2 : this.projected(doc, changed2, settings);
       const after = normalize(projected, today, boundary, usablePresets(settings.groups.presets));
       const text = after.serialize();
       if (writes) this.identity?.wrote(text, after);
@@ -6767,8 +6784,19 @@ ${key.title}`.toLowerCase();
     setProject(keys, project) {
       return nothing(this.rules.setProject(keys, project));
     }
+    /** Each task as it then stands, found by its id, in the order given; null for one gone. */
     toggleProject(keys, name) {
-      return nothing(this.rules.toggleProject(keys, name));
+      return {
+        operation: this.rules.toggleProject(keys, name),
+        answer: (change) => {
+          if (!change) return keys.map(() => null);
+          const today = this.rules.today();
+          return keys.map((key) => {
+            const entry = change.after.byId(this.rules.entryOf(change.before, key).id);
+            return entry ? this.reads.itemAt(change.after, entry, today) : null;
+          });
+        }
+      };
     }
     /** «New project…»: the project as the tree has it after the write (the one of that name it had), or null for a name of nothing. */
     newProject(name, keys) {
@@ -7377,6 +7405,8 @@ ${key.title}`.toLowerCase();
     setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps)),
     setProject: (c, [keys, project]) => c.run(c.writes.setProject(keys, project ?? null)),
     projectNotes: (c) => c.reads.projectNotes(),
+    projects: (c) => c.reads.projectNotes(),
+    unfoldProjectNode: (c, [node]) => c.keepProjectsScreen(unfolded2(c.projectsScreen, node)),
     toggleProject: (c, [keys, name]) => c.run(c.writes.toggleProject(keys, name)),
     newProject: (c, [name, keys]) => {
       const made = c.run(c.writes.newProject(name, keys ?? []));

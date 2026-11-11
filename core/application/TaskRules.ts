@@ -656,18 +656,19 @@ export class TaskRules {
 	}
 
 	/**
-	 * A written document with its projects in its tree: on a file still without `## Projects`, the one move to projects
-	 * first (the notes that were projects, the result mark of the settings), then every project a task names.
+	 * A written document with its projects in its tree: when the file as read still awaited the move to projects (old
+	 * fields, the result mark, or no `## Projects`), the move first, whatever the write did; then every project a task names.
 	 */
-	private projected(doc: TaskDocument, settings: TaskCalendarSettings): TaskDocument {
-		const moved = projectWrites.movedToProjects(doc, this.legacyNotes(), settings.resultMark);
+	private projected(before: TaskDocument, after: TaskDocument, settings: TaskCalendarSettings): TaskDocument {
+		const notes = this.legacyNotes();
+		const moved = projectWrites.awaitsMove(before, notes, settings.resultMark) ? projectWrites.movedToProjects(after, notes, settings.resultMark) : after;
 		return projectWrites.withTasksInTree(moved);
 	}
 
 	private written(doc: TaskDocument, operation: Operation, at: Moment, writes = true): TextChange {
 		const { settings, today, boundary } = at;
 		const changed = operation(doc, today, settings, boundary);
-		const projected = changed === doc ? changed : this.projected(changed, settings);
+		const projected = changed === doc ? changed : this.projected(doc, changed, settings);
 		const after = normalize(projected, today, boundary, ops.usablePresets(settings.groups.presets));
 		const text = after.serialize();
 		if (writes) this.identity?.wrote(text, after);

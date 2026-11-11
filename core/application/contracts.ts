@@ -862,8 +862,10 @@ export interface ProjectsRow {
 	readonly depth: number;
 	/** Drawn as a tile (depth 0), else as a line of text. */
 	readonly tile: boolean;
-	/** The project waits (grey name): its open tasks only in Inbox and Backlog, or none yet. */
+	/** The project waits: its open tasks only in Inbox and Backlog, or none yet. */
 	readonly waiting: boolean;
+	/** Its name is drawn grey: a waiting project, a done one, No project and Done. */
+	readonly muted: boolean;
 	readonly status: ProjectStatus | null;
 	/** Filled light: the chosen node. */
 	readonly selected: boolean;
@@ -1123,10 +1125,13 @@ export interface TaskService {
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void>;
 	/**
 	 * A project of the Project page tapped: put last on every task that lacks it, or taken off them all when every one has
-	 * it; a subtask's key names its top task. One write.
+	 * it; a subtask's key names its top task. One write; each task as it then stands, in the order given, its key fresh;
+	 * null for one gone (as `toggleLabel`).
 	 */
-	toggleProject(keys: readonly TaskKey[], name: string): Promise<void>;
-	/** The projects of the tree, in its order: stub until the frontends read the Project page's options. */
+	toggleProject(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]>;
+	/** The projects of the tree read last, in its order, the tasks' own in it: what the quick entry's Project button offers. */
+	projects(): readonly ProjectRef[];
+	/** `projects()` under its old name. Stub until the frontends drop it. */
 	projectNotes(): readonly ProjectRef[];
 	/**
 	 * «New project…» named `name` (`cleanProjectName`): a project at the top of the tree, last, and `keys` get it, in one
@@ -1157,6 +1162,8 @@ export interface TaskService {
 	 * branch stays as it is). Kept on the device.
 	 */
 	tapProjectNode(node: ProjectsNodeId): Promise<void>;
+	/** A folded branch opened without choosing its node: a card held over the row. Done opens its done projects. Kept on the device. */
+	unfoldProjectNode(node: ProjectsNodeId): Promise<void>;
 	/** The node chosen, unfolding the branches above it so its row shows: search's path, the card's folder mark. Kept on the device. */
 	selectProjectNode(node: ProjectsNodeId): Promise<void>;
 	/** The segment over the tasks: By project or By stage. Kept on the device. */

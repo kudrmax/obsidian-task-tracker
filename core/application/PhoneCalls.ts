@@ -57,7 +57,7 @@ import { listView, sectionChoice } from "./sections";
 import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
-import { projectNodeOf, projectOfNode, projectsGap, projectsLevels, renamedIn, selected, tapped } from "./projectsScreen";
+import { projectNodeOf, projectOfNode, projectsGap, projectsLevels, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -419,6 +419,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps as A)),
 	setProject: (c, [keys, project]) => c.run(c.writes.setProject(keys as A, (project ?? null) as string | null)),
 	projectNotes: (c) => c.reads.projectNotes(),
+	projects: (c) => c.reads.projectNotes(),
+	unfoldProjectNode: (c, [node]) => c.keepProjectsScreen(unfolded(c.projectsScreen, node as string)),
 	toggleProject: (c, [keys, name]) => c.run(c.writes.toggleProject(keys as A, name as string)),
 	newProject: (c, [name, keys]) => {
 		const made = c.run(c.writes.newProject(name as string, (keys ?? []) as A));
