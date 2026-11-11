@@ -57,7 +57,7 @@ import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
 import { projectsTakes } from "./projectsDrop";
-import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -416,6 +416,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	projectsScreen: (c) => c.ask(c.reads.projectsScreenRead()),
 	tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node as string)),
 	selectProjectNode: (c, [node]) => c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, node as string)),
+	hoverProjectNode: (c, [node]) => c.keepProjectsScreen(hovered(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, c.ask(c.reads.projectsScreenRead()).rows, node as string)),
 	setProjectsMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, mode: mode as A }),
 	createProject: (c, [name, place]) => {
 		const made = c.run(c.writes.createProject(name as string, place as A));

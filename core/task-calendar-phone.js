@@ -4827,6 +4827,20 @@ ${key.title}`.toLowerCase();
     return { kind: "many", steps };
   }
 
+  // core/application/projectsLift.ts
+  function originOf(item) {
+    if (item.list === "done") return null;
+    if (item.slot !== null) return "timeline";
+    if (item.list === "now" || item.list === "soon" && item.dueDate !== null) return "day";
+    return item.list;
+  }
+  function liftedOf(item) {
+    return { id: item.id, list: item.list, origin: originOf(item) };
+  }
+  function dropOf(item, from) {
+    return { key: item.key, from, lifted: liftedOf(item) };
+  }
+
   // core/application/projectsScreen.ts
   var PROJECTS_WORDS = {
     all: "All",
@@ -4896,7 +4910,7 @@ ${key.title}`.toLowerCase();
     const statusOf2 = (name2) => statuses.get(projectKey(name2)) ?? "waiting";
     const selected2 = selectedNode(state, tree);
     const mode = state.mode ?? "byProject";
-    const rows = treeRows(tree, state, selected2, statusOf2);
+    const rows = treeRows(tree, state, selected2, statusOf2, (node) => input.doc !== null && nodeReorders(node, statusOf2));
     const parts = input.doc ? sectionsOf(input, input.doc, selected2, mode, statusOf2) : [];
     const name = projectOfNode(selected2);
     const placed = name === null ? null : tree.find(name);
@@ -4914,8 +4928,12 @@ ${key.title}`.toLowerCase();
       newTask: selected2 === "done" || placed !== null && statusOf2(placed.node.name) === "done" ? null : inInbox(placed?.node.name ?? null),
       emptyLabel: PROJECTS_WORDS.noTasks,
       missing: input.doc === null,
-      reorders: input.doc !== null && selected2 !== "done" && !(placed !== null && statusOf2(placed.node.name) === "done")
+      reorders: input.doc !== null && nodeReorders(selected2, statusOf2)
     };
+  }
+  function nodeReorders(node, statusOf2) {
+    const name = projectOfNode(node);
+    return node !== "done" && !(name !== null && statusOf2(name) === "done");
   }
   function projectMenu(project) {
     return {
@@ -4938,8 +4956,9 @@ ${key.title}`.toLowerCase();
   function inInbox(project) {
     return { place: { kind: "list", list: "inbox", group: null, before: null }, project };
   }
-  function treeRows(tree, state, selected2, statusOf2) {
-    const rows = [fixedRow("all", PROJECTS_WORDS.all, selected2, false, false)];
+  function treeRows(tree, state, selected2, statusOf2, reorders) {
+    const row = (fields) => ({ ...fields, opensOnHover: fields.acceptsTask && !fields.selected && reorders(fields.node) });
+    const rows = [row(fixedRow("all", PROJECTS_WORDS.all, selected2, false, false))];
     const walk = (nodes, path, depth, done) => {
       for (const node of nodes) {
         if (statusOf2(node.name) === "done" !== done) continue;
@@ -4947,7 +4966,7 @@ ${key.title}`.toLowerCase();
         const folded2 = branch.length > 0 && isFolded(state, node.name);
         const own = [...path, node.name];
         const status = statusOf2(node.name);
-        rows.push({
+        rows.push(row({
           node: projectNodeOf(node.name),
           kind: "project",
           title: node.name,
@@ -4963,16 +4982,16 @@ ${key.title}`.toLowerCase();
           acceptsTask: true,
           canLift: !done,
           unfoldsOnHover: folded2
-        });
+        }));
         if (!folded2) walk(node.children, own, depth + 1, done);
       }
     };
     walk(tree.roots, [], 0, false);
-    rows.push(fixedRow("none", PROJECTS_WORDS.none, selected2, false, true));
+    rows.push(row(fixedRow("none", PROJECTS_WORDS.none, selected2, false, true)));
     const doneTops = doneRoots(tree, statusOf2);
     const open = state.doneOpen === true;
-    rows.push({ ...fixedRow("done", PROJECTS_WORDS.done, selected2, doneTops.length > 0, false), folded: doneTops.length > 0 && !open });
-    if (open) for (const top of doneTops) walkDone(top, rows, state, selected2, statusOf2, 1);
+    rows.push(row({ ...fixedRow("done", PROJECTS_WORDS.done, selected2, doneTops.length > 0, false), folded: doneTops.length > 0 && !open }));
+    if (open) for (const top of doneTops) walkDone(top, rows, state, selected2, statusOf2, 1, row);
     return rows;
   }
   function doneRoots(tree, statusOf2) {
@@ -4982,10 +5001,10 @@ ${key.title}`.toLowerCase();
       return parent === null || statusOf2(parent) !== "done";
     });
   }
-  function walkDone(placed, rows, state, selected2, statusOf2, depth) {
+  function walkDone(placed, rows, state, selected2, statusOf2, depth, row) {
     const { node, path } = placed;
     const folded2 = node.children.length > 0 && isFolded(state, node.name);
-    rows.push({
+    rows.push(row({
       node: projectNodeOf(node.name),
       kind: "project",
       title: node.name,
@@ -5001,8 +5020,8 @@ ${key.title}`.toLowerCase();
       acceptsTask: true,
       canLift: false,
       unfoldsOnHover: folded2
-    });
-    if (!folded2) for (const child of node.children) walkDone({ node: child, path: [...path, child.name] }, rows, state, selected2, statusOf2, depth + 1);
+    }));
+    if (!folded2) for (const child of node.children) walkDone({ node: child, path: [...path, child.name] }, rows, state, selected2, statusOf2, depth + 1, row);
   }
   function fixedRow(node, title, selected2, hasBranch, acceptsTask) {
     return { node, kind: node, title, depth: 0, tile: true, waiting: false, muted: node !== "all", status: null, selected: selected2 === node, hasBranch, folded: false, project: null, acceptsTask, canLift: false, unfoldsOnHover: false };
@@ -5036,7 +5055,7 @@ ${key.title}`.toLowerCase();
       stage: mode === "byProject" ? stageMark(entry, input.today, input.boundary) : null,
       over: mode === "byStage" ? over : null,
       from,
-      drop: { key: item.key, from },
+      drop: dropOf(item, from),
       menuFrom: menuFromOf(entry),
       canDrop: item.open
     };
@@ -5113,7 +5132,7 @@ ${key.title}`.toLowerCase();
   }
   function subtaskRows(key, item, level, from) {
     if (item.collapsed) return [];
-    return item.subtasks.flatMap((sub) => [{ id: `${key}/${sub.id}`, item: sub, level, card: null, drop: { key: sub.key, from } }, ...subtaskRows(key, sub, level + 1, from)]);
+    return item.subtasks.flatMap((sub) => [{ id: `${key}/${sub.id}`, item: sub, level, card: null, drop: dropOf(sub, from) }, ...subtaskRows(key, sub, level + 1, from)]);
   }
   function shown(sections, open) {
     const kept = open ? sections : sections.filter((s) => !s.empty);
@@ -5132,6 +5151,12 @@ ${key.title}`.toLowerCase();
     if (node === "done") return state.doneOpen ? state : { ...state, doneOpen: true };
     const name = projectOfNode(node);
     return name === null || !isFolded(state, name) ? state : withFold(state, name, false);
+  }
+  function hovered(state, tree, doc, rows, node) {
+    const row = rows.find((r) => sameNode(r.node, node));
+    if (!row) return state;
+    const open = row.unfoldsOnHover ? unfolded2(state, row.node) : state;
+    return row.opensOnHover ? selected(open, tree, doc, row.node) : open;
   }
   function selected(state, tree, doc, node) {
     const name = projectOfNode(node);
@@ -5207,24 +5232,31 @@ ${key.title}`.toLowerCase();
   function listOf2(item) {
     return item.list === "done" ? null : item.list;
   }
-  function originOf(item) {
-    if (item.slot !== null) return "timeline";
-    if (item.list === "now" || item.list === "soon" && item.dueDate !== null) return "day";
-    return item.list;
+  function carriedOf(item) {
+    return { id: item.id, list: item.list, origin: originOf(item), shown: true };
   }
-  function itemOf2(view, key) {
+  function shownItem(view, key) {
     for (const section of view.sections) for (const row of section.rows) if (samePlace2(row.item.key, key)) return row.item;
-    throw new StaleTaskError();
+    return null;
   }
-  function sameTask2(a, b) {
-    return a.id === b.id;
+  function carriedIn(view, card) {
+    const item = shownItem(view, card.key);
+    if (item) return carriedOf(item);
+    if (!card.lifted) throw new StaleTaskError();
+    return { ...card.lifted, shown: false };
+  }
+  function carriedInFile(view, entry, card) {
+    const item = shownItem(view, card.key);
+    if (item) return carriedOf(item);
+    if (!card.lifted) throw new StaleTaskError();
+    return { id: entry.id, list: entry.section, origin: originOf({ list: entry.section, slot: entry.task.slot, dueDate: entry.task.dueDate }), shown: false };
   }
   function planOf(view, carried, place) {
     const section = view.sections.find((s) => s.group === place.group);
     if (!section) throw new StaleTaskError();
     const at = place.before === null ? section.cards.length : section.cards.findIndex((card) => samePlace2(card.item.key, place.before));
     if (at < 0) throw new StaleTaskError();
-    const kept = (card) => !carried.some((item) => sameTask2(item, card.item));
+    const kept = (card) => !carried.some((item) => item.id === card.item.id);
     const above = section.cards.slice(0, at).filter(kept).pop();
     const below = section.cards.slice(at).find(kept);
     const anchors = [...above ? [{ kind: "after", item: above.item }] : [], ...below ? [{ kind: "before", item: below.item }] : []];
@@ -5233,8 +5265,8 @@ ${key.title}`.toLowerCase();
   }
   function enters(carried, target) {
     if (target === null) return true;
-    const moving2 = carried.filter((item) => listOf2(item) !== target);
-    return moving2.length === 0 || acceptsDrop(COLUMN_OF[target], moving2.map(originOf));
+    const moving2 = carried.filter((item) => listOf2(item) !== target).map((item) => item.origin);
+    return moving2.length === 0 || moving2.every((origin) => origin !== null) && acceptsDrop(COLUMN_OF[target], moving2);
   }
   function stageList(section) {
     const place = section.newTask?.place;
@@ -5246,15 +5278,18 @@ ${key.title}`.toLowerCase();
   function projectsTakes(view, cards, place) {
     if (!view.reorders) return false;
     if (place.kind === "subtask") return true;
-    const carried = cards.map((card) => itemOf2(view, card.key));
+    return takes(view, cards.map((card) => carriedIn(view, card)), place);
+  }
+  function takes(view, carried, place) {
     return enters(carried, targetList(planOf(view, carried, place).anchor));
   }
   function projectsDropSteps(view, doc, entryOf, cards, place, today) {
     if (!view.reorders) throw new StaleTaskError();
     if (place.kind === "subtask") return cards.map((card) => ({ key: card.key, change: { kind: "nest", parent: place.parent, before: place.before } }));
-    if (!projectsTakes(view, cards, place)) return [];
-    const carried = cards.map((card) => itemOf2(view, card.key));
-    const { anchor, project } = planOf(view, carried, place);
+    const carried = cards.map((card) => carriedInFile(view, entryOf(card.key), card));
+    if (!takes(view, carried, place)) return [];
+    const plan = planOf(view, carried, place);
+    const { anchor } = plan;
     const target = targetList(anchor);
     const dropped = new Set(cards.map((card) => entryOf(card.key).id));
     const spot = target === null ? null : spotOf(doc, anchor, target, entryOf, dropped);
@@ -5264,11 +5299,12 @@ ${key.title}`.toLowerCase();
       if (spot !== null && target !== null) {
         if (listOf2(item) === target) moves.push({ key: card.key, change: { kind: "reorder", group: spot.group, before: spot.before } });
         else {
-          const move = dropMove(originOf(item), { kind: "group", list: target, date: null, group: spot.group, before: spot.before }, today);
+          const move = dropMove(item.origin, { kind: "group", list: target, date: null, group: spot.group, before: spot.before }, today);
           if (move.kind === "toTime" || move.kind === "clearSlot") throw new StaleTaskError();
           moves.push({ key: card.key, change: move });
         }
       }
+      const project = projectFor(view, plan, item);
       if (project !== void 0 && !sameProject(card.from, project)) moves.push({ key: card.key, change: { kind: "swapProject", from: card.from, to: project } });
       return moves;
     });
@@ -5279,6 +5315,10 @@ ${key.title}`.toLowerCase();
     if (anchor.kind === "before") return { group: entry.group, before: keyOf(entry) };
     const next = doc.tasks(list).find((other) => other.index > entry.index && other.group === entry.group && !dropped.has(other.id));
     return { group: entry.group, before: next ? keyOf(next) : null };
+  }
+  function projectFor(view, plan, item) {
+    if (view.mode === "byProject" || item.shown) return plan.project;
+    return view.selected === "all" ? void 0 : projectOfNode(view.selected);
   }
   function partProject(view, section) {
     return section.group === null ? projectOfNode(view.selected) : projectOfNode(section.key);
@@ -7497,6 +7537,7 @@ ${key.title}`.toLowerCase();
     projectsScreen: (c) => c.ask(c.reads.projectsScreenRead()),
     tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node)),
     selectProjectNode: (c, [node]) => c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, node)),
+    hoverProjectNode: (c, [node]) => c.keepProjectsScreen(hovered(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, c.ask(c.reads.projectsScreenRead()).rows, node)),
     setProjectsMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, mode }),
     createProject: (c, [name, place]) => {
       const made = c.run(c.writes.createProject(name, place));

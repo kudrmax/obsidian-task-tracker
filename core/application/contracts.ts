@@ -742,6 +742,12 @@ export interface ProjectsRow {
 	readonly canLift: boolean;
 	/** A held card over it unfolds its branch after a pause: a folded branch. */
 	readonly unfoldsOnHover: boolean;
+	/**
+	 * A held card over it chooses it after the same pause (`TaskService.hoverProjectNode`), so its tasks show and the card
+	 * can be let go among them: a row that takes a task (`acceptsTask`) whose list takes drops (`ProjectsView.reorders`),
+	 * not the chosen one. A live project and No project; never All, Done or a done project.
+	 */
+	readonly opensOnHover: boolean;
 }
 
 /** What the right side of a card on the Projects screen shows in By project: the stage's symbol, or the task's date. */
@@ -772,6 +778,19 @@ export interface ProjectsCard {
 export interface ProjectsDrop {
 	readonly key: TaskKey;
 	readonly from: string | null;
+	/**
+	 * The task as its card was lifted, filled by the core on every card and row (`ProjectsCard.drop`, `ProjectsListRow.drop`):
+	 * a frontend passes it back as given. It judges a drop in a list that shows no card of the task (lifted on another node,
+	 * then a held card opened this one); without it such a drop is stale.
+	 */
+	readonly lifted?: ProjectsLifted;
+}
+
+/** A carried task as its card was lifted: who it is (`TaskItem.id`), its list (`TaskItem.list`), the funnel's column it is dragged from (null: a closed task's, from none). */
+export interface ProjectsLifted {
+	readonly id: string;
+	readonly list: SectionKey;
+	readonly origin: DropFrom | null;
 }
 
 /** A new task the plus writes where it is let go on the tasks: the place (`createInPlace`'s) and its project (its sixth argument). */
@@ -929,7 +948,7 @@ export { projectsDrop } from "./projectsScreen";
  * shows no drop line there and lets go of nothing, as over a list that does not take the card.
  */
 export { projectsTakes } from "./projectsDrop";
-/** How long a held card waits over a folded row before its branch opens (`unfoldProjectNode`), ms; the indent of a tree's step, px (pt). */
+/** How long a held card waits over a row before it unfolds or opens (`hoverProjectNode`), ms; the indent of a tree's step, px (pt). */
 export { PROJECTS_HOVER_MS, PROJECTS_INDENT } from "./projectsScreen";
 
 /**
@@ -1114,6 +1133,11 @@ export interface TaskService {
 	unfoldProjectNode(node: ProjectsNodeId): Promise<void>;
 	/** The node chosen, unfolding the branches above it so its row shows: search's path, the card's folder mark. Kept on the device. */
 	selectProjectNode(node: ProjectsNodeId): Promise<void>;
+	/**
+	 * A card held over a row for `PROJECTS_HOVER_MS`: its branch unfolds if it unfolds on hover (`ProjectsRow.unfoldsOnHover`),
+	 * and it is chosen if it opens on hover (`ProjectsRow.opensOnHover`), the mode kept. One call, one wait. Kept on the device.
+	 */
+	hoverProjectNode(node: ProjectsNodeId): Promise<void>;
 	/** The segment over the tasks: By project or By stage. Kept on the device. */
 	setProjectsMode(mode: ProjectsMode): Promise<void>;
 	/**

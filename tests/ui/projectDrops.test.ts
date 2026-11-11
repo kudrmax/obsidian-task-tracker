@@ -6,7 +6,7 @@ import { liftLanding, plusLanding, type TreeShown } from "../../obsidian/ui/proj
 
 const row = (node: string, kind: ProjectsRow["kind"], depth: number, hasBranch = false): ProjectsRow => ({
 	node, kind, title: node.replace("project:", ""), depth, tile: depth === 0, waiting: false, muted: false, status: null, selected: false, hasBranch, folded: false, project: null,
-	acceptsTask: kind === "project" || kind === "none", canLift: kind === "project", unfoldsOnHover: false,
+	acceptsTask: kind === "project" || kind === "none", canLift: kind === "project", unfoldsOnHover: false, opensOnHover: false,
 });
 
 /** The tree as laid out: rows 30 px tall from y 0, each a tree step further in per depth from x 10. */

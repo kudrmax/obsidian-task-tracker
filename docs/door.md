@@ -72,7 +72,8 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 - `settings`: the call changed the settings (a calendar shown or hidden; the phone carrying the old choice of calendars
   over, once). The host writes this text as `data.json`; every key it does not know is kept.
 - `projectsScreen`: the call changed what this device keeps of the Projects screen (`tasks.tapProjectNode`,
-  `tasks.selectProjectNode`, `tasks.setProjectsMode`, `tasks.createProject`, `tasks.renameProject`). The host keeps it on
+  `tasks.selectProjectNode`, `tasks.hoverProjectNode`, `tasks.setProjectsMode`, `tasks.createProject`,
+  `tasks.renameProject`). The host keeps it on
   the device, never synced, and hands it in again.
 - `ids`: who the tasks and sections are after the call (`TaskIdState` in `core/application/TaskIdentity.ts`: the
   headings and task lines of the file as read, tidied for today, with their ids, and where new ids go on from). The ids
@@ -220,13 +221,23 @@ as one tree, the first name winning, and is written back as one under the first 
   place)` is false, the host shows no drop line and lets go of nothing, and `dropInProjects` writes nothing. One write;
   answers the tasks' keys as the file now has them; `staleTask` for a part the screen no longer has.
   `tasks.dropInProjects([card.drop], { kind: "task", group: "today", before: null })` puts a Soon card into Now.
+  A card lifted on another node, then carried into the list a held card opened (`tasks.hoverProjectNode`), is judged by
+  its drop's `lifted` (`{ id, list, origin }`, filled by the core; the host passes `drop` back as it got it at the lift)
+  in `projectsTakes`, and as the file has it in `dropInProjects`. By project the part's project takes `from`'s place as
+  for any card; By stage the chosen node's project takes `from`'s place (No project: `from` goes; All: projects stay),
+  while a card the list shows keeps today's rule (projects stay). A card the list does not show and whose drop has no
+  `lifted` is `staleTask`. Lifted on Q, dropped By stage in P's Soon: `- [ ] Back Q 🗂️ Q` becomes a Soon line `- [ ] Back
+  Q 🗂️ P`.
 - `tasks.projectsDropPreview(cards, place)`: the same, writing nothing: `{ landings, view, tasks }`, `view` the
   `ProjectsView` the drop leaves (equal to the next `projectsScreen`), each landing `{ kind: "card", id, item, card,
   section, index }` (the part it was dropped in first), `{ kind: "subtask", id, item, parent, index }` or
   `{ kind: "away", id, item: null }`.
 - `tasks.tapProjectNode(node)`: a node not chosen is chosen; the chosen one folds or unfolds its branch (Done opens its
   done projects). `tasks.unfoldProjectNode(node)`: the branch opened without choosing it, for a card held over a folded
-  row (`unfoldsOnHover`). `ProjectsRow.muted`: the name drawn grey (a waiting or done project, No project, Done). `tasks.selectProjectNode(node)`: chosen, the branches above it opened (a search hit's path, a card's
+  row (`unfoldsOnHover`). `tasks.hoverProjectNode(node)`: a card held `PROJECTS_HOVER_MS` over a row, in one call: its
+  branch unfolds if `unfoldsOnHover`, and it is chosen if `opensOnHover` (a live project or No project, not the chosen
+  row; never All, Done or a done project), the mode kept; `tasks.hoverProjectNode("project:Спорт")` shows Спорт's tasks
+  under the held card. `ProjectsRow.muted`: the name drawn grey (a waiting or done project, No project, Done). `tasks.selectProjectNode(node)`: chosen, the branches above it opened (a search hit's path, a card's
   folder). `tasks.setProjectsMode("byProject" | "byStage")`. Each answers `projectsScreen`.
 - `tasks.createProject(name, { parent, before })`: the plus let go in the tree; answers the `ProjectRef` (chosen at
   once), `null` for a blank name or one the tree has. `tasks.moveProject(name, place)`: a project lifted and let go.
@@ -235,13 +246,13 @@ as one tree, the first name winning, and is written back as one under the first 
   `rules.projectsGap(view.rows, 4, 2)` → `{ place: { parent: "Где знакомиться", before: null }, depth: 2 }`.
   `rules.projectsDrop(rows, gap, shift, lifted?)` takes the finger's sideways way `shift` (px or pt) since the lift: a
   step per `PROJECTS_INDENT` (12) from the lifted project's own depth (the plus: the row above the gap's), so a lifted
-  project keeps its depth until the finger shifts. A held card waits `PROJECTS_HOVER_MS` (600) over a folded row
-  (`unfoldsOnHover`) before `tasks.unfoldProjectNode`. Both constants are in `rules.constants`.
+  project keeps its depth until the finger shifts. A held card waits `PROJECTS_HOVER_MS` (600) over a row before
+  `tasks.hoverProjectNode` (`unfoldsOnHover`, `opensOnHover`). Both constants are in `rules.constants`.
   `tasks.isBlankProjectName(name)`: the Create button of New project… is off for it (`createProject` writes nothing then).
 - `tasks.renameProject(from, to)`: the tree's line and every task's field; `false` for a blank name or another
   project's. `tasks.setProjectNote(name, link | null)`: attach or detach a note (the app only detaches: it can't list
   notes). `projects.noteUrl(link, vault)` → `"obsidian://open?vault=…&file=…"`, what a tap on the attached note opens.
-- `tasks.dropOnProject(cards, row.node)`, each card's `drop` (`ProjectsDrop` `{ key, from }`): cards let go on a row
+- `tasks.dropOnProject(cards, row.node)`, each card's `drop` (`ProjectsDrop` `{ key, from, lifted }`): cards let go on a row
   (`acceptsTask`): each card's `from` gives way to the row's project (No project: taken off), the others and the place in
   the funnel stay. `tasks.dropOnProject([{ key, from: "Где знакомиться" }], "project:Small talk")` turns `🗂️ Где
   знакомиться 🗂️ Дружба` into `🗂️ Small talk 🗂️ Дружба`: the new project takes the old one's place in the line (one

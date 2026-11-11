@@ -45,6 +45,28 @@ Follows `2026-11-11-projects-screen-design.md` and `2026-11-11-projects-order-de
 
 ### Backend
 
+1. **`ProjectsRow.opensOnHover: boolean`**: `acceptsTask && !selected && <the node's list takes drops>`, the last the same
+   rule as `ProjectsView.reorders` (one function, `nodeReorders`: every node but Done and a done project), so a future
+   folder row (`acceptsTask` false) never opens and a row opens exactly when its list would take the card. False without
+   a tasks file.
+2. **`TaskService.hoverProjectNode(node)`**, door `tasks.hoverProjectNode(node)` (answers `projectsScreen`): reads the
+   tree as drawn and applies that row's own `unfoldsOnHover` and `opensOnHover` (`hovered` in `projectsScreen.ts`), no
+   second copy of the rules. Choosing goes through `selected`, so the branches above open as for search. A node with no
+   row (gone) leaves the screen as it is. `unfoldProjectNode` and `selectProjectNode` keep their meaning.
+3. **A card the opened list does not show is judged by `ProjectsDrop.lifted?: { id, list, origin }`** (`ProjectsLifted`),
+   filled by the core on every `ProjectsCard.drop` and `ProjectsListRow.drop` at the lift; a frontend keeps the drops it
+   read at the lift (decision 3) and passes them back unchanged. `projectsTakes` stays sync and pure: a card the view
+   shows is judged from the view, as before; one it does not from `lifted`. `dropInProjects`/`projectsDropPreview`
+   judge and write such a card from the file (its entry by key), `lifted` only saying the frontend did lift it. The field
+   is optional so `dropOnProject` and hand-made `{ key, from }` drops stay valid; a card the view lacks and whose drop has
+   no `lifted` is still `StaleTaskError`.
+4. **`origin` of a closed task is null**: it is dragged from no column of the funnel, so a stage refuses it (before, the
+   list's name `"done"` was passed to `acceptsDrop` by a cast). A reorderable list never shows a closed task, so nothing
+   Max sees changes.
+5. **Writing By stage** (spec decision 4): a card the view does not show gets the chosen node's project in `from`'s place
+   (No project chosen: `from` goes; All: projects stay); a card it shows keeps the projects. By project unchanged (the
+   part's project). Subtask places (`kind: "subtask"`) unchanged: they nest by key.
+
 ### Obsidian frontend
 
 ### iPhone app
