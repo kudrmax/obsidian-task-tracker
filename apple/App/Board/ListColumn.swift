@@ -79,9 +79,9 @@ private struct DayRows: View {
                 if group.empty { EmptyPlate() }
                 ForEach(group.cards) { card in
                     TaskCapsule(card: card)
-                        .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
+                        .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch, card: card.listHeight) } }
                         .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
-                        .frame(height: CardMetrics.height)
+                        .frame(height: card.listHeight)
                 }
             }
         }
@@ -350,13 +350,13 @@ struct DoneColumn: View {
                         ForEach(model.doneCards) { card in
                             CardButton(
                                 card: card,
-                                menu: { later in model.cardMenu(card.item, from: "done", later: later) },
+                                menu: { later in model.cardMenu(card, from: "done", later: later) },
                                 ringed: model.found == card.id,
                                 draggable: false,
                                 onTouch: { model.found = nil },
                                 onLink: { model.openLink($0) },
                                 onProject: model.projectOpener(card.item))
-                                .frame(height: CardMetrics.height)
+                                .frame(height: card.listHeight)
                                 .id(card.id)
                         }
                         Color.clear.frame(height: ListCollection.trailingRoom)
@@ -434,7 +434,8 @@ struct CardRow: View {
             CardButton(
                 card: card,
                 renamedText: model.entry.renamedTexts[card.id],
-                menu: { later in selecting ? nil : model.cardMenu(card.item, later: later) },
+                menu: { later in selecting ? nil : model.cardMenu(card, later: later) },
+                overMenu: { later in selecting ? nil : model.cardMenu(card, over: true, later: later) },
                 ringed: model.found == card.id,
                 draggable: false,
                 carried: hidden,
@@ -443,15 +444,15 @@ struct CardRow: View {
                 onLink: selecting ? nil : { model.openLink($0) },
                 onProject: model.projectOpener(card.item),
                 picking: picks ? CardButton.Picking(picked: model.picked.contains(card.id), count: model.picked.count) { pick() } : nil)
-                .frame(height: CardMetrics.height)
+                .frame(height: card.listHeight)
                 // Carried, the card's row is its dashed place, as the plugin keeps it (`is-waiting`), until the carry ends.
                 .background { if mark.waiting { DashedPlace().transition(.identity) } }
                 // The branch comes with the card's place (the drop's screen drawn), fading in as the row and the copy flying
                 // into it come to rest, so it never travels with a row moving there.
-                .overlay(alignment: .topLeading) { if let branch = card.branch, !mark.waiting { ComingBranch(branch: branch, model: model).transition(Self.branchComes) } }
+                .overlay(alignment: .topLeading) { if let branch = card.branch, !mark.waiting { ComingBranch(branch: branch, card: card.listHeight, model: model).transition(Self.branchComes) } }
                 .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
         }
-        .frame(height: CardMetrics.height, alignment: .top)
+        .frame(height: card.listHeight, alignment: .top)
     }
 
     /// Select Tasks picks this card: the core says which columns' cards are picked.
@@ -467,18 +468,20 @@ struct CardRow: View {
 /// (the carry's end, heard from the flight's own completion), so it never travels with a row moving under the copy.
 struct ComingBranch: View {
     let branch: Branch
+    let card: CGFloat
     /// Read here, not by the row: only the branches follow the drop's flight.
     let model: BoardModel
     @State private var shown: Bool
 
-    init(branch: Branch, model: BoardModel) {
+    init(branch: Branch, card: CGFloat, model: BoardModel) {
         self.branch = branch
+        self.card = card
         self.model = model
         _shown = State(initialValue: !model.dropFlies)
     }
 
     var body: some View {
-        BranchLine(branch: branch)
+        BranchLine(branch: branch, card: card)
             .opacity(shown ? 1 : 0)
             .onChange(of: model.dropFlies) { _, now in
                 guard !now, !shown else { return }
@@ -515,7 +518,7 @@ struct StackFloat: View {
                 layer(Color(hex: dark ? "#242426" : "#F7F7F9"), depth: 1)
             }
             TaskCapsule(card: card)
-                .frame(width: width, height: CardMetrics.height)
+                .frame(width: width, height: card.listHeight)
                 .overlay(alignment: .topTrailing) {
                     if count > 1 {
                         Text(verbatim: "\(count)")
@@ -529,7 +532,7 @@ struct StackFloat: View {
                     }
                 }
         }
-        .frame(width: width, height: CardMetrics.height + 2 * Self.step.height, alignment: .top)
+        .frame(width: width, height: card.listHeight + 2 * Self.step.height, alignment: .top)
         .padding(Self.room)
     }
 
@@ -554,7 +557,7 @@ struct StackFloat: View {
 
     private func layer(_ fill: Color, depth: CGFloat) -> some View {
         Capsule().fill(fill)
-            .frame(width: width - 2 * Self.step.width * depth, height: CardMetrics.height)
+            .frame(width: width - 2 * Self.step.width * depth, height: card.listHeight)
             .offset(x: Self.step.width * depth, y: Self.step.height * depth)
     }
 }

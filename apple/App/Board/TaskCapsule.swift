@@ -24,6 +24,9 @@ struct TaskCapsule: View {
     var onLinks: (([CardLink]) -> Void)?
     /// Where the project's folder mark is drawn, in the capsule's own space: the card lays its button there.
     var onMark: ((CGRect) -> Void)?
+    /// Where a folded result's own line is drawn over its step, in the capsule's own space: a tap there opens the result's
+    /// menu, anywhere else the step's.
+    var onOver: ((CGRect) -> Void)?
     /// A search's find: the found pieces picked out of the title, and the project's name or the description's line under
     /// it where the query was found there, as the plugin's search draws its cards.
     var found: SearchHit?
@@ -41,24 +44,30 @@ struct TaskCapsule: View {
             if selecting { pickCircle }
             if whole {
                 // The copy over a menu shows the whole title, on as many lines as the width it was given needs.
-                Group {
-                    if selectable {
-                        SelectableTitle(parts: parts, closed: card.item.closed, onCopied: onCopied)
-                    } else {
-                        title.fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 0) {
+                    if let over = card.face.over { overLine(over) }
+                    Group {
+                        if selectable {
+                            SelectableTitle(parts: parts, closed: card.item.closed, onCopied: onCopied)
+                        } else {
+                            title.fixedSize(horizontal: false, vertical: true)
+                        }
                     }
+                    .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, alignment: .leading)
             } else if let found {
                 foundTitle(found)
             } else {
-                // The title never widens the card: it runs on past the room and fades out over its last points.
-                Color.clear
-                    .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, maxHeight: CardMetrics.titleLine)
-                    .overlay(alignment: .leading) { linedTitle }
-                    .mask(fadeMask)
-                    .accessibilityElement(children: .combine)
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onTitle?($0) }
+                VStack(alignment: .leading, spacing: 0) {
+                    if let over = card.face.over { overLine(over) }
+                    // The title never widens the card: it runs on past the room and fades out over its last points.
+                    Color.clear
+                        .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, maxHeight: CardMetrics.titleLine)
+                        .overlay(alignment: .leading) { linedTitle }
+                        .mask(fadeMask)
+                        .accessibilityElement(children: .combine)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onTitle?($0) }
+                }
             }
             if card.item.project?.mark == true { projectMark }
             if card.item.progress != nil || card.item.description != nil { meta }
@@ -71,14 +80,14 @@ struct TaskCapsule: View {
         }
         .padding(.leading, CardMetrics.leading)
         .padding(.trailing, CardMetrics.trailing)
-        .padding(.top, onTimeline || whole ? (CardMetrics.height - CardMetrics.titleLine) / 2 : snippet == nil ? 0 : Self.snippetPad)
-        .padding(.bottom, whole ? (CardMetrics.height - CardMetrics.titleLine) / 2 : snippet == nil ? 0 : Self.snippetPad)
-        .frame(maxWidth: .infinity, minHeight: max(height, CardMetrics.height), maxHeight: onTimeline || whole || snippet != nil ? .infinity : CardMetrics.height, alignment: onTimeline || whole ? .top : .center)
-        .frame(height: whole || snippet != nil ? nil : max(height, CardMetrics.height), alignment: .top)
+        .padding(.top, onTimeline || whole ? edge : snippet == nil ? 0 : Self.snippetPad)
+        .padding(.bottom, whole ? edge : snippet == nil ? 0 : Self.snippetPad)
+        .frame(maxWidth: .infinity, minHeight: max(height, base), maxHeight: onTimeline || whole || snippet != nil ? .infinity : base, alignment: onTimeline || whole ? .top : .center)
+        .frame(height: whole || snippet != nil ? nil : max(height, base), alignment: .top)
         .background(alignment: .topLeading) {
             if card.item.inProgress, !selecting {
                 Circle().fill(metaInk(shades)).frame(width: 4, height: 4)
-                    .offset(x: 5, y: (CardMetrics.height - 4) / 2)
+                    .offset(x: 5, y: (base - 4) / 2)
                     .accessibilityLabel("In progress")
             }
         }
@@ -89,7 +98,7 @@ struct TaskCapsule: View {
                 ground
                     .opacity(0.55)
                     .clipShape(.rect(cornerRadius: CardMetrics.radius))
-                    .frame(height: CardMetrics.height)
+                    .frame(height: base)
                     .padding(.horizontal, 8)
                     .offset(y: 4)
             }
@@ -111,7 +120,7 @@ struct TaskCapsule: View {
                 .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, maxHeight: CardMetrics.titleLine)
                 .overlay(alignment: .leading) {
                     marked(hit.title.isEmpty ? [FoundPart(text: card.item.title, match: false)] : hit.title, size: CardMetrics.title)
-                        .font(.system(size: CardMetrics.title))
+                        .font(.system(size: CardMetrics.title, weight: weight))
                         .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
                         .strikethrough(card.item.closed, color: Palette.muted)
                         .lineLimit(1)
@@ -150,6 +159,33 @@ struct TaskCapsule: View {
     private static let snippetLine: CGFloat = 15
     private static let snippetPad: CGFloat = 6
 
+    /// The card's own height: a folded result's card of two lines is taller.
+    private var base: CGFloat { card.listHeight }
+    /// The room over the title's lines (and under them on a menu's copy).
+    private var edge: CGFloat { (base - CardMetrics.titleLine - (card.face.twoLines ? CardMetrics.overLine : 0)) / 2 }
+    /// The title's weight: semibold for a result drawn with its own title.
+    private var weight: Font.Weight { card.face.semibold ? .semibold : .regular }
+
+    /// A folded result's own title over its step (results, point 4): small, in the caption colour, after a target, on one
+    /// line fading out as a title does.
+    private func overLine(_ over: String) -> some View {
+        Color.clear
+            .frame(maxWidth: .infinity, minHeight: CardMetrics.overLine, maxHeight: CardMetrics.overLine)
+            .overlay(alignment: .leading) {
+                HStack(spacing: 3) {
+                    Image(systemName: "scope").font(.system(size: CardMetrics.overFont, weight: .semibold))
+                    Text(verbatim: over).font(.system(size: CardMetrics.overFont))
+                }
+                .foregroundStyle(metaColor)
+                .lineLimit(1)
+                .fixedSize()
+            }
+            .mask(fadeMask)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Result \(over)")
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onOver?($0) }
+    }
+
     /// The title's pieces: the card's, or its new text alone while its rename is written.
     private var parts: [TextPart] { text.map { [TextPart(text: $0)] } ?? card.parts }
 
@@ -158,7 +194,7 @@ struct TaskCapsule: View {
         parts.reduce(Text(verbatim: "")) { text, part in
             text + (part.isLink ? Text(verbatim: part.shown).foregroundColor(Palette.accent(scheme)) : Text(verbatim: part.shown))
         }
-        .font(.system(size: CardMetrics.title))
+        .font(.system(size: CardMetrics.title, weight: weight))
         .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
         .strikethrough(card.item.closed, color: Palette.muted)
     }
@@ -177,7 +213,7 @@ struct TaskCapsule: View {
             }
             .lineLimit(1)
             .fixedSize()
-            .font(.system(size: CardMetrics.title))
+            .font(.system(size: CardMetrics.title, weight: weight))
             .strikethrough(card.item.closed, color: Palette.muted)
             .onChange(of: linkFrames, initial: true) { onLinks?(Array(linkFrames.values)) }
         } else {
@@ -360,12 +396,14 @@ struct LabelFills: View {
 /// in with a rounded corner at the last, and the lines of the tasks further up that go on past the row run through it.
 struct BranchLine: View {
     let branch: Branch
+    /// The row's card height: a folded result's card of two lines is taller.
+    var card: CGFloat = CardMetrics.height
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let color = Palette.branch(scheme)
-        let mid = CardMetrics.height / 2
-        let height = CardMetrics.height + 4 + CardMetrics.gap
+        let mid = card / 2
+        let height = card + 4 + CardMetrics.gap
         let reach = CGFloat(branch.through.count) * CardMetrics.indent
         Canvas { context, size in
             var path = Path()

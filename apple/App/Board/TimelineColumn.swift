@@ -336,7 +336,7 @@ struct TimelineColumn: View {
         return CardButton(
             card: slot.card,
             renamedText: model.entry.renamedTexts[slot.card.id],
-            menu: { later in dimmed ? nil : model.cardMenu(slot.card.item, from: "timeline", later: later) },
+            menu: { later in dimmed ? nil : model.cardMenu(slot.card, from: "timeline", later: later) },
             ringed: model.found == slot.id || model.selectedSlot == slot.id,
             height: tall,
             draggable: !dimmed,

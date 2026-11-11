@@ -54,6 +54,8 @@ public struct TaskAbilities: Codable, Hashable, Sendable {
     public let resize: Bool
     /// The task menu's Project row can be pressed: off on a subtask, whose project is its parent's.
     public let setProject: Bool
+    /// Made a result or a task again, and added to a result: an open task or subtask (`TaskMenuModel.result.rows`).
+    public let result: Bool
 }
 
 /// `ProjectRef`: a task's project as the screens show it.
@@ -103,6 +105,14 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
     public let project: ProjectRef?
     /// The title of the task a subtask belongs to; `nil` for a task.
     public let parentText: String?
+    /// Its line starts with the result mark: a result, whose subtasks are the steps of one outcome.
+    public let isResult: Bool
+    /// The nearest result it is a step of; `nil` for none.
+    public let resultOf: ResultRef?
+    /// How a list's card draws it and whose menu its taps open: a folded result shows its next step.
+    public let card: TaskCard
+    /// How the timeline's block draws it and whose menu a tap opens: a result's next step, folded or not.
+    public let block: TaskBlock
     public let json: JSONValue
 
     public var repeats: Bool { !repeatRule.isNull }
@@ -112,6 +122,7 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, key, text, title, status, dueDate, slot, durationMin, reminder, open, repeatable, priority, labels, colors, group, list
         case isSubtask, day, repeatDay, can, subtasks, allSubtasks, progress, collapsed, description, parentKey, project, parentText
+        case isResult, resultOf, card, block
         case repeatRule = "repeat"
     }
 
@@ -146,11 +157,68 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
         parentKey = try c.decodeIfPresent(TaskKey.self, forKey: .parentKey)
         project = try c.decodeIfPresent(ProjectRef.self, forKey: .project)
         parentText = try c.decodeIfPresent(String.self, forKey: .parentText)
+        isResult = try c.decode(Bool.self, forKey: .isResult)
+        resultOf = try c.decodeIfPresent(ResultRef.self, forKey: .resultOf)
+        card = try c.decode(TaskCard.self, forKey: .card)
+        block = try c.decode(TaskBlock.self, forKey: .block)
         json = try JSONValue(from: decoder)
     }
 
     public static func == (a: TaskItem, b: TaskItem) -> Bool { a.json == b.json }
     public func hash(into hasher: inout Hasher) { hasher.combine(json) }
+}
+
+/// `ResultRef`: a result as a step's row and the Add to result page name it.
+public struct ResultRef: Decodable, Hashable, Sendable {
+    public let id: String
+    /// What `tasks.addToResult` takes.
+    public let key: TaskKey
+    /// Its title, without the result mark.
+    public let title: String
+}
+
+/// `TaskCard`: what a list's card draws and whose menu its taps open. A folded result with an open step is a card of two
+/// lines: `over`, the result's own title (a tap there opens the task's own menu), over the step's title (a tap anywhere
+/// else opens `step`'s menu).
+public struct TaskCard: Decodable, Hashable, Sendable {
+    /// The title drawn, with its links: the step's on a card of two lines, else the task's own `text`.
+    public let text: String
+    public let title: String
+    /// The small line over the title; `nil` for a card of one line.
+    public let over: String?
+    /// The title in semibold: a result drawn with its own title.
+    public let semibold: Bool
+    /// The step a tap on the card opens the menu of; `nil`: the task's own. Held in a list, as a value can't hold itself.
+    private let steps: [TaskItem]
+    public var step: TaskItem? { steps.first }
+
+    enum CodingKeys: String, CodingKey { case text, title, over, semibold, step }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        text = try c.decode(String.self, forKey: .text)
+        title = try c.decode(String.self, forKey: .title)
+        over = try c.decodeIfPresent(String.self, forKey: .over)
+        semibold = try c.decode(Bool.self, forKey: .semibold)
+        steps = try c.decodeIfPresent(TaskItem.self, forKey: .step).map { [$0] } ?? []
+    }
+}
+
+/// `TaskBlock`: what the timeline's block draws and whose menu a tap opens: a result's next step, else the task's own.
+public struct TaskBlock: Decodable, Hashable, Sendable {
+    public let text: String
+    public let title: String
+    private let steps: [TaskItem]
+    public var step: TaskItem? { steps.first }
+
+    enum CodingKeys: String, CodingKey { case text, title, step }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        text = try c.decode(String.self, forKey: .text)
+        title = try c.decode(String.self, forKey: .title)
+        steps = try c.decodeIfPresent(TaskItem.self, forKey: .step).map { [$0] } ?? []
+    }
 }
 
 public struct ListSection: Codable, Hashable, Sendable {
@@ -538,6 +606,49 @@ public struct TaskMenuModel: Decodable, Hashable, Sendable {
     public let project: MenuProject
     /// The Repeat row's value.
     public let `repeat`: RepeatRow
+    /// The result rows, drawn right after Project in `result.rows`' order.
+    public let result: MenuResult
+}
+
+/// `MenuResult`: the menu's result rows: «Add to result» (`addToResult`), which opens the page `tasks.resultPage` reads,
+/// and «Make result» or «Make task» (`toggle`), which writes `tasks.setResult(key, toggle.result)`.
+public struct MenuResult: Decodable, Hashable, Sendable {
+    public let rows: [String]
+    /// «Add to result».
+    public let label: String
+    /// What the row shows on the right: the result the tasks are steps of, else empty.
+    public let value: String
+    public let current: ResultRef?
+    public let toggle: Toggle
+
+    public struct Toggle: Decodable, Hashable, Sendable {
+        public let label: String
+        public let result: Bool
+    }
+}
+
+/// `ResultOption`: an open result the Add to result page offers.
+public struct ResultOption: Decodable, Hashable, Sendable, Identifiable {
+    public let result: ResultRef
+    /// The list it stands in, drawn as that column's icon.
+    public let list: String
+    /// Its project's name, a small line under the title.
+    public let project: String?
+    /// The result the tasks are steps of: choosing it writes nothing.
+    public let checked: Bool
+
+    public var id: String { result.id }
+}
+
+/// `ResultPage`: the Add to result page: the open results the query finds, and the words of its field and its last row.
+public struct ResultPage: Decodable, Hashable, Sendable {
+    public let options: [ResultOption]
+    /// «Search results».
+    public let placeholder: String
+    /// «New result…».
+    public let newLabel: String
+    /// «Result name».
+    public let namePlaceholder: String
 }
 
 // MARK: Repeat
@@ -640,6 +751,8 @@ public struct SettingsForm: Decodable, Sendable {
     public let priorities: [Mark]
     public let labelTag: String
     public let projectTag: String
+    /// The word a result's line starts with (`settings.setResultMark`).
+    public let resultMark: String
     public let labels: [Mark]
     public let presets: [String]
     public let ungrouped: String

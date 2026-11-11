@@ -167,3 +167,41 @@ screen, undo, multi-select). No new logic beyond the three points below.
 11. **Result mark** stands in the Priorities group, right under Add priority, as a text row with its description.
 12. **The bulk menu.** Add to result stands in the edit group after Project (when the core offers it) and opens the same
     page and New result… as one task's menu.
+
+### Swift
+
+1. **The two-line card's height.** The card height is a setting, so a folded result's card is that height plus 9 pt
+   (44 at the default 35), as the plugin's (Obsidian 1). Everything that stands a card in a list reads it per card
+   (`BoardCard.listHeight`): the list's row, the places a drop reads, the carried card's middle, its branch line, the
+   selection circle, the stack under the finger. On the timeline a block is never two lines.
+2. **The small line.** SF Symbol `scope` (the card's target) at 11 pt semibold and the result's title at 11 pt on a
+   13 pt line, in the card's meta colour (the caption colour, or the level's tint on a coloured card), fading at its end
+   as a title does; the two lines are centred in the card, the counter, folder and date centred on the whole card.
+3. **The two tap targets.** The result's menu: the small line across the whole title column, from the card's top edge
+   to just under the line (Obsidian 3). Anything else (the step's title, the padding, the right side) opens the step's
+   menu; the counter, the folder and a title's link keep their own taps. The menu's copy is the result's two-line card
+   as it stands (Obsidian 4).
+4. **The step's menu** is the core's `tasks.menu` for `card.step`, asked from the card's own column (a list's, or
+   `timeline`), precomputed with the screen as every card's menu is; it offers Add Subtask, no Section (a subtask).
+5. **The timeline.** A tap on a result's block opens the shown step's menu with the result's open subtasks stacked over
+   it (Obsidian 5); the block's title is regular weight, never semibold. A long press stays the drag, as for any block.
+6. **Own titles.** The full screen and a search draw a result with its own title, never its step, in semibold (backend
+   decision 4, Obsidian 6); Done's list draws the core's `card` (a closed result: its own title, semibold).
+7. **The rows' symbols.** Add to result: `scope` (the card's). Make result: `target`; Make task: `circle.dashed`. The
+   row words are the core's (`MenuResult.label`, `toggle.label`), Add to result's value its subtitle, which the system
+   menu truncates at its end.
+8. **The Add to result page** is a sheet (medium, then large), as Pick a Date is: a `NavigationStack` titled
+   `MenuResult.label`, the system search field always shown under the title with the core's placeholder, an inset
+   list of the core's options (the column's SF Symbol in the secondary colour: Inbox `tray`, Now `sun.max`, Soon
+   `hourglass`, Backlog `archivebox`, read aloud as the list's name from `tasks.listName`; the title on up to two lines;
+   the project as a folder and its name in footnote under it; the accent tick), and «New result…» with a plus in a
+   section of its own. Typing asks the core again (`tasks.resultPage`) after 120 ms. A query that finds nothing leaves
+   «New result…» alone, no empty-state words (Obsidian 9). A pick closes the sheet and writes `tasks.addToResult`, the
+   ticked one too (the core writes nothing).
+9. **New result…** asks as New project… does: an alert «New Result» with a field (the core's `namePlaceholder`),
+   Cancel and Create (Create off while the name is blank); Create closes the page and writes `tasks.newResult`.
+10. **Result mark** is its own group right under Priorities on the Settings sheet (a text row «Result Mark», the default
+    as its placeholder, saved on Return and on leaving, as Project Tag is; a mark the core refuses puts the saved one
+    back), with a footer saying what it does and that existing lines aren't rewritten. iOS groups unlike rows apart, so
+    it is not a row inside the Priorities list (Obsidian 11 puts it in the plugin's Priorities group).
+11. **The bulk menu** draws `result.rows` after Project as one task's menu does; its Add to result opens the same page.
