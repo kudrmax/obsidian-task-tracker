@@ -1074,7 +1074,7 @@ export class CalendarScreen extends Component {
 
 	/**
 	 * The plus at the Projects screen: carried onto the tree (a new project) or into the tasks, where the field opens as in
-	 * any list; tapped, the field in the part the core marks for the plus, none where no part takes a new task.
+	 * any list. A tap is the entry's own (`QuickEntrySession.plusOpens`).
 	 */
 	private projectsPlus(): PlusAside | null {
 		const projects = this.projects;
@@ -1082,7 +1082,6 @@ export class CalendarScreen extends Component {
 		if (!projects || !tasks || this.mode() !== "projects") return null;
 		return {
 			targets: [this.treeDrop, tasks],
-			opens: () => projects.tasksList.parts.some((part) => part.plus),
 			dropped: (result) => {
 				if (result.kind === "projectGap") void this.newProject(result.gap, result.landing);
 			},

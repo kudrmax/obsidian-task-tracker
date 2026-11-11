@@ -178,7 +178,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		list: shownList,
 		aside: (): PlusAside | null =>
 			projectsList && mode === "projects"
-				? { targets: [stubDrop("day", { kind: "projectsPlace", place: { kind: "task", group: "s", before: null } })], opens: () => projectsList.parts.some((part) => part.plus), dropped: (result) => asideDrops.push(result) }
+				? { targets: [stubDrop("day", { kind: "projectsPlace", place: { kind: "task", group: "s", before: null } })], dropped: (result) => asideDrops.push(result) }
 				: null,
 		sectioned: () => sections,
 		timeline: () => timeline,
@@ -1429,6 +1429,16 @@ describe("QuickEntryController: the Projects list is a list the field stands in 
 		plus.dispatchEvent(tap("pointerdown"));
 		plus.dispatchEvent(tap("pointerup"));
 		expect(rowsOf("projects")).toEqual(["Soon", "A", "A1", "field", "Today", "B", "Inbox", "No tasks"]);
+	});
+
+	it("the plus tapped where no part takes a new task (Done) opens nothing, not even in a hidden funnel column", () => {
+		const done = projectsView([{ ...part("d", "Done", [b], "now"), newTask: null }]);
+		const { plus, root } = setUp({ mode: "projects", items: { day: [b] }, projectsView: done });
+		const tap = (type: string) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 4, pointerType: "touch", isPrimary: true, button: 0 });
+		plus.dispatchEvent(tap("pointerdown"));
+		plus.dispatchEvent(tap("pointerup"));
+		expect(root.querySelector(".tc-quick-row")).toBeNull();
+		expect(root.classList.contains("is-entering")).toBe(false);
 	});
 
 	it("the plus let go in the list opens the field at that place and lands in it; let go on the tree, the screen has it", () => {

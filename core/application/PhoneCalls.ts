@@ -848,6 +848,7 @@ const ENTRY_METHODS: readonly string[] = [
 	"listEntry",
 	"openAtEnd",
 	"openFromPlus",
+	"plusOpens",
 	"openIn",
 	"openSlot",
 	"openAtDrop",

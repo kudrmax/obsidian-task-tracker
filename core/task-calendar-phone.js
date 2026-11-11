@@ -4097,14 +4097,28 @@ ${key.title}`.toLowerCase();
     openAtEnd(column) {
       this.open(this.endOf(column));
     }
-    /** The plus tapped: the end of the part a shown list's plus types in (the Projects list's), else of the day column while it shows, else of Inbox. */
+    /**
+     * The plus tapped: the end of the part a shown list's plus types in (the Projects list's), else of the day column while
+     * it shows, else of Inbox. A shown list that writes by parts with no part taking the plus (Done) opens nothing. Whether
+     * a field opened, as `plusOpens` said before the tap.
+     */
     openFromPlus() {
+      const at = this.plusSpot();
+      if (at) this.open(at);
+      return at !== null;
+    }
+    /** A tap on the plus opens a field: false on a screen whose list writes by parts and has none that takes the plus (Done). */
+    plusOpens() {
+      return this.plusSpot() !== null;
+    }
+    plusSpot() {
       const shown2 = this.look.shown();
       for (const column of shown2) {
         const part2 = this.parts(column).find((p) => p.plus);
-        if (part2) return this.openIn(column, part2.group);
+        if (part2) return this.spotIn(column, { kind: "task", group: part2.group, before: null });
       }
-      this.openAtEnd(shown2.includes("day") ? "day" : "inbox");
+      if (shown2.some(keepsField)) return null;
+      return this.endOf(shown2.includes("day") ? "day" : "inbox");
     }
     /** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
     openIn(column, group) {
@@ -4112,8 +4126,11 @@ ${key.title}`.toLowerCase();
     }
     /** The plus let go at `place` of list `column` (the Projects list's `projectsPlace` drop): the field of a new task there. */
     openAt(column, place) {
+      this.open(this.spotIn(column, place));
+    }
+    spotIn(column, place) {
       const gap = gapOfPlace(this.look.cards(column), place);
-      this.open({ kind: "list", column, place: place.kind === "task" ? { ...gap, level: 0 } : gap });
+      return { kind: "list", column, place: place.kind === "task" ? { ...gap, level: 0 } : gap };
     }
     /** A long tap on the timeline's free room let go: the field of a new task in that slot. */
     openSlot(slot) {
@@ -7965,6 +7982,7 @@ ${key.title}`.toLowerCase();
     "listEntry",
     "openAtEnd",
     "openFromPlus",
+    "plusOpens",
     "openIn",
     "openSlot",
     "openAtDrop",

@@ -87,13 +87,11 @@ export interface QuickEntryControllerDeps {
 }
 
 /**
- * The plus on the Projects screen: its places (the tree, and the tasks' list, where the field opens as in any list);
- * whether a tap opens a field there; what a drop on a place of its own (the tree) does.
+ * The plus on the Projects screen: its places (the tree, and the tasks' list, where the field opens as in any list),
+ * and what a drop on a place of its own (the tree) does.
  */
 export interface PlusAside {
 	readonly targets: readonly DropTarget[];
-	/** A tap opens the field: a part of the list shown takes a new task (`EntryPart.plus`). */
-	opens(): boolean;
 	dropped(result: DropResult): void;
 }
 
@@ -256,10 +254,12 @@ export class QuickEntryController {
 		this.entry.openFromPlus();
 	}
 
-	/** The plus tapped: the field opens as the press ends, and what that press still sends is not a tap elsewhere. */
+	/**
+	 * The plus tapped: the field opens as the press ends, and what that press still sends is not a tap elsewhere; nothing
+	 * where the core says the plus opens no field (`plusOpens`: the Projects screen on Done).
+	 */
 	private openFromPress(): void {
-		const aside = this.deps.aside?.() ?? null;
-		if (aside && !aside.opens()) return;
+		if (!this.entry.plusOpens()) return;
 		this.pressEnding = true;
 		this.openFromPlus();
 	}

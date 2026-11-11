@@ -70,8 +70,13 @@ export class QuickEntrySession {
 		this.entry.openAtEnd(column);
 	}
 
-	openFromPlus(): void {
-		this.entry.openFromPlus();
+	openFromPlus(): boolean {
+		return this.entry.openFromPlus();
+	}
+
+	/** A tap on the plus opens a field (`QuickEntry.plusOpens`): false on the Projects screen where no part takes it. */
+	plusOpens(): boolean {
+		return this.entry.plusOpens();
 	}
 
 	openIn(column: EntryList, group: GroupName): void {

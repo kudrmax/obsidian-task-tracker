@@ -487,7 +487,9 @@ same while the field is open. A card whose `id` is in `renamed` draws `title` in
 once its job is `done`.
 
 Methods: `openAtEnd(column)`, `openFromPlus()`, `openIn(column, group)`, `openAt(column, listPlace)` (the plus let go
-at a place of a list: the field of a new task there), `openSlot(slot)`, `openAtDrop(column, dropTo)`, `subtaskSpot(parent)`, `renameSpot(item, inStack)`, `stackSpot(parent)`, `open(spot, renaming?)`, `type(text)`,
+at a place of a list: the field of a new task there), `plusOpens()` (whether a tap on the plus opens a field: `false` on
+the Projects screen when no part is marked `plus`, as under Done; ask it before the tap and draw no field, or treat the
+tap as doing nothing, when false; `openFromPlus()` answers the same boolean as its `value` and opens nothing then), `openSlot(slot)`, `openAtDrop(column, dropTo)`, `subtaskSpot(parent)`, `renameSpot(item, inStack)`, `stackSpot(parent)`, `open(spot, renaming?)`, `type(text)`,
 `setPriority(prefix)`, `togglePriority(prefix)`, `setLabels(names)`, `toggleLabel(name)`, `setRepeat(rule)`, `setProject(link)`,
 `indent(1 | -1)`, `toggleSection()`, `enter()`, `blur()`, `escape()`, `choosePlace(placement)`, `moveToEnd(column)`,
 `placeOf(column, listPlace, placement?)`, `state()`, `renaming()`, `listEntry(column, drawn?)`, `stackEntry(task)`.

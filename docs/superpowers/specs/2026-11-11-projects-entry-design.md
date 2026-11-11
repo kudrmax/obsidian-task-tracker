@@ -76,6 +76,11 @@ nothing shows, and the first key typed turns the screen to that funnel column (M
    `"projects"` (a type-only adaptation), so the plugin must now wire the Projects list in (its look from
    `projectsEntryLook`, `shown` from `shownEntryLists`, `listEntry("projects")` drawn in `ProjectTasks`, `coming` for
    it, the plate and the plus through `openIn`/`openAt`/`openFromPlus` instead of `askTaskText`).
+9. **Whether the plus opens anything is the core's** (the plugin's Obsidian decision 4, moved into the core). On a screen
+   whose shown list writes by parts (the Projects list) with no part marked `plus` (Done; a folder once folders land),
+   `openFromPlus()` opens nothing, never the hidden Inbox, and answers `false`; `true` when a field opened. The ready
+   answer before the tap is `plusOpens()` (`QuickEntrySession.plusOpens()`, door `entry.plusOpens(session, look)` →
+   `value`), the same rule; off Projects it is always true. A frontend reads it instead of looking at `EntryPart.plus`.
 
 
 ### Obsidian frontend
@@ -92,9 +97,8 @@ nothing shows, and the first key typed turns the screen to that funnel column (M
 3. **The plus is let go in the Projects list as in a column.** `ProjectsListDrop` takes the plus: the line between
    cards, a subtask place by the finger's level, the field opening there (`openAt("projects", place)`) and the plus
    landing in it. It refuses a gap of a part whose `EntryPart.newTask` is null, and the whole list where no part writes
-   one (Done: not even as a subtask). The old `TasksDrop` (a line under
-   a part's last card) and `askTaskText` are gone.
-4. **The plus tap on Projects opens nothing where no part takes a new task** (Done): `PlusAside.opens()` reads
-   `EntryPart.plus`. Without it `openFromPlus` falls back to the end of Inbox, a hidden funnel column; the core could
-   answer this itself (backend follow-up).
+   one (Done: not even as a subtask). The old `TasksDrop` (a line under a part's last card) and `askTaskText` are
+   gone.
+4. **The plus tap on Projects opens nothing where no part takes a new task** (Done): the core decides (Backend
+   Decision 9). The controller asks `plusOpens()` before the tap; the plugin reads no `EntryPart.plus` of its own.
 5. **The No tasks plate of a part that writes no task does nothing** (it gets no tap), as before.
