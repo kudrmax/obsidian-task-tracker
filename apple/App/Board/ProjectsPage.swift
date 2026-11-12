@@ -746,7 +746,16 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
             if firstTop == nil { firstTop = top }
             if top <= y { found = (candidate, bottom) }
         }
-        if let found { return (found.part, found.bottom + CardMetrics.gap / 2) }
+        if let found {
+            // Where the core opens the field in that part (`end`: the card it stands before), so the line, the field and
+            // the written card stand in one place.
+            let part = found.part
+            if let end = projects.entryLook.parts.array.first(where: { $0["group"] == part.section.group.json })?["end"], !end.isNull,
+               let card = part.cards.first(where: { $0.item.key.json == end }), let frame = geometry.cards[part.id + "/" + card.id] {
+                return (part, frame.minY - CardMetrics.gap / 2)
+            }
+            return (part, found.bottom + CardMetrics.gap / 2)
+        }
         return (nil, firstTop.map { $0 - CardMetrics.gap / 2 } ?? area.map { $0.minY + 4 })
     }
 

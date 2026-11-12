@@ -106,6 +106,12 @@ final class ProjectsBoard {
         Task { await read(key) }
     }
 
+    /// The list read together with `snapshot` (a typed task's write): shown in the drawing of that snapshot, as its own.
+    func handOver(_ read: Read, for snapshot: BoardSnapshot) {
+        guard case .projects(let node) = snapshot.presentation.source else { return }
+        prefetched = (ReadKey(node: node, file: snapshot.tasksText, context: snapshot.funnel.view.context), read)
+    }
+
     /// A list read for a view about to be drawn: it shows in the same drawing as the view, never a frame after it.
     @ObservationIgnored private var prefetched: (key: ReadKey, read: Read)?
 

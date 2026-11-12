@@ -668,13 +668,13 @@ final class QuickEntryHost {
                     heirComing = reply == nil ? nil : created["id"].string
                 }
                 if reply == nil { reply = answer("unshown", [.string(id)], over: read, projects: projects) }
+                if let read, let projectsRead { model.projects.handOver(projectsRead, for: read) }
                 if let read { model.draw(read) }
-                if let projectsRead { model.projects.draw(projectsRead) }
                 stack?()
                 if let reply { apply(reply, over: read, projects: projects) }
             } else if let read {
+                if let projectsRead { model.projects.handOver(projectsRead, for: read) }
                 model.draw(read)
-                if let projectsRead { model.projects.draw(projectsRead) }
                 placeField(over: read, projects: projectsRead?.entryLook)
             }
         }
