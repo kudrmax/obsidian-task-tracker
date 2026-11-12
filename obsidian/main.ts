@@ -5,7 +5,7 @@ import { openOutside } from "./infrastructure/OutsideLink";
 import { SYNC_ACTION } from "./infrastructure/SyncRoundTrip";
 
 import { PluginCodeWatcher } from "./infrastructure/PluginCodeWatcher";
-import { PluginSettings } from "./infrastructure/PluginSettings";
+import { DEVICE_STATE_KEY, PluginSettings } from "./infrastructure/PluginSettings";
 import { systemClock, type Clock, type SettingsStore } from "../core/application/ports";
 import { SettingsServiceImpl } from "../core/application/SettingsServiceImpl";
 import { ScreenSettingsImpl } from "../core/application/ScreenSettingsImpl";
@@ -81,6 +81,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
 		this.registerObsidianProtocolHandler(SYNC_ACTION, () => services.syncForApp());
 		this.register(() => services.stopSyncForApp());
+		this.handOverPlace(services);
 		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars });
 		this.addSettingTab(settingsTab);
 		this.register(() => settingsTab.closePage());
@@ -94,6 +95,17 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			clock,
 			openInCalendar: (event) => calendarApp.open(event),
 		};
+	}
+
+	/**
+	 * The place the screen stood at was this view's own setting until 2026-11-12; the core keeps it now
+	 * (`TaskService.setFunnelPlace`): one kept here is handed over once, and goes from the device's storage.
+	 */
+	private handOverPlace(services: Services): void {
+		const device = this.app.loadLocalStorage(DEVICE_STATE_KEY) as Record<string, unknown> | null;
+		if (!device || !("rightMode" in device)) return;
+		const { rightMode, ...rest } = device;
+		void services.tasks.setFunnelPlace(rightMode).then(() => this.app.saveLocalStorage(DEVICE_STATE_KEY, rest));
 	}
 
 	/** What the screen reads: the shared settings it draws and the view's own. */

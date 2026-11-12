@@ -27,6 +27,8 @@ export interface DayPeekDeps {
 	allDayExtraRows(): string;
 	/** The filter the screen is read with (`FunnelView.filter`): the next day shows only its tasks too; null for none. */
 	filter?(): ProjectsNodeId | null;
+	/** The words of an empty section's plate (`ViewChoice.emptyLabel`). */
+	emptyLabel?(): string;
 }
 
 /**
@@ -61,6 +63,7 @@ export class DayPeek {
 			grouped: () => deps.sections(date) !== null,
 			sections: () => deps.sections(date) ?? [],
 			ungroupedName: () => deps.ungroupedName(),
+			emptyLabel: () => deps.emptyLabel?.() ?? "",
 		});
 		this.right = el(this.el, "div", "tc-right");
 		this.allDayEl = el(this.right, "div");
@@ -83,8 +86,7 @@ export class DayPeek {
 			this.render();
 		});
 		const filter = deps.filter?.() ?? null;
-		const read = filter === null ? deps.tasks.dayView(date) : deps.tasks.screen(date, filter).then((screen) => screen.day);
-		void read.then((day) => {
+		void deps.tasks.dayView(date, filter).then((day) => {
 			this.day = day;
 			this.render();
 			this.list.el.scrollTop = deps.listScroll();

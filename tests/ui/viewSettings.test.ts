@@ -45,11 +45,11 @@ describe("view settings", () => {
 		let told = 0;
 		view.onChange(() => told++);
 		await view.set({ listShare: 0.3 });
-		await view.set({ rightMode: "soon" });
+		await view.set({ treeWidth: 300 });
 		await view.set({ zoom: "wholeDay" });
-		expect(disk.local.get(DEVICE_STATE_KEY)).toEqual({ listShare: 0.3, rightMode: "soon", zoom: "wholeDay" });
+		expect(disk.local.get(DEVICE_STATE_KEY)).toEqual({ listShare: 0.3, treeWidth: 300, zoom: "wholeDay" });
 		expect(disk.saves).toBe(0);
-		expect(view.get()).toMatchObject({ listShare: 0.3, rightMode: "soon", zoom: "wholeDay" });
+		expect(view.get()).toMatchObject({ listShare: 0.3, treeWidth: 300, zoom: "wholeDay" });
 		expect(told).toBe(3);
 	});
 
@@ -69,7 +69,7 @@ describe("ShownSettingsStore", () => {
 		const { settings } = await stored();
 		const shown = new ShownSettingsStore(new ScreenSettingsImpl(settings), new ViewSettingsStore(settings));
 		const first = shown.get();
-		expect(first).toMatchObject({ tasksFile: "TODOs Tasks.md", cardHeight: 35, rightMode: "calendar", longPressMs: 250 });
+		expect(first).toMatchObject({ tasksFile: "TODOs Tasks.md", cardHeight: 35, treeWidth: null, longPressMs: 250 });
 		expect(shown.get()).toBe(first);
 		expect(JSON.stringify(first)).not.toMatch(/google/);
 	});
@@ -79,8 +79,8 @@ describe("ShownSettingsStore", () => {
 		const shown = new ShownSettingsStore(new ScreenSettingsImpl(settings), new ViewSettingsStore(settings));
 		let told = 0;
 		shown.onChange(() => told++);
-		await shown.set({ rightMode: "inbox" });
+		await shown.set({ treeWidth: 280 });
 		expect(told).toBe(1);
-		expect(shown.get().rightMode).toBe("inbox");
+		expect(shown.get().treeWidth).toBe(280);
 	});
 });

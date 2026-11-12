@@ -1,4 +1,4 @@
-import { type ListPlace, PROJECTS_HOVER_MS, PROJECTS_INDENT, projectsDrop, type ProjectsLanding, type ProjectsNodeId, type ProjectsRow } from "../../../core/application/contracts";
+import { type ListPlace, PROJECTS_INDENT, projectsDrop, type ProjectsLanding, type ProjectsNodeId, type ProjectsRow } from "../../../core/application/contracts";
 import { DropLine } from "../drag/DropLine";
 import { CardListDrop } from "../drag/ListDrop";
 import type { DragPayload, DropResult, DropTarget, ProjectsDrop, TaskDragPayload } from "../drag/DropTarget";
@@ -76,35 +76,22 @@ export function showGapLine(line: DropLine, tree: TreeShown, gap: number, depth:
 	line.show(left, frame.box.right, y, frame, finger);
 }
 
-/** What the tree's drop asks of the screen: the tree as drawn, and a row a card waited over unfolded or opened. */
+/** What the tree's drop asks of the screen: the tree as drawn, none while the panel is closed. */
 export interface TreeDropDeps {
 	tree(): TreeShown | null;
-	/**
-	 * A card held over a row for `PROJECTS_HOVER_MS` (`TaskService.hoverProjectNode`): its branch unfolds, it opens, the
-	 * screen drawn again, tree and tasks. Resolves once drawn.
-	 */
-	hover(node: ProjectsNodeId): Promise<void>;
-}
-
-/** The row a held card waits over, and since when it is about to unfold or open. */
-interface Hover {
-	readonly node: ProjectsNodeId;
-	readonly timer: number;
 }
 
 /**
  * The tree as a place to let go (board Drag): a card held over a row that takes it fills the row with the place's colour,
- * and let go there the card's project gives way to the row's; held a moment over a row, the row does what the core says
- * (`ProjectsRow.unfoldsOnHover`: its branch unfolds; `opensOnHover`: it is chosen and its tasks show, the card still
- * carried, to be let go among them). The plus held over the tree shows the gap a new project would take, at the depth
- * the finger's distance from the left picks.
+ * and let go there the card's project gives way to the row's. What a pause over a row does (unfold, open) is the core's
+ * carry (`TaskService.carryAt`). The plus held over the tree shows the gap a new project would take, at the depth the
+ * finger's distance from the left picks.
  */
 export class TreeDrop implements DropTarget {
 	/** The row a card lands on, filled, and the plus's line stay in sight: the card rides above the finger. */
 	readonly clearsFinger = true;
 	private readonly line: DropLine;
 	private result: ProjectsDrop | null = null;
-	private hover: Hover | null = null;
 
 	constructor(private readonly deps: TreeDropDeps) {
 		this.line = new DropLine(() => this.deps.tree()?.el ?? document.body);
@@ -114,28 +101,9 @@ export class TreeDrop implements DropTarget {
 		return this.deps.tree();
 	}
 
-	/**
-	 * The card waits over `row`: a row that unfolds or opens under a held card does so once the card has waited
-	 * `PROJECTS_HOVER_MS` there; any other row, or none, stops the wait. Drawn again, the row the card is over is filled anew.
-	 */
-	private hoverOver(row: ProjectsRow | null): void {
-		if (row?.node === this.hover?.node) return;
-		this.stopHover();
-		if (!row || !(row.unfoldsOnHover || row.opensOnHover)) return;
-		const node = row.node;
-		const timer = window.setTimeout(() => void this.deps.hover(node).then(() => this.fillAgain(node)), PROJECTS_HOVER_MS);
-		this.hover = { node, timer };
-	}
-
-	/** The tree drawn again under the card: the row it still waits over shows the drop again. */
-	private fillAgain(node: ProjectsNodeId): void {
-		if (this.hover?.node !== node || this.result?.kind !== "projectRow") return;
-		this.tree()?.showDropOn(this.result.node);
-	}
-
-	private stopHover(): void {
-		if (this.hover) window.clearTimeout(this.hover.timer);
-		this.hover = null;
+	/** The tree drawn again under the card (a pause opened a row): the row it is over shows the drop again. */
+	refill(): void {
+		if (this.result?.kind === "projectRow") this.tree()?.showDropOn(this.result.node);
 	}
 
 	hitTest(x: number, y: number): boolean {
@@ -150,7 +118,6 @@ export class TreeDrop implements DropTarget {
 			const row = rowUnder(tree, y);
 			const node = row?.acceptsTask ? row.node : null;
 			tree.showDropOn(node);
-			this.hoverOver(row);
 			this.result = node === null ? null : { kind: "projectRow", node };
 			return;
 		}
@@ -166,7 +133,6 @@ export class TreeDrop implements DropTarget {
 
 	leave(): void {
 		this.result = null;
-		this.stopHover();
 		this.tree()?.showDropOn(null);
 		this.line.hide();
 	}

@@ -126,8 +126,8 @@ describe("data.json", () => {
 	it("keeps an unknown key after the known ones, and the device's part off the file", async () => {
 		const disk = new Disk(OLD_FILE.replace('"cardGap": 2\n}', '"cardGap": 2,\n  "future": 1\n}'));
 		const settings = await opened(disk);
-		await settings.update({ rightMode: "soon", cardGap: 3 });
+		await settings.update({ treeWidth: 300, cardGap: 3 });
 		expect(disk.text).toBe(OLD_FILE.replace('"cardGap": 2\n}', '"cardGap": 3,\n  "projectTag": "#project",\n  "resultMark": "🎯",\n  "future": 1\n}'));
-		expect(disk.local.get(DEVICE_STATE_KEY)).toEqual({ rightMode: "soon" });
+		expect(disk.local.get(DEVICE_STATE_KEY)).toEqual({ treeWidth: 300 });
 	});
 });

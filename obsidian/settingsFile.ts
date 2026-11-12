@@ -27,7 +27,6 @@ const FILE_ORDER: readonly (keyof StoredSettings)[] = [
 	"scrollToHour",
 	"dayStartHour",
 	"listShare",
-	"rightMode",
 	"staleAfterMinutes",
 	"priorities",
 	"labelTag",

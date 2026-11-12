@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { allColumnsDividerAt, allColumnsShare, allColumnsWidthAt, allColumnsWidths } from "../../obsidian/ui/listWidth";
-import { EdgeReveal } from "../../obsidian/ui/projects/EdgeReveal";
+import { CarryReport } from "../../obsidian/ui/projects/CarryReport";
 import { TaskList } from "../../obsidian/ui/TaskList";
 import { FunnelRows } from "../../obsidian/ui/FunnelRows";
 import { PROJECTS_HOVER_MS } from "../../core/application/contracts";
@@ -27,27 +27,35 @@ describe("All columns (board D1): three lists and the timeline beside the divide
 	});
 });
 
-describe("the phone's left edge (board T5): a held card slides the panel out", () => {
+describe("a carrying finger told to the core's carry (spec decision 39)", () => {
 	afterEach(() => vi.useRealTimers());
 
-	it("waits as long as over a tree row, slides the panel out once, and lets it go when the drag ends", () => {
+	it("tells the core where the finger is only when that changes, and again once the core's wait is up", async () => {
 		vi.useFakeTimers();
 		const root = document.createElement("div");
-		const seen: string[] = [];
-		let enabled = true;
-		const edge = new EdgeReveal({ root: () => root, enabled: () => enabled, reveal: () => seen.push("out"), ended: () => seen.push("back") });
-		expect(edge.hitTest(10)).toBe(true);
-		expect(edge.hitTest(40)).toBe(false);
-		edge.preview();
-		vi.advanceTimersByTime(PROJECTS_HOVER_MS - 1);
-		expect(seen).toEqual([]);
-		vi.advanceTimersByTime(1);
-		expect(seen).toEqual(["out"]);
-		enabled = false;
-		expect(edge.hitTest(10)).toBe(false);
-		expect(edge.drop()).toBeNull();
-		edge.clear();
-		expect(seen).toEqual(["out", "back"]);
+		const told: { edge: boolean; node: string | null }[] = [];
+		let changed = 0;
+		const report = new CarryReport({
+			tasks: { carryAt: async (at) => (told.push(at), { wait: told.length === 1 ? PROJECTS_HOVER_MS : null }) },
+			root: () => root,
+			tree: () => null,
+			now: () => 0,
+			changed: async () => void changed++,
+			onError: (e) => {
+				throw e;
+			},
+		});
+		report.move(5, 100);
+		report.move(6, 120);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(told).toEqual([{ edge: true, node: null }]);
+		await vi.advanceTimersByTimeAsync(PROJECTS_HOVER_MS);
+		expect(told).toHaveLength(2);
+		report.move(200, 100);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(told[2]).toEqual({ edge: false, node: null });
+		expect(changed).toBe(3);
+		report.end();
 	});
 });
 

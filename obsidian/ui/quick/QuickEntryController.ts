@@ -89,13 +89,14 @@ export interface QuickEntryControllerDeps {
 
 /**
  * The plus's places besides the funnel's lists: the projects' tree while it shows, and in the by project mode the node's
- * list, where the field opens as in any list (`alone`: the lists of the funnel are not shown then); what a drop on the
- * tree does.
+ * list, where the field opens as in any list (`alone`: the lists of the funnel are not shown then). The screen hears when
+ * the plus is taken and how it was let go (on the tree, in a list, nowhere): its carry is the screen's.
  */
 export interface PlusAside {
 	readonly targets: readonly DropTarget[];
 	readonly alone: boolean;
-	dropped(result: DropResult): void;
+	started(): void;
+	ended(result: DropResult | null): void;
 }
 
 /**
@@ -276,7 +277,7 @@ export class QuickEntryController {
 		this.droppedOn = null;
 		const targets = [this.ring, ...(aside?.targets ?? []), ...lists.map((target) => this.noted(target)), ...(timeline ? [timeline] : [])];
 		const dropped = (result: DropResult | null): HTMLElement | null => {
-			if (aside && result && isProjectsDrop(result)) aside.dropped(result);
+			aside?.ended(result);
 			return this.dropped(result);
 		};
 		this.ring.show();
@@ -284,6 +285,7 @@ export class QuickEntryController {
 			this.ring.hide();
 			return;
 		}
+		aside?.started();
 		this.carrying = true;
 		this.showPlus();
 	}
@@ -296,10 +298,11 @@ export class QuickEntryController {
 		const dropped = (result: DropResult | null): HTMLElement | null => {
 			this.carrying = false;
 			this.ring.hide();
+			aside.ended(result);
 			if (result?.kind === "projectsPlace") {
 				this.openAt("projects", result.place);
 				if (this.field?.el.isConnected) return this.field.el;
-			} else if (result && isProjectsDrop(result)) aside.dropped(result);
+			}
 			this.showPlus();
 			return null;
 		};
@@ -308,6 +311,7 @@ export class QuickEntryController {
 			this.ring.hide();
 			return;
 		}
+		aside.started();
 		this.carrying = true;
 		this.showPlus();
 	}
