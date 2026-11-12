@@ -440,13 +440,16 @@ private struct DayStart: Decodable {
 extension TaskBoard {
     /// The screen for `day` (`nil`: today) over the vault's files as they are now. The cards' height and gap are the shared settings' (`look`), the
     /// timeline's stack laid out at them whatever `measures` say.
-    public func snapshot(day wanted: String?, measures asked: TimelineMeasures, now: Date = Date()) throws -> BoardSnapshot {
+    /// `filter`: the node to read the lists under instead of the device's chosen one (a node a carry is about to open);
+    /// the snapshot's view stays the device's until the caller hands it the view it is drawn with (`with(funnel:)`).
+    public func snapshot(day wanted: String?, measures asked: TimelineMeasures, now: Date = Date(), filter: String?? = nil) throws -> BoardSnapshot {
         let files = try files(now: now)
         let today: String = try read("days.today", over: files)
         let day = wanted ?? today
         // The device's chosen node filters every list (`tasks.funnelView`): the screen is read with it.
         let funnel: FunnelView = try read("tasks.funnelView", [.bool(false)], over: files)
-        let screen: ScreenView = try read("tasks.screen", [.string(day), funnel.filter.map { .string($0.node) } ?? .null], over: files)
+        let node = filter ?? funnel.filter?.node
+        let screen: ScreenView = try read("tasks.screen", [.string(day), node.map { .string($0) } ?? .null], over: files)
         return try draw(screen, day: day, today: today, files: files, measures: asked, lane: .reading, canUndo: canUndo, funnel: funnel)
     }
 

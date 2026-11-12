@@ -75,6 +75,9 @@ public final class CarrySession {
         self.problem = problem
     }
 
+    /// Told when the core pauses over a panel row (`carryAt` answered a wait for it): the host may read what it opens.
+    public var pausing: @MainActor (String) -> Void = { _ in }
+
     /// A carry lifted: the funnel's tasks by their keys, the By project list's cards by their drops, or the plus.
     public func start(keys: [TaskKey], cards: [JSONValue] = [], plus: Bool = false) {
         isOpen = true
@@ -152,6 +155,8 @@ public final class CarrySession {
             // finger's next report behind the read.
             if waited { Task { await self.redraw() } }
             guard let wait, self.isOpen, self.reported == spot else { return }
+            // The core pauses over a row it will open: what it will show can be read meanwhile, its call already answered.
+            if let node = spot.node, !waited { self.pausing(node) }
             self.callOff = self.clock.after(ms: wait) { [weak self] in
                 guard let self, self.isOpen, self.reported == spot else { return }
                 self.report(spot, waited: true)

@@ -215,7 +215,21 @@ final class BoardModel {
         }
         // The same lists in the same context (the panel opened or closed): the panel moves as it moves by itself.
         if next.motion(from: shown) == .still { change() } else { draw(motion: next.motion(from: shown), change) }
-        if !sameFilter { await reload() }
+        guard !sameFilter else { return }
+        // The node a carry rested on, its lists read while the core's pause ran: drawn the moment they are there.
+        if let ahead = hovered, ahead.node == view.filter?.node {
+            hovered = nil
+            let epoch = viewEpoch
+            if let read = await ahead.read.value, epoch == viewEpoch, let now = snapshot, read.tasksText == now.tasksText, read.day == now.day {
+                let lists = read.with(funnel: view)
+                draw(motion: lists.motion(from: now)) {
+                    snapshot = lists
+                    entry.screenChanged()
+                }
+                return
+            }
+        }
+        await reload()
     }
 
     /// The context the lists drawn were read in: a list drawing rows of another one draws them still, its cards never
@@ -226,15 +240,29 @@ final class BoardModel {
 
     // MARK: The carry to a project: the core's session (`CarrySession`)
 
-    @ObservationIgnored private(set) lazy var session = CarrySession(
-        calls: board, clock: SystemCarryClock(),
-        redraw: { [weak self] in await self?.funnelState.refresh() },
-        problem: { [weak self] in self?.problem($0) })
+    @ObservationIgnored private(set) lazy var session: CarrySession = {
+        let session = CarrySession(
+            calls: board, clock: SystemCarryClock(),
+            redraw: { [weak self] in await self?.funnelState.refresh() },
+            problem: { [weak self] in self?.problem($0) })
+        session.pausing = { [weak self] node in self?.readAhead(node) }
+        return session
+    }()
 
     /// The carrying finger moved: the core is told where it is (at the edge, over which panel row).
     func carryMoved(at point: CGPoint) {
         let node = panelShown ? projects.node(at: point) : nil
         session.moved(to: .init(edge: point.x < Self.panelEdge, node: node))
+    }
+
+    /// The lists under the panel row a carry rests on, read while the core's pause runs: when the pause opens the row,
+    /// its lists are drawn at once, not read after it.
+    @ObservationIgnored private var hovered: (node: String, read: Task<BoardSnapshot?, Never>)?
+
+    private func readAhead(_ node: String) {
+        guard node != hovered?.node, projects.rows.first(where: { $0.node == node })?.opensOnHover == true else { return }
+        let board = board, day = shownDay
+        hovered = (node, Task.detached { try? board.snapshot(day: day, measures: CardMetrics.timeline, filter: .some(node)) })
     }
 
     /// The carry let go on a panel row: every carried task goes to that project, as the core's session says.
