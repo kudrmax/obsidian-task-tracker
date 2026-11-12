@@ -158,7 +158,7 @@ export class CalendarScreen extends Component {
 	/** The rows each drag from the by project list carries and the node it was lifted on, read at the lift. */
 	private readonly carry = new ProjectsCarry({
 		rowOf: (card) => this.layout?.projects()?.rowOf(card),
-		selected: () => this.filterNode(),
+		selected: () => this.data.projects?.selected ?? this.filterNode(),
 		carried: (item) => this.bulk.carried(item),
 	});
 	/** The window stands at Done, left of Inbox: only the search brings it there, and any other move leaves it. */
