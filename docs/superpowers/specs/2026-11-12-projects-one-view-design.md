@@ -166,6 +166,7 @@ Backend, QA (2026-11-12):
 73. No project's row is grey only while no open task without a project stands in the funnel, as a project is grey with no open task; Done is always grey, All never.
 81. Places for a new task are matched field by field, one function (`sameNewPlace`, `rules.sameNewPlace`), never by their JSON text: `projectsEntryLook` matches a part's write with it, and a frontend that matches places calls it instead of sorting keys.
 82. By project, a field opened at a part's end (the plus, a plate, the plus let go at the part's end gap) stands where the card it writes will land: before the part's first card of a later stage than its new task's (`EntryPart.end`, null: the part's end); the core's entry places it there (`spotIn`). The card keeps its stage order (the part's order); the field moves to it rather than the card to the field.
+87. By project, the plus let go anywhere between a part's cards stands where its card will land (the part's `end` for its new task's stage): `projectsPlusPlace(view, place)` (`rules.projectsPlusPlace`) gives that place for the drop line (null where `projectsPlusTakes` is false; under a task, the place itself), and the core's entry snaps the field to it (`openAt`, `openAtDrop`, the plus, a plate), so the line, the field and the card coincide.
 
 ## Contract
 

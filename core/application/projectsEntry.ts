@@ -57,8 +57,8 @@ function sameNewTask(a: ProjectsNewTask, b: ProjectsNewTask): boolean {
 const STAGE_RANK: Readonly<Record<ProjectsStage["kind"], number>> = { inbox: 0, backlog: 1, soon: 2, date: 2, today: 3, done: 4 };
 const LIST_RANK: Readonly<Record<GroupedList, number>> = { inbox: 0, backlog: 1, soon: 2, now: 3 };
 
-/** The part's first card of a stage after the one its new task goes to: a field at the part's end stands before it. */
-function endOf(section: ProjectsSection): TaskKey | null {
+/** The part's first card of a stage after the one its new task goes to: a field at the part's end, or anywhere in it, stands before it. */
+export function endOf(section: ProjectsSection): TaskKey | null {
 	const place = section.newTask?.place;
 	if (!place || place.kind !== "list") return null;
 	const rank = place.date !== undefined ? STAGE_RANK.soon : LIST_RANK[place.list];

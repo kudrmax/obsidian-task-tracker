@@ -8,6 +8,7 @@ import { acceptsDrop, dropMove } from "./drops";
 import type { ListPlace } from "./nesting";
 import { originOf } from "./projectsLift";
 import { projectOfNode } from "./projectsScreen";
+import { endOf } from "./projectsEntry";
 import { keyOf, samePlace } from "./taskKeys";
 
 const COLUMN_OF: Readonly<Record<GroupedList, DropColumn>> = { now: "day", soon: "soon", inbox: "inbox", backlog: "backlog" };
@@ -113,6 +114,19 @@ export function projectsTakes(view: ProjectsView, cards: readonly ProjectsDrop[]
 export function projectsPlusTakes(view: ProjectsView, place: ListPlace): boolean {
 	if (place.kind === "subtask") return view.reorders && nestsUnder(view, place.parent);
 	return view.sections.find((s) => s.group === place.group)?.newTask != null;
+}
+
+/**
+ * Where the plus let go at `place` of the Projects list stands, its drop line, its field and the card it writes all at
+ * one spot: between cards anywhere in a part, the place that part's new task lands at (`EntryPart.end`: before the
+ * part's first card of a later stage, else its end); under a task, there. Null where it may not be let go
+ * (`projectsPlusTakes`).
+ */
+export function projectsPlusPlace(view: ProjectsView, place: ListPlace): ListPlace | null {
+	if (!projectsPlusTakes(view, place)) return null;
+	if (place.kind === "subtask") return place;
+	const section = view.sections.find((s) => s.group === place.group)!;
+	return { kind: "task", group: place.group, before: endOf(section) };
 }
 
 function takes(view: ProjectsView, carried: readonly Carried[], place: Extract<ListPlace, { readonly kind: "task" }>): boolean {
