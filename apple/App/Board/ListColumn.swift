@@ -28,7 +28,7 @@ struct ListColumn: View {
                     .padding(.top, !compact && list.column == .backlog ? ColumnMetrics.headGap : 0)
                     .padding(.bottom, ColumnMetrics.headGap)
             }
-            DayLane(model: model, width: width, slides: list.column == .day, shown: ListCollection(column: list.column, model: model)) { peek in
+            DayLane(model: model, width: width, slides: list.column == .day, shown: ListCollection(column: list.column, model: model, stacked: compact)) { peek in
                 if let other = peek.lists[.day] { DayRows(list: other, model: model) }
             }
             .clipped()

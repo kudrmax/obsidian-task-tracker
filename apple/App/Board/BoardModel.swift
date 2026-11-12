@@ -4,7 +4,7 @@ import UIKit
 import os
 
 /// The places of the ribbon the tab bar switches: three of two half-screen columns each. The Projects page that stood left
-/// of Inbox until 11-12 is a panel now (`ProjectsPanelView`); a place kept from then (-1) opens Today.
+/// of Inbox until 11-12 is a panel now (`ProjectsPanelView`); a place kept from then (-1) opens Inbox, its neighbour.
 enum RibbonPlace: Int, Hashable, CaseIterable {
     case inbox = 0, soon, today
 
@@ -41,7 +41,8 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
 
     /// Where the ribbon stood when the app last showed it, on this device: Today the first time.
     static func remembered() -> RibbonPlace {
-        UserDefaults.standard.object(forKey: key).flatMap { $0 as? Int }.flatMap(RibbonPlace.init(rawValue:)) ?? .today
+        guard let kept = UserDefaults.standard.object(forKey: key) as? Int else { return .today }
+        return RibbonPlace(rawValue: kept) ?? .inbox
     }
 
     func remember() {
@@ -152,8 +153,11 @@ final class BoardModel {
 
     /// The funnel's view the screen was read with: the filter, the view mode, the panel (`tasks.funnelView`).
     var funnel: FunnelView? { snapshot?.funnel }
+    /// The view drawn: the screen's as read, before the first read the one the device keeps (`tasks.firstView`).
+    var viewChoice: ViewChoice? { funnel?.view ?? firstView }
+    @ObservationIgnored private lazy var firstView: ViewChoice? = try? board.firstView()
     /// How the lists are laid out now, the core's.
-    var viewMode: ViewMode { funnel?.view.mode ?? .twoColumns }
+    var viewMode: ViewMode? { viewChoice?.mode }
     /// The node every list is filtered by.
     var filter: ProjectFilter? { funnel?.filter }
 
@@ -170,13 +174,54 @@ final class BoardModel {
         listRows[column] = height
     }
 
-    /// A card or the plus held at the screen's left edge brings the panel out, so it can be let go on a row; it stays out
-    /// until the carry ends. A lifted section or project never does.
+    /// A card or the plus held at the screen's left edge the core's pause (`PROJECTS_HOVER_MS`, as the plugin's
+    /// `EdgeReveal`) brings the panel out, so it can be let go on a row; it stays out until the carry ends, and while the
+    /// name of a project the plus made is typed. A lifted section or project never does.
     func carryHeld(at point: CGPoint, carrying payload: DragPayload?) {
-        guard !panelHeld, point.x < Self.panelEdge else { return }
         if let payload, payload.isSection || payload.isProject { return }
-        UISelectionFeedbackGenerator().selectionChanged()
-        panelHeld = true
+        guard !panelHeld, point.x < Self.panelEdge else {
+            edgeWait?.cancel()
+            edgeWait = nil
+            return
+        }
+        guard edgeWait == nil else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.carrying else { return }
+            self.edgeWait = nil
+            UISelectionFeedbackGenerator().selectionChanged()
+            self.panelHeld = true
+        }
+        edgeWait = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + projects.measures.hoverMs / 1000, execute: work)
+    }
+
+    @ObservationIgnored private var edgeWait: DispatchWorkItem?
+
+    /// The panel a carry brought out goes, unless the name of the project the plus made there is still being asked.
+    func releaseHeldPanel() {
+        edgeWait?.cancel()
+        edgeWait = nil
+        if panelHeld, projects.asking == nil { panelHeld = false }
+    }
+
+    /// The filter a carry was lifted under: a drop on a row reads the task by it, and a carry let go nowhere after a held
+    /// card opened another node chooses it again (decision 26, the plugin's `liftedUnder` and `putBack`).
+    @ObservationIgnored private(set) var liftedUnder: String??
+
+    /// The carry flew home, let go nowhere: the filter it was lifted under is chosen again, when a hover changed it, once
+    /// the carry has ended and the screen draws freely again.
+    func carryWentHome() {
+        guard let under = liftedUnder, under != filter?.node else { return }
+        putBackAfterCarry = .some(under)
+    }
+
+    @ObservationIgnored private var putBackAfterCarry: String??
+
+    /// The tasks the carry under way takes: every picked one going along, or the lifted card's alone.
+    var carriedItems: [TaskItem] {
+        guard let carry else { return [] }
+        if !carry.group.isEmpty { return carry.group.map(\.item) }
+        return carry.item.map { [$0] } ?? []
     }
 
     /// How near the screen's left edge a carry brings the panel out.
@@ -690,8 +735,10 @@ final class BoardModel {
             go(to: .inbox)
         }
         await reload()
-        // A task the filter hides is shown with every task again: the find is never left out of sight.
-        if filter != nil, snapshot?.item(item.id) == nil, snapshot?.screen.done.contains(where: { $0.id == item.id }) != true { await clearProjectFilter() }
+        // A task the filter hides is shown with every task again, as the core says (`tasks.filterHides`).
+        if let node = filter?.node, (try? await Task.detached(operation: { try board.filterHides(item, filter: node) }).value) == true {
+            await clearProjectFilter()
+        }
         if place.list == "done" {
             // The Done column stands left of Inbox in the ribbon only: in another view the find opens on its own page.
             guard viewMode == .twoColumns else { return await openFullScreen(item) }
@@ -1113,6 +1160,7 @@ final class BoardModel {
 
     private func begin() -> Int {
         carryBegins?()
+        liftedUnder = .some(snapshot?.filter)
         // Set only when it changes: the board reads it, and a set redraws all of it.
         if found != nil { found = nil }
         return carries.begin()
@@ -1175,7 +1223,11 @@ final class BoardModel {
     /// The carry ended, its copy down, whatever came of it: once, and only the carry under way.
     func endCarry(_ token: Int) {
         guard carries.end(token) else { return }
-        if panelHeld { panelHeld = false }
+        releaseHeldPanel()
+        if let under = putBackAfterCarry {
+            putBackAfterCarry = nil
+            Task { await viewCall { try $0.putBackFilter(under) } }
+        }
         arriving = []
         previews.clear()
         if readAfterDrop {

@@ -25,8 +25,10 @@ final class ProjectsBoard {
 
     /// The tree's row a carried card would be let go on: lit in the drop's colour.
     var dropOn: String?
-    /// The name asked: a project for the plus in the tree, a rename.
-    var asking: Ask?
+    /// The name asked: a project for the plus in the tree, a rename. Answered, a panel the plus brought out goes.
+    var asking: Ask? {
+        didSet { if asking == nil { model?.releaseHeldPanel() } }
+    }
     /// The project Delete project was chosen for, its question shown before anything is written.
     var deleting: ProjectMenu?
 
@@ -167,17 +169,23 @@ final class ProjectsBoard {
         await act { try $0.hoverProjectNode(node) }
     }
 
-    /// A card let go on a row: the project it was shown under gives way to the row's; its place in the funnel stays. A
-    /// card of the By project list by its own `drop`; one of the funnel's lists or the calendar by its task, under the
-    /// screen's filter.
+    /// Cards let go on a row, every task the carry takes (a selection carried goes whole): the project each was shown
+    /// under gives way to the row's; its place in the funnel stays. The By project list's by their own `drop`; the
+    /// funnel's lists' and the calendar's by their keys, under the filter they were lifted under (a hover may have opened
+    /// another node since).
     func drop(_ card: BoardCard, on node: String) async {
-        if let shown = cards[card.id] {
-            await write { try $0.dropOnProject([shown], to: node) }
+        let items = model?.carriedItems ?? [card.item]
+        if let lifted = cards[card.id] {
+            let ids = Set(items.map(\.id))
+            var seen: Set<String> = [lifted.item.id]
+            let others = cards.values.filter { ids.contains($0.item.id) && seen.insert($0.item.id).inserted }
+            let shown = [lifted] + others.sorted { $0.id < $1.id }
+            await write { try $0.dropOnProject(shown, to: node) }
             return
         }
-        let key = card.item.key
-        let filter = model?.filter?.node
-        await write { try $0.dropTasksOnProject([key], to: node, filter: filter) }
+        let keys = items.map(\.key)
+        let under = model?.liftedUnder ?? model?.filter?.node
+        await write { try $0.dropTasksOnProject(keys, to: node, filter: under) }
     }
 
     /// A project lifted and let go in a gap.

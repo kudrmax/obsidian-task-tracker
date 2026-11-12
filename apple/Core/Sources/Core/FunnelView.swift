@@ -34,6 +34,13 @@ public struct ViewChoice: Decodable, Hashable, Sendable {
     public let wheel: Bool
     /// The rows mode's lists, top to bottom; none in another mode.
     public let rows: [String]
+    /// The words in an empty list: «No tasks».
+    public let emptyLabel: String
+    /// Each funnel list's No tasks plate while it draws no card: its words, or nil for no plate.
+    public let plates: [String: String?]
+
+    /// The plate list `column` draws while it shows no card; nil for none.
+    public func plate(_ column: String) -> String? { plates[column] ?? nil }
 }
 
 /// `ProjectFilter`: the node the funnel is filtered by, and what is drawn over its tasks.
@@ -78,6 +85,25 @@ public struct FunnelView: Decodable, Hashable, Sendable {
 }
 
 extension TaskBoard {
+    /// The view as this device keeps it before the first read answers (`tasks.firstView`): reads no file.
+    public func firstView() throws -> ViewChoice {
+        try read("tasks.firstView", [.bool(false), .bool(false)], over: settingsOnly())
+    }
+
+    /// Whether `filter` hides `item` from the screen (a search's find): the filter is cleared before the find is shown.
+    public func filterHides(_ item: TaskItem, filter: String?) throws -> Bool {
+        try read("tasks.filterHides", [item.json, filter.json], over: try files())
+    }
+
+    /// The node chosen again: a carry let go nowhere after it opened another node puts back the filter it was lifted under.
+    public func putBackFilter(_ node: String?) throws {
+        if let node {
+            try selectProjectNode(node)
+        } else {
+            try clearProjectFilter()
+        }
+    }
+
     /// The funnel's view over the vault's files as they are now, as this device keeps it. The phone's screen is narrow.
     public func funnelView(wide: Bool = false, now: Date? = nil) throws -> FunnelView {
         try read("tasks.funnelView", [.bool(wide)], over: try files(now: now))

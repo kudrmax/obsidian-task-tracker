@@ -87,3 +87,40 @@ import Testing
         #expect(try board.stepFunnel(mode: "done", date: "2026-11-07", shift: 1)?.mode == "inbox")
     }
 }
+
+/// The core's follow-ups the app reads: the plates per list, the view before the first read, whether a filter hides a find.
+@Suite struct FunnelViewFollowUpTests {
+    let core = try! PhoneCore(script: Fixtures.phoneScript)
+
+    func board(_ vault: FakeVault) -> TaskBoard {
+        TaskBoard(core: core, vault: vault, projectsScreen: MemoryText(), clock: { Fixtures.date(7, 9) })
+    }
+
+    @Test func platesAreTheCoresUnderAFilterAndInRows() throws {
+        let board = board(FakeVault(ProjectsScreenTests.file))
+        let plain = try board.funnelView().view
+        #expect(plain.plate("inbox") == nil)
+        #expect(plain.emptyLabel == "No tasks")
+        try board.pickProjectNode("project:Спорт")
+        #expect(try board.funnelView().view.plate("inbox") == "No tasks")
+    }
+
+    @Test func theFirstViewIsTheKeptOne() throws {
+        let board = board(FakeVault(ProjectsScreenTests.file))
+        #expect(try board.firstView().mode == .twoColumns)
+        try board.pickProjectNode("project:Спорт")
+        #expect(try board.firstView().mode == .rows)
+    }
+
+    @Test func aFindTheFilterHidesIsSaidSoAndPuttingBackChoosesAgain() throws {
+        let board = board(FakeVault(ProjectsScreenTests.file))
+        let loose = try #require(try board.snapshot(day: nil, measures: FunnelViewTests.measures).lists[.inbox]?.cards.first { $0.item.title == "Loose" })
+        try board.pickProjectNode("project:Спорт")
+        #expect(try board.filterHides(loose.item, filter: "project:Спорт"))
+        #expect(try !board.filterHides(loose.item, filter: nil))
+        try board.putBackFilter(nil)
+        #expect(try board.funnelView().filter == nil)
+        try board.putBackFilter("project:Дружба")
+        #expect(try board.funnelView().filter?.node == "project:Дружба")
+    }
+}
