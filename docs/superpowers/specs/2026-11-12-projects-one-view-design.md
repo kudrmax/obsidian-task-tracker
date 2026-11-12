@@ -56,6 +56,31 @@ Backend (2026-11-12):
 11. A held card over a panel row opens it (`opensOnHover`), now judged on the panel's rows (nothing chosen: every live project opens).
 12. View icons are Lucide names (`columns-2`, `columns-4`, `rows-3`, `folder-tree`); the Swift app maps them to SF Symbols.
 
+iPhone app (frontend-swift, 2026-11-12):
+
+13. **Max's (11-12):** the projects button stands in the toolbar's top-right glass group between Sync and «⋯» (folder
+    symbol, filled while the panel is out), not at the top left. The panel still slides in from the left.
+14. The panel is half the screen wide (never under 196 pt), over the lists with the rest dimmed; a tap on the dim closes
+    it (`setProjectsPanel(false)`), a pick closes it (the core's). Its header is «Projects» at the column title's size.
+15. The view button is a glass circle the plus's size, left of the tab bar, which narrows for it. In Rows and By project
+    (`wheel` false) the tab bar gives way and the button stands alone in the middle of the bottom row; the plus keeps its
+    place. The menu is the system's, a check at the current mode.
+16. SF Symbols for the core's icons: `columns-2` `rectangle.split.2x1`, `columns-4` `rectangle.split.3x1`, `rows-3`
+    `rectangle.split.1x2`, `folder-tree` `list.bullet.indent`.
+17. Rows: each stage's list as tall as its rows while all four fit; the long ones share what is left and scroll inside
+    (`StackedRows`). Each stage is headed small (13 pt semibold, as a section), the day's title with its arrows stands
+    over the calendar. While the plus is carried or a task is typed every list keeps a card's room more. The day turns by
+    the arrows there (the ribbon's day swipe is the two columns' own).
+18. An empty list shows the «No tasks» plate (a tap types a task there) under a filter (the filter's `emptyLabel`) and in
+    Rows; in two columns without a filter an empty list stays as before.
+19. Search: a find the filter hides clears the filter before it is shown; a done find outside two columns opens on its own
+    page (the Done column stands only in the ribbon).
+20. A card or the plus held within 24 pt of the screen's left edge brings the panel out for that carry; a row lights and
+    takes the card (`dropTasksOnProject` for a funnel card, `dropOnProject` for a By project card), and a held card over
+    a row the core's pause opens it (`hoverProjectNode`).
+21. By project draws the core's `projectsScreen(node)` parts without the old segment (By stage is Rows now), the calendar
+    beside it behind the divider.
+
 ## Contract
 
 All in `core/application/contracts.ts`; the door is `docs/door.md`, «Projects as one view with the funnel».

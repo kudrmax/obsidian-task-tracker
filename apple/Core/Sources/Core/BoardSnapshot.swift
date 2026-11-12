@@ -380,6 +380,11 @@ public struct BoardSnapshot: Sendable {
     public let readAt: Date
     /// The hour the day starts at, as the core read it (`days.boundary`).
     public let startHour: Int
+    /// The funnel's view it was read with (`tasks.funnelView`): the filter every list shows, the view mode, the panel.
+    public let funnel: FunnelView
+
+    /// The node the lists are filtered by (`ProjectFilter.node`): what a drop, its preview and its landing take.
+    public var filter: String? { funnel.filter?.node }
 
     /// The files as they are now say what this snapshot was read from: no file, no setting, no calendar changed.
     public func readFrom(_ files: BoardFiles) -> Bool {
@@ -388,7 +393,7 @@ public struct BoardSnapshot: Sendable {
 
     /// Read from the same files on the same day: a snapshot of another day can stand beside it in a day's turn.
     public func readAlike(_ other: BoardSnapshot) -> Bool {
-        other.tasksText == tasksText && other.settingsJSON == settingsJSON && other.calendarTexts == calendarTexts && other.today == today
+        other.tasksText == tasksText && other.settingsJSON == settingsJSON && other.calendarTexts == calendarTexts && other.today == today && other.funnel == funnel
     }
 
     /// Still true at `now`: read within the same minute, so the now line stands where it should.
@@ -427,8 +432,10 @@ extension TaskBoard {
         let files = try files(now: now)
         let today: String = try read("days.today", over: files)
         let day = wanted ?? today
-        let screen: ScreenView = try read("tasks.screen", [.string(day)], over: files)
-        return try draw(screen, day: day, today: today, files: files, measures: asked, lane: .reading, canUndo: canUndo)
+        // The device's chosen node filters every list (`tasks.funnelView`): the screen is read with it.
+        let funnel: FunnelView = try read("tasks.funnelView", [.bool(false)], over: files)
+        let screen: ScreenView = try read("tasks.screen", [.string(day), funnel.filter.map { .string($0.node) } ?? .null], over: files)
+        return try draw(screen, day: day, today: today, files: files, measures: asked, lane: .reading, canUndo: canUndo, funnel: funnel)
     }
 
     /// The screen a drop will leave, asked at the moment of the drop before anything is written (`tasks.dropPreview`):
@@ -436,13 +443,13 @@ extension TaskBoard {
     /// never waits for a read and no id or undo step of it is kept. The read after the drop's write draws the same.
     public func dropPreview(_ tasks: JSONValue, to: JSONValue, over shown: BoardSnapshot, measures asked: TimelineMeasures, now: Date = Date()) throws -> DropPreview {
         let before = BoardFiles(tasks: shown.tasksText, settingsJSON: shown.settingsJSON, calendars: shown.calendarTexts, now: now)
-        let arguments: [JSONValue] = [tasks, to, .string(shown.day)]
+        let arguments: [JSONValue] = [tasks, to, .string(shown.day), shown.filter.json]
         let answer = try answerPure("tasks.dropPreview", arguments, over: before)
         let landings = try answer["landings"].decode([DropLanding].self)
         let screen = try answer["screen"].decode(ScreenView.self)
         let text = answer["tasks"].string ?? shown.tasksText
         let after = BoardFiles(tasks: text, settingsJSON: shown.settingsJSON, calendars: shown.calendarTexts, now: now)
-        let drawn = try draw(screen, day: shown.day, today: shown.today, files: after, measures: asked, lane: .preview(shown), canUndo: shown.canUndo || text != shown.tasksText)
+        let drawn = try draw(screen, day: shown.day, today: shown.today, files: after, measures: asked, lane: .preview(shown), canUndo: shown.canUndo || text != shown.tasksText, funnel: shown.funnel)
         return DropPreview(landings: landings, snapshot: drawn)
     }
 
@@ -453,7 +460,7 @@ extension TaskBoard {
         case preview(BoardSnapshot)
     }
 
-    private func draw(_ screen: ScreenView, day: String, today: String, files: BoardFiles, measures asked: TimelineMeasures, lane: Lane, canUndo: Bool) throws -> BoardSnapshot {
+    private func draw(_ screen: ScreenView, day: String, today: String, files: BoardFiles, measures asked: TimelineMeasures, lane: Lane, canUndo: Bool, funnel: FunnelView) throws -> BoardSnapshot {
         let pure: Bool
         if case .preview = lane { pure = true } else { pure = false }
         func read<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], over files: BoardFiles, as type: T.Type = T.self) throws -> T {
@@ -539,7 +546,8 @@ extension TaskBoard {
             settingsJSON: files.settingsJSON,
             calendarTexts: files.calendars,
             readAt: files.now,
-            startHour: try read("days.boundary", over: files, as: DayStart.self).startHour)
+            startHour: try read("days.boundary", over: files, as: DayStart.self).startHour,
+            funnel: funnel)
     }
 
     /// Cards for rows drawn outside the screen's lists (a full screen's subtasks, a search's finds), coloured and dated as

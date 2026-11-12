@@ -2,9 +2,10 @@ import Core
 import SwiftUI
 import UIKit
 
-/// The Projects page's state: the core's `ProjectsView` and its cards as the page draws them, each a call through the
-/// door (`docs/door.md`, «Projects»). The page decides nothing: what is chosen, folded, waiting, where a card or the plus
-/// goes, is the core's answer; this only turns taps and drops into its calls and reads the screen again.
+/// The projects' panel and the By project view: the tree's rows (`FunnelView.panel`) and the chosen node's list
+/// (`projectsScreen(node)`) with its cards as the view draws them, each a call through the door (`docs/door.md`,
+/// «Projects», «Projects as one view with the funnel»). Nothing is decided here: what is chosen, folded, waiting, where a
+/// card or the plus goes, is the core's answer; this only turns taps and drops into its calls and reads the screen again.
 @MainActor
 @Observable
 final class ProjectsBoard {
@@ -63,9 +64,13 @@ final class ProjectsBoard {
 
     // MARK: Reading
 
-    /// The page read again over the files as they are now, its cards painted and their menus asked.
+    /// The tree's rows as the screen was read with them: what a tap, a drop and a gap read.
+    var rows: [ProjectsRow] { model?.funnel?.panel?.rows ?? [] }
+
+    /// The By project list read again over the files as they are now, for the filter's node, its cards painted and their
+    /// menus asked.
     func read() async {
-        guard let model, let read = await Self.fetch(board, screen: model.menuScreen) else { return }
+        guard let model, let node = model.filter?.node, let read = await Self.fetch(board, screen: model.menuScreen, node: node) else { return }
         withAnimation(.snappy) {
             draw(read)
             model.entry.screenChanged()
@@ -81,9 +86,9 @@ final class ProjectsBoard {
     }
 
     /// The page read off the main thread; nil when the files cannot be read.
-    static func fetch(_ board: TaskBoard, screen: JSONValue) async -> Read? {
+    static func fetch(_ board: TaskBoard, screen: JSONValue, node: String) async -> Read? {
         try? await Task.detached(operation: { () throws -> Read in
-            let view = try board.projectsScreen()
+            let view = try board.projectsScreen(node: node)
             var drawn: [[BoardCard]] = []
             var menus: [String: TaskMenuModel] = [:]
             for section in view.sections {
@@ -145,10 +150,9 @@ final class ProjectsBoard {
 
     // MARK: The tree
 
-    /// A tap on a row: chosen, or, chosen already, its branch folds or unfolds.
+    /// A tap on a row: chosen (the panel then closes), or, chosen already, its branch folds or unfolds.
     func tap(_ row: ProjectsRow) async {
-        UISelectionFeedbackGenerator().selectionChanged()
-        await act { try $0.tapProjectNode(row.node) }
+        await model?.pickProjectNode(row.node)
     }
 
     /// A project chosen from elsewhere (a card's folder, the full screen's project line), the branches above it opened.
@@ -157,22 +161,23 @@ final class ProjectsBoard {
         await act { try $0.selectProjectNode(node) }
     }
 
-    /// A card held over a folded row: its branch opens, nothing chosen.
-    func unfold(_ node: String) async {
-        await act { try $0.unfoldProjectNode(node) }
+    /// A card held over a row the pause the core gives: a folded branch opens, a live project is chosen, so the card can
+    /// be let go among its tasks (`hoverProjectNode`).
+    func hover(_ node: String) async {
+        await act { try $0.hoverProjectNode(node) }
     }
 
-    /// The segment: By project or By stage.
-    func setMode(_ mode: String) async {
-        guard mode != view?.mode else { return }
-        await act { try $0.setProjectsMode(mode) }
-    }
-
-    /// A card let go on a row (by the card's own id): the project it was shown under gives way to the row's; its place in
-    /// the funnel stays.
-    func drop(_ id: String, on node: String) async {
-        guard let card = cards[id] else { return }
-        await write { try $0.dropOnProject([card], to: node) }
+    /// A card let go on a row: the project it was shown under gives way to the row's; its place in the funnel stays. A
+    /// card of the By project list by its own `drop`; one of the funnel's lists or the calendar by its task, under the
+    /// screen's filter.
+    func drop(_ card: BoardCard, on node: String) async {
+        if let shown = cards[card.id] {
+            await write { try $0.dropOnProject([shown], to: node) }
+            return
+        }
+        let key = card.item.key
+        let filter = model?.filter?.node
+        await write { try $0.dropTasksOnProject([key], to: node, filter: filter) }
     }
 
     /// A project lifted and let go in a gap.
@@ -230,21 +235,15 @@ final class ProjectsBoard {
     /// Where a project lifted, or the plus, let go before row `gap` with the finger `shift` points sideways (since the
     /// lift; the plus: from the row above's depth) lands, and the depth its line is drawn at (`rules.projectsDrop`).
     func landing(gap: Int, shift: Double, lifted: String?) -> ProjectsLanding? {
-        guard let rows = view?.rowsJSON else { return nil }
-        return try? board.projectsDrop(rows, gap: gap, shift: shift, lifted: lifted)
+        guard let panel = model?.funnel?.panel else { return nil }
+        return try? board.projectsDrop(panel.rowsJSON, gap: gap, shift: shift, lifted: lifted)
     }
 
     // MARK: Calls
 
-    /// A call that changes only this device's page (the node chosen, a fold, the segment), then the page read again.
+    /// A call that changes only this device's view (the node chosen, a fold), then the screen read again.
     private func act(_ call: @escaping @Sendable (TaskBoard) throws -> Void) async {
-        let board = board
-        do {
-            try await Task.detached { try call(board) }.value
-        } catch {
-            model?.problem(error)
-        }
-        await read()
+        await model?.viewCall(call)
     }
 
     /// A call that writes the tasks file: the board and the page read again.
@@ -256,6 +255,6 @@ final class ProjectsBoard {
             model?.problem(error)
         }
         await model?.reload()
-        await read()
+        if model?.viewMode == .byProject { await read() }
     }
 }

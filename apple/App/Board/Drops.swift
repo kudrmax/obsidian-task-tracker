@@ -121,6 +121,8 @@ struct TitleDrop<Title: View>: UIViewRepresentable {
     let model: BoardModel
     /// Room over the title that takes a carry too.
     var top: CGFloat = 0
+    /// The title's own height: a column's, or a stage's small heading in the Rows view.
+    var row: CGFloat = ColumnMetrics.titleRow
     @ViewBuilder let title: () -> Title
 
     func makeUIView(context: Context) -> TitleTarget {
@@ -146,7 +148,7 @@ struct TitleDrop<Title: View>: UIViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: TitleTarget, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? uiView.bounds.width, height: top + ColumnMetrics.titleRow + ColumnMetrics.headGap)
+        CGSize(width: proposal.width ?? uiView.bounds.width, height: top + row + ColumnMetrics.headGap)
     }
 }
 

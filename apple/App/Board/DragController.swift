@@ -130,6 +130,7 @@ final class DragController {
             follow(point)
             return
         }
+        model?.carryHeld(at: point, carrying: live.payload)
         hold(point, carrying: live.payload)
         springs.hover(at: point)
         follow(point)
