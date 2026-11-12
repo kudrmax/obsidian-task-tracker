@@ -47,7 +47,8 @@ import type { DropTo, FunnelView, ProjectFilter, ProjectNote, ProjectRef, Projec
 import { ProjectTree } from "../domain/ProjectTree";
 import { chosenNode, nodeHeader, nodeIn, panelRows, PROJECTS_WORDS, projectNodeOf, projectOfNode, projectsView } from "./projectsScreen";
 import { filterTest, noteProject } from "./projectFilter";
-import { viewChoice } from "./viewModes";
+import { firstViewOf, viewChoice } from "./viewModes";
+import type { ViewChoice } from "./contracts";
 
 /** The file as one read sees it: normalized for `today`, the day beginning at `boundary`; `text` as the file holds it. */
 export interface Snapshot {
@@ -183,6 +184,25 @@ export class TaskReads {
 		return { filter: this.filterOf(node, tree, s.doc, false), view: viewChoice(this.source.screen(), { node, closed, wide, note: true }), panel: null };
 	}
 
+	/** The view before the first read: the device's state alone (`firstViewOf`). */
+	firstView(wide: boolean, note: boolean): ViewChoice {
+		return firstViewOf(this.source.screen(), wide, note);
+	}
+
+	/** Whether `filter` hides `item`'s task from the screen: a subtask goes by its top task. */
+	filterHidesRead(item: TaskItem, filter: ProjectsNodeId | null): Read<boolean> {
+		return { reads: filter !== null, tidies: true, missing: () => false, answer: (s) => (s ? this.filterHides(s, item, filter) : false) };
+	}
+
+	filterHides({ doc }: Snapshot, item: TaskItem, filter: ProjectsNodeId | null): boolean {
+		const tree = projectTreeOf(doc);
+		const node = nodeIn(filter, tree);
+		const entry = this.rules.named(doc, item.key) ?? doc.find(item.key.section, item.key.index, item.key.path);
+		if (node === null || !entry) return false;
+		const top = entry.path.length === 0 ? entry : doc.find(entry.section, entry.index, []);
+		return top !== undefined && !filterTest(node, tree, doc)(top);
+	}
+
 	private filterOf(node: ProjectsNodeId, tree: ProjectTree, doc: TaskDocument | null, clearable: boolean): ProjectFilter {
 		const { title, menu, project } = nodeHeader(node, tree, doc);
 		return { node, title, menu, clearable, project, emptyLabel: PROJECTS_WORDS.noTasks };
@@ -274,9 +294,9 @@ export class TaskReads {
 		};
 	}
 
-	dayView({ doc, today, boundary }: Snapshot, date: LocalDate): DayView {
-		const item = this.itemOf(today, doc);
-		return { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
+	/** The day's list and timeline, only the tasks `filter` lets through: `screen(s, date, filter).day`. */
+	dayView(s: Snapshot, date: LocalDate, filter?: ProjectsNodeId | null): DayView {
+		return this.screen(s, date, filter).day;
 	}
 
 	soonWithoutDateView({ doc, today }: Snapshot): readonly TaskItem[] {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type EntryList, type ListCard, placeShowing, projectsEntryLook, projectsPlusTakes, type ProjectsView, QuickEntrySession, shownEntryLists, type TaskItem, type WriteLine } from "../../core/application/contracts";
+import { type EntryList, type ListCard, projectsEntryLook, projectsPlusTakes, type ProjectsView, QuickEntrySession, viewEntryLists, type TaskItem, type WriteLine } from "../../core/application/contracts";
 import { callDoor } from "../../core/application/PhoneCalls";
 import { memoryProjectsScreen, type Clock } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
@@ -63,7 +63,7 @@ class Writes implements WriteLine {
 /**
  * The Projects screen with the quick entry over it, as a frontend wires it: the Projects list is what `projectsEntryLook`
  * gives of the view shown, the funnel's columns are drawn but hidden (`hidden`: the cards they hold), and the screen
- * shows what `shownEntryLists("projects")` says.
+ * shows what `viewEntryLists("byProject", place)` says.
  */
 async function projectsScreen(node = "project:P", mode: "byProject" | "byStage" = "byProject", text = FILE) {
 	const store = new InMemoryTaskFileStore(text);
@@ -83,7 +83,7 @@ async function projectsScreen(node = "project:P", mode: "byProject" | "byStage" 
 			parts: (column) => (column === "projects" ? look().parts : []),
 			day: () => TODAY,
 			today: () => TODAY,
-			shown: () => shownEntryLists("projects"),
+			shown: () => viewEntryLists("byProject", "inbox"),
 			fresh: async (beforeShow) => {
 				view = await svc.projectsScreen();
 				beforeShow?.((column) => (column === "projects" ? look().cards : []));
@@ -241,7 +241,7 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 
 	it("off the Projects screen the plus opens in the day list or Inbox, as before", async () => {
 		const s = await projectsScreen();
-		const screen = new QuickEntrySession(s.svc, { cards: () => [], sections: () => [], sectioned: () => false, day: () => TODAY, today: () => TODAY, shown: () => shownEntryLists("inbox"), fresh: async () => undefined, onChange: () => undefined }, s.writes);
+		const screen = new QuickEntrySession(s.svc, { cards: () => [], sections: () => [], sectioned: () => false, day: () => TODAY, today: () => TODAY, shown: () => viewEntryLists("twoColumns", "inbox"), fresh: async () => undefined, onChange: () => undefined }, s.writes);
 		expect(screen.plusOpens()).toBe(true);
 		expect(screen.openFromPlus()).toBe(true);
 		expect(screen.state).toMatchObject({ spot: { kind: "list", column: "inbox" } });
@@ -253,7 +253,6 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 		const spot = s.entry.state!.spot;
 		const move = s.entry.choosePlace({ kind: "soon" });
 		expect(move).toEqual({ column: "projects", day: null });
-		expect(placeShowing(move!.column, "projects")).toBe("projects");
 		expect(s.entry.state).toMatchObject({ spot, place: { kind: "soon" } });
 		s.entry.type("Later");
 		s.entry.enter();
@@ -273,11 +272,9 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 		expect(lines(s.store.text, "Soon")).toContain("- [ ] Back A 🗂️ P");
 	});
 
-	it("only the Projects screen shows the Projects list; every other screen its funnel lists", () => {
-		expect(shownEntryLists("projects")).toEqual(["projects"]);
-		expect(shownEntryLists("inbox")).toEqual(["inbox", "backlog", "soon"]);
-		expect(placeShowing("projects", "calendar")).toBe("projects");
-		expect(placeShowing("inbox", "projects")).toBe("inbox");
+	it("only the by project view shows the Projects list; every other view its funnel lists", () => {
+		expect(viewEntryLists("byProject", "calendar")).toEqual(["projects"]);
+		expect(viewEntryLists("twoColumns", "inbox")).toEqual(["inbox", "backlog", "soon"]);
 	});
 
 	it("the Projects list's look: its rows as cards in their parts, the parts' writes, the plus on the node's own part", async () => {
@@ -299,7 +296,7 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 		expect(spot).toMatchObject({ ok: true, result: { value: { kind: "list", column: "projects" } } });
 		const opened = callDoor("entry.openIn", [null, wire, "projects", null], context as never);
 		expect(opened).toMatchObject({ ok: true, result: { state: { spot: { column: "projects" }, place: { kind: "inbox" } } } });
-		expect(callDoor("rules.shownEntryLists", ["projects"], context as never)).toMatchObject({ ok: true, result: ["projects"] });
+		expect(callDoor("rules.viewEntryLists", ["byProject", "inbox"], context as never)).toMatchObject({ ok: true, result: ["projects"] });
 		const none = { ...wire, cards: {}, sections: {}, parts: { projects: [] } };
 		expect(callDoor("entry.plusOpens", [null, none], context as never)).toMatchObject({ ok: true, result: { value: false, state: null } });
 		expect(callDoor("entry.openFromPlus", [null, none], context as never)).toMatchObject({ ok: true, result: { value: false, state: null } });

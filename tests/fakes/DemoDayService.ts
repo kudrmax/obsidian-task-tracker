@@ -1,4 +1,4 @@
-import { type FunnelAt, type ScreenAt, stepFunnel, stepScreen } from "../../core/application/screenPlaces";
+import { type FunnelAt, stepFunnel } from "../../core/application/screenPlaces";
 import type { DayBoundary, DayOpening, DayService } from "../../core/application/contracts";
 import { dayOpening } from "../../core/application/DayServiceImpl";
 import type { Clock, SettingsStore } from "../../core/application/ports";
@@ -28,10 +28,6 @@ export class DemoDayService implements DayService {
 
 	step(date: LocalDate, days: number): LocalDate {
 		return addDays(date, days);
-	}
-
-	stepScreen(from: ScreenAt, shift: -1 | 1): ScreenAt | null {
-		return stepScreen(from, shift, this.today());
 	}
 
 	stepFunnel(from: FunnelAt, shift: -1 | 1): FunnelAt | null {

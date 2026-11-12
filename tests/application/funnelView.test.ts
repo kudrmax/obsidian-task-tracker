@@ -76,6 +76,13 @@ describe("the screen under a filter", () => {
 		expect((await svc.screen(T, "all")).inbox[0].project?.mark).toBe(true);
 	});
 
+	it("the day's view takes the filter too", async () => {
+		const { svc } = setup();
+		expect(titles((await svc.dayView(T, "none")).list)).toEqual(["Утренняя зарядка"]);
+		expect((await svc.dayView(T, STYLE)).list).toEqual([]);
+		expect((await svc.dayView(T, STYLE))).toEqual((await svc.screen(T, STYLE)).day);
+	});
+
 	it("no filter, or a project the tree lacks, shows every task", async () => {
 		const { svc } = setup();
 		const whole = lists(await svc.screen(T));
@@ -135,11 +142,80 @@ describe("writes under a filter", () => {
 	});
 });
 
+describe("a card let go on the project it already has", () => {
+	it("leaves its line as it is, from the funnel with no filter, under a filter, and from the Projects list", async () => {
+		const { svc, store } = setup();
+		const before = store.text;
+		const glasses = () => svc.screen(T).then((s) => s.inbox.find((i) => i.title === "Подобрать очки")!);
+		await svc.dropTasksOnProject([(await glasses()).key], STYLE, null);
+		expect(store.text).toBe(before);
+		await svc.dropTasksOnProject([(await glasses()).key], STYLE, STYLE);
+		expect(store.text).toBe(before);
+		await svc.dropTasksOnProject([(await glasses()).key], "project:стиль, ВНЕШНОСТЬ", "all");
+		expect(store.text).toBe(before);
+		const card = (await svc.projectsScreen(STYLE)).sections[0].cards.find((c) => c.item.title === "Подобрать очки")!;
+		await svc.dropOnProject([card.drop], STYLE);
+		expect(store.text).toBe(before);
+		const loose = (await svc.screen(T)).inbox.find((i) => i.title === "Без проекта")!;
+		await svc.dropTasksOnProject([loose.key], "none", null);
+		expect(store.text).toBe(before);
+	});
+});
+
+describe("a find the filter hides", () => {
+	it("is told by the core: a task, a subtask by its task, a timeline task, a done one; nothing hides without a filter", async () => {
+		const text = FILE.replace("- [ ] Утренняя зарядка", "- [ ] Утренняя зарядка\n- [ ] Созвон ⏰ 2026-11-12 15:00-16:00 🗂️ Дружба");
+		const { svc } = setup(text);
+		const screen = await svc.screen(T);
+		const items = [...screen.inbox, ...screen.soon, ...screen.soon.flatMap((i) => i.subtasks), ...screen.day.slotted, ...screen.done];
+		const hits = new Map(items.map((i) => [i.title, i]));
+		expect(await svc.filterHides(hits.get("Подобрать очки")!, STYLE)).toBe(false);
+		expect(await svc.filterHides(hits.get("Без проекта")!, STYLE)).toBe(true);
+		expect(await svc.filterHides(hits.get("Почитать отзывы")!, STYLE)).toBe(false);
+		expect(await svc.filterHides(hits.get("Почитать отзывы")!, "none")).toBe(true);
+		expect(await svc.filterHides(hits.get("Созвон")!, "project:Дружба")).toBe(false);
+		expect(await svc.filterHides(hits.get("Созвон")!, STYLE)).toBe(true);
+		expect(await svc.filterHides(hits.get("Купить билет")!, "done")).toBe(false);
+		expect(await svc.filterHides(hits.get("Купить билет")!, null)).toBe(false);
+		expect(await svc.filterHides(hits.get("Без проекта")!, "project:Нет такого")).toBe(false);
+	});
+});
+
+describe("the No tasks plate", () => {
+	it("shows in an empty list under a filter and in rows; in columns without a filter no list has one", async () => {
+		const { svc } = setup();
+		const none = { inbox: null, backlog: null, soon: null, day: null };
+		const words = { inbox: "No tasks", backlog: "No tasks", soon: "No tasks", day: "No tasks" };
+		expect((await svc.funnelView(true)).view.plates).toEqual(none);
+		await svc.setViewMode("rows");
+		expect((await svc.funnelView(true)).view.plates).toEqual(words);
+		await svc.setViewMode("allColumns");
+		expect((await svc.funnelView(true)).view.plates).toEqual(none);
+		await svc.pickProjectNode(STYLE, true);
+		await svc.setViewMode("twoColumns");
+		expect((await svc.funnelView(true)).view.plates).toEqual(words);
+		expect((await svc.projectNoteView("Заметки/Стиль.md", true))!.view.plates).toEqual(words);
+	});
+});
+
+describe("the view before the first read", () => {
+	it("is the device's: two columns at first, a kept mode, rows with a node chosen and in a note", async () => {
+		const { svc } = setup();
+		expect(svc.firstView(true, false)).toMatchObject({ mode: "twoColumns", wheel: true });
+		expect(svc.firstView(false, true)).toMatchObject({ mode: "rows" });
+		await svc.setViewMode("allColumns");
+		expect(svc.firstView(true, false).mode).toBe("allColumns");
+		expect(svc.firstView(false, false).mode).toBe("twoColumns");
+		await svc.pickProjectNode(STYLE, true);
+		expect(svc.firstView(true, false)).toEqual((await svc.funnelView(true)).view);
+	});
+});
+
 describe("the funnel's view", () => {
 	it("starts with no filter, two columns with the wheel, the panel closed and no row chosen", async () => {
 		const view = await setup().svc.funnelView(true);
 		expect(view.filter).toBeNull();
-		expect(view.view).toMatchObject({ mode: "twoColumns", icon: "columns-2", wheel: true, rows: [] });
+		expect(view.view).toMatchObject({ mode: "twoColumns", icon: "columns-2", wheel: true, rows: [], emptyLabel: "No tasks" });
 		expect(view.view.modes.map((m) => [m.mode, m.label, m.checked])).toEqual([
 			["twoColumns", "Two columns", true],
 			["allColumns", "All columns", false],

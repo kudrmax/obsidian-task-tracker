@@ -33,6 +33,7 @@ import {
 	type ProjectsView,
 	type FunnelView,
 	type ViewMode,
+	type ViewChoice,
 	type NewTaskPlace,
 	type Placement,
 	type RepeatRule,
@@ -168,6 +169,14 @@ export class TaskServiceImpl implements TaskService {
 		this.keepScreen(picked(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, node, wide));
 	}
 
+	firstView(wide: boolean, note: boolean): ViewChoice {
+		return this.reads.firstView(wide, note);
+	}
+
+	filterHides(item: TaskItem, filter: ProjectsNodeId | null): Promise<boolean> {
+		return this.ask(this.reads.filterHidesRead(item, filter));
+	}
+
 	async clearProjectFilter(): Promise<void> {
 		this.keepScreen(cleared(this.projectsScreenStore.get()));
 	}
@@ -276,8 +285,8 @@ export class TaskServiceImpl implements TaskService {
 		return name === null ? null : new ProjectIndex(this.lastTree()).refOf(name, true);
 	}
 
-	async dayView(date: LocalDate): Promise<DayView> {
-		return this.reads.dayView(await this.snapshot(), date);
+	async dayView(date: LocalDate, filter?: ProjectsNodeId | null): Promise<DayView> {
+		return this.reads.dayView(await this.snapshot(), date, filter);
 	}
 
 	async soonWithoutDateView(): Promise<readonly TaskItem[]> {

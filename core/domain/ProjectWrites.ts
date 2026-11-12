@@ -172,9 +172,10 @@ export function setProjectNote(doc: TaskDocument, name: string, note: string | n
 /**
  * A task's projects with `from` giving way to `to` in `from`'s place in their order (`to` there already: `from` only
  * taken off; null `to`: `from` taken off; null `from`, or one the task lacks: `to` added last), the others kept, so the
- * task's first project changes only when `from` was first.
+ * task's first project changes only when `from` was first. `from` and `to` one project: the projects as they are.
  */
 export function swappedProjects(projects: readonly string[], from: string | null, to: string | null): readonly string[] {
+	if (from !== null && to !== null && projectKey(from) === projectKey(to)) return projects;
 	const at = from === null ? -1 : projects.findIndex((p) => projectKey(p) === projectKey(from));
 	const has = to !== null && projects.some((p) => projectKey(p) === projectKey(to));
 	if (at < 0) return uniqueNames(to === null || has ? projects : [...projects, to]);

@@ -20,7 +20,7 @@ import { dayMonth, dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
-import { type EntryList, FUNNEL_PLACES, type FunnelAt, funnelPlaceShowing, placeShowing, SCREEN_PLACES, type ScreenAt, SHOWN_LISTS, shownEntryLists, shownLists, stepFunnel, stepScreen, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { type EntryList, FUNNEL_PLACES, type FunnelAt, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
 import { ROW_LISTS, VIEW_WORDS, viewEntryLists, withMode } from "./viewModes";
 import { type EntryPart, projectsEntryLook } from "./projectsEntry";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
@@ -377,7 +377,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	withPriority: (c, [text, prefix]) => c.reads.withPriority(text as string, (prefix ?? null) as string | null),
 	draftMarks: (c, [text, priority, labels]) => c.reads.draftMarks(text as string, (priority ?? null) as string | null, (labels ?? []) as string[]),
 	screen: (c, [date, filter]) => c.ask(c.reads.screenRead(date as string, filter as A)),
-	dayView: (c, [date]) => c.reads.dayView(KEPT(c), date as string),
+	dayView: (c, [date, filter]) => c.reads.dayView(KEPT(c), date as string, filter as A),
 	soonWithoutDateView: (c) => c.reads.soonWithoutDateView(KEPT(c)),
 	inboxView: (c) => c.reads.inboxView(KEPT(c)),
 	backlogView: (c) => c.reads.backlogView(KEPT(c)),
@@ -424,6 +424,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	funnelView: (c, [wide]) => c.ask(c.reads.funnelViewRead(wide === true)),
 	projectNoteView: (c, [path, wide]) => c.ask(c.reads.projectNoteViewRead(path as string, wide === true)),
 	pickProjectNode: (c, [node, wide]) => c.keepProjectsScreen(picked(c.projectsScreen, c.tree(), node as string, wide === true)),
+	firstView: (c, [wide, note]) => c.reads.firstView(wide === true, note === true),
+	filterHides: (c, [item, filter]) => c.ask(c.reads.filterHidesRead(item as A, (filter ?? null) as string | null)),
 	clearProjectFilter: (c) => c.keepProjectsScreen(cleared(c.projectsScreen)),
 	setProjectsPanel: (c, [open]) => {
 		if ((c.projectsScreen.panelOpen === true) !== (open === true)) c.keepProjectsScreen({ ...c.projectsScreen, panelOpen: open === true });
@@ -529,7 +531,6 @@ const DAYS: Readonly<Record<string, Handler>> = {
 	today: (c) => c.rules.today(),
 	relation: (c, [date]) => dayRelation(date as string, c.rules.today()),
 	step: (_c, [date, days]) => addDays(date as string, days as number),
-	stepScreen: (c, [from, shift]) => stepScreen(from as ScreenAt, shift as -1 | 1, c.rules.today()),
 	stepFunnel: (c, [from, shift]) => stepFunnel(from as FunnelAt, shift as -1 | 1, c.rules.today()),
 	openAt: (c, [date]) => dayOpening(date as string, boundaryOf(c), c.rules.today(), c.now, c.settings.scrollToHour),
 	/** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
@@ -825,10 +826,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	placeAt: (cards, y, level, shift, room, heads, held, hysteresis) => placeAt(cards, y, level, shift, room ?? null, heads ?? [], held ?? null, hysteresis ?? 0),
 	branchOf,
 	gapBranch,
-	placeShowing,
 	swipeLanding,
-	shownLists,
-	shownEntryLists,
 	funnelPlaceShowing,
 	viewEntryLists,
 	projectsEntryLook,
@@ -843,7 +841,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+const CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {

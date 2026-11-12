@@ -93,6 +93,13 @@ Obsidian frontend (2026-11-12; numbered from 22 so as not to meet the Swift fron
 29. The note's block keeps the 11-07 frame (hairline, radius 14), 12 inside it; its rows are as tall as their tasks and the block grows with them up to the old block's tallest; its own bottom row (Undo + ⋯, the view button, the plus) stands inside the frame.
 30. A card's folder mark and the whole screen's project line choose that project as the filter (`selectProjectNode`); the panel stays as it was.
 31. A window kept at the old Projects place opens at Inbox.
+32. (Backend, after the frontends) A card let go on a project it already has leaves its line as it is, on every path (`swappedProjects` with `from` and `to` one project).
+33. `ViewChoice.emptyLabel` («No tasks») in every view, so no frontend keeps its own words; `ProjectFilter.emptyLabel` stays.
+34. `dayView(date, filter?)` is `screen(date, filter).day`.
+35. The deprecated place names are gone (decision 3 carried out).
+36. Whether the filter hides a find is the core's (`filterHides(item, filter)`, a subtask by its task), so decision 19's «clears the filter» is one call each frontend asks.
+37. Decision 18's plate is the core's: `ViewChoice.plates` per list (words or null), the same rule in the main screen and the note's block.
+38. `firstView(wide, note)` is the view drawn before `funnelView`/`projectNoteView` answers, so no frontend keeps its own fallback mode.
 
 Applied from the Swift frontend: 17 (rows: each list as tall as its cards while all fit, the long ones share the rest and scroll inside, a card's room more while a card or the plus is carried or a task typed; the day by the arrows), 18 (the «No tasks» plate in an empty list under a filter and in rows), 19 (a find the filter hides clears it; a done find outside two columns opens on the whole screen), 20 (the left edge for a card and the plus), 21 (by project without a segment). 13, 15 and 16 are the app's own chrome: the plugin keeps the boards' top-left button and its own icons.
 

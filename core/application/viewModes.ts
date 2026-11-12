@@ -1,6 +1,7 @@
 import type { DropColumn, ProjectsNodeId, ProjectsScreenState, ViewChoice, ViewMode, ViewModeOption } from "./contracts";
 import type { EntryList, FunnelSpot } from "./screenPlaces";
 import { SHOWN_LISTS } from "./screenPlaces";
+import { PROJECTS_WORDS } from "./projectsScreen";
 
 /** The words and icons of the view modes, the same in every frontend; the icon a Lucide name the Swift app maps to its symbol. */
 export const VIEW_WORDS = {
@@ -57,7 +58,14 @@ export function viewChoice(state: ProjectsScreenState, ask: ViewAsk): ViewChoice
 	const mode = kept !== undefined && modes.includes(kept) ? kept : defaultMode(ask, modes);
 	const label = (m: ViewMode) => (m === "twoColumns" && !ask.wide ? VIEW_WORDS.columns : VIEW_WORDS[m]);
 	const options: ViewModeOption[] = modes.map((m) => ({ mode: m, label: label(m), icon: ICONS[m], checked: m === mode }));
-	return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", rows: mode === "rows" ? ROW_LISTS : [] };
+	const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
+	const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
+	return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates };
+}
+
+/** The view before any read: the device's kept mode, a node chosen (`state.selected`) counting as a filter that is no done one. */
+export function firstViewOf(state: ProjectsScreenState, wide: boolean, note: boolean): ViewChoice {
+	return viewChoice(state, { node: note ? "note" : (state.selected ?? null), closed: false, wide, note });
 }
 
 /** The state with `mode` kept for the view it was picked in. */

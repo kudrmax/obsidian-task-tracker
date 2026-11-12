@@ -337,9 +337,20 @@ adds to the calls above; the old ones answer as before.
   all four, by project `["projects"]`). `rules.constants` adds `FUNNEL_PLACES`, `ROW_LISTS`, `VIEW_WORDS`.
 - The quick entry's `look` adds `filter`: `{ node, project }` from `funnelView().filter` (or null): a new task's field
   starts with `project`, and its `createInPlace` call carries `node` as the filter (or as `node` of a Projects place).
-- Deprecated, until both frontends move: `SCREEN_PLACES`, `ScreenPlace`, `ScreenSpot`, `ScreenAt`, `days.stepScreen`,
-  `rules.placeShowing`, `rules.shownLists`, `rules.shownEntryLists`; `SHOWN_LISTS` stays without its `projects` entry
-  then.
+- `ViewChoice.emptyLabel` («No tasks»): an empty list's words in every view, with a filter or without.
+  `ViewChoice.plates` `{ inbox, backlog, soon, day }`: each list's No tasks plate while it draws no card, its words under
+  a filter and in rows, null in two and all columns without a filter.
+- `tasks.firstView(wide, note)` → `ViewChoice`: the view before the first read, from the device's state alone (its kept
+  mode; a node chosen counts as a filter; `note` the note's block). Example: `tasks.firstView(false, false)` → `{ mode:
+  "twoColumns", wheel: true, … }`.
+- `tasks.filterHides(item, filter)` → boolean: the filter hides that task (a search's find, a subtask by its task, a
+  timeline or Done task): true → `tasks.clearProjectFilter()` before showing it. Example: `tasks.filterHides(hit.item,
+  "project:Стиль")` → `true`.
+- `tasks.dayView(date, filter?)`: `tasks.screen(date, filter).day`.
+- A card let go on the project it already has (`dropOnProject`, `dropTasksOnProject`, a by project list) leaves its line
+  as it is.
+- Gone (2026-11-12, both frontends moved): `SCREEN_PLACES`, `ScreenPlace`, `ScreenSpot`, `ScreenAt`, `days.stepScreen`,
+  `rules.placeShowing`, `rules.shownLists`, `rules.shownEntryLists`; `SHOWN_LISTS` has no `projects` entry.
 
 #### A folded task's next step
 
@@ -373,7 +384,7 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
 
 ### `days.*`: `DayService`
 
-`today()`, `relation(date)`, `step(date, days)`, `stepFunnel({mode, date}, shift)` (the funnel's walk, see «Projects as one view»), `stepScreen({mode, date}, shift)` (deprecated) (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends;
+`today()`, `relation(date)`, `step(date, days)`, `stepFunnel({mode, date}, shift)` (the funnel's walk, see «Projects as one view») (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends;
 Projects first: back from Inbox and Soon, or from Done, to `{ mode: "projects" }`, on from Projects to Inbox, null back
 from Projects; `rules.swipeLanding` still makes one swipe one step), `boundary()` (`{ startHour }`), `openAt(date)`: where the day's
 timeline opens, minutes from the day's start: `{ kind: "now", minute }` for today (the now line, which the plugin holds
@@ -536,8 +547,8 @@ Typing tasks in place, every rule of it (`core/application/QuickEntry.ts`). Each
 - `look` (`WireLook`): the screen as it stands: `cards` of each list shown (`{ day?, soon?, inbox?, backlog?, projects? }`,
   each a list of `ListCard` `{ key, level, group }` in drawing order: `rules.listView`'s rows), `sections` each draws,
   which are `sectioned`, the `day` the day list shows, `shown`: the lists on screen in their order
-  (`rules.shownEntryLists(place)`: a task is looked for there first; the plus opens in the day list while it shows, else
-  in Inbox, and on the Projects screen in the part its plus writes), and `parts`: `{ projects? }`, the parts of a list
+  (`rules.viewEntryLists(mode, spot)`: a task is looked for there first; the plus opens in the day list while it shows, else
+  in Inbox, and in the by project view in the part its plus writes), and `parts`: `{ projects? }`, the parts of a list
   that decides itself what a new task in it writes. The layout is the frontend's.
 - **The Projects screen's list is a list the field stands in** (`"projects"`, an `EntryList` like a funnel's column):
   while the Projects screen shows, `look.shown` is `["projects"]` and `cards.projects`, `sections.projects` and
@@ -553,8 +564,7 @@ Typing tasks in place, every rule of it (`core/application/QuickEntry.ts`). Each
   in the Projects list, never in a funnel column; a new task's field starts with its part's project and the bar's place
   shows where its part writes. A task written there is `createInPlace` with a `NewTaskPlace` `{ kind: "projects", group,
   before, placement? }`, which the service reads off the screen as the file then stands. A place chosen in the bar keeps
-  the field where it stands (`choosePlace` → `{ column: "projects", day: null }`; `placeShowing("projects", …)` is
-  `"projects"`: the screen does not turn) and the task is written there instead. `coming` for `entry.shown` carries
+  the field where it stands (`choosePlace` → `{ column: "projects", day: null }`: the screen does not turn) and the task is written there instead. `coming` for `entry.shown` carries
   `projects` too. Example: `rules.projectsEntryLook(view)` → `{ cards: [{ key, id, level: 0, group: null }, …],
   sections: [null, "project:Sub"], parts: [{ group: null, newTask: { place: { kind: "list", list: "inbox", group:
   null, before: null }, project: "P" }, plus: true }, …] }`.
@@ -705,9 +715,9 @@ fenced and inline code; `"---\ntags: [project]\n---\n#more"` → `["#project", "
 `{ name, path, link }` of the notes with exactly that tag, case aside, a nested child tag not it, by name; `link` the name,
 the path without `.md` when another note has that name: `[{ path: "Work/Plan.md", text: "#project" }, { path:
 "Home/Plan.md" }]` → `[{ name: "Plan", path: "Work/Plan.md", link: "Work/Plan" }]`; the context's `projects`);
-the screen's places: `placeShowing(column, place)` (the place a list is shown from: `place` itself when it shows
-`column`, else the nearest place that does; `placeShowing("day", "inbox")` → `"soon"`; a place is `"inbox"`, `"soon"`
-or `"calendar"`, the app's Today);
+the funnel's places: `funnelPlaceShowing(column, spot)` (the place a list is shown from: `spot` itself when it shows
+`column`, Done as Inbox, else the nearest place that does; `funnelPlaceShowing("day", "inbox")` → `"soon"`; a place is
+`"inbox"`, `"soon"` or `"calendar"`, the app's Today); `viewEntryLists(mode, spot)` (the quick entry's `look.shown`);
 the copy of a pressed card that shows its whole title, in points or px: `wholeWidth(card, room)` (`card`
 `{ width, titleWidth, textWidth, fade }`: the card's width, its title's box, the title's text measured on one line, the
 fade at the title's end; `room` `{ width, margin }`: the window and the margin a copy keeps from its edges) answers
@@ -727,12 +737,9 @@ max: 280 }`), `DIVIDER_SNAP` (`{ distance: 8, slowSpeed: 0.08 }`), `MOST_CARD_CO
 `every` `"Every"`, `units` `{ day: "days", week: "weeks", month: "months" }`, `weekdays` Monday first `{ short: "Mon",
 name: "Monday", letter: "M" }`, `remove` `"Remove repeat"`),
 `NO_DAY_EVENTS` (a day before any calendar file was read, as `calendars.events` answers it: no events, no statuses, `alert` `"none"`, its `words`),
-`SCREEN_PLACES` (`["projects", "inbox", "soon", "calendar"]`, left to right: Projects a place of its own, the wheel's
-window holding its folder alone) and `SHOWN_LISTS` (the funnel's lists each place shows, in its order: `{ projects: [],
-inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] }`, also `rules.shownLists(place)`; the
-quick entry's `look.shown` is `rules.shownEntryLists(place)`: the same, but `["projects"]` on Projects);
-`rules.placeShowing(column, "projects")` turns as from Inbox (`placeShowing("day", "projects")` → `"soon"`), and
-`placeShowing("projects", place)` is always `"projects"`. `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
+`FUNNEL_PLACES` (`["inbox", "soon", "calendar"]`, left to right) and `SHOWN_LISTS` (the funnel's lists each place
+shows, in its order: `{ inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] }`), `ROW_LISTS`
+(`["inbox", "backlog", "soon", "day"]`), `VIEW_WORDS` (the view modes' words). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.
 
 ## What the door leaves to the host

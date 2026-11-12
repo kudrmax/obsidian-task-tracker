@@ -53,7 +53,7 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
 export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
-export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, shownEntryLists, shownLists, SWIPE_FLICK_SPEED, swipeLanding, type EntryList, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+export { SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type EntryList } from "./screenPlaces";
 /** The funnel's places as the wheel and a swipe walk them, without Projects: the tree is a panel whose node filters them. */
 export { FUNNEL_PLACES, funnelPlaceShowing, stepFunnel, type FunnelAt, type FunnelPlace, type FunnelSpot } from "./screenPlaces";
 /** The view modes' words, the lists the rows mode stacks, and the lists a field can stand in for a mode and a place. */
@@ -65,7 +65,7 @@ export { projectsEntryLook, type EntryListLook, type EntryPart } from "./project
  * its title whole and is lifted itself), `grownStart(start, size, grown, room, margin)` where it starts on one axis.
  */
 export { grownStart, type GrownWidth, type TitleFit, type WholeRoom, wholeWidth } from "./wholeCard";
-import type { FunnelAt as FunnelAtOf, ScreenAt as ScreenAtOf } from "./screenPlaces";
+import type { FunnelAt as FunnelAtOf } from "./screenPlaces";
 /** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
 export { SectionNameEntry } from "./SectionNameEntry";
 /** What a task menu's repeat page writes: a rule changed there as the menu closes, unless it is the task's own again; Remove at once. */
@@ -1011,6 +1011,13 @@ export interface ViewChoice {
 	readonly wheel: boolean;
 	/** The rows mode's lists, top to bottom (`ROW_LISTS`); none in another mode. */
 	readonly rows: readonly DropColumn[];
+	/** The words in an empty list, with a filter or without: «No tasks». */
+	readonly emptyLabel: string;
+	/**
+	 * Each funnel list's No tasks plate, drawn while the list draws no card: its words (`emptyLabel`) under a filter and in
+	 * rows, null (no plate) in two and all columns without a filter.
+	 */
+	readonly plates: Readonly<Record<DropColumn, string | null>>;
 }
 
 /** The node the funnel is filtered by, and what is drawn over its tasks. */
@@ -1121,7 +1128,8 @@ export interface TaskService {
 	 * nothing. Under a project the cards show no folder mark. Sections, the offer and the tree stay the whole file's.
 	 */
 	screen(date: LocalDate, filter?: ProjectsNodeId | null): Promise<ScreenView>;
-	dayView(date: LocalDate): Promise<DayView>;
+	/** The day's list and timeline as `screen(date, filter).day` reads them. */
+	dayView(date: LocalDate, filter?: ProjectsNodeId | null): Promise<DayView>;
 	/** The Soon column: Soon tasks without a due date and without a slot, in file order. */
 	soonWithoutDateView(): Promise<readonly TaskItem[]>;
 	/** Every Inbox task, in file order: none has a due date or a slot (spec §4.4, rule 3). */
@@ -1276,6 +1284,17 @@ export interface TaskService {
 	 * panel. Kept on the device.
 	 */
 	pickProjectNode(node: ProjectsNodeId, wide: boolean): Promise<void>;
+	/**
+	 * The view as this device keeps it, before the first read answers (`funnelView`, or `projectNoteView` with `note`): its
+	 * kept mode, a node chosen counting as a filter; synchronous, reading no file.
+	 */
+	firstView(wide: boolean, note: boolean): ViewChoice;
+	/**
+	 * Whether `filter` hides `item` from the screen (a search's find, a subtask by its task, a timeline or Done task too):
+	 * true sends the frontend to `clearProjectFilter` before it shows the find. False without a filter, for a node the tree
+	 * lacks, and for a task gone.
+	 */
+	filterHides(item: TaskItem, filter: ProjectsNodeId | null): Promise<boolean>;
 	/** The cross beside the filter's title: no node chosen, every task shows. Kept on the device. */
 	clearProjectFilter(): Promise<void>;
 	/** The projects button: the panel opened or closed. Kept on the device. */
@@ -1577,8 +1596,6 @@ export interface DayService {
 	relation(date: LocalDate): DayRelation;
 	/** The day `days` after `date`, before it for a negative count: the step of the day arrows and of the screens past today. */
 	step(date: LocalDate, days: number): LocalDate;
-	/** @deprecated `stepFunnel`. Where a swipe or a day arrow leads from `from`, a step back (-1) or on (1); null past the row's ends. */
-	stepScreen(from: ScreenAtOf, shift: -1 | 1): ScreenAtOf | null;
 	/** Where a swipe or a day arrow leads on the funnel from `from`, a step back (-1) or on (1); null past the row's ends (`stepFunnel`). */
 	stepFunnel(from: FunnelAtOf, shift: -1 | 1): FunnelAtOf | null;
 	/** Where the timeline of `date` opens: today on the now line, another day at the hour the settings name. */
