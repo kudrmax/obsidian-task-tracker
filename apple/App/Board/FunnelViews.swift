@@ -152,7 +152,7 @@ private struct StackedLists: View {
 
     var body: some View {
         let measured = lists.map { model.metrics.lists[$0] ?? StackedList(wanted: Double(ListMetrics.head + CardMetrics.height), stops: []) }
-        StackedRowsLayout(lists: measured, gap: ColumnMetrics.sectionGap, share: { [model] lists, room in MainActor.assumeIsolated { model.stackedHeights(lists, room: room) } }) {
+        StackedRowsLayout(lists: measured, gap: ColumnMetrics.sectionGap, share: { [model] lists, room in MainActor.assumeIsolated { model.stackedHeights(lists, room: room) } }, typed: typed) {
             ForEach(lists, id: \.self) { column in
                 Group {
                     if let list = snapshot.lists[column] {
@@ -165,11 +165,41 @@ private struct StackedLists: View {
             }
         }
         .coordinateSpace(.named(Self.space))
+        .onChange(of: model.entry.isOpen) {
+            // Typing ended: the room stands a moment for the written card, never longer.
+            guard !model.entry.isOpen, var last = lastTyping else { return }
+            let until = Date().addingTimeInterval(1.5)
+            last.until = until
+            lastTyping = last
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                guard lastTyping?.until == until else { return }
+                withAnimation(.snappy) { lastTyping = nil }
+            }
+        }
+        .onChange(of: typedKey) {
+            guard model.entry.isOpen, let typed else { return }
+            lastTyping = (typed.index, typed.room, model.metrics.lists[lists[typed.index]]?.wanted ?? 0, .distantFuture)
+        }
         .padding(.bottom, bottomRoom)
         .offset(y: -lift)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background { Color.clear.onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { area = $0 } }
     }
+
+    /// The list a task is typed in, and the room its field and typed lines take below its rows. Once typing ends the room
+    /// stays until the list's own measure changes (the written card read in): the list never closes over the field to
+    /// open again for its card, nor holds the field's room and the card's at once.
+    private var typed: (index: Int, room: Double)? {
+        if let index = lists.firstIndex(where: { model.entry.lists[$0.rawValue] != nil }), let entry = model.entry.lists[lists[index].rawValue] {
+            return (index, Double(CGFloat(entry.pending.count + 1) * (CardMetrics.height + CardMetrics.gap)))
+        }
+        guard let last = lastTyping, (model.metrics.lists[lists[last.index]]?.wanted ?? 0) == last.wanted, Date() < last.until else { return nil }
+        return (last.index, last.room)
+    }
+
+    /// The room typed into last, the list's measure then, and how long it may stand once typing ends.
+    @State private var lastTyping: (index: Int, room: Double, wanted: Double, until: Date)?
+    private var typedKey: [Double] { typed.map { [Double($0.index), $0.room] } ?? [] }
 
     /// What of the stack's room the tab bar's row covers: the stack ends above it.
     private var bottomRoom: CGFloat {

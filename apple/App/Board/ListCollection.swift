@@ -533,7 +533,13 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         }
         if moved != movedSeen {
             movedSeen = moved
-            reveal(field: ())
+            // A stacked list grows with its field in this same drawing: the field is brought into sight once that is laid
+            // out, so a list that grew to hold it never scrolls first and then snaps back.
+            if host.stacked {
+                DispatchQueue.main.async { [weak self] in self?.reveal(field: ()) }
+            } else {
+                reveal(field: ())
+            }
         }
     }
 
