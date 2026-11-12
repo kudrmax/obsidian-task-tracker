@@ -346,6 +346,10 @@ body {
 	--tc-leading-desk-projects-title: 34px;
 	--tc-desk-projects-top: 72px;
 	--tc-desk-tree-width: 336px;
+	/* A docked panel gives way on a narrow view: the lists keep at least a phone's width beside it, the tree at least a list's least width. */
+	--tc-stage-min: 390px;
+	--tc-tree-min: 110px;
+	--tc-dock-width: max(var(--tc-tree-min), min(var(--tc-tree-width), calc(100% - var(--tc-stage-min) - var(--tc-divider))));
 	--tc-desk-projects-side: var(--tc-space-20);
 	--tc-desk-projects-near: var(--tc-space-16);
 	/*
@@ -1575,11 +1579,11 @@ body:not(.is-mobile) .tc-lifted.is-project-title .tc-lifted-title { font-size: v
  */
 .tc-projects-list > .tc-hidden { display: none; }
 /* What the tokens build from the view's own measures is built again on the view, where those are set: the docked panel's room, the wheel's place. */
-.task-calendar { --tc-half-column: calc((100% - var(--tc-stage-left) - var(--tc-divider)) / 2); --tc-tree-width: var(--tc-half-column); --tc-stage-mid: calc(var(--tc-stage-left) + (100% - var(--tc-stage-left)) / 2); --tc-seg-w: calc((var(--tc-seg-span) + var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad)); }
+.task-calendar { --tc-half-column: calc((100% - var(--tc-stage-left) - var(--tc-divider)) / 2); --tc-tree-width: var(--tc-half-column); --tc-dock-width: max(var(--tc-tree-min), min(var(--tc-tree-width), calc(100% - var(--tc-stage-min) - var(--tc-divider)))); --tc-stage-mid: calc(var(--tc-stage-left) + (100% - var(--tc-stage-left)) / 2); --tc-seg-w: calc((var(--tc-seg-span) + var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad)); }
 body:not(.is-mobile) .task-calendar { --tc-top-row-top: var(--tc-desk-top-row-top); --tc-top-row-h: var(--tc-desk-projects-top); --tc-tree-width: var(--tc-desk-tree-width); --tc-projects-top: var(--tc-desk-projects-top); --tc-font-filter: var(--tc-font-desk-projects-title); --tc-leading-filter: var(--tc-leading-desk-projects-title); }
 .task-calendar.has-top-row { --tc-day-row-top: var(--tc-top-row-h); --tc-columns-top: calc(var(--tc-top-row-h) + var(--tc-columns-head)); }
 .task-calendar.has-head-lead { --tc-head-lead: calc(var(--tc-folder-btn) + var(--tc-space-4)); }
-.task-calendar.has-dock { --tc-stage-left: calc(var(--tc-tree-width) + var(--tc-divider)); --tc-filter-left: calc(var(--tc-stage-left) + var(--tc-space-4)); }
+.task-calendar.has-dock { --tc-stage-left: calc(var(--tc-dock-width) + var(--tc-divider)); --tc-filter-left: calc(var(--tc-stage-left) + var(--tc-space-4)); }
 .task-calendar > button.tc-btn.tc-folder-btn { position: absolute; left: var(--tc-space-10); top: var(--tc-top-row-top); z-index: var(--tc-layer-switch); width: var(--tc-folder-btn); height: var(--tc-folder-btn); color: var(--tc-ink-soft); }
 .task-calendar > button.tc-btn.tc-folder-btn.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
 .tc-folder-btn svg { width: var(--tc-folder-icon); height: var(--tc-folder-icon); stroke-width: var(--tc-stroke-folder); }
@@ -1615,6 +1619,7 @@ body.is-mobile .task-calendar.has-tree > .tc-tree-dim { opacity: 1; visibility: 
 /* A card held over the tree while the panel lies over the lists: nothing under it takes the card, the dim takes no tap. */
 body.is-mobile .task-calendar.is-dragging > .tc-tree-dim { pointer-events: none; }
 .task-calendar.has-dock > .tc-capsule { left: var(--tc-desk-projects-side); }
+body:not(.is-mobile) .tc-tree-panel { width: calc(var(--tc-dock-width) + var(--tc-divider)); }
 /* The docked panel opened or closed (desktop): it slides in or out, and the columns, the controls under them and the filter's name move and take their new widths with it, one motion. */
 body:not(.is-mobile) .task-calendar:not(.has-tree) > .tc-tree-panel { transform: translate3d(calc(-1 * 100%), 0, 0); }
 body:not(.is-mobile) .task-calendar.is-docking > .tc-tree-panel { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out), visibility 0s linear var(--tc-duration-slide); }
@@ -1701,7 +1706,9 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-project-block { margin-top: calc(var(--tc-block-top) - var(--tc-block-lift)); margin-bottom: calc(var(--tc-chrome-room) + var(--tc-block-top)); max-height: var(--tc-block-max-h); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); overflow: hidden; outline: none; }
 .tc-project-block > .task-calendar.is-note { --tc-day-row-top: var(--tc-block-inset); --tc-chrome-room: var(--tc-block-inset); --tc-foot-gap: 0px; --tc-keyboard-room: 0px; --tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room)); --tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-space-8)); }
 .task-calendar.is-note .tc-stage-body { padding: 0 var(--tc-block-inset); }
-.task-calendar.is-note > :is(.tc-right, .tc-head, .tc-divider, .tc-fade) { display: none; }
+.task-calendar.is-note > :is(.tc-right, .tc-head, .tc-divider) { display: none; }
+/* The block's foot fade backs its controls: in a short window the tasks scroll under them, never under bare buttons. */
+.task-calendar.is-note > .tc-fade { left: 0; }
 .task-calendar.is-note > :is(button.tc-plus, .tc-plus-ring) { right: var(--tc-block-inset); }
 .task-calendar.is-note > .tc-capsule { left: var(--tc-block-inset); }
 /* In a note's block every list is as tall as its cards: the block grows, and past its tallest the stages scroll as one. */

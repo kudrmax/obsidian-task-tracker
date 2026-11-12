@@ -223,6 +223,8 @@ export class TaskList {
 		const pending = this.deps.pending?.() ?? null;
 		const empty = this.nodes.length === 0 && entryRow === null && pending === null ? (this.deps.empty?.() ?? null) : null;
 		if (empty !== null) this.emptyPlate(drawing, empty);
+		/** Cards came into an empty list: its plate gives way at once, so the first card grows in where the plate stood, not under it. */
+		else drawing.forget("empty");
 		this.slot = pending ? drawing.take("slot", () => el(null, "div", "tc-group-slot")).node : null;
 		if (pending) this.cardOf(drawing, pending, day, signals);
 		drawing.finish();
