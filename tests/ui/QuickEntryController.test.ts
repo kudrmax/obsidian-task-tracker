@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import type { EntryList, LabelLevel, NewTaskPlace, Placement, ProjectRef, ProjectsCard, ProjectsSection, ProjectsView, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../core/application/contracts";
+import { type EntryList, funnelPlaceShowing, type LabelLevel, NewTaskPlace, Placement, ProjectRef, ProjectsCard, ProjectsSection, ProjectsView, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../core/application/contracts";
 import type { RightMode } from "../../obsidian/ui/viewSettings";
-import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../obsidian/ui/drag/DropTarget";
+
+/** Where the harness's screen stands: a place of the wheel, or the by project list of a node. */
+type Shown = RightMode | "projects";
+import { type DragPayload, type DropResult, type DropTarget, type ListColumn, isProjectsDrop } from "../../obsidian/ui/drag/DropTarget";
 import { GestureArbiter } from "../../obsidian/ui/gestures";
 import { type ColumnDrop, type EntryListShown, type PlusAside, QuickEntryController } from "../../obsidian/ui/quick/QuickEntryController";
 import { ProjectTasks } from "../../obsidian/ui/projects/ProjectTasks";
@@ -11,7 +14,7 @@ import { taskMenu } from "../../core/application/menus";
 import { dayColumn, dayOfPlacement, placementOfDay } from "../../core/domain/Days";
 import { TaskList } from "../../obsidian/ui/TaskList";
 import { Timeline } from "../../obsidian/ui/Timeline";
-import { DayBoundary } from "../../core/application/contracts";
+import { DayBoundary, viewEntryLists } from "../../core/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { FakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";
@@ -45,7 +48,7 @@ const item = (text: string, k: TaskKey, group: string | null = null, subtasks: T
 }, TODAY);
 
 interface SetUp {
-	mode?: RightMode;
+	mode?: Shown;
 	day?: string;
 	items?: Partial<Record<ListColumn, TaskItem[]>>;
 	/** The tasks on the timeline. */
@@ -83,9 +86,9 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		frames.clear();
 		due.forEach((run) => run(0));
 	};
-	let mode = startMode;
+	let mode: Shown = startMode;
 	let day = startDay;
-	const turned: RightMode[] = [];
+	const turned: Shown[] = [];
 	const created: { text: string; priority: string | null; place: NewTaskPlace; repeat?: RepeatRule; project?: string }[] = [];
 	const newProjects: { name: string; keys: readonly TaskKey[] }[] = [];
 	const edits: { key: TaskKey; draft: TaskDraft }[] = [];
@@ -178,7 +181,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		list: shownList,
 		aside: (): PlusAside | null =>
 			projectsList && mode === "projects"
-				? { targets: [stubDrop("day", { kind: "projectsPlace", place: { kind: "task", group: "s", before: null } })], dropped: (result) => asideDrops.push(result) }
+				? { targets: [stubDrop("day", { kind: "projectsPlace", place: { kind: "task", group: "s", before: null } })], alone: true, started: () => undefined, ended: (result) => void (result && isProjectsDrop(result) && result.kind !== "projectsPlace" && asideDrops.push(result)) }
 				: null,
 		sectioned: () => sections,
 		timeline: () => timeline,
@@ -188,8 +191,11 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		desktop: () => desktop !== undefined,
 		chromeTop: () => desktop?.chromeTop ?? Infinity,
 		day: () => day,
-		mode: () => mode,
-		turnTo: (to) => {
+		shown: () => (mode === "projects" ? ["projects"] : viewEntryLists("twoColumns", mode)),
+		filter: () => null,
+		turnTo: (column) => {
+			if (column === "projects" || mode === "projects") return;
+			const to = funnelPlaceShowing(column, mode);
 			turned.push(to);
 			mode = to;
 			void controller?.settle();
@@ -219,7 +225,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		field()!.dispatchEvent(new Event("input", { bubbles: true }));
 	};
 	const press = (k: string) => field()!.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
-	const setMode = (to: RightMode) => {
+	const setMode = (to: Shown) => {
 		mode = to;
 		render();
 	};
@@ -1367,7 +1373,7 @@ describe("QuickEntryController: the Projects list is a list the field stands in 
 	const b = item("B", key("now", 0));
 
 	function part(name: string, title: string, tasks: readonly TaskItem[], list: "soon" | "now" | "inbox"): ProjectsSection {
-		const cards = tasks.map((t): ProjectsCard => ({ id: `${name}/${t.id}`, item: t, stage: null, over: null, from: name, drop: { key: t.key, from: name }, menuFrom: "soon", canDrop: true }));
+		const cards = tasks.map((t): ProjectsCard => ({ id: `${name}/${t.id}`, item: t, stage: null, from: name, drop: { key: t.key, from: name }, menuFrom: "soon", canDrop: true }));
 		const rows = cards.flatMap((card) => [
 			{ id: card.id, item: card.item, level: 0, card, drop: card.drop },
 			...card.item.subtasks.map((s) => ({ id: `${name}/${s.id}`, item: s, level: 1, card: null, drop: { key: s.key, from: name } })),

@@ -11,7 +11,7 @@ const task = (text: string, index: number): TaskItem =>
 	onDay({ key: { section: "soon", index, path: [], raw: `- [ ] ${text}` }, id: `t${index}`, text, status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, group: null, subtasks: [], progress: null, parentText: null, description: null, list: "soon", isSubtask: false } as Partial<TaskItem> as TaskItem, "2026-11-07");
 
 const dropOf = (t: TaskItem, part: string): ProjectsDrop => ({ key: t.key, from: part, lifted: { id: t.id, list: "soon", origin: "soon" } });
-const cardOf = (t: TaskItem, part: string): ProjectsCard => ({ id: `${part}/${t.id}`, item: t, stage: { kind: "soon" }, over: null, from: part, drop: dropOf(t, part), menuFrom: "soon", canDrop: true });
+const cardOf = (t: TaskItem, part: string): ProjectsCard => ({ id: `${part}/${t.id}`, item: t, stage: { kind: "soon" }, from: part, drop: dropOf(t, part), menuFrom: "soon", canDrop: true });
 
 function drawNode(tasks: ProjectTasks, part: string, items: readonly TaskItem[]): void {
 	const cards = items.map((t) => cardOf(t, part));

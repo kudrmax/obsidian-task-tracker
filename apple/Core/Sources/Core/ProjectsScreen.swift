@@ -30,7 +30,7 @@ public struct ProjectsRow: Decodable, Hashable, Sendable, Identifiable {
     /// A held card over it unfolds its branch after a pause.
     public let unfoldsOnHover: Bool
     /// A held card over it chooses it after the same pause, so the card can be let go among its tasks: a live project
-    /// or No project, not the chosen one (`hoverProjectNode`).
+    /// or No project, not the chosen one (`tasks.carryAt`).
     public let opensOnHover: Bool
     public let json: JSONValue
 
@@ -74,8 +74,6 @@ public struct ProjectsCard: Decodable, Hashable, Sendable, Identifiable {
     public let item: TaskItem
     /// By project: the stage's mark on the right; nil in By stage.
     public let stage: ProjectsStage?
-    /// By stage: the subproject the task stands in, small over its title; nil for the node's own and in By project.
-    public let over: String?
     /// The project it is shown under: what a drop on the tree replaces.
     public let from: String?
     /// What `tasks.dropOnProject` takes for this very card (`ProjectsDrop` `{ key, from, lifted }`), passed back as given.
@@ -174,9 +172,6 @@ public struct ProjectDelete: Decodable, Hashable, Sendable {
 public struct ProjectsView: Decodable, Hashable, Sendable {
     public let rows: [ProjectsRow]
     public let selected: String
-    /// `byProject` or `byStage`.
-    public let mode: String
-    public let modes: [Mode]
     /// The header over the tasks: the chosen node's name.
     public let title: String
     public let menu: ProjectMenu?
@@ -189,14 +184,12 @@ public struct ProjectsView: Decodable, Hashable, Sendable {
     /// The view as the core gave it: what `rules.projectsEntryLook` takes back.
     public private(set) var json: JSONValue = .null
 
-    enum CodingKeys: String, CodingKey { case rows, selected, mode, modes, title, menu, sections, newTask, emptyLabel, missing, reorders }
+    enum CodingKeys: String, CodingKey { case rows, selected, title, menu, sections, newTask, emptyLabel, missing, reorders }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         rows = try c.decode([ProjectsRow].self, forKey: .rows)
         selected = try c.decode(String.self, forKey: .selected)
-        mode = try c.decode(String.self, forKey: .mode)
-        modes = try c.decode([Mode].self, forKey: .modes)
         title = try c.decode(String.self, forKey: .title)
         menu = try c.decodeIfPresent(ProjectMenu.self, forKey: .menu)
         sections = try c.decode([ProjectsSection].self, forKey: .sections)
@@ -205,11 +198,6 @@ public struct ProjectsView: Decodable, Hashable, Sendable {
         missing = try c.decode(Bool.self, forKey: .missing)
         reorders = try c.decode(Bool.self, forKey: .reorders)
         json = try JSONValue(from: decoder)
-    }
-
-    public struct Mode: Decodable, Hashable, Sendable {
-        public let mode: String
-        public let label: String
     }
 
     /// The rows as the gap rules take them.
@@ -235,30 +223,9 @@ extension TaskBoard {
         try read("tasks.projectsScreen", over: try files(now: now))
     }
 
-    /// A tap on a row: a node not chosen is chosen; the chosen one folds or unfolds its branch (Done opens its projects).
-    public func tapProjectNode(_ node: String) throws {
-        _ = try screenCall("tasks.tapProjectNode", [.string(node)], over: try files())
-    }
-
     /// A node chosen with the branches above it opened: a search hit's path, a card's folder.
     public func selectProjectNode(_ node: String) throws {
         _ = try screenCall("tasks.selectProjectNode", [.string(node)], over: try files())
-    }
-
-    /// A card held over a folded row: its branch opened, without choosing it (`unfoldsOnHover`).
-    public func unfoldProjectNode(_ node: String) throws {
-        _ = try screenCall("tasks.unfoldProjectNode", [.string(node)], over: try files())
-    }
-
-    /// A card held `PROJECTS_HOVER_MS` over a row, in one call: its branch unfolds (`unfoldsOnHover`) and it is chosen
-    /// (`opensOnHover`), the mode kept.
-    public func hoverProjectNode(_ node: String) throws {
-        _ = try screenCall("tasks.hoverProjectNode", [.string(node)], over: try files())
-    }
-
-    /// The segment: `byProject` or `byStage`.
-    public func setProjectsMode(_ mode: String) throws {
-        _ = try screenCall("tasks.setProjectsMode", [.string(mode)], over: try files())
     }
 
     /// The plus let go in the tree, the name typed: the project made at `place` and chosen; nil for a blank or taken name.

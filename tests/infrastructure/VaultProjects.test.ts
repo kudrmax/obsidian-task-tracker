@@ -121,8 +121,8 @@ describe("LocalProjectsScreenStore", () => {
 		const storage = { loadLocalStorage: (key: string) => saved.get(key) ?? null, saveLocalStorage: (key: string, data: unknown) => void saved.set(key, data) };
 		const store = new LocalProjectsScreenStore(storage);
 		expect(store.get()).toEqual({});
-		store.set({ selected: "project:Дружба", mode: "byStage", folded: ["project:Спорт"], doneOpen: true });
-		expect(new LocalProjectsScreenStore(storage).get()).toEqual({ selected: "project:Дружба", mode: "byStage", folded: ["project:Спорт"], doneOpen: true });
+		store.set({ selected: "project:Дружба", view: "rows", folded: ["project:Спорт"], doneOpen: true });
+		expect(new LocalProjectsScreenStore(storage).get()).toEqual({ selected: "project:Дружба", view: "rows", folded: ["project:Спорт"], doneOpen: true });
 		expect(typeof saved.get(PROJECTS_SCREEN_KEY)).toBe("string");
 	});
 

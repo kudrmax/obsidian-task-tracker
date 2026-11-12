@@ -118,8 +118,8 @@ export class PluginSettings<T extends object> {
 	}
 
 	private savedDevice(): Partial<T> {
-		const saved = this.host.loadLocalStorage(DEVICE_STATE_KEY) as Partial<T> | null;
-		return saved ?? {};
+		const saved = (this.host.loadLocalStorage(DEVICE_STATE_KEY) ?? {}) as Record<string, unknown>;
+		return Object.fromEntries(Object.entries(saved).filter(([key]) => this.isDevice(key))) as Partial<T>;
 	}
 
 	/** A patch split into the part that goes to the device and the part that goes to the synced file. */

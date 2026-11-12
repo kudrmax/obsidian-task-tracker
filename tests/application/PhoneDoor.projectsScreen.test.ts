@@ -9,17 +9,14 @@ type Ok = Extract<DoorAnswer, { ok: true }>;
 const call = (method: string, args: unknown[], extra: Partial<DoorContext> = {}) => callDoor(method, args, { tasks: file, nowMs, ...extra }) as Ok;
 
 describe("the door's Projects screen", () => {
-	it("keeps the device's screen as the app hands it back: a tap answers it, the next read draws it", () => {
-		const tapped = call("tasks.tapProjectNode", ["project:Дружба"]);
-		expect(tapped.projectsScreen).toEqual({ selected: "project:Дружба" });
-		const moded = call("tasks.setProjectsMode", ["byStage"], { projectsScreen: tapped.projectsScreen });
-		const view = call("tasks.projectsScreen", [], { projectsScreen: moded.projectsScreen }).result as ProjectsView;
-		expect(view).toMatchObject({ selected: "project:Дружба", mode: "byStage", title: "Дружба" });
-		expect(view.sections.map((s) => [s.title, s.cards.map((c) => [c.item.title, c.over])])).toEqual([
-			["Inbox", [["Voice", "Small talk"]]],
-			["Backlog", []],
-			["Soon", []],
-			["Today", [["Call", null]]],
+	it("keeps the device's screen as the app hands it back: a pick answers it, the next read draws it", () => {
+		const picked = call("tasks.pickProjectNode", ["project:Дружба", true]);
+		expect(picked.projectsScreen).toEqual({ selected: "project:Дружба" });
+		const view = call("tasks.projectsScreen", [], { projectsScreen: picked.projectsScreen }).result as ProjectsView;
+		expect(view).toMatchObject({ selected: "project:Дружба", title: "Дружба" });
+		expect(view.sections.map((s) => [s.title, s.cards.map((c) => c.item.title)])).toEqual([
+			[null, ["Call"]],
+			["Small talk", ["Voice"]],
 		]);
 	});
 
@@ -51,5 +48,30 @@ describe("the Project page of a menu read over the settings alone", () => {
 			["Дружба", 0, false],
 			["Small talk", 1, true],
 		]);
+	});
+});
+
+describe("the door's old names, kept answering for an app that still calls them", () => {
+	it("days.stepScreen walks as days.stepFunnel, the old Projects place as Done", () => {
+		expect(call("days.stepScreen", [{ mode: "inbox", date: "2026-11-11" }, 1]).result).toEqual({ mode: "soon", date: "2026-11-11" });
+		expect(call("days.stepScreen", [{ mode: "inbox", date: "2026-11-11" }, -1]).result).toBeNull();
+		expect(call("days.stepScreen", [{ mode: "projects", date: "2026-11-11" }, 1]).result).toEqual({ mode: "inbox", date: "2026-11-11" });
+	});
+
+	it("rules.placeShowing, shownLists and shownEntryLists read the funnel's places, the old Projects place as Inbox", () => {
+		expect(call("rules.placeShowing", ["day", "inbox"]).result).toBe("soon");
+		expect(call("rules.placeShowing", ["day", "projects"]).result).toBe("soon");
+		expect(call("rules.placeShowing", ["projects", "soon"]).result).toBe("soon");
+		expect(call("rules.shownLists", ["soon"]).result).toEqual(["soon", "day"]);
+		expect(call("rules.shownLists", ["projects"]).result).toEqual([]);
+		expect(call("rules.shownEntryLists", ["projects"]).result).toEqual(["projects"]);
+		expect(call("rules.shownEntryLists", ["inbox"]).result).toEqual(["inbox", "backlog", "soon"]);
+	});
+
+	it("tasks.tapProjectNode, unfoldProjectNode, hoverProjectNode and setProjectsMode still answer", () => {
+		expect(call("tasks.tapProjectNode", ["project:Дружба"]).projectsScreen).toMatchObject({ selected: "project:Дружба" });
+		expect(call("tasks.hoverProjectNode", ["project:Дружба"]).projectsScreen).toMatchObject({ selected: "project:Дружба" });
+		expect(call("tasks.unfoldProjectNode", ["done"]).projectsScreen).toMatchObject({ doneOpen: true });
+		expect(call("tasks.setProjectsMode", ["byStage"]).ok).toBe(true);
 	});
 });

@@ -8,13 +8,11 @@ import { projectName } from "../domain/Project";
 import { dayOf } from "../domain/operations";
 import type {
 	MenuFrom,
-	NewTaskPlace,
 	ProjectMenu,
 	ProjectRef,
 	ProjectsCard,
 	ProjectsLanding,
 	ProjectsListRow,
-	ProjectsMode,
 	ProjectsNewTask,
 	ProjectsNodeId,
 	ProjectsRow,
@@ -115,15 +113,27 @@ export interface ProjectsInput {
 	readonly item: (entry: TaskEntry) => TaskItem;
 	/** The name a list goes by. */
 	readonly listName: (list: SectionKey) => string;
+	/** The node shown, by project, whatever the device chose (`projectsScreen(node)`); left out, the device's in its segment. */
+	readonly node?: ProjectsNodeId;
 }
 
 /** The node chosen: the device's, while it still names a node of the tree; All otherwise. */
 export function selectedNode(state: ProjectsScreenState, tree: ProjectTree): ProjectsNodeId {
-	const node = state.selected ?? "all";
+	return chosenNode(state, tree) ?? "all";
+}
+
+/** The node chosen, the funnel's filter: the device's, in the tree's spelling, while it still names a node of the tree; none otherwise. */
+export function chosenNode(state: ProjectsScreenState, tree: ProjectTree): ProjectsNodeId | null {
+	return nodeIn(state.selected, tree);
+}
+
+/** `node` as the tree has it: a project's in its spelling, All, No project, Done; null for none and a project the tree lacks. */
+export function nodeIn(node: ProjectsNodeId | null | undefined, tree: ProjectTree): ProjectsNodeId | null {
+	if (node === null || node === undefined) return null;
 	const name = projectOfNode(node);
-	if (name === null) return node === "none" || node === "done" ? node : "all";
+	if (name === null) return node === "all" || node === "none" || node === "done" ? node : null;
 	const found = tree.find(name);
-	return found ? projectNodeOf(found.node.name) : "all";
+	return found ? projectNodeOf(found.node.name) : null;
 }
 
 function isFolded(state: ProjectsScreenState, name: string): boolean {
@@ -135,20 +145,15 @@ export function projectsView(input: ProjectsInput): ProjectsView {
 	const { tree, state } = input;
 	const statuses = input.doc ? projectStatuses(tree, input.doc) : new Map<string, ProjectStatus>();
 	const statusOf = (name: string): ProjectStatus => statuses.get(projectKey(name)) ?? "waiting";
-	const selected = selectedNode(state, tree);
-	const mode: ProjectsMode = state.mode ?? "byProject";
+	const fixed = input.node === undefined ? null : nodeIn(input.node, tree);
+	const selected = fixed ?? selectedNode(state, tree);
 	const rows = treeRows(tree, state, selected, statusOf, (node) => input.doc !== null && nodeReorders(node, statusOf));
-	const parts = input.doc ? sectionsOf(input, input.doc, selected, mode, statusOf) : [];
+	const parts = input.doc ? sectionsOf(input, input.doc, selected, statusOf) : [];
 	const name = projectOfNode(selected);
 	const placed = name === null ? null : tree.find(name);
 	return {
 		rows,
 		selected,
-		mode,
-		modes: [
-			{ mode: "byProject", label: PROJECTS_WORDS.byProject },
-			{ mode: "byStage", label: PROJECTS_WORDS.byStage },
-		],
 		title: placed ? placed.node.name : selected === "none" ? PROJECTS_WORDS.none : selected === "done" ? PROJECTS_WORDS.done : PROJECTS_WORDS.all,
 		menu: placed ? projectMenu(refOfPlaced(placed, false), input.doc !== null && hasOwnTasks(input.doc, placed.node.name)) : null,
 		sections: parts,
@@ -157,6 +162,47 @@ export function projectsView(input: ProjectsInput): ProjectsView {
 		missing: input.doc === null,
 		reorders: input.doc !== null && nodeReorders(selected, statusOf),
 	};
+}
+
+/** The panel's rows: the tree with the filter's row chosen, none without a filter. */
+export function panelRows(tree: ProjectTree, doc: TaskDocument | null, state: ProjectsScreenState): ProjectsRow[] {
+	const statuses = doc ? projectStatuses(tree, doc) : new Map<string, ProjectStatus>();
+	const statusOf = (name: string): ProjectStatus => statuses.get(projectKey(name)) ?? "waiting";
+	return treeRows(tree, state, chosenNode(state, tree) ?? NO_NODE, statusOf, (node) => doc !== null && nodeReorders(node, statusOf));
+}
+
+/** A node no row is: what the rows are drawn with while nothing is chosen. */
+const NO_NODE: ProjectsNodeId = "";
+
+/** What is drawn over the tasks a node filters: its name, a project's menu, and the project a task typed there is given. */
+export interface NodeHeader {
+	readonly title: string;
+	readonly menu: ProjectMenu | null;
+	/** Null for All, No project, Done, a folder and a done project. */
+	readonly project: string | null;
+	/** Done or a done project: only closed tasks show. */
+	readonly closed: boolean;
+}
+
+/** The header of `node`, a node of the tree (`nodeIn`). */
+export function nodeHeader(node: ProjectsNodeId, tree: ProjectTree, doc: TaskDocument | null): NodeHeader {
+	const name = projectOfNode(node);
+	const placed = name === null ? null : tree.find(name);
+	if (!placed) return { title: node === "none" ? PROJECTS_WORDS.none : node === "done" ? PROJECTS_WORDS.done : PROJECTS_WORDS.all, menu: null, project: null, closed: node === "done" };
+	const done = doc !== null && projectStatuses(tree, doc).get(projectKey(placed.node.name)) === "done";
+	return {
+		title: placed.node.name,
+		menu: projectMenu(refOfPlaced(placed, false), doc !== null && hasOwnTasks(doc, placed.node.name)),
+		project: placed.node.folder || done ? null : placed.node.name,
+		closed: done,
+	};
+}
+
+/** The cross over the filtered tasks: nothing chosen. */
+export function cleared(state: ProjectsScreenState): ProjectsScreenState {
+	if (state.selected === undefined) return state;
+	const { selected: _gone, ...rest } = state;
+	return rest;
 }
 
 /** A node's list takes drops: every node but Done and a done project, whose closed tasks stay. */
@@ -307,12 +353,11 @@ function byStage(entries: readonly TaskEntry[]): TaskEntry[] {
 /** A card before its part names it (`part` gives it its id). */
 type PartCard = Omit<ProjectsCard, "id">;
 
-function cardOf(input: ProjectsInput, entry: TaskEntry, mode: ProjectsMode, from: string | null, over: string | null): PartCard {
+function cardOf(input: ProjectsInput, entry: TaskEntry, from: string | null): PartCard {
 	const item = input.item(entry);
 	return {
 		item,
-		stage: mode === "byProject" ? stageMark(entry, input.today, input.boundary) : null,
-		over: mode === "byStage" ? over : null,
+		stage: stageMark(entry, input.today, input.boundary),
 		from,
 		drop: dropOf(item, from),
 		menuFrom: menuFromOf(entry),
@@ -321,83 +366,37 @@ function cardOf(input: ProjectsInput, entry: TaskEntry, mode: ProjectsMode, from
 }
 
 /**
- * The chosen node's tasks in parts. Where cards can be dropped, every part a drop can go to shows, empty too: each stage
- * By stage, each live subproject By project, the node's own part; under Done and a done project an empty part is left out.
+ * The chosen node's tasks in parts, by project. Where cards can be dropped, every part a drop can go to shows, empty too:
+ * each live subproject, the node's own part; under Done and a done project an empty part is left out.
  */
-function sectionsOf(input: ProjectsInput, doc: TaskDocument, selected: ProjectsNodeId, mode: ProjectsMode, statusOf: (name: string) => ProjectStatus): ProjectsSection[] {
+function sectionsOf(input: ProjectsInput, doc: TaskDocument, selected: ProjectsNodeId, statusOf: (name: string) => ProjectStatus): ProjectsSection[] {
 	const name = projectOfNode(selected);
 	const placed = name === null ? null : input.tree.find(name);
-	if (placed) return projectSections(input, doc, placed, mode, statusOf);
-	if (selected === "done") return doneSections(input, doc, mode, statusOf);
+	if (placed) return projectSections(input, doc, placed, statusOf);
+	if (selected === "done") return doneSections(input, doc, statusOf);
 	if (selected === "none") {
 		const loose = tasksOf(doc).filter((entry) => entry.task.projects.length === 0 && stageOf(entry) !== "done");
-		return mode === "byProject" ? shown([part("none", null, [], 0, byStage(loose).map((e) => cardOf(input, e, mode, null, null)), inInbox(null))], true) : stageSections(input, loose.map((entry) => ({ entry, from: null, over: null })), null, true);
+		return shown([part("none", null, [], 0, byStage(loose).map((e) => cardOf(input, e, null)), inInbox(null))], true);
 	}
 	const live = input.tree.all().filter((p) => statusOf(p.node.name) !== "done");
-	if (mode === "byProject") return shown(live.map((p) => projectPart(`project:${p.node.name}`, p, p.path, p.path.length, byStage(tasksNaming(doc, p.node.name, false)).map((e) => cardOf(input, e, mode, p.node.name, null)), inInbox(p.node.name))), true);
-	const tasks = tasksOf(doc).filter((entry) => entry.task.projects.length > 0 && stageOf(entry) !== "done");
-	return stageSections(
-		input,
-		tasks.map((entry) => {
-			const first = input.tree.find(entry.task.projects[0])?.node.name ?? entry.task.projects[0];
-			return { entry, from: first, over: first };
-		}),
-		null,
-		true,
-	);
+	return shown(live.map((p) => projectPart(`project:${p.node.name}`, p, p.path, p.path.length, byStage(tasksNaming(doc, p.node.name, false)).map((e) => cardOf(input, e, p.node.name)), inInbox(p.node.name))), true);
 }
 
-/** A project's own tasks first, untitled, then each subproject's at any depth, in the tree's order; By stage, the whole branch's by stage. */
-function projectSections(input: ProjectsInput, doc: TaskDocument, placed: PlacedProject, mode: ProjectsMode, statusOf: (name: string) => ProjectStatus): ProjectsSection[] {
+/** A project's own tasks first, untitled, then each subproject's at any depth, in the tree's order. */
+function projectSections(input: ProjectsInput, doc: TaskDocument, placed: PlacedProject, statusOf: (name: string) => ProjectStatus): ProjectsSection[] {
 	const closed = statusOf(placed.node.name) === "done";
 	const top = placed.path.length;
 	const branch = input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf(p.node.name) !== "done"));
 	const write = (project: string) => (closed ? null : inInbox(project));
-	if (mode === "byProject") {
-		const own = projectPart(OWN, { ...placed, title: null }, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf(input, e, mode, placed.node.name, null)), write(placed.node.name));
-		const subs = branch.map((p) => projectPart(`project:${p.node.name}`, p, p.path.slice(top), p.path.length - top, byStage(tasksNaming(doc, p.node.name, closed)).map((e) => cardOf(input, e, mode, p.node.name, null)), write(p.node.name)));
-		return shown([own, ...subs], !closed);
-	}
-	const seen = new Set<string>();
-	const tasks: { entry: TaskEntry; from: string; over: string | null }[] = [];
-	for (const p of [placed, ...branch]) {
-		for (const entry of tasksNaming(doc, p.node.name, closed)) {
-			if (seen.has(entry.id)) continue;
-			seen.add(entry.id);
-			const own = namesProject(entry.task.projects, placed.node.name);
-			tasks.push({ entry, from: own ? placed.node.name : p.node.name, over: own ? null : p.node.name });
-		}
-	}
-	return stageSections(input, tasks, closed ? null : placed.node.name, !closed, !placed.node.folder);
+	const own = projectPart(OWN, { ...placed, title: null }, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf(input, e, placed.node.name)), write(placed.node.name));
+	const subs = branch.map((p) => projectPart(`project:${p.node.name}`, p, p.path.slice(top), p.path.length - top, byStage(tasksNaming(doc, p.node.name, closed)).map((e) => cardOf(input, e, p.node.name)), write(p.node.name)));
+	return shown([own, ...subs], !closed);
 }
 
-/** Done: each done project's closed tasks, By project; By stage, one part of them all. */
-function doneSections(input: ProjectsInput, doc: TaskDocument, mode: ProjectsMode, statusOf: (name: string) => ProjectStatus): ProjectsSection[] {
+/** Done: each done project's closed tasks. */
+function doneSections(input: ProjectsInput, doc: TaskDocument, statusOf: (name: string) => ProjectStatus): ProjectsSection[] {
 	const done = input.tree.all().filter((p) => statusOf(p.node.name) === "done");
-	if (mode === "byProject") return shown(done.map((p) => part(`project:${p.node.name}`, p.node.name, p.path, p.path.length, tasksNaming(doc, p.node.name, true).map((e) => cardOf(input, e, mode, p.node.name, null)), null)), false);
-	const seen = new Set<string>();
-	const tasks = done.flatMap((p) => tasksNaming(doc, p.node.name, true).filter((e) => !seen.has(e.id) && (seen.add(e.id), true)).map((entry) => ({ entry, from: p.node.name, over: p.node.name })));
-	return stageSections(input, tasks, null, false);
-}
-
-/**
- * By stage: Inbox, Backlog, Soon, Today (Done for closed tasks), each in the file's order; the plus there writes into
- * that list with `project` (none at all without `plus`: a folder's). `open`: the four stages show with no task too (Done
- * never does).
- */
-function stageSections(input: ProjectsInput, tasks: readonly { entry: TaskEntry; from: string | null; over: string | null }[], project: string | null, open: boolean, plus = true): ProjectsSection[] {
-	const parts = STAGE_ORDER.map((stage) => {
-		const here = tasks.filter((s) => stageOf(s.entry) === stage).sort((a, b) => fileOrder(a.entry, b.entry));
-		const title = stage === "today" ? PROJECTS_WORDS.today : stage === "done" ? PROJECTS_WORDS.done : input.listName(stage);
-		const place: NewTaskPlace | null = stage === "done" || !plus ? null : { kind: "list", list: stage === "today" ? "now" : stage, group: null, before: null };
-		return part(stage, title, [], 0, here.map((s) => cardOf(input, s.entry, "byStage", s.from, s.over)), place && { place, project });
-	});
-	return shown(parts, open).filter((s) => s.key !== "done" || !s.empty);
-}
-
-/** The file's order of two tasks of one stage: their list's order. */
-function fileOrder(a: TaskEntry, b: TaskEntry): number {
-	return a.section === b.section ? a.index - b.index : 0;
+	return shown(done.map((p) => part(`project:${p.node.name}`, p.node.name, p.path, p.path.length, tasksNaming(doc, p.node.name, true).map((e) => cardOf(input, e, p.node.name)), null)), false);
 }
 
 /** The key of a project's own part, By project. */
@@ -440,12 +439,19 @@ function shown(sections: readonly (ProjectsSection | null)[], open: boolean): Pr
 
 /** A tap on a row: the node chosen; the chosen one's branch folded or unfolded. */
 export function tapped(state: ProjectsScreenState, tree: ProjectTree, node: ProjectsNodeId): ProjectsScreenState {
-	const selected = selectedNode(state, tree);
-	if (!sameNode(selected, node)) return { ...state, selected: node };
+	const selected = chosenNode(state, tree);
+	if (selected === null || !sameNode(selected, node)) return { ...state, selected: node };
 	if (node === "done") return { ...state, doneOpen: !(state.doneOpen ?? false) };
 	const name = projectOfNode(node);
 	if (name === null || !tree.find(name)?.node.children.length) return state;
 	return withFold(state, name, !isFolded(state, name));
+}
+
+/** A tap on a row of the panel (`tapped`): on a narrow screen a tap that chose a node closes the panel, which lies over the lists. */
+export function picked(state: ProjectsScreenState, tree: ProjectTree, node: ProjectsNodeId, wide: boolean): ProjectsScreenState {
+	const next = tapped(state, tree, node);
+	const chose = next.selected !== state.selected;
+	return !wide && chose && next.panelOpen ? { ...next, panelOpen: false } : next;
 }
 
 /** A node's branch opened without choosing it: a project's fold taken off, Done's done projects shown. */

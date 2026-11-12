@@ -3,7 +3,7 @@ import type { LocalDate } from "../domain/Task";
 import type { DropColumn } from "./contracts";
 
 /**
- * A list a task's field can stand in: a funnel's column, or the Projects screen's list of the chosen node's tasks. Every
+ * A list a task's field can stand in: a funnel's column, or the Projects list, the chosen node's tasks by project. Every
  * rule of the entry that walks the lists walks `ENTRY_LISTS`, so a list added here is one it knows everywhere.
  */
 export type EntryList = DropColumn | "projects";
@@ -14,61 +14,60 @@ const LIST_SET: Readonly<Record<EntryList, true>> = { day: true, soon: true, inb
 export const ENTRY_LISTS: readonly EntryList[] = Object.keys(LIST_SET) as EntryList[];
 
 /**
- * Where the screen stands: Projects (the tree and the chosen node's tasks, a place of its own: the wheel's window holds
- * its folder alone), Inbox (Inbox over Backlog beside Soon), Soon (Soon beside the day's list), the calendar (the day's
- * list beside the timeline).
+ * Where the funnel's screen stands, as a swipe and the wheel walk it: Inbox (Inbox over Backlog beside Soon), Soon (Soon
+ * beside the day's list), the calendar (the day's list beside the timeline). Projects are no place: the tree is a panel
+ * and its chosen node filters every place (`TaskService.funnelView`).
  */
-export type ScreenPlace = "projects" | "inbox" | "soon" | "calendar";
+export type FunnelPlace = "inbox" | "soon" | "calendar";
 
-/** The places left to right, as a swipe and the wheel walk them: Projects first, left of Inbox. */
-export const SCREEN_PLACES: readonly ScreenPlace[] = ["projects", "inbox", "soon", "calendar"];
+/** The funnel's places left to right, as a swipe and the wheel walk them. */
+export const FUNNEL_PLACES: readonly FunnelPlace[] = ["inbox", "soon", "calendar"];
 
-/** The funnel's lists each place shows, in its order: Projects none. */
-export const SHOWN_LISTS: Readonly<Record<ScreenPlace, readonly DropColumn[]>> = { projects: [], inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] };
+/** Where the funnel's screen stands: one of its places, or Done left of Inbox, which only the search opens. */
+export type FunnelSpot = FunnelPlace | "done";
 
-/** The funnel's lists `place` shows (`SHOWN_LISTS`), for a host that asks a rule rather than reading the constant. */
-export function shownLists(place: ScreenPlace): readonly DropColumn[] {
-	return SHOWN_LISTS[place];
-}
-
-/** The lists a field can stand in that `place` shows, in its order: the Projects screen its own list, the others their funnel lists. */
-export function shownEntryLists(place: ScreenPlace): readonly EntryList[] {
-	return place === "projects" ? ["projects"] : SHOWN_LISTS[place];
-}
-
-/**
- * The place that shows `column`: `place` itself when it does, else the nearest that does, the left one of two as near;
- * from Projects as from Inbox, its neighbour. The Projects list shows only on Projects.
- */
-export function placeShowing(column: EntryList, place: ScreenPlace): ScreenPlace {
-	if (column === "projects") return "projects";
-	const at: ScreenPlace = place === "projects" ? "inbox" : place;
-	if (SHOWN_LISTS[at].includes(column)) return at;
-	const from = SCREEN_PLACES.indexOf(at);
-	const showing = SCREEN_PLACES.filter((other) => SHOWN_LISTS[other].includes(column));
-	return showing.reduce((best, other) => (Math.abs(SCREEN_PLACES.indexOf(other) - from) < Math.abs(SCREEN_PLACES.indexOf(best) - from) ? other : best));
-}
-
-/** Where a screen stands: one of the places, or Done between Projects and Inbox, which only the search opens. */
-export type ScreenSpot = ScreenPlace | "done";
-
-/** What the screen shows: its place and the day of its day column. */
-export interface ScreenAt {
-	readonly mode: ScreenSpot;
+/** What the funnel's screen shows: its spot and the day of its day column. */
+export interface FunnelAt {
+	readonly mode: FunnelSpot;
 	readonly date: LocalDate;
 }
 
 /**
- * Where a swipe or an arrow leads, a step back (-1) or on (1): the screens stand in one row, Projects, Inbox and Soon,
- * Soon and Now, Now and the calendar, then the calendar of each day after. Today is where the calendar meets the lists;
- * a past day walks on through the days, as a later one does. From Done the row goes on to Inbox and back to Projects;
- * nothing leads back to Done, and nothing stands before Projects.
+ * Where a swipe or an arrow leads on the funnel, a step back (-1) or on (1): Inbox and Soon, Soon and Now, Now and the
+ * calendar, then the calendar of each day after; a past day walks on through the days, as a later one does. From Done
+ * the row goes on to Inbox; nothing leads back to Done, and nothing stands before Inbox.
  */
-export function stepScreen(from: ScreenAt, shift: -1 | 1, today: LocalDate): ScreenAt | null {
+export function stepFunnel(from: FunnelAt, shift: -1 | 1, today: LocalDate): FunnelAt | null {
 	if (from.mode === "calendar" && (shift > 0 || from.date !== today)) return { mode: "calendar", date: addDays(from.date, shift) };
-	const at = from.mode === "done" ? SCREEN_PLACES.indexOf("inbox") + (shift > 0 ? 0 : -1) : SCREEN_PLACES.indexOf(from.mode) + shift;
-	return at >= 0 && at < SCREEN_PLACES.length ? { mode: SCREEN_PLACES[at], date: from.date } : null;
+	if (from.mode === "done") return shift > 0 ? { mode: "inbox", date: from.date } : null;
+	const at = FUNNEL_PLACES.indexOf(from.mode) + shift;
+	return at >= 0 && at < FUNNEL_PLACES.length ? { mode: FUNNEL_PLACES[at], date: from.date } : null;
 }
+
+/** The funnel's place that shows `column`: `spot` itself when it does (Done as Inbox), else the nearest that does, the left one of two as near. */
+export function funnelPlaceShowing(column: DropColumn, spot: FunnelSpot): FunnelPlace {
+	const at: FunnelPlace = spot === "done" ? "inbox" : spot;
+	if (SHOWN_LISTS[at].includes(column)) return at;
+	const from = FUNNEL_PLACES.indexOf(at);
+	const showing = FUNNEL_PLACES.filter((other) => SHOWN_LISTS[other].includes(column));
+	return showing.reduce((best, other) => (Math.abs(FUNNEL_PLACES.indexOf(other) - from) < Math.abs(FUNNEL_PLACES.indexOf(best) - from) ? other : best));
+}
+
+/** The app's old numbers for its places (`ribbonPlace`): Projects -1, Inbox 0, Soon 1, Today 2. */
+const OLD_NUMBERS: Readonly<Record<number, FunnelPlace>> = { [-1]: "inbox", 0: "inbox", 1: "soon", 2: "calendar" };
+
+/**
+ * The funnel's place of whatever a device kept: a place as it is; the old Projects place («projects», the app's -1) as
+ * Inbox, its neighbour; the app's old numbers; Today (the calendar) for nothing or anything else.
+ */
+export function funnelPlaceOf(saved: unknown): FunnelPlace {
+	if (typeof saved === "number") return OLD_NUMBERS[saved] ?? "calendar";
+	if (saved === "projects") return "inbox";
+	return FUNNEL_PLACES.includes(saved as FunnelPlace) ? (saved as FunnelPlace) : "calendar";
+}
+
+/** The funnel's lists each place shows, in its order. */
+export const SHOWN_LISTS: Readonly<Record<FunnelPlace, readonly DropColumn[]>> = { inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] };
 
 /** A finger let go this fast, px per ms, sends the screen the way it went, however little of the way it was drawn. */
 export const SWIPE_FLICK_SPEED = 0.3;

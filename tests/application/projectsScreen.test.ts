@@ -6,6 +6,7 @@ import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
 import { UndoHistory } from "../../core/application/UndoHistory";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
+import { hoverRow } from "../fakes/projectsHover";
 
 const T = "2026-11-11";
 const clock: Clock = { now: () => new Date(2026, 10, 11, 12, 0) };
@@ -104,8 +105,8 @@ describe("the tree", () => {
 
 	it("shows the done projects under Done once it is tapped open; a new task brings one back", async () => {
 		const { svc, store } = setup();
-		await svc.tapProjectNode("done");
-		await svc.tapProjectNode("done");
+		await svc.pickProjectNode("done", true);
+		await svc.pickProjectNode("done", true);
 		const open = await svc.projectsScreen();
 		expect(open.rows.slice(-2).map((r) => [r.title, r.depth, r.canLift])).toEqual([
 			["Done", 0, false],
@@ -117,9 +118,9 @@ describe("the tree", () => {
 
 	it("a tap chooses a node; a tap on the chosen one folds its branch", async () => {
 		const { svc } = setup();
-		await svc.tapProjectNode("project:Окружение в Сербии");
+		await svc.pickProjectNode("project:Окружение в Сербии", true);
 		expect((await svc.projectsScreen()).selected).toBe("project:Окружение в Сербии");
-		await svc.tapProjectNode("project:Окружение в Сербии");
+		await svc.pickProjectNode("project:Окружение в Сербии", true);
 		const folded = await svc.projectsScreen();
 		expect(row(folded, "Окружение в Сербии")).toMatchObject({ folded: true, unfoldsOnHover: true });
 		expect(folded.rows.map((r) => r.title)).not.toContain("Где знакомиться");
@@ -141,7 +142,7 @@ describe("a project's tasks", () => {
 			["Свидание", 1, ["Свидание: в каком формате искать"]],
 		]);
 		expect(view.sections[0].cards.map((c) => c.stage)).toEqual([{ kind: "soon" }, { kind: "today" }]);
-		expect(view.sections[3].cards[0]).toMatchObject({ stage: { kind: "inbox" }, from: "Свидание", menuFrom: "inbox", over: null });
+		expect(view.sections[3].cards[0]).toMatchObject({ stage: { kind: "inbox" }, from: "Свидание", menuFrom: "inbox" });
 		expect(view.sections[1].newTask).toEqual({ place: { kind: "list", list: "inbox", group: null, before: null }, project: "Где знакомиться" });
 		expect(view.sections[0].cards[0].item.project).toMatchObject({ name: "Окружение в Сербии", mark: false });
 	});
@@ -154,29 +155,11 @@ describe("a project's tasks", () => {
 		expect(card.stage).toEqual({ kind: "date", date: "2026-11-14", label: { day: "14", month: "NOV" } });
 	});
 
-	it("By stage: Inbox, Backlog, Soon, Today, each card with the subproject it is in", async () => {
+	it("No project gives its tasks without one; Done the done projects' tasks", async () => {
 		const { svc } = setup();
-		await svc.selectProjectNode("project:Окружение в Сербии");
-		await svc.setProjectsMode("byStage");
-		const view = await svc.projectsScreen();
-		expect(view.sections.map((s) => [s.title, s.cards.map((c) => [c.item.title, c.over])])).toEqual([
-			["Inbox", [["Свидание: в каком формате искать", "Свидание"]]],
-			["Backlog", [["Активности как ЛШ", "Где знакомиться"]]],
-			["Soon", [["Брейншторм плана с Клодом", null], ["Найти мероприятия для друзей", "Где знакомиться"]]],
-			["Today", [["Самолет: чекнуть отмену", null]]],
-		]);
-		expect(view.sections[3].newTask).toEqual({ place: { kind: "list", list: "now", group: null, before: null }, project: "Окружение в Сербии" });
-	});
-
-	it("All By stage gives each card its project; No project its tasks without one; Done the done projects' tasks", async () => {
-		const { svc } = setup();
-		await svc.setProjectsMode("byStage");
-		const all = await svc.projectsScreen();
-		expect(all.sections[3].cards.map((c) => c.over)).toEqual(["Окружение в Сербии"]);
-		await svc.tapProjectNode("none");
+		await svc.pickProjectNode("none", true);
 		expect((await svc.projectsScreen()).sections.flatMap((s) => titles(s.cards))).toEqual(["Без проекта"]);
-		await svc.setProjectsMode("byProject");
-		await svc.tapProjectNode("done");
+		await svc.pickProjectNode("done", true);
 		const done = await svc.projectsScreen();
 		expect(done.sections.map((s) => [s.title, titles(s.cards)])).toEqual([["Самолёт", ["Купить билет"]]]);
 		expect(done.newTask).toBeNull();
@@ -186,7 +169,7 @@ describe("a project's tasks", () => {
 		const { svc } = setup();
 		await svc.selectProjectNode("project:Дружба");
 		expect((await svc.projectsScreen()).menu).toMatchObject({ renameLabel: "Rename", noteLabel: "Note", note: { link: "Моя заметка о дружбе", name: "Моя заметка о дружбе" }, detachLabel: "Detach" });
-		await svc.tapProjectNode("all");
+		await svc.pickProjectNode("all", true);
 		expect((await svc.projectsScreen()).menu).toBeNull();
 	});
 });
@@ -352,17 +335,15 @@ describe("the one move to projects, whatever the first write is", () => {
 });
 
 describe("the frontends' follow-ups", () => {
-	it("a held card unfolds a folded branch without choosing it", async () => {
+	it("the held plus unfolds a folded branch without choosing it", async () => {
 		const { svc } = setup();
-		await svc.tapProjectNode("project:Окружение в Сербии");
-		await svc.tapProjectNode("project:Окружение в Сербии");
-		await svc.tapProjectNode("all");
-		await svc.unfoldProjectNode("project:Окружение в Сербии");
+		await svc.pickProjectNode("project:Окружение в Сербии", true);
+		await svc.pickProjectNode("project:Окружение в Сербии", true);
+		await svc.pickProjectNode("all", true);
+		await hoverRow(svc, "project:Окружение в Сербии", true);
 		const view = await svc.projectsScreen();
 		expect(row(view, "Окружение в Сербии")).toMatchObject({ folded: false, selected: false });
 		expect(view.selected).toBe("all");
-		await svc.unfoldProjectNode("done");
-		expect((await svc.projectsScreen()).rows.map((r) => r.title)).toContain("Самолёт");
 	});
 
 	it("toggleProject answers the tasks as they then stand", async () => {
@@ -379,8 +360,8 @@ describe("the frontends' follow-ups", () => {
 	});
 
 	it("No project, Done, a project with no open task in its branch and a done one are drawn grey; one with an open task anywhere is not", async () => {
-		const { svc } = setup();
-		await svc.unfoldProjectNode("done");
+		const { svc, state } = setup();
+		state.set({ ...state.get(), doneOpen: true });
 		const view = await svc.projectsScreen();
 		expect(["All", "Окружение в Сербии", "Спорт", "Новый", "No project", "Done", "Самолёт"].map((t) => row(view, t).muted)).toEqual([false, false, false, true, true, true, true]);
 	});

@@ -126,18 +126,6 @@ describe("bulk actions", () => {
 		expect(bulk.selection.size).toBe(0);
 	});
 
-	it("lets the picked cards go once several are dropped, keeps them for one carried alone", () => {
-		const bulk = controller();
-		const [a, b] = cards([item(), item()]);
-		bulk.selection.toggle(a);
-		bulk.selection.toggle(b);
-		const drag: TaskDragPayload = { item: a.item, from: "day", grabPx: 0 };
-		bulk.dropping(drag);
-		expect(bulk.selection.size).toBe(2);
-		bulk.dropping({ ...drag, carried: [{ item: b.item, from: "soon" }] });
-		expect(bulk.selection.size).toBe(0);
-	});
-
 	it("sends the picked tasks to a section in one call and lets them go", async () => {
 		const toSection = vi.fn(async () => {});
 		const menu = vi.fn((picked: readonly PickedTask[]) => ({ ...taskMenu(picked.map((p) => p.item), T, LEVELS, [], null, { kind: "bulk" }), edits: ["section" as const], sections: { choice: { names: ["Work"], current: null, ungrouped: "No section" }, options: [{ name: "Work", checked: false }, { name: null, checked: true }], create: false } }));

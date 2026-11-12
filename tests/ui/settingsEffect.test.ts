@@ -42,9 +42,8 @@ describe("settingsEffect", () => {
 		}
 	});
 
-	it("redraws the frame for the divider or the column shown, set by another view", () => {
+	it("redraws the frame for the divider, set by another view (the place shown is the core's)", () => {
 		expect(after({ listShare: 0.3 })).toEqual({ ...NOTHING, frame: true });
-		expect(after({ rightMode: "soon" })).toEqual({ ...NOTHING, frame: true });
 	});
 
 	it("nothing for the zoom", () => {

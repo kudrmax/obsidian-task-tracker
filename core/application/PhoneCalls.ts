@@ -20,7 +20,10 @@ import { dayMonth, dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
-import { type EntryList, placeShowing, SCREEN_PLACES, type ScreenAt, SHOWN_LISTS, shownEntryLists, shownLists, stepScreen, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { type EntryList, FUNNEL_PLACES, type FunnelAt, type FunnelPlace, type FunnelSpot, funnelPlaceOf, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { ROW_LISTS, VIEW_WORDS, viewEntryLists, withMode } from "./viewModes";
+import { stackedRows } from "./stackedRows";
+import { carriedAt, carryEnded, carryStarted, endsSelection, gestureGone, nameEnded } from "./projectsCarry";
 import { type EntryPart, projectsEntryLook } from "./projectsEntry";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
@@ -32,6 +35,7 @@ import {
 	type GroupedList,
 	type ProjectNote,
 	type ProjectsScreenState,
+	type ViewMode,
 	StaleTaskError,
 	type SourceProblem,
 	type SourceStatus,
@@ -57,7 +61,7 @@ import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
 import { projectsPlusTakes, projectsTakes } from "./projectsDrop";
-import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { chosenNode, cleared, PROJECTS_HOVER_MS, PROJECTS_INDENT, panelRows, picked, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -179,6 +183,8 @@ export interface WireLook {
 	readonly shown: readonly EntryList[];
 	/** The parts of a list that decides its own writes: the Projects list's, `rules.projectsEntryLook`'s `parts`. */
 	readonly parts?: Partial<Record<EntryList, readonly EntryPart[]>>;
+	/** The screen's filter (`funnelView`'s `filter`: its `node` and `project`), null or left out for none (`EntryLook.filter`). */
+	readonly filter?: { readonly node: string; readonly project: string | null } | null;
 }
 
 class DoorError extends Error {
@@ -372,8 +378,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	isBlank: (c, [text]) => c.reads.isBlank(text as string),
 	withPriority: (c, [text, prefix]) => c.reads.withPriority(text as string, (prefix ?? null) as string | null),
 	draftMarks: (c, [text, priority, labels]) => c.reads.draftMarks(text as string, (priority ?? null) as string | null, (labels ?? []) as string[]),
-	screen: (c, [date]) => c.ask(c.reads.screenRead(date as string)),
-	dayView: (c, [date]) => c.reads.dayView(KEPT(c), date as string),
+	screen: (c, [date, filter]) => c.ask(c.reads.screenRead(date as string, filter as A)),
+	dayView: (c, [date, filter]) => c.reads.dayView(KEPT(c), date as string, filter as A),
 	soonWithoutDateView: (c) => c.reads.soonWithoutDateView(KEPT(c)),
 	inboxView: (c) => c.reads.inboxView(KEPT(c)),
 	backlogView: (c) => c.reads.backlogView(KEPT(c)),
@@ -390,8 +396,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	createInList: (c, [date, text]) => c.run(c.writes.createInList(date as string, text as string)),
 	createInSoon: (c, [text]) => c.run(c.writes.createInSoon(text as string)),
 	createAtTime: (c, [date, start, text]) => c.run(c.writes.createAtTime(date as string, start as number, text as string)),
-	createInPlace: (c, [text, priority, place, repeat, labels, project]) => c.run(c.writes.createInPlace(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A, project as string | null | undefined)),
-	createWithId: (c, [text, priority, place, repeat, labels, project]) => c.run(c.writes.createWithId(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A, project as string | null | undefined)),
+	createInPlace: (c, [text, priority, place, repeat, labels, project, filter]) => c.run(c.writes.createInPlace(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A, project as string | null | undefined, filter as A)),
+	createWithId: (c, [text, priority, place, repeat, labels, project, filter]) => c.run(c.writes.createWithId(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A, project as string | null | undefined, filter as A)),
 	create: (c, [draft, slot]) => c.run(c.writes.create(draft as A, (slot ?? undefined) as A)),
 	createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent as A, draft as A)),
 	edit: (c, [key, draft]) => c.run(c.writes.edit(key as A, draft as A)),
@@ -410,17 +416,59 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps as A)),
 	setProject: (c, [keys, project]) => c.run(c.writes.setProject(keys as A, (project ?? null) as string | null)),
 	projects: (c) => c.reads.projects(),
-	unfoldProjectNode: (c, [node]) => c.keepProjectsScreen(unfolded(c.projectsScreen, node as string)),
 	toggleProject: (c, [keys, name]) => c.run(c.writes.toggleProject(keys as A, name as string)),
 	newProject: (c, [name, keys]) => {
 		const made = c.run(c.writes.newProject(name as string, (keys ?? []) as A));
 		return made === null ? null : new ProjectIndex(c.tree()).refOf(made);
 	},
-	projectsScreen: (c) => c.ask(c.reads.projectsScreenRead()),
-	tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node as string)),
+	projectsScreen: (c, [node]) => c.ask(c.reads.projectsScreenRead((node ?? undefined) as string | undefined)),
+	funnelView: (c, [wide]) => c.ask(c.reads.funnelViewRead(wide === true)),
+	projectNoteView: (c, [path, wide]) => c.ask(c.reads.projectNoteViewRead(path as string, wide === true)),
+	pickProjectNode: (c, [node, wide]) => c.keepProjectsScreen(picked(c.projectsScreen, c.tree(), node as string, wide === true)),
+	firstView: (c, [wide, note]) => {
+		if (note !== true) c.keepProjectsScreen(gestureGone(c.projectsScreen));
+		return c.reads.firstView(wide === true, note === true);
+	},
+	filterHides: (c, [item, filter]) => c.ask(c.reads.filterHidesRead(item as A, (filter ?? null) as string | null)),
+	startCarry: (c, [start, wide]) => c.keepProjectsScreen(carryStarted(c.projectsScreen, start as A, wide === true, c.tree())),
+	carryAt: (c, [at, nowMs]) => {
+		const doc = c.hasTasks() ? c.snapshot().doc : null;
+		const { state, wait } = carriedAt(c.projectsScreen, at as A, nowMs as number, c.tree(), doc);
+		c.keepProjectsScreen(state);
+		return { wait };
+	},
+	carryOnNode: (c, [node]) => {
+		const carry = c.projectsScreen.carry;
+		const target = node === "none" ? null : projectOfNode(node as string);
+		if (target !== null || node === "none") {
+			if (carry?.cards && carry.cards.length > 0) c.run(c.writes.dropOnProject(carry.cards, target));
+			else if (carry && carry.keys.length > 0) c.run(c.writes.dropTasksOnProject(carry.keys, target, carry.under));
+		}
+		c.keepProjectsScreen(carryEnded(c.projectsScreen, "dropped", c.tree(), c.hasTasks() ? c.snapshot().doc : null));
+		return null;
+	},
+	endCarry: (c, [how]) => c.keepProjectsScreen(carryEnded(c.projectsScreen, how as A, c.tree(), c.hasTasks() ? c.snapshot().doc : null)),
+	endProjectName: (c) => c.keepProjectsScreen(nameEnded(c.projectsScreen)),
+	setFunnelPlace: (c, [place]) => {
+		const at = funnelPlaceOf(place);
+		if (c.projectsScreen.place !== at) c.keepProjectsScreen({ ...c.projectsScreen, place: at });
+	},
+	firstPlace: (c) => {
+		c.keepProjectsScreen(gestureGone(c.projectsScreen));
+		return funnelPlaceOf(c.projectsScreen.place);
+	},
+	clearProjectFilter: (c) => c.keepProjectsScreen(cleared(c.projectsScreen)),
+	setProjectsPanel: (c, [open]) => {
+		if ((c.projectsScreen.panelOpen === true) !== (open === true)) c.keepProjectsScreen({ ...c.projectsScreen, panelOpen: open === true });
+	},
+	setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode as ViewMode, chosenNode(c.projectsScreen, c.tree()) !== null)),
+	setNoteViewMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, noteView: mode as ViewMode }),
+	dropTasksOnProject: (c, [keys, to, filter]) => {
+		const target = to === "none" ? null : projectOfNode(to as string);
+		if (target === null && to !== "none") return null;
+		return c.run(c.writes.dropTasksOnProject(keys as A, target, (filter ?? null) as string | null));
+	},
 	selectProjectNode: (c, [node]) => c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, node as string)),
-	hoverProjectNode: (c, [node]) => c.keepProjectsScreen(hovered(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, c.ask(c.reads.projectsScreenRead()).rows, node as string)),
-	setProjectsMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, mode: mode as A }),
 	createProject: (c, [name, place]) => {
 		const made = c.run(c.writes.createProject(name as string, place as A));
 		if (made === null) return null;
@@ -433,8 +481,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 		if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from as string, c.rules.cleanName(to as string)!));
 		return renamed;
 	},
-	dropInProjects: (c, [cards, place]) => c.run(c.ask(c.writes.dropInProjects(cards as A, place as A))),
-	projectsDropPreview: (c, [cards, place]) => c.ask(c.writes.projectsDropPreview(cards as A, place as A)),
+	dropInProjects: (c, [cards, place, node]) => c.run(c.ask(c.writes.dropInProjects(cards as A, place as A, (node ?? undefined) as string | undefined))),
+	projectsDropPreview: (c, [cards, place, node]) => c.ask(c.writes.projectsDropPreview(cards as A, place as A, (node ?? undefined) as string | undefined)),
 	deleteProject: (c, [name]) => c.run(c.writes.deleteProject(name as string)),
 	setProjectFolder: (c, [name, folder]) => c.run(c.writes.setProjectFolder(name as string, folder === true)),
 	setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name as string, (link ?? null) as string | null)),
@@ -487,9 +535,9 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list as A, group as string)),
 	createSection: (c, [name, place]) => c.run(c.writes.createSection(name as string, place as A)),
 	applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps as A)),
-	drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks as A, to as A, day as string))),
-	landing: (c, [tasks, to, day]) => c.ask(c.writes.landing(tasks as A, to as A, day as string)),
-	dropPreview: (c, [tasks, to, day]) => c.ask(c.writes.dropPreview(tasks as A, to as A, day as string)),
+	drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks as A, to as A, day as string, filter as A))),
+	landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks as A, to as A, day as string, filter as A)),
+	dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks as A, to as A, day as string, filter as A)),
 	normalize: (c) => c.normalize(),
 	createFile: (c) => {
 		if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -500,6 +548,37 @@ const TASKS: Readonly<Record<string, Handler>> = {
 /** The TaskService methods the door leaves to the host: it is the host that watches its files. */
 export const HOST_TASK_METHODS: readonly string[] = ["onChange"];
 
+/**
+ * Door names an app may still call whose methods left the services (CLAUDE.md: the door keeps its functions' names),
+ * each a thin mapping onto the rules that replaced it; no frontend of this repository calls them.
+ */
+const KEPT_TASKS: Readonly<Record<string, Handler>> = {
+	/** `pickProjectNode` on a wide screen. */
+	tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node as string)),
+	/** A folded branch opened without choosing its node. */
+	unfoldProjectNode: (c, [node]) => c.keepProjectsScreen(unfolded(c.projectsScreen, node as string)),
+	/** A held card's pause over a row, as `carryAt` acts on it. */
+	hoverProjectNode: (c, [node]) => {
+		const doc = c.hasTasks() ? c.snapshot().doc : null;
+		c.keepProjectsScreen(hovered(c.projectsScreen, c.tree(), doc, panelRows(c.tree(), doc, c.projectsScreen), node as string));
+	},
+	/** By stage went: nothing to keep. */
+	setProjectsMode: () => null,
+};
+
+/** The door's old `tasks.*` names, kept answering: not `TaskService` methods. */
+export const KEPT_TASK_NAMES: readonly string[] = Object.keys(KEPT_TASKS);
+
+/** The old places as the funnel's: the Projects place reads as Done (nothing back, Inbox on) or as Inbox. */
+const oldSpot = (place: unknown): FunnelSpot => (place === "projects" ? "inbox" : (place as FunnelSpot));
+
+/** Door names of the old ribbon with Projects, kept answering as thin mappings onto the funnel's rules. */
+const KEPT_RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
+	placeShowing: (column, place) => (column === "projects" ? oldSpot(place) : funnelPlaceShowing(column, oldSpot(place))),
+	shownLists: (place) => SHOWN_LISTS[place as FunnelPlace] ?? [],
+	shownEntryLists: (place) => (place === "projects" ? ["projects"] : (SHOWN_LISTS[place as FunnelPlace] ?? [])),
+};
+
 function boundaryOf(c: Call): DayBoundary {
 	return c.rules.moment().boundary;
 }
@@ -508,7 +587,7 @@ const DAYS: Readonly<Record<string, Handler>> = {
 	today: (c) => c.rules.today(),
 	relation: (c, [date]) => dayRelation(date as string, c.rules.today()),
 	step: (_c, [date, days]) => addDays(date as string, days as number),
-	stepScreen: (c, [from, shift]) => stepScreen(from as ScreenAt, shift as -1 | 1, c.rules.today()),
+	stepFunnel: (c, [from, shift]) => stepFunnel(from as FunnelAt, shift as -1 | 1, c.rules.today()),
 	openAt: (c, [date]) => dayOpening(date as string, boundaryOf(c), c.rules.today(), c.now, c.settings.scrollToHour),
 	/** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
 	boundary: (c) => ({ startHour: boundaryOf(c).startHour }),
@@ -803,10 +882,12 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	placeAt: (cards, y, level, shift, room, heads, held, hysteresis) => placeAt(cards, y, level, shift, room ?? null, heads ?? [], held ?? null, hysteresis ?? 0),
 	branchOf,
 	gapBranch,
-	placeShowing,
 	swipeLanding,
-	shownLists,
-	shownEntryLists,
+	funnelPlaceShowing,
+	funnelPlaceOf,
+	endsSelection,
+	stackedRows,
+	viewEntryLists,
 	projectsEntryLook,
 	wholeWidth,
 	grownStart,
@@ -819,7 +900,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+const CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {
@@ -836,6 +917,7 @@ function lookOf(c: Call, look: WireLook): EntryLook {
 		today: () => c.rules.today(),
 		shown: () => look.shown,
 		parts: (column) => look.parts?.[column] ?? [],
+		filter: () => look.filter ?? null,
 	};
 }
 
@@ -948,8 +1030,11 @@ export function noteUrl(link: string, vault: string): string {
 }
 
 const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
-	tasks: TASKS,
-	days: DAYS,
+	tasks: { ...TASKS, ...KEPT_TASKS },
+	days: { ...DAYS, stepScreen: (c, [from, shift]) => {
+		const at = from as { readonly mode: string; readonly date: string };
+		return stepFunnel({ mode: at.mode === "projects" ? "done" : (at.mode as FunnelSpot), date: at.date }, shift as -1 | 1, c.rules.today());
+	} },
 	boundary: BOUNDARY,
 	calendars: CALENDARS,
 	history: HISTORY,
@@ -964,7 +1049,7 @@ const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	timeline: TIMELINE,
 	notes: NOTES,
 	projects: PROJECTS,
-	rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c: Call, args: unknown[]) => fn(...args)])), constants: () => CONSTANTS },
+	rules: { ...Object.fromEntries(Object.entries({ ...RULES, ...KEPT_RULES }).map(([name, fn]) => [name, (_c: Call, args: unknown[]) => fn(...args)])), constants: () => CONSTANTS },
 };
 
 /**
@@ -975,8 +1060,8 @@ export type DoorCoverage = { readonly space: string; readonly host: readonly str
 
 /** Every interface of contracts.ts with a method: where the door answers it, or why a host keeps it. */
 export const DOOR_COVERAGE: Readonly<Record<string, DoorCoverage>> = {
-	TaskService: { space: "tasks", host: HOST_TASK_METHODS },
-	DayService: { space: "days", host: HOST_DAY_METHODS },
+	TaskService: { space: "tasks", host: HOST_TASK_METHODS, own: KEPT_TASK_NAMES },
+	DayService: { space: "days", host: HOST_DAY_METHODS, own: ["stepScreen"] },
 	UndoService: { space: "history", host: ["onChange"] },
 	CalendarService: { space: "calendars", host: HOST_CALENDAR_METHODS, own: PHONE_CALENDAR_METHODS },
 	SettingsService: { space: "settings", host: HOST_SETTINGS_METHODS },

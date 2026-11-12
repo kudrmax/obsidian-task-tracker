@@ -36,7 +36,7 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	dayHours: "--tc-day-hours",
 	labelLift: "--tc-label-lift",
 	minorLift: "--tc-minor-lift",
-	columnsTop: "--tc-columns-top",
+	columnsTop: "--tc-columns-head",
 	timelineOffset: "--tc-timeline-top",
 	dividerWidth: "--tc-divider",
 	floatWidth: "--tc-float-w",
@@ -165,6 +165,8 @@ export const LAYOUT = {
 	swipeEdgeGive: 0.55,
 	/** The list scrolls a field typed in at least this far above the bar. */
 	fieldOverBar: 16,
+	/** On the phone a card held this close to the screen's left edge slides the projects' panel out (board T5). */
+	panelEdge: 24,
 } as const;
 
 /** A token's number, read from the stylesheet so it stays the one source: `150ms` → 150, `12px` → 12. */

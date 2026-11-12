@@ -71,8 +71,8 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 - `step`: the write is an action undo takes back; tidying is none. With it comes `history`.
 - `settings`: the call changed the settings (a calendar shown or hidden; the phone carrying the old choice of calendars
   over, once). The host writes this text as `data.json`; every key it does not know is kept.
-- `projectsScreen`: the call changed what this device keeps of the Projects screen (`tasks.tapProjectNode`,
-  `tasks.selectProjectNode`, `tasks.hoverProjectNode`, `tasks.setProjectsMode`, `tasks.createProject`,
+- `projectsScreen`: the call changed what this device keeps of the Projects screen (`tasks.pickProjectNode`,
+  `tasks.selectProjectNode`, `tasks.startCarry`, `tasks.carryAt`, `tasks.createProject`,
   `tasks.renameProject`). The host keeps it on
   the device, never synced, and hands it in again.
 - `ids`: who the tasks and sections are after the call (`TaskIdState` in `core/application/TaskIdentity.ts`: the
@@ -250,13 +250,11 @@ as one tree, the first name winning, and is written back as one under the first 
   `ProjectsView` the drop leaves (equal to the next `projectsScreen`), each landing `{ kind: "card", id, item, card,
   section, index }` (the part it was dropped in first), `{ kind: "subtask", id, item, parent, index }` or
   `{ kind: "away", id, item: null }`.
-- `tasks.tapProjectNode(node)`: a node not chosen is chosen; the chosen one folds or unfolds its branch (Done opens its
-  done projects). `tasks.unfoldProjectNode(node)`: the branch opened without choosing it, for a card held over a folded
-  row (`unfoldsOnHover`). `tasks.hoverProjectNode(node)`: a card held `PROJECTS_HOVER_MS` over a row, in one call: its
-  branch unfolds if `unfoldsOnHover`, and it is chosen if `opensOnHover` (a live project or No project, not the chosen
-  row; never All, Done or a done project), the mode kept; `tasks.hoverProjectNode("project:Спорт")` shows Спорт's tasks
-  under the held card. `ProjectsRow.muted`: the name drawn grey (a waiting or done project, No project, Done). `tasks.selectProjectNode(node)`: chosen, the branches above it opened (a search hit's path, a card's
-  folder). `tasks.setProjectsMode("byProject" | "byStage")`. Each answers `projectsScreen`.
+- A tap on a row is `tasks.pickProjectNode(node, wide)`; a held card's pause over a row is the carry's
+  (`tasks.carryAt`): its branch unfolds if `unfoldsOnHover`, and it is chosen if `opensOnHover` (a live project or No
+  project, not the chosen row; never All, Done or a done project). `ProjectsRow.muted`: the name drawn grey (a waiting or done project, No project, Done). `tasks.selectProjectNode(node)`: chosen, the branches above it opened (a search hit's path, a card's
+  folder). Each answers `projectsScreen`. `ProjectsView` has no `mode`/`modes` any more (By stage went: it is the rows
+  mode); `ProjectsCard.over` is gone.
 - `tasks.createProject(name, { parent, before })`: the plus let go in the tree; answers the `ProjectRef` (chosen at
   once), `null` for a blank name or one the tree has. `tasks.moveProject(name, place)`: a project lifted and let go.
   The place comes from `rules.projectsGap(rows, gap, depth, lifted?)` → `{ place, depth }` (`gap` before row `gap`, the
@@ -295,6 +293,108 @@ as one tree, the first name winning, and is written back as one under the first 
 - `tasks.fullTree(item).project`: the task's first project; a tap opens the Projects screen on it
   (`tasks.selectProjectNode(rules.projectNodeOf(name))`).
 
+#### Projects as one view with the funnel (2026-11-12)
+
+The tree is a panel over the funnel, no place of the ribbon: its chosen node filters every list. Everything below only
+adds to the calls above; the old ones answer as before.
+
+- `tasks.funnelView(wide)` → `FunnelView` `{ filter, view, panel }`: `filter` `null` or `ProjectFilter` `{ node, title,
+  menu, clearable, project, emptyLabel }` (the chosen node: its name big over the tasks, the project menu, the cross, the
+  project a task typed under it gets, «No tasks»); `view` `ViewChoice` `{ mode, modes, icon, wheel, rows }` (the mode
+  `"twoColumns" | "allColumns" | "rows" | "byProject"`, the view button's menu `[{ mode, label, icon, checked }]`, the
+  button's Lucide icon, `wheel` true in two columns alone, `rows` `["inbox", "backlog", "soon", "day"]` in rows); `panel`
+  `{ rows, open, docked, missing }` (the tree's `ProjectsRow`s, the filter's row `selected`, none without one; `docked`
+  is `wide`). `wide`: the host's screen is wide (desktop): only then is All columns offered, and Two columns is named
+  «Columns» on a narrow one. Example: `tasks.funnelView(false)` → `{ filter: null, view: { mode: "twoColumns", wheel:
+  true, … }, panel: { open: false, docked: false, … } }`.
+- `tasks.screen(date, filter?)`: `filter` the `ProjectFilter.node` (null or left out: none): every list, the timeline and
+  Done only the node's tasks, a subtask with its task. Example: `tasks.screen("2026-11-12", "project:Стиль")`.
+- `tasks.drop(tasks, to, day, filter?)`, `tasks.landing(…, filter?)`, `tasks.dropPreview(…, filter?)`,
+  `tasks.createInPlace(text, priority, place, repeat, labels, project, filter?)`, `tasks.createWithId(…, filter?)`: under
+  a filter a drop or a new task at a section's end (`before: null`) goes right after the last task of that section the
+  filter shows; the preview reads the filtered screen. Example: `tasks.drop([{ key, from: "soon" }], { kind: "place",
+  column: "inbox", place: { kind: "task", group: null, before: null } }, "2026-11-12", "project:Стиль")`.
+- `tasks.pickProjectNode(node, wide)`: a tap on a panel row (`tapProjectNode`; on a narrow screen a tap that chose a
+  node also closes the panel). `tasks.clearProjectFilter()`: the cross. `tasks.setProjectsPanel(open)`: the projects
+  button. `tasks.setViewMode(mode)`: a pick in the view button's menu, kept apart with and without a filter.
+  `tasks.setNoteViewMode(mode)`: the same in a note's block. Each answers `projectsScreen`.
+- `tasks.dropTasksOnProject(keys, to, filter)`: funnel cards let go on a panel row; the project each is shown by under
+  `filter` gives way to the row's (no filter, All: its first project). Example: `tasks.dropTasksOnProject([key],
+  "project:Дружба", "project:Стиль")`.
+- `tasks.projectsScreen(node?)`: with `node`, that node's tasks by project whatever the device chose (the by project
+  mode). `tasks.dropInProjects(cards, place, node?)`, `tasks.projectsDropPreview(cards, place, node?)` read that list;
+  `NewTaskPlace` `{ kind: "projects", …, node? }` too.
+- `tasks.projectNoteView(path, wide)`: the block at the end of a project's note (`path` from the vault's folder):
+  `FunnelView` with the note's project as `filter` (`clearable` false), `panel` null, modes Rows and By project, Rows
+  first; null for a note no project has. Example: `tasks.projectNoteView("Заметки/Стиль.md", true)`.
+- `ProjectsScreenState` gains `panelOpen`, `view`, `filteredView`, `noteView`; `selected` left out now means no filter
+  (the old Projects screen still shows All for it).
+- `days.stepFunnel({ mode, date }, shift)`: the swipe on the funnel without Projects (`"inbox" | "soon" | "calendar" |
+  "done"`): null back from Inbox and from Done, Done on to Inbox. `rules.funnelPlaceShowing(column, spot)`,
+  `rules.viewEntryLists(mode, spot)` (the quick entry's `look.shown`: two columns the place's lists, rows and all columns
+  all four, by project `["projects"]`). `rules.constants` adds `FUNNEL_PLACES`, `ROW_LISTS`, `VIEW_WORDS`.
+- The quick entry's `look` adds `filter`: `{ node, project }` from `funnelView().filter` (or null): a new task's field
+  starts with `project`, and its `createInPlace` call carries `node` as the filter (or as `node` of a Projects place).
+- `ViewChoice.emptyLabel` («No tasks»): an empty list's words in every view, with a filter or without.
+  `ViewChoice.plates` `{ inbox, backlog, soon, day }`: each list's No tasks plate while it draws no card, its words under
+  a filter and in rows, null in two and all columns without a filter.
+- `tasks.firstView(wide, note)` → `ViewChoice`: the view before the first read, from the device's state alone (its kept
+  mode; a node chosen counts as a filter; `note` the note's block). Example: `tasks.firstView(false, false)` → `{ mode:
+  "twoColumns", wheel: true, … }`.
+- `tasks.filterHides(item, filter)` → boolean: the filter hides that task (a search's find, a subtask by its task, a
+  timeline or Done task): true → `tasks.clearProjectFilter()` before showing it. Example: `tasks.filterHides(hit.item,
+  "project:Стиль")` → `true`.
+- `tasks.dayView(date, filter?)`: `tasks.screen(date, filter).day`.
+- **The carry to a project is the core's.** The frontend reports the finger, the core keeps the session in
+  `ProjectsScreenState.carry` (the app hands it back as any `projectsScreen`):
+  - `tasks.startCarry({ keys, cards?, plus? }, wide)` at the lift (a funnel's cards by their keys, a by project list's by
+    `ProjectsCard.drop`, or the plus); the core records the filter it is lifted under. A section or a project lifted in
+    the tree starts none.
+  - `tasks.carryAt({ edge, node }, nowMs)` → `{ wait }` on every move (and again after `wait` ms while the finger stays):
+    `edge` the finger is within the left edge, `node` the panel row under it. After `PROJECTS_HOVER_MS` at a narrow
+    screen's edge the panel comes out (`panel.reason` `"carry"`); over a row as long, it unfolds and a card opens it (the
+    plus only unfolds). Example: `tasks.carryAt({ edge: true, node: null }, 1000)` → `{ wait: 600 }`.
+  - `tasks.carryOnNode(node)`: let go on a row: every carried task to that project (by project cards by their drops,
+    funnel cards under the lift's filter), the carry ends.
+  - `tasks.endCarry("nowhere" | "dropped" | "naming")`: let go nowhere or cancelled puts the lift's filter back (none
+    included); dropped in a list keeps the screen; the plus let go in the tree keeps the panel out (`reason` `"naming"`)
+    until `tasks.endProjectName()`.
+  - A carry never outlives its gesture: `tasks.firstPlace()` and the main screen's `tasks.firstView(wide, false)` (the
+    app's first asks; the plugin's service as it is made) drop a carry or a name left in the state, as let go nowhere:
+    no panel, the lift's filter back.
+  - `ProjectsPanel.open` is now true for any reason, `ProjectsPanel.reason` `"button" | "carry" | "naming" | null` says
+    which.
+- **The place is the core's:** `tasks.setFunnelPlace(place)` keeps where the screen stands (anything: an old
+  `"projects"`, the app's old `ribbonPlace` numbers, read by `rules.funnelPlaceOf`: Projects and -1 → Inbox, 0 Inbox, 1
+  Soon, 2 Today, nothing → Today); `FunnelView.place` and `tasks.firstPlace()` (synchronous) read it.
+- `ViewChoice.ribbon`: the screen is the ribbon (two columns, never a note): it swipes, a field moved to a list turns it to
+  that list's place, and Done stands left of Inbox; elsewhere a done find opens on its own page.
+- `rules.endsSelection(end)`: a carry that ended `"dropped"` (a list, the calendar, a row by `carryOnNode`, the by
+  project list) ends Select Tasks; `"nowhere"` and `"naming"` keep it. Example: `rules.endsSelection("dropped")` → true.
+- `FunnelView.plus` `{ tap, list, tree }`: a tap `"inPlace"` (by project: the field at its plus part) or `"newTask"` (the
+  frontend's New Task); held, let go in `"funnel"`'s lists, `"projects"` (the node's by project list, panel closed) or
+  none, and in the tree while the panel shows.
+- `ProjectsPanel.dimCloses`: a tap on the dim closes it (over the lists, opened by the button).
+- `ViewChoice.source`: `"screen"`, or `"projectsScreen"` (by project reads `tasks.projectsScreen(filter.node)` too).
+- `FunnelView.topRow`: the top row stands (wide always; narrow with a filter or a mode but two columns; never a note).
+- `FunnelView.searchPaths`: a search opened over the view shows each find's project path (a filter is chosen).
+- A card let go on the project it already has (`dropOnProject`, `dropTasksOnProject`, a by project list) leaves its line
+  as it is.
+- Gone from `contracts.ts` (2026-11-12, both frontends moved): `SCREEN_PLACES`, `ScreenPlace`, `ScreenSpot`, `ScreenAt`,
+  `stepScreen`, `placeShowing`, `shownLists`, `shownEntryLists`, and `TaskService`'s `tapProjectNode`,
+  `unfoldProjectNode`, `hoverProjectNode`, `setProjectsMode`; `SHOWN_LISTS` has no `projects` entry. **Their door names
+  still answer** (CLAUDE.md: the door keeps its functions' names), as thin mappings no frontend here calls:
+  `days.stepScreen` (`days.stepFunnel`, the old Projects place as Done: nothing back, Inbox on), `rules.placeShowing`
+  (`funnelPlaceShowing`, Projects as Inbox; a `projects` column stays where it is), `rules.shownLists(place)`
+  (`SHOWN_LISTS`, `[]` for Projects), `rules.shownEntryLists(place)` (`["projects"]` for Projects),
+  `tasks.tapProjectNode` (`pickProjectNode` on a wide screen), `tasks.unfoldProjectNode`, `tasks.hoverProjectNode` (the
+  pause `carryAt` acts on), `tasks.setProjectsMode` (answers, keeps nothing).
+- `rules.stackedRows(wanted, room, least)` → heights: the rows mode's lists, each as tall as it wants while all fit; else
+  a list shorter than an even share keeps its height and the others share the rest; none under `least`. Example:
+  `rules.stackedRows([900, 70, 400, 70], 600, 70)` → `[230, 70, 230, 70]`.
+- `EntryState.locksPanel` (the quick entry's state, `entry.*`): true while a field is open; the projects button can't be
+  pressed then.
+
 #### A folded task's next step
 
 Every task with an open subtask, at any depth, drawn folded shows its next open subtask: `TaskItem.card` `{ text,
@@ -327,7 +427,7 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
 
 ### `days.*`: `DayService`
 
-`today()`, `relation(date)`, `step(date, days)`, `stepScreen({mode, date}, shift)` (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends;
+`today()`, `relation(date)`, `step(date, days)`, `stepFunnel({mode, date}, shift)` (the funnel's walk, see «Projects as one view») (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends;
 Projects first: back from Inbox and Soon, or from Done, to `{ mode: "projects" }`, on from Projects to Inbox, null back
 from Projects; `rules.swipeLanding` still makes one swipe one step), `boundary()` (`{ startHour }`), `openAt(date)`: where the day's
 timeline opens, minutes from the day's start: `{ kind: "now", minute }` for today (the now line, which the plugin holds
@@ -490,8 +590,8 @@ Typing tasks in place, every rule of it (`core/application/QuickEntry.ts`). Each
 - `look` (`WireLook`): the screen as it stands: `cards` of each list shown (`{ day?, soon?, inbox?, backlog?, projects? }`,
   each a list of `ListCard` `{ key, level, group }` in drawing order: `rules.listView`'s rows), `sections` each draws,
   which are `sectioned`, the `day` the day list shows, `shown`: the lists on screen in their order
-  (`rules.shownEntryLists(place)`: a task is looked for there first; the plus opens in the day list while it shows, else
-  in Inbox, and on the Projects screen in the part its plus writes), and `parts`: `{ projects? }`, the parts of a list
+  (`rules.viewEntryLists(mode, spot)`: a task is looked for there first; the plus opens in the day list while it shows, else
+  in Inbox, and in the by project view in the part its plus writes), and `parts`: `{ projects? }`, the parts of a list
   that decides itself what a new task in it writes. The layout is the frontend's.
 - **The Projects screen's list is a list the field stands in** (`"projects"`, an `EntryList` like a funnel's column):
   while the Projects screen shows, `look.shown` is `["projects"]` and `cards.projects`, `sections.projects` and
@@ -507,8 +607,7 @@ Typing tasks in place, every rule of it (`core/application/QuickEntry.ts`). Each
   in the Projects list, never in a funnel column; a new task's field starts with its part's project and the bar's place
   shows where its part writes. A task written there is `createInPlace` with a `NewTaskPlace` `{ kind: "projects", group,
   before, placement? }`, which the service reads off the screen as the file then stands. A place chosen in the bar keeps
-  the field where it stands (`choosePlace` → `{ column: "projects", day: null }`; `placeShowing("projects", …)` is
-  `"projects"`: the screen does not turn) and the task is written there instead. `coming` for `entry.shown` carries
+  the field where it stands (`choosePlace` → `{ column: "projects", day: null }`: the screen does not turn) and the task is written there instead. `coming` for `entry.shown` carries
   `projects` too. Example: `rules.projectsEntryLook(view)` → `{ cards: [{ key, id, level: 0, group: null }, …],
   sections: [null, "project:Sub"], parts: [{ group: null, newTask: { place: { kind: "list", list: "inbox", group:
   null, before: null }, project: "P" }, plus: true }, …] }`.
@@ -659,9 +758,9 @@ fenced and inline code; `"---\ntags: [project]\n---\n#more"` → `["#project", "
 `{ name, path, link }` of the notes with exactly that tag, case aside, a nested child tag not it, by name; `link` the name,
 the path without `.md` when another note has that name: `[{ path: "Work/Plan.md", text: "#project" }, { path:
 "Home/Plan.md" }]` → `[{ name: "Plan", path: "Work/Plan.md", link: "Work/Plan" }]`; the context's `projects`);
-the screen's places: `placeShowing(column, place)` (the place a list is shown from: `place` itself when it shows
-`column`, else the nearest place that does; `placeShowing("day", "inbox")` → `"soon"`; a place is `"inbox"`, `"soon"`
-or `"calendar"`, the app's Today);
+the funnel's places: `funnelPlaceShowing(column, spot)` (the place a list is shown from: `spot` itself when it shows
+`column`, Done as Inbox, else the nearest place that does; `funnelPlaceShowing("day", "inbox")` → `"soon"`; a place is
+`"inbox"`, `"soon"` or `"calendar"`, the app's Today); `viewEntryLists(mode, spot)` (the quick entry's `look.shown`);
 the copy of a pressed card that shows its whole title, in points or px: `wholeWidth(card, room)` (`card`
 `{ width, titleWidth, textWidth, fade }`: the card's width, its title's box, the title's text measured on one line, the
 fade at the title's end; `room` `{ width, margin }`: the window and the margin a copy keeps from its edges) answers
@@ -681,12 +780,9 @@ max: 280 }`), `DIVIDER_SNAP` (`{ distance: 8, slowSpeed: 0.08 }`), `MOST_CARD_CO
 `every` `"Every"`, `units` `{ day: "days", week: "weeks", month: "months" }`, `weekdays` Monday first `{ short: "Mon",
 name: "Monday", letter: "M" }`, `remove` `"Remove repeat"`),
 `NO_DAY_EVENTS` (a day before any calendar file was read, as `calendars.events` answers it: no events, no statuses, `alert` `"none"`, its `words`),
-`SCREEN_PLACES` (`["projects", "inbox", "soon", "calendar"]`, left to right: Projects a place of its own, the wheel's
-window holding its folder alone) and `SHOWN_LISTS` (the funnel's lists each place shows, in its order: `{ projects: [],
-inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] }`, also `rules.shownLists(place)`; the
-quick entry's `look.shown` is `rules.shownEntryLists(place)`: the same, but `["projects"]` on Projects);
-`rules.placeShowing(column, "projects")` turns as from Inbox (`placeShowing("day", "projects")` → `"soon"`), and
-`placeShowing("projects", place)` is always `"projects"`. `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
+`FUNNEL_PLACES` (`["inbox", "soon", "calendar"]`, left to right) and `SHOWN_LISTS` (the funnel's lists each place
+shows, in its order: `{ inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] }`), `ROW_LISTS`
+(`["inbox", "backlog", "soon", "day"]`), `VIEW_WORDS` (the view modes' words). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.
 
 ## What the door leaves to the host

@@ -1,4 +1,4 @@
-import type { CalendarService, DayBoundary, DayEvents, DayRelation, DayView, ListSection, TaskService } from "../../core/application/contracts";
+import type { CalendarService, DayBoundary, DayEvents, DayRelation, DayView, ListSection, ProjectsNodeId, TaskService } from "../../core/application/contracts";
 import { renderAllDayRows } from "./AllDayRow";
 import { PROPERTY } from "./design";
 import { el } from "./dom";
@@ -25,6 +25,10 @@ export interface DayPeekDeps {
 	alignTimeline(timeline: Timeline): void;
 	/** The shown day's rows of all-day events past the first: the next day's timeline starts where the shown one does. */
 	allDayExtraRows(): string;
+	/** The filter the screen is read with (`FunnelView.filter`): the next day shows only its tasks too; null for none. */
+	filter?(): ProjectsNodeId | null;
+	/** The words of an empty section's plate (`ViewChoice.emptyLabel`). */
+	emptyLabel?(): string;
 }
 
 /**
@@ -59,6 +63,7 @@ export class DayPeek {
 			grouped: () => deps.sections(date) !== null,
 			sections: () => deps.sections(date) ?? [],
 			ungroupedName: () => deps.ungroupedName(),
+			emptyLabel: () => deps.emptyLabel?.() ?? "",
 		});
 		this.right = el(this.el, "div", "tc-right");
 		this.allDayEl = el(this.right, "div");
@@ -80,7 +85,8 @@ export class DayPeek {
 			this.events = events;
 			this.render();
 		});
-		void deps.tasks.dayView(date).then((day) => {
+		const filter = deps.filter?.() ?? null;
+		void deps.tasks.dayView(date, filter).then((day) => {
 			this.day = day;
 			this.render();
 			this.list.el.scrollTop = deps.listScroll();

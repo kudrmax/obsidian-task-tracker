@@ -42,6 +42,8 @@ struct EntryView: Decodable, Equatable {
     let `repeat`: JSONValue?
     /// The Project button after the flag (`EntryState.project`); nil where the bar has none (a subtask's field, a section's name).
     let project: EntryProject?
+    /// The projects button can't be used while the field is open (`EntryState.locksPanel`).
+    let locksPanel: Bool?
 
     var spotKind: String { spot["kind"].string ?? "" }
     /// The field writes a section's name.
@@ -331,10 +333,11 @@ final class QuickEntryHost {
         }
     }
 
-    /// The ribbon turned to the place the core says shows `column` from where it stands; a place showing it stays.
+    /// The ribbon turned to the place the core says shows `column` from where it stands; a place showing it stays. In a
+    /// view without the ribbon every list shows already.
     private func turn(to column: BoardColumn) {
-        guard let model,
-              let key: String = model.ruleNow("rules.placeShowing", [.string(column.rawValue), .string(model.place.key)]),
+        guard let model, model.ribbon,
+              let key: String = model.ruleNow("rules.funnelPlaceShowing", [.string(column.rawValue), .string(model.place.key)]),
               let place = RibbonPlace(key: key), place != model.place else { return }
         turnedTo = place
         model.go(to: place)
@@ -387,11 +390,13 @@ final class QuickEntryHost {
 
     // MARK: The door
 
-    /// The lists each place of the ribbon shows, in order, as the core says (`rules.shownEntryLists`): on Projects its own.
-    private func shown(at place: RibbonPlace) -> [String] {
-        if let known = shownLists[place.key] { return known }
-        let found: [String] = model?.ruleNow("rules.shownEntryLists", [.string(place.key)]) ?? []
-        shownLists[place.key] = found
+    /// The lists the screen shows, in order, as the core says (`rules.viewEntryLists`): in the ribbon its place's, in rows
+    /// every funnel list, By project its own.
+    private func shown(at place: RibbonPlace, in mode: ViewMode) -> [String] {
+        let key = mode.rawValue + "/" + place.key
+        if let known = shownLists[key] { return known }
+        let found: [String] = model?.ruleNow("rules.viewEntryLists", [.string(mode.rawValue), .string(place.key)]) ?? []
+        shownLists[key] = found
         return found
     }
 
@@ -408,7 +413,7 @@ final class QuickEntryHost {
             sections[column.rawValue] = list.places
             sectioned[column.rawValue] = .bool(list.sectioned)
         }
-        let shown = shown(at: model?.place ?? .today)
+        let shown = shown(at: model?.place ?? .today, in: snapshot.funnel.view.mode)
         var parts: [String: JSONValue] = [:]
         if shown.contains(Self.projects), let list = projects ?? model?.projects.entryLook {
             cards[Self.projects] = list.cards
@@ -416,7 +421,7 @@ final class QuickEntryHost {
             sectioned[Self.projects] = false
             parts[Self.projects] = list.parts
         }
-        return ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map(JSONValue.string)), "parts": .object(parts)]
+        return ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map(JSONValue.string)), "parts": .object(parts), "filter": snapshot.funnel.entryFilter]
     }
 
     /// The core's name of the Projects list (`EntryList`).
@@ -639,9 +644,10 @@ final class QuickEntryHost {
             model.problem(error)
             read = nil
         }
-        // On Projects the Projects list is read with the screen and drawn in the same transaction: the line typed there
+        // By project the Projects list is read with the screen and drawn in the same transaction: the line typed there
         // ends in the drawing that shows its card.
-        let projectsRead = model.place == .projects ? await ProjectsBoard.fetch(board, screen: model.menuScreen) : nil
+        let byProject = read.flatMap { $0.funnel.view.source == "projectsScreen" ? $0.filter : nil }
+        let projectsRead = if let byProject { await ProjectsBoard.fetch(board, screen: model.menuScreen, node: byProject) } else { nil as ProjectsBoard.Read? }
         if method == "edit", case .success(let answer) = written, let item = try? answer.decode(TaskItem.self) { renamed?(item) }
         let created: JSONValue? = if method == "createInPlace", case .success(let made) = written, !made.isNull, read != nil { made } else { nil }
         let stack = created != nil && state?.spotKind == "stack" ? await stackRead?() : nil

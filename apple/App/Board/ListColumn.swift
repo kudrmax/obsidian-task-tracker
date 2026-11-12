@@ -8,6 +8,8 @@ struct ListColumn: View {
     let list: BoardList
     @Bindable var model: BoardModel
     var dayArrows = false
+    /// Stacked in the Rows view: the title small, a section's name, as the plugin's rows head each stage.
+    var compact = false
 
     /// The list's own width: another day slides through it.
     @State private var width: CGFloat = 0
@@ -21,12 +23,12 @@ struct ListColumn: View {
         VStack(alignment: .leading, spacing: 0) {
             // A card carried onto the title goes into the list keeping its project; the title's drop reaches down to the list.
             // Backlog stands under Inbox: the gap between them is its title's too, so a carry there lands somewhere.
-            TitleDrop(column: list.column, model: model, top: list.column == .backlog ? ColumnMetrics.headGap : 0) {
-                ColumnTitle(title: title, dayArrows: dayArrows, model: model, list: list)
-                    .padding(.top, list.column == .backlog ? ColumnMetrics.headGap : 0)
+            TitleDrop(column: list.column, model: model, top: !compact && list.column == .backlog ? ColumnMetrics.headGap : 0, row: compact ? ColumnMetrics.groupHead : ColumnMetrics.titleRow) {
+                ColumnTitle(title: title, dayArrows: dayArrows, compact: compact, model: model, list: list)
+                    .padding(.top, !compact && list.column == .backlog ? ColumnMetrics.headGap : 0)
                     .padding(.bottom, ColumnMetrics.headGap)
             }
-            DayLane(model: model, width: width, slides: list.column == .day, shown: ListCollection(column: list.column, model: model)) { peek in
+            DayLane(model: model, width: width, slides: list.column == .day, shown: ListCollection(column: list.column, model: model, stacked: compact)) { peek in
                 if let other = peek.lists[.day] { DayRows(list: other, model: model) }
             }
             .clipped()
@@ -95,6 +97,8 @@ private struct DayRows: View {
 struct ColumnTitle: View {
     let title: String
     var dayArrows = false
+    /// A stage's small heading in the Rows view.
+    var compact = false
     @Bindable var model: BoardModel
     var list: BoardList?
     @Environment(\.colorScheme) private var scheme
@@ -123,8 +127,8 @@ struct ColumnTitle: View {
         }
         .buttonStyle(.plain)
         .fontWeight(.semibold)
-        .frame(height: ColumnMetrics.titleRow)
-        .padding(.horizontal, dayArrows ? 0 : 16)
+        .frame(height: compact ? ColumnMetrics.groupHead : ColumnMetrics.titleRow, alignment: compact ? .bottom : .center)
+        .padding(.horizontal, dayArrows ? 0 : compact ? CardMetrics.columnInset + CardMetrics.leading : 16)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -140,10 +144,10 @@ struct ColumnTitle: View {
     /// in its own rounded box.
     private var litText: some View {
         Text(title)
-            .font(.system(size: 20, weight: .bold))
+            .font(.system(size: compact ? ColumnMetrics.groupName : 20, weight: compact ? .semibold : .bold))
             .lineLimit(1)
             .minimumScaleFactor(0.7)
-            .foregroundStyle(lit ? Palette.accent(scheme) : Color.primary)
+            .foregroundStyle(lit ? Palette.accent(scheme) : compact ? Palette.pullInk(scheme) : Color.primary)
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
             .background(lit ? Palette.dropBg(scheme) : .clear, in: .rect(cornerRadius: 10))
@@ -572,6 +576,6 @@ enum SoftEdge {
 /// A list's column drawn again only when its list changed: its rows are the collection's, which follows the board itself.
 extension ListColumn: Equatable {
     nonisolated static func == (a: ListColumn, b: ListColumn) -> Bool {
-        MainActor.assumeIsolated { a.list == b.list && a.dayArrows == b.dayArrows && a.model === b.model }
+        MainActor.assumeIsolated { a.list == b.list && a.dayArrows == b.dayArrows && a.compact == b.compact && a.model === b.model }
     }
 }

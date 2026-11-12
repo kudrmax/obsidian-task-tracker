@@ -53,7 +53,15 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
 export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
-export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, shownEntryLists, shownLists, SWIPE_FLICK_SPEED, swipeLanding, type EntryList, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+export { SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type EntryList } from "./screenPlaces";
+/** The funnel's places as the wheel and a swipe walk them, without Projects: the tree is a panel whose node filters them. */
+/** The rows view's list heights: `stackedRows(wanted, room, least)`, each as tall as it wants while all fit, the long ones sharing what the short ones leave. */
+export { stackedRows } from "./stackedRows";
+/** Whether a carry's end ends Select Tasks (`endsSelection(end)`): one that landed does, whatever path it took. */
+export { endsSelection } from "./projectsCarry";
+export { FUNNEL_PLACES, funnelPlaceOf, funnelPlaceShowing, stepFunnel, type FunnelAt, type FunnelPlace, type FunnelSpot } from "./screenPlaces";
+/** The view modes' words, the lists the rows mode stacks, and the lists a field can stand in for a mode and a place. */
+export { ROW_LISTS, VIEW_WORDS, viewEntryLists } from "./viewModes";
 /** The Projects screen's list as the quick entry reads it: a list the field stands in, like a funnel's column. */
 export { projectsEntryLook, type EntryListLook, type EntryPart } from "./projectsEntry";
 /**
@@ -61,7 +69,7 @@ export { projectsEntryLook, type EntryListLook, type EntryPart } from "./project
  * its title whole and is lifted itself), `grownStart(start, size, grown, room, margin)` where it starts on one axis.
  */
 export { grownStart, type GrownWidth, type TitleFit, type WholeRoom, wholeWidth } from "./wholeCard";
-import type { ScreenAt as ScreenAtOf } from "./screenPlaces";
+import type { FunnelAt as FunnelAtOf, FunnelPlace as FunnelPlaceOf } from "./screenPlaces";
 /** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
 export { SectionNameEntry } from "./SectionNameEntry";
 /** What a task menu's repeat page writes: a rule changed there as the menu closes, unless it is the task's own again; Remove at once. */
@@ -149,6 +157,8 @@ export interface ProjectsPlace {
 	readonly group: GroupName;
 	readonly before: TaskKey | null;
 	readonly placement?: Placement;
+	/** The node whose list it is (`projectsScreen(node)`, by project); left out, the device's Projects screen's. */
+	readonly node?: ProjectsNodeId;
 }
 
 /** Where a section is written from the quick-entry field: a top-level place in a column that shows sections. */
@@ -721,13 +731,27 @@ export { projectNodeOf } from "./projectsScreen";
 /** A project's state, computed from its tasks and its subprojects', never set by hand. */
 export type ProjectStatus = "active" | "waiting" | "done";
 
-/** The segment over the tasks of the Projects screen. */
-export type ProjectsMode = "byProject" | "byStage";
-
-/** What a device keeps of the Projects screen, never synced: the node chosen, the segment, the folded branches. */
+/**
+ * What a device keeps of the projects' panel and the funnel's view, never synced: the node chosen (the funnel's filter),
+ * the folded branches, the panel open, and the view modes, each view's own.
+ */
 export interface ProjectsScreenState {
+	/** The node chosen in the tree, which filters the funnel (`funnelView().filter`); none: no filter (the old Projects screen shows All). */
 	readonly selected?: ProjectsNodeId;
-	readonly mode?: ProjectsMode;
+	/** The projects' panel is open (`setProjectsPanel`). */
+	readonly panelOpen?: boolean;
+	/** The view mode last picked with no filter (`setViewMode`). */
+	readonly view?: ViewMode;
+	/** The view mode last picked with a filter. */
+	readonly filteredView?: ViewMode;
+	/** The view mode last picked in a project note's block (`setNoteViewMode`). */
+	readonly noteView?: ViewMode;
+	/** The carry to a project under way (`startCarry`): what the core keeps between the finger's reports. */
+	readonly carry?: CarryState;
+	/** A new project's name is typed in the panel (`endCarry("naming")` until `endProjectName`): the panel stays out. */
+	readonly naming?: boolean;
+	/** The funnel's place the screen last stood at (`setFunnelPlace`). */
+	readonly place?: FunnelPlaceOf;
 	/** The project nodes whose branches are folded. */
 	readonly folded?: readonly ProjectsNodeId[];
 	/** Done's branch, the done projects, is shown: folded until tapped open. */
@@ -766,7 +790,7 @@ export interface ProjectsRow {
 	/** A held card over it unfolds its branch after a pause: a folded branch. */
 	readonly unfoldsOnHover: boolean;
 	/**
-	 * A held card over it chooses it after the same pause (`TaskService.hoverProjectNode`), so its tasks show and the card
+	 * A held card over it chooses it after the same pause (`TaskService.carryAt`), so its tasks show and the card
 	 * can be let go among them: a row that takes a task (`acceptsTask`) whose list takes drops (`ProjectsView.reorders`),
 	 * not the chosen one. A live project and No project; never All, Done or a done project.
 	 */
@@ -783,10 +807,8 @@ export interface ProjectsCard {
 	/** Who the drawn card is: unique on the screen (a task of two parts is two cards), what a view keys it by. */
 	readonly id: string;
 	readonly item: TaskItem;
-	/** By project: the stage's mark on the right; null in By stage. */
+	/** The stage's mark on the right. */
 	readonly stage: ProjectsStage | null;
-	/** By stage: the subproject the task is in, small over its title; null where it is the chosen project's own, and in By project. */
-	readonly over: string | null;
 	/** The project it is shown under: what a drop of it on the tree replaces; null for none. */
 	readonly from: string | null;
 	/** What `dropOnProject` takes for this very card: its task and the project it is shown under. */
@@ -925,9 +947,6 @@ export interface ProjectDelete {
 export interface ProjectsView {
 	readonly rows: readonly ProjectsRow[];
 	readonly selected: ProjectsNodeId;
-	readonly mode: ProjectsMode;
-	/** The segment's words: «By project», «By stage». */
-	readonly modes: readonly { readonly mode: ProjectsMode; readonly label: string }[];
 	/** The header over the tasks: the chosen node's name. */
 	readonly title: string;
 	/** The chosen project's menu (its title tapped); null for All, No project and Done. */
@@ -965,6 +984,149 @@ export interface ProjectsDropPreview {
 	readonly tasks: string;
 }
 
+/**
+ * How the funnel's tasks are laid out: `twoColumns` the ribbon the wheel walks (Inbox, Soon, Today, the calendar);
+ * `allColumns` Inbox over Backlog, Soon, the day's list and the timeline side by side (a wide screen only); `rows` Inbox,
+ * Backlog, Soon and the day's list stacked (`ViewChoice.rows`), the timeline beside them; `byProject` the chosen node's
+ * tasks in its subprojects' parts (`projectsScreen(node)`).
+ */
+export type ViewMode = "twoColumns" | "allColumns" | "rows" | "byProject";
+
+/** A row of the view button's menu: the mode, its words, its icon (a Lucide name), and the check on the current one. */
+export interface ViewModeOption {
+	readonly mode: ViewMode;
+	readonly label: string;
+	readonly icon: string;
+	readonly checked: boolean;
+}
+
+/** The view a screen draws and the button that changes it. */
+export interface ViewChoice {
+	readonly mode: ViewMode;
+	/** The button's menu, in order; a pick writes `setViewMode` (in a note, `setNoteViewMode`). */
+	readonly modes: readonly ViewModeOption[];
+	/** The button's icon: the current mode's. */
+	readonly icon: string;
+	/** The wheel shows (two columns), the button beside it; without it the button stands alone in the wheel's place. */
+	readonly wheel: boolean;
+	/**
+	 * The screen is the ribbon the wheel walks (two columns, never a note's block): a swipe turns it, a field moved to a
+	 * list turns it to that list's place (`funnelPlaceShowing`), and Done stands left of Inbox. Elsewhere none of these:
+	 * the screen does not swipe or turn, and a done find opens on its own page.
+	 */
+	readonly ribbon: boolean;
+	/** The read the mode draws from: `screen(date, filter)`, or by project `projectsScreen(filter.node)` beside it. */
+	readonly source: "screen" | "projectsScreen";
+	/** The rows mode's lists, top to bottom (`ROW_LISTS`); none in another mode. */
+	readonly rows: readonly DropColumn[];
+	/** The words in an empty list, with a filter or without: «No tasks». */
+	readonly emptyLabel: string;
+	/**
+	 * Each funnel list's No tasks plate, drawn while the list draws no card: its words (`emptyLabel`) under a filter and in
+	 * rows, null (no plate) in two and all columns without a filter.
+	 */
+	readonly plates: Readonly<Record<DropColumn, string | null>>;
+}
+
+/** The node the funnel is filtered by, and what is drawn over its tasks. */
+export interface ProjectFilter {
+	/** What `screen`, `drop`, `dropPreview`, `landing`, `createInPlace` and the quick entry (`EntryLook.filter`) take as their filter. */
+	readonly node: ProjectsNodeId;
+	/** The node's name, big over the tasks: the project's, «All», «No project», «Done». */
+	readonly title: string;
+	/** The project's menu, the title tapped (`ProjectsView.menu`); null for All, No project and Done. */
+	readonly menu: ProjectMenu | null;
+	/** The cross beside the title clears the filter (`clearProjectFilter`): the main screen's; never a note's. */
+	readonly clearable: boolean;
+	/** The project a task typed under the filter is given (the quick entry starts with it); null for All, No project, Done, a folder and a done project. */
+	readonly project: string | null;
+	/** The words in an empty list: «No tasks». */
+	readonly emptyLabel: string;
+}
+
+/** The projects' tree as a panel beside or over the funnel. */
+export interface ProjectsPanel {
+	/** The tree's rows (`ProjectsRow`), the filter's row `selected`; none selected without a filter. A tap writes `pickProjectNode`. */
+	readonly rows: readonly ProjectsRow[];
+	/** Drawn, for any reason (`reason`); the projects button shows lit while it is. */
+	readonly open: boolean;
+	/** Why it shows: the button (`setProjectsPanel`), a carry held at the edge (`carryAt`), a new project's name typed in it; null: closed. */
+	readonly reason: PanelReason | null;
+	/** A wide screen docks it beside the lists until the button closes it; a narrow one lays it over them and a pick closes it. */
+	readonly docked: boolean;
+	/** A tap on the dim around it closes it (`setProjectsPanel(false)`): it lies over the lists and the button opened it; a carry's or a name's panel goes with them. */
+	readonly dimCloses: boolean;
+	/** No tasks file: All, No project and Done alone. */
+	readonly missing: boolean;
+}
+
+/**
+ * What the plus does: a tap types in place (`inPlace`: the quick entry at the by project list's plus part) or opens a new
+ * task (`newTask`: the frontend's own New Task, its sheet or field); held, it is let go in the funnel's lists (`funnel`),
+ * the node's by project list alone (`projects`) or no list (null), and in the tree (`tree`, a new project) while the
+ * panel shows.
+ */
+export interface PlusChoice {
+	readonly tap: "inPlace" | "newTask";
+	readonly list: "funnel" | "projects" | null;
+	readonly tree: boolean;
+}
+
+/** Why the projects' panel shows. */
+export type PanelReason = "button" | "carry" | "naming";
+
+/** What a carry to a project carries (`startCarry`): funnel cards by their keys, a by project list's cards by their drops, or the plus. */
+export interface CarryStart {
+	readonly keys: readonly TaskKey[];
+	/** The by project list's cards as read (`ProjectsCard.drop`): let go on a row they go by `dropOnProject`. */
+	readonly cards?: readonly ProjectsDrop[];
+	/** The plus: the edge brings the panel out, a row only unfolds, and it is let go at a gap (`endCarry("naming")`). */
+	readonly plus?: boolean;
+}
+
+/** Where the carrying finger is, as the frontend's hit test found it: at the narrow screen's left edge, over a panel row's node. */
+export interface CarryPoint {
+	readonly edge: boolean;
+	readonly node: ProjectsNodeId | null;
+}
+
+/** How long, ms, until the finger, staying where it is, should be told again (`carryAt`); null: nothing waits. */
+export interface CarryWait {
+	readonly wait: number | null;
+}
+
+/** How a carry ends: let go nowhere or cancelled (the lift's filter put back), dropped somewhere, the plus let go in the tree (its name asked). */
+export type CarryEnd = "nowhere" | "dropped" | "naming";
+
+/** The carry the core keeps on the device between the finger's reports. */
+export interface CarryState extends CarryStart {
+	/** The filter at the lift: what the cards were shown by, and what a let go nowhere puts back. */
+	readonly under: ProjectsNodeId | null;
+	readonly wide: boolean;
+	/** Since when, by the host's clock, the finger waits at the edge. */
+	readonly edgeSince?: number;
+	/** The row the finger waits over, since when, and whether its pause has acted. */
+	readonly over?: { readonly node: ProjectsNodeId; readonly since: number; readonly done: boolean };
+	/** The carry brought the panel out. */
+	readonly revealed?: boolean;
+}
+
+/** The funnel's view as this device shows it (`TaskService.funnelView`), or a project note's block (`projectNoteView`). */
+export interface FunnelView {
+	/** The filter; null for none. The note's block: its project. */
+	readonly filter: ProjectFilter | null;
+	readonly view: ViewChoice;
+	/** The tree's panel; null in a note's block, which shows no tree. */
+	readonly panel: ProjectsPanel | null;
+	readonly plus: PlusChoice;
+	/** The top row (the projects button, the filter's name, the view's titles) stands over the lists: always on a wide screen; on a narrow one with a filter or in a mode without column titles (all but two columns). Never in a note's block. */
+	readonly topRow: boolean;
+	/** A search opened over it shows each find's project path: a filter is chosen. */
+	readonly searchPaths: boolean;
+	/** The funnel's place the screen stands at (`setFunnelPlace`; Today when none was kept). */
+	readonly place: FunnelPlaceOf;
+}
+
 /** Where a project lifted in the tree, or the plus, lands at a gap: the place the call takes, and the depth the gap is drawn at. */
 export interface ProjectsLanding {
 	readonly place: TreePlace;
@@ -989,7 +1151,7 @@ export { projectsDrop } from "./projectsScreen";
  * shows no drop line there and lets go of nothing, as over a list that does not take the card.
  */
 export { projectsPlusTakes, projectsTakes } from "./projectsDrop";
-/** How long a held card waits over a row before it unfolds or opens (`hoverProjectNode`), ms; the indent of a tree's step, px (pt). */
+/** How long a held card waits over a row before it unfolds or opens (`carryAt`), ms; the indent of a tree's step, px (pt). */
 export { PROJECTS_HOVER_MS, PROJECTS_INDENT } from "./projectsScreen";
 
 /**
@@ -1030,10 +1192,14 @@ export interface TaskService {
 
 	/**
 	 * Everything the screen shows of the tasks for `date`, the file normalized first; without a tasks file, the empty screen
-	 * that says so (`missing`).
+	 * that says so (`missing`). `filter` (`ProjectFilter.node`; null or left out: none): every list, the day's list and its
+	 * timeline, Done too, show only the tasks the node lets through, a subtask with its task: a project its branch's, All
+	 * those with a project, No project those without, Done those of the done projects. A project the tree lacks filters
+	 * nothing. Under a project the cards show no folder mark. Sections, the offer and the tree stay the whole file's.
 	 */
-	screen(date: LocalDate): Promise<ScreenView>;
-	dayView(date: LocalDate): Promise<DayView>;
+	screen(date: LocalDate, filter?: ProjectsNodeId | null): Promise<ScreenView>;
+	/** The day's list and timeline as `screen(date, filter).day` reads them. */
+	dayView(date: LocalDate, filter?: ProjectsNodeId | null): Promise<DayView>;
 	/** The Soon column: Soon tasks without a due date and without a slot, in file order. */
 	soonWithoutDateView(): Promise<readonly TaskItem[]>;
 	/** Every Inbox task, in file order: none has a due date or a slot (spec §4.4, rule 3). */
@@ -1089,12 +1255,16 @@ export interface TaskService {
 	 * `ProjectsSection.newTask`): written whatever the place's `project` says. A subtask takes none: its projects are its
 	 * parent's. A folder is never written: the task is made without it.
 	 */
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | null): Promise<TaskKey | null>;
+	/**
+	 * `filter`, the screen's (`ProjectFilter.node`): a task typed at the end of a section of a list (`before` null) goes right
+	 * after the last task of that section the filter shows, not after the tasks it hides (none shown: the section's end).
+	 */
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | null, filter?: ProjectsNodeId | null): Promise<TaskKey | null>;
 	/**
 	 * `createInPlace`, answering the new task's id with its key: the key names it as the file stands right after this write,
 	 * the id for as long as the service runs, whatever writes come before the screen draws it. Null when nothing was created.
 	 */
-	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | null): Promise<CreatedTask | null>;
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | null, filter?: ProjectsNodeId | null): Promise<CreatedTask | null>;
 	/**
 	 * The marks `createInPlace`, `create` or `edit` writes for a title typed as `text` with `priority` (a level's prefix or
 	 * null) and `labels` chosen: the chosen priority, else the level the text's first word is; the labels only without one.
@@ -1162,26 +1332,76 @@ export interface TaskService {
 	newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null>;
 
 	/**
-	 * The Projects screen as this device shows it (`ProjectsView`): the tree with the chosen node, and its tasks By project
-	 * or By stage. Without a tasks file, the screen with nothing but All, No project and Done.
+	 * The Projects screen as this device shows it (`ProjectsView`): the tree with the chosen node (All for none), and its
+	 * tasks by project. Without a tasks file, the screen with nothing but All, No project and Done. With `node`: that node's
+	 * tasks by project whatever the device chose, the funnel's by project mode (`ViewMode`) and a note's block.
 	 */
-	projectsScreen(): Promise<ProjectsView>;
+	projectsScreen(node?: ProjectsNodeId): Promise<ProjectsView>;
 	/**
-	 * A tap on a row of the tree: a node not chosen is chosen; the chosen one folds or unfolds its branch (one without a
-	 * branch stays as it is). Kept on the device.
+	 * The funnel's view as this device shows it: the filter (the node chosen in the tree, null for none), the view mode with
+	 * the modes its button offers on a `wide` screen or a narrow one, and the projects' panel. Without a tasks file, no
+	 * filter and the panel's fixed rows.
 	 */
-	tapProjectNode(node: ProjectsNodeId): Promise<void>;
-	/** A folded branch opened without choosing its node: a card held over the row. Done opens its done projects. Kept on the device. */
-	unfoldProjectNode(node: ProjectsNodeId): Promise<void>;
+	funnelView(wide: boolean): Promise<FunnelView>;
+	/**
+	 * The block at the end of a project's note, `path` the note's from the vault's folder: the view fixed to the project the
+	 * note is attached to (`ProjectRef.note`), rows unless another mode was picked in a note, no panel and no cross. Null for
+	 * a note attached to no project, and without a tasks file.
+	 */
+	projectNoteView(path: string, wide: boolean): Promise<FunnelView | null>;
+	/**
+	 * A tap on a row of the panel: a node not chosen is chosen; the chosen one folds or unfolds its branch (Done shows its
+	 * done projects); and on a narrow screen (`wide` false) a tap that chose a node closes the
+	 * panel. Kept on the device.
+	 */
+	pickProjectNode(node: ProjectsNodeId, wide: boolean): Promise<void>;
+	/**
+	 * The view as this device keeps it, before the first read answers (`funnelView`, or `projectNoteView` with `note`): its
+	 * kept mode, a node chosen counting as a filter; synchronous, reading no file.
+	 */
+	firstView(wide: boolean, note: boolean): ViewChoice;
+	/**
+	 * Whether `filter` hides `item` from the screen (a search's find, a subtask by its task, a timeline or Done task too):
+	 * true sends the frontend to `clearProjectFilter` before it shows the find. False without a filter, for a node the tree
+	 * lacks, and for a task gone.
+	 */
+	filterHides(item: TaskItem, filter: ProjectsNodeId | null): Promise<boolean>;
+	/**
+	 * A card or several, or the plus, lifted for a carry that may reach the projects' panel, on a `wide` screen or not: the
+	 * core keeps what it carries and the filter it was lifted under. A carry under way is replaced.
+	 */
+	startCarry(start: CarryStart, wide: boolean): Promise<void>;
+	/** The carrying finger at `at`, `nowMs` by the host's clock: the core brings the panel out, unfolds or opens a row, and says how long until it should be told again. */
+	carryAt(at: CarryPoint, nowMs: number): Promise<CarryWait>;
+	/** The carry let go on a panel row: every carried task gets the row's project (`dropOnProject`, `dropTasksOnProject` under the lift's filter), and the carry ends. */
+	carryOnNode(node: ProjectsNodeId): Promise<void>;
+	/** The carry ends otherwise (`CarryEnd`). */
+	endCarry(how: CarryEnd): Promise<void>;
+	/** A new project's name typed or given up: the panel the naming held out goes. */
+	endProjectName(): Promise<void>;
+	/** The funnel's place the screen now stands at, kept on the device; anything a host kept before reads as `funnelPlaceOf` says. */
+	setFunnelPlace(place: unknown): Promise<void>;
+	/**
+	 * The place the screen opens at before the first read: the device's (`funnelPlaceOf`). It and the main screen's
+	 * `firstView` (and a service made anew) drop a carry or a name left by a screen gone mid-gesture, as let go nowhere.
+	 */
+	firstPlace(): FunnelPlaceOf;
+	/** The cross beside the filter's title: no node chosen, every task shows. Kept on the device. */
+	clearProjectFilter(): Promise<void>;
+	/** The projects button: the panel opened or closed. Kept on the device. */
+	setProjectsPanel(open: boolean): Promise<void>;
+	/** A mode of the view button's menu: kept for the screen as it is, with a filter or without, each its own. Kept on the device. */
+	setViewMode(mode: ViewMode): Promise<void>;
+	/** A mode of a note's block's view button: kept for every note's block. Kept on the device. */
+	setNoteViewMode(mode: ViewMode): Promise<void>;
+	/**
+	 * Cards of the funnel's lists or its timeline dropped on a row of the panel (`ProjectsRow.acceptsTask`), the screen under
+	 * `filter`: as `dropOnProject`, each card shown under the project the filter shows it by (`shownUnder`: under a project
+	 * the task's first in its branch; else its first project) giving way to the row's. A subtask's key names its top task.
+	 */
+	dropTasksOnProject(keys: readonly TaskKey[], to: ProjectsNodeId, filter: ProjectsNodeId | null): Promise<void>;
 	/** The node chosen, unfolding the branches above it so its row shows: search's path, the card's folder mark. Kept on the device. */
 	selectProjectNode(node: ProjectsNodeId): Promise<void>;
-	/**
-	 * A card held over a row for `PROJECTS_HOVER_MS`: its branch unfolds if it unfolds on hover (`ProjectsRow.unfoldsOnHover`),
-	 * and it is chosen if it opens on hover (`ProjectsRow.opensOnHover`), the mode kept. One call, one wait. Kept on the device.
-	 */
-	hoverProjectNode(node: ProjectsNodeId): Promise<void>;
-	/** The segment over the tasks: By project or By stage. Kept on the device. */
-	setProjectsMode(mode: ProjectsMode): Promise<void>;
 	/**
 	 * The plus dropped in the tree: a project named `name` at `place` (`projectsGap`). Answers the project, or null for a
 	 * blank name or one the tree has (nothing written). It is chosen, so its tasks' column shows it.
@@ -1221,15 +1441,14 @@ export interface TaskService {
 	 * step of undo. A place under a task nests there, as in the lists. Between cards the card above says where (the card
 	 * below at a part's top, or where the card above's stage refuses the cards): a card in that card's stage only moves
 	 * among its list's tasks next to it, nothing on its line changed; a card from another stage moves as a drop on that
-	 * stage's column writes it (Today is Now, dated today). An empty part: By stage that stage's list's end; By project
-	 * nothing moves. By project the part's project then takes the place of the one the card was shown under
+	 * stage's column writes it (Today is Now, dated today). An empty part: nothing moves. The part's project then takes the place of the one the card was shown under
 	 * (`ProjectsDrop.from`) in the line's order, as a drop on the tree's row does. Where a stage's column refuses a card
 	 * (`projectsTakes` false) it writes nothing. Gives the tasks' keys as the file now has them. Rejects with
 	 * StaleTaskError, writing nothing, for a part the screen no longer has.
 	 */
-	dropInProjects(cards: readonly ProjectsDrop[], place: ListPlace): Promise<readonly TaskKey[]>;
-	/** `dropInProjects` writing nothing: where each card lands and the Projects screen the drop leaves, equal to the next `projectsScreen()` after it. */
-	projectsDropPreview(cards: readonly ProjectsDrop[], place: ListPlace): Promise<ProjectsDropPreview>;
+	dropInProjects(cards: readonly ProjectsDrop[], place: ListPlace, node?: ProjectsNodeId): Promise<readonly TaskKey[]>;
+	/** `dropInProjects` writing nothing: where each card lands and the Projects screen the drop leaves, equal to the next `projectsScreen(node)` after it. */
+	projectsDropPreview(cards: readonly ProjectsDrop[], place: ListPlace, node?: ProjectsNodeId): Promise<ProjectsDropPreview>;
 	/** A project's name of nothing, as typed (`cleanProjectName`): the Create button of New project… is off for it. */
 	isBlankProjectName(name: string): boolean;
 	/** The task's labels become these names, written as tags; a task with a priority keeps none. The task as it now stands, its key fresh; null once it is gone. */
@@ -1410,22 +1629,24 @@ export interface TaskService {
 	 * call it means (`setSlot`, `clearSlot`, `moveToGroup`, `nest`, `moveBefore`, `moveToList`, `moveToSoon`, `moveToEnd`);
 	 * several as `applyAll` of what each means by where it came from, never on the timeline. A list without sections puts a
 	 * task from another column at its end (see `placesInGap`). Gives the tasks' keys as the file now has them, in their
-	 * order, so the screen settles the card on the task where it stands; one not found again is left out.
+	 * order, so the screen settles the card on the task where it stands; one not found again is left out. `filter`, the
+	 * screen's (`ProjectFilter.node`): a drop at the end of a section (`before` null) goes right after the last task of that
+	 * section the filter shows, the carried ones aside, not after the tasks it hides (none shown: the section's end).
 	 */
-	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly TaskKey[]>;
+	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<readonly TaskKey[]>;
 	/**
 	 * Where `drop` with the same arguments would leave each task, in their order, writing nothing: the drop's own
 	 * operation run over the file as read, and the screen of `day` read over the result
 	 * by the same code as `screen`. So a copy flies to the very place the write gives, a past time on today included (the
 	 * card rides the now line). Rejects as `drop` would.
 	 */
-	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly DropLanding[]>;
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<readonly DropLanding[]>;
 	/**
 	 * `landing`, with the whole screen the drop leaves and the text it is read from, writing nothing: the screen equals the
-	 * one `screen(day)` reads after `drop` with the same arguments, ids included, so a frontend draws the next
-	 * screen at the moment of the drop. Rejects as `drop` would.
+	 * one `screen(day, filter)` reads after `drop` with the same arguments, ids included, so a frontend draws the next
+	 * screen at the moment of the drop; a task the filter no longer shows lands `away`. Rejects as `drop` would.
 	 */
-	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<DropPreview>;
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<DropPreview>;
 
 	/** Applies the normalization rules (spec §4.4). Writes only when something changed. */
 	normalize(): Promise<void>;
@@ -1451,8 +1672,8 @@ export interface DayService {
 	relation(date: LocalDate): DayRelation;
 	/** The day `days` after `date`, before it for a negative count: the step of the day arrows and of the screens past today. */
 	step(date: LocalDate, days: number): LocalDate;
-	/** Where a swipe or a day arrow leads from `from`, a step back (-1) or on (1); null past the row's ends. */
-	stepScreen(from: ScreenAtOf, shift: -1 | 1): ScreenAtOf | null;
+	/** Where a swipe or a day arrow leads on the funnel from `from`, a step back (-1) or on (1); null past the row's ends (`stepFunnel`). */
+	stepFunnel(from: FunnelAtOf, shift: -1 | 1): FunnelAtOf | null;
 	/** Where the timeline of `date` opens: today on the now line, another day at the hour the settings name. */
 	openAt(date: LocalDate): DayOpening;
 	/**

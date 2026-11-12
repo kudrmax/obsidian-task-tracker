@@ -88,6 +88,7 @@ describe("TaskList", () => {
 			grouped: () => true,
 			sections: () => [{ id: "none", name: null, empty: false }, { id: "t1", name: "Evening", empty: true }],
 			ungroupedName: () => "No section",
+			emptyLabel: () => "No tasks",
 			onPlate: (_plate, group) => plates.push(group.name ?? ""),
 		});
 		list.render();

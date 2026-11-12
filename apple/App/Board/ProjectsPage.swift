@@ -2,87 +2,8 @@ import Core
 import SwiftUI
 import UIKit
 
-/// The Projects page, the ribbon's place left of Inbox (boards `projects-screen/`, the tree variant В): the whole tree on
-/// the left, the chosen node's tasks on the right, the divider between them as between Today and the calendar. A tap on a
-/// row chooses it, again folds its branch; the segment groups the tasks By project or By stage; a card carried onto a row
-/// goes to that project, a project lifted in the tree reorders or nests; the plus let go on the tasks types a task of the
-/// part, in the tree a project of the gap. Everything is the core's answer (`ProjectsBoard`).
-struct ProjectsPage: View {
-    @Bindable var model: BoardModel
-    @AppStorage("projectsTreeShare") private var share: Double = 0.5
-    @State private var dragStart: CGFloat?
-
-    private var projects: ProjectsBoard { model.projects }
-
-    var body: some View {
-        GeometryReader { box in
-            let width = box.size.width
-            let tree = treeWidth(width)
-            HStack(alignment: .top, spacing: 0) {
-                VStack(alignment: .leading, spacing: 0) {
-                    ColumnTitle(title: String(localized: "Projects"), model: model)
-                        .padding(.bottom, ColumnMetrics.headGap)
-                    ProjectTree(model: model)
-                }
-                .frame(width: tree)
-                .frame(maxHeight: .infinity, alignment: .top)
-                Color.clear.frame(width: 0)
-                    .overlay { divider(width) }
-                ProjectTasks(model: model)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            }
-        }
-        .task(id: ReadKey(file: model.snapshot?.tasksText, shown: model.place == .projects)) {
-            guard model.place == .projects || projects.view == nil else { return }
-            await projects.read()
-        }
-        .alert(projects.asking?.title ?? "", isPresented: Binding(get: { projects.asking != nil }, set: { if !$0 { projects.asking = nil } }), presenting: projects.asking) { ask in
-            NameField(ask: ask, board: projects)
-        }
-    }
-
-    private struct ReadKey: Equatable {
-        let file: String?
-        let shown: Bool
-    }
-
-    /// The tree's width for its saved share, within the bounds the core gives a list beside the calendar.
-    private func treeWidth(_ width: CGFloat) -> CGFloat {
-        model.listWidths(share: share, viewWidth: width).map { CGFloat($0.width) } ?? width / 2
-    }
-
-    /// The line between the tree and the tasks, and its handle, which drags the tree wider or narrower as Today's divider.
-    private func divider(_ width: CGFloat) -> some View {
-        ZStack {
-            Rectangle().fill(Color(.separator)).frame(width: 1 / UIScreen.main.scale)
-                .padding(.top, ColumnMetrics.titleRow + ColumnMetrics.headGap)
-            Capsule()
-                .fill(Color(.tertiaryLabel))
-                .frame(width: 5, height: 36)
-                .frame(width: 28)
-                .frame(maxHeight: .infinity)
-                .contentShape(.rect)
-                .gesture(
-                    DragGesture(minimumDistance: 2, coordinateSpace: .global)
-                        .onChanged { drag in
-                            let start = dragStart ?? treeWidth(width)
-                            if dragStart == nil { dragStart = start }
-                            guard let bounds = model.listWidths(share: share, viewWidth: width),
-                                  let stop = model.dividerAt(start + drag.translation.width, widths: bounds, speed: Double(abs(drag.velocity.width)) / 1000) else { return }
-                            share = model.listShare(of: CGFloat(stop.width), viewWidth: width) ?? share
-                        }
-                        .onEnded { _ in dragStart = nil }
-                )
-                .sensoryFeedback(.selection, trigger: dragStart == nil)
-                .accessibilityLabel("Divider")
-                .accessibilityHint("Drag to make the projects wider or narrower")
-        }
-        .frame(width: 28)
-    }
-}
-
 /// The name field of what the Projects page asks: a task typed for the plus, a new project, a rename.
-private struct NameField: View {
+struct NameField: View {
     let ask: ProjectsBoard.Ask
     let board: ProjectsBoard
     @State private var name = ""
@@ -110,7 +31,7 @@ struct ProjectTree: View {
     private var projects: ProjectsBoard { model.projects }
 
     var body: some View {
-        let rows = projects.view?.rows ?? []
+        let rows = projects.rows
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
@@ -243,7 +164,8 @@ private struct Fade: View {
 
 // MARK: The tasks
 
-/// The chosen node's tasks: its name, which opens the project's menu, the segment, and its parts of cards.
+/// The By project view's list (board `T7`): the filter's node's tasks in its subprojects' parts, each card marked with
+/// where it stands in the funnel.
 struct ProjectTasks: View {
     @Bindable var model: BoardModel
     @Environment(\.colorScheme) private var scheme
@@ -253,15 +175,7 @@ struct ProjectTasks: View {
     var body: some View {
         let view = projects.view
         VStack(alignment: .leading, spacing: 0) {
-            title(view)
-                .padding(.bottom, ColumnMetrics.headGap)
             if let view, !view.missing {
-                Picker("Group", selection: Binding(get: { view.mode }, set: { mode in Task { await model.projects.setMode(mode) } })) {
-                    ForEach(view.modes, id: \.mode) { Text($0.label).tag($0.mode) }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, CardMetrics.columnInset)
-                .padding(.bottom, 8)
                 ScrollViewReader { scroller in
                     ScrollView(.vertical) {
                         let entry = model.entry.lists[QuickEntryHost.projects]
@@ -394,59 +308,11 @@ struct ProjectTasks: View {
             }
         }
     }
-
-    /// The chosen node's name, 20 points bold, fading at its end; a project's opens its menu: Rename, and its note.
-    @ViewBuilder
-    private func title(_ view: ProjectsView?) -> some View {
-        let text = Color.clear
-            .frame(maxWidth: .infinity, minHeight: ColumnMetrics.titleRow, maxHeight: ColumnMetrics.titleRow)
-            .overlay(alignment: .leading) {
-                Text(verbatim: view?.title ?? "")
-                    .font(.system(size: 20, weight: .bold))
-                    .lineLimit(1)
-                    .fixedSize()
-            }
-            .mask(Fade())
-            .padding(.horizontal, 16)
-            .accessibilityAddTraits(.isHeader)
-        if let menu = view?.menu {
-            Menu {
-                Button(menu.renameLabel, systemImage: "pencil") { model.projects.asking = .rename(menu.project.name) }
-                FolderToggle(menu: menu, projects: model.projects)
-                if let note = menu.note {
-                    Section(menu.noteLabel) {
-                        Button(note.name, systemImage: "doc.text") { model.projects.openNote(note.link) }
-                        Button(menu.detachLabel, systemImage: "minus.circle", role: .destructive) { Task { await model.projects.detach(menu.project.name) } }
-                    }
-                }
-                Section {
-                    Button(menu.delete.label, systemImage: "trash", role: menu.delete.destructive ? .destructive : nil) { model.projects.deleting = menu }
-                }
-            } label: {
-                text.contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .menuOrder(.fixed)
-            .confirmationDialog(
-                model.projects.deleting?.delete.title ?? "",
-                isPresented: Binding(get: { model.projects.deleting != nil }, set: { if !$0 { model.projects.deleting = nil } }),
-                titleVisibility: .visible,
-                presenting: model.projects.deleting
-            ) { asked in
-                Button(asked.delete.confirm, role: asked.delete.destructive ? .destructive : nil) { Task { await model.projects.delete(asked.project.name) } }
-                Button(asked.delete.cancel, role: .cancel) {}
-            } message: { asked in
-                Text(verbatim: asked.delete.message)
-            }
-        } else {
-            text
-        }
-    }
 }
 
 /// Folder in the project menu, a stock switch next to Rename: on for a folder; while the core can't turn it on (the
 /// project has tasks of its own) it is drawn disabled with the core's reason under its label.
-private struct FolderToggle: View {
+struct FolderToggle: View {
     let menu: ProjectMenu
     let projects: ProjectsBoard
 
@@ -549,7 +415,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     }
 
     private var projects: ProjectsBoard? { model?.projects }
-    private var rows: [ProjectsRow] { projects?.view?.rows ?? [] }
+    private var rows: [ProjectsRow] { projects?.rows ?? [] }
 
     private func row(at point: CGPoint) -> ProjectsRow? {
         rows.first { projects?.geometry.rows[$0.node]?.contains(point) == true }
@@ -596,6 +462,9 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
 
     var scrolls: UIScrollView? { scroll }
 
+    /// The panel lies over the lists: a carry inside it is the tree's, before the list under it.
+    var priority: Int { 1 }
+
     /// A card rides above the finger, the row lit under it seen; a lifted project below it, its line and the row above
     /// the line seen. The plus stands aside of the finger already.
     func ride(_ payload: DragPayload?) -> CopyRide {
@@ -606,11 +475,13 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         }
     }
 
-    /// A card only where it may go to a project (a task, not a subtask); a project lifted here; the plus.
+    /// While the panel shows: a card of the funnel or the calendar (a subtask's goes as its task's), one of the By project
+    /// list where it may go to a project (`canDrop`); a project lifted here; the plus.
     func takes(_ payload: DragPayload?) -> Bool {
-        guard let payload else { return model?.place == .projects }
+        guard model?.panelShown == true else { return false }
+        guard let payload else { return model?.funnel?.plus.tree == true }
         switch payload.kind {
-        case .card(let card): return projects?.cards[card.id]?.canDrop == true
+        case .card(let card): return projects?.cards[card.id].map(\.canDrop) ?? true
         case .project: return true
         case .section: return false
         }
@@ -623,7 +494,6 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
             let under = row(at: point)
             let over = under.flatMap { $0.acceptsTask ? $0.node : nil }
             if projects.dropOn != over { projects.dropOn = over }
-            springLoad(under?.unfoldsOnHover == true ? under?.node : nil)
             return
         }
         aim(at: point, lifted: payload.flatMap { if case .project(let row) = $0.kind { row.node } else { nil } })
@@ -661,41 +531,20 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         model.drag.showLine(from: start, to: area.maxX - TreeMetrics.inset)
     }
 
-    /// The folded row a held card waits over, and the pause after which its branch opens, as a folder opens under a
-    /// carried file in Files.
-    private var waitingOver: String?
-    private var unfold: DispatchWorkItem?
-
-    private func springLoad(_ node: String?) {
-        guard node != waitingOver else { return }
-        unfold?.cancel()
-        unfold = nil
-        waitingOver = node
-        guard let node, let projects else { return }
-        let work = DispatchWorkItem { [weak self] in
-            guard self?.waitingOver == node else { return }
-            UISelectionFeedbackGenerator().selectionChanged()
-            Task { await projects.unfold(node) }
-        }
-        unfold = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + projects.measures.hoverMs / 1000, execute: work)
-    }
-
     func leave() {
         if model?.carrying != true { liftedFrom = nil }
-        springLoad(nil)
         projects?.dropOn = nil
         aimed = nil
         model?.drag.hideLine()
     }
 
     func letGo(carrying payload: DragPayload?) -> CarryLanding? {
-        guard let projects, let model else { return nil }
+        guard let projects, model != nil else { return nil }
         defer { leave() }
         switch payload?.kind {
-        case .card(let card):
+        case .card:
             guard let node = projects.dropOn, let frame = projects.geometry.rows[node] else { return nil }
-            Task { await projects.drop(card.id, on: node) }
+            model?.carryOnNode(node)
             return CarryLanding(rect: frame, folds: true)
         case .project(let row):
             guard let aimed, let name = row.project?.name else { return nil }
@@ -707,6 +556,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         case nil:
             guard let aimed else { return nil }
             let rect = lineRect
+            model?.carryNaming()
             projects.asking = .project(aimed.landing.place)
             return CarryLanding(rect: rect, folds: true)
         }
@@ -801,7 +651,7 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     var scrolls: UIScrollView? { scroll }
 
     /// The plus alone: a card stays where it is shown, let go here.
-    func takes(_ payload: DragPayload?) -> Bool { payload == nil && model?.place == .projects }
+    func takes(_ payload: DragPayload?) -> Bool { payload == nil && model?.funnel?.plus.list == "projects" }
 
     /// Where the plus is held: the part let go in is read from it.
     private var held: CGPoint?

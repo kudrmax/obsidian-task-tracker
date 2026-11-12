@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { ScreenView, TaskItem } from "../../core/application/contracts";
-import { callDoor, callDoorJson, type DoorAnswer, type DoorContext, DOOR_COVERAGE, doorMethods, HOST_TASK_METHODS, plainJson } from "../../core/application/PhoneCalls";
+import { callDoor, callDoorJson, type DoorAnswer, type DoorContext, DOOR_COVERAGE, doorMethods, HOST_TASK_METHODS, KEPT_TASK_NAMES, plainJson } from "../../core/application/PhoneCalls";
 import { ScreenSettingsImpl } from "../../core/application/ScreenSettingsImpl";
 import { DEFAULT_ZOOM_LEVELS } from "../../core/application/timelineZoom";
 import { SettingsServiceImpl } from "../../core/application/SettingsServiceImpl";
@@ -84,6 +84,14 @@ const named = (s: ScreenView, title: string): TaskItem => {
 const key = (s: ScreenView, title: string) => named(s, title).key;
 const menuScreen = (s: ScreenView) => ({ today: T, day: T, offer: s.offer });
 
+/** The door's old `tasks.*` names, kept answering (`KEPT_TASK_NAMES`), no service's methods. */
+const KEPT_CASES: readonly Case[] = [
+	{ method: "unfoldProjectNode", args: () => ["done"] },
+	{ method: "tapProjectNode", args: () => ["project:Окружение"] },
+	{ method: "hoverProjectNode", args: () => ["project:Окружение"] },
+	{ method: "setProjectsMode", args: () => ["byStage"] },
+];
+
 /** Every TaskService method the door answers, with arguments taken from the screen as read. */
 const TASK_CASES: readonly Case[] = [
 	{ method: "priorityLevels", args: () => [] },
@@ -95,8 +103,11 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "screen", args: () => [T] },
 	{ method: "screen", args: () => [LATER] },
 	{ method: "screen", args: () => [T], text: null },
+	{ method: "screen", args: () => [T, "project:Окружение"] },
+	{ method: "screen", args: () => [T, "none"] },
 	{ method: "screen", args: () => [T], text: "## Now\n\n- [x] Closed\n- [ ] Open\n" },
 	{ method: "dayView", args: () => [T] },
+	{ method: "dayView", args: () => [T, "none"] },
 	{ method: "soonWithoutDateView", args: () => [] },
 	{ method: "inboxView", args: () => [] },
 	{ method: "backlogView", args: () => [] },
@@ -117,6 +128,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "createAtTime", args: () => [T, 600, "At ten"] },
 	{ method: "createInPlace", args: () => ["Placed", "p1", { kind: "list", list: "now", group: "Errands", before: null }, null, ["Fast"]] },
 	{ method: "createInPlace", args: (s) => ["Sub", null, { kind: "subtask", parent: key(s, "Parent"), before: null }] },
+	{ method: "createInPlace", args: () => ["Filtered", null, { kind: "list", list: "inbox", group: null, before: null }, null, [], null, "none"] },
 	{ method: "createInPlace", args: () => ["   ", null, { kind: "day", date: T, group: null, before: null }] },
 	{ method: "createWithId", args: () => ["Placed", "p1", { kind: "list", list: "now", group: "Errands", before: null }, null, ["Fast"]] },
 	{ method: "createWithId", args: () => ["   ", null, { kind: "day", date: T, group: null, before: null }] },
@@ -194,12 +206,31 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "newProject", args: () => ["  ", []] },
 	{ method: "projectsScreen", args: () => [] },
 	{ method: "projects", args: () => [] },
-	{ method: "unfoldProjectNode", args: () => ["done"] },
 	{ method: "projectsScreen", args: () => [], text: null },
-	{ method: "tapProjectNode", args: () => ["project:Окружение"] },
+	{ method: "projectsScreen", args: () => ["project:Окружение"] },
+	{ method: "funnelView", args: () => [true] },
+	{ method: "funnelView", args: () => [false], text: null },
+	{ method: "projectNoteView", args: () => ["Окружение.md", false] },
+	{ method: "pickProjectNode", args: () => ["project:Окружение", false] },
+	{ method: "clearProjectFilter", args: () => [] },
+	{ method: "firstView", args: () => [true, false] },
+	{ method: "startCarry", args: (s) => [{ keys: [key(s, "Idea")] }, false] },
+	{ method: "carryAt", args: () => [{ edge: true, node: null }, 1000] },
+	{ method: "carryOnNode", args: () => ["project:Окружение"] },
+	{ method: "endCarry", args: () => ["nowhere"] },
+	{ method: "endProjectName", args: () => [] },
+	{ method: "setFunnelPlace", args: () => ["projects"] },
+	{ method: "firstPlace", args: () => [] },
+	{ method: "firstView", args: () => [false, true], text: null },
+	{ method: "filterHides", args: (s) => [named(s, "Idea"), "project:Окружение"] },
+	{ method: "filterHides", args: (s) => [named(s, "Someday"), "project:Окружение"] },
+	{ method: "filterHides", args: (s) => [named(s, "Idea"), null], text: null },
+	{ method: "setProjectsPanel", args: () => [true] },
+	{ method: "setViewMode", args: () => ["rows"] },
+	{ method: "setNoteViewMode", args: () => ["byProject"] },
+	{ method: "dropTasksOnProject", args: (s) => [[key(s, "Idea")], "project:Окружение", null] },
+	{ method: "dropTasksOnProject", args: (s) => [[key(s, "Someday")], "none", "project:Окружение"] },
 	{ method: "selectProjectNode", args: () => ["project:Окружение"] },
-	{ method: "hoverProjectNode", args: () => ["project:Окружение"] },
-	{ method: "setProjectsMode", args: () => ["byStage"] },
 	{ method: "createProject", args: () => ["Дружба", { parent: "Окружение", before: null }] },
 	{ method: "createProject", args: () => ["Окружение", { parent: null, before: null }] },
 	{ method: "moveProject", args: () => ["Окружение", { parent: null, before: null }] },
@@ -222,6 +253,8 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "dropPreview", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }, { key: key(s, "Someday"), from: "backlog" }], { kind: "list", column: "soon", before: null }, T] },
 	{ method: "drop", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }, { key: key(s, "Someday"), from: "backlog" }], { kind: "list", column: "soon", before: null }, T] },
 	{ method: "drop", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }], { kind: "place", column: "soon", place: { kind: "task", group: null, before: key(s, "Later") } }, T] },
+	{ method: "drop", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }], { kind: "place", column: "backlog", place: { kind: "task", group: null, before: null } }, T, "none"] },
+	{ method: "dropPreview", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }], { kind: "place", column: "backlog", place: { kind: "task", group: null, before: null } }, T, "project:Окружение"] },
 	{ method: "normalize", args: () => [] },
 	{ method: "normalize", args: () => [], text: "## Now\n\n- [ ] Old ⏰ 2026-10-01 10:00\n" },
 	{ method: "createFile", args: () => [], text: null },
@@ -262,8 +295,10 @@ describe("the door's tasks.* calls", () => {
 	it("cover every method of TaskService but the host's own", () => {
 		const declared = interfaceMethods("TaskService");
 		const offered = doorMethods().filter((m) => m.startsWith("tasks.")).map((m) => m.slice("tasks.".length));
-		expect([...offered, ...HOST_TASK_METHODS].sort()).toEqual(declared.sort());
-		expect(new Set(TASK_CASES.map((c) => c.method))).toEqual(new Set(offered));
+		const services = offered.filter((m) => !KEPT_TASK_NAMES.includes(m));
+		expect([...services, ...HOST_TASK_METHODS].sort()).toEqual(declared.sort());
+		expect(new Set(TASK_CASES.map((c) => c.method))).toEqual(new Set(services));
+		expect(new Set(KEPT_CASES.map((c) => c.method))).toEqual(new Set(KEPT_TASK_NAMES));
 	});
 });
 
@@ -492,7 +527,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 	const look = { cards: { day: [card("Parent"), card("Child one", 1), card("In progress")], soon: [card("Later"), card("Dated")] }, sections: { day: [null, "Errands"] }, sectioned: { day: true }, day: T, shown: ["day"] };
 	const gap = { kind: "gap", index: 1, level: 1, group: null };
 	const rule = { kind: "afterDone", every: 1, unit: "day", days: [], dayOfMonth: null, from: null };
-	const tasks = TASK_CASES.map((c) => ({ method: `tasks.${c.method}`, args: c.args(screen), context: context(c.text === undefined ? FILE : c.text) }));
+	const tasks = [...TASK_CASES, ...KEPT_CASES].map((c) => ({ method: `tasks.${c.method}`, args: c.args(screen), context: context(c.text === undefined ? FILE : c.text) }));
 	const plain = (method: string, ...args: unknown[]) => ({ method, args, context: context(FILE, { calendars: CALENDARS }) });
 	const entry = (method: string, ...args: unknown[]) => plain(`entry.${method}`, null, look, ...args);
 	const opened = callDoor("entry.openAtEnd", wire([null, look, "day"]), context()) as Extract<DoorAnswer, { ok: true }>;
@@ -505,8 +540,10 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("days.today"),
 		plain("days.relation", LATER),
 		plain("days.step", T, -3),
-		plain("days.stepScreen", { mode: "calendar", date: T }, 1),
-		plain("days.stepScreen", { mode: "inbox", date: T }, -1),
+		plain("days.stepFunnel", { mode: "calendar", date: T }, 1),
+		plain("days.stepScreen", { mode: "projects", date: T }, 1),
+		plain("days.stepFunnel", { mode: "inbox", date: T }, -1),
+		plain("days.stepFunnel", { mode: "done", date: T }, 1),
 		plain("days.boundary"),
 		plain("days.openAt", LATER),
 		...["startHour", "hourAt", "offsetOfHour"].map((m) => plain(`boundary.${m}`, 3)),
@@ -606,12 +643,15 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.placeAt", [{ level: 0, group: null, top: 0, height: 35 }, { level: 1, group: null, top: 37, height: 35 }], 60, 1.4, 0, null, [], { kind: "gap", index: 1, level: 1, group: null }, 6),
 		plain("rules.branchOf", [0, 1, 1], 1),
 		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
-		plain("rules.placeShowing", "day", "inbox"),
-		plain("rules.shownLists", "projects"),
-		plain("rules.shownEntryLists", "projects"),
-		plain("rules.projectsEntryLook", null),
-		plain("rules.placeShowing", "projects", "inbox"),
+		plain("rules.funnelPlaceShowing", "day", "inbox"),
+		plain("rules.funnelPlaceOf", -1),
 		plain("rules.placeShowing", "day", "projects"),
+		plain("rules.shownLists", "soon"),
+		plain("rules.shownEntryLists", "projects"),
+		plain("rules.endsSelection", "dropped"),
+		plain("rules.stackedRows", [900, 70, 400, 70], 600, 70),
+		plain("rules.viewEntryLists", "rows", "soon"),
+		plain("rules.projectsEntryLook", null),
 		plain("rules.swipeLanding", 120, 200, 0.1),
 		plain("rules.listWidths", 0.5, 390, 16),
 		plain("rules.listShareOf", 187, 390, 16),

@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import Core
 
-/// The Projects screen as the app reads and drives it through the door: the tree, the chosen node's tasks By project and
-/// By stage, the device's state kept, drops on the tree, the plus in the tree, rename and the note.
+/// The Projects list as the app reads and drives it through the door: the tree, the chosen node's tasks by project, the
+/// device's state kept, drops on the tree, the plus in the tree, rename and the note.
 @Suite struct ProjectsScreenTests {
     static let file = [
         "## Inbox", "",
@@ -28,6 +28,17 @@ import Testing
 
     let core = try! PhoneCore(script: Fixtures.phoneScript)
 
+    /// A card (or the plus) held over `node`'s row of the shown panel for the core's pause, then let go elsewhere.
+    func hoverRow(_ board: TaskBoard, _ node: String, plus: Bool = false) throws {
+        try board.setProjectsPanel(true)
+        try board.startCarry(keys: [], plus: plus, wide: true)
+        let start = Date(timeIntervalSince1970: 1_000)
+        _ = try board.carryAt(edge: false, node: node, now: start)
+        _ = try board.carryAt(edge: false, node: node, now: start.addingTimeInterval(1))
+        try board.endCarry("dropped")
+        try board.setProjectsPanel(false)
+    }
+
     func board(_ vault: FakeVault, kept: DeviceText = MemoryText()) -> TaskBoard {
         TaskBoard(core: core, vault: vault, projectsScreen: kept, clock: { Fixtures.date(7, 9) })
     }
@@ -41,14 +52,13 @@ import Testing
         #expect(view.rows.first { $0.title == "Спорт" }?.waiting == false)
         #expect(view.rows.filter(\.muted).map(\.title) == ["No project", "Done"])
         #expect(view.rows.first { $0.title == "Окружение" }?.waiting == false)
-        #expect(view.selected == "all" && view.mode == "byProject")
-        #expect(view.modes.map(\.label) == ["By project", "By stage"])
+        #expect(view.selected == "all")
     }
 
     @Test func aTapChoosesANodeAndTheDeviceKeepsIt() throws {
         let kept = MemoryText()
         let board = board(FakeVault(Self.file), kept: kept)
-        try board.tapProjectNode("project:Окружение")
+        try board.pickProjectNode("project:Окружение", wide: true)
         let view = try board.projectsScreen()
         #expect(view.selected == "project:Окружение" && view.title == "Окружение")
         #expect(view.sections.map(\.title) == [nil, "Где знакомиться", "Свидание"])
@@ -57,13 +67,13 @@ import Testing
         #expect(view.menu?.project.name == "Окружение")
         #expect(kept.load()?.contains("Окружение") == true)
         // A second tap folds its branch.
-        try board.tapProjectNode("project:Окружение")
+        try board.pickProjectNode("project:Окружение", wide: true)
         let folded = try board.projectsScreen()
         #expect(folded.rows.first { $0.title == "Окружение" }?.folded == true)
         #expect(!folded.rows.contains { $0.title == "Где знакомиться" })
-        // A card held over the folded row opens its branch, the choice staying.
+        // The plus held over the folded row opens its branch, the choice staying.
         #expect(folded.rows.first { $0.title == "Окружение" }?.unfoldsOnHover == true)
-        try board.unfoldProjectNode("project:Окружение")
+        try hoverRow(board, "project:Окружение", plus: true)
         let opened = try board.projectsScreen()
         #expect(opened.rows.contains { $0.title == "Где знакомиться" })
         #expect(opened.selected == "project:Окружение")
@@ -81,20 +91,19 @@ import Testing
         #expect(opens["project:Дружба"] == true && opens["project:Спорт"] == true && opens["none"] == true)
     }
 
-    /// One call, one wait: the folded row over which a card is held unfolds and is chosen, the mode kept.
+    /// The core's pause (`tasks.carryAt`): the folded row over which a card is held unfolds and is chosen.
     @Test func aHeldCardUnfoldsAndChoosesTheRowThroughTheDoor() throws {
         let kept = MemoryText()
         let board = board(FakeVault(Self.file), kept: kept)
-        try board.tapProjectNode("project:Дружба")
-        try board.tapProjectNode("project:Дружба")
+        try board.pickProjectNode("project:Дружба", wide: true)
+        try board.pickProjectNode("project:Дружба", wide: true)
         try board.selectProjectNode("project:Окружение")
-        try board.setProjectsMode("byStage")
         let before = try board.projectsScreen()
         let row = try #require(before.rows.first { $0.node == "project:Дружба" })
         #expect(row.folded && row.unfoldsOnHover && row.opensOnHover)
-        try board.hoverProjectNode("project:Дружба")
+        try hoverRow(board, "project:Дружба")
         let after = try board.projectsScreen()
-        #expect(after.selected == "project:Дружба" && after.mode == "byStage")
+        #expect(after.selected == "project:Дружба")
         #expect(after.rows.contains { $0.title == "Small talk" })
         #expect(kept.load()?.contains("Дружба") == true)
     }
@@ -109,20 +118,9 @@ import Testing
             Issue.record("no lifted in \(card.drop)"); return
         }
         #expect(lifted["id"] == .string(card.item.id))
-        try board.hoverProjectNode("project:Дружба")
+        try hoverRow(board, "project:Дружба")
         try board.dropOnProject([card], to: "project:Small talk")
         #expect(vault.text.contains("- [ ] Активности 🗂️ Small talk\n"))
-    }
-
-    @Test func byStageGivesTheStagesAndEachCardsSubproject() throws {
-        let board = board(FakeVault(Self.file))
-        try board.selectProjectNode("project:Окружение")
-        try board.setProjectsMode("byStage")
-        let view = try board.projectsScreen()
-        #expect(view.mode == "byStage")
-        #expect(view.sections.map(\.title) == ["Inbox", "Backlog", "Soon", "Today"])
-        #expect(view.sections[0].cards.first?.over == "Свидание")
-        #expect(view.sections[2].cards.first?.over == nil)
     }
 
     @Test func aCardDroppedOnTheTreeChangesThatProjectAndStaysInTheFunnel() throws {
@@ -232,21 +230,6 @@ import Testing
         let none = try board.projectsScreen()
         #expect(none.sections.flatMap(\.cards).map(\.item.title) == ["Loose"])
         #expect(none.menu == nil)
-    }
-
-    /// By stage every stage shows, an empty one under its header with the No tasks plate, so a card can go there.
-    @Test func byStageShowsEveryStageAnEmptyOneWithItsPlate() throws {
-        let board = board(FakeVault(Self.file))
-        try board.selectProjectNode("project:Спорт")
-        try board.setProjectsMode("byStage")
-        let view = try board.projectsScreen()
-        #expect(view.sections.map(\.title) == ["Inbox", "Backlog", "Soon", "Today"])
-        #expect(view.sections.map(\.header) == [true, true, true, true])
-        #expect(view.sections.map(\.empty) == [true, false, true, true])
-        #expect(view.sections.map(\.plate) == [true, false, true, true])
-        #expect(view.sections.map(\.opens) == [true, true, true, true])
-        #expect(view.sections[1].group == view.sections[1].key)
-        #expect(view.reorders)
     }
 
     /// By project the node's own part, empty above subprojects, draws nothing; a subproject with no task shows its plate.

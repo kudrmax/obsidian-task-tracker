@@ -8,11 +8,11 @@ import { DEFAULT_SETTINGS } from "../../core/settings";
 import { SETTINGS_FILE, type StoredSettings } from "../../obsidian/settingsFile";
 import { TaskCalendarSettingsTab } from "../../obsidian/ui/SettingsTab";
 
-type FileSettings = Omit<StoredSettings, "listShare" | "rightMode" | "zoom" | "treeWidth">;
+type FileSettings = Omit<StoredSettings, "listShare" | "zoom" | "treeWidth">;
 
 /** What data.json holds of the settings: all but the device's part. */
 function fileOf(settings: StoredSettings): FileSettings {
-	const { listShare: _s, rightMode: _m, zoom: _z, treeWidth: _t, ...file } = settings;
+	const { listShare: _s, zoom: _z, treeWidth: _t, ...file } = settings;
 	return file;
 }
 

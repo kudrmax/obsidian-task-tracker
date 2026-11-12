@@ -16,7 +16,7 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
 export function settingsEffect(before: ShownSettings, after: ShownSettings): SettingsEffect {
 	return {
 		restack: before.cardHeight !== after.cardHeight || before.cardGap !== after.cardGap,
-		frame: before.rightMode !== after.rightMode || before.listShare !== after.listShare,
+		frame: before.listShare !== after.listShare,
 		drawn:
 			before.tasksFile !== after.tasksFile ||
 			!same(before.sections, after.sections) ||

@@ -27,10 +27,16 @@ import {
 	type ProjectsDrop,
 	type ProjectsDropPreview,
 	type ListPlace,
-	type ProjectsMode,
 	type ProjectsNodeId,
 	type ProjectsScreenState,
 	type ProjectsView,
+	type FunnelView,
+	type ViewMode,
+	type ViewChoice,
+	type CarryEnd,
+	type CarryPoint,
+	type CarryStart,
+	type CarryWait,
 	type NewTaskPlace,
 	type Placement,
 	type RepeatRule,
@@ -50,7 +56,10 @@ import {
 import type { SectionOffer } from "./sections";
 import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type ProjectsScreenStore, type SettingsStore, type TaskFileStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
-import { hovered, projectOfNode, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { chosenNode, cleared, picked, projectOfNode, renamedIn, selected } from "./projectsScreen";
+import { withMode } from "./viewModes";
+import { carriedAt, carryEnded, carryStarted, gestureGone, nameEnded } from "./projectsCarry";
+import { funnelPlaceOf, type FunnelPlace } from "./screenPlaces";
 import { ProjectTree, type TreePlace } from "../domain/ProjectTree";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
@@ -98,6 +107,14 @@ export class TaskServiceImpl implements TaskService {
 		this.rules = new TaskRules(settings, clock, identity, true, { list: () => legacyProjects.list(), ready: () => legacyProjects.ready?.() ?? true });
 		this.reads = new TaskReads(this.rules, settings, clock, { tree: () => this.lastTree(), screen: () => projectsScreenStore.get() });
 		this.writes = new TaskWrites(this.rules, this.reads);
+		this.dropGesture();
+	}
+
+	/** A carry or a name left in the device's state by a screen gone mid-gesture: dropped as the screen loads (`gestureGone`). */
+	private dropGesture(): void {
+		const state = this.projectsScreenStore.get();
+		const loaded = gestureGone(state);
+		if (loaded !== state) this.projectsScreenStore.set(loaded);
 	}
 
 	priorityLevels(): readonly PriorityLevel[] {
@@ -124,8 +141,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.withPriority(text, prefix);
 	}
 
-	screen(date: LocalDate): Promise<ScreenView> {
-		return this.ask(this.reads.screenRead(date));
+	screen(date: LocalDate, filter?: ProjectsNodeId | null): Promise<ScreenView> {
+		return this.ask(this.reads.screenRead(date, filter));
 	}
 
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void> {
@@ -140,36 +157,103 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.projects();
 	}
 
-	async unfoldProjectNode(node: ProjectsNodeId): Promise<void> {
-		this.keepScreen(unfolded(this.projectsScreenStore.get(), node));
-	}
-
 	async newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null> {
 		return this.refOf(await this.run(this.writes.newProject(name, keys)));
 	}
 
-	projectsScreen(): Promise<ProjectsView> {
-		return this.ask(this.reads.projectsScreenRead());
+	projectsScreen(node?: ProjectsNodeId): Promise<ProjectsView> {
+		return this.ask(this.reads.projectsScreenRead(node));
 	}
 
-	async tapProjectNode(node: ProjectsNodeId): Promise<void> {
+	funnelView(wide: boolean): Promise<FunnelView> {
+		return this.ask(this.reads.funnelViewRead(wide));
+	}
+
+	projectNoteView(path: string, wide: boolean): Promise<FunnelView | null> {
+		return this.ask(this.reads.projectNoteViewRead(path, wide));
+	}
+
+	async pickProjectNode(node: ProjectsNodeId, wide: boolean): Promise<void> {
 		const s = await this.snapshotOrNull();
-		this.keepScreen(tapped(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, node));
+		this.keepScreen(picked(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, node, wide));
+	}
+
+	firstView(wide: boolean, note: boolean): ViewChoice {
+		if (!note) this.dropGesture();
+		return this.reads.firstView(wide, note);
+	}
+
+	filterHides(item: TaskItem, filter: ProjectsNodeId | null): Promise<boolean> {
+		return this.ask(this.reads.filterHidesRead(item, filter));
+	}
+
+	async startCarry(start: CarryStart, wide: boolean): Promise<void> {
+		const s = await this.snapshotOrNull();
+		this.keepScreen(carryStarted(this.projectsScreenStore.get(), start, wide, s ? projectTreeOf(s.doc) : ProjectTree.EMPTY));
+	}
+
+	async carryAt(at: CarryPoint, nowMs: number): Promise<CarryWait> {
+		const s = await this.snapshotOrNull();
+		const { state, wait } = carriedAt(this.projectsScreenStore.get(), at, nowMs, s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, s?.doc ?? null);
+		this.keepScreen(state);
+		return { wait };
+	}
+
+	async carryOnNode(node: ProjectsNodeId): Promise<void> {
+		const carry = this.projectsScreenStore.get().carry;
+		if (carry?.cards && carry.cards.length > 0) await this.dropOnProject(carry.cards, node);
+		else if (carry && carry.keys.length > 0) await this.dropTasksOnProject(carry.keys, node, carry.under);
+		await this.endCarry("dropped");
+	}
+
+	async endCarry(how: CarryEnd): Promise<void> {
+		const s = await this.snapshotOrNull();
+		this.keepScreen(carryEnded(this.projectsScreenStore.get(), how, s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, s?.doc ?? null));
+	}
+
+	async endProjectName(): Promise<void> {
+		this.keepScreen(nameEnded(this.projectsScreenStore.get()));
+	}
+
+	async setFunnelPlace(place: unknown): Promise<void> {
+		const state = this.projectsScreenStore.get();
+		const at = funnelPlaceOf(place);
+		if (state.place !== at) this.keepScreen({ ...state, place: at });
+	}
+
+	firstPlace(): FunnelPlace {
+		this.dropGesture();
+		return funnelPlaceOf(this.projectsScreenStore.get().place);
+	}
+
+	async clearProjectFilter(): Promise<void> {
+		this.keepScreen(cleared(this.projectsScreenStore.get()));
+	}
+
+	async setProjectsPanel(open: boolean): Promise<void> {
+		const state = this.projectsScreenStore.get();
+		if ((state.panelOpen === true) !== open) this.keepScreen({ ...state, panelOpen: open });
+	}
+
+	async setViewMode(mode: ViewMode): Promise<void> {
+		const s = await this.snapshotOrNull();
+		const state = this.projectsScreenStore.get();
+		this.keepScreen(withMode(state, mode, chosenNode(state, s ? projectTreeOf(s.doc) : ProjectTree.EMPTY) !== null));
+	}
+
+	async setNoteViewMode(mode: ViewMode): Promise<void> {
+		this.keepScreen({ ...this.projectsScreenStore.get(), noteView: mode });
+	}
+
+	dropTasksOnProject(keys: readonly TaskKey[], to: ProjectsNodeId, filter: ProjectsNodeId | null): Promise<void> {
+		const target = to === "none" ? null : projectOfNode(to);
+		if (target === null && to !== "none") return Promise.resolve();
+		return this.run(this.writes.dropTasksOnProject(keys, target, filter));
 	}
 
 	async selectProjectNode(node: ProjectsNodeId): Promise<void> {
 		const s = await this.snapshotOrNull();
 		this.keepScreen(selected(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, s?.doc ?? null, node));
-	}
-
-	async hoverProjectNode(node: ProjectsNodeId): Promise<void> {
-		const { rows } = await this.projectsScreen();
-		const s = await this.snapshotOrNull();
-		this.keepScreen(hovered(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, s?.doc ?? null, rows, node));
-	}
-
-	async setProjectsMode(mode: ProjectsMode): Promise<void> {
-		this.keepScreen({ ...this.projectsScreenStore.get(), mode });
 	}
 
 	async createProject(name: string, place: TreePlace): Promise<ProjectRef | null> {
@@ -206,12 +290,12 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.dropOnProject(cards, target));
 	}
 
-	async dropInProjects(cards: readonly ProjectsDrop[], place: ListPlace): Promise<readonly TaskKey[]> {
-		return this.run(await this.ask(this.writes.dropInProjects(cards, place)));
+	async dropInProjects(cards: readonly ProjectsDrop[], place: ListPlace, node?: ProjectsNodeId): Promise<readonly TaskKey[]> {
+		return this.run(await this.ask(this.writes.dropInProjects(cards, place, node)));
 	}
 
-	projectsDropPreview(cards: readonly ProjectsDrop[], place: ListPlace): Promise<ProjectsDropPreview> {
-		return this.ask(this.writes.projectsDropPreview(cards, place));
+	projectsDropPreview(cards: readonly ProjectsDrop[], place: ListPlace, node?: ProjectsNodeId): Promise<ProjectsDropPreview> {
+		return this.ask(this.writes.projectsDropPreview(cards, place, node));
 	}
 
 	isBlankProjectName(name: string): boolean {
@@ -234,8 +318,8 @@ export class TaskServiceImpl implements TaskService {
 		return name === null ? null : new ProjectIndex(this.lastTree()).refOf(name, true);
 	}
 
-	async dayView(date: LocalDate): Promise<DayView> {
-		return this.reads.dayView(await this.snapshot(), date);
+	async dayView(date: LocalDate, filter?: ProjectsNodeId | null): Promise<DayView> {
+		return this.reads.dayView(await this.snapshot(), date, filter);
 	}
 
 	async soonWithoutDateView(): Promise<readonly TaskItem[]> {
@@ -291,12 +375,12 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.createAtTime(date, start, text));
 	}
 
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Promise<TaskKey | null> {
-		return this.run(this.writes.createInPlace(text, priority, place, repeat, labels, project));
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null, filter?: ProjectsNodeId | null): Promise<TaskKey | null> {
+		return this.run(this.writes.createInPlace(text, priority, place, repeat, labels, project, filter));
 	}
 
-	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Promise<CreatedTask | null> {
-		return this.run(this.writes.createWithId(text, priority, place, repeat, labels, project));
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null, filter?: ProjectsNodeId | null): Promise<CreatedTask | null> {
+		return this.run(this.writes.createWithId(text, priority, place, repeat, labels, project, filter));
 	}
 
 	create(draft: TaskDraft, slot?: Slot): Promise<void> {
@@ -535,16 +619,16 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.applyAll(steps));
 	}
 
-	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly TaskKey[]> {
-		return this.run(await this.ask(this.writes.drop(tasks, to, day)));
+	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<readonly TaskKey[]> {
+		return this.run(await this.ask(this.writes.drop(tasks, to, day, filter)));
 	}
 
-	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly DropLanding[]> {
-		return this.ask(this.writes.landing(tasks, to, day));
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<readonly DropLanding[]> {
+		return this.ask(this.writes.landing(tasks, to, day, filter));
 	}
 
-	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<DropPreview> {
-		return this.ask(this.writes.dropPreview(tasks, to, day));
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<DropPreview> {
+		return this.ask(this.writes.dropPreview(tasks, to, day, filter));
 	}
 
 	async normalize(): Promise<void> {

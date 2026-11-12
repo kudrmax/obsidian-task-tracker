@@ -46,10 +46,9 @@ function setup(text = FILE) {
 	return { store, svc, history };
 }
 
-async function chosen(node: string, mode: "byProject" | "byStage" = "byProject", text = FILE) {
+async function chosen(node: string, _mode: "byProject" | "byStage" = "byProject", text = FILE) {
 	const s = setup(text);
 	await s.svc.selectProjectNode(node);
-	await s.svc.setProjectsMode(mode);
 	return { ...s, view: await s.svc.projectsScreen() };
 }
 
@@ -180,34 +179,6 @@ describe("a folder's Projects list", () => {
 		const under = { kind: "subtask", parent: own.cards[0].item.key, before: null } as const;
 		expect(projectsTakes(view, [card.drop], under)).toBe(false);
 		await svc.dropInProjects([card.drop], under);
-		expect(store.text).toBe(before);
-	});
-
-	it("By stage: the stages take cards and only move them; no plus names the folder", async () => {
-		const { svc, store, view } = await chosen("project:Работа", "byStage");
-		expect(view.sections.map((s) => [s.title, s.takes, s.newTask])).toEqual([
-			["Inbox", true, null],
-			["Backlog", true, null],
-			["Soon", true, null],
-			["Today", true, null],
-		]);
-		expect(view.newTask).toBeNull();
-		const card = cardIn(part(view, "Backlog"), "Резюме");
-		await svc.dropInProjects([card.drop], { kind: "task", group: "inbox", before: null });
-		expect(store.text).toContain("- [ ] Отчёт за октябрь 🗂️ Отчёты\n- [ ] Резюме 🗂️ Найм\n");
-	});
-
-	it("By stage, nothing nests under a task that has the folder by hand, nor under its subtasks", async () => {
-		const text = FILE.replace("- [ ] Без проекта", "- [ ] Без проекта 🗂️ Работа\n\t- [ ] Шаг");
-		const { svc, store, view } = await chosen("project:Работа", "byStage", text);
-		const inbox = part(view, "Inbox");
-		const card = cardIn(part(view, "Backlog"), "Резюме");
-		const under = (title: string) => ({ kind: "subtask", parent: inbox.rows.find((r) => r.item.title === title)!.item.key, before: null }) as const;
-		expect(projectsTakes(view, [card.drop], under("Без проекта"))).toBe(false);
-		expect(projectsTakes(view, [card.drop], under("Шаг"))).toBe(false);
-		expect(projectsTakes(view, [card.drop], under("Отчёт за октябрь"))).toBe(true);
-		const before = store.text;
-		await svc.dropInProjects([card.drop], under("Без проекта"));
 		expect(store.text).toBe(before);
 	});
 

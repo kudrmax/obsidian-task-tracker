@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { PROJECTS_HOVER_MS, PROJECTS_INDENT, type ProjectsRow } from "../../core/application/contracts";
+import { describe, expect, it } from "vitest";
+import { PROJECTS_INDENT, type ProjectsRow } from "../../core/application/contracts";
 import { DESIGN } from "../../obsidian/ui/design";
 import { liftLanding, plusLanding, TreeDrop, type TreeShown } from "../../obsidian/ui/projects/ProjectDrops";
 
@@ -55,93 +55,28 @@ describe("the tree's step", () => {
 });
 
 describe("a card held over a row of the tree", () => {
-	afterEach(() => vi.useRealTimers());
-
 	const card = { item: {} as never, from: "soon" as const, grabPx: 18 };
-	const hovered = (rows: readonly ProjectsRow[]) => {
-		vi.useFakeTimers();
-		const hover = vi.fn(async () => undefined);
+	const held = (rows: readonly ProjectsRow[]) => {
 		const filled: (string | null)[] = [];
 		const tree = { ...shown(rows), showDropOn: (node: string | null) => void filled.push(node) };
 		tree.el.getClientRects = () => [tree.el.getBoundingClientRect()] as unknown as DOMRectList;
-		return { drop: new TreeDrop({ tree: () => tree, hover }), hover, filled };
+		return { drop: new TreeDrop({ tree: () => tree }), filled };
 	};
-	const opens = (r: ProjectsRow): ProjectsRow => ({ ...r, opensOnHover: true });
-	const unfolds = (r: ProjectsRow): ProjectsRow => ({ ...r, unfoldsOnHover: true });
 
-	it("opens a row that opens on hover once it has waited the core's pause there", () => {
-		const { drop, hover } = hovered([row("all", "all", 0), opens(row("project:A", "project", 0)), row("project:B", "project", 0)]);
-		drop.preview(20, 30 + 5, card);
-		vi.advanceTimersByTime(PROJECTS_HOVER_MS - 1);
-		expect(hover).not.toHaveBeenCalled();
-		drop.preview(20, 30 + 8, card);
-		vi.advanceTimersByTime(1);
-		expect(hover).toHaveBeenCalledWith("project:A");
-		vi.advanceTimersByTime(PROJECTS_HOVER_MS * 3);
-		expect(hover).toHaveBeenCalledTimes(1);
-	});
-
-	it("unfolds a folded row the same way, in the same one call", () => {
-		const { drop, hover } = hovered([row("all", "all", 0), unfolds(row("project:A", "project", 0, true))]);
-		drop.preview(20, 30 + 5, card);
-		vi.advanceTimersByTime(PROJECTS_HOVER_MS);
-		expect(hover).toHaveBeenCalledWith("project:A");
-	});
-
-	it("does nothing over a row that neither opens nor unfolds: All, the chosen one, Done", () => {
-		const { drop, hover } = hovered([row("all", "all", 0), { ...row("project:A", "project", 0), selected: true }, row("done", "done", 0)]);
-		for (const y of [5, 35, 65]) {
-			drop.preview(20, y, card);
-			vi.advanceTimersByTime(PROJECTS_HOVER_MS);
-		}
-		expect(hover).not.toHaveBeenCalled();
-	});
-
-	it("stops the wait when the card moves to another row or leaves the tree", () => {
-		const { drop, hover } = hovered([opens(row("project:A", "project", 0)), opens(row("project:B", "project", 0))]);
-		drop.preview(20, 5, card);
-		vi.advanceTimersByTime(PROJECTS_HOVER_MS - 100);
-		drop.preview(20, 35, card);
-		vi.advanceTimersByTime(PROJECTS_HOVER_MS - 100);
-		drop.leave();
-		vi.advanceTimersByTime(PROJECTS_HOVER_MS);
-		expect(hover).not.toHaveBeenCalled();
-	});
-
-	it("opens one row after another as the card waits over each in turn", () => {
-		const { drop, hover } = hovered([opens(row("project:A", "project", 0)), opens(row("project:B", "project", 0))]);
-		drop.preview(20, 35, card);
-		vi.advanceTimersByTime(PROJECTS_HOVER_MS);
-		drop.preview(20, 5, card);
-		vi.advanceTimersByTime(PROJECTS_HOVER_MS);
-		expect(hover.mock.calls).toEqual([["project:B"], ["project:A"]]);
-	});
-
-	it("fills the row it still waits over again once the screen is drawn anew", async () => {
-		const { drop, filled } = hovered([opens(row("project:A", "project", 0))]);
+	it("fills the row it is over again once the tree is drawn anew (a pause opened it: the core's carry)", () => {
+		const { drop, filled } = held([row("project:A", "project", 0)]);
 		drop.preview(20, 5, card);
 		filled.length = 0;
-		await vi.advanceTimersByTimeAsync(PROJECTS_HOVER_MS);
+		drop.refill();
 		expect(filled).toEqual(["project:A"]);
 	});
 
-	it("fills nothing again once the card has left the tree before the screen is drawn", async () => {
-		const { drop, filled, hover } = hovered([opens(row("project:A", "project", 0))]);
-		let drawn: () => void = () => undefined;
-		hover.mockImplementation(() => new Promise<undefined>((r) => (drawn = () => r(undefined))));
+	it("fills nothing again once the card has left the tree", () => {
+		const { drop, filled } = held([row("project:A", "project", 0)]);
 		drop.preview(20, 5, card);
-		vi.advanceTimersByTime(PROJECTS_HOVER_MS);
 		drop.leave();
 		filled.length = 0;
-		drawn();
-		await vi.advanceTimersByTimeAsync(0);
+		drop.refill();
 		expect(filled).toEqual([]);
-	});
-
-	it("never opens a row under the plus", () => {
-		const { drop, hover } = hovered([row("all", "all", 0), opens(row("project:A", "project", 0)), row("none", "none", 0)]);
-		drop.preview(20, 35, { from: "new", item: null, grabPx: 0 });
-		vi.advanceTimersByTime(PROJECTS_HOVER_MS);
-		expect(hover).not.toHaveBeenCalled();
 	});
 });

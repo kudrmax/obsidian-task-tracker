@@ -5,7 +5,7 @@ import { repeatDay } from "../domain/RepeatDraft";
 import type { GroupedList } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
 import { samePlacement } from "../domain/operations";
-import type { CreatedTask, DraftMarks, DropColumn, DropTo, MenuProject, NewTaskPlace, ProjectRef, TaskItem, TaskKey, TaskService } from "./contracts";
+import type { CreatedTask, DraftMarks, DropColumn, DropTo, MenuProject, NewTaskPlace, ProjectRef, ProjectsNodeId, TaskItem, TaskKey, TaskService } from "./contracts";
 import { inProject, projectKey, projectName } from "../domain/Project";
 import { projectPage } from "./menus";
 import { fitLevel, type GapPlace, gapOfPlace, type Header, type LevelCard, type ListCard, type ListPlace, placeOfGap, shiftLevel } from "./nesting";
@@ -170,6 +170,11 @@ export interface EntryState {
 	 * subtask's field, new or renamed (its project is its parent's), nor for a section's name.
 	 */
 	readonly project: EntryProject | null;
+	/**
+	 * The projects button can't be pressed while the field is open (Max's app since 11-12, now both frontends'): a panel
+	 * opened over a field being typed would take the screen from it. Always true while there is a state; no field, no lock.
+	 */
+	readonly locksPanel: boolean;
 }
 
 /**
@@ -220,6 +225,12 @@ export interface EntryLook {
 	 * `parts`); none for a funnel's column, whose place is its own. Left out: none anywhere.
 	 */
 	parts?(column: EntryList): readonly EntryPart[];
+	/**
+	 * The filter the screen is read with (`FunnelView.filter`, `ProjectFilter`; null: none): a new task's field starts with its
+	 * project, a task written in a funnel's list goes where the filtered list shows it (`createInPlace`'s `filter`), and one
+	 * in the Projects list is read off that node's list (`ProjectsPlace.node`). Left out: none.
+	 */
+	filter?(): { readonly node: ProjectsNodeId; readonly project: string | null } | null;
 }
 
 /** A line entered: its text, the level it was entered at, and its marks. */
@@ -295,7 +306,7 @@ export interface EntrySession {
 
 /** The service call a job is, read once the lists show the writes before it. */
 export type EntryCall =
-	| { readonly method: "createInPlace"; readonly args: readonly [string, string | null, NewTaskPlace, RepeatRule | null, readonly string[], (string | null)?] }
+	| { readonly method: "createInPlace"; readonly args: readonly [string, string | null, NewTaskPlace, RepeatRule | null, readonly string[], (string | null)?, (ProjectsNodeId | null)?] }
 	| { readonly method: "edit"; readonly args: readonly [TaskKey, TaskDraft] }
 	| { readonly method: "createSection"; readonly args: readonly [string, Extract<NewTaskPlace, { readonly kind: "list" | "day" }>] }
 	| { readonly method: "unfoldAbove"; readonly args: readonly [TaskKey] };
@@ -366,6 +377,7 @@ export class QuickEntry {
 			repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today()),
 			renamed: this.renamed,
 			project: task && this.topLevel(field) ? this.projectButton(field.project ?? null) : null,
+			locksPanel: true,
 		};
 	}
 
@@ -675,8 +687,10 @@ export class QuickEntry {
 		if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
 		const { group, before } = result;
 		switch (column) {
-			case "projects":
-				return { kind: "projects", group, before, ...(placement && { placement }) };
+			case "projects": {
+				const node = this.look.filter?.()?.node;
+				return { kind: "projects", group, before, ...(placement && { placement }), ...(node !== undefined && { node }) };
+			}
 			case "day":
 				return { kind: "day", date: this.look.day(), group, before };
 			default:
@@ -718,7 +732,9 @@ export class QuickEntry {
 						const place = fitLevel(cards, { ...spot.place, level: line.level });
 						job.landing = spot.column;
 						const at = this.placeOf(spot.column, placeOfGap(cards, place), line.placement);
-							return { method: "createInPlace", args: at.kind === "subtask" ? [line.text, line.priority, at, line.repeat, line.labels] : [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null] };
+						const filter = this.look.filter?.()?.node ?? null;
+						if (at.kind === "subtask") return { method: "createInPlace", args: [line.text, line.priority, at, line.repeat, line.labels] };
+						return { method: "createInPlace", args: filter !== null && at.kind !== "projects" ? [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null, filter] : [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null] };
 					}
 				}
 				break;
@@ -867,10 +883,11 @@ export class QuickEntry {
 		return this.parts(spot.column).find((part) => part.group === spot.place.group) ?? null;
 	}
 
-	/** The project a new task's field opened at `spot` starts with: its part's, where the list has parts; none elsewhere. */
+	/** The project a new task's field opened at `spot` starts with: its part's, where the list has parts; elsewhere the filter's; none without one. */
 	private partProject(spot: EntrySpot): string | null {
 		const list = listSpot(spot);
-		return (list && this.partAt(list)?.newTask?.project) ?? null;
+		if (list && this.parts(list.column).length > 0) return this.partAt(list)?.newTask?.project ?? null;
+		return this.look.filter?.()?.project ?? null;
 	}
 
 	/** The lists a task is looked for in: the shown ones first, then every other the entry knows. */

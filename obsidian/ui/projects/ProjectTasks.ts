@@ -223,7 +223,7 @@ export class ProjectTasks implements DropList {
 				node.classList.remove(HIDDEN);
 				node.replaceChildren();
 				if (row.card) {
-					fillCard(node, row.item, { day: null, over: row.card.over, corner: row.card.stage === null });
+					fillCard(node, row.item, { day: null, corner: row.card.stage === null });
 					if (row.card.stage) renderStage(node, row.item, row.card.stage);
 				} else fillCard(node, row.item, { day: null });
 				node.style.setProperty(PROPERTY.level, String(row.level));

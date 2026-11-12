@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dayWords } from "../../core/application/sourceWords";
-import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, type DayEventsAsk, type EventsReason, type ScreenView, type TaskService } from "../../core/application/contracts";
+import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, type DayEventsAsk, type EventsReason, type FunnelView, type ScreenView, type TaskService } from "../../core/application/contracts";
 import { DayData, type DayPart } from "../../obsidian/ui/DayData";
 import type { LocalDate } from "../../obsidian/ui/types";
 import { DemoTaskService } from "../fakes/DemoTaskService";
@@ -353,15 +353,27 @@ describe("DayData", () => {
 		expect(seen).toBe("Renamed");
 	});
 
-	it("reads the Projects screen with the lists where the screen has it, so beforeShow sees the Projects cards about to be drawn", async () => {
-		const tasks = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
-		const withProjects = new DayData({ tasks, calendars: new SlowCalendars(), date: () => TODAY, projects: true, onUpdate: () => {} });
+	it("reads the view first and the lists under its filter, and the node's list by project in that mode, so beforeShow sees what is about to be drawn", async () => {
+		const tasks: TaskService = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
+		const funnel = await tasks.funnelView(true);
+		const node = (await tasks.projectsScreen()).rows.find((row) => row.kind === "project")?.node ?? "all";
+		const filtered: FunnelView = { ...funnel, filter: { node, title: "", menu: null, clearable: true, project: null, emptyLabel: "No tasks" }, view: { ...funnel.view, mode: "byProject", source: "projectsScreen" } };
+		const asked: (string | null | undefined)[] = [];
+		const screen = tasks.screen.bind(tasks);
+		tasks.screen = (date: string, filter?: string | null) => {
+			asked.push(filter);
+			return screen(date, filter);
+		};
+		const withView = new DayData({ tasks, calendars: new SlowCalendars(), date: () => TODAY, view: async () => filtered, onUpdate: () => {} });
 		let seen: unknown = undefined;
-		await withProjects.tasks(() => (seen = withProjects.projects));
-		expect(seen).toEqual(await tasks.projectsScreen());
+		await withView.tasks(() => (seen = withView.projects));
+		expect(asked).toEqual([node]);
+		expect(seen).toEqual(await tasks.projectsScreen(node));
+		expect(withView.funnel).toEqual(filtered);
 		const without = new DayData({ tasks, calendars: new SlowCalendars(), date: () => TODAY, onUpdate: () => {} });
 		await without.tasks();
 		expect(without.projects).toBeNull();
+		expect(without.funnel).toBeNull();
 	});
 
 	it("runs beforeShow even when the tasks read are the same", async () => {

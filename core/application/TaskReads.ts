@@ -43,9 +43,14 @@ import type { TaskRules } from "./TaskRules";
 import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
 import type { Clock, SettingsStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
-import type { DropTo, ProjectNote, ProjectRef, ProjectsScreenState, ProjectsView } from "./contracts";
+import type { DropTo, FunnelView, ProjectFilter, ProjectNote, ProjectRef, ProjectsNodeId, ProjectsScreenState, ProjectsView } from "./contracts";
 import { ProjectTree } from "../domain/ProjectTree";
-import { projectsView } from "./projectsScreen";
+import { chosenNode, nodeHeader, nodeIn, panelRows, PROJECTS_WORDS, projectNodeOf, projectOfNode, projectsView } from "./projectsScreen";
+import { filterTest, noteProject } from "./projectFilter";
+import { firstViewOf, viewChoice } from "./viewModes";
+import { panelReason } from "./projectsCarry";
+import { funnelPlaceOf } from "./screenPlaces";
+import type { PlusChoice, ViewChoice, ViewMode } from "./contracts";
 
 /** The file as one read sees it: normalized for `today`, the day beginning at `boundary`; `text` as the file holds it. */
 export interface Snapshot {
@@ -127,12 +132,12 @@ export class TaskReads {
 		return new ProjectIndex(this.source.tree()).known();
 	}
 
-	/** The Projects screen as this device shows it; without a file, the tree's fixed rows alone. */
-	projectsScreenRead(): Read<ProjectsView> {
-		return { reads: true, tidies: true, missing: () => this.projectsScreen(null), answer: (s) => this.projectsScreen(s) };
+	/** The Projects screen as this device shows it, or `node`'s by project; without a file, the tree's fixed rows alone. */
+	projectsScreenRead(node?: ProjectsNodeId): Read<ProjectsView> {
+		return { reads: true, tidies: true, missing: () => this.projectsScreen(null, node), answer: (s) => this.projectsScreen(s, node) };
 	}
 
-	projectsScreen(s: Snapshot | null): ProjectsView {
+	projectsScreen(s: Snapshot | null, node?: ProjectsNodeId): ProjectsView {
 		const tree = s ? projectTreeOf(s.doc) : ProjectTree.EMPTY;
 		const levels = this.itemLevels(new ProjectIndex(tree), false);
 		const today = s?.today ?? this.today();
@@ -145,7 +150,71 @@ export class TaskReads {
 			state: this.source.screen(),
 			item: (entry) => toItem(entry, today, levels, null, boundary),
 			listName: (list) => this.listName(list),
+			...(node !== undefined && { node }),
 		});
+	}
+
+	/** The funnel's view as this device shows it; without a file, no filter and the panel's fixed rows. */
+	funnelViewRead(wide: boolean): Read<FunnelView> {
+		return { reads: true, tidies: true, missing: () => this.funnelView(null, wide), answer: (s) => this.funnelView(s, wide) };
+	}
+
+	funnelView(s: Snapshot | null, wide: boolean): FunnelView {
+		const state = this.source.screen();
+		const tree = s ? projectTreeOf(s.doc) : ProjectTree.EMPTY;
+		const node = chosenNode(state, tree);
+		const filter = node === null ? null : this.filterOf(node, tree, s?.doc ?? null, true);
+		const closed = node !== null && nodeHeader(node, tree, s?.doc ?? null).closed;
+		const view = viewChoice(state, { node, closed, wide, note: false });
+		const reason = panelReason(state);
+		return {
+			filter,
+			view,
+			panel: { rows: panelRows(tree, s?.doc ?? null, state), open: reason !== null, reason, docked: wide, dimCloses: reason === "button" && !wide, missing: s === null },
+			plus: plusOf(view.mode, reason !== null),
+			topRow: wide || node !== null || view.mode !== "twoColumns",
+			searchPaths: filter !== null,
+			place: funnelPlaceOf(state.place),
+		};
+	}
+
+	/** The block at the end of the note at `path`: null for a note no project has, and without a file. */
+	projectNoteViewRead(path: string, wide: boolean): Read<FunnelView | null> {
+		return { reads: true, tidies: true, missing: () => null, answer: (s) => this.projectNoteView(s!, path, wide) };
+	}
+
+	projectNoteView(s: Snapshot, path: string, wide: boolean): FunnelView | null {
+		const tree = projectTreeOf(s.doc);
+		const name = noteProject(path, tree);
+		if (name === null) return null;
+		const node = projectNodeOf(name);
+		const closed = nodeHeader(node, tree, s.doc).closed;
+		const view = viewChoice(this.source.screen(), { node, closed, wide, note: true });
+		return { filter: this.filterOf(node, tree, s.doc, false), view, panel: null, plus: plusOf(view.mode, false), topRow: false, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
+	}
+
+	/** The view before the first read: the device's state alone (`firstViewOf`). */
+	firstView(wide: boolean, note: boolean): ViewChoice {
+		return firstViewOf(this.source.screen(), wide, note);
+	}
+
+	/** Whether `filter` hides `item`'s task from the screen: a subtask goes by its top task. */
+	filterHidesRead(item: TaskItem, filter: ProjectsNodeId | null): Read<boolean> {
+		return { reads: filter !== null, tidies: true, missing: () => false, answer: (s) => (s ? this.filterHides(s, item, filter) : false) };
+	}
+
+	filterHides({ doc }: Snapshot, item: TaskItem, filter: ProjectsNodeId | null): boolean {
+		const tree = projectTreeOf(doc);
+		const node = nodeIn(filter, tree);
+		const entry = this.rules.named(doc, item.key) ?? doc.find(item.key.section, item.key.index, item.key.path);
+		if (node === null || !entry) return false;
+		const top = entry.path.length === 0 ? entry : doc.find(entry.section, entry.index, []);
+		return top !== undefined && !filterTest(node, tree, doc)(top);
+	}
+
+	private filterOf(node: ProjectsNodeId, tree: ProjectTree, doc: TaskDocument | null, clearable: boolean): ProjectFilter {
+		const { title, menu, project } = nodeHeader(node, tree, doc);
+		return { node, title, menu, clearable, project, emptyLabel: PROJECTS_WORDS.noTasks };
 	}
 
 	priorityLevels(): readonly PriorityLevel[] {
@@ -175,22 +244,26 @@ export class TaskReads {
 		return withPriority(text, prefix, this.priorityLevels().map((l) => l.prefix));
 	}
 
-	/** The screen of `date`: the file tidied for today first; without a file, the empty screen. */
-	screenRead(date: LocalDate): Read<ScreenView> {
-		return { reads: true, tidies: true, missing: () => this.missingScreen(date), answer: (s) => this.screen(s!, date) };
+	/** The screen of `date`, under `filter`: the file tidied for today first; without a file, the empty screen. */
+	screenRead(date: LocalDate, filter?: ProjectsNodeId | null): Read<ScreenView> {
+		return { reads: true, tidies: true, missing: () => this.missingScreen(date), answer: (s) => this.screen(s!, date, filter) };
 	}
 
-	/** The screen of `date`. */
-	screen(s: Snapshot, date: LocalDate): ScreenView {
+	/** The screen of `date`, only the tasks `filter` lets through (`TaskService.screen`). */
+	screen(s: Snapshot, date: LocalDate, filter?: ProjectsNodeId | null): ScreenView {
 		const { doc, today, boundary } = s;
-		const item = this.itemOf(today, doc);
-		const day = { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
+		const tree = projectTreeOf(doc);
+		const node = nodeIn(filter, tree);
+		const shows = node === null ? () => true : filterTest(node, tree, doc);
+		const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
+		const shown = (entries: readonly TaskEntry[]) => entries.filter(shows).map(item);
+		const day = { date, list: shown(dayList(doc, date, today, boundary)), slotted: shown(slottedOn(doc, date, boundary)) };
 		const sections = this.listSections(s);
-		const view = { soon: soonWithoutDate(doc).map(item), inbox: inboxList(doc).map(item), backlog: backlogList(doc).map(item) };
+		const view = { soon: shown(soonWithoutDate(doc)), inbox: shown(inboxList(doc)), backlog: shown(backlogList(doc)) };
 		return {
 			day,
 			...view,
-			done: doc.tasks("done").map(item),
+			done: shown(doc.tasks("done")),
 			sections,
 			offer: this.offerOf(s, date, sections),
 			missing: false,
@@ -230,9 +303,9 @@ export class TaskReads {
 		};
 	}
 
-	dayView({ doc, today, boundary }: Snapshot, date: LocalDate): DayView {
-		const item = this.itemOf(today, doc);
-		return { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
+	/** The day's list and timeline, only the tasks `filter` lets through: `screen(s, date, filter).day`. */
+	dayView(s: Snapshot, date: LocalDate, filter?: ProjectsNodeId | null): DayView {
+		return this.screen(s, date, filter).day;
 	}
 
 	soonWithoutDateView({ doc, today }: Snapshot): readonly TaskItem[] {
@@ -435,9 +508,9 @@ export class TaskReads {
 		return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
 	}
 
-	/** The item of a task of `doc`, its subtasks below it, its projects as `doc`'s tree has them. */
-	private itemOf(today: LocalDate, doc: TaskDocument): (entry: TaskEntry) => TaskItem {
-		const levels = this.itemLevels(new ProjectIndex(projectTreeOf(doc)));
+	/** The item of a task of `doc`, its subtasks below it, its projects as `doc`'s tree has them; `mark`, the card shows the folder mark. */
+	private itemOf(today: LocalDate, doc: TaskDocument, mark = true): (entry: TaskEntry) => TaskItem {
+		const levels = this.itemLevels(new ProjectIndex(projectTreeOf(doc)), mark);
 		const { boundary } = this.rules.moment();
 		return (entry) => toItem(entry, today, levels, null, boundary);
 	}
@@ -456,4 +529,10 @@ export class TaskReads {
 	private today(): LocalDate {
 		return this.rules.today();
 	}
+}
+
+/** What the plus does in `mode`, the panel showing or not (`PlusChoice`). */
+function plusOf(mode: ViewMode, panel: boolean): PlusChoice {
+	if (mode !== "byProject") return { tap: "newTask", list: "funnel", tree: panel };
+	return { tap: "inPlace", list: panel ? null : "projects", tree: panel };
 }

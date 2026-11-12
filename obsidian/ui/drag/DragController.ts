@@ -44,6 +44,8 @@ export interface DragControllerDeps {
 	readonly arbiter: GestureArbiter;
 	/** A card is lifted or settled: the plus hides while it is carried. */
 	onDragging(active: boolean): void;
+	/** The carrying finger moved, a card's or the plus's: where it is, for what reads it besides the targets. */
+	moved?(x: number, y: number): void;
 	/** `drag` lifted from `source`, before any target reads it: what the drop will hand the core is read now, as the screen stands. */
 	onLift?(drag: TaskDragPayload, source: HTMLElement): void;
 	/**
@@ -390,7 +392,9 @@ export class DragController {
 		const session = makeSession(() => detach());
 		session.move(e.clientX, e.clientY);
 		const move = (ev: PointerEvent) => {
-			if (ev.pointerId === e.pointerId) session.move(ev.clientX, ev.clientY);
+			if (ev.pointerId !== e.pointerId) return;
+			session.move(ev.clientX, ev.clientY);
+			this.deps.moved?.(ev.clientX, ev.clientY);
 		};
 		let ended = false;
 		const end = (settling: () => Promise<void>) => {

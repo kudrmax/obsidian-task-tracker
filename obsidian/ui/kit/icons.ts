@@ -52,6 +52,11 @@ const DRAWINGS = {
 	refresh: { d: "M20 12a8 8 0 1 1-2.3-5.7 M20 4v4.5h-4.5" },
 	repeat: { d: "M17 2.5l3.5 3.5-3.5 3.5 M3.5 11.5V10a4 4 0 0 1 4-4h13 M7 21.5L3.5 18 7 14.5 M20.5 12.5V14a4 4 0 0 1-4 4h-13" },
 	stop: { d: `${CIRCLE} M9.5 9.5h5v5h-5z` },
+	/** The view modes (board «Режим вида внизу», variant 1): two columns, all columns, rows, by project. */
+	columns2: { d: "M4.5 4.5h6v15h-6z M13.5 4.5h6v15h-6z" },
+	columns4: { d: "M3 4.5h3v15H3z M8 4.5h3v15H8z M13 4.5h3v15h-3z M18 4.5h3v15h-3z" },
+	rows: { d: "M4.5 4.5h15v6h-15z M4.5 13.5h15v6h-15z" },
+	byProject: { d: "M4 5.5h16 M9.5 12h10.5 M9.5 18.5h10.5 M5.5 5.5v13h4 M5.5 12h4" },
 } satisfies Record<string, IconSpec>;
 
 export type IconName = keyof typeof DRAWINGS;

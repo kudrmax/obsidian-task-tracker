@@ -45,6 +45,9 @@ enum DrawnRow: Hashable {
     case field(id: String, level: Int, branch: Branch?, section: Bool)
     /// Where the plus carried over the list would open its field.
     case plusRoom
+    /// The No tasks plate of a list that draws no card, with the core's words (`ViewChoice.plates`): under a filter and in
+    /// Rows.
+    case vacant(String)
 
     var id: String {
         switch self {
@@ -54,6 +57,7 @@ enum DrawnRow: Hashable {
         case .pending(let key, _, _, _): key
         case .field(let id, _, _, _): id
         case .plusRoom: "\u{0}plus"
+        case .vacant: "\u{0}vacant"
         }
     }
 
@@ -62,7 +66,7 @@ enum DrawnRow: Hashable {
         switch self {
         case .card(let card): card.level
         case .pending(_, _, let level, _), .field(_, let level, _, _): level
-        case .header, .plate, .plusRoom: nil
+        case .header, .plate, .plusRoom, .vacant: nil
         }
     }
 
@@ -80,7 +84,7 @@ enum DrawnRow: Hashable {
         switch self {
         case .header: ColumnMetrics.groupHead
         case .card(let card): card.listHeight
-        case .plate, .plusRoom: CardMetrics.height
+        case .plate, .plusRoom, .vacant: CardMetrics.height
         case .pending, .field: nil
         }
     }
@@ -99,6 +103,8 @@ enum DrawnRow: Hashable {
 struct ListCollection: UIViewRepresentable {
     let column: BoardColumn
     let model: BoardModel
+    /// One of the Rows view's stacked lists, as tall as its rows while they fit (`rules.stackedRows`).
+    var stacked = false
 
     func makeCoordinator() -> ListController { ListController(column: column, model: model) }
 
@@ -118,6 +124,7 @@ struct ListCollection: UIViewRepresentable {
         _ = model.entry.heirs
         controller.update()
         controller.keyboard(KeyboardRise.shared.top)
+        controller.host.stacked = stacked
         controller.follow(found: model.found, moved: model.entry.moved)
     }
 }
@@ -169,17 +176,47 @@ final class ListHostView: UIView {
         // The rows' height changes after the list is laid out: the soft edges follow what is now above and below, or a
         // list that came to run on past its bottom faded nothing there and its last row read as cut.
         sized = collection.observe(\.contentSize, options: [.new]) { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.edges() }
+            MainActor.assumeIsolated {
+                self?.holdStacked()
+                self?.edges()
+                self?.told()
+            }
         }
     }
 
     private var sized: NSKeyValueObservation?
+    /// Told how tall the rows stand, the room after the last left out: the Rows view gives each list its height.
+    var onContent: ((CGFloat) -> Void)?
+    /// A stacked list of the Rows view: while all its rows fit its height it never scrolls, so no carry or earlier scroll
+    /// leaves its rows standing above its top; when they don't, it scrolls no further than its last row.
+    var stacked = false {
+        didSet { if stacked != oldValue { setNeedsLayout() } }
+    }
+
+    private func holdStacked() {
+        guard stacked else {
+            if !collection.isScrollEnabled { collection.isScrollEnabled = true }
+            return
+        }
+        let rows = max(0, collection.contentSize.height - ListCollection.trailingRoom)
+        let fits = rows <= bounds.height + 0.5
+        if collection.isScrollEnabled == fits { collection.isScrollEnabled = !fits }
+        let most = fits ? 0 : rows - bounds.height
+        let top = -collection.adjustedContentInset.top
+        let offset = min(max(collection.contentOffset.y, top), top + most)
+        if abs(offset - collection.contentOffset.y) > 0.5 { collection.contentOffset.y = offset }
+    }
+
+    private func told() {
+        onContent?(max(0, collection.contentSize.height - ListCollection.trailingRoom))
+    }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not from a storyboard") }
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        holdStacked()
         edges()
     }
 
@@ -237,6 +274,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         collection.keyboardDismissMode = .none
         host = ListHostView(collection: collection)
         super.init()
+        host.onContent = { [weak model, column] height in model?.listContent(column, height) }
         let cell = UICollectionView.CellRegistration<RowCell, String> { [weak self] cell, _, id in
             guard let self, let model = self.model, let drawn = self.drawn[id] else { return }
             let column = self.column
@@ -408,6 +446,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         // At the end, or in a section the list doesn't draw (a day with no task yet has none): the field stands last.
         if entry?.at.kind == "end" || entry?.at.kind == "in" && !list.groups.indices.contains(entry?.at.section ?? 0) { rows += typed }
         if let plusRoom { rows.insert(.plusRoom, at: min(max(0, plusRoom), rows.count)) }
+        if rows.isEmpty, let words = model.drawing?.funnel.view.plate(column.rawValue) { rows.append(.vacant(words)) }
         let folded = list.cards.contains { model.isFolded($0) }
         return entry == nil && plusRoom == nil && !folded ? rows : branched(rows, model: model)
     }
@@ -776,12 +815,12 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     private var plusRoom: Int?
 
     func takes(_ payload: DragPayload?) -> Bool {
-        guard let payload, !payload.isProject else { return payload == nil }
+        guard let payload, !payload.isProject else { return payload == nil && model?.drawing?.funnel.plus.list == "funnel" }
         guard payload.isSection else { return true }
         return payload.from == column.rawValue
     }
 
-    var scrolls: UIScrollView? { collection }
+    var scrolls: UIScrollView? { collection.isScrollEnabled ? collection : nil }
 
     var area: CGRect? {
         guard let window = host.window else { return nil }
@@ -970,6 +1009,8 @@ struct ListRowContent: View {
             EntryRow(level: level, branch: branch) { PendingCapsule(text: text) }
         case .field(_, let level, let branch, let section):
             EntryRow(level: level, branch: branch) { EntryCapsule(host: model.entry, section: section) }
+        case .vacant(let label):
+            EmptyPlate(hot: model.isTitleLit(column), open: { model.entry.openIn(column.rawValue, nil) }, label: label)
         case .plusRoom:
             // Where a carried section would go (`.tc-group-drop`): a dashed card's room before a header or at the end.
             DashedPlace().frame(height: CardMetrics.height).accessibilityHidden(true)

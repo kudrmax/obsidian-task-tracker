@@ -1,11 +1,11 @@
 import type { ScreenSettings, ScreenSettingsStore } from "../../core/application/contracts";
-import type { ScreenPlace } from "./screens";
+import type { FunnelPlace } from "./screens";
 
 /**
  * Which pair of neighbouring lists the window shows: Inbox and Soon, Soon and the day's list, or the day's list and the
- * calendar; or the Projects screen. The window's own layout: the services hear only which lists show (`SHOWN_LISTS`).
+ * calendar. The core keeps it on the device (`TaskService.setFunnelPlace`, `FunnelView.place`).
  */
-export type RightMode = ScreenPlace;
+export type RightMode = FunnelPlace;
 
 /**
  * The settings of this frontend alone: how Obsidian's screen is laid out, zoomed and painted. They are kept in the
@@ -19,8 +19,6 @@ import { DEFAULT_ZOOM_HOUR, type Zoom } from "../../core/application/contracts";
 export interface ViewSettings {
 	/** The left column's share of the width the two columns split, 0..1, set by dragging the divider: the line keeps its place as the window changes. */
 	readonly listShare: number;
-	/** What the right column shows; the segmented control in the day row sets it. */
-	readonly rightMode: RightMode;
 	/** The zoom a pinch last settled on: the timeline opens at it. */
 	readonly zoom: Zoom;
 	/** The Projects screen's tree, px, as its divider was last let go; null for the design's width. */
@@ -29,7 +27,6 @@ export interface ViewSettings {
 
 export const VIEW_DEFAULTS: ViewSettings = {
 	listShare: 0.5,
-	rightMode: "calendar",
 	zoom: DEFAULT_ZOOM_HOUR,
 	treeWidth: null,
 };
@@ -37,7 +34,7 @@ export const VIEW_DEFAULTS: ViewSettings = {
 const VIEW_KEYS = Object.keys(VIEW_DEFAULTS) as (keyof ViewSettings)[];
 
 /** What belongs to the device, not the vault: the dividers' places, the column shown and the zoom are set by hand on each screen, and must not travel through Sync. */
-export const DEVICE_KEYS = ["listShare", "rightMode", "zoom", "treeWidth"] as const satisfies readonly (keyof ViewSettings)[];
+export const DEVICE_KEYS = ["listShare", "zoom", "treeWidth"] as const satisfies readonly (keyof ViewSettings)[];
 
 
 /** The view's settings of what was saved, the defaults for any it lacks. */

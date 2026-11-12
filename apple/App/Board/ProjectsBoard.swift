@@ -2,9 +2,10 @@ import Core
 import SwiftUI
 import UIKit
 
-/// The Projects page's state: the core's `ProjectsView` and its cards as the page draws them, each a call through the
-/// door (`docs/door.md`, «Projects»). The page decides nothing: what is chosen, folded, waiting, where a card or the plus
-/// goes, is the core's answer; this only turns taps and drops into its calls and reads the screen again.
+/// The projects' panel and the By project view: the tree's rows (`FunnelView.panel`) and the chosen node's list
+/// (`projectsScreen(node)`) with its cards as the view draws them, each a call through the door (`docs/door.md`,
+/// «Projects», «Projects as one view with the funnel»). Nothing is decided here: what is chosen, folded, waiting, where a
+/// card or the plus goes, is the core's answer; this only turns taps and drops into its calls and reads the screen again.
 @MainActor
 @Observable
 final class ProjectsBoard {
@@ -24,8 +25,13 @@ final class ProjectsBoard {
 
     /// The tree's row a carried card would be let go on: lit in the drop's colour.
     var dropOn: String?
-    /// The name asked: a project for the plus in the tree, a rename.
-    var asking: Ask?
+    /// The name asked: a project for the plus in the tree, a rename. A new project's answered or cancelled, the panel the
+    /// naming kept out goes (`endProjectName`).
+    var asking: Ask? {
+        didSet {
+            if asking == nil, case .project = oldValue { model?.endProjectName() }
+        }
+    }
     /// The project Delete project was chosen for, its question shown before anything is written.
     var deleting: ProjectMenu?
 
@@ -63,9 +69,13 @@ final class ProjectsBoard {
 
     // MARK: Reading
 
-    /// The page read again over the files as they are now, its cards painted and their menus asked.
+    /// The tree's rows as the screen was read with them: what a tap, a drop and a gap read.
+    var rows: [ProjectsRow] { model?.funnel?.panel?.rows ?? [] }
+
+    /// The By project list read again over the files as they are now, for the filter's node, its cards painted and their
+    /// menus asked.
     func read() async {
-        guard let model, let read = await Self.fetch(board, screen: model.menuScreen) else { return }
+        guard let model, let node = model.filter?.node, let read = await Self.fetch(board, screen: model.menuScreen, node: node) else { return }
         withAnimation(.snappy) {
             draw(read)
             model.entry.screenChanged()
@@ -81,9 +91,9 @@ final class ProjectsBoard {
     }
 
     /// The page read off the main thread; nil when the files cannot be read.
-    static func fetch(_ board: TaskBoard, screen: JSONValue) async -> Read? {
+    static func fetch(_ board: TaskBoard, screen: JSONValue, node: String) async -> Read? {
         try? await Task.detached(operation: { () throws -> Read in
-            let view = try board.projectsScreen()
+            let view = try board.projectsScreen(node: node)
             var drawn: [[BoardCard]] = []
             var menus: [String: TaskMenuModel] = [:]
             for section in view.sections {
@@ -112,8 +122,7 @@ final class ProjectsBoard {
     /// The list as the quick entry reads it (`rules.projectsEntryLook`): handed in as its `projects` list.
     @ObservationIgnored private(set) var entryLook = ProjectsEntryLook.empty
 
-    /// A card of the page: By project the stage's symbol, or the date, in the date's place; By stage the subproject the
-    /// task stands in, small over its title after a folder.
+    /// A card of the By project list: the stage's symbol, or the date, in the date's place.
     nonisolated private static func card(_ painted: BoardCard, as row: ProjectsListRow) -> BoardCard {
         guard let card = row.card else {
             return BoardCard(item: painted.item, level: painted.level, branch: painted.branch, due: painted.due, repeats: painted.repeats, paint: painted.paint, parts: painted.parts, face: painted.face, id: row.id)
@@ -123,8 +132,7 @@ final class ProjectsBoard {
         if let mark = card.stage {
             if let label = mark.label { due = label } else { due = nil; stage = symbol(mark.kind) }
         }
-        let face = card.over.map { CardFace(text: painted.face.text, over: $0, overSymbol: "folder", step: painted.face.step) } ?? painted.face
-        return BoardCard(item: painted.item, level: 0, branch: nil, due: due, repeats: painted.repeats, paint: painted.paint, parts: painted.parts, face: face, stage: stage, id: card.id)
+        return BoardCard(item: painted.item, level: 0, branch: nil, due: due, repeats: painted.repeats, paint: painted.paint, parts: painted.parts, face: painted.face, stage: stage, id: card.id)
     }
 
     /// A stage's symbol: the tab bar's for the funnel's lists, the archive box for Backlog.
@@ -145,10 +153,9 @@ final class ProjectsBoard {
 
     // MARK: The tree
 
-    /// A tap on a row: chosen, or, chosen already, its branch folds or unfolds.
+    /// A tap on a row: chosen (the panel then closes), or, chosen already, its branch folds or unfolds.
     func tap(_ row: ProjectsRow) async {
-        UISelectionFeedbackGenerator().selectionChanged()
-        await act { try $0.tapProjectNode(row.node) }
+        await model?.pickProjectNode(row.node)
     }
 
     /// A project chosen from elsewhere (a card's folder, the full screen's project line), the branches above it opened.
@@ -157,22 +164,9 @@ final class ProjectsBoard {
         await act { try $0.selectProjectNode(node) }
     }
 
-    /// A card held over a folded row: its branch opens, nothing chosen.
-    func unfold(_ node: String) async {
-        await act { try $0.unfoldProjectNode(node) }
-    }
-
-    /// The segment: By project or By stage.
-    func setMode(_ mode: String) async {
-        guard mode != view?.mode else { return }
-        await act { try $0.setProjectsMode(mode) }
-    }
-
-    /// A card let go on a row (by the card's own id): the project it was shown under gives way to the row's; its place in
-    /// the funnel stays.
-    func drop(_ id: String, on node: String) async {
-        guard let card = cards[id] else { return }
-        await write { try $0.dropOnProject([card], to: node) }
+    /// The panel row under `point` (window), as last laid out: what the carry reports to the core.
+    func node(at point: CGPoint) -> String? {
+        rows.first { geometry.rows[$0.node]?.contains(point) == true }?.node
     }
 
     /// A project lifted and let go in a gap.
@@ -230,21 +224,15 @@ final class ProjectsBoard {
     /// Where a project lifted, or the plus, let go before row `gap` with the finger `shift` points sideways (since the
     /// lift; the plus: from the row above's depth) lands, and the depth its line is drawn at (`rules.projectsDrop`).
     func landing(gap: Int, shift: Double, lifted: String?) -> ProjectsLanding? {
-        guard let rows = view?.rowsJSON else { return nil }
-        return try? board.projectsDrop(rows, gap: gap, shift: shift, lifted: lifted)
+        guard let panel = model?.funnel?.panel else { return nil }
+        return try? board.projectsDrop(panel.rowsJSON, gap: gap, shift: shift, lifted: lifted)
     }
 
     // MARK: Calls
 
-    /// A call that changes only this device's page (the node chosen, a fold, the segment), then the page read again.
+    /// A call that changes only this device's view (the node chosen, a fold), then the screen read again.
     private func act(_ call: @escaping @Sendable (TaskBoard) throws -> Void) async {
-        let board = board
-        do {
-            try await Task.detached { try call(board) }.value
-        } catch {
-            model?.problem(error)
-        }
-        await read()
+        await model?.viewCall(call)
     }
 
     /// A call that writes the tasks file: the board and the page read again.
@@ -256,6 +244,6 @@ final class ProjectsBoard {
             model?.problem(error)
         }
         await model?.reload()
-        await read()
+        if model?.readsProjects == true { await read() }
     }
 }

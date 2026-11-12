@@ -73,8 +73,8 @@ function planOf(view: ProjectsView, carried: readonly Carried[], place: Extract<
 	const above = section.cards.slice(0, at).filter(kept).pop();
 	const below = section.cards.slice(at).find(kept);
 	const anchors: Anchor[] = [...(above ? [{ kind: "after", item: above.item } as const] : []), ...(below ? [{ kind: "before", item: below.item } as const] : [])];
-	const anchor = anchors.find((a) => enters(carried, targetList(a))) ?? anchors[0] ?? { kind: "empty", list: view.mode === "byStage" ? stageList(section) : null };
-	return { anchor, project: view.mode === "byProject" ? partProject(view, section) : undefined };
+	const anchor = anchors.find((a) => enters(carried, targetList(a))) ?? anchors[0] ?? { kind: "empty", list: null };
+	return { anchor, project: partProject(view, section) };
 }
 
 /** Every card may stand in `target`: one already in it only moves among its tasks; one from elsewhere as that stage's column takes it. */
@@ -82,12 +82,6 @@ function enters(carried: readonly Carried[], target: GroupedList | null): boolea
 	if (target === null) return true;
 	const moving = carried.filter((item) => listOf(item) !== target).map((item) => item.origin);
 	return moving.length === 0 || (moving.every((origin): origin is DropFrom => origin !== null) && acceptsDrop(COLUMN_OF[target], moving));
-}
-
-/** A stage's list, By stage: the list its plus writes into. */
-function stageList(section: ProjectsSection): GroupedList | null {
-	const place = section.newTask?.place;
-	return place && place.kind === "list" ? place.list : null;
 }
 
 /** The list the cards go into: the card's they go next to, or the empty stage's; null where they keep their own (an empty part By project). */
@@ -188,13 +182,9 @@ function spotOf(doc: TaskDocument, anchor: Anchor, list: GroupedList, entryOf: (
 	return { group: entry.group, before: next ? keyOf(next) : null };
 }
 
-/**
- * The project that takes the place of the one a card was shown under: By project the part's; By stage none for a card the
- * list shows (its projects stay), else the chosen node's (No project: the old one only goes; All: they stay).
- */
-function projectFor(view: ProjectsView, plan: Plan, item: Carried): string | null | undefined {
-	if (view.mode === "byProject" || item.shown) return plan.project;
-	return view.selected === "all" ? undefined : projectOfNode(view.selected);
+/** The project that takes the place of the one a card was shown under: the part's. */
+function projectFor(_view: ProjectsView, plan: Plan, _item: Carried): string | null | undefined {
+	return plan.project;
 }
 
 /** The project a part stands for: the chosen node's for its own part, none for No project's, else the part's subproject. */
