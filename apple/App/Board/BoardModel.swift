@@ -228,7 +228,7 @@ final class BoardModel {
 
     @ObservationIgnored private(set) lazy var session = CarrySession(
         calls: board, clock: SystemCarryClock(),
-        redraw: { [weak self] in await self?.reload() },
+        redraw: { [weak self] in await self?.funnelState.refresh() },
         problem: { [weak self] in self?.problem($0) })
 
     /// The carrying finger moved: the core is told where it is (at the edge, over which panel row).
@@ -240,6 +240,8 @@ final class BoardModel {
     /// The carry let go on a panel row: every carried task goes to that project, as the core's session says.
     func carryOnNode(_ node: String) {
         session.onNode(node)
+        // The drop on the row wrote the file: the screen is read again once the session's calls have run.
+        Task { await session.idle(); await reload() }
         endSelectionIf("dropped")
     }
 

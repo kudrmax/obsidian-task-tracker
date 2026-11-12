@@ -148,7 +148,9 @@ public final class CarrySession {
                 return
             }
             guard let self, self.isOpen, self.reported == spot else { return }
-            if waited { await self.redraw() }
+            // The pause brought the panel out or opened a row: drawn as soon as the core said so, without holding the
+            // finger's next report behind the read.
+            if waited { Task { await self.redraw() } }
             guard let wait, self.isOpen, self.reported == spot else { return }
             self.callOff = self.clock.after(ms: wait) { [weak self] in
                 guard let self, self.isOpen, self.reported == spot else { return }

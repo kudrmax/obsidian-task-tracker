@@ -43,6 +43,12 @@ final class FunnelState {
         await call { try $0.setViewMode(mode) }
     }
 
+    /// The view read again after the core changed it by itself (a carry's pause brought the panel out or opened a row):
+    /// drawn over the lists as they are, the lists read only where the filter changed.
+    func refresh() async {
+        await call { _ in }
+    }
+
     /// A project chosen from elsewhere (a card's folder, a page's project line), the branches above it opened.
     func select(_ node: String) async {
         await call { try $0.selectProjectNode(node) }
