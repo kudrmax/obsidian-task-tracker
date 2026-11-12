@@ -78,7 +78,7 @@ describe("an empty list's plate (spec decision 18)", () => {
 
 describe("the rows (board D2)", () => {
 	it("stacks the stages in the core's order under their labels, none but those", () => {
-		const rows = new FunnelRows(document.createElement("div"), ["inbox", "backlog", "soon", "day"], (column) => (column === "day" ? "Today" : column));
+		const rows = new FunnelRows(document.createElement("div"), ["inbox", "backlog", "soon", "day"], (column) => (column === "day" ? "Today" : column), () => true);
 		rows.render(["soon", "inbox"]);
 		const shown = [...rows.el.querySelectorAll<HTMLElement>(".tc-row:not(.tc-hidden)")].map((row) => row.querySelector(".tc-row-label")!.textContent);
 		expect(shown).toEqual(["soon", "inbox"]);

@@ -1636,12 +1636,14 @@ body.is-mobile .task-calendar:is(.is-view-rows, .is-view-by-project) .tc-day-nav
 body:not(.is-mobile) .task-calendar:is(.is-view-rows, .is-view-by-project) > .tc-head.tc-day-nav { padding: 0 var(--tc-space-12) 0 var(--tc-space-10); gap: var(--tc-space-4); }
 /* Each stage's list as tall as its cards while all fit; the long ones give way, the longer the more, and scroll inside (decision 17). */
 .tc-rows-stack { flex: 1 1 0; min-height: 0; padding-bottom: var(--tc-foot-fade-day); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
-.tc-row { flex: 0 1 auto; min-height: calc(var(--tc-group-head-h) + var(--tc-card-h)); display: flex; flex-direction: column; }
+/* Each row's height is the core's (`rules.stackedRows`), set by the code; in a note's block every row is as tall as its cards. */
+.tc-row { flex: none; display: flex; flex-direction: column; }
 .tc-row + .tc-row { margin-top: var(--tc-section-gap); }
 .tc-row.tc-hidden { display: none; }
 .tc-row-label { flex-shrink: 0; height: var(--tc-group-head-h); box-sizing: border-box; padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); display: flex; align-items: flex-end; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); white-space: nowrap; overflow: hidden; }
 .tc-row-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .task-calendar .tc-list.tc-row-list { flex: 0 1 auto; padding-top: var(--tc-card-gap); }
+button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); cursor: default; }
 .task-calendar .tc-list.tc-row-list::after { content: none; }
 /* While the plus is carried or a task is typed, every list keeps a card's room more to take it. */
 .task-calendar:is(.is-dragging, .is-entering) .tc-list.tc-row-list::after { content: ""; height: var(--tc-card-h); }
@@ -1665,4 +1667,3 @@ body:not(.is-mobile) .task-calendar:is(.is-view-rows, .is-view-by-project) > .tc
 .task-calendar.is-note > .tc-capsule { left: var(--tc-block-inset); }
 /* In a note's block every list is as tall as its cards: the block grows, and past its tallest the stages scroll as one. */
 .task-calendar.is-note .tc-rows-stack { overflow-y: auto; scrollbar-width: none; padding-bottom: calc(var(--tc-plus-size) + var(--tc-block-inset) + var(--tc-space-20)); }
-.task-calendar.is-note .tc-row { flex-shrink: 0; }
