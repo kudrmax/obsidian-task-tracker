@@ -68,7 +68,7 @@ describe("the Subprojects row of the view menu", () => {
 		await svc.pickProjectNode("project:Поездки", true);
 		expect((await svc.funnelView(true)).view.subprojects).toBeNull();
 		await svc.pickProjectNode("project:Работа", true);
-		expect((await svc.funnelView(true)).view.subprojects).toBeNull();
+		expect((await svc.funnelView(true)).view.subprojects).toEqual({ label: "Subprojects", checked: true });
 		for (const node of ["all", "none", "done"]) {
 			await svc.pickProjectNode(node, true);
 			expect((await svc.funnelView(true)).view.subprojects).toBeNull();
@@ -157,13 +157,20 @@ describe("Subprojects off", () => {
 		expect(titles((await svc.dayView(T, PEOPLE)).slotted)).toEqual(["Встреча"]);
 	});
 
-	it("off changes nothing for a project without subprojects, a folder, All, No project and no filter", async () => {
+	it("off changes nothing for a project without subprojects, All, No project and no filter", async () => {
 		const { svc } = setup();
-		const on = await Promise.all([undefined, "project:Поездки", "project:Работа", "all", "none"].map(async (f) => lists(await svc.screen(T, f))));
+		const on = await Promise.all([undefined, "project:Поездки", "all", "none"].map(async (f) => lists(await svc.screen(T, f))));
 		await svc.toggleSubprojects();
-		const off = await Promise.all([undefined, "project:Поездки", "project:Работа", "all", "none"].map(async (f) => lists(await svc.screen(T, f))));
+		const off = await Promise.all([undefined, "project:Поездки", "all", "none"].map(async (f) => lists(await svc.screen(T, f))));
 		expect(off).toEqual(on);
-		expect(on[2].soon).toEqual(["Отчёт за квартал"]);
+	});
+
+	/** Max (11-12): a folder is no exception — off shows its own tasks, and a folder has none. */
+	it("a folder with subprojects gets the row; off shows nothing, on its whole branch", async () => {
+		const { svc } = setup();
+		expect(lists(await svc.screen(T, "project:Работа")).soon).toEqual(["Отчёт за квартал"]);
+		await svc.toggleSubprojects();
+		expect(lists(await svc.screen(T, "project:Работа"))).toEqual({ inbox: [], soon: [], day: [], slotted: [] });
 	});
 
 	it("off: a find of a subproject's task is hidden by the filter, a subtask by its task", async () => {

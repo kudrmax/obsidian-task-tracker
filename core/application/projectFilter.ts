@@ -24,20 +24,20 @@ export function filterTest(node: ProjectsNodeId, tree: ProjectTree, doc: TaskDoc
 
 /**
  * Whether the Subprojects setting means anything under `node`: a project with subprojects as the panel draws its branch,
- * a live project's that aren't done, a done project's all (`doc` null: the statuses unknown, every one). A folder has no
- * tasks of its own, so it always shows its branch.
+ * a live project's that aren't done, a done project's all (`doc` null: the statuses unknown, every one). A folder is no
+ * exception: with the setting off it shows its own tasks, and a folder has none (Max, 2026-11-12).
  */
 export function hasSubprojects(node: ProjectsNodeId | null | undefined, tree: ProjectTree, doc: TaskDocument | null): boolean {
 	const name = node === null || node === undefined ? null : projectOfNode(node);
 	const found = name === null ? null : tree.find(name);
-	if (found === null || found.node.folder || found.node.children.length === 0) return false;
+	if (found === null || found.node.children.length === 0) return false;
 	if (doc === null) return true;
 	const statuses = projectStatuses(tree, doc);
 	const done = (project: string) => statuses.get(projectKey(project)) === "done";
 	return done(found.node.name) || found.node.children.some((child) => !done(child.name));
 }
 
-/** The projects a project's node shows: its branch, or with `subprojects` off (a folder aside) itself alone. */
+/** The projects a project's node shows: its branch, or with `subprojects` off itself alone. */
 function shownNames(node: ProjectsNodeId, tree: ProjectTree, doc: TaskDocument, subprojects: boolean): readonly string[] {
 	if (subprojects || !hasSubprojects(node, tree, doc)) return branchNames(node, tree);
 	const found = tree.find(projectOfNode(node) ?? "");
