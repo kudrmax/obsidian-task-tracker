@@ -25,8 +25,13 @@ final class ProjectsBoard {
 
     /// The tree's row a carried card would be let go on: lit in the drop's colour.
     var dropOn: String?
-    /// The name asked: a project for the plus in the tree, a rename.
-    var asking: Ask?
+    /// The name asked: a project for the plus in the tree, a rename. A new project's answered or cancelled, the panel the
+    /// naming kept out goes (`endProjectName`).
+    var asking: Ask? {
+        didSet {
+            if asking == nil, case .project = oldValue { model?.endProjectName() }
+        }
+    }
     /// The project Delete project was chosen for, its question shown before anything is written.
     var deleting: ProjectMenu?
 
@@ -161,23 +166,9 @@ final class ProjectsBoard {
         await act { try $0.selectProjectNode(node) }
     }
 
-    /// A card held over a row the pause the core gives: a folded branch opens, a live project is chosen, so the card can
-    /// be let go among its tasks (`hoverProjectNode`).
-    func hover(_ node: String) async {
-        await act { try $0.hoverProjectNode(node) }
-    }
-
-    /// A card let go on a row: the project it was shown under gives way to the row's; its place in the funnel stays. A
-    /// card of the By project list by its own `drop`; one of the funnel's lists or the calendar by its task, under the
-    /// screen's filter.
-    func drop(_ card: BoardCard, on node: String) async {
-        if let shown = cards[card.id] {
-            await write { try $0.dropOnProject([shown], to: node) }
-            return
-        }
-        let key = card.item.key
-        let filter = model?.filter?.node
-        await write { try $0.dropTasksOnProject([key], to: node, filter: filter) }
+    /// The panel row under `point` (window), as last laid out: what the carry reports to the core.
+    func node(at point: CGPoint) -> String? {
+        rows.first { geometry.rows[$0.node]?.contains(point) == true }?.node
     }
 
     /// A project lifted and let go in a gap.

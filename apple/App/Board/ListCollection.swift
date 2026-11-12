@@ -45,9 +45,9 @@ enum DrawnRow: Hashable {
     case field(id: String, level: Int, branch: Branch?, section: Bool)
     /// Where the plus carried over the list would open its field.
     case plusRoom
-    /// The No tasks plate of a list with nothing in it, where the screen shows every list as a stage (Rows) or a filter
-    /// leaves it empty: the filter's words (`ProjectFilter.emptyLabel`).
-    case vacant(String?)
+    /// The No tasks plate of a list that draws no card, with the core's words (`ViewChoice.plates`): under a filter and in
+    /// Rows.
+    case vacant(String)
 
     var id: String {
         switch self {
@@ -103,6 +103,8 @@ enum DrawnRow: Hashable {
 struct ListCollection: UIViewRepresentable {
     let column: BoardColumn
     let model: BoardModel
+    /// One of the Rows view's stacked lists, as tall as its rows while they fit (`StackedRows`).
+    var stacked = false
 
     func makeCoordinator() -> ListController { ListController(column: column, model: model) }
 
@@ -122,6 +124,7 @@ struct ListCollection: UIViewRepresentable {
         _ = model.entry.heirs
         controller.update()
         controller.keyboard(KeyboardRise.shared.top)
+        controller.host.stacked = stacked
         controller.follow(found: model.found, moved: model.entry.moved)
     }
 }
@@ -174,6 +177,7 @@ final class ListHostView: UIView {
         // list that came to run on past its bottom faded nothing there and its last row read as cut.
         sized = collection.observe(\.contentSize, options: [.new]) { [weak self] _, _ in
             MainActor.assumeIsolated {
+                self?.holdStacked()
                 self?.edges()
                 self?.told()
             }
@@ -183,6 +187,25 @@ final class ListHostView: UIView {
     private var sized: NSKeyValueObservation?
     /// Told how tall the rows stand, the room after the last left out: the Rows view gives each list its height.
     var onContent: ((CGFloat) -> Void)?
+    /// A stacked list of the Rows view: while all its rows fit its height it never scrolls, so no carry or earlier scroll
+    /// leaves its rows standing above its top; when they don't, it scrolls no further than its last row.
+    var stacked = false {
+        didSet { if stacked != oldValue { setNeedsLayout() } }
+    }
+
+    private func holdStacked() {
+        guard stacked else {
+            if !collection.isScrollEnabled { collection.isScrollEnabled = true }
+            return
+        }
+        let rows = max(0, collection.contentSize.height - ListCollection.trailingRoom)
+        let fits = rows <= bounds.height + 0.5
+        if collection.isScrollEnabled == fits { collection.isScrollEnabled = !fits }
+        let most = fits ? 0 : rows - bounds.height
+        let top = -collection.adjustedContentInset.top
+        let offset = min(max(collection.contentOffset.y, top), top + most)
+        if abs(offset - collection.contentOffset.y) > 0.5 { collection.contentOffset.y = offset }
+    }
 
     private func told() {
         onContent?(max(0, collection.contentSize.height - ListCollection.trailingRoom))
@@ -193,6 +216,7 @@ final class ListHostView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        holdStacked()
         edges()
     }
 
@@ -422,9 +446,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         // At the end, or in a section the list doesn't draw (a day with no task yet has none): the field stands last.
         if entry?.at.kind == "end" || entry?.at.kind == "in" && !list.groups.indices.contains(entry?.at.section ?? 0) { rows += typed }
         if let plusRoom { rows.insert(.plusRoom, at: min(max(0, plusRoom), rows.count)) }
-        if rows.isEmpty, let funnel = model.drawing?.funnel, funnel.filter != nil || funnel.view.mode == .rows {
-            rows.append(.vacant(funnel.filter?.emptyLabel))
-        }
+        if rows.isEmpty, let words = model.drawing?.funnel.view.plate(column.rawValue) { rows.append(.vacant(words)) }
         let folded = list.cards.contains { model.isFolded($0) }
         return entry == nil && plusRoom == nil && !folded ? rows : branched(rows, model: model)
     }
@@ -798,7 +820,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         return payload.from == column.rawValue
     }
 
-    var scrolls: UIScrollView? { collection }
+    var scrolls: UIScrollView? { collection.isScrollEnabled ? collection : nil }
 
     var area: CGRect? {
         guard let window = host.window else { return nil }

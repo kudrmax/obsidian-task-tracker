@@ -87,3 +87,74 @@ import Testing
         #expect(try board.stepFunnel(mode: "done", date: "2026-11-07", shift: 1)?.mode == "inbox")
     }
 }
+
+/// The core's follow-ups the app reads: the plates per list, the view before the first read, whether a filter hides a find.
+@Suite struct FunnelViewFollowUpTests {
+    let core = try! PhoneCore(script: Fixtures.phoneScript)
+
+    func board(_ vault: FakeVault) -> TaskBoard {
+        TaskBoard(core: core, vault: vault, projectsScreen: MemoryText(), clock: { Fixtures.date(7, 9) })
+    }
+
+    @Test func platesAreTheCoresUnderAFilterAndInRows() throws {
+        let board = board(FakeVault(ProjectsScreenTests.file))
+        let plain = try board.funnelView().view
+        #expect(plain.plate("inbox") == nil)
+        #expect(plain.emptyLabel == "No tasks")
+        try board.pickProjectNode("project:Спорт")
+        #expect(try board.funnelView().view.plate("inbox") == "No tasks")
+    }
+
+    @Test func theFirstViewIsTheKeptOne() throws {
+        let board = board(FakeVault(ProjectsScreenTests.file))
+        #expect(try board.firstView().mode == .twoColumns)
+        try board.pickProjectNode("project:Спорт")
+        #expect(try board.firstView().mode == .rows)
+    }
+
+    @Test func aFindTheFilterHidesIsSaidSo() throws {
+        let board = board(FakeVault(ProjectsScreenTests.file))
+        let loose = try #require(try board.snapshot(day: nil, measures: FunnelViewTests.measures).lists[.inbox]?.cards.first { $0.item.title == "Loose" })
+        try board.pickProjectNode("project:Спорт")
+        #expect(try board.filterHides(loose.item, filter: "project:Спорт"))
+        #expect(try !board.filterHides(loose.item, filter: nil))
+    }
+
+    @Test func aCarryLetGoNowhereAfterAHoverPutsTheFilterBack() throws {
+        let board = board(FakeVault(ProjectsScreenTests.file))
+        try board.pickProjectNode("project:Дружба")
+        let card = try #require(try board.snapshot(day: nil, measures: FunnelViewTests.measures).lists[.soon]?.cards.first)
+        try board.startCarry(keys: [card.item.key])
+        let start = Date(timeIntervalSince1970: 1000)
+        let wait = try #require(try board.carryAt(edge: true, node: nil, now: start))
+        _ = try board.carryAt(edge: true, node: nil, now: start.addingTimeInterval(wait / 1000))
+        #expect(try board.funnelView().panel?.reason == "carry")
+        _ = try board.carryAt(edge: false, node: "project:Спорт", now: start.addingTimeInterval(1))
+        _ = try board.carryAt(edge: false, node: "project:Спорт", now: start.addingTimeInterval(2))
+        #expect(try board.funnelView().filter?.node == "project:Спорт")
+        try board.endCarry("nowhere")
+        let after = try board.funnelView()
+        #expect(after.filter?.node == "project:Дружба")
+        #expect(after.panel?.open == false)
+    }
+
+    @Test func everyCarriedTaskGoesToTheRowUnderTheLiftsFilter() throws {
+        let vault = FakeVault(ProjectsScreenTests.file)
+        let board = board(vault)
+        let inbox = try #require(try board.snapshot(day: nil, measures: FunnelViewTests.measures).lists[.inbox]?.cards)
+        try board.startCarry(keys: inbox.map(\.item.key))
+        try board.carryOnNode("project:Спорт")
+        #expect(vault.text.contains("- [ ] Loose 🗂️ Спорт"))
+        #expect(vault.text.components(separatedBy: "🗂️ Спорт").count - 1 >= 3)
+    }
+
+    @Test func theKeptPlaceIsTheCores() throws {
+        let board = board(FakeVault(ProjectsScreenTests.file))
+        #expect(try board.firstPlace() == "calendar")
+        try board.setFunnelPlace(.number(-1))
+        #expect(try board.firstPlace() == "inbox")
+        try board.setFunnelPlace("soon")
+        #expect(try board.firstPlace() == "soon")
+    }
+
+}

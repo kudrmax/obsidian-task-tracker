@@ -75,11 +75,17 @@ iPhone app (frontend-swift, 2026-11-12):
     Rows; in two columns without a filter an empty list stays as before.
 19. Search: a find the filter hides clears the filter before it is shown; a done find outside two columns opens on its own
     page (the Done column stands only in the ribbon).
-20. A card or the plus held within 24 pt of the screen's left edge brings the panel out for that carry; a row lights and
+20. A card or the plus held within 24 pt of the screen's left edge the core's pause (`PROJECTS_HOVER_MS`, as the plugin's `EdgeReveal`) brings the panel out for that carry; a row lights and
     takes the card (`dropTasksOnProject` for a funnel card, `dropOnProject` for a By project card), and a held card over
     a row the core's pause opens it (`hoverProjectNode`).
 21. By project draws the core's `projectsScreen(node)` parts without the old segment (By stage is Rows now), the calendar
     beside it behind the divider.
+
+Applied in the app (2026-11-12, round 3): 39 (the carry is the core's session: `startCarry` at the lift, `carryAt` on
+each move and after its wait, `carryOnNode` on a row, `endCarry` nowhere/dropped/naming, `endProjectName`; the app keeps no
+lifted filter, edge timer, hover timer or panel of its own), 40 (the place is the core's: `firstPlace` at launch,
+`setFunnelPlace` as the ribbon settles, the old `ribbonPlace` number handed once), 41 (`ribbon`, `searchPaths`), 33/37
+(`plates`), 36 (`filterHides`), 38 (`firstView`). 28/34: the app reads every day through the filtered `screen`.
 
 Obsidian frontend (2026-11-12; numbered from 22 so as not to meet the Swift frontend's 13–21 on its branch):
 

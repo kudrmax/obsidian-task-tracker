@@ -86,7 +86,7 @@ struct BoardScreen: View {
     /// where the view has no ribbon to walk (Rows, By project) the tab bar gives way and the button stands alone in its
     /// middle (`ViewChoice.wheel`).
     private var bottomBar: some View {
-        let view = model.funnel?.view
+        let view = model.viewChoice
         let wheel = view?.wheel ?? true
         return GeometryReader { screen in ZStack(alignment: .topLeading) {
             PlaceTabs(place: model.place, leading: wheel && view != nil ? Self.viewRoom : 0, hidden: !wheel, choose: { model.go(to: $0) }, slot: {

@@ -334,7 +334,7 @@ final class QuickEntryHost {
     /// The ribbon turned to the place the core says shows `column` from where it stands; a place showing it stays. In a
     /// view without the ribbon every list shows already.
     private func turn(to column: BoardColumn) {
-        guard let model, model.viewMode == .twoColumns,
+        guard let model, model.ribbon,
               let key: String = model.ruleNow("rules.funnelPlaceShowing", [.string(column.rawValue), .string(model.place.key)]),
               let place = RibbonPlace(key: key), place != model.place else { return }
         turnedTo = place
