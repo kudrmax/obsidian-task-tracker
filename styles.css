@@ -1594,7 +1594,7 @@ body:not(.is-mobile) .task-calendar { --tc-top-row-top: var(--tc-desk-top-row-to
  */
 /* The panel ends as the lists do: the screen's one fade over its foot, the tree scrolling its last row up out of it (README «Низ экрана гаснет одним затуханием»). */
 .tc-tree-panel::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--tc-foot-fade-day); background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-half-ink), transparent) var(--tc-foot-fade-half), color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-deep-ink), transparent) var(--tc-foot-fade-deep), var(--tc-bg) var(--tc-foot-fade-solid)); z-index: var(--tc-layer-fade); pointer-events: none; }
-.tc-tree-field { scroll-margin-bottom: var(--tc-foot-fade-day); }
+.tc-tree-field, .tc-tree-field * { scroll-margin-bottom: var(--tc-foot-fade-day); }
 .tc-tree-panel { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--tc-tree-width) + var(--tc-divider)); z-index: var(--tc-layer-tree-panel); background: var(--tc-bg); visibility: hidden; }
 .task-calendar.has-tree > .tc-tree-panel { visibility: visible; }
 .tc-tree-panel-title { position: absolute; top: var(--tc-top-row-top); left: var(--tc-tree-title-left); height: var(--tc-day-row); padding: 0 var(--tc-space-4); box-sizing: border-box; color: var(--tc-text); font-size: var(--tc-font-filter); line-height: var(--tc-day-row); font-weight: var(--tc-weight-bold); white-space: nowrap; }
