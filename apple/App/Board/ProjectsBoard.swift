@@ -122,8 +122,7 @@ final class ProjectsBoard {
     /// The list as the quick entry reads it (`rules.projectsEntryLook`): handed in as its `projects` list.
     @ObservationIgnored private(set) var entryLook = ProjectsEntryLook.empty
 
-    /// A card of the page: By project the stage's symbol, or the date, in the date's place; By stage the subproject the
-    /// task stands in, small over its title after a folder.
+    /// A card of the By project list: the stage's symbol, or the date, in the date's place.
     nonisolated private static func card(_ painted: BoardCard, as row: ProjectsListRow) -> BoardCard {
         guard let card = row.card else {
             return BoardCard(item: painted.item, level: painted.level, branch: painted.branch, due: painted.due, repeats: painted.repeats, paint: painted.paint, parts: painted.parts, face: painted.face, id: row.id)
@@ -133,8 +132,7 @@ final class ProjectsBoard {
         if let mark = card.stage {
             if let label = mark.label { due = label } else { due = nil; stage = symbol(mark.kind) }
         }
-        let face = card.over.map { CardFace(text: painted.face.text, over: $0, overSymbol: "folder", step: painted.face.step) } ?? painted.face
-        return BoardCard(item: painted.item, level: 0, branch: nil, due: due, repeats: painted.repeats, paint: painted.paint, parts: painted.parts, face: face, stage: stage, id: card.id)
+        return BoardCard(item: painted.item, level: 0, branch: nil, due: due, repeats: painted.repeats, paint: painted.paint, parts: painted.parts, face: painted.face, stage: stage, id: card.id)
     }
 
     /// A stage's symbol: the tab bar's for the funnel's lists, the archive box for Backlog.

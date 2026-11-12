@@ -116,7 +116,7 @@ struct ListDivider: View {
 }
 
 /// The Rows view's lists one under another, in the core's order (`ViewChoice.rows`): each as tall as its rows while they
-/// all fit, the long ones sharing the rest and scrolling within it (`StackedRows`).
+/// all fit, the long ones sharing the rest and scrolling within it (`rules.stackedRows`).
 private struct StackedLists: View {
     let snapshot: BoardSnapshot
     @Bindable var model: BoardModel
@@ -130,7 +130,7 @@ private struct StackedLists: View {
             let typing = model.entry.isOpen || model.carried == Carried.plus ? CardMetrics.height + CardMetrics.gap : 0
             let wanted = columns.map { Double(head + (model.listRows[$0] ?? CardMetrics.height) + typing) }
             let gaps = ColumnMetrics.sectionGap * CGFloat(max(0, columns.count - 1))
-            let heights = StackedRows.heights(wanted: wanted, room: Double(box.size.height - gaps), least: Double(head + CardMetrics.height))
+            let heights: [Double] = model.ruleNow("rules.stackedRows", [.array(wanted.map(JSONValue.number)), .number(Double(box.size.height - gaps)), .number(Double(head + CardMetrics.height))]) ?? wanted
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(columns.enumerated()), id: \.element) { index, column in
                     if let list = snapshot.lists[column] {

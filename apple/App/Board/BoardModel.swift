@@ -170,7 +170,7 @@ final class BoardModel {
     /// The screen is the ribbon the tab bar walks (`ViewChoice.ribbon`).
     var ribbon: Bool { viewChoice?.ribbon ?? false }
 
-    /// How tall each list's rows stand: the Rows view stacks the lists at these heights (`StackedRows`).
+    /// How tall each list's rows stand: the Rows view stacks the lists at these heights (`rules.stackedRows`).
     private(set) var listRows: [BoardColumn: CGFloat] = [:]
 
     func listContent(_ column: BoardColumn, _ height: CGFloat) {
@@ -1239,12 +1239,14 @@ final class BoardModel {
     func startCarry(_ card: BoardCard, from column: String) -> Int {
         let token = begin()
         // The By project list's card goes by its own drop (the project it is shown under), any other by its task.
-        let drop = column == "projects" ? projects.cards[card.id]?.drop : nil
-        openCarry(keys: [card.item.key], cards: drop.map { [$0] } ?? [])
         guard selecting, picked.contains(card.id), let snapshot else {
+            let drop = column == "projects" ? projects.cards[card.id]?.drop : nil
+            openCarry(keys: [card.item.key], cards: drop.map { [$0] } ?? [])
             withAnimation(CarryMotion.carry) { carry = Carry(token: token, id: card.id, item: card.item, from: column) }
             return token
         }
+        // A group starts its one session once the core has said which picked tasks go along (`tasks.carried`).
+        let pickedIds = [card.id] + self.picked.filter { $0 != card.id }.sorted()
         let picked = pickedItems
         let froms = Dictionary(picked.map { ($0.id, snapshot.column(of: $0.id) ?? column) }, uniquingKeysWith: { first, _ in first })
         let all = picked.map { (item: $0, from: froms[$0.id] ?? column) }
@@ -1259,9 +1261,10 @@ final class BoardModel {
             // The core names the ones that go along with the lifted one, which leads, by their keys as read.
             let going = kept.compactMap { key in all.first { $0.item.key == key } }
             carry?.group = [(item: card.item, from: column)] + going
-            // Every picked task the lift takes goes with it to a project too.
+            // Every picked task the lift takes goes with it to a project too; the By project list's by their drops.
             let keys = [card.item.key] + going.map(\.item.key)
-            carryCall(redraw: false) { try $0.startCarry(keys: keys) }
+            let drops = column == "projects" ? pickedIds.compactMap { id in projects.cards[id].flatMap { keys.contains($0.item.key) ? $0.drop : nil } } : []
+            openCarry(keys: keys, cards: drops)
         }
         return token
     }

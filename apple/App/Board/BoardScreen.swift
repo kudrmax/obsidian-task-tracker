@@ -202,7 +202,7 @@ struct BoardScreen: View {
         ToolbarItem(placement: .topBarTrailing) {
             // Filled while the panel is out, as a selected toolbar item.
             Button("Projects", systemImage: model.panelShown ? "folder.fill" : "folder") { Task { await model.toggleProjectsPanel() } }
-                .disabled(model.funnel?.panel == nil || model.entry.isOpen)
+                .disabled(model.funnel?.panel == nil || model.entry.state?.locksPanel == true)
                 .tint(.primary)
         }
         ToolbarItem(placement: .topBarTrailing) {

@@ -42,6 +42,8 @@ struct EntryView: Decodable, Equatable {
     let `repeat`: JSONValue?
     /// The Project button after the flag (`EntryState.project`); nil where the bar has none (a subtask's field, a section's name).
     let project: EntryProject?
+    /// The projects button can't be used while the field is open (`EntryState.locksPanel`).
+    let locksPanel: Bool?
 
     var spotKind: String { spot["kind"].string ?? "" }
     /// The field writes a section's name.

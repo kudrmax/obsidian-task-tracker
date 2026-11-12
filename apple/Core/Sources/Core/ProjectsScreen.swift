@@ -74,8 +74,6 @@ public struct ProjectsCard: Decodable, Hashable, Sendable, Identifiable {
     public let item: TaskItem
     /// By project: the stage's mark on the right; nil in By stage.
     public let stage: ProjectsStage?
-    /// By stage: the subproject the task stands in, small over its title; nil for the node's own and in By project.
-    public let over: String?
     /// The project it is shown under: what a drop on the tree replaces.
     public let from: String?
     /// What `tasks.dropOnProject` takes for this very card (`ProjectsDrop` `{ key, from, lifted }`), passed back as given.
