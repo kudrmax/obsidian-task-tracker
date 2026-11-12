@@ -1,59 +1,39 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import { ColumnHeaders } from "../../obsidian/ui/ColumnHeaders";
+import { DayNav } from "../../obsidian/ui/DayNav";
 
-function setUp() {
-	const names = { inbox: "Inbox", soon: "Soon" };
-	let title = "Today";
-	const steps: number[] = [];
-	let todays = 0;
-	const root = document.createElement("div");
-	const headers = new ColumnHeaders(root, {
-		title: () => title,
-		onStep: (days) => steps.push(days),
-		onToday: () => todays++,
-		inboxName: () => names.inbox,
-		doneName: () => "Done",
-		soonName: () => names.soon,
+describe("ColumnHeaders: the ribbon's titles", () => {
+	it("heads Done, Inbox and Soon with the names of their sections, and follows them renamed", () => {
+		const names = { inbox: "Inbox", soon: "Soon" };
+		const root = document.createElement("div");
+		const headers = new ColumnHeaders(root, { inboxName: () => names.inbox, soonName: () => names.soon, doneName: () => "Done" });
+		const text = (selector: string) => root.querySelector(`${selector} .tc-head-title`)!.textContent;
+		expect([text(".tc-head.is-done"), text(".tc-head.is-inbox"), text(".tc-head.is-soon")]).toEqual(["Done", "Inbox", "Soon"]);
+		names.inbox = "Входящие";
+		names.soon = "Скоро";
+		headers.render();
+		expect([text(".tc-head.is-inbox"), text(".tc-head.is-soon")]).toEqual(["Входящие", "Скоро"]);
+		expect(headers.titleOf("inbox").textContent).toBe("Входящие");
 	});
-	const text = (selector: string) => root.querySelector(`${selector} .tc-head-title`)!.textContent;
-	const button = (label: string) => root.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!;
-	return {
-		names,
-		setTitle: (next: string) => (title = next),
-		headers,
-		steps,
-		todays: () => todays,
-		text,
-		button,
-	};
-}
+});
 
-describe("ColumnHeaders", () => {
-	it("heads Inbox and Soon with the names of their sections, and Now with the day", () => {
-		const s = setUp();
-		expect(s.text(".tc-head.is-inbox")).toBe("Inbox");
-		expect(s.text(".tc-head.is-soon")).toBe("Soon");
-		expect(s.text(".tc-day-nav")).toBe("Today");
-	});
-
-	it("follows sections renamed in the settings and another day", () => {
-		const s = setUp();
-		s.names.inbox = "Входящие";
-		s.names.soon = "Скоро";
-		s.setTitle("Wed, 4 Nov");
-		s.headers.render();
-		expect(s.text(".tc-head.is-inbox")).toBe("Входящие");
-		expect(s.text(".tc-head.is-soon")).toBe("Скоро");
-		expect(s.text(".tc-day-nav")).toBe("Wed, 4 Nov");
-	});
-
-	it("steps a day back and forth with the arrows, and goes back to today from the day's name", () => {
-		const s = setUp();
-		s.button("Previous day").click();
-		s.button("Next day").click();
-		s.button("Back to today").click();
-		expect(s.steps).toEqual([-1, 1]);
-		expect(s.todays()).toBe(1);
+describe("DayNav: the day's title between its arrows", () => {
+	it("names the day, follows another, steps back and forth, and goes back to today from the name", () => {
+		let title = "Today";
+		const steps: number[] = [];
+		let todays = 0;
+		const root = document.createElement("div");
+		const nav = new DayNav(root, { title: () => title, onStep: (days) => steps.push(days), onToday: () => todays++ });
+		expect(nav.titleEl.textContent).toBe("Today");
+		title = "Wed, 4 Nov";
+		nav.render();
+		expect(nav.titleEl.textContent).toBe("Wed, 4 Nov");
+		const button = (label: string) => root.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!;
+		button("Previous day").click();
+		button("Next day").click();
+		button("Back to today").click();
+		expect(steps).toEqual([-1, 1]);
+		expect(todays).toBe(1);
 	});
 });

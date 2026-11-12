@@ -51,7 +51,7 @@ export class RowsLayout extends StillLayout {
 			const area = el(row, "div", "tc-row-body");
 			const funnel = funnelList(host.lists, column, { area });
 			funnel.list.el.classList.add("tc-row-list");
-			funnel.drop.hovered = (over) => funnel.list.el.classList.toggle("is-drop-room", over);
+			funnel.drop.onHover = (over) => funnel.list.el.classList.toggle("is-drop-room", over);
 			return { column, el: row, label, title: titles.get(column) ?? null, funnel };
 		});
 		const view = host.root.ownerDocument.defaultView ?? window;

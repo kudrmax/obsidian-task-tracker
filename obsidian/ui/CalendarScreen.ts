@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type CarryEnd, type CarryStart, type DayBoundary, type DayChange, type DayService, type DropColumn, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusTakes, projectsTakes, type MenuScreen, endsSelection, ROW_LISTS, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewChoice, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
+import { type CalendarEvent, type CalendarPoll, type CalendarService, type CarryEnd, type CarryStart, type DayBoundary, type DayChange, type DayService, type DropColumn, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusTakes, projectsTakes, type MenuScreen, endsSelection, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewChoice, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
 import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -9,10 +9,10 @@ import { SearchWindow } from "./search/SearchWindow";
 import { BulkController } from "./BulkController";
 import type { Theme } from "./eventColors";
 import { DayData } from "./DayData";
-import { ColumnHeaders } from "./ColumnHeaders";
+import { DayNav } from "./DayNav";
 import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
-import { type ColumnTitle, ListDrop } from "./drag/ListDrop";
+import { ListDrop } from "./drag/ListDrop";
 import { type ColumnSections, type DropResult, droppedTasks, type HeldOut, isProjectsDrop, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu, ProjectMenu } from "./menu/GroupMenu";
@@ -24,7 +24,6 @@ import { ProjectsCarry } from "./projects/ProjectsCarry";
 import { ProjectTasks } from "./projects/ProjectTasks";
 import { TreeLift } from "./projects/TreeLift";
 import { TreePanel } from "./projects/TreePanel";
-import { FunnelRows } from "./FunnelRows";
 import { ViewButton } from "./ViewButton";
 import type { PlusAside } from "./quick/QuickEntryController";
 import { failureText } from "./failureText";
@@ -48,11 +47,12 @@ import { SourcesPopover } from "./sources/SourcesPopover";
 import { levelsFor, zoomAfterPinch, zoomShown } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
-import { Divider } from "./Divider";
-import { allColumnsDividerAt, allColumnsShare, allColumnsWidthAt, allColumnsWidths, centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./listWidth";
-import { clear, el, px } from "./dom";
+import type { FunnelListDeps } from "./layouts/FunnelLists";
+import type { LayoutHost, RibbonHost, SharedParts } from "./layouts/LayoutHost";
+import type { LayoutDrop, LayoutMotion, ModeLayout } from "./layouts/ModeLayout";
+import { mountLayout } from "./layouts/mountLayout";
+import { clear, el } from "./dom";
 import { Button } from "./kit/Button";
-import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
 import { Keyboard } from "./Keyboard";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
@@ -62,7 +62,7 @@ import { type Place, type Shift } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
-import { type DayLane, DayTrack, EdgeTrack, edgeParts, restore, StripTrack } from "./ScreenTracks";
+import { type DayLane, DayTrack, EdgeTrack, restore } from "./ScreenTracks";
 import { onCounter, onProjectMark } from "./TaskCard";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
@@ -112,7 +112,15 @@ export class CalendarScreen extends Component {
 	private selectedDate: LocalDate;
 	/** A minute passed while the view was hidden or a gesture held it: it ticks once as soon as it can. */
 	private missedTick = false;
-	private headers: ColumnHeaders | null = null;
+	private dayNav: DayNav | null = null;
+	/** The view mode's layout: the ribbon, all columns, the rows or by project; one at a time. */
+	private layout: ModeLayout | null = null;
+	/** The ribbon's swipe, attached only while a layout has pages to turn. */
+	private swipe: Swipe | null = null;
+	/** The context (`ViewChoice.context`) the lists were last drawn in: another one is drawn still. */
+	private drawnContext: string | null = null;
+	/** Where layouts stand among the screen's parts: before the fade and the controls. */
+	private fadeEl: HTMLElement | null = null;
 	private switcher: ColumnSwitch | null = null;
 	/** The projects' tree as a panel: docked left of the lists on the desktop, over them on the phone; none in a note's block. */
 	private panel: TreePanel | null = null;
@@ -125,21 +133,10 @@ export class CalendarScreen extends Component {
 	private filterTitle: FilterTitle | null = null;
 	/** The view button in the bottom row. */
 	private viewButton: ViewButton | null = null;
-	/** The rows mode's column: the funnel's lists stacked, each its own list and place to drop. */
-	private rows: FunnelRows | null = null;
-	private readonly rowLists = new Map<DropColumn, TaskList>();
-	private readonly rowDrops = new Map<DropColumn, ListDrop>();
-	/** The by project mode's list: the filter's node in its subprojects' parts. */
-	private byProject: ProjectTasks | null = null;
-	private byProjectEl: HTMLElement | null = null;
-	/** The node the by project list last drew: another node's is drawn at once, never moved into. */
-	private byProjectNode: ProjectsNodeId | null = null;
 	/** The tree as a place for a card or the plus, while the panel shows. */
 	private readonly treeDrop = new TreeDrop({
 		tree: () => (this.treeShows() ? (this.panel?.treeShown ?? null) : null),
 	});
-	/** The by project list as a place a card or the plus is dropped in, as a list column is. */
-	private projectsListDrop: ProjectsListDrop | null = null;
 	/** Where a carrying finger is, told to the core's carry: the left edge, a row of the panel. */
 	private readonly carryReport = new CarryReport({
 		tasks: this.deps.tasks,
@@ -154,18 +151,10 @@ export class CalendarScreen extends Component {
 	private carrying = false;
 	/** The rows each drag from the by project list carries and the node it was lifted on, read at the lift. */
 	private readonly carry = new ProjectsCarry({
-		rowOf: (card) => this.byProject?.rowOf(card),
+		rowOf: (card) => this.layout?.projects()?.rowOf(card),
 		selected: () => this.filterNode(),
 		carried: (item) => this.bulk.carried(item),
 	});
-	private leftEl: HTMLElement | null = null;
-	private list: TaskList | null = null;
-	private soonEl: HTMLElement | null = null;
-	private soonList: TaskList | null = null;
-	private soonDrop: ListDrop | null = null;
-	private inboxEl: HTMLElement | null = null;
-	private doneEl: HTMLElement | null = null;
-	private doneList: TaskList | null = null;
 	/** The window stands at Done, left of Inbox: only the search brings it there, and any other move leaves it. */
 	private atDone = false;
 	private search: SearchWindow | null = null;
@@ -173,11 +162,6 @@ export class CalendarScreen extends Component {
 	private full: FullScreen | null = null;
 	private readonly found = new FoundCard();
 	private readonly arriving = new ArrivingCard();
-	private inboxList: TaskList | null = null;
-	private inboxDrop: ListDrop | null = null;
-	private backlogList: TaskList | null = null;
-	private backlogDrop: ListDrop | null = null;
-	private backlogTitle: HTMLElement | null = null;
 	private rightEl: HTMLElement | null = null;
 	private allDayEl: HTMLElement | null = null;
 	private timeline: Timeline | null = null;
@@ -199,7 +183,6 @@ export class CalendarScreen extends Component {
 	private readonly drag: DragController;
 	/** Picking several list cards on the desktop, and what is done to them all. */
 	private readonly bulk: BulkController;
-	private leftDrop: ListDrop | null = null;
 	private timelineDrop: TimelineDrop | null = null;
 	private zoomFrame = 0;
 	/** The pinch settled on the whole day: it keeps fitting as the timeline's height changes. */
@@ -207,7 +190,6 @@ export class CalendarScreen extends Component {
 	private readonly groupDrag: GroupDrag;
 	/** A card sent to New section, waiting at the end of its column for the section's name. */
 	private naming: { readonly item: TaskItem; readonly column: ListColumn } | null = null;
-	private switching = 0;
 	/** The place a swipe has just brought the screen to, until the settings have it. */
 	private shownMode: RightMode | null = null;
 	/** The day a swipe brought in, drawn over the screen until the screen has drawn it itself. */
@@ -260,7 +242,10 @@ export class CalendarScreen extends Component {
 			},
 			removeDue: (keys) => this.act(() => this.deps.tasks.removeDue(keys)),
 			carried: (lifted, picked) => this.deps.tasks.carried(lifted, picked),
-			cards: (picked) => (this.byProject?.rowOf(picked.card) ? this.byProject.cards : (this.listOf(picked.column)?.cards ?? [])).map((entry) => entry.card),
+			cards: (picked) => {
+				const projects = this.layout?.projects() ?? null;
+				return (projects?.rowOf(picked.card) ? projects.cards : (this.listOf(picked.column)?.cards ?? [])).map((entry) => entry.card);
+			},
 			toSection: (keys, name) => this.act(() => this.deps.tasks.toSection(keys, name)),
 			setProject: (keys, project) => this.act(() => this.deps.tasks.setProject(keys, project)),
 			newProject: (keys, name) => this.act(async () => (await this.deps.tasks.newProject(name, keys)) !== null),
@@ -290,7 +275,7 @@ export class CalendarScreen extends Component {
 				}
 				this.quick?.onDragging(active);
 				this.contentEl.classList.toggle("is-dragging", active);
-				this.rows?.fit();
+				this.layout?.hold("carry", active);
 				if (!active) this.carryReport.end();
 			},
 			moved: (x, y) => {
@@ -330,112 +315,10 @@ export class CalendarScreen extends Component {
 		this.firstPlace = this.deps.tasks.firstPlace();
 		this.firstView = this.deps.tasks.firstView(this.wide(), this.where.note !== undefined);
 		this.restoreZoom();
-		this.fitListWidth();
-		this.headers = new ColumnHeaders(root, {
-			title: () => {
-				const day = this.titleDay ?? this.selectedDate;
-				return dayTitle(day, this.deps.days.relation(day), this.today());
-			},
+		this.dayNav = new DayNav(root, {
+			title: () => this.dayName(),
 			onStep: (days) => this.turnDay(() => ({ date: this.deps.days.step(this.selectedDate, days), shift: days < 0 ? -1 : 1 })),
 			onToday: () => this.turnDay(() => (this.deps.days.relation(this.selectedDate) === "today" ? null : { date: this.today(), shift: this.selectedDate < this.today() ? 1 : -1 })),
-			inboxName: () => this.deps.tasks.listName("inbox"),
-			soonName: () => this.deps.tasks.listName("soon"),
-			doneName: () => this.deps.tasks.listName("done"),
-		});
-		this.leftEl = el(root, "div", "tc-left");
-		this.list = new TaskList(el(this.leftEl, "div"), {
-			items: () => (this.columnsShow() ? this.unnamed(this.data.day?.list ?? []) : []),
-			day: () => this.selectedDate,
-			grouped: () => this.sectionsOf("day") !== null,
-			sections: () => this.listSectionsOf("day"),
-			onPlate: (plate, group, signal) => this.attachPlate(plate, "day", group, signal),
-			pending: () => this.namingIn("day"),
-			entry: (drawing) => (this.columnsShow() ? (this.quick?.entryIn("day", drawing) ?? null) : null),
-			empty: () => this.view().plates["day"],
-			emptyLabel: () => this.view().emptyLabel,
-			onEmpty: () => this.quick?.openAtEnd("day"),
-			renaming: () => this.quick?.renaming() ?? null,
-			onHeader: (head, group, signal) => this.groupDrag.attach(head, this.sectionsOf("day")?.list ?? "now", this.list!, group, signal),
-			ungroupedName: () => this.settings.ungrouped,
-			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "day", subtree, signal),
-		});
-		this.leftDrop = new ListDrop(this.list, this.leftEl, "day", (origins) => acceptsDrop("day", origins), () => this.sectionsOf("day"), true, () => this.haptics.tap(), this.columnTitle("day"));
-		this.doneEl = el(root, "div", "tc-done");
-		this.doneList = new TaskList(el(this.doneEl, "div"), {
-			items: () => this.data.done,
-			day: () => null,
-			onCard: (card, item, _subtree, signal) => this.attachDoneCard(card, item, signal),
-		});
-		el(el(root, "div", "tc-divider is-fixed is-done"), "div", "tc-divider-line");
-		this.inboxEl = el(root, "div", "tc-inbox");
-		const inboxPane = el(this.inboxEl, "div", "tc-pane is-inbox");
-		const backlogPane = el(this.inboxEl, "div", "tc-pane is-backlog");
-		this.inboxList = new TaskList(el(inboxPane, "div"), {
-			items: () => (this.columnsShow() ? this.unnamed(this.data.inbox) : []),
-			day: () => null,
-			grouped: () => this.sectionsOf("inbox") !== null,
-			sections: () => this.listSectionsOf("inbox"),
-			onPlate: (plate, group, signal) => this.attachPlate(plate, "inbox", group, signal),
-			pending: () => this.namingIn("inbox"),
-			entry: (drawing) => (this.columnsShow() ? (this.quick?.entryIn("inbox", drawing) ?? null) : null),
-			empty: () => this.view().plates["inbox"],
-			emptyLabel: () => this.view().emptyLabel,
-			onEmpty: () => this.quick?.openAtEnd("inbox"),
-			renaming: () => this.quick?.renaming() ?? null,
-			onHeader: (head, group, signal) => this.groupDrag.attach(head, "inbox", this.inboxList!, group, signal),
-			ungroupedName: () => this.settings.ungrouped,
-			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "inbox", subtree, signal),
-		});
-		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", (origins) => acceptsDrop("inbox", origins), () => this.sectionsOf("inbox"), true, () => this.haptics.tap(), this.columnTitle("inbox"));
-		this.backlogTitle = el(el(backlogPane, "div", "tc-pane-head"), "div", "tc-head-title");
-		this.backlogList = new TaskList(el(backlogPane, "div"), {
-			items: () => (this.columnsShow() ? this.unnamed(this.data.backlog) : []),
-			day: () => null,
-			grouped: () => this.sectionsOf("backlog") !== null,
-			sections: () => this.listSectionsOf("backlog"),
-			onPlate: (plate, group, signal) => this.attachPlate(plate, "backlog", group, signal),
-			pending: () => this.namingIn("backlog"),
-			entry: (drawing) => (this.columnsShow() ? (this.quick?.entryIn("backlog", drawing) ?? null) : null),
-			empty: () => this.view().plates["backlog"],
-			emptyLabel: () => this.view().emptyLabel,
-			onEmpty: () => this.quick?.openAtEnd("backlog"),
-			renaming: () => this.quick?.renaming() ?? null,
-			onHeader: (head, group, signal) => this.groupDrag.attach(head, "backlog", this.backlogList!, group, signal),
-			ungroupedName: () => this.settings.ungrouped,
-			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "backlog", subtree, signal),
-		});
-		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", (origins) => acceptsDrop("backlog", origins), () => this.sectionsOf("backlog"), false, () => this.haptics.tap(), this.columnTitle("backlog"));
-		this.soonEl = el(root, "div", "tc-soon");
-		this.soonList = new TaskList(el(this.soonEl, "div"), {
-			items: () => (this.columnsShow() ? this.unnamed(this.data.soon) : []),
-			day: () => null,
-			grouped: () => this.sectionsOf("soon") !== null,
-			sections: () => this.listSectionsOf("soon"),
-			onPlate: (plate, group, signal) => this.attachPlate(plate, "soon", group, signal),
-			pending: () => this.namingIn("soon"),
-			entry: (drawing) => (this.columnsShow() ? (this.quick?.entryIn("soon", drawing) ?? null) : null),
-			empty: () => this.view().plates["soon"],
-			emptyLabel: () => this.view().emptyLabel,
-			onEmpty: () => this.quick?.openAtEnd("soon"),
-			renaming: () => this.quick?.renaming() ?? null,
-			onHeader: (head, group, signal) => this.groupDrag.attach(head, "soon", this.soonList!, group, signal),
-			ungroupedName: () => this.settings.ungrouped,
-			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "soon", subtree, signal),
-		});
-		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (origins) => acceptsDrop("soon", origins), () => this.sectionsOf("soon"), true, () => this.haptics.tap(), this.columnTitle("soon"));
-		this.buildRows(root);
-		this.buildByProject(root);
-		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
-		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
-		new Divider(el(root, "div"), {
-			width: () => this.dividerAt(),
-			onWidth: (at) => root.style.setProperty(PROPERTY.listWidth, px(this.listWidthAt(at))),
-			onRelease: (at) => void this.deps.settings.set({ listShare: this.listShareAt(at) }).then(() => this.parts.request("frame")),
-			min: () => this.dividerBounds().min,
-			max: () => this.dividerBounds().max,
-			center: () => this.dividerBounds().center,
-			onSnap: () => this.haptics.tap(),
-			arbiter: this.arbiter,
 		});
 		this.rightEl = el(root, "div", "tc-right");
 		this.allDayEl = el(this.rightEl, "div");
@@ -459,7 +342,7 @@ export class CalendarScreen extends Component {
 			onEvent: (block, event, signal) => this.drag.attachEvent(block, () => EventMenu.open({ source: block, openInCalendar: () => this.deps.openInCalendar(event) }), signal),
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
-		el(root, "div", "tc-fade");
+		this.fadeEl = el(root, "div", "tc-fade");
 		this.timelineDrop = new TimelineDrop(this.timeline, {
 			snap: (minute) => this.deps.tasks.snap(minute, this.hourPx, LAYOUT.snapTolerance),
 			span: (item, from, start) => this.deps.tasks.dropSpan(item, from, start),
@@ -478,10 +361,6 @@ export class CalendarScreen extends Component {
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
 			onRelease: (hourPx) => this.settleZoom(hourPx),
 		});
-		new FreeRoomDoubleClick([this.leftEl, this.list.el], () => this.quick?.openAtEnd("day"));
-		new FreeRoomDoubleClick([this.soonEl, this.soonList.el], () => this.quick?.openAtEnd("soon"));
-		new FreeRoomDoubleClick([inboxPane, this.inboxList.el], () => this.quick?.openAtEnd("inbox"));
-		new FreeRoomDoubleClick([backlogPane, this.backlogList.el], () => this.quick?.openAtEnd("backlog"));
 		const switcher = new ColumnSwitch(root, {
 			value: () => this.place(),
 			onChange: (mode) => void this.afterEntry(() => this.leaveDone(mode)),
@@ -501,7 +380,7 @@ export class CalendarScreen extends Component {
 			arbiter: this.arbiter,
 			drag: this.drag,
 			titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts, this.where.keys),
-			list: (column) => (column === "projects" ? this.byProject : this.listOf(column)),
+			list: (column) => (column === "projects" ? (this.layout?.projects() ?? null) : this.listOf(column)),
 			sectioned: (column) => column !== "projects" && this.sectionsOf(column) !== null,
 			timeline: () => this.timeline,
 			task: (key) => this.deps.tasks.findIn(this.data.day?.slotted ?? [], key),
@@ -543,13 +422,11 @@ export class CalendarScreen extends Component {
 			this.unsubscribe.push(() => capsule.destroy());
 		}
 		this.bulk.mount();
-		const pager = new ScreenPager({ track: (shift) => this.trackTo(shift), duration: () => tokenMs(root, DURATION.slide), width: () => root.clientWidth });
-		this.pager = pager;
-		new Swipe(root, {
-			arbiter: this.arbiter,
-			accepts: swipeStartsAt,
-			target: pager,
-		});
+		this.pager = new ScreenPager({ track: (shift) => {
+				this.landed();
+				return this.layout?.track?.(shift) ?? new EdgeTrack([], 0);
+			}, duration: () => tokenMs(root, DURATION.slide), width: () => root.clientWidth });
+		this.mount(this.view());
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => {
 				void this.data.tasks();
@@ -629,8 +506,9 @@ export class CalendarScreen extends Component {
 	}
 
 	close(): void {
-		for (const list of [this.list, this.inboxList, this.backlogList, this.soonList, this.doneList, ...this.rowLists.values()]) list?.destroy();
-		this.rows?.destroy();
+		this.swipe?.destroy();
+		this.layout?.destroy();
+		this.layout = null;
 		this.full?.close();
 		this.quick?.close();
 		this.poll?.stop();
@@ -639,7 +517,7 @@ export class CalendarScreen extends Component {
 	}
 
 	resize(): void {
-		this.fitListWidth();
+		this.layout?.frame();
 		this.quick?.reveal();
 		this.catchUpTick();
 		this.poll?.catchUp();
@@ -675,45 +553,104 @@ export class CalendarScreen extends Component {
 		return this.contentEl.ownerDocument.body.classList.contains("theme-light") ? "light" : "dark";
 	}
 
-	/** A view not laid out yet has no width to take a share of: it keeps the design's width until it has one. */
-	private fitListWidth(): void {
-		const width = this.stageWidth();
-		if (width <= 0) return;
-		const share = this.settings.listShare;
-		const list = this.viewMode() === "allColumns" ? allColumnsWidths(share, width).width : shownListWidth(share, width);
-		this.contentEl.style.setProperty(PROPERTY.listWidth, px(list));
-	}
-
 	/** The width the lists and the timeline share: the view's, less the docked panel's. */
 	private stageWidth(): number {
 		const docked = this.contentEl.classList.contains("has-dock") ? (this.panel?.el.offsetWidth ?? 0) : 0;
 		return this.contentEl.clientWidth - docked;
 	}
 
-	/** Where the divider with the handle stands from the lists' left edge: after the list, or in all columns after the three. */
-	private dividerAt(): number {
-		const width = this.stageWidth();
-		const share = this.settings.listShare;
-		return this.viewMode() === "allColumns" ? allColumnsDividerAt(allColumnsWidths(share, width).width) : shownListWidth(share, width);
+	/**
+	 * The layout of `view`'s mode, mounted in place of the one that stood: its lists drawn still (another context), the
+	 * swipe attached only where it has pages to turn. The timeline keeps its scroll through the move.
+	 */
+	private mount(view: ViewChoice): void {
+		const scroll = this.timeline?.el.scrollTop ?? 0;
+		this.swipe?.destroy();
+		this.swipe = null;
+		this.layout?.destroy();
+		this.layout = mountLayout(this.layoutHost(), view.layout);
+		this.drawnContext = null;
+		this.layout.showPlace(this.place(), false);
+		this.timeline?.holdScroll(scroll);
+		if (this.layout.track && this.pager) this.swipe = new Swipe(this.contentEl, { arbiter: this.arbiter, accepts: swipeStartsAt, target: this.pager });
 	}
 
-	/** The lists' width the divider standing at `at` gives. */
-	private listWidthAt(at: number): number {
-		return this.viewMode() === "allColumns" ? allColumnsWidthAt(at) : at;
+	/** What a layout reads of the screen: the shared parts, the lists' and Done's gestures, the measures. */
+	private layoutHost(): LayoutHost {
+		const root = this.contentEl;
+		return {
+			root,
+			shared: this.sharedParts(),
+			lists: this.listDeps(),
+			ribbon: this.ribbonHost(),
+			arbiter: this.arbiter,
+			listName: (column) => (column === "day" ? this.dayName() : this.deps.tasks.listName(column)),
+			dayName: () => this.dayName(),
+			view: () => this.view(),
+			share: () => this.settings.listShare,
+			saveShare: (share) => void this.deps.settings.set({ listShare: share }).then(() => this.parts.request("frame")),
+			stageWidth: () => this.stageWidth(),
+			projectsList: (area) => this.buildByProject(area),
+			projectsView: () => this.data.projects,
+			tap: () => this.haptics.tap(),
+		};
 	}
 
-	/** The share the divider let go at `at` saves. */
-	private listShareAt(at: number): number {
-		const width = this.stageWidth();
-		return this.viewMode() === "allColumns" ? allColumnsShare(allColumnsWidthAt(at), width) : listShareOf(at, width);
+	/** The day's title and the timeline's column: one each for the screen, which each layout stands where its day is. */
+	private sharedParts(): SharedParts {
+		const root = this.contentEl;
+		const nav = this.dayNav!;
+		const timeline = this.rightEl!;
+		const fade = this.fadeEl!;
+		return {
+			nav: nav.el,
+			dayTitle: nav.titleEl,
+			timeline,
+			place: (navIn, timelineIn) => {
+				const scroll = this.timeline?.el.scrollTop ?? 0;
+				if (navIn) navIn.appendChild(nav.el);
+				else root.insertBefore(nav.el, fade);
+				if (timelineIn) timelineIn.appendChild(timeline);
+				else root.insertBefore(timeline, fade);
+				this.timeline?.holdScroll(scroll);
+			},
+		};
 	}
 
-	/** How far the divider goes either way, and where it holds to the middle. */
-	private dividerBounds(): { readonly min: number; readonly max: number; readonly center: number } {
-		const width = this.stageWidth();
-		if (this.viewMode() !== "allColumns") return { min: LIST_WIDTHS.min, max: listWidthMax(width), center: centeredListWidth(width) };
-		const all = allColumnsWidths(this.settings.listShare, width);
-		return { min: allColumnsDividerAt(all.min), max: allColumnsDividerAt(all.max), center: allColumnsDividerAt(all.center) };
+	/** What a funnel list reads of the screen, in whichever layout it stands. */
+	private listDeps(): FunnelListDeps {
+		return {
+			items: (column) => this.unnamed(this.itemsOf(column)),
+			day: () => this.selectedDate,
+			sectionsOf: (column) => this.sectionsOf(column),
+			listSections: (column) => this.listSectionsOf(column),
+			naming: (column) => this.namingIn(column),
+			entry: (column, drawing) => this.quick?.entryIn(column, drawing) ?? null,
+			plate: (column) => this.view().plates[column],
+			emptyLabel: () => this.view().emptyLabel,
+			openAtEnd: (column) => this.quick?.openAtEnd(column),
+			openIn: (column, group) => this.quick?.openIn(column, group),
+			renaming: () => this.quick?.renaming() ?? null,
+			header: (head, list, owner, group, signal) => this.groupDrag.attach(head, list, owner, group, signal),
+			ungroupedName: () => this.settings.ungrouped,
+			card: (card, item, column, subtree, signal) => this.attachCard(card, item, column, subtree, signal),
+			titleDrop: (column) => this.data.titleDrop(column),
+			tap: () => this.haptics.tap(),
+		};
+	}
+
+	/** What the ribbon asks to walk its places and turn its days. */
+	private ribbonHost(): RibbonHost {
+		return {
+			place: () => this.place(),
+			day: () => this.selectedDate,
+			stepFunnel: (from, shift) => this.deps.days.stepFunnel(from, shift),
+			dayTrack: (day, shift) => this.dayTrack(day, shift),
+			arrive: (place) => this.arriveAt(place),
+			follow: (position) => this.switcher?.follow(position),
+			done: () => this.data.done,
+			doneCard: (card, item, signal) => this.attachDoneCard(card, item, signal),
+		};
 	}
 
 	/**
@@ -728,40 +665,13 @@ export class CalendarScreen extends Component {
 	/** The header shows the day at once; its tasks and events replace the last day's as they come. */
 	private select(date: LocalDate): void {
 		this.selectedDate = date;
-		this.headers?.render();
+		this.dayNav?.render();
 		void this.data.selectDay();
 	}
 
 	/** The place the window stands at: one a swipe or the wheel has just brought it to, else the core's (`FunnelView.place`). */
 	private mode(): RightMode {
 		return this.shownMode ?? this.data.funnel?.place ?? (this.firstPlace ??= this.deps.tasks.firstPlace());
-	}
-
-	/**
-	 * A swipe walks the row of screens as the switch and the arrows do: to the next pair of columns the strip slides under
-	 * the finger, to another day each column turns to that day's within itself, and past the row's end it only gives.
-	 */
-	private trackTo(shift: Shift): ScreenTrack {
-		this.landed();
-		const root = this.contentEl;
-		const from = { mode: this.place(), date: this.selectedDate };
-		/** The day's swipe is the two columns' own: in another mode, and in a note's block, the day turns by its arrows (decision 17). */
-		if (!this.view().ribbon) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
-		const to = this.deps.days.stepFunnel(from, shift);
-		if (!to) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
-		if (to.mode !== from.mode) {
-			window.clearTimeout(this.switching);
-			root.classList.remove("is-switching");
-			return new StripTrack({
-				root,
-				from: from.mode,
-				to: to.mode,
-				showMode: (place) => this.showPlace(place),
-				turnWheel: (position) => this.switcher?.follow(position),
-				onArrive: (mode) => this.arriveAt(mode),
-			});
-		}
-		return this.dayTrack(to.date, shift);
 	}
 
 	/**
@@ -810,26 +720,27 @@ export class CalendarScreen extends Component {
 				return shown ? this.data.sections[shown.list] : null;
 			},
 			ungroupedName: () => this.settings.ungrouped,
-			listScroll: () => this.list?.el.scrollTop ?? 0,
+			listScroll: () => this.listOf("day")?.el.scrollTop ?? 0,
 			alignTimeline: (timeline) => this.timeline && timeline.alignWith(this.timeline),
 			allDayExtraRows: () => this.rightEl?.style.getPropertyValue(PROPERTY.allDayExtraRows) ?? "",
 			filter: () => this.filterNode(),
 			emptyLabel: () => this.view().emptyLabel,
 		});
-		const list: DayLane = {
-			shown: () => (this.leftEl ? [...this.leftEl.children].filter((part) => part instanceof HTMLElement) : []),
+		const lane = this.layout?.dayLane() ?? null;
+		const list: DayLane | null = lane && {
+			shown: () => [...lane.children].filter((part) => part instanceof HTMLElement),
 			next: () => peek.listParts(),
-			width: this.leftEl?.offsetWidth ?? 0,
+			width: lane.offsetWidth,
 		};
 		const timeline: DayLane = {
 			shown: () => [...(this.timeline?.dayLayers() ?? []), ...(this.allDayEl?.querySelectorAll<HTMLElement>(".tc-allday") ?? [])],
 			next: () => peek.timelineParts(),
 			width: this.rightEl?.offsetWidth ?? root.clientWidth,
 		};
-		return new DayTrack([list, timeline], timeline, peek, shift, {
+		return new DayTrack(list ? [list, timeline] : [timeline], timeline, peek, shift, {
 			onNearer: (nearer) => {
 				this.titleDay = nearer ? day : null;
-				this.headers?.render();
+				this.dayNav?.render();
 			},
 			onArrive: (arrived, shown) => {
 				this.landing = { peek: arrived, parts: shown };
@@ -847,7 +758,7 @@ export class CalendarScreen extends Component {
 		if (place === "done") return;
 		this.atDone = false;
 		this.shownMode = place;
-		this.showPlace(place);
+		this.layout?.showPlace(place, false);
 		this.switcher?.show(place);
 		void this.afterEntry(() => this.setMode(place, false));
 	}
@@ -880,25 +791,11 @@ export class CalendarScreen extends Component {
 	 * choice is saved the frame follows it.
 	 */
 	private async setMode(mode: RightMode, slide = true): Promise<void> {
-		const root = this.contentEl;
-		if (slide) {
-			window.clearTimeout(this.switching);
-			root.classList.add("is-switching");
-			this.switching = window.setTimeout(() => root.classList.remove("is-switching"), tokenMs(root, DURATION.slide));
-		}
 		this.shownMode = mode;
-		this.showPlace(this.place());
+		this.layout?.showPlace(this.place(), slide);
 		await this.act(() => this.deps.tasks.setFunnelPlace(mode));
 		if (this.shownMode === mode) this.shownMode = null;
 		this.parts.request("frame");
-	}
-
-	/** The classes of a place; in a mode with no wheel the lists stand as at the calendar, which every other mode draws over. */
-	private showPlace(place: Place): void {
-		const shown = this.view().ribbon ? place : "calendar";
-		this.contentEl.classList.toggle("is-lists", shown === "soon");
-		this.contentEl.classList.toggle("is-inbox", shown === "inbox" || shown === "done");
-		this.contentEl.classList.toggle("is-done", shown === "done");
 	}
 
 	/** A Done card has no drag: a tap, a right click open its menu, as anywhere. */
@@ -1064,34 +961,13 @@ export class CalendarScreen extends Component {
 		void this.deps.settings.set({ zoom });
 	}
 
-	/** A column's title as a place to drop: what a drop there means is the screen's (`ScreenView.titleDrops`). */
-	private columnTitle(column: ListColumn): ColumnTitle {
-		return {
-			el: () => (column === "backlog" ? this.backlogTitle : (this.headers?.titleOf(column) ?? null)),
-			drop: () => this.data.titleDrop(column),
-		};
-	}
-
-	/** What the screen shows, as places to drop: the tree while it shows, the phone's left edge, the lists and the timeline of the mode. */
-	private shownDrops(): (ListDrop | TimelineDrop | TreeDrop | ProjectsListDrop)[] {
-		const timeline = this.where.note ? null : this.timelineDrop;
-		const places: Record<ViewMode, (ListDrop | TimelineDrop | ProjectsListDrop | null)[]> = {
-			twoColumns: this.placeDrops()[this.mode()],
-			allColumns: [this.inboxDrop, this.backlogDrop, this.soonDrop, this.leftDrop, timeline],
-			rows: [...this.rowOrder().map((column) => this.rowDrops.get(column) ?? null), timeline],
-			byProject: [this.projectsListDrop, timeline],
-		};
+	/** What the screen shows, as places to drop: the tree while it shows, the layout's lists, the timeline where it shows. */
+	private shownDrops(): (LayoutDrop | TimelineDrop | TreeDrop)[] {
+		const layout = this.layout;
+		if (!layout) return [];
 		const panel = this.panel ? [this.treeDrop] : [];
-		return [...panel, ...places[this.viewMode()].filter((target) => target !== null)];
-	}
-
-	/** The two columns each place of the wheel shows, as places to drop. */
-	private placeDrops(): Record<RightMode, (ListDrop | TimelineDrop | null)[]> {
-		return {
-			calendar: [this.timelineDrop, this.leftDrop],
-			soon: [this.soonDrop, this.leftDrop],
-			inbox: [this.inboxDrop, this.backlogDrop, this.soonDrop],
-		};
+		const timeline = layout.timelineShows() && this.timelineDrop ? [this.timelineDrop] : [];
+		return [...panel, ...timeline, ...layout.drops()];
 	}
 
 	/** A list's card: its gestures. */
@@ -1169,7 +1045,7 @@ export class CalendarScreen extends Component {
 	 * under the finger lands on (`projectsDropPreview`) hidden until the float is down on it.
 	 */
 	private async dropInProjectsList(drag: TaskDragPayload, place: ListPlace): Promise<HTMLElement | null> {
-		const list = this.byProject;
+		const list = this.layout?.projects() ?? null;
 		const node = this.filterNode() ?? undefined;
 		const cards = this.projectsDrops(drag);
 		if (!list || cards.length === 0) return null;
@@ -1201,7 +1077,8 @@ export class CalendarScreen extends Component {
 		if (!plus) return null;
 		/** Held, the plus goes into the funnel's lists, the node's by project list alone, or no list (`PlusChoice.list`). */
 		const into = plus.list;
-		const list = into === "projects" && this.projectsListDrop ? [this.projectsListDrop] : [];
+		const byProject = this.layout?.drops().find((drop) => drop instanceof ProjectsListDrop);
+		const list = into === "projects" && byProject ? [byProject] : [];
 		return { targets: [...tree, ...list], alone: into !== "funnel", ...aside };
 	}
 
@@ -1300,11 +1177,6 @@ export class CalendarScreen extends Component {
 		return sections ? this.data.sections[sections.list] : [];
 	}
 
-	/** A tap on an empty section's No tasks plate: the field of a new task there. */
-	private attachPlate(plate: HTMLElement, column: ListColumn, group: ListGroup, signal: AbortSignal): void {
-		plate.addEventListener("click", () => this.quick?.openIn(column, group.name), { signal });
-	}
-
 	/** A tap on a card's folder mark opens the Projects screen on the task's project, in place of its menu; true when it did. */
 	private openProjectOf(item: TaskItem, target: EventTarget | null): boolean {
 		const project = item.project;
@@ -1380,8 +1252,7 @@ export class CalendarScreen extends Component {
 
 	/** The list `column` is drawn in now: its column's, or in the rows mode its row's. */
 	private listOf(column: ListColumn): TaskList | null {
-		if (this.viewMode() === "rows") return this.rowLists.get(column) ?? null;
-		return { day: this.list, soon: this.soonList, inbox: this.inboxList, backlog: this.backlogList }[column];
+		return this.layout?.listOf(column) ?? null;
 	}
 
 	/** The lists leave out the card waiting for its section's name; its own list draws it last. */
@@ -1543,20 +1414,9 @@ export class CalendarScreen extends Component {
 		return !this.contentEl.ownerDocument.body.classList.contains("is-mobile");
 	}
 
-	/** The mode the view is drawn in; before the first read, the default of the place it is drawn at. */
-	private viewMode(): ViewMode {
-		return this.view().mode;
-	}
-
 	/** The view as read with the lists; before the first read, as the device keeps it (`TaskService.firstView`). */
 	private view(): ViewChoice {
 		return this.data.funnel?.view ?? (this.firstView ??= this.deps.tasks.firstView(this.wide(), this.where.note !== undefined));
-	}
-
-	/** The funnel's columns show their lists: two columns and all columns. */
-	private columnsShow(): boolean {
-		const mode = this.viewMode();
-		return mode === "twoColumns" || mode === "allColumns";
 	}
 
 	/** The node the funnel is filtered by; null for none. */
@@ -1566,13 +1426,7 @@ export class CalendarScreen extends Component {
 
 	/** The lists the screen shows, in its order: where the quick entry looks for a task first. */
 	private shownLists(): readonly EntryList[] {
-		return viewEntryLists(this.viewMode(), this.place());
-	}
-
-	/** The rows mode's stages in the core's order. */
-	private rowOrder(): readonly DropColumn[] {
-		const rows = this.data.funnel?.view.rows ?? [];
-		return rows.length > 0 ? rows : ROW_LISTS;
+		return viewEntryLists(this.view().mode, this.place());
 	}
 
 	/** The panel shows: opened by the button, or slid out by a held card. */
@@ -1587,14 +1441,10 @@ export class CalendarScreen extends Component {
 	private drawView(): void {
 		const root = this.contentEl;
 		const funnel = this.data.funnel;
-		const mode = this.viewMode();
 		const filter = funnel?.filter ?? null;
 		const panel = funnel?.panel ?? null;
 		const main = this.where.view;
 		root.classList.toggle("is-note", this.where.note !== undefined);
-		root.classList.toggle("is-view-all", mode === "allColumns");
-		root.classList.toggle("is-view-rows", mode === "rows");
-		root.classList.toggle("is-view-by-project", mode === "byProject");
 		root.classList.toggle("has-wheel", this.view().wheel);
 		const topRow = funnel?.topRow ?? false;
 		root.classList.toggle("has-top-row", topRow);
@@ -1619,36 +1469,7 @@ export class CalendarScreen extends Component {
 		await this.afterEntry(() => this.act(() => (this.where.note ? this.deps.tasks.setNoteViewMode(mode) : this.deps.tasks.setViewMode(mode))));
 	}
 
-	/** The rows mode's column: a list and a place to drop for each stage, as a column's. */
-	private buildRows(root: HTMLElement): void {
-		const rows = new FunnelRows(root, ROW_LISTS, (column) => (column === "day" ? this.dayName() : this.deps.tasks.listName(column)), () => this.where.note === undefined);
-		this.rows = rows;
-		for (const column of ROW_LISTS) {
-			const row = rows.rowOf(column);
-			const list: TaskList = new TaskList(el(row.body, "div"), {
-				items: () => (this.viewMode() === "rows" ? this.unnamed(this.itemsOf(column)) : []),
-				day: () => (column === "day" ? this.selectedDate : null),
-				grouped: () => this.sectionsOf(column) !== null,
-				sections: () => this.listSectionsOf(column),
-				onPlate: (plate, group, signal) => this.attachPlate(plate, column, group, signal),
-				pending: () => this.namingIn(column),
-				entry: (drawing) => (this.viewMode() === "rows" ? (this.quick?.entryIn(column, drawing) ?? null) : null),
-				empty: () => this.view().plates[column],
-				emptyLabel: () => this.view().emptyLabel,
-				onEmpty: () => this.quick?.openAtEnd(column),
-				renaming: () => this.quick?.renaming() ?? null,
-				onHeader: (head, group, signal) => this.groupDrag.attach(head, this.sectionsOf(column)?.list ?? (column === "day" ? "now" : column), list, group, signal),
-				ungroupedName: () => this.settings.ungrouped,
-				onCard: (card, item, subtree, signal) => this.attachCard(card, item, column, subtree, signal),
-			});
-			list.el.classList.add("tc-row-list");
-			this.rowLists.set(column, list);
-			this.rowDrops.set(column, new ListDrop(list, row.el, column, (origins) => acceptsDrop(column, origins), () => this.sectionsOf(column), false, () => this.haptics.tap()));
-			new FreeRoomDoubleClick([row.body], () => this.quick?.openAtEnd(column));
-		}
-	}
-
-	/** The day's name, as the header over the day's list says it. */
+	/** The day's name, as the header over the day's list says it: the one a swipe has drawn nearer while it does. */
 	private dayName(): string {
 		const day = this.titleDay ?? this.selectedDate;
 		return dayTitle(day, this.deps.days.relation(day), this.today());
@@ -1659,32 +1480,18 @@ export class CalendarScreen extends Component {
 		return { day: this.data.day?.list ?? [], inbox: this.data.inbox, backlog: this.data.backlog, soon: this.data.soon }[column];
 	}
 
-	/** The rows drawn in the rows mode: each stage's list, its label, and its plate while it is empty. */
-	private renderRows(moving: boolean): void {
-		const rows = this.rows;
-		if (!rows) return;
-		for (const list of this.rowLists.values()) list.render(moving);
-		if (this.viewMode() !== "rows") return;
-		rows.render(this.rowOrder());
-	}
-
-
-
-	/** The by project mode's list: the filter's node in its subprojects' parts, its cards a place to drop, as a list's. */
-	private buildByProject(root: HTMLElement): void {
-		const host = el(root, "div", "tc-by-project");
-		this.byProjectEl = host;
-		const list = new ProjectTasks(host, {
+	/** The by project mode's list, built in `area` by its layout: the node's tasks in its projects' parts, its cards a place to drop, as a list's. */
+	private buildByProject(area: HTMLElement): { readonly list: ProjectTasks; readonly drop: ProjectsListDrop } {
+		const list = new ProjectTasks(area, {
 			onCard: (card, row, owner, subtree, signal) => this.attachProjectsCard(card, row, owner, subtree, signal),
 			onPlate: (plate, group, signal) => plate.addEventListener("click", () => this.quick?.openIn("projects", group), { signal }),
-			entry: (drawing) => (this.viewMode() === "byProject" ? (this.quick?.entryIn("projects", drawing) ?? null) : null),
+			entry: (drawing) => this.quick?.entryIn("projects", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
 			coming: () => this.data.projects,
 		});
-		this.byProject = list;
-		this.projectsListDrop = new ProjectsListDrop(
+		const drop = new ProjectsListDrop(
 			list,
-			host,
+			area,
 			{
 				reorders: () => this.data.projects?.reorders ?? false,
 				takesAt: (place, drag) => {
@@ -1699,15 +1506,7 @@ export class CalendarScreen extends Component {
 			},
 			() => this.haptics.tap(),
 		);
-	}
-
-	/** The by project list drawn: another node's at once, the same node's moving into place. */
-	private renderByProject(): void {
-		const view = this.data.projects;
-		if (!this.byProject || !view || this.viewMode() !== "byProject") return;
-		const sameNode = this.byProjectNode === view.selected;
-		this.byProjectNode = view.selected;
-		this.byProject.render(view, sameNode);
+		return { list, drop };
 	}
 
 	/** The projects button, the filter's name and the tree's panel: the plugin's own view only, not a note's block. */
@@ -1729,7 +1528,7 @@ export class CalendarScreen extends Component {
 		this.panel = new TreePanel(root, {
 			arbiter: this.arbiter,
 			treeWidth: () => this.settings.treeWidth,
-			onWidth: () => this.fitListWidth(),
+			onWidth: () => this.layout?.frame(),
 			setTreeWidth: (width) => void this.deps.settings.set({ treeWidth: width }).then(() => this.parts.request("frame")),
 			onSnap: () => this.haptics.tap(),
 			onPick: (node) => void this.afterEntry(() => this.act(() => this.deps.tasks.pickProjectNode(node, this.wide()))),
@@ -1751,36 +1550,34 @@ export class CalendarScreen extends Component {
 	 */
 	private draw(parts: ReadonlySet<ScreenPart>): void {
 		const root = this.contentEl;
-		if (!this.headers || !this.switcher || !this.leftEl || !this.soonEl || !this.inboxEl || !this.doneEl || !this.doneList || !this.rightEl || !this.allDayEl || !this.timeline || !this.list || !this.soonList || !this.inboxList || !this.backlogList || !this.backlogTitle) return;
+		if (!this.dayNav || !this.switcher || !this.rightEl || !this.allDayEl || !this.timeline || !this.layout) return;
+		const view = this.view();
+		if (view.layout.mode !== this.layout.mode) this.mount(view);
+		const layout = this.layout;
 		if (parts.has("frame") || parts.has("tasks")) {
 			this.drawView();
-			this.fitListWidth();
-			this.headers.render();
-			this.showPlace(this.place());
+			layout.frame();
+			this.dayNav.render();
+			layout.showPlace(this.place(), false);
 		}
 		this.switcher.render();
+		let motion: LayoutMotion = "replace";
 		if (parts.has("tasks")) {
 			this.bulk.selection.forgetDrawn();
-			const moving = this.drawnRead;
+			motion = this.drawnRead && this.drawnContext === view.context ? "move" : "replace";
 			this.drawnRead = this.data.read;
-			this.list.render(moving);
+			this.drawnContext = view.context;
 			const missing = this.data.missing;
 			root.classList.toggle("is-missing", missing);
-			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.doneEl, this.rightEl, this.rows?.el, this.byProjectEl]) part?.classList.toggle("tc-hidden", missing);
+			layout.hide(missing);
+			this.rightEl.classList.toggle("tc-hidden", missing);
 			root.querySelector(".tc-missing")?.remove();
 			if (missing) this.renderMissing(root);
-			this.soonList.render(moving);
-			this.inboxList.render(moving);
-			this.backlogTitle.textContent = this.deps.tasks.listName("backlog");
-			this.headers.render();
-			this.backlogList.render(moving);
-			this.doneList.render(moving);
-			this.renderRows(moving);
-			this.renderByProject();
+			layout.render(motion);
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
 		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.allDay, this.theme(), (event) => this.deps.calendars.isPast(event));
-		if (parts.has("tasks") || parts.has("events")) this.timeline.render(this.drawnRead);
+		if (parts.has("tasks") || parts.has("events")) this.timeline.render(parts.has("tasks") ? motion === "move" : this.drawnRead);
 		if (hoursAt !== null) this.keepHoursAt(hoursAt);
 		if (parts.has("tasks") && this.scrolledFor !== this.selectedDate) {
 			this.scrolledFor = this.selectedDate;
@@ -1788,6 +1585,7 @@ export class CalendarScreen extends Component {
 		}
 		if (this.landing?.peek.date === this.selectedDate && (this.data.missing || this.data.day?.date === this.selectedDate)) this.landed();
 		this.quick?.rendered();
+		layout.hold("typing", this.quick?.entering ?? false);
 	}
 
 	/**
