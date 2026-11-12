@@ -155,6 +155,8 @@ View rework (Obsidian frontend, 2026-11-12):
 78. (QA 2) A field typed in is followed into sight until a hand (wheel, finger) scrolls its list; a scroll the layout makes (a row growing, a list's end clamped) does not stop it, and a field still growing in is brought into sight again at its full size.
 79. (QA 2) A docked panel gives way on a narrow view: the lists keep at least a phone's width (390) beside it, the tree at least a list's least width.
 80. (QA 2) The note's block stands under the note's last line (Live Preview no longer stretches the text over a short note's view), is as tall as its view's content with its controls' room in any mode, and its foot fade backs its controls.
+81. (QA 3) A change asked for while a menu's pick still waits for its window to close (Delete confirmed, the menu fading) runs after that pick: a project picked right after a Delete reads the file without the deleted task.
+82. (QA 3) In a note's block the lists don't scroll, so no drop room opens under a carried card: no row moves during a carry. A list's «No tasks» plate is taken over by its first card or field at the same height; only a field's bar room grows under it.
 
 Applied from the Swift frontend: 17 (rows: each list as tall as its cards while all fit, the long ones share the rest and scroll inside, a card's room more while a card or the plus is carried or a task typed; the day by the arrows), 18 (the «No tasks» plate in an empty list under a filter and in rows), 19 (a find the filter hides clears it; a done find outside two columns opens on the whole screen), 20 (the left edge for a card and the plus), 21 (by project without a segment). 13, 15 and 16 are the app's own chrome: the plugin keeps the boards' top-left button and its own icons.
 

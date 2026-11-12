@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { type CalendarEvent, type CalendarPoll, type CalendarService, type CarryEnd, type CarryStart, type DayBoundary, type DayChange, type DayService, type DropColumn, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusTakes, projectsTakes, type MenuScreen, endsSelection, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewChoice, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
+import { type CalendarEvent, type CalendarPoll, type CalendarService, type CarryEnd, type CarryStart, type DayBoundary, type DayChange, type DayService, type DropColumn, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusPlace, projectsTakes, type MenuScreen, endsSelection, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewChoice, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
 import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -53,6 +53,7 @@ import type { LayoutDrop, LayoutMotion, ModeLayout } from "./layouts/ModeLayout"
 import { mountLayout } from "./layouts/mountLayout";
 import { clear, el } from "./dom";
 import { Button } from "./kit/Button";
+import { Picks } from "./kit/Panel";
 import { Keyboard } from "./Keyboard";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
@@ -893,8 +894,13 @@ export class CalendarScreen extends Component {
 	/** Runs a change of the tasks, then reads them anew; a change that answers false wrote nothing and needs no reading. */
 	private async act(change: () => Promise<void | boolean>): Promise<void> {
 		/** One change after another, in the order they were asked: a read after the second never sees the file before the first. */
-		const run = this.changing.then(change);
-		this.changing = run.catch(() => undefined);
+		/** A change asked for while a menu's pick is still to run (its window closing) waits for it: a pick of another project never reads before a Delete picked just before. */
+		const gate = Picks.running ? Promise.resolve() : Picks.settled();
+		const run = gate.then(() => {
+			const queued = this.changing.then(change);
+			this.changing = queued.catch(() => undefined);
+			return queued;
+		});
 		try {
 			if ((await run) === false) return;
 		} catch (error) {
@@ -1552,9 +1558,9 @@ export class CalendarScreen extends Component {
 						throw error;
 					}
 				},
-				plusTakesAt: (place) => {
+				plusPlaceAt: (place) => {
 					const view = this.data.projects;
-					return view !== null && projectsPlusTakes(view, place);
+					return view === null ? null : projectsPlusPlace(view, place);
 				},
 				node: () => this.data.projects?.selected ?? null,
 			},

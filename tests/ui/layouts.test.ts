@@ -78,7 +78,7 @@ function screen(mode: ViewMode, note = false) {
 		stageWidth: () => 1000,
 		projectsList: (area) => {
 			const list = new ProjectTasks(area, {});
-			return { list, drop: new ProjectsListDrop(list, area, { reorders: () => false, takesAt: () => false, plusTakesAt: () => false, node: () => null }) };
+			return { list, drop: new ProjectsListDrop(list, area, { reorders: () => false, takesAt: () => false, plusPlaceAt: () => null, node: () => null }) };
 		},
 		projectsView: () => null,
 		tap: () => undefined,
