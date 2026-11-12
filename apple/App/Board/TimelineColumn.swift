@@ -7,6 +7,9 @@ import SwiftUI
 struct TimelineColumn: View {
     let timeline: BoardTimeline
     @Bindable var model: BoardModel
+    /// Mounted but not shown (the ribbon's while another view shows): it leaves the zoom, the calendar's place and its
+    /// measures to the one that shows, and takes them back when it shows again.
+    var dormant = false
     @State private var position: ScrollPosition
     @State private var opened: Bool
     @State private var pinch: Pinch?
@@ -19,9 +22,10 @@ struct TimelineColumn: View {
     private var visible: CGFloat { zoom.visible }
     private var range: [Double] { zoom.range }
 
-    init(timeline: BoardTimeline, model: BoardModel) {
+    init(timeline: BoardTimeline, model: BoardModel, dormant: Bool = false) {
         self.timeline = timeline
         self.model = model
+        self.dormant = dormant
         // A day slid in opens where the core says from its first frame, at the zoom shown: no frame at the top first.
         let top = model.zoom.openingTop(timeline)
         _position = State(initialValue: ScrollPosition(y: top ?? 0))
@@ -29,6 +33,8 @@ struct TimelineColumn: View {
     }
     /// The column's width: another day slides through it.
     @State private var columnWidth: CGFloat = 0
+    /// The scroll's visible height, kept while dormant so the zoom is set from it when it shows again.
+    @State private var visibleHeight: CGFloat = 0
     /// The zoom a pinch last settled on, kept on the device: `wholeDay`, or the hour's height.
     @AppStorage("timelineZoom") private var savedZoom: String = ""
 
@@ -108,6 +114,8 @@ struct TimelineColumn: View {
                 .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, y in scroll.y = y }
                 .onScrollGeometryChange(for: ScrollSpot.Reach.self) { ScrollSpot.Reach($0) } action: { _, reach in scroll.reach = reach }
                 .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height - $0.contentInsets.top - $0.contentInsets.bottom } action: { _, height in
+                    visibleHeight = height
+                    guard !dormant else { return }
                     zoom.visible = height
                     settleZoom()
                     open()
@@ -193,9 +201,16 @@ struct TimelineColumn: View {
         }
         .frame(width: width, height: height, alignment: .topLeading)
         .coordinateSpace(.named(Self.canvasSpace))
-        .background(alignment: .topLeading) { CanvasProbe(model: model).frame(width: width, height: height) }
-        .onChange(of: hour, initial: true) { model.calendarHour = hour }
-        .onChange(of: width, initial: true) { model.calendarWidth = width }
+        .background(alignment: .topLeading) { CanvasProbe(model: model, dormant: dormant).frame(width: width, height: height) }
+        .onChange(of: hour, initial: true) { if !dormant { model.calendarHour = hour } }
+        .onChange(of: width, initial: true) { if !dormant { model.calendarWidth = width } }
+        .onChange(of: dormant) {
+            guard !dormant else { return }
+            model.calendarHour = hour
+            model.calendarWidth = width
+            if visibleHeight > 0 { zoom.visible = visibleHeight }
+            settleZoom()
+        }
     }
 
     /// The whole-day strip's height: the shown day's rows, while a day slides in the taller of the two days' rows; set
@@ -700,6 +715,6 @@ private struct LandingMark<Line: View>: View {
 /// of the same day, never redraws it; what it reads of the board (the zoom, the line under a carry) it follows itself.
 extension TimelineColumn: Equatable {
     nonisolated static func == (a: TimelineColumn, b: TimelineColumn) -> Bool {
-        MainActor.assumeIsolated { a.timeline == b.timeline && a.model === b.model }
+        MainActor.assumeIsolated { a.timeline == b.timeline && a.dormant == b.dormant && a.model === b.model }
     }
 }

@@ -2,22 +2,24 @@ import Core
 import SwiftUI
 import UIKit
 
-/// The Rows view (board `projects-one-view/T3`): Inbox, Backlog, Soon and the day's list stacked on the left, each under
-/// its small heading, the calendar on the right behind the divider, which sets the list's width as at Today. The day
-/// turns by the arrows over the calendar.
+/// The Rows view (board `projects-one-view/T3`): the funnel's lists stacked on the left, each under its small heading, the
+/// calendar on the right behind the divider, which sets the list's width as at Today. The day turns by the arrows over
+/// the calendar. Nothing here swipes: the screen stands still sideways.
 struct RowsView: View {
     let snapshot: BoardSnapshot
+    let lists: [BoardColumn]
     @Bindable var model: BoardModel
 
     var body: some View {
         SplitWithCalendar(snapshot: snapshot, model: model) {
-            StackedLists(snapshot: snapshot, model: model)
+            StackedLists(snapshot: snapshot, lists: lists, model: model)
         }
     }
 }
 
-/// The By project view (board `T7`): the filter's node's tasks in its subprojects' parts on the left, the calendar on
-/// the right behind the divider.
+/// The By project view (board `T7`): the filter's node's tasks in its subprojects' parts on the left (every task by its
+/// top project with no filter), the calendar on the right behind the divider. Its list is read by `ProjectsBoard.follow`,
+/// the one way it is read.
 struct ByProjectView: View {
     let snapshot: BoardSnapshot
     @Bindable var model: BoardModel
@@ -27,31 +29,50 @@ struct ByProjectView: View {
             ProjectTasks(model: model)
                 .frame(maxHeight: .infinity, alignment: .top)
         }
-        .task(id: ReadKey(file: snapshot.tasksText, node: snapshot.filter)) { await model.projects.read() }
-    }
-
-    private struct ReadKey: Equatable {
-        let file: String?
-        let node: String?
     }
 }
 
-/// A list beside the calendar, the divider between them: the list's width is the day list's at Today, its handle drags
-/// it as there.
+/// All columns (a wide screen's; the phone is never offered it): the funnel's columns side by side, sharing the list's
+/// width, the calendar behind the divider.
+struct AllColumnsView: View {
+    let snapshot: BoardSnapshot
+    let columns: [[BoardColumn]]
+    @Bindable var model: BoardModel
+
+    var body: some View {
+        SplitWithCalendar(snapshot: snapshot, model: model) {
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(Array(columns.enumerated()), id: \.offset) { _, lists in
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(lists, id: \.self) { column in
+                            if let list = snapshot.lists[column] {
+                                ListColumn(list: list, model: model).equatable()
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                }
+            }
+        }
+    }
+}
+
+/// A list beside the calendar, the divider between them: the list's width is the day list's at Today (one share for
+/// both), its handle drags it as there.
 private struct SplitWithCalendar<Lists: View>: View {
     let snapshot: BoardSnapshot
     @Bindable var model: BoardModel
     @ViewBuilder let lists: () -> Lists
-    @AppStorage("listShare") private var listShare: Double = 0.5
 
     var body: some View {
         GeometryReader { box in
             let width = box.size.width
-            let list = model.listWidths(share: listShare, viewWidth: width).map { CGFloat($0.width) } ?? width / 2
+            let list = model.listWidths(share: model.listShare, viewWidth: width).map { CGFloat($0.width) } ?? width / 2
             HStack(alignment: .top, spacing: 0) {
                 lists()
                     .frame(width: list)
                     .frame(maxHeight: .infinity, alignment: .top)
+                    .clipped()
                 VStack(alignment: .leading, spacing: 0) {
                     ColumnTitle(title: model.titleSnapshot?.lists[.day]?.title ?? snapshot.dayTitle, dayArrows: true, model: model)
                         .padding(.bottom, ColumnMetrics.headGap)
@@ -62,17 +83,17 @@ private struct SplitWithCalendar<Lists: View>: View {
                 .frame(width: width - list)
                 .frame(maxHeight: .infinity, alignment: .top)
             }
-            .overlay(alignment: .leading) { ListDivider(model: model, width: width, share: $listShare).offset(x: list) }
+            .overlay(alignment: .leading) { ListDivider(model: model, width: width).offset(x: list) }
         }
     }
 }
 
 /// The handle on the line between the list and the calendar: dragged, the list grows or narrows within the core's
-/// bounds, holding to the middle as the core says (`rules.dividerAt`), a tap felt each time it holds.
+/// bounds, holding to the middle as the core says (`rules.dividerAt`), a tap felt each time it holds. The share is the
+/// device's one (`BoardModel.listShare`), the ribbon's at Today too.
 struct ListDivider: View {
     let model: BoardModel
     let width: CGFloat
-    @Binding var share: Double
     var shown: CGFloat = 1
     @State private var dragStart: CGFloat?
     @State private var snapped = false
@@ -93,11 +114,14 @@ struct ListDivider: View {
                     .onChanged { drag in
                         let start = dragStart ?? listWidth
                         if dragStart == nil { dragStart = start }
-                        guard let bounds = model.listWidths(share: share, viewWidth: width),
+                        guard let bounds = model.listWidths(share: model.listShare, viewWidth: width),
                               let stop = model.dividerAt(start + drag.translation.width, widths: bounds, speed: Double(abs(drag.velocity.width)) / 1000) else { return }
                         if stop.snapped, !snapped { snaps += 1 }
                         snapped = stop.snapped
-                        share = model.listShare(of: CGFloat(stop.width), viewWidth: width) ?? share
+                        // The finger's width at once, no spring: the list and the calendar follow the finger.
+                        var still = Transaction()
+                        still.disablesAnimations = true
+                        withTransaction(still) { model.listShare = model.listShare(of: CGFloat(stop.width), viewWidth: width) ?? model.listShare }
                     }
                     .onEnded { _ in
                         dragStart = nil
@@ -111,37 +135,57 @@ struct ListDivider: View {
     }
 
     private var listWidth: CGFloat {
-        model.listWidths(share: share, viewWidth: width).map { CGFloat($0.width) } ?? width / 2
+        model.listWidths(share: model.listShare, viewWidth: width).map { CGFloat($0.width) } ?? width / 2
     }
 }
 
-/// The Rows view's lists one under another, in the core's order (`ViewChoice.rows`): each as tall as its rows while they
-/// all fit, the long ones sharing the rest and scrolling within it (`rules.stackedRows`).
+/// The Rows view's lists one under another, in the core's order: each as tall as the core shares the room
+/// (`StackedRowsLayout`, `rules.stackedLists`), measured from the rows read (`ListMetrics`), never from what a list draws.
+/// The stack ends above the tab bar's row; while a task is typed in a list the keyboard would cover, the stack rises just
+/// enough to keep that list over the keyboard, its own height unchanged.
 private struct StackedLists: View {
     let snapshot: BoardSnapshot
+    let lists: [BoardColumn]
     @Bindable var model: BoardModel
+    @State private var frames: [BoardColumn: CGRect] = [:]
+    @State private var area: CGRect = .zero
 
     var body: some View {
-        let columns = snapshot.funnel.view.rows.compactMap(BoardColumn.init(rawValue:))
-        GeometryReader { box in
-            let head = ColumnMetrics.groupHead + ColumnMetrics.headGap
-            // While the plus is carried or a task is typed each list keeps a card's room more: the plus's room and the
-            // field at a list's end stand inside it, never past its edge where the list would have to scroll to them.
-            let typing = model.entry.isOpen || model.carried == Carried.plus ? CardMetrics.height + CardMetrics.gap : 0
-            let wanted = columns.map { Double(head + (model.listRows[$0] ?? CardMetrics.height) + typing) }
-            let gaps = ColumnMetrics.sectionGap * CGFloat(max(0, columns.count - 1))
-            let heights: [Double] = model.ruleNow("rules.stackedRows", [.array(wanted.map(JSONValue.number)), .number(Double(box.size.height - gaps)), .number(Double(head + CardMetrics.height))]) ?? wanted
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(columns.enumerated()), id: \.element) { index, column in
+        let measured = lists.map { model.metrics.lists[$0] ?? StackedList(wanted: Double(ListMetrics.head + CardMetrics.height), stops: []) }
+        StackedRowsLayout(lists: measured, gap: ColumnMetrics.sectionGap, share: { model.stackedHeights($0, room: $1) }) {
+            ForEach(lists, id: \.self) { column in
+                Group {
                     if let list = snapshot.lists[column] {
-                        ListColumn(list: list, model: model, compact: true)
-                            .equatable()
-                            .frame(height: CGFloat(heights[safe: index] ?? 0), alignment: .top)
-                            .padding(.top, index == 0 ? 0 : ColumnMetrics.sectionGap)
+                        ListColumn(list: list, model: model, compact: true).equatable()
+                    } else {
+                        Color.clear
                     }
                 }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frames[column] = $0 }
             }
-            .animation(.snappy, value: heights)
         }
+        .coordinateSpace(.named(Self.space))
+        .padding(.bottom, bottomRoom)
+        .offset(y: -lift)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background { Color.clear.onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { area = $0 } }
     }
+
+    /// What of the stack's room the tab bar's row covers: the stack ends above it.
+    private var bottomRoom: CGFloat {
+        guard area.height > 0, model.barTop.isFinite else { return 0 }
+        return max(0, area.maxY - model.barTop + ColumnMetrics.headGap)
+    }
+
+    /// How far the stack rises over the keyboard: the typed-in list's bottom brought to the keyboard's top, its top never
+    /// above the stack's.
+    private var lift: CGFloat {
+        let top = KeyboardRise.shared.top
+        guard top.isFinite, let typed = lists.first(where: { model.entry.lists[$0.rawValue] != nil }), let frame = frames[typed] else { return 0 }
+        // The list where it stands unrisen, on the screen: the stack's frames are its own, never moved by the rise.
+        let resting = frame.offsetBy(dx: 0, dy: area.minY)
+        return max(0, min(resting.maxY - top, resting.minY - area.minY))
+    }
+
+    private static let space = "stack"
 }

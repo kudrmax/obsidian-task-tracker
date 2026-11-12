@@ -13,6 +13,8 @@ final class ProjectsBoard {
     @ObservationIgnored weak var model: BoardModel?
 
     private(set) var view: ProjectsView?
+    /// The view's context the list drawn was read in: a list read for another node or mode is not shown.
+    private(set) var shownContext: String?
     /// The chosen node's parts as drawn: each part's cards painted as a list paints them, with the stage or the subproject.
     private(set) var parts: [Part] = []
     /// The menus of the cards drawn, by task id: the card's menu finds its task's here.
@@ -115,6 +117,7 @@ final class ProjectsBoard {
             transaction.disablesAnimations = !moves
             withTransaction(transaction) {
                 self.draw(read)
+                self.shownContext = key.context
                 model.entry.screenChanged()
             }
             self.drawnKey = key

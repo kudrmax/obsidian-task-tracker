@@ -59,10 +59,16 @@ final class ListMetrics {
 /// The Rows view's lists one under another: each as tall as it is while all fit, else as the core shares the room
 /// (`rules.stackedLists`), a list that scrolls ending under a whole card and the fade. The heights are worked out once
 /// for each room and set of measures, and every list is laid out at its own; nothing is measured back from the lists.
-struct StackedRowsLayout: Layout {
+struct StackedRowsLayout: SwiftUI.Layout {
     let lists: [StackedList]
     let gap: CGFloat
     let share: (_ lists: [StackedList], _ room: Double) -> [Double]
+
+    init(lists: [StackedList], gap: CGFloat, share: @escaping (_ lists: [StackedList], _ room: Double) -> [Double]) {
+        self.lists = lists
+        self.gap = gap
+        self.share = share
+    }
 
     struct Cache {
         var room: CGFloat = -1

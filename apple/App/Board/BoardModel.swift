@@ -182,8 +182,14 @@ final class BoardModel {
     /// Where the tab bar's row starts, in the window: a list stacked over the bottom ends above it.
     var barTop: CGFloat = .infinity
 
-    /// The lists the Rows view stacks are held at their heights: a carry not yet let go, a task typed or written.
-    var listsHeld: Bool { (carry != nil && carry?.landed != true) || entry.isOpen || entry.writing }
+    /// The lists the Rows view stacks are held at their heights while a card or the plus is carried (until its copy is
+    /// down, so it lands where its line was) and while a task is typed or written.
+    var listsHeld: Bool { carry != nil || entry.isOpen || entry.writing }
+
+    /// The Rows view's heights for its measured lists sharing `room` (`rules.stackedLists`), the fade the lists' own.
+    func stackedHeights(_ lists: [StackedList], room: Double) -> [Double] {
+        (try? board.stackedLists(lists, room: room, fade: Double(SoftEdges.fade))) ?? lists.map(\.wanted)
+    }
 
     /// How near the screen's left edge the carrying finger counts as at the edge (`carryAt`'s `edge`).
     static let panelEdge: CGFloat = 24
