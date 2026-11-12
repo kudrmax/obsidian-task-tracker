@@ -1,11 +1,11 @@
 import type { ScreenSettings, ScreenSettingsStore } from "../../core/application/contracts";
-import type { ScreenPlace } from "./screens";
+import { FUNNEL_PLACES, type FunnelPlace } from "./screens";
 
 /**
  * Which pair of neighbouring lists the window shows: Inbox and Soon, Soon and the day's list, or the day's list and the
- * calendar; or the Projects screen. The window's own layout: the services hear only which lists show (`SHOWN_LISTS`).
+ * calendar. The window's own layout: the services hear only which lists show (`viewEntryLists`).
  */
-export type RightMode = ScreenPlace;
+export type RightMode = FunnelPlace;
 
 /**
  * The settings of this frontend alone: how Obsidian's screen is laid out, zoomed and painted. They are kept in the
@@ -43,7 +43,9 @@ export const DEVICE_KEYS = ["listShare", "rightMode", "zoom", "treeWidth"] as co
 /** The view's settings of what was saved, the defaults for any it lacks. */
 export function viewSettingsFrom(saved: unknown): ViewSettings {
 	const s = (saved ?? {}) as Partial<Record<keyof ViewSettings, unknown>>;
-	return Object.fromEntries(VIEW_KEYS.map((key) => [key, s[key] ?? VIEW_DEFAULTS[key]])) as unknown as ViewSettings;
+	const shown = Object.fromEntries(VIEW_KEYS.map((key) => [key, s[key] ?? VIEW_DEFAULTS[key]])) as unknown as ViewSettings;
+	/** The Projects place left the wheel (2026-11-12): a window kept there opens at Inbox, its neighbour. */
+	return FUNNEL_PLACES.includes(shown.rightMode) ? shown : { ...shown, rightMode: "inbox" };
 }
 
 /** Where the view's settings are kept: the plugin's settings file. */

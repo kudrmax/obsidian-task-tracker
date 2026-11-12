@@ -1,5 +1,5 @@
 import { NO_DAY_EVENTS } from "../../core/application/contracts";
-import type { CalendarAlert, CalendarEvent, DayWords, CalendarService, DayEvents, DayView, DropColumn, DropTo, GroupedList, ListSection, ProjectRef, ProjectsView, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
+import type { CalendarAlert, CalendarEvent, DayWords, CalendarService, DayEvents, DayView, DropColumn, DropTo, FunnelView, GroupedList, ListSection, ProjectRef, ProjectsView, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
 import { Reload } from "./Reload";
 import type { LocalDate } from "./types";
 
@@ -7,8 +7,11 @@ export interface DayDataDeps {
 	readonly tasks: TaskService;
 	readonly calendars: CalendarService;
 	readonly date: () => LocalDate;
-	/** The screen shows the Projects screen: its view is read with the lists, and drawn with them. */
-	readonly projects?: boolean;
+	/**
+	 * The view the screen draws (`TaskService.funnelView`, or a note's `projectNoteView`), read before the lists: its filter
+	 * is the one they are read with, and its by project mode reads the node's list too. Left out: no view, no filter.
+	 */
+	readonly view?: () => Promise<FunnelView | null>;
 	/** A part of the data changed: redraw what shows it. Data read the same as shown says nothing. */
 	readonly onUpdate: (part: DayPart) => void;
 }
@@ -35,7 +38,9 @@ interface TasksState {
 	readonly projectTree: readonly ProjectRef[];
 	/** What a drop on each column's title means; none before the screen is read. */
 	readonly titleDrops: Readonly<Record<DropColumn, DropTo>> | null;
-	/** The Projects screen as read with the lists; null where the screen has none, or before the first read. */
+	/** The view as read with the lists: the filter, the mode, the panel; null where the screen has none, or before the first read. */
+	readonly funnel: FunnelView | null;
+	/** The filter's node by project, read with the lists in the by project mode; null in any other. */
 	readonly projects: ProjectsView | null;
 }
 
@@ -52,7 +57,7 @@ const NO_OFFER: SectionOffer = { lists: { now: [], soon: [], inbox: [], backlog:
  * A change to a task never waits for the calendars.
  */
 export class DayData {
-	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true, projectTree: [], titleDrops: null, projects: null };
+	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true, projectTree: [], titleDrops: null, funnel: null, projects: null };
 	private dayEvents: DayEvents = NO_DAY_EVENTS;
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
@@ -103,9 +108,14 @@ export class DayData {
 		return this.state.projectTree;
 	}
 
-	/** The Projects screen read with the lists: the quick entry finds what it wrote among its cards before they are drawn. */
+	/** The node's tasks by project, read with the lists in the by project mode: the quick entry finds what it wrote among its cards before they are drawn. */
 	get projects(): ProjectsView | null {
 		return this.state.projects;
+	}
+
+	/** The view the lists were read for: its filter, its mode and the projects' panel. */
+	get funnel(): FunnelView | null {
+		return this.state.funnel;
 	}
 
 	/** The sections the menus offer. */
@@ -200,9 +210,12 @@ export class DayData {
 
 	private async readTasks(): Promise<TasksState> {
 		const date = this.deps.date();
-		const [screen, projects] = await Promise.all([this.deps.tasks.screen(date), this.deps.projects ? this.deps.tasks.projectsScreen() : null]);
+		const funnel = (await this.deps.view?.()) ?? null;
+		const node = funnel?.filter?.node ?? null;
+		const byProject = node !== null && funnel?.view.mode === "byProject";
+		const [screen, projects] = await Promise.all([this.deps.tasks.screen(date, node), byProject ? this.deps.tasks.projectsScreen(node) : null]);
 		const { day, soon, inbox, backlog, done, sections, offer, missing, calendars, projectTree, titleDrops } = screen;
-		return { date, day: missing ? null : day, soon, inbox, backlog, done, sections, offer, missing, calendars, projectTree, titleDrops, projects };
+		return { date, day: missing ? null : day, soon, inbox, backlog, done, sections, offer, missing, calendars, projectTree, titleDrops, funnel, projects };
 	}
 
 	/** The data changes, the hooks of the read run on it, and only then is the screen told. */

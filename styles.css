@@ -187,12 +187,12 @@ body {
 
 	/* Sizes: the columns */
 	/* The title row, then the head gap: the titles' type stands as far over the first card as Obsidian's header over it. */
-	--tc-columns-top: 40px;
+	--tc-columns-top: var(--tc-columns-head);
 	--tc-head-gap: 4px;
 	--tc-list-width: 187px;
 	--tc-divider: 16px;
 	/* Soon and Now share the window evenly on both sides of the fixed divider. */
-	--tc-half-column: calc((100% - var(--tc-divider)) / 2);
+	--tc-half-column: calc((100% - var(--tc-stage-left) - var(--tc-divider)) / 2);
 	--tc-column-pad-near: 0 var(--tc-space-2) 0 var(--tc-space-10);
 	--tc-column-pad-far: 0 var(--tc-space-10) 0 var(--tc-space-2);
 	--tc-handle-w: 10px;
@@ -311,13 +311,12 @@ body {
 	--tc-whole-margin: var(--tc-space-10);
 
 	/*
-	 * Sizes: the Projects screen (boards in docs/design/canvas/projects-screen/), the strip's place left of Inbox. The tree
-	 * and the tasks start a step lower than the lists, under the title row; the tree is as wide as a half column until its
+	 * Sizes: the projects' tree (boards in docs/design/canvas/projects-screen/ and projects-one-view/), a panel beside or over
+	 * the lists. The tree starts a step lower than the lists, under the title row; it is as wide as a half column until its
 	 * divider is dragged. A project at the top is a tile, a subproject a line of text a step further in per level, a thin
 	 * line running beside an open branch's rows, short of its first and last by the inset.
 	 */
 	--tc-projects-top: calc(var(--tc-day-row) + var(--tc-space-12));
-	--tc-projects-seg-gap: var(--tc-space-8);
 	--tc-tree-width: var(--tc-half-column);
 	--tc-tree-gap: var(--tc-space-2);
 	--tc-tree-tile-h: 38px;
@@ -341,12 +340,7 @@ body {
 	/* The stage's mark on a card in By project: in the date's place and of its width. */
 	--tc-stage-mark-w: var(--tc-due-w);
 	--tc-stroke-stage-mark: var(--tc-stroke-2);
-	/* The segment over the tasks: the wheel's capsule, a step lower. */
-	--tc-projects-seg-font: var(--tc-font-caption);
-	/*
-	 * On the desktop (DeskProj, DeskAll): the titles larger, the segment in their row at the right, the tree a column of its
-	 * own width, the sides of the view further in than on the phone.
-	 */
+	/* On the desktop (D1, D2): the titles larger, the tree a column of its own width, its sides further in than on the phone. */
 	--tc-desk-projects-title-top: 18px;
 	--tc-font-desk-projects-title: var(--tc-text-28);
 	--tc-leading-desk-projects-title: 34px;
@@ -354,8 +348,47 @@ body {
 	--tc-desk-tree-width: 336px;
 	--tc-desk-projects-side: var(--tc-space-20);
 	--tc-desk-projects-near: var(--tc-space-16);
-	--tc-desk-projects-far: var(--tc-space-8);
-	--tc-desk-projects-seg-w: 240px;
+	/*
+	 * Sizes: the funnel's one view (boards in docs/design/canvas/projects-one-view/). The projects button at the top left,
+	 * the day title's circle; the filter's name beside it, or right of the docked panel, with the cross; the row they stand
+	 * in pushes the columns down (on the phone only while a filter is set or a mode has no column titles; without, the
+	 * button stands in the titles' row and the first title makes room for it). The lists stand right of the docked panel:
+	 * every part of the strip moves by its room. The view button is the plus's circle beside the wheel, or alone in its place.
+	 */
+	--tc-stage-left: 0px;
+	/* All columns: the lists side by side left of the divider, Inbox, Soon and the day's. */
+	--tc-all-lists: 3;
+	--tc-stage-mid: calc(var(--tc-stage-left) + (100% - var(--tc-stage-left)) / 2);
+	--tc-columns-head: 40px;
+	--tc-top-row-top: 0px;
+	--tc-top-row-h: var(--tc-projects-top);
+	--tc-head-lead: 0px;
+	--tc-folder-btn: var(--tc-day-row);
+	--tc-folder-icon: var(--tc-icon-l);
+	--tc-stroke-folder: var(--tc-stroke-2-2);
+	--tc-tree-title-left: calc(var(--tc-space-10) + var(--tc-folder-btn));
+	--tc-filter-left: var(--tc-tree-title-left);
+	--tc-font-filter: var(--tc-font-title);
+	--tc-leading-filter: var(--tc-day-row);
+	--tc-filter-cross: var(--tc-day-row);
+	--tc-desk-top-row-top: calc(var(--tc-desk-projects-title-top) - (var(--tc-day-row) - var(--tc-leading-desk-projects-title)) / 2);
+	--tc-view-icon: var(--tc-icon-m);
+	--tc-stroke-view: var(--tc-stroke-2);
+	--tc-view-gap: var(--tc-space-8);
+	--tc-view-menu-w: var(--tc-popover-w);
+	/* The wheel's width as the code turns it: its window and the neighbours it holds. */
+	--tc-seg-w: calc((var(--tc-seg-span) + var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad));
+	/* On the phone the view button and the wheel stand together in the middle of the room between Undo's capsule and the plus. */
+	--tc-foot-mid: calc(50% + var(--tc-capsule-btn) - var(--tc-plus-size) / 2);
+	/*
+	 * A project note's block (D5, T6): the view fixed to the note's project under the note's text, framed by a hairline, as
+	 * tall as its rows need, at most a phone's screen less Obsidian's bars, its own bottom row inside the frame.
+	 */
+	--tc-block-top: var(--p-spacing, var(--tc-space-16));
+	--tc-block-inset: var(--tc-space-12);
+	--tc-block-lift: 0px;
+	--tc-block-max-h: min(640px, 78vh);
+	--tc-radius-block: var(--tc-radius-panel);
 
 	/* Sizes: the task menu, its due submenu and the month picker */
 	--tc-backdrop-blur: 8px;
@@ -632,6 +665,8 @@ body {
 	--tc-layer-drop-gap: 999;
 	--tc-layer-switch: 5;
 	--tc-layer-plus: 5;
+	/* The projects' panel lies over the lists and their fade, under the bottom row and the projects button. */
+	--tc-layer-tree-panel: 4;
 	--tc-layer-bar: 6;
 	--tc-layer-sheet: 20;
 	/* Inside the quick bar: its panels' shadows lie under its ground, its buttons over it. */
@@ -769,7 +804,7 @@ button.tc-btn.is-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc
 .tc-invisible { visibility: hidden; }
 
 /* The column headers: each rides over its column as the strip slides; over Now the arrows round the day's name, across the whole window while the timeline is beside it. */
-.tc-head { position: absolute; top: var(--tc-day-row-top); height: var(--tc-day-row); width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; display: flex; align-items: center; }
+.tc-head { position: absolute; top: var(--tc-day-row-top); height: var(--tc-day-row); width: var(--tc-half-column); padding: 0 var(--tc-space-2) 0 calc(var(--tc-space-10) + var(--tc-head-lead)); box-sizing: border-box; display: flex; align-items: center; }
 .tc-head.is-inbox { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); }
 .tc-head.is-done { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider)) - var(--tc-half-column) - var(--tc-divider)); }
 .task-calendar.is-lists .tc-head.is-done { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); }
@@ -780,7 +815,7 @@ button.tc-btn.is-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc
 .task-calendar.is-lists .tc-head.is-soon { left: 0; }
 .task-calendar.is-inbox .tc-head.is-soon { left: calc(var(--tc-half-column) + var(--tc-divider)); padding: var(--tc-column-pad-far); }
 .task-calendar .tc-head-title { min-width: 0; height: var(--tc-day-row); line-height: var(--tc-day-row); padding: 0 var(--tc-space-4); border-radius: var(--tc-radius-text-btn); color: var(--tc-text); font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tc-head.tc-day-nav { left: 0; width: 100%; padding: 0 var(--tc-space-12) 0 var(--tc-space-10); gap: var(--tc-space-4); }
+.tc-head.tc-day-nav { left: 0; width: calc(100% - var(--tc-stage-left)); padding: 0 var(--tc-space-12) 0 calc(var(--tc-space-10) + var(--tc-head-lead)); gap: var(--tc-space-4); }
 .task-calendar.is-lists .tc-day-nav { left: calc(var(--tc-half-column) + var(--tc-divider)); width: var(--tc-half-column); padding: var(--tc-column-pad-far); gap: var(--tc-space-2); }
 .task-calendar.is-inbox .tc-day-nav { left: calc(100% + var(--tc-divider)); width: var(--tc-half-column); padding: var(--tc-column-pad-far); gap: var(--tc-space-2); }
 .tc-day-nav > button.tc-day-title { padding: 0 var(--tc-space-4); }
@@ -800,7 +835,7 @@ body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-ch
  */
 body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-stand)); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
-.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-span) * var(--tc-seg-btn-w) / 2 - var(--tc-wheel-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
+.task-calendar > .tc-seg { position: absolute; left: calc(var(--tc-stage-mid) - var(--tc-seg-span) * var(--tc-seg-btn-w) / 2 - var(--tc-wheel-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc((var(--tc-seg-span) + var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad)); height: var(--tc-wheel); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-wheel); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule, .task-calendar > button.tc-select-btn { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
@@ -882,7 +917,9 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-done { position: absolute; left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider)) - var(--tc-half-column) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: clip; }
 .task-calendar.is-lists .tc-done { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); }
 .task-calendar.is-inbox .tc-done { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
-.task-calendar.is-done > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-right, .tc-divider, .tc-head) { margin-left: calc(var(--tc-half-column) + var(--tc-divider)); }
+/* Every part of the strip stands right of the docked panel, by its room. */
+.task-calendar > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-right, .tc-divider, .tc-head, .tc-rows, .tc-by-project) { margin-left: var(--tc-stage-left); }
+.task-calendar.is-done > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-right, .tc-divider, .tc-head) { margin-left: calc(var(--tc-stage-left) + var(--tc-half-column) + var(--tc-divider)); }
 .task-calendar.is-done .tc-inbox, .task-calendar.is-done .tc-head.is-inbox { padding: var(--tc-column-pad-far); }
 /* The first column is Inbox over Backlog, half and half; Backlog's title stands in its half under a line, as a column's stands over it. */
 .tc-pane { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
@@ -905,7 +942,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .task-calendar.is-inbox .tc-divider.is-fixed.is-done { left: calc(-1 * var(--tc-divider)); }
 .tc-divider-line { width: var(--tc-hairline); height: 100%; background: var(--tc-line); }
 .task-calendar .tc-divider-handle { position: absolute; top: var(--tc-handle-top); left: var(--tc-handle-left); width: var(--tc-handle-w); height: var(--tc-handle-h); border-radius: var(--tc-radius-handle); background: var(--tc-handle); cursor: col-resize; }
-.tc-right { position: absolute; left: calc(var(--tc-list-width) + var(--tc-divider)); width: calc(100% - var(--tc-list-width) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; overflow: clip; }
+.tc-right { position: absolute; left: calc(var(--tc-list-width) + var(--tc-divider)); width: calc(100% - var(--tc-stage-left) - var(--tc-list-width) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; overflow: clip; }
 .task-calendar.is-lists .tc-right { left: calc(100% + var(--tc-divider)); }
 .task-calendar.is-inbox .tc-right { left: calc(100% + 2 * var(--tc-divider) + var(--tc-half-column)); }
 .task-calendar.is-switching :is(.tc-done, .tc-inbox, .tc-left, .tc-soon, .tc-divider, .tc-right, .tc-head, .tc-day-nav .tc-arrow) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding var(--tc-duration-slide) var(--tc-ease-in-out), gap var(--tc-duration-slide) var(--tc-ease-in-out); }
@@ -1487,28 +1524,6 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 /* On its page the rows stand flat, not in Obsidian's cards: a heading starts on their edge. */
 .tc-settings-page .setting-item-heading { padding-inline: 0; }
 
-/*
- * The Projects screen: the strip's place left of Inbox, a whole window wide. Standing there, every part of the strip
- * moves a window and a divider to the right; Done, which waits left of Inbox for the search, is seen only at its own place.
- */
-.tc-projects { position: absolute; top: 0; bottom: 0; left: calc(-1 * (100% + var(--tc-divider))); width: 100%; }
-.task-calendar.is-projects > :is(.tc-projects, .tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-right, .tc-divider, .tc-head) { margin-left: calc(100% + var(--tc-divider)); }
-.task-calendar:is(:not(.is-done, .is-switching), .is-projects) > :is(.tc-done, .tc-head.is-done, .tc-divider.is-done), .task-calendar.is-done > .tc-projects { visibility: hidden; }
-.task-calendar.is-switching > .tc-projects { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out); }
-.tc-projects-tree-title, .tc-projects-title { position: absolute; top: var(--tc-day-row-top); height: var(--tc-day-row); box-sizing: border-box; line-height: var(--tc-day-row); color: var(--tc-text); font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; overflow: hidden; }
-.tc-projects-tree-title { left: 0; width: var(--tc-tree-width); padding: 0 var(--tc-space-2) 0 calc(var(--tc-space-10) + var(--tc-space-4)); }
-.tc-projects-title { left: calc(var(--tc-tree-width) + var(--tc-divider)); right: calc(var(--tc-space-10) + var(--tc-space-4)); padding: 0 0 0 calc(var(--tc-space-2) + var(--tc-space-4)); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
-.tc-projects-title.has-menu { cursor: pointer; }
-.tc-projects-seg { position: absolute; top: var(--tc-projects-top); left: calc(var(--tc-tree-width) + var(--tc-divider) + var(--tc-space-2)); right: var(--tc-space-10); height: var(--tc-seg); box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); display: flex; }
-.tc-projects-seg > button.tc-btn.tc-projects-seg-btn { flex: 1; min-width: 0; height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: transparent; color: var(--tc-ink-soft); font-size: var(--tc-projects-seg-font); font-weight: var(--tc-weight-semibold); white-space: nowrap; }
-.tc-projects-seg > button.tc-btn.tc-projects-seg-btn.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
-.tc-projects-tree-column, .tc-projects-tasks-column { position: absolute; bottom: 0; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
-.tc-projects-tree-column { left: 0; top: var(--tc-projects-top); width: var(--tc-tree-width); padding: var(--tc-column-pad-near); }
-.tc-projects-tasks-column { left: calc(var(--tc-tree-width) + var(--tc-divider)); right: 0; top: calc(var(--tc-projects-top) + var(--tc-seg) + var(--tc-projects-seg-gap)); padding: var(--tc-column-pad-far); }
-.tc-projects-list > .tc-hidden { display: none; }
-.task-calendar .tc-projects > .tc-divider { left: var(--tc-tree-width); top: var(--tc-projects-top); }
-.tc-projects.is-missing :is(.tc-projects-seg, .tc-projects-tasks-column) { visibility: hidden; }
-
 /* The tree (board TreeC, variant В). */
 .tc-tree { position: relative; flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: none; display: flex; flex-direction: column; gap: var(--tc-tree-gap); }
 .tc-tree::-webkit-scrollbar { display: none; }
@@ -1532,30 +1547,119 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 .tc-stage-mark { width: var(--tc-stage-mark-w); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--tc-muted); }
 .tc-stage-mark svg { width: var(--tc-icon-s); height: var(--tc-icon-s); stroke-width: var(--tc-stroke-stage-mark); }
 
-/* The desktop board: larger titles, the segment in their row, the sides further in. */
-body:not(.is-mobile) .tc-projects { --tc-projects-top: var(--tc-desk-projects-top); --tc-tree-width: var(--tc-desk-tree-width); }
-body:not(.is-mobile) :is(.tc-projects-tree-title, .tc-projects-title) { top: var(--tc-desk-projects-title-top); height: var(--tc-leading-desk-projects-title); line-height: var(--tc-leading-desk-projects-title); font-size: var(--tc-font-desk-projects-title); }
-body:not(.is-mobile) .tc-projects-tree-title { padding: 0 var(--tc-desk-projects-near) 0 var(--tc-desk-projects-side); }
-body:not(.is-mobile) .tc-projects-title { right: calc(var(--tc-desk-projects-seg-w) + var(--tc-desk-projects-side) + var(--tc-space-16)); padding: 0 0 0 var(--tc-desk-projects-far); }
-body:not(.is-mobile) .tc-projects-seg { top: calc(var(--tc-desk-projects-title-top) + (var(--tc-leading-desk-projects-title) - var(--tc-seg)) / 2); left: auto; right: var(--tc-desk-projects-side); width: var(--tc-desk-projects-seg-w); }
-body:not(.is-mobile) .tc-projects-tree-column { padding: 0 var(--tc-desk-projects-near) 0 var(--tc-desk-projects-side); }
-body:not(.is-mobile) .tc-projects-tasks-column { top: var(--tc-projects-top); padding: 0 var(--tc-desk-projects-side) 0 var(--tc-desk-projects-far); }
-
 /* The Project page: the tree in its order, a subproject a step further in per level, as in the Projects screen's tree. */
 .tc-panel button.tc-menu-row.tc-project-option { padding-left: calc(var(--tc-space-16) + var(--tc-level) * var(--tc-tree-indent)); }
-/* Rename: the name typed where the title stood, in the section name's capsule. */
-.tc-projects-title.is-renaming { visibility: hidden; }
-.tc-projects-title-field { position: absolute; top: var(--tc-day-row-top); left: calc(var(--tc-tree-width) + var(--tc-divider) + var(--tc-space-2)); right: var(--tc-space-10); z-index: var(--tc-layer-switch); }
-body:not(.is-mobile) .tc-projects-title-field { top: var(--tc-desk-projects-title-top); left: calc(var(--tc-tree-width) + var(--tc-divider) + var(--tc-desk-projects-far)); right: calc(var(--tc-desk-projects-seg-w) + var(--tc-desk-projects-side) + var(--tc-space-16)); }
 /* A new project's name typed at a gap of the tree, as far in as the gap's depth. */
 .tc-tree-field { flex-shrink: 0; margin-left: calc(var(--tc-level) * var(--tc-tree-indent)); }
 /* A project carried in the tree: its row under the finger, lifted, its place in the tree dimmed. */
 .tc-tree-float { position: fixed; left: 0; top: 0; z-index: var(--tc-layer-float); pointer-events: none; background: var(--tc-float-bg); color: var(--tc-text); box-shadow: var(--tc-shadow-lift); }
 .tc-tree-row.is-lifted { opacity: var(--tc-tile-off-opacity); }
 /* The project's menu: the title over the blur stands as the title it copies, in its size and at its inset. */
-.tc-lifted.is-title.is-project-title { padding: 0 0 0 calc(var(--tc-space-2) + var(--tc-space-4)); }
-body:not(.is-mobile) .tc-lifted.is-title.is-project-title { padding: 0 0 0 var(--tc-desk-projects-far); }
+.tc-lifted.is-title.is-project-title { padding: 0 0 0 var(--tc-space-4); }
 body:not(.is-mobile) .tc-lifted.is-project-title .tc-lifted-title { font-size: var(--tc-font-desk-projects-title); }
 /* Over the Projects screen's tree the carried card rides above the finger, so the row it will land on, filled, stays in sight; a lifted project rides below it, so the drop line and the row it would nest under stay in sight. */
 .tc-float.is-aside, .tc-float-under.is-aside, .tc-float-count.is-aside { translate: 0 calc(-1 * (var(--tc-float-h) + var(--tc-float-above))); }
 .tc-tree-float { translate: 0 var(--tc-float-above); }
+
+/*
+ * The funnel's one view (boards in docs/design/canvas/projects-one-view/). The row over the titles: the projects button, the
+ * filter's name with its cross; the titles and the columns stand under it. On the desktop it always stands; on the phone
+ * while a filter is set or the mode has no column titles, else the button stands in the titles' row and the first title
+ * makes room for it.
+ */
+.tc-projects-list > .tc-hidden { display: none; }
+/* What the tokens build from the view's own measures is built again on the view, where those are set: the docked panel's room, the wheel's place. */
+.task-calendar { --tc-half-column: calc((100% - var(--tc-stage-left) - var(--tc-divider)) / 2); --tc-tree-width: var(--tc-half-column); --tc-stage-mid: calc(var(--tc-stage-left) + (100% - var(--tc-stage-left)) / 2); --tc-seg-w: calc((var(--tc-seg-span) + var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad)); }
+body:not(.is-mobile) .task-calendar { --tc-top-row-top: var(--tc-desk-top-row-top); --tc-top-row-h: var(--tc-desk-projects-top); --tc-tree-width: var(--tc-desk-tree-width); --tc-projects-top: var(--tc-desk-projects-top); --tc-font-filter: var(--tc-font-desk-projects-title); --tc-leading-filter: var(--tc-leading-desk-projects-title); }
+.task-calendar.has-top-row { --tc-day-row-top: var(--tc-top-row-h); --tc-columns-top: calc(var(--tc-top-row-h) + var(--tc-columns-head)); }
+.task-calendar.has-head-lead { --tc-head-lead: calc(var(--tc-folder-btn) + var(--tc-space-4)); }
+.task-calendar.has-dock { --tc-stage-left: calc(var(--tc-tree-width) + var(--tc-divider)); --tc-filter-left: calc(var(--tc-stage-left) + var(--tc-space-4)); }
+.task-calendar > button.tc-btn.tc-folder-btn { position: absolute; left: var(--tc-space-10); top: var(--tc-top-row-top); z-index: var(--tc-layer-switch); width: var(--tc-folder-btn); height: var(--tc-folder-btn); color: var(--tc-ink-soft); }
+.task-calendar > button.tc-btn.tc-folder-btn.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
+.tc-folder-btn svg { width: var(--tc-folder-icon); height: var(--tc-folder-icon); stroke-width: var(--tc-stroke-folder); }
+.tc-filter { position: absolute; top: var(--tc-top-row-top); left: var(--tc-filter-left); right: var(--tc-space-10); height: var(--tc-day-row); z-index: var(--tc-layer-block); display: flex; align-items: center; }
+.tc-filter.is-renaming { visibility: hidden; }
+.tc-filter-title { min-width: 0; padding: 0 var(--tc-space-4); color: var(--tc-text); font-size: var(--tc-font-filter); line-height: var(--tc-leading-filter); font-weight: var(--tc-weight-bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-filter-title.has-menu { cursor: pointer; }
+.tc-filter button.tc-filter-clear { width: var(--tc-filter-cross); height: var(--tc-filter-cross); flex-shrink: 0; }
+.tc-filter button.tc-filter-clear.is-hidden { display: none; }
+.tc-filter-clear svg { width: var(--tc-folder-icon); height: var(--tc-folder-icon); stroke-width: var(--tc-stroke-folder); }
+/* Rename: the name typed where the title stood, in the section name's capsule. */
+.tc-filter-field { position: absolute; top: var(--tc-top-row-top); left: var(--tc-filter-left); right: var(--tc-space-10); z-index: var(--tc-layer-switch); }
+
+/*
+ * The tree's panel (D1, T2): «Projects» beside the button, the tree under it, its divider with the handle at its right
+ * edge. Docked on the desktop, the lists stand right of it; on the phone it lies over the lists and slides in from the
+ * left, the rest dimmed as under a menu.
+ */
+.tc-tree-panel { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--tc-tree-width) + var(--tc-divider)); z-index: var(--tc-layer-tree-panel); background: var(--tc-bg); visibility: hidden; }
+.task-calendar.has-tree > .tc-tree-panel { visibility: visible; }
+.tc-tree-panel-title { position: absolute; top: var(--tc-top-row-top); left: var(--tc-tree-title-left); height: var(--tc-day-row); padding: 0 var(--tc-space-4); box-sizing: border-box; color: var(--tc-text); font-size: var(--tc-font-filter); line-height: var(--tc-day-row); font-weight: var(--tc-weight-bold); white-space: nowrap; }
+.tc-tree-column { position: absolute; left: 0; top: var(--tc-projects-top); bottom: 0; width: var(--tc-tree-width); padding: var(--tc-column-pad-near); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
+body:not(.is-mobile) .tc-tree-column { padding: 0 var(--tc-desk-projects-near) 0 var(--tc-desk-projects-side); }
+.task-calendar .tc-tree-panel > .tc-divider { left: var(--tc-tree-width); top: var(--tc-projects-top); }
+.tc-tree-dim { position: absolute; inset: 0; z-index: var(--tc-layer-tree-panel); background: var(--tc-backdrop); opacity: 0; visibility: hidden; pointer-events: none; }
+body.is-mobile .tc-tree-panel { transform: translate3d(calc(-1 * 100%), 0, 0); transition: transform var(--tc-duration-slide) var(--tc-ease-in-out), visibility 0s linear var(--tc-duration-slide); }
+body.is-mobile .task-calendar.has-tree > .tc-tree-panel { transform: none; transition: transform var(--tc-duration-slide) var(--tc-ease-in-out); }
+body.is-mobile .tc-tree-dim { transition: opacity var(--tc-duration-slide) var(--tc-ease-in-out), visibility 0s linear var(--tc-duration-slide); }
+body.is-mobile .task-calendar.has-tree > .tc-tree-dim { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity var(--tc-duration-slide) var(--tc-ease-in-out); }
+/* A card held over the tree while the panel lies over the lists: nothing under it takes the card, the dim takes no tap. */
+body.is-mobile .task-calendar.is-dragging > .tc-tree-dim { pointer-events: none; }
+.task-calendar.has-dock > .tc-capsule { left: var(--tc-desk-projects-side); }
+
+/*
+ * The view button (board V1): the plus's circle, the current mode's icon. Beside the wheel, a gap to its left; where the
+ * mode has no wheel, alone in its place, in the middle of the lists. On the phone the two stand together in the middle of
+ * the room between Undo's capsule and the plus.
+ */
+.task-calendar > button.tc-view-btn { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); left: calc(var(--tc-stage-mid) - var(--tc-plus-size) / 2); z-index: var(--tc-layer-switch); transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-view-btn svg, .tc-control-copy.tc-view-btn svg { width: var(--tc-view-icon); height: var(--tc-view-icon); stroke-width: var(--tc-stroke-view); }
+.task-calendar.has-wheel > button.tc-view-btn { left: calc(var(--tc-stage-mid) - var(--tc-seg-span) * var(--tc-seg-btn-w) / 2 - var(--tc-wheel-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w) - var(--tc-view-gap) - var(--tc-plus-size)); }
+body.is-mobile .task-calendar.has-wheel > .tc-seg { left: calc(var(--tc-foot-mid) + (var(--tc-plus-size) + var(--tc-view-gap)) / 2 - var(--tc-seg-w) / 2); }
+body.is-mobile .task-calendar.has-wheel > button.tc-view-btn { left: calc(var(--tc-foot-mid) - (var(--tc-plus-size) + var(--tc-view-gap) + var(--tc-seg-w)) / 2); }
+.task-calendar:not(.has-wheel) > .tc-seg { display: none; }
+.task-calendar > .tc-seg.is-settling ~ button.tc-view-btn { transition: left var(--tc-duration-slide) var(--tc-ease-in-out); }
+.task-calendar:is(.is-selecting, .is-entering) > button.tc-view-btn, .task-calendar.is-dragging.is-selecting > button.tc-view-btn { opacity: 0; transform: scale(var(--tc-menu-scale)); visibility: hidden; pointer-events: none; }
+.tc-panel.is-view { width: var(--tc-view-menu-w); }
+.tc-panel.is-view .tc-menu-title { border-bottom: var(--tc-rule); }
+
+/* The rows mode (D2, T3): the lists stacked in the list's column, the day's title over the timeline beside it. */
+.tc-rows, .tc-by-project { position: absolute; left: 0; top: var(--tc-day-row-top); bottom: 0; width: var(--tc-list-width); padding: var(--tc-column-pad-near); box-sizing: border-box; display: none; flex-direction: column; overflow: clip; }
+.task-calendar.is-view-rows > .tc-rows, .task-calendar.is-view-by-project > .tc-by-project { display: flex; }
+.task-calendar:is(.is-view-rows, .is-view-by-project) > :is(.tc-left, .tc-inbox, .tc-soon, .tc-done, .tc-head:not(.tc-day-nav), .tc-divider.is-fixed) { visibility: hidden; }
+.task-calendar:is(.is-view-rows, .is-view-by-project) > .tc-divider:not(.is-fixed) { top: var(--tc-day-row-top); }
+.task-calendar:is(.is-view-rows, .is-view-by-project) > .tc-head.tc-day-nav { left: calc(var(--tc-list-width) + var(--tc-divider)); width: calc(100% - var(--tc-stage-left) - var(--tc-list-width) - var(--tc-divider)); padding: var(--tc-column-pad-far); gap: var(--tc-space-2); }
+body.is-mobile .task-calendar:is(.is-view-rows, .is-view-by-project) .tc-day-nav .tc-arrow { width: var(--tc-arrow-narrow); }
+body:not(.is-mobile) .task-calendar:is(.is-view-rows, .is-view-by-project) > .tc-head.tc-day-nav { padding: 0 var(--tc-space-12) 0 var(--tc-space-10); gap: var(--tc-space-4); }
+/* Each stage's list as tall as its cards while all fit; the long ones give way, the longer the more, and scroll inside (decision 17). */
+.tc-rows-stack { flex: 1 1 0; min-height: 0; padding-bottom: var(--tc-foot-fade-day); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
+.tc-row { flex: 0 1 auto; min-height: calc(var(--tc-group-head-h) + var(--tc-card-h)); display: flex; flex-direction: column; }
+.tc-row + .tc-row { margin-top: var(--tc-section-gap); }
+.tc-row.tc-hidden { display: none; }
+.tc-row-label { flex-shrink: 0; height: var(--tc-group-head-h); box-sizing: border-box; padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); display: flex; align-items: flex-end; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); white-space: nowrap; overflow: hidden; }
+.tc-row-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.task-calendar .tc-list.tc-row-list { flex: 0 1 auto; padding-top: var(--tc-card-gap); }
+.task-calendar .tc-list.tc-row-list::after { content: none; }
+/* While the plus is carried or a task is typed, every list keeps a card's room more to take it. */
+.task-calendar:is(.is-dragging, .is-entering) .tc-list.tc-row-list::after { content: ""; height: var(--tc-card-h); }
+
+/* All columns (D1, the desktop only): Inbox over Backlog, Soon, the day's list and the timeline side by side, each list as wide as the divider sets. */
+.task-calendar.is-view-all > :is(.tc-inbox, .tc-head.is-inbox) { left: 0; width: var(--tc-list-width); padding: var(--tc-column-pad-near); }
+.task-calendar.is-view-all > :is(.tc-soon, .tc-head.is-soon) { left: calc(var(--tc-list-width) + var(--tc-divider)); width: var(--tc-list-width); padding: var(--tc-column-pad-near); }
+.task-calendar.is-view-all > :is(.tc-left, .tc-head.tc-day-nav) { left: calc(2 * (var(--tc-list-width) + var(--tc-divider))); width: var(--tc-list-width); padding: var(--tc-column-pad-near); gap: var(--tc-space-2); }
+.task-calendar.is-view-all .tc-day-nav .tc-arrow { width: var(--tc-arrow-narrow); }
+.task-calendar.is-view-all > .tc-divider.is-fixed.is-inbox { left: var(--tc-list-width); }
+.task-calendar.is-view-all > .tc-divider.is-fixed:not(.is-inbox, .is-done) { left: calc(2 * var(--tc-list-width) + var(--tc-divider)); }
+.task-calendar.is-view-all > .tc-divider:not(.is-fixed) { left: calc(var(--tc-all-lists) * var(--tc-list-width) + (var(--tc-all-lists) - 1) * var(--tc-divider)); }
+.task-calendar.is-view-all > .tc-right { left: calc(var(--tc-all-lists) * (var(--tc-list-width) + var(--tc-divider))); width: calc(100% - var(--tc-stage-left) - var(--tc-all-lists) * (var(--tc-list-width) + var(--tc-divider))); }
+
+/* A project note's block (D5, T6): its view alone, rows or by project, the whole width, no titles and no timeline. */
+.tc-project-block { margin-top: calc(var(--tc-block-top) - var(--tc-block-lift)); margin-bottom: calc(var(--tc-chrome-room) + var(--tc-block-top)); max-height: var(--tc-block-max-h); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); overflow: hidden; outline: none; }
+.tc-project-block > .task-calendar.is-note { --tc-day-row-top: var(--tc-block-inset); --tc-chrome-room: var(--tc-block-inset); --tc-foot-gap: 0px; --tc-keyboard-room: 0px; --tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room)); --tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-space-8)); }
+.task-calendar.is-note > :is(.tc-rows, .tc-by-project) { left: 0; width: 100%; padding: 0 var(--tc-block-inset); }
+.task-calendar.is-note > :is(.tc-right, .tc-head, .tc-divider, .tc-fade) { display: none; }
+.task-calendar.is-note > :is(button.tc-plus, .tc-plus-ring) { right: var(--tc-block-inset); }
+.task-calendar.is-note > .tc-capsule { left: var(--tc-block-inset); }
+/* In a note's block every list is as tall as its cards: the block grows, and past its tallest the stages scroll as one. */
+.task-calendar.is-note .tc-rows-stack { overflow-y: auto; scrollbar-width: none; padding-bottom: calc(var(--tc-switch-row) + var(--tc-chrome-room)); }
+.task-calendar.is-note .tc-row { flex-shrink: 0; }

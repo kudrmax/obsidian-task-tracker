@@ -1,11 +1,11 @@
-import { type CalendarAlert, type DropColumn, placeShowing } from "../../core/application/contracts";
+import { type CalendarAlert, type DropColumn, funnelPlaceShowing } from "../../core/application/contracts";
 import type { RightMode } from "./viewSettings";
 import { CarefulPace } from "./CarefulPace";
 import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { icon } from "./kit/icons";
-import { type Place, placeIndex, SCREEN_PLACES, type ScreenPlace } from "./screens";
+import { FUNNEL_PLACES, type FunnelPlace, type Place, placeIndex } from "./screens";
 import { labelMark } from "./sources/labelMark";
 
 export interface ColumnSwitchOptions {
@@ -18,15 +18,16 @@ export interface ColumnSwitchOptions {
 	onSources(): void;
 	longPressMs(): number;
 	readonly arbiter: GestureArbiter;
+	/** Where the wheel's place is written (its window, span and neighbours): the screen, so what stands beside the wheel follows it too. The wheel itself by default. */
+	readonly host?: HTMLElement;
 }
 
-/** The wheel's icons: the Projects screen's folder, the columns of the strip, the day column as Now. */
-export type SwitchColumn = "projects" | "inbox" | "soon" | "now" | "calendar";
+/** The wheel's icons: the columns of the strip, the day column as Now. */
+export type SwitchColumn = "inbox" | "soon" | "now" | "calendar";
 
-const COLUMNS: readonly SwitchColumn[] = ["projects", "inbox", "soon", "now", "calendar"];
+const COLUMNS: readonly SwitchColumn[] = ["inbox", "soon", "now", "calendar"];
 
-const ICON_OF: Readonly<Record<SwitchColumn, "project" | "inbox" | "soon" | "now" | "calendar">> = { projects: "project", inbox: "inbox", soon: "soon", now: "now", calendar: "calendar" };
-const NAME_OF: Readonly<Record<SwitchColumn, string>> = { projects: "Projects", inbox: "Inbox", soon: "Soon", now: "Now", calendar: "Calendar" };
+const NAME_OF: Readonly<Record<SwitchColumn, string>> = { inbox: "Inbox", soon: "Soon", now: "Now", calendar: "Calendar" };
 
 /** How far out of the window's middle an icon stands before the window no longer holds it: half an icon. */
 const HALF = 0.5;
@@ -35,29 +36,29 @@ const DRAG = "switch";
 
 const placeOf = (place: Place): number => placeIndex(place);
 
-/** The list each icon stands for; the folder and the calendar are no list, and only their own places show them. */
-const LIST_OF: Readonly<Record<SwitchColumn, DropColumn | null>> = { projects: null, inbox: "inbox", soon: "soon", now: "day", calendar: null };
+/** The list each icon stands for; the calendar is no list, and only its own place shows it. */
+const LIST_OF: Readonly<Record<SwitchColumn, DropColumn | null>> = { inbox: "inbox", soon: "soon", now: "day", calendar: null };
 
-/** The place a tap on an icon turns to: the one standing, when it shows the icon's column, else the nearest that does (from Done and Projects, as from Inbox, its neighbour). */
-function placeForIcon(column: SwitchColumn, from: Place): ScreenPlace {
+/** The place a tap on an icon turns to: the one standing, when it shows the icon's column, else the nearest that does (from Done, as from Inbox, its neighbour). */
+function placeForIcon(column: SwitchColumn, from: Place): FunnelPlace {
 	const list = LIST_OF[column];
-	if (list === null) return column === "projects" ? "projects" : "calendar";
-	return placeShowing(list, from === "done" || from === "projects" ? "inbox" : from);
+	if (list === null) return "calendar";
+	return funnelPlaceShowing(list, from === "done" ? "inbox" : from);
 }
 
 /** The place of the wheel's places a place counts as: Done as Inbox, its neighbour. */
 function wheelIndex(place: Place): number {
-	return SCREEN_PLACES.indexOf(place === "done" ? "inbox" : place);
+	return FUNNEL_PLACES.indexOf(place === "done" ? "inbox" : place);
 }
 
 /** The wheel's place nearest to where it stands. */
-function nearest(at: number): ScreenPlace {
-	return SCREEN_PLACES.reduce((best, place) => (Math.abs(placeIndex(place) - at) < Math.abs(placeIndex(best) - at) ? place : best));
+function nearest(at: number): FunnelPlace {
+	return FUNNEL_PLACES.reduce((best, place) => (Math.abs(placeIndex(place) - at) < Math.abs(placeIndex(best) - at) ? place : best));
 }
 
 interface Press {
 	readonly pointerId: number;
-	/** The wheel's place it stood on when pressed (`SCREEN_PLACES`), and where it stood. */
+	/** The wheel's place it stood on when pressed (`FUNNEL_PLACES`), and where it stood. */
 	readonly start: number;
 	readonly startAt: number;
 	/** The wheel stands at `from` with the finger at `x`, and turns a place per icon's width the finger travels from there. */
@@ -90,8 +91,11 @@ export class ColumnSwitch {
 	/** Where the wheel stands, in `placeIndex` units. */
 	private at = 0;
 
+	private readonly host: HTMLElement;
+
 	constructor(parent: HTMLElement, private readonly opts: ColumnSwitchOptions) {
 		this.el = el(parent, "div", "tc-seg");
+		this.host = opts.host ?? this.el;
 		this.el.setAttribute("role", "group");
 		this.el.setAttribute("aria-label", "Columns");
 		this.el.tabIndex = 0;
@@ -107,7 +111,7 @@ export class ColumnSwitch {
 			if (shift === 0) return;
 			e.preventDefault();
 			const place = wheelIndex(this.opts.value()) + shift;
-			if (place >= 0 && place < SCREEN_PLACES.length) this.show(SCREEN_PLACES[place]);
+			if (place >= 0 && place < FUNNEL_PLACES.length) this.show(FUNNEL_PLACES[place]);
 		});
 		this.render();
 	}
@@ -119,7 +123,7 @@ export class ColumnSwitch {
 			cell.dataset.column = column;
 			if (lens) cell.setAttribute("aria-hidden", "true");
 			else cell.setAttribute("aria-label", NAME_OF[column]);
-			cell.appendChild(icon(ICON_OF[column]));
+			cell.appendChild(icon(column));
 			if (column === "calendar") this.dots.push(el(cell, "span", "tc-dot"));
 			this.icons.push(cell);
 		}
@@ -169,9 +173,9 @@ export class ColumnSwitch {
 
 	/** Where the finger puts the wheel: a quick swipe reaches no further than the next place, a careful one anywhere. */
 	private under(press: Press, x: number): number {
-		const reach = press.pace.careful ? SCREEN_PLACES.length : 1;
-		const least = placeIndex(SCREEN_PLACES[Math.max(0, press.start - reach)]);
-		const most = placeIndex(SCREEN_PLACES[Math.min(SCREEN_PLACES.length - 1, press.start + reach)]);
+		const reach = press.pace.careful ? FUNNEL_PLACES.length : 1;
+		const least = placeIndex(FUNNEL_PLACES[Math.max(0, press.start - reach)]);
+		const most = placeIndex(FUNNEL_PLACES[Math.min(FUNNEL_PLACES.length - 1, press.start + reach)]);
 		return Math.min(most, Math.max(least, press.from - (x - press.x) / press.step));
 	}
 
@@ -189,7 +193,7 @@ export class ColumnSwitch {
 		const at = this.position();
 		if (press.pace.careful) return this.show(nearest(at));
 		const way = Math.sign(at - press.startAt);
-		this.show(way === 0 ? this.opts.value() : SCREEN_PLACES[Math.min(SCREEN_PLACES.length - 1, Math.max(0, press.start + way))]);
+		this.show(way === 0 ? this.opts.value() : FUNNEL_PLACES[Math.min(FUNNEL_PLACES.length - 1, Math.max(0, press.start + way))]);
 	}
 
 	private tap(target: EventTarget | null): void {
@@ -224,17 +228,17 @@ export class ColumnSwitch {
 	/**
 	 * Both copies of the wheel to one place: the window keeps its icons whole, the rest shrink and fade by how far out
 	 * they stand. The track holds one neighbour on each side, and only where the wheel has one: past an end it stops at the window.
-	 * The window is as wide as what it shows: the folder alone at Projects, Inbox alone at Done, two columns from Inbox on;
+	 * The window is as wide as what it shows: Inbox alone at Done, two columns from Inbox on;
 	 * between Done and Inbox it widens over Soon, so no icon is ever cut by its edge.
 	 */
 	private turn(position: number): void {
 		this.at = position;
 		const span = 1 + Math.max(0, Math.min(1, 2 * (position - placeIndex("done"))));
 		const left = position + 1 - span / 2;
-		this.el.style.setProperty(PROPERTY.windowAt, String(left));
-		this.el.style.setProperty(PROPERTY.span, String(span));
-		this.el.style.setProperty(PROPERTY.before, String(Math.max(0, Math.min(1, left))));
-		this.el.style.setProperty(PROPERTY.after, String(Math.max(0, Math.min(1, COLUMNS.length - left - span))));
+		this.host.style.setProperty(PROPERTY.windowAt, String(left));
+		this.host.style.setProperty(PROPERTY.span, String(span));
+		this.host.style.setProperty(PROPERTY.before, String(Math.max(0, Math.min(1, left))));
+		this.host.style.setProperty(PROPERTY.after, String(Math.max(0, Math.min(1, COLUMNS.length - left - span))));
 		const middle = left + span / 2;
 		const inside = span / 2 - HALF;
 		this.icons.forEach((cell, i) => {

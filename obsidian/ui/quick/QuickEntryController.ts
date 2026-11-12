@@ -1,6 +1,4 @@
-import { type EntryDrawing, type EntryList, type EntryPart as ListPart, type EntrySpot, type EntryState, type GroupName, type Header, type ListCard, type ListPlace, type Placement, QuickEntrySession, type QuickEntryTasks, shownEntryLists, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
-import { placeShowing } from "../screens";
-import type { RightMode } from "../viewSettings";
+import { type EntryDrawing, type EntryList, type EntryPart as ListPart, type EntrySpot, type EntryState, type GroupName, type Header, type ListCard, type ListPlace, type Placement, type ProjectsNodeId, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
 import type { EntryPart } from "./EntryPart";
 import { DURATION, EASING, LAYOUT, tokenMs } from "../design";
 import { easingOf } from "../easing";
@@ -71,14 +69,17 @@ export interface QuickEntryControllerDeps {
 	chromeTop(): number;
 	/** The day the day column shows. */
 	day(): LocalDate;
-	mode(): RightMode;
-	/** Turns the wheel to `mode`, as a tap on its icon does. */
-	turnTo(mode: RightMode): void;
+	/** The lists the screen shows, in its order (`viewEntryLists` of its mode and place). */
+	shown(): readonly EntryList[];
+	/** The filter the screen is read with (`FunnelView.filter`): its node and the project a new task gets; null for none. */
+	filter(): { readonly node: ProjectsNodeId; readonly project: string | null } | null;
+	/** Brings `column` into sight, as a tap on its icon of the wheel does; nothing where every list shows. */
+	turnTo(column: EntryList): void;
 	/** The day column opens `date`; resolves once its tasks show. */
 	showDay(date: LocalDate): Promise<void>;
 	/** Resolves once the lists show the file as of the last write; `beforeShow` runs once their data is what was read, right before they draw it. */
 	fresh(beforeShow?: () => void): Promise<void>;
-	/** The plus on a screen of its own (the Projects screen): where it may be carried, and what a tap and a drop do there; null elsewhere. */
+	/** The plus's places besides the lists (the projects' tree, the by project list), and what a drop on the tree does; null for none. */
 	aside?(): PlusAside | null;
 	/** Redraws the lists and the timeline, which calls `rendered` once drawn. */
 	render(): void;
@@ -87,11 +88,13 @@ export interface QuickEntryControllerDeps {
 }
 
 /**
- * The plus on the Projects screen: its places (the tree, and the tasks' list, where the field opens as in any list),
- * and what a drop on a place of its own (the tree) does.
+ * The plus's places besides the funnel's lists: the projects' tree while it shows, and in the by project mode the node's
+ * list, where the field opens as in any list (`alone`: the lists of the funnel are not shown then); what a drop on the
+ * tree does.
  */
 export interface PlusAside {
 	readonly targets: readonly DropTarget[];
+	readonly alone: boolean;
 	dropped(result: DropResult): void;
 }
 
@@ -187,7 +190,8 @@ export class QuickEntryController {
 				parts: (column) => deps.list(column)?.parts ?? [],
 				day: () => deps.day(),
 				today: () => deps.today(),
-				shown: () => shownEntryLists(deps.mode()),
+				shown: () => deps.shown(),
+				filter: () => deps.filter(),
 				fresh: (beforeShow) => this.fresh(beforeShow),
 				onChange: (state, drawnNext) => this.changed(state, drawnNext),
 			},
@@ -267,12 +271,16 @@ export class QuickEntryController {
 	/** The plus taken: carried as a task is, and let go on a list, the field opens where the drop showed. */
 	dragFromPlus(e: PointerEvent, source: HTMLElement): void {
 		const aside = this.deps.aside?.() ?? null;
-		if (aside) return this.dragAside(e, source, aside);
+		if (aside?.alone) return this.dragAside(e, source, aside);
 		const { lists, timeline } = this.deps.dropTargets();
 		this.droppedOn = null;
-		const targets = [this.ring, ...lists.map((target) => this.noted(target)), ...(timeline ? [timeline] : [])];
+		const targets = [this.ring, ...(aside?.targets ?? []), ...lists.map((target) => this.noted(target)), ...(timeline ? [timeline] : [])];
+		const dropped = (result: DropResult | null): HTMLElement | null => {
+			if (aside && result && isProjectsDrop(result)) aside.dropped(result);
+			return this.dropped(result);
+		};
 		this.ring.show();
-		if (!this.deps.drag.beginNew(source, e, targets, (result) => this.dropped(result))) {
+		if (!this.deps.drag.beginNew(source, e, targets, dropped)) {
 			this.ring.hide();
 			return;
 		}
@@ -692,7 +700,7 @@ export class QuickEntryController {
 		if (!move) return;
 		this.turning = true;
 		try {
-			this.deps.turnTo(placeShowing(move.column, this.deps.mode()));
+			this.deps.turnTo(move.column);
 		} finally {
 			this.turning = false;
 		}
