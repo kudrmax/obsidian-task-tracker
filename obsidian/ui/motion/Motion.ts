@@ -48,21 +48,18 @@ function gapOf(el: HTMLElement): number {
 	return parent ? parseFloat(getComputedStyle(parent).rowGap) || 0 : 0;
 }
 
-/** What a row takes in its column, as it stands: its height, its margins and its borders (a plate's outline takes room too). */
+/** What a row takes in its column, as it stands: its height and its margins. */
 function edgesOf(style: CSSStyleDeclaration): Record<string, string> {
-	return {
-		height: style.height,
-		minHeight: style.minHeight,
-		marginTop: style.marginTop,
-		marginBottom: style.marginBottom,
-		borderTopWidth: style.borderTopWidth,
-		borderBottomWidth: style.borderBottomWidth,
-	};
+	return { height: style.height, minHeight: style.minHeight, marginTop: style.marginTop, marginBottom: style.marginBottom };
 }
 
-/** A row folded to nothing: no height, no margins, no borders, the column's gap given back. */
-function folded(row: HTMLElement): Record<string, string> {
-	return { height: "0px", minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), borderTopWidth: "0px", borderBottomWidth: "0px" };
+/**
+ * A row folded to nothing: no height but its borders, no margins, the column's gap given back and its borders' room too
+ * (a plate's outline stays: a border folding to nothing still draws a device pixel, so the margin takes it back instead).
+ */
+function folded(row: HTMLElement, style: CSSStyleDeclaration): Record<string, string> {
+	const borders = (parseFloat(style.borderTopWidth) || 0) + (parseFloat(style.borderBottomWidth) || 0);
+	return { height: px(borders), minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row) - borders) };
 }
 
 /** When a leaving row's fade ends (it folds after), and whether it was shown at all (a row still waiting to grow was not). */
@@ -106,7 +103,7 @@ export const Motion = {
 		const to = { ...edges, opacity: "1" };
 		const overflow = row.style.overflow;
 		row.style.overflow = "hidden";
-		const growth = row.animate([{ ...folded(row), opacity: "0" }, to], {
+		const growth = row.animate([{ ...folded(row, style), opacity: "0" }, to], {
 			...timing,
 			delay: wait,
 			fill: "backwards",
@@ -135,7 +132,7 @@ export const Motion = {
 		const style = getComputedStyle(row);
 		const full = edgesOf(style);
 		row.style.overflow = "hidden";
-		const away = { ...folded(row), opacity: "0" };
+		const away = { ...folded(row, style), opacity: "0" };
 		if (fade) FADES.set(row, { end: performance.now() + timing.duration, shown: (parseFloat(full.height) || 0) > 0 && !waitingToGrow(row) });
 		const leaving = fade
 			? row.animate(
@@ -234,12 +231,13 @@ export function motionLeft(el: HTMLElement): number {
 }
 
 /**
- * `measure` as `el` will stand once its moves have ended: each is put a hair before its end for the reading and back at
- * once, within the same frame, so nothing on the screen moves and none of them finishes early.
+ * `measure` as `el` will stand once its moves have ended: each is put at its end for the reading and back at once,
+ * within the same frame, so nothing on the screen moves and none of them finishes early (a move put back before the
+ * page looks is not finished). Exactly at the end, not a hair before: a border a hair from nothing still draws a pixel.
  */
 export function readResting<T>(el: HTMLElement, measure: () => T): T {
 	const moves = endingIn(el);
-	for (const { animation, end } of moves) animation.currentTime = Math.max(0, end - 0.01);
+	for (const { animation, end } of moves) animation.currentTime = end;
 	try {
 		return measure();
 	} finally {

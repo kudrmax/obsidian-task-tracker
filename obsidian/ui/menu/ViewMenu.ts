@@ -29,19 +29,16 @@ export class ViewMenu {
 
 	private constructor(opts: ViewMenuOptions) {
 		this.overlay = new Overlay(() => this.close(), opts.anchor);
-		const rect = opts.anchor.getBoundingClientRect();
 		const copy = LiftedCopy.over(this.overlay, opts.anchor.cloneNode(true) as HTMLElement, false);
 		copy.el.classList.add("tc-control-copy");
-		copy.pin(rect);
-		const panel = Panel.over(
-			this.overlay,
-			{
-				root: "tc-panel",
-				cls: "is-view",
-				place: (p) => placePanel(p, new DOMRect(rect.left + (rect.width - p.offsetWidth) / 2, rect.top, p.offsetWidth, rect.height), tokenPx(p, "--tc-menu-gap"), menuRoom()),
-			},
-			false,
-		);
+		copy.pin(opts.anchor.getBoundingClientRect());
+		/** The button measured each time the panel is placed, never a place kept from before: the copy and the panel stand where it stands now. */
+		const place = (p: HTMLElement) => {
+			const rect = opts.anchor.getBoundingClientRect();
+			copy.pin(rect);
+			placePanel(p, new DOMRect(rect.left + (rect.width - p.offsetWidth) / 2, rect.top, p.offsetWidth, rect.height), tokenPx(p, "--tc-menu-gap"), menuRoom());
+		};
+		const panel = Panel.over(this.overlay, { root: "tc-panel", cls: "is-view", place }, false);
 		panel.replace((p) => {
 			el(p, "div", "tc-menu-title", "View");
 			menuGroup(
@@ -52,6 +49,8 @@ export class ViewMenu {
 			if (subprojects) menuGroup(p, [{ label: subprojects.label, icon: subprojects.checked ? "check" : undefined, choice: true, onPick: panel.pick(() => opts.onSubprojects()) }]);
 		});
 		this.overlay.show();
+		/** A layout still settling as the menu opens (the window just resized) moves the button: placed again on the next frame. */
+		opts.anchor.ownerDocument.defaultView?.requestAnimationFrame(() => panel.place());
 	}
 
 	close(): void {

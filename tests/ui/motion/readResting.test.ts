@@ -33,8 +33,8 @@ describe("reading a column where its moves end", () => {
 		const caret = move(Infinity, 500);
 		const el = host([fold.animation, caret.animation]);
 		const read = readResting(el, () => fold.animation.currentTime);
-		expect(read).toBeCloseTo(299.99);
-		expect(fold.set).toEqual([299.99, 120]);
+		expect(read).toBe(300);
+		expect(fold.set).toEqual([300, 120]);
 		expect(caret.set).toEqual([]);
 	});
 
@@ -49,6 +49,6 @@ describe("a move made in this frame", () => {
 		const fold = move(300, 0);
 		Object.defineProperty(fold.animation, "currentTime", { configurable: true, get: () => null, set: (value: number) => fold.set.push(value) });
 		readResting(host([fold.animation]), () => undefined);
-		expect(fold.set).toEqual([299.99, 0]);
+		expect(fold.set).toEqual([300, 0]);
 	});
 });
