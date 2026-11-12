@@ -1248,7 +1248,7 @@ export class CalendarScreen extends Component {
 	/** Where a card pressed for its menu stands: a timeline card's stack, the whole screen, the timeline, a list column, else Done. */
 	private menuFrom(source: HTMLElement, full: FullScreen | undefined): MenuFrom {
 		if (source.closest(".tc-menu-subtasks")) return "stack";
-		const projectsFrom = source.closest(".tc-by-project") ? source.dataset.menuFrom : undefined;
+		const projectsFrom = source.closest(".tc-projects-list") ? source.dataset.menuFrom : undefined;
 		if (projectsFrom) return projectsFrom as MenuFrom;
 		if (full) return "full";
 		if (source.classList.contains("tc-block")) return "timeline";

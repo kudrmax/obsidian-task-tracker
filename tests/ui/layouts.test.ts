@@ -44,7 +44,7 @@ function screen(mode: ViewMode, note = false) {
 	fade.className = "tc-fade";
 	root.append(nav, timeline, fade);
 	const layout = viewLayout(mode, note, (list: DropColumn) => (list === "day" ? null : list));
-	const tasks = new DemoTaskService();
+	const tasks = new DemoTaskService({ now: () => new Date(2026, 10, 12, 14) });
 	const host: LayoutHost = {
 		root,
 		shared: {

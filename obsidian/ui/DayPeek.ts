@@ -88,7 +88,7 @@ export class DayPeek {
 		this.right = el(this.el, "div", "tc-right");
 		if (frames) {
 			if (frames.list) standOver(this.left, frames.list, root);
-			else this.left.style.display = "none";
+			else this.left.classList.add("tc-invisible");
 			standOver(this.right, frames.timeline, root);
 		}
 		this.allDayEl = el(this.right, "div");
