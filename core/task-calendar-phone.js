@@ -3644,7 +3644,7 @@ ${key.title}`.toLowerCase();
     const statusOf2 = (name2) => statuses.get(projectKey(name2)) ?? "waiting";
     const fixed = input.node === void 0 ? null : nodeIn(input.node, tree);
     const selected2 = fixed ?? selectedNode(state, tree);
-    const rows = treeRows(tree, state, selected2, statusOf2, (node) => input.doc !== null && nodeReorders(node, statusOf2));
+    const rows = treeRows(tree, state, selected2, statusOf2, (node) => input.doc !== null && nodeReorders(node, statusOf2), hasLooseOpen(input.doc));
     const parts = input.doc ? sectionsOf(input, input.doc, selected2, statusOf2) : [];
     const name = projectOfNode(selected2);
     const placed = name === null ? null : tree.find(name);
@@ -3663,7 +3663,10 @@ ${key.title}`.toLowerCase();
   function panelRows(tree, doc, state) {
     const statuses = doc ? projectStatuses(tree, doc) : /* @__PURE__ */ new Map();
     const statusOf2 = (name) => statuses.get(projectKey(name)) ?? "waiting";
-    return treeRows(tree, state, selectedNode(state, tree), statusOf2, (node) => doc !== null && nodeReorders(node, statusOf2));
+    return treeRows(tree, state, selectedNode(state, tree), statusOf2, (node) => doc !== null && nodeReorders(node, statusOf2), hasLooseOpen(doc));
+  }
+  function hasLooseOpen(doc) {
+    return doc !== null && tasksOf(doc).some((entry) => entry.task.projects.length === 0 && stageOf(entry) !== "done");
   }
   function nodeHeader(node, tree, doc) {
     const name = projectOfNode(node);
@@ -3709,7 +3712,7 @@ ${key.title}`.toLowerCase();
   function inInbox(project) {
     return { place: { kind: "list", list: "inbox", group: null, before: null }, project };
   }
-  function treeRows(tree, state, selected2, statusOf2, reorders) {
+  function treeRows(tree, state, selected2, statusOf2, reorders, looseOpen) {
     const row = (fields) => ({ ...fields, opensOnHover: fields.acceptsTask && !fields.selected && reorders(fields.node) });
     const rows = [row(fixedRow("all", PROJECTS_WORDS.all, selected2, false, false))];
     const walk = (nodes, path, depth, done) => {
@@ -3740,7 +3743,7 @@ ${key.title}`.toLowerCase();
       }
     };
     walk(tree.roots, [], 0, false);
-    rows.push(row(fixedRow("none", PROJECTS_WORDS.none, selected2, false, true)));
+    rows.push(row({ ...fixedRow("none", PROJECTS_WORDS.none, selected2, false, true), muted: !looseOpen }));
     const doneTops = doneRoots(tree, statusOf2);
     const open = state.doneOpen === true;
     rows.push(row({ ...fixedRow("done", PROJECTS_WORDS.done, selected2, doneTops.length > 0, false), folded: doneTops.length > 0 && !open }));
@@ -7692,14 +7695,14 @@ ${key.title}`.toLowerCase();
      * What a drop means: the moves, and whether one of them sets a time and so reads the task's duration first. It answers
      * the tasks' keys as the file now has them, in their order; one not found again is left out.
      */
-    drop(tasks, to, day, filter) {
+    drop(tasks, to, day, filter, carry) {
       const read = readDrop(to, (column) => this.reads.columnSections(column, day));
       const filtered = filter !== null && filter !== void 0 && read.kind === "group" && read.before === null;
       return {
         reads: filtered || read.kind === "title" || tasks.length === 1 && read.kind === "time",
         answer: (s) => {
           const moves = dropMoves(tasks, filtered && s ? this.shownDrop(s, read, filter, tasks) : read, day);
-          return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
+          return this.landed(tasks, this.opened(moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps), tasks, filter, carry));
         }
       };
     }
@@ -7707,13 +7710,13 @@ ${key.title}`.toLowerCase();
      * Where `drop` would leave the tasks, writing nothing: its operation tried over the file as read, and the screen of
      * `day` read over the result by the same code as the screen.
      */
-    landing(tasks, to, day, filter) {
-      const preview = this.dropPreview(tasks, to, day, filter);
+    landing(tasks, to, day, filter, carry) {
+      const preview = this.dropPreview(tasks, to, day, filter, carry);
       return { reads: true, answer: (s) => preview.answer(s).landings };
     }
     /** `landing`, with the whole screen the drop leaves and the text it is read from. */
-    dropPreview(tasks, to, day, filter) {
-      const drop = this.drop(tasks, to, day, filter);
+    dropPreview(tasks, to, day, filter, carry) {
+      const drop = this.drop(tasks, to, day, filter, carry);
       return {
         reads: true,
         answer: (s) => {
@@ -7759,6 +7762,31 @@ ${key.title}`.toLowerCase();
       if (node === null) return read;
       const carried = new Set(tasks.map((task) => this.rules.entryOf(s.doc, task.key).id));
       return { ...read, before: afterShown(s.doc, read.list, read.group, filterTest(node, tree, s.doc), carried) };
+    }
+    /**
+     * A carry let go in a list under a filter it opened on its way (`carryAt` over a row, so the filter differs from the
+     * lift's, `carry.under`): the move, then, in the same write, each task gives the project it was shown by under the
+     * lift's filter (`shownUnder`; none with no filter or No project: the project is added) to the opened one, as
+     * `dropOnProject` does; the opened No project takes that project off. Done opened, or the lift's filter, change none.
+     */
+    opened(write, tasks, filter, carry) {
+      const move = write.operation;
+      if (!carry || !move || filter === null || filter === void 0) return write;
+      const operation = (doc, today, settings, boundary) => {
+        const tree = projectTreeOf(doc);
+        const under = filterNode(carry.under, tree);
+        const now = filterNode(filter, tree);
+        const after = move(doc, today, settings, boundary);
+        if (now === null || now === under || now === "done") return after;
+        const entries = tasks.map((task) => this.rules.entryOf(doc, task.key));
+        const cards = entries.flatMap((entry) => {
+          const moved2 = after.byId(entry.id);
+          return moved2 ? [{ key: keyOf(moved2), from: under === null || under === "none" ? null : shownUnder(entry, under, tree) }] : [];
+        });
+        const relabel = this.rules.dropOnProject(cards, now === "none" ? null : projectOfNode(now));
+        return relabel ? relabel(after, today, settings, boundary) : after;
+      };
+      return { operation, answer: write.answer };
     }
     /** The dropped tasks where `write` left them. */
     landed(tasks, write) {
@@ -8272,9 +8300,9 @@ ${key.title}`.toLowerCase();
     removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list, group)),
     createSection: (c, [name, place]) => c.run(c.writes.createSection(name, place)),
     applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps)),
-    drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks, to, day, filter))),
-    landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks, to, day, filter)),
-    dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks, to, day, filter)),
+    drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks, to, day, filter, c.projectsScreen.carry))),
+    landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks, to, day, filter, c.projectsScreen.carry)),
+    dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks, to, day, filter, c.projectsScreen.carry)),
     normalize: (c) => c.normalize(),
     createFile: (c) => {
       if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");

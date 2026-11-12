@@ -40,12 +40,13 @@ const PAUSE = PROJECTS_HOVER_MS;
 function setup() {
 	const store = new InMemoryTaskFileStore(FILE);
 	const state = memoryProjectsScreen();
-	const svc = new TaskServiceImpl(store, new FakeSettingsStore(), clock, new UndoHistory(store), undefined, state);
+	const history = new UndoHistory(store);
+	const svc = new TaskServiceImpl(store, new FakeSettingsStore(), clock, history, undefined, state);
 	const item = async (title: string) => {
 		const s = await svc.screen(T);
 		return [...s.inbox, ...s.soon].find((i) => i.title === title)!;
 	};
-	return { store, state, svc, item };
+	return { store, state, svc, item, history };
 }
 
 describe("a carry to a project, the core's from lift to let go", () => {
@@ -303,5 +304,84 @@ describe("what the frontends no longer decide", () => {
 		await svc.pickProjectNode(SELF, true);
 		await svc.setViewMode("twoColumns");
 		expect((await svc.funnelView(false)).topRow).toBe(true);
+	});
+});
+
+/** QA 2026-11-12: a card that opened a project on its way, let go in a list, lands in it with that project, in one write. */
+describe("a carry let go in a list of the project it opened", () => {
+	const into = (column: "inbox" | "soon") => ({ kind: "place", column, place: { kind: "task", group: null, before: null } }) as const;
+	async function opened(svc: TaskServiceImpl, keys: Parameters<TaskServiceImpl["startCarry"]>[0], node: string) {
+		await svc.setProjectsPanel(true);
+		await svc.startCarry(keys, true);
+		await svc.carryAt({ edge: false, node }, 0);
+		await svc.carryAt({ edge: false, node }, PAUSE);
+		expect((await svc.funnelView(true)).filter?.node).toBe(node);
+	}
+
+	it("lifted with no filter: the opened project is added, the task stays in sight, and one undo takes it all back", async () => {
+		const { svc, store, item, history } = setup();
+		const loose = await item("Без проекта");
+		await opened(svc, { keys: [loose.key] }, SELF);
+		const preview = await svc.dropPreview([{ key: loose.key, from: "inbox" }], into("soon"), T, SELF);
+		expect(preview.screen.soon.map((i) => i.title)).toEqual(["Без проекта"]);
+		expect(preview.landings[0]).not.toBeNull();
+		await svc.drop([{ key: loose.key, from: "inbox" }], into("soon"), T, SELF);
+		await svc.endCarry("dropped");
+		expect(store.text).toContain("## Soon\n\n- [ ] Позвонить 🗂️ Дружба\n- [ ] Без проекта 🗂️ Саморазвитие\n");
+		expect((await svc.screen(T, SELF)).soon.map((i) => i.title)).toEqual(["Без проекта"]);
+		await history.undo();
+		expect(store.text).toBe(FILE);
+	});
+
+	it("lifted under a project: the opened one takes its place, the others stay", async () => {
+		const { svc, store, item } = setup();
+		await svc.pickProjectNode("project:Дружба", true);
+		const call = await item("Позвонить");
+		await opened(svc, { keys: [call.key] }, SELF);
+		const landing = await svc.landing([{ key: call.key, from: "soon" }], into("inbox"), T, SELF);
+		expect(landing[0]).not.toBeNull();
+		await svc.drop([{ key: call.key, from: "soon" }], into("inbox"), T, SELF);
+		expect(store.text).toContain("- [ ] Позвонить 🗂️ Саморазвитие\n");
+		expect(store.text).not.toContain("Позвонить 🗂️ Дружба");
+	});
+
+	it("a drop under the filter it was lifted under changes no project", async () => {
+		const { svc, store, item } = setup();
+		await svc.pickProjectNode("project:Дружба", true);
+		const call = await item("Позвонить");
+		await svc.startCarry({ keys: [call.key] }, true);
+		await svc.drop([{ key: call.key, from: "soon" }], into("inbox"), T, "project:Дружба");
+		expect(store.text).toContain("## Inbox\n\n- [ ] Anki 🗂️ Саморазвитие\n- [ ] Без проекта\n- [ ] Позвонить 🗂️ Дружба\n");
+	});
+
+	it("by project: a card of one project's list let go in the list of the project it opened takes that project", async () => {
+		const { svc, store } = setup();
+		await svc.setViewMode("byProject");
+		await svc.pickProjectNode("project:Дружба", true);
+		const card = (await svc.projectsScreen("project:Дружба")).sections[0].cards[0];
+		await opened(svc, { keys: [card.item.key], cards: [card.drop] }, SELF);
+		const place = { kind: "task", group: null, before: null } as const;
+		const preview = await svc.projectsDropPreview([card.drop], place, SELF);
+		expect(preview.landings[0]).not.toBeNull();
+		await svc.dropInProjects([card.drop], place, SELF);
+		expect(store.text).toContain("- [ ] Позвонить 🗂️ Саморазвитие\n");
+		expect(store.text).not.toContain("Позвонить 🗂️ Дружба");
+	});
+});
+
+describe("a carry let go in the list of the project it opened, over the door", () => {
+	it("the app's drop under the opened filter gives the task that project in the same write", () => {
+		type Ok = Extract<DoorAnswer, { ok: true }>;
+		const nowMs = new Date(2026, 10, 12, 12).getTime();
+		const ask = (method: string, args: unknown[], projectsScreen?: Ok["projectsScreen"]) => callDoor(method, args, { tasks: FILE, nowMs, ...(projectsScreen && { projectsScreen }) }) as Ok;
+		const loose = (ask("tasks.screen", [T]).result as { inbox: { key: unknown; title: string }[] }).inbox.find((i) => i.title === "Без проекта")!;
+		let state = ask("tasks.setProjectsPanel", [true]).projectsScreen;
+		state = ask("tasks.startCarry", [{ keys: [loose.key] }, true], state).projectsScreen ?? state;
+		state = ask("tasks.carryAt", [{ edge: false, node: SELF }, 0], state).projectsScreen ?? state;
+		state = ask("tasks.carryAt", [{ edge: false, node: SELF }, PAUSE], state).projectsScreen ?? state;
+		const to = { kind: "place", column: "soon", place: { kind: "task", group: null, before: null } };
+		const dropped = ask("tasks.drop", [[{ key: loose.key, from: "inbox" }], to, T, SELF], state);
+		expect(dropped.step).toBe(true);
+		expect(dropped.tasks).toContain("- [ ] Без проекта 🗂️ Саморазвитие\n");
 	});
 });

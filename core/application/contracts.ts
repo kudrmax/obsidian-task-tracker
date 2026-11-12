@@ -776,7 +776,7 @@ export interface ProjectsRow {
 	readonly tile: boolean;
 	/** The project waits: its open tasks only in Inbox and Backlog, or none yet. */
 	readonly waiting: boolean;
-	/** Its name is drawn grey: a waiting project, a done one, No project and Done. */
+	/** Its name is drawn grey, no open task under it: a waiting project, a done one, No project with no open task without a project, and Done. */
 	readonly muted: boolean;
 	readonly status: ProjectStatus | null;
 	/** Filled light: the chosen node. */

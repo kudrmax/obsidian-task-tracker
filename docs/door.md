@@ -442,6 +442,11 @@ adds to the calls above; the old ones answer as before.
   to compare: a read whose context differs from the one drawn is drawn still in place; the same context changed animates.
   A note's block's context is its mode alone. Example: `rules.viewContext("project:Стиль", "rows", false)` →
   `'["screen","project:Стиль","rows"]'`.
+- A carry let go in a list under the filter it opened on its way (`carryAt` over a row): `tasks.drop`, `tasks.landing`
+  and `tasks.dropPreview` also give each task the opened project in the same write (one undo), as `dropOnProject` from
+  the lift's filter (added when lifted with no filter). The core reads the carry from the `projectsScreen` handed in, so
+  call `tasks.drop` before `tasks.endCarry("dropped")`, as now.
+- `ProjectsRow.muted` for No project: true only while no open task without a project stands in the funnel.
 - No rule gives a list a card's room more while a card or the plus is carried or a task typed: rows never reflow during
   a carry; the room to drop in is the hovered list's, drawn by the frontend.
 

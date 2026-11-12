@@ -359,10 +359,10 @@ describe("the frontends' follow-ups", () => {
 		expect(svc.projects().map((p) => p.name).slice(0, 3)).toEqual(["Окружение в Сербии", "Где знакомиться", "Приложения для знакомств"]);
 	});
 
-	it("No project, Done, a project with no open task in its branch and a done one are drawn grey; one with an open task anywhere is not", async () => {
+	it("Done, a project with no open task in its branch and a done one are drawn grey; one with an open task anywhere is not, nor No project with an open task", async () => {
 		const { svc, state } = setup();
 		state.set({ ...state.get(), doneOpen: true });
 		const view = await svc.projectsScreen();
-		expect(["All", "Окружение в Сербии", "Спорт", "Новый", "No project", "Done", "Самолёт"].map((t) => row(view, t).muted)).toEqual([false, false, false, true, true, true, true]);
+		expect(["All", "Окружение в Сербии", "Спорт", "Новый", "No project", "Done", "Самолёт"].map((t) => row(view, t).muted)).toEqual([false, false, false, true, false, true, true]);
 	});
 });

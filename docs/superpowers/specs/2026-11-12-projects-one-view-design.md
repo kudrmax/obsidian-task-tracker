@@ -151,6 +151,11 @@ View rework (Obsidian frontend, 2026-11-12):
 
 Applied from the Swift frontend: 17 (rows: each list as tall as its cards while all fit, the long ones share the rest and scroll inside, a card's room more while a card or the plus is carried or a task typed; the day by the arrows), 18 (the «No tasks» plate in an empty list under a filter and in rows), 19 (a find the filter hides clears it; a done find outside two columns opens on the whole screen), 20 (the left edge for a card and the plus), 21 (by project without a segment). 13, 15 and 16 are the app's own chrome: the plugin keeps the boards' top-left button and its own icons.
 
+Backend, QA (2026-11-12):
+
+72. A carry let go in a list (`drop`, `landing`, `dropPreview`) under a filter it opened on its way (a held card over a row, `carryAt`) lands there with that project, in one write and one undo: the move, then each task gives the project it was shown by under the lift's filter (`shownUnder`; lifted with no filter or under No project the opened project is added) to the opened one, as `dropOnProject`; opened No project takes it off; opened Done, or the lift's own filter, changes no project. The core reads the carry from the device's state (`ProjectsScreenState.carry`), so no call changes: the frontend keeps calling `drop` before `endCarry("dropped")`. `dropInProjects` already gave a card the part's project (tested).
+73. No project's row is grey only while no open task without a project stands in the funnel, as a project is grey with no open task; Done is always grey, All never.
+
 ## Contract
 
 All in `core/application/contracts.ts`; the door is `docs/door.md`, «Projects as one view with the funnel».

@@ -50,7 +50,8 @@ import Testing
         #expect(view.rows.filter(\.tile).map(\.title) == ["All", "Окружение", "Дружба", "Спорт", "No project", "Done"])
         // Grey only a branch with no open task at all: «Спорт»'s Backlog task draws it in full colour.
         #expect(view.rows.first { $0.title == "Спорт" }?.waiting == false)
-        #expect(view.rows.filter(\.muted).map(\.title) == ["No project", "Done"])
+        // No project is grey only with no open task without a project; this file has one.
+        #expect(view.rows.filter(\.muted).map(\.title) == ["Done"])
         #expect(view.rows.first { $0.title == "Окружение" }?.waiting == false)
         #expect(view.selected == "all")
     }
