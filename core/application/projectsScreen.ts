@@ -152,7 +152,7 @@ export function projectsView(input: ProjectsInput): ProjectsView {
 	const statusOf = (name: string): ProjectStatus => statuses.get(projectKey(name)) ?? "waiting";
 	const fixed = input.node === undefined ? null : nodeIn(input.node, tree);
 	const selected = fixed ?? selectedNode(state, tree);
-	const rows = treeRows(tree, state, selected, statusOf, (node) => input.doc !== null && nodeReorders(node, statusOf));
+	const rows = treeRows(tree, state, selected, statusOf, (node) => input.doc !== null && nodeReorders(node, statusOf), hasLooseOpen(input.doc));
 	const parts = input.doc ? sectionsOf(input, input.doc, selected, statusOf) : [];
 	const name = projectOfNode(selected);
 	const placed = name === null ? null : tree.find(name);
@@ -173,7 +173,12 @@ export function projectsView(input: ProjectsInput): ProjectsView {
 export function panelRows(tree: ProjectTree, doc: TaskDocument | null, state: ProjectsScreenState): ProjectsRow[] {
 	const statuses = doc ? projectStatuses(tree, doc) : new Map<string, ProjectStatus>();
 	const statusOf = (name: string): ProjectStatus => statuses.get(projectKey(name)) ?? "waiting";
-	return treeRows(tree, state, selectedNode(state, tree), statusOf, (node) => doc !== null && nodeReorders(node, statusOf));
+	return treeRows(tree, state, selectedNode(state, tree), statusOf, (node) => doc !== null && nodeReorders(node, statusOf), hasLooseOpen(doc));
+}
+
+/** An open task without a project stands in the funnel: No project's row is drawn live, as an active project's is. */
+function hasLooseOpen(doc: TaskDocument | null): boolean {
+	return doc !== null && tasksOf(doc).some((entry) => entry.task.projects.length === 0 && stageOf(entry) !== "done");
 }
 
 /** What is drawn over the tasks a node filters: its name, a project's menu, and the project a task typed there is given. */
@@ -242,9 +247,10 @@ function inInbox(project: string | null): ProjectsNewTask {
 /**
  * The rows of the tree: All, the live projects (a folded branch left out), No project, Done and, open, the done projects.
  * `reorders` says whether a node's list takes drops: a row opens under a held card when it takes the card, its list takes
- * drops and it is not chosen.
+ * drops and it is not chosen. No project is grey with no open task without a project (`looseOpen`), as a project with no
+ * open task is; Done always.
  */
-function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: ProjectsNodeId, statusOf: (name: string) => ProjectStatus, reorders: (node: ProjectsNodeId) => boolean): ProjectsRow[] {
+function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: ProjectsNodeId, statusOf: (name: string) => ProjectStatus, reorders: (node: ProjectsNodeId) => boolean, looseOpen: boolean): ProjectsRow[] {
 	const row = (fields: Omit<ProjectsRow, "opensOnHover">): ProjectsRow => ({ ...fields, opensOnHover: fields.acceptsTask && !fields.selected && reorders(fields.node) });
 	const rows: ProjectsRow[] = [row(fixedRow("all", PROJECTS_WORDS.all, selected, false, false))];
 	const walk = (nodes: readonly ProjectNode[], path: readonly string[], depth: number, done: boolean) => {
@@ -275,7 +281,7 @@ function treeRows(tree: ProjectTree, state: ProjectsScreenState, selected: Proje
 		}
 	};
 	walk(tree.roots, [], 0, false);
-	rows.push(row(fixedRow("none", PROJECTS_WORDS.none, selected, false, true)));
+	rows.push(row({ ...fixedRow("none", PROJECTS_WORDS.none, selected, false, true), muted: !looseOpen }));
 	const doneTops = doneRoots(tree, statusOf);
 	const open = state.doneOpen === true;
 	rows.push(row({ ...fixedRow("done", PROJECTS_WORDS.done, selected, doneTops.length > 0, false), folded: doneTops.length > 0 && !open }));

@@ -410,6 +410,19 @@ describe("the funnel's view", () => {
 	});
 });
 
+/** QA 2026-11-12: grey means no open tasks, for No project as for a project; Done stays grey. */
+describe("the panel's No project row", () => {
+	const row = async (text?: string) => (await setup(text).svc.funnelView(true)).panel!.rows;
+	it("is drawn as a live row while a task without a project is open, grey with none; Done is grey", async () => {
+		const live = await row();
+		expect(live.find((r) => r.node === "none")).toMatchObject({ muted: false });
+		expect(live.find((r) => r.node === "done")).toMatchObject({ muted: true });
+		expect(live.find((r) => r.node === "all")).toMatchObject({ muted: false });
+		const none = await row(FILE.replace("- [ ] Без проекта\n", "").replace("- [ ] Утренняя зарядка\n", "").replace("- [ ] Записаться к врачу\n", "- [x] Записаться к врачу\n"));
+		expect(none.find((r) => r.node === "none")).toMatchObject({ muted: true });
+	});
+});
+
 describe("a project note's block", () => {
 	it("is the view of the project the note is attached to: rows, no panel, no cross", async () => {
 		const { svc } = setup();
