@@ -62,9 +62,9 @@ final class ListMetrics {
 struct StackedRowsLayout: SwiftUI.Layout {
     let lists: [StackedList]
     let gap: CGFloat
-    let share: (_ lists: [StackedList], _ room: Double) -> [Double]
+    let share: @Sendable (_ lists: [StackedList], _ room: Double) -> [Double]
 
-    init(lists: [StackedList], gap: CGFloat, share: @escaping (_ lists: [StackedList], _ room: Double) -> [Double]) {
+    init(lists: [StackedList], gap: CGFloat, share: @escaping @Sendable (_ lists: [StackedList], _ room: Double) -> [Double]) {
         self.lists = lists
         self.gap = gap
         self.share = share

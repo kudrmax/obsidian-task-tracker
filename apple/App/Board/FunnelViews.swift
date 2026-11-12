@@ -152,7 +152,7 @@ private struct StackedLists: View {
 
     var body: some View {
         let measured = lists.map { model.metrics.lists[$0] ?? StackedList(wanted: Double(ListMetrics.head + CardMetrics.height), stops: []) }
-        StackedRowsLayout(lists: measured, gap: ColumnMetrics.sectionGap, share: { model.stackedHeights($0, room: $1) }) {
+        StackedRowsLayout(lists: measured, gap: ColumnMetrics.sectionGap, share: { [model] lists, room in MainActor.assumeIsolated { model.stackedHeights(lists, room: room) } }) {
             ForEach(lists, id: \.self) { column in
                 Group {
                     if let list = snapshot.lists[column] {
@@ -187,5 +187,5 @@ private struct StackedLists: View {
         return max(0, min(resting.maxY - top, resting.minY - area.minY))
     }
 
-    private static let space = "stack"
+    nonisolated private static let space = "stack"
 }
