@@ -48,6 +48,8 @@ import { ProjectTree } from "../domain/ProjectTree";
 import { chosenNode, nodeHeader, nodeIn, panelRows, PROJECTS_WORDS, projectNodeOf, projectOfNode, projectsView } from "./projectsScreen";
 import { filterTest, noteProject } from "./projectFilter";
 import { firstViewOf, viewChoice } from "./viewModes";
+import { panelReason } from "./projectsCarry";
+import { funnelPlaceOf } from "./screenPlaces";
 import type { ViewChoice } from "./contracts";
 
 /** The file as one read sees it: normalized for `today`, the day beginning at `boundary`; `text` as the file holds it. */
@@ -166,7 +168,9 @@ export class TaskReads {
 		return {
 			filter,
 			view: viewChoice(state, { node, closed, wide, note: false }),
-			panel: { rows: panelRows(tree, s?.doc ?? null, state), open: state.panelOpen === true, docked: wide, missing: s === null },
+			panel: { rows: panelRows(tree, s?.doc ?? null, state), open: panelReason(state) !== null, reason: panelReason(state), docked: wide, missing: s === null },
+			searchPaths: filter !== null,
+			place: funnelPlaceOf(state.place),
 		};
 	}
 
@@ -181,7 +185,7 @@ export class TaskReads {
 		if (name === null) return null;
 		const node = projectNodeOf(name);
 		const closed = nodeHeader(node, tree, s.doc).closed;
-		return { filter: this.filterOf(node, tree, s.doc, false), view: viewChoice(this.source.screen(), { node, closed, wide, note: true }), panel: null };
+		return { filter: this.filterOf(node, tree, s.doc, false), view: viewChoice(this.source.screen(), { node, closed, wide, note: true }), panel: null, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
 	}
 
 	/** The view before the first read: the device's state alone (`firstViewOf`). */

@@ -20,8 +20,9 @@ import { dayMonth, dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
-import { type EntryList, FUNNEL_PLACES, type FunnelAt, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { type EntryList, FUNNEL_PLACES, type FunnelAt, funnelPlaceOf, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
 import { ROW_LISTS, VIEW_WORDS, viewEntryLists, withMode } from "./viewModes";
+import { carriedAt, carryEnded, carryStarted, nameEnded } from "./projectsCarry";
 import { type EntryPart, projectsEntryLook } from "./projectsEntry";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
@@ -426,6 +427,30 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	pickProjectNode: (c, [node, wide]) => c.keepProjectsScreen(picked(c.projectsScreen, c.tree(), node as string, wide === true)),
 	firstView: (c, [wide, note]) => c.reads.firstView(wide === true, note === true),
 	filterHides: (c, [item, filter]) => c.ask(c.reads.filterHidesRead(item as A, (filter ?? null) as string | null)),
+	startCarry: (c, [start, wide]) => c.keepProjectsScreen(carryStarted(c.projectsScreen, start as A, wide === true, c.tree())),
+	carryAt: (c, [at, nowMs]) => {
+		const doc = c.hasTasks() ? c.snapshot().doc : null;
+		const { state, wait } = carriedAt(c.projectsScreen, at as A, nowMs as number, c.tree(), doc);
+		c.keepProjectsScreen(state);
+		return { wait };
+	},
+	carryOnNode: (c, [node]) => {
+		const carry = c.projectsScreen.carry;
+		const target = node === "none" ? null : projectOfNode(node as string);
+		if (target !== null || node === "none") {
+			if (carry?.cards && carry.cards.length > 0) c.run(c.writes.dropOnProject(carry.cards, target));
+			else if (carry && carry.keys.length > 0) c.run(c.writes.dropTasksOnProject(carry.keys, target, carry.under));
+		}
+		c.keepProjectsScreen(carryEnded(c.projectsScreen, "dropped", c.tree(), c.hasTasks() ? c.snapshot().doc : null));
+		return null;
+	},
+	endCarry: (c, [how]) => c.keepProjectsScreen(carryEnded(c.projectsScreen, how as A, c.tree(), c.hasTasks() ? c.snapshot().doc : null)),
+	endProjectName: (c) => c.keepProjectsScreen(nameEnded(c.projectsScreen)),
+	setFunnelPlace: (c, [place]) => {
+		const at = funnelPlaceOf(place);
+		if (c.projectsScreen.place !== at) c.keepProjectsScreen({ ...c.projectsScreen, place: at });
+	},
+	firstPlace: (c) => funnelPlaceOf(c.projectsScreen.place),
 	clearProjectFilter: (c) => c.keepProjectsScreen(cleared(c.projectsScreen)),
 	setProjectsPanel: (c, [open]) => {
 		if ((c.projectsScreen.panelOpen === true) !== (open === true)) c.keepProjectsScreen({ ...c.projectsScreen, panelOpen: open === true });
@@ -828,6 +853,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	gapBranch,
 	swipeLanding,
 	funnelPlaceShowing,
+	funnelPlaceOf,
 	viewEntryLists,
 	projectsEntryLook,
 	wholeWidth,

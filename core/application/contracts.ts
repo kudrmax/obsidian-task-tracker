@@ -55,7 +55,7 @@ export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, 
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
 export { SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type EntryList } from "./screenPlaces";
 /** The funnel's places as the wheel and a swipe walk them, without Projects: the tree is a panel whose node filters them. */
-export { FUNNEL_PLACES, funnelPlaceShowing, stepFunnel, type FunnelAt, type FunnelPlace, type FunnelSpot } from "./screenPlaces";
+export { FUNNEL_PLACES, funnelPlaceOf, funnelPlaceShowing, stepFunnel, type FunnelAt, type FunnelPlace, type FunnelSpot } from "./screenPlaces";
 /** The view modes' words, the lists the rows mode stacks, and the lists a field can stand in for a mode and a place. */
 export { ROW_LISTS, VIEW_WORDS, viewEntryLists } from "./viewModes";
 /** The Projects screen's list as the quick entry reads it: a list the field stands in, like a funnel's column. */
@@ -65,7 +65,7 @@ export { projectsEntryLook, type EntryListLook, type EntryPart } from "./project
  * its title whole and is lifted itself), `grownStart(start, size, grown, room, margin)` where it starts on one axis.
  */
 export { grownStart, type GrownWidth, type TitleFit, type WholeRoom, wholeWidth } from "./wholeCard";
-import type { FunnelAt as FunnelAtOf } from "./screenPlaces";
+import type { FunnelAt as FunnelAtOf, FunnelPlace as FunnelPlaceOf } from "./screenPlaces";
 /** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
 export { SectionNameEntry } from "./SectionNameEntry";
 /** What a task menu's repeat page writes: a rule changed there as the menu closes, unless it is the task's own again; Remove at once. */
@@ -747,6 +747,12 @@ export interface ProjectsScreenState {
 	readonly filteredView?: ViewMode;
 	/** The view mode last picked in a project note's block (`setNoteViewMode`). */
 	readonly noteView?: ViewMode;
+	/** The carry to a project under way (`startCarry`): what the core keeps between the finger's reports. */
+	readonly carry?: CarryState;
+	/** A new project's name is typed in the panel (`endCarry("naming")` until `endProjectName`): the panel stays out. */
+	readonly naming?: boolean;
+	/** The funnel's place the screen last stood at (`setFunnelPlace`). */
+	readonly place?: FunnelPlaceOf;
 	/** The project nodes whose branches are folded. */
 	readonly folded?: readonly ProjectsNodeId[];
 	/** Done's branch, the done projects, is shown: folded until tapped open. */
@@ -1009,6 +1015,12 @@ export interface ViewChoice {
 	readonly icon: string;
 	/** The wheel shows (two columns), the button beside it; without it the button stands alone in the wheel's place. */
 	readonly wheel: boolean;
+	/**
+	 * The screen is the ribbon the wheel walks (two columns, never a note's block): a swipe turns it, a field moved to a
+	 * list turns it to that list's place (`funnelPlaceShowing`), and Done stands left of Inbox. Elsewhere none of these:
+	 * the screen does not swipe or turn, and a done find opens on its own page.
+	 */
+	readonly ribbon: boolean;
 	/** The rows mode's lists, top to bottom (`ROW_LISTS`); none in another mode. */
 	readonly rows: readonly DropColumn[];
 	/** The words in an empty list, with a filter or without: «No tasks». */
@@ -1040,12 +1052,53 @@ export interface ProjectFilter {
 export interface ProjectsPanel {
 	/** The tree's rows (`ProjectsRow`), the filter's row `selected`; none selected without a filter. A tap writes `pickProjectNode`. */
 	readonly rows: readonly ProjectsRow[];
-	/** Drawn: the projects button opened it (`setProjectsPanel`). A panel a held card slid out is the gesture's own, not this. */
+	/** Drawn, for any reason (`reason`); the projects button shows lit while it is. */
 	readonly open: boolean;
+	/** Why it shows: the button (`setProjectsPanel`), a carry held at the edge (`carryAt`), a new project's name typed in it; null: closed. */
+	readonly reason: PanelReason | null;
 	/** A wide screen docks it beside the lists until the button closes it; a narrow one lays it over them and a pick closes it. */
 	readonly docked: boolean;
 	/** No tasks file: All, No project and Done alone. */
 	readonly missing: boolean;
+}
+
+/** Why the projects' panel shows. */
+export type PanelReason = "button" | "carry" | "naming";
+
+/** What a carry to a project carries (`startCarry`): funnel cards by their keys, a by project list's cards by their drops, or the plus. */
+export interface CarryStart {
+	readonly keys: readonly TaskKey[];
+	/** The by project list's cards as read (`ProjectsCard.drop`): let go on a row they go by `dropOnProject`. */
+	readonly cards?: readonly ProjectsDrop[];
+	/** The plus: the edge brings the panel out, a row only unfolds, and it is let go at a gap (`endCarry("naming")`). */
+	readonly plus?: boolean;
+}
+
+/** Where the carrying finger is, as the frontend's hit test found it: at the narrow screen's left edge, over a panel row's node. */
+export interface CarryPoint {
+	readonly edge: boolean;
+	readonly node: ProjectsNodeId | null;
+}
+
+/** How long, ms, until the finger, staying where it is, should be told again (`carryAt`); null: nothing waits. */
+export interface CarryWait {
+	readonly wait: number | null;
+}
+
+/** How a carry ends: let go nowhere or cancelled (the lift's filter put back), dropped somewhere, the plus let go in the tree (its name asked). */
+export type CarryEnd = "nowhere" | "dropped" | "naming";
+
+/** The carry the core keeps on the device between the finger's reports. */
+export interface CarryState extends CarryStart {
+	/** The filter at the lift: what the cards were shown by, and what a let go nowhere puts back. */
+	readonly under: ProjectsNodeId | null;
+	readonly wide: boolean;
+	/** Since when, by the host's clock, the finger waits at the edge. */
+	readonly edgeSince?: number;
+	/** The row the finger waits over, since when, and whether its pause has acted. */
+	readonly over?: { readonly node: ProjectsNodeId; readonly since: number; readonly done: boolean };
+	/** The carry brought the panel out. */
+	readonly revealed?: boolean;
 }
 
 /** The funnel's view as this device shows it (`TaskService.funnelView`), or a project note's block (`projectNoteView`). */
@@ -1055,6 +1108,10 @@ export interface FunnelView {
 	readonly view: ViewChoice;
 	/** The tree's panel; null in a note's block, which shows no tree. */
 	readonly panel: ProjectsPanel | null;
+	/** A search opened over it shows each find's project path: a filter is chosen. */
+	readonly searchPaths: boolean;
+	/** The funnel's place the screen stands at (`setFunnelPlace`; Today when none was kept). */
+	readonly place: FunnelPlaceOf;
 }
 
 /** Where a project lifted in the tree, or the plus, lands at a gap: the place the call takes, and the depth the gap is drawn at. */
@@ -1295,6 +1352,23 @@ export interface TaskService {
 	 * lacks, and for a task gone.
 	 */
 	filterHides(item: TaskItem, filter: ProjectsNodeId | null): Promise<boolean>;
+	/**
+	 * A card or several, or the plus, lifted for a carry that may reach the projects' panel, on a `wide` screen or not: the
+	 * core keeps what it carries and the filter it was lifted under. A carry under way is replaced.
+	 */
+	startCarry(start: CarryStart, wide: boolean): Promise<void>;
+	/** The carrying finger at `at`, `nowMs` by the host's clock: the core brings the panel out, unfolds or opens a row, and says how long until it should be told again. */
+	carryAt(at: CarryPoint, nowMs: number): Promise<CarryWait>;
+	/** The carry let go on a panel row: every carried task gets the row's project (`dropOnProject`, `dropTasksOnProject` under the lift's filter), and the carry ends. */
+	carryOnNode(node: ProjectsNodeId): Promise<void>;
+	/** The carry ends otherwise (`CarryEnd`). */
+	endCarry(how: CarryEnd): Promise<void>;
+	/** A new project's name typed or given up: the panel the naming held out goes. */
+	endProjectName(): Promise<void>;
+	/** The funnel's place the screen now stands at, kept on the device; anything a host kept before reads as `funnelPlaceOf` says. */
+	setFunnelPlace(place: unknown): Promise<void>;
+	/** The place the screen opens at before the first read: the device's (`funnelPlaceOf`). */
+	firstPlace(): FunnelPlaceOf;
 	/** The cross beside the filter's title: no node chosen, every task shows. Kept on the device. */
 	clearProjectFilter(): Promise<void>;
 	/** The projects button: the panel opened or closed. Kept on the device. */

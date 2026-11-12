@@ -438,7 +438,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async funnelView(wide: boolean): Promise<FunnelView> {
-		return { filter: null, view: viewChoice({}, { node: null, closed: false, wide, note: false }), panel: { rows: (await this.projectsScreen()).rows.map((row) => ({ ...row, selected: false })), open: false, docked: wide, missing: true } };
+		return { filter: null, view: viewChoice({}, { node: null, closed: false, wide, note: false }), panel: { rows: (await this.projectsScreen()).rows.map((row) => ({ ...row, selected: false })), open: false, reason: null, docked: wide, missing: true }, searchPaths: false, place: "calendar" };
 	}
 
 	async projectNoteView(): Promise<null> {
@@ -454,6 +454,24 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async pickProjectNode(): Promise<void> {}
+
+	async startCarry(): Promise<void> {}
+
+	async carryAt(): Promise<{ readonly wait: null }> {
+		return { wait: null };
+	}
+
+	async carryOnNode(): Promise<void> {}
+
+	async endCarry(): Promise<void> {}
+
+	async endProjectName(): Promise<void> {}
+
+	async setFunnelPlace(): Promise<void> {}
+
+	firstPlace(): "calendar" {
+		return "calendar";
+	}
 
 	async clearProjectFilter(): Promise<void> {}
 

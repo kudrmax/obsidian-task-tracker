@@ -3428,6 +3428,12 @@ ${key.title}`.toLowerCase();
     const showing = FUNNEL_PLACES.filter((other) => SHOWN_LISTS[other].includes(column));
     return showing.reduce((best, other) => Math.abs(FUNNEL_PLACES.indexOf(other) - from) < Math.abs(FUNNEL_PLACES.indexOf(best) - from) ? other : best);
   }
+  var OLD_NUMBERS = { [-1]: "inbox", 0: "inbox", 1: "soon", 2: "calendar" };
+  function funnelPlaceOf(saved) {
+    if (typeof saved === "number") return OLD_NUMBERS[saved] ?? "calendar";
+    if (saved === "projects") return "inbox";
+    return FUNNEL_PLACES.includes(saved) ? saved : "calendar";
+  }
   var SHOWN_LISTS = { inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] };
   var SWIPE_FLICK_SPEED = 0.3;
   function swipeLanding(moved2, distance, speed) {
@@ -4021,7 +4027,8 @@ ${key.title}`.toLowerCase();
     const options = modes.map((m) => ({ mode: m, label: label(m), icon: ICONS[m], checked: m === mode }));
     const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
     const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
-    return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates };
+    const ribbon = mode === "twoColumns" && !ask.note;
+    return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", ribbon, rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates };
   }
   function firstViewOf(state, wide, note) {
     return viewChoice(state, { node: note ? "note" : state.selected ?? null, closed: false, wide, note });
@@ -4033,6 +4040,78 @@ ${key.title}`.toLowerCase();
     if (mode === "byProject") return ["projects"];
     if (mode === "twoColumns") return SHOWN_LISTS[spot === "done" ? "inbox" : spot];
     return ROW_LISTS;
+  }
+
+  // core/application/projectsCarry.ts
+  function panelReason(state) {
+    if (state.panelOpen === true) return "button";
+    if (state.carry?.revealed === true) return "carry";
+    if (state.naming === true) return "naming";
+    return null;
+  }
+  function carryStarted(state, start, wide, tree) {
+    const carry = { keys: start.keys, ...start.cards && { cards: start.cards }, ...start.plus && { plus: true }, under: chosenNode(state, tree), wide };
+    return { ...state, carry };
+  }
+  function sameNode2(a, b) {
+    const x = projectOfNode(a);
+    const y = projectOfNode(b);
+    return x !== null && y !== null ? projectKey(x) === projectKey(y) : a === b;
+  }
+  function least(a, b) {
+    return a === null ? b : b === null ? a : Math.min(a, b);
+  }
+  function carriedAt(state, at, now, tree, doc) {
+    const carry = state.carry;
+    if (!carry) return { state, wait: null };
+    let next = state;
+    let wait = null;
+    let edgeSince;
+    let revealed = carry.revealed === true;
+    const carries = carry.keys.length > 0 || carry.plus === true;
+    if (at.edge && !carry.wide && carries && panelReason(state) === null) {
+      const since = carry.edgeSince ?? now;
+      if (now - since >= PROJECTS_HOVER_MS) revealed = true;
+      else {
+        edgeSince = since;
+        wait = PROJECTS_HOVER_MS - (now - since);
+      }
+    }
+    next = { ...next, carry: { ...withoutTimes(carry), ...revealed && { revealed: true }, ...edgeSince !== void 0 && { edgeSince } } };
+    const shows = panelReason(next) !== null;
+    if (at.node === null || !shows) return { state: next, wait };
+    const rows = panelRows(tree, doc, next);
+    const row = rows.find((r) => sameNode2(r.node, at.node));
+    const acts = row !== void 0 && (row.unfoldsOnHover || carry.plus !== true && row.opensOnHover);
+    const over = carry.over && sameNode2(carry.over.node, at.node) ? carry.over : { node: at.node, since: now, done: false };
+    if (!over.done && acts) {
+      if (now - over.since >= PROJECTS_HOVER_MS) {
+        const moved2 = carry.plus === true ? unfolded(next, row.node) : hovered(next, tree, doc, rows, row.node);
+        return { state: { ...moved2, carry: { ...moved2.carry, over: { ...over, done: true } } }, wait };
+      }
+      wait = least(wait, PROJECTS_HOVER_MS - (now - over.since));
+    }
+    return { state: { ...next, carry: { ...next.carry, over } }, wait };
+  }
+  function withoutTimes(carry) {
+    const { edgeSince: _edge, over: _over, revealed: _revealed, ...rest } = carry;
+    return rest;
+  }
+  function carryEnded(state, how, tree, doc) {
+    const carry = state.carry;
+    const { carry: _gone, ...rest } = state;
+    let next = how === "naming" ? { ...rest, naming: true } : rest;
+    if (!carry || how !== "nowhere") return next;
+    const now = chosenNode(next, tree);
+    if (carry.under === null) return now === null ? next : cleared(next);
+    if (now !== null && sameNode2(now, carry.under)) return next;
+    next = selected(next, tree, doc, carry.under);
+    return next;
+  }
+  function nameEnded(state) {
+    if (state.naming !== true) return state;
+    const { naming: _gone, ...rest } = state;
+    return rest;
   }
 
   // core/application/taskKeys.ts
@@ -6197,7 +6276,9 @@ ${key.title}`.toLowerCase();
       return {
         filter,
         view: viewChoice(state, { node, closed, wide, note: false }),
-        panel: { rows: panelRows(tree, s?.doc ?? null, state), open: state.panelOpen === true, docked: wide, missing: s === null }
+        panel: { rows: panelRows(tree, s?.doc ?? null, state), open: panelReason(state) !== null, reason: panelReason(state), docked: wide, missing: s === null },
+        searchPaths: filter !== null,
+        place: funnelPlaceOf(state.place)
       };
     }
     /** The block at the end of the note at `path`: null for a note no project has, and without a file. */
@@ -6210,7 +6291,7 @@ ${key.title}`.toLowerCase();
       if (name === null) return null;
       const node = projectNodeOf(name);
       const closed = nodeHeader(node, tree, s.doc).closed;
-      return { filter: this.filterOf(node, tree, s.doc, false), view: viewChoice(this.source.screen(), { node, closed, wide, note: true }), panel: null };
+      return { filter: this.filterOf(node, tree, s.doc, false), view: viewChoice(this.source.screen(), { node, closed, wide, note: true }), panel: null, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
     }
     /** The view before the first read: the device's state alone (`firstViewOf`). */
     firstView(wide, note) {
@@ -7966,6 +8047,30 @@ ${key.title}`.toLowerCase();
     pickProjectNode: (c, [node, wide]) => c.keepProjectsScreen(picked(c.projectsScreen, c.tree(), node, wide === true)),
     firstView: (c, [wide, note]) => c.reads.firstView(wide === true, note === true),
     filterHides: (c, [item, filter]) => c.ask(c.reads.filterHidesRead(item, filter ?? null)),
+    startCarry: (c, [start, wide]) => c.keepProjectsScreen(carryStarted(c.projectsScreen, start, wide === true, c.tree())),
+    carryAt: (c, [at, nowMs]) => {
+      const doc = c.hasTasks() ? c.snapshot().doc : null;
+      const { state, wait } = carriedAt(c.projectsScreen, at, nowMs, c.tree(), doc);
+      c.keepProjectsScreen(state);
+      return { wait };
+    },
+    carryOnNode: (c, [node]) => {
+      const carry = c.projectsScreen.carry;
+      const target = node === "none" ? null : projectOfNode(node);
+      if (target !== null || node === "none") {
+        if (carry?.cards && carry.cards.length > 0) c.run(c.writes.dropOnProject(carry.cards, target));
+        else if (carry && carry.keys.length > 0) c.run(c.writes.dropTasksOnProject(carry.keys, target, carry.under));
+      }
+      c.keepProjectsScreen(carryEnded(c.projectsScreen, "dropped", c.tree(), c.hasTasks() ? c.snapshot().doc : null));
+      return null;
+    },
+    endCarry: (c, [how]) => c.keepProjectsScreen(carryEnded(c.projectsScreen, how, c.tree(), c.hasTasks() ? c.snapshot().doc : null)),
+    endProjectName: (c) => c.keepProjectsScreen(nameEnded(c.projectsScreen)),
+    setFunnelPlace: (c, [place]) => {
+      const at = funnelPlaceOf(place);
+      if (c.projectsScreen.place !== at) c.keepProjectsScreen({ ...c.projectsScreen, place: at });
+    },
+    firstPlace: (c) => funnelPlaceOf(c.projectsScreen.place),
     clearProjectFilter: (c) => c.keepProjectsScreen(cleared(c.projectsScreen)),
     setProjectsPanel: (c, [open]) => {
       if (c.projectsScreen.panelOpen === true !== (open === true)) c.keepProjectsScreen({ ...c.projectsScreen, panelOpen: open === true });
@@ -8307,6 +8412,7 @@ ${key.title}`.toLowerCase();
     gapBranch,
     swipeLanding,
     funnelPlaceShowing,
+    funnelPlaceOf,
     viewEntryLists,
     projectsEntryLook,
     wholeWidth,
