@@ -123,6 +123,8 @@ export class CalendarScreen extends Component {
 	private swipe: Swipe | null = null;
 	/** The context (`ViewChoice.context`) the lists were last drawn in: another one is drawn still. */
 	private drawnContext: string | null = null;
+	/** The changes asked for, one after another. */
+	private changing: Promise<unknown> = Promise.resolve();
 	/** The timer that ends the docked panel's slide. */
 	private docking = 0;
 	/** Where layouts stand among the screen's parts: before the fade and the controls. */
@@ -890,8 +892,11 @@ export class CalendarScreen extends Component {
 	/** Runs one change to the file and resolves once the screen shows it; a task changed under us is reported instead. */
 	/** Runs a change of the tasks, then reads them anew; a change that answers false wrote nothing and needs no reading. */
 	private async act(change: () => Promise<void | boolean>): Promise<void> {
+		/** One change after another, in the order they were asked: a read after the second never sees the file before the first. */
+		const run = this.changing.then(change);
+		this.changing = run.catch(() => undefined);
 		try {
-			if ((await change()) === false) return;
+			if ((await run) === false) return;
 		} catch (error) {
 			if (!(error instanceof StaleTaskError)) throw error;
 			new Notice(failureText(error));

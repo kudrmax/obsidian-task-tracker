@@ -65,5 +65,8 @@ function contentHeight(scroller: HTMLElement): number {
 		if (rect.height === 0 && rect.width === 0) continue;
 		end = Math.max(end, rect.bottom - box.top + scroller.scrollTop + (parseFloat(getComputedStyle(child).marginBottom) || 0));
 	}
-	return end + (parseFloat(style.paddingBottom) || 0);
+	/** A list's room at its end (`::after`, over the block's controls) is part of what it holds. */
+	const after = getComputedStyle(scroller, "::after");
+	const room = after.content !== "none" && after.content !== "normal" ? (parseFloat(after.height) || 0) + (parseFloat(style.rowGap) || 0) : 0;
+	return end + room + (parseFloat(style.paddingBottom) || 0);
 }
