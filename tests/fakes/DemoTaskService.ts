@@ -438,7 +438,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async funnelView(wide: boolean): Promise<FunnelView> {
-		return { filter: null, view: viewChoice({}, { node: null, closed: false, wide, note: false }), panel: { rows: (await this.projectsScreen()).rows.map((row) => ({ ...row, selected: false })), open: false, reason: null, docked: wide, missing: true }, searchPaths: false, place: "calendar" };
+		return { filter: null, view: viewChoice({}, { node: null, closed: false, wide, note: false }), panel: { rows: (await this.projectsScreen()).rows.map((row) => ({ ...row, selected: false })), open: false, reason: null, docked: wide, dimCloses: false, missing: true }, plus: { tap: "newTask", list: "funnel", tree: false }, topRow: wide, searchPaths: false, place: "calendar" };
 	}
 
 	async projectNoteView(): Promise<null> {

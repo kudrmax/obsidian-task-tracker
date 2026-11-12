@@ -22,7 +22,7 @@ import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timePar
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
 import { type EntryList, FUNNEL_PLACES, type FunnelAt, funnelPlaceOf, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
 import { ROW_LISTS, VIEW_WORDS, viewEntryLists, withMode } from "./viewModes";
-import { carriedAt, carryEnded, carryStarted, gestureGone, nameEnded } from "./projectsCarry";
+import { carriedAt, carryEnded, carryStarted, endsSelection, gestureGone, nameEnded } from "./projectsCarry";
 import { type EntryPart, projectsEntryLook } from "./projectsEntry";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
@@ -860,6 +860,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	swipeLanding,
 	funnelPlaceShowing,
 	funnelPlaceOf,
+	endsSelection,
 	viewEntryLists,
 	projectsEntryLook,
 	wholeWidth,

@@ -4028,7 +4028,7 @@ ${key.title}`.toLowerCase();
     const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
     const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
     const ribbon = mode === "twoColumns" && !ask.note;
-    return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", ribbon, rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates };
+    return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", ribbon, source: mode === "byProject" ? "projectsScreen" : "screen", rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates };
   }
   function firstViewOf(state, wide, note) {
     return viewChoice(state, { node: note ? "note" : state.selected ?? null, closed: false, wide, note });
@@ -4113,6 +4113,9 @@ ${key.title}`.toLowerCase();
     const { carry, naming: _naming, selected: now, ...rest } = state;
     const under = carry ? carry.under : now ?? null;
     return under === null ? rest : { ...rest, selected: under };
+  }
+  function endsSelection(end) {
+    return end === "dropped";
   }
   function nameEnded(state) {
     if (state.naming !== true) return state;
@@ -6279,10 +6282,14 @@ ${key.title}`.toLowerCase();
       const node = chosenNode(state, tree);
       const filter = node === null ? null : this.filterOf(node, tree, s?.doc ?? null, true);
       const closed = node !== null && nodeHeader(node, tree, s?.doc ?? null).closed;
+      const view = viewChoice(state, { node, closed, wide, note: false });
+      const reason = panelReason(state);
       return {
         filter,
-        view: viewChoice(state, { node, closed, wide, note: false }),
-        panel: { rows: panelRows(tree, s?.doc ?? null, state), open: panelReason(state) !== null, reason: panelReason(state), docked: wide, missing: s === null },
+        view,
+        panel: { rows: panelRows(tree, s?.doc ?? null, state), open: reason !== null, reason, docked: wide, dimCloses: reason === "button" && !wide, missing: s === null },
+        plus: plusOf(view.mode, reason !== null),
+        topRow: wide || node !== null || view.mode !== "twoColumns",
         searchPaths: filter !== null,
         place: funnelPlaceOf(state.place)
       };
@@ -6297,7 +6304,8 @@ ${key.title}`.toLowerCase();
       if (name === null) return null;
       const node = projectNodeOf(name);
       const closed = nodeHeader(node, tree, s.doc).closed;
-      return { filter: this.filterOf(node, tree, s.doc, false), view: viewChoice(this.source.screen(), { node, closed, wide, note: true }), panel: null, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
+      const view = viewChoice(this.source.screen(), { node, closed, wide, note: true });
+      return { filter: this.filterOf(node, tree, s.doc, false), view, panel: null, plus: plusOf(view.mode, false), topRow: false, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
     }
     /** The view before the first read: the device's state alone (`firstViewOf`). */
     firstView(wide, note) {
@@ -6586,6 +6594,10 @@ ${key.title}`.toLowerCase();
       return this.rules.today();
     }
   };
+  function plusOf(mode, panel) {
+    if (mode !== "byProject") return { tap: "newTask", list: "funnel", tree: panel };
+    return { tap: "inPlace", list: panel ? null : "projects", tree: panel };
+  }
 
   // core/domain/EntryTags.ts
   var MARK = 57344;
@@ -8425,6 +8437,7 @@ ${key.title}`.toLowerCase();
     swipeLanding,
     funnelPlaceShowing,
     funnelPlaceOf,
+    endsSelection,
     viewEntryLists,
     projectsEntryLook,
     wholeWidth,

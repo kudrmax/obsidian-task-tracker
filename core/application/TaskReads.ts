@@ -50,7 +50,7 @@ import { filterTest, noteProject } from "./projectFilter";
 import { firstViewOf, viewChoice } from "./viewModes";
 import { panelReason } from "./projectsCarry";
 import { funnelPlaceOf } from "./screenPlaces";
-import type { ViewChoice } from "./contracts";
+import type { PlusChoice, ViewChoice, ViewMode } from "./contracts";
 
 /** The file as one read sees it: normalized for `today`, the day beginning at `boundary`; `text` as the file holds it. */
 export interface Snapshot {
@@ -165,10 +165,14 @@ export class TaskReads {
 		const node = chosenNode(state, tree);
 		const filter = node === null ? null : this.filterOf(node, tree, s?.doc ?? null, true);
 		const closed = node !== null && nodeHeader(node, tree, s?.doc ?? null).closed;
+		const view = viewChoice(state, { node, closed, wide, note: false });
+		const reason = panelReason(state);
 		return {
 			filter,
-			view: viewChoice(state, { node, closed, wide, note: false }),
-			panel: { rows: panelRows(tree, s?.doc ?? null, state), open: panelReason(state) !== null, reason: panelReason(state), docked: wide, missing: s === null },
+			view,
+			panel: { rows: panelRows(tree, s?.doc ?? null, state), open: reason !== null, reason, docked: wide, dimCloses: reason === "button" && !wide, missing: s === null },
+			plus: plusOf(view.mode, reason !== null),
+			topRow: wide || node !== null || view.mode !== "twoColumns",
 			searchPaths: filter !== null,
 			place: funnelPlaceOf(state.place),
 		};
@@ -185,7 +189,8 @@ export class TaskReads {
 		if (name === null) return null;
 		const node = projectNodeOf(name);
 		const closed = nodeHeader(node, tree, s.doc).closed;
-		return { filter: this.filterOf(node, tree, s.doc, false), view: viewChoice(this.source.screen(), { node, closed, wide, note: true }), panel: null, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
+		const view = viewChoice(this.source.screen(), { node, closed, wide, note: true });
+		return { filter: this.filterOf(node, tree, s.doc, false), view, panel: null, plus: plusOf(view.mode, false), topRow: false, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
 	}
 
 	/** The view before the first read: the device's state alone (`firstViewOf`). */
@@ -524,4 +529,10 @@ export class TaskReads {
 	private today(): LocalDate {
 		return this.rules.today();
 	}
+}
+
+/** What the plus does in `mode`, the panel showing or not (`PlusChoice`). */
+function plusOf(mode: ViewMode, panel: boolean): PlusChoice {
+	if (mode !== "byProject") return { tap: "newTask", list: "funnel", tree: panel };
+	return { tap: "inPlace", list: panel ? null : "projects", tree: panel };
 }

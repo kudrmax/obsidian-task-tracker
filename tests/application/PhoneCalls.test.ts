@@ -638,6 +638,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
 		plain("rules.funnelPlaceShowing", "day", "inbox"),
 		plain("rules.funnelPlaceOf", -1),
+		plain("rules.endsSelection", "dropped"),
 		plain("rules.viewEntryLists", "rows", "soon"),
 		plain("rules.projectsEntryLook", null),
 		plain("rules.swipeLanding", 120, 200, 0.1),

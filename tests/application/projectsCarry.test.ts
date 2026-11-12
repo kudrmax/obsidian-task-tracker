@@ -3,6 +3,7 @@ import { callDoor, type DoorAnswer } from "../../core/application/PhoneCalls";
 import { memoryProjectsScreen, type Clock } from "../../core/application/ports";
 import { PROJECTS_HOVER_MS } from "../../core/application/projectsScreen";
 import { funnelPlaceOf } from "../../core/application/screenPlaces";
+import { endsSelection } from "../../core/application/contracts";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
 import { UndoHistory } from "../../core/application/UndoHistory";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
@@ -250,5 +251,59 @@ describe("what the view says besides its mode", () => {
 		await svc.setNoteViewMode("rows");
 		expect((await svc.funnelView(true)).view.ribbon).toBe(false);
 		expect(svc.firstView(true, true).ribbon).toBe(false);
+	});
+});
+
+describe("what the frontends no longer decide", () => {
+	it("a carry that lands ends Select Tasks; one let go nowhere or into a new project's name keeps it", () => {
+		expect(endsSelection("dropped")).toBe(true);
+		expect(endsSelection("nowhere")).toBe(false);
+		expect(endsSelection("naming")).toBe(false);
+	});
+
+	it("the plus: in by project a tap types in place and the node's list takes it while the panel is closed; elsewhere a tap opens a new task", async () => {
+		const { svc } = setup();
+		expect((await svc.funnelView(true)).plus).toEqual({ tap: "newTask", list: "funnel", tree: false });
+		await svc.setProjectsPanel(true);
+		expect((await svc.funnelView(true)).plus).toEqual({ tap: "newTask", list: "funnel", tree: true });
+		await svc.pickProjectNode(SELF, true);
+		await svc.setViewMode("byProject");
+		expect((await svc.funnelView(true)).plus).toEqual({ tap: "inPlace", list: null, tree: true });
+		await svc.setProjectsPanel(false);
+		expect((await svc.funnelView(true)).plus).toEqual({ tap: "inPlace", list: "projects", tree: false });
+		await svc.setNoteViewMode("byProject");
+		expect((await svc.projectNoteView("x.md", true))).toBeNull();
+	});
+
+	it("a tap on the panel's dim closes it only when the button opened it over the lists", async () => {
+		const { svc, item } = setup();
+		await svc.setProjectsPanel(true);
+		expect((await svc.funnelView(false)).panel!.dimCloses).toBe(true);
+		expect((await svc.funnelView(true)).panel!.dimCloses).toBe(false);
+		await svc.setProjectsPanel(false);
+		await svc.startCarry({ keys: [(await item("Anki")).key] }, false);
+		await svc.carryAt({ edge: true, node: null }, 0);
+		await svc.carryAt({ edge: true, node: null }, PAUSE);
+		expect((await svc.funnelView(false)).panel).toMatchObject({ reason: "carry", dimCloses: false });
+	});
+
+	it("the read a mode draws from: the screen, by project the node's Projects list", async () => {
+		const { svc } = setup();
+		expect((await svc.funnelView(true)).view.source).toBe("screen");
+		await svc.pickProjectNode(SELF, true);
+		await svc.setViewMode("byProject");
+		expect((await svc.funnelView(true)).view.source).toBe("projectsScreen");
+	});
+
+	it("the top row: always on a wide screen; on a narrow one with a filter or a mode without column titles", async () => {
+		const { svc } = setup();
+		expect((await svc.funnelView(true)).topRow).toBe(true);
+		expect((await svc.funnelView(false)).topRow).toBe(false);
+		await svc.setViewMode("rows");
+		expect((await svc.funnelView(false)).topRow).toBe(true);
+		await svc.setViewMode("twoColumns");
+		await svc.pickProjectNode(SELF, true);
+		await svc.setViewMode("twoColumns");
+		expect((await svc.funnelView(false)).topRow).toBe(true);
 	});
 });

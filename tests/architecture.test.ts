@@ -292,6 +292,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	FUNNEL_PLACES: "./screenPlaces",
 	funnelPlaceShowing: "./screenPlaces",
 	funnelPlaceOf: "./screenPlaces",
+	endsSelection: "./projectsCarry",
 	stepFunnel: "./screenPlaces",
 	ROW_LISTS: "./viewModes",
 	VIEW_WORDS: "./viewModes",

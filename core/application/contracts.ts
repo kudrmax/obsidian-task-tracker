@@ -55,6 +55,8 @@ export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, 
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
 export { SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type EntryList } from "./screenPlaces";
 /** The funnel's places as the wheel and a swipe walk them, without Projects: the tree is a panel whose node filters them. */
+/** Whether a carry's end ends Select Tasks (`endsSelection(end)`): one that landed does, whatever path it took. */
+export { endsSelection } from "./projectsCarry";
 export { FUNNEL_PLACES, funnelPlaceOf, funnelPlaceShowing, stepFunnel, type FunnelAt, type FunnelPlace, type FunnelSpot } from "./screenPlaces";
 /** The view modes' words, the lists the rows mode stacks, and the lists a field can stand in for a mode and a place. */
 export { ROW_LISTS, VIEW_WORDS, viewEntryLists } from "./viewModes";
@@ -1021,6 +1023,8 @@ export interface ViewChoice {
 	 * the screen does not swipe or turn, and a done find opens on its own page.
 	 */
 	readonly ribbon: boolean;
+	/** The read the mode draws from: `screen(date, filter)`, or by project `projectsScreen(filter.node)` beside it. */
+	readonly source: "screen" | "projectsScreen";
 	/** The rows mode's lists, top to bottom (`ROW_LISTS`); none in another mode. */
 	readonly rows: readonly DropColumn[];
 	/** The words in an empty list, with a filter or without: «No tasks». */
@@ -1058,8 +1062,22 @@ export interface ProjectsPanel {
 	readonly reason: PanelReason | null;
 	/** A wide screen docks it beside the lists until the button closes it; a narrow one lays it over them and a pick closes it. */
 	readonly docked: boolean;
+	/** A tap on the dim around it closes it (`setProjectsPanel(false)`): it lies over the lists and the button opened it; a carry's or a name's panel goes with them. */
+	readonly dimCloses: boolean;
 	/** No tasks file: All, No project and Done alone. */
 	readonly missing: boolean;
+}
+
+/**
+ * What the plus does: a tap types in place (`inPlace`: the quick entry at the by project list's plus part) or opens a new
+ * task (`newTask`: the frontend's own New Task, its sheet or field); held, it is let go in the funnel's lists (`funnel`),
+ * the node's by project list alone (`projects`) or no list (null), and in the tree (`tree`, a new project) while the
+ * panel shows.
+ */
+export interface PlusChoice {
+	readonly tap: "inPlace" | "newTask";
+	readonly list: "funnel" | "projects" | null;
+	readonly tree: boolean;
 }
 
 /** Why the projects' panel shows. */
@@ -1108,6 +1126,9 @@ export interface FunnelView {
 	readonly view: ViewChoice;
 	/** The tree's panel; null in a note's block, which shows no tree. */
 	readonly panel: ProjectsPanel | null;
+	readonly plus: PlusChoice;
+	/** The top row (the projects button, the filter's name, the view's titles) stands over the lists: always on a wide screen; on a narrow one with a filter or in a mode without column titles (all but two columns). Never in a note's block. */
+	readonly topRow: boolean;
 	/** A search opened over it shows each find's project path: a filter is chosen. */
 	readonly searchPaths: boolean;
 	/** The funnel's place the screen stands at (`setFunnelPlace`; Today when none was kept). */

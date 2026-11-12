@@ -102,6 +102,11 @@ export function gestureGone(state: ProjectsScreenState): ProjectsScreenState {
 	return under === null ? rest : { ...rest, selected: under };
 }
 
+/** A carry that landed (a list, the calendar, a row, the by project list) ends Select Tasks; one let go nowhere or into a new project's name keeps it. */
+export function endsSelection(end: CarryEnd): boolean {
+	return end === "dropped";
+}
+
 /** The new project's name typed or given up: the panel it held out goes. */
 export function nameEnded(state: ProjectsScreenState): ProjectsScreenState {
 	if (state.naming !== true) return state;

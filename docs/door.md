@@ -371,6 +371,14 @@ adds to the calls above; the old ones answer as before.
   Soon, 2 Today, nothing → Today); `FunnelView.place` and `tasks.firstPlace()` (synchronous) read it.
 - `ViewChoice.ribbon`: the screen is the ribbon (two columns, never a note): it swipes, a field moved to a list turns it to
   that list's place, and Done stands left of Inbox; elsewhere a done find opens on its own page.
+- `rules.endsSelection(end)`: a carry that ended `"dropped"` (a list, the calendar, a row by `carryOnNode`, the by
+  project list) ends Select Tasks; `"nowhere"` and `"naming"` keep it. Example: `rules.endsSelection("dropped")` → true.
+- `FunnelView.plus` `{ tap, list, tree }`: a tap `"inPlace"` (by project: the field at its plus part) or `"newTask"` (the
+  frontend's New Task); held, let go in `"funnel"`'s lists, `"projects"` (the node's by project list, panel closed) or
+  none, and in the tree while the panel shows.
+- `ProjectsPanel.dimCloses`: a tap on the dim closes it (over the lists, opened by the button).
+- `ViewChoice.source`: `"screen"`, or `"projectsScreen"` (by project reads `tasks.projectsScreen(filter.node)` too).
+- `FunnelView.topRow`: the top row stands (wide always; narrow with a filter or a mode but two columns; never a note).
 - `FunnelView.searchPaths`: a search opened over the view shows each find's project path (a filter is chosen).
 - A card let go on the project it already has (`dropOnProject`, `dropTasksOnProject`, a by project list) leaves its line
   as it is.
