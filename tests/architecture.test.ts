@@ -291,6 +291,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	SWIPE_FLICK_SPEED: "./screenPlaces",
 	FUNNEL_PLACES: "./screenPlaces",
 	funnelPlaceShowing: "./screenPlaces",
+	funnelPlaceOf: "./screenPlaces",
 	stepFunnel: "./screenPlaces",
 	ROW_LISTS: "./viewModes",
 	VIEW_WORDS: "./viewModes",

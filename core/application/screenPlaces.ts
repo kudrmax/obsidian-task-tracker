@@ -53,6 +53,19 @@ export function funnelPlaceShowing(column: DropColumn, spot: FunnelSpot): Funnel
 	return showing.reduce((best, other) => (Math.abs(FUNNEL_PLACES.indexOf(other) - from) < Math.abs(FUNNEL_PLACES.indexOf(best) - from) ? other : best));
 }
 
+/** The app's old numbers for its places (`ribbonPlace`): Projects -1, Inbox 0, Soon 1, Today 2. */
+const OLD_NUMBERS: Readonly<Record<number, FunnelPlace>> = { [-1]: "inbox", 0: "inbox", 1: "soon", 2: "calendar" };
+
+/**
+ * The funnel's place of whatever a device kept: a place as it is; the old Projects place («projects», the app's -1) as
+ * Inbox, its neighbour; the app's old numbers; Today (the calendar) for nothing or anything else.
+ */
+export function funnelPlaceOf(saved: unknown): FunnelPlace {
+	if (typeof saved === "number") return OLD_NUMBERS[saved] ?? "calendar";
+	if (saved === "projects") return "inbox";
+	return FUNNEL_PLACES.includes(saved as FunnelPlace) ? (saved as FunnelPlace) : "calendar";
+}
+
 /** The funnel's lists each place shows, in its order. */
 export const SHOWN_LISTS: Readonly<Record<FunnelPlace, readonly DropColumn[]>> = { inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] };
 

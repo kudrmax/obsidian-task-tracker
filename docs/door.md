@@ -347,6 +347,28 @@ adds to the calls above; the old ones answer as before.
   timeline or Done task): true → `tasks.clearProjectFilter()` before showing it. Example: `tasks.filterHides(hit.item,
   "project:Стиль")` → `true`.
 - `tasks.dayView(date, filter?)`: `tasks.screen(date, filter).day`.
+- **The carry to a project is the core's.** The frontend reports the finger, the core keeps the session in
+  `ProjectsScreenState.carry` (the app hands it back as any `projectsScreen`):
+  - `tasks.startCarry({ keys, cards?, plus? }, wide)` at the lift (a funnel's cards by their keys, a by project list's by
+    `ProjectsCard.drop`, or the plus); the core records the filter it is lifted under. A section or a project lifted in
+    the tree starts none.
+  - `tasks.carryAt({ edge, node }, nowMs)` → `{ wait }` on every move (and again after `wait` ms while the finger stays):
+    `edge` the finger is within the left edge, `node` the panel row under it. After `PROJECTS_HOVER_MS` at a narrow
+    screen's edge the panel comes out (`panel.reason` `"carry"`); over a row as long, it unfolds and a card opens it (the
+    plus only unfolds). Example: `tasks.carryAt({ edge: true, node: null }, 1000)` → `{ wait: 600 }`.
+  - `tasks.carryOnNode(node)`: let go on a row: every carried task to that project (by project cards by their drops,
+    funnel cards under the lift's filter), the carry ends.
+  - `tasks.endCarry("nowhere" | "dropped" | "naming")`: let go nowhere or cancelled puts the lift's filter back (none
+    included); dropped in a list keeps the screen; the plus let go in the tree keeps the panel out (`reason` `"naming"`)
+    until `tasks.endProjectName()`.
+  - `ProjectsPanel.open` is now true for any reason, `ProjectsPanel.reason` `"button" | "carry" | "naming" | null` says
+    which.
+- **The place is the core's:** `tasks.setFunnelPlace(place)` keeps where the screen stands (anything: an old
+  `"projects"`, the app's old `ribbonPlace` numbers, read by `rules.funnelPlaceOf`: Projects and -1 → Inbox, 0 Inbox, 1
+  Soon, 2 Today, nothing → Today); `FunnelView.place` and `tasks.firstPlace()` (synchronous) read it.
+- `ViewChoice.ribbon`: the screen is the ribbon (two columns, never a note): it swipes, a field moved to a list turns it to
+  that list's place, and Done stands left of Inbox; elsewhere a done find opens on its own page.
+- `FunnelView.searchPaths`: a search opened over the view shows each find's project path (a filter is chosen).
 - A card let go on the project it already has (`dropOnProject`, `dropTasksOnProject`, a by project list) leaves its line
   as it is.
 - Gone (2026-11-12, both frontends moved): `SCREEN_PLACES`, `ScreenPlace`, `ScreenSpot`, `ScreenAt`, `days.stepScreen`,

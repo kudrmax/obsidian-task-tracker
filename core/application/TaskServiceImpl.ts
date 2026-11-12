@@ -34,6 +34,10 @@ import {
 	type FunnelView,
 	type ViewMode,
 	type ViewChoice,
+	type CarryEnd,
+	type CarryPoint,
+	type CarryStart,
+	type CarryWait,
 	type NewTaskPlace,
 	type Placement,
 	type RepeatRule,
@@ -55,6 +59,8 @@ import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type Proj
 import { ProjectIndex, projectTreeOf } from "./projects";
 import { chosenNode, cleared, hovered, panelRows, picked, projectOfNode, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { withMode } from "./viewModes";
+import { carriedAt, carryEnded, carryStarted, nameEnded } from "./projectsCarry";
+import { funnelPlaceOf, type FunnelPlace } from "./screenPlaces";
 import { ProjectTree, type TreePlace } from "../domain/ProjectTree";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
@@ -175,6 +181,44 @@ export class TaskServiceImpl implements TaskService {
 
 	filterHides(item: TaskItem, filter: ProjectsNodeId | null): Promise<boolean> {
 		return this.ask(this.reads.filterHidesRead(item, filter));
+	}
+
+	async startCarry(start: CarryStart, wide: boolean): Promise<void> {
+		const s = await this.snapshotOrNull();
+		this.keepScreen(carryStarted(this.projectsScreenStore.get(), start, wide, s ? projectTreeOf(s.doc) : ProjectTree.EMPTY));
+	}
+
+	async carryAt(at: CarryPoint, nowMs: number): Promise<CarryWait> {
+		const s = await this.snapshotOrNull();
+		const { state, wait } = carriedAt(this.projectsScreenStore.get(), at, nowMs, s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, s?.doc ?? null);
+		this.keepScreen(state);
+		return { wait };
+	}
+
+	async carryOnNode(node: ProjectsNodeId): Promise<void> {
+		const carry = this.projectsScreenStore.get().carry;
+		if (carry?.cards && carry.cards.length > 0) await this.dropOnProject(carry.cards, node);
+		else if (carry && carry.keys.length > 0) await this.dropTasksOnProject(carry.keys, node, carry.under);
+		await this.endCarry("dropped");
+	}
+
+	async endCarry(how: CarryEnd): Promise<void> {
+		const s = await this.snapshotOrNull();
+		this.keepScreen(carryEnded(this.projectsScreenStore.get(), how, s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, s?.doc ?? null));
+	}
+
+	async endProjectName(): Promise<void> {
+		this.keepScreen(nameEnded(this.projectsScreenStore.get()));
+	}
+
+	async setFunnelPlace(place: unknown): Promise<void> {
+		const state = this.projectsScreenStore.get();
+		const at = funnelPlaceOf(place);
+		if (state.place !== at) this.keepScreen({ ...state, place: at });
+	}
+
+	firstPlace(): FunnelPlace {
+		return funnelPlaceOf(this.projectsScreenStore.get().place);
 	}
 
 	async clearProjectFilter(): Promise<void> {
