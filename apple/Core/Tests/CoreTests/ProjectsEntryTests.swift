@@ -2,8 +2,9 @@ import Foundation
 import Testing
 @testable import Core
 
-/// The quick entry on the Projects tab, as the app drives it: the Projects list handed in as a list the field stands in,
-/// so Rename, Add Subtask, the No tasks plate, the plus and a place chosen in the bar all stay on Projects (Max,
+/// The quick entry in the By project view (the Projects tab before 11-12), as the app drives it: the Projects list handed
+/// in as a list the field stands in, so Rename, Add Subtask, the No tasks plate, the plus and a place chosen in the bar
+/// all stay among the projects (Max,
 /// 2026-11-11: «Это должно происходить ровно там, где задача стоит, то есть в проектах»).
 @Suite struct ProjectsEntryTests {
     let core = try! PhoneCore(script: Fixtures.phoneScript)
@@ -19,10 +20,10 @@ import Testing
 
         var view: ProjectsView { try! board.projectsScreen() }
 
-        /// The look the app hands in on the Projects tab: the Projects list as the core gives it, shown alone.
+        /// The look the app hands in By project: the Projects list as the core gives it, shown alone.
         func look() throws -> JSONValue {
             let list = try board.projectsEntryLook(view)
-            let shown: JSONValue = try board.rule("rules.shownEntryLists", ["projects"])
+            let shown: JSONValue = try board.rule("rules.viewEntryLists", ["byProject", "inbox"])
             return ["cards": ["projects": list.cards], "sections": ["projects": list.sections], "parts": ["projects": list.parts], "day": "2026-11-07", "shown": shown]
         }
 
@@ -48,8 +49,8 @@ import Testing
         }
     }
 
-    @Test func theProjectsTabShowsItsOwnListOnly() throws {
-        let shown: [String] = try Driver(core: core).board.rule("rules.shownEntryLists", ["projects"])
+    @Test func byProjectShowsItsOwnListOnly() throws {
+        let shown: [String] = try Driver(core: core).board.rule("rules.viewEntryLists", ["byProject", "soon"])
         #expect(shown == ["projects"])
     }
 
@@ -78,8 +79,6 @@ import Testing
         let move = try driver.call("choosePlace", [["kind": "inbox"]])["value"]
         #expect(move["column"].string == "projects")
         #expect(move["day"].isNull)
-        let place: String = try driver.board.rule("rules.placeShowing", ["projects", "projects"])
-        #expect(place == "projects")
     }
 
     @Test func thePlateTypesInItsPartAndWritesWhereThePartWrites() throws {

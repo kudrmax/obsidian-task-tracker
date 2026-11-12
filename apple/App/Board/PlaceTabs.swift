@@ -7,6 +7,10 @@ import UIKit
 /// search slot never becomes the selected tab.
 struct PlaceTabs: UIViewControllerRepresentable {
     let place: RibbonPlace
+    /// Room the bar leaves at its left for the view button.
+    var leading: CGFloat = 0
+    /// The tabs give way (a view with no ribbon to walk): only the search slot's place is still laid out, for the plus.
+    var hidden = false
     let choose: (RibbonPlace) -> Void
     /// Where the search slot's round button stands on the screen, as the system laid it out.
     let slot: (CGRect) -> Void
@@ -18,6 +22,7 @@ struct PlaceTabs: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ host: TabsHost, context: Context) {
+        host.leading = leading
         update(host.tabs)
     }
 
@@ -25,12 +30,22 @@ struct PlaceTabs: UIViewControllerRepresentable {
         controller.choose = choose
         controller.slot = slot
         controller.show(place)
+        controller.give(way: hidden)
     }
 }
 
 /// Holds the tab bar controller in a view that lets every touch outside the bar through to the ribbon under it.
 final class TabsHost: UIViewController {
     let tabs = TabsController()
+    var leading: CGFloat = 0 {
+        didSet { if leading != oldValue { view.setNeedsLayout() } }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let frame = CGRect(x: leading, y: 0, width: view.bounds.width - leading, height: view.bounds.height)
+        if tabs.view.frame != frame { tabs.view.frame = frame }
+    }
 
     override func loadView() {
         view = PassThroughView()
@@ -41,7 +56,6 @@ final class TabsHost: UIViewController {
         super.viewDidLoad()
         addChild(tabs)
         tabs.view.frame = view.bounds
-        tabs.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(tabs.view)
         tabs.didMove(toParent: self)
     }
@@ -67,6 +81,14 @@ final class TabsController: UITabBarController, UITabBarControllerDelegate {
         tabBarMinimizeBehavior = .never
     }
 
+    /// The tabs hidden and untouchable, or back: the bar stays laid out, so the plus keeps its slot.
+    func give(way: Bool) {
+        let alpha: CGFloat = way ? 0 : 1
+        guard tabBar.alpha != alpha else { return }
+        UIView.animate(withDuration: 0.25) { self.tabBar.alpha = alpha }
+        tabBar.isUserInteractionEnabled = !way
+    }
+
     func show(_ place: RibbonPlace) {
         guard let tab = tabs.first(where: { $0.identifier == String(place.rawValue) }), selectedTab !== tab else { return }
         selectedTab = tab
@@ -81,6 +103,11 @@ final class TabsController: UITabBarController, UITabBarControllerDelegate {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         reportSlot()
+        // The bar lays its own parts out after this pass (the view moved for the view button): told again once it has.
+        DispatchQueue.main.async { [weak self] in
+            self?.tabBar.layoutIfNeeded()
+            self?.reportSlot()
+        }
     }
 
     override func viewDidAppear(_ animated: Bool) {

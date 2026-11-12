@@ -48,8 +48,8 @@ struct BoardScreen: View {
             entrySheet(sheet)
         }
         .sheet(isPresented: Binding(get: { router.capturing }, set: { router.capturing = $0 }), onDismiss: { Task { await model.reloadIfChanged() } }) {
-            // On the Projects tab a new task gets the chosen node's project, as the plus writes it there.
-            CaptureView(focused: router.typing, project: model.place == .projects ? model.projects.view?.newTask?.project : nil)
+            // Under a filter a new task gets the filter's project, as the core says (`ProjectFilter.project`).
+            CaptureView(focused: router.typing, project: model.filter?.project)
         }
         // Settings may have renamed a list or changed a colour: the screen reads again when it closes.
         .sheet(item: $sheet, onDismiss: { Task { await model.reloadIfChanged() } }) { sheet in
@@ -82,30 +82,55 @@ struct BoardScreen: View {
     private var barShown: Bool { !model.selecting && model.fullScreen.isEmpty && !model.entry.isOpen }
 
     /// The system tab bar with its search slot, laid out by iOS; the plus stands on that slot, the same size, so it can be
-    /// carried while the bar keeps the system's layout.
+    /// carried while the bar keeps the system's layout. The view button stands left of the tab bar (board `V1PhoneCols`);
+    /// where the view has no ribbon to walk (Rows, By project) the tab bar gives way and the button stands alone in its
+    /// middle (`ViewChoice.wheel`).
     private var bottomBar: some View {
-        ZStack(alignment: .topLeading) {
-            PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: {
+        let view = model.funnel?.view
+        let wheel = view?.wheel ?? true
+        return GeometryReader { screen in ZStack(alignment: .topLeading) {
+            PlaceTabs(place: model.place, leading: wheel && view != nil ? Self.viewRoom : 0, hidden: !wheel, choose: { model.go(to: $0) }, slot: {
                 plusSlot = $0
                 model.route.floor = $0.minY
             })
             if let slot = plusSlot {
+                if let view {
+                    let size = slot.height
+                    ViewButton(view: view, model: model, size: size)
+                        .position(x: wheel ? Self.viewEdge + size / 2 : screen.size.width / 2, y: slot.midY)
+                }
                 CarriedPlus(model: model, accent: Palette.accent(scheme)) {
-                    // On Projects the plus types where the tab stands, in the part the core marks, and nothing where the core
+                    // By project the plus types where the view stands, in the part the core marks, and nothing where the core
                     // says it opens nothing (a folder, Done); elsewhere the new task's screen.
-                    if model.place == .projects { model.entry.openFromPlus() } else { router.openTyping() }
+                    if model.viewMode == .byProject { model.entry.openFromPlus() } else { router.openTyping() }
                 }
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }
-        }
+        } }
         .ignoresSafeArea()
     }
+
+    /// Where the view button stands from the screen's left edge, and the room the tab bar leaves it.
+    private static let viewEdge: CGFloat = 16
+    private static let viewRoom: CGFloat = 60
 
     @ViewBuilder
     private var content: some View {
         if let snapshot = model.snapshot, !snapshot.screen.missing {
-            Ribbon(snapshot: snapshot, model: model)
+            VStack(alignment: .leading, spacing: 0) {
+                if let filter = snapshot.funnel.filter {
+                    FilterTitle(filter: filter, model: model)
+                        .padding(.bottom, ColumnMetrics.headGap)
+                }
+                switch snapshot.funnel.view.mode {
+                case .rows: RowsView(snapshot: snapshot, model: model)
+                case .byProject: ByProjectView(snapshot: snapshot, model: model)
+                case .twoColumns, .allColumns: Ribbon(snapshot: snapshot, model: model)
+                }
+            }
+                .overlay { ProjectsPanelView(model: model) }
+                .modifier(ProjectsAsks(model: model))
                 .overlay(alignment: .top) { problem }
                 .overlay { if let stack = model.stackShown { TimelineStack(shown: stack, model: model) } }
                 .overlay(alignment: .bottom) { NoteSuggestions(host: model.entry) }
@@ -167,10 +192,17 @@ struct BoardScreen: View {
                 .disabled(model.snapshot?.canUndo != true)
                 .tint(.primary)
         }
-        // Sync and «⋯» stand in one glass group, as iOS 26 groups the trailing items.
+        // Sync, Projects and «⋯» stand in one glass group, as iOS 26 groups the trailing items (Max, 11-12: the projects
+        // button between Sync and «⋯»).
         ToolbarItem(placement: .topBarTrailing) {
             Button("Sync", systemImage: "arrow.triangle.2.circlepath") { Task { await ObsidianSync.shared.start() } }
                 .disabled(ObsidianSync.shared.vault == nil)
+                .tint(.primary)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            // Filled while the panel is out, as a selected toolbar item.
+            Button("Projects", systemImage: model.panelShown ? "folder.fill" : "folder") { Task { await model.toggleProjectsPanel() } }
+                .disabled(model.funnel?.panel == nil || model.entry.isOpen)
                 .tint(.primary)
         }
         ToolbarItem(placement: .topBarTrailing) {
@@ -264,18 +296,13 @@ struct Ribbon: View {
             // As the plugin's screen: Inbox and Soon split the screen in half wherever the divider stands; at Today the
             // divider sets the day list against the calendar, the list's edge gliding there from the half on the way
             // from Soon (`RibbonColumns`, tested: Max asked for this three times).
-            let columns = RibbonColumns(width: Double(width), list: Double(listWidth(width)), done: model.doneShown, projects: true)
+            let columns = RibbonColumns(width: Double(width), list: Double(listWidth(width)), done: model.doneShown)
             let half = CGFloat(columns.half)
             let list = CGFloat(columns.list)
             let dayList = CGFloat(columns.dayList(toToday: Double(toToday)))
             let stops = columns.stops.map { CGFloat($0) }
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
-                    // The Projects page, its own place left of Inbox: the whole screen.
-                    ProjectsPage(model: model)
-                        .frame(width: width)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                        .id(RibbonPlace.projects)
                     if model.doneShown {
                         DoneColumn(model: model)
                             .frame(width: half)
@@ -333,7 +360,7 @@ struct Ribbon: View {
             .onScrollPhaseChange { _, new in
                 phase = new
                 if new == .idle {
-                    // Off the Done column, onto Inbox or Projects: it closes until the next search, the place where it stood.
+                    // Off the Done column, onto Inbox: it closes until the next search, the place where it stood.
                     if model.doneShown, abs(offset - CGFloat(columns.doneStop)) > half / 2 {
                         var instant = Transaction()
                         instant.disablesAnimations = true
@@ -395,7 +422,6 @@ struct Ribbon: View {
     /// Where a place's left edge stands in the ribbon.
     private func stopOf(_ place: RibbonPlace, _ columns: RibbonColumns) -> CGFloat {
         switch place {
-        case .projects: 0
         case .inbox: CGFloat(columns.lead)
         case .soon: CGFloat(columns.lead + columns.half)
         case .today: CGFloat(columns.lead + columns.width)
@@ -556,7 +582,7 @@ private struct BulkRead: Equatable {
 
 /// The ribbon's own scroll view, reached from inside it: SwiftUI keeps no switch for these.
 /// - It stops at Inbox and at Today as it stops at Soon: no rubber band past its ends that the places between have not.
-/// - At Today a sideways swipe that the core's `days.stepScreen` leads to another day's calendar carries the day, as the
+/// - At Today a sideways swipe that the core's `days.stepFunnel` leads to another day's calendar carries the day, as the
 ///   plugin's swipe does: the ribbon stays, the day slides under the finger (`BoardModel.followDaySwipe`), and let go it
 ///   runs on or springs back. Any other swipe is the ribbon's own paging, which waits for this one to decline.
 private struct RibbonHooks: UIViewRepresentable {

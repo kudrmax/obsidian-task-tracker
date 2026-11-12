@@ -78,12 +78,15 @@ import Testing
     @Test func aSwipeOnTheCalendarLeadsWhereTheCoreSays() throws {
         let board = board(FakeVault(Self.file))
         let files = board.settingsOnly(now: Fixtures.date(6, 10))
-        let on: JSONValue = try board.read("days.stepScreen", [["mode": "calendar", "date": "2026-11-06"], 1], over: files)
+        let on: JSONValue = try board.read("days.stepFunnel", [["mode": "calendar", "date": "2026-11-06"], 1], over: files)
         #expect(on == ["mode": "calendar", "date": "2026-11-07"])
-        let back: JSONValue = try board.read("days.stepScreen", [["mode": "calendar", "date": "2026-11-06"], -1], over: files)
+        let back: JSONValue = try board.read("days.stepFunnel", [["mode": "calendar", "date": "2026-11-06"], -1], over: files)
         #expect(back == ["mode": "soon", "date": "2026-11-06"])
-        let walk: JSONValue = try board.read("days.stepScreen", [["mode": "calendar", "date": "2026-11-08"], -1], over: files)
+        let walk: JSONValue = try board.read("days.stepFunnel", [["mode": "calendar", "date": "2026-11-08"], -1], over: files)
         #expect(walk == ["mode": "calendar", "date": "2026-11-07"])
+        // Nothing stands before Inbox: Projects are a panel, no place of the funnel.
+        let first: JSONValue = try board.read("days.stepFunnel", [["mode": "inbox", "date": "2026-11-06"], -1], over: files)
+        #expect(first == .null)
     }
 
     @Test func aSectionMovesWhereTheCorePlacesItsSlot() throws {

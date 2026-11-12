@@ -3,14 +3,13 @@ import SwiftUI
 import UIKit
 import os
 
-/// The places of the ribbon the tab bar switches: the Projects page, the whole screen, then three of two half-screen
-/// columns each. Projects' raw value keeps the places saved before it came.
+/// The places of the ribbon the tab bar switches: three of two half-screen columns each. The Projects page that stood left
+/// of Inbox until 11-12 is a panel now (`ProjectsPanelView`); a place kept from then (-1) opens Today.
 enum RibbonPlace: Int, Hashable, CaseIterable {
-    case projects = -1, inbox = 0, soon, today
+    case inbox = 0, soon, today
 
     var title: LocalizedStringKey {
         switch self {
-        case .projects: "Projects"
         case .inbox: "Inbox"
         case .soon: "Soon"
         case .today: "Today"
@@ -20,17 +19,15 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
     /// The words the tab bar shows.
     var name: String {
         switch self {
-        case .projects: String(localized: "Projects")
         case .inbox: String(localized: "Inbox")
         case .soon: String(localized: "Soon")
         case .today: String(localized: "Today")
         }
     }
 
-    /// The core's name of the place (`SCREEN_PLACES`): Today is the calendar's; Projects shows no list of the funnel.
+    /// The core's name of the place (`FUNNEL_PLACES`): Today is the calendar's.
     var key: String {
         switch self {
-        case .projects: "projects"
         case .inbox: "inbox"
         case .soon: "soon"
         case .today: "calendar"
@@ -55,7 +52,6 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
 
     var symbol: String {
         switch self {
-        case .projects: "folder"
         case .inbox: "tray"
         case .soon: "hourglass"
         case .today: "sun.max"
@@ -150,6 +146,76 @@ final class BoardModel {
     func go(to place: RibbonPlace) {
         self.place = place
         asked = PlaceAsk(place: place)
+    }
+
+    // MARK: Projects and the view
+
+    /// The funnel's view the screen was read with: the filter, the view mode, the panel (`tasks.funnelView`).
+    var funnel: FunnelView? { snapshot?.funnel }
+    /// How the lists are laid out now, the core's.
+    var viewMode: ViewMode { funnel?.view.mode ?? .twoColumns }
+    /// The node every list is filtered by.
+    var filter: ProjectFilter? { funnel?.filter }
+
+    /// The panel brought out by a card held at the screen's left edge: the gesture's own, never kept on the device.
+    var panelHeld = false
+    /// The projects' panel shows: the button opened it, or a carry brought it out.
+    var panelShown: Bool { funnel?.panel?.open == true || panelHeld }
+
+    /// How tall each list's rows stand: the Rows view stacks the lists at these heights (`StackedRows`).
+    private(set) var listRows: [BoardColumn: CGFloat] = [:]
+
+    func listContent(_ column: BoardColumn, _ height: CGFloat) {
+        guard abs((listRows[column] ?? -1) - height) > 0.5 else { return }
+        listRows[column] = height
+    }
+
+    /// A card or the plus held at the screen's left edge brings the panel out, so it can be let go on a row; it stays out
+    /// until the carry ends. A lifted section or project never does.
+    func carryHeld(at point: CGPoint, carrying payload: DragPayload?) {
+        guard !panelHeld, point.x < Self.panelEdge else { return }
+        if let payload, payload.isSection || payload.isProject { return }
+        UISelectionFeedbackGenerator().selectionChanged()
+        panelHeld = true
+    }
+
+    /// How near the screen's left edge a carry brings the panel out.
+    static let panelEdge: CGFloat = 24
+
+    /// The projects button: the panel opened or closed, kept on the device.
+    func toggleProjectsPanel() async {
+        let open = !(funnel?.panel?.open ?? false)
+        await viewCall { try $0.setProjectsPanel(open) }
+    }
+
+    /// A tap on a row of the panel: chosen and the panel closed (the core's), or, chosen already, folded.
+    func pickProjectNode(_ node: String) async {
+        UISelectionFeedbackGenerator().selectionChanged()
+        await viewCall { try $0.pickProjectNode(node) }
+    }
+
+    /// The cross beside the filter's title: every task shows again.
+    func clearProjectFilter() async {
+        await viewCall { try $0.clearProjectFilter() }
+    }
+
+    /// A mode picked in the view button's menu.
+    func setViewMode(_ mode: ViewMode) async {
+        guard mode != viewMode else { return }
+        await viewCall { try $0.setViewMode(mode) }
+    }
+
+    /// A call that changes only this device's view (the filter, the panel, the mode, a fold), then the screen read again
+    /// with it; By project reads its own list too.
+    func viewCall(_ call: @escaping @Sendable (TaskBoard) throws -> Void) async {
+        let board = board
+        do {
+            try await Task.detached { try call(board) }.value
+        } catch {
+            problem(error)
+        }
+        await reload()
+        if viewMode == .byProject { await projects.read() }
     }
     private(set) var snapshot: BoardSnapshot? {
         didSet {
@@ -413,7 +479,7 @@ final class BoardModel {
         let date: String
     }
 
-    /// The finger starts carrying the day `shift` way when the core's `days.stepScreen` leads from this day's calendar to
+    /// The finger starts carrying the day `shift` way when the core's `days.stepFunnel` leads from this day's calendar to
     /// another day's (any other answer, Soon or the row's end, is the ribbon's own paging). Asked as the finger starts, so
     /// a swipe never pages the ribbon where the core leads to a day; the day comes in under the finger as the arrows bring
     /// it, the one read ahead, or read now when it is not yet.
@@ -434,7 +500,7 @@ final class BoardModel {
         swipeSign = 1
         swipeBase = 0
         let from: JSONValue = ["mode": "calendar", "date": .string(snapshot.day)]
-        guard let at = try? board.read("days.stepScreen", [from, .number(Double(shift))], over: board.settingsOnly()).decode(ScreenAt.self),
+        guard let at = try? board.read("days.stepFunnel", [from, .number(Double(shift))], over: board.settingsOnly()).decode(ScreenAt.self),
               at.mode == "calendar" else { return false }
         // A text being typed is finished first, written for the day it was typed on, as before the arrows turn the day.
         if entry.isOpen || entry.writing {
@@ -624,7 +690,11 @@ final class BoardModel {
             go(to: .inbox)
         }
         await reload()
+        // A task the filter hides is shown with every task again: the find is never left out of sight.
+        if filter != nil, snapshot?.item(item.id) == nil, snapshot?.screen.done.contains(where: { $0.id == item.id }) != true { await clearProjectFilter() }
         if place.list == "done" {
+            // The Done column stands left of Inbox in the ribbon only: in another view the find opens on its own page.
+            guard viewMode == .twoColumns else { return await openFullScreen(item) }
             await openDone()
             found = doneCards.first { $0.item.id == item.id }?.id
             return
@@ -851,16 +921,15 @@ final class BoardModel {
         return (try? await Task.detached { try board.cards(rows) }.value) ?? []
     }
 
-    /// What a tap on a card's folder mark does: the Projects page opens on the task's project, the branches above it open.
+    /// What a tap on a card's folder mark does: the screen is filtered by the task's project, the branches above it open.
     func projectOpener(_ item: TaskItem) -> (() -> Void)? {
         guard let project = item.project, project.mark else { return nil }
         return { [weak self] in self?.openProject(project) }
     }
 
-    /// The Projects page on `project`: chosen, with the branches above it opened (`tasks.selectProjectNode`).
+    /// The screen filtered by `project`: chosen, with the branches above it opened (`tasks.selectProjectNode`).
     func openProject(_ project: ProjectRef) {
         fullScreen = []
-        go(to: .projects)
         Task { await projects.select(project.name) }
     }
 
@@ -1106,6 +1175,7 @@ final class BoardModel {
     /// The carry ended, its copy down, whatever came of it: once, and only the carry under way.
     func endCarry(_ token: Int) {
         guard carries.end(token) else { return }
+        if panelHeld { panelHeld = false }
         arriving = []
         previews.clear()
         if readAfterDrop {
@@ -1424,7 +1494,7 @@ final class BoardModel {
         arriving = Set(preview.landings.prefix(1).map(\.id))
         showPreview(preview.snapshot, landed: true)
         if !carry.group.isEmpty { endSelection() }
-        writeDrop("tasks.drop", [carry.dropped, to, .string(snapshot.day)])
+        writeDrop("tasks.drop", [carry.dropped, to, .string(snapshot.day), snapshot.filter.json])
         return .landed(preview.landings.first)
     }
 

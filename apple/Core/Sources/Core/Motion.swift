@@ -283,7 +283,7 @@ extension TaskBoard {
     /// Where `tasks.drop` with the same arguments will leave each task, over the text `snapshot` was drawn from: asked
     /// in the frame of the drop, it reads no file and never waits for a read on another thread. Nothing is written.
     public func landing(_ tasks: JSONValue, to: JSONValue, over snapshot: BoardSnapshot, now: Date = Date()) throws -> [DropLanding] {
-        try answer("tasks.landing", [tasks, to, .string(snapshot.day)], drawnFrom: snapshot.tasksText, settingsJSON: snapshot.settingsJSON, now: now).decode([DropLanding].self)
+        try answer("tasks.landing", [tasks, to, .string(snapshot.day), snapshot.filter.json], drawnFrom: snapshot.tasksText, settingsJSON: snapshot.settingsJSON, now: now).decode([DropLanding].self)
     }
 
     /// The box a timeline landing's card takes in the stack the core lays out with the day's blocks after the drop.

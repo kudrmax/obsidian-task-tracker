@@ -45,6 +45,9 @@ enum DrawnRow: Hashable {
     case field(id: String, level: Int, branch: Branch?, section: Bool)
     /// Where the plus carried over the list would open its field.
     case plusRoom
+    /// The No tasks plate of a list with nothing in it, where the screen shows every list as a stage (Rows) or a filter
+    /// leaves it empty: the filter's words (`ProjectFilter.emptyLabel`).
+    case vacant(String?)
 
     var id: String {
         switch self {
@@ -54,6 +57,7 @@ enum DrawnRow: Hashable {
         case .pending(let key, _, _, _): key
         case .field(let id, _, _, _): id
         case .plusRoom: "\u{0}plus"
+        case .vacant: "\u{0}vacant"
         }
     }
 
@@ -62,7 +66,7 @@ enum DrawnRow: Hashable {
         switch self {
         case .card(let card): card.level
         case .pending(_, _, let level, _), .field(_, let level, _, _): level
-        case .header, .plate, .plusRoom: nil
+        case .header, .plate, .plusRoom, .vacant: nil
         }
     }
 
@@ -80,7 +84,7 @@ enum DrawnRow: Hashable {
         switch self {
         case .header: ColumnMetrics.groupHead
         case .card(let card): card.listHeight
-        case .plate, .plusRoom: CardMetrics.height
+        case .plate, .plusRoom, .vacant: CardMetrics.height
         case .pending, .field: nil
         }
     }
@@ -169,11 +173,20 @@ final class ListHostView: UIView {
         // The rows' height changes after the list is laid out: the soft edges follow what is now above and below, or a
         // list that came to run on past its bottom faded nothing there and its last row read as cut.
         sized = collection.observe(\.contentSize, options: [.new]) { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.edges() }
+            MainActor.assumeIsolated {
+                self?.edges()
+                self?.told()
+            }
         }
     }
 
     private var sized: NSKeyValueObservation?
+    /// Told how tall the rows stand, the room after the last left out: the Rows view gives each list its height.
+    var onContent: ((CGFloat) -> Void)?
+
+    private func told() {
+        onContent?(max(0, collection.contentSize.height - ListCollection.trailingRoom))
+    }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not from a storyboard") }
@@ -237,6 +250,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         collection.keyboardDismissMode = .none
         host = ListHostView(collection: collection)
         super.init()
+        host.onContent = { [weak model, column] height in model?.listContent(column, height) }
         let cell = UICollectionView.CellRegistration<RowCell, String> { [weak self] cell, _, id in
             guard let self, let model = self.model, let drawn = self.drawn[id] else { return }
             let column = self.column
@@ -408,6 +422,9 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         // At the end, or in a section the list doesn't draw (a day with no task yet has none): the field stands last.
         if entry?.at.kind == "end" || entry?.at.kind == "in" && !list.groups.indices.contains(entry?.at.section ?? 0) { rows += typed }
         if let plusRoom { rows.insert(.plusRoom, at: min(max(0, plusRoom), rows.count)) }
+        if rows.isEmpty, let funnel = model.drawing?.funnel, funnel.filter != nil || funnel.view.mode == .rows {
+            rows.append(.vacant(funnel.filter?.emptyLabel))
+        }
         let folded = list.cards.contains { model.isFolded($0) }
         return entry == nil && plusRoom == nil && !folded ? rows : branched(rows, model: model)
     }
@@ -970,6 +987,8 @@ struct ListRowContent: View {
             EntryRow(level: level, branch: branch) { PendingCapsule(text: text) }
         case .field(_, let level, let branch, let section):
             EntryRow(level: level, branch: branch) { EntryCapsule(host: model.entry, section: section) }
+        case .vacant(let label):
+            EmptyPlate(hot: model.isTitleLit(column), open: { model.entry.openIn(column.rawValue, nil) }, label: label)
         case .plusRoom:
             // Where a carried section would go (`.tc-group-drop`): a dashed card's room before a header or at the end.
             DashedPlace().frame(height: CardMetrics.height).accessibilityHidden(true)
