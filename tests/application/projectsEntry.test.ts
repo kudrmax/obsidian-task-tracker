@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type EntryList, type ListCard, projectsEntryLook, projectsPlusTakes, type ProjectsView, QuickEntrySession, viewEntryLists, type TaskItem, type WriteLine } from "../../core/application/contracts";
+import { type EntryList, type ListCard, projectsEntryLook, projectsPlusPlace, projectsPlusTakes, type ProjectsView, QuickEntrySession, viewEntryLists, type TaskItem, type WriteLine } from "../../core/application/contracts";
 import { callDoor } from "../../core/application/PhoneCalls";
 import { memoryProjectsScreen, type Clock } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
@@ -217,6 +217,28 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 		await s.entry.idle();
 		expect(s.titles(null)).toEqual(["Inbox A", "Typed", "Back A", "Back B", "\tChild", "Soon A", "Now A"]);
 		expect(s.entry.state).toMatchObject({ spot: { column: "projects", place: { group: null, index: at("Back A") } } });
+	});
+
+	/** QA 2026-11-12: the plus let go in the middle of a part: the drop line, the field and the card stand at one spot. */
+	it("the plus let go between a part's cards snaps to where the card will land: the line's place, the field, the card", async () => {
+		const s = await projectsScreen();
+		const at = (title: string) => projectsEntryLook(s.view()).cards.findIndex((c) => c.key.raw === s.item(title).key.raw);
+		const middle = { kind: "task", group: null, before: s.item("Soon A").key } as const;
+		expect(projectsPlusPlace(s.view(), middle)).toEqual({ kind: "task", group: null, before: s.item("Back A").key });
+		s.entry.openAt("projects", middle);
+		expect(s.entry.state).toMatchObject({ spot: { column: "projects", place: { group: null, index: at("Back A") } } });
+		s.entry.type("Typed");
+		s.entry.enter();
+		await s.entry.idle();
+		expect(s.titles(null)).toEqual(["Inbox A", "Typed", "Back A", "Back B", "\tChild", "Soon A", "Now A"]);
+	});
+
+	it("where the plus may not be let go there is no place; under a card the place stays", async () => {
+		const s = await projectsScreen("project:Work", "byProject", FILE.replace("- Q\n", "- Q\n- Work 🗃️\n\t- Sub2\n").replace("- [ ] Inbox loose", "- [ ] Inbox loose\n- [ ] By hand 🗂️ Work"));
+		expect(projectsPlusPlace(s.view(), { kind: "task", group: null, before: null })).toBeNull();
+		const p = await projectsScreen();
+		const under = { kind: "subtask", parent: p.item("Back A").key, before: null } as const;
+		expect(projectsPlusPlace(p.view(), under)).toEqual(under);
 	});
 
 	it("a part's end for a stage it has no card of: after the stages before it", async () => {

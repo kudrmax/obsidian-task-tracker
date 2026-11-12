@@ -450,6 +450,10 @@ adds to the calls above; the old ones answer as before.
 - `rules.sameNewPlace(a, b)` → boolean: two places for a new task are the same, field by field (any key order). Example:
   `rules.sameNewPlace({ kind: "list", list: "inbox", group: null, before: null }, { before: null, group: null, list:
   "inbox", kind: "list" })` → `true`.
+- `rules.projectsPlusPlace(view, place)` → `ListPlace` or null: where the plus let go at `place` of the by project list
+  stands: between cards anywhere in a part, the place its card lands (before `end`, else the part's end); under a task,
+  there; null where `rules.projectsPlusTakes` is false. Draw the plus's drop line at it. The quick entry snaps the field
+  there itself.
 - `rules.projectsEntryLook(view)`'s `parts` add `end` (a `TaskKey` or null): the card a field opened at that part's end
   stands before, so the written card lands where the field was; the quick entry (`entry.*`) uses it when the look's
   parts carry it, so hand the parts in as the rule gives them.
