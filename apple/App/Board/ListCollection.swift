@@ -815,7 +815,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     private var plusRoom: Int?
 
     func takes(_ payload: DragPayload?) -> Bool {
-        guard let payload, !payload.isProject else { return payload == nil }
+        guard let payload, !payload.isProject else { return payload == nil && model?.drawing?.funnel.plus.list == "funnel" }
         guard payload.isSection else { return true }
         return payload.from == column.rawValue
     }

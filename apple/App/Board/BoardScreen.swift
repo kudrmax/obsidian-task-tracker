@@ -102,7 +102,7 @@ struct BoardScreen: View {
                 CarriedPlus(model: model, accent: Palette.accent(scheme)) {
                     // By project the plus types where the view stands, in the part the core marks, and nothing where the core
                     // says it opens nothing (a folder, Done); elsewhere the new task's screen.
-                    if model.viewMode == .byProject { model.entry.openFromPlus() } else { router.openTyping() }
+                    if model.funnel?.plus.tap == "inPlace" { model.entry.openFromPlus() } else { router.openTyping() }
                 }
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)

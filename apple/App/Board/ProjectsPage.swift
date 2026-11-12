@@ -480,7 +480,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     /// list where it may go to a project (`canDrop`); a project lifted here; the plus.
     func takes(_ payload: DragPayload?) -> Bool {
         guard model?.panelShown == true else { return false }
-        guard let payload else { return true }
+        guard let payload else { return model?.funnel?.plus.tree == true }
         switch payload.kind {
         case .card(let card): return projects?.cards[card.id].map(\.canDrop) ?? true
         case .project: return true
@@ -652,7 +652,7 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     var scrolls: UIScrollView? { scroll }
 
     /// The plus alone: a card stays where it is shown, let go here.
-    func takes(_ payload: DragPayload?) -> Bool { payload == nil && model?.viewMode == .byProject && model?.panelShown != true }
+    func takes(_ payload: DragPayload?) -> Bool { payload == nil && model?.funnel?.plus.list == "projects" }
 
     /// Where the plus is held: the part let go in is read from it.
     private var held: CGPoint?
