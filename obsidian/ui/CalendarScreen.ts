@@ -119,8 +119,9 @@ export class CalendarScreen extends Component {
 	private panel: TreePanel | null = null;
 	/** The panel slid out on the phone by a card held at the left edge, for that drag alone. */
 	private revealed = false;
-	/** The view before the first read answers. */
+	/** The view and the place before the first read answers. */
 	private firstView: ViewChoice | null = null;
+	private firstPlace: RightMode | null = null;
 	/** A new project's name is typed in the tree: a panel the plus slid out stays out until it is. */
 	private namingProject = false;
 	/** The projects button at the top left: it opens and closes the panel. */
@@ -522,7 +523,7 @@ export class CalendarScreen extends Component {
 				return filter && { node: filter.node, project: filter.project };
 			},
 			turnTo: (column) => {
-				if (column !== "projects" && this.viewMode() === "twoColumns") this.switcher?.show(funnelPlaceShowing(column, this.place()));
+				if (column !== "projects" && this.view().ribbon) this.switcher?.show(funnelPlaceShowing(column, this.place()));
 			},
 			showDay: (date) => {
 				this.select(date);
@@ -730,8 +731,9 @@ export class CalendarScreen extends Component {
 		void this.data.selectDay();
 	}
 
+	/** The place the window stands at: one a swipe or the wheel has just brought it to, else the core's (`FunnelView.place`). */
 	private mode(): RightMode {
-		return this.shownMode ?? this.settings.rightMode;
+		return this.shownMode ?? this.data.funnel?.place ?? (this.firstPlace ??= this.deps.tasks.firstPlace());
 	}
 
 	/**
@@ -743,7 +745,7 @@ export class CalendarScreen extends Component {
 		const root = this.contentEl;
 		const from = { mode: this.place(), date: this.selectedDate };
 		/** The day's swipe is the two columns' own: in another mode, and in a note's block, the day turns by its arrows (decision 17). */
-		if (this.where.note || this.viewMode() !== "twoColumns") return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
+		if (!this.view().ribbon) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		const to = this.deps.days.stepFunnel(from, shift);
 		if (!to) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		if (to.mode !== from.mode) {
@@ -885,14 +887,14 @@ export class CalendarScreen extends Component {
 		}
 		this.shownMode = mode;
 		this.showPlace(this.place());
-		await this.deps.settings.set({ rightMode: mode });
+		await this.act(() => this.deps.tasks.setFunnelPlace(mode));
 		if (this.shownMode === mode) this.shownMode = null;
 		this.parts.request("frame");
 	}
 
 	/** The classes of a place; in a mode with no wheel the lists stand as at the calendar, which every other mode draws over. */
 	private showPlace(place: Place): void {
-		const shown = this.viewMode() === "twoColumns" ? place : "calendar";
+		const shown = this.view().ribbon ? place : "calendar";
 		this.contentEl.classList.toggle("is-lists", shown === "soon");
 		this.contentEl.classList.toggle("is-inbox", shown === "inbox" || shown === "done");
 		this.contentEl.classList.toggle("is-done", shown === "done");
@@ -935,7 +937,7 @@ export class CalendarScreen extends Component {
 				root: this.contentEl,
 				tasks: this.deps.tasks,
 				desktop: !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
-				paths: this.filterNode() !== null,
+				paths: this.data.funnel?.searchPaths ?? false,
 				...(sheet && { sheet }),
 				sectionName: (section) => this.deps.tasks.listName(section),
 				onPick: (hit) => {
@@ -962,7 +964,7 @@ export class CalendarScreen extends Component {
 		if (await this.deps.tasks.filterHides(item, this.filterNode())) await this.act(() => this.deps.tasks.clearProjectFilter());
 		this.found.mark(item);
 		const place: Place = screen.kind === "day" ? "calendar" : PLACE_OF_LIST[screen.list];
-		if (place === "done" && this.viewMode() !== "twoColumns") return this.openFull(item, false);
+		if (place === "done" && !this.view().ribbon) return this.openFull(item, false);
 		this.atDone = place === "done";
 		if (screen.kind === "day" && screen.date !== this.selectedDate) this.select(screen.date);
 		if (place === "done") this.switcher?.show("done");
