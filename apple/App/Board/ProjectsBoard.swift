@@ -13,6 +13,8 @@ final class ProjectsBoard {
     @ObservationIgnored weak var model: BoardModel?
 
     private(set) var view: ProjectsView?
+    /// The list drawn as the core answered it.
+    @ObservationIgnored private(set) var raw: JSONValue = .null
     /// The view's context the list drawn was read in: a list read for another node or mode is not shown.
     private(set) var shownContext: String?
     /// The chosen node's parts as drawn: each part's cards painted as a list paints them, with the stage or the subproject.
@@ -109,9 +111,9 @@ final class ProjectsBoard {
 
     /// The By project list of `view` read now, off the main thread, when the view reads it and it is not the one drawn;
     /// handed to the drawing of that view (`follow`).
-    func prefetch(_ view: FunnelView) async {
+    func prefetch(_ view: FunnelView, file: String?? = nil) async {
         guard let model, case .projects(let node) = FunnelPresentation(view).source else { return }
-        let key = ReadKey(node: node, file: model.snapshot?.tasksText, context: view.view.context)
+        let key = ReadKey(node: node, file: file ?? model.snapshot?.tasksText, context: view.view.context)
         guard key != drawnKey, let read = await Self.fetch(board, screen: model.menuScreen, node: node) else { return }
         prefetched = (key, read)
     }
@@ -146,6 +148,8 @@ final class ProjectsBoard {
     /// The page as read once: the view, its parts' rows painted, their menus, and the list as the quick entry reads it.
     struct Read: Sendable {
         let view: ProjectsView
+        /// The view as the core answered it: what its rules over the list take (`rules.projectsTakes`).
+        let raw: JSONValue
         let rows: [[BoardCard]]
         let froms: [String: String]
         let entryLook: ProjectsEntryLook
@@ -154,7 +158,8 @@ final class ProjectsBoard {
     /// The page read off the main thread; nil when the files cannot be read.
     static func fetch(_ board: TaskBoard, screen: JSONValue, node: String?) async -> Read? {
         try? await Task.detached(operation: { () throws -> Read in
-            let view = try board.projectsScreen(node: node)
+            let raw: JSONValue = try board.read("tasks.projectsScreen", node.map { [.string($0)] } ?? [], over: try board.files())
+            let view = try raw.decode(ProjectsView.self)
             var drawn: [[BoardCard]] = []
             var froms: [String: String] = [:]
             for section in view.sections {
@@ -162,13 +167,14 @@ final class ProjectsBoard {
                 drawn.append(zip(section.rows, painted).map { Self.card($0.1, as: $0.0) })
                 for row in section.rows where froms[row.item.id] == nil { froms[row.item.id] = row.card?.menuFrom ?? "list" }
             }
-            return Read(view: view, rows: drawn, froms: froms, entryLook: try board.projectsEntryLook(view))
+            return Read(view: view, raw: raw, rows: drawn, froms: froms, entryLook: try board.projectsEntryLook(view))
         }).value
     }
 
     /// A read drawn, in the transaction the caller draws it in (the quick entry's line ending with its card).
     func draw(_ read: Read) {
         froms = read.froms
+        raw = read.raw
         menus = [:]
         cards = Dictionary(read.view.sections.flatMap(\.cards).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         entryLook = read.entryLook

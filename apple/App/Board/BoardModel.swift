@@ -379,6 +379,11 @@ final class BoardModel {
                 // quick picks never show a filter passed by.
                 guard shownDay == day, epoch == viewEpoch else { readAgain = true; continue }
                 if readAgain { continue }
+                // A view first shown that reads By project's list (the first screen, another context) draws it in the
+                // same drawing as the screen: read now, before. The same view changed keeps its list until the new one.
+                if case .projects = read.presentation.source, snapshot?.funnel.view.context != read.funnel.view.context {
+                    await projects.prefetch(read.funnel, file: read.tasksText)
+                }
                 show(read, serial: serial)
                 problem = nil
             } catch {
@@ -1959,7 +1964,11 @@ final class BoardModel {
         // Only the calendar the board draws is laid out: a view still holding the day a turn left (drawn once more in the
         // turn's own transaction) asks for a stack that, come back, would replace the new day's and slide it in again.
         if laid?.hour != hour, timeline == drawing?.timeline { layOut(timeline, hour: hour) }
-        guard let laid else { return Self.scaled(timeline.slots, from: CGFloat(CardMetrics.timeline.hour), to: hour) }
+        guard let laid else {
+            // Nothing laid out for this calendar yet (the first screen, the zoom just known): the core's stack now, the
+            // same the layout under way will keep, so the first frame shows every block where it stays.
+            return (try? board.stack(timeline, measures: Self.measures(hour), pure: true)) ?? Self.scaled(timeline.slots, from: CGFloat(CardMetrics.timeline.hour), to: hour)
+        }
         return laid.hour == hour ? laid.slots : Self.scaled(laid.slots, from: laid.hour, to: hour)
     }
 
