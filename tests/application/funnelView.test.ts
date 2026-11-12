@@ -200,7 +200,7 @@ describe("the No tasks plate", () => {
 });
 
 describe("the view before the first read", () => {
-	it("is the device's: two columns at first, a kept mode, rows with a node chosen and in a note", async () => {
+	it("is the device's: two columns at first, the kept mode with a node chosen or not, rows in a note", async () => {
 		const { svc } = setup();
 		expect(svc.firstView(true, false)).toMatchObject({ mode: "twoColumns", wheel: true });
 		expect(svc.firstView(false, true)).toMatchObject({ mode: "rows" });
@@ -208,6 +208,7 @@ describe("the view before the first read", () => {
 		expect(svc.firstView(true, false).mode).toBe("allColumns");
 		expect(svc.firstView(false, false).mode).toBe("twoColumns");
 		await svc.pickProjectNode(STYLE, true);
+		expect(svc.firstView(true, false).mode).toBe("allColumns");
 		expect(svc.firstView(true, false)).toEqual((await svc.funnelView(true)).view);
 	});
 });
@@ -236,29 +237,77 @@ describe("the funnel's view", () => {
 		expect(view.panel!.docked).toBe(false);
 	});
 
-	it("a pick filters by the node: its title and menu, the cross, rows by default and By project offered", async () => {
+	it("a pick filters by the node: its title and menu, the cross, the mode kept and By project offered", async () => {
 		const { svc } = setup();
 		await svc.pickProjectNode(STYLE, true);
 		const view = await svc.funnelView(true);
 		expect(view.filter).toMatchObject({ node: STYLE, title: "Стиль, внешность", clearable: true, project: "Стиль, внешность", emptyLabel: "No tasks" });
 		expect(view.filter!.menu?.project.name).toBe("Стиль, внешность");
-		expect(view.view).toMatchObject({ mode: "rows", wheel: false, icon: "rows-3", rows: ["inbox", "backlog", "soon", "day"] });
+		expect(view.view).toMatchObject({ mode: "twoColumns", wheel: true, icon: "columns-2", rows: [] });
+		await svc.setViewMode("rows");
+		expect((await svc.funnelView(true)).view).toMatchObject({ mode: "rows", wheel: false, icon: "rows-3", rows: ["inbox", "backlog", "soon", "day"] });
 		expect(view.view.modes.map((m) => m.mode)).toEqual(["twoColumns", "allColumns", "rows", "byProject"]);
 		expect(view.panel!.rows.filter((r) => r.selected).map((r) => r.title)).toEqual(["Стиль, внешность"]);
 	});
 
-	it("keeps a mode for the plain screen and another for a filtered one", async () => {
-		const { svc } = setup();
+	/** Max, 2026-11-12: the view mode is one choice, «независимое решение»; picking or clearing a project never changes it. */
+	it("keeps one mode: only the view button changes it, never a pick or a clear", async () => {
+		const { svc, state } = setup();
 		await svc.setViewMode("allColumns");
 		await svc.pickProjectNode(STYLE, true);
-		expect((await svc.funnelView(true)).view.mode).toBe("rows");
-		await svc.setViewMode("byProject");
-		expect((await svc.funnelView(true)).view.mode).toBe("byProject");
+		expect((await svc.funnelView(true)).view.mode).toBe("allColumns");
 		await svc.clearProjectFilter();
-		const plain = await svc.funnelView(true);
-		expect(plain.filter).toBeNull();
-		expect(plain.view.mode).toBe("allColumns");
-		expect((await svc.funnelView(false)).view.mode).toBe("twoColumns");
+		expect((await svc.funnelView(true)).view.mode).toBe("allColumns");
+		await svc.pickProjectNode(STYLE, true);
+		await svc.setViewMode("rows");
+		await svc.clearProjectFilter();
+		expect((await svc.funnelView(true)).view.mode).toBe("rows");
+		expect(state.get().view).toBe("rows");
+		expect((await svc.funnelView(false)).view.mode).toBe("rows");
+	});
+
+	it("a mode the screen doesn't offer shows as two columns, and is back where it is offered", async () => {
+		const { svc } = setup();
+		await svc.pickProjectNode(STYLE, true);
+		await svc.setViewMode("byProject");
+		await svc.clearProjectFilter();
+		expect((await svc.funnelView(true)).view.mode).toBe("twoColumns");
+		await svc.pickProjectNode(STYLE, true);
+		expect((await svc.funnelView(true)).view.mode).toBe("byProject");
+	});
+
+	it("reads a device's old state with a filtered mode as the one mode, and drops it once a mode is picked", async () => {
+		const { svc, state } = setup();
+		state.set({ selected: STYLE, view: "allColumns", filteredView: "byProject" } as never);
+		expect((await svc.funnelView(true)).view.mode).toBe("allColumns");
+		await svc.setViewMode("rows");
+		expect(state.get()).not.toHaveProperty("filteredView");
+		expect(state.get().view).toBe("rows");
+	});
+
+	it("names its context, the filter and the mode: another context is drawn still, the same one changed moves", async () => {
+		const { svc } = setup();
+		const plain = (await svc.funnelView(true)).view.context;
+		expect((await svc.funnelView(true)).view.context).toBe(plain);
+		await svc.pickProjectNode(STYLE, true);
+		const style = (await svc.funnelView(true)).view.context;
+		expect(style).not.toBe(plain);
+		await svc.setViewMode("rows");
+		const rows = (await svc.funnelView(true)).view.context;
+		expect(rows).not.toBe(style);
+		expect(svc.firstView(true, false).context).toBe(rows);
+		const note = (await svc.projectNoteView("Заметки/Стиль.md", true))!.view.context;
+		expect(note).not.toBe(rows);
+		expect(svc.firstView(true, true).context).toBe(note);
+	});
+
+	it("carries its layout: two columns turned by pages, rows standing still", async () => {
+		const { svc } = setup();
+		expect((await svc.funnelView(true)).view.layout).toMatchObject({ mode: "twoColumns", swipe: "pages" });
+		expect((await svc.funnelView(true)).view.layout.columns[0].lists.map((l) => l.title)).toEqual(["Inbox", "Backlog"]);
+		await svc.setViewMode("rows");
+		expect((await svc.funnelView(true)).view.layout).toMatchObject({ mode: "rows", swipe: "none", stack: { scrolls: true } });
+		expect((await svc.projectNoteView("Заметки/Стиль.md", true))!.view.layout).toMatchObject({ swipe: "none", divider: false, stack: { scrolls: false } });
 	});
 
 	it("All and No project have no menu and give no project; No project offers no By project", async () => {

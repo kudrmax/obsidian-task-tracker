@@ -56,7 +56,7 @@ import {
 import type { SectionOffer } from "./sections";
 import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type ProjectsScreenStore, type SettingsStore, type TaskFileStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
-import { chosenNode, cleared, picked, projectOfNode, renamedIn, selected } from "./projectsScreen";
+import { cleared, picked, projectOfNode, renamedIn, selected } from "./projectsScreen";
 import { withMode } from "./viewModes";
 import { carriedAt, carryEnded, carryStarted, gestureGone, nameEnded } from "./projectsCarry";
 import { funnelPlaceOf, type FunnelPlace } from "./screenPlaces";
@@ -236,9 +236,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async setViewMode(mode: ViewMode): Promise<void> {
-		const s = await this.snapshotOrNull();
-		const state = this.projectsScreenStore.get();
-		this.keepScreen(withMode(state, mode, chosenNode(state, s ? projectTreeOf(s.doc) : ProjectTree.EMPTY) !== null));
+		this.keepScreen(withMode(this.projectsScreenStore.get(), mode));
 	}
 
 	async setNoteViewMode(mode: ViewMode): Promise<void> {

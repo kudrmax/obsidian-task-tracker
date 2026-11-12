@@ -2,6 +2,7 @@ import type { DropColumn, ProjectsNodeId, ProjectsScreenState, ViewChoice, ViewM
 import type { EntryList, FunnelSpot } from "./screenPlaces";
 import { SHOWN_LISTS } from "./screenPlaces";
 import { PROJECTS_WORDS } from "./projectsScreen";
+import { viewLayout } from "./viewLayout";
 
 /** The words and icons of the view modes, the same in every frontend; the icon a Lucide name the Swift app maps to its symbol. */
 export const VIEW_WORDS = {
@@ -25,6 +26,8 @@ export interface ViewAsk {
 	/** The host's screen is wide (the desktop): all columns are offered. */
 	readonly wide: boolean;
 	readonly note: boolean;
+	/** A funnel list's name as its column's title (`listName`); null for the day's, which draws its own. */
+	readonly title: (list: DropColumn) => string | null;
 }
 
 /**
@@ -39,16 +42,26 @@ function offered(ask: ViewAsk): readonly ViewMode[] {
 	return ["twoColumns", ...(ask.wide ? (["allColumns"] as const) : []), "rows", ...byProject];
 }
 
-/** The mode a view starts with: two columns without a filter, rows with one (in a note too); by project where it alone is offered. */
+/**
+ * The mode a view starts with, filter or none: two columns on the screen, rows in a note; by project where it alone is
+ * offered. (Max, 2026-11-12: the mode is one choice; a filter no longer picks its own.)
+ */
 function defaultMode(ask: ViewAsk, modes: readonly ViewMode[]): ViewMode {
-	const wanted: ViewMode = ask.node === null ? "twoColumns" : "rows";
+	const wanted: ViewMode = ask.note ? "rows" : "twoColumns";
 	return modes.includes(wanted) ? wanted : modes[0];
 }
 
-/** The mode kept for this view: the note's, the filtered screen's or the plain screen's, each remembered apart. */
+/** The mode kept for this view: the note's block its own, the screen one for every filter and none. */
 function keptMode(state: ProjectsScreenState, ask: ViewAsk): ViewMode | undefined {
-	if (ask.note) return state.noteView;
-	return ask.node === null ? state.view : state.filteredView;
+	return ask.note ? state.noteView : state.view;
+}
+
+/**
+ * What a frontend tells one context from another by: the screen's filter and mode, or a note's block's mode. A read in
+ * another context is drawn still, in place; the same context changed animates what moved.
+ */
+export function viewContext(node: ProjectsNodeId | null, mode: ViewMode, note: boolean): string {
+	return JSON.stringify(note ? ["note", mode] : ["screen", node, mode]);
 }
 
 /** The view's mode and the modes its button offers: the kept one while it is offered, else the default. */
@@ -61,17 +74,30 @@ export function viewChoice(state: ProjectsScreenState, ask: ViewAsk): ViewChoice
 	const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
 	const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
 	const ribbon = mode === "twoColumns" && !ask.note;
-	return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", ribbon, source: mode === "byProject" ? "projectsScreen" : "screen", rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates };
+	return {
+		mode,
+		modes: options,
+		icon: ICONS[mode],
+		wheel: mode === "twoColumns",
+		ribbon,
+		source: mode === "byProject" ? "projectsScreen" : "screen",
+		rows: mode === "rows" ? ROW_LISTS : [],
+		emptyLabel: PROJECTS_WORDS.noTasks,
+		plates,
+		layout: viewLayout(mode, ask.note, ask.title),
+		context: viewContext(ask.node, mode, ask.note),
+	};
 }
 
 /** The view before any read: the device's kept mode, a node chosen (`state.selected`) counting as a filter that is no done one. */
-export function firstViewOf(state: ProjectsScreenState, wide: boolean, note: boolean): ViewChoice {
-	return viewChoice(state, { node: note ? "note" : (state.selected ?? null), closed: false, wide, note });
+export function firstViewOf(state: ProjectsScreenState, wide: boolean, note: boolean, title: ViewAsk["title"]): ViewChoice {
+	return viewChoice(state, { node: note ? "note" : (state.selected ?? null), closed: false, wide, note, title });
 }
 
-/** The state with `mode` kept for the view it was picked in. */
-export function withMode(state: ProjectsScreenState, mode: ViewMode, filtered: boolean): ProjectsScreenState {
-	return filtered ? { ...state, filteredView: mode } : { ...state, view: mode };
+/** The state with `mode` the screen's one mode; a mode an older version kept for a filter apart (`filteredView`) goes. */
+export function withMode(state: ProjectsScreenState, mode: ViewMode): ProjectsScreenState {
+	const { filteredView: _old, ...rest } = state as ProjectsScreenState & { readonly filteredView?: ViewMode };
+	return { ...rest, view: mode };
 }
 
 /**

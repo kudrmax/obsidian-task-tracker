@@ -47,7 +47,7 @@ Backend (2026-11-12):
 2. The filter is `ProjectsScreenState.selected` (the tree's chosen node, as before); left out means no filter. A device that had a node chosen on the old Projects screen opens filtered by it, with the cross.
 3. Old names stay as deprecated aliases until both frontends move: `SCREEN_PLACES`/`ScreenPlace` (with `projects`), `ScreenSpot`, `ScreenAt`, `stepScreen`, `placeShowing`, `shownLists`, `shownEntryLists`. The new ones are `FUNNEL_PLACES`, `FunnelPlace`, `FunnelSpot`, `FunnelAt`, `stepFunnel`, `funnelPlaceShowing`, `viewEntryLists`. Once both frontends report the move, backend removes the old ones (and `projects` from `SHOWN_LISTS`).
 4. `EntryList` keeps `"projects"`: the by project mode's list.
-5. Modes: no filter → Two columns («Columns» on a narrow screen), All columns (wide only), Rows. A node → the same plus By project, except No project (one part, nothing to split). Done and a done project → By project alone (rows would be four empty lists: their tasks are closed). Default: Two columns without a filter, Rows with one. A kept mode not offered now falls back to the default.
+5. Modes: no filter → Two columns («Columns» on a narrow screen), All columns (wide only), Rows. A node → the same plus By project, except No project (one part, nothing to split). Done and a done project → By project alone (rows would be four empty lists: their tasks are closed). ~~Default: Two columns without a filter, Rows with one.~~ (withdrawn by 49) A kept mode not offered now falls back to the default.
 6. The note's block offers Rows and By project, Rows first; its mode is kept once for every note (`noteView`). No panel, no cross.
 7. A note belongs to a project when the project's `[[link]]` (alias and heading aside) names the note's path without `.md`, or its end after a `/`, case aside.
 8. The panel's `open` is the button's; a panel a carried card slides out is the gesture's own and is not kept. A pick on a narrow screen closes the panel (`pickProjectNode(node, false)`); a tap on the chosen row (fold) doesn't.
@@ -69,7 +69,7 @@ iPhone app (frontend-swift, 2026-11-12):
     `rectangle.split.1x2`, `folder-tree` `list.bullet.indent`.
 17. Rows: each stage's list as tall as its rows while all four fit; the long ones share what is left and scroll inside
     (`StackedRows`). Each stage is headed small (13 pt semibold, as a section), the day's title with its arrows stands
-    over the calendar. While the plus is carried or a task is typed every list keeps a card's room more. The day turns by
+    over the calendar. ~~While the plus is carried or a task is typed every list keeps a card's room more.~~ (withdrawn by 52) The day turns by
     the arrows there (the ribbon's day swipe is the two columns' own).
 18. An empty list shows the «No tasks» plate (a tap types a task there) under a filter (the filter's `emptyLabel`) and in
     Rows; in two columns without a filter an empty list stays as before.
@@ -117,6 +117,13 @@ Obsidian frontend (2026-11-12; numbered from 22 so as not to meet the Swift fron
 47. The old Projects screen's calls with no caller left the services: `tapProjectNode`, `unfoldProjectNode`, `hoverProjectNode`, `setProjectsMode`, and By stage (`ProjectsView.mode`/`modes`; `ProjectsCard.over`, gone once no frontend read it). Their door names still answer as thin mappings (decision 35).
 48. The projects button can't be pressed while the quick entry's field is open (the app's rule, now both frontends'): `EntryState.locksPanel`.
 
+View rework (backend, 2026-11-12, plan `2026-11-12-projects-view-rework.md`):
+
+49. **Max's (11-12): one view mode.** `ProjectsScreenState.view` is the screen's one mode, changed only by `setViewMode`; a pick, a clear or a carry's filter never changes it. Its default is Two columns with a filter or without (Rows in a note's block, which keeps `noteView`). `filteredView` is gone: an old state that has it reads with `view` as the mode, and the next `setViewMode` drops it. Decision 5's default by filter and the Max spec's decision 3 are withdrawn. A mode the screen doesn't offer now shows as the default and comes back where it is offered.
+50. `ViewChoice.layout` (`viewLayout`): the columns in order with their lists, titles and width kinds, `swipe` `pages | none`, the divider and the rows' stack (`scrolls` false in a note's block). Widths are numbers only for still layouts (`layoutWidths`, `layoutShareAt`); the ribbon's columns stay with its own guarded rule (`RibbonColumns`, the plugin's ribbon). All columns' widths moved into the core (`allColumnsWidths`, `allColumnsShare`, `allColumnsDividerAt`, `allColumnsWidthAt`, the divider's width an argument); `obsidian/ui/listWidth.ts` keeps thin wrappers until the plugin switches.
+51. The rows' heights from measured lists (`stackedLists(lists, room, fade)`): a list that scrolls ends at a card's bottom plus the fade, never with the fade on a card; what that frees goes a card at a time to the list it lets show one more. `stackedRows` stays for the door.
+52. `ViewChoice.context` (`viewContext`): the filter and the mode (a note's block: the mode) as a string; another context is drawn still, the same one changed animates. The screen's own reads (`screen`, `projectsScreen`) carry no context: the frontend pairs them with the view they were asked for. Decision 17's card of room more in every list while carrying or typing is withdrawn: no core rule ever had it (the app's `StackedLists` added it); rows never reflow during a carry, the drop room is the hovered list's alone.
+
 Applied from the Swift frontend: 17 (rows: each list as tall as its cards while all fit, the long ones share the rest and scroll inside, a card's room more while a card or the plus is carried or a task typed; the day by the arrows), 18 (the «No tasks» plate in an empty list under a filter and in rows), 19 (a find the filter hides clears it; a done find outside two columns opens on the whole screen), 20 (the left edge for a card and the plus), 21 (by project without a segment). 13, 15 and 16 are the app's own chrome: the plugin keeps the boards' top-left button and its own icons.
 
 ## Contract
@@ -129,7 +136,8 @@ Types:
 - `ProjectFilter { node, title, menu, clearable, project, emptyLabel }`.
 - `ProjectsPanel { rows, open, docked, missing }`.
 - `FunnelView { filter: ProjectFilter | null, view: ViewChoice, panel: ProjectsPanel | null }`.
-- `ProjectsScreenState` adds `panelOpen?`, `view?`, `filteredView?`, `noteView?`; `selected` absent = no filter.
+- `ProjectsScreenState` adds `panelOpen?`, `view?` (the one mode, decision 49), `noteView?`; `selected` absent = no filter.
+- `ViewChoice` adds `layout: ViewLayout` and `context: string` (decisions 50, 52); `viewLayout`, `layoutWidths`, `layoutShareAt`, `stackedLists`, `viewContext`, `allColumns*` (decisions 50–52).
 - `ProjectsPlace` adds `node?` (whose by project list).
 - `FunnelPlace = "inbox" | "soon" | "calendar"`, `FunnelSpot` (+ `"done"`), `FunnelAt { mode, date }`; `FUNNEL_PLACES`, `stepFunnel`, `funnelPlaceShowing`, `viewEntryLists(mode, spot)`, `ROW_LISTS`, `VIEW_WORDS`.
 - `EntryLook.filter?(): { node, project } | null` (the quick entry).
@@ -140,7 +148,7 @@ Types:
 - `pickProjectNode(node, wide)` — a tap on a panel row; `pickProjectNode("project:Стиль", false)` chooses and closes the panel.
 - `clearProjectFilter()` — the cross.
 - `setProjectsPanel(open)` — the projects button.
-- `setViewMode(mode)` — `setViewMode("rows")`, kept for the screen with or without a filter.
+- `setViewMode(mode)` — `setViewMode("rows")`, the screen's one mode, filter or none (decision 49).
 - `setNoteViewMode(mode)` — the note's block.
 - `dropTasksOnProject(keys, to, filter)` — `dropTasksOnProject([item.key], "project:Дружба", filter?.node ?? null)`.
 

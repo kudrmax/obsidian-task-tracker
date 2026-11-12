@@ -21,8 +21,9 @@ import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
 import { type EntryList, FUNNEL_PLACES, type FunnelAt, type FunnelPlace, type FunnelSpot, funnelPlaceOf, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
-import { ROW_LISTS, VIEW_WORDS, viewEntryLists, withMode } from "./viewModes";
-import { stackedRows } from "./stackedRows";
+import { ROW_LISTS, VIEW_WORDS, viewContext, viewEntryLists, withMode } from "./viewModes";
+import { layoutShareAt, layoutWidths, viewLayout } from "./viewLayout";
+import { stackedLists, stackedRows } from "./stackedRows";
 import { carriedAt, carryEnded, carryStarted, endsSelection, gestureGone, nameEnded } from "./projectsCarry";
 import { type EntryPart, projectsEntryLook } from "./projectsEntry";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
@@ -48,7 +49,7 @@ import { branchOf, carriedMiddle, gapBranch, levelAt, placeAt } from "./listDrop
 import { grownStart, wholeWidth } from "./wholeCard";
 import { onTheDay, REPEAT_WORDS, repeatValue } from "./repeatWords";
 import { canPick } from "./menus";
-import { DIVIDER_SNAP, dividerAt, LIST_WIDTHS, listShareOf, listWidths } from "./listWidth";
+import { allColumnsDividerAt, allColumnsShare, allColumnsWidthAt, allColumnsWidths, DIVIDER_SNAP, dividerAt, LIST_WIDTHS, listShareOf, listWidths } from "./listWidth";
 import { type LinkQuery, linkQuery, noteOfLink, noteSuggestions, type VaultNote, withNoteLink } from "./notes";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, type Header, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
@@ -61,7 +62,7 @@ import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
 import { projectsPlusTakes, projectsTakes } from "./projectsDrop";
-import { chosenNode, cleared, PROJECTS_HOVER_MS, PROJECTS_INDENT, panelRows, picked, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { cleared, PROJECTS_HOVER_MS, PROJECTS_INDENT, panelRows, picked, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -461,7 +462,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	setProjectsPanel: (c, [open]) => {
 		if ((c.projectsScreen.panelOpen === true) !== (open === true)) c.keepProjectsScreen({ ...c.projectsScreen, panelOpen: open === true });
 	},
-	setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode as ViewMode, chosenNode(c.projectsScreen, c.tree()) !== null)),
+	setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode as ViewMode)),
 	setNoteViewMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, noteView: mode as ViewMode }),
 	dropTasksOnProject: (c, [keys, to, filter]) => {
 		const target = to === "none" ? null : projectOfNode(to as string);
@@ -887,13 +888,22 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	funnelPlaceOf,
 	endsSelection,
 	stackedRows,
+	stackedLists,
 	viewEntryLists,
+	viewContext: (node, mode, note) => viewContext(node ?? null, mode, note === true),
+	viewLayout: (mode, note, titles) => viewLayout(mode, note === true, (list: string) => (titles as Record<string, string | null> | undefined)?.[list] ?? null),
+	layoutWidths,
+	layoutShareAt,
 	projectsEntryLook,
 	wholeWidth,
 	grownStart,
 	listWidths,
 	listShareOf,
 	dividerAt,
+	allColumnsWidths,
+	allColumnsShare,
+	allColumnsDividerAt,
+	allColumnsWidthAt,
 	repeatValue,
 	onTheDay,
 	canPick,

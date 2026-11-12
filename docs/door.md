@@ -316,7 +316,8 @@ adds to the calls above; the old ones answer as before.
   column: "inbox", place: { kind: "task", group: null, before: null } }, "2026-11-12", "project:Стиль")`.
 - `tasks.pickProjectNode(node, wide)`: a tap on a panel row (`tapProjectNode`; on a narrow screen a tap that chose a
   node also closes the panel). `tasks.clearProjectFilter()`: the cross. `tasks.setProjectsPanel(open)`: the projects
-  button. `tasks.setViewMode(mode)`: a pick in the view button's menu, kept apart with and without a filter.
+  button. `tasks.setViewMode(mode)`: a pick in the view button's menu, the screen's one mode (2026-11-12: no longer kept
+  apart with and without a filter; a pick or a clear never changes it).
   `tasks.setNoteViewMode(mode)`: the same in a note's block. Each answers `projectsScreen`.
 - `tasks.dropTasksOnProject(keys, to, filter)`: funnel cards let go on a panel row; the project each is shown by under
   `filter` gives way to the row's (no filter, All: its first project). Example: `tasks.dropTasksOnProject([key],
@@ -327,8 +328,9 @@ adds to the calls above; the old ones answer as before.
 - `tasks.projectNoteView(path, wide)`: the block at the end of a project's note (`path` from the vault's folder):
   `FunnelView` with the note's project as `filter` (`clearable` false), `panel` null, modes Rows and By project, Rows
   first; null for a note no project has. Example: `tasks.projectNoteView("Заметки/Стиль.md", true)`.
-- `ProjectsScreenState` gains `panelOpen`, `view`, `filteredView`, `noteView`; `selected` left out now means no filter
-  (the old Projects screen still shows All for it).
+- `ProjectsScreenState` gains `panelOpen`, `view`, `noteView`; `selected` left out now means no filter (the old Projects
+  screen still shows All for it). `filteredView` is gone (2026-11-12): an old state that has it reads as before with
+  `view` the one mode, and the next `setViewMode` drops it.
 - `days.stepFunnel({ mode, date }, shift)`: the swipe on the funnel without Projects (`"inbox" | "soon" | "calendar" |
   "done"`): null back from Inbox and from Done, Done on to Inbox. `rules.funnelPlaceShowing(column, spot)`,
   `rules.viewEntryLists(mode, spot)` (the quick entry's `look.shown`: two columns the place's lists, rows and all columns
@@ -394,6 +396,44 @@ adds to the calls above; the old ones answer as before.
   `rules.stackedRows([900, 70, 400, 70], 600, 70)` → `[230, 70, 230, 70]`.
 - `EntryState.locksPanel` (the quick entry's state, `entry.*`): true while a field is open; the projects button can't be
   pressed then.
+
+#### The view rework (2026-11-12): one mode, layouts, contexts
+
+- **One view mode.** `tasks.setViewMode(mode)` alone changes it; `pickProjectNode`, `clearProjectFilter`, a carry's
+  filter never do. Its default is Two columns, filter or none (Rows in a note's block, `setNoteViewMode` its own). A mode
+  the current screen doesn't offer (By project without a node, All columns on a narrow screen) shows as the default and
+  comes back where it is offered.
+- `ViewChoice.layout` `ViewLayout` `{ mode, columns, swipe, divider, stack }`: the columns left to right, each `{ id,
+  lists, width }` (`id` `"inbox" | "soon" | "day" | "timeline" | "rows" | "projects"`; `lists` `[{ list, title }]`, top
+  to bottom, `title` the list's name, null for the day's list (it draws the day's own title) and the by project list;
+  `width` `"half" | "list" | "rest"`); `swipe` `"pages"` (two columns, the ribbon) or `"none"` (no swipe, no
+  rubber-band); `divider` before the timeline (false in a note's block, which has no timeline); `stack` in rows `{ lists,
+  scrolls }` (`scrolls` false in a note's block: the lists grow with their cards). Two columns: Inbox (Inbox over
+  Backlog) half, Soon half, the day `list`, the timeline `rest`. All columns: Inbox, Soon, the day `list`, the timeline.
+  Rows: `rows` then the timeline. By project: `projects` then the timeline. Also `rules.viewLayout(mode, note, titles)`
+  (`titles` `{ inbox, backlog, soon, day }`).
+- `rules.layoutWidths(layout, share, viewWidth, dividerWidth)` → `{ widths, divider }` for a still layout: each column's
+  width, and the divider as `ListWidths` (`width` where it stands from the left, `min`, `max`, `center`; hand it to
+  `rules.dividerAt` as it is); null for two columns (the ribbon's own rule sets them by its place). Example:
+  `rules.layoutWidths(rowsLayout, 0.3, 804, 16)` → `{ widths: [236.4, 551.6], divider: { width: 236.4, min: 110, max:
+  678, center: 394 } }`. `rules.layoutShareAt(layout, at, viewWidth, dividerWidth)` → the share a divider let go at `at`
+  saves (null without a divider or in two columns): `rules.layoutShareAt(rowsLayout, 300, 804, 16)` → `0.3807`.
+- `rules.allColumnsWidths(share, viewWidth, dividerWidth)` → `ListWidths` of one of all columns' three lists;
+  `rules.allColumnsShare(width, viewWidth, dividerWidth)`, `rules.allColumnsDividerAt(width, dividerWidth)`,
+  `rules.allColumnsWidthAt(at, dividerWidth)`. Example: `rules.allColumnsWidths(0.5, 804, 16)` → `{ width: 189, min:
+  110, max: 215.33, center: 189 }`.
+- `rules.stackedLists(lists, room, fade)` → heights: the rows' lists measured, each `{ wanted, stops }` (its whole
+  height, and the bottom of each card from its top, the title in). All that fit keep `wanted`; else `stackedRows`' shares,
+  a list that scrolls ending at a card's bottom plus `fade` (the fade never lies on a card), what that frees going a card
+  at a time to the list it lets show one more; none under its first card and the fade (or its plate). Example:
+  `rules.stackedLists([{ wanted: 380, stops: [90, 160, 230, 300, 370] }, { wanted: 90, stops: [] }], 300, 20)` → `[180,
+  90]`. `rules.stackedRows` still answers.
+- `ViewChoice.context` (also `rules.viewContext(node, mode, note)`): the filter and the mode a view is read in, a string
+  to compare: a read whose context differs from the one drawn is drawn still in place; the same context changed animates.
+  A note's block's context is its mode alone. Example: `rules.viewContext("project:Стиль", "rows", false)` →
+  `'["screen","project:Стиль","rows"]'`.
+- No rule gives a list a card's room more while a card or the plus is carried or a task typed: rows never reflow during
+  a carry; the room to drop in is the hovered list's, drawn by the frontend.
 
 #### A folded task's next step
 

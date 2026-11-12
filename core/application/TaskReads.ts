@@ -165,7 +165,7 @@ export class TaskReads {
 		const node = chosenNode(state, tree);
 		const filter = node === null ? null : this.filterOf(node, tree, s?.doc ?? null, true);
 		const closed = node !== null && nodeHeader(node, tree, s?.doc ?? null).closed;
-		const view = viewChoice(state, { node, closed, wide, note: false });
+		const view = viewChoice(state, { node, closed, wide, note: false, title: this.columnTitle });
 		const reason = panelReason(state);
 		return {
 			filter,
@@ -189,13 +189,13 @@ export class TaskReads {
 		if (name === null) return null;
 		const node = projectNodeOf(name);
 		const closed = nodeHeader(node, tree, s.doc).closed;
-		const view = viewChoice(this.source.screen(), { node, closed, wide, note: true });
+		const view = viewChoice(this.source.screen(), { node, closed, wide, note: true, title: this.columnTitle });
 		return { filter: this.filterOf(node, tree, s.doc, false), view, panel: null, plus: plusOf(view.mode, false), topRow: false, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
 	}
 
 	/** The view before the first read: the device's state alone (`firstViewOf`). */
 	firstView(wide: boolean, note: boolean): ViewChoice {
-		return firstViewOf(this.source.screen(), wide, note);
+		return firstViewOf(this.source.screen(), wide, note, this.columnTitle);
 	}
 
 	/** Whether `filter` hides `item`'s task from the screen: a subtask goes by its top task. */
@@ -456,6 +456,9 @@ export class TaskReads {
 	placementOfDay(date: LocalDate): Placement {
 		return placementOfDay(date, this.today());
 	}
+
+	/** A funnel list's column title: its name; the day's list draws the day's own. */
+	private readonly columnTitle = (list: DropColumn): string | null => (list === "day" ? null : this.listName(list));
 
 	listName(list: SectionKey): string {
 		return this.settings.get().sections[list];

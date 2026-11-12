@@ -3950,6 +3950,95 @@ ${key.title}`.toLowerCase();
     return projectsGap(rows, gap, base + Math.round(shift / PROJECTS_INDENT), lifted2);
   }
 
+  // core/application/listWidth.ts
+  var LIST_WIDTHS = { min: 110, max: 280 };
+  function listWidths(share, viewWidth, dividerWidth) {
+    const columns = viewWidth - dividerWidth;
+    const max = Math.max(LIST_WIDTHS.max, columns - LIST_WIDTHS.min);
+    return { width: Math.min(max, Math.max(LIST_WIDTHS.min, share * columns)), min: LIST_WIDTHS.min, max, center: columns / 2 };
+  }
+  function listShareOf(width, viewWidth, dividerWidth) {
+    return width / (viewWidth - dividerWidth);
+  }
+  var DIVIDER_SNAP = { distance: 8, slowSpeed: 0.08 };
+  function dividerAt(wanted, widths, speed) {
+    const reachable = widths.center >= widths.min && widths.center <= widths.max;
+    const snapped2 = reachable && speed < DIVIDER_SNAP.slowSpeed && Math.abs(wanted - widths.center) <= DIVIDER_SNAP.distance;
+    const width = snapped2 ? widths.center : Math.round(wanted);
+    return { width: Math.min(widths.max, Math.max(widths.min, width)), snapped: snapped2 };
+  }
+  function allColumnsWidths(share, viewWidth, dividerWidth) {
+    const room = viewWidth - 3 * dividerWidth;
+    const max = Math.max(LIST_WIDTHS.min, (room - LIST_WIDTHS.min) / 3);
+    const width = Math.min(max, Math.max(LIST_WIDTHS.min, share * room / (1 + 2 * share)));
+    return { width, min: LIST_WIDTHS.min, max, center: room / 4 };
+  }
+  function allColumnsShare(width, viewWidth, dividerWidth) {
+    const timeline = viewWidth - 3 * dividerWidth - 3 * width;
+    return width + timeline > 0 ? width / (width + timeline) : 0.5;
+  }
+  function allColumnsDividerAt(width, dividerWidth) {
+    return 3 * width + 2 * dividerWidth;
+  }
+  function allColumnsWidthAt(at, dividerWidth) {
+    return (at - 2 * dividerWidth) / 3;
+  }
+
+  // core/application/viewLayout.ts
+  function viewLayout(mode, note, title) {
+    const of = (lists) => lists.map((list) => ({ list, title: title(list) }));
+    const timeline = note ? [] : [{ id: "timeline", lists: [], width: "rest" }];
+    const lead = note ? "rest" : "list";
+    const still = { mode, swipe: "none", divider: !note };
+    if (mode === "twoColumns") {
+      return {
+        mode,
+        swipe: "pages",
+        divider: true,
+        stack: null,
+        columns: [
+          { id: "inbox", lists: of(["inbox", "backlog"]), width: "half" },
+          { id: "soon", lists: of(["soon"]), width: "half" },
+          { id: "day", lists: of(["day"]), width: "list" },
+          ...timeline
+        ]
+      };
+    }
+    if (mode === "allColumns") {
+      return {
+        ...still,
+        stack: null,
+        columns: [
+          { id: "inbox", lists: of(["inbox", "backlog"]), width: "list" },
+          { id: "soon", lists: of(["soon"]), width: "list" },
+          { id: "day", lists: of(["day"]), width: "list" },
+          ...timeline
+        ]
+      };
+    }
+    if (mode === "rows") return { ...still, stack: { lists: ROW_LISTS, scrolls: !note }, columns: [{ id: "rows", lists: of(ROW_LISTS), width: lead }, ...timeline] };
+    return { ...still, stack: null, columns: [{ id: "projects", lists: [{ list: "projects", title: null }], width: lead }, ...timeline] };
+  }
+  function layoutWidths(layout, share, viewWidth, dividerWidth) {
+    if (layout.swipe === "pages") return null;
+    if (!layout.divider) return { widths: layout.columns.map(() => viewWidth / layout.columns.length), divider: null };
+    if (layout.mode === "allColumns") {
+      const all = allColumnsWidths(share, viewWidth, dividerWidth);
+      const at = (width) => allColumnsDividerAt(width, dividerWidth);
+      return {
+        widths: [all.width, all.width, all.width, viewWidth - 3 * dividerWidth - 3 * all.width],
+        divider: { width: at(all.width), min: at(all.min), max: at(all.max), center: at(all.center) }
+      };
+    }
+    const list = listWidths(share, viewWidth, dividerWidth);
+    return { widths: [list.width, viewWidth - dividerWidth - list.width], divider: list };
+  }
+  function layoutShareAt(layout, at, viewWidth, dividerWidth) {
+    if (layout.swipe === "pages" || !layout.divider) return null;
+    if (layout.mode === "allColumns") return allColumnsShare(allColumnsWidthAt(at, dividerWidth), viewWidth, dividerWidth);
+    return listShareOf(at, viewWidth, dividerWidth);
+  }
+
   // core/application/viewModes.ts
   var VIEW_WORDS = {
     twoColumns: "Two columns",
@@ -3967,12 +4056,14 @@ ${key.title}`.toLowerCase();
     return ["twoColumns", ...ask.wide ? ["allColumns"] : [], "rows", ...byProject];
   }
   function defaultMode(ask, modes) {
-    const wanted = ask.node === null ? "twoColumns" : "rows";
+    const wanted = ask.note ? "rows" : "twoColumns";
     return modes.includes(wanted) ? wanted : modes[0];
   }
   function keptMode(state, ask) {
-    if (ask.note) return state.noteView;
-    return ask.node === null ? state.view : state.filteredView;
+    return ask.note ? state.noteView : state.view;
+  }
+  function viewContext(node, mode, note) {
+    return JSON.stringify(note ? ["note", mode] : ["screen", node, mode]);
   }
   function viewChoice(state, ask) {
     const modes = offered(ask);
@@ -3983,13 +4074,26 @@ ${key.title}`.toLowerCase();
     const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
     const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
     const ribbon = mode === "twoColumns" && !ask.note;
-    return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", ribbon, source: mode === "byProject" ? "projectsScreen" : "screen", rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates };
+    return {
+      mode,
+      modes: options,
+      icon: ICONS[mode],
+      wheel: mode === "twoColumns",
+      ribbon,
+      source: mode === "byProject" ? "projectsScreen" : "screen",
+      rows: mode === "rows" ? ROW_LISTS : [],
+      emptyLabel: PROJECTS_WORDS.noTasks,
+      plates,
+      layout: viewLayout(mode, ask.note, ask.title),
+      context: viewContext(ask.node, mode, ask.note)
+    };
   }
-  function firstViewOf(state, wide, note) {
-    return viewChoice(state, { node: note ? "note" : state.selected ?? null, closed: false, wide, note });
+  function firstViewOf(state, wide, note, title) {
+    return viewChoice(state, { node: note ? "note" : state.selected ?? null, closed: false, wide, note, title });
   }
-  function withMode(state, mode, filtered) {
-    return filtered ? { ...state, filteredView: mode } : { ...state, view: mode };
+  function withMode(state, mode) {
+    const { filteredView: _old, ...rest } = state;
+    return { ...rest, view: mode };
   }
   function viewEntryLists(mode, spot) {
     if (mode === "byProject") return ["projects"];
@@ -4017,6 +4121,28 @@ ${key.title}`.toLowerCase();
       open.shift();
     }
     return heights;
+  }
+  function stackedLists(lists, room, fade) {
+    const wanted = lists.map((list) => list.wanted);
+    if (wanted.reduce((sum, height) => sum + height, 0) <= room) return wanted;
+    const least2 = lists.map((list) => Math.min(list.wanted, (list.stops[0] ?? list.wanted) + fade));
+    const heights = stackedRows(wanted, room, 0).map((height, i) => Math.max(least2[i], snapped(lists[i], height, fade)));
+    let left = room - heights.reduce((sum, height) => sum + height, 0);
+    for (; ; ) {
+      const steps = lists.map((list, i) => grown(list, heights[i], fade) - heights[i]);
+      const next = steps.reduce((best, step, i) => step > 0 && step <= left && (best < 0 || step < steps[best]) ? i : best, -1);
+      if (next < 0) return heights;
+      heights[next] += steps[next];
+      left -= steps[next];
+    }
+  }
+  function snapped(list, height, fade) {
+    if (height >= list.wanted) return list.wanted;
+    return list.stops.map((stop2) => stop2 + fade).filter((end) => end <= height && end < list.wanted).pop() ?? 0;
+  }
+  function grown(list, height, fade) {
+    const end = list.stops.map((stop2) => stop2 + fade).find((at) => at > height) ?? list.wanted;
+    return Math.min(end, list.wanted);
   }
 
   // core/application/projectsCarry.ts
@@ -5281,9 +5407,9 @@ ${key.title}`.toLowerCase();
     const width = Math.max(card.width, Math.min(card.width + missing, widest));
     return { width, cut: width < card.width + missing };
   }
-  function grownStart(start, size, grown, room, margin) {
+  function grownStart(start, size, grown2, room, margin) {
     const end = Math.max(start + size, room - margin);
-    return Math.max(Math.min(start, margin), Math.min(start, end - grown));
+    return Math.max(Math.min(start, margin), Math.min(start, end - grown2));
   }
 
   // core/application/SectionNameEntry.ts
@@ -5313,24 +5439,6 @@ ${key.title}`.toLowerCase();
     const elsewhere = description !== state.file;
     if (!elsewhere || editor.focused || editor.pending) return { state: { ...state, file: description }, replace: null };
     return { state: { file: description, typed: false }, replace: description ?? DESCRIPTION_TEMPLATE };
-  }
-
-  // core/application/listWidth.ts
-  var LIST_WIDTHS = { min: 110, max: 280 };
-  function listWidths(share, viewWidth, dividerWidth) {
-    const columns = viewWidth - dividerWidth;
-    const max = Math.max(LIST_WIDTHS.max, columns - LIST_WIDTHS.min);
-    return { width: Math.min(max, Math.max(LIST_WIDTHS.min, share * columns)), min: LIST_WIDTHS.min, max, center: columns / 2 };
-  }
-  function listShareOf(width, viewWidth, dividerWidth) {
-    return width / (viewWidth - dividerWidth);
-  }
-  var DIVIDER_SNAP = { distance: 8, slowSpeed: 0.08 };
-  function dividerAt(wanted, widths, speed) {
-    const reachable = widths.center >= widths.min && widths.center <= widths.max;
-    const snapped = reachable && speed < DIVIDER_SNAP.slowSpeed && Math.abs(wanted - widths.center) <= DIVIDER_SNAP.distance;
-    const width = snapped ? widths.center : Math.round(wanted);
-    return { width: Math.min(widths.max, Math.max(widths.min, width)), snapped };
   }
 
   // core/application/timelineZoom.ts
@@ -6220,6 +6328,8 @@ ${key.title}`.toLowerCase();
       this.settings = settings;
       this.clock = clock;
       this.source = source;
+      /** A funnel list's column title: its name; the day's list draws the day's own. */
+      this.columnTitle = (list) => list === "day" ? null : this.listName(list);
     }
     /** The projects of the tree read last, in its order: the Project page and the quick entry's Project button. */
     projects() {
@@ -6255,7 +6365,7 @@ ${key.title}`.toLowerCase();
       const node = chosenNode(state, tree);
       const filter = node === null ? null : this.filterOf(node, tree, s?.doc ?? null, true);
       const closed = node !== null && nodeHeader(node, tree, s?.doc ?? null).closed;
-      const view = viewChoice(state, { node, closed, wide, note: false });
+      const view = viewChoice(state, { node, closed, wide, note: false, title: this.columnTitle });
       const reason = panelReason(state);
       return {
         filter,
@@ -6277,12 +6387,12 @@ ${key.title}`.toLowerCase();
       if (name === null) return null;
       const node = projectNodeOf(name);
       const closed = nodeHeader(node, tree, s.doc).closed;
-      const view = viewChoice(this.source.screen(), { node, closed, wide, note: true });
+      const view = viewChoice(this.source.screen(), { node, closed, wide, note: true, title: this.columnTitle });
       return { filter: this.filterOf(node, tree, s.doc, false), view, panel: null, plus: plusOf(view.mode, false), topRow: false, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
     }
     /** The view before the first read: the device's state alone (`firstViewOf`). */
     firstView(wide, note) {
-      return firstViewOf(this.source.screen(), wide, note);
+      return firstViewOf(this.source.screen(), wide, note, this.columnTitle);
     }
     /** Whether `filter` hides `item`'s task from the screen: a subtask goes by its top task. */
     filterHidesRead(item, filter) {
@@ -8071,7 +8181,7 @@ ${key.title}`.toLowerCase();
     setProjectsPanel: (c, [open]) => {
       if (c.projectsScreen.panelOpen === true !== (open === true)) c.keepProjectsScreen({ ...c.projectsScreen, panelOpen: open === true });
     },
-    setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode, chosenNode(c.projectsScreen, c.tree()) !== null)),
+    setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode)),
     setNoteViewMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, noteView: mode }),
     dropTasksOnProject: (c, [keys, to, filter]) => {
       const target = to === "none" ? null : projectOfNode(to);
@@ -8425,13 +8535,22 @@ ${key.title}`.toLowerCase();
     funnelPlaceOf,
     endsSelection,
     stackedRows,
+    stackedLists,
     viewEntryLists,
+    viewContext: (node, mode, note) => viewContext(node ?? null, mode, note === true),
+    viewLayout: (mode, note, titles) => viewLayout(mode, note === true, (list) => titles?.[list] ?? null),
+    layoutWidths,
+    layoutShareAt,
     projectsEntryLook,
     wholeWidth,
     grownStart,
     listWidths,
     listShareOf,
     dividerAt,
+    allColumnsWidths,
+    allColumnsShare,
+    allColumnsDividerAt,
+    allColumnsWidthAt,
     repeatValue,
     onTheDay,
     canPick

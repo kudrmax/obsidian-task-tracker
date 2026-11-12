@@ -57,11 +57,16 @@ export { SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type EntryList } from "./
 /** The funnel's places as the wheel and a swipe walk them, without Projects: the tree is a panel whose node filters them. */
 /** The rows view's list heights: `stackedRows(wanted, room, least)`, each as tall as it wants while all fit, the long ones sharing what the short ones leave. */
 export { stackedRows } from "./stackedRows";
+/** The same from measured lists: one that scrolls ends under a whole card and the fade (`stackedLists(lists, room, fade)`). */
+export { type StackedList, stackedLists } from "./stackedRows";
+/** How each view mode stands (`ViewChoice.layout`), its columns' widths and the share a divider let go saves. */
+export { type LayoutColumn, type LayoutColumnId, type LayoutList, type LayoutStack, type LayoutWidth, type LayoutWidths, layoutShareAt, layoutWidths, type ViewLayout, viewLayout } from "./viewLayout";
+import type { ViewLayout } from "./viewLayout";
 /** Whether a carry's end ends Select Tasks (`endsSelection(end)`): one that landed does, whatever path it took. */
 export { endsSelection } from "./projectsCarry";
 export { FUNNEL_PLACES, funnelPlaceOf, funnelPlaceShowing, stepFunnel, type FunnelAt, type FunnelPlace, type FunnelSpot } from "./screenPlaces";
 /** The view modes' words, the lists the rows mode stacks, and the lists a field can stand in for a mode and a place. */
-export { ROW_LISTS, VIEW_WORDS, viewEntryLists } from "./viewModes";
+export { ROW_LISTS, VIEW_WORDS, viewContext, viewEntryLists } from "./viewModes";
 /** The Projects screen's list as the quick entry reads it: a list the field stands in, like a funnel's column. */
 export { projectsEntryLook, type EntryListLook, type EntryPart } from "./projectsEntry";
 /**
@@ -96,7 +101,7 @@ export { CARD_GAPS, CARD_HEIGHTS, DEFAULT_CARD_SIZE } from "../settings";
 /** A date as the quick entry's place button and the sources window write it: `5 Nov`. */
 export { dayMonth } from "./dayLabels";
 /** The list column's width beside the calendar: drawn, its bounds, its middle, and the share a divider let go saves. */
-export { DIVIDER_SNAP, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths } from "./listWidth";
+export { allColumnsDividerAt, allColumnsShare, allColumnsWidthAt, allColumnsWidths, DIVIDER_SNAP, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths } from "./listWidth";
 export type { Clock } from "./ports";
 
 /** A priority level, its colours in the order the settings offer them. */
@@ -740,10 +745,8 @@ export interface ProjectsScreenState {
 	readonly selected?: ProjectsNodeId;
 	/** The projects' panel is open (`setProjectsPanel`). */
 	readonly panelOpen?: boolean;
-	/** The view mode last picked with no filter (`setViewMode`). */
+	/** The screen's view mode (`setViewMode`), one for every filter and none: a pick or a clear never changes it. */
 	readonly view?: ViewMode;
-	/** The view mode last picked with a filter. */
-	readonly filteredView?: ViewMode;
 	/** The view mode last picked in a project note's block (`setNoteViewMode`). */
 	readonly noteView?: ViewMode;
 	/** The carry to a project under way (`startCarry`): what the core keeps between the finger's reports. */
@@ -1026,6 +1029,13 @@ export interface ViewChoice {
 	 * rows, null (no plate) in two and all columns without a filter.
 	 */
 	readonly plates: Readonly<Record<DropColumn, string | null>>;
+	/** How the mode stands: its columns, whether it swipes, its divider and its rows' stack (`viewLayout`). */
+	readonly layout: ViewLayout;
+	/**
+	 * The filter and the mode this view is read in (`viewContext`): a read whose context differs from the one drawn is
+	 * another context, drawn still in place; the same context changed animates what moved.
+	 */
+	readonly context: string;
 }
 
 /** The node the funnel is filtered by, and what is drawn over its tasks. */
