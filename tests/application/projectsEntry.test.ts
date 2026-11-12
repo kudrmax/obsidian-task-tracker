@@ -206,6 +206,29 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 		expect(s.entry.state).toMatchObject({ spot: { kind: "list", column: "projects", place: { group: null } }, place: { kind: "inbox" } });
 	});
 
+	/** QA 2026-11-12: the field typed at a part's end stands where its card will: after the part's cards of its stage. */
+	it("the plus's field stands where the typed card lands, after the part's Inbox cards; Enter keeps them together", async () => {
+		const s = await projectsScreen();
+		const at = (title: string) => projectsEntryLook(s.view()).cards.findIndex((c) => c.key.raw === s.item(title).key.raw);
+		s.entry.openFromPlus();
+		expect(s.entry.state).toMatchObject({ spot: { column: "projects", place: { group: null, index: at("Back A") } } });
+		s.entry.type("Typed");
+		s.entry.enter();
+		await s.entry.idle();
+		expect(s.titles(null)).toEqual(["Inbox A", "Typed", "Back A", "Back B", "\tChild", "Soon A", "Now A"]);
+		expect(s.entry.state).toMatchObject({ spot: { column: "projects", place: { group: null, index: at("Back A") } } });
+	});
+
+	it("a part's end for a stage it has no card of: after the stages before it", async () => {
+		const s = await projectsScreen();
+		const part = projectsEntryLook(s.view()).parts.find((p) => p.group === null)!;
+		expect(part.end).toEqual(s.item("Back A").key);
+		const sub = s.view().sections.find((x) => x.title === "Sub")!;
+		expect(projectsEntryLook(s.view()).parts.find((p) => p.group === sub.group)!.end).toEqual(sub.cards[0].item.key);
+		const empty = s.view().sections.find((x) => x.title === "Empty")!;
+		expect(projectsEntryLook(s.view()).parts.find((p) => p.group === empty.group)!.end).toBeNull();
+	});
+
 	it("on Done no part takes the plus: the plus opens nothing, never the hidden Inbox, and says so before the tap", async () => {
 		const s = await projectsScreen("done");
 		expect(s.entry.plusOpens()).toBe(false);

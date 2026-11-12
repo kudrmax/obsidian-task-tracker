@@ -653,6 +653,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.viewEntryLists", "rows", "soon"),
 		plain("rules.stackedLists", [{ wanted: 380, stops: [90, 160, 230, 300, 370] }, { wanted: 90, stops: [] }], 200, 20),
 		plain("rules.viewContext", "project:Стиль", "rows", false),
+		plain("rules.sameNewPlace", { kind: "list", list: "inbox", group: null, before: null }, { before: null, group: null, list: "inbox", kind: "list" }),
 		plain("rules.viewLayout", "allColumns", false, { inbox: "Inbox", backlog: "Backlog", soon: "Soon", day: null }),
 		plain("rules.layoutWidths", { mode: "rows", columns: [{ id: "rows", lists: [], width: "list" }, { id: "timeline", lists: [], width: "rest" }], swipe: "none", divider: true, stack: null }, 0.3, 804, 16),
 		plain("rules.layoutShareAt", { mode: "allColumns", columns: [], swipe: "none", divider: true, stack: null }, 400, 804, 16),

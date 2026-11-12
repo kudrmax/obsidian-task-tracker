@@ -4,7 +4,8 @@ import type { Placement } from "../domain/Placement";
 import { projectKey } from "../domain/Project";
 import type { LocalDate } from "../domain/Task";
 import type { TaskDocument, TaskEntry } from "../domain/TaskDocument";
-import type { GroupName, NewTaskPlace, ProjectsNewTask, ProjectsPlace, ProjectsSection, ProjectsView, TaskItem, TaskKey } from "./contracts";
+import type { GroupName, NewTaskPlace, ProjectsNewTask, ProjectsPlace, ProjectsSection, ProjectsStage, ProjectsView, TaskItem, TaskKey } from "./contracts";
+import { sameNewPlace } from "./newTaskPlaces";
 import { StaleTaskError } from "./contracts";
 import type { Header, ListCard } from "./nesting";
 import { keyOf, samePlace } from "./taskKeys";
@@ -14,6 +15,11 @@ export interface EntryPart {
 	readonly group: GroupName;
 	readonly newTask: ProjectsNewTask | null;
 	readonly plus: boolean;
+	/**
+	 * Where a field opened at the part's end stands, so the card it writes lands under it: before this card, the part's first
+	 * of a later stage than the one its new task goes to (the part shows its cards by stage); null: the part's end.
+	 */
+	readonly end: TaskKey | null;
 }
 
 /** What the quick entry reads of a list: its cards and sections as `EntryLook` gives them, and its parts' own writes. */
@@ -38,13 +44,25 @@ export function projectsEntryLook(view: ProjectsView | null): EntryListLook {
 	return {
 		cards,
 		sections: view.sections.map((section) => section.group),
-		parts: view.sections.map((section, i) => ({ group: section.group, newTask: section.newTask, plus: i === plusPart })),
+		parts: view.sections.map((section, i) => ({ group: section.group, newTask: section.newTask, plus: i === plusPart, end: endOf(section) })),
 	};
 }
 
 function sameNewTask(a: ProjectsNewTask, b: ProjectsNewTask): boolean {
 	const project = a.project === null || b.project === null ? a.project === b.project : projectKey(a.project) === projectKey(b.project);
-	return project && JSON.stringify(a.place) === JSON.stringify(b.place);
+	return project && sameNewPlace(a.place, b.place);
+}
+
+/** The order the Projects list shows a part's cards in: Inbox, Backlog, Soon (a dated one too), Today, Done. */
+const STAGE_RANK: Readonly<Record<ProjectsStage["kind"], number>> = { inbox: 0, backlog: 1, soon: 2, date: 2, today: 3, done: 4 };
+const LIST_RANK: Readonly<Record<GroupedList, number>> = { inbox: 0, backlog: 1, soon: 2, now: 3 };
+
+/** The part's first card of a stage after the one its new task goes to: a field at the part's end stands before it. */
+function endOf(section: ProjectsSection): TaskKey | null {
+	const place = section.newTask?.place;
+	if (!place || place.kind !== "list") return null;
+	const rank = place.date !== undefined ? STAGE_RANK.soon : LIST_RANK[place.list];
+	return section.cards.find((card) => card.stage !== null && STAGE_RANK[card.stage.kind] > rank)?.item.key ?? null;
 }
 
 /** The place a part's new task is written in as the entry's bar shows it: the part's list (Today: Now), a date for a dated one. */
