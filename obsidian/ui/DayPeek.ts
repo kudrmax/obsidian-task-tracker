@@ -29,6 +29,25 @@ export interface DayPeekDeps {
 	filter?(): ProjectsNodeId | null;
 	/** The words of an empty section's plate (`ViewChoice.emptyLabel`). */
 	emptyLabel?(): string;
+	/**
+	 * Where the shown day stands: the day's list (the layout's `dayLane`; none where the day's list is a row of a stack
+	 * or not drawn) and the timeline's column. The next day's columns stand exactly over them, whatever the layout.
+	 */
+	frames?(): { readonly list: HTMLElement | null; readonly timeline: HTMLElement };
+}
+
+/** `part` over `frame`, box for box: its place in the screen, its size and its padding. */
+function standOver(part: HTMLElement, frame: HTMLElement, root: HTMLElement): void {
+	const at = frame.getBoundingClientRect();
+	const origin = root.getBoundingClientRect();
+	const style = part.style;
+	style.left = `${at.left - origin.left}px`;
+	style.top = `${at.top - origin.top}px`;
+	style.width = `${at.width}px`;
+	style.height = `${at.height}px`;
+	style.bottom = "auto";
+	style.margin = "0";
+	style.padding = getComputedStyle(frame).padding;
 }
 
 /**
@@ -57,6 +76,7 @@ export class DayPeek {
 		this.el.setAttribute("aria-hidden", "true");
 		root.insertBefore(this.el, root.querySelector(":scope > .tc-fade"));
 		this.left = el(this.el, "div", "tc-left");
+		const frames = deps.frames?.() ?? null;
 		this.list = new TaskList(el(this.left, "div"), {
 			items: () => this.day?.list ?? [],
 			day: () => date,
@@ -66,6 +86,11 @@ export class DayPeek {
 			emptyLabel: () => deps.emptyLabel?.() ?? "",
 		});
 		this.right = el(this.el, "div", "tc-right");
+		if (frames) {
+			if (frames.list) standOver(this.left, frames.list, root);
+			else this.left.classList.add("tc-hidden");
+			standOver(this.right, frames.timeline, root);
+		}
 		this.allDayEl = el(this.right, "div");
 		this.timeline = new Timeline(el(this.right, "div"), {
 			theme: () => deps.theme(),

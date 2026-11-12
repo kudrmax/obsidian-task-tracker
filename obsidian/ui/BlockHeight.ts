@@ -11,6 +11,8 @@ export class BlockHeight {
 	constructor(
 		private readonly block: HTMLElement,
 		private readonly root: HTMLElement,
+		/** What scrolls the view the block shows: its layout's stack or list. */
+		private readonly scroller: () => HTMLElement | null,
 	) {
 		const view = root.ownerDocument.defaultView ?? window;
 		this.watch = new view.MutationObserver(() => this.request());
@@ -36,11 +38,6 @@ export class BlockHeight {
 			this.frame = 0;
 			this.fit();
 		});
-	}
-
-	/** The scroller of the mode shown: the rows, or the by project list. */
-	private scroller(): HTMLElement | null {
-		return this.root.querySelector<HTMLElement>(":scope.is-view-rows > .tc-rows .tc-rows-stack, :scope.is-view-by-project > .tc-by-project .tc-list");
 	}
 
 	fit(): void {

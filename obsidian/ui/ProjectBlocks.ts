@@ -31,7 +31,7 @@ class ProjectBlock extends Component {
 		this.scope = new Scope(app.scope);
 		const screen = this.addChild(new CalendarScreen(app, root, deps, { view: false, keys: this.scope, note: () => this.path }));
 		this.screen = screen;
-		this.height = new BlockHeight(this.el, root);
+		this.height = new BlockHeight(this.el, root, () => screen.scroller());
 		this.scope.register(["Mod"], "z", () => screen.undoKey("undo"));
 		this.scope.register(["Mod", "Shift"], "z", () => screen.undoKey("redo"));
 		this.scope.register(["Mod"], "f", () => screen.findKey());

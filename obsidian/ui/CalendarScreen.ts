@@ -725,6 +725,7 @@ export class CalendarScreen extends Component {
 			allDayExtraRows: () => this.rightEl?.style.getPropertyValue(PROPERTY.allDayExtraRows) ?? "",
 			filter: () => this.filterNode(),
 			emptyLabel: () => this.view().emptyLabel,
+			frames: () => ({ list: this.layout?.dayLane() ?? null, timeline: this.rightEl ?? root }),
 		});
 		const lane = this.layout?.dayLane() ?? null;
 		const list: DayLane | null = lane && {
@@ -889,6 +890,11 @@ export class CalendarScreen extends Component {
 		await this.data.tasks();
 	}
 
+	/** What scrolls the whole view in a note's block, which grows with it: its layout's. */
+	scroller(): HTMLElement | null {
+		return this.layout?.scroller() ?? null;
+	}
+
 	/** Cmd+F: the search over the screen. */
 	findKey(): boolean {
 		this.openSearch();
@@ -1046,7 +1052,7 @@ export class CalendarScreen extends Component {
 	 */
 	private async dropInProjectsList(drag: TaskDragPayload, place: ListPlace): Promise<HTMLElement | null> {
 		const list = this.layout?.projects() ?? null;
-		const node = this.filterNode() ?? undefined;
+		const node = this.filterNode() ?? "all";
 		const cards = this.projectsDrops(drag);
 		if (!list || cards.length === 0) return null;
 		let landing: ProjectsDropLanding | null = null;
