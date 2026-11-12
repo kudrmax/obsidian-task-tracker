@@ -1,5 +1,6 @@
 import { type DropColumn, type StackedList, stackedLists, type ViewLayout } from "../../../core/application/contracts";
 import { el, px } from "../dom";
+import { restingRect } from "../motion/Motion";
 import type { ListColumn } from "../drag/DropTarget";
 import type { TaskList } from "../TaskList";
 import { type FunnelList, funnelList } from "./FunnelLists";
@@ -76,11 +77,14 @@ export class RowsLayout extends StillLayout {
 		} else this.fit();
 	}
 
-	/** Measures again once nothing moves in the lists and nothing holds them, then sets each row's height. */
+	/**
+	 * Measures again and sets each row's height, its slide running with the cards that grow in or slide. Rows leaving
+	 * first fold away: until they have, where the cards under them end is not known.
+	 */
 	private fit(): void {
-		if (this.destroyed || !this.scrolls || this.holds.size > 0) return;
+		if (this.destroyed || !this.scrolls || this.holds.has("carry")) return;
 		const view = this.host.root.ownerDocument.defaultView ?? window;
-		const moving = this.stack.getAnimations({ subtree: true }).filter((animation) => animation.playState === "running" && !this.isRowHeight(animation));
+		const moving = this.stack.getAnimations({ subtree: true }).filter((animation) => animation.playState === "running" && this.isLeaving(animation));
 		const token = {};
 		this.waiting = token;
 		if (moving.length > 0) {
@@ -96,18 +100,20 @@ export class RowsLayout extends StillLayout {
 		});
 	}
 
-	/** A row's own height sliding to its last measure: not motion in the lists. */
-	private isRowHeight(animation: Animation): boolean {
+	/** A card or a header folding away out of a list. */
+	private isLeaving(animation: Animation): boolean {
 		const target = (animation.effect as KeyframeEffect | null)?.target;
-		return target instanceof HTMLElement && target.classList.contains("tc-row");
+		return target instanceof HTMLElement && target.classList.contains("is-leaving");
 	}
 
 	private apply(): void {
-		if (this.destroyed || this.holds.size > 0 || this.stack.clientHeight === 0) return;
+		if (this.destroyed || this.holds.has("carry") || this.stack.clientHeight === 0) return;
 		const measured = this.rows.map((row) => this.measure(row));
 		const style = getComputedStyle(this.stack);
 		const gap = this.rows.length > 1 ? parseFloat(getComputedStyle(this.rows[1].el).marginTop) || 0 : 0;
 		const room = this.stack.clientHeight - (parseFloat(style.paddingBottom) || 0) - gap * (this.rows.length - 1);
+		/** A task typed where every list has to share: the list keeps its height and scrolls the field into view, none of the others moves. */
+		if (this.holds.has("typing") && measured.reduce((sum, list) => sum + list.wanted, 0) > room) return;
 		const heights = stackedLists(measured, room, this.fadeProbe.offsetHeight);
 		const still = this.still;
 		this.still = false;
@@ -119,15 +125,26 @@ export class RowsLayout extends StillLayout {
 		}
 	}
 
-	/** A row as it stands drawn: its whole height (label, cards, plate), and where each card ends, from the row's top. */
+	/**
+	 * A row as it will stand once its cards have grown in and slid to their places (`restingRect`): its whole height
+	 * (label, cards, plate), and where each card ends, from the row's top.
+	 */
 	private measure(row: Row): StackedList {
 		const list = row.funnel.list.el;
 		const label = row.label.offsetHeight;
 		const style = getComputedStyle(list);
+		const top = list.getBoundingClientRect().top - list.scrollTop;
 		const inFlow = [...list.children].filter((child): child is HTMLElement => child instanceof HTMLElement && !child.classList.contains("is-leaving") && getComputedStyle(child).position !== "absolute");
-		const stops = inFlow.filter((child) => !child.classList.contains("tc-group-head")).map((child) => label + child.offsetTop + child.offsetHeight);
-		const last = inFlow[inFlow.length - 1];
-		const content = last ? last.offsetTop + last.offsetHeight : parseFloat(style.paddingTop) || 0;
+		let growth = 0;
+		const ends = inFlow.map((child) => {
+			const now = child.getBoundingClientRect().height;
+			const resting = restingRect(child);
+			const end = resting.top + growth + resting.height - top;
+			growth += resting.height - now;
+			return { child, end };
+		});
+		const stops = ends.filter(({ child }) => !child.classList.contains("tc-group-head")).map(({ end }) => label + end);
+		const content = ends.length > 0 ? ends[ends.length - 1].end : parseFloat(style.paddingTop) || 0;
 		return { wanted: label + content + (parseFloat(style.paddingBottom) || 0), stops };
 	}
 
@@ -149,10 +166,10 @@ export class RowsLayout extends StillLayout {
 	}
 
 	override hold(reason: LayoutHold, on: boolean): void {
-		const was = this.holds.size > 0;
+		const was = this.holds.has(reason);
 		if (on) this.holds.add(reason);
 		else this.holds.delete(reason);
-		if (was && this.holds.size === 0) this.fit();
+		if (was !== on) this.fit();
 	}
 
 	override destroy(): void {
