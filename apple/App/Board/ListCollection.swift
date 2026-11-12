@@ -375,8 +375,15 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
                   let field = cell.contentView.firstResponderInside as? EntryTextField else { continue }
             field.park(in: window)
         }
+        // A No tasks plate a card comes into goes at once: its words never stand over the card that arrives.
+        // A list a plate comes into (its last card went): the leaving cards go at once too, never under the plate's words.
+        let emptied = next.contains { if case .vacant = $0 { true } else { false } } && !next.contains { if case .card = $0 { true } else { false } }
+        for id in gone where emptied || id == "\u{0}vacant" || id.hasPrefix("\u{0}plate/") {
+            if let path = source.indexPath(for: id), let cell = collection.cellForItem(at: path) { cell.contentView.alpha = 0 }
+        }
         if let layout = collection.collectionViewLayout as? FoldingListLayout {
             layout.covers = (before: Self.covering(rows), after: Self.covering(next))
+            layout.plates = Set(next.indices.filter { if case .vacant = next[$0] { true } else if case .plate = next[$0] { true } else { false } })
         }
         rows = next
         drawn = tops
@@ -561,7 +568,12 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         guard let frame = collection.layoutAttributesForItem(at: path)?.frame else { return }
         let visible = collection.bounds.inset(by: UIEdgeInsets(top: SoftEdges.fade, left: 0, bottom: collection.contentInset.bottom + SoftEdges.fade, right: 0))
         guard !visible.contains(frame) else { return }
-        collection.scrollToItem(at: path, at: centred ? .centeredVertically : .bottom, animated: animated)
+        if centred { return collection.scrollToItem(at: path, at: .centeredVertically, animated: animated) }
+        // Whole above the bottom fade (and the keyboard), as far as the list scrolls; or under the top fade.
+        let least = -collection.adjustedContentInset.top
+        let most = max(least, collection.contentSize.height + collection.adjustedContentInset.bottom - collection.bounds.height)
+        let wanted = frame.maxY > visible.maxY ? frame.maxY - (visible.maxY - collection.bounds.minY) : frame.minY - SoftEdges.fade
+        collection.setContentOffset(CGPoint(x: collection.contentOffset.x, y: min(most, max(least, wanted))), animated: animated)
     }
 
     /// The keyboard's top at `top` on the screen: the part of the list it covers is room to scroll the last rows above it.
@@ -959,6 +971,8 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
 final class FoldingListLayout: UICollectionViewCompositionalLayout {
     /// The rows, before and after the change, that cover a row folding under them (`ListController.covering`).
     var covers: (before: Set<Int>, after: Set<Int>) = ([], [])
+    /// The rows that come in whole, at once: a list's No tasks plate shows the moment its last card goes.
+    var plates: Set<Int> = []
     private var inserted: Set<Int> = []
     private var deleted: Set<Int> = []
     /// Counts the layouts made: what a carry read of the rows' frames holds for.
@@ -1004,6 +1018,7 @@ final class FoldingListLayout: UICollectionViewCompositionalLayout {
         }
         var anchor = path.item - 1
         while anchor >= 0, inserted.contains(anchor) { anchor -= 1 }
+        if plates.contains(path.item) { return shown }
         guard anchor >= 0, covers.after.contains(anchor), let over = layoutAttributesForItem(at: IndexPath(item: anchor, section: path.section)) else {
             shown.alpha = 0
             return shown

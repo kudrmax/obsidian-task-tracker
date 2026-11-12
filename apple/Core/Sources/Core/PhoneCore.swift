@@ -233,7 +233,7 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
     }
 
     static func json(_ value: Any) throws -> String {
-        String(decoding: try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed]), as: UTF8.self)
+        String(decoding: try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .sortedKeys]), as: UTF8.self)
     }
 
     static func wire(_ context: DoorContext) throws -> [String: Any] {

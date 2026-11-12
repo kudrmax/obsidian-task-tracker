@@ -1648,10 +1648,15 @@ final class BoardModel {
         comingSerial += 1
         let serial = comingSerial
         coming = (serial, next)
-        withAnimation(CarryMotion.dropAnimation) {
-            if landed { carry?.landed = true }
+        // What lit under the carry (an empty section's plate, a title) goes out with the let-go, not fading after it.
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
             if hover != nil { hover = nil }
             if landing != nil { landing = nil }
+        }
+        withAnimation(CarryMotion.dropAnimation) {
+            if landed { carry?.landed = true }
         }
         // The calendar the drop leaves, laid out at the zoom shown now: the copy flies to its block in it.
         if next.timeline != snapshot?.timeline, let hour = zoom.hour, abs(Double(hour) - CardMetrics.timeline.hour) >= 0.5,

@@ -71,7 +71,9 @@ final class BoardRoute {
         }.sorted { $0.0.priority > $1.0.priority }
         let seen = { (area: CGRect) in CGRect(x: area.minX, y: area.minY, width: area.width, height: max(1, min(area.maxY, self.floor) - area.minY)) }
         if let inside = shown.first(where: { seen($0.1).contains(point) }) { return (inside.0, point) }
-        let column = shown.filter { $0.1.minX <= point.x && point.x < $0.1.maxX && $0.0.priority == 0 }
+        // Only under the lists (the tab bar's row) does a column take a carry the finger holds outside it: above them all
+        // (the toolbar, the status bar) nothing does, and a let-go there is a let-go nowhere.
+        let column = shown.filter { $0.1.minX <= point.x && point.x < $0.1.maxX && $0.0.priority == 0 && point.y > seen($0.1).maxY }
         guard let nearest = column.min(by: { distance(point.y, seen($0.1)) < distance(point.y, seen($1.1)) }) else { return nil }
         let area = seen(nearest.1)
         return (nearest.0, CGPoint(x: point.x, y: min(max(point.y, area.minY + 1), area.maxY - 1)))
