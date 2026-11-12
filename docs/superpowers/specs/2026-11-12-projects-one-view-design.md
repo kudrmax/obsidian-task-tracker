@@ -81,12 +81,11 @@ iPhone app (frontend-swift, 2026-11-12):
 21. By project draws the core's `projectsScreen(node)` parts without the old segment (By stage is Rows now), the calendar
     beside it behind the divider.
 
-Applied in the app from the Obsidian frontend and the backend (2026-11-12, round 2): 26 (a drop on a row reads the task
-under the filter it was lifted under; a carry let go nowhere puts that filter back once it has ended), 27 (the panel the
-plus brought out stays while the new project's name is typed), 30 (the folder mark chooses the filter), 31 (a device kept at
-the old Projects place opens Inbox), 33/37 (the plates and their words are `ViewChoice.plates`), 36 (`filterHides` before
-`clearProjectFilter`), 38 (`firstView` before the first read). A selection carried onto a row moves every carried task.
-28/34: the app reads another day through the same filtered `screen`, so it needs no separate `dayView`.
+Applied in the app (2026-11-12, round 3): 39 (the carry is the core's session: `startCarry` at the lift, `carryAt` on
+each move and after its wait, `carryOnNode` on a row, `endCarry` nowhere/dropped/naming, `endProjectName`; the app keeps no
+lifted filter, edge timer, hover timer or panel of its own), 40 (the place is the core's: `firstPlace` at launch,
+`setFunnelPlace` as the ribbon settles, the old `ribbonPlace` number handed once), 41 (`ribbon`, `searchPaths`), 33/37
+(`plates`), 36 (`filterHides`), 38 (`firstView`). 28/34: the app reads every day through the filtered `screen`.
 
 Obsidian frontend (2026-11-12; numbered from 22 so as not to meet the Swift frontend's 13–21 on its branch):
 

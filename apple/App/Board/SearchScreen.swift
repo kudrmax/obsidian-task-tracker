@@ -12,9 +12,9 @@ struct SearchScreen: View {
     @State private var cards: [String: BoardCard] = [:]
     @State private var names: [String: String] = [:]
     @State private var focused = true
-    /// Opened over a screen filtered by a node: each find shows where it stands among the projects, so the same task in
-    /// two projects is seen side by side.
-    private var fromProjects: Bool { model.filter != nil }
+    /// Opened over a view the core says shows paths (`FunnelView.searchPaths`): each find shows where it stands among
+    /// the projects, so the same task in two projects is seen side by side.
+    private var fromProjects: Bool { model.funnel?.searchPaths == true }
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

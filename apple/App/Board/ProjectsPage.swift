@@ -495,7 +495,6 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
             let under = row(at: point)
             let over = under.flatMap { $0.acceptsTask ? $0.node : nil }
             if projects.dropOn != over { projects.dropOn = over }
-            springLoad(under.flatMap { $0.unfoldsOnHover || $0.opensOnHover ? $0.node : nil })
             return
         }
         aim(at: point, lifted: payload.flatMap { if case .project(let row) = $0.kind { row.node } else { nil } })
@@ -533,29 +532,8 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         model.drag.showLine(from: start, to: area.maxX - TreeMetrics.inset)
     }
 
-    /// The folded row a held card waits over, and the pause after which its branch opens, as a folder opens under a
-    /// carried file in Files.
-    private var waitingOver: String?
-    private var unfold: DispatchWorkItem?
-
-    private func springLoad(_ node: String?) {
-        guard node != waitingOver else { return }
-        unfold?.cancel()
-        unfold = nil
-        waitingOver = node
-        guard let node, let projects else { return }
-        let work = DispatchWorkItem { [weak self] in
-            guard self?.waitingOver == node else { return }
-            UISelectionFeedbackGenerator().selectionChanged()
-            Task { await projects.hover(node) }
-        }
-        unfold = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + projects.measures.hoverMs / 1000, execute: work)
-    }
-
     func leave() {
         if model?.carrying != true { liftedFrom = nil }
-        springLoad(nil)
         projects?.dropOn = nil
         aimed = nil
         model?.drag.hideLine()
@@ -565,9 +543,9 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         guard let projects, model != nil else { return nil }
         defer { leave() }
         switch payload?.kind {
-        case .card(let card):
+        case .card:
             guard let node = projects.dropOn, let frame = projects.geometry.rows[node] else { return nil }
-            Task { await projects.drop(card, on: node) }
+            model?.carryOnNode(node)
             return CarryLanding(rect: frame, folds: true)
         case .project(let row):
             guard let aimed, let name = row.project?.name else { return nil }
@@ -579,6 +557,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         case nil:
             guard let aimed else { return nil }
             let rect = lineRect
+            model?.carryNaming()
             projects.asking = .project(aimed.landing.place)
             return CarryLanding(rect: rect, folds: true)
         }

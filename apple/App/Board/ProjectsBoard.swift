@@ -25,9 +25,12 @@ final class ProjectsBoard {
 
     /// The tree's row a carried card would be let go on: lit in the drop's colour.
     var dropOn: String?
-    /// The name asked: a project for the plus in the tree, a rename. Answered, a panel the plus brought out goes.
+    /// The name asked: a project for the plus in the tree, a rename. A new project's answered or cancelled, the panel the
+    /// naming kept out goes (`endProjectName`).
     var asking: Ask? {
-        didSet { if asking == nil { model?.releaseHeldPanel() } }
+        didSet {
+            if asking == nil, case .project = oldValue { model?.endProjectName() }
+        }
     }
     /// The project Delete project was chosen for, its question shown before anything is written.
     var deleting: ProjectMenu?
@@ -163,29 +166,9 @@ final class ProjectsBoard {
         await act { try $0.selectProjectNode(node) }
     }
 
-    /// A card held over a row the pause the core gives: a folded branch opens, a live project is chosen, so the card can
-    /// be let go among its tasks (`hoverProjectNode`).
-    func hover(_ node: String) async {
-        await act { try $0.hoverProjectNode(node) }
-    }
-
-    /// Cards let go on a row, every task the carry takes (a selection carried goes whole): the project each was shown
-    /// under gives way to the row's; its place in the funnel stays. The By project list's by their own `drop`; the
-    /// funnel's lists' and the calendar's by their keys, under the filter they were lifted under (a hover may have opened
-    /// another node since).
-    func drop(_ card: BoardCard, on node: String) async {
-        let items = model?.carriedItems ?? [card.item]
-        if let lifted = cards[card.id] {
-            let ids = Set(items.map(\.id))
-            var seen: Set<String> = [lifted.item.id]
-            let others = cards.values.filter { ids.contains($0.item.id) && seen.insert($0.item.id).inserted }
-            let shown = [lifted] + others.sorted { $0.id < $1.id }
-            await write { try $0.dropOnProject(shown, to: node) }
-            return
-        }
-        let keys = items.map(\.key)
-        let under = model?.liftedUnder ?? model?.filter?.node
-        await write { try $0.dropTasksOnProject(keys, to: node, filter: under) }
+    /// The panel row under `point` (window), as last laid out: what the carry reports to the core.
+    func node(at point: CGPoint) -> String? {
+        rows.first { geometry.rows[$0.node]?.contains(point) == true }?.node
     }
 
     /// A project lifted and let go in a gap.
