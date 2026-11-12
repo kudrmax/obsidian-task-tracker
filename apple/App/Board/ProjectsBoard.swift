@@ -91,8 +91,8 @@ final class ProjectsBoard {
                 drawn.append(zip(section.rows, painted).map { Self.card($0.1, as: $0.0) })
                 for row in section.rows {
                     let from = row.card?.menuFrom ?? "list"
-                    for item in [row.item] + (row.item.card.step.map { [$0] } ?? []) where menus[item.id] == nil {
-                        menus[item.id] = try board.read("tasks.menu", [item.json, .string(from), screen], over: board.settingsOnly())
+                    if menus[row.item.id] == nil {
+                        menus[row.item.id] = try board.read("tasks.menu", [row.item.json, .string(from), screen], over: board.settingsOnly())
                     }
                 }
             }
