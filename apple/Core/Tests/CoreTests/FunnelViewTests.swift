@@ -22,7 +22,7 @@ import Testing
         let view = try board.funnelView()
         #expect(view.filter == nil)
         #expect(view.view.mode == .twoColumns && view.view.wheel)
-        #expect(view.view.modes.map(\.label) == ["Columns", "Rows"])
+        #expect(view.view.modes.map(\.label) == ["Columns", "Rows", "By project"])
         #expect(view.panel?.open == false && view.panel?.docked == false)
         let snapshot = try board.snapshot(day: nil, measures: Self.measures)
         #expect(snapshot.filter == nil)
@@ -62,8 +62,6 @@ import Testing
         try board.setViewMode(.byProject)
         #expect(try board.funnelView().view.mode == .byProject)
         try board.clearProjectFilter()
-        #expect(try board.funnelView().view.mode == .twoColumns)
-        try board.pickProjectNode("project:Дружба")
         #expect(try board.funnelView().view.mode == .byProject)
     }
 

@@ -293,10 +293,10 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 			});
 		}
 
-		it("All keeps its fallback: the first part that writes takes the plus", async () => {
+		it("All, no filter: the plus types in No project's part, a task with no project", async () => {
 			const s = await projectsScreen("all", "byProject", FOLDER);
 			const look = projectsEntryLook(s.view());
-			expect(look.parts.filter((p) => p.plus).map((p) => p.group)).toEqual([s.view().sections.find((x) => x.newTask !== null)!.group]);
+			expect(look.parts.filter((p) => p.plus).map((p) => p.group)).toEqual(["none"]);
 		});
 
 		it("the plus may be let go only where a new task may be written: a subproject's gap and under its tasks, never in the folder's own part or under a task carrying the folder", async () => {

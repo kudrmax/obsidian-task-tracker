@@ -45,7 +45,7 @@ import type { Clock, SettingsStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
 import type { DropTo, FunnelView, ProjectFilter, ProjectNote, ProjectRef, ProjectsNodeId, ProjectsScreenState, ProjectsView } from "./contracts";
 import { ProjectTree } from "../domain/ProjectTree";
-import { chosenNode, nodeHeader, nodeIn, panelRows, PROJECTS_WORDS, projectNodeOf, projectOfNode, projectsView } from "./projectsScreen";
+import { chosenNode, filterNode, nodeHeader, panelRows, PROJECTS_WORDS, projectNodeOf, projectOfNode, projectsView } from "./projectsScreen";
 import { filterTest, noteProject } from "./projectFilter";
 import { firstViewOf, viewChoice } from "./viewModes";
 import { panelReason } from "./projectsCarry";
@@ -205,7 +205,7 @@ export class TaskReads {
 
 	filterHides({ doc }: Snapshot, item: TaskItem, filter: ProjectsNodeId | null): boolean {
 		const tree = projectTreeOf(doc);
-		const node = nodeIn(filter, tree);
+		const node = filterNode(filter, tree);
 		const entry = this.rules.named(doc, item.key) ?? doc.find(item.key.section, item.key.index, item.key.path);
 		if (node === null || !entry) return false;
 		const top = entry.path.length === 0 ? entry : doc.find(entry.section, entry.index, []);
@@ -253,7 +253,7 @@ export class TaskReads {
 	screen(s: Snapshot, date: LocalDate, filter?: ProjectsNodeId | null): ScreenView {
 		const { doc, today, boundary } = s;
 		const tree = projectTreeOf(doc);
-		const node = nodeIn(filter, tree);
+		const node = filterNode(filter, tree);
 		const shows = node === null ? () => true : filterTest(node, tree, doc);
 		const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
 		const shown = (entries: readonly TaskEntry[]) => entries.filter(shows).map(item);

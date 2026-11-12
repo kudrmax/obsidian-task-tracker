@@ -37,7 +37,7 @@ import type { TreePlace } from "../domain/ProjectTree";
 import { isFolder } from "../domain/ProjectWrites";
 import { dayColumn } from "../domain/Days";
 import { projectTreeOf } from "./projects";
-import { nodeIn } from "./projectsScreen";
+import { filterNode } from "./projectsScreen";
 import { afterShown, filterTest, shownUnder } from "./projectFilter";
 import type { ProjectsNodeId } from "./contracts";
 import type { ReadDrop } from "./drops";
@@ -211,7 +211,7 @@ export class TaskWrites {
 		if (keys.length === 0) return nothing(null);
 		return nothing((doc, today, settings, boundary) => {
 			const tree = projectTreeOf(doc);
-			const node = nodeIn(filter, tree);
+			const node = filterNode(filter, tree);
 			const cards = keys.map((key): ProjectsDrop => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree) }));
 			const operation = this.rules.dropOnProject(cards, to);
 			return operation ? operation(doc, today, settings, boundary) : doc;
@@ -512,7 +512,7 @@ export class TaskWrites {
 	/** A drop at a section's end of a filtered list: right after the last task of the section the filter shows (`afterShown`). */
 	private shownDrop(s: Snapshot, read: Extract<ReadDrop, { readonly kind: "group" }>, filter: ProjectsNodeId, tasks: readonly DroppedTask[]): ReadDrop {
 		const tree = projectTreeOf(s.doc);
-		const node = nodeIn(filter, tree);
+		const node = filterNode(filter, tree);
 		if (node === null) return read;
 		const carried = new Set(tasks.map((task) => this.rules.entryOf(s.doc, task.key).id));
 		return { ...read, before: afterShown(s.doc, read.list, read.group, filterTest(node, tree, s.doc), carried) };
@@ -556,7 +556,7 @@ export class TaskWrites {
 function shownPlace(doc: TaskDocument, place: NewTaskPlace, filter: ProjectsNodeId, today: LocalDate): NewTaskPlace {
 	if ((place.kind !== "list" && place.kind !== "day") || place.before !== null) return place;
 	const tree = projectTreeOf(doc);
-	const node = nodeIn(filter, tree);
+	const node = filterNode(filter, tree);
 	if (node === null) return place;
 	const list = place.kind === "list" ? place.list : dayColumn(place.date, today).list;
 	return { ...place, before: afterShown(doc, list, place.group, filterTest(node, tree, doc)) };

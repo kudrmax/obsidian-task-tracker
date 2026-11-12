@@ -31,24 +31,18 @@ export interface ViewAsk {
 }
 
 /**
- * The modes offered, in the menu's order: two columns (the phone's «Columns»), all columns where the screen is wide, rows,
- * and by project with a node chosen but No project; under Done or a done project by project alone. In a note no two or
- * all columns: the block shows its project's lists, not the funnel's walk.
+ * The modes offered, in the menu's order, the same under every filter and none (Max, 2026-11-12: mode and project are
+ * independent): two columns (the phone's «Columns»), all columns where the screen is wide, rows, by project. In a note no
+ * two or all columns: the block shows its project's lists, not the funnel's walk.
  */
 function offered(ask: ViewAsk): readonly ViewMode[] {
-	if (ask.closed && ask.node !== null) return ["byProject"];
-	const byProject: readonly ViewMode[] = ask.node !== null && ask.node !== "none" ? ["byProject"] : [];
-	if (ask.note) return ["rows", ...byProject];
-	return ["twoColumns", ...(ask.wide ? (["allColumns"] as const) : []), "rows", ...byProject];
+	if (ask.note) return ["rows", "byProject"];
+	return ["twoColumns", ...(ask.wide ? (["allColumns"] as const) : []), "rows", "byProject"];
 }
 
-/**
- * The mode a view starts with, filter or none: two columns on the screen, rows in a note; by project where it alone is
- * offered. (Max, 2026-11-12: the mode is one choice; a filter no longer picks its own.)
- */
-function defaultMode(ask: ViewAsk, modes: readonly ViewMode[]): ViewMode {
-	const wanted: ViewMode = ask.note ? "rows" : "twoColumns";
-	return modes.includes(wanted) ? wanted : modes[0];
+/** The mode a view starts with, filter or none: two columns on the screen, rows in a note. */
+function defaultMode(ask: ViewAsk): ViewMode {
+	return ask.note ? "rows" : "twoColumns";
 }
 
 /** The mode kept for this view: the note's block its own, the screen one for every filter and none. */
@@ -64,20 +58,26 @@ export function viewContext(node: ProjectsNodeId | null, mode: ViewMode, note: b
 	return JSON.stringify(note ? ["note", mode] : ["screen", node, mode]);
 }
 
-/** The view's mode and the modes its button offers: the kept one while it is offered, else the default. */
+/**
+ * The view's mode and the modes its button offers: the button shows the kept one while it is offered (All columns on a
+ * narrow screen is not), else the default (`chosen`). What is drawn (`mode`) is the chosen one, except under Done and a
+ * done project, whose own content is their done list by project in any mode chosen.
+ */
 export function viewChoice(state: ProjectsScreenState, ask: ViewAsk): ViewChoice {
 	const modes = offered(ask);
 	const kept = keptMode(state, ask);
-	const mode = kept !== undefined && modes.includes(kept) ? kept : defaultMode(ask, modes);
+	const chosen = kept !== undefined && modes.includes(kept) ? kept : defaultMode(ask);
+	const mode: ViewMode = ask.closed && ask.node !== null ? "byProject" : chosen;
 	const label = (m: ViewMode) => (m === "twoColumns" && !ask.wide ? VIEW_WORDS.columns : VIEW_WORDS[m]);
-	const options: ViewModeOption[] = modes.map((m) => ({ mode: m, label: label(m), icon: ICONS[m], checked: m === mode }));
+	const options: ViewModeOption[] = modes.map((m) => ({ mode: m, label: label(m), icon: ICONS[m], checked: m === chosen }));
 	const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
 	const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
 	const ribbon = mode === "twoColumns" && !ask.note;
 	return {
 		mode,
+		chosen,
 		modes: options,
-		icon: ICONS[mode],
+		icon: ICONS[chosen],
 		wheel: mode === "twoColumns",
 		ribbon,
 		source: mode === "byProject" ? "projectsScreen" : "screen",
@@ -89,9 +89,10 @@ export function viewChoice(state: ProjectsScreenState, ask: ViewAsk): ViewChoice
 	};
 }
 
-/** The view before any read: the device's kept mode, a node chosen (`state.selected`) counting as a filter that is no done one. */
+/** The view before any read: the device's kept mode, a node chosen (`state.selected`) counting as a filter (All as none, Done as closed). */
 export function firstViewOf(state: ProjectsScreenState, wide: boolean, note: boolean, title: ViewAsk["title"]): ViewChoice {
-	return viewChoice(state, { node: note ? "note" : (state.selected ?? null), closed: false, wide, note, title });
+	const node = note ? "note" : state.selected === undefined || state.selected === "all" ? null : state.selected;
+	return viewChoice(state, { node, closed: node === "done", wide, note, title });
 }
 
 /** The state with `mode` the screen's one mode; a mode an older version kept for a filter apart (`filteredView`) goes. */

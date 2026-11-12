@@ -12,10 +12,10 @@ export type TaskTest = (entry: TaskEntry) => boolean;
 
 /**
  * The tasks a node lets through, a subtask going with its task: a project its branch's (its own and every subproject's
- * at any depth), All every task with a project, No project every task without one, Done every task of a done project.
+ * at any depth), All every task (no filter), No project every task without one, Done every task of a done project.
  */
 export function filterTest(node: ProjectsNodeId, tree: ProjectTree, doc: TaskDocument): TaskTest {
-	if (node === "all") return (entry) => entry.task.projects.length > 0;
+	if (node === "all") return () => true;
 	if (node === "none") return (entry) => entry.task.projects.length === 0;
 	const names = node === "done" ? doneNames(tree, doc) : branchNames(node, tree);
 	return (entry) => names.some((name) => namesProject(entry.task.projects, name));

@@ -195,7 +195,7 @@ describe("the writes", () => {
 	it("dropped on No project, it loses that project only", async () => {
 		const { svc, store } = setup();
 		const view = await svc.projectsScreen();
-		const card = view.sections.find((s) => s.title === "Где знакомиться")!.cards.find((c) => c.item.title === "Найти мероприятия для друзей")!;
+		const card = view.sections.find((s) => s.title === "Окружение в Сербии")!.cards.find((c) => c.item.title === "Найти мероприятия для друзей")!;
 		await svc.dropOnProject([card.drop], "none");
 		expect(store.text).toContain("- [ ] Найти мероприятия для друзей 🗂️ Дружба\n");
 	});

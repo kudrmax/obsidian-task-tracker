@@ -400,9 +400,19 @@ adds to the calls above; the old ones answer as before.
 #### The view rework (2026-11-12): one mode, layouts, contexts
 
 - **One view mode.** `tasks.setViewMode(mode)` alone changes it; `pickProjectNode`, `clearProjectFilter`, a carry's
-  filter never do. Its default is Two columns, filter or none (Rows in a note's block, `setNoteViewMode` its own). A mode
-  the current screen doesn't offer (By project without a node, All columns on a narrow screen) shows as the default and
-  comes back where it is offered.
+  filter never do. Every mode is offered under every filter and none (`twoColumns`, `allColumns` on a wide screen,
+  `rows`, `byProject`; a note's block `rows`, `byProject`). Its default is Two columns (Rows in a note's block,
+  `setNoteViewMode` its own); All columns kept on a narrow screen shows as the default.
+- `ViewChoice.chosen`: the mode the button shows and checks (`icon` is its). `ViewChoice.mode`: what is drawn, the chosen
+  one, but By project under Done and a done project (their done list, in any mode chosen); `wheel`, `ribbon`, `source`,
+  `rows`, `layout`, `FunnelView.plus` follow `mode`. Example: Rows chosen, Done picked → `{ mode: "byProject", chosen:
+  "rows", icon: "rows-3" }`.
+- **All is no filter** (Max, 2026-11-12): the panel's All row is `selected` whenever nothing else is chosen;
+  `tasks.pickProjectNode("all", wide)` and `tasks.selectProjectNode("all")` clear the filter (`FunnelView.filter` null, no
+  title, no cross; a narrow panel closes). `"all"` passed as a filter anywhere (`screen`, `drop`, `createInPlace`, …)
+  and an old kept `selected: "all"` mean no filter.
+- `tasks.projectsScreen()` with no filter (or `"all"`): every open task by its top project, then a «No project» part
+  last (key `"none"`); the plus types there. Under `"none"` its one part; under a project its own and its subprojects'.
 - `ViewChoice.layout` `ViewLayout` `{ mode, columns, swipe, divider, stack }`: the columns left to right, each `{ id,
   lists, width }` (`id` `"inbox" | "soon" | "day" | "timeline" | "rows" | "projects"`; `lists` `[{ list, title }]`, top
   to bottom, `title` the list's name, null for the day's list (it draws the day's own title) and the by project list;

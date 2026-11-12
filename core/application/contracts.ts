@@ -1005,10 +1005,13 @@ export interface ViewModeOption {
 
 /** The view a screen draws and the button that changes it. */
 export interface ViewChoice {
+	/** What is drawn: the mode chosen; under Done and a done project by project (their done list) whatever is chosen. */
 	readonly mode: ViewMode;
+	/** The mode the button shows and checks (`setViewMode`'s), every mode under every filter: a filter never changes it. */
+	readonly chosen: ViewMode;
 	/** The button's menu, in order; a pick writes `setViewMode` (in a note, `setNoteViewMode`). */
 	readonly modes: readonly ViewModeOption[];
-	/** The button's icon: the current mode's. */
+	/** The button's icon: the chosen mode's. */
 	readonly icon: string;
 	/** The wheel shows (two columns), the button beside it; without it the button stands alone in the wheel's place. */
 	readonly wheel: boolean;
