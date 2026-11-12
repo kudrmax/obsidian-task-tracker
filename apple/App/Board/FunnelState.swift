@@ -73,7 +73,10 @@ final class FunnelState {
             }.value
             guard let self, let model = self.model else { return }
             switch view {
-            case .success(let view): await model.adopt(view)
+            case .success(let view):
+                // By project's list is read before the view is drawn, so the two show in one drawing.
+                await model.projects.prefetch(view)
+                await model.adopt(view)
             case .failure(let error): model.problem(error)
             }
         }

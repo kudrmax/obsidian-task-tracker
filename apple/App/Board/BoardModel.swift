@@ -1892,7 +1892,7 @@ final class BoardModel {
     /// menu is reached by unfolding it.
     func cardMenu(_ card: BoardCard, from: String = "list", later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         let item = card.item
-        guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] ?? projects.menus[item.id] else { return nil }
+        guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] ?? projects.menu(item) else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
         let nodes = lead(item, from: from) + TaskMenu(items: [item], menu: menu, model: self, selectsText: true).nodes
         return MenuNode.uiMenu(nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }

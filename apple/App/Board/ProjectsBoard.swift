@@ -17,8 +17,9 @@ final class ProjectsBoard {
     private(set) var shownContext: String?
     /// The chosen node's parts as drawn: each part's cards painted as a list paints them, with the stage or the subproject.
     private(set) var parts: [Part] = []
-    /// The menus of the cards drawn, by task id: the card's menu finds its task's here.
-    @ObservationIgnored private(set) var menus: [String: TaskMenuModel] = [:]
+    /// Where each card drawn opens its menu from, by task id; its menu is asked of the core when it opens.
+    @ObservationIgnored private var froms: [String: String] = [:]
+    @ObservationIgnored private var menus: [String: TaskMenuModel] = [:]
     /// The cards drawn, by task id: what a drop on the tree reads (the project it was shown under).
     @ObservationIgnored private(set) var cards: [String: ProjectsCard] = [:]
 
@@ -93,8 +94,38 @@ final class ProjectsBoard {
         guard let model, let snapshot = model.snapshot, case .projects(let node) = snapshot.presentation.source else { return }
         let key = ReadKey(node: node, file: snapshot.tasksText, context: snapshot.funnel.view.context)
         guard key != drawnKey, key != askedKey else { return }
+        // Read before the view was drawn (`prefetch`): drawn with it, in its transaction.
+        if let ready = prefetched, ready.key == key {
+            prefetched = nil
+            show(ready.read, key, moves: false)
+            return
+        }
         askedKey = key
         Task { await read(key) }
+    }
+
+    /// A list read for a view about to be drawn: it shows in the same drawing as the view, never a frame after it.
+    @ObservationIgnored private var prefetched: (key: ReadKey, read: Read)?
+
+    /// The By project list of `view` read now, off the main thread, when the view reads it and it is not the one drawn;
+    /// handed to the drawing of that view (`follow`).
+    func prefetch(_ view: FunnelView) async {
+        guard let model, case .projects(let node) = FunnelPresentation(view).source else { return }
+        let key = ReadKey(node: node, file: model.snapshot?.tasksText, context: view.view.context)
+        guard key != drawnKey, let read = await Self.fetch(board, screen: model.menuScreen, node: node) else { return }
+        prefetched = (key, read)
+    }
+
+    private func show(_ read: Read, _ key: ReadKey, moves: Bool) {
+        var transaction = moves ? Transaction(animation: .snappy) : Transaction()
+        transaction.disablesAnimations = !moves
+        withTransaction(transaction) {
+            draw(read)
+            shownContext = key.context
+            model?.entry.screenChanged()
+        }
+        drawnKey = key
+        if askedKey == key { askedKey = nil }
     }
 
     /// The By project list read again over the files as they are now, whatever the file was when it was asked.
@@ -112,16 +143,7 @@ final class ProjectsBoard {
             guard let self, ask == self.asks, let model = self.model,
                   let read = await Self.fetch(self.board, screen: model.menuScreen, node: key.node), ask == self.asks else { return }
             // Another node or mode drawn still, in place; the same one moving as its cards did.
-            let moves = self.drawnKey?.node == key.node && self.drawnKey?.context == key.context
-            var transaction = moves ? Transaction(animation: .snappy) : Transaction()
-            transaction.disablesAnimations = !moves
-            withTransaction(transaction) {
-                self.draw(read)
-                self.shownContext = key.context
-                model.entry.screenChanged()
-            }
-            self.drawnKey = key
-            if self.askedKey == key { self.askedKey = nil }
+            self.show(read, key, moves: self.drawnKey?.node == key.node && self.drawnKey?.context == key.context)
         }
         reads = mine
         await mine.value
@@ -131,7 +153,7 @@ final class ProjectsBoard {
     struct Read: Sendable {
         let view: ProjectsView
         let rows: [[BoardCard]]
-        let menus: [String: TaskMenuModel]
+        let froms: [String: String]
         let entryLook: ProjectsEntryLook
     }
 
@@ -140,28 +162,34 @@ final class ProjectsBoard {
         try? await Task.detached(operation: { () throws -> Read in
             let view = try board.projectsScreen(node: node)
             var drawn: [[BoardCard]] = []
-            var menus: [String: TaskMenuModel] = [:]
+            var froms: [String: String] = [:]
             for section in view.sections {
                 let painted = try board.cards(section.rows.map { ListRow(item: $0.item, level: $0.level) })
                 drawn.append(zip(section.rows, painted).map { Self.card($0.1, as: $0.0) })
-                for row in section.rows {
-                    let from = row.card?.menuFrom ?? "list"
-                    if menus[row.item.id] == nil {
-                        menus[row.item.id] = try board.read("tasks.menu", [row.item.json, .string(from), screen], over: board.settingsOnly())
-                    }
-                }
+                for row in section.rows where froms[row.item.id] == nil { froms[row.item.id] = row.card?.menuFrom ?? "list" }
             }
-            return Read(view: view, rows: drawn, menus: menus, entryLook: try board.projectsEntryLook(view))
+            return Read(view: view, rows: drawn, froms: froms, entryLook: try board.projectsEntryLook(view))
         }).value
     }
 
     /// A read drawn, in the transaction the caller draws it in (the quick entry's line ending with its card).
     func draw(_ read: Read) {
-        menus = read.menus
+        froms = read.froms
+        menus = [:]
         cards = Dictionary(read.view.sections.flatMap(\.cards).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         entryLook = read.entryLook
         view = read.view
         parts = zip(read.view.sections, read.rows).map { Part(section: $0.0, cards: $0.1) }
+    }
+
+    /// The menu of a card the list draws, asked of the core as it opens (it reads only the settings) and kept; nil for a
+    /// task the list does not draw.
+    func menu(_ item: TaskItem) -> TaskMenuModel? {
+        if let known = menus[item.id] { return known }
+        guard let from = froms[item.id], let model else { return nil }
+        let menu: TaskMenuModel? = try? board.read("tasks.menu", [item.json, .string(from), model.menuScreen], over: board.settingsOnly())
+        menus[item.id] = menu
+        return menu
     }
 
     /// The list as the quick entry reads it (`rules.projectsEntryLook`): handed in as its `projects` list.
