@@ -58,10 +58,17 @@ export class FunnelRows {
 		}
 		for (const [column, row] of this.rows) if (!order.includes(column)) row.el.classList.add("tc-hidden");
 		this.shown = order;
+		for (const column of order) {
+			const list = this.rowOf(column).body.firstElementChild;
+			if (list) this.sized.observe(list);
+		}
 		this.fit();
 	}
 
-	/** Each row as tall as the core says for what it wants (its label and its list's content) and the room they share. */
+	/**
+	 * Each row as tall as the core says for what it wants (its label and its list's content) and the room they share; run
+	 * again whenever the room or a list's height changes, so a row follows its cards leaving or arriving to the end.
+	 */
 	fit(): void {
 		const rows = this.shown.map((column) => this.rowOf(column));
 		if (!this.stacks() || rows.length === 0 || this.stack.clientHeight === 0) {

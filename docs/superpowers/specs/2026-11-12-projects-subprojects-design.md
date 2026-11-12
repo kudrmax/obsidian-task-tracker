@@ -28,6 +28,8 @@ The rule «which tasks a node shows» takes the setting; the device state keeps 
 - backend: off also governs the writes that read the filtered screen: a drop or a typed task at a section's end goes after the last task the screen shows, and a card dropped on a tree row gives way the chosen project itself (not the first subproject it also has).
 - backend: the note's block shows the row as the main screen does (its project with subprojects); it toggles the same device setting. `firstView(wide, true)` (before the note's project is known) has no row; the first `projectNoteView` brings it.
 - backend: the row's words come from the core (`SUBPROJECTS_WORD`, «Subprojects»); the frontends draw `ViewChoice.subprojects.label`.
+- frontend-obsidian: a tap on the Subprojects row toggles it and closes the menu, as a mode's row does (the board shows only the open menu); the lists then drop or return the subprojects' tasks with the lists' usual leave and enter motion, in place.
+- frontend-obsidian: Rows and a note's block follow their lists' heights to the end of that motion (they kept the taller height when tasks left: a row of empty room in Rows, a block that never shrank). Seen while checking this toggle; the app's rows and blocks should shrink the same way.
 
 ## Contract
 
