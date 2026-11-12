@@ -356,8 +356,6 @@ body {
 	 * every part of the strip moves by its room. The view button is the plus's circle beside the wheel, or alone in its place.
 	 */
 	--tc-stage-left: 0px;
-	/* All columns: the lists side by side left of the divider, Inbox, Soon and the day's. */
-	--tc-all-lists: 3;
 	--tc-stage-mid: calc(var(--tc-stage-left) + (100% - var(--tc-stage-left)) / 2);
 	--tc-columns-head: 40px;
 	--tc-top-row-top: 0px;
@@ -919,7 +917,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .task-calendar.is-lists .tc-done { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); }
 .task-calendar.is-inbox .tc-done { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
 /* Every part of the strip stands right of the docked panel, by its room. */
-.task-calendar > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-right, .tc-divider, .tc-head, .tc-rows, .tc-by-project) { margin-left: var(--tc-stage-left); }
+.task-calendar > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-right, .tc-divider, .tc-head) { margin-left: var(--tc-stage-left); }
 .task-calendar.is-done > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-right, .tc-divider, .tc-head) { margin-left: calc(var(--tc-stage-left) + var(--tc-half-column) + var(--tc-divider)); }
 .task-calendar.is-done .tc-inbox, .task-calendar.is-done .tc-head.is-inbox { padding: var(--tc-column-pad-far); }
 /* The first column is Inbox over Backlog, half and half; Backlog's title stands in its half under a line, as a column's stands over it. */
@@ -1611,6 +1609,11 @@ body.is-mobile .task-calendar.has-tree > .tc-tree-dim { opacity: 1; visibility: 
 /* A card held over the tree while the panel lies over the lists: nothing under it takes the card, the dim takes no tap. */
 body.is-mobile .task-calendar.is-dragging > .tc-tree-dim { pointer-events: none; }
 .task-calendar.has-dock > .tc-capsule { left: var(--tc-desk-projects-side); }
+/* The docked panel opened or closed (desktop): it slides in or out, and the columns, the controls under them and the filter's name move and take their new widths with it, one motion. */
+body:not(.is-mobile) .task-calendar:not(.has-tree) > .tc-tree-panel { transform: translate3d(calc(-1 * 100%), 0, 0); }
+body:not(.is-mobile) .task-calendar.is-docking > .tc-tree-panel { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out), visibility 0s linear var(--tc-duration-slide); }
+body:not(.is-mobile) .task-calendar.is-docking.has-tree > .tc-tree-panel { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out); }
+.task-calendar.is-docking > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-divider, .tc-right, .tc-head, .tc-stage, .tc-seg, button.tc-view-btn, .tc-capsule, .tc-filter), .task-calendar.is-docking .tc-stage-col, .task-calendar.is-docking .tc-day-nav .tc-arrow { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding var(--tc-duration-slide) var(--tc-ease-in-out), gap var(--tc-duration-slide) var(--tc-ease-in-out); }
 
 /*
  * The view button (board V1): the plus's circle, the current mode's icon. Beside the wheel, a gap to its left; where the
@@ -1628,42 +1631,55 @@ body.is-mobile .task-calendar.has-wheel > button.tc-view-btn { left: calc(var(--
 .tc-panel.is-view { width: var(--tc-view-menu-w); }
 .tc-panel.is-view .tc-menu-title { border-bottom: var(--tc-rule); }
 
-/* The rows mode (D2, T3): the lists stacked in the list's column, the day's title over the timeline beside it. */
-.tc-rows, .tc-by-project { position: absolute; left: 0; top: var(--tc-day-row-top); bottom: 0; width: var(--tc-list-width); padding: var(--tc-column-pad-near); box-sizing: border-box; display: none; flex-direction: column; overflow: clip; }
-.task-calendar.is-view-rows > .tc-rows, .task-calendar.is-view-by-project > .tc-by-project { display: flex; }
-.task-calendar:is(.is-view-rows, .is-view-by-project) > :is(.tc-left, .tc-inbox, .tc-soon, .tc-done, .tc-head:not(.tc-day-nav), .tc-divider.is-fixed) { visibility: hidden; }
-.task-calendar:is(.is-view-rows, .is-view-by-project) > .tc-divider:not(.is-fixed) { top: var(--tc-day-row-top); }
-.task-calendar:is(.is-view-rows, .is-view-by-project) > .tc-head.tc-day-nav { left: calc(var(--tc-list-width) + var(--tc-divider)); width: calc(100% - var(--tc-stage-left) - var(--tc-list-width) - var(--tc-divider)); padding: var(--tc-column-pad-far); gap: var(--tc-space-2); }
-body.is-mobile .task-calendar:is(.is-view-rows, .is-view-by-project) .tc-day-nav .tc-arrow { width: var(--tc-arrow-narrow); }
-body:not(.is-mobile) .task-calendar:is(.is-view-rows, .is-view-by-project) > .tc-head.tc-day-nav { padding: 0 var(--tc-space-12) 0 var(--tc-space-10); gap: var(--tc-space-4); }
-/* Each stage's list as tall as its cards while all fit; the long ones give way, the longer the more, and scroll inside (decision 17). */
+/*
+ * The still layouts (all columns D1, rows D2/T3, by project D3; obsidian/ui/layouts): their own row of columns, each as
+ * wide as the core says (`layoutWidths`), the last the rest, the divider before the timeline. Nothing here touches the
+ * ribbon's parts: the ribbon is not on the screen while a still layout stands. The day's title and the timeline are the
+ * screen's, taken into a column: over the day's list (all columns) or over the timeline (rows, by project).
+ */
+.tc-stage { position: absolute; left: 0; right: 0; top: var(--tc-day-row-top); bottom: 0; margin-left: var(--tc-stage-left); display: flex; }
+.tc-stage-col { position: relative; flex: none; min-width: 0; display: flex; flex-direction: column; }
+.tc-stage-col.is-rest { flex: 1 1 0; }
+.tc-stage-head { flex: none; height: var(--tc-columns-head); box-sizing: border-box; padding: var(--tc-column-pad-near); display: flex; align-items: flex-start; }
+.tc-stage-head > .tc-head-title { height: var(--tc-day-row); }
+.tc-stage-body { position: relative; flex: 1 1 0; min-height: 0; box-sizing: border-box; padding: var(--tc-column-pad-near); display: flex; flex-direction: column; overflow: clip; }
+.tc-stage-col.is-timeline > .tc-stage-body { padding: 0; }
+.tc-stage-rule { flex: none; width: var(--tc-divider); display: flex; justify-content: center; }
+.tc-stage > .tc-divider { position: relative; left: auto; top: auto; bottom: auto; flex: none; }
+/* All columns: the titles stand over the lists, the lines between the columns start under them. */
+.tc-stage.is-columns > :is(.tc-divider, .tc-stage-rule) { margin-top: var(--tc-columns-head); }
+.tc-stage .tc-right { position: relative; left: auto; top: auto; bottom: auto; width: auto; flex: 1 1 0; min-height: 0; }
+.tc-stage-head > .tc-head.tc-day-nav { position: relative; top: auto; left: auto; flex: 1 1 auto; min-width: 0; width: auto; height: var(--tc-day-row); padding: 0; gap: var(--tc-space-2); }
+.tc-stage-col.is-timeline > .tc-stage-head { padding: var(--tc-column-pad-far); }
+body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var(--tc-space-12) 0 var(--tc-space-10); }
+body:not(.is-mobile) .tc-stage-col.is-timeline .tc-day-nav { gap: var(--tc-space-4); }
+.tc-stage-col.is-day .tc-day-nav .tc-arrow, body.is-mobile .tc-stage-col.is-timeline .tc-day-nav .tc-arrow { width: var(--tc-arrow-narrow); }
+
+/* Another context drawn (another filter, mode or note): every list takes its new shape in place, no margin or height sliding. */
+.task-calendar.is-redrawn :is(.tc-card, .tc-group-head, .tc-group-empty, .tc-group-drop, .tc-row, .tc-list) { transition: none; }
+
+/*
+ * The rows (D2, T3): the stages stacked under their small labels. Each row's height is the core's (`rules.stackedLists`),
+ * measured once the lists' motion settles and set by the code: as tall as its cards while all fit; a list that scrolls
+ * ends under a whole card and its fade. The heights slide when the same view changes and stand at once in another.
+ */
 .tc-rows-stack { flex: 1 1 0; min-height: 0; padding-bottom: var(--tc-foot-fade-day); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
-/* Each row's height is the core's (`rules.stackedRows`), set by the code; in a note's block every row is as tall as its cards. */
-.tc-row { flex: none; display: flex; flex-direction: column; }
+.tc-rows-fade-probe { position: absolute; width: 0; height: var(--tc-scroll-fade); visibility: hidden; pointer-events: none; }
+.tc-row { flex: none; min-height: 0; display: flex; flex-direction: column; transition: height var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-rows-stack.is-still > .tc-row { transition: none; }
 .tc-row + .tc-row { margin-top: var(--tc-section-gap); }
-.tc-row.tc-hidden { display: none; }
 .tc-row-label { flex-shrink: 0; height: var(--tc-group-head-h); box-sizing: border-box; padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); display: flex; align-items: flex-end; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); white-space: nowrap; overflow: hidden; }
 .tc-row-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .task-calendar .tc-list.tc-row-list { flex: 0 1 auto; padding-top: var(--tc-card-gap); }
-button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); cursor: default; }
 .task-calendar .tc-list.tc-row-list::after { content: none; }
-/* While the plus is carried or a task is typed, every list keeps a card's room more to take it. */
-.task-calendar:is(.is-dragging, .is-entering) .tc-list.tc-row-list::after { content: ""; height: var(--tc-card-h); }
-
-/* All columns (D1, the desktop only): Inbox over Backlog, Soon, the day's list and the timeline side by side, each list as wide as the divider sets. */
-.task-calendar.is-view-all > :is(.tc-inbox, .tc-head.is-inbox) { left: 0; width: var(--tc-list-width); padding: var(--tc-column-pad-near); }
-.task-calendar.is-view-all > :is(.tc-soon, .tc-head.is-soon) { left: calc(var(--tc-list-width) + var(--tc-divider)); width: var(--tc-list-width); padding: var(--tc-column-pad-near); }
-.task-calendar.is-view-all > :is(.tc-left, .tc-head.tc-day-nav) { left: calc(2 * (var(--tc-list-width) + var(--tc-divider))); width: var(--tc-list-width); padding: var(--tc-column-pad-near); gap: var(--tc-space-2); }
-.task-calendar.is-view-all .tc-day-nav .tc-arrow { width: var(--tc-arrow-narrow); }
-.task-calendar.is-view-all > .tc-divider.is-fixed.is-inbox { left: var(--tc-list-width); }
-.task-calendar.is-view-all > .tc-divider.is-fixed:not(.is-inbox, .is-done) { left: calc(2 * var(--tc-list-width) + var(--tc-divider)); }
-.task-calendar.is-view-all > .tc-divider:not(.is-fixed) { left: calc(var(--tc-all-lists) * var(--tc-list-width) + (var(--tc-all-lists) - 1) * var(--tc-divider)); }
-.task-calendar.is-view-all > .tc-right { left: calc(var(--tc-all-lists) * (var(--tc-list-width) + var(--tc-divider))); width: calc(100% - var(--tc-stage-left) - var(--tc-all-lists) * (var(--tc-list-width) + var(--tc-divider))); }
+/* The list under a carried card alone opens a card's room at its end, inside its own scroll: no row moves. */
+.task-calendar .tc-list.tc-row-list.is-drop-room::after { content: ""; height: var(--tc-card-h); }
+button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); cursor: default; }
 
 /* A project note's block (D5, T6): its view alone, rows or by project, the whole width, no titles and no timeline. */
 .tc-project-block { margin-top: calc(var(--tc-block-top) - var(--tc-block-lift)); margin-bottom: calc(var(--tc-chrome-room) + var(--tc-block-top)); max-height: var(--tc-block-max-h); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); overflow: hidden; outline: none; }
 .tc-project-block > .task-calendar.is-note { --tc-day-row-top: var(--tc-block-inset); --tc-chrome-room: var(--tc-block-inset); --tc-foot-gap: 0px; --tc-keyboard-room: 0px; --tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room)); --tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-space-8)); }
-.task-calendar.is-note > :is(.tc-rows, .tc-by-project) { left: 0; width: 100%; padding: 0 var(--tc-block-inset); }
+.task-calendar.is-note .tc-stage-body { padding: 0 var(--tc-block-inset); }
 .task-calendar.is-note > :is(.tc-right, .tc-head, .tc-divider, .tc-fade) { display: none; }
 .task-calendar.is-note > :is(button.tc-plus, .tc-plus-ring) { right: var(--tc-block-inset); }
 .task-calendar.is-note > .tc-capsule { left: var(--tc-block-inset); }

@@ -83,6 +83,11 @@ export class ProjectTasks implements DropList {
 		this.entryRows = new EntryRows(this.keyed);
 	}
 
+	/** The list goes away with its layout: it stops following its scroll and size. */
+	destroy(): void {
+		this.edges.destroy();
+	}
+
 	/** The cards drawn as the quick entry reads them (`projectsEntryLook` of the view drawn). */
 	get listCards(): readonly ListCard[] {
 		return this.look.cards;

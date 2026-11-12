@@ -386,6 +386,11 @@ export class QuickEntryController {
 		this.showPlus();
 	}
 
+	/** A task is being typed: its field stands open. */
+	get entering(): boolean {
+		return this.state !== null;
+	}
+
 	/**
 	 * The screen was drawn: the plus, and the field focused and in sight. The cards may
 	 * have changed under the field, a written line landing, so what the field may do is read again.
