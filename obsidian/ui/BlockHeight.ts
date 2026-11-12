@@ -11,6 +11,8 @@ export class BlockHeight {
 	constructor(
 		private readonly block: HTMLElement,
 		private readonly root: HTMLElement,
+		/** What scrolls the view the block shows: its layout's stack or list. */
+		private readonly scroller: () => HTMLElement | null,
 	) {
 		const view = root.ownerDocument.defaultView ?? window;
 		this.watch = new view.MutationObserver(() => this.request());
@@ -38,18 +40,33 @@ export class BlockHeight {
 		});
 	}
 
-	/** The scroller of the mode shown: the rows, or the by project list. */
-	private scroller(): HTMLElement | null {
-		return this.root.querySelector<HTMLElement>(":scope.is-view-rows > .tc-rows .tc-rows-stack, :scope.is-view-by-project > .tc-by-project .tc-list");
-	}
-
 	fit(): void {
 		if (this.root.classList.contains("is-dragging") || !this.root.isConnected) return;
 		const scroller = this.scroller();
 		if (!scroller) return;
 		const over = scroller.getBoundingClientRect().top - this.root.getBoundingClientRect().top;
 		const frame = this.block.offsetHeight - this.root.offsetHeight;
-		const height = `${Math.ceil(over + scroller.scrollHeight + frame)}px`;
+		const height = `${Math.ceil(over + contentHeight(scroller) + frame)}px`;
 		if (this.block.style.height !== height) this.block.style.height = height;
 	}
+}
+
+/**
+ * How tall what `scroller` holds is: its last row's end and its padding. Not its `scrollHeight`, which never reads less
+ * than the scroller's own height, so a block that held a taller view (rows, then by project) would never shrink.
+ */
+function contentHeight(scroller: HTMLElement): number {
+	const box = scroller.getBoundingClientRect();
+	const style = getComputedStyle(scroller);
+	let end = parseFloat(style.paddingTop) || 0;
+	for (const child of scroller.children) {
+		if (!(child instanceof HTMLElement) || getComputedStyle(child).position === "absolute") continue;
+		const rect = child.getBoundingClientRect();
+		if (rect.height === 0 && rect.width === 0) continue;
+		end = Math.max(end, rect.bottom - box.top + scroller.scrollTop + (parseFloat(getComputedStyle(child).marginBottom) || 0));
+	}
+	/** A list's room at its end (`::after`, over the block's controls) is part of what it holds. */
+	const after = getComputedStyle(scroller, "::after");
+	const room = after.content !== "none" && after.content !== "normal" ? (parseFloat(after.height) || 0) + (parseFloat(style.rowGap) || 0) : 0;
+	return end + room + (parseFloat(style.paddingBottom) || 0);
 }

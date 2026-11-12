@@ -71,7 +71,9 @@ final class BoardRoute {
         }.sorted { $0.0.priority > $1.0.priority }
         let seen = { (area: CGRect) in CGRect(x: area.minX, y: area.minY, width: area.width, height: max(1, min(area.maxY, self.floor) - area.minY)) }
         if let inside = shown.first(where: { seen($0.1).contains(point) }) { return (inside.0, point) }
-        let column = shown.filter { $0.1.minX <= point.x && point.x < $0.1.maxX && $0.0.priority == 0 }
+        // Only under the lists (the tab bar's row) does a column take a carry the finger holds outside it: above them all
+        // (the toolbar, the status bar) nothing does, and a let-go there is a let-go nowhere.
+        let column = shown.filter { $0.1.minX <= point.x && point.x < $0.1.maxX && $0.0.priority == 0 && point.y > seen($0.1).maxY }
         guard let nearest = column.min(by: { distance(point.y, seen($0.1)) < distance(point.y, seen($1.1)) }) else { return nil }
         let area = seen(nearest.1)
         return (nearest.0, CGPoint(x: point.x, y: min(max(point.y, area.minY + 1), area.maxY - 1)))
@@ -221,19 +223,23 @@ struct SpringLoaded: UIViewRepresentable {
 /// lives on its collection, so a carry outlives the day its block was lifted from (a day arrow turning the day under it).
 struct CanvasProbe: UIViewRepresentable {
     let model: BoardModel
+    /// The calendar under another view: it is not the calendar a carry reads.
+    var dormant = false
 
     func makeUIView(context: Context) -> Probe {
         let view = Probe()
         view.isUserInteractionEnabled = false
         view.target.model = model
-        model.calendarCanvas = view
+        view.target.dormant = dormant
+        if !dormant { model.calendarCanvas = view }
         model.route.add(view.target)
         return view
     }
 
     func updateUIView(_ view: Probe, context: Context) {
         view.target.model = model
-        model.calendarCanvas = view
+        view.target.dormant = dormant
+        if !dormant { model.calendarCanvas = view }
     }
 
     final class Probe: UIView {
@@ -251,6 +257,7 @@ struct CanvasProbe: UIViewRepresentable {
 @MainActor
 final class CalendarDrop: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     weak var model: BoardModel?
+    var dormant = false
     private(set) weak var scroll: UIScrollView?
     /// The long press that lifts a block, on the calendar's scroll view.
     private let press = UILongPressGestureRecognizer()
@@ -309,7 +316,10 @@ final class CalendarDrop: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         return Double(max(0, local.y - grab - TimelineGeometry.labelLift) / model.calendarHour * 60)
     }
 
-    var area: CGRect? { scroll.flatMap { view in view.window.map { view.convert(view.bounds, to: $0).intersection($0.bounds) } } }
+    var area: CGRect? {
+        guard !dormant else { return nil }
+        return scroll.flatMap { view in view.window.map { view.convert(view.bounds, to: $0).intersection($0.bounds) } }
+    }
 
     var scrolls: UIScrollView? { scroll }
 

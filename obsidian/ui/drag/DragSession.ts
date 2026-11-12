@@ -34,6 +34,8 @@ export interface DragSessionOptions<P = DragPayload, R = DropResult> {
 	readonly carries?: string;
 	/** What it carries has no card of its own to land on (a new task): it lands where the target shows its place. */
 	readonly landsOnTarget?: boolean;
+	/** Something under the finger failed: said once, and the drag ends as a cancelled one does, nothing left behind. */
+	onError?(error: unknown): void;
 }
 
 /**
@@ -67,33 +69,69 @@ export class DragSession<P = DragPayload, R = DropResult> {
 	/** The targets read the layout first; the float, fixed over everything, is written last, so it moves nothing they measure. */
 	move(x: number, y: number): void {
 		if (this.done) return;
-		const target = this.opts.targets.find((t) => t.hitTest(x, y, this.opts.payload)) ?? null;
-		if (target !== this.current) {
-			this.current?.leave();
-			this.current = target;
-			this.opts.float.rideAbove?.(target?.clearsFinger === true);
+		try {
+			const target = this.opts.targets.find((t) => t.hitTest(x, y, this.opts.payload)) ?? null;
+			if (target !== this.current) {
+				this.current?.leave();
+				this.current = target;
+				this.opts.float.rideAbove?.(target?.clearsFinger === true);
+			}
+			target?.preview(x, y, this.opts.payload);
+			this.opts.float.moveTo(x, y);
+		} catch (error) {
+			this.fail(error);
 		}
-		target?.preview(x, y, this.opts.payload);
-		this.opts.float.moveTo(x, y);
 	}
 
 	async release(x: number, y: number): Promise<void> {
 		if (this.done) return;
+		let target: DropTarget<P, R> | null = null;
+		let result: R | null = null;
+		try {
+			target = this.current;
+			result = target?.drop(x, y, this.opts.payload) ?? null;
+		} catch (error) {
+			return this.fail(error);
+		}
 		this.done = true;
-		const target = this.current;
-		const result = target?.drop(x, y, this.opts.payload) ?? null;
 		if (!target || !result) return this.settleBack();
 		this.opts.letGo?.();
-		const line = target.landing();
 		DragSession.landing.add(this.land);
-		const card = await this.opts.onEnd(result);
-		if (card && !(card instanceof HTMLElement)) await this.opts.float.sink(restingRect(card.behind));
-		else {
-			const landing = card ? restingRect(card) : this.opts.landsOnTarget ? line : null;
-			await (landing ? this.opts.float.land(landing) : this.opts.float.vanish());
+		try {
+			const line = target.landing();
+			const card = await this.opts.onEnd(result);
+			if (card && !(card instanceof HTMLElement)) await this.opts.float.sink(restingRect(card.behind));
+			else {
+				const landing = card ? restingRect(card) : this.opts.landsOnTarget ? line : null;
+				await (landing ? this.opts.float.land(landing) : this.opts.float.vanish());
+			}
+		} catch (error) {
+			this.opts.onError?.(error);
+		} finally {
+			this.landed();
+			this.opts.float.remove();
 		}
-		this.landed();
+	}
+
+	/** A target failed under the finger: said, and the drag ends as a cancelled one, the copy flying back. */
+	private fail(error: unknown): Promise<void> {
+		this.opts.onError?.(error);
+		if (this.done) return Promise.resolve();
+		this.done = true;
+		return this.settleBack();
+	}
+
+	/**
+	 * The screen goes away mid-drag (the view closed, the plugin unloaded): the copy goes at once, the targets let go, and
+	 * the drag ends as a cancelled one, nothing left on the page.
+	 */
+	abort(): void {
+		this.done = true;
+		DragSession.landing.add(this.land);
+		this.opts.letGo?.();
+		this.landed(true);
 		this.opts.float.remove();
+		void Promise.resolve(this.opts.onEnd(null)).catch((error: unknown) => this.opts.onError?.(error));
 	}
 
 	/** A newer drag took the screen before this one's copy landed: what it still had to draw is not drawn. */
@@ -131,14 +169,24 @@ export class DragSession<P = DragPayload, R = DropResult> {
 	 * is never seen twice. A screen to put back holds the screen until it is drawn: no new drag starts on what it redraws.
 	 */
 	private async settleBack(): Promise<void> {
-		this.clearAll();
-		DragSession.landing.add(this.land);
-		const back = this.opts.beforeReturn?.();
-		if (back) await back;
-		this.opts.letGo?.();
-		await this.opts.float.flyTo(this.opts.origin());
-		this.landed();
-		this.opts.float.remove();
-		await this.opts.onEnd(null);
+		try {
+			this.clearAll();
+			DragSession.landing.add(this.land);
+			const back = this.opts.beforeReturn?.();
+			if (back) await back;
+			this.opts.letGo?.();
+			await this.opts.float.flyTo(this.opts.origin());
+		} catch (error) {
+			this.opts.letGo?.();
+			this.opts.onError?.(error);
+		} finally {
+			this.landed();
+			this.opts.float.remove();
+		}
+		try {
+			await this.opts.onEnd(null);
+		} catch (error) {
+			this.opts.onError?.(error);
+		}
 	}
 }

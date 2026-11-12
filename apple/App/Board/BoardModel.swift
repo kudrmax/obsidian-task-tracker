@@ -79,8 +79,12 @@ final class BoardModel {
 
     /// Typing tasks in place: the core's quick entry, driven for this screen.
     @ObservationIgnored let entry = QuickEntryHost()
-    /// The Projects page: the tree and the chosen node's tasks.
+    /// The projects' panel and the By project list.
     @ObservationIgnored let projects = ProjectsBoard()
+    /// The funnel's view on this device: the filter, the mode, the panel, the place.
+    @ObservationIgnored let funnelState = FunnelState()
+    /// How tall the Rows view's lists stand.
+    @ObservationIgnored let metrics = ListMetrics()
     /// The timeline's zoom, kept across days.
     @ObservationIgnored let zoom = TimelineZoom()
 
@@ -88,6 +92,8 @@ final class BoardModel {
         place = RibbonPlace.first(AppServices.shared.board)
         entry.model = self
         projects.model = self
+        funnelState.model = self
+        metrics.holds = { [unowned self] in listsHeld }
     }
 
     /// A screen the quick entry read after its write, drawn in the transaction the entry draws its own state in.
@@ -134,8 +140,7 @@ final class BoardModel {
     var place: RibbonPlace {
         didSet {
             guard place != oldValue else { return }
-            let board = board, key = place.key
-            Task.detached { try? board.setFunnelPlace(.string(key)) }
+            funnelState.writePlace(place.key)
         }
     }
     /// The place a tap on a tab asked the ribbon to scroll to, each ask new.
@@ -157,115 +162,116 @@ final class BoardModel {
 
     /// The funnel's view the screen was read with: the filter, the view mode, the panel (`tasks.funnelView`).
     var funnel: FunnelView? { snapshot?.funnel }
-    /// The view drawn: the screen's as read, before the first read the one the device keeps (`tasks.firstView`).
-    var viewChoice: ViewChoice? { funnel?.view ?? firstView }
-    @ObservationIgnored private lazy var firstView: ViewChoice? = try? board.firstView()
-    /// How the lists are laid out now, the core's.
-    var viewMode: ViewMode? { viewChoice?.mode }
+    /// The view decoded: what the screen draws, swipes, reads and does with the plus.
+    var presentation: FunnelPresentation? { snapshot?.presentation }
+    /// The view mode before the first read: the one the device keeps (`tasks.firstView`).
+    @ObservationIgnored private(set) lazy var firstView: ViewChoice? = try? board.firstView()
     /// The node every list is filtered by.
     var filter: ProjectFilter? { funnel?.filter }
 
     /// The projects' panel shows, for whatever reason the core gives (the button, a carry, a new project's name).
-    var panelShown: Bool { funnel?.panel?.open == true }
-    /// The screen is the ribbon the tab bar walks (`ViewChoice.ribbon`).
-    var ribbon: Bool { viewChoice?.ribbon ?? false }
+    var panelShown: Bool { presentation?.panelShown == true }
+    /// The screen is the ribbon the tab bar walks.
+    var ribbon: Bool { presentation?.isRibbon ?? firstView?.ribbon ?? true }
 
-    /// How tall each list's rows stand: the Rows view stacks the lists at these heights (`rules.stackedRows`).
-    private(set) var listRows: [BoardColumn: CGFloat] = [:]
+    /// The share of the screen the list beside the calendar takes, kept on the device: the ribbon's at Today and the
+    /// Rows and By project views' alike, one divider's.
+    var listShare: Double = UserDefaults.standard.object(forKey: "listShare") as? Double ?? 0.5 {
+        didSet { UserDefaults.standard.set(listShare, forKey: "listShare") }
+    }
 
-    func listContent(_ column: BoardColumn, _ height: CGFloat) {
-        guard abs((listRows[column] ?? -1) - height) > 0.5 else { return }
-        listRows[column] = height
+    /// Where the projects' panel ends on the screen while it shows (window x).
+    @ObservationIgnored var panelRight: CGFloat = 0
+
+    /// The tab bar shows: it hides while a task is typed, in Select Tasks and under a pushed page, as in every app.
+    var barRests: Bool { !selecting && fullScreen.isEmpty && !entry.isOpen }
+
+    /// Where the tab bar's row starts, in the window: a list stacked over the bottom ends above it.
+    var barTop: CGFloat = .infinity
+
+    /// The lists the Rows view stacks are held at their heights while a card or the plus is carried (until its copy is
+    /// down, so it lands where its line was) and while a task is typed or written.
+    var listsHeld: Bool { (carry != nil && carry?.landed != true) || entry.writing }
+
+    /// The Rows view's heights for its measured lists sharing `room` (`rules.stackedLists`), the fade the lists' own.
+    func stackedHeights(_ lists: [StackedList], room: Double) -> [Double] {
+        (try? board.stackedLists(lists, room: room, fade: Double(SoftEdges.fade))) ?? lists.map(\.wanted)
     }
 
     /// How near the screen's left edge the carrying finger counts as at the edge (`carryAt`'s `edge`).
     static let panelEdge: CGFloat = 24
 
-    // MARK: The carry to a project: the core's session (`docs/door.md`)
-
-    /// A carry the core keeps a session for (a card, a calendar block, the plus; not a section or a project).
-    @ObservationIgnored private var carrySession = false
-    /// How the session ends, when a place said so: `nowhere`, `naming`, or `closed` (`carryOnNode` ended it).
-    @ObservationIgnored private var carryEnd: String?
-    /// What the finger was last reported at, and the call that tells the core again once its wait is over.
-    @ObservationIgnored private var carryReported: CarrySpot?
-    @ObservationIgnored private var carryWait: DispatchWorkItem?
-    /// The session's calls, one after another in order.
-    @ObservationIgnored private var carryCalls: Task<Void, Never>?
-
-    private struct CarrySpot: Equatable {
-        let edge: Bool
-        let node: String?
-    }
-
-    /// A call of the session, after the ones before it; `redraw` reads the screen again after it.
-    private func carryCall(redraw: Bool, _ call: @escaping @Sendable (TaskBoard) throws -> Void) {
-        let before = carryCalls
-        let board = board
-        carryCalls = Task { [weak self] in
-            await before?.value
-            do {
-                try await Task.detached { try call(board) }.value
-            } catch {
-                self?.problem(error)
-            }
-            if redraw { await self?.reload() }
+    /// The core's new view, after a change of this device's view alone (`FunnelState`): drawn over the lists as they
+    /// are, still where the context changed; a filter changed reads the lists for it, drawn still in turn.
+    func adopt(_ view: FunnelView) async {
+        guard let shown = snapshot else { return await reload() }
+        // The Subprojects check turned over shows other tasks under the same filter: read as another filter is.
+        let sameFilter = shown.filter == view.filter?.node && shown.funnel.view.subprojects?.checked == view.view.subprojects?.checked
+        viewEpoch += 1
+        // Another filter: the panel goes at once; its title comes with the lists read for it, never over the old ones.
+        let next = shown.with(funnel: sameFilter ? view : shown.funnel.with(panelOf: view))
+        let change = {
+            self.snapshot = next
+            self.entry.screenChanged()
         }
+        // The same lists in the same context (the panel opened or closed): the panel moves as it moves by itself.
+        if next.motion(from: shown) == .still { change() } else { draw(motion: next.motion(from: shown), change) }
+        guard !sameFilter else { return }
+        // The node a carry rested on, its lists read while the core's pause ran: drawn the moment they are there.
+        if let ahead = hovered, ahead.node == view.filter?.node {
+            hovered = nil
+            let epoch = viewEpoch
+            if let read = await ahead.read.value, epoch == viewEpoch, let now = snapshot, read.tasksText == now.tasksText, read.day == now.day {
+                let lists = read.with(funnel: view)
+                draw(motion: lists.motion(from: now)) {
+                    snapshot = lists
+                    entry.screenChanged()
+                }
+                return
+            }
+        }
+        await reload()
     }
 
-    private func openCarry(keys: [TaskKey], cards: [JSONValue] = [], plus: Bool = false) {
-        carrySession = true
-        carryEnd = nil
-        carryReported = nil
-        carryCall(redraw: false) { try $0.startCarry(keys: keys, cards: cards, plus: plus) }
-    }
+    /// The context the lists drawn were read in: a list drawing rows of another one draws them still, its cards never
+    /// flying in from where another filter or mode had them.
+    var listsContext: String? { drawing?.funnel.view.context }
+    /// Counts the views adopted: a read begun before one is not drawn, it would put the view back.
+    @ObservationIgnored private var viewEpoch = 0
 
-    /// The carrying finger moved: the core is told where it is (at the edge, over which panel row) whenever that
-    /// changes, and again once the pause it answers is over; the screen is read again then, the panel out or a row open.
+    // MARK: The carry to a project: the core's session (`CarrySession`)
+
+    @ObservationIgnored private(set) lazy var session: CarrySession = {
+        let session = CarrySession(
+            calls: board, clock: SystemCarryClock(),
+            redraw: { [weak self] in await self?.funnelState.refresh() },
+            problem: { [weak self] in self?.problem($0) })
+        session.pausing = { [weak self] node in self?.readAhead(node) }
+        return session
+    }()
+
+    /// The carrying finger moved: the core is told where it is (at the edge, over which panel row).
     func carryMoved(at point: CGPoint) {
-        guard carrySession else { return }
         let node = panelShown ? projects.node(at: point) : nil
-        let spot = CarrySpot(edge: point.x < Self.panelEdge, node: node)
-        guard spot != carryReported else { return }
-        report(spot, waited: false)
+        session.moved(to: .init(edge: point.x < Self.panelEdge, node: node))
     }
 
-    private func report(_ spot: CarrySpot, waited: Bool) {
-        carryReported = spot
-        carryWait?.cancel()
-        carryWait = nil
-        let board = board
-        let before = carryCalls
-        carryCalls = Task { [weak self] in
-            await before?.value
-            let wait = try? await Task.detached { try board.carryAt(edge: spot.edge, node: spot.node) }.value
-            guard let self, self.carrySession, self.carryReported == spot else { return }
-            if waited { await self.reload() }
-            guard let wait = wait ?? nil else { return }
-            let again = DispatchWorkItem { [weak self] in
-                guard let self, self.carrySession, self.carryReported == spot else { return }
-                self.report(spot, waited: true)
-            }
-            self.carryWait = again
-            DispatchQueue.main.asyncAfter(deadline: .now() + max(0, wait) / 1000, execute: again)
-        }
-    }
+    /// The lists under the panel row a carry rests on, read while the core's pause runs: when the pause opens the row,
+    /// its lists are drawn at once, not read after it.
+    @ObservationIgnored private var hovered: (node: String, read: Task<BoardSnapshot?, Never>)?
 
-    /// The carry flew home, let go nowhere or cancelled: the session ends `nowhere` (the core puts the lift's filter back).
-    func carryWentNowhere() {
-        if carryEnd == nil { carryEnd = "nowhere" }
-    }
-
-    /// The plus let go in the tree: the session ends `naming`, the panel kept while the name is typed.
-    func carryNaming() {
-        carryEnd = "naming"
+    private func readAhead(_ node: String) {
+        guard node != hovered?.node, projects.rows.first(where: { $0.node == node })?.opensOnHover == true else { return }
+        projects.readAhead(node)
+        let board = board, day = shownDay
+        hovered = (node, Task.detached { try? board.snapshot(day: day, measures: CardMetrics.timeline, filter: .some(node)) })
     }
 
     /// The carry let go on a panel row: every carried task goes to that project, as the core's session says.
     func carryOnNode(_ node: String) {
-        carryEnd = "closed"
-        carryCall(redraw: true) { try $0.carryOnNode(node) }
-        if readsProjects { Task { await carryCalls?.value; await projects.read() } }
+        session.onNode(node)
+        // The drop on the row wrote the file: the screen is read again once the session's calls have run.
+        Task { await session.idle(); await reload() }
         endSelectionIf("dropped")
     }
 
@@ -274,70 +280,19 @@ final class BoardModel {
         if selecting, board.endsSelection(how) { endSelection() }
     }
 
-    /// The view reads the By project list too (`ViewChoice.source`).
-    var readsProjects: Bool { viewChoice?.source == "projectsScreen" }
-
-    /// The new project's name answered or cancelled: the panel the naming kept out goes.
-    func endProjectName() {
-        carryCall(redraw: true) { try $0.endProjectName() }
-    }
-
     private func closeCarry() {
-        guard carrySession else { return }
-        carrySession = false
-        carryWait?.cancel()
-        carryWait = nil
-        carryReported = nil
-        let how = carryEnd ?? "dropped"
-        carryEnd = nil
-        guard how != "closed" else { return }
-        carryCall(redraw: how != "dropped") { try $0.endCarry(how) }
-        endSelectionIf(how)
+        // The drop's write reaches the core before the session's end: the end puts the lift's filter back otherwise.
+        guard let how = session.close(after: lastDrop), how != .closed else { return }
+        endSelectionIf(how.rawValue)
     }
 
-    /// The projects button: the panel opened or closed, kept on the device.
-    func toggleProjectsPanel() async {
-        let open = !(funnel?.panel?.open ?? false)
-        await viewCall { try $0.setProjectsPanel(open) }
-    }
-
-    /// A tap on a row of the panel: chosen and the panel closed (the core's), or, chosen already, folded.
-    func pickProjectNode(_ node: String) async {
-        UISelectionFeedbackGenerator().selectionChanged()
-        await viewCall { try $0.pickProjectNode(node) }
-    }
-
-    /// The cross beside the filter's title: every task shows again.
-    func clearProjectFilter() async {
-        await viewCall { try $0.clearProjectFilter() }
-    }
-
-    /// A mode picked in the view button's menu.
-    func setViewMode(_ mode: ViewMode) async {
-        guard mode != viewMode else { return }
-        await viewCall { try $0.setViewMode(mode) }
-    }
-
-    /// The view button's Subprojects row: the chosen project's subprojects' tasks shown or hidden.
-    func toggleSubprojects() async {
-        await viewCall { try $0.toggleSubprojects() }
-    }
-
-    /// A call that changes only this device's view (the filter, the panel, the mode, a fold), then the screen read again
-    /// with it; By project reads its own list too.
-    func viewCall(_ call: @escaping @Sendable (TaskBoard) throws -> Void) async {
-        let board = board
-        do {
-            try await Task.detached { try call(board) }.value
-        } catch {
-            problem(error)
-        }
-        await reload()
-        if readsProjects { await projects.read() }
-    }
     private(set) var snapshot: BoardSnapshot? {
         didSet {
-            if let snapshot { CardMetrics.follow(snapshot.look) }
+            if let snapshot {
+                CardMetrics.follow(snapshot.look)
+                metrics.measure(snapshot)
+            }
+            projects.follow()
             if let timeline = snapshot?.timeline, timeline != oldValue?.timeline {
                 // A drop's calendar was laid out as it was let go: that stack, not another ask of the core.
                 if let laid = comingLaid, laid.timeline == timeline {
@@ -452,10 +407,22 @@ final class BoardModel {
             let board = board
             readsStarted += 1
             let serial = readsStarted
+            let epoch = viewEpoch
             do {
+                // By project's list is read beside the screen, at the same time, and drawn in the screen's drawing: a
+                // card a write took away leaves both at once.
+                let shownFunnel = snapshot?.funnel
+                async let list: Void = { if let shownFunnel { await self.projects.prefetch(shownFunnel, file: .some(nil)) } }()
                 let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
-                // Another day was asked for meanwhile (a turn that went on): this read is not drawn, the day asked is read.
-                guard shownDay == day else { readAgain = true; continue }
+                await list
+                // Another day was asked for meanwhile (a turn that went on), or another view adopted: this read is not
+                // drawn, the screen as asked is read. A read asked meanwhile reads again before anything is drawn, so
+                // quick picks never show a filter passed by.
+                guard shownDay == day, epoch == viewEpoch else { readAgain = true; continue }
+                if readAgain { continue }
+                // A view first shown that reads By project's list (the first screen, another context) draws it in the
+                // same drawing as the screen: read now, before. The same view changed keeps its list until the new one.
+                if case .projects = read.presentation.source { await projects.prefetch(read.funnel, file: read.tasksText) }
                 show(read, serial: serial)
                 problem = nil
             } catch {
@@ -481,7 +448,7 @@ final class BoardModel {
     /// system's spring). Another day is drawn still: it came in through the day's own slide (`turn(to:)`).
     func draw(motion: BoardMotion, _ change: () -> Void) {
         switch motion {
-        case .still, .turn:
+        case .still, .turn, .context:
             var still = Transaction()
             still.disablesAnimations = true
             withTransaction(still, change)
@@ -755,7 +722,7 @@ final class BoardModel {
         // A carry over the day that came in (a swipe let go, or a day arrow it was held over) points at that day's places
         // now, the finger still: its lists are drawn at once and the place under the finger is read anew.
         guard carry != nil else { return }
-        for list in lists.values { list.controller?.update() }
+        for list in listControllers { list.update() }
         drag.holdAgain()
     }
 
@@ -810,7 +777,7 @@ final class BoardModel {
         await reload()
         // A task the filter hides is shown with every task again, as the core says (`tasks.filterHides`).
         if let node = filter?.node, (try? await Task.detached(operation: { try board.filterHides(item, filter: node) }).value) == true {
-            await clearProjectFilter()
+            await funnelState.clear()
         }
         if place.list == "done" {
             // The Done column stands left of Inbox in the ribbon only: in another view the find opens on its own page.
@@ -865,13 +832,23 @@ final class BoardModel {
     /// A call through the door that may write, then the screen read again: the change moves as it differs.
     func write(_ method: String, _ arguments: [JSONValue]) async {
         let board = board
-        do {
-            _ = try await Task.detached { try board.write(method, arguments) }.value
-        } catch {
-            problem = Self.words(error)
+        let before = writing
+        let mine = Task { @MainActor in
+            await before?.value
+            do {
+                _ = try await Task.detached { try board.write(method, arguments) }.value
+            } catch {
+                self.problem = Self.words(error)
+            }
         }
+        writing = mine
+        await mine.value
         await reload()
     }
+
+    /// The last write asked for: a change of the view (a pick, a mode) reads the file after it, so another context's
+    /// first frame already has what the write did (a card done or deleted is not drawn there at all).
+    @ObservationIgnored private(set) var writing: Task<Void, Never>?
 
     func read<T: Decodable & Sendable>(_ method: String, _ arguments: [JSONValue] = []) async throws -> T {
         let board = board
@@ -1050,7 +1027,8 @@ final class BoardModel {
     /// The screen filtered by `project`: chosen, with the branches above it opened (`tasks.selectProjectNode`).
     func openProject(_ project: ProjectRef) {
         fullScreen = []
-        Task { await projects.select(project.name) }
+        guard let node: String = ruleNow("rules.projectNodeOf", [.string(project.name)]) else { return }
+        Task { await funnelState.select(node) }
     }
 
     /// A card on the calendar lifted with its subtasks while a subtask is typed under it (Add Subtask there).
@@ -1188,7 +1166,7 @@ final class BoardModel {
             markCards()
             // The rows a carry folds away (a card's subtasks, the other picked tasks, a lifted section's) go and come back.
             if oldValue?.token != carry?.token || oldValue?.group.count != carry?.group.count || oldValue?.landed != carry?.landed {
-                for list in lists.values { list.controller?.update() }
+                for list in listControllers { list.update() }
             }
         }
     }
@@ -1214,7 +1192,7 @@ final class BoardModel {
     /// Which reads may draw while drops are written.
     @ObservationIgnored private var dropReads = DropReads()
     /// The lists on the screen, which a drop's preview is drawn into at once.
-    @ObservationIgnored private var lists: [BoardColumn: WeakList] = [:]
+    @ObservationIgnored private var lists: [WeakList] = []
     /// The one routing of a carry's point to its place.
     @ObservationIgnored let route = BoardRoute()
     /// The board's drag: lift, carry, drop.
@@ -1224,12 +1202,20 @@ final class BoardModel {
         weak var controller: ListController?
     }
 
+    /// A list on the screen. The ribbon's lists stay while another view shows (dormant), so each column may have two.
     func register(_ list: ListController) {
-        lists[list.column] = WeakList(controller: list)
+        lists.removeAll { $0.controller == nil || $0.controller === list }
+        lists.append(WeakList(controller: list))
         route.add(list)
     }
 
-    func listController(_ column: BoardColumn) -> ListController? { lists[column]?.controller }
+    /// Every list mounted, the dormant ones too: they draw the screen when they wake.
+    var listControllers: [ListController] { lists.compactMap(\.controller) }
+
+    /// The list of `column` that shows now.
+    func listController(_ column: BoardColumn) -> ListController? {
+        listControllers.first { $0.column == column && !$0.dormant }
+    }
 
     private func begin() -> Int {
         carryBegins?()
@@ -1246,7 +1232,7 @@ final class BoardModel {
         // The By project list's card goes by its own drop (the project it is shown under), any other by its task.
         guard selecting, picked.contains(card.id), let snapshot else {
             let drop = column == "projects" ? projects.cards[card.id]?.drop : nil
-            openCarry(keys: [card.item.key], cards: drop.map { [$0] } ?? [])
+            session.start(keys: [card.item.key], cards: drop.map { [$0] } ?? [])
             withAnimation(CarryMotion.carry) { carry = Carry(token: token, id: card.id, item: card.item, from: column) }
             return token
         }
@@ -1269,7 +1255,7 @@ final class BoardModel {
             // Every picked task the lift takes goes with it to a project too; the By project list's by their drops.
             let keys = [card.item.key] + going.map(\.item.key)
             let drops = column == "projects" ? pickedIds.compactMap { id in projects.cards[id].flatMap { keys.contains($0.item.key) ? $0.drop : nil } } : []
-            openCarry(keys: keys, cards: drops)
+            session.start(keys: keys, cards: drops)
         }
         return token
     }
@@ -1297,9 +1283,24 @@ final class BoardModel {
     @discardableResult
     func startCarryingPlus() -> Int {
         let token = begin()
-        openCarry(keys: [], plus: true)
+        session.start(keys: [], plus: true)
         carry = Carry(token: token, id: Carried.plus, item: nil, from: "new")
         return token
+    }
+
+    /// The By project list a drop leaves (`ProjectsBoard.preview`), drawn now: while its copy still flies, the cards it
+    /// lands as stay hidden until it is down.
+    func landDropped(_ read: ProjectsBoard.Read, as landings: [String]) {
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
+            if carry != nil {
+                arriving.formUnion(landings)
+                // Its place is the card's now, not the dashed one it was lifted from: as a list's drop, landed.
+                carry?.landed = true
+            }
+        }
+        projects.drawDropped(read)
     }
 
     /// The carry ended, its copy down, whatever came of it: once, and only the carry under way.
@@ -1366,9 +1367,9 @@ final class BoardModel {
     func finishCarry(_ token: Int) {
         let changed = landingIds
         CardControl.reveal(changed)
-        for list in lists.values { list.controller?.showHeaders(all: true) }
+        for list in listControllers { list.showHeaders(all: true) }
         endCarry(token)
-        for list in lists.values { list.controller?.redraw(changed) }
+        for list in listControllers { list.redraw(changed) }
     }
 
     /// The carried card itself, wherever the screen draws it: its copy stands for it until the carry ends, once the copy
@@ -1474,13 +1475,14 @@ final class BoardModel {
     /// `cards` and `heads` where they stand in the list without the carried ones, the finger at `point`. A card is placed
     /// by its middle (`rules.carriedMiddle`, the finger's hold on it known from the lift), the plus by the finger; the level
     /// by the finger's `x` (`rules.levelAt`); the place shown holds until the finger is well past it.
-    func placeUnder(_ column: BoardColumn, cards: [PlacedCard], heads: [PlacedHead], at point: CGPoint, grab: CGFloat?, width: CGFloat, held: JSONValue?) -> JSONValue? {
+    func placeUnder(_ column: BoardColumn, cards: [PlacedCard], heads: [PlacedHead], at point: CGPoint, grab: CGFloat?, width: CGFloat, covered: CGFloat = 0, held: JSONValue?) -> JSONValue? {
         let inset = Double(CardMetrics.columnInset)
         // A folded result's card of two lines is held by its own middle.
         let carried = carry.flatMap { $0.from == "timeline" ? nil : $0.item }.map { CardFace($0.card).twoLines ? CardMetrics.twoLineHeight : CardMetrics.height } ?? CardMetrics.height
         let y = grab.flatMap { try? board.carriedMiddle(y: Double(point.y), grab: Double($0), cardHeight: Double(carried)) } ?? Double(point.y)
         do {
-            let level = try board.levelAt(x: Double(point.x), left: inset, width: Double(width) - 2 * inset, indent: Double(CardMetrics.indent))
+            let shown = Double(min(covered, width / 2))
+            let level = try board.levelAt(x: Double(point.x), left: inset + shown, width: Double(width) - 2 * inset - shown, indent: Double(CardMetrics.indent))
             let hold = held ?? carry.flatMap { homeGap($0.id, in: column) } ?? .null
             return try board.placeAt(cards, y: y, level: level, shift: 0, room: .null, heads: heads, held: hold, hysteresis: CardMetrics.dropHysteresis)
         } catch {
@@ -1657,10 +1659,10 @@ final class BoardModel {
     }
 
     /// The last drop's write: the next one waits for it, so drops are written in the order they were let go.
-    @ObservationIgnored private var lastDrop: Task<Void, Never>?
+    @ObservationIgnored private(set) var lastDrop: Task<Void, Never>?
 
     /// A drop's write after its screen was drawn: in drop order; a read begun before it never draws, the one after it does.
-    private func writeDrop(_ method: String, _ arguments: [JSONValue]) {
+    func writeDrop(_ method: String, _ arguments: [JSONValue]) {
         let before = lastDrop
         let board = board
         lastDrop = Task {
@@ -1691,17 +1693,22 @@ final class BoardModel {
         comingSerial += 1
         let serial = comingSerial
         coming = (serial, next)
-        withAnimation(CarryMotion.dropAnimation) {
-            if landed { carry?.landed = true }
+        // What lit under the carry (an empty section's plate, a title) goes out with the let-go, not fading after it.
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
             if hover != nil { hover = nil }
             if landing != nil { landing = nil }
+        }
+        withAnimation(CarryMotion.dropAnimation) {
+            if landed { carry?.landed = true }
         }
         // The calendar the drop leaves, laid out at the zoom shown now: the copy flies to its block in it.
         if next.timeline != snapshot?.timeline, let hour = zoom.hour, abs(Double(hour) - CardMetrics.timeline.hour) >= 0.5,
            let slots = try? board.stack(next.timeline, measures: Self.measures(hour), pure: true) {
             comingLaid = Laid(timeline: next.timeline, hour: hour, slots: slots)
         }
-        for list in lists.values { list.controller?.update() }
+        for list in listControllers { list.update() }
         NextFrame.run { [self] in
             guard coming?.serial == serial else { return }
             withAnimation(CarryMotion.dropAnimation) {
@@ -1726,7 +1733,7 @@ final class BoardModel {
         dropReads.previewDrawn()
         sectionMove = SectionMove(column: column, group: group.id, before: list.groups[safe: at]?.id)
         carry?.landed = true
-        for list in lists.values { list.controller?.update() }
+        for list in listControllers { list.update() }
         writeDrop("tasks.moveGroup", [.string(section.list), section.names[section.lifted].json, place])
         return true
     }
@@ -1961,7 +1968,7 @@ final class BoardModel {
     /// menu is reached by unfolding it.
     func cardMenu(_ card: BoardCard, from: String = "list", later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         let item = card.item
-        guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] ?? projects.menus[item.id] else { return nil }
+        guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] ?? projects.menu(item) else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
         let nodes = lead(item, from: from) + TaskMenu(items: [item], menu: menu, model: self, selectsText: true).nodes
         return MenuNode.uiMenu(nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
@@ -2027,7 +2034,11 @@ final class BoardModel {
         // Only the calendar the board draws is laid out: a view still holding the day a turn left (drawn once more in the
         // turn's own transaction) asks for a stack that, come back, would replace the new day's and slide it in again.
         if laid?.hour != hour, timeline == drawing?.timeline { layOut(timeline, hour: hour) }
-        guard let laid else { return Self.scaled(timeline.slots, from: CGFloat(CardMetrics.timeline.hour), to: hour) }
+        guard let laid else {
+            // Nothing laid out for this calendar yet (the first screen, the zoom just known): the core's stack now, the
+            // same the layout under way will keep, so the first frame shows every block where it stays.
+            return (try? board.stack(timeline, measures: Self.measures(hour), pure: true)) ?? Self.scaled(timeline.slots, from: CGFloat(CardMetrics.timeline.hour), to: hour)
+        }
         return laid.hour == hour ? laid.slots : Self.scaled(laid.slots, from: laid.hour, to: hour)
     }
 

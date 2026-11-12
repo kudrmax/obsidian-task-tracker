@@ -15,12 +15,27 @@ struct ProjectsPanelView: View {
         GeometryReader { box in
             let shown = model.panelShown
             ZStack(alignment: .topLeading) {
-                // The dim over the lists: a tap there closes the panel the button opened.
-                Color.black.opacity(shown ? (scheme == .dark ? 0.5 : 0.2) : 0)
+                // The dim over the lists: a tap there closes the panel the button opened. It stands only while the panel
+                // does: closed, nothing of it lies over the lists.
+                if shown {
+                Color.black.opacity(scheme == .dark ? 0.5 : 0.2)
                     .ignoresSafeArea()
+                    // A tap where the panel will stand while it still slides in is the panel's: its row by height (a
+                    // row's height does not move with the slide), elsewhere the dim's.
+                    .gesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
+                        let panel = max(Self.least, box.size.width / 2)
+                        if tap.location.x < box.frame(in: .global).minX + panel,
+                           let row = model.projects.rows.first(where: { model.projects.geometry.rows[$0.node].map { tap.location.y >= $0.minY && tap.location.y <= $0.maxY } == true }) {
+                            Task { await model.projects.tap(row) }
+                        } else {
+                            Task { await model.funnelState.togglePanel() }
+                        }
+                    })
+                    // Closed, the dim takes no touch at all: below it the lists lift their cards.
                     .allowsHitTesting(model.funnel?.panel?.dimCloses == true)
-                    .onTapGesture { Task { await model.toggleProjectsPanel() } }
+                    .transition(.opacity)
                     .zIndex(0)
+                }
                 if shown {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Projects")
@@ -30,6 +45,8 @@ struct ProjectsPanelView: View {
                             .padding(.bottom, ColumnMetrics.headGap)
                             .accessibilityAddTraits(.isHeader)
                         ProjectTree(model: model)
+                            // The tree ends above the view button and the plus, and scrolls under them no further.
+                            .padding(.bottom, max(0, box.frame(in: .global).maxY - model.barTop))
                     }
                     .frame(width: max(Self.least, box.size.width / 2))
                     .frame(maxHeight: .infinity, alignment: .top)
@@ -42,6 +59,7 @@ struct ProjectsPanelView: View {
                     .overlay(alignment: .trailing) {
                         Rectangle().fill(Color(.separator)).frame(width: 1 / scale).ignoresSafeArea()
                     }
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { model.panelRight = $0 }
                     .transition(.move(edge: .leading))
                     .zIndex(1)
                 }
@@ -68,7 +86,7 @@ struct FilterTitle: View {
                 .accessibilityHidden(true)
             name
             if filter.clearable {
-                Button { Task { await model.clearProjectFilter() } } label: {
+                Button { Task { await model.funnelState.clear() } } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.secondary)
@@ -156,13 +174,13 @@ struct ViewButton: View {
     var body: some View {
         Menu {
             ForEach(view.modes, id: \.mode) { option in
-                Toggle(isOn: Binding(get: { option.checked }, set: { _ in Task { await model.setViewMode(option.mode) } })) {
+                Toggle(isOn: Binding(get: { option.checked }, set: { _ in Task { await model.funnelState.setMode(option.mode) } })) {
                     Label(option.label, systemImage: Self.symbol(option.icon))
                 }
             }
             if let subprojects = view.subprojects {
                 Section {
-                    Toggle(isOn: Binding(get: { subprojects.checked }, set: { _ in Task { await model.toggleSubprojects() } })) {
+                    Toggle(isOn: Binding(get: { subprojects.checked }, set: { _ in Task { await model.funnelState.toggleSubprojects() } })) {
                         Text(verbatim: subprojects.label)
                     }
                 }

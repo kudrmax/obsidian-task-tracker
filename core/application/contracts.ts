@@ -57,11 +57,18 @@ export { SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type EntryList } from "./
 /** The funnel's places as the wheel and a swipe walk them, without Projects: the tree is a panel whose node filters them. */
 /** The rows view's list heights: `stackedRows(wanted, room, least)`, each as tall as it wants while all fit, the long ones sharing what the short ones leave. */
 export { stackedRows } from "./stackedRows";
+/** The same from measured lists: one that scrolls ends under a whole card and the fade (`stackedLists(lists, room, fade)`). */
+export { type StackedList, stackedLists } from "./stackedRows";
+/** Two places for a new task are the same, field by field (`sameNewPlace`): what every frontend matches places by. */
+export { sameNewPlace } from "./newTaskPlaces";
+/** How each view mode stands (`ViewChoice.layout`), its columns' widths and the share a divider let go saves. */
+export { type LayoutColumn, type LayoutColumnId, type LayoutList, type LayoutStack, type LayoutWidth, type LayoutWidths, layoutShareAt, layoutWidths, type ViewLayout, viewLayout } from "./viewLayout";
+import type { ViewLayout } from "./viewLayout";
 /** Whether a carry's end ends Select Tasks (`endsSelection(end)`): one that landed does, whatever path it took. */
 export { endsSelection } from "./projectsCarry";
 export { FUNNEL_PLACES, funnelPlaceOf, funnelPlaceShowing, stepFunnel, type FunnelAt, type FunnelPlace, type FunnelSpot } from "./screenPlaces";
 /** The view modes' words, the lists the rows mode stacks, and the lists a field can stand in for a mode and a place. */
-export { ROW_LISTS, VIEW_WORDS, viewEntryLists } from "./viewModes";
+export { ROW_LISTS, VIEW_WORDS, viewContext, viewEntryLists } from "./viewModes";
 /** The Projects screen's list as the quick entry reads it: a list the field stands in, like a funnel's column. */
 export { projectsEntryLook, type EntryListLook, type EntryPart } from "./projectsEntry";
 /**
@@ -96,7 +103,7 @@ export { CARD_GAPS, CARD_HEIGHTS, DEFAULT_CARD_SIZE } from "../settings";
 /** A date as the quick entry's place button and the sources window write it: `5 Nov`. */
 export { dayMonth } from "./dayLabels";
 /** The list column's width beside the calendar: drawn, its bounds, its middle, and the share a divider let go saves. */
-export { DIVIDER_SNAP, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths } from "./listWidth";
+export { allColumnsDividerAt, allColumnsShare, allColumnsWidthAt, allColumnsWidths, DIVIDER_SNAP, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths } from "./listWidth";
 export type { Clock } from "./ports";
 
 /** A priority level, its colours in the order the settings offer them. */
@@ -740,10 +747,8 @@ export interface ProjectsScreenState {
 	readonly selected?: ProjectsNodeId;
 	/** The projects' panel is open (`setProjectsPanel`). */
 	readonly panelOpen?: boolean;
-	/** The view mode last picked with no filter (`setViewMode`). */
+	/** The screen's view mode (`setViewMode`), one for every filter and none: a pick or a clear never changes it. */
 	readonly view?: ViewMode;
-	/** The view mode last picked with a filter. */
-	readonly filteredView?: ViewMode;
 	/** The view mode last picked in a project note's block (`setNoteViewMode`). */
 	readonly noteView?: ViewMode;
 	/** A chosen project shows its subprojects' tasks too (`toggleSubprojects`); left out: on. The screen, a note's block and by project alike. */
@@ -775,7 +780,7 @@ export interface ProjectsRow {
 	readonly tile: boolean;
 	/** The project waits: its open tasks only in Inbox and Backlog, or none yet. */
 	readonly waiting: boolean;
-	/** Its name is drawn grey: a waiting project, a done one, No project and Done. */
+	/** Its name is drawn grey, no open task under it: a waiting project, a done one, No project with no open task without a project, and Done. */
 	readonly muted: boolean;
 	readonly status: ProjectStatus | null;
 	/** Filled light: the chosen node. */
@@ -1004,10 +1009,13 @@ export interface ViewModeOption {
 
 /** The view a screen draws and the button that changes it. */
 export interface ViewChoice {
+	/** What is drawn: the mode chosen; under Done and a done project by project (their done list) whatever is chosen. */
 	readonly mode: ViewMode;
+	/** The mode the button shows and checks (`setViewMode`'s), every mode under every filter: a filter never changes it. */
+	readonly chosen: ViewMode;
 	/** The button's menu, in order; a pick writes `setViewMode` (in a note, `setNoteViewMode`). */
 	readonly modes: readonly ViewModeOption[];
-	/** The button's icon: the current mode's. */
+	/** The button's icon: the chosen mode's. */
 	readonly icon: string;
 	/** The wheel shows (two columns), the button beside it; without it the button stands alone in the wheel's place. */
 	readonly wheel: boolean;
@@ -1028,6 +1036,13 @@ export interface ViewChoice {
 	 * rows, null (no plate) in two and all columns without a filter.
 	 */
 	readonly plates: Readonly<Record<DropColumn, string | null>>;
+	/** How the mode stands: its columns, whether it swipes, its divider and its rows' stack (`viewLayout`). */
+	readonly layout: ViewLayout;
+	/**
+	 * The filter and the mode this view is read in (`viewContext`): a read whose context differs from the one drawn is
+	 * another context, drawn still in place; the same context changed animates what moved.
+	 */
+	readonly context: string;
 	/**
 	 * The menu's Subprojects row, its own group under the modes, the check in the accent when on: shown while the chosen
 	 * node is a project with subprojects as the panel draws its branch (a live project's not done; never a folder), null otherwise. A tap writes `toggleSubprojects`.
@@ -1164,6 +1179,8 @@ export { projectsDrop } from "./projectsScreen";
  * shows no drop line there and lets go of nothing, as over a list that does not take the card.
  */
 export { projectsPlusTakes, projectsTakes } from "./projectsDrop";
+/** Where the plus let go in the Projects list stands (`projectsPlusPlace(view, place)`): snapped to where its card lands; null where it may not. */
+export { projectsPlusPlace } from "./projectsDrop";
 /** How long a held card waits over a row before it unfolds or opens (`carryAt`), ms; the indent of a tree's step, px (pt). */
 export { PROJECTS_HOVER_MS, PROJECTS_INDENT } from "./projectsScreen";
 

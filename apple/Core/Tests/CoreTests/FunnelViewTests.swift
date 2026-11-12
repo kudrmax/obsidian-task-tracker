@@ -22,7 +22,7 @@ import Testing
         let view = try board.funnelView()
         #expect(view.filter == nil)
         #expect(view.view.mode == .twoColumns && view.view.wheel)
-        #expect(view.view.modes.map(\.label) == ["Columns", "Rows"])
+        #expect(view.view.modes.map(\.label) == ["Columns", "Rows", "By project"])
         #expect(view.panel?.open == false && view.panel?.docked == false)
         let snapshot = try board.snapshot(day: nil, measures: Self.measures)
         #expect(snapshot.filter == nil)
@@ -39,8 +39,8 @@ import Testing
         #expect(view.filter?.project == "Окружение")
         #expect(view.panel?.open == false)
         #expect(view.panel?.rows.first { $0.selected }?.node == "project:Окружение")
-        // Rows by default with a project, By project offered.
-        #expect(view.view.mode == .rows && !view.view.wheel && view.view.rows == ["inbox", "backlog", "soon", "day"])
+        // The one mode stays (Max, 11-12), By project offered.
+        #expect(view.view.mode == .twoColumns && view.view.wheel && view.view.rows.isEmpty)
         #expect(view.view.modes.map(\.mode) == [.twoColumns, .rows, .byProject])
         let snapshot = try board.snapshot(day: nil, measures: Self.measures)
         #expect(snapshot.filter == "project:Окружение")
@@ -52,15 +52,17 @@ import Testing
         #expect(titles(try board.snapshot(day: nil, measures: Self.measures), .inbox).count == 2)
     }
 
-    @Test func eachViewKeepsItsOwnMode() throws {
+    /// Max, 2026-11-12: the view mode is one choice; picking or clearing a project never changes it.
+    @Test func theScreenKeepsOneMode() throws {
         let board = board(FakeVault(ProjectsScreenTests.file))
         try board.setViewMode(.rows)
         #expect(try board.funnelView().view.mode == .rows)
         try board.pickProjectNode("project:Дружба")
+        #expect(try board.funnelView().view.mode == .rows)
         try board.setViewMode(.byProject)
         #expect(try board.funnelView().view.mode == .byProject)
         try board.clearProjectFilter()
-        #expect(try board.funnelView().view.mode == .rows)
+        #expect(try board.funnelView().view.mode == .byProject)
     }
 
     @Test func theSubprojectsRowHidesTheBranchAndKeepsTheMode() throws {
@@ -128,6 +130,7 @@ import Testing
     @Test func theFirstViewIsTheKeptOne() throws {
         let board = board(FakeVault(ProjectsScreenTests.file))
         #expect(try board.firstView().mode == .twoColumns)
+        try board.setViewMode(.rows)
         try board.pickProjectNode("project:Спорт")
         #expect(try board.firstView().mode == .rows)
     }

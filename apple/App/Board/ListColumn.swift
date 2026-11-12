@@ -10,6 +10,8 @@ struct ListColumn: View {
     var dayArrows = false
     /// Stacked in the Rows view: the title small, a section's name, as the plugin's rows head each stage.
     var compact = false
+    /// Mounted but not shown (the ribbon under another view): its list takes no carry and draws nothing until it shows.
+    var dormant = false
 
     /// The list's own width: another day slides through it.
     @State private var width: CGFloat = 0
@@ -28,7 +30,7 @@ struct ListColumn: View {
                     .padding(.top, !compact && list.column == .backlog ? ColumnMetrics.headGap : 0)
                     .padding(.bottom, ColumnMetrics.headGap)
             }
-            DayLane(model: model, width: width, slides: list.column == .day, shown: ListCollection(column: list.column, model: model, stacked: compact)) { peek in
+            DayLane(model: model, width: width, slides: list.column == .day, shown: ListCollection(column: list.column, model: model, stacked: compact, dormant: dormant)) { peek in
                 if let other = peek.lists[.day] { DayRows(list: other, model: model) }
             }
             .clipped()
@@ -106,24 +108,10 @@ struct ColumnTitle: View {
     private var lit: Bool { list.map { model.isTitleLit($0.column) } ?? false }
 
     var body: some View {
-        HStack(spacing: 4) {
-            if dayArrows {
-                Button { Task { await model.step(-1) } } label: { arrow("chevron.left") }
-                    // A card held over an arrow turns the day, as a folder opens under a carried file in Files.
-                    .background { SpringLoaded(model: model) { Task { await model.step(-1) } } }
-                    .accessibilityLabel("Previous Day")
-            }
-            if dayArrows {
-                Button { Task { await model.showToday() } } label: { litText.frame(height: ColumnMetrics.titleRow).contentShape(.rect) }
-                    .accessibilityHint("Back to today")
-            } else {
-                litText.accessibilityAddTraits(.isHeader)
-            }
-            if dayArrows {
-                Button { Task { await model.step(1) } } label: { arrow("chevron.right") }
-                    .background { SpringLoaded(model: model) { Task { await model.step(1) } } }
-                    .accessibilityLabel("Next Day")
-            }
+        // A narrow column (the calendar beside a wide list) takes the plugin's narrow arrows, so the day's name fits whole.
+        ViewThatFits(in: .horizontal) {
+            row(arrow: 32)
+            row(arrow: Self.narrowArrow)
         }
         .buttonStyle(.plain)
         .fontWeight(.semibold)
@@ -132,11 +120,37 @@ struct ColumnTitle: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// The plugin's narrow arrow (`--tc-arrow-narrow`).
+    private static let narrowArrow: CGFloat = 24
+
+    private func row(arrow width: CGFloat) -> some View {
+        HStack(spacing: width < 32 ? 0 : 4) {
+            if dayArrows {
+                Button { Task { await model.step(-1) } } label: { arrow("chevron.left", width: width) }
+                    // A card held over an arrow turns the day, as a folder opens under a carried file in Files.
+                    .background { SpringLoaded(model: model) { Task { await model.step(-1) } } }
+                    .accessibilityLabel("Previous Day")
+            }
+            if dayArrows {
+                Button { Task { await model.showToday() } } label: { litText.fixedSize().frame(height: ColumnMetrics.titleRow).contentShape(.rect) }
+                    .accessibilityHint("Back to today")
+            } else {
+                litText.accessibilityAddTraits(.isHeader)
+            }
+            if dayArrows {
+                Button { Task { await model.step(1) } } label: { arrow("chevron.right", width: width) }
+                    .background { SpringLoaded(model: model) { Task { await model.step(1) } } }
+                    .accessibilityLabel("Next Day")
+            }
+        }
+        .fixedSize(horizontal: dayArrows, vertical: false)
+    }
+
     /// A day arrow: the whole 32-point square takes the tap, not only the chevron's strokes, which a plain button's label
     /// alone would.
-    private func arrow(_ symbol: String) -> some View {
+    private func arrow(_ symbol: String, width: CGFloat = 32) -> some View {
         Image(systemName: symbol)
-            .frame(width: 32, height: 32)
+            .frame(width: width, height: 32)
             .contentShape(.rect)
     }
 
@@ -576,6 +590,6 @@ enum SoftEdge {
 /// A list's column drawn again only when its list changed: its rows are the collection's, which follows the board itself.
 extension ListColumn: Equatable {
     nonisolated static func == (a: ListColumn, b: ListColumn) -> Bool {
-        MainActor.assumeIsolated { a.list == b.list && a.dayArrows == b.dayArrows && a.compact == b.compact && a.model === b.model }
+        MainActor.assumeIsolated { a.list == b.list && a.dayArrows == b.dayArrows && a.compact == b.compact && a.dormant == b.dormant && a.model === b.model }
     }
 }

@@ -37,9 +37,9 @@ import type { TreePlace } from "../domain/ProjectTree";
 import { isFolder } from "../domain/ProjectWrites";
 import { dayColumn } from "../domain/Days";
 import { projectTreeOf } from "./projects";
-import { nodeIn } from "./projectsScreen";
+import { filterNode, projectOfNode } from "./projectsScreen";
 import { afterShown, filterTest, shownUnder } from "./projectFilter";
-import type { ProjectsNodeId } from "./contracts";
+import type { CarryState, ProjectsNodeId } from "./contracts";
 import type { ReadDrop } from "./drops";
 
 /** The project of the cleaned name `clean`, as the tree after a write has it; null when it has none. */
@@ -211,7 +211,7 @@ export class TaskWrites {
 		if (keys.length === 0) return nothing(null);
 		return nothing((doc, today, settings, boundary) => {
 			const tree = projectTreeOf(doc);
-			const node = nodeIn(filter, tree);
+			const node = filterNode(filter, tree);
 			const cards = keys.map((key): ProjectsDrop => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree, doc, this.reads.subprojects()) }));
 			const operation = this.rules.dropOnProject(cards, to);
 			return operation ? operation(doc, today, settings, boundary) : doc;
@@ -444,14 +444,14 @@ export class TaskWrites {
 	 * What a drop means: the moves, and whether one of them sets a time and so reads the task's duration first. It answers
 	 * the tasks' keys as the file now has them, in their order; one not found again is left out.
 	 */
-	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Read<Write<readonly TaskKey[]>> {
+	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null, carry?: CarryState): Read<Write<readonly TaskKey[]>> {
 		const read = readDrop(to, (column) => this.reads.columnSections(column, day));
 		const filtered = filter !== null && filter !== undefined && read.kind === "group" && read.before === null;
 		return {
 			reads: filtered || read.kind === "title" || (tasks.length === 1 && read.kind === "time"),
 			answer: (s) => {
 				const moves = dropMoves(tasks, filtered && s ? this.shownDrop(s, read, filter!, tasks) : read, day);
-				return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
+				return this.landed(tasks, this.opened(moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps), tasks, filter, carry));
 			},
 		};
 	}
@@ -460,14 +460,14 @@ export class TaskWrites {
 	 * Where `drop` would leave the tasks, writing nothing: its operation tried over the file as read, and the screen of
 	 * `day` read over the result by the same code as the screen.
 	 */
-	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Read<readonly DropLanding[]> {
-		const preview = this.dropPreview(tasks, to, day, filter);
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null, carry?: CarryState): Read<readonly DropLanding[]> {
+		const preview = this.dropPreview(tasks, to, day, filter, carry);
 		return { reads: true, answer: (s) => preview.answer(s).landings };
 	}
 
 	/** `landing`, with the whole screen the drop leaves and the text it is read from. */
-	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Read<DropPreview> {
-		const drop = this.drop(tasks, to, day, filter);
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null, carry?: CarryState): Read<DropPreview> {
+		const drop = this.drop(tasks, to, day, filter, carry);
 		return {
 			reads: true,
 			answer: (s) => {
@@ -512,10 +512,36 @@ export class TaskWrites {
 	/** A drop at a section's end of a filtered list: right after the last task of the section the filter shows (`afterShown`). */
 	private shownDrop(s: Snapshot, read: Extract<ReadDrop, { readonly kind: "group" }>, filter: ProjectsNodeId, tasks: readonly DroppedTask[]): ReadDrop {
 		const tree = projectTreeOf(s.doc);
-		const node = nodeIn(filter, tree);
+		const node = filterNode(filter, tree);
 		if (node === null) return read;
 		const carried = new Set(tasks.map((task) => this.rules.entryOf(s.doc, task.key).id));
 		return { ...read, before: afterShown(s.doc, read.list, read.group, filterTest(node, tree, s.doc, this.reads.subprojects()), carried) };
+	}
+
+	/**
+	 * A carry let go in a list under a filter it opened on its way (`carryAt` over a row, so the filter differs from the
+	 * lift's, `carry.under`): the move, then, in the same write, each task gives the project it was shown by under the
+	 * lift's filter (`shownUnder`; none with no filter or No project: the project is added) to the opened one, as
+	 * `dropOnProject` does; the opened No project takes that project off. Done opened, or the lift's filter, change none.
+	 */
+	private opened(write: Write<void>, tasks: readonly { readonly key: TaskKey }[], filter: ProjectsNodeId | null | undefined, carry: CarryState | undefined): Write<void> {
+		const move = write.operation;
+		if (!carry || !move || filter === null || filter === undefined) return write;
+		const operation: Operation = (doc, today, settings, boundary) => {
+			const tree = projectTreeOf(doc);
+			const under = filterNode(carry.under, tree);
+			const now = filterNode(filter, tree);
+			const after = move(doc, today, settings, boundary);
+			if (now === null || now === under || now === "done") return after;
+			const entries = tasks.map((task) => this.rules.entryOf(doc, task.key));
+			const cards = entries.flatMap((entry): ProjectsDrop[] => {
+				const moved = after.byId(entry.id);
+				return moved ? [{ key: keyOf(moved), from: under === null || under === "none" ? null : shownUnder(entry, under, tree, doc, this.reads.subprojects()) }] : [];
+			});
+			const relabel = this.rules.dropOnProject(cards, now === "none" ? null : projectOfNode(now));
+			return relabel ? relabel(after, today, settings, boundary) : after;
+		};
+		return { operation, answer: write.answer };
 	}
 
 	/** The dropped tasks where `write` left them. */
@@ -556,7 +582,7 @@ export class TaskWrites {
 function shownPlace(doc: TaskDocument, place: NewTaskPlace, filter: ProjectsNodeId, today: LocalDate, subprojects: boolean): NewTaskPlace {
 	if ((place.kind !== "list" && place.kind !== "day") || place.before !== null) return place;
 	const tree = projectTreeOf(doc);
-	const node = nodeIn(filter, tree);
+	const node = filterNode(filter, tree);
 	if (node === null) return place;
 	const list = place.kind === "list" ? place.list : dayColumn(place.date, today).list;
 	return { ...place, before: afterShown(doc, list, place.group, filterTest(node, tree, doc, subprojects)) };

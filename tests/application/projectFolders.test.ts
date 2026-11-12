@@ -182,9 +182,10 @@ describe("a folder's Projects list", () => {
 		expect(store.text).toBe(before);
 	});
 
-	it("All By project: an empty folder's part is left out; one with a task of its own by hand takes nothing", async () => {
+	it("All By project: a top folder's part holds its subprojects' tasks and takes nothing; No project last", async () => {
 		const all = (await chosen("all")).view;
-		expect(all.sections.map((s) => s.title)).toEqual(["Отчёты", "Найм", "Дружба"]);
+		expect(all.sections.map((s) => s.title)).toEqual(["Работа", "Дружба", "No project"]);
+		expect(part(all, "Работа")).toMatchObject({ takes: false, newTask: null });
 		const hand = (await chosen("all", "byProject", FILE.replace("- [ ] Без проекта", "- [ ] Без проекта 🗂️ Работа"))).view;
 		expect(part(hand, "Работа")).toMatchObject({ takes: false, newTask: null, plate: false });
 		expect(part(hand, "Дружба")).toMatchObject({ takes: true, newTask: { project: "Дружба" } });

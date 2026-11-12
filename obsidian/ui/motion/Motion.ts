@@ -39,7 +39,7 @@ export function restingRect(el: HTMLElement): DOMRect {
 	}
 	const height = growing !== undefined && GROWTHS.get(el)?.playState === "running" ? growing : rect.height;
 	const width = SLIDES.get(el)?.playState === "running" ? (SLID_TO.get(el) ?? rect.width) : rect.width;
-	return new DOMRect(rect.left - shift.x, rect.top - shift.y, width, height);
+	return new DOMRect(rect.left - shift.x, rect.top - shift.y + settling(el), width, height);
 }
 
 /** The row gap of the flex column `el` stands in: a row folded to nothing gives it back with a negative margin. */
@@ -48,12 +48,34 @@ function gapOf(el: HTMLElement): number {
 	return parent ? parseFloat(getComputedStyle(parent).rowGap) || 0 : 0;
 }
 
+/** How far a box that holds rows still moves down as its own height change settles (a row of the rows' stack), and until when. */
+const SETTLES = new WeakMap<Element, { readonly dy: number; readonly until: number }>();
+
+/** How far the boxes `el` stands in still move it, as their height changes settle. */
+function settling(el: Element): number {
+	let dy = 0;
+	const now = performance.now();
+	for (let box = el.parentElement; box; box = box.parentElement) {
+		const settle = SETTLES.get(box);
+		if (settle && settle.until > now) dy += settle.dy;
+	}
+	return dy;
+}
+
 const SLIDES = new WeakMap<Element, Animation>();
 const GROWTHS = new WeakMap<Element, Animation>();
 /** The height a growing row grows to, and the box a reshaped one goes to. */
 const GROWN = new WeakMap<Element, number>();
 const RESHAPED = new WeakMap<Element, Box>();
 const SLID_TO = new WeakMap<Element, number>();
+const GROWN_MARGIN = new WeakMap<Element, number>();
+
+/** The bottom margin `el` will stand with once it has grown in (it grows from none): its own otherwise. */
+export function restingMarginBottom(el: HTMLElement): number {
+	const grown = GROWN_MARGIN.get(el);
+	if (grown !== undefined && GROWTHS.get(el)?.playState === "running") return grown;
+	return parseFloat(getComputedStyle(el).marginBottom) || 0;
+}
 
 /**
  * The moves a row of a list makes, and anything that floats over the screen: it grows in from nothing, fades and then
@@ -72,6 +94,7 @@ export const Motion = {
 		const growth = row.animate([{ height: "0px", minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" }, to], timing);
 		GROWTHS.set(row, growth);
 		GROWN.set(row, parseFloat(to.height) || 0);
+		GROWN_MARGIN.set(row, parseFloat(to.marginBottom) || 0);
 		const done = () => {
 			if (GROWTHS.get(row) === growth) row.style.overflow = overflow;
 		};
@@ -149,6 +172,23 @@ export const Motion = {
 		if (Math.abs(to.top - from.top) < 0.5 && Math.abs(to.left - from.left) < 0.5 && Math.abs(to.height - from.height) < 0.5) return;
 		RESHAPED.set(node, to);
 		SLIDES.set(node, node.animate([{ top: px(from.top), left: px(from.left), height: px(from.height) }, { top: px(to.top), left: px(to.left), height: px(to.height) }], timing));
+	},
+
+	/**
+	 * A box moves `dy` down over `ms` as heights above it settle (a CSS transition the code started): whatever stands in it
+	 * is read where it will rest (`restingRect`), so a card landing in it lands where it ends up.
+	 */
+	settles(box: Element, dy: number, ms: number): void {
+		if (Math.abs(dy) < 0.5) SETTLES.delete(box);
+		else SETTLES.set(box, { dy, until: performance.now() + ms });
+	},
+
+	/** A row standing in for another of its height (a list's plate) grows only the room under it (a field's bar room), if it keeps any. */
+	growRoomUnder(row: HTMLElement): void {
+		const timing = timingOf(row);
+		const room = getComputedStyle(row).marginBottom;
+		if (!timing || !(parseFloat(room) > 0)) return;
+		row.animate([{ marginBottom: "0px" }, { marginBottom: room }], timing);
 	},
 
 	/** Something floating comes in where it stands: it fades in. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type EntryList, type ListCard, projectsEntryLook, projectsPlusTakes, type ProjectsView, QuickEntrySession, viewEntryLists, type TaskItem, type WriteLine } from "../../core/application/contracts";
+import { type EntryList, type ListCard, projectsEntryLook, projectsPlusPlace, projectsPlusTakes, type ProjectsView, QuickEntrySession, viewEntryLists, type TaskItem, type WriteLine } from "../../core/application/contracts";
 import { callDoor } from "../../core/application/PhoneCalls";
 import { memoryProjectsScreen, type Clock } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
@@ -206,6 +206,51 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 		expect(s.entry.state).toMatchObject({ spot: { kind: "list", column: "projects", place: { group: null } }, place: { kind: "inbox" } });
 	});
 
+	/** QA 2026-11-12: the field typed at a part's end stands where its card will: after the part's cards of its stage. */
+	it("the plus's field stands where the typed card lands, after the part's Inbox cards; Enter keeps them together", async () => {
+		const s = await projectsScreen();
+		const at = (title: string) => projectsEntryLook(s.view()).cards.findIndex((c) => c.key.raw === s.item(title).key.raw);
+		s.entry.openFromPlus();
+		expect(s.entry.state).toMatchObject({ spot: { column: "projects", place: { group: null, index: at("Back A") } } });
+		s.entry.type("Typed");
+		s.entry.enter();
+		await s.entry.idle();
+		expect(s.titles(null)).toEqual(["Inbox A", "Typed", "Back A", "Back B", "\tChild", "Soon A", "Now A"]);
+		expect(s.entry.state).toMatchObject({ spot: { column: "projects", place: { group: null, index: at("Back A") } } });
+	});
+
+	/** QA 2026-11-12: the plus let go in the middle of a part: the drop line, the field and the card stand at one spot. */
+	it("the plus let go between a part's cards snaps to where the card will land: the line's place, the field, the card", async () => {
+		const s = await projectsScreen();
+		const at = (title: string) => projectsEntryLook(s.view()).cards.findIndex((c) => c.key.raw === s.item(title).key.raw);
+		const middle = { kind: "task", group: null, before: s.item("Soon A").key } as const;
+		expect(projectsPlusPlace(s.view(), middle)).toEqual({ kind: "task", group: null, before: s.item("Back A").key });
+		s.entry.openAt("projects", middle);
+		expect(s.entry.state).toMatchObject({ spot: { column: "projects", place: { group: null, index: at("Back A") } } });
+		s.entry.type("Typed");
+		s.entry.enter();
+		await s.entry.idle();
+		expect(s.titles(null)).toEqual(["Inbox A", "Typed", "Back A", "Back B", "\tChild", "Soon A", "Now A"]);
+	});
+
+	it("where the plus may not be let go there is no place; under a card the place stays", async () => {
+		const s = await projectsScreen("project:Work", "byProject", FILE.replace("- Q\n", "- Q\n- Work 🗃️\n\t- Sub2\n").replace("- [ ] Inbox loose", "- [ ] Inbox loose\n- [ ] By hand 🗂️ Work"));
+		expect(projectsPlusPlace(s.view(), { kind: "task", group: null, before: null })).toBeNull();
+		const p = await projectsScreen();
+		const under = { kind: "subtask", parent: p.item("Back A").key, before: null } as const;
+		expect(projectsPlusPlace(p.view(), under)).toEqual(under);
+	});
+
+	it("a part's end for a stage it has no card of: after the stages before it", async () => {
+		const s = await projectsScreen();
+		const part = projectsEntryLook(s.view()).parts.find((p) => p.group === null)!;
+		expect(part.end).toEqual(s.item("Back A").key);
+		const sub = s.view().sections.find((x) => x.title === "Sub")!;
+		expect(projectsEntryLook(s.view()).parts.find((p) => p.group === sub.group)!.end).toEqual(sub.cards[0].item.key);
+		const empty = s.view().sections.find((x) => x.title === "Empty")!;
+		expect(projectsEntryLook(s.view()).parts.find((p) => p.group === empty.group)!.end).toBeNull();
+	});
+
 	it("on Done no part takes the plus: the plus opens nothing, never the hidden Inbox, and says so before the tap", async () => {
 		const s = await projectsScreen("done");
 		expect(s.entry.plusOpens()).toBe(false);
@@ -293,10 +338,10 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 			});
 		}
 
-		it("All keeps its fallback: the first part that writes takes the plus", async () => {
+		it("All, no filter: the plus types in No project's part, a task with no project", async () => {
 			const s = await projectsScreen("all", "byProject", FOLDER);
 			const look = projectsEntryLook(s.view());
-			expect(look.parts.filter((p) => p.plus).map((p) => p.group)).toEqual([s.view().sections.find((x) => x.newTask !== null)!.group]);
+			expect(look.parts.filter((p) => p.plus).map((p) => p.group)).toEqual(["none"]);
 		});
 
 		it("the plus may be let go only where a new task may be written: a subproject's gap and under its tasks, never in the folder's own part or under a task carrying the folder", async () => {

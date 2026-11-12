@@ -90,6 +90,23 @@ describe("the Subprojects row of the view menu", () => {
 		expect((await svc.funnelView(true)).view.subprojects?.checked).toBe(true);
 	});
 
+	it("stands in every mode, By project too, and its check off is another context, drawn still like another filter", async () => {
+		const { svc } = setup();
+		await svc.pickProjectNode(PEOPLE, true);
+		for (const mode of ["twoColumns", "allColumns", "rows", "byProject"] as const) {
+			await svc.setViewMode(mode);
+			const on = (await svc.funnelView(true)).view;
+			expect(on.subprojects).toEqual({ label: "Subprojects", checked: true });
+			await svc.toggleSubprojects();
+			const off = (await svc.funnelView(true)).view;
+			expect(off.subprojects?.checked).toBe(false);
+			expect(off.mode).toBe(mode);
+			expect(off.context).not.toBe(on.context);
+			await svc.toggleSubprojects();
+			expect((await svc.funnelView(true)).view.context).toBe(on.context);
+		}
+	});
+
 	it("is kept on the device: choosing, clearing and choosing again leave it as it was", async () => {
 		const { svc, state } = setup();
 		await svc.pickProjectNode(PEOPLE, true);

@@ -3626,7 +3626,10 @@ ${key.title}`.toLowerCase();
     return chosenNode(state, tree) ?? "all";
   }
   function chosenNode(state, tree) {
-    return nodeIn(state.selected, tree);
+    return filterNode(state.selected, tree);
+  }
+  function filterNode(node, tree) {
+    return node === "all" ? null : nodeIn(node, tree);
   }
   function nodeIn(node, tree) {
     if (node === null || node === void 0) return null;
@@ -3644,7 +3647,7 @@ ${key.title}`.toLowerCase();
     const statusOf2 = (name2) => statuses.get(projectKey(name2)) ?? "waiting";
     const fixed = input.node === void 0 ? null : nodeIn(input.node, tree);
     const selected2 = fixed ?? selectedNode(state, tree);
-    const rows = treeRows(tree, state, selected2, statusOf2, (node) => input.doc !== null && nodeReorders(node, statusOf2));
+    const rows = treeRows(tree, state, selected2, statusOf2, (node) => input.doc !== null && nodeReorders(node, statusOf2), hasLooseOpen(input.doc));
     const parts = input.doc ? sectionsOf(input, input.doc, selected2, statusOf2) : [];
     const name = projectOfNode(selected2);
     const placed = name === null ? null : tree.find(name);
@@ -3663,9 +3666,11 @@ ${key.title}`.toLowerCase();
   function panelRows(tree, doc, state) {
     const statuses = doc ? projectStatuses(tree, doc) : /* @__PURE__ */ new Map();
     const statusOf2 = (name) => statuses.get(projectKey(name)) ?? "waiting";
-    return treeRows(tree, state, chosenNode(state, tree) ?? NO_NODE, statusOf2, (node) => doc !== null && nodeReorders(node, statusOf2));
+    return treeRows(tree, state, selectedNode(state, tree), statusOf2, (node) => doc !== null && nodeReorders(node, statusOf2), hasLooseOpen(doc));
   }
-  var NO_NODE = "";
+  function hasLooseOpen(doc) {
+    return doc !== null && tasksOf(doc).some((entry) => entry.task.projects.length === 0 && stageOf(entry) !== "done");
+  }
   function nodeHeader(node, tree, doc) {
     const name = projectOfNode(node);
     const placed = name === null ? null : tree.find(name);
@@ -3710,7 +3715,7 @@ ${key.title}`.toLowerCase();
   function inInbox(project) {
     return { place: { kind: "list", list: "inbox", group: null, before: null }, project };
   }
-  function treeRows(tree, state, selected2, statusOf2, reorders) {
+  function treeRows(tree, state, selected2, statusOf2, reorders, looseOpen) {
     const row = (fields) => ({ ...fields, opensOnHover: fields.acceptsTask && !fields.selected && reorders(fields.node) });
     const rows = [row(fixedRow("all", PROJECTS_WORDS.all, selected2, false, false))];
     const walk = (nodes, path, depth, done) => {
@@ -3741,7 +3746,7 @@ ${key.title}`.toLowerCase();
       }
     };
     walk(tree.roots, [], 0, false);
-    rows.push(row(fixedRow("none", PROJECTS_WORDS.none, selected2, false, true)));
+    rows.push(row({ ...fixedRow("none", PROJECTS_WORDS.none, selected2, false, true), muted: !looseOpen }));
     const doneTops = doneRoots(tree, statusOf2);
     const open = state.doneOpen === true;
     rows.push(row({ ...fixedRow("done", PROJECTS_WORDS.done, selected2, doneTops.length > 0, false), folded: doneTops.length > 0 && !open }));
@@ -3822,8 +3827,21 @@ ${key.title}`.toLowerCase();
       const loose = tasksOf(doc).filter((entry) => entry.task.projects.length === 0 && stageOf(entry) !== "done");
       return shown([part("none", null, [], 0, byStage(loose).map((e) => cardOf(input, e, null)), inInbox(null))], true);
     }
-    const live = input.tree.all().filter((p) => statusOf2(p.node.name) !== "done");
-    return shown(live.map((p) => projectPart(`project:${p.node.name}`, p, p.path, p.path.length, byStage(tasksNaming(doc, p.node.name, false)).map((e) => cardOf(input, e, p.node.name)), inInbox(p.node.name))), true);
+    return allSections(input, doc, statusOf2);
+  }
+  function allSections(input, doc, statusOf2) {
+    const open = tasksOf(doc).filter((entry) => stageOf(entry) !== "done");
+    const tops = input.tree.roots.filter((node) => statusOf2(node.name) !== "done").map((node) => input.tree.find(node.name));
+    const parts = tops.map((top) => {
+      const branch = input.tree.all().filter((p) => p.path.length >= 1 && projectKey(p.path[0]) === projectKey(top.node.name) && statusOf2(p.node.name) !== "done").map((p) => p.node.name);
+      const cards = byStage(open.filter((entry) => branch.some((name) => namesProject(entry.task.projects, name)))).map((entry) => {
+        const by = entry.task.projects.find((p) => namesProject(branch, p));
+        return cardOf(input, entry, by === void 0 ? top.node.name : input.tree.find(by)?.node.name ?? by);
+      });
+      return projectPart(`project:${top.node.name}`, top, top.path, 0, cards, inInbox(top.node.name));
+    });
+    const loose = byStage(open.filter((entry) => entry.task.projects.length === 0)).map((e) => cardOf(input, e, null));
+    return shown([...parts, part("none", PROJECTS_WORDS.none, [], 0, loose, inInbox(null))], true);
   }
   function projectSections(input, doc, placed, statusOf2) {
     const closed = statusOf2(placed.node.name) === "done";
@@ -3862,6 +3880,7 @@ ${key.title}`.toLowerCase();
     return kept.map((s, i) => ({ ...s, plate: s.empty && (s.header || kept.length === 1), opens: s.header && !untitledAbove(i) }));
   }
   function tapped(state, tree, node) {
+    if (node === "all") return cleared(state);
     const selected2 = chosenNode(state, tree);
     if (selected2 === null || !sameNode(selected2, node)) return { ...state, selected: node };
     if (node === "done") return { ...state, doneOpen: !(state.doneOpen ?? false) };
@@ -3871,7 +3890,7 @@ ${key.title}`.toLowerCase();
   }
   function picked(state, tree, node, wide) {
     const next = tapped(state, tree, node);
-    const chose = next.selected !== state.selected;
+    const chose = next.selected !== state.selected || node === "all";
     return !wide && chose && next.panelOpen ? { ...next, panelOpen: false } : next;
   }
   function unfolded(state, node) {
@@ -3886,6 +3905,7 @@ ${key.title}`.toLowerCase();
     return row.opensOnHover ? selected(open, tree, doc, row.node) : open;
   }
   function selected(state, tree, doc, node) {
+    if (node === "all") return cleared(state);
     const name = projectOfNode(node);
     const found = name === null ? null : tree.find(name);
     if (name !== null && !found) return state;
@@ -3954,6 +3974,95 @@ ${key.title}`.toLowerCase();
     return projectsGap(rows, gap, base + Math.round(shift / PROJECTS_INDENT), lifted2);
   }
 
+  // core/application/listWidth.ts
+  var LIST_WIDTHS = { min: 110, max: 280 };
+  function listWidths(share, viewWidth, dividerWidth) {
+    const columns = viewWidth - dividerWidth;
+    const max = Math.max(LIST_WIDTHS.max, columns - LIST_WIDTHS.min);
+    return { width: Math.min(max, Math.max(LIST_WIDTHS.min, share * columns)), min: LIST_WIDTHS.min, max, center: columns / 2 };
+  }
+  function listShareOf(width, viewWidth, dividerWidth) {
+    return width / (viewWidth - dividerWidth);
+  }
+  var DIVIDER_SNAP = { distance: 8, slowSpeed: 0.08 };
+  function dividerAt(wanted, widths, speed) {
+    const reachable = widths.center >= widths.min && widths.center <= widths.max;
+    const snapped2 = reachable && speed < DIVIDER_SNAP.slowSpeed && Math.abs(wanted - widths.center) <= DIVIDER_SNAP.distance;
+    const width = snapped2 ? widths.center : Math.round(wanted);
+    return { width: Math.min(widths.max, Math.max(widths.min, width)), snapped: snapped2 };
+  }
+  function allColumnsWidths(share, viewWidth, dividerWidth) {
+    const room = viewWidth - 3 * dividerWidth;
+    const max = Math.max(LIST_WIDTHS.min, (room - LIST_WIDTHS.min) / 3);
+    const width = Math.min(max, Math.max(LIST_WIDTHS.min, share * room / (1 + 2 * share)));
+    return { width, min: LIST_WIDTHS.min, max, center: room / 4 };
+  }
+  function allColumnsShare(width, viewWidth, dividerWidth) {
+    const timeline = viewWidth - 3 * dividerWidth - 3 * width;
+    return width + timeline > 0 ? width / (width + timeline) : 0.5;
+  }
+  function allColumnsDividerAt(width, dividerWidth) {
+    return 3 * width + 2 * dividerWidth;
+  }
+  function allColumnsWidthAt(at, dividerWidth) {
+    return (at - 2 * dividerWidth) / 3;
+  }
+
+  // core/application/viewLayout.ts
+  function viewLayout(mode, note, title) {
+    const of = (lists) => lists.map((list) => ({ list, title: title(list) }));
+    const timeline = note ? [] : [{ id: "timeline", lists: [], width: "rest" }];
+    const lead = note ? "rest" : "list";
+    const still = { mode, swipe: "none", divider: !note };
+    if (mode === "twoColumns") {
+      return {
+        mode,
+        swipe: "pages",
+        divider: true,
+        stack: null,
+        columns: [
+          { id: "inbox", lists: of(["inbox", "backlog"]), width: "half" },
+          { id: "soon", lists: of(["soon"]), width: "half" },
+          { id: "day", lists: of(["day"]), width: "list" },
+          ...timeline
+        ]
+      };
+    }
+    if (mode === "allColumns") {
+      return {
+        ...still,
+        stack: null,
+        columns: [
+          { id: "inbox", lists: of(["inbox", "backlog"]), width: "list" },
+          { id: "soon", lists: of(["soon"]), width: "list" },
+          { id: "day", lists: of(["day"]), width: "list" },
+          ...timeline
+        ]
+      };
+    }
+    if (mode === "rows") return { ...still, stack: { lists: ROW_LISTS, scrolls: !note }, columns: [{ id: "rows", lists: of(ROW_LISTS), width: lead }, ...timeline] };
+    return { ...still, stack: null, columns: [{ id: "projects", lists: [{ list: "projects", title: null }], width: lead }, ...timeline] };
+  }
+  function layoutWidths(layout, share, viewWidth, dividerWidth) {
+    if (layout.swipe === "pages") return null;
+    if (!layout.divider) return { widths: layout.columns.map(() => viewWidth / layout.columns.length), divider: null };
+    if (layout.mode === "allColumns") {
+      const all = allColumnsWidths(share, viewWidth, dividerWidth);
+      const at = (width) => allColumnsDividerAt(width, dividerWidth);
+      return {
+        widths: [all.width, all.width, all.width, viewWidth - 3 * dividerWidth - 3 * all.width],
+        divider: { width: at(all.width), min: at(all.min), max: at(all.max), center: at(all.center) }
+      };
+    }
+    const list = listWidths(share, viewWidth, dividerWidth);
+    return { widths: [list.width, viewWidth - dividerWidth - list.width], divider: list };
+  }
+  function layoutShareAt(layout, at, viewWidth, dividerWidth) {
+    if (layout.swipe === "pages" || !layout.divider) return null;
+    if (layout.mode === "allColumns") return allColumnsShare(allColumnsWidthAt(at, dividerWidth), viewWidth, dividerWidth);
+    return listShareOf(at, viewWidth, dividerWidth);
+  }
+
   // core/application/viewModes.ts
   var VIEW_WORDS = {
     twoColumns: "Two columns",
@@ -3966,39 +4075,56 @@ ${key.title}`.toLowerCase();
   var ICONS = { twoColumns: "columns-2", allColumns: "columns-4", rows: "rows-3", byProject: "folder-tree" };
   var ROW_LISTS = ["inbox", "backlog", "soon", "day"];
   function offered(ask) {
-    if (ask.closed && ask.node !== null) return ["byProject"];
-    const byProject = ask.node !== null && ask.node !== "none" ? ["byProject"] : [];
-    if (ask.note) return ["rows", ...byProject];
-    return ["twoColumns", ...ask.wide ? ["allColumns"] : [], "rows", ...byProject];
+    if (ask.note) return ["rows", "byProject"];
+    return ["twoColumns", ...ask.wide ? ["allColumns"] : [], "rows", "byProject"];
   }
-  function defaultMode(ask, modes) {
-    const wanted = ask.node === null ? "twoColumns" : "rows";
-    return modes.includes(wanted) ? wanted : modes[0];
+  function defaultMode(ask) {
+    return ask.note ? "rows" : "twoColumns";
   }
   function keptMode(state, ask) {
-    if (ask.note) return state.noteView;
-    return ask.node === null ? state.view : state.filteredView;
+    return ask.note ? state.noteView : state.view;
+  }
+  function viewContext(node, mode, note, subprojects = true) {
+    const base = note ? ["note", mode] : ["screen", node, mode];
+    return JSON.stringify(subprojects ? base : [...base, "own"]);
   }
   function viewChoice(state, ask) {
     const modes = offered(ask);
     const kept = keptMode(state, ask);
-    const mode = kept !== void 0 && modes.includes(kept) ? kept : defaultMode(ask, modes);
+    const chosen = kept !== void 0 && modes.includes(kept) ? kept : defaultMode(ask);
+    const mode = ask.closed && ask.node !== null ? "byProject" : chosen;
     const label = (m) => m === "twoColumns" && !ask.wide ? VIEW_WORDS.columns : VIEW_WORDS[m];
-    const options = modes.map((m) => ({ mode: m, label: label(m), icon: ICONS[m], checked: m === mode }));
+    const options = modes.map((m) => ({ mode: m, label: label(m), icon: ICONS[m], checked: m === chosen }));
     const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
     const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
     const ribbon = mode === "twoColumns" && !ask.note;
     const subprojects = ask.branches ? { label: SUBPROJECTS_WORD, checked: subprojectsOn(state) } : null;
-    return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", ribbon, source: mode === "byProject" ? "projectsScreen" : "screen", rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates, subprojects };
+    return {
+      mode,
+      chosen,
+      modes: options,
+      icon: ICONS[chosen],
+      wheel: mode === "twoColumns",
+      ribbon,
+      source: mode === "byProject" ? "projectsScreen" : "screen",
+      rows: mode === "rows" ? ROW_LISTS : [],
+      emptyLabel: PROJECTS_WORDS.noTasks,
+      plates,
+      layout: viewLayout(mode, ask.note, ask.title),
+      context: viewContext(ask.node, mode, ask.note, subprojects?.checked ?? true),
+      subprojects
+    };
   }
-  function firstViewOf(state, wide, note, branches) {
-    return viewChoice(state, { node: note ? "note" : state.selected ?? null, closed: false, wide, note, branches: !note && branches });
+  function firstViewOf(state, wide, note, title, branches) {
+    const node = note ? "note" : state.selected === void 0 || state.selected === "all" ? null : state.selected;
+    return viewChoice(state, { node, closed: node === "done", wide, note, title, branches: !note && branches });
   }
   function toggledSubprojects(state) {
     return { ...state, subprojects: !subprojectsOn(state) };
   }
-  function withMode(state, mode, filtered) {
-    return filtered ? { ...state, filteredView: mode } : { ...state, view: mode };
+  function withMode(state, mode) {
+    const { filteredView: _old, ...rest } = state;
+    return { ...rest, view: mode };
   }
   function viewEntryLists(mode, spot) {
     if (mode === "byProject") return ["projects"];
@@ -4026,6 +4152,71 @@ ${key.title}`.toLowerCase();
       open.shift();
     }
     return heights;
+  }
+  function stackedLists(lists, room, fade) {
+    const wanted = lists.map((list) => list.wanted);
+    if (wanted.reduce((sum, height) => sum + height, 0) <= room) return wanted;
+    const least2 = lists.map((list) => Math.min(list.wanted, (list.stops[0] ?? list.wanted) + fade));
+    const heights = stackedRows(wanted, room, 0).map((height, i) => Math.max(least2[i], snapped(lists[i], height, fade)));
+    let left = room - heights.reduce((sum, height) => sum + height, 0);
+    for (; ; ) {
+      const steps = lists.map((list, i) => grown(list, heights[i], fade) - heights[i]);
+      const next = steps.reduce((best, step, i) => step > 0 && step <= left && (best < 0 || step < steps[best]) ? i : best, -1);
+      if (next < 0) return heights;
+      heights[next] += steps[next];
+      left -= steps[next];
+    }
+  }
+  function snapped(list, height, fade) {
+    if (height >= list.wanted) return list.wanted;
+    return list.stops.map((stop2) => stop2 + fade).filter((end) => end <= height && end < list.wanted).pop() ?? 0;
+  }
+  function grown(list, height, fade) {
+    const end = list.stops.map((stop2) => stop2 + fade).find((at) => at > height) ?? list.wanted;
+    return Math.min(end, list.wanted);
+  }
+
+  // core/application/taskKeys.ts
+  function keyOf(entry) {
+    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
+  }
+  function samePlace2(a, b) {
+    return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
+  }
+  function sameLine(a, b) {
+    return a.raw === b.raw;
+  }
+  function sameTaskTree(a, b) {
+    return a.section === b.section && a.index === b.index;
+  }
+  function keyId(key) {
+    return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
+  }
+  function isUnder(a, b) {
+    return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
+  }
+
+  // core/application/newTaskPlaces.ts
+  function sameKey(a, b) {
+    return a === null || b === null ? a === b : keyId(a) === keyId(b);
+  }
+  function samePlacement2(a, b) {
+    if (a === void 0 || b === void 0) return a === b;
+    return a.kind === b.kind && (a.kind !== "date" || b.kind === "date" && a.date === b.date);
+  }
+  function sameNewPlace(a, b) {
+    switch (a.kind) {
+      case "list":
+        return b.kind === "list" && a.list === b.list && a.group === b.group && a.date === b.date && sameKey(a.before, b.before);
+      case "day":
+        return b.kind === "day" && a.date === b.date && a.group === b.group && sameKey(a.before, b.before);
+      case "subtask":
+        return b.kind === "subtask" && sameKey(a.parent, b.parent) && sameKey(a.before, b.before);
+      case "slot":
+        return b.kind === "slot" && sameSlot(a.slot, b.slot);
+      case "projects":
+        return b.kind === "projects" && a.group === b.group && a.node === b.node && sameKey(a.before, b.before) && samePlacement2(a.placement, b.placement);
+    }
   }
 
   // core/application/projectsCarry.ts
@@ -4107,26 +4298,6 @@ ${key.title}`.toLowerCase();
     if (state.naming !== true) return state;
     const { naming: _gone, ...rest } = state;
     return rest;
-  }
-
-  // core/application/taskKeys.ts
-  function keyOf(entry) {
-    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
-  }
-  function samePlace2(a, b) {
-    return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
-  }
-  function sameLine(a, b) {
-    return a.raw === b.raw;
-  }
-  function sameTaskTree(a, b) {
-    return a.section === b.section && a.index === b.index;
-  }
-  function keyId(key) {
-    return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
-  }
-  function isUnder(a, b) {
-    return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
   }
 
   // core/application/marks.ts
@@ -4717,7 +4888,9 @@ ${key.title}`.toLowerCase();
     openAt(column, place) {
       this.open(this.spotIn(column, place));
     }
-    spotIn(column, place) {
+    spotIn(column, asked) {
+      const part2 = asked.kind === "task" ? this.parts(column).find((p) => p.group === asked.group && p.newTask !== null) : void 0;
+      const place = part2 && asked.kind === "task" ? { ...asked, before: part2.end } : asked;
       const gap = gapOfPlace(this.look.cards(column), place);
       return { kind: "list", column, place: place.kind === "task" ? { ...gap, level: 0 } : gap };
     }
@@ -5290,9 +5463,9 @@ ${key.title}`.toLowerCase();
     const width = Math.max(card.width, Math.min(card.width + missing, widest));
     return { width, cut: width < card.width + missing };
   }
-  function grownStart(start, size, grown, room, margin) {
+  function grownStart(start, size, grown2, room, margin) {
     const end = Math.max(start + size, room - margin);
-    return Math.max(Math.min(start, margin), Math.min(start, end - grown));
+    return Math.max(Math.min(start, margin), Math.min(start, end - grown2));
   }
 
   // core/application/SectionNameEntry.ts
@@ -5322,24 +5495,6 @@ ${key.title}`.toLowerCase();
     const elsewhere = description !== state.file;
     if (!elsewhere || editor.focused || editor.pending) return { state: { ...state, file: description }, replace: null };
     return { state: { file: description, typed: false }, replace: description ?? DESCRIPTION_TEMPLATE };
-  }
-
-  // core/application/listWidth.ts
-  var LIST_WIDTHS = { min: 110, max: 280 };
-  function listWidths(share, viewWidth, dividerWidth) {
-    const columns = viewWidth - dividerWidth;
-    const max = Math.max(LIST_WIDTHS.max, columns - LIST_WIDTHS.min);
-    return { width: Math.min(max, Math.max(LIST_WIDTHS.min, share * columns)), min: LIST_WIDTHS.min, max, center: columns / 2 };
-  }
-  function listShareOf(width, viewWidth, dividerWidth) {
-    return width / (viewWidth - dividerWidth);
-  }
-  var DIVIDER_SNAP = { distance: 8, slowSpeed: 0.08 };
-  function dividerAt(wanted, widths, speed) {
-    const reachable = widths.center >= widths.min && widths.center <= widths.max;
-    const snapped = reachable && speed < DIVIDER_SNAP.slowSpeed && Math.abs(wanted - widths.center) <= DIVIDER_SNAP.distance;
-    const width = snapped ? widths.center : Math.round(wanted);
-    return { width: Math.min(widths.max, Math.max(widths.min, width)), snapped };
   }
 
   // core/application/timelineZoom.ts
@@ -5552,6 +5707,12 @@ ${key.title}`.toLowerCase();
     if (place.kind === "subtask") return view.reorders && nestsUnder(view, place.parent);
     return view.sections.find((s) => s.group === place.group)?.newTask != null;
   }
+  function projectsPlusPlace(view, place) {
+    if (!projectsPlusTakes(view, place)) return null;
+    if (place.kind === "subtask") return place;
+    const section = view.sections.find((s) => s.group === place.group);
+    return { kind: "task", group: place.group, before: endOf(section) };
+  }
   function takes(view, carried, place) {
     if (!(view.sections.find((s) => s.group === place.group)?.takes ?? true)) return false;
     return enters(carried, targetList(planOf(view, carried, place).anchor));
@@ -5656,12 +5817,20 @@ ${key.title}`.toLowerCase();
     return {
       cards,
       sections: view.sections.map((section) => section.group),
-      parts: view.sections.map((section, i) => ({ group: section.group, newTask: section.newTask, plus: i === plusPart }))
+      parts: view.sections.map((section, i) => ({ group: section.group, newTask: section.newTask, plus: i === plusPart, end: endOf(section) }))
     };
   }
   function sameNewTask(a, b) {
     const project = a.project === null || b.project === null ? a.project === b.project : projectKey(a.project) === projectKey(b.project);
-    return project && JSON.stringify(a.place) === JSON.stringify(b.place);
+    return project && sameNewPlace(a.place, b.place);
+  }
+  var STAGE_RANK = { inbox: 0, backlog: 1, soon: 2, date: 2, today: 3, done: 4 };
+  var LIST_RANK = { inbox: 0, backlog: 1, soon: 2, now: 3 };
+  function endOf(section) {
+    const place = section.newTask?.place;
+    if (!place || place.kind !== "list") return null;
+    const rank = place.date !== void 0 ? STAGE_RANK.soon : LIST_RANK[place.list];
+    return section.cards.find((card) => card.stage !== null && STAGE_RANK[card.stage.kind] > rank)?.item.key ?? null;
   }
   function placementOfNewTask(newTask2) {
     const place = newTask2?.place;
@@ -6168,7 +6337,7 @@ ${key.title}`.toLowerCase();
 
   // core/application/projectFilter.ts
   function filterTest(node, tree, doc, subprojects) {
-    if (node === "all") return (entry) => entry.task.projects.length > 0;
+    if (node === "all") return () => true;
     if (node === "none") return (entry) => entry.task.projects.length === 0;
     const names = node === "done" ? doneNames(tree, doc) : shownNames(node, tree, doc, subprojects);
     return (entry) => names.some((name) => namesProject(entry.task.projects, name));
@@ -6243,6 +6412,8 @@ ${key.title}`.toLowerCase();
       this.settings = settings;
       this.clock = clock;
       this.source = source;
+      /** A funnel list's column title: its name; the day's list draws the day's own. */
+      this.columnTitle = (list) => list === "day" ? null : this.listName(list);
     }
     /** The projects of the tree read last, in its order: the Project page and the quick entry's Project button. */
     projects() {
@@ -6278,7 +6449,7 @@ ${key.title}`.toLowerCase();
       const node = chosenNode(state, tree);
       const filter = node === null ? null : this.filterOf(node, tree, s?.doc ?? null, true);
       const closed = node !== null && nodeHeader(node, tree, s?.doc ?? null).closed;
-      const view = viewChoice(state, { node, closed, wide, note: false, branches: hasSubprojects(node, tree, s?.doc ?? null) });
+      const view = viewChoice(state, { node, closed, wide, note: false, title: this.columnTitle, branches: hasSubprojects(node, tree, s?.doc ?? null) });
       const reason = panelReason(state);
       return {
         filter,
@@ -6300,13 +6471,13 @@ ${key.title}`.toLowerCase();
       if (name === null) return null;
       const node = projectNodeOf(name);
       const closed = nodeHeader(node, tree, s.doc).closed;
-      const view = viewChoice(this.source.screen(), { node, closed, wide, note: true, branches: hasSubprojects(node, tree, s.doc) });
+      const view = viewChoice(this.source.screen(), { node, closed, wide, note: true, title: this.columnTitle, branches: hasSubprojects(node, tree, s.doc) });
       return { filter: this.filterOf(node, tree, s.doc, false), view, panel: null, plus: plusOf(view.mode, false), topRow: false, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
     }
     /** The view before the first read: the device's state alone (`firstViewOf`). */
     firstView(wide, note) {
       const state = this.source.screen();
-      return firstViewOf(state, wide, note, hasSubprojects(state.selected, this.source.tree(), null));
+      return firstViewOf(state, wide, note, this.columnTitle, hasSubprojects(state.selected, this.source.tree(), null));
     }
     /** The device's Subprojects setting (`subprojectsOn`): what every filtered read and write goes by. */
     subprojects() {
@@ -6318,7 +6489,7 @@ ${key.title}`.toLowerCase();
     }
     filterHides({ doc }, item, filter) {
       const tree = projectTreeOf(doc);
-      const node = nodeIn(filter, tree);
+      const node = filterNode(filter, tree);
       const entry = this.rules.named(doc, item.key) ?? doc.find(item.key.section, item.key.index, item.key.path);
       if (node === null || !entry) return false;
       const top = entry.path.length === 0 ? entry : doc.find(entry.section, entry.index, []);
@@ -6357,7 +6528,7 @@ ${key.title}`.toLowerCase();
     screen(s, date, filter) {
       const { doc, today, boundary } = s;
       const tree = projectTreeOf(doc);
-      const node = nodeIn(filter, tree);
+      const node = filterNode(filter, tree);
       const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
       const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
       const shown2 = (entries) => entries.filter(shows).map(item);
@@ -6659,7 +6830,7 @@ ${key.title}`.toLowerCase();
     if (change.kind === "nest") return { ...change, parent: fresh(change.parent), before: fresh(change.before) };
     return change;
   }
-  function sameKey(a, b) {
+  function sameKey2(a, b) {
     return samePlace2(a, b) && sameLine(a, b);
   }
   function columnOfPlace(place, today) {
@@ -7096,7 +7267,7 @@ ${key.title}`.toLowerCase();
         const now = steps.map((step) => ({ key: fresh(step.key), change: freshChange(step.change, fresh) }));
         const named = [];
         const tagOf = (key) => {
-          const at = named.findIndex((k) => sameKey(k, key));
+          const at = named.findIndex((k) => sameKey2(k, key));
           return at >= 0 ? at : named.push(key) - 1;
         };
         const lineOf = (key) => doc.lineOf(this.entryOf(doc, key));
@@ -7402,7 +7573,7 @@ ${key.title}`.toLowerCase();
       if (keys.length === 0) return nothing(null);
       return nothing((doc, today, settings, boundary) => {
         const tree = projectTreeOf(doc);
-        const node = nodeIn(filter, tree);
+        const node = filterNode(filter, tree);
         const cards = keys.map((key) => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree, doc, this.reads.subprojects()) }));
         const operation = this.rules.dropOnProject(cards, to);
         return operation ? operation(doc, today, settings, boundary) : doc;
@@ -7593,14 +7764,14 @@ ${key.title}`.toLowerCase();
      * What a drop means: the moves, and whether one of them sets a time and so reads the task's duration first. It answers
      * the tasks' keys as the file now has them, in their order; one not found again is left out.
      */
-    drop(tasks, to, day, filter) {
+    drop(tasks, to, day, filter, carry) {
       const read = readDrop(to, (column) => this.reads.columnSections(column, day));
       const filtered = filter !== null && filter !== void 0 && read.kind === "group" && read.before === null;
       return {
         reads: filtered || read.kind === "title" || tasks.length === 1 && read.kind === "time",
         answer: (s) => {
           const moves = dropMoves(tasks, filtered && s ? this.shownDrop(s, read, filter, tasks) : read, day);
-          return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
+          return this.landed(tasks, this.opened(moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps), tasks, filter, carry));
         }
       };
     }
@@ -7608,13 +7779,13 @@ ${key.title}`.toLowerCase();
      * Where `drop` would leave the tasks, writing nothing: its operation tried over the file as read, and the screen of
      * `day` read over the result by the same code as the screen.
      */
-    landing(tasks, to, day, filter) {
-      const preview = this.dropPreview(tasks, to, day, filter);
+    landing(tasks, to, day, filter, carry) {
+      const preview = this.dropPreview(tasks, to, day, filter, carry);
       return { reads: true, answer: (s) => preview.answer(s).landings };
     }
     /** `landing`, with the whole screen the drop leaves and the text it is read from. */
-    dropPreview(tasks, to, day, filter) {
-      const drop = this.drop(tasks, to, day, filter);
+    dropPreview(tasks, to, day, filter, carry) {
+      const drop = this.drop(tasks, to, day, filter, carry);
       return {
         reads: true,
         answer: (s) => {
@@ -7656,10 +7827,35 @@ ${key.title}`.toLowerCase();
     /** A drop at a section's end of a filtered list: right after the last task of the section the filter shows (`afterShown`). */
     shownDrop(s, read, filter, tasks) {
       const tree = projectTreeOf(s.doc);
-      const node = nodeIn(filter, tree);
+      const node = filterNode(filter, tree);
       if (node === null) return read;
       const carried = new Set(tasks.map((task) => this.rules.entryOf(s.doc, task.key).id));
       return { ...read, before: afterShown(s.doc, read.list, read.group, filterTest(node, tree, s.doc, this.reads.subprojects()), carried) };
+    }
+    /**
+     * A carry let go in a list under a filter it opened on its way (`carryAt` over a row, so the filter differs from the
+     * lift's, `carry.under`): the move, then, in the same write, each task gives the project it was shown by under the
+     * lift's filter (`shownUnder`; none with no filter or No project: the project is added) to the opened one, as
+     * `dropOnProject` does; the opened No project takes that project off. Done opened, or the lift's filter, change none.
+     */
+    opened(write, tasks, filter, carry) {
+      const move = write.operation;
+      if (!carry || !move || filter === null || filter === void 0) return write;
+      const operation = (doc, today, settings, boundary) => {
+        const tree = projectTreeOf(doc);
+        const under = filterNode(carry.under, tree);
+        const now = filterNode(filter, tree);
+        const after = move(doc, today, settings, boundary);
+        if (now === null || now === under || now === "done") return after;
+        const entries = tasks.map((task) => this.rules.entryOf(doc, task.key));
+        const cards = entries.flatMap((entry) => {
+          const moved2 = after.byId(entry.id);
+          return moved2 ? [{ key: keyOf(moved2), from: under === null || under === "none" ? null : shownUnder(entry, under, tree, doc, this.reads.subprojects()) }] : [];
+        });
+        const relabel = this.rules.dropOnProject(cards, now === "none" ? null : projectOfNode(now));
+        return relabel ? relabel(after, today, settings, boundary) : after;
+      };
+      return { operation, answer: write.answer };
     }
     /** The dropped tasks where `write` left them. */
     landed(tasks, write) {
@@ -7696,7 +7892,7 @@ ${key.title}`.toLowerCase();
   function shownPlace(doc, place, filter, today, subprojects) {
     if (place.kind !== "list" && place.kind !== "day" || place.before !== null) return place;
     const tree = projectTreeOf(doc);
-    const node = nodeIn(filter, tree);
+    const node = filterNode(filter, tree);
     if (node === null) return place;
     const list = place.kind === "list" ? place.list : dayColumn(place.date, today).list;
     return { ...place, before: afterShown(doc, list, place.group, filterTest(node, tree, doc, subprojects)) };
@@ -8099,7 +8295,7 @@ ${key.title}`.toLowerCase();
     setProjectsPanel: (c, [open]) => {
       if (c.projectsScreen.panelOpen === true !== (open === true)) c.keepProjectsScreen({ ...c.projectsScreen, panelOpen: open === true });
     },
-    setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode, chosenNode(c.projectsScreen, c.tree()) !== null)),
+    setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode)),
     setNoteViewMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, noteView: mode }),
     toggleSubprojects: (c) => c.keepProjectsScreen(toggledSubprojects(c.projectsScreen)),
     dropTasksOnProject: (c, [keys, to, filter]) => {
@@ -8174,9 +8370,9 @@ ${key.title}`.toLowerCase();
     removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list, group)),
     createSection: (c, [name, place]) => c.run(c.writes.createSection(name, place)),
     applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps)),
-    drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks, to, day, filter))),
-    landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks, to, day, filter)),
-    dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks, to, day, filter)),
+    drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks, to, day, filter, c.projectsScreen.carry))),
+    landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks, to, day, filter, c.projectsScreen.carry)),
+    dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks, to, day, filter, c.projectsScreen.carry)),
     normalize: (c) => c.normalize(),
     createFile: (c) => {
       if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -8415,6 +8611,7 @@ ${key.title}`.toLowerCase();
     projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
     projectsTakes: (view, cards, place) => projectsTakes(view, cards, place),
     projectsPlusTakes: (view, place) => projectsPlusTakes(view, place),
+    projectsPlusPlace: (view, place) => projectsPlusPlace(view, place),
     projectsGap: (rows, gap, depth, lifted2) => projectsGap(rows, gap, depth, lifted2 ?? null),
     projectsLevels: (rows, gap, lifted2) => projectsLevels(rows, gap, lifted2 ?? null),
     projectsDrop: (rows, gap, shift, lifted2) => projectsDrop(rows, gap, shift, lifted2 ?? null),
@@ -8454,13 +8651,23 @@ ${key.title}`.toLowerCase();
     funnelPlaceOf,
     endsSelection,
     stackedRows,
+    stackedLists,
+    sameNewPlace,
     viewEntryLists,
+    viewContext: (node, mode, note, subprojects) => viewContext(node ?? null, mode, note === true, subprojects !== false),
+    viewLayout: (mode, note, titles) => viewLayout(mode, note === true, (list) => titles?.[list] ?? null),
+    layoutWidths,
+    layoutShareAt,
     projectsEntryLook,
     wholeWidth,
     grownStart,
     listWidths,
     listShareOf,
     dividerAt,
+    allColumnsWidths,
+    allColumnsShare,
+    allColumnsDividerAt,
+    allColumnsWidthAt,
     repeatValue,
     onTheDay,
     canPick

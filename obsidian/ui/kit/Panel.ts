@@ -10,8 +10,49 @@ export type PanelRoot = "tc-panel" | "tc-popover" | "tc-desc-peek";
  * the screen under it, never under its fading copy; any pick after it, while that closes, does nothing. One that opens
  * a field acts inside the tap itself (`pickNow`): iOS raises the keyboard only for a field focused by the finger's own tap.
  */
+/** How long a pick's action is waited for at most, should its window never finish closing. */
+const PICK_WAIT_MS = 2000;
+
 export class Picks {
 	private picked = false;
+	/** Picks made whose action has not run yet: the window still closes. */
+	private static readonly waiting = new Set<Promise<void>>();
+	private static runningNow = false;
+
+	/** A pick's action is being started now: a change it asks for is that pick's own. */
+	static get running(): boolean {
+		return Picks.runningNow;
+	}
+
+	/** Once every pick made so far has run its action: a change asked for after a pick never runs before it. */
+	static settled(): Promise<void> {
+		return Promise.all([...Picks.waiting]).then(() => undefined);
+	}
+
+	/** `then` runs as a pick's action: known as one while it starts, and waited for by `settled` until it has run (a window that never closes lets go after a while). */
+	private static run(then: () => void | Promise<void>): (() => Promise<void>) {
+		let done = () => {};
+		const waited = new Promise<void>((resolve) => (done = resolve));
+		Picks.waiting.add(waited);
+		const finish = () => {
+			Picks.waiting.delete(waited);
+			done();
+		};
+		const giveUp = setTimeout(finish, PICK_WAIT_MS);
+		return () => {
+			let result: void | Promise<void>;
+			Picks.runningNow = true;
+			try {
+				result = then();
+			} finally {
+				Picks.runningNow = false;
+			}
+			return Promise.resolve(result).finally(() => {
+				clearTimeout(giveUp);
+				finish();
+			});
+		};
+	}
 
 	/** `afterClose` runs what is picked once the window has gone (an overlay's `afterClose`); without it, at once. */
 	constructor(
@@ -23,8 +64,9 @@ export class Picks {
 		return () => {
 			if (this.picked) return;
 			this.picked = true;
+			const run = Picks.run(then);
 			this.close();
-			this.afterClose(then);
+			this.afterClose(run);
 		};
 	}
 

@@ -45,14 +45,16 @@ import Testing
     /// The app's board: the previews worked out on their own core, apart from the reads' and the pure rules'.
     private func check(_ title: String, to: (BoardSnapshot) throws -> JSONValue) throws {
         let board = TaskBoard(core: core, vault: FakeVault(Self.file), pure: try PhoneCore(script: Fixtures.phoneScript), preview: try PhoneCore(script: Fixtures.phoneScript))
-        let before = try board.snapshot(day: nil, measures: Self.measures)
+        // One moment for every read: a minute turning between them would move the now line, not the drop.
+        let now = Date()
+        let before = try board.snapshot(day: nil, measures: Self.measures, now: now)
         let (lifted, column) = try card(before, title)
         let tasks: JSONValue = [["key": lifted.item.key.json, "from": .string(column.rawValue)]]
         let target = try to(before)
-        let preview = try board.dropPreview(tasks, to: target, over: before, measures: Self.measures)
+        let preview = try board.dropPreview(tasks, to: target, over: before, measures: Self.measures, now: now)
         #expect(preview.landings.first?.id == lifted.id)
         try board.write("tasks.drop", [tasks, target, .string(before.day)])
-        let after = try board.snapshot(day: nil, measures: Self.measures)
+        let after = try board.snapshot(day: nil, measures: Self.measures, now: now)
         #expect(preview.snapshot.lists == after.lists)
         #expect(preview.snapshot.timeline == after.timeline)
         #expect(preview.snapshot.tasksText == after.tasksText)

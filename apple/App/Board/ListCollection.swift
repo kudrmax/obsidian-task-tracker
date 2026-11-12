@@ -103,8 +103,10 @@ enum DrawnRow: Hashable {
 struct ListCollection: UIViewRepresentable {
     let column: BoardColumn
     let model: BoardModel
-    /// One of the Rows view's stacked lists, as tall as its rows while they fit (`rules.stackedRows`).
+    /// One of the Rows view's stacked lists, as tall as the stack gives it (`rules.stackedLists`).
     var stacked = false
+    /// Mounted but not shown (the ribbon while another view shows): it takes no carry and draws nothing until it shows.
+    var dormant = false
 
     func makeCoordinator() -> ListController { ListController(column: column, model: model) }
 
@@ -122,9 +124,10 @@ struct ListCollection: UIViewRepresentable {
         _ = model.entry.lineKeys[column.rawValue]
         _ = model.entry.state?.renaming?.id
         _ = model.entry.heirs
+        controller.host.stacked = stacked
+        controller.dormant = dormant
         controller.update()
         controller.keyboard(KeyboardRise.shared.top)
-        controller.host.stacked = stacked
         controller.follow(found: model.found, moved: model.entry.moved)
     }
 }
@@ -160,8 +163,9 @@ final class ListHostView: UIView {
     let collection: UICollectionView
     private let fade = CAGradientLayer()
 
-    init(collection: UICollectionView) {
+    init(collection: UICollectionView, room: TrailingRoom) {
         self.collection = collection
+        self.room = room
         super.init(frame: .zero)
         collection.translatesAutoresizingMaskIntoConstraints = false
         addSubview(collection)
@@ -179,18 +183,23 @@ final class ListHostView: UIView {
             MainActor.assumeIsolated {
                 self?.holdStacked()
                 self?.edges()
-                self?.told()
             }
         }
     }
 
     private var sized: NSKeyValueObservation?
-    /// Told how tall the rows stand, the room after the last left out: the Rows view gives each list its height.
-    var onContent: ((CGFloat) -> Void)?
+    /// The room after the last row, so a column's last card scrolls clear of the tab bar and the keyboard; none in a
+    /// stacked list, which ends at its last row (the keyboard's part is its content inset, `keyboard(_:)`).
+    let room: TrailingRoom
     /// A stacked list of the Rows view: while all its rows fit its height it never scrolls, so no carry or earlier scroll
     /// leaves its rows standing above its top; when they don't, it scrolls no further than its last row.
     var stacked = false {
-        didSet { if stacked != oldValue { setNeedsLayout() } }
+        didSet {
+            guard stacked != oldValue else { return }
+            room.points = stacked ? 0 : ListCollection.trailingRoom
+            collection.collectionViewLayout.invalidateLayout()
+            setNeedsLayout()
+        }
     }
 
     private func holdStacked() {
@@ -198,17 +207,13 @@ final class ListHostView: UIView {
             if !collection.isScrollEnabled { collection.isScrollEnabled = true }
             return
         }
-        let rows = max(0, collection.contentSize.height - ListCollection.trailingRoom)
+        let rows = max(0, collection.contentSize.height - room.points)
         let fits = rows <= bounds.height + 0.5
         if collection.isScrollEnabled == fits { collection.isScrollEnabled = !fits }
         let most = fits ? 0 : rows - bounds.height
         let top = -collection.adjustedContentInset.top
         let offset = min(max(collection.contentOffset.y, top), top + most)
         if abs(offset - collection.contentOffset.y) > 0.5 { collection.contentOffset.y = offset }
-    }
-
-    private func told() {
-        onContent?(max(0, collection.contentSize.height - ListCollection.trailingRoom))
     }
 
     @available(*, unavailable)
@@ -229,7 +234,7 @@ final class ListHostView: UIView {
         let height = max(1, bounds.height)
         let most = SoftEdges.fade
         let above = collection.contentOffset.y + collection.adjustedContentInset.top
-        let below = collection.contentSize.height + collection.adjustedContentInset.bottom - ListCollection.trailingRoom - collection.contentOffset.y - bounds.height
+        let below = collection.contentSize.height + collection.adjustedContentInset.bottom - room.points - collection.contentOffset.y - bounds.height
         let top = min(most, max(0, above)) / height
         let bottom = min(most, max(0, below)) / height
         fade.locations = [0, NSNumber(value: Double(top)), NSNumber(value: Double(1 - bottom)), 1]
@@ -238,8 +243,14 @@ final class ListHostView: UIView {
 }
 
 extension ListCollection {
-    /// Room after the last row, so the last card scrolls over the keyboard.
+    /// Room after a column's last row, so the last card scrolls clear of the tab bar.
     static let trailingRoom: CGFloat = 160
+}
+
+/// The room after a list's last row, read by its layout each time it lays the section out.
+@MainActor
+final class TrailingRoom {
+    var points = ListCollection.trailingRoom
 }
 
 @MainActor
@@ -255,6 +266,20 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     /// Each row's key in the collection, by the row's id: a card made from a typed line keeps that line's.
     private var keys: [String: String] = [:]
     private var shownIds: [String] = []
+    /// The view's context the rows drawn were read in (`BoardModel.listsContext`): rows of another one come in still.
+    private var context: String?
+    /// Stale while dormant: drawn anew, still, when it shows again.
+    private var stale = false
+
+    /// Mounted but not shown: it takes no carry and draws the screen only once it shows again, still.
+    var dormant = false {
+        didSet {
+            guard dormant != oldValue, !dormant, stale else { return }
+            stale = false
+            context = nil
+            update(force: true)
+        }
+    }
 
     init(column: BoardColumn, model: BoardModel) {
         self.column = column
@@ -262,9 +287,10 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         var list = UICollectionLayoutListConfiguration(appearance: .plain)
         list.showsSeparators = false
         list.backgroundColor = .clear
+        let room = TrailingRoom()
         let layout = FoldingListLayout { _, environment in
             let section = NSCollectionLayoutSection.list(using: list, layoutEnvironment: environment)
-            section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: CardMetrics.columnInset, bottom: ListCollection.trailingRoom, trailing: CardMetrics.columnInset)
+            section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: CardMetrics.columnInset, bottom: room.points, trailing: CardMetrics.columnInset)
             return section
         }
         collection = UICollectionView(frame: .zero, collectionViewLayout: layout)
@@ -272,9 +298,8 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         collection.showsVerticalScrollIndicator = false
         collection.contentInsetAdjustmentBehavior = .never
         collection.keyboardDismissMode = .none
-        host = ListHostView(collection: collection)
+        host = ListHostView(collection: collection, room: room)
         super.init()
-        host.onContent = { [weak model, column] height in model?.listContent(column, height) }
         let cell = UICollectionView.CellRegistration<RowCell, String> { [weak self] cell, _, id in
             guard let self, let model = self.model, let drawn = self.drawn[id] else { return }
             let column = self.column
@@ -303,6 +328,10 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     /// changed is drawn again in place. Another day comes in still: it slid in through the day's own motion.
     func update(force: Bool = false) {
         guard let model else { return }
+        guard !dormant else {
+            stale = true
+            return
+        }
         // A card's menu going: the list draws the new screen once the card is back in its row; a card renamed from it
         // turns into its field at once, in its own row, the preview landing on it. A carry lifted meanwhile is drawn at
         // once: its drop lands on the rows as they are, never on the screen the menu holds.
@@ -335,9 +364,10 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         guard force || ids != shownIds || !changed.isEmpty else { return }
         let gone = Set(shownIds).subtracting(ids)
         // Only rows drawn anew in place (a card turning into its field, a title written): drawn at once, never cross-faded.
-        let animated = day == shownDay && host.window != nil && ids != shownIds
+        let animated = day == shownDay && context == model.listsContext && host.window != nil && ids != shownIds
         shownIds = ids
         day = shownDay
+        context = model.listsContext
         // The quick entry's one field keeps the keyboard from row to row: a row going away hands it to the window's holder
         // first, as any box that stops showing it does, so the collection never deletes the first responder's row.
         for id in gone {
@@ -345,8 +375,15 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
                   let field = cell.contentView.firstResponderInside as? EntryTextField else { continue }
             field.park(in: window)
         }
+        // A No tasks plate a card comes into goes at once: its words never stand over the card that arrives.
+        // A list a plate comes into (its last card went): the leaving cards go at once too, never under the plate's words.
+        let emptied = next.contains { if case .vacant = $0 { true } else { false } } && !next.contains { if case .card = $0 { true } else { false } }
+        for id in gone where emptied || id == "\u{0}vacant" || id.hasPrefix("\u{0}plate/") {
+            if let path = source.indexPath(for: id), let cell = collection.cellForItem(at: path) { cell.contentView.alpha = 0 }
+        }
         if let layout = collection.collectionViewLayout as? FoldingListLayout {
             layout.covers = (before: Self.covering(rows), after: Self.covering(next))
+            layout.plates = Set(next.indices.filter { if case .vacant = next[$0] { true } else if case .plate = next[$0] { true } else { false } })
         }
         rows = next
         drawn = tops
@@ -370,6 +407,10 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         }
         rowsVersion += 1
         showHeaders()
+        // A stacked list shares its height with the others: a field its rows push past its bottom (Enter's next field, a
+        // written card coming in above it) is brought into sight in this same pass, before its row stops being displayed:
+        // a field whose row leaves the list's sight loses the keyboard and the entry ends.
+        if host.stacked, model.entry.lists[column.rawValue] != nil { reveal(field: (), animated: false) }
     }
 
     /// The rows of the cards `ids` on the screen drawn anew at once, in place, from the model as it stands now (the carry
@@ -503,33 +544,52 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         }
         if moved != movedSeen {
             movedSeen = moved
-            reveal(field: ())
+            // A stacked list grows with its field in this same drawing: the field is brought into sight once that is laid
+            // out, so a list that grew to hold it never scrolls first and then snaps back.
+            if host.stacked {
+                DispatchQueue.main.async { [weak self] in self?.reveal(field: ()) }
+            } else {
+                reveal(field: ())
+            }
         }
     }
 
-    private func reveal(field: Void) {
+    private func reveal(field: Void, animated: Bool = true) {
         guard let model, model.entry.lists[column.rawValue] != nil else { return }
         let renaming = model.entry.state?.renaming?.id
         guard let id = renaming ?? model.entry.lineKeys[column.rawValue]?.last ?? rows.first(where: { if case .field = $0 { true } else { false } })?.id,
               let path = indexPath(of: id) else { return }
         collection.layoutIfNeeded()
-        reveal(path, centred: false)
+        reveal(path, centred: false, animated: animated)
     }
 
     /// A row whole between the list's soft top and the room the keyboard leaves stays; another comes into sight.
-    private func reveal(_ path: IndexPath, centred: Bool) {
+    private func reveal(_ path: IndexPath, centred: Bool, animated: Bool = true) {
         guard let frame = collection.layoutAttributesForItem(at: path)?.frame else { return }
         let visible = collection.bounds.inset(by: UIEdgeInsets(top: SoftEdges.fade, left: 0, bottom: collection.contentInset.bottom + SoftEdges.fade, right: 0))
         guard !visible.contains(frame) else { return }
-        collection.scrollToItem(at: path, at: centred ? .centeredVertically : .bottom, animated: true)
+        if centred { return collection.scrollToItem(at: path, at: .centeredVertically, animated: animated) }
+        // Whole above the bottom fade (and the keyboard), as far as the list scrolls; or under the top fade.
+        let least = -collection.adjustedContentInset.top
+        let most = max(least, collection.contentSize.height + collection.adjustedContentInset.bottom - collection.bounds.height)
+        let wanted = frame.maxY > visible.maxY ? frame.maxY - (visible.maxY - collection.bounds.minY) : frame.minY - SoftEdges.fade
+        collection.setContentOffset(CGPoint(x: collection.contentOffset.x, y: min(most, max(least, wanted))), animated: animated)
     }
 
     /// The keyboard's top at `top` on the screen: the part of the list it covers is room to scroll the last rows above it.
     func keyboard(_ top: CGFloat) {
+        cover(top)
+        // A stacked list rises over the keyboard in the same drawing: its place is read again once that is laid out.
+        if host.stacked { DispatchQueue.main.async { [weak self] in self?.cover(KeyboardRise.shared.top) } }
+    }
+
+    private func cover(_ top: CGFloat) {
         guard let window = host.window else { return }
         let frame = host.convert(host.bounds, to: window)
         let covered = min(frame.height, max(0, frame.maxY - max(frame.minY, top)))
-        if collection.contentInset.bottom != covered { collection.contentInset.bottom = covered }
+        guard collection.contentInset.bottom != covered else { return }
+        collection.contentInset.bottom = covered
+        host.edges()
     }
 
     /// A row coming in unfolds from under the row before it, its own view carried down from there with the rows moving
@@ -755,7 +815,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         let anywhere = model.placesInGap(column, carrying: payload)
         let place: JSONValue
         if anywhere {
-            guard let under = model.placeUnder(column, cards: standing.placed, heads: standing.heads.map(\.head), at: point, grab: payload.map(\.grab), width: collection.bounds.width, held: aimed?.place) else { return nil }
+            guard let under = model.placeUnder(column, cards: standing.placed, heads: standing.heads.map(\.head), at: point, grab: payload.map(\.grab), width: collection.bounds.width, covered: covered, held: aimed?.place) else { return nil }
             place = under
         } else {
             place = ["kind": "gap", "index": .number(Double(standing.cards.count)), "level": 0, "group": .null]
@@ -815,18 +875,26 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     private var plusRoom: Int?
 
     func takes(_ payload: DragPayload?) -> Bool {
-        guard let payload, !payload.isProject else { return payload == nil && model?.drawing?.funnel.plus.list == "funnel" }
+        guard let payload, !payload.isProject else { return payload == nil && model?.drawing?.presentation.plusList == .funnel }
         guard payload.isSection else { return true }
         return payload.from == column.rawValue
     }
 
     var scrolls: UIScrollView? { collection.isScrollEnabled ? collection : nil }
 
+    /// How much of the list's left the projects' panel lies over (a carry brought it out): the level is read from the
+    /// part that shows, so a card let go right of the panel can stand at the top level.
+    private var covered: CGFloat {
+        guard let model, model.panelShown, let window = host.window else { return 0 }
+        return max(0, model.panelRight - host.convert(host.bounds, to: window).minX)
+    }
+
     var area: CGRect? {
-        guard let window = host.window else { return nil }
+        guard !dormant, let window = host.window else { return nil }
         // The title over the list takes the carry too: it is the list's first place.
         let frame = host.convert(host.bounds, to: window)
-        return CGRect(x: frame.minX, y: frame.minY - ColumnMetrics.titleRow - ColumnMetrics.headGap, width: frame.width, height: frame.height + ColumnMetrics.titleRow + ColumnMetrics.headGap)
+        let title = (host.stacked ? ColumnMetrics.groupHead : ColumnMetrics.titleRow) + ColumnMetrics.headGap
+        return CGRect(x: frame.minX, y: frame.minY - title, width: frame.width, height: frame.height + title)
     }
 
     func hover(at point: CGPoint, carrying payload: DragPayload?) {
@@ -903,6 +971,8 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
 final class FoldingListLayout: UICollectionViewCompositionalLayout {
     /// The rows, before and after the change, that cover a row folding under them (`ListController.covering`).
     var covers: (before: Set<Int>, after: Set<Int>) = ([], [])
+    /// The rows that come in whole, at once: a list's No tasks plate shows the moment its last card goes.
+    var plates: Set<Int> = []
     private var inserted: Set<Int> = []
     private var deleted: Set<Int> = []
     /// Counts the layouts made: what a carry read of the rows' frames holds for.
@@ -948,6 +1018,7 @@ final class FoldingListLayout: UICollectionViewCompositionalLayout {
         }
         var anchor = path.item - 1
         while anchor >= 0, inserted.contains(anchor) { anchor -= 1 }
+        if plates.contains(path.item) { return shown }
         guard anchor >= 0, covers.after.contains(anchor), let over = layoutAttributesForItem(at: IndexPath(item: anchor, section: path.section)) else {
             shown.alpha = 0
             return shown

@@ -597,6 +597,7 @@ describe("QuickEntryController", () => {
 			const { list, slide } = withKeyboard();
 			slide(200);
 			vi.advanceTimersByTime(100);
+			list.dispatchEvent(new Event("touchmove", { bubbles: true }));
 			list.scrollTop = 3;
 			list.dispatchEvent(new Event("scroll"));
 			vi.advanceTimersByTime(500);
@@ -765,6 +766,7 @@ describe("QuickEntryController", () => {
 			set.field()!.getBoundingClientRect = () => new DOMRect(10, fieldTop - list.scrollTop, 175, 35);
 			set.render();
 			const followed = list.scrollTop;
+			list.dispatchEvent(new Event("touchmove", { bubbles: true }));
 			list.scrollTop = 20;
 			list.dispatchEvent(new Event("scroll"));
 			return { ...set, list, followed };
@@ -796,6 +798,7 @@ describe("QuickEntryController", () => {
 		it("goes back to the field once Enter moves it", async () => {
 			const { press, type, list, field } = scrolledAway();
 			type("Call");
+			list.dispatchEvent(new Event("touchmove", { bubbles: true }));
 			list.scrollTop = 20;
 			list.dispatchEvent(new Event("scroll"));
 			field()!.getBoundingClientRect = () => new DOMRect(10, 640 - list.scrollTop, 175, 35);
@@ -1453,7 +1456,8 @@ describe("QuickEntryController: the Projects list is a list the field stands in 
 		controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 		const onDrop = beginNew.mock.calls[0][3] as (result: DropResult | null) => HTMLElement | null;
 		expect(onDrop({ kind: "projectsPlace", place: { kind: "task", group: "t", before: b.key } })).toBe(field());
-		expect(rowsOf("projects")).toEqual(["Soon", "A", "A1", "Today", "field", "B", "Inbox", "No tasks"]);
+		// Snapped to where the part's card lands (decision 87): after B, the part's last card of its stage.
+		expect(rowsOf("projects")).toEqual(["Soon", "A", "A1", "Today", "B", "field", "Inbox", "No tasks"]);
 		controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 		const gap: DropResult = { kind: "projectGap", gap: 1, landing: { depth: 0, place: { parent: null, before: null } } as never };
 		(beginNew.mock.calls[1][3] as (result: DropResult | null) => HTMLElement | null)(gap);

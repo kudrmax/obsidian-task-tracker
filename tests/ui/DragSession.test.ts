@@ -379,3 +379,38 @@ describe("DragSession", () => {
 		});
 	});
 });
+
+describe("a drag that fails (QA 2026-11-12: a stale place under the finger)", () => {
+	class Throwing extends FakeTarget {
+		override preview(): void {
+			throw new Error("stale");
+		}
+	}
+
+	it("says the failure once, flies the copy back, ends as cancelled and leaves nothing on the page", async () => {
+		const float = new FakeFloat();
+		const ended: unknown[] = [];
+		const errors: unknown[] = [];
+		const target = new Throwing("a", 0, 100, null);
+		const s = new DragSession({ payload, targets: [target], float, origin: () => rect(5, 5), onEnd: async (r) => void ended.push(r), onError: (e) => errors.push(e) });
+		s.move(10, 10);
+		await vi.waitFor(() => expect(float.log).toContain("remove"));
+		s.move(20, 20);
+		await s.release(20, 20);
+		expect(errors).toHaveLength(1);
+		expect(float.log).toContain("fly 5,5");
+		expect(ended).toEqual([null]);
+		expect(target.log).toContain("clear");
+	});
+
+	it("aborted (the screen gone mid-drag): the copy goes at once and the drag ends as cancelled", async () => {
+		const float = new FakeFloat();
+		const ended: unknown[] = [];
+		const s = new DragSession({ payload, targets: [new FakeTarget("a", 0, 100, null)], float, origin: () => rect(5, 5), onEnd: async (r) => void ended.push(r) });
+		s.move(10, 10);
+		s.abort();
+		await Promise.resolve();
+		expect(float.log).toContain("remove");
+		expect(ended).toEqual([null]);
+	});
+});

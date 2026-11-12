@@ -5,6 +5,7 @@ import type { LocalDate } from "./types";
 import { el } from "./dom";
 import { fillCard } from "./TaskCard";
 import { KeyedRows, type RowsDrawing } from "./motion/KeyedRows";
+import { Motion } from "./motion/Motion";
 import { ScrollHold } from "./motion/ScrollHold";
 import { EntryRows, type LevelRow, type ListEntryInput } from "./EntryRows";
 
@@ -222,10 +223,22 @@ export class TaskList {
 		});
 		const pending = this.deps.pending?.() ?? null;
 		const empty = this.nodes.length === 0 && entryRow === null && pending === null ? (this.deps.empty?.() ?? null) : null;
+		/**
+		 * Cards or a field came into an empty list: its plate gives way at once and the first of them stands in its place, the
+		 * same height, nothing growing in or folding away under it; only the room a field keeps under it grows.
+		 */
+		const plated = this.keyed.nodeOf("empty") !== null;
+		let standIn: HTMLElement | null = null;
 		if (empty !== null) this.emptyPlate(drawing, empty);
+		else if (plated) {
+			drawing.forget("empty");
+			standIn = drawing.first();
+			if (standIn) drawing.standIn(standIn);
+		}
 		this.slot = pending ? drawing.take("slot", () => el(null, "div", "tc-group-slot")).node : null;
 		if (pending) this.cardOf(drawing, pending, day, signals);
 		drawing.finish();
+		if (standIn && moves) Motion.growRoomUnder(standIn);
 	}
 
 	/** A task's card: the one drawn for it last time, filled anew, or a new one; its branches go, the list draws them again. */

@@ -214,7 +214,7 @@ final class DragController {
     /// The copy flies back where the thing was lifted from, as the system returns a cancelled drag; the carry ends once it
     /// is down, and its place closes then.
     private func flyHome(_ live: Live) {
-        model?.carryWentNowhere()
+        model?.session.wentNowhere()
         guard let home = live.home() else { return landed(live) }
         CarryMotion.animate({ live.copy.land(on: CarryLanding(rect: home), look: nil) }) { _ in self.landed(live) }
     }
@@ -331,6 +331,9 @@ final class CarryLayer: UIView {
     }
 
     func hideLine() {
+        // A step of the line still sliding would go on drawing it after it is hidden: its animation goes with it.
+        dot.layer.removeAllAnimations()
+        bar.layer.removeAllAnimations()
         UIView.performWithoutAnimation {
             dot.alpha = 0
             bar.alpha = 0
@@ -466,7 +469,13 @@ final class EdgeScroll {
         guard let window = scroll.window else { return nil }
         let area = scroll.convert(scroll.bounds, to: window)
         guard point.x >= area.minX, point.x < area.maxX else { return nil }
-        let velocity = CarryMotion.edges.velocity(fromTop: Double(point.y - area.minY), fromBottom: Double(min(area.maxY, floor) - point.y))
+        // A list stacked among others in Rows is short: its bands are a share of its height and start at its own top, so
+        // a carry passing over it on the way to another list, or over its title, scrolls nothing.
+        let stacked = (scroll.superview as? ListHostView)?.stacked == true
+        let edges = stacked ? EdgeScrollStep(band: min(CarryMotion.edges.band, Double(area.height) * 0.15), speed: CarryMotion.edges.speed) : CarryMotion.edges
+        let fromTop = Double(point.y - area.minY)
+        if stacked, fromTop < 0 { return nil }
+        let velocity = edges.velocity(fromTop: fromTop, fromBottom: Double(min(area.maxY, floor) - point.y))
         let least = -scroll.adjustedContentInset.top
         let most = scroll.contentSize.height + scroll.adjustedContentInset.bottom - scroll.bounds.height
         return EdgeScrollStep.next(offset: Double(scroll.contentOffset.y), velocity: velocity, elapsed: elapsed, least: Double(least), most: Double(most)).map { CGFloat($0) }

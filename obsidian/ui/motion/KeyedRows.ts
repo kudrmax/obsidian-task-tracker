@@ -91,7 +91,8 @@ export class KeyedRows {
 				() => {
 					if (this.leaving.get(key)?.node === row.node) this.leaving.delete(key);
 				},
-				!this.marks.has(key),
+				/** A place that only marked where something lands, or a lifted card's place nobody sees, folds at once: there is nothing to fade. */
+				!this.marks.has(key) && !row.node.classList.contains("is-lifted"),
 			);
 			if (row.node.isConnected) this.leaving.set(key, { node: row.node, animation });
 		}
@@ -141,6 +142,11 @@ export class RowsDrawing {
 	takeMark(key: string, make: () => HTMLElement): TakenRow {
 		this.rows.marks.add(key);
 		return this.take(key, make);
+	}
+
+	/** The first row taken in this drawing, if any. */
+	first(): HTMLElement | null {
+		return this.order[0] ?? null;
 	}
 
 	/** A new row that stands in for one of the same height in the same frame (a renamed card's field): it does not grow in. */

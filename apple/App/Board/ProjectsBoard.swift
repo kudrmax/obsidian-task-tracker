@@ -13,10 +13,15 @@ final class ProjectsBoard {
     @ObservationIgnored weak var model: BoardModel?
 
     private(set) var view: ProjectsView?
+    /// The list drawn as the core answered it.
+    @ObservationIgnored private(set) var raw: JSONValue = .null
+    /// The view's context the list drawn was read in: a list read for another node or mode is not shown.
+    private(set) var shownContext: String?
     /// The chosen node's parts as drawn: each part's cards painted as a list paints them, with the stage or the subproject.
     private(set) var parts: [Part] = []
-    /// The menus of the cards drawn, by task id: the card's menu finds its task's here.
-    @ObservationIgnored private(set) var menus: [String: TaskMenuModel] = [:]
+    /// Where each card drawn opens its menu from, by task id; its menu is asked of the core when it opens.
+    @ObservationIgnored private var froms: [String: String] = [:]
+    @ObservationIgnored private var menus: [String: TaskMenuModel] = [:]
     /// The cards drawn, by task id: what a drop on the tree reads (the project it was shown under).
     @ObservationIgnored private(set) var cards: [String: ProjectsCard] = [:]
 
@@ -29,7 +34,7 @@ final class ProjectsBoard {
     /// naming kept out goes (`endProjectName`).
     var asking: Ask? {
         didSet {
-            if asking == nil, case .project = oldValue { model?.endProjectName() }
+            if asking == nil, case .project = oldValue { model?.session.endProjectName() }
         }
     }
     /// The project Delete project was chosen for, its question shown before anything is written.
@@ -72,51 +77,175 @@ final class ProjectsBoard {
     /// The tree's rows as the screen was read with them: what a tap, a drop and a gap read.
     var rows: [ProjectsRow] { model?.funnel?.panel?.rows ?? [] }
 
-    /// The By project list read again over the files as they are now, for the filter's node, its cards painted and their
-    /// menus asked.
-    func read() async {
-        guard let model, let node = model.filter?.node, let read = await Self.fetch(board, screen: model.menuScreen, node: node) else { return }
-        withAnimation(.snappy) {
-            draw(read)
-            model.entry.screenChanged()
+    /// What the list drawn was read for: the node, the file, and the view's context it was drawn in.
+    private struct ReadKey: Equatable {
+        let node: String?
+        let file: String?
+        let context: String
+    }
+
+    @ObservationIgnored private var drawnKey: ReadKey?
+    @ObservationIgnored private var askedKey: ReadKey?
+    /// The reads, one after another: the last asked is the one drawn, an earlier one that ends after it never is.
+    @ObservationIgnored private var reads: Task<Void, Never>?
+    @ObservationIgnored private var asks = 0
+
+    /// The screen drawn now asks for the By project list (`FunnelPresentation.source`): read when the node, the file or
+    /// the context differs from the one drawn. The one way the list is read.
+    func follow() {
+        guard let model, let snapshot = model.snapshot, case .projects(let node) = snapshot.presentation.source else { return }
+        let key = ReadKey(node: node, file: snapshot.tasksText, context: snapshot.funnel.view.context)
+        guard key != drawnKey, key != askedKey else { return }
+        // Read before the view was drawn (`prefetch`): drawn with it, in its transaction.
+        if let ready = prefetched, ready.key == key {
+            prefetched = nil
+            show(ready.read, key, moves: drawnKey?.node == key.node && drawnKey?.context == key.context)
+            return
         }
+        askedKey = key
+        Task { await read(key) }
+    }
+
+    /// The list read together with `snapshot` (a typed task's write): shown in the drawing of that snapshot, as its own.
+    func handOver(_ read: Read, for snapshot: BoardSnapshot) {
+        guard case .projects(let node) = snapshot.presentation.source else { return }
+        prefetched = (ReadKey(node: node, file: snapshot.tasksText, context: snapshot.funnel.view.context), read)
+    }
+
+    /// A list read for a view about to be drawn: it shows in the same drawing as the view, never a frame after it.
+    @ObservationIgnored private var prefetched: (key: ReadKey, read: Read)?
+
+    /// The list of a node a carry rests on, read while the core's pause runs (`readAhead`): the view the pause opens is
+    /// drawn with it, never waiting for its read.
+    @ObservationIgnored private var ahead: (node: String, read: Task<Read?, Never>)?
+
+    /// The By project list of `node` read ahead, while the drawn view reads By project's list.
+    func readAhead(_ node: String) {
+        guard let model, case .projects = model.presentation?.source, node != ahead?.node else { return }
+        let board = board, screen = model.menuScreen
+        ahead = (node, Task.detached { await Self.fetch(board, screen: screen, node: node) })
+    }
+
+    /// The By project list of `view` read now, off the main thread, when the view reads it and it is not the one drawn;
+    /// handed to the drawing of that view (`follow`).
+    func prefetch(_ view: FunnelView, file: String?? = nil) async {
+        guard let model, case .projects(let node) = FunnelPresentation(view).source else { return }
+        let key = ReadKey(node: node, file: file ?? model.snapshot?.tasksText, context: view.view.context)
+        // Read during a carry's pause over this node: taken when it was read over the file asked.
+        if let early = ahead, early.node == node {
+            ahead = nil
+            if let read = await early.read.value, key.file == nil || read.file == key.file {
+                prefetched = (ReadKey(node: node, file: read.file, context: key.context), read)
+                return
+            }
+        }
+        // A list read beside the screen (no file asked) counts for the screen read over the same file.
+        if let ready = prefetched, ready.key.node == key.node, ready.key.context == key.context, ready.read.file == key.file || key.file == nil {
+            prefetched = (ProjectsBoard.ReadKey(node: key.node, file: ready.read.file, context: key.context), ready.read)
+            return
+        }
+        guard key != drawnKey || key.file == nil, let read = await Self.fetch(board, screen: model.menuScreen, node: node) else { return }
+        prefetched = (ReadKey(node: key.node, file: read.file, context: key.context), read)
+    }
+
+    private func show(_ read: Read, _ key: ReadKey, moves: Bool) {
+        var transaction = moves ? Transaction(animation: .snappy) : Transaction()
+        transaction.disablesAnimations = !moves
+        withTransaction(transaction) {
+            draw(read)
+            shownContext = key.context
+            model?.entry.screenChanged()
+        }
+        drawnKey = key
+        if askedKey == key { askedKey = nil }
+    }
+
+    private func read(_ key: ReadKey) async {
+        asks += 1
+        let ask = asks
+        let before = reads
+        let mine = Task { [weak self] in
+            await before?.value
+            guard let self, ask == self.asks, let model = self.model,
+                  let read = await Self.fetch(self.board, screen: model.menuScreen, node: key.node), ask == self.asks else { return }
+            // Another node or mode drawn still, in place; the same one moving as its cards did.
+            self.show(read, key, moves: self.drawnKey?.node == key.node && self.drawnKey?.context == key.context)
+        }
+        reads = mine
+        await mine.value
     }
 
     /// The page as read once: the view, its parts' rows painted, their menus, and the list as the quick entry reads it.
     struct Read: Sendable {
         let view: ProjectsView
+        /// The view as the core answered it: what its rules over the list take (`rules.projectsTakes`).
+        let raw: JSONValue
         let rows: [[BoardCard]]
-        let menus: [String: TaskMenuModel]
+        let froms: [String: String]
         let entryLook: ProjectsEntryLook
+        /// The tasks file's text it was read over.
+        var file: String? = nil
     }
 
     /// The page read off the main thread; nil when the files cannot be read.
-    static func fetch(_ board: TaskBoard, screen: JSONValue, node: String) async -> Read? {
+    static func fetch(_ board: TaskBoard, screen: JSONValue, node: String?) async -> Read? {
         try? await Task.detached(operation: { () throws -> Read in
-            let view = try board.projectsScreen(node: node)
-            var drawn: [[BoardCard]] = []
-            var menus: [String: TaskMenuModel] = [:]
-            for section in view.sections {
-                let painted = try board.cards(section.rows.map { ListRow(item: $0.item, level: $0.level) })
-                drawn.append(zip(section.rows, painted).map { Self.card($0.1, as: $0.0) })
-                for row in section.rows {
-                    let from = row.card?.menuFrom ?? "list"
-                    if menus[row.item.id] == nil {
-                        menus[row.item.id] = try board.read("tasks.menu", [row.item.json, .string(from), screen], over: board.settingsOnly())
-                    }
-                }
-            }
-            return Read(view: view, rows: drawn, menus: menus, entryLook: try board.projectsEntryLook(view))
+            let files = try board.files()
+            let raw: JSONValue = try board.read("tasks.projectsScreen", node.map { [.string($0)] } ?? [], over: files)
+            return try painted(raw, board, file: files.tasks)
         }).value
+    }
+
+    /// The list a drop of `drops` at `place` leaves (`tasks.projectsDropPreview`, writing nothing), read off the main
+    /// thread, and the ids of the cards it lands as.
+    static func preview(_ board: TaskBoard, drops: [JSONValue], place: JSONValue, node: String) async -> (read: Read, landings: [String])? {
+        try? await Task.detached(operation: { () throws -> (read: Read, landings: [String]) in
+            let files = try board.files()
+            let answer: JSONValue = try board.read("tasks.projectsDropPreview", [.array(drops), place, .string(node)], over: files)
+            // The card each landing is drawn as in the list (`card`), a subtask's by its own id.
+            let landings = answer["landings"].array.compactMap { $0["card"].string ?? $0["id"].string }
+            return (try painted(answer["view"], board, file: nil), landings)
+        }).value
+    }
+
+    /// A list as the core answered it, its rows painted as a list paints them.
+    nonisolated private static func painted(_ raw: JSONValue, _ board: TaskBoard, file: String?) throws -> Read {
+        let view = try raw.decode(ProjectsView.self)
+        var drawn: [[BoardCard]] = []
+        var froms: [String: String] = [:]
+        for section in view.sections {
+            let painted = try board.cards(section.rows.map { ListRow(item: $0.item, level: $0.level) })
+            drawn.append(zip(section.rows, painted).map { Self.card($0.1, as: $0.0) })
+            for row in section.rows where froms[row.item.id] == nil { froms[row.item.id] = row.card?.menuFrom ?? "list" }
+        }
+        return Read(view: view, raw: raw, rows: drawn, froms: froms, entryLook: try board.projectsEntryLook(view), file: file)
+    }
+
+    /// The list a drop leaves, drawn the moment it is let go, in the drop's own motion: its card stands where the line
+    /// stood while the file is written and read again.
+    func drawDropped(_ read: Read) {
+        withAnimation(CarryMotion.dropAnimation) { draw(read) }
     }
 
     /// A read drawn, in the transaction the caller draws it in (the quick entry's line ending with its card).
     func draw(_ read: Read) {
-        menus = read.menus
+        froms = read.froms
+        raw = read.raw
+        menus = [:]
         cards = Dictionary(read.view.sections.flatMap(\.cards).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         entryLook = read.entryLook
         view = read.view
         parts = zip(read.view.sections, read.rows).map { Part(section: $0.0, cards: $0.1) }
+    }
+
+    /// The menu of a card the list draws, asked of the core as it opens (it reads only the settings) and kept; nil for a
+    /// task the list does not draw.
+    func menu(_ item: TaskItem) -> TaskMenuModel? {
+        if let known = menus[item.id] { return known }
+        guard let from = froms[item.id], let model else { return nil }
+        let menu: TaskMenuModel? = try? board.read("tasks.menu", [item.json, .string(from), model.menuScreen], over: board.settingsOnly())
+        menus[item.id] = menu
+        return menu
     }
 
     /// The list as the quick entry reads it (`rules.projectsEntryLook`): handed in as its `projects` list.
@@ -155,13 +284,7 @@ final class ProjectsBoard {
 
     /// A tap on a row: chosen (the panel then closes), or, chosen already, its branch folds or unfolds.
     func tap(_ row: ProjectsRow) async {
-        await model?.pickProjectNode(row.node)
-    }
-
-    /// A project chosen from elsewhere (a card's folder, the full screen's project line), the branches above it opened.
-    func select(_ name: String) async {
-        guard let node: String = model?.ruleNow("rules.projectNodeOf", [.string(name)]) else { return }
-        await act { try $0.selectProjectNode(node) }
+        await model?.funnelState.pick(row.node)
     }
 
     /// The panel row under `point` (window), as last laid out: what the carry reports to the core.
@@ -230,11 +353,6 @@ final class ProjectsBoard {
 
     // MARK: Calls
 
-    /// A call that changes only this device's view (the node chosen, a fold), then the screen read again.
-    private func act(_ call: @escaping @Sendable (TaskBoard) throws -> Void) async {
-        await model?.viewCall(call)
-    }
-
     /// A call that writes the tasks file: the board and the page read again.
     private func write(_ call: @escaping @Sendable (TaskBoard) throws -> Void) async {
         let board = board
@@ -244,6 +362,5 @@ final class ProjectsBoard {
             model?.problem(error)
         }
         await model?.reload()
-        if model?.readsProjects == true { await read() }
     }
 }

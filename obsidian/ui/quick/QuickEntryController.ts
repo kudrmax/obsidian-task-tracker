@@ -32,6 +32,9 @@ const LISTS = Object.keys(LIST_SET) as EntryList[];
  * A list the field stands in, as the entry reads it and tells it what was written: a funnel's column (`TaskList`), or the
  * Projects screen's list (`ProjectTasks`), whose look and parts are the core's (`projectsEntryLook`).
  */
+/** How long after a wheel, a finger or a key a scroll is still taken as the hand's. */
+const HAND_SCROLL_MS = 400;
+
 export interface EntryListShown {
 	readonly el: HTMLElement;
 	/** The cards as drawn, each in its section. */
@@ -169,6 +172,8 @@ export class QuickEntryController {
 		if (!scroller || e.target !== scroller) return;
 		const at = this.revealedAt.get(scroller);
 		if (at !== undefined && Math.abs(scroller.scrollTop - at) < 1) return;
+		/** Only a hand stops the following: a scroll the layout made (a row of the rows growing, its end clamped) does not. */
+		if (performance.now() - this.handScrolledAt > HAND_SCROLL_MS) return;
 		this.follow = false;
 		this.glide.stop();
 	};
@@ -178,6 +183,15 @@ export class QuickEntryController {
 	};
 	/** The view grew or shrank, Obsidian's toolbar coming or going under it: the field keeps over the bar in the same frame. */
 	private readonly sizeWatch = new ResizeObserver(() => this.reveal());
+	/** When a wheel or a finger last could scroll: a scroll long after neither is the layout's. */
+	private handScrolledAt = Number.NEGATIVE_INFINITY;
+	private readonly handScrolled = () => (this.handScrolledAt = performance.now());
+	/** The scroller of the field, watched for its size while the field is open: it grew or shrank under the field (a row of the rows), not by a finger, so the field is followed into sight again. */
+	private watchedScroller: HTMLElement | null = null;
+	private readonly scrollerWatch = new ResizeObserver(() => {
+		this.follow = true;
+		this.reveal();
+	});
 	private readonly tapAway = (e: Event) => {
 		if (!this.state || this.pressEnding || (e.target instanceof Element && this.owns(e.target))) return;
 		this.entry.blur();
@@ -223,6 +237,7 @@ export class QuickEntryController {
 		deps.root.ownerDocument.addEventListener("pointerdown", this.pressed, true);
 		deps.root.ownerDocument.addEventListener("mousedown", this.mousePressed, true);
 		deps.root.addEventListener("scroll", this.scrolled, true);
+		for (const type of ["wheel", "touchmove"] as const) deps.root.addEventListener(type, this.handScrolled, { capture: true, passive: true });
 		deps.root.addEventListener("transitionend", this.settled, true);
 		this.sizeWatch.observe(deps.root);
 	}
@@ -386,6 +401,11 @@ export class QuickEntryController {
 		this.showPlus();
 	}
 
+	/** A task is being typed: its field stands open. */
+	get entering(): boolean {
+		return this.state !== null;
+	}
+
 	/**
 	 * The screen was drawn: the plus, and the field focused and in sight. The cards may
 	 * have changed under the field, a written line landing, so what the field may do is read again.
@@ -441,8 +461,10 @@ export class QuickEntryController {
 		this.deps.root.ownerDocument.removeEventListener("pointerdown", this.pressed, true);
 		this.deps.root.ownerDocument.removeEventListener("mousedown", this.mousePressed, true);
 		this.deps.root.removeEventListener("scroll", this.scrolled, true);
+		for (const type of ["wheel", "touchmove"] as const) this.deps.root.removeEventListener(type, this.handScrolled, true);
 		this.deps.root.removeEventListener("transitionend", this.settled, true);
 		this.sizeWatch.disconnect();
+		this.scrollerWatch.disconnect();
 		this.renames();
 		this.glide.stop();
 		this.revealing = false;
@@ -576,11 +598,27 @@ export class QuickEntryController {
 		const state = this.state;
 		const revealing = this.revealing;
 		this.revealing = false;
+		this.watchScroller(state ? this.scrollerOf(state.spot) : null);
 		if (!state) return;
 		const { view, box, field, rect: drawn } = this.measure(state);
 		let rect = drawn;
 		if (field && rect && revealing && this.follow && this.bringIntoSight(state, rect, view, box)) rect = field.getBoundingClientRect();
 		this.followBar(state, rect, view, box);
+		/** The field still grows in (its height, the room under it): once it has, it is brought into sight at its full size. */
+		const growing = field && revealing ? field.getAnimations().filter((animation) => animation.playState === "running") : [];
+		if (growing.length > 0) void Promise.allSettled(growing.map((animation) => animation.finished)).then(() => {
+			if (!this.state) return;
+			this.follow = true;
+			this.reveal();
+		});
+	}
+
+	/** The field's list or timeline changing size (a row of the rows growing for it) brings the field into sight again. */
+	private watchScroller(scroller: HTMLElement | null): void {
+		if (scroller === this.watchedScroller) return;
+		if (this.watchedScroller) this.scrollerWatch.unobserve(this.watchedScroller);
+		this.watchedScroller = scroller;
+		if (scroller) this.scrollerWatch.observe(scroller);
 	}
 
 	/** The view, the field's list or timeline (the view for a menu's stack), and the field where it is drawn. */
@@ -597,7 +635,8 @@ export class QuickEntryController {
 	 * `glide` the list scrolls along with the keyboard instead of at once.
 	 */
 	private bringIntoSight(state: EntryState, rect: DOMRect, view: DOMRect, box: DOMRect, glide?: Glide): boolean {
-		const limit = this.deps.desktop() ? this.roomOf(view, box).bottom - this.bar.room : view.bottom - this.bar.room - LAYOUT.fieldOverBar;
+		/** On the phone over the bar, and never past the bottom of what shows the field (a row of the rows ends above the bar). */
+		const limit = this.deps.desktop() ? this.roomOf(view, box).bottom - this.bar.room : Math.min(view.bottom - this.bar.room - LAYOUT.fieldOverBar, this.roomOf(view, box).bottom);
 		const menu = this.stack?.menu ?? null;
 		if (menu) {
 			menu.raise(menu.raised + rect.bottom - limit);

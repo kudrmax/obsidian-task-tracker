@@ -1,10 +1,6 @@
 import { el } from "./dom";
-import { Button } from "./kit/Button";
 
 export interface ColumnHeadersOptions {
-	title(): string;
-	onStep(days: number): void;
-	onToday(): void;
 	/** The names of the sections Inbox and Soon, as the tasks file heads them. */
 	inboxName(): string;
 	soonName(): string;
@@ -12,33 +8,29 @@ export interface ColumnHeadersOptions {
 	doneName(): string;
 }
 
-/** A header over each list, riding with its column: Done's, Inbox's and Soon's names, and over Now the arrows round the day's name. */
+/** The ribbon's titles over its lists, each riding with its column: Done's, Inbox's and Soon's names. */
 export class ColumnHeaders {
 	private readonly doneEl: HTMLElement;
 	private readonly inboxEl: HTMLElement;
 	private readonly soonEl: HTMLElement;
-	private readonly title: Button;
+	/** The headers, Done's, Inbox's, Soon's, in that order. */
+	readonly elements: readonly HTMLElement[];
 
 	constructor(parent: HTMLElement, private readonly opts: ColumnHeadersOptions) {
-		this.doneEl = el(el(parent, "div", "tc-head is-done"), "div", "tc-head-title");
-		this.inboxEl = el(el(parent, "div", "tc-head is-inbox"), "div", "tc-head-title");
-		this.soonEl = el(el(parent, "div", "tc-head is-soon"), "div", "tc-head-title");
-		const nav = el(parent, "div", "tc-head tc-day-nav");
-		Button.create(nav, { kind: "icon", tone: "quiet", label: "Previous day", icon: "chevronLeft", cls: "tc-arrow", onPress: () => opts.onStep(-1) });
-		this.title = Button.create(nav, { kind: "text", label: "Back to today", text: "", cls: "tc-head-title tc-day-title", onPress: () => opts.onToday() });
-		Button.create(nav, { kind: "icon", tone: "quiet", label: "Next day", icon: "chevronRight", cls: "tc-arrow", onPress: () => opts.onStep(1) });
+		const heads = (["is-done", "is-inbox", "is-soon"] as const).map((kind) => el(parent, "div", `tc-head ${kind}`));
+		this.elements = heads;
+		[this.doneEl, this.inboxEl, this.soonEl] = heads.map((head) => el(head, "div", "tc-head-title"));
 		this.render();
 	}
 
-	/** The title over a column: the day's name over Now, Inbox's and Soon's names. */
-	titleOf(column: "day" | "inbox" | "soon"): HTMLElement {
-		return column === "day" ? this.title.el : column === "inbox" ? this.inboxEl : this.soonEl;
+	/** The title over a column: Inbox's and Soon's names. */
+	titleOf(column: "inbox" | "soon"): HTMLElement {
+		return column === "inbox" ? this.inboxEl : this.soonEl;
 	}
 
 	render(): void {
 		this.doneEl.textContent = this.opts.doneName();
 		this.inboxEl.textContent = this.opts.inboxName();
 		this.soonEl.textContent = this.opts.soonName();
-		this.title.setText(this.opts.title());
 	}
 }

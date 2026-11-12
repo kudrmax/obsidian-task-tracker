@@ -34,19 +34,23 @@ const WINDOW_FRAMES: Frames = {
 /**
  * A scroller that scrolls itself under a dragged card held near its top or bottom edge, a frame at a time, faster the
  * closer to the edge, for as long as the finger stays there; after each step `onScrolled` previews the drop again. Only a
- * finger heading for the edge, then held there, scrolls: one lifting a card near the edge, or carried in across it back
- * from the zones under the list, leaves it where it is.
+ * finger heading for the edge, then held there for a moment (`LAYOUT.autoScrollDwell`), scrolls: one lifting a card near
+ * the edge, carried across it on to another list, or in across it back from the zones under the list, leaves it as it is.
  */
 export class AutoScroll {
 	private frame = 0;
 	private lastY: number | null = null;
 	/** Steps are being taken: a finger held still goes on scrolling, one that has not set off does not start. */
 	private scrolling = false;
+	/** When the finger came to the edge heading for it: it scrolls once held there long enough. */
+	private arrived: number | null = null;
 
 	constructor(
 		private readonly scroller: () => HTMLElement,
 		private readonly onScrolled: () => void,
 		private readonly frames: Frames = WINDOW_FRAMES,
+		private readonly now: () => number = () => performance.now(),
+		private readonly dwellMs: number = LAYOUT.autoScrollDwell,
 	) {}
 
 	/** The finger is at `y`, the scroller's box read by the caller before it wrote anything: a step is planned near an edge it heads for, and none elsewhere. */
@@ -55,8 +59,18 @@ export class AutoScroll {
 		const velocity = edgeVelocity(y, box.top, shownBottom(el, box.bottom));
 		const from = this.lastY;
 		this.lastY = y;
-		const towards = from !== null && (y === from ? this.scrolling : velocity > 0 === y > from);
+		const towards = from !== null && (y === from ? this.scrolling || this.arrived !== null : velocity > 0 === y > from);
 		if (velocity === 0 || !towards) return this.halt();
+		const now = this.now();
+		this.arrived ??= now;
+		if (!this.scrolling && now - this.arrived < this.dwellMs) {
+			/** Held still, the finger sends nothing: the frame asks again until the moment has passed. */
+			if (!this.frame) this.frame = this.frames.request(() => {
+				this.frame = 0;
+				this.onScrolled();
+			});
+			return;
+		}
 		this.scrolling = true;
 		if (this.frame) return;
 		this.frame = this.frames.request(() => {
@@ -77,5 +91,6 @@ export class AutoScroll {
 		if (this.frame) this.frames.cancel(this.frame);
 		this.frame = 0;
 		this.scrolling = false;
+		this.arrived = null;
 	}
 }

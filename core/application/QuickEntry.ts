@@ -469,7 +469,9 @@ export class QuickEntry {
 		this.open(this.spotIn(column, place));
 	}
 
-	private spotIn(column: EntryList, place: ListPlace): EntrySpot {
+	private spotIn(column: EntryList, asked: ListPlace): EntrySpot {
+		const part = asked.kind === "task" ? this.parts(column).find((p) => p.group === asked.group && p.newTask !== null) : undefined;
+		const place: ListPlace = part && asked.kind === "task" ? { ...asked, before: part.end } : asked;
 		const gap = gapOfPlace(this.look.cards(column), place);
 		return { kind: "list", column, place: place.kind === "task" ? { ...gap, level: 0 } : gap };
 	}

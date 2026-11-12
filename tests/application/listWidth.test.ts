@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DIVIDER_SNAP, dividerAt, listShareOf, listWidths } from "../../core/application/listWidth";
+import { allColumnsDividerAt, allColumnsShare, allColumnsWidthAt, allColumnsWidths, DIVIDER_SNAP, dividerAt, listShareOf, listWidths } from "../../core/application/listWidth";
 
 const DIVIDER = 16;
 
@@ -41,5 +41,26 @@ describe("dividerAt", () => {
 	it("does not hold to a middle out of reach", () => {
 		const narrow = { width: 150, min: 110, max: 160, center: 187 };
 		expect(dividerAt(185, narrow, 0)).toEqual({ width: 160, snapped: false });
+	});
+});
+
+describe("All columns' widths (board D1): three lists and the timeline beside the divider, in the core", () => {
+	it("stands four equal columns at the middle share, as the board draws them", () => {
+		const { width } = allColumnsWidths(0.5, 804, DIVIDER);
+		expect(width).toBe(189);
+		expect(allColumnsDividerAt(width, DIVIDER)).toBe(3 * 189 + 32);
+	});
+
+	it("turns the divider's place back into the lists' width and the share it saves", () => {
+		expect(allColumnsWidthAt(allColumnsDividerAt(200, DIVIDER), DIVIDER)).toBe(200);
+		const share = allColumnsShare(189, 804, DIVIDER);
+		expect(share).toBeCloseTo(0.5);
+		expect(allColumnsWidths(share, 804, DIVIDER).width).toBeCloseTo(189);
+	});
+
+	it("keeps the timeline at least a list's least width", () => {
+		const { width, max } = allColumnsWidths(0.95, 804, DIVIDER);
+		expect(width).toBe(max);
+		expect(804 - 48 - 3 * max).toBeGreaterThanOrEqual(110);
 	});
 });

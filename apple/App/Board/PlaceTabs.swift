@@ -84,10 +84,15 @@ final class TabsController: UITabBarController, UITabBarControllerDelegate {
     /// The tabs hidden and untouchable, or back: the bar stays laid out, so the plus keeps its slot.
     func give(way: Bool) {
         let alpha: CGFloat = way ? 0 : 1
+        defer { given = true }
         guard tabBar.alpha != alpha else { return }
-        UIView.animate(withDuration: 0.25) { self.tabBar.alpha = alpha }
         tabBar.isUserInteractionEnabled = !way
+        // The first screen stands as it is from its first frame: no bar fading out under a view that has none.
+        guard given else { return tabBar.alpha = alpha }
+        UIView.animate(withDuration: 0.25) { self.tabBar.alpha = alpha }
     }
+
+    private var given = false
 
     func show(_ place: RibbonPlace) {
         guard let tab = tabs.first(where: { $0.identifier == String(place.rawValue) }), selectedTab !== tab else { return }

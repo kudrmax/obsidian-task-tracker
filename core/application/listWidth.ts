@@ -48,3 +48,31 @@ export function dividerAt(wanted: number, widths: ListWidths, speed: number): Di
 	const width = snapped ? widths.center : Math.round(wanted);
 	return { width: Math.min(widths.max, Math.max(widths.min, width)), snapped };
 }
+
+/**
+ * All columns (a wide screen): Inbox, Soon and the day's list, each `width` wide, then the timeline behind the divider,
+ * `dividerWidth` between each two. The share the divider saves is one list's against the timeline, so at the middle share
+ * the four columns are equal; the timeline keeps at least a list's least width.
+ */
+export function allColumnsWidths(share: number, viewWidth: number, dividerWidth: number): ListWidths {
+	const room = viewWidth - 3 * dividerWidth;
+	const max = Math.max(LIST_WIDTHS.min, (room - LIST_WIDTHS.min) / 3);
+	const width = Math.min(max, Math.max(LIST_WIDTHS.min, (share * room) / (1 + 2 * share)));
+	return { width, min: LIST_WIDTHS.min, max, center: room / 4 };
+}
+
+/** The share all columns' lists `width` wide save: one list's against the timeline. */
+export function allColumnsShare(width: number, viewWidth: number, dividerWidth: number): number {
+	const timeline = viewWidth - 3 * dividerWidth - 3 * width;
+	return width + timeline > 0 ? width / (width + timeline) : 0.5;
+}
+
+/** Where the divider stands in all columns, from the view's left: after the three lists and the dividers between them. */
+export function allColumnsDividerAt(width: number, dividerWidth: number): number {
+	return 3 * width + 2 * dividerWidth;
+}
+
+/** The lists' width the divider standing at `at` gives in all columns. */
+export function allColumnsWidthAt(at: number, dividerWidth: number): number {
+	return (at - 2 * dividerWidth) / 3;
+}

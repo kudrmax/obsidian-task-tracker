@@ -316,7 +316,8 @@ adds to the calls above; the old ones answer as before.
   column: "inbox", place: { kind: "task", group: null, before: null } }, "2026-11-12", "project:Стиль")`.
 - `tasks.pickProjectNode(node, wide)`: a tap on a panel row (`tapProjectNode`; on a narrow screen a tap that chose a
   node also closes the panel). `tasks.clearProjectFilter()`: the cross. `tasks.setProjectsPanel(open)`: the projects
-  button. `tasks.setViewMode(mode)`: a pick in the view button's menu, kept apart with and without a filter.
+  button. `tasks.setViewMode(mode)`: a pick in the view button's menu, the screen's one mode (2026-11-12: no longer kept
+  apart with and without a filter; a pick or a clear never changes it).
   `tasks.setNoteViewMode(mode)`: the same in a note's block. Each answers `projectsScreen`.
 - `tasks.dropTasksOnProject(keys, to, filter)`: funnel cards let go on a panel row; the project each is shown by under
   `filter` gives way to the row's (no filter, All: its first project). Example: `tasks.dropTasksOnProject([key],
@@ -327,8 +328,9 @@ adds to the calls above; the old ones answer as before.
 - `tasks.projectNoteView(path, wide)`: the block at the end of a project's note (`path` from the vault's folder):
   `FunnelView` with the note's project as `filter` (`clearable` false), `panel` null, modes Rows and By project, Rows
   first; null for a note no project has. Example: `tasks.projectNoteView("Заметки/Стиль.md", true)`.
-- `ProjectsScreenState` gains `panelOpen`, `view`, `filteredView`, `noteView`; `selected` left out now means no filter
-  (the old Projects screen still shows All for it).
+- `ProjectsScreenState` gains `panelOpen`, `view`, `noteView`; `selected` left out now means no filter (the old Projects
+  screen still shows All for it). `filteredView` is gone (2026-11-12): an old state that has it reads as before with
+  `view` the one mode, and the next `setViewMode` drops it.
 - `days.stepFunnel({ mode, date }, shift)`: the swipe on the funnel without Projects (`"inbox" | "soon" | "calendar" |
   "done"`): null back from Inbox and from Done, Done on to Inbox. `rules.funnelPlaceShowing(column, spot)`,
   `rules.viewEntryLists(mode, spot)` (the quick entry's `look.shown`: two columns the place's lists, rows and all columns
@@ -395,6 +397,69 @@ adds to the calls above; the old ones answer as before.
 - `EntryState.locksPanel` (the quick entry's state, `entry.*`): true while a field is open; the projects button can't be
   pressed then.
 
+#### The view rework (2026-11-12): one mode, layouts, contexts
+
+- **One view mode.** `tasks.setViewMode(mode)` alone changes it; `pickProjectNode`, `clearProjectFilter`, a carry's
+  filter never do. Every mode is offered under every filter and none (`twoColumns`, `allColumns` on a wide screen,
+  `rows`, `byProject`; a note's block `rows`, `byProject`). Its default is Two columns (Rows in a note's block,
+  `setNoteViewMode` its own); All columns kept on a narrow screen shows as the default.
+- `ViewChoice.chosen`: the mode the button shows and checks (`icon` is its). `ViewChoice.mode`: what is drawn, the chosen
+  one, but By project under Done and a done project (their done list, in any mode chosen); `wheel`, `ribbon`, `source`,
+  `rows`, `layout`, `FunnelView.plus` follow `mode`. Example: Rows chosen, Done picked → `{ mode: "byProject", chosen:
+  "rows", icon: "rows-3" }`.
+- **All is no filter** (Max, 2026-11-12): the panel's All row is `selected` whenever nothing else is chosen;
+  `tasks.pickProjectNode("all", wide)` and `tasks.selectProjectNode("all")` clear the filter (`FunnelView.filter` null, no
+  title, no cross; a narrow panel closes). `"all"` passed as a filter anywhere (`screen`, `drop`, `createInPlace`, …)
+  and an old kept `selected: "all"` mean no filter.
+- `tasks.projectsScreen()` with no filter (or `"all"`): every open task by its top project, then a «No project» part
+  last (key `"none"`); the plus types there. Under `"none"` its one part; under a project its own and its subprojects'.
+- `ViewChoice.layout` `ViewLayout` `{ mode, columns, swipe, divider, stack }`: the columns left to right, each `{ id,
+  lists, width }` (`id` `"inbox" | "soon" | "day" | "timeline" | "rows" | "projects"`; `lists` `[{ list, title }]`, top
+  to bottom, `title` the list's name, null for the day's list (it draws the day's own title) and the by project list;
+  `width` `"half" | "list" | "rest"`); `swipe` `"pages"` (two columns, the ribbon) or `"none"` (no swipe, no
+  rubber-band); `divider` before the timeline (false in a note's block, which has no timeline); `stack` in rows `{ lists,
+  scrolls }` (`scrolls` false in a note's block: the lists grow with their cards). Two columns: Inbox (Inbox over
+  Backlog) half, Soon half, the day `list`, the timeline `rest`. All columns: Inbox, Soon, the day `list`, the timeline.
+  Rows: `rows` then the timeline. By project: `projects` then the timeline. Also `rules.viewLayout(mode, note, titles)`
+  (`titles` `{ inbox, backlog, soon, day }`).
+- `rules.layoutWidths(layout, share, viewWidth, dividerWidth)` → `{ widths, divider }` for a still layout: each column's
+  width, and the divider as `ListWidths` (`width` where it stands from the left, `min`, `max`, `center`; hand it to
+  `rules.dividerAt` as it is); null for two columns (the ribbon's own rule sets them by its place). Example:
+  `rules.layoutWidths(rowsLayout, 0.3, 804, 16)` → `{ widths: [236.4, 551.6], divider: { width: 236.4, min: 110, max:
+  678, center: 394 } }`. `rules.layoutShareAt(layout, at, viewWidth, dividerWidth)` → the share a divider let go at `at`
+  saves (null without a divider or in two columns): `rules.layoutShareAt(rowsLayout, 300, 804, 16)` → `0.3807`.
+- `rules.allColumnsWidths(share, viewWidth, dividerWidth)` → `ListWidths` of one of all columns' three lists;
+  `rules.allColumnsShare(width, viewWidth, dividerWidth)`, `rules.allColumnsDividerAt(width, dividerWidth)`,
+  `rules.allColumnsWidthAt(at, dividerWidth)`. Example: `rules.allColumnsWidths(0.5, 804, 16)` → `{ width: 189, min:
+  110, max: 215.33, center: 189 }`.
+- `rules.stackedLists(lists, room, fade)` → heights: the rows' lists measured, each `{ wanted, stops }` (its whole
+  height, and the bottom of each card from its top, the title in). All that fit keep `wanted`; else `stackedRows`' shares,
+  a list that scrolls ending at a card's bottom plus `fade` (the fade never lies on a card), what that frees going a card
+  at a time to the list it lets show one more; none under its first card and the fade (or its plate). Example:
+  `rules.stackedLists([{ wanted: 380, stops: [90, 160, 230, 300, 370] }, { wanted: 90, stops: [] }], 300, 20)` → `[180,
+  90]`. `rules.stackedRows` still answers.
+- `ViewChoice.context` (also `rules.viewContext(node, mode, note, subprojects)`): the filter and the mode a view is read
+  in, and the Subprojects check where it is off (`subprojects` false; left out or true: on), a string to compare: a read whose context differs from the one drawn is drawn still in place; the same context changed animates.
+  A note's block's context is its mode alone. Example: `rules.viewContext("project:Стиль", "rows", false)` →
+  `'["screen","project:Стиль","rows"]'`.
+- A carry let go in a list under the filter it opened on its way (`carryAt` over a row): `tasks.drop`, `tasks.landing`
+  and `tasks.dropPreview` also give each task the opened project in the same write (one undo), as `dropOnProject` from
+  the lift's filter (added when lifted with no filter). The core reads the carry from the `projectsScreen` handed in, so
+  call `tasks.drop` before `tasks.endCarry("dropped")`, as now.
+- `ProjectsRow.muted` for No project: true only while no open task without a project stands in the funnel.
+- `rules.sameNewPlace(a, b)` → boolean: two places for a new task are the same, field by field (any key order). Example:
+  `rules.sameNewPlace({ kind: "list", list: "inbox", group: null, before: null }, { before: null, group: null, list:
+  "inbox", kind: "list" })` → `true`.
+- `rules.projectsPlusPlace(view, place)` → `ListPlace` or null: where the plus let go at `place` of the by project list
+  stands: between cards anywhere in a part, the place its card lands (before `end`, else the part's end); under a task,
+  there; null where `rules.projectsPlusTakes` is false. Draw the plus's drop line at it. The quick entry snaps the field
+  there itself.
+- `rules.projectsEntryLook(view)`'s `parts` add `end` (a `TaskKey` or null): the card a field opened at that part's end
+  stands before, so the written card lands where the field was; the quick entry (`entry.*`) uses it when the look's
+  parts carry it, so hand the parts in as the rule gives them.
+- No rule gives a list a card's room more while a card or the plus is carried or a task typed: rows never reflow during
+  a carry; the room to drop in is the hovered list's, drawn by the frontend.
+
 #### Subprojects in the filter (2026-11-12)
 
 - `ViewChoice.subprojects` → `{ label: "Subprojects", checked }` or `null`: the view menu's row, its own group under the
@@ -406,6 +471,9 @@ adds to the calls above; the old ones answer as before.
   lists, `filterHides`, and where a drop or a typed task goes at a section's end and which project a card dropped on a
   row gives way (`dropTasksOnProject`) all follow it. One device setting (`ProjectsScreenState.subprojects`, `false`
   when off, left out on), never synced; it changes no mode or filter and none changes it.
+- The check off is another context: `ViewChoice.context` gains `"own"` (`rules.viewContext("project:Люди", "rows",
+  false, false)` → `'["screen","project:Люди","rows","own"]'`), so the screen is drawn still in place, as for another filter.
+  The row and its setting hold in every mode, By project too.
 
 #### A folded task's next step
 

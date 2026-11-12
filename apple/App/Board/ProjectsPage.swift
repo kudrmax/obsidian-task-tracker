@@ -44,7 +44,7 @@ struct ProjectTree: View {
                 }
             }
             .padding(.horizontal, TreeMetrics.inset)
-            .padding(.bottom, 120)
+            .padding(.bottom, TreeMetrics.inset)
             .background { TreeProbe(model: model) }
         }
         .scrollIndicators(.hidden)
@@ -173,7 +173,8 @@ struct ProjectTasks: View {
     private var projects: ProjectsBoard { model.projects }
 
     var body: some View {
-        let view = projects.view
+        // Only the list read for the view drawn: another node's list is never shown under this one's title.
+        let view = projects.shownContext == model.snapshot?.funnel.view.context ? projects.view : nil
         VStack(alignment: .leading, spacing: 0) {
             if let view, !view.missing {
                 ScrollViewReader { scroller in
@@ -196,19 +197,26 @@ struct ProjectTasks: View {
                                         .mask(Fade())
                                         .frame(maxWidth: .infinity, minHeight: ColumnMetrics.groupHead, alignment: .bottomLeading)
                                         .padding(.leading, CardMetrics.leading)
-                                        .padding(.top, projects.drawsAnything(before: index) ? ColumnMetrics.sectionGap : 0)
+                                        // The header as drawn, the room above it left out: the gap under a part's last card is
+                                        // that part's, as the plugin's header's box (its margin outside) leaves it.
                                         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.projects.geometry.parts[part.id] = $0 }
+                                        .padding(.top, projects.drawsAnything(before: index) ? ColumnMetrics.sectionGap : 0)
                                 }
                                 let here: Int? = if case .part(index, let row) = at { row } else { nil }
                                 ForEach(rows(of: part, entry: here.flatMap { row in entry.map { ($0, row) } })) { row in
+                                    // A typed row keeps its key as the field's text becomes a line waiting and then its
+                                    // card: each stands in the place of the one before at once, never fading over it.
                                     switch row {
-                                    case .card(let card, _):
+                                    case .card(let card, let key):
                                         ProjectCard(card: card, model: model)
                                             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.projects.geometry.cards[part.id + "/" + card.id] = $0 }
+                                            .transition(key == card.id ? .opacity : .identity)
                                     case .pending(_, let text, let level, let branch):
                                         EntryRow(level: level, branch: branch) { PendingCapsule(text: text) }
+                                            .transition(.identity)
                                     case .field(_, let level, let branch):
                                         EntryRow(level: level, branch: branch) { EntryCapsule(host: model.entry) }
+                                            .transition(.identity)
                                     }
                                 }
                                 if part.section.plate, here == nil || entry?.at.keepsPlate == true {
@@ -279,8 +287,8 @@ struct ProjectTasks: View {
     private func typed(_ entry: ListEntryView) -> some View {
         ForEach(typedRows(entry)) { row in
             switch row {
-            case .pending(_, let text, let level, _): EntryRow(level: level, branch: nil) { PendingCapsule(text: text) }
-            case .field(_, let level, _): EntryRow(level: level, branch: nil) { EntryCapsule(host: model.entry) }
+            case .pending(_, let text, let level, _): EntryRow(level: level, branch: nil) { PendingCapsule(text: text) }.transition(.identity)
+            case .field(_, let level, _): EntryRow(level: level, branch: nil) { EntryCapsule(host: model.entry) }.transition(.identity)
             case .card: EmptyView()
             }
         }
@@ -343,7 +351,7 @@ private struct ProjectCard: View {
             carried: mark.hidden,
             onCarry: { model.startCarry(card, from: "projects") },
             from: "projects",
-            onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item); await model.projects.read() } } : nil,
+            onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item) } } : nil,
             onLink: { model.openLink($0) })
             .frame(height: card.listHeight)
             .background { if mark.waiting { DashedPlace() } }
@@ -556,7 +564,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         case nil:
             guard let aimed else { return nil }
             let rect = lineRect
-            model?.carryNaming()
+            model?.session.naming()
             projects.asking = .project(aimed.landing.place)
             return CarryLanding(rect: rect, folds: true)
         }
@@ -650,61 +658,174 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
 
     var scrolls: UIScrollView? { scroll }
 
-    /// The plus alone: a card stays where it is shown, let go here.
-    func takes(_ payload: DragPayload?) -> Bool { payload == nil && model?.funnel?.plus.list == "projects" }
-
-    /// Where the plus is held: the part let go in is read from it.
-    private var held: CGPoint?
-
-    /// The plus held over the tasks shows the drop line where the task will go, as the plugin's: after the last card of
-    /// the part under the finger (the last whose header or card stands above it), or over the first part above them all.
-    func hover(at point: CGPoint, carrying payload: DragPayload?) {
-        held = point
-        let aimed = target(at: point.y)
-        guard let model, let area, let line = aimed.line, newTask(in: aimed.part) != nil else { return model?.drag.hideLine() ?? () }
-        model.drag.showLine(from: CGPoint(x: area.minX + CardMetrics.columnInset, y: line), to: area.maxX - CardMetrics.columnInset)
+    /// The plus, and a card of this list carried among its parts (moved, or into another part, as the core's
+    /// `dropInProjects` writes it, as the plugin's).
+    func takes(_ payload: DragPayload?) -> Bool {
+        guard model?.presentation?.plusList == .projects else { return false }
+        guard let payload else { return true }
+        if case .card = payload.kind { return payload.from == "projects" }
+        return false
     }
 
-    func leave() {
-        held = nil
+    /// Where a carried card or the plus would go: the list's place (`rules.placeOfDrop`), the line's start; nil where
+    /// nothing would be written.
+    private var aimed: (place: JSONValue, line: CGPoint)?
+
+    /// The parts' rows as they stand on the screen, `lifted` left out (its place kept as `home`), as the list's own
+    /// machinery reads them (`rules.placeAt`): the cards and the parts' headers, each where it is drawn.
+    private struct Laid {
+        var placed: [JSONValue] = [], listed: [JSONValue] = [], heads: [JSONValue] = [], frames: [CGRect] = [], keys: [JSONValue] = []
+        /// Each header drawn, by its part's group, with the card it stands over.
+        var headFrames: [(group: JSONValue, firstCard: Int, frame: CGRect)] = []
+        var home: JSONValue = .null
+    }
+
+    private func laid(without lifted: BoardCard?) -> Laid {
+        var laid = Laid()
+        guard let projects = model?.projects else { return laid }
+        let geometry = projects.geometry
+        for part in projects.parts {
+            if part.section.header, let head = geometry.parts[part.id] {
+                laid.heads.append(["group": part.section.group.json, "opens": .bool(part.section.opens), "firstCard": .number(Double(laid.placed.count)), "top": .number(Double(head.minY)), "height": .number(Double(head.height))])
+                laid.headFrames.append((part.section.group.json, laid.placed.count, head))
+            }
+            for other in part.cards {
+                if other.id == lifted?.id {
+                    laid.home = ["kind": "gap", "index": .number(Double(laid.placed.count)), "level": .number(Double(other.level)), "group": part.section.group.json]
+                    continue
+                }
+                guard let frame = geometry.cards[part.id + "/" + other.id] else { continue }
+                laid.placed.append(["level": .number(Double(other.level)), "group": part.section.group.json, "top": .number(Double(frame.minY)), "height": .number(Double(frame.height))])
+                laid.listed.append(["id": .string(other.item.id), "key": other.item.key.json, "level": .number(Double(other.level)), "group": part.section.group.json])
+                laid.frames.append(frame)
+                laid.keys.append(other.item.key.json)
+            }
+        }
+        return laid
+    }
+
+    /// The gap under the finger, as a list places a card or the plus (the plugin's `CardListDrop`): the core's `placeAt`
+    /// over the cards and the parts' headers where they stand, the level by the finger's `x`; then what it means
+    /// (`placeOfDrop`). Nil where the finger is off the list.
+    private func gap(at point: CGPoint, _ laid: Laid) -> (gap: JSONValue, place: JSONValue)? {
+        guard let model, let area else { return nil }
+        let inset = Double(CardMetrics.columnInset)
+        let level: Double = model.ruleNow("rules.levelAt", [.number(Double(point.x)), ["left": .number(Double(area.minX) + inset), "width": .number(Double(area.width) - 2 * inset)], .number(Double(CardMetrics.indent))]) ?? 0
+        guard let gap: JSONValue = model.ruleNow("rules.placeAt", [.array(laid.placed), .number(Double(point.y)), .number(level), .number(0), .null, .array(laid.heads), laid.home, .number(CardMetrics.dropHysteresis)]),
+              let place: JSONValue = model.ruleNow("rules.placeOfDrop", [.array(laid.listed), gap, laid.home]), !place.isNull else { return nil }
+        return (gap, place)
+    }
+
+    /// The line's start at gap `gap`: between the cards around it, at its level.
+    private func line(at gap: JSONValue, _ laid: Laid) -> CGPoint? {
+        guard let area, let index = gap["index"].number.map(Int.init) else { return nil }
+        let opens = laid.headFrames.last { $0.group == gap["group"] && $0.firstCard == index }
+        // A part with no card of its own there: under its header, where its field opens.
+        let empty = index >= laid.frames.count || laid.placed[index]["group"] != gap["group"]
+        let y = if let opens, empty { opens.frame.maxY + CardMetrics.gap / 2 }
+            else if index < laid.frames.count { laid.frames[index].minY - CardMetrics.gap / 2 }
+            else { (laid.frames.last?.maxY ?? area.minY) + CardMetrics.gap / 2 }
+        return CGPoint(x: area.minX + CardMetrics.columnInset + CGFloat(gap["level"].number ?? 0) * CardMetrics.indent, y: y)
+    }
+
+    private func show(_ place: JSONValue, at start: CGPoint) {
+        guard let area else { return clear() }
+        aimed = (place, start)
+        model?.drag.showLine(from: start, to: area.maxX - CardMetrics.columnInset)
+    }
+
+    /// A carried card among the parts: its line where the core takes it (`rules.projectsTakes`); none in a folder's own
+    /// part or a stage that refuses the card.
+    private func aimCard(_ card: BoardCard, at point: CGPoint) {
+        guard let model else { return clear() }
+        let projects = model.projects
+        let laid = laid(without: card)
+        guard let (gap, place) = gap(at: point, laid), let drop = projects.cards[card.id]?.drop,
+              model.ruleNow("rules.projectsTakes", [projects.raw, [drop], place]) == true,
+              let start = line(at: gap, laid) else { return clear() }
+        show(place, at: start)
+        if preview?.card != card.id || preview?.place != place {
+            let board = AppServices.shared.board, node = model.filter?.node ?? "all"
+            preview = (card.id, place, Task { await ProjectsBoard.preview(board, drops: [drop], place: place, node: node) })
+        }
+    }
+
+    /// The list the drop at the line would leave, read while the card is held there: drawn the moment it is let go.
+    private var preview: (card: String, place: JSONValue, read: Task<(read: ProjectsBoard.Read, landings: [String])?, Never>)?
+
+    /// The plus held over the parts, as the plugin's: the gap under the finger, and where the core takes a new task let
+    /// go there (`rules.projectsPlusPlace`: under a card a subtask stays at the gap; between a part's cards the task goes
+    /// where its card will land, null where nothing is written). The line stands at that place, where the field opens.
+    private func aimPlus(at point: CGPoint) {
+        guard let model else { return clear() }
+        let laid = laid(without: nil)
+        guard let (gap, asked) = gap(at: point, laid),
+              let place: JSONValue = model.ruleNow("rules.projectsPlusPlace", [model.projects.raw, asked]), !place.isNull,
+              let start = place["kind"] == "task" ? line(before: place, laid) : line(at: gap, laid) else { return clear() }
+        show(place, at: start)
+    }
+
+    /// The line's start for a new task of a part at `place`: before the card it names, else after the part's last card,
+    /// else under the part's header.
+    private func line(before place: JSONValue, _ laid: Laid) -> CGPoint? {
+        guard let area else { return nil }
+        let x = area.minX + CardMetrics.columnInset
+        let group = place["group"]
+        if !place["before"].isNull, let index = laid.keys.indices.first(where: { laid.keys[$0] == place["before"] && laid.placed[$0]["group"] == group }) {
+            return CGPoint(x: x, y: laid.frames[index].minY - CardMetrics.gap / 2)
+        }
+        if let last = laid.placed.indices.last(where: { laid.placed[$0]["group"] == group }) {
+            return CGPoint(x: x, y: laid.frames[last].maxY + CardMetrics.gap / 2)
+        }
+        if let head = laid.headFrames.last(where: { $0.group == group }) {
+            return CGPoint(x: x, y: head.frame.maxY + CardMetrics.gap / 2)
+        }
+        return CGPoint(x: x, y: (laid.frames.first?.minY ?? area.minY) - CardMetrics.gap / 2)
+    }
+
+    private func clear() {
+        aimed = nil
         model?.drag.hideLine()
     }
 
-    /// The part a let-go at `y` (window) writes into, and where its line stands.
-    private func target(at y: CGFloat) -> (part: ProjectsBoard.Part?, line: CGFloat?) {
-        guard let projects = model?.projects else { return (nil, nil) }
-        let geometry = projects.geometry
-        var found: (part: ProjectsBoard.Part, bottom: CGFloat)?
-        var firstTop: CGFloat?
-        for candidate in projects.parts {
-            let frames = ([geometry.parts[candidate.id]] + candidate.cards.map { geometry.cards[candidate.id + "/" + $0.id] }).compactMap { $0 }
-            guard let top = frames.map(\.minY).min(), let bottom = frames.map(\.maxY).max() else { continue }
-            if firstTop == nil { firstTop = top }
-            if top <= y { found = (candidate, bottom) }
+    /// A card let go where its line stood: written by the core (`tasks.dropInProjects`), the copy folding into the line;
+    /// where the core takes no drop there (a stage that refuses it) nothing is written and the list stays.
+    private func dropCard(_ card: BoardCard) -> CarryLanding? {
+        defer {
+            clear()
+            preview = nil
         }
-        if let found { return (found.part, found.bottom + CardMetrics.gap / 2) }
-        return (nil, firstTop.map { $0 - CardMetrics.gap / 2 } ?? area.map { $0.minY + 4 })
+        guard let model, let aim = aimed, let drop = model.projects.cards[card.id]?.drop else { return nil }
+        // No filter is By project's every task: the core's node for it is All (the plugin passes it so too).
+        let node = model.filter?.node ?? "all"
+        // The list the drop leaves is drawn as the copy folds into the line, the card it lands as hidden until the copy
+        // is down; never the card back in its old place while the file is written and read again.
+        if let ahead = preview, ahead.card == card.id, ahead.place == aim.place {
+            Task { [weak model] in
+                guard let model, let (read, landings) = await ahead.read.value else { return }
+                model.landDropped(read, as: landings)
+            }
+        }
+        model.writeDrop("tasks.dropInProjects", [.array([drop]), aim.place, .string(node)])
+        return CarryLanding(rect: CGRect(x: aim.line.x, y: aim.line.y - 4, width: 8, height: 8), folds: true)
     }
 
-    /// What the plus let go in `part` writes, the core's: the part's own when one is aimed at, the list's only above them
-    /// all; nil where it writes nothing (a folder's tasks, Done), and then no line is shown either.
-    private func newTask(in part: ProjectsBoard.Part?) -> ProjectsNewTask? {
-        guard let part else { return model?.projects.view?.newTask }
-        return part.section.newTask
+    func hover(at point: CGPoint, carrying payload: DragPayload?) {
+        if let payload, case .card(let card) = payload.kind { return aimCard(card, at: point) }
+        aimPlus(at: point)
     }
 
-    /// The part let go in, as the line showed it: the field at its end; above them all, before the first part's first
-    /// card. Where the plus writes nothing (a folder's tasks, Done) it takes nothing.
+    func leave() {
+        clear()
+    }
+
+    /// The plus let go where its line stood: the field of a new task at that place of the list (`openAt`), which the
+    /// core opens where the line showed; where no line stood it takes nothing.
     func letGo(carrying payload: DragPayload?) -> CarryLanding? {
-        guard payload == nil, let model, let first = model.projects.parts.first else { return nil }
-        let at = held
-        let found = target(at: at?.y ?? 0).part
-        held = nil
-        model.drag.hideLine()
-        let part = found ?? first
-        guard newTask(in: found) != nil, part.section.newTask != nil else { return nil }
-        let before = found == nil ? part.section.cards.first?.item.key.json ?? .null : .null
-        model.entry.openAt(QuickEntryHost.projects, ["kind": "task", "group": part.section.group.json, "before": before])
-        return CarryLanding(rect: at.map { CGRect(x: $0.x - 4, y: $0.y - 4, width: 8, height: 8) } ?? .null, folds: true)
+        if let payload, case .card(let card) = payload.kind { return dropCard(card) }
+        defer { clear() }
+        guard payload == nil, let model, let aim = aimed else { return nil }
+        model.entry.openAt(QuickEntryHost.projects, aim.place)
+        return CarryLanding(rect: CGRect(x: aim.line.x, y: aim.line.y - 4, width: 8, height: 8), folds: true)
     }
 }

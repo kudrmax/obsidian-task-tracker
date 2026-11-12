@@ -1,4 +1,4 @@
-import { carriedMiddle, type DropTo, type GapPlace, type GroupName, type Header, type ListCard, type ListPlace, levelAt, placeOfDrop, placesInGap, sameGap } from "../../../core/application/contracts";
+import { carriedMiddle, type DropTo, gapOfPlace, type GapPlace, type GroupName, type Header, type ListCard, type ListPlace, levelAt, placeOfDrop, placesInGap, sameGap } from "../../../core/application/contracts";
 import { type CardSize, shownCardSize } from "../cardSize";
 import { DESIGN, LAYOUT, tokenPx } from "../design";
 import { type ListEntry, PLATE } from "../TaskList";
@@ -78,6 +78,8 @@ export interface DropList {
 export abstract class CardListDrop implements DropTarget {
 	/** What a drop means now. */
 	private place: GapPlace | null = null;
+	/** Where the line shows the drop: the place under the finger, or where the list stands what is let go there. */
+	private shownGap: GapPlace | null = null;
 	private layout: Layout | null = null;
 	private last: { x: number; y: number; drag: DragPayload } | null = null;
 	private readonly line: DropLine;
@@ -86,6 +88,9 @@ export abstract class CardListDrop implements DropTarget {
 	/** The column's title, lit while a drop would go on it. */
 	private litTitle: HTMLElement | null = null;
 	private readonly scroll: AutoScroll;
+	/** The finger is over the list: the owner may give it room at its end for the card (the rows' lists alone, nothing else moving). */
+	onHover: ((over: boolean) => void) | null = null;
+	private over = false;
 
 	constructor(
 		protected readonly list: DropList,
@@ -120,6 +125,11 @@ export abstract class CardListDrop implements DropTarget {
 		return true;
 	}
 
+	/** Where the list stands what is let go at `place`: there, when it takes it; null when it doesn't. */
+	protected snapPlace(place: ListPlace, drag: DragPayload): ListPlace | null {
+		return this.takesPlace(place, drag) ? place : null;
+	}
+
 	/** How far over the area the list still takes a finger: a column's title stands there. */
 	protected reachAbove(): number {
 		return 0;
@@ -144,6 +154,7 @@ export abstract class CardListDrop implements DropTarget {
 	}
 
 	preview(x: number, y: number, drag: DragPayload): void {
+		this.hover(true);
 		const title = this.titleAt(x, y, drag);
 		this.lightTitle(title);
 		if (title) {
@@ -151,6 +162,7 @@ export abstract class CardListDrop implements DropTarget {
 			this.light(null);
 			this.scroll.stop();
 			this.place = null;
+			this.shownGap = null;
 			this.last = null;
 			return;
 		}
@@ -173,19 +185,23 @@ export abstract class CardListDrop implements DropTarget {
 				);
 		this.place = place;
 		if (fresh && (!before || !sameGap(before, place) || before.level !== place.level)) this.onNewPlace();
-		const where = placeOfDrop(this.placed(frame), place, this.home());
-		const home = where === null;
-		if (where !== null && !this.takesPlace(where, drag)) {
+		const asked = placeOfDrop(this.placed(frame), place, this.home());
+		const where = asked === null ? null : this.snapPlace(asked, drag);
+		const home = asked === null;
+		if (asked !== null && where === null) {
 			this.light(null);
 			this.line.hide();
 			this.scroll.follow(y, frame.box);
 			return;
 		}
-		const plate = home ? null : this.list.plateOf(place.group);
+		/** The list may stand what is let go elsewhere than under the finger (the plus in a by project part): the line shows where. */
+		const shown: GapPlace = where !== null && where !== asked ? { ...gapOfPlace(this.placed(frame), where), level: place.level } : place;
+		this.shownGap = shown;
+		const plate = home ? null : this.list.plateOf(shown.group);
 		this.light(plate);
 		if (plate) this.line.hide();
 		else if (!home) {
-			const line = this.lineRect(place, frame);
+			const line = this.lineRect(shown, frame);
 			this.line.show(line.left, line.right, line.top, frame, fresh ? { x, y } : null);
 		} else this.line.hide();
 		this.scroll.follow(y, frame.box);
@@ -193,15 +209,17 @@ export abstract class CardListDrop implements DropTarget {
 
 	/** The plus shrinks into the plate it lights or into the line's dot. */
 	landing(): DOMRect | null {
-		if (!this.layout || !this.place) return null;
+		const place = this.shownGap ?? this.place;
+		if (!this.layout || !place) return null;
 		if (this.plate) return this.plate.getBoundingClientRect();
-		return this.lineRect(this.place, readFrame(this.list.el));
+		return this.lineRect(place, readFrame(this.list.el));
 	}
 
 	/** The finger has left the list: the line goes, a card lifted from it still waits dashed where it stood. */
 	leave(): void {
 		this.line.hide();
 		this.reset();
+		this.hover(false);
 	}
 
 	/** The drag is over. */
@@ -209,6 +227,13 @@ export abstract class CardListDrop implements DropTarget {
 		this.line.hide();
 		this.reset();
 		this.layout = null;
+		this.hover(false);
+	}
+
+	private hover(over: boolean): void {
+		if (over === this.over) return;
+		this.over = over;
+		this.onHover?.(over);
 	}
 
 	/** An empty section's plate lights while the card would land in it; any other goes dark. */
@@ -231,6 +256,7 @@ export abstract class CardListDrop implements DropTarget {
 		this.lightTitle(null);
 		this.scroll.stop();
 		this.place = null;
+		this.shownGap = null;
 		this.last = null;
 	}
 
@@ -240,8 +266,9 @@ export abstract class CardListDrop implements DropTarget {
 		if (!this.placesAnywhere(drag)) return this.resultOf(null);
 		if (!this.place) this.preview(x, y, drag);
 		if (!this.place) return null;
-		const place = placeOfDrop(this.placed(readFrame(this.list.el)), this.place, this.home());
-		return place && this.takesPlace(place, drag) ? this.resultOf(place) : null;
+		const asked = placeOfDrop(this.placed(readFrame(this.list.el)), this.place, this.home());
+		const place = asked && this.snapPlace(asked, drag);
+		return place ? this.resultOf(place) : null;
 	}
 
 	/** The place a card carried alone was lifted from, at its level; several cards carried have none. */
