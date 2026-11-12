@@ -60,7 +60,8 @@ export function viewChoice(state: ProjectsScreenState, ask: ViewAsk): ViewChoice
 	const options: ViewModeOption[] = modes.map((m) => ({ mode: m, label: label(m), icon: ICONS[m], checked: m === mode }));
 	const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
 	const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
-	return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates };
+	const ribbon = mode === "twoColumns" && !ask.note;
+	return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", ribbon, rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates };
 }
 
 /** The view before any read: the device's kept mode, a node chosen (`state.selected`) counting as a filter that is no done one. */
