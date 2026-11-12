@@ -83,6 +83,8 @@ export interface QuickEntryControllerDeps {
 	aside?(): PlusAside | null;
 	/** Redraws the lists and the timeline, which calls `rendered` once drawn. */
 	render(): void;
+	/** The field opened or closed: the projects button can't be pressed while it is open (`EntryState.locksPanel`). */
+	locksPanel?(locked: boolean): void;
 	/** A write that failed. */
 	onError(error: unknown): void;
 }
@@ -662,6 +664,7 @@ export class QuickEntryController {
 	private changed(state: EntryState | null, drawnNext = false): void {
 		const before = this.state;
 		this.state = state;
+		if ((before?.locksPanel ?? false) !== (state?.locksPanel ?? false)) this.deps.locksPanel?.(state?.locksPanel ?? false);
 		if (!state) {
 			for (const column of LISTS) this.deps.list(column)?.forgetTyped();
 			this.glide.stop();

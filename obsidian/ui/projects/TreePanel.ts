@@ -5,6 +5,7 @@ import { el, px } from "../dom";
 import { GroupNameField } from "../GroupNameField";
 import type { GestureArbiter } from "../gestures";
 import { listWidthMax } from "../listWidth";
+import { ScrollEdges } from "../ScrollEdges";
 import type { TreeShown } from "./ProjectDrops";
 import { ProjectTree } from "./ProjectTree";
 
@@ -32,6 +33,7 @@ export class TreePanel {
 	readonly el: HTMLElement;
 	private readonly dim: HTMLElement;
 	private readonly tree: ProjectTree;
+	private readonly edges: ScrollEdges;
 
 	constructor(
 		private readonly root: HTMLElement,
@@ -44,6 +46,8 @@ export class TreePanel {
 		el(this.el, "div", "tc-tree-panel-title", "Projects");
 		const column = el(this.el, "div", "tc-tree-column");
 		this.tree = new ProjectTree(column, { onTap: (node) => deps.onPick(node), onRow: deps.onRow });
+		/** Rows scrolled under the title fade out there, as a list's do. */
+		this.edges = new ScrollEdges(this.tree.el);
 		new Divider(el(this.el, "div"), {
 			width: () => column.offsetWidth,
 			onWidth: (width) => {
@@ -72,6 +76,7 @@ export class TreePanel {
 		else this.root.style.setProperty(PROPERTY.treeWidth, px(width));
 		this.el.classList.toggle("is-missing", panel.missing);
 		this.tree.render(panel.rows);
+		this.edges.update();
 	}
 
 	/** A new project's name typed at a gap of the tree, `depth` steps in; resolves with the name, or null for nothing typed. */

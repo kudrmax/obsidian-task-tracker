@@ -290,6 +290,7 @@ export class CalendarScreen extends Component {
 				}
 				this.quick?.onDragging(active);
 				this.contentEl.classList.toggle("is-dragging", active);
+				this.rows?.fit();
 				if (!active) this.carryReport.end();
 			},
 			moved: (x, y) => {
@@ -527,6 +528,9 @@ export class CalendarScreen extends Component {
 			},
 			fresh: (beforeShow) => this.data.tasks(beforeShow),
 			render: () => this.parts.request("tasks"),
+			locksPanel: (locked) => {
+				if (this.folder) this.folder.el.disabled = locked;
+			},
 			onError: (error) => this.reportFailure(error),
 		});
 		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
@@ -626,6 +630,7 @@ export class CalendarScreen extends Component {
 
 	close(): void {
 		for (const list of [this.list, this.inboxList, this.backlogList, this.soonList, this.doneList, ...this.rowLists.values()]) list?.destroy();
+		this.rows?.destroy();
 		this.full?.close();
 		this.quick?.close();
 		this.poll?.stop();
@@ -1618,7 +1623,7 @@ export class CalendarScreen extends Component {
 
 	/** The rows mode's column: a list and a place to drop for each stage, as a column's. */
 	private buildRows(root: HTMLElement): void {
-		const rows = new FunnelRows(root, ROW_LISTS, (column) => (column === "day" ? this.dayName() : this.deps.tasks.listName(column)));
+		const rows = new FunnelRows(root, ROW_LISTS, (column) => (column === "day" ? this.dayName() : this.deps.tasks.listName(column)), () => this.where.note === undefined);
 		this.rows = rows;
 		for (const column of ROW_LISTS) {
 			const row = rows.rowOf(column);
