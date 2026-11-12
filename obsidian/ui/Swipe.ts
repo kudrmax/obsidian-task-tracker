@@ -66,9 +66,13 @@ interface Stream {
  */
 const NOT_SWIPED = ".tc-quick-row, .tc-quick-bar, .tc-group-field, .tc-divider:not(.is-fixed), .tc-full";
 
-/** Whether a swipe of the screen may start at `target`: anywhere but where text is being typed, the columns resized, or a task is on the whole screen. */
-export function swipeStartsAt(target: EventTarget | null): boolean {
-	return !(target instanceof Element && target.closest(NOT_SWIPED));
+/**
+ * Whether a swipe of the screen may start at `target`: only on the ribbon the wheel walks (`ViewChoice.ribbon`: in all
+ * columns, rows, by project and a note's block nothing swipes), and there anywhere but where text is being typed, the
+ * columns resized, or a task is on the whole screen.
+ */
+export function swipeStartsAt(target: EventTarget | null, ribbon = true): boolean {
+	return ribbon && !(target instanceof Element && target.closest(NOT_SWIPED));
 }
 
 const SWIPE = "swipe";

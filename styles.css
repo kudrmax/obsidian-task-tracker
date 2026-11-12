@@ -1647,8 +1647,6 @@ body:not(.is-mobile) .task-calendar:is(.is-view-rows, .is-view-by-project) > .tc
 .task-calendar .tc-list.tc-row-list { flex: 0 1 auto; padding-top: var(--tc-card-gap); }
 button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); cursor: default; }
 .task-calendar .tc-list.tc-row-list::after { content: none; }
-/* While the plus is carried or a task is typed, every list keeps a card's room more to take it. */
-.task-calendar:is(.is-dragging, .is-entering) .tc-list.tc-row-list::after { content: ""; height: var(--tc-card-h); }
 
 /* All columns (D1, the desktop only): Inbox over Backlog, Soon, the day's list and the timeline side by side, each list as wide as the divider sets. */
 .task-calendar.is-view-all > :is(.tc-inbox, .tc-head.is-inbox) { left: 0; width: var(--tc-list-width); padding: var(--tc-column-pad-near); }

@@ -290,7 +290,6 @@ export class CalendarScreen extends Component {
 				}
 				this.quick?.onDragging(active);
 				this.contentEl.classList.toggle("is-dragging", active);
-				this.rows?.fit();
 				if (!active) this.carryReport.end();
 			},
 			moved: (x, y) => {
@@ -547,7 +546,7 @@ export class CalendarScreen extends Component {
 		this.pager = pager;
 		new Swipe(root, {
 			arbiter: this.arbiter,
-			accepts: swipeStartsAt,
+			accepts: (target) => swipeStartsAt(target, this.view().ribbon),
 			target: pager,
 		});
 		this.unsubscribe.push(
@@ -745,8 +744,6 @@ export class CalendarScreen extends Component {
 		this.landed();
 		const root = this.contentEl;
 		const from = { mode: this.place(), date: this.selectedDate };
-		/** The day's swipe is the two columns' own: in another mode, and in a note's block, the day turns by its arrows (decision 17). */
-		if (!this.view().ribbon) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		const to = this.deps.days.stepFunnel(from, shift);
 		if (!to) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		if (to.mode !== from.mode) {
