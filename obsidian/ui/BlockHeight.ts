@@ -1,3 +1,5 @@
+import { contentHeight } from "./contentHeight";
+
 /**
  * A note's block as tall as its rows need (board D5): the whole list of the view shown, its bottom row under it, so the
  * note scrolls and not the block; past the CSS's tallest the list scrolls inside. It fits again once a frame after its
@@ -54,27 +56,8 @@ export class BlockHeight {
 		const over = scroller.getBoundingClientRect().top - this.root.getBoundingClientRect().top;
 		const frame = this.block.offsetHeight - this.root.offsetHeight;
 		this.watchRows(scroller);
-		const height = `${Math.ceil(over + this.contentHeight(scroller) + frame)}px`;
+		const height = `${Math.ceil(over + contentHeight(scroller) + frame)}px`;
 		if (this.block.style.height !== height) this.block.style.height = height;
-	}
-
-	/** What the scroller's rows take, from its top to its last row's foot and its padding: not its box, which fills the block and never shrinks. */
-	private contentHeight(scroller: HTMLElement): number {
-		const rows = this.rowsOf(scroller);
-		const last = rows[rows.length - 1];
-		if (!last) return scroller.scrollHeight;
-		const style = getComputedStyle(scroller);
-		const foot = last.getBoundingClientRect().bottom + (parseFloat(getComputedStyle(last).marginBottom) || 0);
-		return foot - scroller.getBoundingClientRect().top + scroller.scrollTop + (parseFloat(style.paddingBottom) || 0);
-	}
-
-	/** The rows in the scroller's flow: drawn, and not laid over it. */
-	private rowsOf(scroller: HTMLElement): HTMLElement[] {
-		return [...scroller.children].filter((row): row is HTMLElement => {
-			if (!(row instanceof HTMLElement) || row.getClientRects().length === 0) return false;
-			const position = getComputedStyle(row).position;
-			return position !== "absolute" && position !== "fixed";
-		});
 	}
 
 	private watchRows(scroller: HTMLElement): void {

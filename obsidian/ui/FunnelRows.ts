@@ -1,4 +1,5 @@
 import { type DropColumn, stackedRows } from "../../core/application/contracts";
+import { contentHeight } from "./contentHeight";
 import { el, px } from "./dom";
 import { motionLeft, readResting, timingOf } from "./motion/Motion";
 
@@ -84,7 +85,7 @@ export class FunnelRows {
 		const style = getComputedStyle(this.stack);
 		const gap = rows.length > 1 ? parseFloat(getComputedStyle(rows[1].el).marginTop) || 0 : 0;
 		const room = this.stack.clientHeight - (parseFloat(style.paddingBottom) || 0) - gap * (rows.length - 1);
-		const wanted = readResting(this.stack, () => rows.map((row) => row.label.offsetHeight + (row.body.firstElementChild?.scrollHeight ?? 0)));
+		const wanted = readResting(this.stack, () => rows.map((row) => row.label.offsetHeight + listHeight(row.body.firstElementChild)));
 		const card = parseFloat(style.getPropertyValue("--tc-card-h")) || 0;
 		const least = (rows[0]?.label.offsetHeight ?? 0) + card;
 		const heights = stackedRows(wanted, room, least);
@@ -105,4 +106,9 @@ export class FunnelRows {
 	destroy(): void {
 		this.sized.disconnect();
 	}
+}
+
+/** What a row's list takes for its cards: none when it has no list yet. */
+function listHeight(list: Element | null): number {
+	return list instanceof HTMLElement ? contentHeight(list) : 0;
 }

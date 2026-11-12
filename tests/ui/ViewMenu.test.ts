@@ -41,3 +41,19 @@ describe("ViewMenu", () => {
 		expect(document.querySelector(".tc-panel")?.classList.contains("is-closing")).toBe(true);
 	});
 });
+
+describe("where the View menu stands", () => {
+	it("measures the button when it is placed, not a place kept from before: a layout settling as it opens moves the menu with the button", async () => {
+		document.body.innerHTML = "";
+		const anchor = document.body.appendChild(document.createElement("button"));
+		anchor.className = "tc-view-btn";
+		let rect = new DOMRect(800, 900, 44, 44);
+		anchor.getBoundingClientRect = () => rect;
+		ViewMenu.open({ anchor, modes: MODES, subprojects: null, onPick: () => undefined, onSubprojects: () => undefined });
+		const copy = document.querySelector<HTMLElement>(".tc-control-copy")!;
+		expect(copy.style.top).toBe("900px");
+		rect = new DOMRect(800, 700, 44, 44);
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(copy.style.top).toBe("700px");
+	});
+});
