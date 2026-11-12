@@ -180,6 +180,9 @@ final class BoardModel {
         didSet { UserDefaults.standard.set(listShare, forKey: "listShare") }
     }
 
+    /// Where the projects' panel ends on the screen while it shows (window x).
+    @ObservationIgnored var panelRight: CGFloat = 0
+
     /// The tab bar shows: it hides while a task is typed, in Select Tasks and under a pushed page, as in every app.
     var barRests: Bool { !selecting && fullScreen.isEmpty && !entry.isOpen }
 
@@ -246,7 +249,8 @@ final class BoardModel {
     }
 
     private func closeCarry() {
-        guard let how = session.close(), how != .closed else { return }
+        // The drop's write reaches the core before the session's end: the end puts the lift's filter back otherwise.
+        guard let how = session.close(after: lastDrop), how != .closed else { return }
         endSelectionIf(how.rawValue)
     }
 
@@ -1411,13 +1415,14 @@ final class BoardModel {
     /// `cards` and `heads` where they stand in the list without the carried ones, the finger at `point`. A card is placed
     /// by its middle (`rules.carriedMiddle`, the finger's hold on it known from the lift), the plus by the finger; the level
     /// by the finger's `x` (`rules.levelAt`); the place shown holds until the finger is well past it.
-    func placeUnder(_ column: BoardColumn, cards: [PlacedCard], heads: [PlacedHead], at point: CGPoint, grab: CGFloat?, width: CGFloat, held: JSONValue?) -> JSONValue? {
+    func placeUnder(_ column: BoardColumn, cards: [PlacedCard], heads: [PlacedHead], at point: CGPoint, grab: CGFloat?, width: CGFloat, covered: CGFloat = 0, held: JSONValue?) -> JSONValue? {
         let inset = Double(CardMetrics.columnInset)
         // A folded result's card of two lines is held by its own middle.
         let carried = carry.flatMap { $0.from == "timeline" ? nil : $0.item }.map { CardFace($0.card).twoLines ? CardMetrics.twoLineHeight : CardMetrics.height } ?? CardMetrics.height
         let y = grab.flatMap { try? board.carriedMiddle(y: Double(point.y), grab: Double($0), cardHeight: Double(carried)) } ?? Double(point.y)
         do {
-            let level = try board.levelAt(x: Double(point.x), left: inset, width: Double(width) - 2 * inset, indent: Double(CardMetrics.indent))
+            let shown = Double(min(covered, width / 2))
+            let level = try board.levelAt(x: Double(point.x), left: inset + shown, width: Double(width) - 2 * inset - shown, indent: Double(CardMetrics.indent))
             let hold = held ?? carry.flatMap { homeGap($0.id, in: column) } ?? .null
             return try board.placeAt(cards, y: y, level: level, shift: 0, room: .null, heads: heads, held: hold, hysteresis: CardMetrics.dropHysteresis)
         } catch {
@@ -1597,7 +1602,7 @@ final class BoardModel {
     @ObservationIgnored private var lastDrop: Task<Void, Never>?
 
     /// A drop's write after its screen was drawn: in drop order; a read begun before it never draws, the one after it does.
-    private func writeDrop(_ method: String, _ arguments: [JSONValue]) {
+    func writeDrop(_ method: String, _ arguments: [JSONValue]) {
         let before = lastDrop
         let board = board
         lastDrop = Task {

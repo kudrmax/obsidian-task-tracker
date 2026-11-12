@@ -42,6 +42,7 @@ struct ProjectsPanelView: View {
                     .overlay(alignment: .trailing) {
                         Rectangle().fill(Color(.separator)).frame(width: 1 / scale).ignoresSafeArea()
                     }
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { model.panelRight = $0 }
                     .transition(.move(edge: .leading))
                     .zIndex(1)
                 }

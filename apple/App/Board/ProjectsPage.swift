@@ -712,7 +712,7 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         guard let model, let aim = cardAim, let drop = model.projects.cards[card.id]?.drop else { return nil }
         // No filter is By project's every task: the core's node for it is All (the plugin passes it so too).
         let node = model.filter?.node ?? "all"
-        Task { await model.write("tasks.dropInProjects", [.array([drop]), aim.place, .string(node)]) }
+        model.writeDrop("tasks.dropInProjects", [.array([drop]), aim.place, .string(node)])
         return CarryLanding(rect: CGRect(x: aim.line.x, y: aim.line.y - 4, width: 8, height: 8), folds: true)
     }
 

@@ -108,7 +108,9 @@ public final class CarrySession {
 
     /// The carry over, its copy down: the core told how it ended, unless a drop on a row ended it already. Returns how.
     @discardableResult
-    public func close() -> End? {
+    /// `after`: a write the carry's drop made (`tasks.drop`), which the core must have before the end is told, so a
+    /// carry that opened a project lands with that project.
+    public func close(after drop: Task<Void, Never>? = nil) -> End? {
         guard isOpen else { return nil }
         isOpen = false
         stopWaiting()
@@ -116,7 +118,7 @@ public final class CarrySession {
         let how = end ?? .dropped
         end = nil
         guard how != .closed else { return how }
-        enqueue(redraw: how != .dropped) { try $0.endCarry(how.rawValue) }
+        enqueue(redraw: how != .dropped, after: drop) { try $0.endCarry(how.rawValue) }
         return how
     }
 
@@ -160,11 +162,12 @@ public final class CarrySession {
         callOff = nil
     }
 
-    private func enqueue(redraw: Bool, _ call: @escaping @Sendable (any CarryCalls) throws -> Void) {
+    private func enqueue(redraw: Bool, after drop: Task<Void, Never>? = nil, _ call: @escaping @Sendable (any CarryCalls) throws -> Void) {
         let calls = calls
         let before = chain
         chain = Task { [weak self] in
             await before?.value
+            await drop?.value
             do {
                 try await Task.detached { try call(calls) }.value
             } catch {
