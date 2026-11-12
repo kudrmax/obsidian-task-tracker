@@ -1806,7 +1806,8 @@
     return listed(doc).filter((e) => shown2(e) && !slottedOnDate(e, date, boundary));
   }
   function slottedOn(doc, date, boundary = DayBoundary.MIDNIGHT) {
-    return listed(doc).filter((e) => slottedOnDate(e, date, boundary));
+    const start = (e) => boundary.spanOf(e.task.slot, date).start;
+    return listed(doc).filter((e) => slottedOnDate(e, date, boundary)).sort((a, b) => start(a) - start(b));
   }
   function openSlotted(doc) {
     return listed(doc).filter((e) => e.task.slot !== null && isOpen(e.task.status));

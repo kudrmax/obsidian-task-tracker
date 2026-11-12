@@ -403,7 +403,7 @@ export interface DayView {
 	readonly date: LocalDate;
 	/** Left column, in file order: see spec §5. */
 	readonly list: readonly TaskItem[];
-	/** Tasks slotted on this date, in file order: the timeline. */
+	/** Tasks slotted on this date, by their time, ties in file order: the timeline. */
 	readonly slotted: readonly TaskItem[];
 }
 

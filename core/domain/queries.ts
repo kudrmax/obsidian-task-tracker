@@ -19,8 +19,12 @@ export function dayList(doc: TaskDocument, date: LocalDate, today: LocalDate, bo
 	return listed(doc).filter((e) => shown(e) && !slottedOnDate(e, date, boundary));
 }
 
+/** The timeline's tasks of `date`, by the time each is put on, ties in file order. */
 export function slottedOn(doc: TaskDocument, date: LocalDate, boundary = DayBoundary.MIDNIGHT): readonly TaskEntry[] {
-	return listed(doc).filter((e) => slottedOnDate(e, date, boundary));
+	const start = (e: TaskEntry): number => boundary.spanOf(e.task.slot!, date).start;
+	return listed(doc)
+		.filter((e) => slottedOnDate(e, date, boundary))
+		.sort((a, b) => start(a) - start(b));
 }
 
 /** Unfinished tasks of Now and Soon that are put on a time, on any day. */
