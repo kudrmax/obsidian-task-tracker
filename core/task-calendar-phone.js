@@ -4878,8 +4878,8 @@ ${key.title}`.toLowerCase();
       this.open(this.spotIn(column, place));
     }
     spotIn(column, asked) {
-      const end = asked.kind === "task" && asked.before === null ? this.parts(column).find((part2) => part2.group === asked.group)?.end : null;
-      const place = end ? { ...asked, before: end } : asked;
+      const part2 = asked.kind === "task" ? this.parts(column).find((p) => p.group === asked.group && p.newTask !== null) : void 0;
+      const place = part2 && asked.kind === "task" ? { ...asked, before: part2.end } : asked;
       const gap = gapOfPlace(this.look.cards(column), place);
       return { kind: "list", column, place: place.kind === "task" ? { ...gap, level: 0 } : gap };
     }
@@ -5695,6 +5695,12 @@ ${key.title}`.toLowerCase();
   function projectsPlusTakes(view, place) {
     if (place.kind === "subtask") return view.reorders && nestsUnder(view, place.parent);
     return view.sections.find((s) => s.group === place.group)?.newTask != null;
+  }
+  function projectsPlusPlace(view, place) {
+    if (!projectsPlusTakes(view, place)) return null;
+    if (place.kind === "subtask") return place;
+    const section = view.sections.find((s) => s.group === place.group);
+    return { kind: "task", group: place.group, before: endOf(section) };
   }
   function takes(view, carried, place) {
     if (!(view.sections.find((s) => s.group === place.group)?.takes ?? true)) return false;
@@ -8574,6 +8580,7 @@ ${key.title}`.toLowerCase();
     projectNotes: (notes, tag) => projectNotesOfTexts(notes, tag),
     projectsTakes: (view, cards, place) => projectsTakes(view, cards, place),
     projectsPlusTakes: (view, place) => projectsPlusTakes(view, place),
+    projectsPlusPlace: (view, place) => projectsPlusPlace(view, place),
     projectsGap: (rows, gap, depth, lifted2) => projectsGap(rows, gap, depth, lifted2 ?? null),
     projectsLevels: (rows, gap, lifted2) => projectsLevels(rows, gap, lifted2 ?? null),
     projectsDrop: (rows, gap, shift, lifted2) => projectsDrop(rows, gap, shift, lifted2 ?? null),

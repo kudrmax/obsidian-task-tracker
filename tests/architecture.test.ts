@@ -296,6 +296,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	stackedRows: "./stackedRows",
 	stackedLists: "./stackedRows",
 	sameNewPlace: "./newTaskPlaces",
+	projectsPlusPlace: "./projectsDrop",
 	viewLayout: "./viewLayout",
 	layoutWidths: "./viewLayout",
 	layoutShareAt: "./viewLayout",

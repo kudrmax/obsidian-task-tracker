@@ -687,6 +687,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.projectsGap", [{ node: "all", kind: "all", depth: 0 }, { node: "project:A", kind: "project", depth: 0, title: "A" }, { node: "none", kind: "none", depth: 0 }], 2, 1),
 		plain("rules.projectsTakes", { reorders: false, mode: "byProject", selected: "all", sections: [] }, [], { kind: "task", group: null, before: null }),
 		plain("rules.projectsPlusTakes", { reorders: false, mode: "byProject", selected: "all", sections: [] }, { kind: "task", group: null, before: null }),
+		plain("rules.projectsPlusPlace", { reorders: false, mode: "byProject", selected: "all", sections: [] }, { kind: "task", group: null, before: null }),
 		plain("rules.projectsDrop", [{ node: "all", kind: "all", depth: 0 }, { node: "project:A", kind: "project", depth: 0, title: "A" }, { node: "none", kind: "none", depth: 0 }], 2, 12),
 		...[
 			["openAtEnd", "soon"],
