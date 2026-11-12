@@ -536,7 +536,16 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     /// to make its room (`FoldingListLayout`).
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt path: IndexPath) {
         shows(cell, at: path)
-        guard let layout = collectionView.collectionViewLayout as? FoldingListLayout, let rise = layout.takeUnfolding(path.item) else { return }
+        guard let layout = collectionView.collectionViewLayout as? FoldingListLayout else { return }
+        if layout.takeWaiting(path.item) {
+            // Hidden while the rows it takes the place of fade, then fading in itself.
+            let wait = CAKeyframeAnimation(keyPath: "opacity")
+            wait.values = [0, 0, 1]
+            wait.keyTimes = [0, 0.5, 1]
+            wait.duration = 0.5
+            cell.contentView.layer.add(wait, forKey: "wait")
+        }
+        guard let rise = layout.takeUnfolding(path.item) else { return }
         // The cell's own frame and transform are the layout's, set again as it is laid out: its content is carried
         // instead, by an animation of its own that no layout pass resets, on the drop's one spring, so a row coming in
         // with a drop comes to rest with the copy.
@@ -899,7 +908,9 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
 /// (a subtask from its parent, a task from the one above) while the rows after it move down to make its room, and a row
 /// that goes slides back under the row before it while the rows after it close over it. Nothing fades in place under rows
 /// sliding past it, and no two rows cross: the ones coming and going stay beneath the rest, each under the one before.
-/// A row under no card (the first, or one after a header) fades instead, where it stands.
+/// A row under no card (the first, or one after a header) fades instead, where it stands; one coming where such rows go
+/// (the No tasks plate taking the last cards' place, or the reverse) waits until they have faded, so the two never show
+/// over each other and the list never stands taller than before or after.
 final class FoldingListLayout: UICollectionViewCompositionalLayout {
     /// The rows, before and after the change, that cover a row folding under them (`ListController.covering`).
     var covers: (before: Set<Int>, after: Set<Int>) = ([], [])
@@ -924,11 +935,28 @@ final class FoldingListLayout: UICollectionViewCompositionalLayout {
         super.prepare(forCollectionViewUpdates: updateItems)
         inserted = Set(updateItems.compactMap { $0.updateAction == .insert ? $0.indexPathAfterUpdate?.item : nil })
         deleted = Set(updateItems.compactMap { $0.updateAction == .delete ? $0.indexPathBeforeUpdate?.item : nil })
+        let goingInPlace = deleted.contains { Self.anchor(of: $0, among: deleted, covered: covers.before) == nil }
+        waiting = goingInPlace ? Set(inserted.filter { Self.anchor(of: $0, among: inserted, covered: covers.after) == nil }) : []
+    }
+
+    /// The row a coming or going row folds under: the nearest before it that stays and covers; nil where it fades in place.
+    private static func anchor(of item: Int, among changing: Set<Int>, covered: Set<Int>) -> Int? {
+        var anchor = item - 1
+        while anchor >= 0, changing.contains(anchor) { anchor -= 1 }
+        return anchor >= 0 && covered.contains(anchor) ? anchor : nil
+    }
+
+    /// The rows coming in place that wait for the rows going in place to fade (`ListController.willDisplay`).
+    private var waiting: Set<Int> = []
+
+    func takeWaiting(_ item: Int) -> Bool {
+        waiting.remove(item) != nil
     }
 
     override func finalizeCollectionViewUpdates() {
         super.finalizeCollectionViewUpdates()
         unfolding = [:]
+        waiting = []
         inserted = []
         deleted = []
     }
