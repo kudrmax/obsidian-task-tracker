@@ -107,7 +107,7 @@ export class RowsLayout extends StillLayout {
 	}
 
 	private apply(): void {
-		if (this.destroyed || this.holds.has("carry") || this.stack.clientHeight === 0) return;
+		if (this.destroyed || !this.scrolls || this.holds.has("carry") || this.stack.clientHeight === 0) return;
 		const measured = this.rows.map((row) => this.measure(row));
 		const style = getComputedStyle(this.stack);
 		const gap = this.rows.length > 1 ? parseFloat(getComputedStyle(this.rows[1].el).marginTop) || 0 : 0;
