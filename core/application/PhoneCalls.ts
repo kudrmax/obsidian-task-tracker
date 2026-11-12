@@ -536,9 +536,9 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list as A, group as string)),
 	createSection: (c, [name, place]) => c.run(c.writes.createSection(name as string, place as A)),
 	applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps as A)),
-	drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks as A, to as A, day as string, filter as A))),
-	landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks as A, to as A, day as string, filter as A)),
-	dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks as A, to as A, day as string, filter as A)),
+	drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks as A, to as A, day as string, filter as A, c.projectsScreen.carry))),
+	landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks as A, to as A, day as string, filter as A, c.projectsScreen.carry)),
+	dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks as A, to as A, day as string, filter as A, c.projectsScreen.carry)),
 	normalize: (c) => c.normalize(),
 	createFile: (c) => {
 		if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");

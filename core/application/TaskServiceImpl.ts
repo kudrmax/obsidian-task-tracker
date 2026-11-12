@@ -618,15 +618,15 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<readonly TaskKey[]> {
-		return this.run(await this.ask(this.writes.drop(tasks, to, day, filter)));
+		return this.run(await this.ask(this.writes.drop(tasks, to, day, filter, this.projectsScreenStore.get().carry)));
 	}
 
 	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<readonly DropLanding[]> {
-		return this.ask(this.writes.landing(tasks, to, day, filter));
+		return this.ask(this.writes.landing(tasks, to, day, filter, this.projectsScreenStore.get().carry));
 	}
 
 	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<DropPreview> {
-		return this.ask(this.writes.dropPreview(tasks, to, day, filter));
+		return this.ask(this.writes.dropPreview(tasks, to, day, filter, this.projectsScreenStore.get().carry));
 	}
 
 	async normalize(): Promise<void> {
