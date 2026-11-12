@@ -51,6 +51,8 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
 export const PROPERTY = {
 	listWidth: "--tc-list-width",
+	/** Where the screen's foot fade starts: past the rows' column, which ends on its own (rows). */
+	fadeLeft: "--tc-fade-left",
 	/** The Projects screen's tree, as wide as its divider was let go at on this device. */
 	treeWidth: "--tc-tree-width",
 	/** Room a scrolled list keeps under its last row while its rows fold away, so it stays where it was scrolled. */
@@ -152,6 +154,8 @@ export const LAYOUT = {
 	autoScrollEdge: 40,
 	/** Pixels per frame of that scroll at the very edge. */
 	autoScrollSpeed: 12,
+	/** How long a carried card is held at a list's edge before the list scrolls: one carried across the edge leaves it as it was. */
+	autoScrollDwell: 250,
 	/**
 	 * How far past the edge of the place a list shows the finger goes before another place is taken: at an edge the place
 	 * would otherwise flip between its two sides with every tremor of the finger.

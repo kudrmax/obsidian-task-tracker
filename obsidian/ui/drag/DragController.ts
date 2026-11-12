@@ -55,6 +55,8 @@ export interface DragControllerDeps {
 	putBack?(drag: TaskDragPayload): Promise<void> | null;
 	/** Writes the drop and draws it: gives the dropped task's card as drawn now, null when none shows. */
 	onResult(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | HeldOut | null>;
+	/** A drag failed under the finger or at its drop: said; the drag has ended as a cancelled one. */
+	onError?(error: unknown): void;
 	/** The card of `item` while its `edge` dot is held at `minute` of the shown day. */
 	stretch(item: TaskItem, edge: ResizeEdge, minute: number): StretchSpan;
 	/** The `edge` dot let go at `minute`, a card being `minDurationMin` tall: true once the new time is written, false when nothing changes. */
@@ -89,6 +91,16 @@ const NEW_SLOT = "newslot";
  * scrolling (see the arbiter).
  */
 export class DragController {
+	/** The drag under way, until its finger lets go: the screen going away ends it at once. */
+	private live: DragSession | null = null;
+
+	/** The screen goes away (the view closed, the plugin unloaded): a drag under way ends, its copy gone from the page. */
+	destroy(): void {
+		const live = this.live;
+		this.live = null;
+		live?.abort();
+	}
+
 	constructor(private readonly deps: DragControllerDeps) {}
 
 	/** `subtree`: the cards of the task's subtasks, which gather under it while it is dragged. */
@@ -324,6 +336,7 @@ export class DragController {
 					origin: () => (source.isConnected && source.getClientRects().length > 0 ? source.getBoundingClientRect() : origin),
 					beforeReturn: () => this.deps.putBack?.(payload) ?? null,
 					carries: payload.item.id,
+					onError: (error) => this.deps.onError?.(error),
 					letGo: () => {
 						detach();
 						this.deps.arbiter.release(DRAG);
@@ -363,6 +376,7 @@ export class DragController {
 					targets,
 					float,
 					landsOnTarget: true,
+					onError: (error) => this.deps.onError?.(error),
 					origin: () => origin,
 					letGo: () => {
 						detach();
@@ -390,6 +404,7 @@ export class DragController {
 	private follow(source: HTMLElement, e: PointerEvent, makeSession: (detach: () => void) => DragSession): void {
 		const doc = source.ownerDocument;
 		const session = makeSession(() => detach());
+		this.live = session;
 		session.move(e.clientX, e.clientY);
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId !== e.pointerId) return;
@@ -400,6 +415,7 @@ export class DragController {
 		const end = (settling: () => Promise<void>) => {
 			if (ended) return;
 			ended = true;
+			if (this.live === session) this.live = null;
 			doc.removeEventListener("keydown", escape, true);
 			void settling();
 		};

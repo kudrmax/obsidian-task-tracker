@@ -96,7 +96,11 @@ export abstract class StillLayout implements ModeLayout {
 			if (col.column.width === "rest") col.el.style.removeProperty("width");
 			else col.el.style.width = px(widths.widths[i] ?? 0);
 		});
+		this.widthsApplied(widths.widths);
 	}
+
+	/** The columns took `widths`, left to right. */
+	protected widthsApplied(_widths: readonly number[]): void {}
 
 	showPlace(): void {}
 
