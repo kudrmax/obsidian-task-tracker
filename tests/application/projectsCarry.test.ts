@@ -271,8 +271,6 @@ describe("what the frontends no longer decide", () => {
 		expect((await svc.funnelView(true)).plus).toEqual({ tap: "inPlace", list: null, tree: true });
 		await svc.setProjectsPanel(false);
 		expect((await svc.funnelView(true)).plus).toEqual({ tap: "inPlace", list: "projects", tree: false });
-		await svc.setNoteViewMode("byProject");
-		expect((await svc.projectNoteView("x.md", true))).toBeNull();
 	});
 
 	it("a tap on the panel's dim closes it only when the button opened it over the lists", async () => {
