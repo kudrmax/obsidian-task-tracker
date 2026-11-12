@@ -117,6 +117,11 @@ export interface ProjectsInput {
 	readonly node?: ProjectsNodeId;
 }
 
+/** A chosen project shows its subprojects' tasks too (`ProjectsScreenState.subprojects`): on unless turned off. */
+export function subprojectsOn(state: ProjectsScreenState): boolean {
+	return state.subprojects !== false;
+}
+
 /** The node chosen: the device's, while it still names a node of the tree; All otherwise. */
 export function selectedNode(state: ProjectsScreenState, tree: ProjectTree): ProjectsNodeId {
 	return chosenNode(state, tree) ?? "all";
@@ -382,11 +387,12 @@ function sectionsOf(input: ProjectsInput, doc: TaskDocument, selected: ProjectsN
 	return shown(live.map((p) => projectPart(`project:${p.node.name}`, p, p.path, p.path.length, byStage(tasksNaming(doc, p.node.name, false)).map((e) => cardOf(input, e, p.node.name)), inInbox(p.node.name))), true);
 }
 
-/** A project's own tasks first, untitled, then each subproject's at any depth, in the tree's order. */
+/** A project's own tasks first, untitled, then each subproject's at any depth, in the tree's order; with Subprojects off its own alone (a folder's branch stays). */
 function projectSections(input: ProjectsInput, doc: TaskDocument, placed: PlacedProject, statusOf: (name: string) => ProjectStatus): ProjectsSection[] {
 	const closed = statusOf(placed.node.name) === "done";
 	const top = placed.path.length;
-	const branch = input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf(p.node.name) !== "done"));
+	const whole = subprojectsOn(input.state) || placed.node.folder;
+	const branch = whole ? input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf(p.node.name) !== "done")) : [];
 	const write = (project: string) => (closed ? null : inInbox(project));
 	const own = projectPart(OWN, { ...placed, title: null }, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf(input, e, placed.node.name)), write(placed.node.name));
 	const subs = branch.map((p) => projectPart(`project:${p.node.name}`, p, p.path.slice(top), p.path.length - top, byStage(tasksNaming(doc, p.node.name, closed)).map((e) => cardOf(input, e, p.node.name)), write(p.node.name)));

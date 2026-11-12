@@ -21,7 +21,7 @@ import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
 import { type EntryList, FUNNEL_PLACES, type FunnelAt, type FunnelPlace, type FunnelSpot, funnelPlaceOf, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
-import { ROW_LISTS, VIEW_WORDS, viewEntryLists, withMode } from "./viewModes";
+import { ROW_LISTS, VIEW_WORDS, toggledSubprojects, viewEntryLists, withMode } from "./viewModes";
 import { stackedRows } from "./stackedRows";
 import { carriedAt, carryEnded, carryStarted, endsSelection, gestureGone, nameEnded } from "./projectsCarry";
 import { type EntryPart, projectsEntryLook } from "./projectsEntry";
@@ -463,6 +463,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	},
 	setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode as ViewMode, chosenNode(c.projectsScreen, c.tree()) !== null)),
 	setNoteViewMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, noteView: mode as ViewMode }),
+	toggleSubprojects: (c) => c.keepProjectsScreen(toggledSubprojects(c.projectsScreen)),
 	dropTasksOnProject: (c, [keys, to, filter]) => {
 		const target = to === "none" ? null : projectOfNode(to as string);
 		if (target === null && to !== "none") return null;

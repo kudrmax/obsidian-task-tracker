@@ -1,7 +1,7 @@
-import type { DropColumn, ProjectsNodeId, ProjectsScreenState, ViewChoice, ViewMode, ViewModeOption } from "./contracts";
+import type { DropColumn, ProjectsNodeId, ProjectsScreenState, SubprojectsOption, ViewChoice, ViewMode, ViewModeOption } from "./contracts";
 import type { EntryList, FunnelSpot } from "./screenPlaces";
 import { SHOWN_LISTS } from "./screenPlaces";
-import { PROJECTS_WORDS } from "./projectsScreen";
+import { PROJECTS_WORDS, subprojectsOn } from "./projectsScreen";
 
 /** The words and icons of the view modes, the same in every frontend; the icon a Lucide name the Swift app maps to its symbol. */
 export const VIEW_WORDS = {
@@ -11,6 +11,9 @@ export const VIEW_WORDS = {
 	rows: "Rows",
 	byProject: "By project",
 } as const;
+
+/** The words of the view menu's Subprojects row. */
+export const SUBPROJECTS_WORD = "Subprojects";
 
 const ICONS: Readonly<Record<ViewMode, string>> = { twoColumns: "columns-2", allColumns: "columns-4", rows: "rows-3", byProject: "folder-tree" };
 
@@ -25,6 +28,8 @@ export interface ViewAsk {
 	/** The host's screen is wide (the desktop): all columns are offered. */
 	readonly wide: boolean;
 	readonly note: boolean;
+	/** The node is a project with subprojects (`hasSubprojects`): the menu has the Subprojects row. */
+	readonly branches: boolean;
 }
 
 /**
@@ -61,12 +66,21 @@ export function viewChoice(state: ProjectsScreenState, ask: ViewAsk): ViewChoice
 	const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
 	const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
 	const ribbon = mode === "twoColumns" && !ask.note;
-	return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", ribbon, source: mode === "byProject" ? "projectsScreen" : "screen", rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates };
+	const subprojects: SubprojectsOption | null = ask.branches ? { label: SUBPROJECTS_WORD, checked: subprojectsOn(state) } : null;
+	return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", ribbon, source: mode === "byProject" ? "projectsScreen" : "screen", rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates, subprojects };
 }
 
-/** The view before any read: the device's kept mode, a node chosen (`state.selected`) counting as a filter that is no done one. */
-export function firstViewOf(state: ProjectsScreenState, wide: boolean, note: boolean): ViewChoice {
-	return viewChoice(state, { node: note ? "note" : (state.selected ?? null), closed: false, wide, note });
+/**
+ * The view before any read: the device's kept mode, a node chosen (`state.selected`) counting as a filter that is no done
+ * one; `branches` whether it is a project with subprojects, as the tree read last says (a note's block: unknown, none).
+ */
+export function firstViewOf(state: ProjectsScreenState, wide: boolean, note: boolean, branches: boolean): ViewChoice {
+	return viewChoice(state, { node: note ? "note" : (state.selected ?? null), closed: false, wide, note, branches: !note && branches });
+}
+
+/** The state with the Subprojects row's check turned over. */
+export function toggledSubprojects(state: ProjectsScreenState): ProjectsScreenState {
+	return { ...state, subprojects: !subprojectsOn(state) };
 }
 
 /** The state with `mode` kept for the view it was picked in. */
