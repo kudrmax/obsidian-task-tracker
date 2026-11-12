@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type CarryEnd, type CarryStart, type DayBoundary, type DayChange, type DayService, type DropColumn, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusTakes, projectsTakes, type MenuScreen, ROW_LISTS, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewChoice, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
+import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type CarryEnd, type CarryStart, type DayBoundary, type DayChange, type DayService, type DropColumn, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusTakes, projectsTakes, type MenuScreen, endsSelection, ROW_LISTS, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewChoice, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
 import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -293,7 +293,7 @@ export class CalendarScreen extends Component {
 				if (!active) this.carryReport.end();
 			},
 			moved: (x, y) => {
-				if (this.carrying) this.carryReport.move(x, y);
+				if (this.carrying && this.panel) this.carryReport.move(x, y);
 			},
 			onResult: (drag, result) => this.applyDrop(drag, result),
 			onLift: (drag, source) => {
@@ -1128,7 +1128,6 @@ export class CalendarScreen extends Component {
 	 * carries and the filter it was lifted under (`TaskService.startCarry`).
 	 */
 	private startCarry(start: CarryStart): void {
-		if (!this.panel) return;
 		this.carrying = true;
 		this.carryReport.end();
 		void this.deps.tasks.startCarry(start, this.wide()).catch((error: unknown) => this.reportFailure(error));
@@ -1141,16 +1140,22 @@ export class CalendarScreen extends Component {
 		this.carryReport.end();
 		return this.deps.tasks
 			.endCarry(how)
+			.then(() => this.endSelectionAfter(how))
 			.then(() => this.data.tasks())
 			.catch((error: unknown) => this.reportFailure(error));
 	}
 
+	/** A carry that landed ends Select Tasks as the core says (`endsSelection`), however many it carried. */
+	private endSelectionAfter(how: CarryEnd): void {
+		if (endsSelection(how)) this.bulk.stop();
+	}
+
 	/** Cards let go on a row of the tree: every carried task gets the row's project (`TaskService.carryOnNode`). */
 	private async dropOnTree(drag: TaskDragPayload, node: ProjectsNodeId): Promise<null> {
-		this.bulk.dropping(drag);
 		this.carrying = false;
 		this.carryReport.end();
 		await this.act(() => this.deps.tasks.carryOnNode(node));
+		this.endSelectionAfter("dropped");
 		return null;
 	}
 
@@ -1162,7 +1167,6 @@ export class CalendarScreen extends Component {
 		const list = this.byProject;
 		const node = this.filterNode() ?? undefined;
 		const cards = this.projectsDrops(drag);
-		this.bulk.dropping(drag);
 		if (!list || cards.length === 0) return null;
 		let landing: ProjectsDropLanding | null = null;
 		await this.act(async () => {
@@ -1180,6 +1184,7 @@ export class CalendarScreen extends Component {
 	 * carry is the core's, as a card's. A tap is the entry's own (`QuickEntrySession.plusOpens`).
 	 */
 	private projectsPlus(): PlusAside | null {
+		const plus = this.data.funnel?.plus;
 		const tree = this.panel ? [this.treeDrop] : [];
 		const aside = {
 			started: () => this.startCarry({ keys: [], plus: true }),
@@ -1188,8 +1193,11 @@ export class CalendarScreen extends Component {
 				void this.endCarry(result ? "dropped" : "nowhere");
 			},
 		};
-		if (this.viewMode() === "byProject" && this.projectsListDrop) return { targets: [...tree, this.projectsListDrop], alone: true, ...aside };
-		return tree.length > 0 ? { targets: tree, alone: false, ...aside } : null;
+		if (!plus) return null;
+		/** Held, the plus goes into the funnel's lists, the node's by project list alone, or no list (`PlusChoice.list`). */
+		const into = plus.list;
+		const list = into === "projects" && this.projectsListDrop ? [this.projectsListDrop] : [];
+		return { targets: [...tree, ...list], alone: into !== "funnel", ...aside };
 	}
 
 	/**
@@ -1221,7 +1229,6 @@ export class CalendarScreen extends Component {
 			await this.endCarry("dropped");
 			return card;
 		}
-		this.bulk.dropping(drag);
 		this.arriving.dropping(drag.item);
 		await this.act(async () => void (await this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate, this.filterNode())));
 		await this.endCarry("dropped");
@@ -1581,14 +1588,14 @@ export class CalendarScreen extends Component {
 		const filter = funnel?.filter ?? null;
 		const panel = funnel?.panel ?? null;
 		const main = this.where.view;
-		const phone = !this.wide();
 		root.classList.toggle("is-note", this.where.note !== undefined);
 		root.classList.toggle("is-view-all", mode === "allColumns");
 		root.classList.toggle("is-view-rows", mode === "rows");
 		root.classList.toggle("is-view-by-project", mode === "byProject");
 		root.classList.toggle("has-wheel", this.view().wheel);
-		root.classList.toggle("has-top-row", main && (!phone || filter !== null || mode !== "twoColumns"));
-		root.classList.toggle("has-head-lead", main && phone && filter === null && mode === "twoColumns");
+		const topRow = funnel?.topRow ?? false;
+		root.classList.toggle("has-top-row", topRow);
+		root.classList.toggle("has-head-lead", main && !topRow);
 		root.classList.toggle("has-dock", this.panel !== null && (panel?.open ?? false) && (panel?.docked ?? false));
 		root.classList.toggle("has-tree", this.treeShows());
 		this.folder?.setOn(this.treeShows());
@@ -1723,7 +1730,9 @@ export class CalendarScreen extends Component {
 			setTreeWidth: (width) => void this.deps.settings.set({ treeWidth: width }).then(() => this.parts.request("frame")),
 			onSnap: () => this.haptics.tap(),
 			onPick: (node) => void this.afterEntry(() => this.act(() => this.deps.tasks.pickProjectNode(node, this.wide()))),
-			onClose: () => this.togglePanel(),
+			onClose: () => {
+				if (this.data.funnel?.panel?.dimCloses) void this.act(() => this.deps.tasks.setProjectsPanel(false));
+			},
 			onRow: (row, model, signal) => treeLift.attach(row, model, signal),
 		});
 	}

@@ -357,7 +357,7 @@ describe("DayData", () => {
 		const tasks: TaskService = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
 		const funnel = await tasks.funnelView(true);
 		const node = (await tasks.projectsScreen()).rows.find((row) => row.kind === "project")?.node ?? "all";
-		const filtered: FunnelView = { ...funnel, filter: { node, title: "", menu: null, clearable: true, project: null, emptyLabel: "No tasks" }, view: { ...funnel.view, mode: "byProject" } };
+		const filtered: FunnelView = { ...funnel, filter: { node, title: "", menu: null, clearable: true, project: null, emptyLabel: "No tasks" }, view: { ...funnel.view, mode: "byProject", source: "projectsScreen" } };
 		const asked: (string | null | undefined)[] = [];
 		const screen = tasks.screen.bind(tasks);
 		tasks.screen = (date: string, filter?: string | null) => {

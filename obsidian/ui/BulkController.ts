@@ -145,11 +145,6 @@ export class BulkController {
 		this.ring.hide();
 	}
 
-	/** Several cards let go on a place: they leave the selection, as any action done on them. */
-	dropping(drag: TaskDragPayload): void {
-		if (carriesMany(drag)) this.stop();
-	}
-
 	/** Escape lets the picked cards go and ends Select tasks; the menu over them takes its own Escape first. */
 	onKey(e: KeyboardEvent): void {
 		if (e.key === "Escape" && !this.menu && (this.selecting || this.selection.size > 0)) this.stop();
