@@ -39,13 +39,27 @@ export function restingRect(el: HTMLElement): DOMRect {
 	}
 	const height = growing !== undefined && GROWTHS.get(el)?.playState === "running" ? growing : rect.height;
 	const width = SLIDES.get(el)?.playState === "running" ? (SLID_TO.get(el) ?? rect.width) : rect.width;
-	return new DOMRect(rect.left - shift.x, rect.top - shift.y, width, height);
+	return new DOMRect(rect.left - shift.x, rect.top - shift.y + settling(el), width, height);
 }
 
 /** The row gap of the flex column `el` stands in: a row folded to nothing gives it back with a negative margin. */
 function gapOf(el: HTMLElement): number {
 	const parent = el.parentElement;
 	return parent ? parseFloat(getComputedStyle(parent).rowGap) || 0 : 0;
+}
+
+/** How far a box that holds rows still moves down as its own height change settles (a row of the rows' stack), and until when. */
+const SETTLES = new WeakMap<Element, { readonly dy: number; readonly until: number }>();
+
+/** How far the boxes `el` stands in still move it, as their height changes settle. */
+function settling(el: Element): number {
+	let dy = 0;
+	const now = performance.now();
+	for (let box = el.parentElement; box; box = box.parentElement) {
+		const settle = SETTLES.get(box);
+		if (settle && settle.until > now) dy += settle.dy;
+	}
+	return dy;
 }
 
 const SLIDES = new WeakMap<Element, Animation>();
@@ -149,6 +163,15 @@ export const Motion = {
 		if (Math.abs(to.top - from.top) < 0.5 && Math.abs(to.left - from.left) < 0.5 && Math.abs(to.height - from.height) < 0.5) return;
 		RESHAPED.set(node, to);
 		SLIDES.set(node, node.animate([{ top: px(from.top), left: px(from.left), height: px(from.height) }, { top: px(to.top), left: px(to.left), height: px(to.height) }], timing));
+	},
+
+	/**
+	 * A box moves `dy` down over `ms` as heights above it settle (a CSS transition the code started): whatever stands in it
+	 * is read where it will rest (`restingRect`), so a card landing in it lands where it ends up.
+	 */
+	settles(box: Element, dy: number, ms: number): void {
+		if (Math.abs(dy) < 0.5) SETTLES.delete(box);
+		else SETTLES.set(box, { dy, until: performance.now() + ms });
 	},
 
 	/** Something floating comes in where it stands: it fades in. */

@@ -1,7 +1,7 @@
 import { type DropColumn, type StackedList, stackedLists, type ViewLayout } from "../../../core/application/contracts";
-import { DURATION } from "../design";
+import { DESIGN, DURATION, PROPERTY, tokenMs } from "../design";
 import { el, px } from "../dom";
-import { restingRect } from "../motion/Motion";
+import { Motion, restingRect } from "../motion/Motion";
 import type { ListColumn } from "../drag/DropTarget";
 import type { TaskList } from "../TaskList";
 import { type FunnelList, funnelList } from "./FunnelLists";
@@ -31,6 +31,8 @@ export class RowsLayout extends StillLayout {
 	private readonly rows: readonly Row[];
 	/** A box as tall as a list's scroll fade (`--tc-scroll-fade`), read for `stackedLists`. */
 	private readonly fadeProbe: HTMLElement;
+	/** A box as tall as the room a list keeps under a field typed in it (`--tc-row-entry-room`). */
+	private readonly entryProbe: HTMLElement;
 	private readonly holds = new Set<LayoutHold>();
 	private readonly sized: ResizeObserver;
 	/** The next heights come in sliding (the same context changed) or at once (another context, the first drawing). */
@@ -44,6 +46,7 @@ export class RowsLayout extends StillLayout {
 		this.stack = el(body, "div", "tc-rows-stack");
 		this.stack.classList.toggle("is-growing", !this.scrolls);
 		this.fadeProbe = el(this.stack, "div", "tc-rows-fade-probe");
+		this.entryProbe = el(this.stack, "div", "tc-rows-entry-probe");
 		const titles = new Map(layout.columns.flatMap((column) => column.lists).map((list) => [list.list, list.title]));
 		this.rows = (layout.stack?.lists ?? []).map((column) => {
 			const row = el(this.stack, "div", "tc-row");
@@ -70,10 +73,8 @@ export class RowsLayout extends StillLayout {
 			row.funnel.list.render(motion === "move");
 		}
 		super.frame();
-		if (motion === "replace") {
-			this.still = true;
-			this.apply();
-		} else this.fit();
+		/** Measured now, at the shape the lists move to: the rows start their slide in the same frame as the cards. */
+		this.apply(motion === "replace" || this.still);
 	}
 
 	/**
@@ -86,32 +87,60 @@ export class RowsLayout extends StillLayout {
 		if (this.frameId) return;
 		this.frameId = view.requestAnimationFrame(() => {
 			this.frameId = 0;
-			this.apply();
+			this.apply(this.still);
 		});
 	}
 
-	private apply(): void {
-		if (this.destroyed || !this.scrolls || this.holds.has("carry") || this.stack.clientHeight === 0) return;
+	/** `still`: another context drawn, its heights stand at once, even while a carry holds the rows (a held card opened another node). */
+	private apply(still = false): void {
+		if (this.destroyed || !this.scrolls || (!still && this.holds.has("carry")) || this.stack.clientHeight === 0) return;
 		const measured = this.rows.map((row) => this.measure(row));
 		const style = getComputedStyle(this.stack);
 		const gap = this.rows.length > 1 ? parseFloat(getComputedStyle(this.rows[1].el).marginTop) || 0 : 0;
 		const room = this.stack.clientHeight - (parseFloat(style.paddingBottom) || 0) - gap * (this.rows.length - 1);
-		/** A task typed where every list has to share: the list keeps its height and scrolls the field into view, none of the others moves. */
-		if (this.holds.has("typing") && measured.reduce((sum, list) => sum + list.wanted, 0) > room) return;
-		const heights = stackedLists(measured, room, this.fadeProbe.offsetHeight);
-		const still = this.still;
+		const now = this.rows.map((row) => row.el.getBoundingClientRect().height);
+		/**
+		 * A task typed where every list has to share: the lists keep their heights and the field's list scrolls it into view,
+		 * only made tall enough, once, for the field and the bar's room under it, from the tallest of the others.
+		 */
+		const typed = this.holds.has("typing") && measured.reduce((sum, list) => sum + list.wanted, 0) > room;
+		const heights = typed ? this.typingHeights(now) : stackedLists(measured, room, this.fadeProbe.offsetHeight);
+		if (!heights) return;
 		this.still = false;
 		this.stack.classList.toggle("is-still", still);
-		/** A row that shrinks waits while its leaving cards fade, then folds with them (`Motion.leave`); one that grows grows with its new cards. */
+		/**
+		 * Every row takes its new height in one motion, with the cards that grow in, slide or fold away: a row under rows that
+		 * change moves once, and a card landing in it is read where it comes to rest (`Motion.settles`).
+		 */
+		const ms = still ? 0 : tokenMs(this.stack, DURATION.collapse);
+		let dy = 0;
 		this.rows.forEach((row, i) => {
-			const shrinks = heights[i] < row.el.getBoundingClientRect().height - 0.5;
-			row.el.style.transitionDelay = shrinks ? `var(${DURATION.collapse})` : "";
+			Motion.settles(row.el, dy, ms);
+			dy += heights[i] - now[i];
 			row.el.style.height = px(heights[i]);
 		});
 		if (still) {
 			void this.stack.offsetHeight;
 			this.stack.classList.remove("is-still");
 		}
+	}
+
+	/** The heights while a task is typed in rows that share the room: as they stand, the field's row made tall enough for it; null when it already is. */
+	private typingHeights(now: readonly number[]): number[] | null {
+		const at = this.rows.findIndex((row) => row.funnel.list.el.querySelector(":scope > .tc-quick-row") !== null);
+		if (at < 0) return null;
+		const row = this.rows[at];
+		const field = row.funnel.list.el.querySelector<HTMLElement>(":scope > .tc-quick-row")!;
+		const style = getComputedStyle(row.funnel.list.el);
+		const need = row.label.offsetHeight + (parseFloat(style.paddingTop) || 0) + restingRect(field).height + this.entryProbe.offsetHeight;
+		const deficit = need - now[at];
+		if (deficit <= 0.5) return null;
+		const heights = [...now];
+		const giver = heights.reduce((best, height, i) => (i !== at && (best < 0 || height > heights[best]) ? i : best), -1);
+		if (giver < 0) return null;
+		heights[giver] -= deficit;
+		heights[at] = need;
+		return heights;
 	}
 
 	/**
@@ -122,7 +151,7 @@ export class RowsLayout extends StillLayout {
 		const list = row.funnel.list.el;
 		const label = row.label.offsetHeight;
 		const style = getComputedStyle(list);
-		const top = list.getBoundingClientRect().top - list.scrollTop;
+		const top = restingRect(list).top - list.scrollTop;
 		const gap = parseFloat(style.rowGap) || 0;
 		const inFlow = [...list.children].filter((child): child is HTMLElement => child instanceof HTMLElement && getComputedStyle(child).position !== "absolute");
 		let growth = 0;
@@ -139,13 +168,24 @@ export class RowsLayout extends StillLayout {
 			growth += resting.height - now;
 		}
 		const stops = ends.filter(({ child }) => !child.classList.contains("tc-group-head")).map(({ end }) => label + end);
-		const content = ends.length > 0 ? ends[ends.length - 1].end : parseFloat(style.paddingTop) || 0;
-		return { wanted: label + content + (parseFloat(style.paddingBottom) || 0), stops };
+		const last = ends[ends.length - 1];
+		const content = last ? last.end + (parseFloat(getComputedStyle(last.child).marginBottom) || 0) : parseFloat(style.paddingTop) || 0;
+		/** The room at the list's end while a task is typed in it: the desktop's bar stands there, under the field. */
+		const after = getComputedStyle(list, "::after");
+		const room = after.content !== "none" && after.content !== "normal" ? (parseFloat(after.height) || 0) + gap : 0;
+		return { wanted: label + content + room + (parseFloat(style.paddingBottom) || 0), stops };
 	}
 
 	override frame(): void {
 		super.frame();
 		this.fit();
+	}
+
+	/** The screen's foot fade lies past the rows' column, over the timeline: a list in the rows ends on its own. */
+	protected override widthsApplied(widths: readonly number[]): void {
+		if (!this.scrolls) return;
+		const docked = this.host.root.clientWidth - this.host.stageWidth();
+		this.host.root.style.setProperty(PROPERTY.fadeLeft, px(docked + (widths[0] ?? 0) + DESIGN.dividerWidth));
 	}
 
 	drops(): readonly LayoutDrop[] {
@@ -173,6 +213,7 @@ export class RowsLayout extends StillLayout {
 		const view = this.host.root.ownerDocument.defaultView ?? window;
 		if (this.frameId) view.cancelAnimationFrame(this.frameId);
 		for (const row of this.rows) row.funnel.list.destroy();
+		this.host.root.style.removeProperty(PROPERTY.fadeLeft);
 		super.destroy();
 	}
 }

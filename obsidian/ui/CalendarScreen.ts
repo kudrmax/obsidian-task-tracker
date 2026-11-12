@@ -149,8 +149,8 @@ export class CalendarScreen extends Component {
 		root: () => this.contentEl,
 		tree: () => (this.treeShows() ? (this.panel?.treeShown ?? null) : null),
 		now: () => this.deps.clock.now().getTime(),
-		/** The panel and the tree follow the carry at once, while the lists under the finger wait for the drag to end. */
-		changed: () => this.data.tasks().then(() => this.drawView()),
+		/** The panel, the tree and, when the held card opened another node, its lists follow the carry at once. */
+		changed: () => this.data.tasks().then(() => this.drawCarried()),
 		onError: (error) => this.reportFailure(error),
 	});
 	/** A carry the core keeps is under way (a card or the plus lifted in the plugin's own view). */
@@ -158,7 +158,7 @@ export class CalendarScreen extends Component {
 	/** The rows each drag from the by project list carries and the node it was lifted on, read at the lift. */
 	private readonly carry = new ProjectsCarry({
 		rowOf: (card) => this.layout?.projects()?.rowOf(card),
-		selected: () => this.filterNode(),
+		selected: () => this.data.projects?.selected ?? this.filterNode(),
 		carried: (item) => this.bulk.carried(item),
 	});
 	/** The window stands at Done, left of Inbox: only the search brings it there, and any other move leaves it. */
@@ -288,6 +288,7 @@ export class CalendarScreen extends Component {
 				if (this.carrying && this.panel) this.carryReport.move(x, y);
 			},
 			onResult: (drag, result) => this.applyDrop(drag, result),
+			onError: (error) => this.reportFailure(error),
 			onLift: (drag, source) => {
 				this.carry.lift(drag, source);
 				const cards = this.carry.dropsOf(drag);
@@ -512,6 +513,8 @@ export class CalendarScreen extends Component {
 	}
 
 	close(): void {
+		this.drag.destroy();
+		if (this.carrying) void this.endCarry("nowhere");
 		this.swipe?.destroy();
 		this.layout?.destroy();
 		this.layout = null;
@@ -1035,6 +1038,7 @@ export class CalendarScreen extends Component {
 			.endCarry(how)
 			.then(() => this.endSelectionAfter(how))
 			.then(() => this.data.tasks())
+			.then(() => this.drawCarried())
 			.catch((error: unknown) => this.reportFailure(error));
 	}
 
@@ -1487,6 +1491,15 @@ export class CalendarScreen extends Component {
 		root.classList.toggle("has-dock", docked);
 	}
 
+	/**
+	 * The screen while a carry holds it: the frame follows at once; when the held card opened another node (or the carry
+	 * put the lift's back), that context's lists are drawn now, still, so the card is let go among the tasks it sees.
+	 */
+	private drawCarried(): void {
+		if (this.view().context !== this.drawnContext) this.draw(new Set<ScreenPart>(["frame", "tasks"]));
+		else this.drawView();
+	}
+
 	/** The projects button: the panel opened or closed, kept on the device. */
 	private togglePanel(): void {
 		const open = this.data.funnel?.panel?.open ?? false;
@@ -1525,7 +1538,14 @@ export class CalendarScreen extends Component {
 				reorders: () => this.data.projects?.reorders ?? false,
 				takesAt: (place, drag) => {
 					const view = this.data.projects;
-					return view !== null && projectsTakes(view, this.projectsDrops(drag), place);
+					if (view === null) return false;
+					/** A place read off cards another read has since replaced is no place: the next drawing brings the right ones. */
+					try {
+						return projectsTakes(view, this.projectsDrops(drag), place);
+					} catch (error) {
+						if (error instanceof StaleTaskError) return false;
+						throw error;
+					}
 				},
 				plusTakesAt: (place) => {
 					const view = this.data.projects;
@@ -1603,6 +1623,8 @@ export class CalendarScreen extends Component {
 			root.querySelector(".tc-missing")?.remove();
 			if (missing) this.renderMissing(root);
 			root.classList.toggle(REDRAWN, motion === "replace");
+			/** A field about to open holds the rows as they stand before they draw it, where they share the room. */
+			layout.hold("typing", this.quick?.entering ?? false);
 			layout.render(motion);
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;

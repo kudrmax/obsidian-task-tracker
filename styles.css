@@ -356,6 +356,12 @@ body {
 	 * every part of the strip moves by its room. The view button is the plus's circle beside the wheel, or alone in its place.
 	 */
 	--tc-stage-left: 0px;
+	/* Where the screen's foot fade starts from the left: the rows' column keeps its own end, the fade lies only over what runs under the foot (the code sets it in rows). */
+	--tc-fade-left: 0px;
+	/* The room a rows list keeps at its end while a task is typed in it: the bar stands there (the desktop's capsule under the field, the phone's bar over the keyboard). */
+	--tc-row-entry-room: var(--tc-entry-room);
+	/* What a rows list typed in must show besides the field: the desktop's capsule under it; on the phone the bar stands over the keyboard, outside the list. */
+	--tc-row-field-room: 0px;
 	--tc-stage-mid: calc(var(--tc-stage-left) + (100% - var(--tc-stage-left)) / 2);
 	--tc-columns-head: 40px;
 	--tc-top-row-top: 0px;
@@ -824,7 +830,7 @@ button.tc-btn.is-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc
 .task-calendar .tc-arrow { width: var(--tc-arrow); height: var(--tc-arrow); flex-shrink: 0; }
 .tc-arrow svg { width: var(--tc-chevron); height: var(--tc-chevron); stroke-width: var(--tc-stroke-chevron); }
 /* One fade over the bottom of every column, under the foot's controls, the switch and the plus. */
-.task-calendar > .tc-fade { position: absolute; left: 0; right: 0; bottom: 0; height: var(--tc-foot-fade-day); background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-half-ink), transparent) var(--tc-foot-fade-half), color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-deep-ink), transparent) var(--tc-foot-fade-deep), var(--tc-bg) var(--tc-foot-fade-solid)); z-index: var(--tc-layer-fade); pointer-events: none; transition: height var(--tc-duration-slide) var(--tc-ease-in-out); }
+.task-calendar > .tc-fade { position: absolute; left: var(--tc-fade-left); right: 0; bottom: 0; height: var(--tc-foot-fade-day); background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-half-ink), transparent) var(--tc-foot-fade-half), color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-deep-ink), transparent) var(--tc-foot-fade-deep), var(--tc-bg) var(--tc-foot-fade-solid)); z-index: var(--tc-layer-fade); pointer-events: none; transition: height var(--tc-duration-slide) var(--tc-ease-in-out); }
 /* On the desktop the field is typed with the wheel and the plus hidden and no bar at the bottom: the foot fade gives way, so a field near the bottom shows whole. */
 body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-chrome-room); }
 /*
@@ -1613,7 +1619,7 @@ body.is-mobile .task-calendar.is-dragging > .tc-tree-dim { pointer-events: none;
 body:not(.is-mobile) .task-calendar:not(.has-tree) > .tc-tree-panel { transform: translate3d(calc(-1 * 100%), 0, 0); }
 body:not(.is-mobile) .task-calendar.is-docking > .tc-tree-panel { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out), visibility 0s linear var(--tc-duration-slide); }
 body:not(.is-mobile) .task-calendar.is-docking.has-tree > .tc-tree-panel { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out); }
-.task-calendar.is-docking > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-divider, .tc-right, .tc-head, .tc-stage, .tc-seg, button.tc-view-btn, .tc-capsule, .tc-filter), .task-calendar.is-docking .tc-stage-col, .task-calendar.is-docking .tc-day-nav .tc-arrow { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding var(--tc-duration-slide) var(--tc-ease-in-out), gap var(--tc-duration-slide) var(--tc-ease-in-out); }
+.task-calendar.is-docking > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-divider, .tc-right, .tc-head, .tc-stage, .tc-seg, button.tc-view-btn, .tc-capsule, .tc-filter, .tc-fade), .task-calendar.is-docking .tc-stage-col, .task-calendar.is-docking .tc-day-nav .tc-arrow { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding var(--tc-duration-slide) var(--tc-ease-in-out), gap var(--tc-duration-slide) var(--tc-ease-in-out); }
 
 /*
  * The view button (board V1): the plus's circle, the current mode's icon. Beside the wheel, a gap to its left; where the
@@ -1663,8 +1669,9 @@ body:not(.is-mobile) .tc-stage-col.is-timeline .tc-day-nav { gap: var(--tc-space
  * measured once the lists' motion settles and set by the code: as tall as its cards while all fit; a list that scrolls
  * ends under a whole card and its fade. The heights slide when the same view changes and stand at once in another.
  */
-.tc-rows-stack { flex: 1 1 0; min-height: 0; padding-bottom: var(--tc-foot-fade-day); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
+.tc-rows-stack { flex: 1 1 0; min-height: 0; padding-bottom: var(--tc-foot-room); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
 .tc-rows-fade-probe { position: absolute; width: 0; height: var(--tc-scroll-fade); visibility: hidden; pointer-events: none; }
+.tc-rows-entry-probe { position: absolute; width: 0; height: var(--tc-row-field-room); visibility: hidden; pointer-events: none; }
 .tc-row { flex: none; min-height: 0; display: flex; flex-direction: column; transition: height var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-rows-stack.is-still > .tc-row { transition: none; }
 .tc-row + .tc-row { margin-top: var(--tc-section-gap); }
@@ -1672,6 +1679,20 @@ body:not(.is-mobile) .tc-stage-col.is-timeline .tc-day-nav { gap: var(--tc-space
 .tc-row-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .task-calendar .tc-list.tc-row-list { flex: 0 1 auto; padding-top: var(--tc-card-gap); }
 .task-calendar .tc-list.tc-row-list::after { content: none; }
+/*
+ * A list that scrolls ends on whole cards: under its last whole card the fade's room stays empty, the next card cut away
+ * there, never faded over (Max's defect 2). Near its end the cut gives way with the content left under it.
+ */
+.task-calendar .tc-list.tc-row-list.is-under-bottom { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade)))); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade)))); }
+/*
+ * While a task is typed in a rows list, the bar never lies on its cards: on the desktop the field keeps the capsule's room
+ * under it, wherever it stands in the list; on the phone the list keeps the room over the bar at its end.
+ */
+body:not(.is-mobile) .task-calendar .tc-list.tc-row-list > .tc-quick-row { margin-bottom: var(--tc-row-entry-room); }
+body.is-mobile .task-calendar.is-entering .tc-list.tc-row-list:has(> .tc-quick-row)::after { content: ""; height: var(--tc-row-entry-room); }
+body:not(.is-mobile) .task-calendar { --tc-row-entry-room: calc(var(--tc-bar-h) + 2 * var(--tc-desk-bar-gap)); --tc-row-field-room: var(--tc-row-entry-room); }
+/* The list a task is typed in shows its field whole: under it is only the bar's room, so its end is not cut away. */
+.task-calendar .tc-list.tc-row-list.is-under-bottom:has(> .tc-quick-row) { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade))); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade))); }
 /* The list under a carried card alone opens a card's room at its end, inside its own scroll: no row moves. */
 .task-calendar .tc-list.tc-row-list.is-drop-room::after { content: ""; height: var(--tc-card-h); }
 button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); cursor: default; }

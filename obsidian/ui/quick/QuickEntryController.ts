@@ -178,6 +178,12 @@ export class QuickEntryController {
 	};
 	/** The view grew or shrank, Obsidian's toolbar coming or going under it: the field keeps over the bar in the same frame. */
 	private readonly sizeWatch = new ResizeObserver(() => this.reveal());
+	/** The scroller of the field, watched for its size while the field is open: it grew or shrank under the field (a row of the rows), not by a finger, so the field is followed into sight again. */
+	private watchedScroller: HTMLElement | null = null;
+	private readonly scrollerWatch = new ResizeObserver(() => {
+		this.follow = true;
+		this.reveal();
+	});
 	private readonly tapAway = (e: Event) => {
 		if (!this.state || this.pressEnding || (e.target instanceof Element && this.owns(e.target))) return;
 		this.entry.blur();
@@ -448,6 +454,7 @@ export class QuickEntryController {
 		this.deps.root.removeEventListener("scroll", this.scrolled, true);
 		this.deps.root.removeEventListener("transitionend", this.settled, true);
 		this.sizeWatch.disconnect();
+		this.scrollerWatch.disconnect();
 		this.renames();
 		this.glide.stop();
 		this.revealing = false;
@@ -581,11 +588,20 @@ export class QuickEntryController {
 		const state = this.state;
 		const revealing = this.revealing;
 		this.revealing = false;
+		this.watchScroller(state ? this.scrollerOf(state.spot) : null);
 		if (!state) return;
 		const { view, box, field, rect: drawn } = this.measure(state);
 		let rect = drawn;
 		if (field && rect && revealing && this.follow && this.bringIntoSight(state, rect, view, box)) rect = field.getBoundingClientRect();
 		this.followBar(state, rect, view, box);
+	}
+
+	/** The field's list or timeline changing size (a row of the rows growing for it) brings the field into sight again. */
+	private watchScroller(scroller: HTMLElement | null): void {
+		if (scroller === this.watchedScroller) return;
+		if (this.watchedScroller) this.scrollerWatch.unobserve(this.watchedScroller);
+		this.watchedScroller = scroller;
+		if (scroller) this.scrollerWatch.observe(scroller);
 	}
 
 	/** The view, the field's list or timeline (the view for a menu's stack), and the field where it is drawn. */
@@ -602,7 +618,8 @@ export class QuickEntryController {
 	 * `glide` the list scrolls along with the keyboard instead of at once.
 	 */
 	private bringIntoSight(state: EntryState, rect: DOMRect, view: DOMRect, box: DOMRect, glide?: Glide): boolean {
-		const limit = this.deps.desktop() ? this.roomOf(view, box).bottom - this.bar.room : view.bottom - this.bar.room - LAYOUT.fieldOverBar;
+		/** On the phone over the bar, and never past the bottom of what shows the field (a row of the rows ends above the bar). */
+		const limit = this.deps.desktop() ? this.roomOf(view, box).bottom - this.bar.room : Math.min(view.bottom - this.bar.room - LAYOUT.fieldOverBar, this.roomOf(view, box).bottom);
 		const menu = this.stack?.menu ?? null;
 		if (menu) {
 			menu.raise(menu.raised + rect.bottom - limit);
