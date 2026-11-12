@@ -97,17 +97,26 @@ export class Swipe {
 	private holds = 0;
 	/** Counts the times the screen was made to stand at once: a settling begun before that no longer holds it. */
 	private round = 0;
+	private readonly listening = new AbortController();
 
 	constructor(
 		private readonly el: HTMLElement,
 		private readonly opts: SwipeOptions,
 	) {
-		el.addEventListener("pointerdown", () => this.interrupt(), { capture: true });
-		el.addEventListener("pointerdown", (e) => this.down(e));
-		el.addEventListener("pointermove", (e) => this.move(e));
-		el.addEventListener("pointerup", (e) => this.up(e, true));
-		el.addEventListener("pointercancel", (e) => this.up(e, false));
-		el.addEventListener("wheel", (e) => this.wheel(e), { passive: false });
+		const signal = this.listening.signal;
+		el.addEventListener("pointerdown", () => this.interrupt(), { capture: true, signal });
+		el.addEventListener("pointerdown", (e) => this.down(e), { signal });
+		el.addEventListener("pointermove", (e) => this.move(e), { signal });
+		el.addEventListener("pointerup", (e) => this.up(e, true), { signal });
+		el.addEventListener("pointercancel", (e) => this.up(e, false), { signal });
+		el.addEventListener("wheel", (e) => this.wheel(e), { passive: false, signal });
+	}
+
+	/** The screen stops swiping: a layout with no pages to turn has no swipe at all, not a swipe that only gives. */
+	destroy(): void {
+		this.listening.abort();
+		if (this.stream) window.clearTimeout(this.stream.timer);
+		this.stream = null;
 	}
 
 	private wheel(e: WheelEvent): void {

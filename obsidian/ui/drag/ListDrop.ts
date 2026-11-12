@@ -86,6 +86,9 @@ export abstract class CardListDrop implements DropTarget {
 	/** The column's title, lit while a drop would go on it. */
 	private litTitle: HTMLElement | null = null;
 	private readonly scroll: AutoScroll;
+	/** The finger is over the list: the owner may give it room at its end for the card (the rows' lists alone, nothing else moving). */
+	onHover: ((over: boolean) => void) | null = null;
+	private over = false;
 
 	constructor(
 		protected readonly list: DropList,
@@ -144,6 +147,7 @@ export abstract class CardListDrop implements DropTarget {
 	}
 
 	preview(x: number, y: number, drag: DragPayload): void {
+		this.hover(true);
 		const title = this.titleAt(x, y, drag);
 		this.lightTitle(title);
 		if (title) {
@@ -202,6 +206,7 @@ export abstract class CardListDrop implements DropTarget {
 	leave(): void {
 		this.line.hide();
 		this.reset();
+		this.hover(false);
 	}
 
 	/** The drag is over. */
@@ -209,6 +214,13 @@ export abstract class CardListDrop implements DropTarget {
 		this.line.hide();
 		this.reset();
 		this.layout = null;
+		this.hover(false);
+	}
+
+	private hover(over: boolean): void {
+		if (over === this.over) return;
+		this.over = over;
+		this.onHover?.(over);
 	}
 
 	/** An empty section's plate lights while the card would land in it; any other goes dark. */
