@@ -59,7 +59,7 @@ import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type Proj
 import { ProjectIndex, projectTreeOf } from "./projects";
 import { chosenNode, cleared, hovered, panelRows, picked, projectOfNode, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { withMode } from "./viewModes";
-import { carriedAt, carryEnded, carryStarted, nameEnded } from "./projectsCarry";
+import { carriedAt, carryEnded, carryStarted, gestureGone, nameEnded } from "./projectsCarry";
 import { funnelPlaceOf, type FunnelPlace } from "./screenPlaces";
 import { ProjectTree, type TreePlace } from "../domain/ProjectTree";
 import { readsAnew } from "./readingSettings";
@@ -108,6 +108,14 @@ export class TaskServiceImpl implements TaskService {
 		this.rules = new TaskRules(settings, clock, identity, true, { list: () => legacyProjects.list(), ready: () => legacyProjects.ready?.() ?? true });
 		this.reads = new TaskReads(this.rules, settings, clock, { tree: () => this.lastTree(), screen: () => projectsScreenStore.get() });
 		this.writes = new TaskWrites(this.rules, this.reads);
+		this.dropGesture();
+	}
+
+	/** A carry or a name left in the device's state by a screen gone mid-gesture: dropped as the screen loads (`gestureGone`). */
+	private dropGesture(): void {
+		const state = this.projectsScreenStore.get();
+		const loaded = gestureGone(state);
+		if (loaded !== state) this.projectsScreenStore.set(loaded);
 	}
 
 	priorityLevels(): readonly PriorityLevel[] {
@@ -176,6 +184,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	firstView(wide: boolean, note: boolean): ViewChoice {
+		if (!note) this.dropGesture();
 		return this.reads.firstView(wide, note);
 	}
 
@@ -218,6 +227,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	firstPlace(): FunnelPlace {
+		this.dropGesture();
 		return funnelPlaceOf(this.projectsScreenStore.get().place);
 	}
 

@@ -182,6 +182,43 @@ describe("a carry to a project, the core's from lift to let go", () => {
 	});
 });
 
+describe("a carry never outlives its gesture", () => {
+	const killed = async () => {
+		const { svc, state, item } = setup();
+		await svc.startCarry({ keys: [(await item("Anki")).key] }, false);
+		await svc.carryAt({ edge: true, node: null }, 0);
+		await svc.carryAt({ edge: true, node: null }, PAUSE);
+		await svc.carryAt({ edge: false, node: "project:Дружба" }, PAUSE);
+		await svc.carryAt({ edge: false, node: "project:Дружба" }, PAUSE * 2);
+		expect((await svc.funnelView(false)).filter?.node).toBe("project:Дружба");
+		return state.get();
+	};
+	const relaunched = (saved: ReturnType<ReturnType<typeof memoryProjectsScreen>["get"]>) => {
+		const store = new InMemoryTaskFileStore(FILE);
+		const state = memoryProjectsScreen(saved);
+		return new TaskServiceImpl(store, new FakeSettingsStore(), clock, new UndoHistory(store), undefined, state);
+	};
+
+	it("a service made over a state with a carry left in it drops it: no panel, the lift's filter back", async () => {
+		const svc = relaunched(await killed());
+		const view = await svc.funnelView(false);
+		expect(view.panel).toMatchObject({ open: false, reason: null });
+		expect(view.filter).toBeNull();
+	});
+
+	it("the door drops it at the app's first asks, firstPlace and firstView", async () => {
+		type Ok = Extract<DoorAnswer, { ok: true }>;
+		const saved = { ...(await killed()), naming: true };
+		for (const [method, args] of [["tasks.firstPlace", []], ["tasks.firstView", [false, false]]] as const) {
+			const answer = callDoor(method, [...args], { tasks: FILE, nowMs: 0, projectsScreen: saved }) as Ok;
+			expect(answer.projectsScreen).toBeDefined();
+			expect(answer.projectsScreen!.carry).toBeUndefined();
+			expect(answer.projectsScreen!.naming).toBeUndefined();
+			expect(answer.projectsScreen!.selected).toBeUndefined();
+		}
+	});
+});
+
 describe("the place the device kept", () => {
 	it("is a funnel place: the old Projects place is Inbox, the app's old numbers read too, nothing kept is Today", async () => {
 		expect(funnelPlaceOf("soon")).toBe("soon");

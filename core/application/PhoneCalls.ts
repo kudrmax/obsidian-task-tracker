@@ -22,7 +22,7 @@ import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timePar
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
 import { type EntryList, FUNNEL_PLACES, type FunnelAt, funnelPlaceOf, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
 import { ROW_LISTS, VIEW_WORDS, viewEntryLists, withMode } from "./viewModes";
-import { carriedAt, carryEnded, carryStarted, nameEnded } from "./projectsCarry";
+import { carriedAt, carryEnded, carryStarted, gestureGone, nameEnded } from "./projectsCarry";
 import { type EntryPart, projectsEntryLook } from "./projectsEntry";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
@@ -425,7 +425,10 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	funnelView: (c, [wide]) => c.ask(c.reads.funnelViewRead(wide === true)),
 	projectNoteView: (c, [path, wide]) => c.ask(c.reads.projectNoteViewRead(path as string, wide === true)),
 	pickProjectNode: (c, [node, wide]) => c.keepProjectsScreen(picked(c.projectsScreen, c.tree(), node as string, wide === true)),
-	firstView: (c, [wide, note]) => c.reads.firstView(wide === true, note === true),
+	firstView: (c, [wide, note]) => {
+		if (note !== true) c.keepProjectsScreen(gestureGone(c.projectsScreen));
+		return c.reads.firstView(wide === true, note === true);
+	},
 	filterHides: (c, [item, filter]) => c.ask(c.reads.filterHidesRead(item as A, (filter ?? null) as string | null)),
 	startCarry: (c, [start, wide]) => c.keepProjectsScreen(carryStarted(c.projectsScreen, start as A, wide === true, c.tree())),
 	carryAt: (c, [at, nowMs]) => {
@@ -450,7 +453,10 @@ const TASKS: Readonly<Record<string, Handler>> = {
 		const at = funnelPlaceOf(place);
 		if (c.projectsScreen.place !== at) c.keepProjectsScreen({ ...c.projectsScreen, place: at });
 	},
-	firstPlace: (c) => funnelPlaceOf(c.projectsScreen.place),
+	firstPlace: (c) => {
+		c.keepProjectsScreen(gestureGone(c.projectsScreen));
+		return funnelPlaceOf(c.projectsScreen.place);
+	},
 	clearProjectFilter: (c) => c.keepProjectsScreen(cleared(c.projectsScreen)),
 	setProjectsPanel: (c, [open]) => {
 		if ((c.projectsScreen.panelOpen === true) !== (open === true)) c.keepProjectsScreen({ ...c.projectsScreen, panelOpen: open === true });
