@@ -1,7 +1,7 @@
 import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
-import { cardMenuTask, fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
+import { fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
 import { linkAt, type TaskLink } from "../TaskTitle";
 import { showWhole } from "../wholeCard";
 import type { LocalDate } from "../types";
@@ -137,11 +137,6 @@ export interface MenuActions {
 
 export interface TaskMenuContext {
 	readonly item: TaskItem;
-	/**
-	 * The task whose card or block `source` is, when the menu is another's: a folded result's, whose step's menu a tap
-	 * opens. Its copy stays over the blur as it is drawn, a timeline block with its subtasks under it.
-	 */
-	readonly drawn?: TaskItem;
 	/** The card or block tapped; a copy of it stays over the backdrop, grown only to show a title the card cuts. */
 	readonly source: HTMLElement;
 	readonly today: LocalDate;
@@ -153,7 +148,7 @@ export interface TaskMenuContext {
 	/** Dresses the copy over the blur: a selected timeline card gives its copy the dots that stretch it. */
 	readonly lifted?: (copy: HTMLElement, close: () => void) => void;
 	/** A timeline card's subtasks stand between its copy and the panel; a tap on one opens its own menu instead. */
-	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement, sheet: Sheet, drawn?: TaskItem) => void;
+	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement, sheet: Sheet) => void;
 	/** The sheet of the menu this one replaces, taken over as it stands: a subtask's menu opened from its task's stack. */
 	readonly sheet?: Sheet;
 	/** Draws the start of the task's description over its copy; without it the menu shows none. */
@@ -213,9 +208,9 @@ export class TaskMenu extends LiftedMenu {
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
-		} else fillCard(this.lifted, this.drawn, { day: context.day });
+		} else fillCard(this.lifted, this.context.item, { day: context.day });
 		const copy = this.liftWhole(context.source, showWhole);
-		this.anchor = this.stacks && this.drawn.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
+		this.anchor = this.stacks && this.context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
 		this.panel = this.addPanel("is-task").el;
@@ -232,11 +227,6 @@ export class TaskMenu extends LiftedMenu {
 		e.preventDefault();
 		e.stopPropagation();
 		this.pick(() => this.context.actions.openLink(link))();
-	}
-
-	/** The task whose card the copy is: the menu's own, or the folded result whose step's menu this is. */
-	private get drawn(): TaskItem {
-		return this.context.drawn ?? this.context.item;
 	}
 
 	/** The menu of a timeline card: its subtasks stand in a stack under its copy. */
@@ -311,7 +301,7 @@ export class TaskMenu extends LiftedMenu {
 	/** The open subtasks of a timeline card, under its copy at its width; the panel then goes by them. */
 	private showSubtasks(copy: DOMRect): DOMRect {
 		const stack = (this.stack = this.stackUnder(copy));
-		this.fillStack(stack, this.drawn.subtasks);
+		this.fillStack(stack, this.context.item.subtasks);
 		return new DOMRect(copy.left, copy.top, copy.width, stack.getBoundingClientRect().bottom - copy.top);
 	}
 
@@ -327,11 +317,9 @@ export class TaskMenu extends LiftedMenu {
 		for (const subtask of subtasks) {
 			const card = renderTaskCard(null, subtask, { day });
 			stack.insertBefore(card, this.stackRow);
-			let pressed: EventTarget | null = null;
-			card.addEventListener("pointerdown", (e) => (pressed = e.target));
 			card.addEventListener(
 				"click",
-				this.picks.handOff(() => onSubtask?.(cardMenuTask(subtask, pressed), card, (onClose) => this.overlay.handOver(onClose), subtask)),
+				this.picks.handOff(() => onSubtask?.(subtask, card, (onClose) => this.overlay.handOver(onClose))),
 			);
 		}
 	}
@@ -425,11 +413,9 @@ export class TaskMenu extends LiftedMenu {
 			const next = await this.context.actions.toggleLabel(name);
 			if (this.isClosed) return;
 			if (!next) return this.close();
-			/** The copy is this task's own card, not a folded result's that shows it as its step: it takes the new colours. */
-			const ownCopy = this.drawn.id === this.context.item.id;
-			this.context = { ...this.context, item: next, drawn: ownCopy ? next : this.context.drawn };
+			this.context = { ...this.context, item: next };
 			const card = this.lifted.classList.contains("is-block") ? this.lifted.querySelector<HTMLElement>(".tc-block-card") : this.lifted;
-			if (card && ownCopy) markColours(card, next);
+			if (card) markColours(card, next);
 			this.showMenu(this.groupsAbove());
 		} finally {
 			this.labelling = false;
@@ -512,8 +498,7 @@ export class TaskMenu extends LiftedMenu {
 		const next = await this.context.actions.toggleProject(name);
 		if (this.isClosed) return;
 		if (!next) return this.close();
-		const ownCopy = this.drawn.id === this.context.item.id;
-		this.context = { ...this.context, item: next, drawn: ownCopy ? next : this.context.drawn };
+		this.context = { ...this.context, item: next };
 		this.showProjects();
 	}
 

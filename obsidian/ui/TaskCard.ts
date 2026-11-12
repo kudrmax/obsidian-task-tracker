@@ -87,21 +87,6 @@ function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: s
 	fillTitle(el(lines, "div", "tc-card-title"), step ? RenamedTexts.shown(step).text : shown.text);
 }
 
-/** Whose menu a tap on a list's card opens where `pressed` is: a folded result's on its small line, its shown step's anywhere else. */
-export function cardMenuTask(item: TaskItem, pressed: EventTarget | null): TaskItem {
-	const step = item.card.step;
-	return step && !onOver(pressed) ? step : item;
-}
-
-/** Whose menu a tap on a timeline's block opens: a result's next step, else the task's own (`TaskItem.block`). */
-export function blockMenuTask(item: TaskItem): TaskItem {
-	return item.block.step ?? item;
-}
-
-function onOver(target: EventTarget | null): boolean {
-	return target instanceof Element && target.closest(".tc-card-over") !== null;
-}
-
 /**
  * One column where the subtask counter stood: «2/5», of the task's own subtasks the done ones out of those not given up,
  * and under it the mark of a description; either alone when the task has only that.

@@ -1,6 +1,5 @@
 import type { ResizeEdge, StretchSpan, TaskItem } from "../../../core/application/contracts";
 import { shownCardSize } from "../cardSize";
-import { blockMenuTask, cardMenuTask } from "../TaskCard";
 import { DESIGN, LAYOUT } from "../design";
 import { pxToMinutes } from "../timelineLayout";
 import { capturePointer, releasePointer } from "../dom";
@@ -62,7 +61,7 @@ export interface DragControllerDeps {
 	 * Opens the task menu over `source`; `lifted` dresses the copy of the card that stays over the blur. `drawn`: the task
 	 * whose card or block `source` is, when the menu is another's (a folded result's step, `TaskItem.card`).
 	 */
-	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, held?: boolean, drawn?: TaskItem): OpenMenu;
+	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, held?: boolean): OpenMenu;
 	/** A card or block double-clicked: its title is renamed in place, no menu. */
 	onRename(item: TaskItem): void;
 	/** A long tap on an empty place of the timeline, let go: the field of a new task in the slot the target showed. */
@@ -96,7 +95,7 @@ export class DragController {
 			"contextmenu",
 			(e) => {
 				e.preventDefault();
-				if (!this.deps.pick?.(item, card, e, "menu")) this.deps.onMenu(cardMenuTask(item, e.target), card, undefined, undefined, item);
+				if (!this.deps.pick?.(item, card, e, "menu")) this.deps.onMenu(item, card);
 			},
 			{ signal },
 		);
@@ -114,8 +113,7 @@ export class DragController {
 			},
 			onTap: (e) => {
 				if (this.deps.pick?.(item, card, e, "tap") || this.deps.mark?.(item, pressed) || this.deps.fold?.(item, pressed)) return;
-				const shown = cardMenuTask(item, pressed);
-				this.tapped(e, shown, this.deps.onMenu(shown, card, undefined, undefined, item));
+				this.tapped(e, item, this.deps.onMenu(item, card));
 			},
 		});
 	}
@@ -137,7 +135,7 @@ export class DragController {
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => (e.pointerType === "mouse" ? this.begin(block, this.payload(block, item, "timeline", e), e) : this.hold(block, item, e)),
 			onTap: (e) => {
-				if (!this.deps.mark?.(item, pressed)) this.tapped(e, blockMenuTask(item), this.deps.onMenu(blockMenuTask(item), block, undefined, undefined, item));
+				if (!this.deps.mark?.(item, pressed)) this.tapped(e, item, this.deps.onMenu(item, block));
 			},
 			onLongTap: () => this.selectWithMenu(block, item),
 		});
@@ -179,7 +177,7 @@ export class DragController {
 	/** Selects the card and opens its menu; the dots on the copy over the blur stretch the card as its own do. */
 	private selectWithMenu(block: HTMLElement, item: TaskItem, held = false): OpenMenu {
 		this.deps.timeline()?.select(item);
-		return this.deps.onMenu(blockMenuTask(item), block, (copy, close) => this.gripsOn(copy, block, item, close), held, item);
+		return this.deps.onMenu(item, block, (copy, close) => this.gripsOn(copy, block, item, close), held);
 	}
 
 	/** A dot of the selected card taken. */

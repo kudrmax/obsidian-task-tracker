@@ -26,9 +26,6 @@ struct TaskCapsule: View {
     var onLinks: (([CardLink]) -> Void)?
     /// Where the project's folder mark is drawn, in the capsule's own space: the card lays its button there.
     var onMark: ((CGRect) -> Void)?
-    /// Where a folded result's own line is drawn over its step, in the capsule's own space: a tap there opens the result's
-    /// menu, anywhere else the step's.
-    var onOver: ((CGRect) -> Void)?
     /// A search's find: the found pieces picked out of the title, and the project's name or the description's line under
     /// it where the query was found there, as the plugin's search draws its cards.
     var found: SearchHit?
@@ -194,7 +191,6 @@ struct TaskCapsule: View {
             .mask(fadeMask)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(card.face.overSymbol == "folder" ? "Project \(over)" : "Task \(over)")
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onOver?($0) }
     }
 
     /// The title's pieces: the card's, or its new text alone while its rename is written.

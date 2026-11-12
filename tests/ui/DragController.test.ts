@@ -333,6 +333,43 @@ describe("DragController: a tap on a list card", () => {
 		const { onMenu } = tapped((card) => card, () => false);
 		expect(onMenu).toHaveBeenCalledTimes(1);
 	});
+
+	/**
+	 * Max, 2026-11-12: a tap on a card opens that card's menu, wherever on it the tap lands. A folded task's card shows its
+	 * next step in big type, yet its menu is the folded task's own; the step's menu is reached by unfolding it.
+	 */
+	it("opens a folded task's own menu wherever on its card the tap lands, on its next step's title too", () => {
+		const step = { key: { section: "now", index: 1, path: [0], raw: "\t- [ ] Step" }, text: "Step" } as unknown as TaskItem;
+		const folded = { key: { section: "now", index: 0, path: [], raw: "- [ ] Result" }, text: "Result", card: { text: "Result", title: "Result", over: "Result", step, semibold: false }, block: { text: "Step", title: "Step", step } } as unknown as TaskItem;
+		for (const where of [".tc-card-over", ".tc-card-title", null]) {
+			const onMenu = vi.fn(() => ({ close: vi.fn(), onClickedAgain: vi.fn() }));
+			const deps = { longPressMs: () => 300, haptics: { tap: () => {} }, arbiter: new GestureArbiter(), onMenu } as unknown as DragControllerDeps;
+			const card = document.body.appendChild(document.createElement("div"));
+			card.appendChild(document.createElement("div")).className = "tc-card-over";
+			card.appendChild(document.createElement("div")).className = "tc-card-title";
+			new DragController(deps).attachCard(card, folded, "day");
+			const target = where ? card.querySelector<HTMLElement>(where)! : card;
+			target.dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, isPrimary: true, button: 0, pointerType: "touch" }));
+			card.dispatchEvent(Object.assign(new Event("pointerup", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, pointerType: "touch" }));
+			expect(onMenu).toHaveBeenCalledWith(folded, card);
+			card.dispatchEvent(Object.assign(new Event("contextmenu", { bubbles: true, cancelable: true })));
+			expect(onMenu).toHaveBeenLastCalledWith(folded, card);
+			card.remove();
+		}
+	});
+
+	it("opens a folded task's own menu from its block on the timeline, though the block is named by its next step", () => {
+		const step = { key: { section: "now", index: 1, path: [0], raw: "\t- [ ] Step" }, text: "Step" } as unknown as TaskItem;
+		const folded = { key: { section: "now", index: 0, path: [], raw: "- [ ] Result" }, text: "Result", block: { text: "Step", title: "Step", step } } as unknown as TaskItem;
+		const onMenu = vi.fn(() => ({ close: vi.fn(), onClickedAgain: vi.fn() }));
+		const deps = { longPressMs: () => 300, haptics: { tap: () => {} }, arbiter: new GestureArbiter(), onMenu } as unknown as DragControllerDeps;
+		const block = document.body.appendChild(document.createElement("div"));
+		new DragController(deps).attachBlock(block, folded);
+		block.dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, isPrimary: true, button: 0, pointerType: "touch" }));
+		block.dispatchEvent(Object.assign(new Event("pointerup", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, pointerType: "touch" }));
+		expect(onMenu).toHaveBeenCalledWith(folded, block);
+		block.remove();
+	});
 });
 
 describe("DragController: a finger held on a calendar event", () => {

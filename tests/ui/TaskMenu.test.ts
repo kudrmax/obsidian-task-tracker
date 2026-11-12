@@ -135,23 +135,16 @@ describe("the label group", () => {
 		document.body.innerHTML = "";
 	});
 
-	it("recolours the copy for the task its card draws, as every card tap passes it, and leaves a folded result's copy as it is", async () => {
-		const open = async (drawn: TaskItem) => {
-			const source = document.body.appendChild(document.createElement("div"));
-			const labelled = item({ labels: [LABELS[0]], colors: ["red"], key: { section: "now", index: 0, path: [], raw: "- [ ] A #label/Важное" } });
-			const actions = { setRepeat: vi.fn(async () => {}), pickStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setProject: vi.fn(async () => {}), newProject: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), toggleLabel: vi.fn(async () => labelled), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn(), toggleProject: vi.fn(async () => null) };
-			const menu = TaskMenu.open({ item: item(), drawn, source, today: "2026-11-01", day: "2026-11-01", menu: menuOf(LEVELS, LABELS), actions });
-			await new Promise((r) => setTimeout(r, 0));
-			document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-labels .tc-menu-tile")[0].click();
-			await vi.waitFor(() => expect(actions.toggleLabel).toHaveBeenCalled());
-			await new Promise((r) => setTimeout(r, 0));
-			const painted = document.querySelector(".tc-lifted")?.getAttribute("data-priority") ?? null;
-			menu.close();
-			document.body.innerHTML = "";
-			return painted;
-		};
-		expect(await open(item())).toBe("red");
-		expect(await open(item({ text: "Result", key: { section: "now", index: 1, path: [], raw: "- [ ] 🎯 Result" } }))).toBeNull();
+	it("recolours its copy once a label goes on the task", async () => {
+		const source = document.body.appendChild(document.createElement("div"));
+		const labelled = item({ labels: [LABELS[0]], colors: ["red"], key: { section: "now", index: 0, path: [], raw: "- [ ] A #label/Важное" } });
+		const actions = { setRepeat: vi.fn(async () => {}), pickStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setProject: vi.fn(async () => {}), newProject: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), toggleLabel: vi.fn(async () => labelled), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn(), toggleProject: vi.fn(async () => null) };
+		const menu = TaskMenu.open({ item: item(), source, today: "2026-11-01", day: "2026-11-01", menu: menuOf(LEVELS, LABELS), actions });
+		await new Promise((r) => setTimeout(r, 0));
+		document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-labels .tc-menu-tile")[0].click();
+		await vi.waitFor(() => expect(document.querySelector(".tc-lifted")?.getAttribute("data-priority")).toBe("red"));
+		menu.close();
+		document.body.innerHTML = "";
 	});
 
 	it("can't be pressed while the task has a priority, nor the levels while it has labels: as the task's `can` says", () => {
