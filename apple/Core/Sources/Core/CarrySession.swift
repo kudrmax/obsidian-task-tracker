@@ -26,10 +26,16 @@ public struct SystemCarryClock: CarryClock {
 
     public func now() -> Date { Date() }
 
+    /// On time to the millisecond: `asyncAfter` may run a pause this long tens of milliseconds late.
     public func after(ms: Double, _ work: @escaping @MainActor () -> Void) -> () -> Void {
-        let item = DispatchWorkItem { MainActor.assumeIsolated { work() } }
-        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, ms) / 1000, execute: item)
-        return { item.cancel() }
+        let timer = DispatchSource.makeTimerSource(flags: .strict, queue: .main)
+        timer.schedule(deadline: .now() + max(0, ms) / 1000, leeway: .milliseconds(1))
+        timer.setEventHandler {
+            timer.cancel()
+            MainActor.assumeIsolated { work() }
+        }
+        timer.resume()
+        return { timer.cancel() }
     }
 }
 
@@ -157,7 +163,10 @@ public final class CarrySession {
             guard let wait, self.isOpen, self.reported == spot else { return }
             // The core pauses over a row it will open: what it will show can be read meanwhile, its call already answered.
             if let node = spot.node, !waited { self.pausing(node) }
-            self.callOff = self.clock.after(ms: wait) { [weak self] in
+            // The pause runs from the moment the finger came (`now`, as the core was told), not from the answer: the time
+            // the call took is not waited twice.
+            let spent = self.clock.now().timeIntervalSince(now) * 1000
+            self.callOff = self.clock.after(ms: max(0, wait - spent)) { [weak self] in
                 guard let self, self.isOpen, self.reported == spot else { return }
                 self.report(spot, waited: true)
             }

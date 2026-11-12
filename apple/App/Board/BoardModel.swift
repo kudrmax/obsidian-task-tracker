@@ -261,6 +261,7 @@ final class BoardModel {
 
     private func readAhead(_ node: String) {
         guard node != hovered?.node, projects.rows.first(where: { $0.node == node })?.opensOnHover == true else { return }
+        projects.readAhead(node)
         let board = board, day = shownDay
         hovered = (node, Task.detached { try? board.snapshot(day: day, measures: CardMetrics.timeline, filter: .some(node)) })
     }
@@ -1284,6 +1285,21 @@ final class BoardModel {
         session.start(keys: [], plus: true)
         carry = Carry(token: token, id: Carried.plus, item: nil, from: "new")
         return token
+    }
+
+    /// The By project list a drop leaves (`ProjectsBoard.preview`), drawn now: while its copy still flies, the cards it
+    /// lands as stay hidden until it is down.
+    func landDropped(_ read: ProjectsBoard.Read, as landings: [String]) {
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
+            if carry != nil {
+                arriving.formUnion(landings)
+                // Its place is the card's now, not the dashed one it was lifted from: as a list's drop, landed.
+                carry?.landed = true
+            }
+        }
+        projects.drawDropped(read)
     }
 
     /// The carry ended, its copy down, whatever came of it: once, and only the carry under way.

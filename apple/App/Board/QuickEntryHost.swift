@@ -711,6 +711,9 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
     private let bar = UIHostingController(rootView: KeyBar(host: nil))
     /// The entry wants the keyboard: the field takes it again whenever it comes into a window.
     private var wanted = false
+    /// The field stands for a card being renamed: the row passes from the card to it in a fade. A new row (Enter's next
+    /// field) is the field at once, never a fade from what its cell drew before.
+    var renames: Bool { host?.state?.renaming != nil }
     /// A touch anywhere in the window outside the field: a tap elsewhere.
     private lazy var elsewhere: UITapGestureRecognizer = {
         let tap = UITapGestureRecognizer(target: self, action: #selector(tappedElsewhere))
@@ -872,10 +875,20 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
 
     /// The keyboard went to something else (another field, a page's editor): the entry ends as by a tap elsewhere, unless
     /// a sheet of the bar took it for a while. Moving between rows and lists never ends editing: the field stays in the
-    /// window.
+    /// window: a field dropped with the row that showed it (its view taken out of the window before it could be parked)
+    /// gave the keyboard to nothing, and is parked and takes it back, the entry going on.
     func textFieldDidEndEditing(_ textField: UITextField) {
         guard wanted, host?.paused != true else { return }
-        host?.blur()
+        let window = window
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.wanted, !self.isFirstResponder else { return }
+            if let window, window.firstResponderInside == nil {
+                if self.window == nil { self.park(in: window) }
+                self.take()
+                return
+            }
+            self.host?.blur()
+        }
     }
 }
 
@@ -959,7 +972,7 @@ final class EntryFieldBox: UIView {
         guard field.superview !== self else { return }
         // A row that turns into the field (a card renamed) passes from what it showed to the field, scrolled to its caret,
         // in a short fade: the card's title from its start, the field's at its end, never one replacing the other at once.
-        if let row = sequence(first: self as UIView, next: { $0.superview }).lazy.compactMap({ $0 as? UICollectionViewCell }).first {
+        if field.renames, let row = sequence(first: self as UIView, next: { $0.superview }).lazy.compactMap({ $0 as? UICollectionViewCell }).first {
             let fade = CATransition()
             fade.type = .fade
             fade.duration = Self.fade

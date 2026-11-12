@@ -115,11 +115,30 @@ final class ProjectsBoard {
     /// A list read for a view about to be drawn: it shows in the same drawing as the view, never a frame after it.
     @ObservationIgnored private var prefetched: (key: ReadKey, read: Read)?
 
+    /// The list of a node a carry rests on, read while the core's pause runs (`readAhead`): the view the pause opens is
+    /// drawn with it, never waiting for its read.
+    @ObservationIgnored private var ahead: (node: String, read: Task<Read?, Never>)?
+
+    /// The By project list of `node` read ahead, while the drawn view reads By project's list.
+    func readAhead(_ node: String) {
+        guard let model, case .projects = model.presentation?.source, node != ahead?.node else { return }
+        let board = board, screen = model.menuScreen
+        ahead = (node, Task.detached { await Self.fetch(board, screen: screen, node: node) })
+    }
+
     /// The By project list of `view` read now, off the main thread, when the view reads it and it is not the one drawn;
     /// handed to the drawing of that view (`follow`).
     func prefetch(_ view: FunnelView, file: String?? = nil) async {
         guard let model, case .projects(let node) = FunnelPresentation(view).source else { return }
         let key = ReadKey(node: node, file: file ?? model.snapshot?.tasksText, context: view.view.context)
+        // Read during a carry's pause over this node: taken when it was read over the file asked.
+        if let early = ahead, early.node == node {
+            ahead = nil
+            if let read = await early.read.value, key.file == nil || read.file == key.file {
+                prefetched = (ReadKey(node: node, file: read.file, context: key.context), read)
+                return
+            }
+        }
         // A list read beside the screen (no file asked) counts for the screen read over the same file.
         if let ready = prefetched, ready.key.node == key.node, ready.key.context == key.context, ready.read.file == key.file || key.file == nil {
             prefetched = (ProjectsBoard.ReadKey(node: key.node, file: ready.read.file, context: key.context), ready.read)
@@ -173,16 +192,39 @@ final class ProjectsBoard {
         try? await Task.detached(operation: { () throws -> Read in
             let files = try board.files()
             let raw: JSONValue = try board.read("tasks.projectsScreen", node.map { [.string($0)] } ?? [], over: files)
-            let view = try raw.decode(ProjectsView.self)
-            var drawn: [[BoardCard]] = []
-            var froms: [String: String] = [:]
-            for section in view.sections {
-                let painted = try board.cards(section.rows.map { ListRow(item: $0.item, level: $0.level) })
-                drawn.append(zip(section.rows, painted).map { Self.card($0.1, as: $0.0) })
-                for row in section.rows where froms[row.item.id] == nil { froms[row.item.id] = row.card?.menuFrom ?? "list" }
-            }
-            return Read(view: view, raw: raw, rows: drawn, froms: froms, entryLook: try board.projectsEntryLook(view), file: files.tasks)
+            return try painted(raw, board, file: files.tasks)
         }).value
+    }
+
+    /// The list a drop of `drops` at `place` leaves (`tasks.projectsDropPreview`, writing nothing), read off the main
+    /// thread, and the ids of the cards it lands as.
+    static func preview(_ board: TaskBoard, drops: [JSONValue], place: JSONValue, node: String) async -> (read: Read, landings: [String])? {
+        try? await Task.detached(operation: { () throws -> (read: Read, landings: [String]) in
+            let files = try board.files()
+            let answer: JSONValue = try board.read("tasks.projectsDropPreview", [.array(drops), place, .string(node)], over: files)
+            // The card each landing is drawn as in the list (`card`), a subtask's by its own id.
+            let landings = answer["landings"].array.compactMap { $0["card"].string ?? $0["id"].string }
+            return (try painted(answer["view"], board, file: nil), landings)
+        }).value
+    }
+
+    /// A list as the core answered it, its rows painted as a list paints them.
+    nonisolated private static func painted(_ raw: JSONValue, _ board: TaskBoard, file: String?) throws -> Read {
+        let view = try raw.decode(ProjectsView.self)
+        var drawn: [[BoardCard]] = []
+        var froms: [String: String] = [:]
+        for section in view.sections {
+            let painted = try board.cards(section.rows.map { ListRow(item: $0.item, level: $0.level) })
+            drawn.append(zip(section.rows, painted).map { Self.card($0.1, as: $0.0) })
+            for row in section.rows where froms[row.item.id] == nil { froms[row.item.id] = row.card?.menuFrom ?? "list" }
+        }
+        return Read(view: view, raw: raw, rows: drawn, froms: froms, entryLook: try board.projectsEntryLook(view), file: file)
+    }
+
+    /// The list a drop leaves, drawn the moment it is let go, in the drop's own motion: its card stands where the line
+    /// stood while the file is written and read again.
+    func drawDropped(_ read: Read) {
+        withAnimation(CarryMotion.dropAnimation) { draw(read) }
     }
 
     /// A read drawn, in the transaction the caller draws it in (the quick entry's line ending with its card).

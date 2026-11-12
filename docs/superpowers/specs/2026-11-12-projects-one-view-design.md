@@ -165,6 +165,13 @@ Backend, QA (2026-11-12):
 81. Places for a new task are matched field by field, one function (`sameNewPlace`, `rules.sameNewPlace`), never by their JSON text: `projectsEntryLook` matches a part's write with it, and a frontend that matches places calls it instead of sorting keys.
 82. By project, a field opened at a part's end (the plus, a plate, the plus let go at the part's end gap) stands where the card it writes will land: before the part's first card of a later stage than its new task's (`EntryPart.end`, null: the part's end); the core's entry places it there (`spotIn`). The card keeps its stage order (the part's order); the field moves to it rather than the card to the field.
 
+Swift frontend, QA 3 (2026-11-12):
+
+83. By project the plus is let go as on a list, as the plugin's (`ProjectsListDrop`): the gap under the finger by `rules.placeAt` over the cards and the parts' headers as drawn, then `rules.placeOfDrop`, shown and taken only where `rules.projectsPlusTakes` says; the field opens there (`openAt("projects", place)`). A part's header is measured as drawn, the room above it left out (the plugin's header keeps its margin outside its box), so the gap under a part's last card is that part's: let go there, the plus writes that part's project. Its line stands where the field opens: at a part's end gap before `EntryPart.end` when the core gives one, in an empty part under its header.
+84. By project a card let go among the parts draws the list the drop leaves (`tasks.projectsDropPreview`, read while the card is held at the line) the moment it is let go: the card stands at the line's place, hidden until its copy is down, and never back at its old place while the file is written and read again.
+85. The pause of a held card over a panel row runs from the moment the finger came there (the `now` the core was told), not from the core's answer, on a timer precise to the millisecond; By project the list of the row it rests on is read during the pause with its lists, so the view the pause opens is drawn with both at once.
+86. A typed line, its waiting text and its card keep one row (By project as the lists): each stands in place of the one before at once, never cross-fading; a new field's row (Enter's next) is the field at once, never a fade from what its cell drew before (the fade is a renamed card's alone). A field whose row is dropped before the field could be parked takes the keyboard back; the entry ends only when something else took the keyboard.
+
 ## Contract
 
 All in `core/application/contracts.ts`; the door is `docs/door.md`, «Projects as one view with the funnel».

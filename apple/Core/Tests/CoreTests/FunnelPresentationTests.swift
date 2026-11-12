@@ -128,6 +128,8 @@ import Testing
         var at = Date(timeIntervalSince1970: 1000)
         private var waiting: [Int: @MainActor () -> Void] = [:]
         private var made = 0
+        /// The pauses asked for, in milliseconds.
+        var asked: [Double] = []
 
         var pending: Int { waiting.count }
 
@@ -135,6 +137,7 @@ import Testing
 
         func after(ms: Double, _ work: @escaping @MainActor () -> Void) -> () -> Void {
             made += 1
+            asked.append(ms)
             let id = made
             waiting[id] = work
             return { [weak self] in self?.waiting[id] = nil }
@@ -171,6 +174,19 @@ import Testing
         #expect(calls.log == ["start 0", "at true - 1000", "at true - 1001"])
         // The pause over brought the panel out: the screen is read again.
         #expect(redraws.count == 1)
+    }
+
+    /// The core's pause counts from the moment the finger came, so the time its call took is not waited on top (QA
+    /// 11-12: a held card opened a row 0.74 s after it came, against the core's 0.6 s).
+    @Test func thePauseRunsFromTheMomentTheFingerCame() async {
+        let calls = Calls(), clock = Clock(), redraws = Redraws()
+        let carry = session(calls, clock, redraws)
+        carry.start(keys: [])
+        carry.moved(to: .init(edge: false, node: "project:A"))
+        clock.at = clock.at.addingTimeInterval(0.08)
+        await carry.idle()
+        #expect(clock.asked.count == 1)
+        #expect(abs(clock.asked[0] - 220) < 0.001)
     }
 
     @Test func movingElsewhereCallsThePauseOff() async {
