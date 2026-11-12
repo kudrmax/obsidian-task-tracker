@@ -103,7 +103,7 @@ enum DrawnRow: Hashable {
 struct ListCollection: UIViewRepresentable {
     let column: BoardColumn
     let model: BoardModel
-    /// One of the Rows view's stacked lists, as tall as its rows while they fit (`StackedRows`).
+    /// One of the Rows view's stacked lists, as tall as its rows while they fit (`rules.stackedRows`).
     var stacked = false
 
     func makeCoordinator() -> ListController { ListController(column: column, model: model) }
