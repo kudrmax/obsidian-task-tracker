@@ -1650,6 +1650,9 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
 body:not(.is-mobile) .tc-stage-col.is-timeline .tc-day-nav { gap: var(--tc-space-4); }
 .tc-stage-col.is-day .tc-day-nav .tc-arrow, body.is-mobile .tc-stage-col.is-timeline .tc-day-nav .tc-arrow { width: var(--tc-arrow-narrow); }
 
+/* Another context drawn (another filter, mode or note): every list takes its new shape in place, no margin or height sliding. */
+.task-calendar.is-redrawn :is(.tc-card, .tc-group-head, .tc-group-empty, .tc-group-drop, .tc-row, .tc-list) { transition: none; }
+
 /*
  * The rows (D2, T3): the stages stacked under their small labels. Each row's height is the core's (`rules.stackedLists`),
  * measured once the lists' motion settles and set by the code: as tall as its cards while all fit; a list that scrolls

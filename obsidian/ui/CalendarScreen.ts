@@ -72,6 +72,8 @@ const MINUTE_MS = 60_000;
 /** The place of the screens a list stands at: Backlog under Inbox, Done left of it. */
 const PLACE_OF_LIST: Readonly<Record<Extract<TaskScreen, { kind: "list" }>["list"], Place>> = { done: "done", inbox: "inbox", backlog: "inbox", soon: "soon" };
 
+/** Another context drawn: its styles settle with no transition, so nothing on it slides in (spec decision 52). */
+const REDRAWN = "is-redrawn";
 /** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
 const NAMING = "naming";
 /** How long a tap waits at most for the screen to draw the day the last turn brought in. */
@@ -1579,6 +1581,7 @@ export class CalendarScreen extends Component {
 			this.rightEl.classList.toggle("tc-hidden", missing);
 			root.querySelector(".tc-missing")?.remove();
 			if (missing) this.renderMissing(root);
+			root.classList.toggle(REDRAWN, motion === "replace");
 			layout.render(motion);
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
@@ -1592,6 +1595,10 @@ export class CalendarScreen extends Component {
 		if (this.landing?.peek.date === this.selectedDate && (this.data.missing || this.data.day?.date === this.selectedDate)) this.landed();
 		this.quick?.rendered();
 		layout.hold("typing", this.quick?.entering ?? false);
+		if (root.classList.contains(REDRAWN)) {
+			void root.offsetHeight;
+			root.classList.remove(REDRAWN);
+		}
 	}
 
 	/**

@@ -68,9 +68,12 @@ export class RowsLayout extends StillLayout {
 			row.label.textContent = row.title ?? this.host.dayName();
 			row.funnel.list.render(motion === "move");
 		}
-		if (motion === "replace") this.still = true;
-		this.frame();
-		this.fit();
+		super.frame();
+		if (motion === "replace") {
+			this.still = true;
+			this.waiting = null;
+			this.apply();
+		} else this.fit();
 	}
 
 	/** Measures again once nothing moves in the lists and nothing holds them, then sets each row's height. */
