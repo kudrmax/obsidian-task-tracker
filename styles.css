@@ -1695,7 +1695,7 @@ body:not(.is-mobile) .tc-stage-col.is-timeline .tc-day-nav { gap: var(--tc-space
  */
 body:not(.is-mobile) .task-calendar .tc-list.tc-row-list > .tc-quick-row { margin-bottom: var(--tc-row-entry-room); }
 body.is-mobile .task-calendar.is-entering .tc-list.tc-row-list:has(> .tc-quick-row)::after { content: ""; height: var(--tc-row-entry-room); }
-body:not(.is-mobile) .task-calendar { --tc-row-entry-room: calc(var(--tc-bar-h) + 2 * var(--tc-desk-bar-gap)); --tc-row-field-room: var(--tc-row-entry-room); }
+body:not(.is-mobile) .task-calendar { --tc-row-entry-room: calc(var(--tc-seg) + 2 * var(--tc-desk-bar-gap)); --tc-row-field-room: var(--tc-row-entry-room); }
 /* The list a task is typed in shows its field whole: under it is only the bar's room, so its end is not cut away. */
 .task-calendar .tc-list.tc-row-list.is-under-bottom:has(> .tc-quick-row) { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade))); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade))); }
 /* The list under a carried card alone opens a card's room at its end, inside its own scroll: no row moves. */

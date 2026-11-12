@@ -150,7 +150,7 @@ export class RowsLayout extends StillLayout {
 		}
 	}
 
-	/** The heights while a task is typed in rows that share the room: as they stand, the field's row made tall enough for it; null when it already is. */
+	/** The heights while a task is typed in rows that share the room: as they stand, the field's row made exactly as tall as the field and the bar's room under it (the tallest other row gives or takes the difference); null when it already is. */
 	private typingHeights(now: readonly number[]): number[] | null {
 		const at = this.rows.findIndex((row) => row.funnel.list.el.querySelector(":scope > .tc-quick-row") !== null);
 		if (at < 0) return null;
@@ -158,12 +158,13 @@ export class RowsLayout extends StillLayout {
 		const field = row.funnel.list.el.querySelector<HTMLElement>(":scope > .tc-quick-row")!;
 		const style = getComputedStyle(row.funnel.list.el);
 		const need = row.label.offsetHeight + (parseFloat(style.paddingTop) || 0) + restingRect(field).height + this.entryProbe.offsetHeight;
+		/** Exactly that tall: scrolled to the field, the list shows no part of a row above it under its label. */
 		const deficit = need - now[at];
-		if (deficit <= 0.5) return null;
+		if (Math.abs(deficit) <= 0.5) return null;
 		const heights = [...now];
-		const giver = heights.reduce((best, height, i) => (i !== at && (best < 0 || height > heights[best]) ? i : best), -1);
-		if (giver < 0) return null;
-		heights[giver] -= deficit;
+		const other = heights.reduce((best, height, i) => (i !== at && (best < 0 || height > heights[best]) ? i : best), -1);
+		if (other < 0) return null;
+		heights[other] -= deficit;
 		heights[at] = need;
 		return heights;
 	}
