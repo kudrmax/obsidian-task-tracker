@@ -81,6 +81,21 @@ iPhone app (frontend-swift, 2026-11-12):
 21. By project draws the core's `projectsScreen(node)` parts without the old segment (By stage is Rows now), the calendar
     beside it behind the divider.
 
+Obsidian frontend (2026-11-12; numbered from 22 so as not to meet the Swift frontend's 13–21 on its branch):
+
+22. The top row: on the desktop the row of the projects button and the filter's title always stands over the column titles (D4); on the phone only while a filter is set or the mode has no column titles (rows, by project), else the button stands in the titles' row and the first title makes room for it (T1).
+23. The docked panel (desktop): every column moves right by its room; the wheel and the view button centre on the lists right of it; Undo's capsule stands at the panel's tree inset (D1: 20 from the edge).
+24. The phone's bottom row with the wheel: the view button and the wheel stand together in the middle of the room between Undo's capsule and the plus, as the boards measure it (T1, T4: the wheel ends up right of the screen's centre). Alone, the view button stands in the middle (T3).
+25. All columns: Inbox, Soon and the day's list each as wide as the one divider sets, the timeline the rest; the share it saves is one list's against the timeline, so the middle share gives four equal columns (D1); it is the same setting as two columns' divider.
+26. The panel on the phone lies over the lists and their fade, under the bottom row; a tap on the dim closes it (as the app's 14). A drag let go nowhere after a held card opened another node puts back the filter it was lifted under, none included.
+27. The plus can be let go in the tree (a new project) in every mode while the panel shows; on the phone the plus held at the left edge slides the panel out too (the app's 20); the panel stays out while the new project's name is typed.
+28. A swipe's next day reads the filtered day (`screen(date, filter).day`), so the day sliding in shows only the filter's tasks; in every mode but two columns, and in a note's block, the screen does not swipe (the app's 17).
+29. The note's block keeps the 11-07 frame (hairline, radius 14), 12 inside it; its rows are as tall as their tasks and the block grows with them up to the old block's tallest; its own bottom row (Undo + ⋯, the view button, the plus) stands inside the frame.
+30. A card's folder mark and the whole screen's project line choose that project as the filter (`selectProjectNode`); the panel stays as it was.
+31. A window kept at the old Projects place opens at Inbox.
+
+Applied from the Swift frontend: 17 (rows: each list as tall as its cards while all fit, the long ones share the rest and scroll inside, a card's room more while a card or the plus is carried or a task typed; the day by the arrows), 18 (the «No tasks» plate in an empty list under a filter and in rows), 19 (a find the filter hides clears it; a done find outside two columns opens on the whole screen), 20 (the left edge for a card and the plus), 21 (by project without a segment). 13, 15 and 16 are the app's own chrome: the plugin keeps the boards' top-left button and its own icons.
+
 ## Contract
 
 All in `core/application/contracts.ts`; the door is `docs/door.md`, «Projects as one view with the funnel».

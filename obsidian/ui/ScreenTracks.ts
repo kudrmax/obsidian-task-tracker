@@ -4,7 +4,7 @@ import { type Place, placeIndex, type Shift } from "./screens";
 import type { ScreenTrack } from "./ScreenPager";
 
 /** What stands on the strip and slides with it: the columns, the dividers between them and the headers over them. */
-const STRIP = [".tc-projects", ".tc-done", ".tc-inbox", ".tc-soon", ".tc-left", ".tc-right", ".tc-divider", ".tc-head"];
+const STRIP = [".tc-done", ".tc-rows", ".tc-by-project", ".tc-inbox", ".tc-soon", ".tc-left", ".tc-right", ".tc-divider", ".tc-head"];
 
 export function stripParts(root: HTMLElement): HTMLElement[] {
 	return [...root.querySelectorAll<HTMLElement>(STRIP.map((part) => `:scope > ${part}`).join(", "))];

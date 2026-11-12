@@ -34,6 +34,10 @@ export interface TaskListDeps {
 	onHeader?(head: HTMLElement, group: ListGroup, signal: AbortSignal): void;
 	/** The No tasks plate under an empty section's header. */
 	onPlate?(plate: HTMLElement, group: ListGroup, signal: AbortSignal): void;
+	/** The words of the plate a list that draws nothing shows (a filter's «No tasks», a row of the rows mode); null: none. */
+	empty?(): string | null;
+	/** That plate tapped: a new task at the list's end. */
+	onEmpty?(): void;
 }
 
 export interface ListEntry {
@@ -215,6 +219,8 @@ export class TaskList {
 			if (lines) branch(row.node, lines.through, lines.last);
 		});
 		const pending = this.deps.pending?.() ?? null;
+		const empty = this.nodes.length === 0 && entryRow === null && pending === null ? (this.deps.empty?.() ?? null) : null;
+		if (empty !== null) this.emptyPlate(drawing, empty);
 		this.slot = pending ? drawing.take("slot", () => el(null, "div", "tc-group-slot")).node : null;
 		if (pending) this.cardOf(drawing, pending, day, signals);
 		drawing.finish();
@@ -326,6 +332,13 @@ export class TaskList {
 		this.headsById.set(group.id, head);
 		this.deps.onHeader?.(head, group, signal);
 		return head;
+	}
+
+	/** The plate of a list that draws nothing: not a section's, a tap types a task at the list's end. */
+	private emptyPlate(drawing: RowsDrawing, words: string): void {
+		const { node: plate, signal } = drawing.take("empty", () => el(null, "div", `${PLATE} tc-list-empty`));
+		plate.textContent = words;
+		plate.addEventListener("click", () => this.deps.onEmpty?.(), { signal });
 	}
 
 	private plate(drawing: RowsDrawing, group: ListGroup): HTMLElement {

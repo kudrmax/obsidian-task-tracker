@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { placeIndex, placeShowing, shownLists, SCREEN_PLACES } from "../../obsidian/ui/screens";
+import { funnelPlaceShowing, FUNNEL_PLACES, placeIndex, WHEEL_END } from "../../obsidian/ui/screens";
 
-describe("the Projects place on the wheel (board Nav)", () => {
-	it("stands first on the wheel, the folder alone in the middle of the window, Done holding Inbox alone", () => {
-		expect(SCREEN_PLACES[0]).toBe("projects");
-		expect(placeIndex("projects")).toBe(-0.5);
-		expect(placeIndex("done")).toBe(0.5);
-		expect(placeIndex("inbox")).toBe(1);
-		expect(placeIndex("calendar")).toBe(3);
+describe("the wheel walks the funnel alone (spec 2026-11-12 «Projects one view»: the tree is a panel, no place)", () => {
+	it("stands Inbox first, a place per icon to the calendar, Done holding Inbox alone half a place before it", () => {
+		expect(FUNNEL_PLACES).toEqual(["inbox", "soon", "calendar"]);
+		expect(placeIndex("done")).toBe(-0.5);
+		expect(placeIndex("inbox")).toBe(0);
+		expect(placeIndex("soon")).toBe(1);
+		expect(placeIndex("calendar")).toBe(2);
+		expect(WHEEL_END).toBe(2);
 	});
 
-	it("shows none of the funnel's lists, and a list asked for from there turns to the nearest place from Inbox", () => {
-		expect(shownLists("projects")).toEqual([]);
-		expect(placeShowing("soon", "projects")).toBe("inbox");
-		expect(placeShowing("day", "projects")).toBe("soon");
+	it("turns to the nearest place that shows a list, from Done as from Inbox", () => {
+		expect(funnelPlaceShowing("soon", "done")).toBe("inbox");
+		expect(funnelPlaceShowing("day", "inbox")).toBe("soon");
 	});
 });

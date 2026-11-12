@@ -8,7 +8,8 @@ export interface DividerOptions {
 	width(): number;
 	onWidth(width: number): void;
 	onRelease(width: number): void;
-	min: number;
+	/** The least width; a function where it changes with the view's mode. */
+	min: number | (() => number);
 	max(): number;
 	/** The width that puts the line in the middle of the window. */
 	center(): number;
@@ -67,7 +68,7 @@ export class Divider {
 		const press = this.press!;
 		press.speed.update(e.clientX, e.timeStamp);
 		const wanted = press.width + e.clientX - press.x;
-		return dividerAt(wanted, { width: wanted, min: this.opts.min, max: this.opts.max(), center: this.opts.center() }, press.speed.value);
+		return dividerAt(wanted, { width: wanted, min: typeof this.opts.min === "number" ? this.opts.min : this.opts.min(), max: this.opts.max(), center: this.opts.center() }, press.speed.value);
 	}
 
 	private move(e: PointerEvent): void {

@@ -14,6 +14,7 @@ import { SETTINGS_FILE, type StoredSettings } from "./settingsFile";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { clearPriorityColors, showLabelPaint, showPriorityColors } from "./ui/priorityColors";
 import { addWindowDocument } from "./ui/windowDocuments";
+import { ProjectBlocks } from "./ui/ProjectBlocks";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
 import { ShownSettingsStore, ViewSettingsStore } from "./ui/viewSettings";
@@ -61,6 +62,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		});
 		const deps = this.createDeps();
 		this.registerView(VIEW_TYPE, (leaf) => new TaskCalendarView(leaf, deps));
+		this.addChild(new ProjectBlocks(this.app, deps));
 		this.addRibbonIcon("calendar-days", "Task Calendar", () => void this.openView());
 		this.addCommand({ id: "open", name: "Open Task Calendar", callback: () => void this.openView() });
 	}

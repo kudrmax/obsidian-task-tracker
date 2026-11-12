@@ -33,6 +33,9 @@ export class SourcesPopover {
 		const rect = opts.anchor.getBoundingClientRect();
 		const copy = LiftedCopy.over(this.overlay, opts.anchor.cloneNode(true) as HTMLElement, false);
 		copy.el.classList.add("tc-seg-copy");
+		/** The wheel's place is written on the screen it stands in: the copy, out of it, takes it along. */
+		const look = getComputedStyle(opts.anchor);
+		for (const name of [PROPERTY.windowAt, PROPERTY.span, PROPERTY.before, PROPERTY.after]) copy.el.style.setProperty(name, look.getPropertyValue(name));
 		copy.pin(rect);
 		const panel = Panel.over(this.overlay, { root: "tc-popover", place: (p) => SourcesPopover.over(p, rect) }, false);
 		panel.replace((p) => {
