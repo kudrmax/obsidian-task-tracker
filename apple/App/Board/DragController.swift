@@ -331,6 +331,9 @@ final class CarryLayer: UIView {
     }
 
     func hideLine() {
+        // A step of the line still sliding would go on drawing it after it is hidden: its animation goes with it.
+        dot.layer.removeAllAnimations()
+        bar.layer.removeAllAnimations()
         UIView.performWithoutAnimation {
             dot.alpha = 0
             bar.alpha = 0

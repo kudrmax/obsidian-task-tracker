@@ -26,10 +26,16 @@ public struct SystemCarryClock: CarryClock {
 
     public func now() -> Date { Date() }
 
+    /// On time to the millisecond: `asyncAfter` may run a pause this long tens of milliseconds late.
     public func after(ms: Double, _ work: @escaping @MainActor () -> Void) -> () -> Void {
-        let item = DispatchWorkItem { MainActor.assumeIsolated { work() } }
-        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, ms) / 1000, execute: item)
-        return { item.cancel() }
+        let timer = DispatchSource.makeTimerSource(flags: .strict, queue: .main)
+        timer.schedule(deadline: .now() + max(0, ms) / 1000, leeway: .milliseconds(1))
+        timer.setEventHandler {
+            timer.cancel()
+            MainActor.assumeIsolated { work() }
+        }
+        timer.resume()
+        return { timer.cancel() }
     }
 }
 
@@ -74,6 +80,9 @@ public final class CarrySession {
         self.redraw = redraw
         self.problem = problem
     }
+
+    /// Told when the core pauses over a panel row (`carryAt` answered a wait for it): the host may read what it opens.
+    public var pausing: @MainActor (String) -> Void = { _ in }
 
     /// A carry lifted: the funnel's tasks by their keys, the By project list's cards by their drops, or the plus.
     public func start(keys: [TaskKey], cards: [JSONValue] = [], plus: Bool = false) {
@@ -152,7 +161,12 @@ public final class CarrySession {
             // finger's next report behind the read.
             if waited { Task { await self.redraw() } }
             guard let wait, self.isOpen, self.reported == spot else { return }
-            self.callOff = self.clock.after(ms: wait) { [weak self] in
+            // The core pauses over a row it will open: what it will show can be read meanwhile, its call already answered.
+            if let node = spot.node, !waited { self.pausing(node) }
+            // The pause runs from the moment the finger came (`now`, as the core was told), not from the answer: the time
+            // the call took is not waited twice.
+            let spent = self.clock.now().timeIntervalSince(now) * 1000
+            self.callOff = self.clock.after(ms: max(0, wait - spent)) { [weak self] in
                 guard let self, self.isOpen, self.reported == spot else { return }
                 self.report(spot, waited: true)
             }
