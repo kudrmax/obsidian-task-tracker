@@ -141,6 +141,13 @@ View rework (Obsidian frontend, 2026-11-12):
 62. The drop room in rows is one card's height at the end of the hovered list, inside its own scroll (`.is-drop-room`); no row changes height during a carry.
 63. The still layouts (all columns, rows, by project, a note's block) attach no swipe at all: a sideways trackpad scroll or a finger does nothing there, no rubber band.
 64. The docked panel (desktop) slides in and out (`duration-slide`, `ease-in-out`), and every column, the controls under them and the filter's name move and take their new widths with it as one motion; rows keep their heights. Nothing slides on the first drawing.
+65. A held card that opens another node (`carryAt`) draws that node's lists at once, still, during the carry, so the card is let go among the tasks it sees; let go nowhere, the lift's lists are drawn back before the copy flies home.
+66. A drag whose place fails under the finger or at the drop ends as a cancelled one: said once, the copy flies back, the lift's filter put back; a view closed mid-drag ends it at once, nothing left on the page.
+67. Rows: every row takes its new height in the same motion as the cards that grow in, slide or fold away, no row waiting for another; a card landing in a row is read where it comes to rest. (Replaces 60's «a row that shrinks waits».)
+68. Rows: a list that scrolls shows whole cards; the fade's room under its last whole card stays empty, the next card cut away there (Max's defect 2), the cut giving way near the list's end. The list a task is typed in is not cut.
+69. Rows while typing: on the desktop the field keeps the capsule's room under it, wherever it stands in the list; on the phone the list keeps the room over the bar at its end. When the lists share the room, the field's list is made tall enough for the field and that room, once, from the tallest of the others. (Narrows 59.)
+70. A list scrolls under a carried card only once the card is held at its edge a moment (250 ms), in every list: a card carried across a list's edge leaves it as it was.
+71. The rows end at the bottom row (the controls), and the screen's foot fade lies only past the rows' column.
 
 Applied from the Swift frontend: 17 (rows: each list as tall as its cards while all fit, the long ones share the rest and scroll inside, a card's room more while a card or the plus is carried or a task typed; the day by the arrows), 18 (the «No tasks» plate in an empty list under a filter and in rows), 19 (a find the filter hides clears it; a done find outside two columns opens on the whole screen), 20 (the left edge for a card and the plus), 21 (by project without a segment). 13, 15 and 16 are the app's own chrome: the plugin keeps the boards' top-left button and its own icons.
 

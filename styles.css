@@ -360,6 +360,8 @@ body {
 	--tc-fade-left: 0px;
 	/* The room a rows list keeps at its end while a task is typed in it: the bar stands there (the desktop's capsule under the field, the phone's bar over the keyboard). */
 	--tc-row-entry-room: var(--tc-entry-room);
+	/* What a rows list typed in must show besides the field: the desktop's capsule under it; on the phone the bar stands over the keyboard, outside the list. */
+	--tc-row-field-room: 0px;
 	--tc-stage-mid: calc(var(--tc-stage-left) + (100% - var(--tc-stage-left)) / 2);
 	--tc-columns-head: 40px;
 	--tc-top-row-top: 0px;
@@ -1669,7 +1671,7 @@ body:not(.is-mobile) .tc-stage-col.is-timeline .tc-day-nav { gap: var(--tc-space
  */
 .tc-rows-stack { flex: 1 1 0; min-height: 0; padding-bottom: var(--tc-foot-room); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
 .tc-rows-fade-probe { position: absolute; width: 0; height: var(--tc-scroll-fade); visibility: hidden; pointer-events: none; }
-.tc-rows-entry-probe { position: absolute; width: 0; height: var(--tc-row-entry-room); visibility: hidden; pointer-events: none; }
+.tc-rows-entry-probe { position: absolute; width: 0; height: var(--tc-row-field-room); visibility: hidden; pointer-events: none; }
 .tc-row { flex: none; min-height: 0; display: flex; flex-direction: column; transition: height var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-rows-stack.is-still > .tc-row { transition: none; }
 .tc-row + .tc-row { margin-top: var(--tc-section-gap); }
@@ -1688,7 +1690,9 @@ body:not(.is-mobile) .tc-stage-col.is-timeline .tc-day-nav { gap: var(--tc-space
  */
 body:not(.is-mobile) .task-calendar .tc-list.tc-row-list > .tc-quick-row { margin-bottom: var(--tc-row-entry-room); }
 body.is-mobile .task-calendar.is-entering .tc-list.tc-row-list:has(> .tc-quick-row)::after { content: ""; height: var(--tc-row-entry-room); }
-body:not(.is-mobile) .task-calendar { --tc-row-entry-room: calc(var(--tc-bar-h) + 2 * var(--tc-desk-bar-gap)); }
+body:not(.is-mobile) .task-calendar { --tc-row-entry-room: calc(var(--tc-bar-h) + 2 * var(--tc-desk-bar-gap)); --tc-row-field-room: var(--tc-row-entry-room); }
+/* The list a task is typed in shows its field whole: under it is only the bar's room, so its end is not cut away. */
+.task-calendar .tc-list.tc-row-list.is-under-bottom:has(> .tc-quick-row) { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade))); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade))); }
 /* The list under a carried card alone opens a card's room at its end, inside its own scroll: no row moves. */
 .task-calendar .tc-list.tc-row-list.is-drop-room::after { content: ""; height: var(--tc-card-h); }
 button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); cursor: default; }

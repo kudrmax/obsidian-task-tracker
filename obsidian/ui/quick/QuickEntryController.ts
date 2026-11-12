@@ -618,7 +618,8 @@ export class QuickEntryController {
 	 * `glide` the list scrolls along with the keyboard instead of at once.
 	 */
 	private bringIntoSight(state: EntryState, rect: DOMRect, view: DOMRect, box: DOMRect, glide?: Glide): boolean {
-		const limit = this.deps.desktop() ? this.roomOf(view, box).bottom - this.bar.room : view.bottom - this.bar.room - LAYOUT.fieldOverBar;
+		/** On the phone over the bar, and never past the bottom of what shows the field (a row of the rows ends above the bar). */
+		const limit = this.deps.desktop() ? this.roomOf(view, box).bottom - this.bar.room : Math.min(view.bottom - this.bar.room - LAYOUT.fieldOverBar, this.roomOf(view, box).bottom);
 		const menu = this.stack?.menu ?? null;
 		if (menu) {
 			menu.raise(menu.raised + rect.bottom - limit);
