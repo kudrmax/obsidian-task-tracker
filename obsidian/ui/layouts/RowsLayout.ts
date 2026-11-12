@@ -1,13 +1,16 @@
 import { type DropColumn, type StackedList, stackedLists, type ViewLayout } from "../../../core/application/contracts";
 import { DESIGN, DURATION, PROPERTY, tokenMs } from "../design";
 import { el, px } from "../dom";
-import { Motion, restingRect } from "../motion/Motion";
+import { Motion, restingMarginBottom, restingRect } from "../motion/Motion";
 import type { ListColumn } from "../drag/DropTarget";
 import type { TaskList } from "../TaskList";
 import { type FunnelList, funnelList } from "./FunnelLists";
 import type { LayoutHost } from "./LayoutHost";
 import type { LayoutDrop, LayoutHold, LayoutMotion } from "./ModeLayout";
 import { StillLayout } from "./StillLayout";
+
+/** How long after the rows' motion ends they are measured again (a card leaves in twice the collapse: fade, then fold). */
+const SETTLE_MARGIN_MS = 32;
 
 /** A stage of the rows: its label over its list. */
 interface Row {
@@ -38,6 +41,10 @@ export class RowsLayout extends StillLayout {
 	/** The next heights come in sliding (the same context changed) or at once (another context, the first drawing). */
 	private still = true;
 	private frameId = 0;
+	/** The next fit stands at once: the room itself changed. */
+	private fitStill = false;
+	/** Once every card has grown in, slid and folded away, the rows are measured again as they stand: what the motion's start could not know is set right. */
+	private settleTimer = 0;
 	private destroyed = false;
 
 	constructor(host: LayoutHost, layout: ViewLayout) {
@@ -55,11 +62,15 @@ export class RowsLayout extends StillLayout {
 			const area = el(row, "div", "tc-row-body");
 			const funnel = funnelList(host.lists, column, { area });
 			funnel.list.el.classList.add("tc-row-list");
-			funnel.drop.onHover = (over) => funnel.list.el.classList.toggle("is-drop-room", over);
+			funnel.drop.onHover = (over) => {
+				funnel.list.el.classList.toggle("is-drop-room", over);
+				if (!over) this.fit();
+			};
 			return { column, el: row, label, title: titles.get(column) ?? null, funnel };
 		});
 		const view = host.root.ownerDocument.defaultView ?? window;
-		this.sized = new view.ResizeObserver(() => this.fit());
+		/** The room changed (the window, the panel): the rows follow it at once, no slide behind the window's edge. */
+		this.sized = new view.ResizeObserver(() => this.fit(true));
 		this.sized.observe(this.stack);
 	}
 
@@ -81,13 +92,16 @@ export class RowsLayout extends StillLayout {
 	 * Measures again and sets each row's height on the next frame, its slide running with the cards that grow in, slide
 	 * or fold away: the rows are measured at the shape the lists move to, not as they stand mid-motion.
 	 */
-	private fit(): void {
+	private fit(still = false): void {
 		if (this.destroyed || !this.scrolls || this.holds.has("carry")) return;
 		const view = this.host.root.ownerDocument.defaultView ?? window;
+		this.fitStill ||= still;
 		if (this.frameId) return;
 		this.frameId = view.requestAnimationFrame(() => {
 			this.frameId = 0;
-			this.apply(this.still);
+			const asked = this.fitStill;
+			this.fitStill = false;
+			this.apply(this.still || asked);
 		});
 	}
 
@@ -113,19 +127,30 @@ export class RowsLayout extends StillLayout {
 		 * change moves once, and a card landing in it is read where it comes to rest (`Motion.settles`).
 		 */
 		const ms = still ? 0 : tokenMs(this.stack, DURATION.collapse);
+		/**
+		 * A card that fades before it folds away (`Motion.leave`) keeps its room while it fades: every row then waits as long,
+		 * and they all take their heights together as it folds, none ahead of another.
+		 */
+		const fading = !still && this.rows.some((row) => [...row.funnel.list.el.children].some((child) => child.classList.contains("is-leaving") && !child.classList.contains("is-lifted")));
+		const delay = fading ? ms : 0;
 		let dy = 0;
 		this.rows.forEach((row, i) => {
-			Motion.settles(row.el, dy, ms);
+			Motion.settles(row.el, dy, delay + ms);
 			dy += heights[i] - now[i];
+			row.el.style.transitionDelay = delay > 0 ? `${delay}ms` : "";
 			row.el.style.height = px(heights[i]);
 		});
+		const view = this.host.root.ownerDocument.defaultView ?? window;
+		view.clearTimeout(this.settleTimer);
+		const changed = heights.some((height, i) => Math.abs(height - now[i]) > 0.5);
+		if (!still && changed) this.settleTimer = view.setTimeout(() => this.fit(), delay + 2 * ms + SETTLE_MARGIN_MS);
 		if (still) {
 			void this.stack.offsetHeight;
 			this.stack.classList.remove("is-still");
 		}
 	}
 
-	/** The heights while a task is typed in rows that share the room: as they stand, the field's row made tall enough for it; null when it already is. */
+	/** The heights while a task is typed in rows that share the room: as they stand, the field's row made exactly as tall as the field and the bar's room under it (the tallest other row gives or takes the difference); null when it already is. */
 	private typingHeights(now: readonly number[]): number[] | null {
 		const at = this.rows.findIndex((row) => row.funnel.list.el.querySelector(":scope > .tc-quick-row") !== null);
 		if (at < 0) return null;
@@ -133,12 +158,13 @@ export class RowsLayout extends StillLayout {
 		const field = row.funnel.list.el.querySelector<HTMLElement>(":scope > .tc-quick-row")!;
 		const style = getComputedStyle(row.funnel.list.el);
 		const need = row.label.offsetHeight + (parseFloat(style.paddingTop) || 0) + restingRect(field).height + this.entryProbe.offsetHeight;
+		/** Exactly that tall: scrolled to the field, the list shows no part of a row above it under its label. */
 		const deficit = need - now[at];
-		if (deficit <= 0.5) return null;
+		if (Math.abs(deficit) <= 0.5) return null;
 		const heights = [...now];
-		const giver = heights.reduce((best, height, i) => (i !== at && (best < 0 || height > heights[best]) ? i : best), -1);
-		if (giver < 0) return null;
-		heights[giver] -= deficit;
+		const other = heights.reduce((best, height, i) => (i !== at && (best < 0 || height > heights[best]) ? i : best), -1);
+		if (other < 0) return null;
+		heights[other] -= deficit;
 		heights[at] = need;
 		return heights;
 	}
@@ -169,10 +195,11 @@ export class RowsLayout extends StillLayout {
 		}
 		const stops = ends.filter(({ child }) => !child.classList.contains("tc-group-head")).map(({ end }) => label + end);
 		const last = ends[ends.length - 1];
-		const content = last ? last.end + (parseFloat(getComputedStyle(last.child).marginBottom) || 0) : parseFloat(style.paddingTop) || 0;
+		const content = last ? last.end + restingMarginBottom(last.child) : parseFloat(style.paddingTop) || 0;
 		/** The room at the list's end while a task is typed in it: the desktop's bar stands there, under the field. */
 		const after = getComputedStyle(list, "::after");
-		const room = after.content !== "none" && after.content !== "normal" ? (parseFloat(after.height) || 0) + gap : 0;
+		/** The drop room under a carried card is the list's for the carry only: never measured into its height. */
+		const room = after.content !== "none" && after.content !== "normal" && !list.classList.contains("is-drop-room") ? (parseFloat(after.height) || 0) + gap : 0;
 		return { wanted: label + content + room + (parseFloat(style.paddingBottom) || 0), stops };
 	}
 
@@ -209,6 +236,7 @@ export class RowsLayout extends StillLayout {
 
 	override destroy(): void {
 		this.destroyed = true;
+		(this.host.root.ownerDocument.defaultView ?? window).clearTimeout(this.settleTimer);
 		this.sized.disconnect();
 		const view = this.host.root.ownerDocument.defaultView ?? window;
 		if (this.frameId) view.cancelAnimationFrame(this.frameId);

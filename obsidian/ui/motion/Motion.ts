@@ -68,6 +68,14 @@ const GROWTHS = new WeakMap<Element, Animation>();
 const GROWN = new WeakMap<Element, number>();
 const RESHAPED = new WeakMap<Element, Box>();
 const SLID_TO = new WeakMap<Element, number>();
+const GROWN_MARGIN = new WeakMap<Element, number>();
+
+/** The bottom margin `el` will stand with once it has grown in (it grows from none): its own otherwise. */
+export function restingMarginBottom(el: HTMLElement): number {
+	const grown = GROWN_MARGIN.get(el);
+	if (grown !== undefined && GROWTHS.get(el)?.playState === "running") return grown;
+	return parseFloat(getComputedStyle(el).marginBottom) || 0;
+}
 
 /**
  * The moves a row of a list makes, and anything that floats over the screen: it grows in from nothing, fades and then
@@ -86,6 +94,7 @@ export const Motion = {
 		const growth = row.animate([{ height: "0px", minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" }, to], timing);
 		GROWTHS.set(row, growth);
 		GROWN.set(row, parseFloat(to.height) || 0);
+		GROWN_MARGIN.set(row, parseFloat(to.marginBottom) || 0);
 		const done = () => {
 			if (GROWTHS.get(row) === growth) row.style.overflow = overflow;
 		};

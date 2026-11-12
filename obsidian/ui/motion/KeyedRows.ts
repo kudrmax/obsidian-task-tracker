@@ -91,7 +91,8 @@ export class KeyedRows {
 				() => {
 					if (this.leaving.get(key)?.node === row.node) this.leaving.delete(key);
 				},
-				!this.marks.has(key),
+				/** A place that only marked where something lands, or a lifted card's place nobody sees, folds at once: there is nothing to fade. */
+				!this.marks.has(key) && !row.node.classList.contains("is-lifted"),
 			);
 			if (row.node.isConnected) this.leaving.set(key, { node: row.node, animation });
 		}

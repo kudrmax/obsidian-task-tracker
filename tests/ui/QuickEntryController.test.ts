@@ -597,6 +597,7 @@ describe("QuickEntryController", () => {
 			const { list, slide } = withKeyboard();
 			slide(200);
 			vi.advanceTimersByTime(100);
+			list.dispatchEvent(new Event("touchmove", { bubbles: true }));
 			list.scrollTop = 3;
 			list.dispatchEvent(new Event("scroll"));
 			vi.advanceTimersByTime(500);
@@ -765,6 +766,7 @@ describe("QuickEntryController", () => {
 			set.field()!.getBoundingClientRect = () => new DOMRect(10, fieldTop - list.scrollTop, 175, 35);
 			set.render();
 			const followed = list.scrollTop;
+			list.dispatchEvent(new Event("touchmove", { bubbles: true }));
 			list.scrollTop = 20;
 			list.dispatchEvent(new Event("scroll"));
 			return { ...set, list, followed };
@@ -796,6 +798,7 @@ describe("QuickEntryController", () => {
 		it("goes back to the field once Enter moves it", async () => {
 			const { press, type, list, field } = scrolledAway();
 			type("Call");
+			list.dispatchEvent(new Event("touchmove", { bubbles: true }));
 			list.scrollTop = 20;
 			list.dispatchEvent(new Event("scroll"));
 			field()!.getBoundingClientRect = () => new DOMRect(10, 640 - list.scrollTop, 175, 35);
