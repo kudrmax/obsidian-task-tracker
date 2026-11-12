@@ -1,4 +1,5 @@
 import { type DropColumn, type StackedList, stackedLists, type ViewLayout } from "../../../core/application/contracts";
+import { DURATION } from "../design";
 import { el, px } from "../dom";
 import { restingRect } from "../motion/Motion";
 import type { ListColumn } from "../drag/DropTarget";
@@ -35,7 +36,6 @@ export class RowsLayout extends StillLayout {
 	/** The next heights come in sliding (the same context changed) or at once (another context, the first drawing). */
 	private still = true;
 	private frameId = 0;
-	private waiting: object | null = null;
 	private destroyed = false;
 
 	constructor(host: LayoutHost, layout: ViewLayout) {
@@ -72,38 +72,22 @@ export class RowsLayout extends StillLayout {
 		super.frame();
 		if (motion === "replace") {
 			this.still = true;
-			this.waiting = null;
 			this.apply();
 		} else this.fit();
 	}
 
 	/**
-	 * Measures again and sets each row's height, its slide running with the cards that grow in or slide. Rows leaving
-	 * first fold away: until they have, where the cards under them end is not known.
+	 * Measures again and sets each row's height on the next frame, its slide running with the cards that grow in, slide
+	 * or fold away: the rows are measured at the shape the lists move to, not as they stand mid-motion.
 	 */
 	private fit(): void {
 		if (this.destroyed || !this.scrolls || this.holds.has("carry")) return;
 		const view = this.host.root.ownerDocument.defaultView ?? window;
-		const moving = this.stack.getAnimations({ subtree: true }).filter((animation) => animation.playState === "running" && this.isLeaving(animation));
-		const token = {};
-		this.waiting = token;
-		if (moving.length > 0) {
-			void Promise.allSettled(moving.map((animation) => animation.finished)).then(() => {
-				if (this.waiting === token) this.fit();
-			});
-			return;
-		}
-		if (this.frameId) view.cancelAnimationFrame(this.frameId);
+		if (this.frameId) return;
 		this.frameId = view.requestAnimationFrame(() => {
 			this.frameId = 0;
-			if (this.waiting === token) this.apply();
+			this.apply();
 		});
-	}
-
-	/** A card or a header folding away out of a list. */
-	private isLeaving(animation: Animation): boolean {
-		const target = (animation.effect as KeyframeEffect | null)?.target;
-		return target instanceof HTMLElement && target.classList.contains("is-leaving");
 	}
 
 	private apply(): void {
@@ -118,7 +102,12 @@ export class RowsLayout extends StillLayout {
 		const still = this.still;
 		this.still = false;
 		this.stack.classList.toggle("is-still", still);
-		this.rows.forEach((row, i) => (row.el.style.height = px(heights[i])));
+		/** A row that shrinks waits while its leaving cards fade, then folds with them (`Motion.leave`); one that grows grows with its new cards. */
+		this.rows.forEach((row, i) => {
+			const shrinks = heights[i] < row.el.getBoundingClientRect().height - 0.5;
+			row.el.style.transitionDelay = shrinks ? `var(${DURATION.collapse})` : "";
+			row.el.style.height = px(heights[i]);
+		});
 		if (still) {
 			void this.stack.offsetHeight;
 			this.stack.classList.remove("is-still");
@@ -134,15 +123,21 @@ export class RowsLayout extends StillLayout {
 		const label = row.label.offsetHeight;
 		const style = getComputedStyle(list);
 		const top = list.getBoundingClientRect().top - list.scrollTop;
-		const inFlow = [...list.children].filter((child): child is HTMLElement => child instanceof HTMLElement && !child.classList.contains("is-leaving") && getComputedStyle(child).position !== "absolute");
+		const gap = parseFloat(style.rowGap) || 0;
+		const inFlow = [...list.children].filter((child): child is HTMLElement => child instanceof HTMLElement && getComputedStyle(child).position !== "absolute");
 		let growth = 0;
-		const ends = inFlow.map((child) => {
+		const ends: { readonly child: HTMLElement; readonly end: number }[] = [];
+		for (const child of inFlow) {
 			const now = child.getBoundingClientRect().height;
+			if (child.classList.contains("is-leaving")) {
+				const margins = getComputedStyle(child);
+				growth -= now + (parseFloat(margins.marginTop) || 0) + (parseFloat(margins.marginBottom) || 0) + gap;
+				continue;
+			}
 			const resting = restingRect(child);
-			const end = resting.top + growth + resting.height - top;
+			ends.push({ child, end: resting.top + growth + resting.height - top });
 			growth += resting.height - now;
-			return { child, end };
-		});
+		}
 		const stops = ends.filter(({ child }) => !child.classList.contains("tc-group-head")).map(({ end }) => label + end);
 		const content = ends.length > 0 ? ends[ends.length - 1].end : parseFloat(style.paddingTop) || 0;
 		return { wanted: label + content + (parseFloat(style.paddingBottom) || 0), stops };

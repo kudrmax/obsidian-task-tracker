@@ -1112,6 +1112,8 @@ export class CalendarScreen extends Component {
 	/** A drop: the service says what it means for the file (spec §5.1), for the card under the finger and those carried along. */
 	/** The drop written and drawn: the card the dragged task stands on now, hidden until the float lands on it. */
 	private async applyDrop(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | HeldOut | null> {
+		/** Let go: the rows measure again as the drop is drawn, growing with the card that lands. */
+		this.layout?.hold("carry", false);
 		if (isProjectsDrop(result)) {
 			if (result.kind === "projectRow") return this.dropOnTree(drag, result.node);
 			if (result.kind !== "projectsPlace") return null;
