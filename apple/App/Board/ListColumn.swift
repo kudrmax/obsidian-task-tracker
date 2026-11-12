@@ -108,24 +108,10 @@ struct ColumnTitle: View {
     private var lit: Bool { list.map { model.isTitleLit($0.column) } ?? false }
 
     var body: some View {
-        HStack(spacing: 4) {
-            if dayArrows {
-                Button { Task { await model.step(-1) } } label: { arrow("chevron.left") }
-                    // A card held over an arrow turns the day, as a folder opens under a carried file in Files.
-                    .background { SpringLoaded(model: model) { Task { await model.step(-1) } } }
-                    .accessibilityLabel("Previous Day")
-            }
-            if dayArrows {
-                Button { Task { await model.showToday() } } label: { litText.frame(height: ColumnMetrics.titleRow).contentShape(.rect) }
-                    .accessibilityHint("Back to today")
-            } else {
-                litText.accessibilityAddTraits(.isHeader)
-            }
-            if dayArrows {
-                Button { Task { await model.step(1) } } label: { arrow("chevron.right") }
-                    .background { SpringLoaded(model: model) { Task { await model.step(1) } } }
-                    .accessibilityLabel("Next Day")
-            }
+        // A narrow column (the calendar beside a wide list) takes the plugin's narrow arrows, so the day's name fits whole.
+        ViewThatFits(in: .horizontal) {
+            row(arrow: 32)
+            row(arrow: Self.narrowArrow)
         }
         .buttonStyle(.plain)
         .fontWeight(.semibold)
@@ -134,11 +120,37 @@ struct ColumnTitle: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// The plugin's narrow arrow (`--tc-arrow-narrow`).
+    private static let narrowArrow: CGFloat = 24
+
+    private func row(arrow width: CGFloat) -> some View {
+        HStack(spacing: width < 32 ? 0 : 4) {
+            if dayArrows {
+                Button { Task { await model.step(-1) } } label: { arrow("chevron.left", width: width) }
+                    // A card held over an arrow turns the day, as a folder opens under a carried file in Files.
+                    .background { SpringLoaded(model: model) { Task { await model.step(-1) } } }
+                    .accessibilityLabel("Previous Day")
+            }
+            if dayArrows {
+                Button { Task { await model.showToday() } } label: { litText.fixedSize().frame(height: ColumnMetrics.titleRow).contentShape(.rect) }
+                    .accessibilityHint("Back to today")
+            } else {
+                litText.accessibilityAddTraits(.isHeader)
+            }
+            if dayArrows {
+                Button { Task { await model.step(1) } } label: { arrow("chevron.right", width: width) }
+                    .background { SpringLoaded(model: model) { Task { await model.step(1) } } }
+                    .accessibilityLabel("Next Day")
+            }
+        }
+        .fixedSize(horizontal: dayArrows, vertical: false)
+    }
+
     /// A day arrow: the whole 32-point square takes the tap, not only the chevron's strokes, which a plain button's label
     /// alone would.
-    private func arrow(_ symbol: String) -> some View {
+    private func arrow(_ symbol: String, width: CGFloat = 32) -> some View {
         Image(systemName: symbol)
-            .frame(width: 32, height: 32)
+            .frame(width: width, height: 32)
             .contentShape(.rect)
     }
 

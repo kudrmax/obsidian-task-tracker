@@ -13,13 +13,18 @@ final class ListMetrics {
     @ObservationIgnored private var waiting: [BoardColumn: StackedList]?
 
     /// A carry or a field holds the heights.
-    @ObservationIgnored var held = false {
-        didSet {
-            guard !held, let waiting else { return }
-            self.waiting = nil
-            withAnimation(.snappy) { lists = waiting }
-        }
+    /// What holds the heights, asked as each read is measured: a carry not let go yet, the typed tasks being written.
+    @ObservationIgnored var holds: () -> Bool = { false }
+
+    /// The hold ended: the heights the screen now needs come in, in the drop's own motion when a carry was let go, so
+    /// the lists open for the dropped card while its copy flies and nothing moves once it has landed.
+    func release() {
+        guard !holds(), let waiting else { return }
+        self.waiting = nil
+        withAnimation(CarryMotion.dropAnimation) { apply(waiting) }
     }
+
+    private var held: Bool { holds() }
 
     /// The heights the read `snapshot` needs, set in the transaction it is drawn in, or kept until a hold ends.
     func measure(_ snapshot: BoardSnapshot) {
@@ -29,9 +34,10 @@ final class ListMetrics {
         }
         if held {
             waiting = measured
-        } else if measured != lists {
-            apply(measured)
+            return
         }
+        waiting = nil
+        if measured != lists { apply(measured) }
     }
 
     /// The heights that grow now, in the drawing's own motion; the ones that shrink after the card leaving has faded.

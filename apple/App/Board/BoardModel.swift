@@ -93,6 +93,7 @@ final class BoardModel {
         entry.model = self
         projects.model = self
         funnelState.model = self
+        metrics.holds = { [unowned self] in listsHeld }
     }
 
     /// A screen the quick entry read after its write, drawn in the transaction the entry draws its own state in.
@@ -187,7 +188,7 @@ final class BoardModel {
 
     /// The lists the Rows view stacks are held at their heights while a card or the plus is carried (until its copy is
     /// down, so it lands where its line was) and while a task is typed or written.
-    var listsHeld: Bool { carry != nil || entry.writing }
+    var listsHeld: Bool { (carry != nil && carry?.landed != true) || entry.writing }
 
     /// The Rows view's heights for its measured lists sharing `room` (`rules.stackedLists`), the fade the lists' own.
     func stackedHeights(_ lists: [StackedList], room: Double) -> [Double] {
