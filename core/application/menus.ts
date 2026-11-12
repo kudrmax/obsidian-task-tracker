@@ -99,6 +99,21 @@ export function tileStatus(id: MenuStatusId): TaskStatus | null {
 	return statuses[id];
 }
 
+/**
+ * The task a status tile of a card's menu writes: a folded card's shown step (Max, 11-12: Done, In progress and Won't
+ * do on a folded card are for the task he looks at), any other card's own task. The rest of the menu stays the folded
+ * task's: a move or a label is for the whole group.
+ */
+function statusTask(item: TaskItem, from: MenuFrom): TaskItem {
+	if (from === "timeline") return item.block.step ?? item;
+	return COLUMNS.has(from) ? (item.card.step ?? item) : item;
+}
+
+/** The tasks the status tiles write: one task's menu from `of.from`, the bulk menu's each from its column (`froms`). */
+function statusTasks(items: readonly TaskItem[], of: MenuOf, froms: readonly MenuFrom[]): readonly TaskItem[] {
+	return items.map((item, i) => statusTask(item, of.kind === "task" ? of.from : (froms[i] ?? "full")));
+}
+
 /** Done, the progress tile named for what it sets, Won't do, and Stop for one task that may be stopped; one task's menu asks before Won't do and Stop. */
 function menuStatuses(items: readonly TaskItem[], of: MenuOf): readonly MenuStatus[] {
 	const one = of.kind === "task";
@@ -184,12 +199,14 @@ export function projectPage(chosen: readonly (readonly ProjectRef[])[], known: r
 export const MENU_GROUPS: readonly MenuGroupId[] = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
 
 /** The menu of one task or of several picked at once: what each group offers, what is on, what can't be pressed, what asks first. */
-export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD, projects: readonly ProjectChoice[] = []): TaskMenuModel {
+export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD, projects: readonly ProjectChoice[] = [], froms: readonly MenuFrom[] = []): TaskMenuModel {
 	const sections = menuSections(items, offer, of);
 	const edits = menuEdits(items, of, sections);
+	const statusFor = statusTasks(items, of, froms);
 	return {
 		groups: MENU_GROUPS,
-		statuses: menuStatuses(items, of),
+		statuses: menuStatuses(statusFor, of),
+		statusTasks: statusFor,
 		levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
 		labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },
 		moves: sharedMoves(items, today),

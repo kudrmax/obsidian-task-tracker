@@ -529,6 +529,8 @@ public struct TaskMenuModel: Decodable, Hashable, Sendable {
     /// The order the groups are drawn in, top to bottom: the core's, the same as the plugin's.
     public let groups: [String]
     public let statuses: [MenuStatus]
+    /// The tasks a status row writes and its question names: a folded card's shown step, else the menu's own task.
+    public let statusTasks: [TaskItem]
     public let levels: MenuTiles
     public let labels: MenuTiles
     public let moves: [QuickMove]

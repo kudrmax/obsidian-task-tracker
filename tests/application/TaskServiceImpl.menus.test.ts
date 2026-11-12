@@ -201,3 +201,34 @@ describe("renaming a section", () => {
 		expect(store.text).toContain("### Y\n");
 	});
 });
+
+describe("the status tiles of a folded card's menu", () => {
+	const screenOf = async (svc: TaskServiceImpl) => ({ today: T, day: T, offer: await svc.sectionOffer(T) });
+	/** Max, 11-12: the menu of a folded card is the whole task's, but Done, In progress and Won't do are for the step it shows. */
+	it("write the shown step; the move stays the whole task's", async () => {
+		const { store, svc } = setup("## Now\n\n- [ ] Порядок 📁\n  - [ ] Проверить\n  - [ ] Раскидать\n");
+		const [folded] = (await svc.dayView(T)).list;
+		const menu = svc.menu(folded, "day", await screenOf(svc));
+		expect(menu.statusTasks.map((task) => task.text)).toEqual(["Проверить"]);
+		await svc.pickStatus(menu.statusTasks.map((task) => task.key), "done");
+		expect(store.text).toContain("- [ ] Порядок 📁\n  - [x] Проверить\n  - [ ] Раскидать\n");
+		const [after] = (await svc.dayView(T)).list;
+		expect(after.card.title).toBe("Раскидать");
+	});
+
+	it("on the timeline the block's step; whole screen and the bulk menu from no list the task itself", async () => {
+		const { svc } = setup("## Now\n\n- [ ] Порядок 📁\n  - [/] Проверить\n  - [ ] Раскидать\n");
+		const [folded] = (await svc.dayView(T)).list;
+		const screen = await screenOf(svc);
+		expect(svc.menu(folded, "timeline", screen).statusTasks.map((task) => task.text)).toEqual(["Проверить"]);
+		expect(svc.menu(folded, "day", screen).statuses.map((status) => status.id)).toContain("stopProgress");
+		expect(svc.menu(folded, "full", screen).statusTasks.map((task) => task.text)).toEqual(["Порядок"]);
+		expect(svc.bulkMenu([{ item: folded, from: "day" }], screen).statusTasks.map((task) => task.text)).toEqual(["Проверить"]);
+	});
+
+	it("an unfolded card's menu writes its own task", async () => {
+		const { svc } = setup("## Now\n\n- [ ] Порядок\n  - [ ] Проверить\n");
+		const [open] = (await svc.dayView(T)).list;
+		expect(svc.menu(open, "day", await screenOf(svc)).statusTasks.map((task) => task.text)).toEqual(["Порядок"]);
+	});
+});

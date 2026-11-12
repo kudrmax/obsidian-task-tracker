@@ -187,7 +187,7 @@ export class BulkController {
 			day: this.deps.day(),
 			menu: (now) => this.deps.menu(now.map((item, i) => ({ item, from: cards[i].column }))),
 			actions: {
-				pickStatus: (id) => done((picked) => this.deps.pickStatus(picked, id)),
+				pickStatus: (id, tasks) => done(() => this.deps.pickStatus(tasks.map((task) => task.key), id)),
 				togglePriority: (prefix) => done((picked) => this.deps.togglePriority(picked, prefix)),
 				postpone: (date) => done((picked) => this.deps.postpone(picked, date)),
 				removeDue: () => done((picked) => this.deps.removeDue(picked)),

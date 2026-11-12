@@ -485,7 +485,7 @@ export class TaskReads {
 
 	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel {
 		const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices(screen));
+		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices(screen), picked.map((p) => p.from));
 	}
 
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[] {
