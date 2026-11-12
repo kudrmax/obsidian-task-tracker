@@ -212,7 +212,7 @@ export class DayData {
 		const date = this.deps.date();
 		const funnel = (await this.deps.view?.()) ?? null;
 		const node = funnel?.filter?.node ?? null;
-		const byProject = node !== null && funnel?.view.mode === "byProject";
+		const byProject = node !== null && funnel?.view.source === "projectsScreen";
 		const [screen, projects] = await Promise.all([this.deps.tasks.screen(date, node), byProject ? this.deps.tasks.projectsScreen(node) : null]);
 		const { day, soon, inbox, backlog, done, sections, offer, missing, calendars, projectTree, titleDrops } = screen;
 		return { date, day: missing ? null : day, soon, inbox, backlog, done, sections, offer, missing, calendars, projectTree, titleDrops, funnel, projects };
