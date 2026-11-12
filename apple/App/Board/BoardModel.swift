@@ -79,8 +79,12 @@ final class BoardModel {
 
     /// Typing tasks in place: the core's quick entry, driven for this screen.
     @ObservationIgnored let entry = QuickEntryHost()
-    /// The Projects page: the tree and the chosen node's tasks.
+    /// The projects' panel and the By project list.
     @ObservationIgnored let projects = ProjectsBoard()
+    /// The funnel's view on this device: the filter, the mode, the panel, the place.
+    @ObservationIgnored let funnelState = FunnelState()
+    /// How tall the Rows view's lists stand.
+    @ObservationIgnored let metrics = ListMetrics()
     /// The timeline's zoom, kept across days.
     @ObservationIgnored let zoom = TimelineZoom()
 
@@ -88,6 +92,7 @@ final class BoardModel {
         place = RibbonPlace.first(AppServices.shared.board)
         entry.model = self
         projects.model = self
+        funnelState.model = self
     }
 
     /// A screen the quick entry read after its write, drawn in the transaction the entry draws its own state in.
@@ -134,8 +139,7 @@ final class BoardModel {
     var place: RibbonPlace {
         didSet {
             guard place != oldValue else { return }
-            let board = board, key = place.key
-            Task.detached { try? board.setFunnelPlace(.string(key)) }
+            funnelState.writePlace(place.key)
         }
     }
     /// The place a tap on a tab asked the ribbon to scroll to, each ask new.
@@ -157,115 +161,79 @@ final class BoardModel {
 
     /// The funnel's view the screen was read with: the filter, the view mode, the panel (`tasks.funnelView`).
     var funnel: FunnelView? { snapshot?.funnel }
-    /// The view drawn: the screen's as read, before the first read the one the device keeps (`tasks.firstView`).
-    var viewChoice: ViewChoice? { funnel?.view ?? firstView }
-    @ObservationIgnored private lazy var firstView: ViewChoice? = try? board.firstView()
-    /// How the lists are laid out now, the core's.
-    var viewMode: ViewMode? { viewChoice?.mode }
+    /// The view decoded: what the screen draws, swipes, reads and does with the plus.
+    var presentation: FunnelPresentation? { snapshot?.presentation }
+    /// The view mode before the first read: the one the device keeps (`tasks.firstView`).
+    @ObservationIgnored private(set) lazy var firstView: ViewChoice? = try? board.firstView()
     /// The node every list is filtered by.
     var filter: ProjectFilter? { funnel?.filter }
 
     /// The projects' panel shows, for whatever reason the core gives (the button, a carry, a new project's name).
-    var panelShown: Bool { funnel?.panel?.open == true }
-    /// The screen is the ribbon the tab bar walks (`ViewChoice.ribbon`).
-    var ribbon: Bool { viewChoice?.ribbon ?? false }
+    var panelShown: Bool { presentation?.panelShown == true }
+    /// The screen is the ribbon the tab bar walks.
+    var ribbon: Bool { presentation?.isRibbon ?? (firstView?.mode == .twoColumns) }
 
-    /// How tall each list's rows stand: the Rows view stacks the lists at these heights (`rules.stackedRows`).
-    private(set) var listRows: [BoardColumn: CGFloat] = [:]
-
-    func listContent(_ column: BoardColumn, _ height: CGFloat) {
-        guard abs((listRows[column] ?? -1) - height) > 0.5 else { return }
-        listRows[column] = height
+    /// The share of the screen the list beside the calendar takes, kept on the device: the ribbon's at Today and the
+    /// Rows and By project views' alike, one divider's.
+    var listShare: Double = UserDefaults.standard.object(forKey: "listShare") as? Double ?? 0.5 {
+        didSet { UserDefaults.standard.set(listShare, forKey: "listShare") }
     }
+
+    /// Where the tab bar's row starts, in the window: a list stacked over the bottom ends above it.
+    var barTop: CGFloat = .infinity
+
+    /// The lists the Rows view stacks are held at their heights: a carry not yet let go, a task typed or written.
+    var listsHeld: Bool { (carry != nil && carry?.landed != true) || entry.isOpen || entry.writing }
 
     /// How near the screen's left edge the carrying finger counts as at the edge (`carryAt`'s `edge`).
     static let panelEdge: CGFloat = 24
 
-    // MARK: The carry to a project: the core's session (`docs/door.md`)
-
-    /// A carry the core keeps a session for (a card, a calendar block, the plus; not a section or a project).
-    @ObservationIgnored private var carrySession = false
-    /// How the session ends, when a place said so: `nowhere`, `naming`, or `closed` (`carryOnNode` ended it).
-    @ObservationIgnored private var carryEnd: String?
-    /// What the finger was last reported at, and the call that tells the core again once its wait is over.
-    @ObservationIgnored private var carryReported: CarrySpot?
-    @ObservationIgnored private var carryWait: DispatchWorkItem?
-    /// The session's calls, one after another in order.
-    @ObservationIgnored private var carryCalls: Task<Void, Never>?
-
-    private struct CarrySpot: Equatable {
-        let edge: Bool
-        let node: String?
-    }
-
-    /// A call of the session, after the ones before it; `redraw` reads the screen again after it.
-    private func carryCall(redraw: Bool, _ call: @escaping @Sendable (TaskBoard) throws -> Void) {
-        let before = carryCalls
-        let board = board
-        carryCalls = Task { [weak self] in
-            await before?.value
-            do {
-                try await Task.detached { try call(board) }.value
-            } catch {
-                self?.problem(error)
-            }
-            if redraw { await self?.reload() }
+    /// The core's new view, after a change of this device's view alone (`FunnelState`): drawn over the lists as they
+    /// are, still where the context changed; a filter changed reads the lists for it, drawn still in turn.
+    func adopt(_ view: FunnelView) async {
+        guard let shown = snapshot else { return await reload() }
+        let sameFilter = shown.filter == view.filter?.node
+        viewEpoch += 1
+        let next = shown.with(funnel: view)
+        draw(motion: next.motion(from: shown)) {
+            adopting = !sameFilter
+            snapshot = next
+            adopting = false
+            entry.screenChanged()
         }
+        if !sameFilter { await reload() }
     }
 
-    private func openCarry(keys: [TaskKey], cards: [JSONValue] = [], plus: Bool = false) {
-        carrySession = true
-        carryEnd = nil
-        carryReported = nil
-        carryCall(redraw: false) { try $0.startCarry(keys: keys, cards: cards, plus: plus) }
+    /// The context the lists drawn were read in: a read in another one is drawn still, its cards never flying in from
+    /// where another filter had them.
+    private(set) var listsContext: String?
+    @ObservationIgnored private var adopting = false
+    /// Counts the views adopted: a read begun before one is not drawn, it would put the view back.
+    @ObservationIgnored private var viewEpoch = 0
+
+    /// How a read is drawn over the screen: as it differs, still in another context of the lists.
+    func motion(of read: BoardSnapshot) -> BoardMotion {
+        let motion = read.motion(from: snapshot)
+        if motion == .change, read.funnel.view.context != listsContext { return .context }
+        return motion
     }
 
-    /// The carrying finger moved: the core is told where it is (at the edge, over which panel row) whenever that
-    /// changes, and again once the pause it answers is over; the screen is read again then, the panel out or a row open.
+    // MARK: The carry to a project: the core's session (`CarrySession`)
+
+    @ObservationIgnored private(set) lazy var session = CarrySession(
+        calls: board, clock: SystemCarryClock(),
+        redraw: { [weak self] in await self?.reload() },
+        problem: { [weak self] in self?.problem($0) })
+
+    /// The carrying finger moved: the core is told where it is (at the edge, over which panel row).
     func carryMoved(at point: CGPoint) {
-        guard carrySession else { return }
         let node = panelShown ? projects.node(at: point) : nil
-        let spot = CarrySpot(edge: point.x < Self.panelEdge, node: node)
-        guard spot != carryReported else { return }
-        report(spot, waited: false)
-    }
-
-    private func report(_ spot: CarrySpot, waited: Bool) {
-        carryReported = spot
-        carryWait?.cancel()
-        carryWait = nil
-        let board = board
-        let before = carryCalls
-        carryCalls = Task { [weak self] in
-            await before?.value
-            let wait = try? await Task.detached { try board.carryAt(edge: spot.edge, node: spot.node) }.value
-            guard let self, self.carrySession, self.carryReported == spot else { return }
-            if waited { await self.reload() }
-            guard let wait = wait ?? nil else { return }
-            let again = DispatchWorkItem { [weak self] in
-                guard let self, self.carrySession, self.carryReported == spot else { return }
-                self.report(spot, waited: true)
-            }
-            self.carryWait = again
-            DispatchQueue.main.asyncAfter(deadline: .now() + max(0, wait) / 1000, execute: again)
-        }
-    }
-
-    /// The carry flew home, let go nowhere or cancelled: the session ends `nowhere` (the core puts the lift's filter back).
-    func carryWentNowhere() {
-        if carryEnd == nil { carryEnd = "nowhere" }
-    }
-
-    /// The plus let go in the tree: the session ends `naming`, the panel kept while the name is typed.
-    func carryNaming() {
-        carryEnd = "naming"
+        session.moved(to: .init(edge: point.x < Self.panelEdge, node: node))
     }
 
     /// The carry let go on a panel row: every carried task goes to that project, as the core's session says.
     func carryOnNode(_ node: String) {
-        carryEnd = "closed"
-        carryCall(redraw: true) { try $0.carryOnNode(node) }
-        if readsProjects { Task { await carryCalls?.value; await projects.read() } }
+        session.onNode(node)
         endSelectionIf("dropped")
     }
 
@@ -274,65 +242,19 @@ final class BoardModel {
         if selecting, board.endsSelection(how) { endSelection() }
     }
 
-    /// The view reads the By project list too (`ViewChoice.source`).
-    var readsProjects: Bool { viewChoice?.source == "projectsScreen" }
-
-    /// The new project's name answered or cancelled: the panel the naming kept out goes.
-    func endProjectName() {
-        carryCall(redraw: true) { try $0.endProjectName() }
-    }
-
     private func closeCarry() {
-        guard carrySession else { return }
-        carrySession = false
-        carryWait?.cancel()
-        carryWait = nil
-        carryReported = nil
-        let how = carryEnd ?? "dropped"
-        carryEnd = nil
-        guard how != "closed" else { return }
-        carryCall(redraw: how != "dropped") { try $0.endCarry(how) }
-        endSelectionIf(how)
+        guard let how = session.close(), how != .closed else { return }
+        endSelectionIf(how.rawValue)
     }
 
-    /// The projects button: the panel opened or closed, kept on the device.
-    func toggleProjectsPanel() async {
-        let open = !(funnel?.panel?.open ?? false)
-        await viewCall { try $0.setProjectsPanel(open) }
-    }
-
-    /// A tap on a row of the panel: chosen and the panel closed (the core's), or, chosen already, folded.
-    func pickProjectNode(_ node: String) async {
-        UISelectionFeedbackGenerator().selectionChanged()
-        await viewCall { try $0.pickProjectNode(node) }
-    }
-
-    /// The cross beside the filter's title: every task shows again.
-    func clearProjectFilter() async {
-        await viewCall { try $0.clearProjectFilter() }
-    }
-
-    /// A mode picked in the view button's menu.
-    func setViewMode(_ mode: ViewMode) async {
-        guard mode != viewMode else { return }
-        await viewCall { try $0.setViewMode(mode) }
-    }
-
-    /// A call that changes only this device's view (the filter, the panel, the mode, a fold), then the screen read again
-    /// with it; By project reads its own list too.
-    func viewCall(_ call: @escaping @Sendable (TaskBoard) throws -> Void) async {
-        let board = board
-        do {
-            try await Task.detached { try call(board) }.value
-        } catch {
-            problem(error)
-        }
-        await reload()
-        if readsProjects { await projects.read() }
-    }
     private(set) var snapshot: BoardSnapshot? {
         didSet {
-            if let snapshot { CardMetrics.follow(snapshot.look) }
+            if let snapshot {
+                CardMetrics.follow(snapshot.look)
+                metrics.measure(snapshot)
+                if !adopting { listsContext = snapshot.funnel.view.context }
+            }
+            projects.follow()
             if let timeline = snapshot?.timeline, timeline != oldValue?.timeline {
                 // A drop's calendar was laid out as it was let go: that stack, not another ask of the core.
                 if let laid = comingLaid, laid.timeline == timeline {
@@ -447,10 +369,14 @@ final class BoardModel {
             let board = board
             readsStarted += 1
             let serial = readsStarted
+            let epoch = viewEpoch
             do {
                 let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
-                // Another day was asked for meanwhile (a turn that went on): this read is not drawn, the day asked is read.
-                guard shownDay == day else { readAgain = true; continue }
+                // Another day was asked for meanwhile (a turn that went on), or another view adopted: this read is not
+                // drawn, the screen as asked is read. A read asked meanwhile reads again before anything is drawn, so
+                // quick picks never show a filter passed by.
+                guard shownDay == day, epoch == viewEpoch else { readAgain = true; continue }
+                if readAgain { continue }
                 show(read, serial: serial)
                 problem = nil
             } catch {
@@ -465,7 +391,7 @@ final class BoardModel {
         guard dropReads.mayDraw(serial) else { return }
         if let before = snapshot { follow(read.dayChange(since: before), from: before) }
         defer { if reopen, read.day == read.today, !readAgain { reopen = false; dayMoved += 1 } }
-        draw(motion: read.motion(from: snapshot)) {
+        draw(motion: motion(of: read)) {
             snapshot = read
             sectionMove = nil
             entry.screenChanged()
@@ -476,7 +402,7 @@ final class BoardModel {
     /// system's spring). Another day is drawn still: it came in through the day's own slide (`turn(to:)`).
     func draw(motion: BoardMotion, _ change: () -> Void) {
         switch motion {
-        case .still, .turn:
+        case .still, .turn, .context:
             var still = Transaction()
             still.disablesAnimations = true
             withTransaction(still, change)
@@ -750,7 +676,7 @@ final class BoardModel {
         // A carry over the day that came in (a swipe let go, or a day arrow it was held over) points at that day's places
         // now, the finger still: its lists are drawn at once and the place under the finger is read anew.
         guard carry != nil else { return }
-        for list in lists.values { list.controller?.update() }
+        for list in listControllers { list.update() }
         drag.holdAgain()
     }
 
@@ -805,7 +731,7 @@ final class BoardModel {
         await reload()
         // A task the filter hides is shown with every task again, as the core says (`tasks.filterHides`).
         if let node = filter?.node, (try? await Task.detached(operation: { try board.filterHides(item, filter: node) }).value) == true {
-            await clearProjectFilter()
+            await funnelState.clear()
         }
         if place.list == "done" {
             // The Done column stands left of Inbox in the ribbon only: in another view the find opens on its own page.
@@ -1045,7 +971,8 @@ final class BoardModel {
     /// The screen filtered by `project`: chosen, with the branches above it opened (`tasks.selectProjectNode`).
     func openProject(_ project: ProjectRef) {
         fullScreen = []
-        Task { await projects.select(project.name) }
+        guard let node: String = ruleNow("rules.projectNodeOf", [.string(project.name)]) else { return }
+        Task { await funnelState.select(node) }
     }
 
     /// A card on the calendar lifted with its subtasks while a subtask is typed under it (Add Subtask there).
@@ -1183,7 +1110,7 @@ final class BoardModel {
             markCards()
             // The rows a carry folds away (a card's subtasks, the other picked tasks, a lifted section's) go and come back.
             if oldValue?.token != carry?.token || oldValue?.group.count != carry?.group.count || oldValue?.landed != carry?.landed {
-                for list in lists.values { list.controller?.update() }
+                for list in listControllers { list.update() }
             }
         }
     }
@@ -1209,7 +1136,7 @@ final class BoardModel {
     /// Which reads may draw while drops are written.
     @ObservationIgnored private var dropReads = DropReads()
     /// The lists on the screen, which a drop's preview is drawn into at once.
-    @ObservationIgnored private var lists: [BoardColumn: WeakList] = [:]
+    @ObservationIgnored private var lists: [WeakList] = []
     /// The one routing of a carry's point to its place.
     @ObservationIgnored let route = BoardRoute()
     /// The board's drag: lift, carry, drop.
@@ -1219,12 +1146,20 @@ final class BoardModel {
         weak var controller: ListController?
     }
 
+    /// A list on the screen. The ribbon's lists stay while another view shows (dormant), so each column may have two.
     func register(_ list: ListController) {
-        lists[list.column] = WeakList(controller: list)
+        lists.removeAll { $0.controller == nil || $0.controller === list }
+        lists.append(WeakList(controller: list))
         route.add(list)
     }
 
-    func listController(_ column: BoardColumn) -> ListController? { lists[column]?.controller }
+    /// Every list mounted, the dormant ones too: they draw the screen when they wake.
+    var listControllers: [ListController] { lists.compactMap(\.controller) }
+
+    /// The list of `column` that shows now.
+    func listController(_ column: BoardColumn) -> ListController? {
+        listControllers.first { $0.column == column && !$0.dormant }
+    }
 
     private func begin() -> Int {
         carryBegins?()
@@ -1241,7 +1176,7 @@ final class BoardModel {
         // The By project list's card goes by its own drop (the project it is shown under), any other by its task.
         guard selecting, picked.contains(card.id), let snapshot else {
             let drop = column == "projects" ? projects.cards[card.id]?.drop : nil
-            openCarry(keys: [card.item.key], cards: drop.map { [$0] } ?? [])
+            session.start(keys: [card.item.key], cards: drop.map { [$0] } ?? [])
             withAnimation(CarryMotion.carry) { carry = Carry(token: token, id: card.id, item: card.item, from: column) }
             return token
         }
@@ -1264,7 +1199,7 @@ final class BoardModel {
             // Every picked task the lift takes goes with it to a project too; the By project list's by their drops.
             let keys = [card.item.key] + going.map(\.item.key)
             let drops = column == "projects" ? pickedIds.compactMap { id in projects.cards[id].flatMap { keys.contains($0.item.key) ? $0.drop : nil } } : []
-            openCarry(keys: keys, cards: drops)
+            session.start(keys: keys, cards: drops)
         }
         return token
     }
@@ -1292,7 +1227,7 @@ final class BoardModel {
     @discardableResult
     func startCarryingPlus() -> Int {
         let token = begin()
-        openCarry(keys: [], plus: true)
+        session.start(keys: [], plus: true)
         carry = Carry(token: token, id: Carried.plus, item: nil, from: "new")
         return token
     }
@@ -1361,9 +1296,9 @@ final class BoardModel {
     func finishCarry(_ token: Int) {
         let changed = landingIds
         CardControl.reveal(changed)
-        for list in lists.values { list.controller?.showHeaders(all: true) }
+        for list in listControllers { list.showHeaders(all: true) }
         endCarry(token)
-        for list in lists.values { list.controller?.redraw(changed) }
+        for list in listControllers { list.redraw(changed) }
     }
 
     /// The carried card itself, wherever the screen draws it: its copy stands for it until the carry ends, once the copy
@@ -1696,7 +1631,7 @@ final class BoardModel {
            let slots = try? board.stack(next.timeline, measures: Self.measures(hour), pure: true) {
             comingLaid = Laid(timeline: next.timeline, hour: hour, slots: slots)
         }
-        for list in lists.values { list.controller?.update() }
+        for list in listControllers { list.update() }
         NextFrame.run { [self] in
             guard coming?.serial == serial else { return }
             withAnimation(CarryMotion.dropAnimation) {
@@ -1721,7 +1656,7 @@ final class BoardModel {
         dropReads.previewDrawn()
         sectionMove = SectionMove(column: column, group: group.id, before: list.groups[safe: at]?.id)
         carry?.landed = true
-        for list in lists.values { list.controller?.update() }
+        for list in listControllers { list.update() }
         writeDrop("tasks.moveGroup", [.string(section.list), section.names[section.lifted].json, place])
         return true
     }

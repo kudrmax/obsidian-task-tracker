@@ -18,8 +18,8 @@ struct ProjectsPanelView: View {
                 // The dim over the lists: a tap there closes the panel the button opened.
                 Color.black.opacity(shown ? (scheme == .dark ? 0.5 : 0.2) : 0)
                     .ignoresSafeArea()
-                    .allowsHitTesting(model.funnel?.panel?.dimCloses == true)
-                    .onTapGesture { Task { await model.toggleProjectsPanel() } }
+                    .allowsHitTesting(shown && model.funnel?.panel?.dimCloses == true)
+                    .onTapGesture { Task { await model.funnelState.togglePanel() } }
                     .zIndex(0)
                 if shown {
                     VStack(alignment: .leading, spacing: 0) {
@@ -68,7 +68,7 @@ struct FilterTitle: View {
                 .accessibilityHidden(true)
             name
             if filter.clearable {
-                Button { Task { await model.clearProjectFilter() } } label: {
+                Button { Task { await model.funnelState.clear() } } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.secondary)
@@ -155,7 +155,7 @@ struct ViewButton: View {
     var body: some View {
         Menu {
             ForEach(view.modes, id: \.mode) { option in
-                Toggle(isOn: Binding(get: { option.checked }, set: { _ in Task { await model.setViewMode(option.mode) } })) {
+                Toggle(isOn: Binding(get: { option.checked }, set: { _ in Task { await model.funnelState.setMode(option.mode) } })) {
                     Label(option.label, systemImage: Self.symbol(option.icon))
                 }
             }

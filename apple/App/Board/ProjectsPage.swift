@@ -343,7 +343,7 @@ private struct ProjectCard: View {
             carried: mark.hidden,
             onCarry: { model.startCarry(card, from: "projects") },
             from: "projects",
-            onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item); await model.projects.read() } } : nil,
+            onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item) } } : nil,
             onLink: { model.openLink($0) })
             .frame(height: card.listHeight)
             .background { if mark.waiting { DashedPlace() } }
@@ -556,7 +556,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         case nil:
             guard let aimed else { return nil }
             let rect = lineRect
-            model?.carryNaming()
+            model?.session.naming()
             projects.asking = .project(aimed.landing.place)
             return CarryLanding(rect: rect, folds: true)
         }
