@@ -31,6 +31,7 @@ The rule «which tasks a node shows» takes the setting; the device state keeps 
 - frontend-obsidian: a tap on the Subprojects row toggles it and closes the menu, as a mode's row does (the board shows only the open menu); the lists then drop or return the subprojects' tasks with the lists' usual leave and enter motion, in place.
 - frontend-obsidian: Rows and a note's block follow their lists' heights to the end of that motion (they kept the taller height when tasks left: a row of empty room in Rows, a block that never shrank). Seen while checking this toggle; the app's rows and blocks should shrink the same way.
 - frontend-obsidian: a list whose last cards leave and whose «No tasks» plate comes (or the reverse) never stands taller than before or after: the coming row waits while the leaving ones fade and grows as they fold, on the same curve; a section header first among the rows that stay has no top margin. In Rows each row goes once, straight, to the height it rests at, and a note's block follows. The app's lists should move the same way.
+- frontend-swift: the row is text alone, no symbol: the boards draw none, the core gives no icon, and By project's symbol would repeat. Its check is the system menu's, the same as the modes' check beside it.
 
 ## Contract
 
