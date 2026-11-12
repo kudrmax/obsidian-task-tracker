@@ -254,7 +254,7 @@ as one tree, the first name winning, and is written back as one under the first 
   (`tasks.carryAt`): its branch unfolds if `unfoldsOnHover`, and it is chosen if `opensOnHover` (a live project or No
   project, not the chosen row; never All, Done or a done project). `ProjectsRow.muted`: the name drawn grey (a waiting or done project, No project, Done). `tasks.selectProjectNode(node)`: chosen, the branches above it opened (a search hit's path, a card's
   folder). Each answers `projectsScreen`. `ProjectsView` has no `mode`/`modes` any more (By stage went: it is the rows
-  mode); `ProjectsCard.over` is always null.
+  mode); `ProjectsCard.over` is gone.
 - `tasks.createProject(name, { parent, before })`: the plus let go in the tree; answers the `ProjectRef` (chosen at
   once), `null` for a blank name or one the tree has. `tasks.moveProject(name, place)`: a project lifted and let go.
   The place comes from `rules.projectsGap(rows, gap, depth, lifted?)` → `{ place, depth }` (`gap` before row `gap`, the

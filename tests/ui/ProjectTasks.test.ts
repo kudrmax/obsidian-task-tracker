@@ -8,7 +8,7 @@ import { projectsView } from "../fakes/projectsView";
 
 const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: "2026-11-12", slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, group: null, subtasks: [], progress: null, parentText: null, description: null, list: "soon", isSubtask: false, ...extra }, "2026-11-07");
 
-const card = (task: TaskItem, stage: ProjectsCard["stage"]): ProjectsCard => ({ id: "c1", item: task, stage, over: null, from: null, drop: { key: task.key, from: null }, menuFrom: "soon", canDrop: true });
+const card = (task: TaskItem, stage: ProjectsCard["stage"]): ProjectsCard => ({ id: "c1", item: task, stage, from: null, drop: { key: task.key, from: null }, menuFrom: "soon", canDrop: true });
 
 function drawn(model: ProjectsCard): HTMLElement {
 	const tasks = new ProjectTasks(document.body.appendChild(document.createElement("div")), {});
@@ -43,7 +43,7 @@ import { shownCardSize } from "../../obsidian/ui/cardSize";
 const task = (text: string, index: number, extra: Partial<TaskItem> = {}): TaskItem => item({ key: { section: "soon", index, path: [], raw: `- [ ] ${text}` }, text, id: `t${index}`, ...extra } as Partial<TaskItem>);
 
 function cardOf(t: TaskItem, part: string): ProjectsCard {
-	return { id: `${part}/${t.id}`, item: t, stage: { kind: "soon" }, over: null, from: part, drop: { key: t.key, from: part }, menuFrom: "soon", canDrop: true };
+	return { id: `${part}/${t.id}`, item: t, stage: { kind: "soon" }, from: part, drop: { key: t.key, from: part }, menuFrom: "soon", canDrop: true };
 }
 
 function rowsOf(part: string, cards: readonly ProjectsCard[], subtasks: Readonly<Record<string, readonly TaskItem[]>> = {}): ProjectsListRow[] {

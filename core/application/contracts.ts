@@ -809,8 +809,6 @@ export interface ProjectsCard {
 	readonly item: TaskItem;
 	/** The stage's mark on the right. */
 	readonly stage: ProjectsStage | null;
-	/** Always null since By stage went (its parts' titles name the subproject); goes once no frontend reads it. */
-	readonly over: string | null;
 	/** The project it is shown under: what a drop of it on the tree replaces; null for none. */
 	readonly from: string | null;
 	/** What `dropOnProject` takes for this very card: its task and the project it is shown under. */

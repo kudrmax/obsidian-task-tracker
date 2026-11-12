@@ -1373,7 +1373,7 @@ describe("QuickEntryController: the Projects list is a list the field stands in 
 	const b = item("B", key("now", 0));
 
 	function part(name: string, title: string, tasks: readonly TaskItem[], list: "soon" | "now" | "inbox"): ProjectsSection {
-		const cards = tasks.map((t): ProjectsCard => ({ id: `${name}/${t.id}`, item: t, stage: null, over: null, from: name, drop: { key: t.key, from: name }, menuFrom: "soon", canDrop: true }));
+		const cards = tasks.map((t): ProjectsCard => ({ id: `${name}/${t.id}`, item: t, stage: null, from: name, drop: { key: t.key, from: name }, menuFrom: "soon", canDrop: true }));
 		const rows = cards.flatMap((card) => [
 			{ id: card.id, item: card.item, level: 0, card, drop: card.drop },
 			...card.item.subtasks.map((s) => ({ id: `${name}/${s.id}`, item: s, level: 1, card: null, drop: { key: s.key, from: name } })),

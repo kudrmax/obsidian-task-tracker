@@ -358,7 +358,6 @@ function cardOf(input: ProjectsInput, entry: TaskEntry, from: string | null): Pa
 	return {
 		item,
 		stage: stageMark(entry, input.today, input.boundary),
-		over: null,
 		from,
 		drop: dropOf(item, from),
 		menuFrom: menuFromOf(entry),

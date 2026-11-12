@@ -142,7 +142,7 @@ describe("a project's tasks", () => {
 			["Свидание", 1, ["Свидание: в каком формате искать"]],
 		]);
 		expect(view.sections[0].cards.map((c) => c.stage)).toEqual([{ kind: "soon" }, { kind: "today" }]);
-		expect(view.sections[3].cards[0]).toMatchObject({ stage: { kind: "inbox" }, from: "Свидание", menuFrom: "inbox", over: null });
+		expect(view.sections[3].cards[0]).toMatchObject({ stage: { kind: "inbox" }, from: "Свидание", menuFrom: "inbox" });
 		expect(view.sections[1].newTask).toEqual({ place: { kind: "list", list: "inbox", group: null, before: null }, project: "Где знакомиться" });
 		expect(view.sections[0].cards[0].item.project).toMatchObject({ name: "Окружение в Сербии", mark: false });
 	});

@@ -3804,7 +3804,6 @@ ${key.title}`.toLowerCase();
     return {
       item,
       stage: stageMark(entry, input.today, input.boundary),
-      over: null,
       from,
       drop: dropOf(item, from),
       menuFrom: menuFromOf(entry),
