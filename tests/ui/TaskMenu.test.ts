@@ -314,7 +314,7 @@ describe("the menu", () => {
 			expect(confirmButton().querySelector("svg")).not.toBeNull();
 			confirmButton().click();
 			expect(actions.pickStatus).toHaveBeenCalledTimes(1);
-			expect(actions.pickStatus).toHaveBeenCalledWith("stop");
+			expect(actions.pickStatus).toHaveBeenCalledWith("stop", expect.anything());
 			expect(closing()).toBe(true);
 		});
 
@@ -322,7 +322,7 @@ describe("the menu", () => {
 			const actions = open(item({ repeat: EVERY_3_DAYS }));
 			statusTile("Stop").click();
 			document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-			expect(actions.pickStatus).toHaveBeenCalledWith("stop");
+			expect(actions.pickStatus).toHaveBeenCalledWith("stop", expect.anything());
 		});
 
 		it("shows a week's days beside Repeat, the chosen ones on", () => {
@@ -543,17 +543,17 @@ describe("the menu", () => {
 		const tile = () => panel().querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-status .tc-menu-tile")[1];
 		const start = open(item());
 		tile().click();
-		expect(start.pickStatus).toHaveBeenCalledWith("inProgress");
+		expect(start.pickStatus).toHaveBeenCalledWith("inProgress", expect.anything());
 		document.body.innerHTML = "";
 		const stop = open(item({ status: "inProgress" }));
 		tile().click();
-		expect(stop.pickStatus).toHaveBeenCalledWith("stopProgress");
+		expect(stop.pickStatus).toHaveBeenCalledWith("stopProgress", expect.anything());
 	});
 
 	it("marks the task done from its tile", () => {
 		const actions = open(item());
 		panel().querySelector<HTMLButtonElement>(".tc-menu-tiles.is-status .tc-menu-tile")?.click();
-		expect(actions.pickStatus).toHaveBeenCalledWith("done");
+		expect(actions.pickStatus).toHaveBeenCalledWith("done", expect.anything());
 	});
 
 	describe("asking before Delete and Won’t do", () => {
@@ -590,7 +590,7 @@ describe("the menu", () => {
 			expect(ask()!.querySelector(".tc-menu-ask-question")!.textContent).toBe("Won’t do “Call the doctor”?");
 			expect(panel().firstElementChild).toBe(ask());
 			askButton(".tc-menu-ask-btn:last-child").click();
-			expect(actions.pickStatus).toHaveBeenCalledWith("wontDo");
+			expect(actions.pickStatus).toHaveBeenCalledWith("wontDo", expect.anything());
 			expect(closing()).toBe(true);
 		});
 

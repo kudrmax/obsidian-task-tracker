@@ -99,8 +99,8 @@ export function labelTiles(model: TaskMenuModel): readonly LabelTile[] {
 }
 
 export interface MenuActions {
-	/** A status tile (`TaskService.pickStatus`). */
-	pickStatus(id: MenuStatusId): Promise<void>;
+	/** A status tile (`TaskService.pickStatus`) on the tasks the menu's model names for it (`statusTasks`). */
+	pickStatus(id: MenuStatusId, tasks: readonly TaskItem[]): Promise<void>;
 	/** Puts the task off to `date`: due that day, no slot, at the end of Now for today, of Soon for a later day. */
 	postpone(date: LocalDate): Promise<void>;
 	removeDue(): Promise<void>;
@@ -360,8 +360,8 @@ export class TaskMenu extends LiftedMenu {
 				statuses: () => {
 					const tiles = statusTiles(model);
 					const asked = this.asking;
-					if (asked !== null && asked !== "delete") this.askGroup(asked);
-					else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: tile.confirm ? () => this.askFor(tile.id) : this.pick(() => actions.pickStatus(tile.id)) }))]);
+					if (asked !== null && asked !== "delete") this.askGroup(asked, model.statusTasks);
+					else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: tile.confirm ? () => this.askFor(tile.id) : this.pick(() => actions.pickStatus(tile.id, model.statusTasks)) }))]);
 				},
 				levels: () => {
 					const levelTiles = priorityTiles(model).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: model.levels.disabled, onPick: this.pick(() => actions.togglePriority(tile.prefix)) }));
@@ -392,7 +392,7 @@ export class TaskMenu extends LiftedMenu {
 				},
 				remove: () => {
 					const remove = model.remove;
-					if (this.asking === "delete") this.askGroup("delete");
+					if (this.asking === "delete") this.askGroup("delete", [item]);
 					else if (remove) menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
 				},
 			};
@@ -437,10 +437,12 @@ export class TaskMenu extends LiftedMenu {
 		return this.upper.hidden ? 0 : this.upper.children.length;
 	}
 
-	private askGroup(what: Asking): void {
-		const { item, actions } = this.context;
+	/** The question in place of the pressed row, naming the task it is for: a status's (`statusTasks`), or the menu's own for Delete. */
+	private askGroup(what: Asking, tasks: readonly TaskItem[]): void {
+		const { actions } = this.context;
 		const { verb, icon, danger } = askLooks(what);
-		const confirm = this.pick(() => (what === "delete" ? actions.remove() : actions.pickStatus(what)));
+		const item = tasks[0] ?? this.context.item;
+		const confirm = this.pick(() => (what === "delete" ? actions.remove() : actions.pickStatus(what, tasks)));
 		this.confirmAsked = confirm;
 		askGroup(this.panel, {
 			verb,

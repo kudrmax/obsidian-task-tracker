@@ -309,9 +309,9 @@ export interface TaskItem {
 
 /**
  * How a card of a list draws a task, every list and a day's list alike, and what its taps open. A folded task with an
- * open subtask (at any depth) is a card of two lines: `over` (the task's own title, small, in the caption colour), whose
- * tap opens the task's own menu; and its next step's title, whose tap (anywhere on the card but `over` and the counter)
- * opens `step`'s menu, where Done closes the step and the next one takes its place. The card keeps the task's own marks
+ * open subtask (at any depth) is a card of two lines: `over` (the task's own title, small, in the caption colour) and its
+ * next step's title. A tap anywhere opens the task's own menu, whose status tiles write the step (`TaskMenuModel.statusTasks`):
+ * Done closes the step and the next one takes its place. The card keeps the task's own marks
  * (its counter, project, date, repeat, description, priority and labels), its pick and its drag. Any other card is one
  * line, the task's own title, a tap opening its own menu.
  */
@@ -322,18 +322,18 @@ export interface TaskCard {
 	readonly title: string;
 	/** The small line over the title: the folded task's own title, plain; null for a card of one line. */
 	readonly over: string | null;
-	/** The step a tap on the card opens the menu of; null: the task's own. */
+	/** The step the menu's status tiles write; null: the task's own. */
 	readonly step: TaskItem | null;
 }
 
 /**
- * How a block of the timeline draws a task: a folded task's next step (there is no room for the task's own line), whose
- * menu a tap opens, the task's open subtasks in the stack above it as for any task; else the task's own title.
+ * How a block of the timeline draws a task: a folded task's next step (there is no room for the task's own line), which
+ * the status tiles of the task's menu write, the task's open subtasks in the stack above it as for any task; else the task's own title.
  */
 export interface TaskBlock {
 	readonly text: string;
 	readonly title: string;
-	/** The step whose menu a tap opens; null: the task's own. */
+	/** The step the menu's status tiles write; null: the task's own. */
 	readonly step: TaskItem | null;
 }
 
@@ -676,6 +676,12 @@ export interface TaskMenuModel {
 	readonly groups: readonly MenuGroupId[];
 	/** Done, the progress tile, Won't do, in this order; Stop last on one task that may be stopped. A task done or given up has them all too. */
 	readonly statuses: readonly MenuStatus[];
+	/**
+	 * The tasks a status tile writes (`pickStatus` with their keys) and a status question names, one per task of the menu:
+	 * a folded card's shown step (`card.step` in a list, `block.step` on the timeline), else the task itself. Every other
+	 * row is for the menu's own tasks, a folded one with all its subtasks.
+	 */
+	readonly statusTasks: readonly TaskItem[];
 	/** In the settings' order; `disabled` while none of the tasks may have a priority (they carry labels). */
 	readonly levels: { readonly tiles: readonly MenuLevel[]; readonly disabled: boolean };
 	/** In the settings' order; `disabled` while none of the tasks may carry labels (they have a priority). */

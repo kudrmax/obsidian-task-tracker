@@ -19,8 +19,8 @@ export function countLabel(count: number): string {
 }
 
 export interface BulkActions {
-	/** A status tile (`TaskService.pickStatus`). */
-	pickStatus(id: MenuStatusId): Promise<void>;
+	/** A status tile (`TaskService.pickStatus`) on the tasks the menu's model names for it (`statusTasks`). */
+	pickStatus(id: MenuStatusId, tasks: readonly TaskItem[]): Promise<void>;
 	/** A tap on a level (`TaskService.togglePriority`). */
 	togglePriority(prefix: string): Promise<void>;
 	/** A tap on a label (`TaskService.toggleLabel`); the tasks as they then stand, null once one is gone. */
@@ -120,9 +120,9 @@ export class BulkMenu {
 		const { items, actions } = this.context;
 		const model = this.context.menu(items);
 		el(panel, "div", "tc-menu-title", countLabel(items.length));
-		const statuses = statusTiles(model).map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: tile.confirm ? () => this.askFor(tile.id) : this.pick(() => actions.pickStatus(tile.id)) }));
+		const statuses = statusTiles(model).map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: tile.confirm ? () => this.askFor(tile.id) : this.pick(() => actions.pickStatus(tile.id, model.statusTasks)) }));
 		const asked = this.asking;
-		if (asked !== null && asked !== "delete") this.askGroup(panel, asked);
+		if (asked !== null && asked !== "delete") this.askGroup(panel, asked, model.statusTasks);
 		else tileGroup(panel, "is-status", [statuses]);
 		const levels = priorityTiles(model).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: model.levels.disabled, onPick: this.pick(() => actions.togglePriority(tile.prefix)) }));
 		if (levels.length > 0) tileGroup(panel, "is-priority", tileRows(levels));
@@ -136,7 +136,7 @@ export class BulkMenu {
 		};
 		menuGroup(panel, model.edits.flatMap((id) => rows[id] ?? []));
 		const remove = model.remove;
-		if (this.asking === "delete") this.askGroup(panel, "delete");
+		if (this.asking === "delete") this.askGroup(panel, "delete", items);
 		else if (remove) menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
 	}
 
@@ -146,7 +146,7 @@ export class BulkMenu {
 		this.showMenu();
 	}
 
-	private askGroup(panel: HTMLElement, what: Asking): void {
+	private askGroup(panel: HTMLElement, what: Asking, tasks: readonly TaskItem[]): void {
 		const { items, actions } = this.context;
 		const { verb, icon, danger } = askLooks(what);
 		askGroup(panel, {
@@ -156,7 +156,7 @@ export class BulkMenu {
 			icon,
 			danger,
 			onCancel: () => this.askFor(null),
-			onConfirm: this.pick(() => (what === "delete" ? actions.remove() : actions.pickStatus(what))),
+			onConfirm: this.pick(() => (what === "delete" ? actions.remove() : actions.pickStatus(what, tasks))),
 		});
 	}
 

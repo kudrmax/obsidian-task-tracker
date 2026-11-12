@@ -1364,7 +1364,7 @@ export class CalendarScreen extends Component {
 			today,
 			day: this.selectedDate,
 			actions: {
-				pickStatus: (id) => this.act(() => tasks.pickStatus([current.key], id)),
+				pickStatus: (id, targets) => this.act(() => tasks.pickStatus(targets.map((task) => task.key), id)),
 				postpone: (date) => this.act(() => tasks.postpone(current.key, date)),
 				removeDue: () => this.act(() => tasks.removeDue([current.key])),
 				toSection: (name) => this.act(() => tasks.toSection([current.key], name)),

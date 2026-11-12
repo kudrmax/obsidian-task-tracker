@@ -4525,6 +4525,13 @@ ${key.title}`.toLowerCase();
     const statuses = { done: "done", inProgress: "inProgress", stopProgress: "todo", wontDo: "cancelled", stop: null };
     return statuses[id];
   }
+  function statusTask(item, from) {
+    if (from === "timeline") return item.block.step ?? item;
+    return COLUMNS.has(from) ? item.card.step ?? item : item;
+  }
+  function statusTasks(items, of, froms) {
+    return items.map((item, i) => statusTask(item, of.kind === "task" ? of.from : froms[i] ?? "full"));
+  }
   function menuStatuses(items, of) {
     const one = of.kind === "task";
     const progress = nextProgress(items.map((item) => item.status)) === "todo" ? "stopProgress" : "inProgress";
@@ -4588,12 +4595,14 @@ ${key.title}`.toLowerCase();
     };
   }
   var MENU_GROUPS = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
-  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = []) {
+  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = [], froms = []) {
     const sections = menuSections(items, offer, of);
     const edits = menuEdits(items, of, sections);
+    const statusFor = statusTasks(items, of, froms);
     return {
       groups: MENU_GROUPS,
-      statuses: menuStatuses(items, of),
+      statuses: menuStatuses(statusFor, of),
+      statusTasks: statusFor,
       levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
       labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },
       moves: sharedMoves(items, today),
@@ -6724,7 +6733,7 @@ ${key.title}`.toLowerCase();
     }
     bulkMenu(picked2, screen) {
       const offer = menuOffer(picked2.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-      return taskMenu(picked2.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices(screen));
+      return taskMenu(picked2.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices(screen), picked2.map((p) => p.from));
     }
     carried(lifted2, picked2) {
       return carriedWith(lifted2, picked2);

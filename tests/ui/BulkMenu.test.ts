@@ -79,14 +79,14 @@ describe("the bulk menu draws its model", () => {
 		expect(progress.textContent).toContain("Stop progress");
 		progress.click();
 		await Promise.resolve();
-		expect(actions.pickStatus).toHaveBeenCalledWith("stopProgress");
+		expect(actions.pickStatus).toHaveBeenCalledWith("stopProgress", expect.anything());
 	});
 
 	it("gives tasks up and deletes them at once, as the model says neither asks", async () => {
 		const actions = open({});
 		tiles("is-status")[2].click();
 		await Promise.resolve();
-		expect(actions.pickStatus).toHaveBeenCalledWith("wontDo");
+		expect(actions.pickStatus).toHaveBeenCalledWith("wontDo", expect.anything());
 		document.body.replaceChildren();
 		const again = open({});
 		[...document.querySelectorAll<HTMLButtonElement>(".tc-menu-row")].find((row) => row.textContent?.includes("Delete 2 tasks"))!.click();
@@ -101,7 +101,7 @@ describe("the bulk menu draws its model", () => {
 		expect(document.querySelector(".tc-menu-ask-question")?.textContent).toBe("Won’t do “2 tasks”?");
 		document.querySelector<HTMLButtonElement>(".tc-menu-ask-btn:last-child")!.click();
 		await Promise.resolve();
-		expect(actions.pickStatus).toHaveBeenCalledWith("wontDo");
+		expect(actions.pickStatus).toHaveBeenCalledWith("wontDo", expect.anything());
 	});
 
 	it("draws Delete only where the model offers it", () => {
