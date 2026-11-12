@@ -265,8 +265,17 @@ final class BoardModel {
     func carryOnNode(_ node: String) {
         carryEnd = "closed"
         carryCall(redraw: true) { try $0.carryOnNode(node) }
-        if viewMode == .byProject { Task { await carryCalls?.value; await projects.read() } }
+        if readsProjects { Task { await carryCalls?.value; await projects.read() } }
+        endSelectionIf("dropped")
     }
+
+    /// Select Tasks ends where the core says the carry's end ends it (`rules.endsSelection`).
+    private func endSelectionIf(_ how: String) {
+        if selecting, board.endsSelection(how) { endSelection() }
+    }
+
+    /// The view reads the By project list too (`ViewChoice.source`).
+    var readsProjects: Bool { viewChoice?.source == "projectsScreen" }
 
     /// The new project's name answered or cancelled: the panel the naming kept out goes.
     func endProjectName() {
@@ -283,6 +292,7 @@ final class BoardModel {
         carryEnd = nil
         guard how != "closed" else { return }
         carryCall(redraw: how != "dropped") { try $0.endCarry(how) }
+        endSelectionIf(how)
     }
 
     /// The projects button: the panel opened or closed, kept on the device.
@@ -318,7 +328,7 @@ final class BoardModel {
             problem(error)
         }
         await reload()
-        if viewMode == .byProject { await projects.read() }
+        if readsProjects { await projects.read() }
     }
     private(set) var snapshot: BoardSnapshot? {
         didSet {
@@ -1605,7 +1615,6 @@ final class BoardModel {
         // The card the copy lands as waits for it; the other picked tasks come in with the rows, the copy being the lead's.
         arriving = Set(preview.landings.prefix(1).map(\.id))
         showPreview(preview.snapshot, landed: true)
-        if !carry.group.isEmpty { endSelection() }
         writeDrop("tasks.drop", [carry.dropped, to, .string(snapshot.day), snapshot.filter.json])
         return .landed(preview.landings.first)
     }

@@ -246,6 +246,6 @@ final class ProjectsBoard {
             model?.problem(error)
         }
         await model?.reload()
-        if model?.viewMode == .byProject { await read() }
+        if model?.readsProjects == true { await read() }
     }
 }

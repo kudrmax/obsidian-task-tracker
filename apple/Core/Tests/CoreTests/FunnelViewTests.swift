@@ -148,6 +148,21 @@ import Testing
         #expect(vault.text.components(separatedBy: "🗂️ Спорт").count - 1 >= 3)
     }
 
+    @Test func aDropEndsSelectTasksWhateverItsPathAndAViewSaysWhatThePlusDoes() throws {
+        let board = board(FakeVault(ProjectsScreenTests.file))
+        #expect(board.endsSelection("dropped"))
+        #expect(!board.endsSelection("nowhere"))
+        #expect(!board.endsSelection("naming"))
+        #expect(try board.funnelView().plus.tap == "newTask")
+        try board.pickProjectNode("project:Окружение")
+        try board.setViewMode(.byProject)
+        let view = try board.funnelView()
+        #expect(view.plus.tap == "inPlace" && view.plus.list == "projects")
+        #expect(view.view.source == "projectsScreen")
+        try board.setProjectsPanel(true)
+        #expect(try board.funnelView().panel?.dimCloses == true)
+    }
+
     @Test func theKeptPlaceIsTheCores() throws {
         let board = board(FakeVault(ProjectsScreenTests.file))
         #expect(try board.firstPlace() == "calendar")

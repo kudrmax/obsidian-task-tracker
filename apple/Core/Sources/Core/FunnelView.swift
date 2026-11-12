@@ -35,6 +35,8 @@ public struct ViewChoice: Decodable, Hashable, Sendable {
     /// The screen is the ribbon: it swipes, a field moved to a list turns it to that list's place, Done stands left of
     /// Inbox; elsewhere a done find opens on its own page.
     public let ribbon: Bool
+    /// What the view reads: `screen`, or `projectsScreen` (By project reads `projectsScreen(filter.node)` too).
+    public let source: String
     /// The rows mode's lists, top to bottom; none in another mode.
     public let rows: [String]
     /// The words in an empty list: «No tasks».
@@ -69,12 +71,24 @@ public struct ProjectsPanel: Decodable, Hashable, Sendable {
     /// Why it shows: `button`, `carry` (a carry brought it out at the edge), `naming` (a new project's name is typed in
     /// it); nil while it is closed.
     public let reason: String?
+    /// A tap on the dim around it closes it.
+    public let dimCloses: Bool
     /// A wide screen docks it; the phone lays it over the lists and a pick closes it.
     public let docked: Bool
     public let missing: Bool
 
     /// The rows as the gap rules take them.
     public var rowsJSON: JSONValue { .array(rows.map(\.json)) }
+}
+
+/// `PlusChoice`: the plus in this view.
+public struct PlusChoice: Decodable, Hashable, Sendable {
+    /// `inPlace` (By project: the field at its plus part) or `newTask` (the New Task screen).
+    public let tap: String
+    /// Held and let go: `funnel` (the funnel's lists), `projects` (the By project list), or nil.
+    public let list: String?
+    /// Let go in the tree while the panel shows: a new project there.
+    public let tree: Bool
 }
 
 /// `FunnelView`: the funnel's view as this device shows it.
@@ -84,6 +98,8 @@ public struct FunnelView: Decodable, Hashable, Sendable {
     public let panel: ProjectsPanel?
     /// A search opened over the view shows each find's project path.
     public let searchPaths: Bool
+    /// What the plus does here: a tap types in place or opens New Task; held, which list and whether the tree takes it.
+    public let plus: PlusChoice
     /// The place of the funnel the screen stands at, as the device keeps it.
     public let place: String
 
@@ -133,6 +149,11 @@ extension TaskBoard {
     /// the panel out while a new project's name is typed.
     public func endCarry(_ how: String) throws {
         _ = try screenCall("tasks.endCarry", [.string(how)], over: try files())
+    }
+
+    /// Whether a carry that ended `how` (`dropped`, `nowhere`, `naming`) ends Select Tasks.
+    public func endsSelection(_ how: String) -> Bool {
+        (try? rule("rules.endsSelection", [.string(how)], as: Bool.self)) ?? false
     }
 
     /// The new project's name answered or cancelled: the panel the naming kept out goes.

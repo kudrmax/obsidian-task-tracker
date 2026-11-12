@@ -644,7 +644,7 @@ final class QuickEntryHost {
         }
         // By project the Projects list is read with the screen and drawn in the same transaction: the line typed there
         // ends in the drawing that shows its card.
-        let byProject = read.flatMap { $0.funnel.view.mode == .byProject ? $0.filter : nil }
+        let byProject = read.flatMap { $0.funnel.view.source == "projectsScreen" ? $0.filter : nil }
         let projectsRead = if let byProject { await ProjectsBoard.fetch(board, screen: model.menuScreen, node: byProject) } else { nil as ProjectsBoard.Read? }
         if method == "edit", case .success(let answer) = written, let item = try? answer.decode(TaskItem.self) { renamed?(item) }
         let created: JSONValue? = if method == "createInPlace", case .success(let made) = written, !made.isNull, read != nil { made } else { nil }

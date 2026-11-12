@@ -18,7 +18,7 @@ struct ProjectsPanelView: View {
                 // The dim over the lists: a tap there closes the panel the button opened.
                 Color.black.opacity(shown ? (scheme == .dark ? 0.5 : 0.2) : 0)
                     .ignoresSafeArea()
-                    .allowsHitTesting(shown && model.funnel?.panel?.reason == "button")
+                    .allowsHitTesting(model.funnel?.panel?.dimCloses == true)
                     .onTapGesture { Task { await model.toggleProjectsPanel() } }
                     .zIndex(0)
                 if shown {
