@@ -63,10 +63,10 @@ describe("a task drawn twice", () => {
 
 	it("a closed task's card can't be dropped; an open one can", async () => {
 		const { svc } = setup();
-		await svc.tapProjectNode("done");
+		await svc.pickProjectNode("done", true);
 		const done = cards(await svc.projectsScreen());
 		expect(done.map((c) => [c.item.title, c.canDrop])).toEqual([["Старое", false]]);
-		await svc.tapProjectNode("all");
+		await svc.pickProjectNode("all", true);
 		expect(cards(await svc.projectsScreen()).every((c) => c.canDrop)).toBe(true);
 	});
 });

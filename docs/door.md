@@ -71,8 +71,8 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 - `step`: the write is an action undo takes back; tidying is none. With it comes `history`.
 - `settings`: the call changed the settings (a calendar shown or hidden; the phone carrying the old choice of calendars
   over, once). The host writes this text as `data.json`; every key it does not know is kept.
-- `projectsScreen`: the call changed what this device keeps of the Projects screen (`tasks.tapProjectNode`,
-  `tasks.selectProjectNode`, `tasks.hoverProjectNode`, `tasks.setProjectsMode`, `tasks.createProject`,
+- `projectsScreen`: the call changed what this device keeps of the Projects screen (`tasks.pickProjectNode`,
+  `tasks.selectProjectNode`, `tasks.startCarry`, `tasks.carryAt`, `tasks.createProject`,
   `tasks.renameProject`). The host keeps it on
   the device, never synced, and hands it in again.
 - `ids`: who the tasks and sections are after the call (`TaskIdState` in `core/application/TaskIdentity.ts`: the
@@ -250,13 +250,11 @@ as one tree, the first name winning, and is written back as one under the first 
   `ProjectsView` the drop leaves (equal to the next `projectsScreen`), each landing `{ kind: "card", id, item, card,
   section, index }` (the part it was dropped in first), `{ kind: "subtask", id, item, parent, index }` or
   `{ kind: "away", id, item: null }`.
-- `tasks.tapProjectNode(node)`: a node not chosen is chosen; the chosen one folds or unfolds its branch (Done opens its
-  done projects). `tasks.unfoldProjectNode(node)`: the branch opened without choosing it, for a card held over a folded
-  row (`unfoldsOnHover`). `tasks.hoverProjectNode(node)`: a card held `PROJECTS_HOVER_MS` over a row, in one call: its
-  branch unfolds if `unfoldsOnHover`, and it is chosen if `opensOnHover` (a live project or No project, not the chosen
-  row; never All, Done or a done project), the mode kept; `tasks.hoverProjectNode("project:Спорт")` shows Спорт's tasks
-  under the held card. `ProjectsRow.muted`: the name drawn grey (a waiting or done project, No project, Done). `tasks.selectProjectNode(node)`: chosen, the branches above it opened (a search hit's path, a card's
-  folder). `tasks.setProjectsMode("byProject" | "byStage")`. Each answers `projectsScreen`.
+- A tap on a row is `tasks.pickProjectNode(node, wide)`; a held card's pause over a row is the carry's
+  (`tasks.carryAt`): its branch unfolds if `unfoldsOnHover`, and it is chosen if `opensOnHover` (a live project or No
+  project, not the chosen row; never All, Done or a done project). `ProjectsRow.muted`: the name drawn grey (a waiting or done project, No project, Done). `tasks.selectProjectNode(node)`: chosen, the branches above it opened (a search hit's path, a card's
+  folder). Each answers `projectsScreen`. `ProjectsView` has no `mode`/`modes` any more (By stage went: it is the rows
+  mode); `ProjectsCard.over` is always null.
 - `tasks.createProject(name, { parent, before })`: the plus let go in the tree; answers the `ProjectRef` (chosen at
   once), `null` for a blank name or one the tree has. `tasks.moveProject(name, place)`: a project lifted and let go.
   The place comes from `rules.projectsGap(rows, gap, depth, lifted?)` → `{ place, depth }` (`gap` before row `gap`, the
@@ -382,8 +380,20 @@ adds to the calls above; the old ones answer as before.
 - `FunnelView.searchPaths`: a search opened over the view shows each find's project path (a filter is chosen).
 - A card let go on the project it already has (`dropOnProject`, `dropTasksOnProject`, a by project list) leaves its line
   as it is.
-- Gone (2026-11-12, both frontends moved): `SCREEN_PLACES`, `ScreenPlace`, `ScreenSpot`, `ScreenAt`, `days.stepScreen`,
-  `rules.placeShowing`, `rules.shownLists`, `rules.shownEntryLists`; `SHOWN_LISTS` has no `projects` entry.
+- Gone from `contracts.ts` (2026-11-12, both frontends moved): `SCREEN_PLACES`, `ScreenPlace`, `ScreenSpot`, `ScreenAt`,
+  `stepScreen`, `placeShowing`, `shownLists`, `shownEntryLists`, and `TaskService`'s `tapProjectNode`,
+  `unfoldProjectNode`, `hoverProjectNode`, `setProjectsMode`; `SHOWN_LISTS` has no `projects` entry. **Their door names
+  still answer** (CLAUDE.md: the door keeps its functions' names), as thin mappings no frontend here calls:
+  `days.stepScreen` (`days.stepFunnel`, the old Projects place as Done: nothing back, Inbox on), `rules.placeShowing`
+  (`funnelPlaceShowing`, Projects as Inbox; a `projects` column stays where it is), `rules.shownLists(place)`
+  (`SHOWN_LISTS`, `[]` for Projects), `rules.shownEntryLists(place)` (`["projects"]` for Projects),
+  `tasks.tapProjectNode` (`pickProjectNode` on a wide screen), `tasks.unfoldProjectNode`, `tasks.hoverProjectNode` (the
+  pause `carryAt` acts on), `tasks.setProjectsMode` (answers, keeps nothing).
+- `rules.stackedRows(wanted, room, least)` → heights: the rows mode's lists, each as tall as it wants while all fit; else
+  a list shorter than an even share keeps its height and the others share the rest; none under `least`. Example:
+  `rules.stackedRows([900, 70, 400, 70], 600, 70)` → `[230, 70, 230, 70]`.
+- `EntryState.locksPanel` (the quick entry's state, `entry.*`): true while a field is open; the projects button can't be
+  pressed then.
 
 #### A folded task's next step
 

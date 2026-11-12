@@ -170,6 +170,11 @@ export interface EntryState {
 	 * subtask's field, new or renamed (its project is its parent's), nor for a section's name.
 	 */
 	readonly project: EntryProject | null;
+	/**
+	 * The projects button can't be pressed while the field is open (Max's app since 11-12, now both frontends'): a panel
+	 * opened over a field being typed would take the screen from it. Always true while there is a state; no field, no lock.
+	 */
+	readonly locksPanel: boolean;
 }
 
 /**
@@ -372,6 +377,7 @@ export class QuickEntry {
 			repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today()),
 			renamed: this.renamed,
 			project: task && this.topLevel(field) ? this.projectButton(field.project ?? null) : null,
+			locksPanel: true,
 		};
 	}
 

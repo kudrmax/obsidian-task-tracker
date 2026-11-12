@@ -55,6 +55,8 @@ export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, 
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
 export { SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type EntryList } from "./screenPlaces";
 /** The funnel's places as the wheel and a swipe walk them, without Projects: the tree is a panel whose node filters them. */
+/** The rows view's list heights: `stackedRows(wanted, room, least)`, each as tall as it wants while all fit, the long ones sharing what the short ones leave. */
+export { stackedRows } from "./stackedRows";
 /** Whether a carry's end ends Select Tasks (`endsSelection(end)`): one that landed does, whatever path it took. */
 export { endsSelection } from "./projectsCarry";
 export { FUNNEL_PLACES, funnelPlaceOf, funnelPlaceShowing, stepFunnel, type FunnelAt, type FunnelPlace, type FunnelSpot } from "./screenPlaces";
@@ -729,9 +731,6 @@ export { projectNodeOf } from "./projectsScreen";
 /** A project's state, computed from its tasks and its subprojects', never set by hand. */
 export type ProjectStatus = "active" | "waiting" | "done";
 
-/** The segment over the tasks of the Projects screen. */
-export type ProjectsMode = "byProject" | "byStage";
-
 /**
  * What a device keeps of the projects' panel and the funnel's view, never synced: the node chosen (the funnel's filter),
  * the folded branches, the panel open, and the view modes, each view's own.
@@ -739,8 +738,6 @@ export type ProjectsMode = "byProject" | "byStage";
 export interface ProjectsScreenState {
 	/** The node chosen in the tree, which filters the funnel (`funnelView().filter`); none: no filter (the old Projects screen shows All). */
 	readonly selected?: ProjectsNodeId;
-	/** The old Projects screen's segment. */
-	readonly mode?: ProjectsMode;
 	/** The projects' panel is open (`setProjectsPanel`). */
 	readonly panelOpen?: boolean;
 	/** The view mode last picked with no filter (`setViewMode`). */
@@ -793,7 +790,7 @@ export interface ProjectsRow {
 	/** A held card over it unfolds its branch after a pause: a folded branch. */
 	readonly unfoldsOnHover: boolean;
 	/**
-	 * A held card over it chooses it after the same pause (`TaskService.hoverProjectNode`), so its tasks show and the card
+	 * A held card over it chooses it after the same pause (`TaskService.carryAt`), so its tasks show and the card
 	 * can be let go among them: a row that takes a task (`acceptsTask`) whose list takes drops (`ProjectsView.reorders`),
 	 * not the chosen one. A live project and No project; never All, Done or a done project.
 	 */
@@ -810,9 +807,9 @@ export interface ProjectsCard {
 	/** Who the drawn card is: unique on the screen (a task of two parts is two cards), what a view keys it by. */
 	readonly id: string;
 	readonly item: TaskItem;
-	/** By project: the stage's mark on the right; null in By stage. */
+	/** The stage's mark on the right. */
 	readonly stage: ProjectsStage | null;
-	/** By stage: the subproject the task is in, small over its title; null where it is the chosen project's own, and in By project. */
+	/** Always null since By stage went (its parts' titles name the subproject); goes once no frontend reads it. */
 	readonly over: string | null;
 	/** The project it is shown under: what a drop of it on the tree replaces; null for none. */
 	readonly from: string | null;
@@ -952,9 +949,6 @@ export interface ProjectDelete {
 export interface ProjectsView {
 	readonly rows: readonly ProjectsRow[];
 	readonly selected: ProjectsNodeId;
-	readonly mode: ProjectsMode;
-	/** The segment's words: «By project», «By stage». */
-	readonly modes: readonly { readonly mode: ProjectsMode; readonly label: string }[];
 	/** The header over the tasks: the chosen node's name. */
 	readonly title: string;
 	/** The chosen project's menu (its title tapped); null for All, No project and Done. */
@@ -1159,7 +1153,7 @@ export { projectsDrop } from "./projectsScreen";
  * shows no drop line there and lets go of nothing, as over a list that does not take the card.
  */
 export { projectsPlusTakes, projectsTakes } from "./projectsDrop";
-/** How long a held card waits over a row before it unfolds or opens (`hoverProjectNode`), ms; the indent of a tree's step, px (pt). */
+/** How long a held card waits over a row before it unfolds or opens (`carryAt`), ms; the indent of a tree's step, px (pt). */
 export { PROJECTS_HOVER_MS, PROJECTS_INDENT } from "./projectsScreen";
 
 /**
@@ -1340,8 +1334,8 @@ export interface TaskService {
 	newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null>;
 
 	/**
-	 * The Projects screen as this device shows it (`ProjectsView`): the tree with the chosen node, and its tasks By project
-	 * or By stage. Without a tasks file, the screen with nothing but All, No project and Done. With `node`: that node's
+	 * The Projects screen as this device shows it (`ProjectsView`): the tree with the chosen node (All for none), and its
+	 * tasks by project. Without a tasks file, the screen with nothing but All, No project and Done. With `node`: that node's
 	 * tasks by project whatever the device chose, the funnel's by project mode (`ViewMode`) and a note's block.
 	 */
 	projectsScreen(node?: ProjectsNodeId): Promise<ProjectsView>;
@@ -1358,7 +1352,8 @@ export interface TaskService {
 	 */
 	projectNoteView(path: string, wide: boolean): Promise<FunnelView | null>;
 	/**
-	 * A tap on a row of the panel: `tapProjectNode`, and on a narrow screen (`wide` false) a tap that chose a node closes the
+	 * A tap on a row of the panel: a node not chosen is chosen; the chosen one folds or unfolds its branch (Done shows its
+	 * done projects); and on a narrow screen (`wide` false) a tap that chose a node closes the
 	 * panel. Kept on the device.
 	 */
 	pickProjectNode(node: ProjectsNodeId, wide: boolean): Promise<void>;
@@ -1407,22 +1402,8 @@ export interface TaskService {
 	 * the task's first in its branch; else its first project) giving way to the row's. A subtask's key names its top task.
 	 */
 	dropTasksOnProject(keys: readonly TaskKey[], to: ProjectsNodeId, filter: ProjectsNodeId | null): Promise<void>;
-	/**
-	 * A tap on a row of the tree: a node not chosen is chosen; the chosen one folds or unfolds its branch (one without a
-	 * branch stays as it is). Kept on the device.
-	 */
-	tapProjectNode(node: ProjectsNodeId): Promise<void>;
-	/** A folded branch opened without choosing its node: a card held over the row. Done opens its done projects. Kept on the device. */
-	unfoldProjectNode(node: ProjectsNodeId): Promise<void>;
 	/** The node chosen, unfolding the branches above it so its row shows: search's path, the card's folder mark. Kept on the device. */
 	selectProjectNode(node: ProjectsNodeId): Promise<void>;
-	/**
-	 * A card held over a row for `PROJECTS_HOVER_MS`: its branch unfolds if it unfolds on hover (`ProjectsRow.unfoldsOnHover`),
-	 * and it is chosen if it opens on hover (`ProjectsRow.opensOnHover`), the mode kept. One call, one wait. Kept on the device.
-	 */
-	hoverProjectNode(node: ProjectsNodeId): Promise<void>;
-	/** The segment over the tasks: By project or By stage. Kept on the device. */
-	setProjectsMode(mode: ProjectsMode): Promise<void>;
 	/**
 	 * The plus dropped in the tree: a project named `name` at `place` (`projectsGap`). Answers the project, or null for a
 	 * blank name or one the tree has (nothing written). It is chosen, so its tasks' column shows it.
@@ -1462,8 +1443,7 @@ export interface TaskService {
 	 * step of undo. A place under a task nests there, as in the lists. Between cards the card above says where (the card
 	 * below at a part's top, or where the card above's stage refuses the cards): a card in that card's stage only moves
 	 * among its list's tasks next to it, nothing on its line changed; a card from another stage moves as a drop on that
-	 * stage's column writes it (Today is Now, dated today). An empty part: By stage that stage's list's end; By project
-	 * nothing moves. By project the part's project then takes the place of the one the card was shown under
+	 * stage's column writes it (Today is Now, dated today). An empty part: nothing moves. The part's project then takes the place of the one the card was shown under
 	 * (`ProjectsDrop.from`) in the line's order, as a drop on the tree's row does. Where a stage's column refuses a card
 	 * (`projectsTakes` false) it writes nothing. Gives the tasks' keys as the file now has them. Rejects with
 	 * StaleTaskError, writing nothing, for a part the screen no longer has.

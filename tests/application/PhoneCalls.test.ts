@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { ScreenView, TaskItem } from "../../core/application/contracts";
-import { callDoor, callDoorJson, type DoorAnswer, type DoorContext, DOOR_COVERAGE, doorMethods, HOST_TASK_METHODS, plainJson } from "../../core/application/PhoneCalls";
+import { callDoor, callDoorJson, type DoorAnswer, type DoorContext, DOOR_COVERAGE, doorMethods, HOST_TASK_METHODS, KEPT_TASK_NAMES, plainJson } from "../../core/application/PhoneCalls";
 import { ScreenSettingsImpl } from "../../core/application/ScreenSettingsImpl";
 import { DEFAULT_ZOOM_LEVELS } from "../../core/application/timelineZoom";
 import { SettingsServiceImpl } from "../../core/application/SettingsServiceImpl";
@@ -83,6 +83,14 @@ const named = (s: ScreenView, title: string): TaskItem => {
 };
 const key = (s: ScreenView, title: string) => named(s, title).key;
 const menuScreen = (s: ScreenView) => ({ today: T, day: T, offer: s.offer });
+
+/** The door's old `tasks.*` names, kept answering (`KEPT_TASK_NAMES`), no service's methods. */
+const KEPT_CASES: readonly Case[] = [
+	{ method: "unfoldProjectNode", args: () => ["done"] },
+	{ method: "tapProjectNode", args: () => ["project:Окружение"] },
+	{ method: "hoverProjectNode", args: () => ["project:Окружение"] },
+	{ method: "setProjectsMode", args: () => ["byStage"] },
+];
 
 /** Every TaskService method the door answers, with arguments taken from the screen as read. */
 const TASK_CASES: readonly Case[] = [
@@ -198,7 +206,6 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "newProject", args: () => ["  ", []] },
 	{ method: "projectsScreen", args: () => [] },
 	{ method: "projects", args: () => [] },
-	{ method: "unfoldProjectNode", args: () => ["done"] },
 	{ method: "projectsScreen", args: () => [], text: null },
 	{ method: "projectsScreen", args: () => ["project:Окружение"] },
 	{ method: "funnelView", args: () => [true] },
@@ -223,10 +230,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "setNoteViewMode", args: () => ["byProject"] },
 	{ method: "dropTasksOnProject", args: (s) => [[key(s, "Idea")], "project:Окружение", null] },
 	{ method: "dropTasksOnProject", args: (s) => [[key(s, "Someday")], "none", "project:Окружение"] },
-	{ method: "tapProjectNode", args: () => ["project:Окружение"] },
 	{ method: "selectProjectNode", args: () => ["project:Окружение"] },
-	{ method: "hoverProjectNode", args: () => ["project:Окружение"] },
-	{ method: "setProjectsMode", args: () => ["byStage"] },
 	{ method: "createProject", args: () => ["Дружба", { parent: "Окружение", before: null }] },
 	{ method: "createProject", args: () => ["Окружение", { parent: null, before: null }] },
 	{ method: "moveProject", args: () => ["Окружение", { parent: null, before: null }] },
@@ -291,8 +295,10 @@ describe("the door's tasks.* calls", () => {
 	it("cover every method of TaskService but the host's own", () => {
 		const declared = interfaceMethods("TaskService");
 		const offered = doorMethods().filter((m) => m.startsWith("tasks.")).map((m) => m.slice("tasks.".length));
-		expect([...offered, ...HOST_TASK_METHODS].sort()).toEqual(declared.sort());
-		expect(new Set(TASK_CASES.map((c) => c.method))).toEqual(new Set(offered));
+		const services = offered.filter((m) => !KEPT_TASK_NAMES.includes(m));
+		expect([...services, ...HOST_TASK_METHODS].sort()).toEqual(declared.sort());
+		expect(new Set(TASK_CASES.map((c) => c.method))).toEqual(new Set(services));
+		expect(new Set(KEPT_CASES.map((c) => c.method))).toEqual(new Set(KEPT_TASK_NAMES));
 	});
 });
 
@@ -521,7 +527,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 	const look = { cards: { day: [card("Parent"), card("Child one", 1), card("In progress")], soon: [card("Later"), card("Dated")] }, sections: { day: [null, "Errands"] }, sectioned: { day: true }, day: T, shown: ["day"] };
 	const gap = { kind: "gap", index: 1, level: 1, group: null };
 	const rule = { kind: "afterDone", every: 1, unit: "day", days: [], dayOfMonth: null, from: null };
-	const tasks = TASK_CASES.map((c) => ({ method: `tasks.${c.method}`, args: c.args(screen), context: context(c.text === undefined ? FILE : c.text) }));
+	const tasks = [...TASK_CASES, ...KEPT_CASES].map((c) => ({ method: `tasks.${c.method}`, args: c.args(screen), context: context(c.text === undefined ? FILE : c.text) }));
 	const plain = (method: string, ...args: unknown[]) => ({ method, args, context: context(FILE, { calendars: CALENDARS }) });
 	const entry = (method: string, ...args: unknown[]) => plain(`entry.${method}`, null, look, ...args);
 	const opened = callDoor("entry.openAtEnd", wire([null, look, "day"]), context()) as Extract<DoorAnswer, { ok: true }>;
@@ -535,6 +541,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("days.relation", LATER),
 		plain("days.step", T, -3),
 		plain("days.stepFunnel", { mode: "calendar", date: T }, 1),
+		plain("days.stepScreen", { mode: "projects", date: T }, 1),
 		plain("days.stepFunnel", { mode: "inbox", date: T }, -1),
 		plain("days.stepFunnel", { mode: "done", date: T }, 1),
 		plain("days.boundary"),
@@ -638,7 +645,11 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
 		plain("rules.funnelPlaceShowing", "day", "inbox"),
 		plain("rules.funnelPlaceOf", -1),
+		plain("rules.placeShowing", "day", "projects"),
+		plain("rules.shownLists", "soon"),
+		plain("rules.shownEntryLists", "projects"),
 		plain("rules.endsSelection", "dropped"),
+		plain("rules.stackedRows", [900, 70, 400, 70], 600, 70),
 		plain("rules.viewEntryLists", "rows", "soon"),
 		plain("rules.projectsEntryLook", null),
 		plain("rules.swipeLanding", 120, 200, 0.1),

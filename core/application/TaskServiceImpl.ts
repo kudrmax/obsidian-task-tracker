@@ -27,7 +27,6 @@ import {
 	type ProjectsDrop,
 	type ProjectsDropPreview,
 	type ListPlace,
-	type ProjectsMode,
 	type ProjectsNodeId,
 	type ProjectsScreenState,
 	type ProjectsView,
@@ -57,7 +56,7 @@ import {
 import type { SectionOffer } from "./sections";
 import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type ProjectsScreenStore, type SettingsStore, type TaskFileStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
-import { chosenNode, cleared, hovered, panelRows, picked, projectOfNode, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { chosenNode, cleared, picked, projectOfNode, renamedIn, selected } from "./projectsScreen";
 import { withMode } from "./viewModes";
 import { carriedAt, carryEnded, carryStarted, gestureGone, nameEnded } from "./projectsCarry";
 import { funnelPlaceOf, type FunnelPlace } from "./screenPlaces";
@@ -158,10 +157,6 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.projects();
 	}
 
-	async unfoldProjectNode(node: ProjectsNodeId): Promise<void> {
-		this.keepScreen(unfolded(this.projectsScreenStore.get(), node));
-	}
-
 	async newProject(name: string, keys: readonly TaskKey[]): Promise<ProjectRef | null> {
 		return this.refOf(await this.run(this.writes.newProject(name, keys)));
 	}
@@ -256,25 +251,9 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.dropTasksOnProject(keys, target, filter));
 	}
 
-	async tapProjectNode(node: ProjectsNodeId): Promise<void> {
-		const s = await this.snapshotOrNull();
-		this.keepScreen(tapped(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, node));
-	}
-
 	async selectProjectNode(node: ProjectsNodeId): Promise<void> {
 		const s = await this.snapshotOrNull();
 		this.keepScreen(selected(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, s?.doc ?? null, node));
-	}
-
-	async hoverProjectNode(node: ProjectsNodeId): Promise<void> {
-		const s = await this.snapshotOrNull();
-		const tree = s ? projectTreeOf(s.doc) : ProjectTree.EMPTY;
-		const state = this.projectsScreenStore.get();
-		this.keepScreen(hovered(state, tree, s?.doc ?? null, panelRows(tree, s?.doc ?? null, state), node));
-	}
-
-	async setProjectsMode(mode: ProjectsMode): Promise<void> {
-		this.keepScreen({ ...this.projectsScreenStore.get(), mode });
 	}
 
 	async createProject(name: string, place: TreePlace): Promise<ProjectRef | null> {

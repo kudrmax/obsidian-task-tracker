@@ -20,8 +20,9 @@ import { dayMonth, dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
-import { type EntryList, FUNNEL_PLACES, type FunnelAt, funnelPlaceOf, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { type EntryList, FUNNEL_PLACES, type FunnelAt, type FunnelPlace, type FunnelSpot, funnelPlaceOf, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
 import { ROW_LISTS, VIEW_WORDS, viewEntryLists, withMode } from "./viewModes";
+import { stackedRows } from "./stackedRows";
 import { carriedAt, carryEnded, carryStarted, endsSelection, gestureGone, nameEnded } from "./projectsCarry";
 import { type EntryPart, projectsEntryLook } from "./projectsEntry";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
@@ -415,7 +416,6 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps as A)),
 	setProject: (c, [keys, project]) => c.run(c.writes.setProject(keys as A, (project ?? null) as string | null)),
 	projects: (c) => c.reads.projects(),
-	unfoldProjectNode: (c, [node]) => c.keepProjectsScreen(unfolded(c.projectsScreen, node as string)),
 	toggleProject: (c, [keys, name]) => c.run(c.writes.toggleProject(keys as A, name as string)),
 	newProject: (c, [name, keys]) => {
 		const made = c.run(c.writes.newProject(name as string, (keys ?? []) as A));
@@ -468,13 +468,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 		if (target === null && to !== "none") return null;
 		return c.run(c.writes.dropTasksOnProject(keys as A, target, (filter ?? null) as string | null));
 	},
-	tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node as string)),
 	selectProjectNode: (c, [node]) => c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, node as string)),
-	hoverProjectNode: (c, [node]) => {
-		const doc = c.hasTasks() ? c.snapshot().doc : null;
-		c.keepProjectsScreen(hovered(c.projectsScreen, c.tree(), doc, panelRows(c.tree(), doc, c.projectsScreen), node as string));
-	},
-	setProjectsMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, mode: mode as A }),
 	createProject: (c, [name, place]) => {
 		const made = c.run(c.writes.createProject(name as string, place as A));
 		if (made === null) return null;
@@ -553,6 +547,37 @@ const TASKS: Readonly<Record<string, Handler>> = {
 
 /** The TaskService methods the door leaves to the host: it is the host that watches its files. */
 export const HOST_TASK_METHODS: readonly string[] = ["onChange"];
+
+/**
+ * Door names an app may still call whose methods left the services (CLAUDE.md: the door keeps its functions' names),
+ * each a thin mapping onto the rules that replaced it; no frontend of this repository calls them.
+ */
+const KEPT_TASKS: Readonly<Record<string, Handler>> = {
+	/** `pickProjectNode` on a wide screen. */
+	tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node as string)),
+	/** A folded branch opened without choosing its node. */
+	unfoldProjectNode: (c, [node]) => c.keepProjectsScreen(unfolded(c.projectsScreen, node as string)),
+	/** A held card's pause over a row, as `carryAt` acts on it. */
+	hoverProjectNode: (c, [node]) => {
+		const doc = c.hasTasks() ? c.snapshot().doc : null;
+		c.keepProjectsScreen(hovered(c.projectsScreen, c.tree(), doc, panelRows(c.tree(), doc, c.projectsScreen), node as string));
+	},
+	/** By stage went: nothing to keep. */
+	setProjectsMode: () => null,
+};
+
+/** The door's old `tasks.*` names, kept answering: not `TaskService` methods. */
+export const KEPT_TASK_NAMES: readonly string[] = Object.keys(KEPT_TASKS);
+
+/** The old places as the funnel's: the Projects place reads as Done (nothing back, Inbox on) or as Inbox. */
+const oldSpot = (place: unknown): FunnelSpot => (place === "projects" ? "inbox" : (place as FunnelSpot));
+
+/** Door names of the old ribbon with Projects, kept answering as thin mappings onto the funnel's rules. */
+const KEPT_RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
+	placeShowing: (column, place) => (column === "projects" ? oldSpot(place) : funnelPlaceShowing(column, oldSpot(place))),
+	shownLists: (place) => SHOWN_LISTS[place as FunnelPlace] ?? [],
+	shownEntryLists: (place) => (place === "projects" ? ["projects"] : (SHOWN_LISTS[place as FunnelPlace] ?? [])),
+};
 
 function boundaryOf(c: Call): DayBoundary {
 	return c.rules.moment().boundary;
@@ -861,6 +886,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	funnelPlaceShowing,
 	funnelPlaceOf,
 	endsSelection,
+	stackedRows,
 	viewEntryLists,
 	projectsEntryLook,
 	wholeWidth,
@@ -1004,8 +1030,11 @@ export function noteUrl(link: string, vault: string): string {
 }
 
 const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
-	tasks: TASKS,
-	days: DAYS,
+	tasks: { ...TASKS, ...KEPT_TASKS },
+	days: { ...DAYS, stepScreen: (c, [from, shift]) => {
+		const at = from as { readonly mode: string; readonly date: string };
+		return stepFunnel({ mode: at.mode === "projects" ? "done" : (at.mode as FunnelSpot), date: at.date }, shift as -1 | 1, c.rules.today());
+	} },
 	boundary: BOUNDARY,
 	calendars: CALENDARS,
 	history: HISTORY,
@@ -1020,7 +1049,7 @@ const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	timeline: TIMELINE,
 	notes: NOTES,
 	projects: PROJECTS,
-	rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c: Call, args: unknown[]) => fn(...args)])), constants: () => CONSTANTS },
+	rules: { ...Object.fromEntries(Object.entries({ ...RULES, ...KEPT_RULES }).map(([name, fn]) => [name, (_c: Call, args: unknown[]) => fn(...args)])), constants: () => CONSTANTS },
 };
 
 /**
@@ -1031,8 +1060,8 @@ export type DoorCoverage = { readonly space: string; readonly host: readonly str
 
 /** Every interface of contracts.ts with a method: where the door answers it, or why a host keeps it. */
 export const DOOR_COVERAGE: Readonly<Record<string, DoorCoverage>> = {
-	TaskService: { space: "tasks", host: HOST_TASK_METHODS },
-	DayService: { space: "days", host: HOST_DAY_METHODS },
+	TaskService: { space: "tasks", host: HOST_TASK_METHODS, own: KEPT_TASK_NAMES },
+	DayService: { space: "days", host: HOST_DAY_METHODS, own: ["stepScreen"] },
 	UndoService: { space: "history", host: ["onChange"] },
 	CalendarService: { space: "calendars", host: HOST_CALENDAR_METHODS, own: PHONE_CALENDAR_METHODS },
 	SettingsService: { space: "settings", host: HOST_SETTINGS_METHODS },

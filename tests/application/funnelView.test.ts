@@ -9,6 +9,7 @@ import { UndoHistory } from "../../core/application/UndoHistory";
 import { viewEntryLists } from "../../core/application/viewModes";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
+import { hoverRow } from "../fakes/projectsHover";
 
 const T = "2026-11-12";
 const clock: Clock = { now: () => new Date(2026, 10, 12, 12, 0) };
@@ -306,7 +307,7 @@ describe("the funnel's view", () => {
 
 	it("a held card over a row opens it as the panel draws it: nothing chosen, a project opens", async () => {
 		const { svc } = setup();
-		await svc.hoverProjectNode("project:Дружба");
+		await hoverRow(svc, "project:Дружба");
 		expect((await svc.funnelView(true)).filter?.node).toBe("project:Дружба");
 	});
 
@@ -339,9 +340,8 @@ describe("a project note's block", () => {
 describe("by project", () => {
 	it("reads a node's parts whatever the device chose, and drops and types in them", async () => {
 		const { svc, store } = setup();
-		await svc.setProjectsMode("byStage");
 		const view = await svc.projectsScreen(STYLE);
-		expect(view).toMatchObject({ selected: STYLE, mode: "byProject" });
+		expect(view).toMatchObject({ selected: STYLE });
 		expect(view.sections.map((s) => s.title)).toEqual([null, "Гардероб"]);
 		const shoes = view.sections[1].cards[0];
 		const keys = await svc.dropInProjects([shoes.drop], { kind: "task", group: null, before: null }, STYLE);
@@ -403,6 +403,7 @@ describe("the quick entry under a filter", () => {
 		const session = new QuickEntrySession(svc, { ...look, fresh: async (before) => before?.(() => []), onChange: () => undefined }, writes);
 		session.openAtEnd("inbox");
 		expect(session.state?.project?.lit).toBe(true);
+		expect(session.state?.locksPanel).toBe(true);
 		session.type("Новая стрижка");
 		session.enter();
 		await session.idle();

@@ -89,10 +89,7 @@ import Testing
     @Test func thePlusHasNothingToWriteInAFolderOrDone() throws {
         let board = board(FakeVault(Self.file))
         try board.selectProjectNode("project:Работа")
-        try board.setProjectsMode("byStage")
-        let stages = try board.projectsScreen()
-        #expect(stages.newTask == nil)
-        #expect(stages.sections.allSatisfy { $0.newTask == nil })
+        #expect(try board.projectsScreen().newTask == nil)
         try board.selectProjectNode("done")
         #expect(try board.projectsScreen().newTask == nil)
         try board.selectProjectNode("project:Дружба")
