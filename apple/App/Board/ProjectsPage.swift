@@ -753,22 +753,34 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     /// The list the drop at the line would leave, read while the card is held there: drawn the moment it is let go.
     private var preview: (card: String, place: JSONValue, read: Task<(read: ProjectsBoard.Read, landings: [String])?, Never>)?
 
-    /// The plus held over the parts, as the plugin's: the gap under the finger where the core lets a new task be written
-    /// there (`rules.projectsPlusTakes`: a part with a new task, or under a card it may nest under). At a part's end the
-    /// line stands where the core opens the field and the card lands (`EntryPart.end`: before that card).
+    /// The plus held over the parts, as the plugin's: the gap under the finger, and where the core takes a new task let
+    /// go there (`rules.projectsPlusPlace`: under a card a subtask stays at the gap; between a part's cards the task goes
+    /// where its card will land, null where nothing is written). The line stands at that place, where the field opens.
     private func aimPlus(at point: CGPoint) {
         guard let model else { return clear() }
-        let projects = model.projects
         let laid = laid(without: nil)
-        guard let (gap, place) = gap(at: point, laid),
-              model.ruleNow("rules.projectsPlusTakes", [projects.raw, place]) == true,
-              var start = line(at: gap, laid) else { return clear() }
-        if place["kind"] == "task", place["before"].isNull,
-           let end = projects.entryLook.parts.array.first(where: { $0["group"] == place["group"] })?["end"], !end.isNull,
-           let index = laid.keys.firstIndex(of: end) {
-            start = CGPoint(x: area.map { $0.minX + CardMetrics.columnInset } ?? start.x, y: laid.frames[index].minY - CardMetrics.gap / 2)
-        }
+        guard let (gap, asked) = gap(at: point, laid),
+              let place: JSONValue = model.ruleNow("rules.projectsPlusPlace", [model.projects.raw, asked]), !place.isNull,
+              let start = place["kind"] == "task" ? line(before: place, laid) : line(at: gap, laid) else { return clear() }
         show(place, at: start)
+    }
+
+    /// The line's start for a new task of a part at `place`: before the card it names, else after the part's last card,
+    /// else under the part's header.
+    private func line(before place: JSONValue, _ laid: Laid) -> CGPoint? {
+        guard let area else { return nil }
+        let x = area.minX + CardMetrics.columnInset
+        let group = place["group"]
+        if !place["before"].isNull, let index = laid.keys.indices.first(where: { laid.keys[$0] == place["before"] && laid.placed[$0]["group"] == group }) {
+            return CGPoint(x: x, y: laid.frames[index].minY - CardMetrics.gap / 2)
+        }
+        if let last = laid.placed.indices.last(where: { laid.placed[$0]["group"] == group }) {
+            return CGPoint(x: x, y: laid.frames[last].maxY + CardMetrics.gap / 2)
+        }
+        if let head = laid.headFrames.last(where: { $0.group == group }) {
+            return CGPoint(x: x, y: head.frame.maxY + CardMetrics.gap / 2)
+        }
+        return CGPoint(x: x, y: (laid.frames.first?.minY ?? area.minY) - CardMetrics.gap / 2)
     }
 
     private func clear() {
