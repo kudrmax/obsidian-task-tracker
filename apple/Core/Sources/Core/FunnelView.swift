@@ -32,6 +32,9 @@ public struct ViewChoice: Decodable, Hashable, Sendable {
     public let icon: String
     /// The wheel (the app's tab bar) shows: two columns alone.
     public let wheel: Bool
+    /// The screen is the ribbon: it swipes, a field moved to a list turns it to that list's place, Done stands left of
+    /// Inbox; elsewhere a done find opens on its own page.
+    public let ribbon: Bool
     /// The rows mode's lists, top to bottom; none in another mode.
     public let rows: [String]
     /// The words in an empty list: «No tasks».
@@ -61,8 +64,11 @@ public struct ProjectFilter: Decodable, Hashable, Sendable {
 /// `ProjectsPanel`: the tree as a panel over the funnel.
 public struct ProjectsPanel: Decodable, Hashable, Sendable {
     public let rows: [ProjectsRow]
-    /// The projects button opened it.
+    /// It shows, for any reason (`reason`).
     public let open: Bool
+    /// Why it shows: `button`, `carry` (a carry brought it out at the edge), `naming` (a new project's name is typed in
+    /// it); nil while it is closed.
+    public let reason: String?
     /// A wide screen docks it; the phone lays it over the lists and a pick closes it.
     public let docked: Bool
     public let missing: Bool
@@ -76,6 +82,10 @@ public struct FunnelView: Decodable, Hashable, Sendable {
     public let filter: ProjectFilter?
     public let view: ViewChoice
     public let panel: ProjectsPanel?
+    /// A search opened over the view shows each find's project path.
+    public let searchPaths: Bool
+    /// The place of the funnel the screen stands at, as the device keeps it.
+    public let place: String
 
     /// What the quick entry's look takes as its `filter` (`EntryLook.filter`): the node and the project, or null.
     public var entryFilter: JSONValue {
@@ -95,13 +105,51 @@ extension TaskBoard {
         try read("tasks.filterHides", [item.json, filter.json], over: try files())
     }
 
-    /// The node chosen again: a carry let go nowhere after it opened another node puts back the filter it was lifted under.
-    public func putBackFilter(_ node: String?) throws {
-        if let node {
-            try selectProjectNode(node)
-        } else {
-            try clearProjectFilter()
-        }
+    // MARK: The carry to a project (the core's session, `docs/door.md`)
+
+    /// A carry lifted: the funnel's tasks by their keys, the By project list's cards by their drops, or the plus. The core
+    /// keeps the filter it is lifted under.
+    public func startCarry(keys: [TaskKey], cards: [JSONValue] = [], plus: Bool = false, wide: Bool = false) throws {
+        var start: [String: JSONValue] = ["keys": .array(keys.map(\.json))]
+        if !cards.isEmpty { start["cards"] = .array(cards) }
+        if plus { start["plus"] = .bool(true) }
+        _ = try screenCall("tasks.startCarry", [.object(start), .bool(wide)], over: try files())
+    }
+
+    /// The carrying finger: within the left edge, over a panel row's node. The core brings the panel out, unfolds or
+    /// opens a row once the finger has waited there; the answer is how long until it should be told again (nil: never).
+    public func carryAt(edge: Bool, node: String?, now: Date = Date()) throws -> Double? {
+        let at: JSONValue = ["edge": .bool(edge), "node": node.json]
+        let answer = try screenCall("tasks.carryAt", [at, .number((now.timeIntervalSince1970 * 1000).rounded())], over: try files())
+        return answer["wait"].number
+    }
+
+    /// The carry let go on a panel row: every carried task goes to that project, under the filter it was lifted under.
+    public func carryOnNode(_ node: String) throws {
+        try write("tasks.carryOnNode", [.string(node)])
+    }
+
+    /// The carry ended: `nowhere` (or cancelled) puts the lift's filter back, `dropped` keeps the screen, `naming` keeps
+    /// the panel out while a new project's name is typed.
+    public func endCarry(_ how: String) throws {
+        _ = try screenCall("tasks.endCarry", [.string(how)], over: try files())
+    }
+
+    /// The new project's name answered or cancelled: the panel the naming kept out goes.
+    public func endProjectName() throws {
+        _ = try screenCall("tasks.endProjectName", [], over: try files())
+    }
+
+    // MARK: The place
+
+    /// The place the screen stands at, as the device keeps it (`inbox`, `soon`, `calendar`); read at once.
+    public func firstPlace() throws -> String {
+        try read("tasks.firstPlace", [], over: settingsOnly())
+    }
+
+    /// Where the screen stands now kept on the device: a place's name, or anything kept before (the core reads it).
+    public func setFunnelPlace(_ place: JSONValue) throws {
+        _ = try screenCall("tasks.setFunnelPlace", [place], over: settingsOnly())
     }
 
     /// The funnel's view over the vault's files as they are now, as this device keeps it. The phone's screen is narrow.
