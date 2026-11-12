@@ -1595,9 +1595,9 @@ body:not(.is-mobile) .task-calendar { --tc-top-row-top: var(--tc-desk-top-row-to
 .tc-tree-panel { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--tc-tree-width) + var(--tc-divider)); z-index: var(--tc-layer-tree-panel); background: var(--tc-bg); visibility: hidden; }
 .task-calendar.has-tree > .tc-tree-panel { visibility: visible; }
 .tc-tree-panel-title { position: absolute; top: var(--tc-top-row-top); left: var(--tc-tree-title-left); height: var(--tc-day-row); padding: 0 var(--tc-space-4); box-sizing: border-box; color: var(--tc-text); font-size: var(--tc-font-filter); line-height: var(--tc-day-row); font-weight: var(--tc-weight-bold); white-space: nowrap; }
-.tc-tree-column { position: absolute; left: 0; top: var(--tc-projects-top); bottom: 0; width: var(--tc-tree-width); padding: var(--tc-column-pad-near); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
+.tc-tree-column { position: absolute; left: 0; top: var(--tc-projects-top); bottom: 0; width: calc(100% - var(--tc-divider)); padding: var(--tc-column-pad-near); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
 body:not(.is-mobile) .tc-tree-column { padding: 0 var(--tc-desk-projects-near) 0 var(--tc-desk-projects-side); }
-.task-calendar .tc-tree-panel > .tc-divider { left: var(--tc-tree-width); top: var(--tc-projects-top); }
+.task-calendar .tc-tree-panel > .tc-divider { left: calc(100% - var(--tc-divider)); top: var(--tc-projects-top); }
 .tc-tree-dim { position: absolute; inset: 0; z-index: var(--tc-layer-tree-panel); background: var(--tc-backdrop); opacity: 0; visibility: hidden; pointer-events: none; }
 body.is-mobile .tc-tree-panel { transform: translate3d(calc(-1 * 100%), 0, 0); transition: transform var(--tc-duration-slide) var(--tc-ease-in-out), visibility 0s linear var(--tc-duration-slide); }
 body.is-mobile .task-calendar.has-tree > .tc-tree-panel { transform: none; transition: transform var(--tc-duration-slide) var(--tc-ease-in-out); }
@@ -1661,5 +1661,5 @@ body:not(.is-mobile) .task-calendar:is(.is-view-rows, .is-view-by-project) > .tc
 .task-calendar.is-note > :is(button.tc-plus, .tc-plus-ring) { right: var(--tc-block-inset); }
 .task-calendar.is-note > .tc-capsule { left: var(--tc-block-inset); }
 /* In a note's block every list is as tall as its cards: the block grows, and past its tallest the stages scroll as one. */
-.task-calendar.is-note .tc-rows-stack { overflow-y: auto; scrollbar-width: none; padding-bottom: calc(var(--tc-switch-row) + var(--tc-chrome-room)); }
+.task-calendar.is-note .tc-rows-stack { overflow-y: auto; scrollbar-width: none; padding-bottom: calc(var(--tc-plus-size) + var(--tc-block-inset) + var(--tc-space-20)); }
 .task-calendar.is-note .tc-row { flex-shrink: 0; }

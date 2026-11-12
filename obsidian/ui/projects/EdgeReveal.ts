@@ -1,6 +1,6 @@
 import { PROJECTS_HOVER_MS } from "../../../core/application/contracts";
 import { LAYOUT } from "../design";
-import type { DragPayload, DropResult, DropTarget } from "../drag/DropTarget";
+import type { DropResult, DropTarget } from "../drag/DropTarget";
 
 export interface EdgeRevealDeps {
 	/** The view the edge is the left of. */
@@ -9,20 +9,22 @@ export interface EdgeRevealDeps {
 	enabled(): boolean;
 	/** A card waited at the edge: the panel slides out for this drag. */
 	reveal(): void;
+	/** The drag is over: a panel it slid out goes back. */
+	ended(): void;
 }
 
 /**
  * The phone's left edge as a place a held card waits at (board T5): a task's card held there as long as a card waits over
- * a row of the tree slides the projects' panel out, for the drag alone, so the card can be let go on a row. Nothing is
- * let go on the edge itself.
+ * a row of the tree slides the projects' panel out, for the drag alone, so the card can be let go on a row (the plus: a
+ * new project at a gap). Nothing is let go on the edge itself.
  */
 export class EdgeReveal implements DropTarget {
 	private timer = 0;
 
 	constructor(private readonly deps: EdgeRevealDeps) {}
 
-	hitTest(x: number, _y: number, drag: DragPayload): boolean {
-		if (drag.from === "new" || !this.deps.enabled()) return false;
+	hitTest(x: number): boolean {
+		if (!this.deps.enabled()) return false;
 		return x - this.deps.root().getBoundingClientRect().left < LAYOUT.panelEdge;
 	}
 
@@ -45,6 +47,7 @@ export class EdgeReveal implements DropTarget {
 
 	clear(): void {
 		this.leave();
+		this.deps.ended();
 	}
 
 	drop(): DropResult | null {

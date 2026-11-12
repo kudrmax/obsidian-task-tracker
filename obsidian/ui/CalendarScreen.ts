@@ -119,6 +119,8 @@ export class CalendarScreen extends Component {
 	private panel: TreePanel | null = null;
 	/** The panel slid out on the phone by a card held at the left edge, for that drag alone. */
 	private revealed = false;
+	/** A new project's name is typed in the tree: a panel the plus slid out stays out until it is. */
+	private namingProject = false;
 	/** The projects button at the top left: it opens and closes the panel. */
 	private folder: Button | null = null;
 	/** The filter's name over the tasks and the cross that clears it. */
@@ -145,7 +147,8 @@ export class CalendarScreen extends Component {
 	private readonly edge = new EdgeReveal({
 		root: () => this.contentEl,
 		enabled: () => this.panel !== null && !this.wide() && !this.treeShows(),
-		reveal: () => this.revealPanel(),
+		reveal: () => this.revealPanel(true),
+		ended: () => this.revealPanel(false),
 	});
 	/** The nodes a held card chooses, one after another, each drawn before the next. */
 	private readonly choices = new ProjectsChoices({
@@ -295,10 +298,7 @@ export class CalendarScreen extends Component {
 				}
 				this.quick?.onDragging(active);
 				this.contentEl.classList.toggle("is-dragging", active);
-				if (!active && this.revealed) {
-					this.revealed = false;
-					this.drawView();
-				}
+				if (!active) this.revealPanel(false);
 			},
 			onResult: (drag, result) => this.applyDrop(drag, result),
 			onLift: (drag, source) => {
@@ -1182,11 +1182,12 @@ export class CalendarScreen extends Component {
 	}
 
 	/**
-	 * The plus's places besides the funnel's lists: the tree while it shows (a new project), and in the by project mode the
+	 * The plus's places besides the funnel's lists: the tree while it shows (a new project; on the phone the left edge slides
+	 * it out), and in the by project mode the
 	 * node's list alone, where the field opens as in any list. A tap is the entry's own (`QuickEntrySession.plusOpens`).
 	 */
 	private projectsPlus(): PlusAside | null {
-		const tree = this.treeShows() ? [this.treeDrop] : [];
+		const tree = this.panel ? [this.treeDrop, this.edge] : [];
 		const dropped = (result: DropResult) => {
 			if (result.kind === "projectGap") void this.newProject(result.gap, result.landing);
 		};
@@ -1198,8 +1199,13 @@ export class CalendarScreen extends Component {
 	private async newProject(gap: number, landing: ProjectsLanding): Promise<void> {
 		const panel = this.panel;
 		if (!panel || !this.arbiter.claim(NAMING)) return;
+		/** The plus brought the panel out at the phone's edge: it stays out while the name is typed in it. */
+		this.revealPanel(true);
+		this.namingProject = true;
 		const name = await panel.askProjectName(gap, landing.depth);
+		this.namingProject = false;
 		this.arbiter.release(NAMING);
+		this.revealPanel(false);
 		if (name !== null) await this.act(async () => void (await this.deps.tasks.createProject(name, landing.place)));
 	}
 
@@ -1553,9 +1559,10 @@ export class CalendarScreen extends Component {
 		return this.panel !== null && ((this.data.funnel?.panel?.open ?? false) || this.revealed);
 	}
 
-	/** A card waited at the phone's left edge: the panel slides out for this drag. */
-	private revealPanel(): void {
-		this.revealed = true;
+	/** A card or the plus waited at the phone's left edge: the panel slides out for this drag, and goes back once it ends. */
+	private revealPanel(shown: boolean): void {
+		if (this.revealed === shown || (!shown && this.namingProject)) return;
+		this.revealed = shown;
 		this.drawView();
 	}
 
