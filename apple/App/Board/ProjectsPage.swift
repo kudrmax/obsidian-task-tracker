@@ -44,7 +44,7 @@ struct ProjectTree: View {
                 }
             }
             .padding(.horizontal, TreeMetrics.inset)
-            .padding(.bottom, 120)
+            .padding(.bottom, TreeMetrics.inset)
             .background { TreeProbe(model: model) }
         }
         .scrollIndicators(.hidden)

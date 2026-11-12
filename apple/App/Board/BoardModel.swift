@@ -228,7 +228,7 @@ final class BoardModel {
 
     @ObservationIgnored private(set) lazy var session = CarrySession(
         calls: board, clock: SystemCarryClock(),
-        redraw: { [weak self] in await self?.reload() },
+        redraw: { [weak self] in await self?.funnelState.refresh() },
         problem: { [weak self] in self?.problem($0) })
 
     /// The carrying finger moved: the core is told where it is (at the edge, over which panel row).
@@ -240,6 +240,8 @@ final class BoardModel {
     /// The carry let go on a panel row: every carried task goes to that project, as the core's session says.
     func carryOnNode(_ node: String) {
         session.onNode(node)
+        // The drop on the row wrote the file: the screen is read again once the session's calls have run.
+        Task { await session.idle(); await reload() }
         endSelectionIf("dropped")
     }
 
@@ -377,7 +379,12 @@ final class BoardModel {
             let serial = readsStarted
             let epoch = viewEpoch
             do {
+                // By project's list is read beside the screen, at the same time, and drawn in the screen's drawing: a
+                // card a write took away leaves both at once.
+                let shownFunnel = snapshot?.funnel
+                async let list: Void = { if let shownFunnel { await self.projects.prefetch(shownFunnel, file: .some(nil)) } }()
                 let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
+                await list
                 // Another day was asked for meanwhile (a turn that went on), or another view adopted: this read is not
                 // drawn, the screen as asked is read. A read asked meanwhile reads again before anything is drawn, so
                 // quick picks never show a filter passed by.
@@ -385,9 +392,7 @@ final class BoardModel {
                 if readAgain { continue }
                 // A view first shown that reads By project's list (the first screen, another context) draws it in the
                 // same drawing as the screen: read now, before. The same view changed keeps its list until the new one.
-                if case .projects = read.presentation.source, snapshot?.funnel.view.context != read.funnel.view.context {
-                    await projects.prefetch(read.funnel, file: read.tasksText)
-                }
+                if case .projects = read.presentation.source { await projects.prefetch(read.funnel, file: read.tasksText) }
                 show(read, serial: serial)
                 problem = nil
             } catch {
@@ -797,13 +802,23 @@ final class BoardModel {
     /// A call through the door that may write, then the screen read again: the change moves as it differs.
     func write(_ method: String, _ arguments: [JSONValue]) async {
         let board = board
-        do {
-            _ = try await Task.detached { try board.write(method, arguments) }.value
-        } catch {
-            problem = Self.words(error)
+        let before = writing
+        let mine = Task { @MainActor in
+            await before?.value
+            do {
+                _ = try await Task.detached { try board.write(method, arguments) }.value
+            } catch {
+                self.problem = Self.words(error)
+            }
         }
+        writing = mine
+        await mine.value
         await reload()
     }
+
+    /// The last write asked for: a change of the view (a pick, a mode) reads the file after it, so another context's
+    /// first frame already has what the write did (a card done or deleted is not drawn there at all).
+    @ObservationIgnored private(set) var writing: Task<Void, Never>?
 
     func read<T: Decodable & Sendable>(_ method: String, _ arguments: [JSONValue] = []) async throws -> T {
         let board = board
@@ -1599,7 +1614,7 @@ final class BoardModel {
     }
 
     /// The last drop's write: the next one waits for it, so drops are written in the order they were let go.
-    @ObservationIgnored private var lastDrop: Task<Void, Never>?
+    @ObservationIgnored private(set) var lastDrop: Task<Void, Never>?
 
     /// A drop's write after its screen was drawn: in drop order; a read begun before it never draws, the one after it does.
     func writeDrop(_ method: String, _ arguments: [JSONValue]) {
