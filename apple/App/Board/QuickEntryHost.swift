@@ -959,7 +959,9 @@ final class EntryFieldBox: UIView {
         guard field.superview !== self else { return }
         // A row that turns into the field (a card renamed) passes from what it showed to the field, scrolled to its caret,
         // in a short fade: the card's title from its start, the field's at its end, never one replacing the other at once.
-        if let row = sequence(first: self as UIView, next: { $0.superview }).lazy.compactMap({ $0 as? UICollectionViewCell }).first {
+        // Only a renamed card: a new field's row may be a reused cell, whose last drawing is another task's card.
+        if field.host?.state?.renaming != nil,
+           let row = sequence(first: self as UIView, next: { $0.superview }).lazy.compactMap({ $0 as? UICollectionViewCell }).first {
             let fade = CATransition()
             fade.type = .fade
             fade.duration = Self.fade
