@@ -133,6 +133,7 @@ View rework (Obsidian frontend, 2026-11-12):
 61. Another context (decision 52) is drawn with no CSS transition for that frame: a section header's margin, a card's height, a row's height take their new values in place.
 62. The drop room in rows is one card's height at the end of the hovered list, inside its own scroll (`.is-drop-room`); no row changes height during a carry.
 63. The still layouts (all columns, rows, by project, a note's block) attach no swipe at all: a sideways trackpad scroll or a finger does nothing there, no rubber band.
+64. The docked panel (desktop) slides in and out (`duration-slide`, `ease-in-out`), and every column, the controls under them and the filter's name move and take their new widths with it as one motion; rows keep their heights. Nothing slides on the first drawing.
 
 Applied from the Swift frontend: 17 (rows: each list as tall as its cards while all fit, the long ones share the rest and scroll inside, a card's room more while a card or the plus is carried or a task typed; the day by the arrows), 18 (the «No tasks» plate in an empty list under a filter and in rows), 19 (a find the filter hides clears it; a done find outside two columns opens on the whole screen), 20 (the left edge for a card and the plus), 21 (by project without a segment). 13, 15 and 16 are the app's own chrome: the plugin keeps the boards' top-left button and its own icons.
 

@@ -1609,6 +1609,11 @@ body.is-mobile .task-calendar.has-tree > .tc-tree-dim { opacity: 1; visibility: 
 /* A card held over the tree while the panel lies over the lists: nothing under it takes the card, the dim takes no tap. */
 body.is-mobile .task-calendar.is-dragging > .tc-tree-dim { pointer-events: none; }
 .task-calendar.has-dock > .tc-capsule { left: var(--tc-desk-projects-side); }
+/* The docked panel opened or closed (desktop): it slides in or out, and the columns, the controls under them and the filter's name move and take their new widths with it, one motion. */
+body:not(.is-mobile) .task-calendar:not(.has-tree) > .tc-tree-panel { transform: translate3d(calc(-1 * 100%), 0, 0); }
+body:not(.is-mobile) .task-calendar.is-docking > .tc-tree-panel { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out), visibility 0s linear var(--tc-duration-slide); }
+body:not(.is-mobile) .task-calendar.is-docking.has-tree > .tc-tree-panel { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out); }
+.task-calendar.is-docking > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-divider, .tc-right, .tc-head, .tc-stage, .tc-seg, button.tc-view-btn, .tc-capsule, .tc-filter), .task-calendar.is-docking .tc-stage-col, .task-calendar.is-docking .tc-day-nav .tc-arrow { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding var(--tc-duration-slide) var(--tc-ease-in-out), gap var(--tc-duration-slide) var(--tc-ease-in-out); }
 
 /*
  * The view button (board V1): the plus's circle, the current mode's icon. Beside the wheel, a gap to its left; where the

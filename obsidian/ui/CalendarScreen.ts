@@ -72,6 +72,8 @@ const MINUTE_MS = 60_000;
 /** The place of the screens a list stands at: Backlog under Inbox, Done left of it. */
 const PLACE_OF_LIST: Readonly<Record<Extract<TaskScreen, { kind: "list" }>["list"], Place>> = { done: "done", inbox: "inbox", backlog: "inbox", soon: "soon" };
 
+/** The docked panel slides in or out, the columns moving with it. */
+const DOCKING = "is-docking";
 /** Another context drawn: its styles settle with no transition, so nothing on it slides in (spec decision 52). */
 const REDRAWN = "is-redrawn";
 /** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
@@ -121,6 +123,8 @@ export class CalendarScreen extends Component {
 	private swipe: Swipe | null = null;
 	/** The context (`ViewChoice.context`) the lists were last drawn in: another one is drawn still. */
 	private drawnContext: string | null = null;
+	/** The timer that ends the docked panel's slide. */
+	private docking = 0;
 	/** Where layouts stand among the screen's parts: before the fade and the controls. */
 	private fadeEl: HTMLElement | null = null;
 	private switcher: ColumnSwitch | null = null;
@@ -1459,13 +1463,28 @@ export class CalendarScreen extends Component {
 		const topRow = funnel?.topRow ?? false;
 		root.classList.toggle("has-top-row", topRow);
 		root.classList.toggle("has-head-lead", main && !topRow);
-		root.classList.toggle("has-dock", this.panel !== null && (panel?.open ?? false) && (panel?.docked ?? false));
+		this.dock(this.panel !== null && (panel?.open ?? false) && (panel?.docked ?? false));
 		root.classList.toggle("has-tree", this.treeShows());
 		this.folder?.setOn(this.treeShows());
 		this.filterTitle?.render(main ? filter : null);
 		if (panel) this.panel?.render(panel);
 		this.treeDrop.refill();
 		this.viewButton?.render(funnel?.view ?? null);
+	}
+
+	/**
+	 * The docked panel (desktop) stands or goes: after the first drawing it slides in or out, and every column moves and
+	 * takes its new width with it in the same motion (`is-docking` for the slide's duration).
+	 */
+	private dock(docked: boolean): void {
+		const root = this.contentEl;
+		if (root.classList.contains("has-dock") === docked) return;
+		if (this.drawnRead) {
+			window.clearTimeout(this.docking);
+			root.classList.add(DOCKING);
+			this.docking = window.setTimeout(() => root.classList.remove(DOCKING), tokenMs(root, DURATION.slide));
+		}
+		root.classList.toggle("has-dock", docked);
 	}
 
 	/** The projects button: the panel opened or closed, kept on the device. */
