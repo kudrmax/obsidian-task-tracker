@@ -149,8 +149,8 @@ describe("a carry to a project, the core's from lift to let go", () => {
 	it("the plus held over a folded row unfolds it, never opens a project", async () => {
 		const { svc } = setup();
 		await svc.setProjectsPanel(true);
-		await svc.tapProjectNode(SELF);
-		await svc.tapProjectNode(SELF);
+		await svc.pickProjectNode(SELF, true);
+		await svc.pickProjectNode(SELF, true);
 		await svc.clearProjectFilter();
 		await svc.startCarry({ keys: [], plus: true }, true);
 		await svc.carryAt({ edge: false, node: SELF }, 0);

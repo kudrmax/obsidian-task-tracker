@@ -81,23 +81,6 @@ import Testing
         #expect(move["day"].isNull)
     }
 
-    @Test func thePlateTypesInItsPartAndWritesWhereThePartWrites() throws {
-        let driver = Driver(core: core)
-        try driver.board.selectProjectNode("project:Окружение")
-        try driver.board.setProjectsMode("byStage")
-        let today = try #require(driver.view.sections.first { $0.title == "Today" })
-        #expect(today.plate)
-        try driver.call("openIn", ["projects", today.group.json])
-        #expect(!(try driver.call("listEntry", ["projects"])["value"]).isNull)
-        try driver.call("type", ["Позвонить"])
-        let entered = try driver.call("enter")
-        // Enter keeps typing the next one in the same part.
-        #expect(entered["state"]["spot"]["column"].string == "projects")
-        try driver.runJobs()
-        let now = try #require(driver.vault.text.components(separatedBy: "## Now").last?.components(separatedBy: "## Soon").first)
-        #expect(now.contains("Позвонить") && now.contains("🗂️ Окружение"))
-    }
-
     @Test func addSubtaskStandsUnderTheCardInTheProjectsList() throws {
         let driver = Driver(core: core)
         try driver.board.selectProjectNode("project:Окружение")

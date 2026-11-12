@@ -238,7 +238,7 @@ public final class TaskBoard: @unchecked Sendable {
     }
 
     /// A read over `files` that keeps what the answer changed of the device's Projects screen
-    /// (`tasks.tapProjectNode`, `selectProjectNode`, `setProjectsMode`): nothing is written to the vault.
+    /// (`tasks.pickProjectNode`, `selectProjectNode`, `startCarry`, `carryAt`…): nothing is written to the vault.
     public func screenCall(_ method: String, _ arguments: [JSONValue], over files: BoardFiles) throws -> JSONValue {
         let reply = try answer(method, arguments, files)
         if let kept = reply.projectsScreen { projectsScreen.save(kept) }

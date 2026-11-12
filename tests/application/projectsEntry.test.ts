@@ -65,11 +65,10 @@ class Writes implements WriteLine {
  * gives of the view shown, the funnel's columns are drawn but hidden (`hidden`: the cards they hold), and the screen
  * shows what `viewEntryLists("byProject", place)` says.
  */
-async function projectsScreen(node = "project:P", mode: "byProject" | "byStage" = "byProject", text = FILE) {
+async function projectsScreen(node = "project:P", _mode: "byProject" | "byStage" = "byProject", text = FILE) {
 	const store = new InMemoryTaskFileStore(text);
 	const svc = new TaskServiceImpl(store, new FakeSettingsStore(), clock, new UndoHistory(store), undefined, memoryProjectsScreen());
 	await svc.selectProjectNode(node);
-	await svc.setProjectsMode(mode);
 	let view: ProjectsView = await svc.projectsScreen();
 	const hidden: Partial<Record<EntryList, ListCard[]>> = {};
 	const look = () => projectsEntryLook(view);
@@ -199,28 +198,6 @@ describe("the entry on the Projects screen (Max, 2026-11-11: «Rename для з�
 		s.entry.enter();
 		await s.entry.idle();
 		expect(lines(s.store.text, "Inbox")).toEqual(["- [ ] Inbox A 🗂️ P", "- [ ] Typed 🗂️ P", "- [ ] Inbox loose"]);
-	});
-
-	it("By stage, a task typed among a stage's cards goes into that stage's list right there, with the node's project", async () => {
-		const s = await projectsScreen("project:P", "byStage");
-		expect(s.titles("soon")).toEqual(["Soon A", "Soon B"]);
-		s.entry.openAt("projects", { kind: "task", group: "soon", before: s.item("Soon B").key });
-		expect(s.entry.state).toMatchObject({ place: { kind: "soon" }, project: { lit: true } });
-		s.entry.type("Between");
-		s.entry.enter();
-		await s.entry.idle();
-		expect(lines(s.store.text, "Soon")).toEqual(["- [ ] Soon A 🗂️ P", "- [ ] Between 🗂️ P", "- [ ] Soon other", "- [ ] Soon B 🗂️ Sub 🗂️ Q"]);
-		expect(s.titles("soon")).toEqual(["Soon A", "Between", "Soon B"]);
-	});
-
-	it("By stage, the Today part writes into Now, dated today", async () => {
-		const s = await projectsScreen("project:Q", "byStage");
-		s.entry.openIn("projects", "today");
-		expect(s.entry.state).toMatchObject({ place: { kind: "now" } });
-		s.entry.type("For today");
-		s.entry.enter();
-		await s.entry.idle();
-		expect(lines(s.store.text, "Now")).toContain(`- [ ] For today 🗂️ Q 📅 ${TODAY}`);
 	});
 
 	it("the plus tapped on the Projects screen types at the end of the node's own part, never in a funnel column", async () => {

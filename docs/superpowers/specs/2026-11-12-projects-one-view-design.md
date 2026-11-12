@@ -77,7 +77,7 @@ iPhone app (frontend-swift, 2026-11-12):
     page (the Done column stands only in the ribbon).
 20. A card or the plus held within 24 pt of the screen's left edge the core's pause (`PROJECTS_HOVER_MS`, as the plugin's `EdgeReveal`) brings the panel out for that carry; a row lights and
     takes the card (`dropTasksOnProject` for a funnel card, `dropOnProject` for a By project card), and a held card over
-    a row the core's pause opens it (`hoverProjectNode`).
+    a row the core's pause opens it (the carry's `carryAt`, which decides the pause).
 21. By project draws the core's `projectsScreen(node)` parts without the old segment (By stage is Rows now), the calendar
     beside it behind the divider.
 
@@ -102,7 +102,7 @@ Obsidian frontend (2026-11-12; numbered from 22 so as not to meet the Swift fron
 32. (Backend, after the frontends) A card let go on a project it already has leaves its line as it is, on every path (`swappedProjects` with `from` and `to` one project).
 33. `ViewChoice.emptyLabel` («No tasks») in every view, so no frontend keeps its own words; `ProjectFilter.emptyLabel` stays.
 34. `dayView(date, filter?)` is `screen(date, filter).day`.
-35. The deprecated place names are gone (decision 3 carried out).
+35. The deprecated place names are gone from `contracts.ts` (decision 3 carried out); their door names (`days.stepScreen`, `rules.placeShowing`, `rules.shownLists`, `rules.shownEntryLists`) still answer as thin mappings onto the funnel's rules, as CLAUDE.md binds the door, and no frontend calls them.
 36. Whether the filter hides a find is the core's (`filterHides(item, filter)`, a subtask by its task), so decision 19's «clears the filter» is one call each frontend asks.
 37. Decision 18's plate is the core's: `ViewChoice.plates` per list (words or null), the same rule in the main screen and the note's block.
 38. `firstView(wide, note)` is the view drawn before `funnelView`/`projectNoteView` answers, so no frontend keeps its own fallback mode.
@@ -113,6 +113,9 @@ Obsidian frontend (2026-11-12; numbered from 22 so as not to meet the Swift fron
 43. (Root cause, the app kept Select Tasks after a drop on a row) Ending Select Tasks after a drop is one rule, `endsSelection(end)`: a carry ended `dropped`, by any path, ends it; `nowhere` and `naming` keep it.
 44. The plus is the view's (`FunnelView.plus`): by project, a tap types in place and the node's list takes the held plus only while the panel is closed; elsewhere a tap opens the frontend's New Task and the funnel's lists take it; the tree takes it while the panel shows.
 45. `ProjectsPanel.dimCloses`, `ViewChoice.source` and `FunnelView.topRow` carry the dim's tap, the read a mode draws from and the narrow screen's top row, which each frontend decided.
+46. The rows mode's heights are one rule, `stackedRows(wanted, room, least)` (the app's `StackedRows` ported, its tests with it): a list shorter than an even share keeps its height, the rest share evenly, none under its title and a card. Both frontends call it; the Swift type goes.
+47. The old Projects screen's calls with no caller left the services: `tapProjectNode`, `unfoldProjectNode`, `hoverProjectNode`, `setProjectsMode`, and By stage (`ProjectsView.mode`/`modes`; `ProjectsCard.over` is always null until no frontend reads it). Their door names still answer as thin mappings (decision 35).
+48. The projects button can't be pressed while the quick entry's field is open (the app's rule, now both frontends'): `EntryState.locksPanel`.
 
 Applied from the Swift frontend: 17 (rows: each list as tall as its cards while all fit, the long ones share the rest and scroll inside, a card's room more while a card or the plus is carried or a task typed; the day by the arrows), 18 (the «No tasks» plate in an empty list under a filter and in rows), 19 (a find the filter hides clears it; a done find outside two columns opens on the whole screen), 20 (the left edge for a card and the plus), 21 (by project without a segment). 13, 15 and 16 are the app's own chrome: the plugin keeps the boards' top-left button and its own icons.
 
