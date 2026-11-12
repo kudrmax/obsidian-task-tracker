@@ -71,6 +71,8 @@ final class FunnelState {
         let before = calls
         let mine = Task { [weak self] in
             await before?.value
+            await self?.model?.writing?.value
+            await self?.model?.lastDrop?.value
             let view: Result<FunnelView, Error> = await Task.detached {
                 Result {
                     try change(board)

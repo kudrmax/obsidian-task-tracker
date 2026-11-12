@@ -802,13 +802,23 @@ final class BoardModel {
     /// A call through the door that may write, then the screen read again: the change moves as it differs.
     func write(_ method: String, _ arguments: [JSONValue]) async {
         let board = board
-        do {
-            _ = try await Task.detached { try board.write(method, arguments) }.value
-        } catch {
-            problem = Self.words(error)
+        let before = writing
+        let mine = Task { @MainActor in
+            await before?.value
+            do {
+                _ = try await Task.detached { try board.write(method, arguments) }.value
+            } catch {
+                self.problem = Self.words(error)
+            }
         }
+        writing = mine
+        await mine.value
         await reload()
     }
+
+    /// The last write asked for: a change of the view (a pick, a mode) reads the file after it, so another context's
+    /// first frame already has what the write did (a card done or deleted is not drawn there at all).
+    @ObservationIgnored private(set) var writing: Task<Void, Never>?
 
     func read<T: Decodable & Sendable>(_ method: String, _ arguments: [JSONValue] = []) async throws -> T {
         let board = board
@@ -1604,7 +1614,7 @@ final class BoardModel {
     }
 
     /// The last drop's write: the next one waits for it, so drops are written in the order they were let go.
-    @ObservationIgnored private var lastDrop: Task<Void, Never>?
+    @ObservationIgnored private(set) var lastDrop: Task<Void, Never>?
 
     /// A drop's write after its screen was drawn: in drop order; a read begun before it never draws, the one after it does.
     func writeDrop(_ method: String, _ arguments: [JSONValue]) {
