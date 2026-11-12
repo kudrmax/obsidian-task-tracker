@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { type CalendarEvent, type CalendarPoll, type CalendarService, type CarryEnd, type CarryStart, type DayBoundary, type DayChange, type DayService, type DropColumn, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusTakes, projectsTakes, type MenuScreen, endsSelection, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewChoice, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
+import { type CalendarEvent, type CalendarPoll, type CalendarService, type CarryEnd, type CarryStart, type DayBoundary, type DayChange, type DayService, type DropColumn, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusPlace, projectsTakes, type MenuScreen, endsSelection, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewChoice, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
 import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -1558,9 +1558,9 @@ export class CalendarScreen extends Component {
 						throw error;
 					}
 				},
-				plusTakesAt: (place) => {
+				plusPlaceAt: (place) => {
 					const view = this.data.projects;
-					return view !== null && projectsPlusTakes(view, place);
+					return view === null ? null : projectsPlusPlace(view, place);
 				},
 				node: () => this.data.projects?.selected ?? null,
 			},

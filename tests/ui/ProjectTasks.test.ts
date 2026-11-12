@@ -125,7 +125,7 @@ describe("the Projects tasks as a list column (spec «Projects order» 1–3)", 
 			const area = tasks.el.parentElement!;
 			area.getBoundingClientRect = () => new DOMRect(0, 100, 300, 600);
 			tasks.el.getBoundingClientRect = () => new DOMRect(0, 100, 300, 600);
-			return new ProjectsListDrop(tasks, area, { reorders: () => reorders, takesAt: (place) => takes(place), plusTakesAt: (place) => place.kind === "task" && sections.some((s) => s.group === place.group && s.newTask !== null), node });
+			return new ProjectsListDrop(tasks, area, { reorders: () => reorders, takesAt: (place) => takes(place), plusPlaceAt: (place) => (place.kind === "task" && sections.some((s) => s.group === place.group && s.newTask !== null) ? place : null), node });
 		}
 		const carried = (t: TaskItem) => ({ item: t, from: "soon" as const, grabPx: shownCardSize().height / 2 });
 		/** A carried card hangs by its middle: the finger at `y` is where its middle is. */

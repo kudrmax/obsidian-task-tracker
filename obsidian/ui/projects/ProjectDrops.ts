@@ -155,7 +155,8 @@ export interface ProjectsListShown {
 	/** Whether the core takes the carried cards at a place (`projectsTakes`). */
 	takesAt(place: ListPlace, drag: TaskDragPayload): boolean;
 	/** Whether the core lets the plus be let go at a place (`projectsPlusTakes`). */
-	plusTakesAt(place: ListPlace): boolean;
+	/** Where the plus let go at `place` stands (`projectsPlusPlace`); null where it may not be let go. */
+	plusPlaceAt(place: ListPlace): ListPlace | null;
 	/** The node whose tasks are drawn. */
 	node(): ProjectsNodeId | null;
 }
@@ -187,8 +188,13 @@ export class ProjectsListDrop extends CardListDrop {
 	}
 
 	protected override takesPlace(place: ListPlace, drag: DragPayload): boolean {
-		if (drag.from !== "new") return this.shown.takesAt(place, drag);
-		return this.shown.plusTakesAt(place);
+		return this.snapPlace(place, drag) !== null;
+	}
+
+	/** A card stands where let go; the plus where the core stands its card (`projectsPlusPlace`): line, field and card at one spot. */
+	protected override snapPlace(place: ListPlace, drag: DragPayload): ListPlace | null {
+		if (drag.from !== "new") return this.shown.takesAt(place, drag) ? place : null;
+		return this.shown.plusPlaceAt(place);
 	}
 
 	override preview(x: number, y: number, drag: DragPayload): void {
