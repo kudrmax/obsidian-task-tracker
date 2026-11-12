@@ -376,7 +376,6 @@ struct CardRow: View {
                 renamedText: model.entry.renamedTexts[card.face.step?.id ?? card.id],
                 renamedOver: card.face.twoLines ? model.entry.renamedTexts[card.id] : nil,
                 menu: { later in selecting ? nil : model.cardMenu(card, later: later) },
-                overMenu: { later in selecting ? nil : model.cardMenu(card, over: true, later: later) },
                 ringed: model.found == card.id,
                 draggable: false,
                 carried: hidden,

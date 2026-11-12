@@ -339,7 +339,6 @@ private struct ProjectCard: View {
             renamedText: model.entry.renamedTexts[card.face.step?.id ?? card.item.id],
             renamedOver: card.face.twoLines ? model.entry.renamedTexts[card.item.id] : nil,
             menu: { later in model.cardMenu(card, later: later) },
-            overMenu: { later in model.cardMenu(card, over: true, later: later) },
             draggable: model.projects.cards[card.id]?.canDrop == true,
             carried: mark.hidden,
             onCarry: { model.startCarry(card, from: "projects") },

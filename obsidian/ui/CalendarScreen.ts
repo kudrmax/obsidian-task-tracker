@@ -63,7 +63,7 @@ import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
 import { type DayLane, DayTrack, EdgeTrack, edgeParts, restore, StripTrack } from "./ScreenTracks";
-import { cardMenuTask, onCounter, onProjectMark } from "./TaskCard";
+import { onCounter, onProjectMark } from "./TaskCard";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -309,7 +309,7 @@ export class CalendarScreen extends Component {
 				await this.act(async () => (written = await this.deps.tasks.resize(item.key, this.selectedDate, edge, minute, minDurationMin)));
 				return written;
 			},
-			onMenu: (item, source, lifted, held, drawn) => this.showMenu(item, source, lifted, undefined, held, undefined, drawn),
+			onMenu: (item, source, lifted, held) => this.showMenu(item, source, lifted, undefined, held),
 			onRename: (item) => this.quick?.rename(item),
 			newSlot: () => this.timelineDrop,
 			onNewSlot: (slot) => this.quick?.openSlot(slot),
@@ -908,7 +908,7 @@ export class CalendarScreen extends Component {
 		card.addEventListener(
 			"click",
 			(e) => {
-				if (!this.fold(item, e.target)) this.showMenu(cardMenuTask(item, e.target), card, undefined, undefined, undefined, undefined, item);
+				if (!this.fold(item, e.target)) this.showMenu(item, card);
 			},
 			{ signal },
 		);
@@ -916,7 +916,7 @@ export class CalendarScreen extends Component {
 			"contextmenu",
 			(e) => {
 				e.preventDefault();
-				this.showMenu(cardMenuTask(item, e.target), card, undefined, undefined, undefined, undefined, item);
+				this.showMenu(item, card);
 			},
 			{ signal },
 		);
@@ -1119,7 +1119,7 @@ export class CalendarScreen extends Component {
 			return this.drag.attachCard(card, item, column, subtree, signal);
 		}
 		card.addEventListener("click", (e) => {
-			if (!this.fold(item, e.target)) this.showMenu(cardMenuTask(item, e.target), card, undefined, undefined, undefined, undefined, item);
+			if (!this.fold(item, e.target)) this.showMenu(item, card);
 		}, { signal });
 	}
 
@@ -1439,9 +1439,8 @@ export class CalendarScreen extends Component {
 
 	/**
 	 * The task menu; a list card's offers the sections of its list too. On the whole screen, typing and opening stay there.
-	 * `drawn`: the task whose card `source` is, when the menu is its shown step's (a folded result, `TaskItem.card`).
 	 */
-	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen, held?: boolean, sheet?: Sheet, drawn?: TaskItem): TaskMenu {
+	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen, held?: boolean, sheet?: Sheet): TaskMenu {
 		const tasks = this.deps.tasks;
 		const from = this.menuFrom(source, full);
 		const column = this.columnOf(source);
@@ -1455,9 +1454,8 @@ export class CalendarScreen extends Component {
 			lifted,
 			held,
 			sheet,
-			drawn,
 			menu: (task) => tasks.menu(task, from, screen),
-			onSubtask: (subtask, card, taken, drawnCard) => this.showMenu(subtask, card, undefined, undefined, undefined, taken, drawnCard),
+			onSubtask: (subtask, card, taken) => this.showMenu(subtask, card, undefined, undefined, undefined, taken),
 			markdown: full?.holds(item) ? undefined : this.markdown,
 			today,
 			day: this.selectedDate,

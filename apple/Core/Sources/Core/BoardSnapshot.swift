@@ -518,16 +518,13 @@ extension TaskBoard {
             if let shown, let kept = shown.menus[item.id], shown.item(item.id) == item, shown.column(of: item.id) == from { return kept }
             return try read("tasks.menu", [item.json, .string(from), menuScreen], over: settingsOnly)
         }
-        // A folded task's card shows its next step, whose menu a tap on the card opens: asked from where the card stands.
         for (column, list) in lists {
             for card in list.cards {
                 menus[card.item.id] = try menu(card.item, column.rawValue)
-                if let step = card.face.step { menus[step.id] = try menu(step, column.rawValue) }
             }
         }
         for slot in timeline.slots {
             menus[slot.card.item.id] = try menu(slot.card.item, "timeline")
-            if let step = slot.card.face.step { menus[step.id] = try menu(step, "timeline") }
         }
         return BoardSnapshot(
             today: today,

@@ -18,9 +18,6 @@ struct CardButton: UIViewRepresentable {
     var renamedOver: String?
     /// The card's menu; `later` holds a row that opens a sheet or a page until the menu has gone.
     let menu: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?
-    /// A folded result's own menu, which a tap on its line over the step opens (`CardFace.over`); the rest of the card
-    /// opens `menu`, the step's.
-    var overMenu: ((_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?)?
     var ringed = false
     var height: CGFloat = CardMetrics.height
     var draggable = false
@@ -60,8 +57,7 @@ struct CardButton: UIViewRepresentable {
                 onCounter: { [weak control] in control?.counterFrame = $0 },
                 onTitle: { [weak control] in control?.titleFrame = $0 },
                 onLinks: { [weak control] in control?.links = $0 },
-                onMark: { [weak control] in control?.markFrame = $0 },
-                onOver: { [weak control] in control?.overFrame = $0 })
+                onMark: { [weak control] in control?.markFrame = $0 })
         }
         .margins(.all, 0)
     }
@@ -78,12 +74,11 @@ struct CardButton: UIViewRepresentable {
         control.id = card.id
         let look = CardControl.Look(card: card, text: renamedText, over: renamedOver, ringed: ringed, height: height)
         control.menuMaker = menu
-        control.overMenuMaker = card.face.twoLines ? overMenu : nil
         if control.look != look {
             control.look = look
             control.content.configuration = configuration(control: control)
         }
-        CardControl.follow(card: card, look: look, menu: menu, over: card.face.twoLines ? overMenu : nil, from: control)
+        CardControl.follow(card: card, look: look, menu: menu, from: control)
         control.onTouch = onTouch
         control.onCarry = onCarry
         control.from = from
@@ -103,12 +98,6 @@ final class CardControl: UIControl {
         didSet { Self.live.add(self) }
     }
     var menuMaker: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? = { _ in nil }
-    /// A folded result's own menu, opened by a tap on its line over the step.
-    var overMenuMaker: ((_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?)?
-    /// The menu up was opened from the result's line: a redraw keeps it the result's.
-    private var openedOver = false
-    /// Where the capsule draws a folded result's own line.
-    var overFrame: CGRect?
     var onTouch: () -> Void = {}
     var onCarry: () -> Int = { 0 }
     var from = "timeline"
@@ -246,13 +235,12 @@ final class CardControl: UIControl {
     static private(set) var lastLifted: (card: BoardCard, frame: CGRect)?
 
     /// A card drawn: when it is the task whose menu shows, the menu takes the new drawing.
-    static func follow(card: BoardCard, look: Look, menu: @escaping (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?, over: ((_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?)? = nil, from control: CardControl) {
+    static func follow(card: BoardCard, look: Look, menu: @escaping (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?, from control: CardControl) {
         guard let owner = menuOwner, owner.opener.showing, let shown = owner.look else { return }
         // A card of a screen under another (the main screen under a project's view) draws the same task as that screen
         // reads it: never the menu's, which follows the screen it was opened on.
         guard shown.card.item.id == card.item.id, owner === control || (shown != look && control.window != nil) else { return }
         owner.menuMaker = menu
-        owner.overMenuMaker = over
         owner.redrawn(look)
     }
 
@@ -281,19 +269,12 @@ final class CardControl: UIControl {
             onLink(link.part)
             return
         }
-        // A folded result's own line, from the card's top down to under the line, as wide as the title's room.
-        if overMenuMaker != nil, let over = overFrame {
-            let reach = CGRect(x: 0, y: 0, width: titleFrame?.maxX ?? over.maxX, height: over.maxY + 2)
-            openedOver = reach.contains(point)
-        } else {
-            openedOver = false
-        }
         openMenu(at: tap.location(in: opener))
     }
 
-    /// The menu the last tap asked for: the result's own from its line, else the card's.
+    /// The card's menu: a tap anywhere on a card opens its own task's, a folded one's too.
     private var maker: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
-        openedOver ? overMenuMaker ?? menuMaker : menuMaker
+        menuMaker
     }
 
     /// The system's menu over the card: the card itself lifts in place; a card whose title is cut shows its whole title in

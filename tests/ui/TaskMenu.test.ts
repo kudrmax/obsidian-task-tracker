@@ -135,23 +135,16 @@ describe("the label group", () => {
 		document.body.innerHTML = "";
 	});
 
-	it("recolours the copy for the task its card draws, as every card tap passes it, and leaves a folded result's copy as it is", async () => {
-		const open = async (drawn: TaskItem) => {
-			const source = document.body.appendChild(document.createElement("div"));
-			const labelled = item({ labels: [LABELS[0]], colors: ["red"], key: { section: "now", index: 0, path: [], raw: "- [ ] A #label/Важное" } });
-			const actions = { setRepeat: vi.fn(async () => {}), pickStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setProject: vi.fn(async () => {}), newProject: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), toggleLabel: vi.fn(async () => labelled), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn(), toggleProject: vi.fn(async () => null) };
-			const menu = TaskMenu.open({ item: item(), drawn, source, today: "2026-11-01", day: "2026-11-01", menu: menuOf(LEVELS, LABELS), actions });
-			await new Promise((r) => setTimeout(r, 0));
-			document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-labels .tc-menu-tile")[0].click();
-			await vi.waitFor(() => expect(actions.toggleLabel).toHaveBeenCalled());
-			await new Promise((r) => setTimeout(r, 0));
-			const painted = document.querySelector(".tc-lifted")?.getAttribute("data-priority") ?? null;
-			menu.close();
-			document.body.innerHTML = "";
-			return painted;
-		};
-		expect(await open(item())).toBe("red");
-		expect(await open(item({ text: "Result", key: { section: "now", index: 1, path: [], raw: "- [ ] 🎯 Result" } }))).toBeNull();
+	it("recolours its copy once a label goes on the task", async () => {
+		const source = document.body.appendChild(document.createElement("div"));
+		const labelled = item({ labels: [LABELS[0]], colors: ["red"], key: { section: "now", index: 0, path: [], raw: "- [ ] A #label/Важное" } });
+		const actions = { setRepeat: vi.fn(async () => {}), pickStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setProject: vi.fn(async () => {}), newProject: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), toggleLabel: vi.fn(async () => labelled), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn(), toggleProject: vi.fn(async () => null) };
+		const menu = TaskMenu.open({ item: item(), source, today: "2026-11-01", day: "2026-11-01", menu: menuOf(LEVELS, LABELS), actions });
+		await new Promise((r) => setTimeout(r, 0));
+		document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-labels .tc-menu-tile")[0].click();
+		await vi.waitFor(() => expect(document.querySelector(".tc-lifted")?.getAttribute("data-priority")).toBe("red"));
+		menu.close();
+		document.body.innerHTML = "";
 	});
 
 	it("can't be pressed while the task has a priority, nor the levels while it has labels: as the task's `can` says", () => {
@@ -641,6 +634,31 @@ describe("the menu", () => {
 		expect(peek?.querySelector(".tc-desc-text")?.textContent).toBe("note link");
 		expect(surface.rendered[surface.rendered.length - 1]).toBe("- note");
 		expect(document.querySelector(".tc-panel .tc-menu-label")?.textContent).toBe("Rename");
+	});
+
+	it("shows the start of the description right of a menu split over and under the card, over the card", () => {
+		const groupHeight = 100;
+		const top = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetTop")!;
+		const height = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight")!;
+		const width = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetWidth")!;
+		Object.defineProperty(HTMLElement.prototype, "offsetTop", { configurable: true, get(this: HTMLElement) { return this.parentElement?.classList.contains("tc-panel") ? [...this.parentElement.children].indexOf(this) * groupHeight : 0; } });
+		Object.defineProperty(HTMLElement.prototype, "offsetHeight", { configurable: true, get(this: HTMLElement) { return this.classList.contains("tc-panel") ? this.children.length * groupHeight : 0; } });
+		Object.defineProperty(HTMLElement.prototype, "offsetWidth", { configurable: true, get(this: HTMLElement) { return this.classList.contains("tc-panel") || this.classList.contains("tc-desc-peek") ? 300 : 0; } });
+		try {
+			const source = document.body.appendChild(document.createElement("div"));
+			source.getBoundingClientRect = () => new DOMRect(100, 380, 900, 35);
+			TaskMenu.open({ item: item({ description: "- note" }), source, today: "2026-11-01", day: "2026-11-01", menu: menuOf(LEVELS, []), actions: { setRepeat: vi.fn(async () => {}), pickStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setProject: vi.fn(async () => {}), newProject: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), toggleLabel: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn(), toggleProject: vi.fn(async () => null) }, markdown: surface });
+			const parts = [...document.querySelectorAll<HTMLElement>(".tc-panel.is-task")];
+			expect(parts.filter((part) => !part.hidden)).toHaveLength(2);
+			const peek = document.querySelector<HTMLElement>(".tc-desc-peek")!;
+			expect(peek.classList.contains("is-away")).toBe(false);
+			expect(parseFloat(peek.style.left)).toBeGreaterThanOrEqual(400);
+			expect(peek.classList.contains("is-under")).toBe(false);
+		} finally {
+			Object.defineProperty(HTMLElement.prototype, "offsetTop", top);
+			Object.defineProperty(HTMLElement.prototype, "offsetHeight", height);
+			Object.defineProperty(HTMLElement.prototype, "offsetWidth", width);
+		}
 	});
 
 	it("shows no start of a description for a task without one", () => {

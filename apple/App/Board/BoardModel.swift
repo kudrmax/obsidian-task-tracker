@@ -1952,42 +1952,33 @@ final class BoardModel {
     /// The card's menu as UIKit draws it, read from the screen as it stands. `later` holds a row that opens a sheet or a
     /// page until the menu has gone. Over the core's rows, as the plugin shows them over its menu: the start of the task's
     /// description, and, for a card on the calendar (`from: "timeline"`), its open subtasks, each opening its own menu.
-    /// A result's card shows its next step (`CardFace.step`): a tap on the card opens the step's menu, a tap on the result's
-    /// own line over it (`over`) the result's (results, point 5); on the calendar the step's, the result's open subtasks
-    /// above it as for any task (point 8).
-    func cardMenu(_ card: BoardCard, from: String = "list", over: Bool = false, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
-        let item = over ? card.item : card.face.step ?? card.item
+    /// A tap anywhere on a card opens its own task's menu: a folded task's too, though its card shows its next step, whose
+    /// menu is reached by unfolding it.
+    func cardMenu(_ card: BoardCard, from: String = "list", later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
+        let item = card.item
         guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] ?? projects.menus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        let nodes = lead(item, stack: card.item, from: from) + TaskMenu(items: [item], menu: menu, model: self, selectsText: true).nodes
+        let nodes = lead(item, from: from) + TaskMenu(items: [item], menu: menu, model: self, selectsText: true).nodes
         return MenuNode.uiMenu(nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
     }
 
     /// What the plugin shows between a card and its menu, as the menu's first groups: `item`'s description, and on the
-    /// calendar the open subtasks of the card's task (`stack`).
-    private func lead(_ item: TaskItem, stack: TaskItem, from: String) -> [MenuNode] {
+    /// calendar its open subtasks.
+    private func lead(_ item: TaskItem, from: String) -> [MenuNode] {
         var lead: [MenuNode] = []
         if let peek = descriptionPeek(item) { lead.append(.group(row: false, children: peek)) }
-        if from == "timeline", !stack.subtasks.isEmpty {
-            lead.append(.group(row: false, children: stack.subtasks.map(stackRow)))
+        if from == "timeline", !item.subtasks.isEmpty {
+            lead.append(.group(row: false, children: item.subtasks.map(stackRow)))
         }
         return lead
     }
 
-    /// A subtask's row over a calendar card's menu, opening its own menu. A folded result among them follows its card's two
-    /// taps (results, point 5): the row is its step, whose menu it opens, the result's title under it; that menu starts with
-    /// the result's own row, which opens the result's menu.
+    /// A subtask's row over a calendar card's menu, opening its own menu; a folded one's row shows its next step, the
+    /// subtask's own title under it, as its card does, and opens the subtask's own menu too.
     private func stackRow(_ subtask: TaskItem) -> MenuNode {
         let symbol = subtask.closed ? "checkmark.circle" : "circle"
-        guard let step = subtask.card.step, let over = subtask.card.over else {
-            return .deferred(title: subtask.card.title, symbol: symbol, subtitle: nil) { [weak self] in
-                await self?.stackMenu(subtask) ?? []
-            }
-        }
-        return .deferred(title: subtask.card.title, symbol: symbol, subtitle: over) { [weak self] in
-            guard let self else { return [] }
-            let result: MenuNode = .deferred(title: over, symbol: "scope", subtitle: nil) { [weak self] in await self?.stackMenu(subtask) ?? [] }
-            return [.group(row: false, children: [result])] + (await self.stackMenu(step))
+        return .deferred(title: subtask.card.title, symbol: symbol, subtitle: subtask.card.over) { [weak self] in
+            await self?.stackMenu(subtask) ?? []
         }
     }
 
