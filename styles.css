@@ -366,7 +366,8 @@ body {
 	/* The start of a task's description over its copy in the menu: Obsidian draws the text, the plugin only its size and the panel. */
 	--tc-desc-peek-max: 214px;
 	--tc-desc-peek-pad: 10px 14px 10px 6px;
-	--tc-desc-fade: 40px;
+	--tc-desc-peek-pad-cut: 10px 14px 0 6px;
+	--tc-desc-fade: 18px;
 	--tc-font-desc-peek: var(--tc-font-body);
 	--tc-panel-w: 250px;
 	--tc-menu-w: 300px;
@@ -1213,6 +1214,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-desc-peek.is-shown { opacity: 1; transform: none; }
 .tc-desc-peek.is-away { opacity: 0; pointer-events: none; }
 .tc-desc-peek.is-closing { transition-duration: var(--tc-duration-collapse); }
+.tc-desc-peek.is-cut { padding: var(--tc-desc-peek-pad-cut); }
 .tc-desc-peek.is-cut .tc-desc-text { -webkit-mask-image: var(--tc-fade-peek-bottom); mask-image: var(--tc-fade-peek-bottom); }
 .tc-desc-peek .tc-desc-text { --font-text-size: var(--tc-font-desc-peek); font-size: var(--tc-font-desc-peek); flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .tc-desc-text > :first-child { margin-top: 0; }
