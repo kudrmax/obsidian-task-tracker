@@ -165,7 +165,7 @@ export class TaskReads {
 		const node = chosenNode(state, tree);
 		const filter = node === null ? null : this.filterOf(node, tree, s?.doc ?? null, true);
 		const closed = node !== null && nodeHeader(node, tree, s?.doc ?? null).closed;
-		const view = viewChoice(state, { node, closed, wide, note: false, branches: hasSubprojects(node, tree) });
+		const view = viewChoice(state, { node, closed, wide, note: false, branches: hasSubprojects(node, tree, s?.doc ?? null) });
 		const reason = panelReason(state);
 		return {
 			filter,
@@ -189,14 +189,14 @@ export class TaskReads {
 		if (name === null) return null;
 		const node = projectNodeOf(name);
 		const closed = nodeHeader(node, tree, s.doc).closed;
-		const view = viewChoice(this.source.screen(), { node, closed, wide, note: true, branches: hasSubprojects(node, tree) });
+		const view = viewChoice(this.source.screen(), { node, closed, wide, note: true, branches: hasSubprojects(node, tree, s.doc) });
 		return { filter: this.filterOf(node, tree, s.doc, false), view, panel: null, plus: plusOf(view.mode, false), topRow: false, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
 	}
 
 	/** The view before the first read: the device's state alone (`firstViewOf`). */
 	firstView(wide: boolean, note: boolean): ViewChoice {
 		const state = this.source.screen();
-		return firstViewOf(state, wide, note, hasSubprojects(state.selected, this.source.tree()));
+		return firstViewOf(state, wide, note, hasSubprojects(state.selected, this.source.tree(), null));
 	}
 
 	/** The device's Subprojects setting (`subprojectsOn`): what every filtered read and write goes by. */

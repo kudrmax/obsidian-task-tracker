@@ -212,7 +212,7 @@ export class TaskWrites {
 		return nothing((doc, today, settings, boundary) => {
 			const tree = projectTreeOf(doc);
 			const node = nodeIn(filter, tree);
-			const cards = keys.map((key): ProjectsDrop => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree, this.reads.subprojects()) }));
+			const cards = keys.map((key): ProjectsDrop => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree, doc, this.reads.subprojects()) }));
 			const operation = this.rules.dropOnProject(cards, to);
 			return operation ? operation(doc, today, settings, boundary) : doc;
 		});

@@ -1030,7 +1030,7 @@ export interface ViewChoice {
 	readonly plates: Readonly<Record<DropColumn, string | null>>;
 	/**
 	 * The menu's Subprojects row, its own group under the modes, the check in the accent when on: shown while the chosen
-	 * node is a project with subprojects (never a folder), null otherwise. A tap writes `toggleSubprojects`.
+	 * node is a project with subprojects as the panel draws its branch (a live project's not done; never a folder), null otherwise. A tap writes `toggleSubprojects`.
 	 */
 	readonly subprojects: SubprojectsOption | null;
 }

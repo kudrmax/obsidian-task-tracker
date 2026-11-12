@@ -103,6 +103,17 @@ describe("the Subprojects row of the view menu", () => {
 		expect(svc.firstView(true, false).subprojects).toEqual({ label: "Subprojects", checked: false });
 	});
 
+	it("counts only subprojects that aren't done, as the panel draws the branch; a done project counts its done ones", async () => {
+		const text = FILE.replace("- Поездки\n", "- Поездки\n\t- Рим\n").replace("## Done\n\n", "## Done\n\n- [x] Билеты в Рим 🗂️ Рим\n- [x] Отпуск 🗂️ Архив\n- [x] Старый план 🗂️ Черновики\n").replace("\t- Рим\n", "\t- Рим\n- Архив\n\t- Черновики\n");
+		const { svc } = setup(text);
+		await svc.pickProjectNode("project:Поездки", true);
+		const trips = await svc.funnelView(true);
+		expect(trips.panel!.rows.find((r) => r.title === "Поездки")!.hasBranch).toBe(false);
+		expect(trips.view.subprojects).toBeNull();
+		await svc.pickProjectNode("project:Архив", true);
+		expect((await svc.funnelView(true)).view.subprojects).toEqual({ label: "Subprojects", checked: true });
+	});
+
 	it("shows in a project note's block too, the same setting", async () => {
 		const { svc } = setup();
 		expect((await svc.projectNoteView("Заметки/Люди.md", true))!.view.subprojects).toEqual({ label: "Subprojects", checked: true });

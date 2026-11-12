@@ -6170,16 +6170,20 @@ ${key.title}`.toLowerCase();
   function filterTest(node, tree, doc, subprojects) {
     if (node === "all") return (entry) => entry.task.projects.length > 0;
     if (node === "none") return (entry) => entry.task.projects.length === 0;
-    const names = node === "done" ? doneNames(tree, doc) : shownNames(node, tree, subprojects);
+    const names = node === "done" ? doneNames(tree, doc) : shownNames(node, tree, doc, subprojects);
     return (entry) => names.some((name) => namesProject(entry.task.projects, name));
   }
-  function hasSubprojects(node, tree) {
+  function hasSubprojects(node, tree, doc) {
     const name = node === null || node === void 0 ? null : projectOfNode(node);
     const found = name === null ? null : tree.find(name);
-    return found !== null && !found.node.folder && found.node.children.length > 0;
+    if (found === null || found.node.folder || found.node.children.length === 0) return false;
+    if (doc === null) return true;
+    const statuses = projectStatuses(tree, doc);
+    const done = (project) => statuses.get(projectKey(project)) === "done";
+    return done(found.node.name) || found.node.children.some((child) => !done(child.name));
   }
-  function shownNames(node, tree, subprojects) {
-    if (subprojects || !hasSubprojects(node, tree)) return branchNames(node, tree);
+  function shownNames(node, tree, doc, subprojects) {
+    if (subprojects || !hasSubprojects(node, tree, doc)) return branchNames(node, tree);
     const found = tree.find(projectOfNode(node) ?? "");
     return found ? [found.node.name] : [];
   }
@@ -6201,10 +6205,10 @@ ${key.title}`.toLowerCase();
     const next = last < 0 ? void 0 : tasks.slice(last + 1).find((entry) => !carried.has(entry.id));
     return next ? keyOf(next) : null;
   }
-  function shownUnder(entry, node, tree, subprojects) {
+  function shownUnder(entry, node, tree, doc, subprojects) {
     const projects = entry.task.projects;
     const name = node === null ? null : projectOfNode(node);
-    const branch = name === null ? [] : shownNames(projectNodeOf(name), tree, subprojects);
+    const branch = name === null ? [] : shownNames(projectNodeOf(name), tree, doc, subprojects);
     const own = branch.length > 0 ? projects.find((p) => namesProject(branch, p)) : void 0;
     const first = own ?? projects[0];
     return first === void 0 ? null : tree.find(first)?.node.name ?? first;
@@ -6274,7 +6278,7 @@ ${key.title}`.toLowerCase();
       const node = chosenNode(state, tree);
       const filter = node === null ? null : this.filterOf(node, tree, s?.doc ?? null, true);
       const closed = node !== null && nodeHeader(node, tree, s?.doc ?? null).closed;
-      const view = viewChoice(state, { node, closed, wide, note: false, branches: hasSubprojects(node, tree) });
+      const view = viewChoice(state, { node, closed, wide, note: false, branches: hasSubprojects(node, tree, s?.doc ?? null) });
       const reason = panelReason(state);
       return {
         filter,
@@ -6296,13 +6300,13 @@ ${key.title}`.toLowerCase();
       if (name === null) return null;
       const node = projectNodeOf(name);
       const closed = nodeHeader(node, tree, s.doc).closed;
-      const view = viewChoice(this.source.screen(), { node, closed, wide, note: true, branches: hasSubprojects(node, tree) });
+      const view = viewChoice(this.source.screen(), { node, closed, wide, note: true, branches: hasSubprojects(node, tree, s.doc) });
       return { filter: this.filterOf(node, tree, s.doc, false), view, panel: null, plus: plusOf(view.mode, false), topRow: false, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
     }
     /** The view before the first read: the device's state alone (`firstViewOf`). */
     firstView(wide, note) {
       const state = this.source.screen();
-      return firstViewOf(state, wide, note, hasSubprojects(state.selected, this.source.tree()));
+      return firstViewOf(state, wide, note, hasSubprojects(state.selected, this.source.tree(), null));
     }
     /** The device's Subprojects setting (`subprojectsOn`): what every filtered read and write goes by. */
     subprojects() {
@@ -7399,7 +7403,7 @@ ${key.title}`.toLowerCase();
       return nothing((doc, today, settings, boundary) => {
         const tree = projectTreeOf(doc);
         const node = nodeIn(filter, tree);
-        const cards = keys.map((key) => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree, this.reads.subprojects()) }));
+        const cards = keys.map((key) => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree, doc, this.reads.subprojects()) }));
         const operation = this.rules.dropOnProject(cards, to);
         return operation ? operation(doc, today, settings, boundary) : doc;
       });
