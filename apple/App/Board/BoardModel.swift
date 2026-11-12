@@ -379,7 +379,12 @@ final class BoardModel {
             let serial = readsStarted
             let epoch = viewEpoch
             do {
+                // By project's list is read beside the screen, at the same time, and drawn in the screen's drawing: a
+                // card a write took away leaves both at once.
+                let shownFunnel = snapshot?.funnel
+                async let list: Void = { if let shownFunnel { await self.projects.prefetch(shownFunnel, file: .some(nil)) } }()
                 let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
+                await list
                 // Another day was asked for meanwhile (a turn that went on), or another view adopted: this read is not
                 // drawn, the screen as asked is read. A read asked meanwhile reads again before anything is drawn, so
                 // quick picks never show a filter passed by.
@@ -387,9 +392,7 @@ final class BoardModel {
                 if readAgain { continue }
                 // A view first shown that reads By project's list (the first screen, another context) draws it in the
                 // same drawing as the screen: read now, before. The same view changed keeps its list until the new one.
-                if case .projects = read.presentation.source, snapshot?.funnel.view.context != read.funnel.view.context {
-                    await projects.prefetch(read.funnel, file: read.tasksText)
-                }
+                if case .projects = read.presentation.source { await projects.prefetch(read.funnel, file: read.tasksText) }
                 show(read, serial: serial)
                 problem = nil
             } catch {

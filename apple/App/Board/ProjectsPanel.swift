@@ -15,10 +15,11 @@ struct ProjectsPanelView: View {
         GeometryReader { box in
             let shown = model.panelShown
             ZStack(alignment: .topLeading) {
-                // The dim over the lists: a tap there closes the panel the button opened.
-                Color.black.opacity(shown ? (scheme == .dark ? 0.5 : 0.2) : 0)
+                // The dim over the lists: a tap there closes the panel the button opened. It stands only while the panel
+                // does: closed, nothing of it lies over the lists.
+                if shown {
+                Color.black.opacity(scheme == .dark ? 0.5 : 0.2)
                     .ignoresSafeArea()
-                    .allowsHitTesting(shown && model.funnel?.panel?.dimCloses == true)
                     // A tap where the panel will stand while it still slides in is the panel's: its row by height (a
                     // row's height does not move with the slide), elsewhere the dim's.
                     .gesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
@@ -30,7 +31,11 @@ struct ProjectsPanelView: View {
                             Task { await model.funnelState.togglePanel() }
                         }
                     })
+                    // Closed, the dim takes no touch at all: below it the lists lift their cards.
+                    .allowsHitTesting(model.funnel?.panel?.dimCloses == true)
+                    .transition(.opacity)
                     .zIndex(0)
+                }
                 if shown {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Projects")

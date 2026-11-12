@@ -99,7 +99,7 @@ final class ProjectsBoard {
         // Read before the view was drawn (`prefetch`): drawn with it, in its transaction.
         if let ready = prefetched, ready.key == key {
             prefetched = nil
-            show(ready.read, key, moves: false)
+            show(ready.read, key, moves: drawnKey?.node == key.node && drawnKey?.context == key.context)
             return
         }
         askedKey = key
@@ -114,8 +114,13 @@ final class ProjectsBoard {
     func prefetch(_ view: FunnelView, file: String?? = nil) async {
         guard let model, case .projects(let node) = FunnelPresentation(view).source else { return }
         let key = ReadKey(node: node, file: file ?? model.snapshot?.tasksText, context: view.view.context)
-        guard key != drawnKey, let read = await Self.fetch(board, screen: model.menuScreen, node: node) else { return }
-        prefetched = (key, read)
+        // A list read beside the screen (no file asked) counts for the screen read over the same file.
+        if let ready = prefetched, ready.key.node == key.node, ready.key.context == key.context, ready.read.file == key.file || key.file == nil {
+            prefetched = (ProjectsBoard.ReadKey(node: key.node, file: ready.read.file, context: key.context), ready.read)
+            return
+        }
+        guard key != drawnKey || key.file == nil, let read = await Self.fetch(board, screen: model.menuScreen, node: node) else { return }
+        prefetched = (ReadKey(node: key.node, file: read.file, context: key.context), read)
     }
 
     private func show(_ read: Read, _ key: ReadKey, moves: Bool) {
@@ -153,12 +158,15 @@ final class ProjectsBoard {
         let rows: [[BoardCard]]
         let froms: [String: String]
         let entryLook: ProjectsEntryLook
+        /// The tasks file's text it was read over.
+        var file: String? = nil
     }
 
     /// The page read off the main thread; nil when the files cannot be read.
     static func fetch(_ board: TaskBoard, screen: JSONValue, node: String?) async -> Read? {
         try? await Task.detached(operation: { () throws -> Read in
-            let raw: JSONValue = try board.read("tasks.projectsScreen", node.map { [.string($0)] } ?? [], over: try board.files())
+            let files = try board.files()
+            let raw: JSONValue = try board.read("tasks.projectsScreen", node.map { [.string($0)] } ?? [], over: files)
             let view = try raw.decode(ProjectsView.self)
             var drawn: [[BoardCard]] = []
             var froms: [String: String] = [:]
@@ -167,7 +175,7 @@ final class ProjectsBoard {
                 drawn.append(zip(section.rows, painted).map { Self.card($0.1, as: $0.0) })
                 for row in section.rows where froms[row.item.id] == nil { froms[row.item.id] = row.card?.menuFrom ?? "list" }
             }
-            return Read(view: view, raw: raw, rows: drawn, froms: froms, entryLook: try board.projectsEntryLook(view))
+            return Read(view: view, raw: raw, rows: drawn, froms: froms, entryLook: try board.projectsEntryLook(view), file: files.tasks)
         }).value
     }
 
