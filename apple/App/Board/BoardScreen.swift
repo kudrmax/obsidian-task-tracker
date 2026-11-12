@@ -79,19 +79,21 @@ struct BoardScreen: View {
         }
     }
 
-    private var barShown: Bool { !model.selecting && model.fullScreen.isEmpty && !model.entry.isOpen }
+    private var barShown: Bool { model.barRests }
 
     /// The system tab bar with its search slot, laid out by iOS; the plus stands on that slot, the same size, so it can be
     /// carried while the bar keeps the system's layout. The view button stands left of the tab bar (board `V1PhoneCols`);
     /// where the view has no ribbon to walk (Rows, By project) the tab bar gives way and the button stands alone in its
     /// middle (`ViewChoice.wheel`).
     private var bottomBar: some View {
-        let view = model.viewChoice
-        let wheel = view?.wheel ?? true
+        let view = model.funnel?.view ?? model.firstView
+        let wheel = model.presentation?.wheel ?? view?.wheel ?? true
         return GeometryReader { screen in ZStack(alignment: .topLeading) {
             PlaceTabs(place: model.place, leading: wheel && view != nil ? Self.viewRoom : 0, hidden: !wheel, choose: { model.go(to: $0) }, slot: {
                 plusSlot = $0
                 model.route.floor = $0.minY
+                // Where the bar rests, never where it passes while it slides away under a field or a page.
+                if model.barRests, model.barTop != $0.minY { model.barTop = $0.minY }
             })
             if let slot = plusSlot {
                 if let view {
@@ -102,7 +104,10 @@ struct BoardScreen: View {
                 CarriedPlus(model: model, accent: Palette.accent(scheme)) {
                     // By project the plus types where the view stands, in the part the core marks, and nothing where the core
                     // says it opens nothing (a folder, Done); elsewhere the new task's screen.
-                    if model.funnel?.plus.tap == "inPlace" { model.entry.openFromPlus() } else { router.openTyping() }
+                    switch model.presentation?.plusTap ?? .newTask {
+                    case .inPlace: model.entry.openFromPlus()
+                    case .newTask: router.openTyping()
+                    }
                 }
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
@@ -123,11 +128,7 @@ struct BoardScreen: View {
                     FilterTitle(filter: filter, model: model)
                         .padding(.bottom, ColumnMetrics.headGap)
                 }
-                switch snapshot.funnel.view.mode {
-                case .rows: RowsView(snapshot: snapshot, model: model)
-                case .byProject: ByProjectView(snapshot: snapshot, model: model)
-                case .twoColumns, .allColumns: Ribbon(snapshot: snapshot, model: model)
-                }
+                FunnelBody(snapshot: snapshot, model: model)
             }
                 .overlay { ProjectsPanelView(model: model) }
                 .modifier(ProjectsAsks(model: model))
@@ -137,6 +138,8 @@ struct BoardScreen: View {
                 .animation(.snappy, value: model.entry.notes)
                 .animation(.snappy, value: model.stackShown != nil)
                 .onChange(of: model.entry.isOpen) { if !model.entry.isOpen { model.stackShown = nil } }
+                // The Rows view's heights hold while a carry or a field stands in a list.
+                .onChange(of: model.listsHeld, initial: true) { model.metrics.held = model.listsHeld }
         } else if let problem = model.problem {
             ContentUnavailableView {
                 Label("Can’t Read Your Tasks", systemImage: "exclamationmark.triangle")
@@ -201,7 +204,7 @@ struct BoardScreen: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
             // Filled while the panel is out, as a selected toolbar item.
-            Button("Projects", systemImage: model.panelShown ? "folder.fill" : "folder") { Task { await model.toggleProjectsPanel() } }
+            Button("Projects", systemImage: model.panelShown ? "folder.fill" : "folder") { Task { await model.funnelState.togglePanel() } }
                 .disabled(model.funnel?.panel == nil || model.entry.state?.locksPanel == true)
                 .tint(.primary)
         }
@@ -267,6 +270,38 @@ enum BoardSheet: String, Identifiable {
     var id: String { rawValue }
 }
 
+/// The screen beside the calendar for the view the core gives (`FunnelPresentation.body`), one switch over it. The ribbon
+/// stays mounted under every other view, hidden and off the screen: its scroll position, its swipe and its lists live on,
+/// so coming back to Columns draws it where it stood, nothing rebuilt and nothing scrolled.
+private struct FunnelBody: View {
+    let snapshot: BoardSnapshot
+    @Bindable var model: BoardModel
+
+    var body: some View {
+        let presentation = snapshot.presentation
+        let ribbon = presentation.isRibbon
+        GeometryReader { box in
+            ZStack(alignment: .topLeading) {
+                Ribbon(snapshot: snapshot, model: model, dormant: !ribbon)
+                    .opacity(ribbon ? 1 : 0)
+                    .offset(x: ribbon ? 0 : 2 * box.size.width + 100)
+                    .allowsHitTesting(ribbon)
+                    .accessibilityHidden(!ribbon)
+                switch presentation.body {
+                case .ribbon:
+                    EmptyView()
+                case .rows(let lists, _):
+                    RowsView(snapshot: snapshot, lists: lists, model: model)
+                case .byProject:
+                    ByProjectView(snapshot: snapshot, model: model)
+                case .allColumns(let columns):
+                    AllColumnsView(snapshot: snapshot, columns: columns, model: model)
+                }
+            }
+        }
+    }
+}
+
 /// The ribbon: four columns side by side, Inbox over Backlog, Soon, the day list and the calendar, each a fixed width the
 /// whole time, as if the ones off the screen stood just past its edges. The day list and Inbox are as wide as the
 /// divider leaves the day list, Soon and the calendar the rest; so Inbox–Soon, Soon–day and day–calendar each fill the
@@ -274,14 +309,11 @@ enum BoardSheet: String, Identifiable {
 struct Ribbon: View {
     let snapshot: BoardSnapshot
     @Bindable var model: BoardModel
+    /// Mounted under another view: its lists and calendar take no carry and draw nothing until it shows again.
+    var dormant = false
     @State private var position = ScrollPosition(idType: RibbonPlace.self)
     /// How far the ribbon has come from Soon to Today, 0 to 1: the divider's handle shows at Today.
     @State private var toToday: CGFloat = 0
-    @AppStorage("listShare") private var listShare: Double = 0.5
-    @State private var dragStart: CGFloat?
-    /// The divider holds to the middle now; each time it comes to hold, `snaps` counts one, and a tap is felt.
-    @State private var dividerSnapped = false
-    @State private var snaps = 0
     @State private var phase = ScrollPhase.idle
     /// The place the ribbon last came to rest on.
     @State private var rested: RibbonPlace?
@@ -319,7 +351,7 @@ struct Ribbon: View {
                     // The day list and the calendar show one day; when it changes, each slides it within itself. The
                     // calendar keeps the divider's width and slides with the list's edge, so it never reflows.
                     ZStack(alignment: .topLeading) {
-                        TimelineColumn(timeline: snapshot.timeline, model: model)
+                        TimelineColumn(timeline: snapshot.timeline, model: model, dormant: dormant)
                             .equatable()
                             .frame(width: width - list)
                             .frame(maxHeight: .infinity, alignment: .top)
@@ -328,7 +360,7 @@ struct Ribbon: View {
                             .frame(width: dayList)
                             .frame(maxHeight: .infinity, alignment: .top)
                     }
-                    .overlay(alignment: .leading) { divider(width).offset(x: dayList) }
+                    .overlay(alignment: .leading) { ListDivider(model: model, width: width, shown: toToday).offset(x: dayList) }
                     .frame(width: width, alignment: .leading)
                     .frame(maxHeight: .infinity, alignment: .top)
                     .id(RibbonPlace.today)
@@ -430,40 +462,7 @@ struct Ribbon: View {
 
     /// The day list's width for its saved share of the screen, within the bounds the core gives (`rules.listWidths`).
     private func listWidth(_ width: CGFloat) -> CGFloat {
-        model.listWidths(share: listShare, viewWidth: width).map { CGFloat($0.width) } ?? width / 2
-    }
-
-    /// The handle on the line between the day list and the calendar; it shows and moves only at Today.
-    private func divider(_ width: CGFloat) -> some View {
-        Capsule()
-            .fill(Color(.tertiaryLabel))
-            .frame(width: 5, height: 36)
-            .frame(width: 28)
-            .frame(maxHeight: .infinity)
-            .contentShape(.rect)
-            .offset(x: -14)
-            .opacity(toToday)
-            .allowsHitTesting(toToday > 0.99)
-            .gesture(
-                DragGesture(minimumDistance: 2, coordinateSpace: .global)
-                    .onChanged { drag in
-                        let start = dragStart ?? listWidth(width)
-                        if dragStart == nil { dragStart = start }
-                        guard let bounds = model.listWidths(share: listShare, viewWidth: width),
-                              let stop = model.dividerAt(start + drag.translation.width, widths: bounds, speed: Double(abs(drag.velocity.width)) / 1000) else { return }
-                        if stop.snapped, !dividerSnapped { snaps += 1 }
-                        dividerSnapped = stop.snapped
-                        listShare = model.listShare(of: CGFloat(stop.width), viewWidth: width) ?? listShare
-                    }
-                    .onEnded { _ in
-                        dragStart = nil
-                        dividerSnapped = false
-                    }
-            )
-            .sensoryFeedback(.selection, trigger: dragStart == nil)
-            .sensoryFeedback(.impact(weight: .light), trigger: snaps)
-            .accessibilityLabel("Divider")
-            .accessibilityHint("Drag to make the list wider or narrower")
+        model.listWidths(share: model.listShare, viewWidth: width).map { CGFloat($0.width) } ?? width / 2
     }
 
     private func column(_ place: RibbonPlace, _ width: CGFloat, @ViewBuilder content: () -> some View) -> some View {
@@ -476,7 +475,7 @@ struct Ribbon: View {
     @ViewBuilder
     private func lists(_ column: BoardColumn, dayArrows: Bool = false) -> some View {
         if let list = snapshot.lists[column] {
-            ListColumn(list: list, model: model, dayArrows: dayArrows)
+            ListColumn(list: list, model: model, dayArrows: dayArrows, dormant: dormant)
                 .equatable()
         }
     }

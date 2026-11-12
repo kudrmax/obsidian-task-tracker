@@ -173,7 +173,8 @@ struct ProjectTasks: View {
     private var projects: ProjectsBoard { model.projects }
 
     var body: some View {
-        let view = projects.view
+        // Only the list read for the view drawn: another node's list is never shown under this one's title.
+        let view = projects.shownContext == model.snapshot?.funnel.view.context ? projects.view : nil
         VStack(alignment: .leading, spacing: 0) {
             if let view, !view.missing {
                 ScrollViewReader { scroller in
@@ -343,7 +344,7 @@ private struct ProjectCard: View {
             carried: mark.hidden,
             onCarry: { model.startCarry(card, from: "projects") },
             from: "projects",
-            onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item); await model.projects.read() } } : nil,
+            onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item) } } : nil,
             onLink: { model.openLink($0) })
             .frame(height: card.listHeight)
             .background { if mark.waiting { DashedPlace() } }
@@ -556,7 +557,7 @@ final class TreeTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         case nil:
             guard let aimed else { return nil }
             let rect = lineRect
-            model?.carryNaming()
+            model?.session.naming()
             projects.asking = .project(aimed.landing.place)
             return CarryLanding(rect: rect, folds: true)
         }
@@ -651,7 +652,7 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     var scrolls: UIScrollView? { scroll }
 
     /// The plus alone: a card stays where it is shown, let go here.
-    func takes(_ payload: DragPayload?) -> Bool { payload == nil && model?.funnel?.plus.list == "projects" }
+    func takes(_ payload: DragPayload?) -> Bool { payload == nil && model?.presentation?.plusList == .projects }
 
     /// Where the plus is held: the part let go in is read from it.
     private var held: CGPoint?

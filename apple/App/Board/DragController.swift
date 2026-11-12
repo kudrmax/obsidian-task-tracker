@@ -214,7 +214,7 @@ final class DragController {
     /// The copy flies back where the thing was lifted from, as the system returns a cancelled drag; the carry ends once it
     /// is down, and its place closes then.
     private func flyHome(_ live: Live) {
-        model?.carryWentNowhere()
+        model?.session.wentNowhere()
         guard let home = live.home() else { return landed(live) }
         CarryMotion.animate({ live.copy.land(on: CarryLanding(rect: home), look: nil) }) { _ in self.landed(live) }
     }

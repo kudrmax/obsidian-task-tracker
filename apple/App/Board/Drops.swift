@@ -221,19 +221,23 @@ struct SpringLoaded: UIViewRepresentable {
 /// lives on its collection, so a carry outlives the day its block was lifted from (a day arrow turning the day under it).
 struct CanvasProbe: UIViewRepresentable {
     let model: BoardModel
+    /// The calendar under another view: it is not the calendar a carry reads.
+    var dormant = false
 
     func makeUIView(context: Context) -> Probe {
         let view = Probe()
         view.isUserInteractionEnabled = false
         view.target.model = model
-        model.calendarCanvas = view
+        view.target.dormant = dormant
+        if !dormant { model.calendarCanvas = view }
         model.route.add(view.target)
         return view
     }
 
     func updateUIView(_ view: Probe, context: Context) {
         view.target.model = model
-        model.calendarCanvas = view
+        view.target.dormant = dormant
+        if !dormant { model.calendarCanvas = view }
     }
 
     final class Probe: UIView {
@@ -251,6 +255,7 @@ struct CanvasProbe: UIViewRepresentable {
 @MainActor
 final class CalendarDrop: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     weak var model: BoardModel?
+    var dormant = false
     private(set) weak var scroll: UIScrollView?
     /// The long press that lifts a block, on the calendar's scroll view.
     private let press = UILongPressGestureRecognizer()
@@ -309,7 +314,10 @@ final class CalendarDrop: NSObject, BoardTarget, UIGestureRecognizerDelegate {
         return Double(max(0, local.y - grab - TimelineGeometry.labelLift) / model.calendarHour * 60)
     }
 
-    var area: CGRect? { scroll.flatMap { view in view.window.map { view.convert(view.bounds, to: $0).intersection($0.bounds) } } }
+    var area: CGRect? {
+        guard !dormant else { return nil }
+        return scroll.flatMap { view in view.window.map { view.convert(view.bounds, to: $0).intersection($0.bounds) } }
+    }
 
     var scrolls: UIScrollView? { scroll }
 

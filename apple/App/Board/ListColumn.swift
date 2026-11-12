@@ -10,6 +10,8 @@ struct ListColumn: View {
     var dayArrows = false
     /// Stacked in the Rows view: the title small, a section's name, as the plugin's rows head each stage.
     var compact = false
+    /// Mounted but not shown (the ribbon under another view): its list takes no carry and draws nothing until it shows.
+    var dormant = false
 
     /// The list's own width: another day slides through it.
     @State private var width: CGFloat = 0
@@ -28,7 +30,7 @@ struct ListColumn: View {
                     .padding(.top, !compact && list.column == .backlog ? ColumnMetrics.headGap : 0)
                     .padding(.bottom, ColumnMetrics.headGap)
             }
-            DayLane(model: model, width: width, slides: list.column == .day, shown: ListCollection(column: list.column, model: model, stacked: compact)) { peek in
+            DayLane(model: model, width: width, slides: list.column == .day, shown: ListCollection(column: list.column, model: model, stacked: compact, dormant: dormant)) { peek in
                 if let other = peek.lists[.day] { DayRows(list: other, model: model) }
             }
             .clipped()
@@ -576,6 +578,6 @@ enum SoftEdge {
 /// A list's column drawn again only when its list changed: its rows are the collection's, which follows the board itself.
 extension ListColumn: Equatable {
     nonisolated static func == (a: ListColumn, b: ListColumn) -> Bool {
-        MainActor.assumeIsolated { a.list == b.list && a.dayArrows == b.dayArrows && a.compact == b.compact && a.model === b.model }
+        MainActor.assumeIsolated { a.list == b.list && a.dayArrows == b.dayArrows && a.compact == b.compact && a.dormant == b.dormant && a.model === b.model }
     }
 }
