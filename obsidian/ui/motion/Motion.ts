@@ -48,6 +48,23 @@ function gapOf(el: HTMLElement): number {
 	return parent ? parseFloat(getComputedStyle(parent).rowGap) || 0 : 0;
 }
 
+/** What a row takes in its column, as it stands: its height, its margins and its borders (a plate's outline takes room too). */
+function edgesOf(style: CSSStyleDeclaration): Record<string, string> {
+	return {
+		height: style.height,
+		minHeight: style.minHeight,
+		marginTop: style.marginTop,
+		marginBottom: style.marginBottom,
+		borderTopWidth: style.borderTopWidth,
+		borderBottomWidth: style.borderBottomWidth,
+	};
+}
+
+/** A row folded to nothing: no height, no margins, no borders, the column's gap given back. */
+function folded(row: HTMLElement): Record<string, string> {
+	return { height: "0px", minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), borderTopWidth: "0px", borderBottomWidth: "0px" };
+}
+
 const SLIDES = new WeakMap<Element, Animation>();
 const GROWTHS = new WeakMap<Element, Animation>();
 /** The height a growing row grows to, and the box a reshaped one goes to. */
@@ -61,17 +78,26 @@ const SLID_TO = new WeakMap<Element, number>();
  * with none (a test) the change is simply made.
  */
 export const Motion = {
-	/** A row comes in: from no height and no opacity to its own, the rows under it sliding down as it grows. */
-	enter(row: HTMLElement): void {
+	/**
+	 * A row comes in: from no height and no opacity to its own, the rows under it sliding down as it grows. `afterFade`:
+	 * rows of its column are leaving in the same drawing; it waits at no height while they fade and grows as they fold, on
+	 * the same curve, so it takes the room they free and the column never stands taller than before or after.
+	 */
+	enter(row: HTMLElement, afterFade = false): void {
 		const timing = timingOf(row);
 		if (!timing) return;
 		const style = getComputedStyle(row);
-		const to = { height: style.height, minHeight: style.minHeight, marginTop: style.marginTop, marginBottom: style.marginBottom, opacity: "1" };
+		const edges = edgesOf(style);
+		const to = { ...edges, opacity: "1" };
 		const overflow = row.style.overflow;
 		row.style.overflow = "hidden";
-		const growth = row.animate([{ height: "0px", minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" }, to], timing);
+		const growth = row.animate([{ ...folded(row), opacity: "0" }, to], {
+			...timing,
+			delay: afterFade ? timing.duration : 0,
+			fill: "backwards",
+		});
 		GROWTHS.set(row, growth);
-		GROWN.set(row, parseFloat(to.height) || 0);
+		GROWN.set(row, parseFloat(edges.height) || 0);
 		const done = () => {
 			if (GROWTHS.get(row) === growth) row.style.overflow = overflow;
 		};
@@ -92,19 +118,19 @@ export const Motion = {
 			return null;
 		}
 		const style = getComputedStyle(row);
-		const full = { height: style.height, minHeight: style.minHeight, marginTop: style.marginTop, marginBottom: style.marginBottom };
+		const full = edgesOf(style);
 		row.style.overflow = "hidden";
-		const folded = { height: "0px", minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" };
+		const away = { ...folded(row), opacity: "0" };
 		const leaving = fade
 			? row.animate(
 					[
 						{ ...full, opacity: "1", easing: timing.easing },
 						{ ...full, opacity: "0", easing: timing.easing, offset: 0.5 },
-						folded,
+						away,
 					],
 					{ duration: 2 * timing.duration, fill: "forwards" },
 				)
-			: row.animate([{ ...full, opacity: "1" }, folded], { ...timing, fill: "forwards" });
+			: row.animate([{ ...full, opacity: "1" }, away], { ...timing, fill: "forwards" });
 		leaving.addEventListener("finish", () => {
 			row.remove();
 			gone();
@@ -165,6 +191,31 @@ export const Motion = {
 		node.animate([{ opacity: getComputedStyle(node).opacity }, { opacity: "0" }], { ...timing, fill: "forwards" }).addEventListener("finish", gone);
 	},
 };
+
+/** The moves running in `el` and under it: cards growing in or folding away, a header's margin easing. */
+function runningIn(el: HTMLElement): Animation[] {
+	if (typeof el.getAnimations !== "function") return [];
+	return el.getAnimations({ subtree: true }).filter((animation) => animation.playState === "running");
+}
+
+/** How long the moves in `el` and under it still run, in ms; 0 when nothing moves. */
+export function motionLeft(el: HTMLElement): number {
+	return Math.max(0, ...runningIn(el).map((animation) => Number(animation.effect?.getComputedTiming().endTime ?? 0) - Number(animation.currentTime ?? 0)));
+}
+
+/**
+ * `measure` as `el` will stand once its moves have ended: each is put a hair before its end for the reading and back at
+ * once, within the same frame, so nothing on the screen moves and none of them finishes early.
+ */
+export function readResting<T>(el: HTMLElement, measure: () => T): T {
+	const moves = runningIn(el).map((animation) => ({ animation, at: animation.currentTime }));
+	for (const { animation } of moves) animation.currentTime = Math.max(0, Number(animation.effect?.getComputedTiming().endTime ?? 0) - 0.01);
+	try {
+		return measure();
+	} finally {
+		for (const { animation, at } of moves) animation.currentTime = at;
+	}
+}
 
 /** An absolutely placed box in its parent's pixels, as its own `top`, `left` and `height` lay it out. */
 export interface Box {
