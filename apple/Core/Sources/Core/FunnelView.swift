@@ -27,7 +27,10 @@ public struct ViewModeOption: Decodable, Hashable, Sendable {
 
 /// `ViewChoice`: the view a screen draws and the button that changes it.
 public struct ViewChoice: Decodable, Hashable, Sendable {
+    /// What is drawn: the chosen mode, but By project under Done and a done project.
     public let mode: ViewMode
+    /// The mode the button shows and checks: one for every filter and none (Max, 2026-11-12).
+    public let chosen: ViewMode
     public let modes: [ViewModeOption]
     public let icon: String
     /// The wheel (the app's tab bar) shows: two columns alone.
@@ -43,6 +46,10 @@ public struct ViewChoice: Decodable, Hashable, Sendable {
     public let emptyLabel: String
     /// Each funnel list's No tasks plate while it draws no card: its words, or nil for no plate.
     public let plates: [String: String?]
+    /// How the mode stands: its columns, whether it swipes, its divider, its rows' stack.
+    public let layout: ViewLayout
+    /// The filter and the mode the view is read in: a read in another context is drawn still.
+    public let context: String
 
     /// The plate list `column` draws while it shows no card; nil for none.
     public func plate(_ column: String) -> String? { plates[column] ?? nil }
@@ -193,7 +200,7 @@ extension TaskBoard {
         _ = try screenCall("tasks.setProjectsPanel", [.bool(open)], over: try files())
     }
 
-    /// A mode of the view button's menu, kept apart for the screen with a filter and without.
+    /// A mode of the view button's menu: the screen's one mode, whatever the filter.
     public func setViewMode(_ mode: ViewMode) throws {
         _ = try screenCall("tasks.setViewMode", [.string(mode.rawValue)], over: try files())
     }
@@ -204,9 +211,10 @@ extension TaskBoard {
         try write("tasks.dropTasksOnProject", [.array(keys.map(\.json)), .string(node), filter.json])
     }
 
-    /// The node's tasks by project whatever the device chose: the by project mode's list.
-    public func projectsScreen(node: String, now: Date? = nil) throws -> ProjectsView {
-        try read("tasks.projectsScreen", [.string(node)], over: try files(now: now))
+    /// The node's tasks by project whatever the device chose: the by project mode's list; with no node (no filter)
+    /// every open task by its top project.
+    public func projectsScreen(node: String?, now: Date? = nil) throws -> ProjectsView {
+        try read("tasks.projectsScreen", node.map { [.string($0)] } ?? [], over: try files(now: now))
     }
 
     /// Where a swipe on the funnel leads from `mode` on `date`, a step back (-1) or on (1); nil at the row's end.

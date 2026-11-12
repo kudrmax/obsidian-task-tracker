@@ -386,6 +386,18 @@ public struct BoardSnapshot: Sendable {
     /// The node the lists are filtered by (`ProjectFilter.node`): what a drop, its preview and its landing take.
     public var filter: String? { funnel.filter?.node }
 
+    /// The same screen under another view of the same filter (the panel opened, another mode): no file is read again.
+    public func with(funnel: FunnelView) -> BoardSnapshot {
+        BoardSnapshot(
+            today: today, day: day, dayTitle: dayTitle, screen: screen, lists: lists, timeline: timeline, statuses: statuses,
+            calendarsAlert: calendarsAlert, calendarWords: calendarWords, canUndo: canUndo, menus: menus, look: look,
+            tasksText: tasksText, settingsJSON: settingsJSON, calendarTexts: calendarTexts, readAt: readAt, startHour: startHour,
+            funnel: funnel)
+    }
+
+    /// How the screen is drawn: the core's view decoded.
+    public var presentation: FunnelPresentation { FunnelPresentation(funnel) }
+
     /// The files as they are now say what this snapshot was read from: no file, no setting, no calendar changed.
     public func readFrom(_ files: BoardFiles) -> Bool {
         files.tasks == tasksText && files.settingsJSON == settingsJSON && files.calendars == calendarTexts

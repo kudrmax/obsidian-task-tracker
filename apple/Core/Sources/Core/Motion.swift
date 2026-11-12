@@ -10,12 +10,16 @@ public enum BoardMotion: Equatable, Sendable {
     case turn(forward: Bool)
     /// Cards came, went, moved or changed: each by its id slides, folds away or unfolds in one transaction.
     case change
+    /// Another filter or view mode (`ViewChoice.context`): the screen is drawn still, in place, no card flying from where
+    /// another view had it.
+    case context
 }
 
 extension BoardSnapshot {
     /// The motion from `old`, the drawing on the screen, to this one.
     public func motion(from old: BoardSnapshot?) -> BoardMotion {
         guard let old else { return .still }
+        if old.funnel.view.context != funnel.view.context { return .context }
         if old.day != day { return .turn(forward: day > old.day) }
         return old.lists == lists && old.timeline == timeline ? .still : .change
     }
