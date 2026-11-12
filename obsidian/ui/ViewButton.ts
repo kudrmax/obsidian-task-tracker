@@ -8,13 +8,14 @@ const ICON_OF: Readonly<Record<string, IconName>> = { "columns-2": "columns2", "
 
 /**
  * The view button in the bottom row (board V1): a round button like the plus wearing the current mode's icon, beside the
- * wheel or alone in its place; a tap opens the modes the core offers.
+ * wheel or alone in its place; a tap opens the modes the core offers and, under a project with subprojects, the
+ * Subprojects row.
  */
 export class ViewButton {
 	private readonly button: Button;
 	private view: ViewChoice | null = null;
 
-	constructor(parent: HTMLElement, onPick: (mode: ViewMode) => void) {
+	constructor(parent: HTMLElement, onPick: (mode: ViewMode) => void, onSubprojects: () => void) {
 		this.button = Button.create(parent, {
 			kind: "round",
 			tone: "plain",
@@ -23,7 +24,7 @@ export class ViewButton {
 			cls: "tc-view-btn",
 			onPress: () => {
 				const view = this.view;
-				if (view) ViewMenu.open({ anchor: this.button.el, modes: view.modes, onPick });
+				if (view) ViewMenu.open({ anchor: this.button.el, modes: view.modes, subprojects: view.subprojects, onPick, onSubprojects });
 			},
 		});
 	}

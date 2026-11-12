@@ -228,6 +228,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "setProjectsPanel", args: () => [true] },
 	{ method: "setViewMode", args: () => ["rows"] },
 	{ method: "setNoteViewMode", args: () => ["byProject"] },
+	{ method: "toggleSubprojects", args: () => [] },
 	{ method: "dropTasksOnProject", args: (s) => [[key(s, "Idea")], "project:Окружение", null] },
 	{ method: "dropTasksOnProject", args: (s) => [[key(s, "Someday")], "none", "project:Окружение"] },
 	{ method: "selectProjectNode", args: () => ["project:Окружение"] },

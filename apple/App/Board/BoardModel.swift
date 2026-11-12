@@ -318,6 +318,11 @@ final class BoardModel {
         await viewCall { try $0.setViewMode(mode) }
     }
 
+    /// The view button's Subprojects row: the chosen project's subprojects' tasks shown or hidden.
+    func toggleSubprojects() async {
+        await viewCall { try $0.toggleSubprojects() }
+    }
+
     /// A call that changes only this device's view (the filter, the panel, the mode, a fold), then the screen read again
     /// with it; By project reads its own list too.
     func viewCall(_ call: @escaping @Sendable (TaskBoard) throws -> Void) async {

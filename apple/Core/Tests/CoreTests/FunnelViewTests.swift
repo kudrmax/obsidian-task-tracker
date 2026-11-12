@@ -63,6 +63,26 @@ import Testing
         #expect(try board.funnelView().view.mode == .rows)
     }
 
+    @Test func theSubprojectsRowHidesTheBranchAndKeepsTheMode() throws {
+        let board = board(FakeVault(ProjectsScreenTests.file))
+        #expect(try board.funnelView().view.subprojects == nil)
+        try board.pickProjectNode("project:Спорт")
+        #expect(try board.funnelView().view.subprojects == nil)
+        try board.pickProjectNode("project:Окружение")
+        try board.setViewMode(.byProject)
+        #expect(try board.funnelView().view.subprojects == SubprojectsOption(label: "Subprojects", checked: true))
+        #expect(titles(try board.snapshot(day: nil, measures: Self.measures), .backlog) == ["Активности"])
+        try board.toggleSubprojects()
+        let off = try board.funnelView().view
+        #expect(off.subprojects?.checked == false && off.mode == .byProject)
+        let snapshot = try board.snapshot(day: nil, measures: Self.measures)
+        #expect(titles(snapshot, .backlog).isEmpty && titles(snapshot, .inbox).isEmpty)
+        #expect(titles(snapshot, .soon) == ["Брейншторм"])
+        try board.toggleSubprojects()
+        #expect(try board.funnelView().view.subprojects?.checked == true)
+        #expect(titles(try board.snapshot(day: nil, measures: Self.measures), .inbox) == ["Свидание: формат"])
+    }
+
     @Test func byProjectReadsTheNodesOwnList() throws {
         let board = board(FakeVault(ProjectsScreenTests.file))
         let view = try board.projectsScreen(node: "project:Окружение")

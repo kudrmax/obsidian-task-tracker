@@ -95,7 +95,7 @@ export class TaskWrites {
 				place.kind === "projects"
 					? this.createInProjects(text, priority, place, repeat, labels, project)
 					: filter !== null && filter !== undefined && !this.rules.isBlank(text)
-						? (doc, today, settings, boundary) => this.rules.placeNew(text, priority, shownPlace(doc, place, filter, today), repeat, labels, project)(doc, today, settings, boundary)
+						? (doc, today, settings, boundary) => this.rules.placeNew(text, priority, shownPlace(doc, place, filter, today, this.reads.subprojects()), repeat, labels, project)(doc, today, settings, boundary)
 						: this.rules.createInPlace(text, priority, place, repeat, labels, project),
 			answer: (change) => {
 				const created = change?.after.insertedSince(change.before);
@@ -212,7 +212,7 @@ export class TaskWrites {
 		return nothing((doc, today, settings, boundary) => {
 			const tree = projectTreeOf(doc);
 			const node = nodeIn(filter, tree);
-			const cards = keys.map((key): ProjectsDrop => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree) }));
+			const cards = keys.map((key): ProjectsDrop => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree, doc, this.reads.subprojects()) }));
 			const operation = this.rules.dropOnProject(cards, to);
 			return operation ? operation(doc, today, settings, boundary) : doc;
 		});
@@ -515,7 +515,7 @@ export class TaskWrites {
 		const node = nodeIn(filter, tree);
 		if (node === null) return read;
 		const carried = new Set(tasks.map((task) => this.rules.entryOf(s.doc, task.key).id));
-		return { ...read, before: afterShown(s.doc, read.list, read.group, filterTest(node, tree, s.doc), carried) };
+		return { ...read, before: afterShown(s.doc, read.list, read.group, filterTest(node, tree, s.doc, this.reads.subprojects()), carried) };
 	}
 
 	/** The dropped tasks where `write` left them. */
@@ -553,11 +553,11 @@ export class TaskWrites {
 }
 
 /** A new task's place at a section's end of a list under `filter`: right after the last task of the section the filter shows (`afterShown`). */
-function shownPlace(doc: TaskDocument, place: NewTaskPlace, filter: ProjectsNodeId, today: LocalDate): NewTaskPlace {
+function shownPlace(doc: TaskDocument, place: NewTaskPlace, filter: ProjectsNodeId, today: LocalDate, subprojects: boolean): NewTaskPlace {
 	if ((place.kind !== "list" && place.kind !== "day") || place.before !== null) return place;
 	const tree = projectTreeOf(doc);
 	const node = nodeIn(filter, tree);
 	if (node === null) return place;
 	const list = place.kind === "list" ? place.list : dayColumn(place.date, today).list;
-	return { ...place, before: afterShown(doc, list, place.group, filterTest(node, tree, doc)) };
+	return { ...place, before: afterShown(doc, list, place.group, filterTest(node, tree, doc, subprojects)) };
 }

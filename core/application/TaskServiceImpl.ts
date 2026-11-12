@@ -57,7 +57,7 @@ import type { SectionOffer } from "./sections";
 import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type ProjectsScreenStore, type SettingsStore, type TaskFileStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
 import { chosenNode, cleared, picked, projectOfNode, renamedIn, selected } from "./projectsScreen";
-import { withMode } from "./viewModes";
+import { toggledSubprojects, withMode } from "./viewModes";
 import { carriedAt, carryEnded, carryStarted, gestureGone, nameEnded } from "./projectsCarry";
 import { funnelPlaceOf, type FunnelPlace } from "./screenPlaces";
 import { ProjectTree, type TreePlace } from "../domain/ProjectTree";
@@ -243,6 +243,10 @@ export class TaskServiceImpl implements TaskService {
 
 	async setNoteViewMode(mode: ViewMode): Promise<void> {
 		this.keepScreen({ ...this.projectsScreenStore.get(), noteView: mode });
+	}
+
+	async toggleSubprojects(): Promise<void> {
+		this.keepScreen(toggledSubprojects(this.projectsScreenStore.get()));
 	}
 
 	dropTasksOnProject(keys: readonly TaskKey[], to: ProjectsNodeId, filter: ProjectsNodeId | null): Promise<void> {
