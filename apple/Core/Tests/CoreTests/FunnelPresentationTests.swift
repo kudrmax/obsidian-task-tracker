@@ -204,6 +204,20 @@ import Testing
         #expect(calls.log.count == 3)
     }
 
+    /// The drop's write reaches the core before the session's end, which would put the lift's filter back (QA 11-12).
+    @Test func theEndWaitsForTheDropsWrite() async {
+        let calls = Calls(), clock = Clock(), redraws = Redraws()
+        let carry = session(calls, clock, redraws)
+        carry.start(keys: [])
+        let drop = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(50))
+            try? calls.endCarry("drop written")
+        }
+        #expect(carry.close(after: drop) == .dropped)
+        await carry.idle()
+        #expect(calls.log == ["start 0", "end drop written", "end dropped"])
+    }
+
     @Test func aDropOnARowEndsTheSessionItself() async {
         let calls = Calls(), clock = Clock(), redraws = Redraws()
         let carry = session(calls, clock, redraws)

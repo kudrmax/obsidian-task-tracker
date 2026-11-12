@@ -651,8 +651,70 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
 
     var scrolls: UIScrollView? { scroll }
 
-    /// The plus alone: a card stays where it is shown, let go here.
-    func takes(_ payload: DragPayload?) -> Bool { payload == nil && model?.presentation?.plusList == .projects }
+    /// The plus, and a card of this list carried among its parts (moved, or into another part, as the core's
+    /// `dropInProjects` writes it, as the plugin's).
+    func takes(_ payload: DragPayload?) -> Bool {
+        guard model?.presentation?.plusList == .projects else { return false }
+        guard let payload else { return true }
+        if case .card = payload.kind { return payload.from == "projects" }
+        return false
+    }
+
+    /// Where a carried card would go: the list's place (`rules.placeOfDrop`), the line's start; nil where it stays.
+    private var cardAim: (place: JSONValue, line: CGPoint)?
+
+    /// The card under the finger among the parts' cards, the carried one left out, as a list places a card: the gap by
+    /// the core's `placeAt` over the cards and the parts' headers where they stand, the level by the finger's `x`.
+    private func aimCard(_ card: BoardCard, at point: CGPoint) {
+        guard let model, let area else { return clearCard() }
+        let projects = model.projects
+        let geometry = projects.geometry
+        var placed: [JSONValue] = [], listed: [JSONValue] = [], heads: [JSONValue] = [], frames: [CGRect] = []
+        var home: JSONValue = .null
+        for part in projects.parts {
+            if part.section.header, let head = geometry.parts[part.id] {
+                heads.append(["group": part.section.group.json, "firstCard": .number(Double(placed.count)), "top": .number(Double(head.minY)), "height": .number(Double(head.height))])
+            }
+            for other in part.cards {
+                if other.id == card.id {
+                    home = ["kind": "gap", "index": .number(Double(placed.count)), "level": .number(Double(other.level)), "group": part.section.group.json]
+                    continue
+                }
+                guard let frame = geometry.cards[part.id + "/" + other.id] else { continue }
+                placed.append(["level": .number(Double(other.level)), "group": part.section.group.json, "top": .number(Double(frame.minY)), "height": .number(Double(frame.height))])
+                listed.append(["id": .string(other.item.id), "key": other.item.key.json, "level": .number(Double(other.level)), "group": part.section.group.json])
+                frames.append(frame)
+            }
+        }
+        let inset = Double(CardMetrics.columnInset)
+        let level: Double = model.ruleNow("rules.levelAt", [.number(Double(point.x)), ["left": .number(Double(area.minX) + inset), "width": .number(Double(area.width) - 2 * inset)], .number(Double(CardMetrics.indent))]) ?? 0
+        guard let gap: JSONValue = model.ruleNow("rules.placeAt", [.array(placed), .number(Double(point.y)), .number(level), .number(0), .null, .array(heads), home, .number(CardMetrics.dropHysteresis)]),
+              let place: JSONValue = model.ruleNow("rules.placeOfDrop", [.array(listed), gap, home]), !place.isNull,
+              let drop = projects.cards[card.id]?.drop,
+              // Where the core takes no drop (a folder's own part, a stage that refuses the card) no line shows.
+              model.ruleNow("rules.projectsTakes", [projects.raw, [drop], place]) == true,
+              let index = gap["index"].number.map(Int.init) else { return clearCard() }
+        let y = index < frames.count ? frames[index].minY - CardMetrics.gap / 2 : (frames.last?.maxY ?? area.minY) + CardMetrics.gap / 2
+        let x = area.minX + CardMetrics.columnInset + CGFloat(gap["level"].number ?? 0) * CardMetrics.indent
+        cardAim = (place, CGPoint(x: x, y: y))
+        model.drag.showLine(from: CGPoint(x: x, y: y), to: area.maxX - CardMetrics.columnInset)
+    }
+
+    private func clearCard() {
+        cardAim = nil
+        model?.drag.hideLine()
+    }
+
+    /// A card let go where its line stood: written by the core (`tasks.dropInProjects`), the copy folding into the line;
+    /// where the core takes no drop there (a stage that refuses it) nothing is written and the list stays.
+    private func dropCard(_ card: BoardCard) -> CarryLanding? {
+        defer { clearCard() }
+        guard let model, let aim = cardAim, let drop = model.projects.cards[card.id]?.drop else { return nil }
+        // No filter is By project's every task: the core's node for it is All (the plugin passes it so too).
+        let node = model.filter?.node ?? "all"
+        model.writeDrop("tasks.dropInProjects", [.array([drop]), aim.place, .string(node)])
+        return CarryLanding(rect: CGRect(x: aim.line.x, y: aim.line.y - 4, width: 8, height: 8), folds: true)
+    }
 
     /// Where the plus is held: the part let go in is read from it.
     private var held: CGPoint?
@@ -660,6 +722,7 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     /// The plus held over the tasks shows the drop line where the task will go, as the plugin's: after the last card of
     /// the part under the finger (the last whose header or card stands above it), or over the first part above them all.
     func hover(at point: CGPoint, carrying payload: DragPayload?) {
+        if let payload, case .card(let card) = payload.kind { return aimCard(card, at: point) }
         held = point
         let aimed = target(at: point.y)
         guard let model, let area, let line = aimed.line, newTask(in: aimed.part) != nil else { return model?.drag.hideLine() ?? () }
@@ -668,7 +731,7 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
 
     func leave() {
         held = nil
-        model?.drag.hideLine()
+        clearCard()
     }
 
     /// The part a let-go at `y` (window) writes into, and where its line stands.
@@ -697,6 +760,7 @@ final class TasksTarget: NSObject, BoardTarget, UIGestureRecognizerDelegate {
     /// The part let go in, as the line showed it: the field at its end; above them all, before the first part's first
     /// card. Where the plus writes nothing (a folder's tasks, Done) it takes nothing.
     func letGo(carrying payload: DragPayload?) -> CarryLanding? {
+        if let payload, case .card(let card) = payload.kind { return dropCard(card) }
         guard payload == nil, let model, let first = model.projects.parts.first else { return nil }
         let at = held
         let found = target(at: at?.y ?? 0).part

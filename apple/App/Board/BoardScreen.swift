@@ -139,7 +139,7 @@ struct BoardScreen: View {
                 .animation(.snappy, value: model.stackShown != nil)
                 .onChange(of: model.entry.isOpen) { if !model.entry.isOpen { model.stackShown = nil } }
                 // The Rows view's heights hold while a carry or a field stands in a list.
-                .onChange(of: model.listsHeld, initial: true) { model.metrics.held = model.listsHeld }
+                .onChange(of: model.listsHeld) { model.metrics.release() }
         } else if let problem = model.problem {
             ContentUnavailableView {
                 Label("Can’t Read Your Tasks", systemImage: "exclamationmark.triangle")

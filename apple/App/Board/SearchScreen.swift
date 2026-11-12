@@ -9,6 +9,9 @@ struct SearchScreen: View {
     @Bindable var model: BoardModel
     @State private var query = ""
     @State private var groups: [SearchGroup] = []
+    /// The query the finds shown were searched for: «No Results» only once that query has been searched, never while its
+    /// search still runs.
+    @State private var searched: String?
     @State private var cards: [String: BoardCard] = [:]
     @State private var names: [String: String] = [:]
     @State private var focused = true
@@ -34,7 +37,7 @@ struct SearchScreen: View {
             .listStyle(.plain)
             .environment(\.defaultMinListRowHeight, CardMetrics.height)
             .overlay {
-                if !query.isEmpty, groups.isEmpty { ContentUnavailableView.search(text: query) }
+                if !query.isEmpty, searched == query, groups.isEmpty { ContentUnavailableView.search(text: query) }
             }
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.inline)
@@ -56,6 +59,7 @@ struct SearchScreen: View {
                     cards = Dictionary(drawn.map { ($0.item.id, $0) }, uniquingKeysWith: { first, _ in first })
                     names = named
                     groups = found
+                    searched = query
                 }
             }
         }

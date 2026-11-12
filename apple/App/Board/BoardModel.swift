@@ -93,6 +93,7 @@ final class BoardModel {
         entry.model = self
         projects.model = self
         funnelState.model = self
+        metrics.holds = { [unowned self] in listsHeld }
     }
 
     /// A screen the quick entry read after its write, drawn in the transaction the entry draws its own state in.
@@ -179,6 +180,9 @@ final class BoardModel {
         didSet { UserDefaults.standard.set(listShare, forKey: "listShare") }
     }
 
+    /// Where the projects' panel ends on the screen while it shows (window x).
+    @ObservationIgnored var panelRight: CGFloat = 0
+
     /// The tab bar shows: it hides while a task is typed, in Select Tasks and under a pushed page, as in every app.
     var barRests: Bool { !selecting && fullScreen.isEmpty && !entry.isOpen }
 
@@ -187,7 +191,7 @@ final class BoardModel {
 
     /// The lists the Rows view stacks are held at their heights while a card or the plus is carried (until its copy is
     /// down, so it lands where its line was) and while a task is typed or written.
-    var listsHeld: Bool { carry != nil || entry.writing }
+    var listsHeld: Bool { (carry != nil && carry?.landed != true) || entry.writing }
 
     /// The Rows view's heights for its measured lists sharing `room` (`rules.stackedLists`), the fade the lists' own.
     func stackedHeights(_ lists: [StackedList], room: Double) -> [Double] {
@@ -245,7 +249,8 @@ final class BoardModel {
     }
 
     private func closeCarry() {
-        guard let how = session.close(), how != .closed else { return }
+        // The drop's write reaches the core before the session's end: the end puts the lift's filter back otherwise.
+        guard let how = session.close(after: lastDrop), how != .closed else { return }
         endSelectionIf(how.rawValue)
     }
 
@@ -378,6 +383,11 @@ final class BoardModel {
                 // quick picks never show a filter passed by.
                 guard shownDay == day, epoch == viewEpoch else { readAgain = true; continue }
                 if readAgain { continue }
+                // A view first shown that reads By project's list (the first screen, another context) draws it in the
+                // same drawing as the screen: read now, before. The same view changed keeps its list until the new one.
+                if case .projects = read.presentation.source, snapshot?.funnel.view.context != read.funnel.view.context {
+                    await projects.prefetch(read.funnel, file: read.tasksText)
+                }
                 show(read, serial: serial)
                 problem = nil
             } catch {
@@ -1405,13 +1415,14 @@ final class BoardModel {
     /// `cards` and `heads` where they stand in the list without the carried ones, the finger at `point`. A card is placed
     /// by its middle (`rules.carriedMiddle`, the finger's hold on it known from the lift), the plus by the finger; the level
     /// by the finger's `x` (`rules.levelAt`); the place shown holds until the finger is well past it.
-    func placeUnder(_ column: BoardColumn, cards: [PlacedCard], heads: [PlacedHead], at point: CGPoint, grab: CGFloat?, width: CGFloat, held: JSONValue?) -> JSONValue? {
+    func placeUnder(_ column: BoardColumn, cards: [PlacedCard], heads: [PlacedHead], at point: CGPoint, grab: CGFloat?, width: CGFloat, covered: CGFloat = 0, held: JSONValue?) -> JSONValue? {
         let inset = Double(CardMetrics.columnInset)
         // A folded result's card of two lines is held by its own middle.
         let carried = carry.flatMap { $0.from == "timeline" ? nil : $0.item }.map { CardFace($0.card).twoLines ? CardMetrics.twoLineHeight : CardMetrics.height } ?? CardMetrics.height
         let y = grab.flatMap { try? board.carriedMiddle(y: Double(point.y), grab: Double($0), cardHeight: Double(carried)) } ?? Double(point.y)
         do {
-            let level = try board.levelAt(x: Double(point.x), left: inset, width: Double(width) - 2 * inset, indent: Double(CardMetrics.indent))
+            let shown = Double(min(covered, width / 2))
+            let level = try board.levelAt(x: Double(point.x), left: inset + shown, width: Double(width) - 2 * inset - shown, indent: Double(CardMetrics.indent))
             let hold = held ?? carry.flatMap { homeGap($0.id, in: column) } ?? .null
             return try board.placeAt(cards, y: y, level: level, shift: 0, room: .null, heads: heads, held: hold, hysteresis: CardMetrics.dropHysteresis)
         } catch {
@@ -1591,7 +1602,7 @@ final class BoardModel {
     @ObservationIgnored private var lastDrop: Task<Void, Never>?
 
     /// A drop's write after its screen was drawn: in drop order; a read begun before it never draws, the one after it does.
-    private func writeDrop(_ method: String, _ arguments: [JSONValue]) {
+    func writeDrop(_ method: String, _ arguments: [JSONValue]) {
         let before = lastDrop
         let board = board
         lastDrop = Task {
@@ -1958,7 +1969,11 @@ final class BoardModel {
         // Only the calendar the board draws is laid out: a view still holding the day a turn left (drawn once more in the
         // turn's own transaction) asks for a stack that, come back, would replace the new day's and slide it in again.
         if laid?.hour != hour, timeline == drawing?.timeline { layOut(timeline, hour: hour) }
-        guard let laid else { return Self.scaled(timeline.slots, from: CGFloat(CardMetrics.timeline.hour), to: hour) }
+        guard let laid else {
+            // Nothing laid out for this calendar yet (the first screen, the zoom just known): the core's stack now, the
+            // same the layout under way will keep, so the first frame shows every block where it stays.
+            return (try? board.stack(timeline, measures: Self.measures(hour), pure: true)) ?? Self.scaled(timeline.slots, from: CGFloat(CardMetrics.timeline.hour), to: hour)
+        }
         return laid.hour == hour ? laid.slots : Self.scaled(laid.slots, from: laid.hour, to: hour)
     }
 

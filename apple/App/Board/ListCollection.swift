@@ -803,7 +803,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         let anywhere = model.placesInGap(column, carrying: payload)
         let place: JSONValue
         if anywhere {
-            guard let under = model.placeUnder(column, cards: standing.placed, heads: standing.heads.map(\.head), at: point, grab: payload.map(\.grab), width: collection.bounds.width, held: aimed?.place) else { return nil }
+            guard let under = model.placeUnder(column, cards: standing.placed, heads: standing.heads.map(\.head), at: point, grab: payload.map(\.grab), width: collection.bounds.width, covered: covered, held: aimed?.place) else { return nil }
             place = under
         } else {
             place = ["kind": "gap", "index": .number(Double(standing.cards.count)), "level": 0, "group": .null]
@@ -869,6 +869,13 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
     }
 
     var scrolls: UIScrollView? { collection.isScrollEnabled ? collection : nil }
+
+    /// How much of the list's left the projects' panel lies over (a carry brought it out): the level is read from the
+    /// part that shows, so a card let go right of the panel can stand at the top level.
+    private var covered: CGFloat {
+        guard let model, model.panelShown, let window = host.window else { return 0 }
+        return max(0, model.panelRight - host.convert(host.bounds, to: window).minX)
+    }
 
     var area: CGRect? {
         guard !dormant, let window = host.window else { return nil }
