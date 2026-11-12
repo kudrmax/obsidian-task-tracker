@@ -6345,7 +6345,7 @@ ${key.title}`.toLowerCase();
   function hasSubprojects(node, tree, doc) {
     const name = node === null || node === void 0 ? null : projectOfNode(node);
     const found = name === null ? null : tree.find(name);
-    if (found === null || found.node.folder || found.node.children.length === 0) return false;
+    if (found === null || found.node.children.length === 0) return false;
     if (doc === null) return true;
     const statuses = projectStatuses(tree, doc);
     const done = (project) => statuses.get(projectKey(project)) === "done";
