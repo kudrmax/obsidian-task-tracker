@@ -966,7 +966,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .task-calendar.is-entering .tc-list.is-holding::after { height: calc(max(var(--tc-foot-fade-day), var(--tc-entry-room)) + var(--tc-list-hold)); }
 .tc-list::-webkit-scrollbar { display: none; }
 /* Content scrolled under a list's or the calendar's edge fades out there instead of being cut by a line. Each fade is as deep as the content under its edge, up to its full height, so it grows in and out with the scroll and never appears in a step; a list at rest at an edge shows none there. */
-:is(.tc-list, .tc-timeline):is(.is-under-top, .is-under-bottom) { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); }
+:is(.tc-list, .tc-timeline, .tc-tree):is(.is-under-top, .is-under-bottom) { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); }
 
 /* A card: the dot of a task in progress, the title fading out on the right, the due date. */
 .tc-card { position: relative; overflow: hidden; flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; cursor: pointer; }
@@ -1592,6 +1592,9 @@ body:not(.is-mobile) .task-calendar { --tc-top-row-top: var(--tc-desk-top-row-to
  * edge. Docked on the desktop, the lists stand right of it; on the phone it lies over the lists and slides in from the
  * left, the rest dimmed as under a menu.
  */
+/* The panel ends as the lists do: the screen's one fade over its foot, the tree scrolling its last row up out of it (README «Низ экрана гаснет одним затуханием»). */
+.tc-tree-panel::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--tc-foot-fade-day); background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-half-ink), transparent) var(--tc-foot-fade-half), color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-deep-ink), transparent) var(--tc-foot-fade-deep), var(--tc-bg) var(--tc-foot-fade-solid)); z-index: var(--tc-layer-fade); pointer-events: none; }
+.tc-tree-field { scroll-margin-bottom: var(--tc-foot-fade-day); }
 .tc-tree-panel { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--tc-tree-width) + var(--tc-divider)); z-index: var(--tc-layer-tree-panel); background: var(--tc-bg); visibility: hidden; }
 .task-calendar.has-tree > .tc-tree-panel { visibility: visible; }
 .tc-tree-panel-title { position: absolute; top: var(--tc-top-row-top); left: var(--tc-tree-title-left); height: var(--tc-day-row); padding: 0 var(--tc-space-4); box-sizing: border-box; color: var(--tc-text); font-size: var(--tc-font-filter); line-height: var(--tc-day-row); font-weight: var(--tc-weight-bold); white-space: nowrap; }
