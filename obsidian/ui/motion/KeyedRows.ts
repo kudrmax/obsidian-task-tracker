@@ -1,4 +1,4 @@
-import { fadeLeft, Motion } from "./Motion";
+import { Motion } from "./Motion";
 
 /** A row as a drawing takes it: its node, kept from the last drawing when its key was there, and the signal its listeners hang on until the next drawing. */
 export interface TakenRow {
@@ -75,7 +75,8 @@ export class KeyedRows {
 	}
 
 	/** @internal: the rows of this drawing, in order; those not drawn leave. */
-	settle(drawn: Map<string, Row>, moving: boolean): void {
+	settle(drawn: Map<string, Row>, moving: boolean): HTMLElement[] {
+		const gone: HTMLElement[] = [];
 		const kept = new Set(drawn.values());
 		for (const [key, row] of this.rows) {
 			if (kept.has(row)) continue;
@@ -84,6 +85,7 @@ export class KeyedRows {
 				row.node.remove();
 				continue;
 			}
+			gone.push(row.node);
 			const animation = Motion.leave(
 				row.node,
 				() => {
@@ -100,6 +102,7 @@ export class KeyedRows {
 				this.leaving.delete(key);
 			}
 		this.rows = drawn;
+		return gone;
 	}
 }
 
@@ -153,23 +156,17 @@ export class RowsDrawing {
 	/**
 	 * The rows stand in the page in the order taken; the new ones grow in, the moved ones slide, the rest leave. The new
 	 * ones start growing first, from nothing: a moved row slides to where it stands with them at that height, and their
-	 * growth carries it on. A new row in place (under no card: the first, or one after a header) waits while the rows in
-	 * place still fade, whichever drawing sent them, and grows as they fold, never over them: a list's last cards going
-	 * and its No tasks plate coming, or the reverse, or a typed text's field going as its card comes. As the app's list.
+	 * growth carries it on.
 	 */
 	finish(): void {
 		const host = this.rows.host;
 		const old = [...host.children] as HTMLElement[];
 		this.rows.settle(this.drawn, this.moving);
-		const drawnNodes = new Set([...this.drawn.values()].map((row) => row.node));
-		const changing = (node: HTMLElement) => this.fresh.has(node) || !drawnNodes.has(node);
 		const wanted = new Set(this.order);
 		const stays = old.filter((node) => node.isConnected && node.parentElement === host && !wanted.has(node));
 		arrange(host, withStays(this.order, old, stays));
 		if (!this.moving) return;
-		const now = [...host.children] as HTMLElement[];
-		const wait = Math.max(0, ...now.filter((node) => inPlace(now, node, changing)).map(fadeLeft));
-		for (const node of this.fresh) Motion.enter(node, inPlace(now, node, changing) ? wait : 0);
+		for (const node of this.fresh) Motion.enter(node);
 		for (const node of this.order) {
 			if (this.fresh.has(node)) continue;
 			const from = this.before.get(node);
@@ -177,19 +174,6 @@ export class RowsDrawing {
 			if (from && (from.width > 0 || from.height > 0)) Motion.slide(node, from);
 		}
 	}
-}
-
-/**
- * Whether `node` stands in place in `column`: the nearest row before it that is not itself coming or going is no card
- * (none, or a header), so it fades or grows where it stands rather than under a card.
- */
-function inPlace(column: readonly HTMLElement[], node: HTMLElement, changing: (node: HTMLElement) => boolean): boolean {
-	for (let i = column.indexOf(node) - 1; i >= 0; i--) {
-		const row = column[i];
-		if (changing(row)) continue;
-		return !row.classList.contains("tc-card");
-	}
-	return true;
 }
 
 /** The rows in order, with what else stood in the column (rows leaving, a drop line) each after the row it stood after. */

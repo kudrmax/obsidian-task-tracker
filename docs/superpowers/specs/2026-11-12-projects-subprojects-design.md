@@ -41,3 +41,7 @@ The rule «which tasks a node shows» takes the setting; the device state keeps 
 - `ProjectsScreenState.subprojects?: boolean` — false when off; left out means on. Device-only, kept in the same state as the view modes.
 - Reads that follow it with no new argument: `screen(date, filter)`, `dayView`, `projectsScreen(node)` (own part alone when off), `projectNoteView`, `filterHides`, `drop`/`dropPreview`/`landing`/`createInPlace` positions under a filter, `dropTasksOnProject`.
 - `contracts.ts` changes: the field on `ProjectsScreenState`, `ViewChoice.subprojects`, the type `SubprojectsOption`, the method `toggleSubprojects`. `settings.ts`: unchanged.
+
+## Scope cut (2026-11-12)
+
+The motion changes made on the way (rows and note-block heights following their lists, the «No tasks» plate waiting for leaving cards, the editor's content height under a note's block, `readResting`; the app's two-step list drawing and `FoldingListLayout.anchor`) are taken out: that layer is rebuilt in `projects-view-rework`, and this branch must not touch it. The decisions above about that motion are withdrawn here and belong to the rework. Kept: the core rule and setting, the view menu row on both sides, and the app's reused-cell fix (a dropped plus opened no field and lost the typed text; a new field showed another task's title).

@@ -336,7 +336,6 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         let gone = Set(shownIds).subtracting(ids)
         // Only rows drawn anew in place (a card turning into its field, a title written): drawn at once, never cross-faded.
         let animated = day == shownDay && host.window != nil && ids != shownIds
-        let before = (ids: shownIds, rows: rows)
         shownIds = ids
         day = shownDay
         // The quick entry's one field keeps the keyboard from row to row: a row going away hands it to the window's holder
@@ -346,43 +345,11 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
                   let field = cell.contentView.firstResponderInside as? EntryTextField else { continue }
             field.park(in: window)
         }
-        drawn = tops
-        phase += 1
-        let mine = phase
-        // Rows that come where rows go, both where they stand (the No tasks plate taking the last cards' place, or the
-        // reverse): the going rows fade first, and only then do the coming ones come, in order, into the room they free,
-        // so the two never show over each other and the list never stands taller than before or after.
-        if animated, Self.fadesInPlace(going: before, coming: (ids, next)) {
-            let staying = Set(before.ids)
-            let kept = zip(ids, next).filter { staying.contains($0.0) }
-            show(kept.map(\.0), kept.map(\.1), changed: [], animated: true) { [weak self] in
-                guard let self, self.phase == mine else { return }
-                self.show(ids, next, changed: changed, animated: true)
-            }
-        } else {
-            show(ids, next, changed: changed, animated: animated)
-        }
-    }
-
-    /// Counts the drawings asked for: the second step of a drawing in two waits only while no later one came.
-    private var phase = 0
-
-    /// Whether a change makes rows go and rows come where each stands, under no row that stays (`FoldingListLayout`).
-    private static func fadesInPlace(going old: (ids: [String], rows: [DrawnRow]), coming new: (ids: [String], rows: [DrawnRow])) -> Bool {
-        let kept = Set(new.ids), had = Set(old.ids)
-        let gone = Set(old.ids.indices.filter { !kept.contains(old.ids[$0]) })
-        let come = Set(new.ids.indices.filter { !had.contains(new.ids[$0]) })
-        let goes = gone.contains { FoldingListLayout.anchor(of: $0, among: gone, covered: covering(old.rows)) == nil }
-        let comes = come.contains { FoldingListLayout.anchor(of: $0, among: come, covered: covering(new.rows)) == nil }
-        return goes && comes
-    }
-
-    /// The collection drawn with `ids`, the rows `drawing`; `done` once its motion has ended.
-    private func show(_ ids: [String], _ drawing: [DrawnRow], changed: [String], animated: Bool, done: (() -> Void)? = nil) {
         if let layout = collection.collectionViewLayout as? FoldingListLayout {
-            layout.covers = (before: Self.covering(rows), after: Self.covering(drawing))
+            layout.covers = (before: Self.covering(rows), after: Self.covering(next))
         }
-        rows = drawing
+        rows = next
+        drawn = tops
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
         snapshot.appendSections([0])
         snapshot.appendItems(ids)
@@ -390,7 +357,7 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         // next frame, so a drop's frame lays the rows out without drawing them all again.
         let later = animated ? changed : []
         snapshot.reconfigureItems(animated ? [] : changed)
-        source.apply(snapshot, animatingDifferences: animated, completion: done)
+        source.apply(snapshot, animatingDifferences: animated)
         if !later.isEmpty {
             NextFrame.run { [weak self] in
                 guard let self else { return }
@@ -970,13 +937,6 @@ final class FoldingListLayout: UICollectionViewCompositionalLayout {
         deleted = Set(updateItems.compactMap { $0.updateAction == .delete ? $0.indexPathBeforeUpdate?.item : nil })
     }
 
-    /// The row a coming or going row folds under: the nearest before it that stays and covers; nil where it fades in place.
-    static func anchor(of item: Int, among changing: Set<Int>, covered: Set<Int>) -> Int? {
-        var anchor = item - 1
-        while anchor >= 0, changing.contains(anchor) { anchor -= 1 }
-        return anchor >= 0 && covered.contains(anchor) ? anchor : nil
-    }
-
     override func finalizeCollectionViewUpdates() {
         super.finalizeCollectionViewUpdates()
         unfolding = [:]
@@ -997,8 +957,9 @@ final class FoldingListLayout: UICollectionViewCompositionalLayout {
         guard inserted.contains(path.item), let shown = layoutAttributesForItem(at: path)?.copy() as? UICollectionViewLayoutAttributes else {
             return super.initialLayoutAttributesForAppearingItem(at: path)
         }
-        guard let anchor = Self.anchor(of: path.item, among: inserted, covered: covers.after),
-              let over = layoutAttributesForItem(at: IndexPath(item: anchor, section: path.section)) else {
+        var anchor = path.item - 1
+        while anchor >= 0, inserted.contains(anchor) { anchor -= 1 }
+        guard anchor >= 0, covers.after.contains(anchor), let over = layoutAttributesForItem(at: IndexPath(item: anchor, section: path.section)) else {
             shown.alpha = 0
             return shown
         }
@@ -1016,7 +977,9 @@ final class FoldingListLayout: UICollectionViewCompositionalLayout {
             return super.finalLayoutAttributesForDisappearingItem(at: path)
         }
         gone.frame = stood
-        guard let anchor = Self.anchor(of: path.item, among: deleted, covered: covers.before), let over = before[anchor] else {
+        var anchor = path.item - 1
+        while anchor >= 0, deleted.contains(anchor) { anchor -= 1 }
+        guard anchor >= 0, covers.before.contains(anchor), let over = before[anchor] else {
             gone.alpha = 0
             return gone
         }

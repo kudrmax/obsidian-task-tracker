@@ -48,36 +48,6 @@ function gapOf(el: HTMLElement): number {
 	return parent ? parseFloat(getComputedStyle(parent).rowGap) || 0 : 0;
 }
 
-/** What a row takes in its column, as it stands: its height and its margins. */
-function edgesOf(style: CSSStyleDeclaration): Record<string, string> {
-	return { height: style.height, minHeight: style.minHeight, marginTop: style.marginTop, marginBottom: style.marginBottom };
-}
-
-/**
- * A row folded to nothing: no height but its borders, no margins, the column's gap given back and its borders' room too
- * (a plate's outline stays: a border folding to nothing still draws a device pixel, so the margin takes it back instead).
- */
-function folded(row: HTMLElement, style: CSSStyleDeclaration): Record<string, string> {
-	const borders = (parseFloat(style.borderTopWidth) || 0) + (parseFloat(style.borderBottomWidth) || 0);
-	return { height: px(borders), minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row) - borders) };
-}
-
-/** When a leaving row's fade ends (it folds after), and whether it was shown at all (a row still waiting to grow was not). */
-const FADES = new WeakMap<Element, { readonly end: number; readonly shown: boolean }>();
-
-/** A row still waiting at no height before it grows in (`enter`'s wait): it has not been seen. */
-function waitingToGrow(row: Element): boolean {
-	const growth = GROWTHS.get(row);
-	if (growth?.playState !== "running") return false;
-	return Number(growth.currentTime) < Number(growth.effect?.getTiming().delay ?? 0);
-}
-
-/** How long `row`, leaving, still fades before it folds, in ms; 0 for a row that folds now or was never shown. */
-export function fadeLeft(row: Element): number {
-	const fade = FADES.get(row);
-	return fade?.shown && row.classList.contains("is-leaving") ? Math.max(0, fade.end - performance.now()) : 0;
-}
-
 const SLIDES = new WeakMap<Element, Animation>();
 const GROWTHS = new WeakMap<Element, Animation>();
 /** The height a growing row grows to, and the box a reshaped one goes to. */
@@ -91,25 +61,17 @@ const SLID_TO = new WeakMap<Element, number>();
  * with none (a test) the change is simply made.
  */
 export const Motion = {
-	/**
-	 * A row comes in: from no height and no opacity to its own, the rows under it sliding down as it grows. `wait`: it
-	 * stands at no height that long first (while rows it takes the place of fade, `fadeLeft`), then grows as they fold.
-	 */
-	enter(row: HTMLElement, wait = 0): void {
+	/** A row comes in: from no height and no opacity to its own, the rows under it sliding down as it grows. */
+	enter(row: HTMLElement): void {
 		const timing = timingOf(row);
 		if (!timing) return;
 		const style = getComputedStyle(row);
-		const edges = edgesOf(style);
-		const to = { ...edges, opacity: "1" };
+		const to = { height: style.height, minHeight: style.minHeight, marginTop: style.marginTop, marginBottom: style.marginBottom, opacity: "1" };
 		const overflow = row.style.overflow;
 		row.style.overflow = "hidden";
-		const growth = row.animate([{ ...folded(row, style), opacity: "0" }, to], {
-			...timing,
-			delay: wait,
-			fill: "backwards",
-		});
+		const growth = row.animate([{ height: "0px", minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" }, to], timing);
 		GROWTHS.set(row, growth);
-		GROWN.set(row, parseFloat(edges.height) || 0);
+		GROWN.set(row, parseFloat(to.height) || 0);
 		const done = () => {
 			if (GROWTHS.get(row) === growth) row.style.overflow = overflow;
 		};
@@ -130,20 +92,19 @@ export const Motion = {
 			return null;
 		}
 		const style = getComputedStyle(row);
-		const full = edgesOf(style);
+		const full = { height: style.height, minHeight: style.minHeight, marginTop: style.marginTop, marginBottom: style.marginBottom };
 		row.style.overflow = "hidden";
-		const away = { ...folded(row, style), opacity: "0" };
-		if (fade) FADES.set(row, { end: performance.now() + timing.duration, shown: (parseFloat(full.height) || 0) > 0 && !waitingToGrow(row) });
+		const folded = { height: "0px", minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" };
 		const leaving = fade
 			? row.animate(
 					[
 						{ ...full, opacity: "1", easing: timing.easing },
 						{ ...full, opacity: "0", easing: timing.easing, offset: 0.5 },
-						away,
+						folded,
 					],
 					{ duration: 2 * timing.duration, fill: "forwards" },
 				)
-			: row.animate([{ ...full, opacity: "1" }, away], { ...timing, fill: "forwards" });
+			: row.animate([{ ...full, opacity: "1" }, folded], { ...timing, fill: "forwards" });
 		leaving.addEventListener("finish", () => {
 			row.remove();
 			gone();
@@ -204,46 +165,6 @@ export const Motion = {
 		node.animate([{ opacity: getComputedStyle(node).opacity }, { opacity: "0" }], { ...timing, fill: "forwards" }).addEventListener("finish", gone);
 	},
 };
-
-/** A move running under `el` that ends (a card growing in or folding away, a header's margin easing), and where it ends. */
-interface Ending {
-	readonly animation: Animation;
-	readonly end: number;
-	readonly at: number;
-}
-
-/**
- * The moves running in `el` and under it that come to an end, one just made (not started yet) among them: one that never
- * ends (a field's caret blinking) has no resting place to read.
- */
-function endingIn(el: HTMLElement): Ending[] {
-	if (typeof el.getAnimations !== "function") return [];
-	return el.getAnimations({ subtree: true }).flatMap((animation) => {
-		const end = Number(animation.effect?.getComputedTiming().endTime);
-		const at = animation.currentTime === null ? 0 : Number(animation.currentTime);
-		return animation.playState === "running" && Number.isFinite(end) && Number.isFinite(at) ? [{ animation, end, at }] : [];
-	});
-}
-
-/** How long the moves in `el` and under it still run, in ms; 0 when nothing moves. */
-export function motionLeft(el: HTMLElement): number {
-	return Math.max(0, ...endingIn(el).map(({ end, at }) => end - at));
-}
-
-/**
- * `measure` as `el` will stand once its moves have ended: each is put at its end for the reading and back at once,
- * within the same frame, so nothing on the screen moves and none of them finishes early (a move put back before the
- * page looks is not finished). Exactly at the end, not a hair before: a border a hair from nothing still draws a pixel.
- */
-export function readResting<T>(el: HTMLElement, measure: () => T): T {
-	const moves = endingIn(el);
-	for (const { animation, end } of moves) animation.currentTime = end;
-	try {
-		return measure();
-	} finally {
-		for (const { animation, at } of moves) animation.currentTime = at;
-	}
-}
 
 /** An absolutely placed box in its parent's pixels, as its own `top`, `left` and `height` lay it out. */
 export interface Box {
