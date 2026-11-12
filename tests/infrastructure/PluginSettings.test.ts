@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS } from "../../core/settings";
 import { SETTINGS_FILE, type StoredSettings } from "../../obsidian/settingsFile";
 
 /** The file the defaults are written as: every key but the device's. */
-const DEFAULT_FILE: Partial<StoredSettings> = (({ listShare: _s, rightMode: _m, zoom: _z, ...file }) => file)(SETTINGS_FILE.from(null));
+const DEFAULT_FILE: Partial<StoredSettings> = (({ listShare: _s, zoom: _z, treeWidth: _t, ...file }) => file)(SETTINGS_FILE.from(null));
 
 const FILE = ".obsidian/plugins/task-calendar/data.json";
 
@@ -72,12 +72,12 @@ describe("PluginSettings", () => {
 
 	it("a device-only patch neither reads nor writes data.json and tells the listeners once", async () => {
 		const { settings, host, told } = await loaded();
-		await settings.update({ rightMode: "soon" });
+		await settings.update({ treeWidth: 300 });
 		expect(host.loads).toBe(0);
 		expect(host.saves).toBe(0);
 		expect(host.localSaves).toBe(1);
 		expect(told()).toBe(1);
-		expect(settings.get().rightMode).toBe("soon");
+		expect(settings.get().treeWidth).toBe(300);
 	});
 
 	it("a shared patch reads the file once, writes it once and tells once", async () => {
@@ -97,14 +97,14 @@ describe("PluginSettings", () => {
 
 	it("a file Sync changed is seen and told", async () => {
 		const { settings, host, told } = await loaded();
-		await settings.update({ rightMode: "inbox" });
+		await settings.update({ treeWidth: 280 });
 		const before = told();
 		const file = host.fileSettings();
 		host.file = { ...file, google: { ...file.google, refreshToken: "fromMac" } };
 		await settings.reload();
 		expect(told()).toBe(before + 1);
 		expect(settings.get().google.refreshToken).toBe("fromMac");
-		expect(settings.get().rightMode).toBe("inbox");
+		expect(settings.get().treeWidth).toBe(280);
 	});
 
 	it("a shared patch is seen by get() at once, before the file is written", async () => {

@@ -5,7 +5,7 @@ import type { RightMode } from "../../obsidian/ui/viewSettings";
 
 /** Where the harness's screen stands: a place of the wheel, or the by project list of a node. */
 type Shown = RightMode | "projects";
-import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../obsidian/ui/drag/DropTarget";
+import { type DragPayload, type DropResult, type DropTarget, type ListColumn, isProjectsDrop } from "../../obsidian/ui/drag/DropTarget";
 import { GestureArbiter } from "../../obsidian/ui/gestures";
 import { type ColumnDrop, type EntryListShown, type PlusAside, QuickEntryController } from "../../obsidian/ui/quick/QuickEntryController";
 import { ProjectTasks } from "../../obsidian/ui/projects/ProjectTasks";
@@ -181,7 +181,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		list: shownList,
 		aside: (): PlusAside | null =>
 			projectsList && mode === "projects"
-				? { targets: [stubDrop("day", { kind: "projectsPlace", place: { kind: "task", group: "s", before: null } })], alone: true, dropped: (result) => asideDrops.push(result) }
+				? { targets: [stubDrop("day", { kind: "projectsPlace", place: { kind: "task", group: "s", before: null } })], alone: true, started: () => undefined, ended: (result) => void (result && isProjectsDrop(result) && result.kind !== "projectsPlace" && asideDrops.push(result)) }
 				: null,
 		sectioned: () => sections,
 		timeline: () => timeline,
