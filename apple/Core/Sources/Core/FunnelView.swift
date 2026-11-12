@@ -110,6 +110,11 @@ public struct FunnelView: Decodable, Hashable, Sendable {
     /// The place of the funnel the screen stands at, as the device keeps it.
     public let place: String
 
+    /// This view with `next`'s panel: a pick's panel closes at once, its filter shown with the lists read for it.
+    public func with(panelOf next: FunnelView) -> FunnelView {
+        FunnelView(filter: filter, view: view, panel: next.panel, searchPaths: searchPaths, plus: plus, place: place)
+    }
+
     /// What the quick entry's look takes as its `filter` (`EntryLook.filter`): the node and the project, or null.
     public var entryFilter: JSONValue {
         guard let filter else { return .null }

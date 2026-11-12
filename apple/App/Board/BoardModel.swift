@@ -200,29 +200,22 @@ final class BoardModel {
         guard let shown = snapshot else { return await reload() }
         let sameFilter = shown.filter == view.filter?.node
         viewEpoch += 1
-        let next = shown.with(funnel: view)
-        draw(motion: next.motion(from: shown)) {
-            adopting = !sameFilter
-            snapshot = next
-            adopting = false
-            entry.screenChanged()
+        // Another filter: the panel goes at once; its title comes with the lists read for it, never over the old ones.
+        let next = shown.with(funnel: sameFilter ? view : shown.funnel.with(panelOf: view))
+        let change = {
+            self.snapshot = next
+            self.entry.screenChanged()
         }
+        // The same lists in the same context (the panel opened or closed): the panel moves as it moves by itself.
+        if next.motion(from: shown) == .still { change() } else { draw(motion: next.motion(from: shown), change) }
         if !sameFilter { await reload() }
     }
 
-    /// The context the lists drawn were read in: a read in another one is drawn still, its cards never flying in from
-    /// where another filter had them.
-    private(set) var listsContext: String?
-    @ObservationIgnored private var adopting = false
+    /// The context the lists drawn were read in: a list drawing rows of another one draws them still, its cards never
+    /// flying in from where another filter or mode had them.
+    var listsContext: String? { drawing?.funnel.view.context }
     /// Counts the views adopted: a read begun before one is not drawn, it would put the view back.
     @ObservationIgnored private var viewEpoch = 0
-
-    /// How a read is drawn over the screen: as it differs, still in another context of the lists.
-    func motion(of read: BoardSnapshot) -> BoardMotion {
-        let motion = read.motion(from: snapshot)
-        if motion == .change, read.funnel.view.context != listsContext { return .context }
-        return motion
-    }
 
     // MARK: The carry to a project: the core's session (`CarrySession`)
 
@@ -258,7 +251,6 @@ final class BoardModel {
             if let snapshot {
                 CardMetrics.follow(snapshot.look)
                 metrics.measure(snapshot)
-                if !adopting { listsContext = snapshot.funnel.view.context }
             }
             projects.follow()
             if let timeline = snapshot?.timeline, timeline != oldValue?.timeline {
@@ -397,7 +389,7 @@ final class BoardModel {
         guard dropReads.mayDraw(serial) else { return }
         if let before = snapshot { follow(read.dayChange(since: before), from: before) }
         defer { if reopen, read.day == read.today, !readAgain { reopen = false; dayMoved += 1 } }
-        draw(motion: motion(of: read)) {
+        draw(motion: read.motion(from: snapshot)) {
             snapshot = read
             sectionMove = nil
             entry.screenChanged()
