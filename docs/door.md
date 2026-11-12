@@ -395,6 +395,18 @@ adds to the calls above; the old ones answer as before.
 - `EntryState.locksPanel` (the quick entry's state, `entry.*`): true while a field is open; the projects button can't be
   pressed then.
 
+#### Subprojects in the filter (2026-11-12)
+
+- `ViewChoice.subprojects` → `{ label: "Subprojects", checked }` or `null`: the view menu's row, its own group under the
+  modes, the accent check when `checked`. Present only while the chosen node (a note's block: its project) is a project
+  with subprojects, never a folder; `null` elsewhere and in `tasks.firstView(wide, true)`. Example:
+  `tasks.funnelView(false).view.subprojects` → `{ label: "Subprojects", checked: true }` under «Люди».
+- `tasks.toggleSubprojects()`: a tap on the row; answers like `setViewMode`. Off, a chosen project shows only the tasks
+  whose own projects include it: `tasks.screen`, `dayView`, `projectsScreen` (its own part alone), `projectNoteView`'s
+  lists, `filterHides`, and where a drop or a typed task goes at a section's end and which project a card dropped on a
+  row gives way (`dropTasksOnProject`) all follow it. One device setting (`ProjectsScreenState.subprojects`, `false`
+  when off, left out on), never synced; it changes no mode or filter and none changes it.
+
 #### A folded task's next step
 
 Every task with an open subtask, at any depth, drawn folded shows its next open subtask: `TaskItem.card` `{ text,

@@ -3619,6 +3619,9 @@ ${key.title}`.toLowerCase();
     tree.roots.forEach(visit);
     return statuses;
   }
+  function subprojectsOn(state) {
+    return state.subprojects !== false;
+  }
   function selectedNode(state, tree) {
     return chosenNode(state, tree) ?? "all";
   }
@@ -3825,7 +3828,8 @@ ${key.title}`.toLowerCase();
   function projectSections(input, doc, placed, statusOf2) {
     const closed = statusOf2(placed.node.name) === "done";
     const top = placed.path.length;
-    const branch = input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf2(p.node.name) !== "done"));
+    const whole = subprojectsOn(input.state) || placed.node.folder;
+    const branch = whole ? input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf2(p.node.name) !== "done")) : [];
     const write = (project) => closed ? null : inInbox(project);
     const own = projectPart(OWN, { ...placed, title: null }, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf(input, e, placed.node.name)), write(placed.node.name));
     const subs = branch.map((p) => projectPart(`project:${p.node.name}`, p, p.path.slice(top), p.path.length - top, byStage(tasksNaming(doc, p.node.name, closed)).map((e) => cardOf(input, e, p.node.name)), write(p.node.name)));
@@ -3958,6 +3962,7 @@ ${key.title}`.toLowerCase();
     rows: "Rows",
     byProject: "By project"
   };
+  var SUBPROJECTS_WORD = "Subprojects";
   var ICONS = { twoColumns: "columns-2", allColumns: "columns-4", rows: "rows-3", byProject: "folder-tree" };
   var ROW_LISTS = ["inbox", "backlog", "soon", "day"];
   function offered(ask) {
@@ -3983,10 +3988,14 @@ ${key.title}`.toLowerCase();
     const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
     const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
     const ribbon = mode === "twoColumns" && !ask.note;
-    return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", ribbon, source: mode === "byProject" ? "projectsScreen" : "screen", rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates };
+    const subprojects = ask.branches ? { label: SUBPROJECTS_WORD, checked: subprojectsOn(state) } : null;
+    return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", ribbon, source: mode === "byProject" ? "projectsScreen" : "screen", rows: mode === "rows" ? ROW_LISTS : [], emptyLabel: PROJECTS_WORDS.noTasks, plates, subprojects };
   }
-  function firstViewOf(state, wide, note) {
-    return viewChoice(state, { node: note ? "note" : state.selected ?? null, closed: false, wide, note });
+  function firstViewOf(state, wide, note, branches) {
+    return viewChoice(state, { node: note ? "note" : state.selected ?? null, closed: false, wide, note, branches: !note && branches });
+  }
+  function toggledSubprojects(state) {
+    return { ...state, subprojects: !subprojectsOn(state) };
   }
   function withMode(state, mode, filtered) {
     return filtered ? { ...state, filteredView: mode } : { ...state, view: mode };
@@ -6158,11 +6167,21 @@ ${key.title}`.toLowerCase();
   };
 
   // core/application/projectFilter.ts
-  function filterTest(node, tree, doc) {
+  function filterTest(node, tree, doc, subprojects) {
     if (node === "all") return (entry) => entry.task.projects.length > 0;
     if (node === "none") return (entry) => entry.task.projects.length === 0;
-    const names = node === "done" ? doneNames(tree, doc) : branchNames(node, tree);
+    const names = node === "done" ? doneNames(tree, doc) : shownNames(node, tree, subprojects);
     return (entry) => names.some((name) => namesProject(entry.task.projects, name));
+  }
+  function hasSubprojects(node, tree) {
+    const name = node === null || node === void 0 ? null : projectOfNode(node);
+    const found = name === null ? null : tree.find(name);
+    return found !== null && !found.node.folder && found.node.children.length > 0;
+  }
+  function shownNames(node, tree, subprojects) {
+    if (subprojects || !hasSubprojects(node, tree)) return branchNames(node, tree);
+    const found = tree.find(projectOfNode(node) ?? "");
+    return found ? [found.node.name] : [];
   }
   function branchNames(node, tree) {
     const found = tree.find(projectOfNode(node) ?? "");
@@ -6182,10 +6201,10 @@ ${key.title}`.toLowerCase();
     const next = last < 0 ? void 0 : tasks.slice(last + 1).find((entry) => !carried.has(entry.id));
     return next ? keyOf(next) : null;
   }
-  function shownUnder(entry, node, tree) {
+  function shownUnder(entry, node, tree, subprojects) {
     const projects = entry.task.projects;
     const name = node === null ? null : projectOfNode(node);
-    const branch = name === null ? [] : branchNames(projectNodeOf(name), tree);
+    const branch = name === null ? [] : shownNames(projectNodeOf(name), tree, subprojects);
     const own = branch.length > 0 ? projects.find((p) => namesProject(branch, p)) : void 0;
     const first = own ?? projects[0];
     return first === void 0 ? null : tree.find(first)?.node.name ?? first;
@@ -6255,7 +6274,7 @@ ${key.title}`.toLowerCase();
       const node = chosenNode(state, tree);
       const filter = node === null ? null : this.filterOf(node, tree, s?.doc ?? null, true);
       const closed = node !== null && nodeHeader(node, tree, s?.doc ?? null).closed;
-      const view = viewChoice(state, { node, closed, wide, note: false });
+      const view = viewChoice(state, { node, closed, wide, note: false, branches: hasSubprojects(node, tree) });
       const reason = panelReason(state);
       return {
         filter,
@@ -6277,12 +6296,17 @@ ${key.title}`.toLowerCase();
       if (name === null) return null;
       const node = projectNodeOf(name);
       const closed = nodeHeader(node, tree, s.doc).closed;
-      const view = viewChoice(this.source.screen(), { node, closed, wide, note: true });
+      const view = viewChoice(this.source.screen(), { node, closed, wide, note: true, branches: hasSubprojects(node, tree) });
       return { filter: this.filterOf(node, tree, s.doc, false), view, panel: null, plus: plusOf(view.mode, false), topRow: false, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
     }
     /** The view before the first read: the device's state alone (`firstViewOf`). */
     firstView(wide, note) {
-      return firstViewOf(this.source.screen(), wide, note);
+      const state = this.source.screen();
+      return firstViewOf(state, wide, note, hasSubprojects(state.selected, this.source.tree()));
+    }
+    /** The device's Subprojects setting (`subprojectsOn`): what every filtered read and write goes by. */
+    subprojects() {
+      return subprojectsOn(this.source.screen());
     }
     /** Whether `filter` hides `item`'s task from the screen: a subtask goes by its top task. */
     filterHidesRead(item, filter) {
@@ -6294,7 +6318,7 @@ ${key.title}`.toLowerCase();
       const entry = this.rules.named(doc, item.key) ?? doc.find(item.key.section, item.key.index, item.key.path);
       if (node === null || !entry) return false;
       const top = entry.path.length === 0 ? entry : doc.find(entry.section, entry.index, []);
-      return top !== void 0 && !filterTest(node, tree, doc)(top);
+      return top !== void 0 && !filterTest(node, tree, doc, this.subprojects())(top);
     }
     filterOf(node, tree, doc, clearable) {
       const { title, menu, project } = nodeHeader(node, tree, doc);
@@ -6330,7 +6354,7 @@ ${key.title}`.toLowerCase();
       const { doc, today, boundary } = s;
       const tree = projectTreeOf(doc);
       const node = nodeIn(filter, tree);
-      const shows = node === null ? () => true : filterTest(node, tree, doc);
+      const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
       const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
       const shown2 = (entries) => entries.filter(shows).map(item);
       const day = { date, list: shown2(dayList(doc, date, today, boundary)), slotted: shown2(slottedOn(doc, date, boundary)) };
@@ -7274,7 +7298,7 @@ ${key.title}`.toLowerCase();
     }
     createWithId(text, priority, place, repeat, labels = [], project, filter) {
       return {
-        operation: place.kind === "projects" ? this.createInProjects(text, priority, place, repeat, labels, project) : filter !== null && filter !== void 0 && !this.rules.isBlank(text) ? (doc, today, settings, boundary) => this.rules.placeNew(text, priority, shownPlace(doc, place, filter, today), repeat, labels, project)(doc, today, settings, boundary) : this.rules.createInPlace(text, priority, place, repeat, labels, project),
+        operation: place.kind === "projects" ? this.createInProjects(text, priority, place, repeat, labels, project) : filter !== null && filter !== void 0 && !this.rules.isBlank(text) ? (doc, today, settings, boundary) => this.rules.placeNew(text, priority, shownPlace(doc, place, filter, today, this.reads.subprojects()), repeat, labels, project)(doc, today, settings, boundary) : this.rules.createInPlace(text, priority, place, repeat, labels, project),
         answer: (change) => {
           const created = change?.after.insertedSince(change.before);
           return created ? { key: keyOf(created), id: created.id } : null;
@@ -7375,7 +7399,7 @@ ${key.title}`.toLowerCase();
       return nothing((doc, today, settings, boundary) => {
         const tree = projectTreeOf(doc);
         const node = nodeIn(filter, tree);
-        const cards = keys.map((key) => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree) }));
+        const cards = keys.map((key) => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree, this.reads.subprojects()) }));
         const operation = this.rules.dropOnProject(cards, to);
         return operation ? operation(doc, today, settings, boundary) : doc;
       });
@@ -7631,7 +7655,7 @@ ${key.title}`.toLowerCase();
       const node = nodeIn(filter, tree);
       if (node === null) return read;
       const carried = new Set(tasks.map((task) => this.rules.entryOf(s.doc, task.key).id));
-      return { ...read, before: afterShown(s.doc, read.list, read.group, filterTest(node, tree, s.doc), carried) };
+      return { ...read, before: afterShown(s.doc, read.list, read.group, filterTest(node, tree, s.doc, this.reads.subprojects()), carried) };
     }
     /** The dropped tasks where `write` left them. */
     landed(tasks, write) {
@@ -7665,13 +7689,13 @@ ${key.title}`.toLowerCase();
       }
     }
   };
-  function shownPlace(doc, place, filter, today) {
+  function shownPlace(doc, place, filter, today, subprojects) {
     if (place.kind !== "list" && place.kind !== "day" || place.before !== null) return place;
     const tree = projectTreeOf(doc);
     const node = nodeIn(filter, tree);
     if (node === null) return place;
     const list = place.kind === "list" ? place.list : dayColumn(place.date, today).list;
-    return { ...place, before: afterShown(doc, list, place.group, filterTest(node, tree, doc)) };
+    return { ...place, before: afterShown(doc, list, place.group, filterTest(node, tree, doc, subprojects)) };
   }
 
   // core/application/UndoSteps.ts
@@ -8073,6 +8097,7 @@ ${key.title}`.toLowerCase();
     },
     setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode, chosenNode(c.projectsScreen, c.tree()) !== null)),
     setNoteViewMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, noteView: mode }),
+    toggleSubprojects: (c) => c.keepProjectsScreen(toggledSubprojects(c.projectsScreen)),
     dropTasksOnProject: (c, [keys, to, filter]) => {
       const target = to === "none" ? null : projectOfNode(to);
       if (target === null && to !== "none") return null;

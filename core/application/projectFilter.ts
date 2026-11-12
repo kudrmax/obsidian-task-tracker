@@ -12,13 +12,31 @@ export type TaskTest = (entry: TaskEntry) => boolean;
 
 /**
  * The tasks a node lets through, a subtask going with its task: a project its branch's (its own and every subproject's
- * at any depth), All every task with a project, No project every task without one, Done every task of a done project.
+ * at any depth; with `subprojects` off its own alone), All every task with a project, No project every task without one,
+ * Done every task of a done project.
  */
-export function filterTest(node: ProjectsNodeId, tree: ProjectTree, doc: TaskDocument): TaskTest {
+export function filterTest(node: ProjectsNodeId, tree: ProjectTree, doc: TaskDocument, subprojects: boolean): TaskTest {
 	if (node === "all") return (entry) => entry.task.projects.length > 0;
 	if (node === "none") return (entry) => entry.task.projects.length === 0;
-	const names = node === "done" ? doneNames(tree, doc) : branchNames(node, tree);
+	const names = node === "done" ? doneNames(tree, doc) : shownNames(node, tree, subprojects);
 	return (entry) => names.some((name) => namesProject(entry.task.projects, name));
+}
+
+/**
+ * Whether the Subprojects setting means anything under `node`: a project with subprojects. A folder has no tasks of its
+ * own, so it always shows its branch.
+ */
+export function hasSubprojects(node: ProjectsNodeId | null | undefined, tree: ProjectTree): boolean {
+	const name = node === null || node === undefined ? null : projectOfNode(node);
+	const found = name === null ? null : tree.find(name);
+	return found !== null && !found.node.folder && found.node.children.length > 0;
+}
+
+/** The projects a project's node shows: its branch, or with `subprojects` off (a folder aside) itself alone. */
+function shownNames(node: ProjectsNodeId, tree: ProjectTree, subprojects: boolean): readonly string[] {
+	if (subprojects || !hasSubprojects(node, tree)) return branchNames(node, tree);
+	const found = tree.find(projectOfNode(node) ?? "");
+	return found ? [found.node.name] : [];
 }
 
 function branchNames(node: ProjectsNodeId, tree: ProjectTree): readonly string[] {
@@ -50,12 +68,13 @@ export function afterShown(doc: TaskDocument, list: GroupedList, group: GroupNam
 
 /**
  * The project a card of the filtered funnel is shown under, what a drop of it on the tree gives way (`ProjectsDrop.from`):
- * under a project, the first of the task's projects in its branch; else, as under All, its first project; none without one.
+ * under a project, the first of the task's projects it shows (its branch, or itself with `subprojects` off); else, as
+ * under All, its first project; none without one.
  */
-export function shownUnder(entry: TaskEntry, node: ProjectsNodeId | null, tree: ProjectTree): string | null {
+export function shownUnder(entry: TaskEntry, node: ProjectsNodeId | null, tree: ProjectTree, subprojects: boolean): string | null {
 	const projects = entry.task.projects;
 	const name = node === null ? null : projectOfNode(node);
-	const branch = name === null ? [] : branchNames(projectNodeOf(name), tree);
+	const branch = name === null ? [] : shownNames(projectNodeOf(name), tree, subprojects);
 	const own = branch.length > 0 ? projects.find((p) => namesProject(branch, p)) : undefined;
 	const first = own ?? projects[0];
 	return first === undefined ? null : (tree.find(first)?.node.name ?? first);

@@ -438,7 +438,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async funnelView(wide: boolean): Promise<FunnelView> {
-		return { filter: null, view: viewChoice({}, { node: null, closed: false, wide, note: false }), panel: { rows: (await this.projectsScreen()).rows.map((row) => ({ ...row, selected: false })), open: false, reason: null, docked: wide, dimCloses: false, missing: true }, plus: { tap: "newTask", list: "funnel", tree: false }, topRow: wide, searchPaths: false, place: "calendar" };
+		return { filter: null, view: viewChoice({}, { node: null, closed: false, wide, note: false, branches: false }), panel: { rows: (await this.projectsScreen()).rows.map((row) => ({ ...row, selected: false })), open: false, reason: null, docked: wide, dimCloses: false, missing: true }, plus: { tap: "newTask", list: "funnel", tree: false }, topRow: wide, searchPaths: false, place: "calendar" };
 	}
 
 	async projectNoteView(): Promise<null> {
@@ -446,7 +446,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	firstView(wide: boolean, note: boolean): ViewChoice {
-		return firstViewOf({}, wide, note);
+		return firstViewOf({}, wide, note, false);
 	}
 
 	async filterHides(): Promise<boolean> {
@@ -478,6 +478,7 @@ export class DemoTaskService implements TaskService {
 	async setProjectsPanel(): Promise<void> {}
 
 	async setViewMode(): Promise<void> {}
+	async toggleSubprojects(): Promise<void> {}
 
 	async setNoteViewMode(): Promise<void> {}
 
