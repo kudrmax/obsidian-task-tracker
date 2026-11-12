@@ -179,6 +179,9 @@ final class BoardModel {
         didSet { UserDefaults.standard.set(listShare, forKey: "listShare") }
     }
 
+    /// The tab bar shows: it hides while a task is typed, in Select Tasks and under a pushed page, as in every app.
+    var barRests: Bool { !selecting && fullScreen.isEmpty && !entry.isOpen }
+
     /// Where the tab bar's row starts, in the window: a list stacked over the bottom ends above it.
     var barTop: CGFloat = .infinity
 

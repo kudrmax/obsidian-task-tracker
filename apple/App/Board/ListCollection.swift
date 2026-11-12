@@ -556,10 +556,18 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
 
     /// The keyboard's top at `top` on the screen: the part of the list it covers is room to scroll the last rows above it.
     func keyboard(_ top: CGFloat) {
+        cover(top)
+        // A stacked list rises over the keyboard in the same drawing: its place is read again once that is laid out.
+        if host.stacked { DispatchQueue.main.async { [weak self] in self?.cover(KeyboardRise.shared.top) } }
+    }
+
+    private func cover(_ top: CGFloat) {
         guard let window = host.window else { return }
         let frame = host.convert(host.bounds, to: window)
         let covered = min(frame.height, max(0, frame.maxY - max(frame.minY, top)))
-        if collection.contentInset.bottom != covered { collection.contentInset.bottom = covered }
+        guard collection.contentInset.bottom != covered else { return }
+        collection.contentInset.bottom = covered
+        host.edges()
     }
 
     /// A row coming in unfolds from under the row before it, its own view carried down from there with the rows moving

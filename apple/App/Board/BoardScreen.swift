@@ -79,7 +79,7 @@ struct BoardScreen: View {
         }
     }
 
-    private var barShown: Bool { !model.selecting && model.fullScreen.isEmpty && !model.entry.isOpen }
+    private var barShown: Bool { model.barRests }
 
     /// The system tab bar with its search slot, laid out by iOS; the plus stands on that slot, the same size, so it can be
     /// carried while the bar keeps the system's layout. The view button stands left of the tab bar (board `V1PhoneCols`);
@@ -92,7 +92,8 @@ struct BoardScreen: View {
             PlaceTabs(place: model.place, leading: wheel && view != nil ? Self.viewRoom : 0, hidden: !wheel, choose: { model.go(to: $0) }, slot: {
                 plusSlot = $0
                 model.route.floor = $0.minY
-                if model.barTop != $0.minY { model.barTop = $0.minY }
+                // Where the bar rests, never where it passes while it slides away under a field or a page.
+                if model.barRests, model.barTop != $0.minY { model.barTop = $0.minY }
             })
             if let slot = plusSlot {
                 if let view {
