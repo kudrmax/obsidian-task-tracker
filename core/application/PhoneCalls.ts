@@ -24,6 +24,7 @@ import { type EntryList, FUNNEL_PLACES, type FunnelAt, type FunnelPlace, type Fu
 import { ROW_LISTS, VIEW_WORDS, viewContext, viewEntryLists, withMode } from "./viewModes";
 import { layoutShareAt, layoutWidths, viewLayout } from "./viewLayout";
 import { stackedLists, stackedRows } from "./stackedRows";
+import { sameNewPlace } from "./newTaskPlaces";
 import { carriedAt, carryEnded, carryStarted, endsSelection, gestureGone, nameEnded } from "./projectsCarry";
 import { type EntryPart, projectsEntryLook } from "./projectsEntry";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
@@ -889,6 +890,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	endsSelection,
 	stackedRows,
 	stackedLists,
+	sameNewPlace,
 	viewEntryLists,
 	viewContext: (node, mode, note) => viewContext(node ?? null, mode, note === true),
 	viewLayout: (mode, note, titles) => viewLayout(mode, note === true, (list: string) => (titles as Record<string, string | null> | undefined)?.[list] ?? null),

@@ -4165,6 +4165,49 @@ ${key.title}`.toLowerCase();
     return Math.min(end, list.wanted);
   }
 
+  // core/application/taskKeys.ts
+  function keyOf(entry) {
+    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
+  }
+  function samePlace2(a, b) {
+    return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
+  }
+  function sameLine(a, b) {
+    return a.raw === b.raw;
+  }
+  function sameTaskTree(a, b) {
+    return a.section === b.section && a.index === b.index;
+  }
+  function keyId(key) {
+    return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
+  }
+  function isUnder(a, b) {
+    return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
+  }
+
+  // core/application/newTaskPlaces.ts
+  function sameKey(a, b) {
+    return a === null || b === null ? a === b : keyId(a) === keyId(b);
+  }
+  function samePlacement2(a, b) {
+    if (a === void 0 || b === void 0) return a === b;
+    return a.kind === b.kind && (a.kind !== "date" || b.kind === "date" && a.date === b.date);
+  }
+  function sameNewPlace(a, b) {
+    switch (a.kind) {
+      case "list":
+        return b.kind === "list" && a.list === b.list && a.group === b.group && a.date === b.date && sameKey(a.before, b.before);
+      case "day":
+        return b.kind === "day" && a.date === b.date && a.group === b.group && sameKey(a.before, b.before);
+      case "subtask":
+        return b.kind === "subtask" && sameKey(a.parent, b.parent) && sameKey(a.before, b.before);
+      case "slot":
+        return b.kind === "slot" && sameSlot(a.slot, b.slot);
+      case "projects":
+        return b.kind === "projects" && a.group === b.group && a.node === b.node && sameKey(a.before, b.before) && samePlacement2(a.placement, b.placement);
+    }
+  }
+
   // core/application/projectsCarry.ts
   function panelReason(state) {
     if (state.panelOpen === true) return "button";
@@ -4244,26 +4287,6 @@ ${key.title}`.toLowerCase();
     if (state.naming !== true) return state;
     const { naming: _gone, ...rest } = state;
     return rest;
-  }
-
-  // core/application/taskKeys.ts
-  function keyOf(entry) {
-    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
-  }
-  function samePlace2(a, b) {
-    return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
-  }
-  function sameLine(a, b) {
-    return a.raw === b.raw;
-  }
-  function sameTaskTree(a, b) {
-    return a.section === b.section && a.index === b.index;
-  }
-  function keyId(key) {
-    return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
-  }
-  function isUnder(a, b) {
-    return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
   }
 
   // core/application/marks.ts
@@ -4854,7 +4877,9 @@ ${key.title}`.toLowerCase();
     openAt(column, place) {
       this.open(this.spotIn(column, place));
     }
-    spotIn(column, place) {
+    spotIn(column, asked) {
+      const end = asked.kind === "task" && asked.before === null ? this.parts(column).find((part2) => part2.group === asked.group)?.end : null;
+      const place = end ? { ...asked, before: end } : asked;
       const gap = gapOfPlace(this.look.cards(column), place);
       return { kind: "list", column, place: place.kind === "task" ? { ...gap, level: 0 } : gap };
     }
@@ -5775,12 +5800,20 @@ ${key.title}`.toLowerCase();
     return {
       cards,
       sections: view.sections.map((section) => section.group),
-      parts: view.sections.map((section, i) => ({ group: section.group, newTask: section.newTask, plus: i === plusPart }))
+      parts: view.sections.map((section, i) => ({ group: section.group, newTask: section.newTask, plus: i === plusPart, end: endOf(section) }))
     };
   }
   function sameNewTask(a, b) {
     const project = a.project === null || b.project === null ? a.project === b.project : projectKey(a.project) === projectKey(b.project);
-    return project && JSON.stringify(a.place) === JSON.stringify(b.place);
+    return project && sameNewPlace(a.place, b.place);
+  }
+  var STAGE_RANK = { inbox: 0, backlog: 1, soon: 2, date: 2, today: 3, done: 4 };
+  var LIST_RANK = { inbox: 0, backlog: 1, soon: 2, now: 3 };
+  function endOf(section) {
+    const place = section.newTask?.place;
+    if (!place || place.kind !== "list") return null;
+    const rank = place.date !== void 0 ? STAGE_RANK.soon : LIST_RANK[place.list];
+    return section.cards.find((card) => card.stage !== null && STAGE_RANK[card.stage.kind] > rank)?.item.key ?? null;
   }
   function placementOfNewTask(newTask2) {
     const place = newTask2?.place;
@@ -6761,7 +6794,7 @@ ${key.title}`.toLowerCase();
     if (change.kind === "nest") return { ...change, parent: fresh(change.parent), before: fresh(change.before) };
     return change;
   }
-  function sameKey(a, b) {
+  function sameKey2(a, b) {
     return samePlace2(a, b) && sameLine(a, b);
   }
   function columnOfPlace(place, today) {
@@ -7198,7 +7231,7 @@ ${key.title}`.toLowerCase();
         const now = steps.map((step) => ({ key: fresh(step.key), change: freshChange(step.change, fresh) }));
         const named = [];
         const tagOf = (key) => {
-          const at = named.findIndex((k) => sameKey(k, key));
+          const at = named.findIndex((k) => sameKey2(k, key));
           return at >= 0 ? at : named.push(key) - 1;
         };
         const lineOf = (key) => doc.lineOf(this.entryOf(doc, key));
@@ -8581,6 +8614,7 @@ ${key.title}`.toLowerCase();
     endsSelection,
     stackedRows,
     stackedLists,
+    sameNewPlace,
     viewEntryLists,
     viewContext: (node, mode, note) => viewContext(node ?? null, mode, note === true),
     viewLayout: (mode, note, titles) => viewLayout(mode, note === true, (list) => titles?.[list] ?? null),

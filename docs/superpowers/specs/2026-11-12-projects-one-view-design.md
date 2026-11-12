@@ -162,6 +162,8 @@ Backend, QA (2026-11-12):
 
 72. A carry let go in a list (`drop`, `landing`, `dropPreview`) under a filter it opened on its way (a held card over a row, `carryAt`) lands there with that project, in one write and one undo: the move, then each task gives the project it was shown by under the lift's filter (`shownUnder`; lifted with no filter or under No project the opened project is added) to the opened one, as `dropOnProject`; opened No project takes it off; opened Done, or the lift's own filter, changes no project. The core reads the carry from the device's state (`ProjectsScreenState.carry`), so no call changes: the frontend keeps calling `drop` before `endCarry("dropped")`. `dropInProjects` already gave a card the part's project (tested).
 73. No project's row is grey only while no open task without a project stands in the funnel, as a project is grey with no open task; Done is always grey, All never.
+81. Places for a new task are matched field by field, one function (`sameNewPlace`, `rules.sameNewPlace`), never by their JSON text: `projectsEntryLook` matches a part's write with it, and a frontend that matches places calls it instead of sorting keys.
+82. By project, a field opened at a part's end (the plus, a plate, the plus let go at the part's end gap) stands where the card it writes will land: before the part's first card of a later stage than its new task's (`EntryPart.end`, null: the part's end); the core's entry places it there (`spotIn`). The card keeps its stage order (the part's order); the field moves to it rather than the card to the field.
 
 ## Contract
 
