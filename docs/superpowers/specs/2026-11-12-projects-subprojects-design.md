@@ -28,6 +28,7 @@ The rule «which tasks a node shows» takes the setting; the device state keeps 
 - backend: off also governs the writes that read the filtered screen: a drop or a typed task at a section's end goes after the last task the screen shows, and a card dropped on a tree row gives way the chosen project itself (not the first subproject it also has).
 - backend: the note's block shows the row as the main screen does (its project with subprojects); it toggles the same device setting. `firstView(wide, true)` (before the note's project is known) has no row; the first `projectNoteView` brings it.
 - backend: the row's words come from the core (`SUBPROJECTS_WORD`, «Subprojects»); the frontends draw `ViewChoice.subprojects.label`.
+- frontend-swift: the row is text alone, no symbol: the boards draw none, the core gives no icon, and By project's symbol would repeat. Its check is the system menu's, the same as the modes' check beside it.
 
 ## Contract
 

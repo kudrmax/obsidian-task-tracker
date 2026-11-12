@@ -145,7 +145,8 @@ struct ProjectsAsks: ViewModifier {
 }
 
 /// The view button (board `V1PhoneCols`): a glass circle with the current mode's symbol; a tap opens the modes as the
-/// system's menu, a check at the current one. The core gives the modes, their words and icons.
+/// system's menu, a check at the current one, and under them the Subprojects row while the core offers it. The core gives
+/// the modes, their words and icons.
 struct ViewButton: View {
     let view: ViewChoice
     @Bindable var model: BoardModel
@@ -157,6 +158,13 @@ struct ViewButton: View {
             ForEach(view.modes, id: \.mode) { option in
                 Toggle(isOn: Binding(get: { option.checked }, set: { _ in Task { await model.setViewMode(option.mode) } })) {
                     Label(option.label, systemImage: Self.symbol(option.icon))
+                }
+            }
+            if let subprojects = view.subprojects {
+                Section {
+                    Toggle(isOn: Binding(get: { subprojects.checked }, set: { _ in Task { await model.toggleSubprojects() } })) {
+                        Text(verbatim: subprojects.label)
+                    }
                 }
             }
         } label: {
