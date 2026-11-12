@@ -53,6 +53,7 @@ import type { LayoutDrop, LayoutMotion, ModeLayout } from "./layouts/ModeLayout"
 import { mountLayout } from "./layouts/mountLayout";
 import { clear, el } from "./dom";
 import { Button } from "./kit/Button";
+import { Picks } from "./kit/Panel";
 import { Keyboard } from "./Keyboard";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
@@ -893,8 +894,13 @@ export class CalendarScreen extends Component {
 	/** Runs a change of the tasks, then reads them anew; a change that answers false wrote nothing and needs no reading. */
 	private async act(change: () => Promise<void | boolean>): Promise<void> {
 		/** One change after another, in the order they were asked: a read after the second never sees the file before the first. */
-		const run = this.changing.then(change);
-		this.changing = run.catch(() => undefined);
+		/** A change asked for while a menu's pick is still to run (its window closing) waits for it: a pick of another project never reads before a Delete picked just before. */
+		const gate = Picks.running ? Promise.resolve() : Picks.settled();
+		const run = gate.then(() => {
+			const queued = this.changing.then(change);
+			this.changing = queued.catch(() => undefined);
+			return queued;
+		});
 		try {
 			if ((await run) === false) return;
 		} catch (error) {

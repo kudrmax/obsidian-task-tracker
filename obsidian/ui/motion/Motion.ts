@@ -183,6 +183,14 @@ export const Motion = {
 		else SETTLES.set(box, { dy, until: performance.now() + ms });
 	},
 
+	/** A row standing in for another of its height (a list's plate) grows only the room under it (a field's bar room), if it keeps any. */
+	growRoomUnder(row: HTMLElement): void {
+		const timing = timingOf(row);
+		const room = getComputedStyle(row).marginBottom;
+		if (!timing || !(parseFloat(room) > 0)) return;
+		row.animate([{ marginBottom: "0px" }, { marginBottom: room }], timing);
+	},
+
 	/** Something floating comes in where it stands: it fades in. */
 	appear(node: HTMLElement, duration: DurationToken = DURATION.collapse): void {
 		const timing = timingOf(node, duration);

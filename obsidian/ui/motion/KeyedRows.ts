@@ -144,6 +144,11 @@ export class RowsDrawing {
 		return this.take(key, make);
 	}
 
+	/** The first row taken in this drawing, if any. */
+	first(): HTMLElement | null {
+		return this.order[0] ?? null;
+	}
+
 	/** A new row that stands in for one of the same height in the same frame (a renamed card's field): it does not grow in. */
 	standIn(node: HTMLElement): void {
 		this.fresh.delete(node);

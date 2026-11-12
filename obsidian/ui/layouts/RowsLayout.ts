@@ -62,7 +62,9 @@ export class RowsLayout extends StillLayout {
 			const area = el(row, "div", "tc-row-body");
 			const funnel = funnelList(host.lists, column, { area });
 			funnel.list.el.classList.add("tc-row-list");
+			/** The room opens inside a list's own scroll; in a note's block the lists don't scroll, so none opens and no row moves. */
 			funnel.drop.onHover = (over) => {
+				if (!this.scrolls) return;
 				funnel.list.el.classList.toggle("is-drop-room", over);
 				if (!over) this.fit();
 			};
