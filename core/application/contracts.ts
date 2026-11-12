@@ -1367,7 +1367,10 @@ export interface TaskService {
 	endProjectName(): Promise<void>;
 	/** The funnel's place the screen now stands at, kept on the device; anything a host kept before reads as `funnelPlaceOf` says. */
 	setFunnelPlace(place: unknown): Promise<void>;
-	/** The place the screen opens at before the first read: the device's (`funnelPlaceOf`). */
+	/**
+	 * The place the screen opens at before the first read: the device's (`funnelPlaceOf`). It and the main screen's
+	 * `firstView` (and a service made anew) drop a carry or a name left by a screen gone mid-gesture, as let go nowhere.
+	 */
 	firstPlace(): FunnelPlaceOf;
 	/** The cross beside the filter's title: no node chosen, every task shows. Kept on the device. */
 	clearProjectFilter(): Promise<void>;

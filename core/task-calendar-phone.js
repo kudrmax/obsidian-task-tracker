@@ -4108,6 +4108,12 @@ ${key.title}`.toLowerCase();
     next = selected(next, tree, doc, carry.under);
     return next;
   }
+  function gestureGone(state) {
+    if (state.carry === void 0 && state.naming === void 0) return state;
+    const { carry, naming: _naming, selected: now, ...rest } = state;
+    const under = carry ? carry.under : now ?? null;
+    return under === null ? rest : { ...rest, selected: under };
+  }
   function nameEnded(state) {
     if (state.naming !== true) return state;
     const { naming: _gone, ...rest } = state;
@@ -8045,7 +8051,10 @@ ${key.title}`.toLowerCase();
     funnelView: (c, [wide]) => c.ask(c.reads.funnelViewRead(wide === true)),
     projectNoteView: (c, [path, wide]) => c.ask(c.reads.projectNoteViewRead(path, wide === true)),
     pickProjectNode: (c, [node, wide]) => c.keepProjectsScreen(picked(c.projectsScreen, c.tree(), node, wide === true)),
-    firstView: (c, [wide, note]) => c.reads.firstView(wide === true, note === true),
+    firstView: (c, [wide, note]) => {
+      if (note !== true) c.keepProjectsScreen(gestureGone(c.projectsScreen));
+      return c.reads.firstView(wide === true, note === true);
+    },
     filterHides: (c, [item, filter]) => c.ask(c.reads.filterHidesRead(item, filter ?? null)),
     startCarry: (c, [start, wide]) => c.keepProjectsScreen(carryStarted(c.projectsScreen, start, wide === true, c.tree())),
     carryAt: (c, [at, nowMs]) => {
@@ -8070,7 +8079,10 @@ ${key.title}`.toLowerCase();
       const at = funnelPlaceOf(place);
       if (c.projectsScreen.place !== at) c.keepProjectsScreen({ ...c.projectsScreen, place: at });
     },
-    firstPlace: (c) => funnelPlaceOf(c.projectsScreen.place),
+    firstPlace: (c) => {
+      c.keepProjectsScreen(gestureGone(c.projectsScreen));
+      return funnelPlaceOf(c.projectsScreen.place);
+    },
     clearProjectFilter: (c) => c.keepProjectsScreen(cleared(c.projectsScreen)),
     setProjectsPanel: (c, [open]) => {
       if (c.projectsScreen.panelOpen === true !== (open === true)) c.keepProjectsScreen({ ...c.projectsScreen, panelOpen: open === true });

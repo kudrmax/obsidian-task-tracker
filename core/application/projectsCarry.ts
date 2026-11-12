@@ -91,6 +91,17 @@ export function carryEnded(state: ProjectsScreenState, how: CarryEnd, tree: Proj
 	return next;
 }
 
+/**
+ * The state as a screen loads it: a carry or a name being typed left in it (the app killed mid-gesture) is gone, as a
+ * carry let go nowhere: its panel goes and the filter it was lifted under is back. A gesture never outlives the screen.
+ */
+export function gestureGone(state: ProjectsScreenState): ProjectsScreenState {
+	if (state.carry === undefined && state.naming === undefined) return state;
+	const { carry, naming: _naming, selected: now, ...rest } = state;
+	const under = carry ? carry.under : (now ?? null);
+	return under === null ? rest : { ...rest, selected: under };
+}
+
 /** The new project's name typed or given up: the panel it held out goes. */
 export function nameEnded(state: ProjectsScreenState): ProjectsScreenState {
 	if (state.naming !== true) return state;
