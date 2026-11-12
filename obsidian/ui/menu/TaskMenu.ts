@@ -345,11 +345,11 @@ export class TaskMenu extends LiftedMenu {
 		});
 	}
 
-	/** A menu split over and under the card leaves no side to the description, which then stays away. */
+	/** The description by the menu: on the side of the card it leaves free, or beside a menu split over and under it. */
 	private place(keepAbove?: number): void {
 		this.placeBy(this.panel, this.anchor, this.upper, keepAbove);
 		if (this.upper.hidden) this.peek?.place(this.anchor, this.panel);
-		else this.peek?.hide();
+		else this.peek?.placeBeside(this.anchor, this.upper);
 	}
 
 	private showMenu(keepAbove?: number): void {
