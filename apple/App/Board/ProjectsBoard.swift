@@ -128,12 +128,6 @@ final class ProjectsBoard {
         if askedKey == key { askedKey = nil }
     }
 
-    /// The By project list read again over the files as they are now, whatever the file was when it was asked.
-    func read() async {
-        guard let model, let snapshot = model.snapshot, case .projects(let node) = snapshot.presentation.source else { return }
-        await read(ReadKey(node: node, file: snapshot.tasksText, context: snapshot.funnel.view.context))
-    }
-
     private func read(_ key: ReadKey) async {
         asks += 1
         let ask = asks

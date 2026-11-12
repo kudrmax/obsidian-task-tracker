@@ -171,7 +171,7 @@ final class BoardModel {
     /// The projects' panel shows, for whatever reason the core gives (the button, a carry, a new project's name).
     var panelShown: Bool { presentation?.panelShown == true }
     /// The screen is the ribbon the tab bar walks.
-    var ribbon: Bool { presentation?.isRibbon ?? (firstView?.mode == .twoColumns) }
+    var ribbon: Bool { presentation?.isRibbon ?? firstView?.ribbon ?? true }
 
     /// The share of the screen the list beside the calendar takes, kept on the device: the ribbon's at Today and the
     /// Rows and By project views' alike, one divider's.

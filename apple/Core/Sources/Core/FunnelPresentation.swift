@@ -82,19 +82,6 @@ public struct FunnelPresentation: Equatable, Sendable {
         case funnel, projects
     }
 
-    /// Why the panel shows.
-    public enum PanelReason: Equatable, Sendable {
-        case button, carry, naming
-    }
-
-    /// How a drawing follows the one on the screen.
-    public enum Drawing: Equatable, Sendable {
-        /// The same filter and mode: what moved, moves.
-        case same
-        /// Another filter or mode: drawn still, in place.
-        case another
-    }
-
     public let mode: ViewMode
     public let chosen: ViewMode
     public let body: Body
@@ -108,7 +95,6 @@ public struct FunnelPresentation: Equatable, Sendable {
     public let plusTap: PlusTap
     public let plusList: PlusList?
     public let panelShown: Bool
-    public let panelReason: PanelReason?
     /// The filter and the mode the view is read in.
     public let context: String
 
@@ -145,18 +131,6 @@ public struct FunnelPresentation: Equatable, Sendable {
         default: plusList = nil
         }
         panelShown = view.panel?.open == true
-        switch view.panel?.reason {
-        case "button": panelReason = .button
-        case "carry": panelReason = .carry
-        case "naming": panelReason = .naming
-        default: panelReason = nil
-        }
-    }
-
-    /// How this presentation is drawn over `old`, the one on the screen: in another context still, else moving.
-    public func drawing(after old: FunnelPresentation?) -> Drawing {
-        guard let old else { return .another }
-        return old.context == context ? .same : .another
     }
 
     /// The ribbon is the screen: it swipes, the quick entry turns it to a list's place, Done stands left of Inbox.

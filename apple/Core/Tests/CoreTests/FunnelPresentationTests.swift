@@ -41,19 +41,18 @@ import Testing
         try board.pickProjectNode("project:Окружение")
         let picked = try presentation(board)
         #expect(picked.mode == .rows && picked.chosen == .rows)
-        #expect(picked.drawing(after: plain) == .another)
-        #expect(picked.drawing(after: picked) == .same)
+        #expect(picked.context != plain.context)
         try board.setProjectsPanel(true)
         let panel = try presentation(board)
-        #expect(panel.panelShown && panel.panelReason == .button)
+        #expect(panel.panelShown)
         // The panel opened is the same context: nothing is drawn still for it.
-        #expect(panel.drawing(after: picked) == .same)
+        #expect(panel.context == picked.context)
         try board.setProjectsPanel(false)
         try board.setViewMode(.byProject)
         let byProject = try presentation(board)
         #expect(byProject.source == .projects(node: "project:Окружение"))
         #expect(byProject.plusTap == .inPlace && byProject.plusList == .projects)
-        #expect(byProject.drawing(after: panel) == .another)
+        #expect(byProject.context != panel.context)
         try board.pickProjectNode("all")
         #expect(try board.funnelView().filter == nil)
         #expect(try presentation(board).chosen == .byProject)
@@ -70,6 +69,18 @@ import Testing
         let swapped = before.with(funnel: try board.funnelView())
         #expect(swapped.lists == before.lists && swapped.funnel.view.mode == .rows)
         #expect(swapped.motion(from: before) == .context)
+    }
+
+    /// A pick closes the panel at once; its filter is drawn with the lists read for it, never over the old ones.
+    @Test func aPicksPanelGoesBeforeItsFilter() throws {
+        let board = board()
+        try board.setProjectsPanel(true)
+        let open = try board.funnelView()
+        try board.pickProjectNode("project:Окружение")
+        let picked = try board.funnelView()
+        let closing = open.with(panelOf: picked)
+        #expect(closing.panel?.open == false && closing.filter == nil)
+        #expect(closing.view.context == open.view.context)
     }
 
     @Test func aListIsMeasuredFromItsRows() {
