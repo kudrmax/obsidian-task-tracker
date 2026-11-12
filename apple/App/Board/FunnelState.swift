@@ -43,6 +43,12 @@ final class FunnelState {
         await call { try $0.setViewMode(mode) }
     }
 
+    /// The view button's Subprojects row: the chosen project's subprojects' tasks shown or hidden, the mode and the filter
+    /// kept; the lists read again for it.
+    func toggleSubprojects() async {
+        await call { try $0.toggleSubprojects() }
+    }
+
     /// The view read again after the core changed it by itself (a carry's pause brought the panel out or opened a row):
     /// drawn over the lists as they are, the lists read only where the filter changed.
     func refresh() async {

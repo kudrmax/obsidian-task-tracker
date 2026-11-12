@@ -45,8 +45,8 @@ import type { Clock, SettingsStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
 import type { DropTo, FunnelView, ProjectFilter, ProjectNote, ProjectRef, ProjectsNodeId, ProjectsScreenState, ProjectsView } from "./contracts";
 import { ProjectTree } from "../domain/ProjectTree";
-import { chosenNode, filterNode, nodeHeader, panelRows, PROJECTS_WORDS, projectNodeOf, projectOfNode, projectsView } from "./projectsScreen";
-import { filterTest, noteProject } from "./projectFilter";
+import { chosenNode, filterNode, nodeHeader, panelRows, PROJECTS_WORDS, projectNodeOf, projectOfNode, projectsView, subprojectsOn } from "./projectsScreen";
+import { filterTest, hasSubprojects, noteProject } from "./projectFilter";
 import { firstViewOf, viewChoice } from "./viewModes";
 import { panelReason } from "./projectsCarry";
 import { funnelPlaceOf } from "./screenPlaces";
@@ -165,7 +165,7 @@ export class TaskReads {
 		const node = chosenNode(state, tree);
 		const filter = node === null ? null : this.filterOf(node, tree, s?.doc ?? null, true);
 		const closed = node !== null && nodeHeader(node, tree, s?.doc ?? null).closed;
-		const view = viewChoice(state, { node, closed, wide, note: false, title: this.columnTitle });
+		const view = viewChoice(state, { node, closed, wide, note: false, title: this.columnTitle, branches: hasSubprojects(node, tree, s?.doc ?? null) });
 		const reason = panelReason(state);
 		return {
 			filter,
@@ -189,13 +189,19 @@ export class TaskReads {
 		if (name === null) return null;
 		const node = projectNodeOf(name);
 		const closed = nodeHeader(node, tree, s.doc).closed;
-		const view = viewChoice(this.source.screen(), { node, closed, wide, note: true, title: this.columnTitle });
+		const view = viewChoice(this.source.screen(), { node, closed, wide, note: true, title: this.columnTitle, branches: hasSubprojects(node, tree, s.doc) });
 		return { filter: this.filterOf(node, tree, s.doc, false), view, panel: null, plus: plusOf(view.mode, false), topRow: false, searchPaths: true, place: funnelPlaceOf(this.source.screen().place) };
 	}
 
 	/** The view before the first read: the device's state alone (`firstViewOf`). */
 	firstView(wide: boolean, note: boolean): ViewChoice {
-		return firstViewOf(this.source.screen(), wide, note, this.columnTitle);
+		const state = this.source.screen();
+		return firstViewOf(state, wide, note, this.columnTitle, hasSubprojects(state.selected, this.source.tree(), null));
+	}
+
+	/** The device's Subprojects setting (`subprojectsOn`): what every filtered read and write goes by. */
+	subprojects(): boolean {
+		return subprojectsOn(this.source.screen());
 	}
 
 	/** Whether `filter` hides `item`'s task from the screen: a subtask goes by its top task. */
@@ -209,7 +215,7 @@ export class TaskReads {
 		const entry = this.rules.named(doc, item.key) ?? doc.find(item.key.section, item.key.index, item.key.path);
 		if (node === null || !entry) return false;
 		const top = entry.path.length === 0 ? entry : doc.find(entry.section, entry.index, []);
-		return top !== undefined && !filterTest(node, tree, doc)(top);
+		return top !== undefined && !filterTest(node, tree, doc, this.subprojects())(top);
 	}
 
 	private filterOf(node: ProjectsNodeId, tree: ProjectTree, doc: TaskDocument | null, clearable: boolean): ProjectFilter {
@@ -254,7 +260,7 @@ export class TaskReads {
 		const { doc, today, boundary } = s;
 		const tree = projectTreeOf(doc);
 		const node = filterNode(filter, tree);
-		const shows = node === null ? () => true : filterTest(node, tree, doc);
+		const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
 		const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
 		const shown = (entries: readonly TaskEntry[]) => entries.filter(shows).map(item);
 		const day = { date, list: shown(dayList(doc, date, today, boundary)), slotted: shown(slottedOn(doc, date, boundary)) };

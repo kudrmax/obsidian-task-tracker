@@ -25,6 +25,13 @@ public struct ViewModeOption: Decodable, Hashable, Sendable {
     public let checked: Bool
 }
 
+/// `SubprojectsOption`: the view button's own row under the modes, shown while the chosen node is a project with
+/// subprojects; checked, the project shows its whole branch.
+public struct SubprojectsOption: Decodable, Hashable, Sendable {
+    public let label: String
+    public let checked: Bool
+}
+
 /// `ViewChoice`: the view a screen draws and the button that changes it.
 public struct ViewChoice: Decodable, Hashable, Sendable {
     /// What is drawn: the chosen mode, but By project under Done and a done project.
@@ -50,6 +57,8 @@ public struct ViewChoice: Decodable, Hashable, Sendable {
     public let layout: ViewLayout
     /// The filter and the mode the view is read in: a read in another context is drawn still.
     public let context: String
+    /// The Subprojects row; nil where the menu has none.
+    public let subprojects: SubprojectsOption?
 
     /// The plate list `column` draws while it shows no card; nil for none.
     public func plate(_ column: String) -> String? { plates[column] ?? nil }
@@ -208,6 +217,11 @@ extension TaskBoard {
     /// A mode of the view button's menu: the screen's one mode, whatever the filter.
     public func setViewMode(_ mode: ViewMode) throws {
         _ = try screenCall("tasks.setViewMode", [.string(mode.rawValue)], over: try files())
+    }
+
+    /// The view button's Subprojects row tapped: the chosen project's subprojects' tasks shown or hidden on this device.
+    public func toggleSubprojects() throws {
+        _ = try screenCall("tasks.toggleSubprojects", [], over: try files())
     }
 
     /// The funnel's tasks `keys` let go on a row of the panel, the screen under `filter`: the project each is shown by

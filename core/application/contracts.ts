@@ -751,6 +751,8 @@ export interface ProjectsScreenState {
 	readonly view?: ViewMode;
 	/** The view mode last picked in a project note's block (`setNoteViewMode`). */
 	readonly noteView?: ViewMode;
+	/** A chosen project shows its subprojects' tasks too (`toggleSubprojects`); left out: on. The screen, a note's block and by project alike. */
+	readonly subprojects?: boolean;
 	/** The carry to a project under way (`startCarry`): what the core keeps between the finger's reports. */
 	readonly carry?: CarryState;
 	/** A new project's name is typed in the panel (`endCarry("naming")` until `endProjectName`): the panel stays out. */
@@ -1041,6 +1043,17 @@ export interface ViewChoice {
 	 * another context, drawn still in place; the same context changed animates what moved.
 	 */
 	readonly context: string;
+	/**
+	 * The menu's Subprojects row, its own group under the modes, the check in the accent when on: shown while the chosen
+	 * node is a project with subprojects as the panel draws its branch (a live project's not done; never a folder), null otherwise. A tap writes `toggleSubprojects`.
+	 */
+	readonly subprojects: SubprojectsOption | null;
+}
+
+/** The view menu's Subprojects row: its words and its check (on: the chosen project's whole branch shows; off: its own tasks alone). */
+export interface SubprojectsOption {
+	readonly label: string;
+	readonly checked: boolean;
 }
 
 /** The node the funnel is filtered by, and what is drawn over its tasks. */
@@ -1411,6 +1424,12 @@ export interface TaskService {
 	setViewMode(mode: ViewMode): Promise<void>;
 	/** A mode of a note's block's view button: kept for every note's block. Kept on the device. */
 	setNoteViewMode(mode: ViewMode): Promise<void>;
+	/**
+	 * The view menu's Subprojects row (`ViewChoice.subprojects`): on, a chosen project shows its whole branch; off, only the
+	 * tasks whose own projects include it, in every list, the timeline, rows, by project, a note's block and `filterHides`.
+	 * One setting of the device for every view, never synced; it changes no mode and no filter, and none changes it.
+	 */
+	toggleSubprojects(): Promise<void>;
 	/**
 	 * Cards of the funnel's lists or its timeline dropped on a row of the panel (`ProjectsRow.acceptsTask`), the screen under
 	 * `filter`: as `dropOnProject`, each card shown under the project the filter shows it by (`shownUnder`: under a project

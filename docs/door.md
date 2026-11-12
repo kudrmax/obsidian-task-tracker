@@ -438,8 +438,8 @@ adds to the calls above; the old ones answer as before.
   at a time to the list it lets show one more; none under its first card and the fade (or its plate). Example:
   `rules.stackedLists([{ wanted: 380, stops: [90, 160, 230, 300, 370] }, { wanted: 90, stops: [] }], 300, 20)` → `[180,
   90]`. `rules.stackedRows` still answers.
-- `ViewChoice.context` (also `rules.viewContext(node, mode, note)`): the filter and the mode a view is read in, a string
-  to compare: a read whose context differs from the one drawn is drawn still in place; the same context changed animates.
+- `ViewChoice.context` (also `rules.viewContext(node, mode, note, subprojects)`): the filter and the mode a view is read
+  in, and the Subprojects check where it is off (`subprojects` false; left out or true: on), a string to compare: a read whose context differs from the one drawn is drawn still in place; the same context changed animates.
   A note's block's context is its mode alone. Example: `rules.viewContext("project:Стиль", "rows", false)` →
   `'["screen","project:Стиль","rows"]'`.
 - A carry let go in a list under the filter it opened on its way (`carryAt` over a row): `tasks.drop`, `tasks.landing`
@@ -459,6 +459,21 @@ adds to the calls above; the old ones answer as before.
   parts carry it, so hand the parts in as the rule gives them.
 - No rule gives a list a card's room more while a card or the plus is carried or a task typed: rows never reflow during
   a carry; the room to drop in is the hovered list's, drawn by the frontend.
+
+#### Subprojects in the filter (2026-11-12)
+
+- `ViewChoice.subprojects` → `{ label: "Subprojects", checked }` or `null`: the view menu's row, its own group under the
+  modes, the accent check when `checked`. Present only while the chosen node (a note's block: its project) is a project
+  with subprojects as the panel draws its branch (an active project's done ones don't count), never a folder; `null` elsewhere and in `tasks.firstView(wide, true)`. Example:
+  `tasks.funnelView(false).view.subprojects` → `{ label: "Subprojects", checked: true }` under «Люди».
+- `tasks.toggleSubprojects()`: a tap on the row; answers like `setViewMode`. Off, a chosen project shows only the tasks
+  whose own projects include it: `tasks.screen`, `dayView`, `projectsScreen` (its own part alone), `projectNoteView`'s
+  lists, `filterHides`, and where a drop or a typed task goes at a section's end and which project a card dropped on a
+  row gives way (`dropTasksOnProject`) all follow it. One device setting (`ProjectsScreenState.subprojects`, `false`
+  when off, left out on), never synced; it changes no mode or filter and none changes it.
+- The check off is another context: `ViewChoice.context` gains `"own"` (`rules.viewContext("project:Люди", "rows",
+  false, false)` → `'["screen","project:Люди","rows","own"]'`), so the screen is drawn still in place, as for another filter.
+  The row and its setting hold in every mode, By project too.
 
 #### A folded task's next step
 

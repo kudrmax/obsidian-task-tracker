@@ -205,7 +205,8 @@ final class BoardModel {
     /// are, still where the context changed; a filter changed reads the lists for it, drawn still in turn.
     func adopt(_ view: FunnelView) async {
         guard let shown = snapshot else { return await reload() }
-        let sameFilter = shown.filter == view.filter?.node
+        // The Subprojects check turned over shows other tasks under the same filter: read as another filter is.
+        let sameFilter = shown.filter == view.filter?.node && shown.funnel.view.subprojects?.checked == view.view.subprojects?.checked
         viewEpoch += 1
         // Another filter: the panel goes at once; its title comes with the lists read for it, never over the old ones.
         let next = shown.with(funnel: sameFilter ? view : shown.funnel.with(panelOf: view))

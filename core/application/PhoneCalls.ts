@@ -21,7 +21,7 @@ import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
 import { type EntryList, FUNNEL_PLACES, type FunnelAt, type FunnelPlace, type FunnelSpot, funnelPlaceOf, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
-import { ROW_LISTS, VIEW_WORDS, viewContext, viewEntryLists, withMode } from "./viewModes";
+import { ROW_LISTS, VIEW_WORDS, toggledSubprojects, viewContext, viewEntryLists, withMode } from "./viewModes";
 import { layoutShareAt, layoutWidths, viewLayout } from "./viewLayout";
 import { stackedLists, stackedRows } from "./stackedRows";
 import { sameNewPlace } from "./newTaskPlaces";
@@ -465,6 +465,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	},
 	setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode as ViewMode)),
 	setNoteViewMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, noteView: mode as ViewMode }),
+	toggleSubprojects: (c) => c.keepProjectsScreen(toggledSubprojects(c.projectsScreen)),
 	dropTasksOnProject: (c, [keys, to, filter]) => {
 		const target = to === "none" ? null : projectOfNode(to as string);
 		if (target === null && to !== "none") return null;
@@ -893,7 +894,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	stackedLists,
 	sameNewPlace,
 	viewEntryLists,
-	viewContext: (node, mode, note) => viewContext(node ?? null, mode, note === true),
+	viewContext: (node, mode, note, subprojects) => viewContext(node ?? null, mode, note === true, subprojects !== false),
 	viewLayout: (mode, note, titles) => viewLayout(mode, note === true, (list: string) => (titles as Record<string, string | null> | undefined)?.[list] ?? null),
 	layoutWidths,
 	layoutShareAt,

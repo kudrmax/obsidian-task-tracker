@@ -381,7 +381,11 @@ export class CalendarScreen extends Component {
 			host: root,
 		});
 		this.switcher = switcher;
-		this.viewButton = new ViewButton(root, (mode) => void this.pickView(mode));
+		this.viewButton = new ViewButton(
+			root,
+			(mode) => void this.pickView(mode),
+			() => void this.toggleSubprojects(),
+		);
 		this.buildPanel(root);
 		const chrome = new ObsidianChrome(root.ownerDocument);
 		this.quick = new QuickEntryController({
@@ -1520,6 +1524,11 @@ export class CalendarScreen extends Component {
 	/** A mode picked in the view button's menu: kept for this view (a note's block keeps its own). */
 	private async pickView(mode: ViewMode): Promise<void> {
 		await this.afterEntry(() => this.act(() => (this.where.note ? this.deps.tasks.setNoteViewMode(mode) : this.deps.tasks.setViewMode(mode))));
+	}
+
+	/** The view menu's Subprojects row tapped: one device setting, the same for the screen and a note's block. */
+	private async toggleSubprojects(): Promise<void> {
+		await this.afterEntry(() => this.act(() => this.deps.tasks.toggleSubprojects()));
 	}
 
 	/** The day's name, as the header over the day's list says it: the one a swipe has drawn nearer while it does. */
