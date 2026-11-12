@@ -3413,6 +3413,20 @@ ${key.title}`.toLowerCase();
   // core/application/screenPlaces.ts
   var LIST_SET = { day: true, soon: true, inbox: true, backlog: true, projects: true };
   var ENTRY_LISTS = Object.keys(LIST_SET);
+  var FUNNEL_PLACES = ["inbox", "soon", "calendar"];
+  function stepFunnel(from, shift, today) {
+    if (from.mode === "calendar" && (shift > 0 || from.date !== today)) return { mode: "calendar", date: addDays(from.date, shift) };
+    if (from.mode === "done") return shift > 0 ? { mode: "inbox", date: from.date } : null;
+    const at = FUNNEL_PLACES.indexOf(from.mode) + shift;
+    return at >= 0 && at < FUNNEL_PLACES.length ? { mode: FUNNEL_PLACES[at], date: from.date } : null;
+  }
+  function funnelPlaceShowing(column, spot) {
+    const at = spot === "done" ? "inbox" : spot;
+    if (SHOWN_LISTS[at].includes(column)) return at;
+    const from = FUNNEL_PLACES.indexOf(at);
+    const showing = FUNNEL_PLACES.filter((other) => SHOWN_LISTS[other].includes(column));
+    return showing.reduce((best, other) => Math.abs(FUNNEL_PLACES.indexOf(other) - from) < Math.abs(FUNNEL_PLACES.indexOf(best) - from) ? other : best);
+  }
   var SCREEN_PLACES = ["projects", "inbox", "soon", "calendar"];
   var SHOWN_LISTS = { projects: [], inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] };
   function shownLists(place) {
@@ -3440,6 +3454,47 @@ ${key.title}`.toLowerCase();
     const shift = moved2 > 0 ? 1 : -1;
     if (Math.abs(speed) >= SWIPE_FLICK_SPEED) return Math.sign(speed) === shift ? shift : 0;
     return Math.abs(moved2) * 2 >= distance ? shift : 0;
+  }
+
+  // core/application/viewModes.ts
+  var VIEW_WORDS = {
+    twoColumns: "Two columns",
+    columns: "Columns",
+    allColumns: "All columns",
+    rows: "Rows",
+    byProject: "By project"
+  };
+  var ICONS = { twoColumns: "columns-2", allColumns: "columns-4", rows: "rows-3", byProject: "folder-tree" };
+  var ROW_LISTS = ["inbox", "backlog", "soon", "day"];
+  function offered(ask) {
+    if (ask.closed && ask.node !== null) return ["byProject"];
+    const byProject = ask.node !== null && ask.node !== "none" ? ["byProject"] : [];
+    if (ask.note) return ["rows", ...byProject];
+    return ["twoColumns", ...ask.wide ? ["allColumns"] : [], "rows", ...byProject];
+  }
+  function defaultMode(ask, modes) {
+    const wanted = ask.node === null ? "twoColumns" : "rows";
+    return modes.includes(wanted) ? wanted : modes[0];
+  }
+  function keptMode(state, ask) {
+    if (ask.note) return state.noteView;
+    return ask.node === null ? state.view : state.filteredView;
+  }
+  function viewChoice(state, ask) {
+    const modes = offered(ask);
+    const kept = keptMode(state, ask);
+    const mode = kept !== void 0 && modes.includes(kept) ? kept : defaultMode(ask, modes);
+    const label = (m) => m === "twoColumns" && !ask.wide ? VIEW_WORDS.columns : VIEW_WORDS[m];
+    const options = modes.map((m) => ({ mode: m, label: label(m), icon: ICONS[m], checked: m === mode }));
+    return { mode, modes: options, icon: ICONS[mode], wheel: mode === "twoColumns", rows: mode === "rows" ? ROW_LISTS : [] };
+  }
+  function withMode(state, mode, filtered) {
+    return filtered ? { ...state, filteredView: mode } : { ...state, view: mode };
+  }
+  function viewEntryLists(mode, spot) {
+    if (mode === "byProject") return ["projects"];
+    if (mode === "twoColumns") return SHOWN_LISTS[spot === "done" ? "inbox" : spot];
+    return ROW_LISTS;
   }
 
   // core/application/taskKeys.ts
@@ -3776,8 +3831,8 @@ ${key.title}`.toLowerCase();
     return moves.filter((move) => move.date === null || move.date !== item.day);
   }
   function sharedMoves(items, today) {
-    const offered = items.flatMap((item) => quickMoves(item, today));
-    return MOVE_ORDER.flatMap((id) => offered.find((move) => move.id === id) ?? []);
+    const offered2 = items.flatMap((item) => quickMoves(item, today));
+    return MOVE_ORDER.flatMap((id) => offered2.find((move) => move.id === id) ?? []);
   }
   function sharedDueDate(items) {
     const first = items[0]?.dueDate ?? null;
@@ -3819,7 +3874,7 @@ ${key.title}`.toLowerCase();
       ["project", true],
       ["subtask", of.from !== "stack"]
     ];
-    return edits.flatMap(([id, offered]) => offered ? [id] : []);
+    return edits.flatMap(([id, offered2]) => offered2 ? [id] : []);
   }
   function menuSections(items, offer, of) {
     const choice = offer ? sectionChoice(items, offer) : null;
@@ -3878,9 +3933,9 @@ ${key.title}`.toLowerCase();
       remove: { confirm: of.kind === "task" }
     };
   }
-  function carriedWith(lifted2, picked) {
+  function carriedWith(lifted2, picked2) {
     const id = keyId(lifted2);
-    return picked.filter((key) => keyId(key) !== id && !picked.some((other) => other !== key && isUnder(key, other)));
+    return picked2.filter((key) => keyId(key) !== id && !picked2.some((other) => other !== key && isUnder(key, other)));
   }
 
   // core/domain/NextStep.ts
@@ -4355,8 +4410,10 @@ ${key.title}`.toLowerCase();
       if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
       const { group, before } = result;
       switch (column) {
-        case "projects":
-          return { kind: "projects", group, before, ...placement && { placement } };
+        case "projects": {
+          const node = this.look.filter?.()?.node;
+          return { kind: "projects", group, before, ...placement && { placement }, ...node !== void 0 && { node } };
+        }
         case "day":
           return { kind: "day", date: this.look.day(), group, before };
         default:
@@ -4395,7 +4452,9 @@ ${key.title}`.toLowerCase();
               const place = fitLevel(cards, { ...spot.place, level: line.level });
               job.landing = spot.column;
               const at = this.placeOf(spot.column, placeOfGap(cards, place), line.placement);
-              return { method: "createInPlace", args: at.kind === "subtask" ? [line.text, line.priority, at, line.repeat, line.labels] : [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null] };
+              const filter = this.look.filter?.()?.node ?? null;
+              if (at.kind === "subtask") return { method: "createInPlace", args: [line.text, line.priority, at, line.repeat, line.labels] };
+              return { method: "createInPlace", args: filter !== null && at.kind !== "projects" ? [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null, filter] : [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null] };
             }
           }
           break;
@@ -4526,10 +4585,11 @@ ${key.title}`.toLowerCase();
     partAt(spot) {
       return this.parts(spot.column).find((part2) => part2.group === spot.place.group) ?? null;
     }
-    /** The project a new task's field opened at `spot` starts with: its part's, where the list has parts; none elsewhere. */
+    /** The project a new task's field opened at `spot` starts with: its part's, where the list has parts; elsewhere the filter's; none without one. */
     partProject(spot) {
       const list = listSpot(spot);
-      return (list && this.partAt(list)?.newTask?.project) ?? null;
+      if (list && this.parts(list.column).length > 0) return this.partAt(list)?.newTask?.project ?? null;
+      return this.look.filter?.()?.project ?? null;
     }
     /** The lists a task is looked for in: the shown ones first, then every other the entry knows. */
     lookOrder() {
@@ -5003,11 +5063,17 @@ ${key.title}`.toLowerCase();
     return statuses;
   }
   function selectedNode(state, tree) {
-    const node = state.selected ?? "all";
+    return chosenNode(state, tree) ?? "all";
+  }
+  function chosenNode(state, tree) {
+    return nodeIn(state.selected, tree);
+  }
+  function nodeIn(node, tree) {
+    if (node === null || node === void 0) return null;
     const name = projectOfNode(node);
-    if (name === null) return node === "none" || node === "done" ? node : "all";
+    if (name === null) return node === "all" || node === "none" || node === "done" ? node : null;
     const found = tree.find(name);
-    return found ? projectNodeOf(found.node.name) : "all";
+    return found ? projectNodeOf(found.node.name) : null;
   }
   function isFolded(state, name) {
     return (state.folded ?? []).some((node) => sameNode(node, projectNodeOf(name)));
@@ -5016,8 +5082,9 @@ ${key.title}`.toLowerCase();
     const { tree, state } = input;
     const statuses = input.doc ? projectStatuses(tree, input.doc) : /* @__PURE__ */ new Map();
     const statusOf2 = (name2) => statuses.get(projectKey(name2)) ?? "waiting";
-    const selected2 = selectedNode(state, tree);
-    const mode = state.mode ?? "byProject";
+    const fixed = input.node === void 0 ? null : nodeIn(input.node, tree);
+    const selected2 = fixed ?? selectedNode(state, tree);
+    const mode = input.node !== void 0 ? "byProject" : state.mode ?? "byProject";
     const rows = treeRows(tree, state, selected2, statusOf2, (node) => input.doc !== null && nodeReorders(node, statusOf2));
     const parts = input.doc ? sectionsOf(input, input.doc, selected2, mode, statusOf2) : [];
     const name = projectOfNode(selected2);
@@ -5038,6 +5105,29 @@ ${key.title}`.toLowerCase();
       missing: input.doc === null,
       reorders: input.doc !== null && nodeReorders(selected2, statusOf2)
     };
+  }
+  function panelRows(tree, doc, state) {
+    const statuses = doc ? projectStatuses(tree, doc) : /* @__PURE__ */ new Map();
+    const statusOf2 = (name) => statuses.get(projectKey(name)) ?? "waiting";
+    return treeRows(tree, state, chosenNode(state, tree) ?? NO_NODE, statusOf2, (node) => doc !== null && nodeReorders(node, statusOf2));
+  }
+  var NO_NODE = "";
+  function nodeHeader(node, tree, doc) {
+    const name = projectOfNode(node);
+    const placed = name === null ? null : tree.find(name);
+    if (!placed) return { title: node === "none" ? PROJECTS_WORDS.none : node === "done" ? PROJECTS_WORDS.done : PROJECTS_WORDS.all, menu: null, project: null, closed: node === "done" };
+    const done = doc !== null && projectStatuses(tree, doc).get(projectKey(placed.node.name)) === "done";
+    return {
+      title: placed.node.name,
+      menu: projectMenu(refOfPlaced(placed, false), doc !== null && hasOwnTasks(doc, placed.node.name)),
+      project: placed.node.folder || done ? null : placed.node.name,
+      closed: done
+    };
+  }
+  function cleared(state) {
+    if (state.selected === void 0) return state;
+    const { selected: _gone, ...rest } = state;
+    return rest;
   }
   function nodeReorders(node, statusOf2) {
     const name = projectOfNode(node);
@@ -5256,12 +5346,17 @@ ${key.title}`.toLowerCase();
     return kept.map((s, i) => ({ ...s, plate: s.empty && (s.header || kept.length === 1), opens: s.header && !untitledAbove(i) }));
   }
   function tapped(state, tree, node) {
-    const selected2 = selectedNode(state, tree);
-    if (!sameNode(selected2, node)) return { ...state, selected: node };
+    const selected2 = chosenNode(state, tree);
+    if (selected2 === null || !sameNode(selected2, node)) return { ...state, selected: node };
     if (node === "done") return { ...state, doneOpen: !(state.doneOpen ?? false) };
     const name = projectOfNode(node);
     if (name === null || !tree.find(name)?.node.children.length) return state;
     return withFold(state, name, !isFolded(state, name));
+  }
+  function picked(state, tree, node, wide) {
+    const next = tapped(state, tree, node);
+    const chose = next.selected !== state.selected;
+    return !wide && chose && next.panelOpen ? { ...next, panelOpen: false } : next;
   }
   function unfolded2(state, node) {
     if (node === "done") return state.doneOpen ? state : { ...state, doneOpen: true };
@@ -5727,7 +5822,7 @@ ${key.title}`.toLowerCase();
       if (usableLabelTag(labelTag)) await this.store.update({ labelTag });
     }
     async setLabelPaint(paint) {
-      const labelPaint = LABEL_PAINTS.find((offered) => offered === paint);
+      const labelPaint = LABEL_PAINTS.find((offered2) => offered2 === paint);
       if (labelPaint) await this.store.update({ labelPaint });
     }
     async setCardHeight(px) {
@@ -6015,6 +6110,49 @@ ${key.title}`.toLowerCase();
     }
   };
 
+  // core/application/projectFilter.ts
+  function filterTest(node, tree, doc) {
+    if (node === "all") return (entry) => entry.task.projects.length > 0;
+    if (node === "none") return (entry) => entry.task.projects.length === 0;
+    const names = node === "done" ? doneNames(tree, doc) : branchNames(node, tree);
+    return (entry) => names.some((name) => namesProject(entry.task.projects, name));
+  }
+  function branchNames(node, tree) {
+    const found = tree.find(projectOfNode(node) ?? "");
+    if (!found) return [];
+    return tree.all().filter((p) => p.path.length >= found.path.length && p.path.slice(0, found.path.length).every((n, i) => projectKey(n) === projectKey(found.path[i]))).map((p) => p.node.name);
+  }
+  function doneNames(tree, doc) {
+    const statuses = projectStatuses(tree, doc);
+    return tree.all().filter((p) => statuses.get(projectKey(p.node.name)) === "done").map((p) => p.node.name);
+  }
+  function afterShown(doc, list, group, shows, carried = /* @__PURE__ */ new Set()) {
+    const tasks = doc.tasks(list).filter((entry) => entry.group === group);
+    let last = -1;
+    tasks.forEach((entry, i) => {
+      if (!carried.has(entry.id) && shows(entry)) last = i;
+    });
+    const next = last < 0 ? void 0 : tasks.slice(last + 1).find((entry) => !carried.has(entry.id));
+    return next ? keyOf(next) : null;
+  }
+  function shownUnder(entry, node, tree) {
+    const projects = entry.task.projects;
+    const name = node === null ? null : projectOfNode(node);
+    const branch = name === null ? [] : branchNames(projectNodeOf(name), tree);
+    const own = branch.length > 0 ? projects.find((p) => namesProject(branch, p)) : void 0;
+    const first = own ?? projects[0];
+    return first === void 0 ? null : tree.find(first)?.node.name ?? first;
+  }
+  function noteProject(path, tree) {
+    const file = path.replace(/\.md$/i, "").toLowerCase();
+    const found = tree.all().find(({ node }) => {
+      if (node.note === null) return false;
+      const link = node.note.split("|")[0].split("#")[0].trim().replace(/\.md$/i, "").toLowerCase();
+      return link !== "" && (file === link || file.endsWith(`/${link}`));
+    });
+    return found ? found.node.name : null;
+  }
+
   // core/application/TaskReads.ts
   var NO_PROJECT_SOURCE = { tree: () => ProjectTree.EMPTY, screen: () => ({}) };
   function sectionsOf2(doc, list) {
@@ -6040,11 +6178,11 @@ ${key.title}`.toLowerCase();
     projects() {
       return new ProjectIndex(this.source.tree()).known();
     }
-    /** The Projects screen as this device shows it; without a file, the tree's fixed rows alone. */
-    projectsScreenRead() {
-      return { reads: true, tidies: true, missing: () => this.projectsScreen(null), answer: (s) => this.projectsScreen(s) };
+    /** The Projects screen as this device shows it, or `node`'s by project; without a file, the tree's fixed rows alone. */
+    projectsScreenRead(node) {
+      return { reads: true, tidies: true, missing: () => this.projectsScreen(null, node), answer: (s) => this.projectsScreen(s, node) };
     }
-    projectsScreen(s) {
+    projectsScreen(s, node) {
       const tree = s ? projectTreeOf(s.doc) : ProjectTree.EMPTY;
       const levels = this.itemLevels(new ProjectIndex(tree), false);
       const today = s?.today ?? this.today();
@@ -6056,8 +6194,41 @@ ${key.title}`.toLowerCase();
         boundary,
         state: this.source.screen(),
         item: (entry) => toItem(entry, today, levels, null, boundary),
-        listName: (list) => this.listName(list)
+        listName: (list) => this.listName(list),
+        ...node !== void 0 && { node }
       });
+    }
+    /** The funnel's view as this device shows it; without a file, no filter and the panel's fixed rows. */
+    funnelViewRead(wide) {
+      return { reads: true, tidies: true, missing: () => this.funnelView(null, wide), answer: (s) => this.funnelView(s, wide) };
+    }
+    funnelView(s, wide) {
+      const state = this.source.screen();
+      const tree = s ? projectTreeOf(s.doc) : ProjectTree.EMPTY;
+      const node = chosenNode(state, tree);
+      const filter = node === null ? null : this.filterOf(node, tree, s?.doc ?? null, true);
+      const closed = node !== null && nodeHeader(node, tree, s?.doc ?? null).closed;
+      return {
+        filter,
+        view: viewChoice(state, { node, closed, wide, note: false }),
+        panel: { rows: panelRows(tree, s?.doc ?? null, state), open: state.panelOpen === true, docked: wide, missing: s === null }
+      };
+    }
+    /** The block at the end of the note at `path`: null for a note no project has, and without a file. */
+    projectNoteViewRead(path, wide) {
+      return { reads: true, tidies: true, missing: () => null, answer: (s) => this.projectNoteView(s, path, wide) };
+    }
+    projectNoteView(s, path, wide) {
+      const tree = projectTreeOf(s.doc);
+      const name = noteProject(path, tree);
+      if (name === null) return null;
+      const node = projectNodeOf(name);
+      const closed = nodeHeader(node, tree, s.doc).closed;
+      return { filter: this.filterOf(node, tree, s.doc, false), view: viewChoice(this.source.screen(), { node, closed, wide, note: true }), panel: null };
+    }
+    filterOf(node, tree, doc, clearable) {
+      const { title, menu, project } = nodeHeader(node, tree, doc);
+      return { node, title, menu, clearable, project, emptyLabel: PROJECTS_WORDS.noTasks };
     }
     priorityLevels() {
       return this.rules.priorityLevels();
@@ -6080,21 +6251,25 @@ ${key.title}`.toLowerCase();
     withPriority(text, prefix) {
       return withPriority(text, prefix, this.priorityLevels().map((l) => l.prefix));
     }
-    /** The screen of `date`: the file tidied for today first; without a file, the empty screen. */
-    screenRead(date) {
-      return { reads: true, tidies: true, missing: () => this.missingScreen(date), answer: (s) => this.screen(s, date) };
+    /** The screen of `date`, under `filter`: the file tidied for today first; without a file, the empty screen. */
+    screenRead(date, filter) {
+      return { reads: true, tidies: true, missing: () => this.missingScreen(date), answer: (s) => this.screen(s, date, filter) };
     }
-    /** The screen of `date`. */
-    screen(s, date) {
+    /** The screen of `date`, only the tasks `filter` lets through (`TaskService.screen`). */
+    screen(s, date, filter) {
       const { doc, today, boundary } = s;
-      const item = this.itemOf(today, doc);
-      const day = { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
+      const tree = projectTreeOf(doc);
+      const node = nodeIn(filter, tree);
+      const shows = node === null ? () => true : filterTest(node, tree, doc);
+      const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
+      const shown2 = (entries) => entries.filter(shows).map(item);
+      const day = { date, list: shown2(dayList(doc, date, today, boundary)), slotted: shown2(slottedOn(doc, date, boundary)) };
       const sections = this.listSections(s);
-      const view = { soon: soonWithoutDate(doc).map(item), inbox: inboxList(doc).map(item), backlog: backlogList(doc).map(item) };
+      const view = { soon: shown2(soonWithoutDate(doc)), inbox: shown2(inboxList(doc)), backlog: shown2(backlogList(doc)) };
       return {
         day,
         ...view,
-        done: doc.tasks("done").map(item),
+        done: shown2(doc.tasks("done")),
         sections,
         offer: this.offerOf(s, date, sections),
         missing: false,
@@ -6277,12 +6452,12 @@ ${key.title}`.toLowerCase();
       const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
       return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectChoices(screen));
     }
-    bulkMenu(picked, screen) {
-      const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-      return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices(screen));
+    bulkMenu(picked2, screen) {
+      const offer = menuOffer(picked2.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
+      return taskMenu(picked2.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices(screen));
     }
-    carried(lifted2, picked) {
-      return carriedWith(lifted2, picked);
+    carried(lifted2, picked2) {
+      return carriedWith(lifted2, picked2);
     }
     fullTree(item) {
       return fullTree(item);
@@ -6303,9 +6478,9 @@ ${key.title}`.toLowerCase();
     timeline() {
       return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
     }
-    /** The item of a task of `doc`, its subtasks below it, its projects as `doc`'s tree has them. */
-    itemOf(today, doc) {
-      const levels = this.itemLevels(new ProjectIndex(projectTreeOf(doc)));
+    /** The item of a task of `doc`, its subtasks below it, its projects as `doc`'s tree has them; `mark`, the card shows the folder mark. */
+    itemOf(today, doc, mark = true) {
+      const levels = this.itemLevels(new ProjectIndex(projectTreeOf(doc)), mark);
       const { boundary } = this.rules.moment();
       return (entry) => toItem(entry, today, levels, null, boundary);
     }
@@ -6745,8 +6920,8 @@ ${key.title}`.toLowerCase();
       return (doc, today) => {
         const entry = this.entryOf(doc, key);
         const before = place?.before ? this.entryOf(doc, place.before) : null;
-        const cleared = clearSlot(doc, entry);
-        return place ? moveBefore(cleared, cleared.tasks(entry.section)[entry.index], before && cleared.tasks(before.section)[before.index], place.date, today) : cleared;
+        const cleared2 = clearSlot(doc, entry);
+        return place ? moveBefore(cleared2, cleared2.tasks(entry.section)[entry.index], before && cleared2.tasks(before.section)[before.index], place.date, today) : cleared2;
       };
     }
     moveToList(key, date) {
@@ -7019,13 +7194,13 @@ ${key.title}`.toLowerCase();
     createAtTime(date, start, text) {
       return nothing(this.rules.createAtTime(date, start, text));
     }
-    createInPlace(text, priority, place, repeat, labels = [], project) {
-      const write = this.createWithId(text, priority, place, repeat, labels, project);
+    createInPlace(text, priority, place, repeat, labels = [], project, filter) {
+      const write = this.createWithId(text, priority, place, repeat, labels, project, filter);
       return { operation: write.operation, answer: (change) => write.answer(change)?.key ?? null };
     }
-    createWithId(text, priority, place, repeat, labels = [], project) {
+    createWithId(text, priority, place, repeat, labels = [], project, filter) {
       return {
-        operation: place.kind === "projects" ? this.createInProjects(text, priority, place, repeat, labels, project) : this.rules.createInPlace(text, priority, place, repeat, labels, project),
+        operation: place.kind === "projects" ? this.createInProjects(text, priority, place, repeat, labels, project) : filter !== null && filter !== void 0 && !this.rules.isBlank(text) ? (doc, today, settings, boundary) => this.rules.placeNew(text, priority, shownPlace(doc, place, filter, today), repeat, labels, project)(doc, today, settings, boundary) : this.rules.createInPlace(text, priority, place, repeat, labels, project),
         answer: (change) => {
           const created = change?.after.insertedSince(change.before);
           return created ? { key: keyOf(created), id: created.id } : null;
@@ -7036,7 +7211,7 @@ ${key.title}`.toLowerCase();
     createInProjects(text, priority, place, repeat, labels, project) {
       if (this.rules.isBlank(text)) return null;
       return (doc, today, settings, boundary) => {
-        const view = this.reads.projectsScreen({ text: "", doc, today, boundary });
+        const view = this.reads.projectsScreen({ text: "", doc, today, boundary }, place.node);
         const at = projectsNewPlace(view, doc, (key) => this.rules.entryOf(doc, key), place, today);
         return this.rules.placeNew(text, priority, at, repeat, labels, project)(doc, today, settings, boundary);
       };
@@ -7119,6 +7294,17 @@ ${key.title}`.toLowerCase();
     }
     dropOnProject(cards, to) {
       return nothing(this.rules.dropOnProject(cards, to));
+    }
+    /** Funnel cards let go on the tree: each shown under the project `filter` shows it by (`shownUnder`), then as `dropOnProject`. */
+    dropTasksOnProject(keys, to, filter) {
+      if (keys.length === 0) return nothing(null);
+      return nothing((doc, today, settings, boundary) => {
+        const tree = projectTreeOf(doc);
+        const node = nodeIn(filter, tree);
+        const cards = keys.map((key) => ({ key, from: shownUnder(this.rules.entryOf(doc, key), node, tree) }));
+        const operation = this.rules.dropOnProject(cards, to);
+        return operation ? operation(doc, today, settings, boundary) : doc;
+      });
     }
     /** The project made, as the tree has it; null when nothing was written. */
     createProject(name, place) {
@@ -7305,12 +7491,13 @@ ${key.title}`.toLowerCase();
      * What a drop means: the moves, and whether one of them sets a time and so reads the task's duration first. It answers
      * the tasks' keys as the file now has them, in their order; one not found again is left out.
      */
-    drop(tasks, to, day) {
+    drop(tasks, to, day, filter) {
       const read = readDrop(to, (column) => this.reads.columnSections(column, day));
+      const filtered = filter !== null && filter !== void 0 && read.kind === "group" && read.before === null;
       return {
-        reads: read.kind === "title" || tasks.length === 1 && read.kind === "time",
+        reads: filtered || read.kind === "title" || tasks.length === 1 && read.kind === "time",
         answer: (s) => {
-          const moves = dropMoves(tasks, read, day);
+          const moves = dropMoves(tasks, filtered && s ? this.shownDrop(s, read, filter, tasks) : read, day);
           return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
         }
       };
@@ -7319,13 +7506,13 @@ ${key.title}`.toLowerCase();
      * Where `drop` would leave the tasks, writing nothing: its operation tried over the file as read, and the screen of
      * `day` read over the result by the same code as the screen.
      */
-    landing(tasks, to, day) {
-      const preview = this.dropPreview(tasks, to, day);
+    landing(tasks, to, day, filter) {
+      const preview = this.dropPreview(tasks, to, day, filter);
       return { reads: true, answer: (s) => preview.answer(s).landings };
     }
     /** `landing`, with the whole screen the drop leaves and the text it is read from. */
-    dropPreview(tasks, to, day) {
-      const drop = this.drop(tasks, to, day);
+    dropPreview(tasks, to, day, filter) {
+      const drop = this.drop(tasks, to, day, filter);
       return {
         reads: true,
         answer: (s) => {
@@ -7333,25 +7520,25 @@ ${key.title}`.toLowerCase();
           const write = drop.answer(s);
           const after = write.operation ? this.rules.trial(s.doc, write.operation).after : s.doc;
           const text = after.serialize();
-          const screen = this.reads.screen({ text, doc: after, today: s.today, boundary: s.boundary }, day);
+          const screen = this.reads.screen({ text, doc: after, today: s.today, boundary: s.boundary }, day, filter);
           const timeline = this.reads.timeline();
           return { landings: ids.map((id) => landingOf(screen, id, day, timeline)), screen, tasks: text };
         }
       };
     }
     /** A drop in the Projects list: the funnel's moves the screen as read gives it (`projectsDropSteps`), one write. */
-    dropInProjects(cards, place) {
+    dropInProjects(cards, place, node) {
       return {
         reads: true,
         answer: (s) => {
-          const steps = projectsDropSteps(this.reads.projectsScreen(s), s.doc, (key) => this.rules.entryOf(s.doc, key), cards, place, s.today);
+          const steps = projectsDropSteps(this.reads.projectsScreen(s, node), s.doc, (key) => this.rules.entryOf(s.doc, key), cards, place, s.today);
           return this.landed(cards, this.applyAll(steps));
         }
       };
     }
     /** `dropInProjects` tried over the file as read: where each card lands on the Projects screen it leaves. */
-    projectsDropPreview(cards, place) {
-      const drop = this.dropInProjects(cards, place);
+    projectsDropPreview(cards, place, node) {
+      const drop = this.dropInProjects(cards, place, node);
       return {
         reads: true,
         answer: (s) => {
@@ -7359,10 +7546,18 @@ ${key.title}`.toLowerCase();
           const write = drop.answer(s);
           const after = write.operation ? this.rules.trial(s.doc, write.operation).after : s.doc;
           const text = after.serialize();
-          const view = this.reads.projectsScreen({ text, doc: after, today: s.today, boundary: s.boundary });
+          const view = this.reads.projectsScreen({ text, doc: after, today: s.today, boundary: s.boundary }, node);
           return { landings: ids.map((id) => projectsLandingOf(view, id, place.kind === "task" ? place.group : void 0)), view, tasks: text };
         }
       };
+    }
+    /** A drop at a section's end of a filtered list: right after the last task of the section the filter shows (`afterShown`). */
+    shownDrop(s, read, filter, tasks) {
+      const tree = projectTreeOf(s.doc);
+      const node = nodeIn(filter, tree);
+      if (node === null) return read;
+      const carried = new Set(tasks.map((task) => this.rules.entryOf(s.doc, task.key).id));
+      return { ...read, before: afterShown(s.doc, read.list, read.group, filterTest(node, tree, s.doc), carried) };
     }
     /** The dropped tasks where `write` left them. */
     landed(tasks, write) {
@@ -7396,6 +7591,14 @@ ${key.title}`.toLowerCase();
       }
     }
   };
+  function shownPlace(doc, place, filter, today) {
+    if (place.kind !== "list" && place.kind !== "day" || place.before !== null) return place;
+    const tree = projectTreeOf(doc);
+    const node = nodeIn(filter, tree);
+    if (node === null) return place;
+    const list = place.kind === "list" ? place.list : dayColumn(place.date, today).list;
+    return { ...place, before: afterShown(doc, list, place.group, filterTest(node, tree, doc)) };
+  }
 
   // core/application/UndoSteps.ts
   var DEPTH = 100;
@@ -7711,7 +7914,7 @@ ${key.title}`.toLowerCase();
     isBlank: (c, [text]) => c.reads.isBlank(text),
     withPriority: (c, [text, prefix]) => c.reads.withPriority(text, prefix ?? null),
     draftMarks: (c, [text, priority, labels]) => c.reads.draftMarks(text, priority ?? null, labels ?? []),
-    screen: (c, [date]) => c.ask(c.reads.screenRead(date)),
+    screen: (c, [date, filter]) => c.ask(c.reads.screenRead(date, filter)),
     dayView: (c, [date]) => c.reads.dayView(KEPT(c), date),
     soonWithoutDateView: (c) => c.reads.soonWithoutDateView(KEPT(c)),
     inboxView: (c) => c.reads.inboxView(KEPT(c)),
@@ -7729,8 +7932,8 @@ ${key.title}`.toLowerCase();
     createInList: (c, [date, text]) => c.run(c.writes.createInList(date, text)),
     createInSoon: (c, [text]) => c.run(c.writes.createInSoon(text)),
     createAtTime: (c, [date, start, text]) => c.run(c.writes.createAtTime(date, start, text)),
-    createInPlace: (c, [text, priority, place, repeat, labels, project]) => c.run(c.writes.createInPlace(text, priority ?? null, place, repeat ?? null, labels ?? [], project)),
-    createWithId: (c, [text, priority, place, repeat, labels, project]) => c.run(c.writes.createWithId(text, priority ?? null, place, repeat ?? null, labels ?? [], project)),
+    createInPlace: (c, [text, priority, place, repeat, labels, project, filter]) => c.run(c.writes.createInPlace(text, priority ?? null, place, repeat ?? null, labels ?? [], project, filter)),
+    createWithId: (c, [text, priority, place, repeat, labels, project, filter]) => c.run(c.writes.createWithId(text, priority ?? null, place, repeat ?? null, labels ?? [], project, filter)),
     create: (c, [draft, slot]) => c.run(c.writes.create(draft, slot ?? void 0)),
     createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent, draft)),
     edit: (c, [key, draft]) => c.run(c.writes.edit(key, draft)),
@@ -7755,10 +7958,27 @@ ${key.title}`.toLowerCase();
       const made = c.run(c.writes.newProject(name, keys ?? []));
       return made === null ? null : new ProjectIndex(c.tree()).refOf(made);
     },
-    projectsScreen: (c) => c.ask(c.reads.projectsScreenRead()),
+    projectsScreen: (c, [node]) => c.ask(c.reads.projectsScreenRead(node ?? void 0)),
+    funnelView: (c, [wide]) => c.ask(c.reads.funnelViewRead(wide === true)),
+    projectNoteView: (c, [path, wide]) => c.ask(c.reads.projectNoteViewRead(path, wide === true)),
+    pickProjectNode: (c, [node, wide]) => c.keepProjectsScreen(picked(c.projectsScreen, c.tree(), node, wide === true)),
+    clearProjectFilter: (c) => c.keepProjectsScreen(cleared(c.projectsScreen)),
+    setProjectsPanel: (c, [open]) => {
+      if (c.projectsScreen.panelOpen === true !== (open === true)) c.keepProjectsScreen({ ...c.projectsScreen, panelOpen: open === true });
+    },
+    setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode, chosenNode(c.projectsScreen, c.tree()) !== null)),
+    setNoteViewMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, noteView: mode }),
+    dropTasksOnProject: (c, [keys, to, filter]) => {
+      const target = to === "none" ? null : projectOfNode(to);
+      if (target === null && to !== "none") return null;
+      return c.run(c.writes.dropTasksOnProject(keys, target, filter ?? null));
+    },
     tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node)),
     selectProjectNode: (c, [node]) => c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, node)),
-    hoverProjectNode: (c, [node]) => c.keepProjectsScreen(hovered(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, c.ask(c.reads.projectsScreenRead()).rows, node)),
+    hoverProjectNode: (c, [node]) => {
+      const doc = c.hasTasks() ? c.snapshot().doc : null;
+      c.keepProjectsScreen(hovered(c.projectsScreen, c.tree(), doc, panelRows(c.tree(), doc, c.projectsScreen), node));
+    },
     setProjectsMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, mode }),
     createProject: (c, [name, place]) => {
       const made = c.run(c.writes.createProject(name, place));
@@ -7772,8 +7992,8 @@ ${key.title}`.toLowerCase();
       if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from, c.rules.cleanName(to)));
       return renamed;
     },
-    dropInProjects: (c, [cards, place]) => c.run(c.ask(c.writes.dropInProjects(cards, place))),
-    projectsDropPreview: (c, [cards, place]) => c.ask(c.writes.projectsDropPreview(cards, place)),
+    dropInProjects: (c, [cards, place, node]) => c.run(c.ask(c.writes.dropInProjects(cards, place, node ?? void 0))),
+    projectsDropPreview: (c, [cards, place, node]) => c.ask(c.writes.projectsDropPreview(cards, place, node ?? void 0)),
     deleteProject: (c, [name]) => c.run(c.writes.deleteProject(name)),
     setProjectFolder: (c, [name, folder]) => c.run(c.writes.setProjectFolder(name, folder === true)),
     setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name, link ?? null)),
@@ -7788,11 +8008,11 @@ ${key.title}`.toLowerCase();
     toggleLabel: (c, [keys, name]) => c.run(c.ask(c.writes.toggleLabel(keys, name))),
     removeDue: (c, [keys]) => c.run(c.writes.removeDue(KEPT(c), keys)),
     menu: (c, [item, from, screen]) => c.reads.menu(item, from, screen),
-    bulkMenu: (c, [picked, screen]) => c.reads.bulkMenu(picked, screen),
+    bulkMenu: (c, [picked2, screen]) => c.reads.bulkMenu(picked2, screen),
     pickStatus: (c, [keys, id]) => c.run(c.writes.pickStatus(keys, id)),
     postponeAll: (c, [keys, date]) => c.run(c.writes.postponeAll(KEPT(c), keys, date)),
     removeAll: (c, [keys]) => c.run(c.writes.removeAll(keys)),
-    carried: (c, [lifted2, picked]) => c.reads.carried(lifted2, picked),
+    carried: (c, [lifted2, picked2]) => c.reads.carried(lifted2, picked2),
     setCollapsed: (c, [key, collapsed]) => c.run(c.writes.setCollapsed(key, collapsed)),
     toggleCollapsed: (c, [key]) => c.run(c.writes.toggleCollapsed(key)),
     unfoldAbove: (c, [key]) => c.run(c.writes.unfoldAbove(key)),
@@ -7826,9 +8046,9 @@ ${key.title}`.toLowerCase();
     removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list, group)),
     createSection: (c, [name, place]) => c.run(c.writes.createSection(name, place)),
     applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps)),
-    drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks, to, day))),
-    landing: (c, [tasks, to, day]) => c.ask(c.writes.landing(tasks, to, day)),
-    dropPreview: (c, [tasks, to, day]) => c.ask(c.writes.dropPreview(tasks, to, day)),
+    drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks, to, day, filter))),
+    landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks, to, day, filter)),
+    dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks, to, day, filter)),
     normalize: (c) => c.normalize(),
     createFile: (c) => {
       if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -7843,6 +8063,7 @@ ${key.title}`.toLowerCase();
     relation: (c, [date]) => dayRelation(date, c.rules.today()),
     step: (_c, [date, days]) => addDays(date, days),
     stepScreen: (c, [from, shift]) => stepScreen(from, shift, c.rules.today()),
+    stepFunnel: (c, [from, shift]) => stepFunnel(from, shift, c.rules.today()),
     openAt: (c, [date]) => dayOpening(date, boundaryOf2(c), c.rules.today(), c.now, c.settings.scrollToHour),
     /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
     boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
@@ -8085,6 +8306,8 @@ ${key.title}`.toLowerCase();
     swipeLanding,
     shownLists,
     shownEntryLists,
+    funnelPlaceShowing,
+    viewEntryLists,
     projectsEntryLook,
     wholeWidth,
     grownStart,
@@ -8095,7 +8318,7 @@ ${key.title}`.toLowerCase();
     onTheDay,
     canPick
   };
-  var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+  var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };
@@ -8107,7 +8330,8 @@ ${key.title}`.toLowerCase();
       day: () => look.day,
       today: () => c.rules.today(),
       shown: () => look.shown,
-      parts: (column) => look.parts?.[column] ?? []
+      parts: (column) => look.parts?.[column] ?? [],
+      filter: () => look.filter ?? null
     };
   }
   var ENTRY_METHODS = [

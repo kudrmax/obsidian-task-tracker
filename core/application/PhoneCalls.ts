@@ -20,7 +20,8 @@ import { dayMonth, dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
-import { type EntryList, placeShowing, SCREEN_PLACES, type ScreenAt, SHOWN_LISTS, shownEntryLists, shownLists, stepScreen, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { type EntryList, FUNNEL_PLACES, type FunnelAt, funnelPlaceShowing, placeShowing, SCREEN_PLACES, type ScreenAt, SHOWN_LISTS, shownEntryLists, shownLists, stepFunnel, stepScreen, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
+import { ROW_LISTS, VIEW_WORDS, viewEntryLists, withMode } from "./viewModes";
 import { type EntryPart, projectsEntryLook } from "./projectsEntry";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
@@ -32,6 +33,7 @@ import {
 	type GroupedList,
 	type ProjectNote,
 	type ProjectsScreenState,
+	type ViewMode,
 	StaleTaskError,
 	type SourceProblem,
 	type SourceStatus,
@@ -57,7 +59,7 @@ import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
 import { projectsPlusTakes, projectsTakes } from "./projectsDrop";
-import { PROJECTS_HOVER_MS, PROJECTS_INDENT, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { chosenNode, cleared, PROJECTS_HOVER_MS, PROJECTS_INDENT, panelRows, picked, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -179,6 +181,8 @@ export interface WireLook {
 	readonly shown: readonly EntryList[];
 	/** The parts of a list that decides its own writes: the Projects list's, `rules.projectsEntryLook`'s `parts`. */
 	readonly parts?: Partial<Record<EntryList, readonly EntryPart[]>>;
+	/** The screen's filter (`funnelView`'s `filter`: its `node` and `project`), null or left out for none (`EntryLook.filter`). */
+	readonly filter?: { readonly node: string; readonly project: string | null } | null;
 }
 
 class DoorError extends Error {
@@ -372,7 +376,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	isBlank: (c, [text]) => c.reads.isBlank(text as string),
 	withPriority: (c, [text, prefix]) => c.reads.withPriority(text as string, (prefix ?? null) as string | null),
 	draftMarks: (c, [text, priority, labels]) => c.reads.draftMarks(text as string, (priority ?? null) as string | null, (labels ?? []) as string[]),
-	screen: (c, [date]) => c.ask(c.reads.screenRead(date as string)),
+	screen: (c, [date, filter]) => c.ask(c.reads.screenRead(date as string, filter as A)),
 	dayView: (c, [date]) => c.reads.dayView(KEPT(c), date as string),
 	soonWithoutDateView: (c) => c.reads.soonWithoutDateView(KEPT(c)),
 	inboxView: (c) => c.reads.inboxView(KEPT(c)),
@@ -390,8 +394,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	createInList: (c, [date, text]) => c.run(c.writes.createInList(date as string, text as string)),
 	createInSoon: (c, [text]) => c.run(c.writes.createInSoon(text as string)),
 	createAtTime: (c, [date, start, text]) => c.run(c.writes.createAtTime(date as string, start as number, text as string)),
-	createInPlace: (c, [text, priority, place, repeat, labels, project]) => c.run(c.writes.createInPlace(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A, project as string | null | undefined)),
-	createWithId: (c, [text, priority, place, repeat, labels, project]) => c.run(c.writes.createWithId(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A, project as string | null | undefined)),
+	createInPlace: (c, [text, priority, place, repeat, labels, project, filter]) => c.run(c.writes.createInPlace(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A, project as string | null | undefined, filter as A)),
+	createWithId: (c, [text, priority, place, repeat, labels, project, filter]) => c.run(c.writes.createWithId(text as string, (priority ?? null) as A, place as A, (repeat ?? null) as A, (labels ?? []) as A, project as string | null | undefined, filter as A)),
 	create: (c, [draft, slot]) => c.run(c.writes.create(draft as A, (slot ?? undefined) as A)),
 	createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent as A, draft as A)),
 	edit: (c, [key, draft]) => c.run(c.writes.edit(key as A, draft as A)),
@@ -416,10 +420,27 @@ const TASKS: Readonly<Record<string, Handler>> = {
 		const made = c.run(c.writes.newProject(name as string, (keys ?? []) as A));
 		return made === null ? null : new ProjectIndex(c.tree()).refOf(made);
 	},
-	projectsScreen: (c) => c.ask(c.reads.projectsScreenRead()),
+	projectsScreen: (c, [node]) => c.ask(c.reads.projectsScreenRead((node ?? undefined) as string | undefined)),
+	funnelView: (c, [wide]) => c.ask(c.reads.funnelViewRead(wide === true)),
+	projectNoteView: (c, [path, wide]) => c.ask(c.reads.projectNoteViewRead(path as string, wide === true)),
+	pickProjectNode: (c, [node, wide]) => c.keepProjectsScreen(picked(c.projectsScreen, c.tree(), node as string, wide === true)),
+	clearProjectFilter: (c) => c.keepProjectsScreen(cleared(c.projectsScreen)),
+	setProjectsPanel: (c, [open]) => {
+		if ((c.projectsScreen.panelOpen === true) !== (open === true)) c.keepProjectsScreen({ ...c.projectsScreen, panelOpen: open === true });
+	},
+	setViewMode: (c, [mode]) => c.keepProjectsScreen(withMode(c.projectsScreen, mode as ViewMode, chosenNode(c.projectsScreen, c.tree()) !== null)),
+	setNoteViewMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, noteView: mode as ViewMode }),
+	dropTasksOnProject: (c, [keys, to, filter]) => {
+		const target = to === "none" ? null : projectOfNode(to as string);
+		if (target === null && to !== "none") return null;
+		return c.run(c.writes.dropTasksOnProject(keys as A, target, (filter ?? null) as string | null));
+	},
 	tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node as string)),
 	selectProjectNode: (c, [node]) => c.keepProjectsScreen(selected(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, node as string)),
-	hoverProjectNode: (c, [node]) => c.keepProjectsScreen(hovered(c.projectsScreen, c.tree(), c.hasTasks() ? c.snapshot().doc : null, c.ask(c.reads.projectsScreenRead()).rows, node as string)),
+	hoverProjectNode: (c, [node]) => {
+		const doc = c.hasTasks() ? c.snapshot().doc : null;
+		c.keepProjectsScreen(hovered(c.projectsScreen, c.tree(), doc, panelRows(c.tree(), doc, c.projectsScreen), node as string));
+	},
 	setProjectsMode: (c, [mode]) => c.keepProjectsScreen({ ...c.projectsScreen, mode: mode as A }),
 	createProject: (c, [name, place]) => {
 		const made = c.run(c.writes.createProject(name as string, place as A));
@@ -433,8 +454,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 		if (renamed) c.keepProjectsScreen(renamedIn(c.projectsScreen, from as string, c.rules.cleanName(to as string)!));
 		return renamed;
 	},
-	dropInProjects: (c, [cards, place]) => c.run(c.ask(c.writes.dropInProjects(cards as A, place as A))),
-	projectsDropPreview: (c, [cards, place]) => c.ask(c.writes.projectsDropPreview(cards as A, place as A)),
+	dropInProjects: (c, [cards, place, node]) => c.run(c.ask(c.writes.dropInProjects(cards as A, place as A, (node ?? undefined) as string | undefined))),
+	projectsDropPreview: (c, [cards, place, node]) => c.ask(c.writes.projectsDropPreview(cards as A, place as A, (node ?? undefined) as string | undefined)),
 	deleteProject: (c, [name]) => c.run(c.writes.deleteProject(name as string)),
 	setProjectFolder: (c, [name, folder]) => c.run(c.writes.setProjectFolder(name as string, folder === true)),
 	setProjectNote: (c, [name, link]) => c.run(c.writes.setProjectNote(name as string, (link ?? null) as string | null)),
@@ -487,9 +508,9 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list as A, group as string)),
 	createSection: (c, [name, place]) => c.run(c.writes.createSection(name as string, place as A)),
 	applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps as A)),
-	drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks as A, to as A, day as string))),
-	landing: (c, [tasks, to, day]) => c.ask(c.writes.landing(tasks as A, to as A, day as string)),
-	dropPreview: (c, [tasks, to, day]) => c.ask(c.writes.dropPreview(tasks as A, to as A, day as string)),
+	drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks as A, to as A, day as string, filter as A))),
+	landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks as A, to as A, day as string, filter as A)),
+	dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks as A, to as A, day as string, filter as A)),
 	normalize: (c) => c.normalize(),
 	createFile: (c) => {
 		if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -509,6 +530,7 @@ const DAYS: Readonly<Record<string, Handler>> = {
 	relation: (c, [date]) => dayRelation(date as string, c.rules.today()),
 	step: (_c, [date, days]) => addDays(date as string, days as number),
 	stepScreen: (c, [from, shift]) => stepScreen(from as ScreenAt, shift as -1 | 1, c.rules.today()),
+	stepFunnel: (c, [from, shift]) => stepFunnel(from as FunnelAt, shift as -1 | 1, c.rules.today()),
 	openAt: (c, [date]) => dayOpening(date as string, boundaryOf(c), c.rules.today(), c.now, c.settings.scrollToHour),
 	/** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
 	boundary: (c) => ({ startHour: boundaryOf(c).startHour }),
@@ -807,6 +829,8 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	swipeLanding,
 	shownLists,
 	shownEntryLists,
+	funnelPlaceShowing,
+	viewEntryLists,
 	projectsEntryLook,
 	wholeWidth,
 	grownStart,
@@ -819,7 +843,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+const CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {
@@ -836,6 +860,7 @@ function lookOf(c: Call, look: WireLook): EntryLook {
 		today: () => c.rules.today(),
 		shown: () => look.shown,
 		parts: (column) => look.parts?.[column] ?? [],
+		filter: () => look.filter ?? null,
 	};
 }
 

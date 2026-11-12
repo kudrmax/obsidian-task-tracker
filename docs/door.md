@@ -295,6 +295,52 @@ as one tree, the first name winning, and is written back as one under the first 
 - `tasks.fullTree(item).project`: the task's first project; a tap opens the Projects screen on it
   (`tasks.selectProjectNode(rules.projectNodeOf(name))`).
 
+#### Projects as one view with the funnel (2026-11-12)
+
+The tree is a panel over the funnel, no place of the ribbon: its chosen node filters every list. Everything below only
+adds to the calls above; the old ones answer as before.
+
+- `tasks.funnelView(wide)` → `FunnelView` `{ filter, view, panel }`: `filter` `null` or `ProjectFilter` `{ node, title,
+  menu, clearable, project, emptyLabel }` (the chosen node: its name big over the tasks, the project menu, the cross, the
+  project a task typed under it gets, «No tasks»); `view` `ViewChoice` `{ mode, modes, icon, wheel, rows }` (the mode
+  `"twoColumns" | "allColumns" | "rows" | "byProject"`, the view button's menu `[{ mode, label, icon, checked }]`, the
+  button's Lucide icon, `wheel` true in two columns alone, `rows` `["inbox", "backlog", "soon", "day"]` in rows); `panel`
+  `{ rows, open, docked, missing }` (the tree's `ProjectsRow`s, the filter's row `selected`, none without one; `docked`
+  is `wide`). `wide`: the host's screen is wide (desktop): only then is All columns offered, and Two columns is named
+  «Columns» on a narrow one. Example: `tasks.funnelView(false)` → `{ filter: null, view: { mode: "twoColumns", wheel:
+  true, … }, panel: { open: false, docked: false, … } }`.
+- `tasks.screen(date, filter?)`: `filter` the `ProjectFilter.node` (null or left out: none): every list, the timeline and
+  Done only the node's tasks, a subtask with its task. Example: `tasks.screen("2026-11-12", "project:Стиль")`.
+- `tasks.drop(tasks, to, day, filter?)`, `tasks.landing(…, filter?)`, `tasks.dropPreview(…, filter?)`,
+  `tasks.createInPlace(text, priority, place, repeat, labels, project, filter?)`, `tasks.createWithId(…, filter?)`: under
+  a filter a drop or a new task at a section's end (`before: null`) goes right after the last task of that section the
+  filter shows; the preview reads the filtered screen. Example: `tasks.drop([{ key, from: "soon" }], { kind: "place",
+  column: "inbox", place: { kind: "task", group: null, before: null } }, "2026-11-12", "project:Стиль")`.
+- `tasks.pickProjectNode(node, wide)`: a tap on a panel row (`tapProjectNode`; on a narrow screen a tap that chose a
+  node also closes the panel). `tasks.clearProjectFilter()`: the cross. `tasks.setProjectsPanel(open)`: the projects
+  button. `tasks.setViewMode(mode)`: a pick in the view button's menu, kept apart with and without a filter.
+  `tasks.setNoteViewMode(mode)`: the same in a note's block. Each answers `projectsScreen`.
+- `tasks.dropTasksOnProject(keys, to, filter)`: funnel cards let go on a panel row; the project each is shown by under
+  `filter` gives way to the row's (no filter, All: its first project). Example: `tasks.dropTasksOnProject([key],
+  "project:Дружба", "project:Стиль")`.
+- `tasks.projectsScreen(node?)`: with `node`, that node's tasks by project whatever the device chose (the by project
+  mode). `tasks.dropInProjects(cards, place, node?)`, `tasks.projectsDropPreview(cards, place, node?)` read that list;
+  `NewTaskPlace` `{ kind: "projects", …, node? }` too.
+- `tasks.projectNoteView(path, wide)`: the block at the end of a project's note (`path` from the vault's folder):
+  `FunnelView` with the note's project as `filter` (`clearable` false), `panel` null, modes Rows and By project, Rows
+  first; null for a note no project has. Example: `tasks.projectNoteView("Заметки/Стиль.md", true)`.
+- `ProjectsScreenState` gains `panelOpen`, `view`, `filteredView`, `noteView`; `selected` left out now means no filter
+  (the old Projects screen still shows All for it).
+- `days.stepFunnel({ mode, date }, shift)`: the swipe on the funnel without Projects (`"inbox" | "soon" | "calendar" |
+  "done"`): null back from Inbox and from Done, Done on to Inbox. `rules.funnelPlaceShowing(column, spot)`,
+  `rules.viewEntryLists(mode, spot)` (the quick entry's `look.shown`: two columns the place's lists, rows and all columns
+  all four, by project `["projects"]`). `rules.constants` adds `FUNNEL_PLACES`, `ROW_LISTS`, `VIEW_WORDS`.
+- The quick entry's `look` adds `filter`: `{ node, project }` from `funnelView().filter` (or null): a new task's field
+  starts with `project`, and its `createInPlace` call carries `node` as the filter (or as `node` of a Projects place).
+- Deprecated, until both frontends move: `SCREEN_PLACES`, `ScreenPlace`, `ScreenSpot`, `ScreenAt`, `days.stepScreen`,
+  `rules.placeShowing`, `rules.shownLists`, `rules.shownEntryLists`; `SHOWN_LISTS` stays without its `projects` entry
+  then.
+
 #### A folded task's next step
 
 Every task with an open subtask, at any depth, drawn folded shows its next open subtask: `TaskItem.card` `{ text,
@@ -327,7 +373,7 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
 
 ### `days.*`: `DayService`
 
-`today()`, `relation(date)`, `step(date, days)`, `stepScreen({mode, date}, shift)` (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends;
+`today()`, `relation(date)`, `step(date, days)`, `stepFunnel({mode, date}, shift)` (the funnel's walk, see «Projects as one view»), `stepScreen({mode, date}, shift)` (deprecated) (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends;
 Projects first: back from Inbox and Soon, or from Done, to `{ mode: "projects" }`, on from Projects to Inbox, null back
 from Projects; `rules.swipeLanding` still makes one swipe one step), `boundary()` (`{ startHour }`), `openAt(date)`: where the day's
 timeline opens, minutes from the day's start: `{ kind: "now", minute }` for today (the now line, which the plugin holds

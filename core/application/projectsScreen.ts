@@ -115,15 +115,27 @@ export interface ProjectsInput {
 	readonly item: (entry: TaskEntry) => TaskItem;
 	/** The name a list goes by. */
 	readonly listName: (list: SectionKey) => string;
+	/** The node shown, by project, whatever the device chose (`projectsScreen(node)`); left out, the device's in its segment. */
+	readonly node?: ProjectsNodeId;
 }
 
 /** The node chosen: the device's, while it still names a node of the tree; All otherwise. */
 export function selectedNode(state: ProjectsScreenState, tree: ProjectTree): ProjectsNodeId {
-	const node = state.selected ?? "all";
+	return chosenNode(state, tree) ?? "all";
+}
+
+/** The node chosen, the funnel's filter: the device's, in the tree's spelling, while it still names a node of the tree; none otherwise. */
+export function chosenNode(state: ProjectsScreenState, tree: ProjectTree): ProjectsNodeId | null {
+	return nodeIn(state.selected, tree);
+}
+
+/** `node` as the tree has it: a project's in its spelling, All, No project, Done; null for none and a project the tree lacks. */
+export function nodeIn(node: ProjectsNodeId | null | undefined, tree: ProjectTree): ProjectsNodeId | null {
+	if (node === null || node === undefined) return null;
 	const name = projectOfNode(node);
-	if (name === null) return node === "none" || node === "done" ? node : "all";
+	if (name === null) return node === "all" || node === "none" || node === "done" ? node : null;
 	const found = tree.find(name);
-	return found ? projectNodeOf(found.node.name) : "all";
+	return found ? projectNodeOf(found.node.name) : null;
 }
 
 function isFolded(state: ProjectsScreenState, name: string): boolean {
@@ -135,8 +147,9 @@ export function projectsView(input: ProjectsInput): ProjectsView {
 	const { tree, state } = input;
 	const statuses = input.doc ? projectStatuses(tree, input.doc) : new Map<string, ProjectStatus>();
 	const statusOf = (name: string): ProjectStatus => statuses.get(projectKey(name)) ?? "waiting";
-	const selected = selectedNode(state, tree);
-	const mode: ProjectsMode = state.mode ?? "byProject";
+	const fixed = input.node === undefined ? null : nodeIn(input.node, tree);
+	const selected = fixed ?? selectedNode(state, tree);
+	const mode: ProjectsMode = input.node !== undefined ? "byProject" : (state.mode ?? "byProject");
 	const rows = treeRows(tree, state, selected, statusOf, (node) => input.doc !== null && nodeReorders(node, statusOf));
 	const parts = input.doc ? sectionsOf(input, input.doc, selected, mode, statusOf) : [];
 	const name = projectOfNode(selected);
@@ -157,6 +170,47 @@ export function projectsView(input: ProjectsInput): ProjectsView {
 		missing: input.doc === null,
 		reorders: input.doc !== null && nodeReorders(selected, statusOf),
 	};
+}
+
+/** The panel's rows: the tree with the filter's row chosen, none without a filter. */
+export function panelRows(tree: ProjectTree, doc: TaskDocument | null, state: ProjectsScreenState): ProjectsRow[] {
+	const statuses = doc ? projectStatuses(tree, doc) : new Map<string, ProjectStatus>();
+	const statusOf = (name: string): ProjectStatus => statuses.get(projectKey(name)) ?? "waiting";
+	return treeRows(tree, state, chosenNode(state, tree) ?? NO_NODE, statusOf, (node) => doc !== null && nodeReorders(node, statusOf));
+}
+
+/** A node no row is: what the rows are drawn with while nothing is chosen. */
+const NO_NODE: ProjectsNodeId = "";
+
+/** What is drawn over the tasks a node filters: its name, a project's menu, and the project a task typed there is given. */
+export interface NodeHeader {
+	readonly title: string;
+	readonly menu: ProjectMenu | null;
+	/** Null for All, No project, Done, a folder and a done project. */
+	readonly project: string | null;
+	/** Done or a done project: only closed tasks show. */
+	readonly closed: boolean;
+}
+
+/** The header of `node`, a node of the tree (`nodeIn`). */
+export function nodeHeader(node: ProjectsNodeId, tree: ProjectTree, doc: TaskDocument | null): NodeHeader {
+	const name = projectOfNode(node);
+	const placed = name === null ? null : tree.find(name);
+	if (!placed) return { title: node === "none" ? PROJECTS_WORDS.none : node === "done" ? PROJECTS_WORDS.done : PROJECTS_WORDS.all, menu: null, project: null, closed: node === "done" };
+	const done = doc !== null && projectStatuses(tree, doc).get(projectKey(placed.node.name)) === "done";
+	return {
+		title: placed.node.name,
+		menu: projectMenu(refOfPlaced(placed, false), doc !== null && hasOwnTasks(doc, placed.node.name)),
+		project: placed.node.folder || done ? null : placed.node.name,
+		closed: done,
+	};
+}
+
+/** The cross over the filtered tasks: nothing chosen. */
+export function cleared(state: ProjectsScreenState): ProjectsScreenState {
+	if (state.selected === undefined) return state;
+	const { selected: _gone, ...rest } = state;
+	return rest;
 }
 
 /** A node's list takes drops: every node but Done and a done project, whose closed tasks stay. */
@@ -440,12 +494,19 @@ function shown(sections: readonly (ProjectsSection | null)[], open: boolean): Pr
 
 /** A tap on a row: the node chosen; the chosen one's branch folded or unfolded. */
 export function tapped(state: ProjectsScreenState, tree: ProjectTree, node: ProjectsNodeId): ProjectsScreenState {
-	const selected = selectedNode(state, tree);
-	if (!sameNode(selected, node)) return { ...state, selected: node };
+	const selected = chosenNode(state, tree);
+	if (selected === null || !sameNode(selected, node)) return { ...state, selected: node };
 	if (node === "done") return { ...state, doneOpen: !(state.doneOpen ?? false) };
 	const name = projectOfNode(node);
 	if (name === null || !tree.find(name)?.node.children.length) return state;
 	return withFold(state, name, !isFolded(state, name));
+}
+
+/** A tap on a row of the panel (`tapped`): on a narrow screen a tap that chose a node closes the panel, which lies over the lists. */
+export function picked(state: ProjectsScreenState, tree: ProjectTree, node: ProjectsNodeId, wide: boolean): ProjectsScreenState {
+	const next = tapped(state, tree, node);
+	const chose = next.selected !== state.selected;
+	return !wide && chose && next.panelOpen ? { ...next, panelOpen: false } : next;
 }
 
 /** A node's branch opened without choosing it: a project's fold taken off, Done's done projects shown. */

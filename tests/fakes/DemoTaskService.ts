@@ -1,4 +1,4 @@
-import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ProjectsDropPreview } from "../../core/application/contracts";
+import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ProjectsDropPreview, type FunnelView } from "../../core/application/contracts";
 import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
 import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
@@ -11,6 +11,7 @@ import { droppedSpan, TimelineSpans } from "../../core/application/TimelineSpans
 import { DayBoundary } from "../../core/domain/DayBoundary";
 import { ProjectTree } from "../../core/domain/ProjectTree";
 import { projectsView } from "../../core/application/projectsScreen";
+import { viewChoice } from "../../core/application/viewModes";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../../core/domain/Days";
 import { typedMarks } from "../../core/domain/Marks";
 import { draftMarksOf, markColors } from "../../core/application/marks";
@@ -435,6 +436,26 @@ export class DemoTaskService implements TaskService {
 	async projectsScreen(): Promise<ProjectsView> {
 		return projectsView({ doc: null, tree: ProjectTree.EMPTY, today: this.today(), boundary: DayBoundary.MIDNIGHT, state: {}, item: () => { throw new Error("The board has no projects"); }, listName: (list) => list });
 	}
+
+	async funnelView(wide: boolean): Promise<FunnelView> {
+		return { filter: null, view: viewChoice({}, { node: null, closed: false, wide, note: false }), panel: { rows: (await this.projectsScreen()).rows.map((row) => ({ ...row, selected: false })), open: false, docked: wide, missing: true } };
+	}
+
+	async projectNoteView(): Promise<null> {
+		return null;
+	}
+
+	async pickProjectNode(): Promise<void> {}
+
+	async clearProjectFilter(): Promise<void> {}
+
+	async setProjectsPanel(): Promise<void> {}
+
+	async setViewMode(): Promise<void> {}
+
+	async setNoteViewMode(): Promise<void> {}
+
+	async dropTasksOnProject(): Promise<void> {}
 
 	async tapProjectNode(): Promise<void> {}
 

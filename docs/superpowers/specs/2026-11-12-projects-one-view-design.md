@@ -41,8 +41,58 @@ The lead's outline; the backend decides the exact shapes and writes them back he
 
 ## Decisions
 
-(agents add here what they decide on the way)
+Backend (2026-11-12):
+
+1. The filter is explicit: the core reads the device's chosen node in `funnelView`, and the frontend passes `filter.node` to `screen`, `drop`, `dropPreview`, `landing`, `createInPlace`/`createWithId` and the quick entry's `look.filter`. So the note's block (another node) and the main screen use the same calls, and a call without the argument answers as before.
+2. The filter is `ProjectsScreenState.selected` (the tree's chosen node, as before); left out means no filter. A device that had a node chosen on the old Projects screen opens filtered by it, with the cross.
+3. Old names stay as deprecated aliases until both frontends move: `SCREEN_PLACES`/`ScreenPlace` (with `projects`), `ScreenSpot`, `ScreenAt`, `stepScreen`, `placeShowing`, `shownLists`, `shownEntryLists`. The new ones are `FUNNEL_PLACES`, `FunnelPlace`, `FunnelSpot`, `FunnelAt`, `stepFunnel`, `funnelPlaceShowing`, `viewEntryLists`. Once both frontends report the move, backend removes the old ones (and `projects` from `SHOWN_LISTS`).
+4. `EntryList` keeps `"projects"`: the by project mode's list.
+5. Modes: no filter → Two columns («Columns» on a narrow screen), All columns (wide only), Rows. A node → the same plus By project, except No project (one part, nothing to split). Done and a done project → By project alone (rows would be four empty lists: their tasks are closed). Default: Two columns without a filter, Rows with one. A kept mode not offered now falls back to the default.
+6. The note's block offers Rows and By project, Rows first; its mode is kept once for every note (`noteView`). No panel, no cross.
+7. A note belongs to a project when the project's `[[link]]` (alias and heading aside) names the note's path without `.md`, or its end after a `/`, case aside.
+8. The panel's `open` is the button's; a panel a carried card slides out is the gesture's own and is not kept. A pick on a narrow screen closes the panel (`pickProjectNode(node, false)`); a tap on the chosen row (fold) doesn't.
+9. Visible-neighbour rule only where `before` is null (the section's end): after the last shown task of that section of that list, the carried ones aside; a drop before a shown card is already right. A drop on a column's title and a past day's list (no sections) stay as they were.
+10. Under a project filter the cards show no folder mark; under All, No project and Done they keep it.
+11. A held card over a panel row opens it (`opensOnHover`), now judged on the panel's rows (nothing chosen: every live project opens).
+12. View icons are Lucide names (`columns-2`, `columns-4`, `rows-3`, `folder-tree`); the Swift app maps them to SF Symbols.
 
 ## Contract
 
-(the backend fills this in)
+All in `core/application/contracts.ts`; the door is `docs/door.md`, «Projects as one view with the funnel».
+
+Types:
+- `ViewMode = "twoColumns" | "allColumns" | "rows" | "byProject"`.
+- `ViewModeOption { mode, label, icon, checked }`; `ViewChoice { mode, modes, icon, wheel, rows }` (`rows`: `["inbox","backlog","soon","day"]` in rows, else `[]`).
+- `ProjectFilter { node, title, menu, clearable, project, emptyLabel }`.
+- `ProjectsPanel { rows, open, docked, missing }`.
+- `FunnelView { filter: ProjectFilter | null, view: ViewChoice, panel: ProjectsPanel | null }`.
+- `ProjectsScreenState` adds `panelOpen?`, `view?`, `filteredView?`, `noteView?`; `selected` absent = no filter.
+- `ProjectsPlace` adds `node?` (whose by project list).
+- `FunnelPlace = "inbox" | "soon" | "calendar"`, `FunnelSpot` (+ `"done"`), `FunnelAt { mode, date }`; `FUNNEL_PLACES`, `stepFunnel`, `funnelPlaceShowing`, `viewEntryLists(mode, spot)`, `ROW_LISTS`, `VIEW_WORDS`.
+- `EntryLook.filter?(): { node, project } | null` (the quick entry).
+
+`TaskService`, new:
+- `funnelView(wide)` — `await tasks.funnelView(true)` → `{ filter: null, view: { mode: "twoColumns", wheel: true, … }, panel: { open: false, docked: true, rows } }`.
+- `projectNoteView(path, wide)` — `projectNoteView("Заметки/Стиль.md", true)` → `{ filter: { node: "project:Стиль", clearable: false, … }, view: { mode: "rows" }, panel: null }`; null for a note of no project.
+- `pickProjectNode(node, wide)` — a tap on a panel row; `pickProjectNode("project:Стиль", false)` chooses and closes the panel.
+- `clearProjectFilter()` — the cross.
+- `setProjectsPanel(open)` — the projects button.
+- `setViewMode(mode)` — `setViewMode("rows")`, kept for the screen with or without a filter.
+- `setNoteViewMode(mode)` — the note's block.
+- `dropTasksOnProject(keys, to, filter)` — `dropTasksOnProject([item.key], "project:Дружба", filter?.node ?? null)`.
+
+`TaskService`, an argument added (optional, last):
+- `screen(date, filter?)` — `screen("2026-11-12", "project:Стиль")`.
+- `drop / landing / dropPreview(tasks, to, day, filter?)`.
+- `createInPlace / createWithId(text, priority, place, repeat, labels, project, filter?)`.
+- `projectsScreen(node?)` — `projectsScreen("project:Стиль")`: its by project view whatever the device chose.
+- `dropInProjects / projectsDropPreview(cards, place, node?)`.
+
+`DayService.stepFunnel(from, shift)` — `stepFunnel({ mode: "inbox", date }, -1)` → null.
+
+What each frontend changes:
+- The ribbon/wheel walk `FUNNEL_PLACES` and `stepFunnel` (Done → Inbox on, null back); `funnelPlaceShowing` instead of `placeShowing`; the quick entry's `shown` is `viewEntryLists(view.mode, spot)` and its `look.filter` is `funnelView().filter`.
+- Read `funnelView(wide)` with the screen, pass `filter?.node` to `screen`/`drop`/`dropPreview`/`landing`; by project mode reads `projectsScreen(filter.node)` and passes the node to `dropInProjects`/`projectsDropPreview`.
+- Panel row tap → `pickProjectNode`; cross → `clearProjectFilter`; projects button → `setProjectsPanel(!panel.open)`; view menu → `setViewMode`; a funnel card on a row → `dropTasksOnProject`; hover stays `hoverProjectNode`.
+- The note's block: `projectNoteView(path, wide)`, `setNoteViewMode`, its node as the filter everywhere.
+- When both have moved, the deprecated names go (decision 3); nothing breaks before that.

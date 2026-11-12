@@ -31,6 +31,8 @@ import {
 	type ProjectsNodeId,
 	type ProjectsScreenState,
 	type ProjectsView,
+	type FunnelView,
+	type ViewMode,
 	type NewTaskPlace,
 	type Placement,
 	type RepeatRule,
@@ -50,7 +52,8 @@ import {
 import type { SectionOffer } from "./sections";
 import { type Clock, memoryProjectsScreen, NO_PROJECTS, type Projects, type ProjectsScreenStore, type SettingsStore, type TaskFileStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
-import { hovered, projectOfNode, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { chosenNode, cleared, hovered, panelRows, picked, projectOfNode, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { withMode } from "./viewModes";
 import { ProjectTree, type TreePlace } from "../domain/ProjectTree";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
@@ -124,8 +127,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.withPriority(text, prefix);
 	}
 
-	screen(date: LocalDate): Promise<ScreenView> {
-		return this.ask(this.reads.screenRead(date));
+	screen(date: LocalDate, filter?: ProjectsNodeId | null): Promise<ScreenView> {
+		return this.ask(this.reads.screenRead(date, filter));
 	}
 
 	setProject(keys: readonly TaskKey[], project: string | null): Promise<void> {
@@ -148,8 +151,46 @@ export class TaskServiceImpl implements TaskService {
 		return this.refOf(await this.run(this.writes.newProject(name, keys)));
 	}
 
-	projectsScreen(): Promise<ProjectsView> {
-		return this.ask(this.reads.projectsScreenRead());
+	projectsScreen(node?: ProjectsNodeId): Promise<ProjectsView> {
+		return this.ask(this.reads.projectsScreenRead(node));
+	}
+
+	funnelView(wide: boolean): Promise<FunnelView> {
+		return this.ask(this.reads.funnelViewRead(wide));
+	}
+
+	projectNoteView(path: string, wide: boolean): Promise<FunnelView | null> {
+		return this.ask(this.reads.projectNoteViewRead(path, wide));
+	}
+
+	async pickProjectNode(node: ProjectsNodeId, wide: boolean): Promise<void> {
+		const s = await this.snapshotOrNull();
+		this.keepScreen(picked(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, node, wide));
+	}
+
+	async clearProjectFilter(): Promise<void> {
+		this.keepScreen(cleared(this.projectsScreenStore.get()));
+	}
+
+	async setProjectsPanel(open: boolean): Promise<void> {
+		const state = this.projectsScreenStore.get();
+		if ((state.panelOpen === true) !== open) this.keepScreen({ ...state, panelOpen: open });
+	}
+
+	async setViewMode(mode: ViewMode): Promise<void> {
+		const s = await this.snapshotOrNull();
+		const state = this.projectsScreenStore.get();
+		this.keepScreen(withMode(state, mode, chosenNode(state, s ? projectTreeOf(s.doc) : ProjectTree.EMPTY) !== null));
+	}
+
+	async setNoteViewMode(mode: ViewMode): Promise<void> {
+		this.keepScreen({ ...this.projectsScreenStore.get(), noteView: mode });
+	}
+
+	dropTasksOnProject(keys: readonly TaskKey[], to: ProjectsNodeId, filter: ProjectsNodeId | null): Promise<void> {
+		const target = to === "none" ? null : projectOfNode(to);
+		if (target === null && to !== "none") return Promise.resolve();
+		return this.run(this.writes.dropTasksOnProject(keys, target, filter));
 	}
 
 	async tapProjectNode(node: ProjectsNodeId): Promise<void> {
@@ -163,9 +204,10 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async hoverProjectNode(node: ProjectsNodeId): Promise<void> {
-		const { rows } = await this.projectsScreen();
 		const s = await this.snapshotOrNull();
-		this.keepScreen(hovered(this.projectsScreenStore.get(), s ? projectTreeOf(s.doc) : ProjectTree.EMPTY, s?.doc ?? null, rows, node));
+		const tree = s ? projectTreeOf(s.doc) : ProjectTree.EMPTY;
+		const state = this.projectsScreenStore.get();
+		this.keepScreen(hovered(state, tree, s?.doc ?? null, panelRows(tree, s?.doc ?? null, state), node));
 	}
 
 	async setProjectsMode(mode: ProjectsMode): Promise<void> {
@@ -206,12 +248,12 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.dropOnProject(cards, target));
 	}
 
-	async dropInProjects(cards: readonly ProjectsDrop[], place: ListPlace): Promise<readonly TaskKey[]> {
-		return this.run(await this.ask(this.writes.dropInProjects(cards, place)));
+	async dropInProjects(cards: readonly ProjectsDrop[], place: ListPlace, node?: ProjectsNodeId): Promise<readonly TaskKey[]> {
+		return this.run(await this.ask(this.writes.dropInProjects(cards, place, node)));
 	}
 
-	projectsDropPreview(cards: readonly ProjectsDrop[], place: ListPlace): Promise<ProjectsDropPreview> {
-		return this.ask(this.writes.projectsDropPreview(cards, place));
+	projectsDropPreview(cards: readonly ProjectsDrop[], place: ListPlace, node?: ProjectsNodeId): Promise<ProjectsDropPreview> {
+		return this.ask(this.writes.projectsDropPreview(cards, place, node));
 	}
 
 	isBlankProjectName(name: string): boolean {
@@ -291,12 +333,12 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.createAtTime(date, start, text));
 	}
 
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Promise<TaskKey | null> {
-		return this.run(this.writes.createInPlace(text, priority, place, repeat, labels, project));
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null, filter?: ProjectsNodeId | null): Promise<TaskKey | null> {
+		return this.run(this.writes.createInPlace(text, priority, place, repeat, labels, project, filter));
 	}
 
-	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Promise<CreatedTask | null> {
-		return this.run(this.writes.createWithId(text, priority, place, repeat, labels, project));
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null, filter?: ProjectsNodeId | null): Promise<CreatedTask | null> {
+		return this.run(this.writes.createWithId(text, priority, place, repeat, labels, project, filter));
 	}
 
 	create(draft: TaskDraft, slot?: Slot): Promise<void> {
@@ -535,16 +577,16 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.applyAll(steps));
 	}
 
-	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly TaskKey[]> {
-		return this.run(await this.ask(this.writes.drop(tasks, to, day)));
+	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<readonly TaskKey[]> {
+		return this.run(await this.ask(this.writes.drop(tasks, to, day, filter)));
 	}
 
-	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly DropLanding[]> {
-		return this.ask(this.writes.landing(tasks, to, day));
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<readonly DropLanding[]> {
+		return this.ask(this.writes.landing(tasks, to, day, filter));
 	}
 
-	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<DropPreview> {
-		return this.ask(this.writes.dropPreview(tasks, to, day));
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<DropPreview> {
+		return this.ask(this.writes.dropPreview(tasks, to, day, filter));
 	}
 
 	async normalize(): Promise<void> {
