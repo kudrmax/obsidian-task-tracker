@@ -361,6 +361,9 @@ adds to the calls above; the old ones answer as before.
   - `tasks.endCarry("nowhere" | "dropped" | "naming")`: let go nowhere or cancelled puts the lift's filter back (none
     included); dropped in a list keeps the screen; the plus let go in the tree keeps the panel out (`reason` `"naming"`)
     until `tasks.endProjectName()`.
+  - A carry never outlives its gesture: `tasks.firstPlace()` and the main screen's `tasks.firstView(wide, false)` (the
+    app's first asks; the plugin's service as it is made) drop a carry or a name left in the state, as let go nowhere:
+    no panel, the lift's filter back.
   - `ProjectsPanel.open` is now true for any reason, `ProjectsPanel.reason` `"button" | "carry" | "naming" | null` says
     which.
 - **The place is the core's:** `tasks.setFunnelPlace(place)` keeps where the screen stands (anything: an old
