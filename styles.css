@@ -1661,6 +1661,8 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .task-calendar.is-view-all > .tc-right { left: calc(var(--tc-all-lists) * (var(--tc-list-width) + var(--tc-divider))); width: calc(100% - var(--tc-stage-left) - var(--tc-all-lists) * (var(--tc-list-width) + var(--tc-divider))); }
 
 /* A project note's block (D5, T6): its view alone, rows or by project, the whole width, no titles and no timeline. */
+/* Live Preview grows the editor's content to fill the note's page; with the block after it, the content keeps its own height, so the block stands under the text whatever its own height. */
+.cm-sizer:has(> .tc-project-block) > .cm-contentContainer { flex-grow: 0; }
 .tc-project-block { margin-top: calc(var(--tc-block-top) - var(--tc-block-lift)); margin-bottom: calc(var(--tc-chrome-room) + var(--tc-block-top)); max-height: var(--tc-block-max-h); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); overflow: hidden; outline: none; }
 .tc-project-block > .task-calendar.is-note { --tc-day-row-top: var(--tc-block-inset); --tc-chrome-room: var(--tc-block-inset); --tc-foot-gap: 0px; --tc-keyboard-room: 0px; --tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room)); --tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-space-8)); }
 .task-calendar.is-note > :is(.tc-rows, .tc-by-project) { left: 0; width: 100%; padding: 0 var(--tc-block-inset); }
