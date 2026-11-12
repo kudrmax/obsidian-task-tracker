@@ -400,6 +400,10 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         }
         rowsVersion += 1
         showHeaders()
+        // A stacked list shares its height with the others: a field its rows push past its bottom (Enter's next field, a
+        // written card coming in above it) is brought into sight in this same pass, before its row stops being displayed:
+        // a field whose row leaves the list's sight loses the keyboard and the entry ends.
+        if host.stacked, model.entry.lists[column.rawValue] != nil { reveal(field: (), animated: false) }
     }
 
     /// The rows of the cards `ids` on the screen drawn anew at once, in place, from the model as it stands now (the carry
@@ -543,21 +547,21 @@ final class ListController: NSObject, UICollectionViewDelegate, UIGestureRecogni
         }
     }
 
-    private func reveal(field: Void) {
+    private func reveal(field: Void, animated: Bool = true) {
         guard let model, model.entry.lists[column.rawValue] != nil else { return }
         let renaming = model.entry.state?.renaming?.id
         guard let id = renaming ?? model.entry.lineKeys[column.rawValue]?.last ?? rows.first(where: { if case .field = $0 { true } else { false } })?.id,
               let path = indexPath(of: id) else { return }
         collection.layoutIfNeeded()
-        reveal(path, centred: false)
+        reveal(path, centred: false, animated: animated)
     }
 
     /// A row whole between the list's soft top and the room the keyboard leaves stays; another comes into sight.
-    private func reveal(_ path: IndexPath, centred: Bool) {
+    private func reveal(_ path: IndexPath, centred: Bool, animated: Bool = true) {
         guard let frame = collection.layoutAttributesForItem(at: path)?.frame else { return }
         let visible = collection.bounds.inset(by: UIEdgeInsets(top: SoftEdges.fade, left: 0, bottom: collection.contentInset.bottom + SoftEdges.fade, right: 0))
         guard !visible.contains(frame) else { return }
-        collection.scrollToItem(at: path, at: centred ? .centeredVertically : .bottom, animated: true)
+        collection.scrollToItem(at: path, at: centred ? .centeredVertically : .bottom, animated: animated)
     }
 
     /// The keyboard's top at `top` on the screen: the part of the list it covers is room to scroll the last rows above it.
