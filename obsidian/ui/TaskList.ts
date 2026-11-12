@@ -34,8 +34,10 @@ export interface TaskListDeps {
 	onHeader?(head: HTMLElement, group: ListGroup, signal: AbortSignal): void;
 	/** The No tasks plate under an empty section's header. */
 	onPlate?(plate: HTMLElement, group: ListGroup, signal: AbortSignal): void;
-	/** The words of the plate a list that draws nothing shows (a filter's «No tasks», a row of the rows mode); null: none. */
+	/** The words of the plate a list that draws nothing shows (`ViewChoice.plates`); null: none. */
 	empty?(): string | null;
+	/** The words of an empty section's plate (`ViewChoice.emptyLabel`). */
+	emptyLabel?(): string;
 	/** That plate tapped: a new task at the list's end. */
 	onEmpty?(): void;
 }
@@ -342,7 +344,8 @@ export class TaskList {
 	}
 
 	private plate(drawing: RowsDrawing, group: ListGroup): HTMLElement {
-		const { node: plate, signal } = drawing.take(`plate:${JSON.stringify(group.id)}`, () => el(null, "div", PLATE, "No tasks"));
+		const { node: plate, signal } = drawing.take(`plate:${JSON.stringify(group.id)}`, () => el(null, "div", PLATE));
+		plate.textContent = this.deps.emptyLabel?.() ?? "";
 		plate.dataset.group = group.name ?? "";
 		this.plates.set(plateKey(group.name), plate);
 		this.deps.onPlate?.(plate, group, signal);

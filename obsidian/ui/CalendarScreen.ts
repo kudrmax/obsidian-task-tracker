@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type DropColumn, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusTakes, projectsTakes, type MenuScreen, ROW_LISTS, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
+import { acceptsDrop, LIST_WIDTHS, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type DropColumn, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusTakes, projectsTakes, type MenuScreen, ROW_LISTS, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewChoice, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
 import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -119,6 +119,8 @@ export class CalendarScreen extends Component {
 	private panel: TreePanel | null = null;
 	/** The panel slid out on the phone by a card held at the left edge, for that drag alone. */
 	private revealed = false;
+	/** The view before the first read answers. */
+	private firstView: ViewChoice | null = null;
 	/** A new project's name is typed in the tree: a panel the plus slid out stays out until it is. */
 	private namingProject = false;
 	/** The projects button at the top left: it opens and closes the panel. */
@@ -351,7 +353,8 @@ export class CalendarScreen extends Component {
 			onPlate: (plate, group, signal) => this.attachPlate(plate, "day", group, signal),
 			pending: () => this.namingIn("day"),
 			entry: (drawing) => (this.columnsShow() ? (this.quick?.entryIn("day", drawing) ?? null) : null),
-			empty: () => (this.filterNode() !== null ? this.emptyWords() : null),
+			empty: () => this.view().plates["day"],
+			emptyLabel: () => this.view().emptyLabel,
 			onEmpty: () => this.quick?.openAtEnd("day"),
 			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group, signal) => this.groupDrag.attach(head, this.sectionsOf("day")?.list ?? "now", this.list!, group, signal),
@@ -377,7 +380,8 @@ export class CalendarScreen extends Component {
 			onPlate: (plate, group, signal) => this.attachPlate(plate, "inbox", group, signal),
 			pending: () => this.namingIn("inbox"),
 			entry: (drawing) => (this.columnsShow() ? (this.quick?.entryIn("inbox", drawing) ?? null) : null),
-			empty: () => (this.filterNode() !== null ? this.emptyWords() : null),
+			empty: () => this.view().plates["inbox"],
+			emptyLabel: () => this.view().emptyLabel,
 			onEmpty: () => this.quick?.openAtEnd("inbox"),
 			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group, signal) => this.groupDrag.attach(head, "inbox", this.inboxList!, group, signal),
@@ -394,7 +398,8 @@ export class CalendarScreen extends Component {
 			onPlate: (plate, group, signal) => this.attachPlate(plate, "backlog", group, signal),
 			pending: () => this.namingIn("backlog"),
 			entry: (drawing) => (this.columnsShow() ? (this.quick?.entryIn("backlog", drawing) ?? null) : null),
-			empty: () => (this.filterNode() !== null ? this.emptyWords() : null),
+			empty: () => this.view().plates["backlog"],
+			emptyLabel: () => this.view().emptyLabel,
 			onEmpty: () => this.quick?.openAtEnd("backlog"),
 			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group, signal) => this.groupDrag.attach(head, "backlog", this.backlogList!, group, signal),
@@ -411,7 +416,8 @@ export class CalendarScreen extends Component {
 			onPlate: (plate, group, signal) => this.attachPlate(plate, "soon", group, signal),
 			pending: () => this.namingIn("soon"),
 			entry: (drawing) => (this.columnsShow() ? (this.quick?.entryIn("soon", drawing) ?? null) : null),
-			empty: () => (this.filterNode() !== null ? this.emptyWords() : null),
+			empty: () => this.view().plates["soon"],
+			emptyLabel: () => this.view().emptyLabel,
 			onEmpty: () => this.quick?.openAtEnd("soon"),
 			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group, signal) => this.groupDrag.attach(head, "soon", this.soonList!, group, signal),
@@ -805,6 +811,7 @@ export class CalendarScreen extends Component {
 			alignTimeline: (timeline) => this.timeline && timeline.alignWith(this.timeline),
 			allDayExtraRows: () => this.rightEl?.style.getPropertyValue(PROPERTY.allDayExtraRows) ?? "",
 			filter: () => this.filterNode(),
+			emptyLabel: () => this.view().emptyLabel,
 		});
 		const list: DayLane = {
 			shown: () => (this.leftEl ? [...this.leftEl.children].filter((part) => part instanceof HTMLElement) : []),
@@ -952,7 +959,7 @@ export class CalendarScreen extends Component {
 		});
 		const { screen } = revealed;
 		if (!screen) return;
-		if (this.filterNode() !== null && !this.shows(item)) await this.act(() => this.deps.tasks.clearProjectFilter());
+		if (await this.deps.tasks.filterHides(item, this.filterNode())) await this.act(() => this.deps.tasks.clearProjectFilter());
 		this.found.mark(item);
 		const place: Place = screen.kind === "day" ? "calendar" : PLACE_OF_LIST[screen.list];
 		if (place === "done" && this.viewMode() !== "twoColumns") return this.openFull(item, false);
@@ -961,13 +968,6 @@ export class CalendarScreen extends Component {
 		if (place === "done") this.switcher?.show("done");
 		await this.setMode(place === "done" ? "inbox" : place);
 		this.parts.request("tasks");
-	}
-
-	/** Whether the lists as read show `item`, a subtask under its task too: a find the filter hides clears the filter. */
-	private shows(item: TaskItem): boolean {
-		const within = (items: readonly TaskItem[]): boolean => items.some((shown) => shown.id === item.id || within(shown.subtasks));
-		const day = this.data.day;
-		return [this.data.inbox, this.data.backlog, this.data.soon, this.data.done, day?.list ?? [], day?.slotted ?? []].some(within);
 	}
 
 	/** A tap anywhere but the selected card, its dots, or the menu over it lets the selection go. */
@@ -1529,7 +1529,12 @@ export class CalendarScreen extends Component {
 
 	/** The mode the view is drawn in; before the first read, the default of the place it is drawn at. */
 	private viewMode(): ViewMode {
-		return this.data.funnel?.view.mode ?? (this.where.note ? "rows" : "twoColumns");
+		return this.view().mode;
+	}
+
+	/** The view as read with the lists; before the first read, as the device keeps it (`TaskService.firstView`). */
+	private view(): ViewChoice {
+		return this.data.funnel?.view ?? (this.firstView ??= this.deps.tasks.firstView(this.wide(), this.where.note !== undefined));
 	}
 
 	/** The funnel's columns show their lists: two columns and all columns. */
@@ -1619,7 +1624,8 @@ export class CalendarScreen extends Component {
 				onPlate: (plate, group, signal) => this.attachPlate(plate, column, group, signal),
 				pending: () => this.namingIn(column),
 				entry: (drawing) => (this.viewMode() === "rows" ? (this.quick?.entryIn(column, drawing) ?? null) : null),
-				empty: () => this.emptyWords(),
+				empty: () => this.view().plates[column],
+				emptyLabel: () => this.view().emptyLabel,
 				onEmpty: () => this.quick?.openAtEnd(column),
 				renaming: () => this.quick?.renaming() ?? null,
 				onHeader: (head, group, signal) => this.groupDrag.attach(head, this.sectionsOf(column)?.list ?? (column === "day" ? "now" : column), list, group, signal),
@@ -1653,10 +1659,7 @@ export class CalendarScreen extends Component {
 		rows.render(this.rowOrder());
 	}
 
-	/** The words of an empty list's plate: the filter's, else the lists' own. */
-	private emptyWords(): string {
-		return this.data.funnel?.filter?.emptyLabel ?? "No tasks";
-	}
+
 
 	/** The by project mode's list: the filter's node in its subprojects' parts, its cards a place to drop, as a list's. */
 	private buildByProject(root: HTMLElement): void {
