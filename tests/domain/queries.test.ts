@@ -46,7 +46,16 @@ describe("dayList", () => {
 });
 
 describe("slottedOn", () => {
-	it("lists Now and Soon tasks slotted on the date, in file order", () => {
+	it("orders them by their time, not by the file: past midnight comes after the evening, ties keep file order (Max, 11-12)", () => {
+		const evening = TaskDocument.parse(
+			["## Now", "- [ ] Order ⏰ 2026-10-30 22:00", "- [ ] Washer ⏰ 2026-10-30 21:30", "- [ ] Night ⏰ 2026-10-31 01:00", "- [ ] Send ⏰ 2026-10-30 23:30", "- [ ] Also send ⏰ 2026-10-30 23:30"].join("\n"),
+			SECTIONS,
+			M,
+		);
+		expect(texts(slottedOn(evening, T, new DayBoundary(4)))).toEqual(["Washer", "Order", "Send", "Also send", "Night"]);
+	});
+
+	it("lists Now and Soon tasks slotted on the date", () => {
 		expect(texts(slottedOn(doc, T))).toEqual(["Slotted today", "Soon due D slotted today"]);
 		expect(texts(slottedOn(doc, "2026-10-31"))).toEqual(["Slotted tomorrow"]);
 		expect(texts(slottedOn(doc, D))).toEqual(["Due D slotted D", "Soon slotted D"]);
