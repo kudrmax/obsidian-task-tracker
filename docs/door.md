@@ -447,6 +447,12 @@ adds to the calls above; the old ones answer as before.
   the lift's filter (added when lifted with no filter). The core reads the carry from the `projectsScreen` handed in, so
   call `tasks.drop` before `tasks.endCarry("dropped")`, as now.
 - `ProjectsRow.muted` for No project: true only while no open task without a project stands in the funnel.
+- `rules.sameNewPlace(a, b)` → boolean: two places for a new task are the same, field by field (any key order). Example:
+  `rules.sameNewPlace({ kind: "list", list: "inbox", group: null, before: null }, { before: null, group: null, list:
+  "inbox", kind: "list" })` → `true`.
+- `rules.projectsEntryLook(view)`'s `parts` add `end` (a `TaskKey` or null): the card a field opened at that part's end
+  stands before, so the written card lands where the field was; the quick entry (`entry.*`) uses it when the look's
+  parts carry it, so hand the parts in as the rule gives them.
 - No rule gives a list a card's room more while a card or the plus is carried or a task typed: rows never reflow during
   a carry; the room to drop in is the hovered list's, drawn by the frontend.
 

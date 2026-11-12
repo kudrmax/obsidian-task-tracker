@@ -59,6 +59,8 @@ export { SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type EntryList } from "./
 export { stackedRows } from "./stackedRows";
 /** The same from measured lists: one that scrolls ends under a whole card and the fade (`stackedLists(lists, room, fade)`). */
 export { type StackedList, stackedLists } from "./stackedRows";
+/** Two places for a new task are the same, field by field (`sameNewPlace`): what every frontend matches places by. */
+export { sameNewPlace } from "./newTaskPlaces";
 /** How each view mode stands (`ViewChoice.layout`), its columns' widths and the share a divider let go saves. */
 export { type LayoutColumn, type LayoutColumnId, type LayoutList, type LayoutStack, type LayoutWidth, type LayoutWidths, layoutShareAt, layoutWidths, type ViewLayout, viewLayout } from "./viewLayout";
 import type { ViewLayout } from "./viewLayout";
