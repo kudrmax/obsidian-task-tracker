@@ -1669,6 +1669,7 @@ body:not(.is-mobile) .tc-stage-col.is-timeline .tc-day-nav { gap: var(--tc-space
  */
 .tc-rows-stack { flex: 1 1 0; min-height: 0; padding-bottom: var(--tc-foot-room); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
 .tc-rows-fade-probe { position: absolute; width: 0; height: var(--tc-scroll-fade); visibility: hidden; pointer-events: none; }
+.tc-rows-entry-probe { position: absolute; width: 0; height: var(--tc-row-entry-room); visibility: hidden; pointer-events: none; }
 .tc-row { flex: none; min-height: 0; display: flex; flex-direction: column; transition: height var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-rows-stack.is-still > .tc-row { transition: none; }
 .tc-row + .tc-row { margin-top: var(--tc-section-gap); }
@@ -1681,8 +1682,12 @@ body:not(.is-mobile) .tc-stage-col.is-timeline .tc-day-nav { gap: var(--tc-space
  * there, never faded over (Max's defect 2). Near its end the cut gives way with the content left under it.
  */
 .task-calendar .tc-list.tc-row-list.is-under-bottom { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade)))); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade)))); }
-/* While a task is typed in a list, the list keeps room at its end for the bar, so the bar never lies on its cards. */
-.task-calendar.is-entering .tc-list.tc-row-list:has(> .tc-quick-row)::after { content: ""; height: var(--tc-row-entry-room); }
+/*
+ * While a task is typed in a rows list, the bar never lies on its cards: on the desktop the field keeps the capsule's room
+ * under it, wherever it stands in the list; on the phone the list keeps the room over the bar at its end.
+ */
+body:not(.is-mobile) .task-calendar .tc-list.tc-row-list > .tc-quick-row { margin-bottom: var(--tc-row-entry-room); }
+body.is-mobile .task-calendar.is-entering .tc-list.tc-row-list:has(> .tc-quick-row)::after { content: ""; height: var(--tc-row-entry-room); }
 body:not(.is-mobile) .task-calendar { --tc-row-entry-room: calc(var(--tc-bar-h) + 2 * var(--tc-desk-bar-gap)); }
 /* The list under a carried card alone opens a card's room at its end, inside its own scroll: no row moves. */
 .task-calendar .tc-list.tc-row-list.is-drop-room::after { content: ""; height: var(--tc-card-h); }

@@ -1623,6 +1623,8 @@ export class CalendarScreen extends Component {
 			root.querySelector(".tc-missing")?.remove();
 			if (missing) this.renderMissing(root);
 			root.classList.toggle(REDRAWN, motion === "replace");
+			/** A field about to open holds the rows as they stand before they draw it, where they share the room. */
+			layout.hold("typing", this.quick?.entering ?? false);
 			layout.render(motion);
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
