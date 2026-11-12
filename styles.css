@@ -973,7 +973,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-card { position: relative; overflow: hidden; flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; cursor: pointer; }
 .tc-group-head { flex-shrink: 0; height: var(--tc-group-head-h); box-sizing: border-box; margin-top: var(--tc-section-gap); margin-bottom: calc(-1 * var(--tc-card-gap)); padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); display: flex; align-items: flex-end; white-space: nowrap; overflow: hidden; touch-action: pan-y; }
 .tc-card, .tc-group-head { transition: height var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out); }
-.tc-group-head:first-child { margin-top: 0; }
+.tc-group-head:not(:not(.is-leaving) ~ .tc-group-head) { margin-top: 0; }
 .tc-group-head:not(.is-ungrouped) { cursor: pointer; }
 .tc-group-head.is-folded { height: 0; margin-top: 0; opacity: 0; }
 .tc-group-head.is-renamed { display: none; }
@@ -1501,7 +1501,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .task-calendar > .tc-search > .tc-search-results { position: absolute; left: 0; right: 0; top: 0; bottom: calc(var(--tc-search-bottom) + var(--tc-bar-h)); box-sizing: border-box; padding: var(--tc-space-16) var(--tc-space-10) var(--tc-space-8); }
 .task-calendar.is-keyboard-up > .tc-search { --tc-search-bottom: var(--tc-bar-bottom); }
 .tc-search-results > * { flex-shrink: 0; }
-.tc-search-results > .tc-group-head:first-child { margin-top: 0; }
+.tc-search-results > .tc-group-head:not(:not(.is-leaving) ~ .tc-group-head) { margin-top: 0; }
 .tc-search-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-search-bottom); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); background: var(--tc-bg); display: flex; align-items: center; gap: var(--tc-space-8); }
 .tc-search-field { flex: 1; min-width: 0; height: var(--tc-bar-btn-h); box-sizing: border-box; padding: 0 var(--tc-search-field-pad); border-radius: var(--tc-radius-bar-btn); background: var(--tc-card-bg); color: var(--tc-muted); display: flex; align-items: center; gap: var(--tc-space-6); }
 .tc-search-field svg { width: var(--tc-icon-m); height: var(--tc-icon-m); flex-shrink: 0; stroke: currentColor; stroke-width: var(--tc-stroke-ring); }

@@ -1,5 +1,6 @@
 import { type DropColumn, stackedRows } from "../../core/application/contracts";
 import { el, px } from "./dom";
+import { motionLeft, readResting, timingOf } from "./motion/Motion";
 
 /** One stage of the rows: its label and the place its list is built in. */
 export interface FunnelRow {
@@ -21,6 +22,9 @@ export class FunnelRows {
 	private readonly rows = new Map<DropColumn, FunnelRow>();
 	private shown: readonly DropColumn[] = [];
 	private readonly sized = new ResizeObserver(() => this.fit());
+	/** The heights the rows were last fitted to, and the moves taking them there. */
+	private fitted: readonly number[] = [];
+	private readonly easing = new Map<HTMLElement, Animation>();
 
 	constructor(
 		parent: HTMLElement,
@@ -58,24 +62,44 @@ export class FunnelRows {
 		}
 		for (const [column, row] of this.rows) if (!order.includes(column)) row.el.classList.add("tc-hidden");
 		this.shown = order;
+		for (const column of order) {
+			const list = this.rowOf(column).body.firstElementChild;
+			if (list) this.sized.observe(list);
+		}
 		this.fit();
 	}
 
-	/** Each row as tall as the core says for what it wants (its label and its list's content) and the room they share. */
+	/**
+	 * Each row as tall as the core says for what it wants (its label and its list's content) and the room they share; run
+	 * again whenever the room or a list's height changes. While cards leave or arrive, each row goes once, straight, from
+	 * where it stands to where it rests when they are done: no row takes room another frees for a moment and gives it back.
+	 */
 	fit(): void {
 		const rows = this.shown.map((column) => this.rowOf(column));
 		if (!this.stacks() || rows.length === 0 || this.stack.clientHeight === 0) {
 			for (const row of rows) row.el.style.removeProperty("height");
+			this.fitted = [];
 			return;
 		}
 		const style = getComputedStyle(this.stack);
 		const gap = rows.length > 1 ? parseFloat(getComputedStyle(rows[1].el).marginTop) || 0 : 0;
 		const room = this.stack.clientHeight - (parseFloat(style.paddingBottom) || 0) - gap * (rows.length - 1);
-		const wanted = rows.map((row) => row.label.offsetHeight + (row.body.firstElementChild?.scrollHeight ?? 0));
+		const wanted = readResting(this.stack, () => rows.map((row) => row.label.offsetHeight + (row.body.firstElementChild?.scrollHeight ?? 0)));
 		const card = parseFloat(style.getPropertyValue("--tc-card-h")) || 0;
 		const least = (rows[0]?.label.offsetHeight ?? 0) + card;
 		const heights = stackedRows(wanted, room, least);
-		rows.forEach((row, i) => (row.el.style.height = px(heights[i])));
+		if (heights.length === this.fitted.length && heights.every((height, i) => Math.abs(height - this.fitted[i]) < 0.5)) return;
+		this.fitted = heights;
+		const left = Math.max(0, ...rows.map((row) => motionLeft(row.body)));
+		rows.forEach((row, i) => {
+			const from = row.el.getBoundingClientRect().height;
+			this.easing.get(row.el)?.cancel();
+			this.easing.delete(row.el);
+			row.el.style.height = px(heights[i]);
+			const timing = timingOf(row.el);
+			if (left <= 0 || !timing || Math.abs(from - heights[i]) < 0.5) return;
+			this.easing.set(row.el, row.el.animate([{ height: px(from) }, { height: px(heights[i]) }], { duration: left, easing: timing.easing }));
+		});
 	}
 
 	destroy(): void {
