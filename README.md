@@ -2,7 +2,9 @@
 
 A task list next to a day timeline, inside Obsidian. One markdown file is the only truth: the plugin reads it on every change and writes it back line by line, so editing the file by hand is always fine. Drag a task onto a time, see your Google and work calendars beside it. Built for the iPhone first.
 
-**Full documentation (in Russian): [docs/plugin/README.md](docs/plugin/README.md)** — what makes this task manager different, how a day goes with it, the file, the screen, every action, settings, and how an agent should edit the tasks file. This README keeps the short English overview and the Google setup.
+The idea: a task travels Inbox and Backlog → Soon → Now → a time on the calendar → Done, and at any moment you see a short list of what to do now. A task of several steps is folded and shows only its next open step; Done on it brings up the step after. Projects are marks on tasks over that path: a chosen project filters the whole screen.
+
+**Full documentation (in Russian): [docs/plugin/README.md](docs/plugin/README.md)** — the essence, how the tool is built part by part, how a day goes with it, the file, the screen, every action, settings, and how an agent should edit the tasks file. This README keeps the short English overview and the Google setup.
 
 ## The file
 
