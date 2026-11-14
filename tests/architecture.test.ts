@@ -9,7 +9,7 @@ const ROOT = resolve(__dirname, "..");
 type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root";
 
 /** Obsidian's own packages: the app provides them at run time (`external` in esbuild.config.mjs). */
-const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
+const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view", "preact", "preact/hooks", "preact/jsx-runtime"];
 
 function layerOf(file: string): Layer | null {
 	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";

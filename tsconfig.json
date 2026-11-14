@@ -3,7 +3,11 @@
     "target": "ES2020",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["DOM", "DOM.Iterable", "ES2021"],
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ES2021"
+    ],
     "strict": true,
     "noImplicitOverride": true,
     "noUnusedLocals": true,
@@ -11,7 +15,18 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
   },
-  "include": ["core/**/*.ts", "obsidian/**/*.ts", "tests/**/*.ts", "vitest.config.mts"]
+  "include": [
+    "core/**/*.ts",
+    "obsidian/**/*.ts",
+    "obsidian/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "vitest.config.mts"
+  ]
 }
