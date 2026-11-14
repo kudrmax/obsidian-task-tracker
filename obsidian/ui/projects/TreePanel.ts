@@ -48,6 +48,15 @@ export class TreePanel {
 		this.tree = new ProjectTree(column, { onTap: (node) => deps.onPick(node), onRow: deps.onRow });
 		/** Rows scrolled under the title fade out there, as a list's do. */
 		this.edges = new ScrollEdges(this.tree.el);
+		/** The lists take what the docked panel leaves: whatever sets its width (its first drawing, a theme, a drag) frames them anew. */
+		const Observer = root.ownerDocument.defaultView?.ResizeObserver ?? ResizeObserver;
+		let seen = -1;
+		new Observer(() => {
+			const width = this.el.offsetWidth;
+			if (width === seen) return;
+			seen = width;
+			deps.onWidth(width);
+		}).observe(this.el);
 		new Divider(el(this.el, "div"), {
 			width: () => column.offsetWidth,
 			onWidth: (width) => {
