@@ -6466,7 +6466,7 @@ ${key.title}`.toLowerCase();
         view,
         panel: { rows: panelRows(tree, s?.doc ?? null, state), open: reason !== null, reason, docked: wide, dimCloses: reason === "button" && !wide, missing: s === null },
         plus: plusOf(view.mode, reason !== null),
-        topRow: wide || node !== null || view.mode !== "twoColumns",
+        topRow: node !== null || view.mode !== "twoColumns",
         searchPaths: filter !== null,
         place: funnelPlaceOf(state.place)
       };

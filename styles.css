@@ -1580,9 +1580,11 @@ body:not(.is-mobile) .tc-lifted.is-project-title .tc-lifted-title { font-size: v
 .tc-projects-list > .tc-hidden { display: none; }
 /* What the tokens build from the view's own measures is built again on the view, where those are set: the docked panel's room, the wheel's place. */
 .task-calendar { --tc-half-column: calc((100% - var(--tc-stage-left) - var(--tc-divider)) / 2); --tc-tree-width: var(--tc-half-column); --tc-dock-width: max(var(--tc-tree-min), min(var(--tc-tree-width), calc(100% - var(--tc-stage-min) - var(--tc-divider)))); --tc-stage-mid: calc(var(--tc-stage-left) + (100% - var(--tc-stage-left)) / 2); --tc-seg-w: calc((var(--tc-seg-span) + var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad)); }
-body:not(.is-mobile) .task-calendar { --tc-top-row-top: var(--tc-desk-top-row-top); --tc-top-row-h: var(--tc-desk-projects-top); --tc-tree-width: var(--tc-desk-tree-width); --tc-projects-top: var(--tc-desk-projects-top); --tc-font-filter: var(--tc-font-desk-projects-title); --tc-leading-filter: var(--tc-leading-desk-projects-title); }
+body:not(.is-mobile) .task-calendar.has-top-row { --tc-top-row-top: var(--tc-desk-top-row-top); }
+body:not(.is-mobile) .task-calendar { --tc-top-row-h: var(--tc-desk-projects-top); --tc-tree-width: var(--tc-desk-tree-width); --tc-projects-top: var(--tc-desk-projects-top); --tc-font-filter: var(--tc-font-desk-projects-title); --tc-leading-filter: var(--tc-leading-desk-projects-title); }
 .task-calendar.has-top-row { --tc-day-row-top: var(--tc-top-row-h); --tc-columns-top: calc(var(--tc-top-row-h) + var(--tc-columns-head)); }
 .task-calendar.has-head-lead { --tc-head-lead: calc(var(--tc-folder-btn) + var(--tc-space-4)); }
+.task-calendar.has-head-lead.has-dock { --tc-head-lead: 0px; }
 .task-calendar.has-dock { --tc-stage-left: calc(var(--tc-dock-width) + var(--tc-divider)); --tc-filter-left: calc(var(--tc-stage-left) + var(--tc-space-4)); }
 .task-calendar > button.tc-btn.tc-folder-btn { position: absolute; left: var(--tc-space-10); top: var(--tc-top-row-top); z-index: var(--tc-layer-switch); width: var(--tc-folder-btn); height: var(--tc-folder-btn); color: var(--tc-ink-soft); }
 .task-calendar > button.tc-btn.tc-folder-btn.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }

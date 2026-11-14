@@ -89,7 +89,7 @@ lifted filter, edge timer, hover timer or panel of its own), 40 (the place is th
 
 Obsidian frontend (2026-11-12; numbered from 22 so as not to meet the Swift frontend's 13–21 on its branch):
 
-22. The top row: on the desktop the row of the projects button and the filter's title always stands over the column titles (D4); on the phone only while a filter is set or the mode has no column titles (rows, by project), else the button stands in the titles' row and the first title makes room for it (T1).
+22. The top row: on the desktop and the phone alike (Max, 2026-11-14: on the desktop the button alone took a whole row, D4 is overruled) only while a filter is set or the mode has no column titles (rows, by project), else the button stands in the titles' row and the first title makes room for it (T1).
 23. The docked panel (desktop): every column moves right by its room; the wheel and the view button centre on the lists right of it; Undo's capsule stands at the panel's tree inset (D1: 20 from the edge).
 24. The phone's bottom row with the wheel: the view button and the wheel stand together in the middle of the room between Undo's capsule and the plus, as the boards measure it (T1, T4: the wheel ends up right of the screen's centre). Alone, the view button stands in the middle (T3).
 25. All columns: Inbox, Soon and the day's list each as wide as the one divider sets, the timeline the rest; the share it saves is one list's against the timeline, so the middle share gives four equal columns (D1); it is the same setting as two columns' divider.

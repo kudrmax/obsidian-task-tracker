@@ -1153,7 +1153,7 @@ export interface FunnelView {
 	/** The tree's panel; null in a note's block, which shows no tree. */
 	readonly panel: ProjectsPanel | null;
 	readonly plus: PlusChoice;
-	/** The top row (the projects button, the filter's name, the view's titles) stands over the lists: always on a wide screen; on a narrow one with a filter or in a mode without column titles (all but two columns). Never in a note's block. */
+	/** The top row (the projects button, the filter's name, the view's titles) stands over the lists: only with a filter or in a mode without column titles (all but two columns), on every screen; else the projects button stands in the column titles' row. Never in a note's block. */
 	readonly topRow: boolean;
 	/** A search opened over it shows each find's project path: a filter is chosen. */
 	readonly searchPaths: boolean;
