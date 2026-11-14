@@ -294,9 +294,10 @@ describe("what the frontends no longer decide", () => {
 		expect((await svc.funnelView(true)).view.source).toBe("projectsScreen");
 	});
 
-	it("the top row: always on a wide screen; on a narrow one with a filter or a mode without column titles", async () => {
+	/** Max, 2026-11-14: the projects button alone took a whole row over the lists on the Mac; it stands left of the first title there too. */
+	it("the top row: only with a filter or a mode without column titles, on a wide screen as on a narrow one", async () => {
 		const { svc } = setup();
-		expect((await svc.funnelView(true)).topRow).toBe(true);
+		expect((await svc.funnelView(true)).topRow).toBe(false);
 		expect((await svc.funnelView(false)).topRow).toBe(false);
 		await svc.setViewMode("rows");
 		expect((await svc.funnelView(false)).topRow).toBe(true);
