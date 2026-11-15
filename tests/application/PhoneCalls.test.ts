@@ -596,6 +596,8 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("calendarsRefresh.silence"),
 		plain("ids.continueFrom", { next: 3, lines: [] }, { next: 9, lines: [] }),
 		plain("rules.constants"),
+		plain("rules.entryJobStep", { queue: [], running: null }, null),
+		plain("rules.queuedEntryJobs", { queue: [], running: null }, []),
 		plain("rules.nextProgress", ["todo", "inProgress"]),
 		plain("rules.sameSlot", { date: T, start: 1, end: null }, { date: T, start: 1, end: null }),
 		plain("rules.sameRule", rule, null),

@@ -51,6 +51,7 @@ export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace
 /** What a drop in a gap means, and none when it changes nothing; which section a gap is in; where a lifted section goes. */
 export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
+export { entryJobStep, type EntryJobOutcome, type EntryJobs, type EntryJobStep, NO_ENTRY_JOBS, queuedEntryJobs } from "./EntryJobs";
 export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
 export { SHOWN_LISTS, SWIPE_FLICK_SPEED, swipeLanding, type EntryList } from "./screenPlaces";
@@ -184,6 +185,16 @@ export interface ListSection {
 }
 
 /** Of a task's own subtasks: how many are done out of those not given up. */
+/** A card's marks (`TaskItem.marks`), the task's own whether or not its card shows a folded step. */
+export interface CardMarks {
+	/** The dot in the card's left padding: the task is in progress. */
+	readonly progressDot: boolean;
+	/** The description's mark under the counter: the task has a description. */
+	readonly description: boolean;
+	/** The subtask counter, «done/total» of its own subtasks; null without subtasks. */
+	readonly count: string | null;
+}
+
 export interface SubtaskProgress {
 	readonly done: number;
 	readonly total: number;
@@ -297,6 +308,8 @@ export interface TaskItem {
 	readonly allSubtasks: readonly TaskItem[];
 	/** Null without subtasks. */
 	readonly progress: SubtaskProgress | null;
+	/** What a card draws beside its title, decided here: a frontend draws these and reads nothing else for them. */
+	readonly marks: CardMarks;
 	/** Its open subtasks are folded away: a list draws its card without them. Only a task with an open subtask is. */
 	readonly collapsed: boolean;
 	/** The text of the task a subtask belongs to; null for a task. */
@@ -1546,8 +1559,12 @@ export interface TaskService {
 	 * stands, its key fresh; null when nothing was written.
 	 */
 	rename(key: TaskKey, text: string): Promise<TaskItem | null>;
-	/** The task as the full screen shows it: its tree, and where a new subtask stands in it. */
-	fullTree(item: TaskItem): FullTree;
+	/**
+	 * The task as the full screen shows it: its tree, and where a new subtask stands in it. `filter`, the view's
+	 * (`FunnelView.filter.node`): under a project's, no card of the tree shows the folder mark, as that view's lists
+	 * show none; left out, each keeps the mark `item` has.
+	 */
+	fullTree(item: TaskItem, filter?: ProjectsNodeId | null): FullTree;
 	/**
 	 * The description from Markdown, one block right under the task and before its subtasks; the same text writes
 	 * nothing, an empty one or `DESCRIPTION_TEMPLATE` alone takes it away. Blank lines go: they would end the task in the file.
@@ -1559,8 +1576,9 @@ export interface TaskService {
 	/**
 	 * The task `key` names as the file now has it: its line at its place; moved, the one line like it anywhere; else the
 	 * task at its place whose text is `text`, its other fields changed there. Null when none of these is found.
+	 * `filter`, the view's: under a project's, the task and its subtasks show no folder mark, as the view's lists.
 	 */
-	find(key: TaskKey, text: string): Promise<TaskItem | null>;
+	find(key: TaskKey, text: string, filter?: ProjectsNodeId | null): Promise<TaskItem | null>;
 
 	/**
 	 * Puts `key` right before the task `before` in the file, in `before`'s section. `before` null: end of the list's section

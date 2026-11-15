@@ -12,7 +12,7 @@ import type { TaskEntry } from "../domain/TaskDocument";
 import { plainText } from "../domain/TaskText";
 import { nextStep } from "../domain/NextStep";
 import { markColors } from "./marks";
-import type { ProjectRef, SubtaskProgress, TaskBlock, TaskCard, TaskItem } from "./contracts";
+import type { CardMarks, ProjectRef, SubtaskProgress, TaskBlock, TaskCard, TaskItem } from "./contracts";
 import { keyOf } from "./taskKeys";
 
 /** Of the task's own subtasks, the done ones out of all but those given up. */
@@ -53,6 +53,27 @@ function itemWithId(items: readonly TaskItem[], id: string): TaskItem | null {
 }
 
 /** A card of one line: the task's own title. */
+/** The marks a task's card draws beside its title. */
+function marksOfCard(entry: TaskEntry, described: boolean): CardMarks {
+	const progress = progressOf(entry);
+	return { progressDot: entry.task.status === "inProgress", description: described, count: progress ? `${progress.done}/${progress.total}` : null };
+}
+
+/** `item` and every task in it with each project's folder mark as `mark` says. */
+export function withFolderMark(item: TaskItem, mark: boolean): TaskItem {
+	const ref = (project: ProjectRef): ProjectRef => (project.mark === mark ? project : { ...project, mark });
+	const step = (s: TaskItem | null) => (s === null ? null : withFolderMark(s, mark));
+	return {
+		...item,
+		project: item.project === null ? null : ref(item.project),
+		projects: item.projects.map(ref),
+		subtasks: item.subtasks.map((s) => withFolderMark(s, mark)),
+		allSubtasks: item.allSubtasks.map((s) => withFolderMark(s, mark)),
+		card: { ...item.card, step: step(item.card.step) },
+		block: { ...item.block, step: step(item.block.step) },
+	};
+}
+
 export function ownCard(item: Pick<TaskItem, "text" | "title">): TaskCard {
 	return { text: item.text, title: item.title, over: null, step: null };
 }
@@ -129,6 +150,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 		subtasks: allSubtasks.filter((sub) => sub.open),
 		allSubtasks,
 		progress: progressOf(entry),
+		marks: marksOfCard(entry, description !== null),
 		collapsed,
 		description,
 		parentText: parent?.task.text ?? null,

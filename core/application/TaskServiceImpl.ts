@@ -513,8 +513,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.rename(await this.snapshot(), key, text));
 	}
 
-	fullTree(item: TaskItem): FullTree {
-		return this.reads.fullTree(item);
+	fullTree(item: TaskItem, filter?: ProjectsNodeId | null): FullTree {
+		return this.reads.fullTree(item, filter);
 	}
 
 	setDescription(key: TaskKey, markdown: string): Promise<void> {
@@ -525,8 +525,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.remove(key));
 	}
 
-	async find(key: TaskKey, text: string): Promise<TaskItem | null> {
-		return this.reads.find(await this.snapshot(), key, text);
+	async find(key: TaskKey, text: string, filter?: ProjectsNodeId | null): Promise<TaskItem | null> {
+		return this.reads.find(await this.snapshot(), key, text, filter);
 	}
 
 	lineOf(key: TaskKey): Promise<number> {

@@ -38,7 +38,7 @@ import { carriedWith, menuOffer, taskMenu } from "./menus";
 import { NO_SECTION_ID, offeredNames, type SectionOffer, shownSections } from "./sections";
 import { samePlace } from "./taskKeys";
 import { fullTree } from "./fullTree";
-import { type ItemLevels, itemLevels, ownCard, toItem } from "./taskItems";
+import { type ItemLevels, itemLevels, ownCard, toItem, withFolderMark } from "./taskItems";
 import type { TaskRules } from "./TaskRules";
 import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
 import type { Clock, SettingsStore } from "./ports";
@@ -51,6 +51,11 @@ import { firstViewOf, viewChoice } from "./viewModes";
 import { panelReason } from "./projectsCarry";
 import { funnelPlaceOf } from "./screenPlaces";
 import type { PlusChoice, ViewChoice, ViewMode } from "./contracts";
+
+/** Whether a view under `filter` shows the folder mark: everywhere but under a project's filter, whose cards are all its. */
+export function showsFolderMark(filter: ProjectsNodeId | null | undefined): boolean {
+	return filter === null || filter === undefined || projectOfNode(filter) === null;
+}
 
 /** The file as one read sees it: normalized for `today`, the day beginning at `boundary`; `text` as the file holds it. */
 export interface Snapshot {
@@ -261,7 +266,7 @@ export class TaskReads {
 		const tree = projectTreeOf(doc);
 		const node = filterNode(filter, tree);
 		const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
-		const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
+		const item = this.itemOf(today, doc, showsFolderMark(node));
 		const shown = (entries: readonly TaskEntry[]) => entries.filter(shows).map(item);
 		const day = { date, list: shown(dayList(doc, date, today, boundary)), slotted: shown(slottedOn(doc, date, boundary)) };
 		const sections = this.listSections(s);
@@ -404,7 +409,13 @@ export class TaskReads {
 		return null;
 	}
 
-	find({ doc, today }: Snapshot, key: TaskKey, text: string): TaskItem | null {
+	/** `filter`, the view's: under a project's, the task shows no folder mark, as the view's lists. */
+	find({ doc, today }: Snapshot, key: TaskKey, text: string, filter?: ProjectsNodeId | null): TaskItem | null {
+		const found = this.foundAt(doc, key, text, today);
+		return found && !showsFolderMark(filter) ? withFolderMark(found, false) : found;
+	}
+
+	private foundAt(doc: TaskDocument, key: TaskKey, text: string, today: LocalDate): TaskItem | null {
 		const named = this.rules.named(doc, key);
 		if (named !== undefined) return named ? this.itemAt(doc, named, today) : null;
 		const atPlace = doc.find(key.section, key.index, key.path);
@@ -492,8 +503,9 @@ export class TaskReads {
 		return carriedWith(lifted, picked);
 	}
 
-	fullTree(item: TaskItem): FullTree {
-		return fullTree(item);
+	/** `filter`, the view's: under a project's, no card of the tree shows the folder mark; left out, `item`'s marks stand. */
+	fullTree(item: TaskItem, filter?: ProjectsNodeId | null): FullTree {
+		return fullTree(filter === undefined ? item : withFolderMark(item, showsFolderMark(filter)));
 	}
 
 	shownSpan(item: TaskItem, day: LocalDate): DaySpan {
