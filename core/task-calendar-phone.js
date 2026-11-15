@@ -2735,6 +2735,82 @@ ${e.calendar}`;
     return keys.length === Object.keys(b).length && keys.every((k) => Object.prototype.hasOwnProperty.call(b, k) && sameJson(a[k], b[k]));
   }
 
+  // core/application/taskKeys.ts
+  function keyOf(entry) {
+    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
+  }
+  function samePlace2(a, b) {
+    return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
+  }
+  function sameLine(a, b) {
+    return a.raw === b.raw;
+  }
+  function sameTaskTree(a, b) {
+    return a.section === b.section && a.index === b.index;
+  }
+  function keyId(key) {
+    return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
+  }
+  function isUnder(a, b) {
+    return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
+  }
+
+  // core/application/firstStepTyping.ts
+  var FIELD_BLOCK = { text: "", title: "", step: null };
+  function typing(item) {
+    return { ...item, collapsed: true, card: item.firstStepCard, block: FIELD_BLOCK };
+  }
+  function typedIn(items, id) {
+    let changed2 = false;
+    const next = items.map((item) => {
+      const drawn = typedItem(item, id);
+      if (drawn !== item) changed2 = true;
+      return drawn;
+    });
+    return changed2 ? next : items;
+  }
+  function typedItem(item, id) {
+    if (keyId(item.key) === id) return typing(item);
+    const subtasks = typedIn(item.subtasks, id);
+    const allSubtasks = typedIn(item.allSubtasks, id);
+    return subtasks === item.subtasks && allSubtasks === item.allSubtasks ? item : { ...item, subtasks, allSubtasks };
+  }
+  function firstStepScreen(view, key) {
+    const id = keyId(key);
+    const list = typedIn(view.day.list, id);
+    const slotted2 = typedIn(view.day.slotted, id);
+    const soon = typedIn(view.soon, id);
+    const inbox = typedIn(view.inbox, id);
+    const backlog = typedIn(view.backlog, id);
+    const same = list === view.day.list && slotted2 === view.day.slotted && soon === view.soon && inbox === view.inbox && backlog === view.backlog;
+    return same ? view : { ...view, day: { ...view.day, list, slotted: slotted2 }, soon, inbox, backlog };
+  }
+  function typedRows(rows, id) {
+    const out = [];
+    let under = null;
+    for (const row of rows) {
+      if (under !== null && row.level > under) continue;
+      under = null;
+      if (keyId(row.item.key) !== id) {
+        out.push(row);
+        continue;
+      }
+      under = row.level;
+      out.push({ ...row, item: typing(row.item), card: row.card && { ...row.card, item: typing(row.card.item) } });
+    }
+    return out.length === rows.length && out.every((row, i) => row === rows[i]) ? rows : out;
+  }
+  function typedSection(section, id) {
+    const rows = typedRows(section.rows, id);
+    if (rows === section.rows) return section;
+    return { ...section, rows, cards: section.cards.map((card) => keyId(card.item.key) === id ? { ...card, item: typing(card.item) } : card) };
+  }
+  function firstStepProjects(view, key) {
+    const id = keyId(key);
+    const sections = view.sections.map((section) => typedSection(section, id));
+    return sections.every((section, i) => section === view.sections[i]) ? view : { ...view, sections };
+  }
+
   // core/domain/RepeatDraft.ts
   var KINDS = ["schedule", "afterDone"];
   var UNITS = ["day", "week", "month"];
@@ -4181,26 +4257,6 @@ ${key.title}`.toLowerCase();
   function grown(list, height, fade) {
     const end = list.stops.map((stop2) => stop2 + fade).find((at) => at > height) ?? list.wanted;
     return Math.min(end, list.wanted);
-  }
-
-  // core/application/taskKeys.ts
-  function keyOf(entry) {
-    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
-  }
-  function samePlace2(a, b) {
-    return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
-  }
-  function sameLine(a, b) {
-    return a.raw === b.raw;
-  }
-  function sameTaskTree(a, b) {
-    return a.section === b.section && a.index === b.index;
-  }
-  function keyId(key) {
-    return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
-  }
-  function isUnder(a, b) {
-    return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
   }
 
   // core/application/newTaskPlaces.ts
@@ -8263,6 +8319,8 @@ ${key.title}`.toLowerCase();
     create: (c, [draft, slot]) => c.run(c.writes.create(draft, slot ?? void 0)),
     createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent, draft)),
     firstStep: (c, [key, text]) => c.run(c.writes.firstStep(key, text)),
+    firstStepScreen: (_c, [view, key]) => firstStepScreen(view, key),
+    firstStepProjects: (_c, [view, key]) => firstStepProjects(view, key),
     edit: (c, [key, draft]) => c.run(c.writes.edit(key, draft)),
     placementOf: (c, [item]) => c.reads.placementOf(item),
     dayColumn: (c, [date]) => c.reads.dayColumn(date),

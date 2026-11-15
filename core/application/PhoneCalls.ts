@@ -1,3 +1,4 @@
+import { firstStepProjects, firstStepScreen } from "./firstStepTyping";
 import type { DayBoundary } from "../domain/DayBoundary";
 import { GROUPED_LISTS } from "../domain/Lists";
 import { dayRelation } from "../domain/Days";
@@ -403,6 +404,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	create: (c, [draft, slot]) => c.run(c.writes.create(draft as A, (slot ?? undefined) as A)),
 	createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent as A, draft as A)),
 	firstStep: (c, [key, text]) => c.run(c.writes.firstStep(key as A, text as string)),
+	firstStepScreen: (_c, [view, key]) => firstStepScreen(view as A, key as A),
+	firstStepProjects: (_c, [view, key]) => firstStepProjects(view as A, key as A),
 	edit: (c, [key, draft]) => c.run(c.writes.edit(key as A, draft as A)),
 	placementOf: (c, [item]) => c.reads.placementOf(item as A),
 	dayColumn: (c, [date]) => c.reads.dayColumn(date as string),

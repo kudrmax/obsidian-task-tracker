@@ -78,3 +78,10 @@ AI caller needs only a task key and a text.
   as it was.
 - **Obsidian, the row's icon.** First step's row has its own icon: a flight of steps (`M3.5 20h5v-5h5v-5h5V5h2`), right
   after Add subtask's arrow.
+- **Backend, the fold at the tap.** The screen while the field is open is the core's: `TaskService.firstStepScreen(view,
+  key)` and `firstStepProjects(view, key)` (door: `tasks.firstStepScreen`, `tasks.firstStepProjects`). Synchronous
+  transforms of the view already drawn, not a new read option: the field opens in the same tap, so no file is read
+  and nothing waits. The task (any list, the timeline, any depth) comes back `collapsed` (its subtask rows leave the
+  lists; with no subtask yet the card still shows the fold's edge), `card` = `firstStepCard`, `block` empty with no
+  step; on the Projects screen its row and card fold and the rows under it go. The UI passes only the view and the
+  key, and draws the read view again when the field closes (Escape or blank: the subtasks come back).

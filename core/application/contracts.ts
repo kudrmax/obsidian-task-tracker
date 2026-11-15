@@ -1335,6 +1335,16 @@ export interface TaskService {
 	 */
 	firstStep(key: TaskKey, text: string): Promise<void>;
 	/**
+	 * The screen as drawn while First step's field is open on the task `key` (Max, 11-15: the task folds at the tap, not at
+	 * Enter): the same `view` with that task, in the day's list, the timeline, Soon, Inbox or Backlog, at any depth,
+	 * folded (`collapsed`, so its subtasks leave the lists and its card shows the fold's edge even with no subtask yet),
+	 * its `card` its `firstStepCard` and its `block` the field's (empty, no step). Reads no file: the UI passes the view
+	 * it draws and the key, and draws `view` again once the field closes. `view` itself when the task is not on it.
+	 */
+	firstStepScreen(view: ScreenView, key: TaskKey): ScreenView;
+	/** The Projects screen's list the same way: the task's row (and card) folded, the rows of its subtasks left out; `view` itself when it is not on it. */
+	firstStepProjects(view: ProjectsView, key: TaskKey): ProjectsView;
+	/**
 	 * The task sheet on an existing task: new text and placement in one write. The slot stays. A placement equal to the
 	 * task's current one leaves its position in the file alone; a different one moves it as `create` would place it.
 	 * Inbox takes the slot away too. A subtask stays where it is: a different placement only sets its due date, as for

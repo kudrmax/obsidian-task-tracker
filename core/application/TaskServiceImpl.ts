@@ -1,3 +1,4 @@
+import { firstStepProjects, firstStepScreen } from "./firstStepTyping";
 import type { TaskScreen } from "../domain/Days";
 import type { LocalDate, ReminderKind, SectionKey, Slot, TaskStatus } from "../domain/Task";
 import type { TaskDocument } from "../domain/TaskDocument";
@@ -395,6 +396,14 @@ export class TaskServiceImpl implements TaskService {
 
 	firstStep(key: TaskKey, text: string): Promise<void> {
 		return this.run(this.writes.firstStep(key, text));
+	}
+
+	firstStepScreen(view: ScreenView, key: TaskKey): ScreenView {
+		return firstStepScreen(view, key);
+	}
+
+	firstStepProjects(view: ProjectsView, key: TaskKey): ProjectsView {
+		return firstStepProjects(view, key);
 	}
 
 	edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null> {

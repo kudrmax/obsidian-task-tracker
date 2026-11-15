@@ -148,3 +148,94 @@ describe("the card First step's field is drawn on", () => {
 		expect((await named(svc, "Pack")).firstStepCard.over).toBe("Pack");
 	});
 });
+
+describe("the screen while First step's field is open (Max, 11-15: the task folds at the tap, not at Enter)", () => {
+	const ids = (items: readonly TaskItem[]): string[] => items.flatMap((item) => [item.text, ...(item.collapsed ? [] : ids(item.subtasks))]);
+
+	it("draws an unfolded task with subtasks folded, its card the field's, its subtasks gone from the list", async () => {
+		const { svc } = setup(file("- [ ] Trip\n\t- [ ] Pack\n\t- [ ] Fly\n- [ ] Other\n"));
+		const view = await svc.screen(T);
+		const trip = view.day.list[0];
+		const typing = svc.firstStepScreen(view, trip.key);
+		expect(ids(typing.day.list)).toEqual(["Trip", "Other"]);
+		expect(typing.day.list[0]).toMatchObject({ collapsed: true, card: trip.firstStepCard });
+		expect(typing.day.list[1]).toBe(view.day.list[1]);
+	});
+
+	it("draws a task without subtasks folded too, so its card shows the fold's edge", async () => {
+		const { svc } = setup(file("- [ ] Taxes\n"));
+		const view = await svc.screen(T);
+		const typing = svc.firstStepScreen(view, view.day.list[0].key);
+		expect(typing.day.list[0]).toMatchObject({ collapsed: true, card: { over: "Taxes", text: "", title: "", step: null } });
+	});
+
+	it("draws an already folded task with the field in place of its shown step", async () => {
+		const { svc } = setup(file("- [ ] Trip 📁\n\t- [ ] Pack\n"));
+		const view = await svc.screen(T);
+		expect(view.day.list[0].card.text).toBe("Pack");
+		const typing = svc.firstStepScreen(view, view.day.list[0].key);
+		expect(typing.day.list[0]).toMatchObject({ collapsed: true, card: { over: "Trip", text: "", step: null } });
+	});
+
+	it("folds a subtask at depth, its task and the others as they were", async () => {
+		const { svc } = setup(file("- [ ] Move\n\t- [ ] Kitchen\n\t\t- [ ] Boxes\n\t- [ ] Bath\n"));
+		const view = await svc.screen(T);
+		const kitchen = view.day.list[0].subtasks[0];
+		const typing = svc.firstStepScreen(view, kitchen.key);
+		expect(ids(typing.day.list)).toEqual(["Move", "Kitchen", "Bath"]);
+		expect(typing.day.list[0].collapsed).toBe(false);
+		expect(typing.day.list[0].subtasks[0]).toMatchObject({ collapsed: true, card: { over: "Kitchen", text: "" } });
+		expect(typing.day.list[0].subtasks[1]).toBe(view.day.list[0].subtasks[1]);
+	});
+
+	it("folds the task in every list it is read in: Soon, Inbox, Backlog", async () => {
+		const { svc } = setup("## Inbox\n\n- [ ] Idea\n\t- [ ] Think\n\n## Now\n\n## Soon\n\n- [ ] Later\n\t- [ ] Sub\n\n## Backlog\n\n- [ ] Some day\n\t- [ ] Sub\n\n## Done\n");
+		const view = await svc.screen(T);
+		for (const list of ["inbox", "soon", "backlog"] as const) {
+			const typing = svc.firstStepScreen(view, view[list][0].key);
+			expect(typing[list][0].collapsed).toBe(true);
+			expect(typing[list][0].card.text).toBe("");
+		}
+	});
+
+	it("draws the timeline's block of the task as the field's: no step line, no step", async () => {
+		const { svc } = setup(file("- [ ] Call ⏰ 2026-10-30 10:00-11:00\n\t- [ ] Dial\n"));
+		const view = await svc.screen(T);
+		const call = view.day.slotted[0];
+		const typing = svc.firstStepScreen(view, call.key);
+		expect(typing.day.slotted[0]).toMatchObject({ collapsed: true, block: { text: "", title: "", step: null }, card: call.firstStepCard });
+	});
+
+	it("leaves out the rows of the task's subtasks on the Projects screen, its row and card folded", async () => {
+		const { svc } = setup(file("- [ ] Trip\n\t- [ ] Pack\n\t\t- [ ] Socks\n- [ ] Other\n"));
+		const view = await svc.projectsScreen("all");
+		const rows = view.sections.flatMap((s) => s.rows);
+		const trip = rows.find((r) => r.item.text === "Trip")!;
+		expect(rows.map((r) => r.item.text)).toEqual(expect.arrayContaining(["Trip", "Pack", "Socks", "Other"]));
+		const typing = svc.firstStepProjects(view, trip.item.key);
+		const after = typing.sections.flatMap((s) => s.rows);
+		expect(after.map((r) => r.item.text)).toEqual(rows.map((r) => r.item.text).filter((t) => t !== "Pack" && t !== "Socks"));
+		const folded = after.find((r) => r.item.text === "Trip")!;
+		expect(folded.item).toMatchObject({ collapsed: true, card: { over: "Trip", text: "" } });
+		expect(folded.card?.item.collapsed).toBe(true);
+		expect(typing.sections.flatMap((s) => s.cards).find((c) => c.item.text === "Trip")?.item.collapsed).toBe(true);
+	});
+
+	it("folds a subtask's row on the Projects screen and leaves out only the rows under it", async () => {
+		const { svc } = setup(file("- [ ] Move\n\t- [ ] Kitchen\n\t\t- [ ] Boxes\n\t- [ ] Bath\n"));
+		const view = await svc.projectsScreen("all");
+		const kitchen = view.sections.flatMap((s) => s.rows).find((r) => r.item.text === "Kitchen")!;
+		const typing = svc.firstStepProjects(view, kitchen.item.key);
+		expect(typing.sections.flatMap((s) => s.rows).map((r) => r.item.text)).toEqual(["Move", "Kitchen", "Bath"]);
+	});
+
+	it("changes nothing for a key of no task on the screen", async () => {
+		const { svc } = setup(file("- [ ] Trip\n\t- [ ] Pack\n"));
+		const view = await svc.screen(T);
+		const projects = await svc.projectsScreen("all");
+		const gone = { section: "now", index: 9, path: [], raw: "- [ ] Gone" } as const;
+		expect(svc.firstStepScreen(view, gone)).toBe(view);
+		expect(svc.firstStepProjects(projects, gone)).toBe(projects);
+		expect(await svc.screen(T)).toEqual(view);
+	});
+});

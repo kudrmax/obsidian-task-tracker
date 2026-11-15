@@ -293,6 +293,14 @@ export class DemoTaskService implements TaskService {
 
 	async firstStep(): Promise<void> {}
 
+	firstStepScreen(view: ScreenView): ScreenView {
+		return view;
+	}
+
+	firstStepProjects(view: ProjectsView): ProjectsView {
+		return view;
+	}
+
 	async nest(): Promise<void> {}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
