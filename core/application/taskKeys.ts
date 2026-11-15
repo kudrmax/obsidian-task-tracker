@@ -6,6 +6,13 @@ export function keyOf(entry: TaskEntry): TaskKey {
 	return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
 }
 
+/** A task's key as the core gives it (`TaskKey`): a section, a place and a line. */
+export function isTaskKey(value: unknown): value is TaskKey {
+	if (typeof value !== "object" || value === null) return false;
+	const v = value as Record<string, unknown>;
+	return typeof v.section === "string" && typeof v.index === "number" && Array.isArray(v.path) && typeof v.raw === "string";
+}
+
 /** The same place in the file: section, index and path. Two reads of one place match even when its line changed. */
 export function samePlace(a: TaskKey, b: TaskKey): boolean {
 	return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);

@@ -72,7 +72,7 @@ Sync) reads it, about 0.7 ms on that file.
 **Answer** (`DoorAnswer`):
 
 ```
-{ "ok": true, "result": …, "tasks"?: "<new text>", "step"?: true, "history"?: {…}, "settings"?: "<new data.json>", "projectsScreen"?: {…}, "ids"?: {…} }
+{ "ok": true, "result": …, "tasks"?: "<new text>", "step"?: true, "history"?: {…}, "settings"?: "<new data.json>", "projectsScreen"?: {…}, "ids"?: {…}, "created"?: ["t31", …] }
 { "ok": false, "error": { "code": "staleTask" | "tasksFileMissing" | "blank" | "unknownMethod" | "badArguments" | "failed", "message": "…" } }
 ```
 
@@ -95,6 +95,13 @@ Sync) reads it, about 0.7 ms on that file.
   are the same whether the host hands in the file as the door tidied it or as it still is on disk. It comes whenever it changed: after a write, an
   undo or redo, and a read of a text other than the one it was for. The host keeps it as it is, in memory (never synced,
   never parsed), and hands it in as `ids` with the next call; a host that leaves it out still gets ids, new ones each call.
+- `created`: the ids the call's writes gave the tasks and sections they made, in the order given: a create's
+  (`createWithId`, `createInPlace`, `createInList`, `createInSoon`, `createAtTime`, `create`, `createSubtask`,
+  `capture.add`), a new section's (`createSection`, `createGroup`), a repeating task's next turn and its subtasks when
+  it is done (the task done keeps its own id), any write that makes a line. Left out when it gave none: a tidy, an
+  undo or redo (a task given back keeps its id), a read that meets lines written elsewhere. An id given is never given
+  again while the host hands `ids` back. Example: `tasks.createWithId("Call", …)` → `created: ["t31"]`, `result.id`
+  `"t31"`. A host maps a replayed create's ids by it and never reads an id.
 - `staleTask`: a task or section the call names is no longer there as read: read again (`tasks.screen`) and redraw.
   `tasksFileMissing`: the call needs the tasks file; `tasks.createFile` answers the text of a new one. `blank`: a task to
   write has no title (`capture.add`).
@@ -522,6 +529,12 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
   for the day, nothing written: the answer has no `tasks`), or `null` when no task has it (gone, never was, or a
   section's id), and `null` when the context has no `ids`: the ids are fresh then, and one may name another task. What a host that keeps tasks by id hands an action. Example: a pending `setStatus` of `t12`, the file
   changed by Sync since, replays as `tasks.setStatus(keyOf("t12"), "done")`.
+- `tasks.freshArgs(args, idMap)`: a call's arguments as it takes them now, for a host that replays it over a file
+  changed since: each id in `idMap` (`{ oldId: newId }`, the `created` of a create replayed) replaced wherever an
+  object carries it as `id`, and each task's key (`TaskKey`, recognised by the core) replaced by the task's key as the
+  file has it now, found by its id; `staleTask` when such a task is gone. Without `ids` in the context the keys stay.
+  Example: `freshArgs([key of Idea, { lifted: { id: "t27" } }], { t27: "t31" })` → `[Idea's key now, { lifted: { id:
+  "t31" } }]`. A host never has to tell a key from its other arguments.
 - `tasks.sectionOf(id)`: `{ list, name }` of the section with that id (`ListSection.id`), the name as the file has it
   now, `null` when no section has it or the context has no `ids`. Example: `sectionOf("t40")` → `{ list: "now", name: "Shopping" }` after another
   device renamed Errands; a pending `tasks.renameGroup("now", "Errands", …)` replays with the new name.
@@ -538,6 +551,13 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
   call changed no screen. Example: a lifted new task replayed as `t31` instead of `t27` →
   `reconcile({ t27: "t31" }, [])`, then `carryOnNode("project:Дружба")` writes it there.
 - Twins (two identical lines) are two tasks with two ids: the door knows which line a write made of which.
+
+### `ids.*`: who the tasks are, for a host's replica
+
+- `ids.continueFrom(base, current)` → `TaskIdState`: `base` (the ids that went with a base text) going on from
+  `current`'s counter when it is further, `base` itself otherwise; either left out or null gives the other. A host
+  reads a new base with it: its tasks keep their ids, and no id the replica gave is given again. Example: after Sync,
+  `ids.continueFrom(log.base.ids, replica.ids)` is the `ids` the new base and the replayed calls run with.
 
 ### `calendarsRefresh.*`: when to fetch the calendars
 
@@ -948,7 +968,7 @@ tasks outside any section. A task's and the bulk menu's `remove` is null when De
 Open full screen and Open in Obsidian are its own rows, outside the model.
 
 `DOOR_COVERAGE`'s `own` names a space's methods beside its interface's: `calendars.files` and `calendars.meetings`;
-`tasks.keyOf`, `tasks.sectionOf` and `tasks.reconcile` for a host's replica.
+`tasks.keyOf`, `tasks.sectionOf`, `tasks.freshArgs` and `tasks.reconcile` for a host's replica.
 
 - `GoogleAccount` (`isLoggedIn`, `login`, `logout`): the login is a browser's consent and a token fetched over the network;
   the door makes no request.

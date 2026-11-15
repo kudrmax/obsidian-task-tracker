@@ -66,7 +66,7 @@ import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
 import { projectsPlusPlace, projectsPlusTakes, projectsTakes } from "./projectsDrop";
 import { cleared, PROJECTS_HOVER_MS, PROJECTS_INDENT, panelRows, picked, projectNodeOf, projectOfNode, projectsDrop, sameNode, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
-import { keyId, keyOf, sameLine, samePlace, sameTaskTree } from "./taskKeys";
+import { isTaskKey, keyId, keyOf, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
 import { type Operation, TaskRules } from "./TaskRules";
@@ -147,6 +147,8 @@ export type DoorAnswer =
 			readonly projectsScreen?: ProjectsScreenState;
 			/** Who the tasks are after this call: the host keeps it and hands it in again, so a task keeps its id. */
 			readonly ids?: TaskIdState;
+			/** The ids the call's writes gave the tasks and sections they made, in the order given; left out for none. */
+			readonly created?: readonly string[];
 	  }
 	| { readonly ok: false; readonly error: { readonly code: DoorErrorCode; readonly message: string } };
 
@@ -240,6 +242,7 @@ interface Effects {
 	settings?: string;
 	projectsScreen?: ProjectsScreenState;
 	ids?: TaskIdState;
+	created?: string[];
 }
 
 /** One call's world: the rules under the settings given, at the moment given, over the texts given. */
@@ -355,9 +358,12 @@ class Call {
 	write(make: (text: string) => string | null): boolean {
 		const before = this.tasks();
 		const was = this.rules.idsOf(before);
+		const counter = this.identity.state.next;
 		const text = make(before);
 		if (text === null) return false;
 		this.setText(text, true, { before: was, after: this.rules.idsOf(text) });
+		const made = this.identity.mintedSince(counter);
+		if (made.length > 0) this.kept.created = [...(this.kept.created ?? []), ...made];
 		return true;
 	}
 
@@ -664,6 +670,30 @@ const REPLICA_TASKS: Readonly<Record<string, Handler>> = {
 		const entry = c.snapshot().doc.byId(id as string);
 		return entry ? keyOf(entry) : null;
 	},
+	/**
+	 * `args` as the call takes them now: each id an earlier replayed create gave anew (`idMap`, old id → new id) mapped,
+	 * wherever an object carries it as `id`, and each task's key (`TaskKey`) the task's key as the file has it now, found
+	 * by its id; staleTask when such a task is gone. Without `ids` in the context, keys stay as they are.
+	 */
+	freshArgs: (c, [args, idMap]) => {
+		const ids = (idMap ?? {}) as Readonly<Record<string, string>>;
+		const moved = (id: string) => (Object.prototype.hasOwnProperty.call(ids, id) ? ids[id] : id);
+		const doc = c.knowsIds() ? c.snapshot().doc : null;
+		const fresh = (value: unknown): unknown => {
+			if (Array.isArray(value)) return value.map(fresh);
+			if (typeof value !== "object" || value === null) return value;
+			if (isTaskKey(value) && typeof value.id === "string") {
+				const id = moved(value.id);
+				if (doc === null) return { ...value, id };
+				const entry = doc.byId(id);
+				if (!entry) throw new StaleTaskError();
+				return keyOf(entry);
+			}
+			const parts = Object.fromEntries(Object.entries(value).map(([k, v]) => [k, k === "id" && typeof v === "string" ? moved(v) : fresh(v)]));
+			return parts;
+		};
+		return fresh(args ?? []);
+	},
 	/** The list and name of the section `id` names (`ListSection.id`) in the file as read now, null when no section has it or without `ids`. */
 	sectionOf: (c, [id]) => {
 		if (!c.knowsIds()) return null;
@@ -837,6 +867,12 @@ const CALENDARS_REFRESH: Readonly<Record<string, Handler>> = {
 		return typeof message === "string" ? feedProblem(new Error(message)) : feedProblem(failure);
 	},
 	silence: () => ({ ms: FEED_SILENCE_MS, problem: feedSilence().problem }),
+};
+
+/** Who the tasks are, for a host that keeps a replica: what it would otherwise read out of the ids themselves. */
+const IDS: Readonly<Record<string, Handler>> = {
+	/** `base` going on from `current`'s counter: the ids a new base is read with, so no id is ever given twice. */
+	continueFrom: (_c, [base, current]) => TaskIdentity.continued((base ?? null) as TaskIdState | null, (current ?? null) as TaskIdState | null),
 };
 
 /** The door's own calendar calls for the phone, beside CalendarService's. */
@@ -1200,6 +1236,7 @@ const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	boundary: BOUNDARY,
 	calendars: CALENDARS,
 	calendarsRefresh: CALENDARS_REFRESH,
+	ids: IDS,
 	history: HISTORY,
 	settings: SETTINGS,
 	screenSettings: SCREEN_SETTINGS,
