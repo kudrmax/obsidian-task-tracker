@@ -2008,10 +2008,10 @@ body.is-mobile .task-calendar .tc-n-fade-entering { height: calc(var(--tc-bar-h)
 .task-calendar button.tc-n-btn.tc-n-bar-btn:disabled { color: var(--tc-ink-dim); cursor: default; }
 .task-calendar .tc-n-bar-btn svg { width: var(--tc-bar-flag); height: var(--tc-bar-flag); stroke-width: var(--tc-stroke-bar); }
 .task-calendar .tc-n-bar-shifts .tc-n-bar-btn svg { width: var(--tc-bar-icon); height: var(--tc-bar-icon); }
-.task-calendar .tc-n-bar-btn.is-set { color: var(--tc-accent); }
-.task-calendar .tc-n-bar-btn[data-priority].is-set { color: var(--tc-priority-ink); }
+.task-calendar button.tc-n-btn.tc-n-bar-btn.is-set { color: var(--tc-accent); }
+.task-calendar button.tc-n-btn.tc-n-bar-btn[data-priority].is-set { color: var(--tc-priority-ink); }
 .task-calendar .tc-n-bar-btn[data-priority].is-set svg { fill: var(--tc-priority-ink); }
-.task-calendar .tc-n-bar-project.is-set { color: var(--tc-accent); }
+.task-calendar button.tc-n-btn.tc-n-bar-project.is-set { color: var(--tc-accent); }
 .task-calendar .tc-n-bar-project.is-set svg { fill: var(--tc-accent); }
 .task-calendar button.tc-n-btn.tc-n-bar-place { width: var(--tc-place-w); box-sizing: border-box; padding: 0 var(--tc-space-12) 0 var(--tc-space-10); background: var(--tc-track-bg); gap: var(--tc-space-6); display: flex; align-items: center; justify-content: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); height: var(--tc-bar-btn-h); border-radius: var(--tc-radius-bar-btn); flex-shrink: 0; }
 .task-calendar .tc-n-bar-place svg { width: var(--tc-place-icon); height: var(--tc-place-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-seg); }
