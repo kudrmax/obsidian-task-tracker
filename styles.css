@@ -2093,6 +2093,9 @@ body.is-mobile .task-calendar .tc-n-fade-entering { height: calc(var(--tc-bar-h)
 .task-calendar .tc-n-card-over svg { width: var(--tc-font-card-over); height: var(--tc-font-card-over); flex-shrink: 0; stroke-width: var(--tc-stroke-card-over); }
 /* next: carry2 */
 .task-calendar.tc-n-block > .tc-n-plus.is-away { visibility: hidden; }
+/* While a card or the plus is carried the plus and the capsule beside it step aside, fading as the old block's did (QuickEntryController: hidden while dragging or carrying); a lifted section leaves them. */
+.task-calendar.tc-n-block > :is(.tc-n-plus, .tc-n-capsule) { transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear 0s; }
+.task-calendar.tc-n-block.is-carrying > :is(.tc-n-plus, .tc-n-capsule) { opacity: 0; transform: scale(var(--tc-menu-scale)); visibility: hidden; pointer-events: none; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear var(--tc-duration-collapse); }
 .task-calendar.tc-n-block > .tc-n-plus-ring { position: absolute; right: var(--tc-block-inset); bottom: calc(var(--tc-block-inset) + (var(--tc-wheel) - var(--tc-plus-size)) / 2); z-index: var(--tc-layer-plus); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; border: var(--tc-hairline) dashed var(--tc-dash); color: var(--tc-accent); pointer-events: none; }
 .task-calendar.tc-n-block > .tc-n-plus-ring.tc-n-plus-ring-hot { border: var(--tc-hairline) solid var(--tc-accent); background: var(--tc-drop-bg); }
 .task-calendar .tc-n-plus-ring svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-ring); }

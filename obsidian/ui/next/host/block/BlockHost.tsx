@@ -218,7 +218,11 @@ export class BlockHost {
 	private draw(model: BlockModel): void {
 		if (this.disposed) return;
 		const moved = model.motion.seq !== this.drawnSeq;
-		this.motion.before(moved && model.motion.cause === "move");
+		/** A drawing that changes no rows leaves the motions under way running (a carry's next message must not stop the rows still sliding). */
+		if (moved) this.motion.before(model.motion.cause === "move");
+		/** Held before the lift's drawing: a lift that takes rows out of the lists (a section, a parent's subtasks) leaves the frame as tall as it stood. */
+		const held = this.node.firstElementChild;
+		if (held instanceof HTMLElement && model.carry !== null) Motion.holdHeight(held, true);
 		render(<BlockRoot model={model} layers={this.overlay.node} />, this.node);
 		this.drawnSeq = model.motion.seq;
 		this.motion.after(moved ? model.motion.cause : "none", new Map([...rowVars(drawnLists(model)), ...carryVars(model), ...fullRowVars(model), ...rootVars(model)]), model.entry?.bound);

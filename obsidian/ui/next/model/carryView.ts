@@ -66,3 +66,8 @@ export function floatFace(model: BlockModel): FloatFace | null {
 	if (!row) return null;
 	return { face: row.face, count: carry.rows.length, stacked: carry.rows.length > 1 || carry.folded.length > 0 || row.face.folded };
 }
+
+/** The plus and the capsule step aside while a card or the plus is carried; a lifted section leaves them (the old block's QuickEntryController). */
+export function footAside(model: BlockModel): boolean {
+	return model.carry !== null && model.carry.kind !== "section";
+}

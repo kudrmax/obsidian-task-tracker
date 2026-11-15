@@ -155,7 +155,9 @@ export function updateCarry(model: BlockModel, msg: CarryMsg): Step {
 		case "slot": {
 			const carry = model.carry;
 			if (!carry?.section || carry.phase !== "carried" || carry.section.gap === msg.gap) return [model, []];
-			return [{ ...model, carry: { ...carry, section: { ...carry.section, gap: msg.gap } } }, []];
+			/** The landing place opens at the new slot and closes behind: the rows around it slide (a drawing that moves). */
+			const motion = { ...model.motion, seq: model.motion.seq + 1, cause: "move" as const };
+			return [{ ...model, carry: { ...carry, section: { ...carry.section, gap: msg.gap } }, motion }, []];
 		}
 		case "measured":
 			return model.carry ? [{ ...model, carry: { ...model.carry, geometry: msg.geometry } }, []] : [model, []];
