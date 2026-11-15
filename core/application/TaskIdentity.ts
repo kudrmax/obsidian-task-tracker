@@ -1,6 +1,10 @@
 import { matchLines } from "../domain/LineMatch";
 import type { LineIds, OutlineLine, TaskDocument } from "../domain/TaskDocument";
 import type { ReadingCache } from "./ReadingCache";
+import { parseTaskLine, type Markers } from "../domain/TaskLine";
+import { plainText } from "../domain/TaskText";
+import { DEFAULT_SETTINGS } from "../settings";
+import { markersOf } from "./documentText";
 
 /** A heading or a task line of the text the ids are for, in file order, with its id. */
 export interface TaskIdLine {
@@ -51,9 +55,11 @@ export class TaskIdentity {
 	private pending: { readonly text: string; readonly ids: ReadonlyMap<number, string> } | null = null;
 
 	/** `cache`: what identities settled on before, shared across the door's calls, so a reading from a state is matched once. */
+	/** `markers`: what the file's task lines are read by, so a line edited elsewhere is judged by its title alone. */
 	constructor(
 		state: TaskIdState = NO_TASK_IDS,
 		private readonly cache: ReadingCache | null = null,
+		private readonly markers: () => Markers = () => DEFAULT_MARKERS,
 	) {
 		this.current = state;
 	}
@@ -182,7 +188,7 @@ export class TaskIdentity {
 		const pairs = matchLines(
 			old.map((l) => l.raw),
 			outline.map((o) => o.raw),
-			(b, a) => old[b].task === outline[a].task && (!old[b].task || sameTaskLine(old[b].raw, outline[a].raw)),
+			(b, a) => old[b].task === outline[a].task && (!old[b].task || sameTaskLine(old[b].raw, outline[a].raw, this.markers())),
 			true,
 		);
 		const known = new Map<number, string>();
@@ -195,24 +201,65 @@ function sameOutline(lines: readonly TaskIdLine[], outline: readonly OutlineLine
 	return lines.length === outline.length && lines.every((line, i) => line.raw === outline[i].raw && line.task === outline[i].task);
 }
 
-/** A title's words: letters and digits, lowercased; the checkbox, marks, tags' signs and numbers alone (dates, times) left out. */
-function titleWords(raw: string): Set<string> {
-	const text = raw.replace(/^\s*[-*+]\s+\[.\]\s*/u, "").toLowerCase();
-	return new Set((text.match(/[\p{L}\p{N}]+/gu) ?? []).filter((word) => /\p{L}/u.test(word)));
+/** The title a task line shows, read by the file's own parser under `markers`: no status, dates, times, repeat rule, projects, labels or priority, a link as its word. */
+export function taskLineTitle(raw: string, markers: Markers): string {
+	const parsed = parseTaskLine(raw, markers);
+	return plainText(parsed ? parsed.task.text : raw)
+		.toLowerCase()
+		.replace(/\s+/gu, " ")
+		.trim();
 }
 
+/** A title's words: runs of letters and digits with a letter in them; a tag (`#…`) is none. */
+function titleWords(title: string): Set<string> {
+	return new Set(
+		title
+			.split(" ")
+			.filter((word) => !word.startsWith("#"))
+			.flatMap((word) => word.match(/[\p{L}\p{N}]+/gu) ?? [])
+			.filter((word) => /\p{L}/u.test(word)),
+	);
+}
+
+/** The letters one title takes to become the other: one changed, added, dropped, or two side by side swapped, each one. */
+function lettersApart(a: string, b: string, most: number): number {
+	const x = [...a];
+	const y = [...b];
+	if (Math.abs(x.length - y.length) > most) return most + 1;
+	const rows = Array.from({ length: x.length + 1 }, (_, i) => Array.from({ length: y.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)));
+	for (let i = 1; i <= x.length; i++) {
+		for (let j = 1; j <= y.length; j++) {
+			const change = x[i - 1] === y[j - 1] ? 0 : 1;
+			let best = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + change);
+			if (i > 1 && j > 1 && x[i - 1] === y[j - 2] && x[i - 2] === y[j - 1]) best = Math.min(best, rows[i - 2][j - 2] + 1);
+			rows[i][j] = best;
+		}
+	}
+	return rows[x.length][y.length];
+}
+
+const DEFAULT_MARKERS = markersOf(DEFAULT_SETTINGS);
+
 /**
- * Two task lines are plausibly the same task, one edited into the other elsewhere: at least half the words of the
- * shorter title stand in the other (its status, marks, dates and times aside). Titles of no words are the same only to
- * each other. An edit of a word or two keeps a task; another task written over its line does not.
+ * Two task lines are plausibly the same task, one edited into the other elsewhere, by their titles alone
+ * (`taskLineTitle`): the same title; or a typo apart, at most a quarter of the longer title's letters (one at least)
+ * changed, added, dropped or swapped; or every word of the shorter title standing in the other (words added); or, when
+ * the shorter title has three words or more, at least half its words standing in the other. Another task written over
+ * a line is none of these.
  */
-export function sameTaskLine(a: string, b: string): boolean {
-	const x = titleWords(a);
-	const y = titleWords(b);
-	if (x.size === 0 || y.size === 0) return x.size === y.size;
+export function sameTaskLine(a: string, b: string, markers: Markers = DEFAULT_MARKERS): boolean {
+	const x = taskLineTitle(a, markers);
+	const y = taskLineTitle(b, markers);
+	if (x === y) return true;
+	const most = Math.max(1, Math.floor(Math.max([...x].length, [...y].length) / 4));
+	if (lettersApart(x, y, most) <= most) return true;
+	const xw = titleWords(x);
+	const yw = titleWords(y);
+	const shorter = Math.min(xw.size, yw.size);
+	if (shorter === 0) return false;
 	let shared = 0;
-	for (const word of x) if (y.has(word)) shared++;
-	return shared * 2 >= Math.min(x.size, y.size);
+	for (const word of xw) if (yw.has(word)) shared++;
+	return shared === shorter || (shorter >= 3 && shared * 2 >= shorter);
 }
 
 /** The number an id was minted with (`t<n>`, n the counter then). */

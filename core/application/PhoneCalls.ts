@@ -78,6 +78,7 @@ import { NO_TASK_IDS, TaskIdentity, type TaskIdState } from "./TaskIdentity";
 import type { PatchIds } from "../domain/TextPatch";
 import { snapMinute } from "./snapGrid";
 import { ReadingCache } from "./ReadingCache";
+import { markersOf } from "./documentText";
 import { deepFrozen } from "../domain/frozen";
 import { dayOpening } from "./DayServiceImpl";
 import { repeatPageEnd } from "./RepeatPage";
@@ -284,7 +285,7 @@ class Call {
 			onChange: () => () => undefined,
 		};
 		this.store = store;
-		this.identity = new TaskIdentity(context.ids, cache);
+		this.identity = new TaskIdentity(context.ids, cache, () => (cache === null ? markersOf(this.current) : cache.memo(this.current, "markers", () => markersOf(this.current))));
 		this.rules = new TaskRules(store, clock, this.identity, context.ids !== undefined, { list: () => context.projects ?? NO_NOTES, ready: () => context.projectsReady !== false }, cache);
 		this.reads = new TaskReads(this.rules, store, clock, { tree: () => this.tree(), screen: () => this.projectsScreen });
 		this.writes = new TaskWrites(this.rules, this.reads);
