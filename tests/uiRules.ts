@@ -109,6 +109,8 @@ const HOST_FILE = /(^|\/)(lib\.(dom|webworker|scripthost)[\w.-]*\.d\.ts|node_mod
 /** The language's own doors to the host and to code named at run time, declared in its standard library. */
 const ES_HOST = new Set(["globalThis", "Reflect", "Function", "eval", "Proxy", "WeakRef", "FinalizationRegistry", "SharedArrayBuffer", "Atomics"]);
 const STD_LIB = /(^|\/)lib\.[\w.-]*\.d\.ts$/;
+/** The DOM's, the workers' and Node's: what a host value is for the flow rule (Obsidian's own objects reach the runtime as structural ports). */
+const DOM_FILE = /(^|\/)(lib\.(dom|webworker|scripthost)[\w.-]*\.d\.ts|node_modules\/@types\/node\/.*)$/;
 const OBSIDIAN_FILE = /node_modules\/obsidian\/obsidian\.d\.ts$/;
 const PREACT_FILE = /node_modules\/preact\//;
 
@@ -185,7 +187,7 @@ export const HOST_WORK: readonly HostWork[] = [
 	{ what: "a scroll", owners: ["scroll"], matches: (r) => (member(["Element"], ["scrollTop", "scrollLeft"])(r) && r.write) || member(["Element", "Window", "HTMLElement"], ["scroll", "scrollTo", "scrollBy", "scrollIntoView", "scrollIntoViewIfNeeded"])(r) || globalNamed(["scroll", "scrollTo", "scrollBy"])(r) },
 	{ what: "a focus", owners: ["focus"], matches: (r) => member(["HTMLOrSVGElement", "HTMLElement", "SVGElement", "Window", "Element"], ["focus", "blur"])(r) || globalNamed(["focus", "blur"])(r) || reading(member(["Document", "DocumentOrShadowRoot"], ["activeElement", "hasFocus"]))(r) },
 	{ what: "an observer", owners: ["measure"], matches: (r) => globalNamed(["ResizeObserver", "IntersectionObserver", "MutationObserver", "PerformanceObserver"])(r) || member(["ResizeObserver", "IntersectionObserver", "MutationObserver", "PerformanceObserver", "ResizeObserverEntry", "IntersectionObserverEntry", "MutationRecord", "ResizeObserverSize"], "*")(r) },
-	{ what: "the platform, the theme or the viewport's media", owners: ["chrome"], matches: (r) => globalNamed(["matchMedia"])(r) || member(["MediaQueryList", "MediaQueryListEvent"], "*")(r) },
+	{ what: "the platform, the theme or the viewport's media", owners: ["chrome"], matches: (r) => globalNamed(["matchMedia"])(r) || member(["MediaQueryList", "MediaQueryListEvent"], "*")(r) || (OBSIDIAN_FILE.test(r.file) && r.owner === "Workspace" && r.name === "on" && r.firstArg === "css-change") },
 	{
 		what: "a class written whole, from a list or by its attribute (chrome writes only literal is-… states, one class each)",
 		owners: "nowhere",
@@ -271,9 +273,11 @@ export const DRIVER_ALLOW: Readonly<Record<Driver, readonly ((r: Reach) => boole
 	motion: [workOf("an inline style"), workOf("an animation"), workOf("a geometry read")],
 	measure: [workOf("a geometry read"), workOf("an observer")],
 	scroll: [workOf("a scroll")],
-	focus: [workOf("a focus"), member(["FocusEvent"], "*")],
-	input: [member(POINTER_OWNERS, "*"), member(["Element"], ["setPointerCapture", "releasePointerCapture", "hasPointerCapture"])],
-	keys: [workOf("a key scope"), member(["KeyboardEvent"], "*"), obsidianExport(["Scope", "Keymap"])],
+	focus: [workOf("a focus"), reading(member(["FocusEvent"], "*")), reading(member(["ElementContentEditable", "HTMLElement", "HTMLOrSVGElement"], ["isContentEditable", "contentEditable", "tabIndex"]))],
+	/** The pointer, touch and wheel; a key read while a gesture runs (Escape ends a lift). */
+	input: [member(POINTER_OWNERS, "*"), reading(member(["KeyboardEvent"], "*")), member(["Element"], ["setPointerCapture", "releasePointerCapture", "hasPointerCapture"])],
+	/** Scopes and keys; where focus went, so a scope ends when its field loses it. */
+	keys: [workOf("a key scope"), reading(member(["KeyboardEvent", "FocusEvent"], "*")), obsidianExport(["Scope", "Keymap"]), reading(obsidianMember(["App"], ["keymap"]))],
 	chrome: [
 		workOf("a class or dataset write"),
 		(r) => member(["Element"], ["classList"])(r) && r.at === "member",
@@ -290,12 +294,34 @@ export const DRIVER_ALLOW: Readonly<Record<Driver, readonly ((r: Reach) => boole
 	overlay: [MOUNTING],
 };
 
-/** What a host may reach: Obsidian's views it extends (their lifecycle, their element to mount into), DOM types. */
+/**
+ * Obsidian's API as a host uses it: the views it extends and their lifecycle, the vault's and the workspace's events and
+ * leaves to find where its blocks go, the files' names. Never the files' contents (the runtime reads and writes them),
+ * never Obsidian's own UI (a notice is the runtime's words, a menu or a modal a layer or an island), never its DOM helpers.
+ */
+const HOST_OBSIDIAN: readonly ((r: Reach) => boolean)[] = [
+	obsidianExport(["ItemView", "View", "MarkdownView", "MarkdownRenderChild", "PluginSettingTab", "SettingTab", "Component", "TFile", "TFolder", "TAbstractFile", "WorkspaceLeaf"]),
+	obsidianMember(["Component", "View", "ItemView", "FileView", "TextFileView", "EditableFileView", "MarkdownView", "MarkdownRenderChild", "PluginSettingTab", "SettingTab"], "*", ["registerDomEvent", "registerInterval", "registerScopeEvent", "scope", "navigation"]),
+	reading(obsidianMember(["App"], ["vault", "workspace", "metadataCache"])),
+	obsidianMember(["Vault", "MetadataCache", "Workspace", "Events"], ["on", "offref", "getAbstractFileByPath", "getFileByPath", "getName", "iterateAllLeaves", "iterateRootLeaves", "getLeavesOfType", "getActiveViewOfType", "onLayoutReady", "layoutReady", "activeLeaf"]),
+	reading(obsidianMember(["WorkspaceLeaf"], ["view", "getViewState", "getRoot"])),
+	reading(obsidianMember(["TAbstractFile", "TFile", "TFolder"], ["path", "name", "basename", "extension", "parent"])),
+];
+const obsidianApi = (r: Reach) => HOST_OBSIDIAN.some((a) => a(r));
+/** Work a driver owns: a host never does it, even through Obsidian's API (a scope, the theme's change). */
+const driversWork = (r: Reach) => HOST_WORK.some((w) => Array.isArray(w.owners) && w.matches(r));
+
+/**
+ * What a host may reach (§Architecture: mount, own, dispose): Obsidian's API (the app, the vault's and the workspace's
+ * events, the leaves and views it mounts into), the DOM's tree read to find where its block goes, DOM and Obsidian types.
+ * The node itself is made and placed by a driver (`islands`, `overlay`: host nodes made once), and Preact renders into
+ * it; a host never writes the DOM, nor does a driver's work (style, class, listener, geometry, timer, scope, focus).
+ */
 const HOST_ALLOW: readonly ((r: Reach) => boolean)[] = [
 	domType,
 	(r) => r.at === "type" && OBSIDIAN_FILE.test(r.file),
-	obsidianExport(["ItemView", "View", "MarkdownRenderChild", "PluginSettingTab", "SettingTab", "Component"]),
-	obsidianMember(["Component", "View", "ItemView", "MarkdownRenderChild", "PluginSettingTab", "SettingTab"], "*", ["registerDomEvent", "registerInterval", "scope", "navigation"]),
+	(r) => !driversWork(r) && (obsidianApi(r) || reading(member(NODE_OWNERS, ["parentNode", "parentElement", "contains", "isConnected", "firstChild", "lastChild", "nextSibling", "previousSibling", "firstElementChild", "lastElementChild", "nextElementSibling", "previousElementSibling"]))(r)),
+	(r) => r.at === "instanceof" && isHost(r) && ELEMENTS.test(r.name),
 ];
 
 /** What a view may reach: the DOM's types for its handlers, and what a field says it holds as it is typed. */
@@ -629,14 +655,18 @@ class HostTypes {
 
 	private compute(type: Type, depth: number): boolean {
 		const own = [type.getSymbol(), type.getAliasSymbol()].filter((s): s is TsSymbol => !!s);
-		if (own.some((s) => HOST_FILE.test(fileOf(s)) || ES_HOST.has(s.name) || (s.name === "ContainerNode" && PREACT_FILE.test(fileOf(s))))) return true;
+		if (own.some((s) => DOM_FILE.test(fileOf(s)) || ES_HOST.has(s.name) || (s.name === "ContainerNode" && PREACT_FILE.test(fileOf(s))))) return true;
 		if (type.isUnionType() || type.isIntersectionType()) return (type.getTypes() ?? []).some((t) => this.carries(t, depth + 1));
 		if (type.isTypeReference()) {
 			const args = this.checker.getTypeArguments(type);
 			if (args.some((t) => this.carries(t, depth + 1))) return true;
 		}
-		if ((type.flags & TypeFlags.Object) !== 0 && !STD_LIB.test(fileOf(type.getSymbol())) && !PREACT_FILE.test(fileOf(type.getSymbol()))) {
-			const props = this.checker.getPropertiesOfType(type).slice(0, 40);
+		const library = (file: string) => STD_LIB.test(file) || HOST_FILE.test(file) || PREACT_FILE.test(file) || /node_modules\//.test(file);
+		if ((type.flags & TypeFlags.Object) !== 0 && !library(fileOf(type.getSymbol()))) {
+			const props = this.checker
+				.getPropertiesOfType(type)
+				.filter((p) => (p.flags & SymbolFlags.Method) === 0 && !library(fileOf(p)))
+				.slice(0, 40);
 			if (props.length === 0) return false;
 			const types = this.checker.getTypeOfSymbol(props);
 			return types.some((t) => this.carries(t, depth + 1));
@@ -647,7 +677,8 @@ class HostTypes {
 
 /** A target no host value may go into anywhere: `any`, `unknown`, `object`, `{}`. */
 const untypedTarget = (type: Type, checker: Checker): boolean =>
-	(type.flags & (TypeFlags.Any | TypeFlags.Unknown | TypeFlags.NonPrimitive)) !== 0 || ((type.flags & TypeFlags.Object) !== 0 && checker.getPropertiesOfType(type).length === 0 && checker.getSignaturesOfType(type, SignatureKind.Call).length === 0);
+	(type.flags & (TypeFlags.Any | TypeFlags.Unknown | TypeFlags.NonPrimitive)) !== 0 ||
+	((type.flags & TypeFlags.Object) !== 0 && ["", "__type", "__object", "Object"].includes(type.getSymbol()?.name ?? "") && checker.getPropertiesOfType(type).length === 0 && checker.getSignaturesOfType(type, SignatureKind.Call).length === 0);
 
 /** The candidates for a flow: a value used whole (not as a member's object or a callee). */
 function wholeValues(sf: SourceFile): AnyNode[] {
@@ -727,20 +758,29 @@ function declaredParameter(checker: Checker, call: AnyNode, index: number): { ty
 
 // Views: no style, states as literal is- classes --------------------------------------------------------------------
 
-/** What a class expression may be: each a set of the classes it gives, or null when a name is made at run time. */
-function classAlternatives(n: AnyNode | undefined, depth = 0): string[][] | null {
+const tokens = (s: string) => s.split(/\s+/).filter((t) => t !== "");
+
+/**
+ * What a class expression may be: each a set of the classes it gives, or null when a name is made at run time. Read from
+ * the text (literals, conditions, templates, a list joined), and where the text says no more, from the type: a value
+ * typed as string literals (`cls: "tc-n-icon" | "tc-n-icon is-on"`) gives exactly those.
+ */
+function classAlternatives(n: AnyNode | undefined, checker: Checker, depth = 0): string[][] | null {
 	if (!n || depth > 8) return null;
-	const tokens = (s: string) => s.split(/\s+/).filter((t) => t !== "");
+	const byType = (): string[][] | null => {
+		const values = literalsOf(checker.getTypeAtLocation(n));
+		return values && values.every((v) => typeof v === "string") ? values.map((v) => tokens(String(v))) : null;
+	};
 	switch (n.kind) {
 		case SyntaxKind.StringLiteral:
 		case SyntaxKind.NoSubstitutionTemplateLiteral:
 			return [tokens(String(n.text))];
 		case SyntaxKind.ParenthesizedExpression:
 		case SyntaxKind.JsxExpression:
-			return classAlternatives(n.expression as AnyNode, depth + 1);
+			return classAlternatives(n.expression as AnyNode, checker, depth + 1);
 		case SyntaxKind.ConditionalExpression: {
-			const a = classAlternatives(n.whenTrue as AnyNode, depth + 1);
-			const b = classAlternatives(n.whenFalse as AnyNode, depth + 1);
+			const a = classAlternatives(n.whenTrue as AnyNode, checker, depth + 1);
+			const b = classAlternatives(n.whenFalse as AnyNode, checker, depth + 1);
 			return a && b ? [...a, ...b] : null;
 		}
 		case SyntaxKind.FalseKeyword:
@@ -748,20 +788,20 @@ function classAlternatives(n: AnyNode | undefined, depth = 0): string[][] | null
 		case SyntaxKind.UndefinedKeyword:
 			return [[]];
 		case SyntaxKind.Identifier:
-			return n.text === "undefined" ? [[]] : null;
+			return n.text === "undefined" ? [[]] : byType();
 		case SyntaxKind.BinaryExpression: {
 			const op = (n.operatorToken as Node).kind;
 			if (op === SyntaxKind.AmpersandAmpersandToken) {
-				const right = classAlternatives(n.right as AnyNode, depth + 1);
+				const right = classAlternatives(n.right as AnyNode, checker, depth + 1);
 				return right ? [...right, []] : null;
 			}
 			if (op === SyntaxKind.BarBarToken || op === SyntaxKind.QuestionQuestionToken) {
-				const a = classAlternatives(n.left as AnyNode, depth + 1);
-				const b = classAlternatives(n.right as AnyNode, depth + 1);
+				const a = classAlternatives(n.left as AnyNode, checker, depth + 1);
+				const b = classAlternatives(n.right as AnyNode, checker, depth + 1);
 				return a && b ? [...a, ...b] : null;
 			}
-			if (op === SyntaxKind.PlusToken) return joined([n.left as AnyNode, n.right as AnyNode], depth, false);
-			return null;
+			if (op === SyntaxKind.PlusToken) return joined([n.left as AnyNode, n.right as AnyNode], checker, depth, false);
+			return byType();
 		}
 		case SyntaxKind.TemplateExpression: {
 			const parts: (string | AnyNode)[] = [String((n.head as AnyNode).text)];
@@ -773,7 +813,7 @@ function classAlternatives(n: AnyNode | undefined, depth = 0): string[][] | null
 			}
 			let out: string[][] = [[]];
 			for (const p of parts) {
-				const alts = typeof p === "string" ? [tokens(p)] : classAlternatives(p, depth + 1);
+				const alts = typeof p === "string" ? [tokens(p)] : classAlternatives(p, checker, depth + 1);
 				if (!alts) return null;
 				out = out.flatMap((o) => alts.map((a) => [...o, ...a])).slice(0, 256);
 			}
@@ -781,23 +821,23 @@ function classAlternatives(n: AnyNode | undefined, depth = 0): string[][] | null
 		}
 		case SyntaxKind.CallExpression: {
 			const callee = n.expression as AnyNode;
-			if (callee.kind !== SyntaxKind.PropertyAccessExpression || String((callee.name as AnyNode).text) !== "join") return null;
+			if (callee.kind !== SyntaxKind.PropertyAccessExpression || String((callee.name as AnyNode).text) !== "join") return byType();
 			const sep = literal((n.arguments as unknown as Node[])[0]);
 			if (sep === null || sep.trim() !== "" || sep === "") return null;
 			let list = callee.expression as AnyNode;
 			if (list.kind === SyntaxKind.CallExpression && (list.expression as AnyNode).kind === SyntaxKind.PropertyAccessExpression && String(((list.expression as AnyNode).name as AnyNode).text) === "filter") list = (list.expression as AnyNode).expression as AnyNode;
 			if (list.kind !== SyntaxKind.ArrayLiteralExpression) return null;
-			return joined(list.elements as unknown as AnyNode[], depth, true);
+			return joined(list.elements as unknown as AnyNode[], checker, depth, true);
 		}
 		default:
-			return null;
+			return byType();
 	}
 }
 
-function joined(parts: readonly AnyNode[], depth: number, spaced: boolean): string[][] | null {
+function joined(parts: readonly AnyNode[], checker: Checker, depth: number, spaced: boolean): string[][] | null {
 	let out: string[][] = [[]];
 	for (const p of parts) {
-		const alts = classAlternatives(p, depth + 1);
+		const alts = classAlternatives(p, checker, depth + 1);
 		if (!alts) return null;
 		if (!spaced && p.kind !== SyntaxKind.StringLiteral) return null;
 		out = out.flatMap((o) => alts.map((a) => [...o, ...a])).slice(0, 256);
@@ -806,8 +846,8 @@ function joined(parts: readonly AnyNode[], depth: number, spaced: boolean): stri
 }
 
 /** The classes a class expression gives only sometimes must be is- states; a name made at run time is refused. */
-function classProblem(n: AnyNode): string | null {
-	const alts = classAlternatives(n);
+function classProblem(n: AnyNode, checker: Checker): string | null {
+	const alts = classAlternatives(n, checker);
 	if (!alts) return "a class named at run time (a view gives its component's classes as literals and its states as literal is-… classes)";
 	const all = new Set(alts.flat());
 	const always = [...all].filter((t) => alts.every((a) => a.includes(t)));
@@ -830,7 +870,7 @@ function viewRules(path: string, sf: SourceFile, checker: Checker): Violation[] 
 			const name = String((n.name as AnyNode).text);
 			if (FORBIDDEN_PROPS.includes(name)) out.push({ path, rule: "JSX style", what: `«${text(sf, n)}»` });
 			if (isView && CLASS_PROPS.includes(name) && n.initializer) {
-				const problem = classProblem(n.initializer as AnyNode);
+				const problem = classProblem(n.initializer as AnyNode, checker);
 				if (problem) out.push({ path, rule: "view classes", what: `${problem} «${text(sf, n)}»` });
 			}
 		}
@@ -858,7 +898,7 @@ function viewRules(path: string, sf: SourceFile, checker: Checker): Violation[] 
 					const key = p.name as AnyNode | undefined;
 					const name = key ? String(key.text ?? literal(key as Node) ?? "") : "";
 					if (p.kind === SyntaxKind.PropertyAssignment && CLASS_PROPS.includes(name)) {
-						const problem = classProblem(p.initializer as AnyNode);
+						const problem = classProblem(p.initializer as AnyNode, checker);
 						if (problem) out.push({ path, rule: "view classes", what: `${problem} «${text(sf, p)}»` });
 					}
 				}
