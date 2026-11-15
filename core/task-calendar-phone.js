@@ -997,7 +997,7 @@
   }
 
   // core/domain/LineMatch.ts
-  function matchLines(before, after, alike) {
+  function matchLines(before, after, alike, each = false) {
     let head = 0;
     while (head < before.length && head < after.length && before[head] === after[head]) head++;
     let tail = 0;
@@ -1008,16 +1008,17 @@
     let b = 0;
     let a = 0;
     for (const anchor of [...anchors, [before.length, after.length]]) {
-      pairs.push(...inPlace(b, anchor[0], a, anchor[1], alike));
+      pairs.push(...inPlace(b, anchor[0], a, anchor[1], alike, each));
       if (anchor[0] < before.length) pairs.push(anchor);
       b = anchor[0] + 1;
       a = anchor[1] + 1;
     }
     return pairs;
   }
-  function inPlace(b0, b1, a0, a1, alike) {
+  function inPlace(b0, b1, a0, a1, alike, each) {
     if (b1 - b0 !== a1 - a0 || b1 === b0) return [];
     const pairs = Array.from({ length: b1 - b0 }, (_, k) => [b0 + k, a0 + k]);
+    if (each) return pairs.filter(([x, y]) => alike(x, y));
     return pairs.every(([x, y]) => alike(x, y)) ? pairs : [];
   }
 
@@ -8188,7 +8189,7 @@ ${at.reading}`;
      * whose id was minted at or past it.
      */
     mintedSince(next) {
-      return this.current.lines.filter((line) => idNumber(line.id) >= next).sort((a, b) => idNumber(a.id) - idNumber(b.id)).map((line) => line.id);
+      return this.current.lines.filter((line) => idNumber(line.id) >= next).sort((a, b) => idNumber(a.id) - idNumber(b.id));
     }
     /**
      * `base`, who a base's tasks and sections are, going on from `from`'s counter when it is further: a new base read
@@ -8240,7 +8241,8 @@ ${at.reading}`;
       const pairs = matchLines(
         old.map((l) => l.raw),
         outline.map((o) => o.raw),
-        (b, a) => old[b].task === outline[a].task
+        (b, a) => old[b].task === outline[a].task && (!old[b].task || sameTaskLine(old[b].raw, outline[a].raw)),
+        true
       );
       const known = /* @__PURE__ */ new Map();
       for (const [b, a] of pairs) if (old[b].task === outline[a].task) known.set(outline[a].tag, old[b].id);
@@ -8249,6 +8251,18 @@ ${at.reading}`;
   };
   function sameOutline(lines, outline) {
     return lines.length === outline.length && lines.every((line, i) => line.raw === outline[i].raw && line.task === outline[i].task);
+  }
+  function titleWords(raw) {
+    const text = raw.replace(/^\s*[-*+]\s+\[.\]\s*/u, "").toLowerCase();
+    return new Set((text.match(/[\p{L}\p{N}]+/gu) ?? []).filter((word) => /\p{L}/u.test(word)));
+  }
+  function sameTaskLine(a, b) {
+    const x = titleWords(a);
+    const y = titleWords(b);
+    if (x.size === 0 || y.size === 0) return x.size === y.size;
+    let shared = 0;
+    for (const word of x) if (y.has(word)) shared++;
+    return shared * 2 >= Math.min(x.size, y.size);
   }
   function idNumber(id) {
     return Number(id.slice(1));
@@ -8472,7 +8486,10 @@ ${at.reading}`;
       if (text === null) return false;
       this.setText(text, true, { before: was, after: this.rules.idsOf(text) });
       const made = this.identity.mintedSince(counter);
-      if (made.length > 0) this.kept.created = [...this.kept.created ?? [], ...made];
+      if (made.length > 0) {
+        this.kept.created = [...this.kept.created ?? [], ...made.map((line) => line.id)];
+        this.kept.createdKinds = [...this.kept.createdKinds ?? [], ...made.map((line) => line.task ? "task" : "section")];
+      }
       return true;
     }
     /** A write as one action: its operation over the text, the new text a step of the history. */
