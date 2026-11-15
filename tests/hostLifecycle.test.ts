@@ -229,7 +229,112 @@ describe("every host leaves nothing alive", () => {
 	});
 });
 
+describe("the leak counter on what a host may forget besides", () => {
+	let leaks: LeakCounter;
+	beforeEach(() => {
+		leaks = new LeakCounter(window);
+	});
+	afterEach(() => leaks.uninstall());
+
+	it("a handler property left on an element, the window or a media query", () => {
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+		el.onpointerdown = () => undefined;
+		window.onresize = () => undefined;
+		const query = window.matchMedia("(hover: hover)");
+		query.onchange = () => undefined;
+		const alive = leaks.alive().join("\n");
+		expect(alive).toMatch(/handler property onpointerdown on <div/);
+		expect(alive).toMatch(/handler property onresize on window/);
+		expect(alive).toMatch(/handler property onchange on the media query/);
+		el.onpointerdown = null;
+		window.onresize = null;
+		query.onchange = null;
+		el.remove();
+		expect(leaks.alive()).toEqual([]);
+	});
+
+	it("an immediate never run, and one cleared", () => {
+		const kept = setImmediate(() => undefined);
+		expect(leaks.alive()).toContain("an immediate");
+		clearImmediate(kept);
+		expect(leaks.alive()).toEqual([]);
+	});
+
+	it("clearTimeout on an interval's handle ends it, as in a browser", () => {
+		const interval = window.setInterval(() => undefined, 60_000);
+		expect(leaks.alive()).toContain("an interval");
+		window.clearTimeout(interval);
+		expect(leaks.alive()).toEqual([]);
+		const timeout = window.setTimeout(() => undefined, 60_000);
+		window.clearInterval(timeout);
+		expect(leaks.alive()).toEqual([]);
+	});
+
+	it("a Node timer's handle, an object, is told apart from another", () => {
+		const a = globalThis.setTimeout(() => undefined, 60_000);
+		const b = globalThis.setTimeout(() => undefined, 60_000);
+		globalThis.clearTimeout(a);
+		expect(leaks.alive()).toEqual(["a timeout"]);
+		globalThis.clearTimeout(b);
+		expect(leaks.alive()).toEqual([]);
+	});
+});
+
 describe("the leak counter on what happy-dom lacks", () => {
+	it("counts a running animation, an infinite one too, until it is cancelled", () => {
+		const proto = Element.prototype as unknown as { animate?: unknown };
+		const had = proto.animate;
+		class FakeAnimation {
+			playState = "running";
+			constructor(readonly effect: { target: Element }) {}
+			cancel() {
+				this.playState = "idle";
+			}
+			finish() {
+				this.playState = "finished";
+			}
+		}
+		proto.animate = function (this: Element) {
+			return new FakeAnimation({ target: this });
+		};
+		const leaks = new LeakCounter(window);
+		try {
+			const el = document.createElement("div");
+			const once = (el as unknown as { animate(k: unknown, o: unknown): FakeAnimation }).animate([], 200);
+			const forever = (el as unknown as { animate(k: unknown, o: unknown): FakeAnimation }).animate([], { duration: 200, iterations: Infinity });
+			expect(leaks.alive().filter((a) => a.startsWith("an animation"))).toHaveLength(2);
+			once.finish();
+			expect(leaks.alive().filter((a) => a.startsWith("an animation"))).toHaveLength(1);
+			forever.cancel();
+			expect(leaks.alive()).toEqual([]);
+		} finally {
+			leaks.uninstall();
+			proto.animate = had;
+		}
+	});
+
+	it("counts a PerformanceObserver observing until it disconnects", () => {
+		const win = window as unknown as { PerformanceObserver?: unknown };
+		const had = win.PerformanceObserver;
+		win.PerformanceObserver = class {
+			observe(): void {}
+			disconnect(): void {}
+		};
+		const leaks = new LeakCounter(window);
+		try {
+			const observer = new (window as unknown as { PerformanceObserver: new (f: () => void) => { observe(o: unknown): void; disconnect(): void } }).PerformanceObserver(() => undefined);
+			observer.observe({ type: "longtask" });
+			expect(leaks.alive().join("\n")).toMatch(/PerformanceObserver observing 1/);
+			observer.disconnect();
+			expect(leaks.alive()).toEqual([]);
+		} finally {
+			leaks.uninstall();
+			win.PerformanceObserver = had;
+		}
+	});
+
+
 	it("counts the visual viewport's listeners and idle callbacks once the window has them", () => {
 		const win = window as unknown as { visualViewport?: EventTarget; requestIdleCallback?: (f: () => void) => number; cancelIdleCallback?: (id: number) => void };
 		const had = { viewport: win.visualViewport, idle: win.requestIdleCallback, cancel: win.cancelIdleCallback };
