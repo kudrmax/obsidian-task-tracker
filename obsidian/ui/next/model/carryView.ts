@@ -1,3 +1,4 @@
+import { groupPlaceOf } from "../../../../core/application/contracts";
 import { type BlockModel, currentLists } from "./block";
 import type { CardFace } from "./card";
 import type { CardRow, ListRow } from "./lists";
@@ -9,6 +10,7 @@ export interface Marks {
 	readonly hot: string | null;
 	readonly picking: boolean;
 	readonly picked: ReadonlySet<string>;
+	readonly landing: { readonly column: string; readonly index: number } | null;
 }
 
 /** The carried cards wait dashed where they stood; the card a drop lands on is its place until the float is down; the plate under the finger lit; the picks. */
@@ -21,7 +23,18 @@ export function rowMarks(model: BlockModel): Marks {
 		hot: carry?.target?.plate ?? null,
 		picking: model.select?.selecting === true,
 		picked: new Set(model.select?.picked ?? []),
+		landing: sectionLanding(model),
 	};
+}
+
+/**
+ * Where a lifted section's landing place shows (the old screen's `SectionSlots.preview`): over the header of the slot
+ * nearest the finger, among the headers the list draws while the section is lifted; none on the section's own slots.
+ */
+export function sectionLanding(model: BlockModel): { readonly column: string; readonly index: number } | null {
+	const section = model.carry?.phase === "carried" ? model.carry.section : null;
+	if (!section || groupPlaceOf(section.groups, section.lifted, section.gap) === null) return null;
+	return { column: section.column, index: section.gap <= section.lifted ? section.gap : section.gap - 1 };
 }
 
 /** The drop line under the finger, in the stack's content pixels; null while none shows. */

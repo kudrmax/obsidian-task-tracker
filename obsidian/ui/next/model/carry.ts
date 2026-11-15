@@ -1,4 +1,4 @@
-import type { DropColumn, DropOrigin, GapPlace, ListPlace, ProjectsDrop } from "../../../../core/application/contracts";
+import type { DropColumn, DropOrigin, GapPlace, GroupedList, GroupName, ListPlace, ProjectsDrop } from "../../../../core/application/contracts";
 
 /** A row of a list as measured at the lift (P4): its box in the stack's content pixels, so a scroll moves nothing in it. */
 export interface MeasuredRow {
@@ -52,7 +52,34 @@ export interface CarryTarget {
  * from, how the finger holds it, the geometry measured at the lift, the target under the finger and its phase. While a
  * carry stands, `model.pinned` holds the lists as they stood at the lift.
  */
+/**
+ * A section lifted by its header (the old screen's `GroupDrag`): its list, its name and its place among the list's
+ * sections, how many tasks it holds, and the slot between the sections nearest the finger (`groupPlaceOf`'s).
+ */
+export interface SectionCarry {
+	/** The row's column its list is drawn in, and the grouped list the core moves it in. */
+	readonly column: DropColumn;
+	readonly list: GroupedList;
+	/** The header's row key, and the section's name (null: No section). */
+	readonly head: string;
+	readonly group: GroupName;
+	readonly name: string;
+	readonly count: number;
+	/** Every section the list draws, in order, and the lifted one's index among them. */
+	readonly groups: readonly GroupName[];
+	/** Their headers' row keys, in the same order. */
+	readonly heads: readonly string[];
+	readonly lifted: number;
+	/** The slot nearest the finger: before the section of that index, or past the last. */
+	readonly gap: number;
+}
+
 export interface CarryModel {
+	/** What is carried: cards, the plus (a new task, let go it opens the field there), a section by its header. */
+	readonly kind: "cards" | "plus" | "section";
+	/** The plus's place lit: the finger came back to its ring, and a drop there is a cancel. */
+	readonly ring: boolean;
+	readonly section: SectionCarry | null;
 	/** The row key of the card under the finger: the task's id (By subprojects, the row's id). */
 	readonly id: string;
 	/** Every carried task's id, the one under the finger first. */
@@ -88,8 +115,14 @@ export type CarryMsg =
 	/** The picked cards that go along with the one lifted (`tasks.carried`), by their ids: the carry starts with them. */
 	| { readonly kind: "along"; readonly key: string; readonly at: { readonly x: number; readonly y: number }; readonly box: CarryModel["box"]; readonly ids: readonly string[] }
 	| { readonly kind: "measured"; readonly geometry: CarryGeometry }
-	/** The target under the finger changed (the host reads it through `targetAt` on every move, telling only a change). */
-	| { readonly kind: "over"; readonly target: CarryTarget | null }
+	/** The plus pressed and moved: a new task carried from the plus's place (its box, screen pixels). */
+	| { readonly kind: "liftPlus"; readonly at: { readonly x: number; readonly y: number }; readonly box: CarryModel["box"] }
+	/** A section's header held (a finger) or moved (the mouse): the section lifted. */
+	| { readonly kind: "liftSection"; readonly key: string; readonly at: { readonly x: number; readonly y: number }; readonly box: CarryModel["box"] }
+	/** The target under the finger changed (the host reads it through `targetAt` on every move, telling only a change); `ring`: over the plus's ring. */
+	| { readonly kind: "over"; readonly target: CarryTarget | null; readonly ring?: boolean }
+	/** The slot nearest a lifted section changed. */
+	| { readonly kind: "slot"; readonly gap: number }
 	| { readonly kind: "drop" }
 	/** Let go nowhere, called off, or the pointer lost: the card flies back. */
 	| { readonly kind: "cancel" }

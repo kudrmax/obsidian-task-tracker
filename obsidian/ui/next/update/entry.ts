@@ -65,6 +65,10 @@ export function updateEntry(model: BlockModel, msg: EntryMsg): Step {
 		}
 		case "atEnd":
 			return opening(model, "entry.openAtEnd", [msg.column]);
+		case "atDrop":
+			return opening(model, "entry.openAtDrop", [msg.column, msg.drop]);
+		case "atPlace":
+			return opening(model, "entry.openAt", [msg.column, msg.place]);
 		case "rename": {
 			const item = itemOf(model, msg.id);
 			return item ? opening(model, "entry.renameSpot", [item, false], { open: "rename", item }) : [model, []];

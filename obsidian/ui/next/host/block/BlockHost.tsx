@@ -18,7 +18,8 @@ import { OverlayHost } from "../../drivers/overlay";
 import { EdgeScroll } from "../../drivers/scroll";
 import { type BlockModel, blockModel, blockNeeds, currentLists, projectsView, rootVars, rowVars, sectioned, settings } from "../../model/block";
 import type { CarryMsg, CarryTarget } from "../../model/carry";
-import { targetAt } from "../../model/carryPlace";
+import { ringNear, sectionSlotAt, targetAt } from "../../model/carryPlace";
+import { PLUS_ANCHOR } from "../../update/carry";
 import { carryVars } from "../../model/carryView";
 import { type Gesture, IDLE, press, type PressInput, type PressState } from "../../recognizers/press";
 import type { Command } from "../../model/commands";
@@ -294,6 +295,8 @@ export class BlockHost {
 	private gesture(gesture: Gesture): void {
 		switch (gesture.kind) {
 			case "tap":
+				if (gesture.target.act === "plus") return this.dispatch({ kind: "plusTapped" });
+				if (gesture.target.act === "head") return gesture.target.key === null ? undefined : this.dispatch({ kind: "section", msg: { kind: "menu", head: gesture.target.key } });
 				if (gesture.target.key !== null) this.carry({ kind: "tap", key: gesture.target.key, act: gesture.target.act, mod: gesture.mod, shift: gesture.shift });
 				return;
 			case "menu":
@@ -301,9 +304,12 @@ export class BlockHost {
 				return;
 			case "lift": {
 				const key = gesture.target.key;
-				const box = key === null ? null : Measure.row(this.node, key);
-				if (key === null || !box) return;
-				this.carry({ kind: "lift", key, at: gesture.at, box });
+				const plus = gesture.target.act === "plus";
+				const box = plus ? Measure.anchor(this.node, PLUS_ANCHOR) : key === null ? null : Measure.row(this.node, key);
+				if ((!plus && key === null) || !box) return;
+				if (plus) this.carry({ kind: "liftPlus", at: gesture.at, box });
+				else if (gesture.target.act === "head" && key !== null) this.carry({ kind: "liftSection", key, at: gesture.at, box });
+				else if (key !== null) this.carry({ kind: "lift", key, at: gesture.at, box });
 				const carry = this.store.model.carry;
 				if (!carry) return;
 				const stack = this.stack();
@@ -344,8 +350,14 @@ export class BlockHost {
 		const stack = this.stack();
 		if (!carry || carry.phase !== "carried" || !this.finger || !stack || !model.pinned) return;
 		const at = Measure.inStack(stack, this.finger.x, this.finger.y);
-		const target = targetAt(carry, model.pinned, projectsView(model), at.x, at.y);
-		if (!sameTarget(target, carry.target)) this.carry({ kind: "over", target });
+		if (carry.kind === "section") {
+			const slot = sectionSlotAt(carry, model.pinned, at.y);
+			if (slot !== null && slot !== carry.section?.gap) this.carry({ kind: "slot", gap: slot });
+			return;
+		}
+		const ring = carry.kind === "plus" && ringNear(Measure.anchor(this.node, PLUS_ANCHOR), this.finger.x, this.finger.y);
+		const target = ring ? null : targetAt(carry, model.pinned, projectsView(model), at.x, at.y);
+		if (!sameTarget(target, carry.target) || ring !== carry.ring) this.carry({ kind: "over", target, ring });
 	}
 
 	/** The description's editor tells what was typed, its focus, Escape (the keyboard goes, what was typed is written). */
@@ -416,7 +428,7 @@ export class BlockHost {
 				return;
 			}
 			case "fly":
-				return this.motion.fly(this.overlay.node, command.to, () => dispatch(command.done));
+				return this.motion.fly(this.overlay.node, command.to, () => dispatch(command.done), command.later === true);
 			case "openTasksFile":
 				return this.deps.openTasksFile(command.line);
 		}

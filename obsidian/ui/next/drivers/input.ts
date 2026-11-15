@@ -4,7 +4,7 @@
  * gives it the focus first.
  */
 /** The parts of a card a press may lift it by: their taps come from the press recognizer, never as a click. */
-export const PRESSED: ReadonlySet<string> = new Set(["card", "counter", "mark"]);
+export const PRESSED: ReadonlySet<string> = new Set(["card", "counter", "mark", "head", "plus"]);
 
 /** A raw event of the pointer's stream, as the press recognizer reads it (`recognizers/press.ts`'s `PressInput`). */
 export type RawPress =

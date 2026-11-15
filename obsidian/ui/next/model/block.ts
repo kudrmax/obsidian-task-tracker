@@ -6,6 +6,7 @@ import type { Layer } from "./layers";
 import { type EntryModel, entryNeeds } from "./entry";
 import type { CarryModel } from "./carry";
 import type { SelectModel } from "./select";
+import type { SectionRename } from "./section";
 import { type Found, type SearchModel, searchNeeds } from "./search";
 import { menuNeeds } from "./menuNeeds";
 import { fullLayer, fullNeeds } from "./full";
@@ -27,6 +28,8 @@ export interface BlockModel {
 	readonly entry: EntryModel | null;
 	/** A card (or the plus) carried inside the block. */
 	readonly carry: CarryModel | null;
+	/** A section's name typed in place of its header. */
+	readonly sectionRename: SectionRename | null;
 	/** Select mode: the cards picked. */
 	readonly select: SelectModel | null;
 	/** The search over the block. */
@@ -53,7 +56,7 @@ export interface Motion {
 }
 
 export function blockModel(note: string, wide: boolean): BlockModel {
-	return { note, wide, answers: NO_ANSWERS, layers: [], entry: null, carry: null, select: null, search: null, found: null, pinned: null, motion: { seq: 0, cause: "replace", context: null } };
+	return { note, wide, answers: NO_ANSWERS, layers: [], entry: null, carry: null, sectionRename: null, select: null, search: null, found: null, pinned: null, motion: { seq: 0, cause: "replace", context: null } };
 }
 
 // Needs ------------------------------------------------------------------------------------------------------------
@@ -127,6 +130,8 @@ export interface BlockRow {
 	readonly label: string;
 	/** The list shows its sections (`tasks.columnSections` answered some). */
 	readonly grouped: boolean;
+	/** The grouped list its sections are the sections of (`ColumnSections.list`): what a section's move, rename or removal names; null without sections. */
+	readonly sectionList: ColumnSections["list"] | null;
 	readonly list: ListModel;
 }
 
@@ -187,6 +192,7 @@ function listsOf(model: BlockModel): BlockLists {
 			column,
 			label: titles.get(column) ?? dayTitle(day, "today", day),
 			grouped: sections !== null,
+			sectionList: sections?.list ?? null,
 			list: funnelList({
 				column,
 				items: itemsOf(screen, column),

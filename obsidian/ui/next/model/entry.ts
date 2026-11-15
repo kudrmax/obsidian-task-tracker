@@ -63,6 +63,10 @@ export type EntryMsg =
 	/** New section, from a task's Section page: the task waits at the end of its list under a field for the new section's name. */
 	| { readonly kind: "inSection"; readonly row: string; readonly group: GroupName; readonly list: boolean }
 	| { readonly kind: "atEnd"; readonly column: EntryList }
+	/** The plus let go on a place of a funnel's list (`drop`, what `tasks.drop` would take there): the field opens at it. */
+	| { readonly kind: "atDrop"; readonly column: EntryList; readonly drop: unknown }
+	/** The plus let go on a place of By subprojects' parts: the field opens at it. */
+	| { readonly kind: "atPlace"; readonly column: EntryList; readonly place: unknown }
 	| { readonly kind: "typed"; readonly text: string }
 	| { readonly kind: "key"; readonly key: "enter" | "escape" | "tab" | "shiftTab" | "altTab" }
 	/** The field lost the focus and did not get it back (the keyboard put away, a tap elsewhere). */

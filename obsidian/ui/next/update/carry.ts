@@ -1,7 +1,7 @@
-import { canPick, type DropColumn, type DroppedTask, endsSelection, type ProjectsDrop, type TaskKey } from "../../../../core/application/contracts";
+import { canPick, type DropColumn, type DroppedTask, endsSelection, groupPlaceOf, type ProjectsDrop, type TaskKey } from "../../../../core/application/contracts";
 import { okResult } from "../model/answers";
 import { type BlockLists, type BlockModel, currentLists, noteView, taskById, today } from "../model/block";
-import type { CarryModel, CarryMsg } from "../model/carry";
+import type { CarryModel, CarryMsg, SectionCarry } from "../model/carry";
 import { type Command, write } from "../model/commands";
 import type { CardRow, ListModel, ListRow } from "../model/lists";
 import type { BlockMsg } from "../model/messages";
@@ -9,6 +9,7 @@ import { assertNever } from "../model/assertNever";
 import type { Step } from "./block";
 import { updateMenu } from "./menu";
 import { updateSelect } from "./select";
+import { updateEntry } from "./entry";
 
 const failed = (error: { readonly code: string; readonly message: string }): BlockMsg => ({ kind: "failed", error });
 const carryMsg = (msg: CarryMsg): BlockMsg => ({ kind: "carry", msg });
@@ -61,6 +62,9 @@ function lifted(model: BlockModel, key: string, at: { readonly x: number; readon
 	const folded = rows.flatMap((id) => subtreeOf(cardRowOf(lists, id)!.list, id));
 	const projects = cards.flatMap((card) => (card.drop ? [card.drop] : []));
 	const carry: CarryModel = {
+		kind: "cards",
+		ring: false,
+		section: null,
 		id: key,
 		ids: cards.map((card) => card.item.id),
 		rows,
@@ -144,15 +148,26 @@ export function updateCarry(model: BlockModel, msg: CarryMsg): Step {
 		}
 		case "along":
 			return lifted(model, msg.key, msg.at, msg.box, msg.ids);
+		case "liftPlus":
+			return liftedPlus(model, msg.at, msg.box);
+		case "liftSection":
+			return liftedSection(model, msg.key, msg.at, msg.box);
+		case "slot": {
+			const carry = model.carry;
+			if (!carry?.section || carry.phase !== "carried" || carry.section.gap === msg.gap) return [model, []];
+			return [{ ...model, carry: { ...carry, section: { ...carry.section, gap: msg.gap } } }, []];
+		}
 		case "measured":
 			return model.carry ? [{ ...model, carry: { ...model.carry, geometry: msg.geometry } }, []] : [model, []];
 		case "over":
-			return model.carry && model.carry.phase === "carried" ? [{ ...model, carry: { ...model.carry, target: msg.target } }, []] : [model, []];
+			return model.carry && model.carry.phase === "carried" ? [{ ...model, carry: { ...model.carry, target: msg.target, ring: msg.ring === true } }, []] : [model, []];
 		case "drop":
 			return droppedNow(model);
 		case "cancel": {
 			const carry = model.carry;
 			if (!carry || carry.phase !== "carried") return [model, []];
+			if (carry.kind === "plus") return [{ ...model, carry: { ...carry, phase: "returning", target: null, ring: false } }, [fly(PLUS_ANCHOR)]];
+			if (carry.kind === "section") return [{ ...model, carry: { ...carry, phase: "returning" }, pinned: unpinned(model) }, [fly(carry.section?.head ?? null, true)]];
 			const [next, commands] = ended({ ...model, carry: { ...carry, phase: "returning", target: null } }, "nowhere");
 			return [next, [...commands, fly(carry.id)]];
 		}
@@ -166,15 +181,118 @@ export function updateCarry(model: BlockModel, msg: CarryMsg): Step {
 	}
 }
 
-/** The float's flight onto a row (or fading with none), ending the carry. */
-function fly(to: string | null): Command<BlockMsg> {
-	return { kind: "fly", to, done: carryMsg({ kind: "landed" }) };
+/** The float's flight onto a row (or fading with none), ending the carry; `later`: onto what the next drawing puts there (a field opened, a section moved). */
+function fly(to: string | null, later = false): Command<BlockMsg> {
+	return later ? { kind: "fly", to, later, done: carryMsg({ kind: "landed" }) } : { kind: "fly", to, done: carryMsg({ kind: "landed" }) };
+}
+
+/** Where the plus stands (`data-n-anchor`): its float flies back there, and its ring stands there while it is carried. */
+export const PLUS_ANCHOR = "plus";
+
+/** The lists pinned no more, unless a closing layer still holds them (P6). */
+function unpinned(model: BlockModel): BlockModel["pinned"] {
+	return model.layers.some((layer) => layer.closing) ? model.pinned : null;
+}
+
+/** The plus carried (the old screen's `beginNew`): a new task over the same places as a card, its ring standing in for the plus. */
+function liftedPlus(model: BlockModel, at: { readonly x: number; readonly y: number }, box: CarryModel["box"]): Step {
+	if (model.carry || model.entry?.state) return [model, []];
+	const carry: CarryModel = {
+		kind: "plus",
+		ring: false,
+		section: null,
+		id: PLUS_ANCHOR,
+		ids: [],
+		rows: [],
+		folded: [],
+		origins: ["new"],
+		cards: [],
+		grab: { dx: at.x - box.left, dy: at.y - box.top },
+		box,
+		geometry: null,
+		target: null,
+		phase: "carried",
+		lands: null,
+	};
+	return [{ ...model, carry, pinned: model.pinned ?? currentLists(model) }, [{ kind: "haptic" }, { kind: "measureCarry", measured: (geometry) => carryMsg({ kind: "measured", geometry }) }]];
+}
+
+/** A section's own rows: its header, then everything up to the next header (its cards, its plate). */
+function sectionRows(list: ListModel, head: string): readonly string[] {
+	const at = list.rows.findIndex((row) => row.key === head);
+	if (at < 0) return [];
+	const next = list.rows.findIndex((row, i) => i > at && row.kind === "head");
+	return list.rows.slice(at, next < 0 ? undefined : next).map((row) => row.key);
+}
+
+/** A section lifted by its header (the old screen's `GroupDrag`): its rows leave the pinned lists, the list closing over them. */
+function liftedSection(model: BlockModel, key: string, at: { readonly x: number; readonly y: number }, box: CarryModel["box"]): Step {
+	if (model.carry) return [model, []];
+	const lists = currentLists(model);
+	if (lists.kind !== "rows") return [model, []];
+	const row = lists.rows.find((r) => r.list.rows.some((x) => x.key === key));
+	const head = row?.list.rows.find((x) => x.key === key);
+	if (!row || !head || head.kind !== "head" || !head.reorder || row.sectionList === null) return [model, []];
+	const heads = row.list.rows.flatMap((x) => (x.kind === "head" ? [x] : []));
+	const lifted = heads.findIndex((x) => x.key === key);
+	const carry: CarryModel = {
+		kind: "section",
+		ring: false,
+		section: { column: row.column, list: row.sectionList, head: key, group: head.group, name: head.name, count: head.count, groups: heads.map((x) => x.group), heads: heads.map((x) => x.key), lifted, gap: lifted },
+		id: key,
+		ids: [],
+		rows: [],
+		folded: [],
+		origins: [],
+		cards: [],
+		grab: { dx: at.x - box.left, dy: at.y - box.top },
+		box,
+		geometry: null,
+		target: null,
+		phase: "carried",
+		lands: null,
+	};
+	return [{ ...model, carry, pinned: without(lists, new Set(sectionRows(row.list, key))) }, [{ kind: "haptic" }, { kind: "measureCarry", measured: (geometry) => carryMsg({ kind: "measured", geometry }) }]];
+}
+
+/** A section named in a writing call: by its id (`SectionRef`, decision 1), No section as it is. */
+function sectionArg(section: SectionCarry, index: number): unknown {
+	const head = section.heads[index];
+	return section.groups[index] === null || head === undefined ? null : { sectionRef: head.slice("head:".length) };
+}
+
+/** A section let go: on a slot of another place, moved there as the core says (`moveGroup`); on its own, back. */
+function droppedSection(model: BlockModel, carry: CarryModel): Step {
+	const section = carry.section;
+	if (!section) return updateCarry(model, { kind: "cancel" });
+	const place = groupPlaceOf(section.groups, section.lifted, section.gap);
+	if (place === null) return updateCarry(model, { kind: "cancel" });
+	const before = place === "end" ? "end" : { before: sectionArg(section, section.groups.indexOf(place.before)) };
+	const move: Command<BlockMsg> = { kind: "door", method: "tasks.moveGroup", args: [section.list, sectionArg(section, section.lifted), before], reply: (o) => (o.answer.ok ? null : failed(o.answer.error)) };
+	return [{ ...model, carry: { ...carry, phase: "landing", lands: section.head }, pinned: unpinned(model) }, [move, { kind: "haptic" }, fly(section.head, true)]];
+}
+
+/** The plus let go: on a place the field of a new task opens there in the same tap, the plus landing in it; on its ring or nowhere, back. */
+function droppedPlus(model: BlockModel, carry: CarryModel): Step {
+	const drop = carry.ring ? null : (carry.target?.drop ?? null);
+	if (!drop) return updateCarry(model, { kind: "cancel" });
+	const freed: BlockModel = { ...model, carry: { ...carry, phase: "landing", target: null }, pinned: unpinned(model) };
+	const [opened, commands] =
+		drop.kind === "projects"
+			? updateEntry(freed, { kind: "atPlace", column: "projects", place: drop.place })
+			: drop.place === null
+				? updateEntry(freed, { kind: "atEnd", column: drop.column })
+				: updateEntry(freed, { kind: "atDrop", column: drop.column, drop: { kind: "place", column: drop.column, place: drop.place } });
+	const field = opened.entry?.field ?? null;
+	return [{ ...opened, carry: opened.carry ? { ...opened.carry, lands: field } : null }, [...commands, { kind: "haptic" }, fly(field, true)]];
 }
 
 /** Let go: on a place, written as the core says, the float flying to the card where it lands; anywhere else, back home. */
 function droppedNow(model: BlockModel): Step {
 	const carry = model.carry;
 	if (!carry || carry.phase !== "carried") return [model, []];
+	if (carry.kind === "plus") return droppedPlus(model, carry);
+	if (carry.kind === "section") return droppedSection(model, carry);
 	const drop = carry.target?.drop ?? null;
 	if (!drop) return updateCarry(model, { kind: "cancel" });
 	const funnel = noteView(model);

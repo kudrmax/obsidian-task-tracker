@@ -100,3 +100,35 @@ function lineOf(gap: GapPlace, cards: readonly Placed[], heads: readonly PlacedH
 	if (waiting) return { left, right, y: waiting.top - geometry.cardGap / 2 };
 	return { left, right, y: Math.max(top - geometry.cardGap / 2, list.top + geometry.dot / 2) };
 }
+
+/** How far past the plus's ring the finger may stand and still be over it, px (the old screen's `plusRingReach`). */
+export const PLUS_RING_REACH = 24;
+
+/** Whether the finger at (`x`, `y`) is over the plus's ring (`ring`, its box on the screen): nearer its centre than its radius and the reach. */
+export function ringNear(ring: { readonly left: number; readonly top: number; readonly width: number; readonly height: number } | null, x: number, y: number): boolean {
+	if (!ring) return false;
+	return Math.hypot(x - (ring.left + ring.width / 2), y - (ring.top + ring.height / 2)) < ring.width / 2 + PLUS_RING_REACH;
+}
+
+/**
+ * The slot nearest a lifted section's finger (`y`, content pixels of the stack; the old screen's `nearestSlot`): the
+ * slots are the tops of the list's headers and its end, the lifted section's own two at the place it left, measured
+ * at the lift with the section gone from the list.
+ */
+export function sectionSlotAt(carry: CarryModel, lists: BlockLists, y: number): number | null {
+	const section = carry.section;
+	const geometry = carry.geometry;
+	if (!section || !geometry || lists.kind !== "rows") return null;
+	const measured = geometry.lists.find((list) => list.column === section.column);
+	const row = lists.rows.find((r) => r.column === section.column);
+	if (!measured || !row) return null;
+	const boxes = new Map(measured.rows.map((r) => [r.key, r] as const));
+	const tops = row.list.rows.flatMap((r) => (r.kind === "head" ? [boxes.get(r.key)?.top ?? null] : [])).filter((top): top is number => top !== null);
+	const last = measured.rows.slice(-1).find(() => true);
+	const end = last ? last.top + last.height : measured.top;
+	const left = [...tops, end];
+	const place = (slot: number): number => left.slice(slot <= section.lifted ? slot : slot - 1).find(() => true) ?? end;
+	let best = 0;
+	for (let slot = 0; slot <= section.groups.length; slot++) if (Math.abs(place(slot) - y) < Math.abs(place(best) - y)) best = slot;
+	return best;
+}

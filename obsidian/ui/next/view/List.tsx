@@ -14,9 +14,11 @@ export interface RowMarks {
 	/** Select tasks: every card shows its circle. */
 	readonly picking: boolean;
 	readonly picked: ReadonlySet<string>;
+	/** A lifted section's landing place: in the list of that column, before its header of that index (past the last: at the end). */
+	readonly landing: { readonly column: string; readonly index: number } | null;
 }
 
-export const NO_MARKS: RowMarks = { waiting: new Set(), arriving: null, hot: null, picking: false, picked: new Set() };
+export const NO_MARKS: RowMarks = { waiting: new Set(), arriving: null, hot: null, picking: false, picked: new Set(), landing: null };
 
 /** Which list it is: a row's list (Rows), the parts By subprojects, the full card's subtasks. */
 export type ListKind = "row" | "projects" | "full";
@@ -33,18 +35,37 @@ export interface ListProps {
 	readonly extra?: ReadonlyMap<string, JSX.Element>;
 	/** The card the search led to: it wears the ring. */
 	readonly found?: string | null;
+	/** A section's name typed in place of its header: the header's row key, and the name it starts from. */
+	readonly renaming?: { readonly head: string; readonly name: string } | null;
 }
 
 /**
  * A column of rows, each keyed by who it is (P1): headers of sections, No tasks plates, cards with their subtasks under
  * them a level in, the branches running to each. Motion within it is `motion`'s, by the rows' keys.
  */
-export function List({ list, kind, column, marks = NO_MARKS, hidden, extra, found }: ListProps): JSX.Element {
+export function List({ list, kind, column, marks = NO_MARKS, hidden, extra, found, renaming }: ListProps): JSX.Element {
 	const row = (r: ListRow): JSX.Element => {
 		switch (r.kind) {
 			case "head":
+				if (renaming?.head === r.key)
+					return (
+						<div key={r.key} class="tc-n-group-field" data-n-key={r.key}>
+							<input
+								type="text"
+								class="tc-n-group-input"
+								placeholder=" "
+								aria-label="Section name"
+								defaultValue={renaming.name}
+								enterKeyHint="done"
+								data-n-field="section"
+								data-n-enter="section:named"
+								data-n-escape="section:unnamed"
+							/>
+							<span class="tc-n-group-hint">Section name</span>
+						</div>
+					);
 				return (
-					<div key={r.key} class={r.ungrouped ? "tc-n-group-head is-ungrouped" : "tc-n-group-head"} data-n-key={r.key}>
+					<div key={r.key} class={r.ungrouped ? "tc-n-group-head is-ungrouped" : "tc-n-group-head"} data-n-key={r.key} data-n-anchor={r.key} data-n-act={r.menu !== null || r.reorder ? "head" : undefined}>
 						<span class="tc-n-group-name">{r.name}</span>
 					</div>
 				);
@@ -85,11 +106,16 @@ export function List({ list, kind, column, marks = NO_MARKS, hidden, extra, foun
 		}
 	};
 	const rows: JSX.Element[] = [];
+	const landing = marks.landing !== null && marks.landing.column === column ? marks.landing.index : null;
+	const mark = () => <div key="landing" class="tc-n-group-drop" data-n-key="landing" />;
+	let heads = 0;
 	for (const r of list.rows) {
 		const before = extra?.get(r.key);
 		if (before) rows.push(before);
+		if (r.kind === "head" && landing === heads++) rows.push(mark());
 		rows.push(row(r));
 	}
+	if (landing !== null && landing >= heads) rows.push(mark());
 	const end = extra?.get("end");
 	if (end) rows.push(end);
 	/** The field's room at the list's end: on the phone the bar over the keyboard stands there. */

@@ -57,6 +57,14 @@ export function actMessage(model: BlockModel, act: Act): BlockMsg | null {
 		}
 		case "room":
 			return act.value === null ? null : { kind: "entry", msg: { kind: "atEnd", column: act.value as EntryList } };
+		case "section:rename":
+			return { kind: "section", msg: { kind: "rename" } };
+		case "section:remove":
+			return { kind: "section", msg: { kind: "remove" } };
+		case "section:named":
+			return { kind: "section", msg: { kind: "named", text: act.value ?? "" } };
+		case "section:unnamed":
+			return { kind: "section", msg: { kind: "unnamed" } };
 		default: {
 			if (act.act.startsWith("bar:")) return { kind: "entry", msg: { kind: "bar", act: act.act.slice("bar:".length), value: act.value } };
 			if (!act.act.startsWith("menu:")) return fullAct(act);

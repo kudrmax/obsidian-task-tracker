@@ -1,6 +1,7 @@
 import type { JSX } from "preact";
 import { type BlockModel, blends, canUndo, viewChoice } from "../model/block";
 import type { Layer } from "../model/layers";
+import type { SectionMenuLayer } from "../model/section";
 import { Icon, modeIcon } from "./icons";
 import { Backdrop, MenuGroup, Placed } from "./Sheet";
 import { CarryFloat } from "./carry/CarryFloat";
@@ -59,6 +60,26 @@ function MoreMenu({ model, index, closing }: LayerProps): JSX.Element {
 	);
 }
 
+/** A section's header tapped (the old screen's `GroupMenu`): the header stays as it is over the blur, the panel under it. */
+function SectionMenu({ index, closing, layer }: LayerProps & { readonly layer: SectionMenuLayer }): JSX.Element {
+	return (
+		<>
+			<Backdrop layer={index} closing={closing} />
+			<Placed layer={index} closing={closing} anchor={layer.head} how="copy" part="copy" kind="headCopy">
+				<span class="tc-n-group-name">{layer.section}</span>
+			</Placed>
+			<Placed layer={index} closing={closing} anchor={layer.head} how="start" part="panel" kind="headPanel">
+				<MenuGroup
+					rows={[
+						...(layer.rename ? [{ label: "Rename", icon: "rename" as const, act: "section:rename" }] : []),
+						...(layer.remove ? [{ label: "Remove section", icon: "removeSection" as const, act: "section:remove" }] : []),
+					]}
+				/>
+			</Placed>
+		</>
+	);
+}
+
 function LayerView(props: LayerProps & { readonly layer: Layer }): JSX.Element | null {
 	switch (props.layer.kind) {
 		case "viewMenu":
@@ -69,6 +90,8 @@ function LayerView(props: LayerProps & { readonly layer: Layer }): JSX.Element |
 			return <TaskMenu model={props.model} layer={props.layer} index={props.index} />;
 		case "full":
 			return null;
+		case "sectionMenu":
+			return <SectionMenu {...props} layer={props.layer} />;
 	}
 }
 

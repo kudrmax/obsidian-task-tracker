@@ -23,7 +23,7 @@ function Lists({ model, marks }: BlockProps & { readonly marks: Marks }): JSX.El
 					{lists.rows.map((row) => (
 						<div key={row.column} class="tc-n-row">
 							<div class="tc-n-row-label">{row.label}</div>
-							<List list={row.list} kind="row" column={row.column} marks={marks} found={model.found?.id ?? null} />
+							<List list={row.list} kind="row" column={row.column} marks={marks} found={model.found?.id ?? null} renaming={renamingIn(model)} />
 						</div>
 					))}
 				</>
@@ -70,9 +70,7 @@ export function Block({ model }: BlockProps): JSX.Element {
 					<Icon name={icon} />
 				</button>
 			) : null}
-			<button class="tc-n-btn tc-n-round tc-n-plus" aria-label="New task" data-n-act="plus">
-				<Icon name="plus" />
-			</button>
+			<Plus model={model} />
 			{model.entry ? <Bar entry={model.entry} wide={model.wide} placeTitle={placeTitle(model)} listName={(list) => listName(model, list)} /> : null}
 			<FullCard model={model} />
 			<SearchInBlock model={model} />
@@ -103,5 +101,42 @@ function Stack({ model, children }: BlockProps & { readonly children: ComponentC
 		<div class="tc-n-stack" data-n-stack="">
 			{children}
 		</div>
+	);
+}
+
+/** A section's name typed in place of its header: which header, and the name the field starts from. */
+function renamingIn(model: BlockModel): { readonly head: string; readonly name: string } | null {
+	const rename = model.sectionRename;
+	return rename ? { head: rename.head, name: rename.name } : null;
+}
+
+/**
+ * The plus (the old screen's `PlusButton`, `PlusRing`): a tap opens the field, a press moved carries it. While it is
+ * carried its place stays as a dashed ring, lit when the finger comes back to it (a drop there is a cancel); the plus
+ * itself keeps its place out of sight until its float is back.
+ */
+function Plus({ model }: BlockProps): JSX.Element {
+	const carry = model.carry?.kind === "plus" ? model.carry : null;
+	if (!carry)
+		return (
+			<button class="tc-n-btn tc-n-round tc-n-plus" aria-label="New task" data-n-act="plus" data-n-anchor="plus">
+				<Icon name="plus" />
+			</button>
+		);
+	return (
+		<>
+			<button class="tc-n-btn tc-n-round tc-n-plus is-away" aria-label="New task" data-n-anchor="plus">
+				<Icon name="plus" />
+			</button>
+			{carry.phase !== "carried" ? null : carry.ring ? (
+				<div class="tc-n-plus-ring tc-n-plus-ring-hot">
+					<Icon name="plus" />
+				</div>
+			) : (
+				<div class="tc-n-plus-ring">
+					<Icon name="plus" />
+				</div>
+			)}
+		</>
 	);
 }

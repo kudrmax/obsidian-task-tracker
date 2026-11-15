@@ -6,6 +6,7 @@ import type { FullMsg } from "./full";
 import type { SearchMsg } from "./search";
 import type { SelectMsg } from "./select";
 import type { MenuMsg } from "./taskMenu";
+import type { SectionMsg } from "./section";
 
 /** A link in a title, tapped: a note opens in a new tab, an address in the browser. */
 export interface Link {
@@ -58,6 +59,7 @@ export type BlockMsg =
 	| { readonly kind: "selectPicked" }
 	/** Each part's own messages, handled by its own update (`update/<part>.ts`). */
 	| { readonly kind: "menu"; readonly msg: MenuMsg }
+	| { readonly kind: "section"; readonly msg: SectionMsg }
 	| { readonly kind: "entry"; readonly msg: EntryMsg }
 	| { readonly kind: "full"; readonly msg: FullMsg }
 	| { readonly kind: "carry"; readonly msg: CarryMsg }
