@@ -75,7 +75,7 @@ export class CalendarServiceImpl implements CalendarService {
 			wake: () => polling.wake(),
 			catchUp: () => polling.catchUp(),
 			refreshNow: () => {
-				this.work.export();
+				if (calendarsAsk("refresh", true, true).exportFirst) this.work.export();
 				return polling.refresh();
 			},
 			stop: () => polling.stop(),

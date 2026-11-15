@@ -567,12 +567,14 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
 For a host that fetches the calendars itself and holds their files (the plugin's network lane): the rule
 `CalendarServiceImpl` runs by, as a decision.
 
-- `ask(reason, cached)` → `{ feeds, waitFeeds }` for a day's events by `EventsReason` (`open`, `peek`, `refresh`),
-  `cached` when the files were read before. `feeds`: `"forced"` (every feed afresh: `refresh`), `"due"` (only a feed
+- `ask(reason, cached, byHand?)` → `{ feeds, waitFeeds, exportFirst }` for a day's events by `EventsReason` (`open`,
+  `peek`, `refresh`), `cached` when the files were read before, `byHand` when Max asked (Refresh now) rather than the
+  polling or a source that changed. `exportFirst`: ask the phone for its fresh work events
+  (`WorkCalendarSetup.export`) before fetching: Refresh now alone, `ask("refresh", true, true)`. `feeds`: `"forced"` (every feed afresh: `refresh`), `"due"` (only a feed
   that `feedDue` says: `open`, and `peek` with nothing read yet), `"none"` (`peek` with events read: nothing).
   `waitFeeds`: the fresh events wait for the feeds before the files are read (`refresh`); otherwise the files are read
   at once and a feed runs behind, its file's change drawing the day again. Example: `ask("peek", true)` →
-  `{ feeds: "none", waitFeeds: false }`.
+  `{ feeds: "none", waitFeeds: false, exportFirst: false }`.
 - `feedKey()`: what a feed's file depends on in the settings handed in (Google's client and token): a run under another
   key is not fresh.
 - `feedDue(last)`: whether a feed asked unforced runs, `last` its last good run `{ atMs, key }` or `null`: never ran

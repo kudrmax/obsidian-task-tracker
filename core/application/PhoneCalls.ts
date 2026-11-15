@@ -861,7 +861,7 @@ function meetings(c: Call, fromMs: number, toMs: number): WireMeeting[] {
  * feeds, whether a feed is due, and what a failure or a silence shows on its source.
  */
 const CALENDARS_REFRESH: Readonly<Record<string, Handler>> = {
-	ask: (_c, [reason, cached]) => calendarsAsk(reason as EventsReason, cached === true),
+	ask: (_c, [reason, cached, byHand]) => calendarsAsk(reason as EventsReason, cached === true, byHand === true),
 	feedKey: (c) => feedKey(c.settings),
 	feedDue: (c, [last]) => feedDue((last ?? null) as FeedRun | null, c.context.nowMs, c.settings),
 	problem: (_c, [failure]) => {

@@ -3338,10 +3338,10 @@ ${key.title}`.toLowerCase();
   // core/application/calendarsRefresh.ts
   var SECOND_MS = 1e3;
   var FEED_SILENCE_MS = 15e3;
-  function calendarsAsk(reason, cached) {
-    if (reason === "refresh") return { feeds: "forced", waitFeeds: true };
-    if (reason === "peek" && cached) return { feeds: "none", waitFeeds: false };
-    return { feeds: "due", waitFeeds: false };
+  function calendarsAsk(reason, cached, byHand = false) {
+    if (reason === "refresh") return { feeds: "forced", waitFeeds: true, exportFirst: byHand };
+    if (reason === "peek" && cached) return { feeds: "none", waitFeeds: false, exportFirst: false };
+    return { feeds: "due", waitFeeds: false, exportFirst: false };
   }
   function feedKey(settings) {
     const { clientId, refreshToken } = settings.google;
@@ -8903,7 +8903,7 @@ ${at.reading}`;
     return calendarDay(c).timedBetween(new Date(fromMs), new Date(toMs)).map((e) => ({ title: e.title, startMs: e.start.getTime(), endMs: e.end.getTime() }));
   }
   var CALENDARS_REFRESH = {
-    ask: (_c, [reason, cached]) => calendarsAsk(reason, cached === true),
+    ask: (_c, [reason, cached, byHand]) => calendarsAsk(reason, cached === true, byHand === true),
     feedKey: (c) => feedKey(c.settings),
     feedDue: (c, [last]) => feedDue(last ?? null, c.context.nowMs, c.settings),
     problem: (_c, [failure]) => {
