@@ -1,7 +1,7 @@
-import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { budget } from "./budget";
+import { buildE2E } from "./build";
 import { Driver, type Outcome } from "./driver";
 import { type Fixture, fixture } from "./fixture";
 import { type Platform, prepareVault, TestObsidian, type Theme } from "./obsidian";
@@ -77,10 +77,10 @@ export async function main(argv: readonly string[]): Promise<number> {
 		console.log(USAGE);
 		return 2;
 	}
-	execFileSync("node", ["esbuild.config.mjs", "production", "e2e"], { cwd: p.root, stdio: "inherit" });
+	const built = buildE2E(p.root, join(p.build, "main.js"));
 	const taken = fixture(p, argv.includes("--refresh-fixture"));
 	const fx = command === "budget" ? { ...taken, tasks: budgetTasks(taken.tasks) } : taken;
-	prepareVault(p, fx);
+	prepareVault(p, fx, built);
 	const obsidian = await TestObsidian.launch(p);
 	if (command === "open") {
 		console.log(`the test Obsidian is up on port ${obsidian.port}`);
