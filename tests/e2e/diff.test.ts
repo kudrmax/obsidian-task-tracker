@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { diffImages } from "../../scripts/e2e/diff";
 import { decodePng, encodePng, type Image } from "../../scripts/e2e/png";
+import { REST } from "../../scripts/e2e/driver";
 import { budgetTasks } from "../../scripts/e2e/main";
 
 const image = (width: number, height: number, paint: (x: number, y: number) => [number, number, number]): Image => {
@@ -24,6 +25,18 @@ describe("the shots' PNG and diff", () => {
 		expect(diffImages(base, moved, { regions: [], rest, masks: [{ x: 0, y: 0, w: 2, h: 2 }] }).failed).toBe(false);
 		expect(diffImages(base, image(10, 10, () => [10, 10, 10]), { regions: [], rest, masks: [] }).failed).toBe(false);
 		expect(diffImages(base, image(9, 10, () => [0, 0, 0]), { regions: [], rest, masks: [] }).sizeDiffers).toBe(true);
+	});
+
+	it("catches a text one pixel off sideways at the shots' own tolerance, and lets the GPU's rounding pass", () => {
+		/** Glyph-like strokes: short bright bars over a dark ground, about a tenth of the image. */
+		const glyphs = (shift: number) => image(300, 60, (x, y) => ((x - shift) % 7 < 2 && y % 20 > 4 && y % 20 < 15 && x > 10 && x < 290 ? [230, 230, 230] : [20, 20, 22]));
+		expect(diffImages(glyphs(0), glyphs(1), { regions: [], rest: REST, masks: [] }).failed).toBe(true);
+		const noisy = image(300, 60, (x, y) => {
+			const base = x % 7 < 2 && y % 20 > 4 && y % 20 < 15 && x > 10 && x < 290 ? [230, 230, 230] : [20, 20, 22];
+			const n = ((x * 7 + y * 13) % 7) - 3;
+			return [base[0] + n, base[1] + n, base[2] + n] as [number, number, number];
+		});
+		expect(diffImages(glyphs(0), noisy, { regions: [], rest: REST, masks: [] }).failed).toBe(false);
 	});
 
 	it("loads the budget run with 300 tasks", () => {

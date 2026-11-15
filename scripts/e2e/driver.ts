@@ -19,6 +19,9 @@ export interface StepOptions {
 	readonly carried?: readonly string[];
 	readonly tolerated?: readonly string[];
 	readonly expectMotion?: boolean;
+	/** The rows the step may move (key prefixes): everything else must stand still. Default: every row. */
+	readonly moves?: readonly string[] | "all";
+	readonly maxStep?: number;
 }
 
 export interface ShotOptions {
@@ -36,8 +39,11 @@ export interface Outcome {
 	readonly file?: string;
 }
 
-/** The default tolerance of a shot: a channel may move by 16 of 255, on at most 0.2 % of the pixels. */
-const REST = { channel: 16, share: 0.002 };
+/**
+ * The default tolerance of a shot: a channel may move by 5 of 255 (the GPU's rounding), on at most 0.2 % of the pixels
+ * (anti-aliasing at glyph edges); a text one pixel off moves far more than that.
+ */
+export const REST = { channel: 5, share: 0.002 };
 
 /** The pause before each step: a person's pace between two actions, never a gesture on the heels of the last one's settle. */
 const HUMAN_PAUSE = 500;
@@ -135,6 +141,32 @@ export class Driver {
 		else await this.mouse("mouseReleased", to);
 	}
 
+	/**
+	 * A card lifted and held still, then let go where it was taken: the finger holds it (and on), the mouse lifts it by a
+	 * small move (its hold would open the menu) and comes back before letting go.
+	 */
+	async liftAndHold(at: Point, holdMs: number): Promise<void> {
+		if (this.platform === "phone") {
+			await this.touch("touchStart", [at]);
+			await sleep(450 + holdMs);
+			await this.touch("touchEnd", []);
+			return;
+		}
+		await this.mouse("mouseMoved", at);
+		await this.mouse("mousePressed", at, 1);
+		const off = { x: at.x, y: at.y + 8 };
+		for (let i = 1; i <= 4; i++) {
+			await this.mouse("mouseMoved", { x: at.x, y: at.y + 2 * i }, 1);
+			await sleep(16);
+		}
+		await sleep(holdMs);
+		for (let i = 3; i >= 0; i--) {
+			await this.mouse("mouseMoved", { x: off.x, y: at.y + 2 * i }, 1);
+			await sleep(16);
+		}
+		await this.mouse("mouseReleased", at);
+	}
+
 	/** One swipe of the screen: a finger flicked on the phone, two fingers on the trackpad (a wheel along x) on the desktop. */
 	async swipe(at: Point, dx: number): Promise<void> {
 		if (this.platform === "phone") return this.drag(at, { x: at.x + dx, y: at.y }, 0, 8, 12);
@@ -154,13 +186,13 @@ export class Driver {
 		this.started = [];
 		await this.page("__e2e.start(); return true");
 		await act();
-		await this.page("return __e2e.rest(8000)");
+		const settled = await this.page<boolean>("return __e2e.rest(8000)");
 		const { frames } = await this.page<{ frames: Frame[] }>("return __e2e.stop()");
 		await sleep(400);
 		const rest = await this.page<Row[]>("return __e2e.rows()");
 		const gap = await this.page<number>("return __e2e.cardGap()");
 		const carried = options.carried ? frames.flatMap((f) => f.rows.map((r) => r.key)).filter((k) => options.carried!.some((c) => k.includes(c))) : undefined;
-		const log: StepLog = { name, cause, frames, started: [...this.started], rest, gap, expectPlaces: options.expectPlaces, carried, tolerated: options.tolerated, expectMotion: options.expectMotion };
+		const log: StepLog = { name, cause, frames, started: [...this.started], rest, settled, gap, expectPlaces: options.expectPlaces, carried, tolerated: options.tolerated, expectMotion: options.expectMotion, moves: options.moves, maxStep: options.maxStep };
 		const failures = judge(log);
 		const file = join(this.dirs.run, this.combo, `${name}.frames.json`);
 		mkdirSync(join(this.dirs.run, this.combo), { recursive: true });
@@ -191,7 +223,11 @@ export class Driver {
 		writeFileSync(file, png);
 		const baselineFile = join(this.dirs.baselines, this.combo, `${name}.png`);
 		const sidecar = `${baselineFile}.json`;
-		if (this.update || !existsSync(baselineFile)) {
+		if (!this.update && !existsSync(baselineFile)) {
+			this.outcomes.push({ combo: this.combo, name, kind: "shot", failures: [`no baseline at ${baselineFile}: record it with --update`], file });
+			return;
+		}
+		if (this.update) {
 			mkdirSync(join(this.dirs.baselines, this.combo), { recursive: true });
 			writeFileSync(baselineFile, png);
 			writeFileSync(sidecar, JSON.stringify({ masks, regions }, null, 1));

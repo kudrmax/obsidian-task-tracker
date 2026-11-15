@@ -2,24 +2,29 @@
  * What the harness runs inside the test Obsidian's page, installed as `window.__e2e` after every load: the screen's
  * rows and places as boxes, the frame sampler, the rest wait. It reads the DOM as a camera does and never changes the
  * plugin. Plain JavaScript in a string, so the page gets exactly this text.
+ *
+ * The selectors at the top are today's screen's; the new screens (slices 3 and 4) bring theirs (`tc-n-…`) here.
  */
 export const PAGE_SCRIPT = String.raw`
 (() => {
 	const ROWS = ".tc-card, .tc-quick-row";
 	const COLUMNS = [["inbox", ".tc-inbox"], ["soon", ".tc-soon"], ["now", ".tc-left"], ["calendar", ".tc-right"]];
+	const PANEL = ".tc-tree-panel";
+	const DAY_TITLE = ".tc-day-nav";
 	const view = () => document.querySelector(".workspace-leaf.mod-active .task-calendar") ?? document.querySelector(".task-calendar");
 	const box = (r) => ({ x: r.left, y: r.top, w: r.width, h: r.height });
 	const visible = (r, within) => r.width > 0 && r.height > 0 && r.right > within.left + 1 && r.left < within.right - 1 && r.bottom > within.top + 1 && r.top < within.bottom - 1;
 	const titleOf = (el) => (el.querySelector(".tc-card-title")?.textContent ?? el.textContent ?? "").trim().slice(0, 60);
 
 	/**
-	 * Every visible row of the screen: a key (its title and its count among equals, the same in every mode), its list, its box, the row before it in
-	 * the DOM. A row's box takes in its own margin below: the room it claims under itself (a folded parent draws its fold
-	 * there), so the gap to the next row is the list's card gap.
+	 * Every visible row of the screen: a key (its title and its count among equals, the same in every mode), its list,
+	 * its box, the row before it in the DOM. A row's box takes in its own margin below: the room it claims under itself
+	 * (a folded parent draws its fold there), so the gap to the next row is the list's card gap. Also the elements by key,
+	 * so an animation is told to its row.
 	 */
-	const rows = () => {
+	const sampleRows = () => {
 		const root = view();
-		if (!root) return [];
+		if (!root) return { rows: [], keyOf: new Map() };
 		const within = root.getBoundingClientRect();
 		const lists = [...root.querySelectorAll(".tc-list, .tc-rows-stack, .tc-project-group")];
 		const seen = new Map();
@@ -37,13 +42,15 @@ export const PAGE_SCRIPT = String.raw`
 			const below = parseFloat(getComputedStyle(el).marginBottom) || 0;
 			found.push({ el, row: { key: base + "/" + n, list, x: r.left, y: r.top, w: r.width, h: r.height + below } });
 		}
-		const keys = new Map(found.map(({ el, row }) => [el, row.key]));
-		return found.map(({ el, row }) => ({ ...row, prev: (el.previousElementSibling && keys.get(el.previousElementSibling)) ?? null }));
+		const keyOf = new Map(found.map(({ el, row }) => [el, row.key]));
+		return { rows: found.map(({ el, row }) => ({ ...row, prev: (el.previousElementSibling && keyOf.get(el.previousElementSibling)) ?? null })), keyOf };
 	};
+	const rows = () => sampleRows().rows;
 
 	/**
 	 * The ribbon's place as Max sees it: the leftmost column showing (Inbox 0, Soon 1, the day's list 2) and, on the day's
-	 * list, the shown day after today (Tomorrow 3…). Null where the screen shows no ribbon (Rows, By project).
+	 * list, the shown day after today (Tomorrow 3…); and how far that column stands from the stage's edge it should snap
+	 * to (the view's left, or a docked panel's right). Null where the screen shows no ribbon (Rows, By project).
 	 */
 	const DAYS = { Yesterday: -1, Today: 0, Tomorrow: 1 };
 	const place = () => {
@@ -58,30 +65,43 @@ export const PAGE_SCRIPT = String.raw`
 			if (!visible(r, within)) return;
 			if (!best || r.left < best.left) best = { left: r.left, name, index };
 		});
-		const day = root.querySelector(".tc-day-nav")?.textContent?.trim() ?? null;
-		if (!best) return { column: null, index: null, day };
+		const day = root.querySelector(DAY_TITLE)?.textContent?.trim() ?? null;
+		if (!best) return { column: null, index: null, day, snapOff: null };
+		const edges = [within.left];
+		const panel = root.querySelector(PANEL)?.getBoundingClientRect();
+		if (panel && panel.width > 0 && visible(panel, within)) edges.push(panel.right);
+		const snapOff = Math.min(...edges.map((edge) => Math.abs(best.left - edge)));
 		const offset = best.name === "now" ? DAYS[day] : 0;
-		return { column: best.name, index: offset === undefined ? null : best.index + offset, day };
+		return { column: best.name, index: offset === undefined ? null : best.index + offset, day, snapOff };
 	};
 
-	const animations = () =>
-		document.getAnimations().map((a) => ({
-			name: a.animationName ?? a.transitionProperty ?? a.id ?? a.constructor.name,
-			kind: a.constructor.name,
-			state: a.playState,
-			target: (() => {
-				const t = a.effect?.target;
-				return t ? t.tagName.toLowerCase() + (t.className && typeof t.className === "string" ? "." + t.className.split(" ").slice(0, 2).join(".") : "") : null;
-			})(),
-		}));
+	/** The animations running, each told to the row its target is in (null for anything else). */
+	const animations = (keyOf) =>
+		document
+			.getAnimations()
+			.filter((a) => a.playState === "running")
+			.map((a) => {
+				const t = a.effect?.target ?? null;
+				const rowEl = t && t.closest ? t.closest(ROWS) : null;
+				return {
+					name: a.animationName ?? a.transitionProperty ?? a.id ?? a.constructor.name,
+					kind: a.constructor.name,
+					state: a.playState,
+					target: t ? t.tagName.toLowerCase() + (typeof t.className === "string" && t.className ? "." + t.className.split(" ").slice(0, 2).join(".") : "") : null,
+					row: rowEl ? (keyOf.get(rowEl) ?? titleOf(rowEl)) : null,
+				};
+			});
 
-	/** Samples every frame (rAF) until stopped: time, the animations running, the rows' boxes. */
-	const recorder = { frames: [], running: false, longTasks: [], rafs: 0, light: false };
-	const sample = () => ({ t: performance.now(), animations: animations().filter((a) => a.state === "running"), rows: rows(), place: place() });
-	const tick = () => {
+	/** Samples every frame (rAF) until stopped: time, the animations running, the rows' boxes. Light: frame times only (the budget run). */
+	const recorder = { frames: [], times: [], running: false, longTasks: [], light: false };
+	const sample = () => {
+		const { rows, keyOf } = sampleRows();
+		return { t: performance.now(), animations: animations(keyOf), rows, place: place() };
+	};
+	const tick = (t) => {
 		if (!recorder.running) return;
+		recorder.times.push(t);
 		if (!recorder.light) recorder.frames.push(sample());
-		recorder.rafs++;
 		requestAnimationFrame(tick);
 	};
 	try {
@@ -95,7 +115,7 @@ export const PAGE_SCRIPT = String.raw`
 
 	window.__e2e = {
 		view: () => !!view(),
-		rows: () => rows(),
+		rows,
 		place,
 		/** The center of the first element matching the selector (and holding the text, if given), in CSS pixels of the page. */
 		center(selector, text) {
@@ -105,6 +125,10 @@ export const PAGE_SCRIPT = String.raw`
 			const r = el.getBoundingClientRect();
 			return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
 		},
+		/** The texts of the elements matching a selector that show. */
+		texts(selector) {
+			return [...document.querySelectorAll(selector)].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent.trim());
+		},
 		rect(selector) {
 			const el = selector === "view" ? view() : document.querySelector(selector);
 			if (!el) return null;
@@ -113,7 +137,7 @@ export const PAGE_SCRIPT = String.raw`
 		rects(selector) {
 			return [...document.querySelectorAll(selector)].map((e) => box(e.getBoundingClientRect())).filter((r) => r.w > 0 && r.h > 0);
 		},
-		/** Resolves once nothing animates and the rows have stood still for three samples, or after timeoutMs. */
+		/** Resolves true once nothing animates and the rows have stood still for three samples; false if that never came within timeoutMs. */
 		async rest(timeoutMs = 6000) {
 			const until = performance.now() + timeoutMs;
 			let last = rows();
@@ -128,20 +152,20 @@ export const PAGE_SCRIPT = String.raw`
 			}
 			return false;
 		},
-		/** Starts sampling every frame; \`light\` only counts the frames (the budget run, which must not pay for the sampling). */
+		/** Starts sampling every frame; light only keeps the frames' times (the budget run, which must not pay for the sampling). */
 		start(light = false) {
 			recorder.light = light;
 			recorder.frames = [];
+			recorder.times = [];
 			recorder.longTasks = [];
-			recorder.rafs = 0;
 			recorder.running = true;
-			recorder.frames.push(sample());
+			if (!light) recorder.frames.push(sample());
 			requestAnimationFrame(tick);
 		},
 		stop() {
 			recorder.running = false;
-			recorder.frames.push(sample());
-			return { frames: recorder.frames, longTasks: recorder.longTasks, rafs: recorder.rafs };
+			if (!recorder.light) recorder.frames.push(sample());
+			return { frames: recorder.frames, times: recorder.times, longTasks: recorder.longTasks };
 		},
 		cardGap() {
 			const v = view();

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ALLOWED, type FreezeAllowance } from "./uiFreeze.allow";
@@ -19,11 +19,13 @@ export interface Measure {
 	readonly cssBytes: number;
 }
 
+/** The files git tracks under `dir`: a scratch file lying in a worktree is not the old screen. */
+function trackedFiles(dir: string): string[] {
+	return execFileSync("git", ["ls-files", "-z", "--", dir], { cwd: ROOT, encoding: "utf8" }).split("\0").filter((p) => p !== "");
+}
+
 function measure(): Measure {
-	const files = readdirSync(join(ROOT, "obsidian/ui"), { recursive: true, encoding: "utf8" })
-		.map((p) => `obsidian/ui/${p.split("\\").join("/")}`)
-		.filter((p) => !p.startsWith("obsidian/ui/next/") && statSync(join(ROOT, p)).isFile())
-		.sort();
+	const files = trackedFiles("obsidian/ui").filter((p) => !p.startsWith("obsidian/ui/next/") && existsSync(join(ROOT, p))).sort();
 	const lines: Record<string, number> = {};
 	for (const file of files) lines[dirname(file)] = (lines[dirname(file)] ?? 0) + readFileSync(join(ROOT, file), "utf8").split("\n").length;
 	const css = readFileSync(join(ROOT, "styles.css"), "utf8");

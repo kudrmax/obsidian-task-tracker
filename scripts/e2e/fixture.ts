@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, relative } from "node:path";
+import { calendarPath } from "../../core/application/calendarFile";
+import type { TaskCalendarSettings } from "../../core/settings";
 import type { E2EFixture } from "../../obsidian/e2e";
 import type { Paths } from "./paths";
 
@@ -20,7 +22,7 @@ export interface Fixture {
 	readonly e2e: E2EFixture;
 	/** Vault paths of the project notes' stubs, with their text. */
 	readonly notes: Readonly<Record<string, string>>;
-	/** The phone's and the work calendar's files, by vault path. */
+	/** The phone's and the work calendar's files, at the paths the settings name (`calendarPath`). */
 	readonly calendarFiles: Readonly<Record<string, string>>;
 }
 
@@ -39,7 +41,7 @@ function markdownFiles(dir: string): string[] {
 	});
 }
 
-function calendarsOf(day: string, now: Date): Pick<Fixture, "calendarFiles"> & { google: E2EFixture["google"] } {
+function calendarsOf(day: string, now: Date, settings: TaskCalendarSettings): Pick<Fixture, "calendarFiles"> & { google: E2EFixture["google"] } {
 	const iso = (d: Date) => d.toISOString();
 	const tomorrow = localDay(new Date(at(day, 12).getTime() + 86_400_000));
 	const google: E2EFixture["google"] = {
@@ -69,8 +71,8 @@ function calendarsOf(day: string, now: Date): Pick<Fixture, "calendarFiles"> & {
 	return {
 		google,
 		calendarFiles: {
-			"calendar/iphone.json": file("iPhone", "Family", "iCloud", [["Call parents", 13, 0, 13, 30]]),
-			"calendar/work.json": file(null, "Календарь", "Work", [["Design review", 15, 0, 16, 0], ["1:1", 16, 30, 17, 0]]),
+			[calendarPath("iphone", settings)]: file("iPhone", "Family", "iCloud", [["Call parents", 13, 0, 13, 30]]),
+			[calendarPath("work", settings)]: file(null, "Календарь", "Work", [["Design review", 15, 0, 16, 0], ["1:1", 16, 30, 17, 0]]),
 		},
 	};
 }
@@ -90,7 +92,7 @@ export function takeFixture(p: Paths): void {
 	/** The day the file was taken, at 14:20: a working afternoon, the same moment in every run. */
 	const now = at(localDay(new Date()), 14, 20);
 	const e2eNow = `${localDay(now)}T14:20`;
-	const { google, calendarFiles } = calendarsOf(localDay(now), now);
+	const { google, calendarFiles } = calendarsOf(localDay(now), now, settings as unknown as TaskCalendarSettings);
 	const fixture: Fixture = { tasksFile, tasks, settings, e2e: { now: e2eNow, google }, notes, calendarFiles };
 	mkdirSync(p.fixture, { recursive: true });
 	writeFileSync(join(p.fixture, "fixture.json"), JSON.stringify(fixture, null, 1));

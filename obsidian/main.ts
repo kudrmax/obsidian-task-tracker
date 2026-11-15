@@ -87,7 +87,8 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars });
 		this.addSettingTab(settingsTab);
 		this.register(() => settingsTab.closePage());
-		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), runScript: runAppleScript });
+		const outside = this.outside();
+		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => outside.open(url), runScript: (script, args) => outside.runScript(script, args) });
 		return {
 			tasks: services.tasks,
 			days: services.days,
@@ -119,10 +120,15 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		return this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
 	}
 
+	/** Where the plugin reaches outside Obsidian: links to other apps (Shortcuts, the iPhone app, a calendar) and the Mac's scripts. The e2e build records them instead. */
+	protected outside(): { open(url: string): void; runScript(script: string, args: readonly string[]): void } {
+		return { open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), runScript: runAppleScript };
+	}
+
 	private servicesHost(): ServicesHost {
 		return {
 			pluginDir: this.pluginDir,
-			shortcuts: { isPhone: Platform.isIosApp, vaultName: this.app.vault.getName(), open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }) },
+			shortcuts: { isPhone: Platform.isIosApp, vaultName: this.app.vault.getName(), open: (url) => this.outside().open(url) },
 		};
 	}
 

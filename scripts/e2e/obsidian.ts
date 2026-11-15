@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Cdp, targets } from "./cdp";
 import type { Fixture } from "./fixture";
@@ -37,6 +37,30 @@ function ownProcesses(profile: string): { pid: number; port: number | null }[] {
 		.map((line) => ({ pid: Number(line.trim().split(/\s+/)[0]), port: Number(/--remote-debugging-port=(\d+)/.exec(line)?.[1] ?? NaN) || null }));
 }
 
+/** The process listening on `port` is this profile's: waits for it to listen, answers false if another holds the port. */
+async function portIsOwn(port: number, p: Paths): Promise<boolean> {
+	for (let i = 0; i < 100; i++) {
+		const out = spawnSync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fp"], { encoding: "utf8" }).stdout;
+		const pids = [...out.matchAll(/^p(\d+)$/gm)].map((m) => Number(m[1]));
+		if (pids.length > 0) return pids.some((pid) => ownProcesses(p.profile).some((o) => o.pid === pid));
+		if (ownProcesses(p.profile).length > 0 && i > 60) return false;
+		await sleep(300);
+	}
+	return false;
+}
+
+/** Ends this profile's own processes (the instance just launched without a port of its own): named by the full profile path, never another's. */
+async function endOwn(p: Paths): Promise<void> {
+	for (const own of ownProcesses(p.profile)) {
+		try {
+			process.kill(own.pid, "SIGTERM");
+		} catch {
+			/* gone already */
+		}
+	}
+	await TestObsidian.gone(p);
+}
+
 function freePort(): number {
 	for (let port = FIRST_PORT; port < FIRST_PORT + 200; port++) {
 		const taken = execFileSync("ps", ["axww", "-o", "command="], { encoding: "utf8" }).includes(`--remote-debugging-port=${port}`);
@@ -45,19 +69,17 @@ function freePort(): number {
 	throw new Error("no free debugging port from 9345");
 }
 
-/** A file removed: to the bin, never deleted (CLAUDE.md, «Files»). */
-function toTrash(path: string): void {
-	if (existsSync(path)) execFileSync("trash", [path]);
-}
-
 function write(path: string, text: string): void {
 	mkdirSync(dirname(path), { recursive: true });
 	writeFileSync(path, text);
 }
 
-/** The scratch vault, made anew from the fixture: the tasks file, the settings, the plugin's e2e build, the calendars, the notes. */
+/**
+ * The scratch vault, written over in place from the fixture each run (never moved to the Bin: it holds a copy of Max's
+ * tasks): the tasks file, the settings, the plugin's e2e build, the calendars, the notes. Each platform and theme then
+ * starts clean through `reset`.
+ */
 export function prepareVault(p: Paths, fx: Fixture): void {
-	toTrash(p.vault);
 	mkdirSync(p.vault, { recursive: true });
 	write(join(p.vault, fx.tasksFile), fx.tasks);
 	for (const [path, text] of Object.entries(fx.notes)) write(join(p.vault, path), text);
@@ -83,16 +105,30 @@ export class TestObsidian {
 		private readonly p: Paths,
 	) {}
 
-	/** Launches the harness's own Obsidian in the background (a stale one of its own from a broken run is quit first). */
+	/**
+	 * Launches the harness's own Obsidian in the background (a stale one of its own from a broken run is quit first). If
+	 * another session took the port in the moment between the check and the launch, the instance just launched (it has no
+	 * debugging port then) is ended and the launch tried on the next port; nothing is driven before the port is its own.
+	 */
 	static async launch(p: Paths): Promise<TestObsidian> {
-		for (const stale of ownProcesses(p.profile)) if (stale.port) await TestObsidian.quitAt(stale.port, p);
-		const port = freePort();
+		for (const stale of ownProcesses(p.profile)) {
+			if (stale.port) await TestObsidian.quitAt(stale.port, p).catch(() => endOwn(p));
+			else await endOwn(p);
+		}
 		mkdirSync(p.profile, { recursive: true });
-		execFileSync("open", ["-n", "-g", "-a", "Obsidian", "--args", `--user-data-dir=${p.profile}`, `--remote-debugging-port=${port}`, ...BACKGROUND_SWITCHES]);
-		const cdp = await TestObsidian.page(port, 60_000);
-		const obsidian = new TestObsidian(cdp, port, p);
-		await obsidian.settle();
-		return obsidian;
+		for (let attempt = 0; attempt < 3; attempt++) {
+			const port = freePort();
+			execFileSync("open", ["-n", "-g", "-a", "Obsidian", "--args", `--user-data-dir=${p.profile}`, `--remote-debugging-port=${port}`, ...BACKGROUND_SWITCHES]);
+			if (!(await portIsOwn(port, p))) {
+				await endOwn(p);
+				continue;
+			}
+			const cdp = await TestObsidian.page(port, 60_000);
+			const obsidian = new TestObsidian(cdp, port, p);
+			await obsidian.settle();
+			return obsidian;
+		}
+		throw new Error("could not launch a test Obsidian on a port of its own in three tries");
 	}
 
 	/** The harness's own instance already running (`npm run e2e -- open`), for a look by hand. */
@@ -141,10 +177,22 @@ export class TestObsidian {
 			if (!app.plugins.isEnabled()) await app.plugins.setEnable(true);
 			if (!app.plugins.enabledPlugins.has("${PLUGIN}")) await app.plugins.enablePluginAndSave("${PLUGIN}");
 			for (let i = 0; i < 100 && !app.plugins.plugins["${PLUGIN}"]?.e2e; i++) await new Promise((r) => setTimeout(r, 100));
-			document.querySelectorAll(".modal-container .modal-close-button").forEach((b) => b.click());
 			return !!app.plugins.plugins["${PLUGIN}"]?.e2e;
 		`);
 		if (!enabled) throw new Error("the e2e build of the plugin did not load");
+		await this.closeModals();
+	}
+
+	/** Obsidian's own dialogs (a first start's) closed by a click through CDP's input, as a person would, never a click made in the page. */
+	private async closeModals(): Promise<void> {
+		const buttons = await this.cdp.eval<{ x: number; y: number }[]>(
+			`return [...document.querySelectorAll(".modal-container .modal-close-button")].map((b) => b.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 }))`,
+		);
+		for (const at of buttons) {
+			await this.cdp.call("Input.dispatchMouseEvent", { type: "mousePressed", x: at.x, y: at.y, button: "left", buttons: 1, clickCount: 1 });
+			await this.cdp.call("Input.dispatchMouseEvent", { type: "mouseReleased", x: at.x, y: at.y, button: "left", buttons: 0, clickCount: 1 });
+			await sleep(200);
+		}
 	}
 
 	/** Reloads the page (after `emulateMobile`, a theme…) and settles again. */
@@ -215,7 +263,7 @@ export class TestObsidian {
 		await TestObsidian.gone(p);
 	}
 
-	private static async gone(p: Paths): Promise<void> {
+	static async gone(p: Paths): Promise<void> {
 		for (let i = 0; i < 60; i++) {
 			if (ownProcesses(p.profile).length === 0) return;
 			await sleep(500);

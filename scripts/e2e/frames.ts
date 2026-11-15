@@ -2,7 +2,10 @@
  * The frame recorder's verdict (spec §Tests 6): a step's frames, sampled every animation frame in the page (rows' boxes,
  * `document.getAnimations()`) and the animations the CDP Animation domain saw start, judged by the failure rules:
  * motion without a cause, single rows moving across a context, overshoot, a rest more than 0.5 px off, gaps or overlaps,
- * a swipe landing two places away. Pure: `tests/e2e/frames.test.ts` proves each rule on made-up frames.
+ * a swipe landing two places away; and the shapes of Max's past bugs: cards flying in on a project switch, a row that
+ * jumps and returns under a lift, a region that jerks back and forth, a screen that never settles, a ribbon resting off
+ * its column's edge. Each row is judged from the frame it first shows in. Pure: `tests/e2e/frames.test.ts` proves each
+ * rule on frame logs made to reproduce each bug.
  */
 
 export interface Row {
@@ -21,12 +24,16 @@ export interface PageAnimation {
 	readonly kind: string;
 	readonly state: string;
 	readonly target: string | null;
+	/** The row the animated element is in, null for anything else. */
+	readonly row: string | null;
 }
 
 export interface Place {
 	readonly column: string | null;
 	readonly index: number | null;
 	readonly day: string | null;
+	/** How far the leftmost column stands from the stage's edge it snaps to, px; null without a ribbon. */
+	readonly snapOff?: number | null;
 }
 
 export interface Frame {
@@ -40,7 +47,7 @@ export interface Frame {
 export type Cause =
 	/** Nothing: the screen must stand still (a check that nothing moves on its own). */
 	| "none"
-	/** Another mode, project or filter: drawn in place, no row moves. */
+	/** Another mode, project or filter: drawn in place, no row moves or animates. */
 	| "context"
 	/** A place or day change: the region moves as a whole. */
 	| "swipe"
@@ -55,22 +62,55 @@ export interface StepLog {
 	readonly started: readonly { readonly name: string; readonly type: string }[];
 	/** The rows sampled again once the screen was quiet for a while after the step. */
 	readonly rest: readonly Row[];
+	/** The screen came to rest after the step (nothing animating, the rows still) within its bound. */
+	readonly settled: boolean;
 	/** The card gap the CSS says (`--tc-card-gap`), px. */
 	readonly gap: number;
 	/** The places a swipe must move the ribbon by (+1 forward, -1 back). */
 	readonly expectPlaces?: number;
-	/** Row keys exempt from the motion rules: what the step itself carries. */
+	/** Row keys the step carries: they follow the finger, exempt from the motion rules. */
 	readonly carried?: readonly string[];
+	/** The rows the step may move (key prefixes), or every row; everything else must stand still. Default: every row. */
+	readonly moves?: readonly string[] | "all";
 	/** The step must move something (a drag, a swipe): a step whose gesture did nothing fails, so no rule passes on an empty recording. */
 	readonly expectMotion?: boolean;
 	/** Animation names a `none` step tolerates (Obsidian's own, a caret). */
 	readonly tolerated?: readonly string[];
+	/** The most a moving row may travel between two frames, px; more is a jerk. Default 120. */
+	readonly maxStep?: number;
 }
 
 const PX = 0.5;
 const near = (a: number, b: number) => Math.abs(a - b) <= PX;
-const sameBox = (a: Row, b: Row) => near(a.x, b.x) && near(a.y, b.y) && near(a.w, b.w) && near(a.h, b.h);
+const sameBox = (a: Pick<Row, "x" | "y" | "w" | "h">, b: Pick<Row, "x" | "y" | "w" | "h">) => near(a.x, b.x) && near(a.y, b.y) && near(a.w, b.w) && near(a.h, b.h);
 const byKey = (rows: readonly Row[]) => new Map(rows.map((r) => [r.key, r]));
+
+/** A row's boxes frame by frame, from the frame it first shows in. */
+interface Track {
+	readonly key: string;
+	readonly boxes: readonly { readonly frame: number; readonly row: Row }[];
+}
+
+function tracks(step: StepLog): Track[] {
+	const all = new Map<string, { frame: number; row: Row }[]>();
+	step.frames.forEach((f, frame) => {
+		for (const row of f.rows) {
+			const list = all.get(row.key) ?? [];
+			list.push({ frame, row });
+			all.set(row.key, list);
+		}
+	});
+	const carried = new Set(step.carried ?? []);
+	return [...all.entries()].filter(([key]) => !carried.has(key)).map(([key, boxes]) => ({ key, boxes }));
+}
+
+const first = (t: Track) => t.boxes[0].row;
+const last = (t: Track) => t.boxes[t.boxes.length - 1].row;
+const mayMove = (step: StepLog, key: string) => step.moves === undefined || step.moves === "all" || step.moves.some((prefix) => key.startsWith(prefix));
+
+function unsettled(step: StepLog): string[] {
+	return step.settled ? [] : ["the screen never came to rest"];
+}
 
 function motionWithoutCause(step: StepLog): string[] {
 	if (step.cause !== "none") return [];
@@ -79,34 +119,31 @@ function motionWithoutCause(step: StepLog): string[] {
 	const anims = new Set(step.frames.flatMap((f) => f.animations.map((a) => `${a.kind} ${a.name} on ${a.target}`)).filter((a) => !tolerated(a)));
 	for (const a of anims) out.push(`motion without a cause: ${a}`);
 	for (const a of step.started) if (!tolerated(a.name)) out.push(`motion without a cause: ${a.type} ${a.name} started`);
-	for (let i = 1; i < step.frames.length; i++) {
-		const before = byKey(step.frames[i - 1].rows);
-		for (const row of step.frames[i].rows) {
-			const was = before.get(row.key);
-			if (was && !sameBox(was, row)) {
-				out.push(`motion without a cause: ${row.key} moved at frame ${i}`);
-				return out;
-			}
-		}
-	}
+	const moved = tracks(step).find((t) => t.boxes.some((b) => !sameBox(b.row, first(t))));
+	if (moved) out.push(`motion without a cause: ${moved.key} moved`);
 	return out;
 }
 
-/** Rows standing between where they were and where they end, in a frame: what is moving then, with its offset. */
-function inBetween(step: StepLog, frame: Frame): { key: string; dx: number; dy: number }[] {
-	const first = byKey(step.frames[0].rows);
-	const last = byKey(step.frames[step.frames.length - 1].rows);
-	const carried = new Set(step.carried ?? []);
-	return frame.rows
-		.filter((r) => !carried.has(r.key) && first.has(r.key) && last.has(r.key))
-		.filter((r) => !sameBox(r, first.get(r.key)!) && !sameBox(r, last.get(r.key)!))
-		.map((r) => ({ key: r.key, dx: r.x - first.get(r.key)!.x, dy: r.y - first.get(r.key)!.y }));
+/** A context change draws in place: no row animates (no card flies in from a corner, none fades and slides). */
+function rowsAnimatedAcrossContext(step: StepLog): string[] {
+	if (step.cause !== "context") return [];
+	const animated = [...new Set(step.frames.flatMap((f) => f.animations.filter((a) => a.row !== null).map((a) => `${a.row} (${a.kind} ${a.name})`)))];
+	return animated.length ? [`rows animated across a context: ${animated.slice(0, 3).join("; ")}`] : [];
+}
+
+/** Rows standing, in a frame, between where they first showed and where they end: what is moving then, with its offset. */
+function inBetween(step: StepLog, frame: number): { key: string; dx: number; dy: number }[] {
+	return tracks(step).flatMap((t) => {
+		const at = t.boxes.find((b) => b.frame === frame);
+		if (!at || sameBox(at.row, first(t)) || sameBox(at.row, last(t))) return [];
+		return [{ key: t.key, dx: at.row.x - first(t).x, dy: at.row.y - first(t).y }];
+	});
 }
 
 function rowsAcrossContext(step: StepLog): string[] {
 	if (step.cause !== "context" && step.cause !== "swipe") return [];
 	for (let i = 1; i < step.frames.length - 1; i++) {
-		const moving = inBetween(step, step.frames[i]);
+		const moving = inBetween(step, i);
 		if (moving.length === 0) continue;
 		if (step.cause === "context") return [`single rows moving across a context at frame ${i}: ${moving.slice(0, 3).map((m) => m.key).join("; ")}`];
 		const whole = moving.every((m) => Math.abs(m.dx - moving[0].dx) <= 1 && Math.abs(m.dy - moving[0].dy) <= 1);
@@ -115,22 +152,56 @@ function rowsAcrossContext(step: StepLog): string[] {
 	return [];
 }
 
-function overshoot(step: StepLog): string[] {
-	if (step.frames.length < 3) return [];
-	const first = byKey(step.frames[0].rows);
-	const last = byKey(step.frames[step.frames.length - 1].rows);
-	const carried = new Set(step.carried ?? []);
+/** What the step does not move stands still; a row that ends where it began never left it (no jump and return under a lift). */
+function stillness(step: StepLog): string[] {
 	const out: string[] = [];
-	for (const [key, end] of last) {
-		const start = first.get(key);
-		if (!start || carried.has(key)) continue;
+	for (const t of tracks(step)) {
+		const start = first(t);
+		const off = t.boxes.find((b) => !sameBox(b.row, start));
+		if (!off) continue;
+		if (!mayMove(step, t.key)) out.push(`${t.key} moved though the step moves only ${(step.moves as readonly string[]).join(", ") || "nothing"} (frame ${off.frame})`);
+		else if (sameBox(last(t), start)) out.push(`${t.key} jumped ${Math.max(Math.abs(off.row.x - start.x), Math.abs(off.row.y - start.y)).toFixed(1)} px and came back (frame ${off.frame})`);
+	}
+	return out;
+}
+
+function overshoot(step: StepLog): string[] {
+	const out: string[] = [];
+	for (const t of tracks(step)) {
+		const [start, end] = [first(t), last(t)];
 		for (const axis of ["x", "y"] as const) {
 			const travel = end[axis] - start[axis];
 			if (Math.abs(travel) <= PX) continue;
-			const beyond = step.frames.map((f) => f.rows.find((r) => r.key === key)?.[axis]).filter((v): v is number => v !== undefined).map((v) => (v - end[axis]) * Math.sign(travel));
-			const most = Math.max(...beyond);
+			const most = Math.max(...t.boxes.map((b) => (b.row[axis] - end[axis]) * Math.sign(travel)));
 			if (most > PX) {
-				out.push(`overshoot: ${key} went ${most.toFixed(1)} px past its rest on ${axis}`);
+				out.push(`overshoot: ${t.key} went ${most.toFixed(1)} px past its rest on ${axis}`);
+				break;
+			}
+		}
+	}
+	return out;
+}
+
+/** A moving row goes one way and smoothly: no turn back (a jerk), no leap between two frames. */
+function continuity(step: StepLog): string[] {
+	if (step.cause === "context" || step.cause === "none") return [];
+	const maxStep = step.maxStep ?? 120;
+	const out: string[] = [];
+	for (const t of tracks(step)) {
+		for (const axis of ["x", "y"] as const) {
+			let direction = 0;
+			let problem: string | null = null;
+			for (let i = 1; i < t.boxes.length && !problem; i++) {
+				if (t.boxes[i].frame !== t.boxes[i - 1].frame + 1) continue;
+				const d = t.boxes[i].row[axis] - t.boxes[i - 1].row[axis];
+				if (Math.abs(d) > maxStep) problem = `leapt ${d.toFixed(0)} px on ${axis} between frames ${i - 1} and ${i}`;
+				else if (Math.abs(d) > PX) {
+					if (direction !== 0 && Math.sign(d) !== direction) problem = `turned back on ${axis} at frame ${t.boxes[i].frame}`;
+					direction = Math.sign(d);
+				}
+			}
+			if (problem) {
+				out.push(`a jerk: ${t.key} ${problem}`);
 				break;
 			}
 		}
@@ -139,12 +210,20 @@ function overshoot(step: StepLog): string[] {
 }
 
 function restOff(step: StepLog): string[] {
-	const last = byKey(step.frames[step.frames.length - 1].rows);
+	const end = byKey(step.frames[step.frames.length - 1].rows);
 	return step.rest.flatMap((r) => {
-		const at = last.get(r.key);
+		const at = end.get(r.key);
 		if (!at || sameBox(at, r)) return [];
 		return [`a rest off: ${r.key} ended at ${at.x.toFixed(1)},${at.y.toFixed(1)} and settled at ${r.x.toFixed(1)},${r.y.toFixed(1)}`];
 	});
+}
+
+/** A swipe rests with its column on the stage's edge, not where the motion happened to stop. */
+function snap(step: StepLog): string[] {
+	if (step.expectPlaces === undefined) return [];
+	const off = step.frames[step.frames.length - 1].place?.snapOff;
+	if (off === null || off === undefined) return ["a swipe ended where no column stands"];
+	return off > PX ? [`the ribbon rests ${off.toFixed(1)} px off its column's edge`] : [];
 }
 
 function gapsAndOverlaps(step: StepLog): string[] {
@@ -179,30 +258,87 @@ function swipeLanding(step: StepLog): string[] {
 
 function nothingMoved(step: StepLog): string[] {
 	if (!step.expectMotion) return [];
-	const first = byKey(step.frames[0].rows);
-	const moved = step.frames.some((f) => f.rows.some((r) => first.has(r.key) && !sameBox(first.get(r.key)!, r))) || step.frames.some((f) => f.animations.length > 0);
-	const changed = step.frames[0].rows.length !== step.rest.length || step.rest.some((r) => !first.has(r.key) || !sameBox(first.get(r.key)!, r));
+	const moved = tracks(step).some((t) => t.boxes.some((b) => !sameBox(b.row, first(t)))) || step.frames.some((f) => f.animations.length > 0) || (step.carried ?? []).length > 0;
+	const firstRows = byKey(step.frames[0].rows);
+	const changed = step.frames[0].rows.length !== step.rest.length || step.rest.some((r) => !firstRows.has(r.key) || !sameBox(firstRows.get(r.key)!, r));
 	return moved || changed ? [] : ["the gesture moved nothing"];
 }
 
-export const FRAME_RULES = { nothingMoved, motionWithoutCause, rowsAcrossContext, overshoot, restOff, gapsAndOverlaps, swipeLanding };
+export const FRAME_RULES = { unsettled, nothingMoved, motionWithoutCause, rowsAnimatedAcrossContext, rowsAcrossContext, stillness, overshoot, continuity, restOff, snap, gapsAndOverlaps, swipeLanding };
 
 /** Every failure of a step, by the rules of §Tests 6. */
 export function judge(step: StepLog): string[] {
 	return Object.values(FRAME_RULES).flatMap((rule) => rule(step));
 }
 
-export interface Budget {
-	readonly frames: number;
+/** One frame of a budget run, from the trace: when it began, how long it took to the next, the script run in it. */
+export interface BudgetFrame {
+	readonly start: number;
+	readonly interval: number;
 	readonly scriptMs: number;
+}
+
+export interface Budget {
+	readonly frames: readonly BudgetFrame[];
+	/** Every main-thread task over 16 ms, from the trace (not only the 50 ms the page's PerformanceObserver tells). */
 	readonly longTasks: readonly { readonly t: number; readonly ms: number }[];
 }
 
-/** The budget (§Tests 6): under 8 ms of script per frame, no long task over 16 ms. */
+/** The budget (§Tests 6): under 8 ms of script in any frame that ran script, no task over 16 ms. */
 export function judgeBudget(b: Budget): string[] {
 	const out: string[] = [];
-	const perFrame = b.frames > 0 ? b.scriptMs / b.frames : b.scriptMs;
-	if (perFrame >= 8) out.push(`${perFrame.toFixed(1)} ms of script per frame (budget 8)`);
+	const worked = b.frames.filter((f) => f.scriptMs > 0);
+	const worst = worked.reduce((m, f) => Math.max(m, f.scriptMs), 0);
+	if (worst >= 8) out.push(`${worst.toFixed(1)} ms of script in a frame (budget 8)`);
 	for (const t of b.longTasks) if (t.ms > 16) out.push(`a long task of ${t.ms.toFixed(0)} ms`);
 	return out;
+}
+
+export function budgetSummary(b: Budget): string {
+	const worked = b.frames.filter((f) => f.scriptMs > 0);
+	const average = worked.length ? worked.reduce((s, f) => s + f.scriptMs, 0) / worked.length : 0;
+	const worst = worked.reduce((m, f) => Math.max(m, f.scriptMs), 0);
+	const longest = b.frames.reduce((m, f) => Math.max(m, f.interval), 0);
+	return `${b.frames.length} frames, script ${average.toFixed(2)} ms average over the ${worked.length} that ran script, ${worst.toFixed(1)} ms at most; the longest frame ${longest.toFixed(0)} ms; ${b.longTasks.length} tasks over 16 ms`;
+}
+
+interface TraceEvent {
+	readonly name: string;
+	readonly ph: string;
+	readonly ts: number;
+	readonly dur?: number;
+	readonly pid: number;
+	readonly tid: number;
+	readonly args?: { readonly name?: string };
+}
+
+const SCRIPT_EVENTS = new Set(["FunctionCall", "EvaluateScript", "v8.compile", "V8.Execute", "RunMicrotasks", "TimerFire", "FireAnimationFrame", "EventDispatch", "v8.callFunction"]);
+
+/**
+ * The budget from a CDP trace of the gesture: the page's main thread (the renderer's main thread with the most work),
+ * its frames (each `FireAnimationFrame`, the recorder asking for every frame), the script run in each (the union of
+ * the script events, so nested ones count once) and every task over 16 ms.
+ */
+export function budgetOfTrace(events: readonly TraceEvent[]): Budget {
+	const mains = events.filter((e) => e.ph === "M" && e.name === "thread_name" && e.args?.name === "CrRendererMain").map((e) => `${e.pid}:${e.tid}`);
+	const busiest = mains
+		.map((id) => ({ id, n: events.filter((e) => `${e.pid}:${e.tid}` === id && e.ph === "X").length }))
+		.sort((a, b) => b.n - a.n)[0]?.id;
+	const main = events.filter((e) => `${e.pid}:${e.tid}` === busiest && e.ph === "X" && e.dur !== undefined);
+	const starts = main.filter((e) => e.name === "FireAnimationFrame").map((e) => e.ts).sort((a, b) => a - b);
+	const scripts = main.filter((e) => SCRIPT_EVENTS.has(e.name)).map((e) => [e.ts, e.ts + e.dur!] as const).sort((a, b) => a[0] - b[0]);
+	const merged: [number, number][] = [];
+	for (const [s, e] of scripts) {
+		const top = merged[merged.length - 1];
+		if (top && s <= top[1]) top[1] = Math.max(top[1], e);
+		else merged.push([s, e]);
+	}
+	const frames: BudgetFrame[] = [];
+	for (let i = 0; i + 1 < starts.length; i++) {
+		const [from, to] = [starts[i], starts[i + 1]];
+		const script = merged.reduce((sum, [s, e]) => sum + Math.max(0, Math.min(e, to) - Math.max(s, from)), 0);
+		frames.push({ start: from / 1000, interval: (to - from) / 1000, scriptMs: script / 1000 });
+	}
+	const longTasks = main.filter((e) => (e.name === "RunTask" || e.name === "ThreadControllerImpl::RunTask") && e.dur! > 16_000).map((e) => ({ t: e.ts / 1000, ms: e.dur! / 1000 }));
+	return { frames, longTasks };
 }

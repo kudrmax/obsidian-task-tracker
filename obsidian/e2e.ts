@@ -60,10 +60,38 @@ export function fixtureHttp(fixture: E2EFixture, asked: HttpRequest[]): Http {
 
 export default class E2ETaskCalendarPlugin extends TaskCalendarPlugin {
 	private fixture: E2EFixture | null = null;
-	/** What the harness reads and moves over CDP: the clock and every request the plugin made. */
-	e2e: { readonly clock: FrozenClock; readonly asked: HttpRequest[] } | null = null;
+	/** What the harness reads and moves over CDP: the clock, every request the plugin made, every reach outside Obsidian. */
+	e2e: { readonly clock: FrozenClock; readonly asked: HttpRequest[]; readonly opened: string[] } | null = null;
+	private readonly opened: string[] = [];
+
+	/**
+	 * Nothing leaves the test Obsidian for Max's Mac: links to other apps (Shortcuts, the iPhone app, Google's login, a
+	 * link in a task) and the Mac's scripts (Calendar) are recorded, never opened. `window.open` and `location.assign`
+	 * are taken over in this test window for the same reason: the plugin's views and Google's login open through them.
+	 */
+	protected override outside(): { open(url: string): void; runScript(script: string, args: readonly string[]): void } {
+		return { open: (url) => void this.opened.push(url), runScript: (script) => void this.opened.push(`osascript: ${script.slice(0, 60)}`) };
+	}
 
 	override async onload(): Promise<void> {
+		const page = window as Window & { open: (url?: string | URL) => Window | null };
+		const opened = this.opened;
+		const open = page.open;
+		page.open = (url?: string | URL) => (opened.push(String(url)), null);
+		const assign = page.location.assign.bind(page.location);
+		try {
+			Object.defineProperty(page.location, "assign", { value: (url: string | URL) => void opened.push(String(url)), configurable: true });
+		} catch {
+			/* a location that cannot be taken over: links go through window.open on the desktop and in the phone view */
+		}
+		this.register(() => {
+			page.open = open;
+			try {
+				Object.defineProperty(page.location, "assign", { value: assign, configurable: true });
+			} catch {
+				/* as above */
+			}
+		});
 		const dir = this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
 		this.fixture = JSON.parse(await this.app.vault.adapter.read(`${dir}/e2e.json`)) as E2EFixture;
 		await super.onload();
@@ -73,7 +101,7 @@ export default class E2ETaskCalendarPlugin extends TaskCalendarPlugin {
 		const fixture = this.fixture!;
 		const clock = new FrozenClock(localMs(fixture.now));
 		const asked: HttpRequest[] = [];
-		this.e2e = { clock, asked };
+		this.e2e = { clock, asked, opened: this.opened };
 		return super.createDeps(clock, fixtureHttp(fixture, asked));
 	}
 }
