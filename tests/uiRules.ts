@@ -270,12 +270,14 @@ const MOUNTING = member(NODE_OWNERS, ["appendChild", "insertBefore", "removeChil
 
 /** Each driver's own work beside the common: its row of §Architecture's table. */
 export const DRIVER_ALLOW: Readonly<Record<Driver, readonly ((r: Reach) => boolean)[]>> = {
-	motion: [workOf("an inline style"), workOf("an animation"), workOf("a geometry read")],
+	/** Styles, animations and the boxes it animates; a title's text measured through a range, as the old screen fits a card. */
+	motion: [workOf("an inline style"), workOf("an animation"), workOf("a geometry read"), member(["Document"], ["createRange"]), member(["Range", "AbstractRange"], ["selectNodeContents"])],
 	measure: [workOf("a geometry read"), workOf("an observer")],
 	scroll: [workOf("a scroll")],
 	focus: [workOf("a focus"), reading(member(["FocusEvent"], "*")), reading(member(["ElementContentEditable", "HTMLElement", "HTMLOrSVGElement"], ["isContentEditable", "contentEditable", "tabIndex"]))],
 	/** The pointer, touch and wheel; a key read while a gesture runs (Escape ends a lift). */
-	input: [member(POINTER_OWNERS, "*"), reading(member(["KeyboardEvent"], "*")), member(["Element"], ["setPointerCapture", "releasePointerCapture", "hasPointerCapture"])],
+	/** …and a plain field's text as it is typed, which it reports as a message (a search query, a name). */
+	input: [member(POINTER_OWNERS, "*"), reading(member(["KeyboardEvent"], "*")), member(["Element"], ["setPointerCapture", "releasePointerCapture", "hasPointerCapture"]), reading(member(["HTMLInputElement", "HTMLTextAreaElement"], ["value"]))],
 	/** Scopes and keys; where focus went, so a scope ends when its field loses it. */
 	keys: [workOf("a key scope"), reading(member(["KeyboardEvent", "FocusEvent"], "*")), obsidianExport(["Scope", "Keymap"]), reading(obsidianMember(["App"], ["keymap"]))],
 	chrome: [
@@ -290,6 +292,10 @@ export const DRIVER_ALLOW: Readonly<Record<Driver, readonly ((r: Reach) => boole
 		MOUNTING,
 		obsidianExport(["MarkdownRenderer", "Modal", "Component", "MarkdownRenderChild"]),
 		obsidianMember(["MarkdownRenderer", "Modal", "Component", "MarkdownRenderChild"], "*", ["registerDomEvent", "registerInterval"]),
+		/** The editor island (§Architecture: CodeMirror, edits): the note its links resolve against, the keys its keymap reads while text is composed. */
+		reading(obsidianMember(["App"], ["vault"])),
+		reading(obsidianMember(["Vault"], ["getFileByPath"])),
+		reading(member(["KeyboardEvent"], ["isComposing", "keyCode"])),
 	],
 	overlay: [MOUNTING],
 };
