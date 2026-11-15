@@ -102,6 +102,9 @@ Sync) reads it, about 0.7 ms on that file.
   undo or redo (a task given back keeps its id), a read that meets lines written elsewhere. An id given is never given
   again while the host hands `ids` back. Example: `tasks.createWithId("Call", …)` → `created: ["t31"]`, `result.id`
   `"t31"`. A host maps a replayed create's ids by it and never reads an id.
+- `createdKinds`: beside `created`, each id's kind in the same order, `"task"` or `"section"`: a host pairs a replayed
+  create's ids with the first run's by kind, so a section's id never maps to a task's. Example: `tasks.createSection`
+  → `created: ["t40"], createdKinds: ["section"]`.
 - `staleTask`: a task or section the call names is no longer there as read: read again (`tasks.screen`) and redraw.
   `tasksFileMissing`: the call needs the tasks file; `tasks.createFile` answers the text of a new one. `blank`: a task to
   write has no title (`capture.add`).
@@ -518,8 +521,13 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
   the same task across calls while the host hands `ids` back, through every write the door makes to it (status,
   priority, labels, date, time, repeat, rename, fold, description, a move to another list, section, project or parent,
   the timeline and back, several at once), through `history.undo`/`redo`, and through an edit elsewhere that leaves its
-  line in place (or edits that one line in place). A task made gets a new id; a removed task's id is gone; a task added
-  elsewhere gets a new one. A view keys its card by `id`; `key` stays what an action names (the task as read).
+  line in place, or edits that line in place while it stays plausibly the same task: at least half the words of the
+  shorter title stand in the other, its status, marks, dates and times aside (`sameTaskLine` in
+  `core/application/TaskIdentity.ts`; "Call the bank" → "Call the bank tomorrow" keeps its id, "Buy milk" → "Buy bread"
+  too). Another task written over its line elsewhere ("Call the bank" → "Pay rent", or "Idea" deleted and "Buy milk"
+  added in its place) gets a new id: the old one is gone, and a call that names the old task is `staleTask`, never a
+  write to the new one. A task made gets a new id; a removed task's id is gone; a task added elsewhere gets a new one.
+  A section keeps its id through a rename elsewhere: a heading is who it is by its place. A view keys its card by `id`; `key` stays what an action names (the task as read).
 - `ListSection.id` (`tasks.screen`'s `sections`, `tasks.listSections`) and `ListGroup.id` (a column's groups): who a
   section is, the same through `tasks.renameGroup`, `tasks.moveGroup`, the writes to its tasks and undo; a section made
   gets a new one; No section's is `"none"` in every list. A header is keyed by it, never by its name.

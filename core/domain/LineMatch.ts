@@ -3,9 +3,10 @@ import { sharedLines } from "./TextPatch";
 /**
  * Which line of `after` each line of `before` is, as [index in before, index in after] in order: the longest run of lines
  * the two share, then, in a changed block between two shared lines, lines edited in place: a block with as many lines on
- * each side, every pair of them `alike`, pairs them one for one. Any other changed block pairs nothing.
+ * each side, every pair of them `alike`, pairs them one for one. Any other changed block pairs nothing. `each`: such a
+ * block pairs each of its lines that is `alike` its counterpart, the others none.
  */
-export function matchLines(before: readonly string[], after: readonly string[], alike: (b: number, a: number) => boolean): (readonly [number, number])[] {
+export function matchLines(before: readonly string[], after: readonly string[], alike: (b: number, a: number) => boolean, each = false): (readonly [number, number])[] {
 	let head = 0;
 	while (head < before.length && head < after.length && before[head] === after[head]) head++;
 	let tail = 0;
@@ -16,7 +17,7 @@ export function matchLines(before: readonly string[], after: readonly string[], 
 	let b = 0;
 	let a = 0;
 	for (const anchor of [...anchors, [before.length, after.length] as const]) {
-		pairs.push(...inPlace(b, anchor[0], a, anchor[1], alike));
+		pairs.push(...inPlace(b, anchor[0], a, anchor[1], alike, each));
 		if (anchor[0] < before.length) pairs.push(anchor);
 		b = anchor[0] + 1;
 		a = anchor[1] + 1;
@@ -25,8 +26,9 @@ export function matchLines(before: readonly string[], after: readonly string[], 
 }
 
 /** A changed block's lines edited in place: one for one when both sides are as long and every pair is alike. */
-function inPlace(b0: number, b1: number, a0: number, a1: number, alike: (b: number, a: number) => boolean): (readonly [number, number])[] {
+function inPlace(b0: number, b1: number, a0: number, a1: number, alike: (b: number, a: number) => boolean, each: boolean): (readonly [number, number])[] {
 	if (b1 - b0 !== a1 - a0 || b1 === b0) return [];
 	const pairs = Array.from({ length: b1 - b0 }, (_, k) => [b0 + k, a0 + k] as const);
+	if (each) return pairs.filter(([x, y]) => alike(x, y));
 	return pairs.every(([x, y]) => alike(x, y)) ? pairs : [];
 }
