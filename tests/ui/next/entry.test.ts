@@ -98,6 +98,13 @@ describe("the block's quick entry", () => {
 		expect(titles()).toContain("Idea, better");
 	});
 
+	it("a rename's field stands where its card stood, not at its list's end (the old screen's rename in place)", () => {
+		const id = rowKeys().find((k) => titles()[0] === "Idea" && k !== "head" && !k.startsWith("entry"))!;
+		host.dispatch({ kind: "entry", msg: { kind: "rename", id } });
+		const order = [...host.node.querySelectorAll("[data-n-island=field], .tc-n-card .tc-n-card-title")].map((el) => (el.matches("[data-n-island=field]") ? "field" : el.textContent));
+		expect(order).toEqual(["field", "Call"]);
+	});
+
 	it("a subtask is typed under its task, a level in", async () => {
 		const id = rowKeys().find((k) => k !== "head" && !k.startsWith("entry"))!;
 		host.dispatch({ kind: "entry", msg: { kind: "subtask", id } });

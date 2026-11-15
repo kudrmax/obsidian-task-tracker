@@ -211,7 +211,8 @@ export function withEntry(list: ListModel, column: EntryList, model: BlockModel)
 		const text = renamedText(entry, row.item);
 		return text === null ? row : { ...row, face: { ...row.face, title: titleOf(text) } };
 	};
-	let rows = list.rows.filter((row) => !(row.kind === "card" && row.item.id === renaming)).map(renamed);
+	/** The card renamed keeps its row while the field is placed (the core counts it among the cards), then gives it to the field. */
+	let rows = list.rows.map(renamed);
 	const placed = state ? listEntry(model.answers, column) : null;
 	if (state && entry && placed) {
 		const shown: ListModel = { ...list, rows };
@@ -237,6 +238,7 @@ export function withEntry(list: ListModel, column: EntryList, model: BlockModel)
 		};
 		rows = [...rows.slice(0, at), ...typed, field, ...rows.slice(at)];
 	}
+	rows = rows.filter((row) => !(row.kind === "card" && row.item.id === renaming));
 	return { ...list, rows: withBranches(rows) };
 }
 

@@ -85,7 +85,7 @@ export async function block(d: Driver, newBlock: boolean): Promise<void> {
 	const described = titles.find((t) => t.length > 0 && t !== first) ?? first;
 	await d.page(`
 		const file = app.vault.getAbstractFileByPath(app.plugins.plugins["task-calendar"].pluginSettings.get().tasksFile);
-		await app.vault.process(file, (text) => text.split("\n").map((line) => (/^- \[.\] /.test(line) && line.includes(${JSON.stringify(described)}) ? line + "\n\t- E2E description: what to bring, and [[Дружба]]" : line)).join("\n"));
+		await app.vault.process(file, (text) => text.split("\\n").map((line) => (/^- \\[.\\] /.test(line) && line.includes(${JSON.stringify(described)}) ? line + "\\n\\t- E2E description: what to bring, and [[Дружба]]" : line)).join("\\n"));
 		return true;`);
 	await d.page("return __e2e.rest()");
 	await showBlock(d);
