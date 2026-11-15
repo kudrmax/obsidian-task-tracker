@@ -10,6 +10,7 @@ import { Runtime } from "../../obsidian/runtime/Runtime";
 import type { Door } from "../../obsidian/runtime/replica/Door";
 import { SETTINGS_FILE, type StoredSettings } from "../../obsidian/settingsFile";
 import { FakeTimers } from "../fakes/FakeTimers";
+import { noticeText } from "../../obsidian/ui/failureText";
 
 export const PATH = "TODOs Tasks.md";
 export const DAY = "2026-11-15";
@@ -227,7 +228,7 @@ export async function harness(options: HarnessOptions = {}): Promise<Harness> {
 		work: { export: () => void exports++ },
 		clock,
 		timers,
-		notices: { show: (text) => notices.push(text) },
+		notices: { tell: (notice) => notices.push(noticeText(notice)) },
 	});
 	const events: RuntimeEvent[] = [];
 	runtime.subscribe((e) => e && events.push(e));

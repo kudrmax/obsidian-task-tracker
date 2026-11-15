@@ -137,7 +137,7 @@ describe("D. a failure is kept by its kind", () => {
 
 describe("E. nothing outlives unload, nothing rejects unheard", () => {
 	it("the lane's silence timer and a read landing late are gone with the runtime", async () => {
-		const feed: CalendarFeed = { name: "google", refresh: () => new Promise(() => undefined) };
+		const feed: CalendarFeed = { name: "google", refresh: () => new Promise(() => undefined), lastRun: () => null };
 		const { runtime, timers } = await harness({ feeds: [feed] });
 		const fetching = runtime.refreshCalendars("refresh");
 		await macrotask();

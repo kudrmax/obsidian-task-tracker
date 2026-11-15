@@ -86,7 +86,7 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 			projectsScreenChanged: (state) => this.projectsScreen.save(state),
 		});
 		this.viewAnswers = new ViewAnswers({ state: () => this.replica.state, minute: () => minuteOf(now()), read: (m, a) => this.calls.read(m, a) });
-		this.calendars = new CalendarLane({ replica: this.replica, read: (m, a) => this.calls.read(m, a), feeds: deps.feeds, texts: deps.calendarTexts, work: deps.work, timers: deps.timers, now, failed });
+		this.calendars = new CalendarLane({ replica: this.replica, read: (m, a) => this.calls.read(m, a), feeds: deps.feeds, texts: deps.calendarTexts, work: deps.work, timers: deps.timers, failed });
 		this.clock = new MinuteClock({
 			timers: deps.timers,
 			now,
@@ -240,6 +240,6 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 
 	private failed(error: unknown): void {
 		this.log.record(`failed ${error instanceof Error ? error.message : String(error)}`);
-		this.deps.notices.show(error instanceof Error ? error.message : String(error));
+		this.deps.notices.tell({ kind: "failed", error });
 	}
 }

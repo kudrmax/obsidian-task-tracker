@@ -47,6 +47,11 @@ export class GoogleCalendarFeed implements EventFeed {
 		private readonly path = GOOGLE_CALENDAR_FILE,
 	) {}
 
+	/** The last good run: when, and under which settings; the one record of it, which the runtime's lane reads too. */
+	lastRun(): FeedRun | null {
+		return this.last;
+	}
+
 	async refresh(force: boolean): Promise<void> {
 		const settings = this.settings.get();
 		const key = feedKey(settings);

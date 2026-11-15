@@ -26,14 +26,18 @@ export class RuntimeEvents {
 	}
 }
 
+/**
+ * What the runtime tells Max: a call dropped because its task changed (`stale`), the pending calls let go past the bound
+ * of replays (`busy`), the tasks file gone (`gone`), a failure of the disk or the network (`failed`). The words are the
+ * plugin's, in one place with the old screen's (`obsidian/ui/failureText.ts`); the composition says them.
+ */
+export type RuntimeNotice =
+	| { readonly kind: "stale" }
+	| { readonly kind: "busy" }
+	| { readonly kind: "gone"; readonly path: string }
+	| { readonly kind: "failed"; readonly error: unknown };
+
 /** A short message to Max: Obsidian's `Notice` in the plugin. */
 export interface Notices {
-	show(text: string): void;
+	tell(notice: RuntimeNotice): void;
 }
-
-/** What Max reads when the runtime had to let his changes go. */
-export const NOTICE_WORDS = {
-	stale: "The task changed in the file; the view was refreshed",
-	busy: "The tasks file kept changing; your last changes were not saved",
-	gone: (path: string) => `Tasks file not found: ${path}`,
-} as const;

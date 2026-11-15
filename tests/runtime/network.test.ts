@@ -1,15 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { GOOGLE_CALENDAR_FILE } from "../../core/application/calendarFile";
+import type { FeedRun } from "../../core/application/calendarsRefresh";
 import { SourceProblemError } from "../../core/application/EventSource";
+import { callDoor } from "../../core/application/PhoneCalls";
 import type { CalendarFeed } from "../../obsidian/runtime/network/CalendarLane";
 import { harness } from "./harness";
 
-/** A feed whose runs end when the test says. */
+/** The settings key a feed's run is good under, by the core (default settings). */
+const KEY = (callDoor("calendarsRefresh.feedKey", [], { tasks: null, nowMs: 0 }) as { result: string }).result;
+
+/** A feed whose runs end when the test says; it records a good run, as `GoogleCalendarFeed` does. */
 class HeldFeed implements CalendarFeed {
 	readonly name = "google" as const;
 	readonly runs: { resolve: () => void; reject: (e: unknown) => void }[] = [];
+	private last: FeedRun | null = null;
 	refresh(): Promise<void> {
-		return new Promise((resolve, reject) => this.runs.push({ resolve, reject }));
+		return new Promise<void>((resolve, reject) => this.runs.push({ resolve, reject })).then(() => {
+			this.last = { atMs: new Date(2026, 10, 15, 12, 0).getTime(), key: KEY };
+		});
+	}
+	lastRun(): FeedRun | null {
+		return this.last;
 	}
 }
 

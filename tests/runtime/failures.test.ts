@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TFile } from "obsidian";
-import { NOTICE_WORDS } from "../../obsidian/runtime/events";
+import { NOTICE_WORDS } from "../../obsidian/ui/failureText";
 import { FILE, harness, itemOf, ok, PATH, settle } from "./harness";
 
 const macrotask = () => new Promise((resolve) => setTimeout(resolve, 0));

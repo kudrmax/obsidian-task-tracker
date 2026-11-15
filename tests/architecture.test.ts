@@ -9,7 +9,11 @@ const ROOT = resolve(__dirname, "..");
 type Layer = "domain" | "application" | "infrastructure" | "runtime" | "host" | "ui" | "phone" | "settings" | "root";
 
 /** Obsidian's own packages: the app provides them at run time (`external` in esbuild.config.mjs). */
-const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view", "preact", "preact/hooks", "preact/jsx-runtime"];
+const PROVIDED_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
+/** Preact, which the views are written in: bundled into main.js, a dependency of the plugin's own. */
+const BUNDLED_PACKAGES = ["preact", "preact/hooks", "preact/jsx-runtime"];
+/** The packages the plugin's code may import: Obsidian's and Preact. */
+const OBSIDIAN_PACKAGES = [...PROVIDED_PACKAGES, ...BUNDLED_PACKAGES];
 
 function layerOf(file: string): Layer | null {
 	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";

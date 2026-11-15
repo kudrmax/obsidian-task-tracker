@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CreatedTask } from "../../core/application/contracts";
-import { NOTICE_WORDS } from "../../obsidian/runtime/events";
+import { NOTICE_WORDS } from "../../obsidian/ui/failureText";
 import { FILE, harness, itemOf, ok, PATH, screenOf, settle } from "./harness";
 
 const NEW = (title: string) => [title, null, { kind: "list", list: "inbox", group: null, before: null }];

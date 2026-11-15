@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TFile } from "obsidian";
 import type { Program } from "../../obsidian/runtime/dispatch/Program";
 import type { CalendarFeed } from "../../obsidian/runtime/network/CalendarLane";
-import { NOTICE_WORDS } from "../../obsidian/runtime/events";
+import { NOTICE_WORDS } from "../../obsidian/ui/failureText";
 import { pairCreated } from "../../obsidian/runtime/persistence/Replay";
 import { FILE, harness, itemOf, ok, PATH, settle } from "./harness";
 
@@ -88,7 +88,7 @@ describe("a host's teardown", () => {
 describe("the network lane", () => {
 	it("runs one feed once at a time: an ask while it runs joins it", async () => {
 		const runs: (() => void)[] = [];
-		const feed: CalendarFeed = { name: "google", refresh: () => new Promise<void>((resolve) => runs.push(resolve)) };
+		const feed: CalendarFeed = { name: "google", refresh: () => new Promise<void>((resolve) => runs.push(resolve)), lastRun: () => null };
 		const { runtime } = await harness({ feeds: [feed] });
 		const first = runtime.refreshCalendars("refresh");
 		const second = runtime.refreshCalendars("refresh");

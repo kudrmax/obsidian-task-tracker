@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CreatedTask, ProjectsScreenState } from "../../core/application/contracts";
-import { NOTICE_WORDS, type RuntimeEvent } from "../../obsidian/runtime/events";
+import type { RuntimeEvent } from "../../obsidian/runtime/events";
+import { NOTICE_WORDS } from "../../obsidian/ui/failureText";
 import { sectionRef } from "../../obsidian/runtime/replica/refs";
 import { DAY, FILE, harness, itemOf, ManualClock, ok, PATH, screenOf, settle } from "./harness";
 

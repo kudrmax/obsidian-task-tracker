@@ -6,10 +6,14 @@ import type { DoorAnswer } from "../../../core/application/PhoneCalls";
 import { resultOf } from "../replica/Door";
 import type { Replica } from "../replica/Replica";
 
-/** A calendar the host fetches itself into its file (`GoogleCalendarFeed`). */
+/**
+ * A calendar the host fetches itself into its file (`GoogleCalendarFeed`). The feed keeps the one record of its last good
+ * run (`lastRun`): the lane asks the core's rule over it, and the old screen's polling reads the same record.
+ */
 export interface CalendarFeed {
 	readonly name: CalendarSource;
 	refresh(force: boolean): Promise<void>;
+	lastRun(): FeedRun | null;
 }
 
 /** The calendars' files as text, by path from the vault's folder (null for none), and their changes by path. */
@@ -27,7 +31,6 @@ export interface CalendarLaneDeps {
 	/** The phone's export of its calendars (Scriptable, Shortcuts, the app): asked first when the rule says (`exportFirst`: Refresh now). */
 	readonly work: { export(): void };
 	readonly timers: Timers;
-	readonly now: () => number;
 	/** A failure no caller hears (a file change's read): told, never thrown unheard. */
 	readonly failed: (error: unknown) => void;
 }
@@ -44,7 +47,6 @@ type Problems = Partial<Record<CalendarSource, SourceProblem>>;
  * replica's `feedProblems`.
  */
 export class CalendarLane {
-	private readonly runs = new Map<CalendarSource, FeedRun>();
 	private readonly feedFailures: Problems = {};
 	private readonly readFailures: Problems = {};
 	private reads = 0;
@@ -88,7 +90,7 @@ export class CalendarLane {
 	}
 
 	private due(feed: CalendarFeed): boolean {
-		return resultOf<boolean>(this.deps.read("calendarsRefresh.feedDue", [this.runs.get(feed.name) ?? null]), "calendarsRefresh.feedDue");
+		return resultOf<boolean>(this.deps.read("calendarsRefresh.feedDue", [feed.lastRun()]), "calendarsRefresh.feedDue");
 	}
 
 	/** A failure as the door reads it: plain data (`{ problem }` of a source's own problem, else `{ message }`), as on the wire. */
@@ -97,7 +99,6 @@ export class CalendarLane {
 		return resultOf<SourceProblem>(this.deps.read("calendarsRefresh.problem", [failure]), "calendarsRefresh.problem");
 	}
 
-	/** One feed run, bounded by the core's silence: a good run is remembered, a failure or a silence is the source's problem. */
 	/** The feed's run under way, joined; else a new one. */
 	private runOnce(feed: CalendarFeed): Promise<void> {
 		const under = this.running.get(feed.name);
@@ -107,8 +108,8 @@ export class CalendarLane {
 		return run;
 	}
 
+	/** One feed run, bounded by the core's silence: the feed records a good run; a failure or a silence is the source's problem. */
 	private async run(feed: CalendarFeed): Promise<void> {
-		const key = resultOf<string>(this.deps.read("calendarsRefresh.feedKey", []), "calendarsRefresh.feedKey");
 		const silence = resultOf<{ ms: number; problem: SourceProblem }>(this.deps.read("calendarsRefresh.silence", []), "calendarsRefresh.silence");
 		let timer = 0;
 		const silent = new Promise<never>((_, reject) => {
@@ -118,7 +119,6 @@ export class CalendarLane {
 		try {
 			await Promise.race([feed.refresh(true), silent]);
 			if (this.stopped) return;
-			this.runs.set(feed.name, { atMs: this.deps.now(), key });
 			delete this.feedFailures[feed.name];
 		} catch (e) {
 			if (this.stopped) return;

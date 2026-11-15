@@ -3,7 +3,7 @@ import type { TaskIdState } from "../../../core/application/TaskIdentity";
 import { resultOf } from "../replica/Door";
 import type { Door } from "../replica/Door";
 import { contextOf, type Replica } from "../replica/Replica";
-import { NOTICE_WORDS, type Notices, type RuntimeEvents } from "../events";
+import type { Notices, RuntimeEvents } from "../events";
 import type { PendingCall, PendingLog } from "./PendingLog";
 import { replay } from "./Replay";
 
@@ -39,14 +39,14 @@ export class Rebaser {
 		const result = replay(door, tidied, log.entries);
 		log.replace(result.kept);
 		replica.update({ tasks: result.context.tasks, history: result.context.history, ids: result.context.ids });
-		if (result.dropped.length > 0) this.deps.notices.show(NOTICE_WORDS.stale);
+		if (result.dropped.length > 0) this.deps.notices.tell({ kind: "stale" });
 		this.settle(result.idMap, [...dropped, ...result.dropped]);
 	}
 
 	/** Past the bound of replays: the file is taken as it is, and every pending call is dropped. */
 	giveUp(text: string): void {
 		const dropped = this.deps.log.dropAll();
-		if (dropped.length > 0) this.deps.notices.show(NOTICE_WORDS.busy);
+		if (dropped.length > 0) this.deps.notices.tell({ kind: "busy" });
 		this.rebase(text, dropped);
 	}
 
@@ -56,7 +56,7 @@ export class Rebaser {
 		const dropped = log.dropAll();
 		log.forget();
 		replica.update({ tasks: null, history: undefined });
-		if (dropped.length > 0) this.deps.notices.show(NOTICE_WORDS.gone(path));
+		if (dropped.length > 0) this.deps.notices.tell({ kind: "gone", path });
 		this.settle(new Map(), dropped);
 		this.deps.events.emit({ kind: "fileGone", path });
 	}
