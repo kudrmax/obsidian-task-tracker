@@ -29,6 +29,8 @@ export const BLOCK_FILE = [
 	"",
 	"## Done",
 	"",
+	"- [x] Finished long ago",
+	"",
 ].join("\n");
 
 /** An editor that stands in for Obsidian's: what it was given, and the hooks to type in it. */

@@ -1,4 +1,4 @@
-import { type ColumnSections, dayTitle, type ListSection, type DropColumn, type FunnelView, type ProjectsView, type ScreenSettings, type ScreenView, type TaskItem, type ViewChoice } from "../../../../core/application/contracts";
+import { type ColumnSections, type DayRelation, dayTitle, type ListSection, type DropColumn, type FunnelView, type ProjectsView, type ScreenSettings, type ScreenView, type TaskItem, type ViewChoice } from "../../../../core/application/contracts";
 import type { LocalDate } from "./answers";
 import { type Answers, type Need, NO_ANSWERS, resultOf } from "./answers";
 import { funnelList, type ListModel, projectsList } from "./lists";
@@ -34,6 +34,11 @@ export interface BlockModel {
 	/** The task the search led to: its card wears the ring until the next press. */
 	readonly found: Found | null;
 	/**
+	 * The day the block's day list shows: today (null) until a search reveals a task of another day, as the old block's
+	 * selected date did.
+	 */
+	readonly day: LocalDate | null;
+	/**
 	 * The lists as they stood when something began to move (a carry, a closing sheet): drawn while it moves, so nothing
 	 * under the finger or the sheet is redrawn (P6). Null when nothing pins them.
 	 */
@@ -53,7 +58,7 @@ export interface Motion {
 }
 
 export function blockModel(note: string, wide: boolean): BlockModel {
-	return { note, wide, answers: NO_ANSWERS, layers: [], entry: null, carry: null, select: null, search: null, found: null, pinned: null, motion: { seq: 0, cause: "replace", context: null } };
+	return { note, wide, answers: NO_ANSWERS, layers: [], entry: null, carry: null, select: null, search: null, found: null, day: null, pinned: null, motion: { seq: 0, cause: "replace", context: null } };
 }
 
 // Needs ------------------------------------------------------------------------------------------------------------
@@ -70,7 +75,8 @@ export function blockNeeds(model: BlockModel): readonly Need[] {
 		{ key: "settings", method: "screenSettings.get", args: [] },
 	];
 	const funnel = noteView(model);
-	const today = resultOf<LocalDate>(model.answers, "today");
+	const today = shownDay(model);
+	if (model.day !== null) needs.push({ key: "relation", method: "days.relation", args: [model.day] });
 	if (funnel && today) {
 		const node = funnel.filter?.node ?? null;
 		/** The screen's read is the menus' too (the sections and projects they offer), By subprojects as well. */
@@ -94,6 +100,11 @@ export function sectioned(model: BlockModel, column: string): boolean {
 /** The note's project's view; null when the note is no project's (the host then takes the block away), undefined before the first read. */
 export function noteView(model: BlockModel): FunnelView | null {
 	return resultOf<FunnelView | null>(model.answers, "note");
+}
+
+/** The day the block's day list shows: the one a search revealed, else today. */
+export function shownDay(model: BlockModel): LocalDate | null {
+	return model.day ?? today(model);
 }
 
 export function today(model: BlockModel): LocalDate | null {
@@ -170,9 +181,10 @@ const LISTS_OF = new WeakMap<Answers, BlockLists>();
 
 function listsOf(model: BlockModel): BlockLists {
 	const funnel = noteView(model);
-	const day = today(model);
+	const day = shownDay(model);
+	const now = today(model);
 	const shown = settings(model);
-	if (!funnel || !day || !shown) return NO_LISTS;
+	if (!funnel || !day || !now || !shown) return NO_LISTS;
 	const view = funnel.view;
 	if (view.source === "projectsScreen") {
 		const projects = projectsView(model);
@@ -185,7 +197,7 @@ function listsOf(model: BlockModel): BlockLists {
 		const sections = resultOf<ColumnSections | null>(model.answers, ROW_KEY(column));
 		return {
 			column,
-			label: titles.get(column) ?? dayTitle(day, "today", day),
+			label: titles.get(column) ?? dayTitle(day, model.day === null ? "today" : (resultOf<DayRelation>(model.answers, "relation") ?? "other"), now),
 			grouped: sections !== null,
 			list: funnelList({
 				column,

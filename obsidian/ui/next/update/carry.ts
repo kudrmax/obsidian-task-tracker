@@ -1,6 +1,6 @@
 import { canPick, type DropColumn, type DroppedTask, endsSelection, type ProjectsDrop, type TaskKey } from "../../../../core/application/contracts";
 import { okResult } from "../model/answers";
-import { type BlockLists, type BlockModel, currentLists, noteView, taskById, today } from "../model/block";
+import { type BlockLists, type BlockModel, currentLists, noteView, shownDay, taskById } from "../model/block";
 import type { CarryModel, CarryMsg } from "../model/carry";
 import { type Command, write } from "../model/commands";
 import type { CardRow, ListModel, ListRow } from "../model/lists";
@@ -181,7 +181,7 @@ function droppedNow(model: BlockModel): Step {
 	const node = funnel?.filter?.node ?? null;
 	const write: Command<BlockMsg> =
 		drop.kind === "list"
-			? { kind: "door", method: "tasks.drop", args: [dropped(model, carry), { kind: "place", column: drop.column, place: drop.place }, today(model), node], reply: (o) => (o.answer.ok ? null : failed(o.answer.error)) }
+			? { kind: "door", method: "tasks.drop", args: [dropped(model, carry), { kind: "place", column: drop.column, place: drop.place }, shownDay(model), node], reply: (o) => (o.answer.ok ? null : failed(o.answer.error)) }
 			: { kind: "door", method: "tasks.dropInProjects", args: [carry.cards satisfies readonly ProjectsDrop[], drop.place, node ?? "all"], reply: (o) => (o.answer.ok ? null : failed(o.answer.error)) };
 	const landing: BlockModel = { ...model, carry: { ...carry, phase: "landing", lands: carry.id, target: null }, pinned: model.layers.some((layer) => layer.closing) ? model.pinned : null };
 	const [next, end] = ended(landing, "dropped");

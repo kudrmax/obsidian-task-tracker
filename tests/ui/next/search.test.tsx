@@ -56,14 +56,27 @@ describe("the search over the note's block", () => {
 		expect(picked).toBeTruthy();
 	});
 
-	it("opens a found task the block does not show (another project's) on the full card", async () => {
+	it("as the old block: a found task its filter hides clears the main screen's filter and moves the funnel's place there, and wears the ring", async () => {
 		b = await mountBlock();
+		b.h.screens.set({ ...b.h.screens.get(), selected: "project:Дружба" });
 		b.host.dispatch({ kind: "key", key: "find" });
 		type("Elsewhere");
 		key("Enter");
 		b.host.dispatch({ kind: "search", msg: { kind: "gone" } });
-		expect(fullLayer(b.host.model.layers)?.id).toBe(b.item("Elsewhere").id);
-		expect(q(".tc-n-full-title")?.textContent).toBe("Elsewhere");
+		expect(fullLayer(b.host.model.layers)).toBeNull();
+		expect(b.host.model.found?.id).toBe(b.item("Elsewhere").id);
+		expect(b.h.screens.get().selected).toBeUndefined();
+		expect(b.h.screens.get().place).toBe("calendar");
+	});
+
+	it("as the old block: a found Done task opens on the full card, the place left as it is", async () => {
+		b = await mountBlock();
+		b.host.dispatch({ kind: "key", key: "find" });
+		type("Finished long ago");
+		key("Enter");
+		b.host.dispatch({ kind: "search", msg: { kind: "gone" } });
+		expect(fullLayer(b.host.model.layers)?.id).toBe(b.item("Finished long ago").id);
+		expect(b.h.screens.get().place).toBeUndefined();
 	});
 
 	it("on the phone covers the block, the field at the bottom with Cancel; Escape in the field closes it too", async () => {

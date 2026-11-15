@@ -1,5 +1,5 @@
-import type { SearchHit } from "../../../../core/application/contracts";
-import { type BlockModel, taskById } from "../model/block";
+import type { SearchHit, TaskScreen } from "../../../../core/application/contracts";
+import { type BlockModel, noteView, shownDay, taskById } from "../model/block";
 import type { Command } from "../model/commands";
 import { fullTaskOf } from "../model/full";
 import type { BlockMsg } from "../model/messages";
@@ -29,7 +29,7 @@ export function updateSearch(model: BlockModel, msg: SearchMsg): Step {
 	switch (msg.kind) {
 		case "open": {
 			if (current && !current.closing) return [model, [{ kind: "focus", field: SEARCH_FIELD }]];
-			const opened: SearchModel = { query: "", picked: 0, closing: false, chosen: null };
+			const opened: SearchModel = { query: "", picked: 0, closing: false, chosen: null, screen: null };
 			return [{ ...model, search: opened, found: null }, [{ kind: "focus", field: SEARCH_FIELD }]];
 		}
 		case "typed":
@@ -48,8 +48,28 @@ export function updateSearch(model: BlockModel, msg: SearchMsg): Step {
 			const hit = searchHits(model.answers).find((_, i) => i === msg.row) ?? null;
 			if (!current || current.closing || !hit) return [model, []];
 			/** The core unfolds the tasks above a found subtask, so its card is drawn (`tasks.reveal`). */
-			const reveal: Command<BlockMsg> = { kind: "door", method: "tasks.reveal", args: [hit.item], reply: (outcome) => (outcome.answer.ok ? null : { kind: "failed", error: outcome.answer.error }) };
+			const reveal: Command<BlockMsg> = { kind: "door", method: "tasks.reveal", args: [hit.item], reply: (outcome) => (outcome.answer.ok ? search({ kind: "revealed", screen: outcome.answer.result as TaskScreen }) : { kind: "failed", error: outcome.answer.error }) };
 			return [closing(model, hit), [reveal]];
+		}
+		case "revealed": {
+			const hit = current?.chosen ?? null;
+			if (!current || !hit) return [model, []];
+			const node = noteView(model)?.filter?.node ?? null;
+			const hides: Command<BlockMsg> = { kind: "door", method: "tasks.filterHides", args: [hit.item, node], reply: (outcome) => search({ kind: "hides", hides: outcome.answer.ok && outcome.answer.result === true }) };
+			return [{ ...model, search: { ...current, screen: msg.screen } }, [hides]];
+		}
+		case "hides": {
+			/**
+			 * As the old block's `reveal`: a task its filter hides clears the main screen's filter; a task of a day takes the
+			 * block's day list to that day; the funnel's place moves to the task's, except for Done, which opens on the full card.
+			 */
+			const screen = current?.screen ?? null;
+			if (!current || !screen) return [model, []];
+			const clear: Command<BlockMsg>[] = msg.hides ? [{ kind: "door", method: "tasks.clearProjectFilter", args: [], reply: () => null }] : [];
+			const place = placeOf(screen);
+			if (place === "done") return [model, clear];
+			const day = screen.kind === "day" && screen.date !== shownDay(model) ? screen.date : model.day;
+			return [{ ...model, day }, [...clear, { kind: "door", method: "tasks.setFunnelPlace", args: [place], reply: () => null }]];
 		}
 		case "cancel":
 			return [closing(model, null), []];
@@ -57,8 +77,9 @@ export function updateSearch(model: BlockModel, msg: SearchMsg): Step {
 			const picked = current?.chosen ?? null;
 			const left: BlockModel = { ...model, search: null };
 			if (!picked) return [left, []];
-			if (taskById(left, picked.item.id)) return [{ ...left, found: { id: picked.item.id, scroll: true } }, [{ kind: "show", key: picked.item.id, then: search({ kind: "shown" }) }]];
-			return updateFull(left, { kind: "open", id: picked.item.id, description: false, task: fullTaskOf(picked.item) });
+			if (current?.screen && placeOf(current.screen) === "done") return updateFull(left, { kind: "open", id: picked.item.id, description: false, task: fullTaskOf(picked.item) });
+			const found: BlockModel = { ...left, found: { id: picked.item.id, scroll: true } };
+			return taskById(left, picked.item.id) ? [found, [{ kind: "show", key: picked.item.id, then: search({ kind: "shown" }) }]] : [found, []];
 		}
 		case "pressed":
 			return model.found ? [{ ...model, found: null }, []] : [model, []];
@@ -82,5 +103,19 @@ export function searchFieldKey(key: string): SearchMsg | null {
 			return { kind: "cancel" };
 		default:
 			return null;
+	}
+}
+
+/** The funnel's place a task's screen stands at, as the old screen's `PLACE_OF_LIST`: Backlog under Inbox, a day beside its calendar. */
+function placeOf(screen: TaskScreen): "done" | "inbox" | "soon" | "calendar" {
+	if (screen.kind === "day") return "calendar";
+	switch (screen.list) {
+		case "done":
+			return "done";
+		case "inbox":
+		case "backlog":
+			return "inbox";
+		case "soon":
+			return "soon";
 	}
 }

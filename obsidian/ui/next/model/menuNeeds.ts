@@ -1,6 +1,6 @@
 import type { MenuScreen, PickedTask, TaskItem, TaskMenuModel } from "../../../../core/application/contracts";
 import { resultOf, type Need } from "./answers";
-import { type BlockModel, currentLists, screenView, today } from "./block";
+import { type BlockModel, currentLists, screenView, shownDay, today } from "./block";
 import type { CardRow } from "./lists";
 import type { MenuInput, TaskMenuLayer } from "./taskMenu";
 
@@ -32,9 +32,10 @@ export function menuTasks(model: BlockModel, layer: TaskMenuLayer): readonly Tas
 
 /** The screen a menu opens over (`tasks.menu`'s `screen`): today, the day it shows, the sections and projects it offers. */
 export function menuScreen(model: BlockModel): MenuScreen | null {
-	const day = today(model);
+	const now = today(model);
+	const day = shownDay(model);
 	const screen = screenView(model);
-	return day && screen ? { today: day, day, offer: screen.offer, projects: screen.projectTree } : null;
+	return now && day && screen ? { today: now, day, offer: screen.offer, projects: screen.projectTree } : null;
 }
 
 /** The core's model of the open menu (`tasks.menu`, `tasks.bulkMenu`), a view answer while the menu stands (P2). */

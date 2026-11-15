@@ -2,7 +2,7 @@ import { type EntryList, type EntryPart, type EntryInList, type EntryState, type
 
 /** What follows an `entry.*` answer: the field opened at the spot it answered (renaming a task, typing its subtask, naming a section), another call, or an Enter's own. */
 export type EntryThen = { readonly open: "rename" | "subtask" | "newSection"; readonly item: TaskItem } | { readonly after: string } | { readonly enter: true } | null;
-import { type BlockLists, type BlockModel, currentLists, noteView, sectioned, shownLists, today } from "./block";
+import { type BlockLists, type BlockModel, currentLists, noteView, sectioned, shownDay, shownLists } from "./block";
 import { type ListModel, type ListRow, withBranches } from "./lists";
 import { type TitlePart, titleParts } from "./card";
 import { type Answers, type LocalDate, type Need, resultOf } from "./answers";
@@ -99,7 +99,7 @@ export function entryLists(lists: BlockLists): ReadonlyMap<EntryList, ListModel>
 /** The look of the block as it stands in `lists` (what the lists draw, or are about to). Null before the block has its view. */
 export function entryLook(model: BlockModel, lists: BlockLists, sectioned: (column: EntryList) => boolean): EntryLook | null {
 	const funnel = noteView(model);
-	const day = today(model);
+	const day = shownDay(model);
 	if (!funnel || !day) return null;
 	const shown = entryLists(lists);
 	const by = <T>(read: (list: ListModel, column: EntryList) => T) => Object.fromEntries([...shown].map(([column, list]) => [column, read(list, column)] as const));
