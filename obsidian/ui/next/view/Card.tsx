@@ -238,11 +238,7 @@ export function Due({ due }: { readonly due: NonNullable<CardFace["due"]> }): JS
 }
 
 const sameBranch = (a: Branch | null, b: Branch | null): boolean => a === b || (a !== null && b !== null && a.last === b.last && a.passes.length === b.passes.length && a.passes.every((p, i) => p === b.passes[i]));
-const sameStates = (a: CardStates | undefined, b: CardStates | undefined): boolean => {
-	if (a === b) return true;
-	const keys = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
-	return [...keys].every((k) => new Map(Object.entries(a ?? {})).get(k) === new Map(Object.entries(b ?? {})).get(k));
-};
+const sameStates = (a: CardStates | undefined, b: CardStates | undefined): boolean => a === b || JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
 
 /**
  * A card, drawn again only when what it shows changed (its face, the same object while the core answers the same task;

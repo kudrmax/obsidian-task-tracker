@@ -217,7 +217,7 @@ export class BlockHost {
 	private draw(model: BlockModel): void {
 		if (this.disposed) return;
 		const moved = model.motion.seq !== this.drawnSeq;
-		this.motion.before();
+		this.motion.before(moved && model.motion.cause === "move");
 		render(<BlockRoot model={model} layers={this.overlay.node} />, this.node);
 		this.drawnSeq = model.motion.seq;
 		this.motion.after(moved ? model.motion.cause : "none", new Map([...rowVars(drawnLists(model)), ...carryVars(model), ...fullRowVars(model), ...rootVars(model)]), model.entry?.bound);

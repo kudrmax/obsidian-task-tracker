@@ -40,14 +40,20 @@ function keyOf(el: Element): string | null {
 export class Motion {
 	private running: Animation[] = [];
 	private boxes: Boxes = new Map();
-	private readonly set = new Map<HTMLElement, Set<string>>();
+	/** The variables written on each element, as written: compared here, never read back from its style. */
+	private readonly set = new Map<HTMLElement, ReadonlyMap<string, string>>();
 
 	constructor(private readonly root: HTMLElement) {}
 
 	/** The commit phase, before the render: running motions are cancelled, and the keyed rows' boxes read as they stand. */
-	before(): void {
+	before(moving = true): void {
 		this.cancel();
 		const boxes = new Map<string, DOMRect>();
+		/** A drawing that moves nothing (a layer opened, another context) reads no box: nothing slides from where it stood. */
+		if (!moving) {
+			this.boxes = boxes;
+			return;
+		}
 		for (const el of this.root.querySelectorAll("[data-n-key]")) {
 			const key = keyOf(el);
 			if (key !== null && !key.includes("/")) boxes.set(key, el.getBoundingClientRect());
@@ -102,10 +108,10 @@ export class Motion {
 			const had = this.set.get(el);
 			if (!given && !had) continue;
 			seen.add(el);
-			const names = new Set(Object.keys(given ?? {}));
-			for (const name of had ?? []) if (!names.has(name)) el.style.removeProperty(name);
-			for (const [name, value] of Object.entries(given ?? {})) if (el.style.getPropertyValue(name) !== value) el.style.setProperty(name, value);
-			this.set.set(el, names);
+			const now = new Map(Object.entries(given ?? {}));
+			for (const name of had?.keys() ?? []) if (!now.has(name)) el.style.removeProperty(name);
+			for (const [name, value] of now) if (had?.get(name) !== value) el.style.setProperty(name, value);
+			this.set.set(el, now);
 		}
 		for (const el of [...this.set.keys()]) if (!el.isConnected || (root.contains(el) && !seen.has(el))) this.set.delete(el);
 	}
@@ -133,6 +139,9 @@ export class Motion {
 	layers(host: HTMLElement, screen: ParentNode, gone: (layer: number) => void): void {
 		const view = host.ownerDocument.defaultView;
 		if (!view) return;
+		/** Nothing new to stand or fade: no style is read, so a drawing with no layer to move costs no recalculation. */
+		const parts = [...host.querySelectorAll<HTMLElement>("[data-n-part]")].filter((part) => (part.dataset.nClosing !== undefined ? !this.leaving.has(part) : !this.shown.has(part)));
+		if (parts.length === 0) return;
 		const style = view.getComputedStyle(this.root);
 		const menuMs = tokenMs(this.root, "--tc-duration-menu");
 		const outMs = tokenMs(this.root, "--tc-duration-collapse");

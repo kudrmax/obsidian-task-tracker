@@ -3,6 +3,7 @@ import { type Command, write } from "../model/commands";
 import { type Layer, topLayer } from "../model/layers";
 import type { BlockMsg } from "../model/messages";
 import { assertNever } from "../model/assertNever";
+import type { ListRow } from "../model/lists";
 import { remapIds } from "./ids";
 import { actMessage } from "./acts";
 import { carryFollows, updateCarry } from "./carry";
@@ -23,10 +24,30 @@ const contextOf = (lists: BlockLists): string | null => (lists.kind === "none" ?
 function withMotion(before: BlockModel, after: BlockModel): BlockModel {
 	const was = shownLists(before);
 	const next = shownLists(after);
-	if (was === next) return after;
+	if (was === next || sameRows(was, next)) return after;
 	const context = contextOf(next);
 	const cause = before.motion.context !== null && context === before.motion.context ? "move" : "replace";
 	return { ...after, motion: { seq: before.motion.seq + 1, cause, context } };
+}
+
+/** Every row of the lists, in order. */
+function rowsOf(lists: BlockLists): readonly ListRow[] {
+	return lists.kind === "rows" ? lists.rows.flatMap((row) => row.list.rows) : lists.kind === "byProject" ? lists.list.rows : [];
+}
+
+/**
+ * The same rows drawn the same way (a read that changed nothing the lists show, a layer's own answer): nothing to move,
+ * so the next drawing reads no box and runs no motion (P5).
+ */
+function sameRows(a: BlockLists, b: BlockLists): boolean {
+	if (a.kind !== b.kind || contextOf(a) !== contextOf(b)) return false;
+	const x = rowsOf(a);
+	const y = rowsOf(b);
+	return x.length === y.length && x.every((row, i) => {
+		const other = y.slice(i, i + 1).find(() => true);
+		if (!other || other.kind !== row.kind || other.key !== row.key) return false;
+		return row.kind !== "card" || (other.kind === "card" && other.face === row.face && other.level === row.level);
+	});
 }
 
 /** A layer opens over the block. */
