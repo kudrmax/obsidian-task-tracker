@@ -21,7 +21,7 @@ export function Title({ parts, links }: { readonly parts: readonly TitlePart[]; 
 }
 
 /** A subtask's branch from its task, and the lines of the tasks further up going on past it; `data-n-key` carries each line's offset to `motion`. */
-function Branches({ branch, rowKey }: { readonly branch: Branch; readonly rowKey: string }): JSX.Element {
+export function Branches({ branch, rowKey }: { readonly branch: Branch; readonly rowKey: string }): JSX.Element {
 	return (
 		<>
 			<span class={branch.last ? "tc-n-branch tc-n-branch-last" : "tc-n-branch tc-n-branch-mid"} />

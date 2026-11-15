@@ -7,6 +7,11 @@ import type { Outcome } from "./answers";
  */
 export type Command<Msg> =
 	| { readonly kind: "door"; readonly method: string; readonly args: readonly unknown[]; readonly reply: (outcome: Outcome) => Msg | null }
+	/**
+	 * A call of the core's quick entry (`entry.<method>`): the host hands the core the entry's session and the look of the
+	 * block as they stand when it runs, then `args`; the answer comes back as `reply`'s message.
+	 */
+	| { readonly kind: "entryCall"; readonly method: string; readonly args: readonly unknown[]; readonly reply: (answer: unknown) => Msg }
 	| { readonly kind: "openLink"; readonly link: { readonly kind: "note" | "url"; readonly target: string } }
 	| { readonly kind: "notice"; readonly text: string }
 	/** A door call that failed, told in the plugin's one set of words (`failureText`), which the host is given. */

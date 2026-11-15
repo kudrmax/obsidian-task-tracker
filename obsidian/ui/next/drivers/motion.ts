@@ -47,7 +47,7 @@ export class Motion {
 	 * After the render: each row's variables from the model, then the drawing's motion. `move`: a row that stood elsewhere
 	 * slides from there, a row new to it fades in. `replace`: nothing moves.
 	 */
-	after(cause: "move" | "replace" | "none", vars: ReadonlyMap<string, Readonly<Record<string, string>>>): void {
+	after(cause: "move" | "replace" | "none", vars: ReadonlyMap<string, Readonly<Record<string, string>>>, heirs: ReadonlyMap<string, string> = new Map()): void {
 		this.applyVars(vars);
 		if (cause !== "move") return;
 		const ms = tokenMs(this.root, "--tc-duration-collapse");
@@ -56,7 +56,9 @@ export class Motion {
 		for (const el of this.root.querySelectorAll<HTMLElement>("[data-n-key]")) {
 			const key = keyOf(el);
 			if (key === null || key.includes("/")) continue;
-			const was = this.boxes.get(key);
+			/** A row new to the drawing that takes another's place (a written line's card, the field's) starts from that one's box. */
+			const heir = heirs.get(key);
+			const was = this.boxes.get(key) ?? (heir === undefined ? undefined : this.boxes.get(heir));
 			if (!was) {
 				if (this.boxes.size > 0) this.running.push(el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing }));
 				continue;
@@ -173,6 +175,36 @@ export class Motion {
 			part.style.bottom = `${view.innerHeight - rect.top + gap}px`;
 		} else part.style.top = `${rect.bottom + gap}px`;
 		return above;
+	}
+
+	/**
+	 * The parts that stand by the field a task is typed in (`data-n-place="field"`), inside `frame`: on the desktop the bar
+	 * right under the field, its right edge on the field's, or over the field where the frame shows no room under it; the
+	 * section's capsule on the bar's row by the field's left edge (the old screen's `barBesideField`).
+	 */
+	besideField(frame: HTMLElement): void {
+		const view = frame.ownerDocument.defaultView;
+		if (!view) return;
+		let field: HTMLElement | null = null;
+		for (const el of frame.querySelectorAll<HTMLElement>("[data-n-island]")) field = el;
+		const parts = [...frame.querySelectorAll<HTMLElement>("[data-n-place]")].filter((el) => el.dataset.nPlace === "field");
+		if (!field || parts.length === 0) return;
+		const box = frame.getBoundingClientRect();
+		const at = field.getBoundingClientRect();
+		const gap = parseFloat(view.getComputedStyle(frame).getPropertyValue("--tc-desk-bar-gap")) || 0;
+		const room = { top: box.top, bottom: box.bottom };
+		const bar = parts.find((el) => el.dataset.nHow === "beside") ?? null;
+		const size = bar?.getBoundingClientRect() ?? at;
+		const below = at.bottom + gap;
+		const above = at.top - gap - size.height;
+		const top = below + size.height <= room.bottom || above < room.top ? below : above;
+		const barLeft = at.right - size.width;
+		for (const part of parts) {
+			const width = part.getBoundingClientRect().width;
+			const left = part === bar ? barLeft : bar ? Math.min(at.left, barLeft - gap - width) : at.left;
+			Motion.put(part, "left", `${left - box.left - frame.clientLeft}px`);
+			Motion.put(part, "top", `${top - box.top - frame.clientTop + frame.scrollTop}px`);
+		}
 	}
 
 	dispose(): void {

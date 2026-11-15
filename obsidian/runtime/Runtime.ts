@@ -26,6 +26,11 @@ export type { Cmd, Program, Scheduler } from "./dispatch/Program";
 export { Store, type StoreOptions } from "./dispatch/Store";
 export { HostSession };
 export { sectionRef, type SectionRef } from "./replica/refs";
+/**
+ * The core's job order of the quick entry (`entryJobStep`): a pure rule a host's program runs, one step a message, until
+ * the core's contract exports it to the screens themselves.
+ */
+export { entryJobStep, queuedEntryJobs, type EntryJobOutcome, type EntryJobs, type EntryJobStep } from "../../core/application/EntryJobs";
 
 export interface RuntimeDeps<S extends TaskCalendarSettings> {
 	readonly vault: TasksVault;

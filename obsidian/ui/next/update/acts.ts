@@ -1,4 +1,4 @@
-import type { ViewMode } from "../../../../core/application/contracts";
+import type { EntryList, ViewMode } from "../../../../core/application/contracts";
 import { type BlockModel, shownLists } from "../model/block";
 import type { Act, BlockMsg } from "../model/messages";
 import type { ListRow } from "../model/lists";
@@ -49,7 +49,9 @@ export function actMessage(model: BlockModel, act: Act): BlockMsg | null {
 			const row = act.key === null ? null : rowOf(model, act.key);
 			return row?.kind === "plate" ? { kind: "plateTapped", row: row.key, group: row.group, list: row.list } : null;
 		}
+		case "room":
+			return act.value === null ? null : { kind: "entry", msg: { kind: "atEnd", column: act.value as EntryList } };
 		default:
-			return null;
+			return act.act.startsWith("bar:") ? { kind: "entry", msg: { kind: "bar", act: act.act.slice("bar:".length), value: act.value } } : null;
 	}
 }

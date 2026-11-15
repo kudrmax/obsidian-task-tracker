@@ -1,5 +1,7 @@
 import type { JSX } from "preact";
 import { type BlockModel, canUndo, shownLists, viewChoice } from "../model/block";
+import { drawnLists, listName, placeTitle } from "../model/entry";
+import { Bar } from "./entry/Bar";
 import { Icon, modeIcon } from "./icons";
 import { List } from "./List";
 
@@ -11,7 +13,7 @@ export interface BlockProps {
 
 /** The lists of the block's mode: Rows (each list under its label, stacked) or By subprojects (the project's parts). */
 function Lists({ model }: BlockProps): JSX.Element | null {
-	const lists = shownLists(model);
+	const lists = drawnLists(model);
 	switch (lists.kind) {
 		case "rows":
 			return (
@@ -19,13 +21,13 @@ function Lists({ model }: BlockProps): JSX.Element | null {
 					{lists.rows.map((row) => (
 						<div key={row.column} class="tc-n-row">
 							<div class="tc-n-row-label">{row.label}</div>
-							<List list={row.list} classes="tc-n-row-list" />
+							<List list={row.list} classes="tc-n-row-list" column={row.column} />
 						</div>
 					))}
 				</>
 			);
 		case "byProject":
-			return <List list={lists.list} classes="tc-n-projects-list" />;
+			return <List list={lists.list} classes="tc-n-projects-list" column="projects" />;
 		case "none":
 			return null;
 	}
@@ -44,6 +46,7 @@ export function Block({ model }: BlockProps): JSX.Element {
 				<Lists model={model} />
 			</div>
 			<div class="tc-n-fade" />
+			<div class="tc-n-fade-entering" />
 			<div class="tc-n-capsule" data-n-anchor="capsule">
 				<button class={canUndo(model) ? "tc-n-btn tc-n-undo" : "tc-n-btn tc-n-undo is-off"} aria-label="Undo" data-n-act="undo">
 					<Icon name="undo" />
@@ -60,6 +63,7 @@ export function Block({ model }: BlockProps): JSX.Element {
 			<button class="tc-n-btn tc-n-round tc-n-plus" aria-label="New task" data-n-act="plus">
 				<Icon name="plus" />
 			</button>
+			{model.entry ? <Bar entry={model.entry} wide={model.wide} placeTitle={placeTitle(model)} listName={(list) => listName(model, list)} /> : null}
 		</>
 	);
 }

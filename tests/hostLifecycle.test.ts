@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TaskKey } from "../core/application/contracts";
 import type { HostSession, Program } from "../obsidian/runtime/Runtime";
 import { LeakCounter } from "./helpers/LeakCounter";
+import { fakeTitleFields } from "./helpers/FakeTitleField";
 import { harness, type Harness } from "./runtime/harness";
 import { BlockHost } from "../obsidian/ui/next/host/block/BlockHost";
 import { NoteBlocks, type NoteView } from "../obsidian/ui/next/host/block/NoteBlocks";
@@ -118,7 +119,7 @@ function referenceHost(forget: Kind | null = null): HostCase {
 }
 
 /** What a block's host is told besides its session: the words and the reach outside, which the test does not hear. */
-const BLOCK_WORDS = { failure: () => "", notice: () => undefined, openLink: () => undefined };
+const BLOCK_WORDS = { failure: () => "", notice: () => undefined, openLink: () => undefined, titleField: () => fakeTitleFields().factory };
 
 /** The note `Дружба.md` attached to the project Дружба, so its view shows a block. */
 function attachNote(session: HostSession): void {

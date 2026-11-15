@@ -1,4 +1,4 @@
-import { type App, type KeymapEventHandler, Scope } from "obsidian";
+import { type App, type KeymapEventHandler, type Modifier, Scope } from "obsidian";
 
 export type BlockKey = "undo" | "redo" | "find";
 
@@ -31,6 +31,27 @@ export class Keys {
 		el.addEventListener("focusin", focusIn);
 		el.addEventListener("focusout", focusOut);
 		this.stops.push(() => el.removeEventListener("focusin", focusIn), () => el.removeEventListener("focusout", focusOut));
+	}
+
+	/**
+	 * A title field's own keys, over the block's while the field has the focus: Option+Tab switches it (a command may
+	 * hold the key, Templater does), and the line commands' hotkeys do nothing in it.
+	 */
+	field(onSwitch: () => void, lines: readonly { readonly modifiers: readonly Modifier[]; readonly key: string }[]): { hold(on: boolean): void; dispose(): void } {
+		const scope = new Scope(this.scope);
+		for (const { modifiers, key } of lines) scope.register([...modifiers], key, () => false);
+		scope.register(["Alt"], "Tab", () => {
+			onSwitch();
+			return false;
+		});
+		let held = false;
+		const hold = (on: boolean) => {
+			if (on === held) return;
+			held = on;
+			if (on) this.app.keymap.pushScope(scope);
+			else this.app.keymap.popScope(scope);
+		};
+		return { hold, dispose: () => hold(false) };
 	}
 
 	private hold(on: boolean): void {
