@@ -62,6 +62,20 @@ export function titleParts(text: string): readonly TitlePart[] {
 
 /** How the card of `item` is drawn on a list of `day` (null for a list of no day): its due date there goes without saying. */
 export function cardFace(item: TaskItem, day: LocalDate | null, stage: ProjectsStage | null = null): CardFace {
+	const kept = FACES.get(item);
+	if (kept && kept.day === day && kept.stage === stage) return kept.face;
+	const face = faceOf(item, day, stage);
+	FACES.set(item, { day, stage, face });
+	return face;
+}
+
+/**
+ * The face drawn for a task item, kept while the core answers the same item (its view answers are kept by replica):
+ * a card whose face is the same object is not drawn again.
+ */
+const FACES = new WeakMap<TaskItem, { readonly day: LocalDate | null; readonly stage: ProjectsStage | null; readonly face: CardFace }>();
+
+function faceOf(item: TaskItem, day: LocalDate | null, stage: ProjectsStage | null): CardFace {
 	const colors = item.colors.slice(0, MOST_CARD_COLORS);
 	const face = item.card;
 	const step = face.step;

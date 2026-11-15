@@ -158,6 +158,17 @@ function sectionsOfList(screen: ScreenView, list: ColumnSections["list"]): reado
 
 /** The lists as the core's answers stand now. */
 export function currentLists(model: BlockModel): BlockLists {
+	const kept = LISTS_OF.get(model.answers);
+	if (kept) return kept;
+	const lists = listsOf(model);
+	LISTS_OF.set(model.answers, lists);
+	return lists;
+}
+
+/** The lists drawn from one set of answers: a pass reads them many times (the view, the rows' variables, the needs, the menus), the core's answers once. */
+const LISTS_OF = new WeakMap<Answers, BlockLists>();
+
+function listsOf(model: BlockModel): BlockLists {
 	const funnel = noteView(model);
 	const day = today(model);
 	const shown = settings(model);

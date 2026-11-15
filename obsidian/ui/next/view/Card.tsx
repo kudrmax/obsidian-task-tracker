@@ -1,3 +1,4 @@
+import { memo } from "preact/compat";
 import type { JSX } from "preact";
 import { type CardFace, stageName, type TitlePart } from "../model/card";
 import type { Branch } from "../model/lists";
@@ -134,7 +135,7 @@ function Inside({ face, branch, rowKey, listed, links, full, pick, titled }: { r
  * (a folded task's next step under its own small title), the folder of its project, the counter over the description's
  * mark, the due date or the stage; a card peeking out under it while its subtasks are folded away.
  */
-export function Card({ rowKey, face, branch, as, states = {}, links = false, attributes, full = false, bare = false }: CardProps): JSX.Element {
+function CardDrawn({ rowKey, face, branch, as, states = {}, links = false, attributes, full = false, bare = false }: CardProps): JSX.Element {
 	const s = states;
 	const colours = colourAttributes(face);
 	const inside = (pick: boolean, listed: boolean, titled: boolean) => <Inside face={face} branch={branch} rowKey={rowKey} listed={listed} links={links} full={full} pick={pick} titled={titled} />;
@@ -235,3 +236,19 @@ export function Due({ due }: { readonly due: NonNullable<CardFace["due"]> }): JS
 		</span>
 	);
 }
+
+const sameBranch = (a: Branch | null, b: Branch | null): boolean => a === b || (a !== null && b !== null && a.last === b.last && a.passes.length === b.passes.length && a.passes.every((p, i) => p === b.passes[i]));
+const sameStates = (a: CardStates | undefined, b: CardStates | undefined): boolean => {
+	if (a === b) return true;
+	const keys = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
+	return [...keys].every((k) => new Map(Object.entries(a ?? {})).get(k) === new Map(Object.entries(b ?? {})).get(k));
+};
+
+/**
+ * A card, drawn again only when what it shows changed (its face, the same object while the core answers the same task;
+ * its branch, its states): a pass over hundreds of cards draws only the ones a change touched (§Tests 6, the budget).
+ */
+export const Card = memo(
+	CardDrawn,
+	(a, b) => a.rowKey === b.rowKey && a.face === b.face && sameBranch(a.branch, b.branch) && a.as === b.as && sameStates(a.states, b.states) && a.links === b.links && a.attributes === b.attributes && a.full === b.full && a.bare === b.bare,
+);
