@@ -37,7 +37,8 @@ export async function openBlock(d: Driver, newBlock: boolean): Promise<void> {
 
 /** The note scrolled so the whole block shows, its foot over the window's bottom edge: as Max scrolls to it. */
 async function showBlock(d: Driver): Promise<void> {
-	await d.page(`document.querySelector(${JSON.stringify(SEL.block)})?.scrollIntoView({ block: "end" }); return true`);
+	/** As far as the note scrolls: the block's room under it (Obsidian's navigation on the phone) shows too, as at the note's end. */
+	await d.page(`const b = document.querySelector(${JSON.stringify(SEL.block)}); const s = b?.closest(".cm-scroller, .markdown-preview-view"); if (s) s.scrollTop = s.scrollHeight; return true`);
 	await d.page("return __e2e.rest()");
 }
 
