@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { budget } from "./budget";
 import { buildE2E } from "./build";
+import { CdpTimeout } from "./cdp";
 import { Driver, type Outcome } from "./driver";
 import { type Fixture, fixture } from "./fixture";
 import { type Platform, prepareVault, TestObsidian, type Theme } from "./obsidian";
@@ -101,7 +102,7 @@ export async function main(argv: readonly string[]): Promise<number> {
 	const taken = fixture(p, argv.includes("--refresh-fixture"));
 	const fx = command === "budget" ? { ...taken, tasks: budgetTasks(taken.tasks) } : command === "block-budget" ? { ...taken, tasks: blockBudgetTasks(taken.tasks) } : taken;
 	prepareVault(p, fx, built);
-	const obsidian = await TestObsidian.launch(p);
+	let obsidian = await TestObsidian.launch(p);
 	if (command === "open") {
 		console.log(`the test Obsidian is up on port ${obsidian.port}`);
 		obsidian.cdp.close();
@@ -114,16 +115,26 @@ export async function main(argv: readonly string[]): Promise<number> {
 		if (command === "block") {
 			const combos = args.length === 2 ? [[args[0], args[1]] as [Platform, Theme]] : COMBOS;
 			const outcomes: Outcome[] = [];
+			const said = (what: string) => console.log(`${new Date().toISOString()} ${what}`);
 			for (const [platform, theme] of combos)
 				for (const which of ["old", "new"] as const) {
+					said(`${which} ${platform}-${theme}: reset`);
 					await obsidian.reset(platform, theme, { path: fx.tasksFile, text: fx.tasks });
 					const driver = new Driver(obsidian, platform, theme, { baselines: join(p.baselines, "block"), run: join(run, which) }, which === "old");
 					await driver.install();
+					said(`${which} ${platform}-${theme}: scenario`);
 					try {
 						await block(driver, which === "new");
 					} catch (e) {
 						driver.outcomes.push({ combo: driver.combo, name: "the scenario", kind: "step", failures: [e instanceof Error ? e.message : String(e)] });
+						/** A page that stopped answering is not reset in place: the next pass gets an instance of its own. */
+						if (e instanceof CdpTimeout) {
+							said(`${which} ${platform}-${theme}: the page stopped answering (${e.message}); the test Obsidian is started again`);
+							await obsidian.quit().catch(() => TestObsidian.end(p));
+							obsidian = await TestObsidian.launch(p);
+						}
 					}
+					said(`${which} ${platform}-${theme}: done`);
 					outcomes.push(...driver.outcomes.map((o) => ({ ...o, name: `${which}: ${o.name}` })));
 				}
 			return report(outcomes, run);
