@@ -1,6 +1,6 @@
 # Plugin UI refactor: the plugin becomes a host of the core's door
 
-Issue: kudrmax/obsidian-task-tracker#41 (takes in #40). Branch `ui-refactor`. Revision 8.
+Issue: kudrmax/obsidian-task-tracker#41 (takes in #40). Branch `ui-refactor`. Revision 9.
 
 ## How this spec is made
 
@@ -20,7 +20,8 @@ Revisions 1–3 were written top-down, and every review found new holes: the spe
 | 5 | 219 (7 classes) | 3 |
 | 6 | 155 (4 classes) | 3 |
 | 7 | 158 (5 classes) | 3 (settings persistence, the pending log, per-call cost) |
-| 8 | the five classes and the three faults corrected in P3 and in the migration, below | |
+| 8 | (rerun pending) | 2 (the pending log's references and rollback; the dispatch loop) |
+| 9 | both corrected in P2 and P3, below | |
 
 The faults of revisions 5 and 6 had one cause. The spec treated the core as an asynchronous service the UI waits on, and built machinery around the waiting: read-back, previews, transactions, read-ahead, echoes. The core already has a **synchronous, pure door**, `callDoor(method, args, context) → answer` (`core/application/PhoneCalls.ts`). The iPhone app runs on it, and it covers every `TaskService`, `DayService`, undo, settings and calendar method (a typed coverage map, `PhoneCalls.ts:1077`). On Max's real tasks file (31 KB) a whole funnel view costs about 3 ms through it, JSON included (measured locally). Revision 7 puts the plugin on the same door, and the waiting is gone.
 
@@ -55,7 +56,13 @@ The rules themselves stay where they are, in the core: where a task lands, what 
 **P2. One timeline.**
 - The model changes only by messages, one at a time: `update(model, msg) → [model, commands]`.
 - Work outside the model is a command, and its outcome is a message.
-- **A user's event is handled to the end inside it:** update, render, drivers, focus last. That is what lets the iPhone keyboard rise on a typing pick. Other messages are batched once per microtask.
+- **The dispatch loop.** One loop, the same for every message:
+  1. `update` returns the next model and its commands.
+  2. The runtime runs the door commands at once, synchronously, and feeds each answer back as the next message, until the chain is drained.
+  3. The runtime computes the view answers the mounted screens need from the replica, memoised, and hands them to the model as data (`viewsChanged`). Selectors read the model only; they never call the core.
+  4. Render, then the drivers, then focus last.
+
+  A user's event runs the whole loop inside the event, which is what lets the iPhone keyboard rise on a typing pick and makes a write's outcome visible in the same frame. Messages from elsewhere run it once per microtask. Asynchronous work (persistence, the network, timers) is a command whose outcome comes back later as a message.
 - **Every wait on something the user sees has a bound,** and the bound is a message.
 
 **P3. The core is a pure, synchronous function over a replica the runtime holds.**
@@ -73,26 +80,31 @@ The rules themselves stay where they are, in the core: where a task lands, what 
   | Part | Kept in | Written by | Outside writers |
   |---|---|---|---|
   | **Tasks text** | the vault file at `tasksFile` | a serial queue. Each write runs inside `vault.process(fn)`, and `fn` checks that the current text is the base. If not, it returns the text unchanged and the runtime replays. A missing file is created through the door's `createFile`. | Sync, agents, other devices, the old screen during the migration |
-  | **Synced settings** | `data.json` | a per-key patch: the runtime compares the answer's settings with what it handed in and calls `PluginSettings.update(patch)`, which merges over a fresh read | `GoogleAuth`'s refresh token, the place hand-over, the calendars' migration. These go through the runtime's settings port, so the replica sees them. |
+  | **Synced settings** | `data.json` | a per-key patch: the runtime compares the answer's settings with what it handed in and calls `PluginSettings.update(patch)`, which merges over a fresh read | All of them: Sync reloading `data.json`, `GoogleAuth`'s refresh token, the place hand-over, the calendars' migration, the old screen. The replica's settings are `PluginSettings.get()`, refreshed on its `onChange`. |
   | **Device values** (`DEVICE_KEYS`: list share, zoom, tree width…) | device storage, never `data.json` | the same per-key patch, routed by `PluginSettings.partition` | — |
-  | **Projects screen** | device storage | on every change | — |
+  | **Projects screen** | device storage | on every change | The old leaf during the migration. One shared `LocalProjectsScreenStore` instance gains a change signal, and the replica follows it. |
   | **Undo history, id state** | memory, as today | the answers | — |
   | **Calendar texts** | their files, read through the adapters | the network lane | the Scriptable and Shortcuts exports |
-- **The pending log.** Each call that changed the tasks text and is not yet persisted is kept with:
-  - its method and arguments;
-  - its own `nowMs`;
-  - the row keys it made.
+- **The pending log.** It holds every call that changed the tasks text and is not yet persisted. Each entry records:
+  - its method and arguments, with every task referred to by **id**, never by a stored key;
+  - the **inputs it read** besides the text: its own `nowMs`, and the projects screen and settings as they stood when it ran;
+  - the ids its creates produced.
 
-  The log starts from a snapshot of every part of the replica at the base (text, history, ids, projects screen).
+  The log is based on the persisted text with the undo history and id state that went with it.
 - **Outside changes.** When the file's text differs from the last text persisted or read:
-  - It becomes the new base.
-  - The log is replayed through the door from the snapshot, each call at its own `nowMs`.
-  - A replayed create rebinds its row keys to the ids the replay answers (P1: the row key belongs to the call, not to an id).
+  - It becomes the new base, with the id state the core settles on reading it.
+  - The log is replayed through the door, in order. Each entry runs over the new text with its own recorded inputs. Before it runs, every id in its arguments is mapped through the ids that earlier replayed creates produced, then resolved to that task's current key (`tasks.keyOf(id)`, added to the door if missing).
+  - **Only the text, the undo history and the ids are taken from the replay.** Every other part of the replica (projects screen, carry, settings) stays as it is now, so a pick or a carry made after the base is never rolled back.
+  - Row keys made by a create are rebound to the ids the replay answers (P1).
   - A call that now fails (`staleTask`) is dropped with a notice and a reverse transition.
-  - **Bounds:** at most two replays per write. Past that, the replica takes the file as it is, and the pending calls are dropped with a notice. The iPhone app's "busy after two tries" works this way.
-  - **A missing file:** if the file disappears (renamed, deleted), the pending calls are dropped with a notice, and the screen offers to create the file, as today.
+  - **Bounds:** at most two replays per write. Past that, the replica takes the file as it is, and the pending calls are dropped with a notice. The iPhone app's "busy after two tries" works this way, for one call at a time.
+  - **A missing or moved file:** `fn` also checks that the file still sits at `tasksFile`, because `vault.process` holds a `TFile` that follows a rename. If the file has gone, the pending calls are dropped with a notice and the screen offers to create the file, as today.
   - **Our own echo:** our write's change event finds our text and does nothing.
-- **Tidy.** The core tidies inside its view reads (`ask` → `normalize`). The runtime calls `tasks.normalize` once whenever the base or the day changes, before any view is drawn, and persists the answer's text. Views are memoised by (replica, minute).
+- **Tidy.** The core tidies inside its view reads (`ask` → `normalize`). The runtime calls `tasks.normalize` whenever the base changes or the core's day boundary passes (not midnight as such), before any view is drawn:
+  - it adopts the answer's text and ids;
+  - it enters the log as an entry with its own `nowMs`, so calls from before the boundary replay over a base tidied for the new day.
+
+  Views are memoised by (replica, minute).
 - **Readiness.** The runtime builds the replica only after the host is ready (P8): the layout is ready and Obsidian's metadata cache is resolved. It hands the door `projectsReady`, so the one move to projects never runs on an incomplete list (57562189).
 - **Facts the door is told about its host.** These are added to `DoorContext` by `backend`; the app's defaults stay:
   - `host`: the calendar choice carries over only on iOS, as `composeCore` does today;
@@ -135,6 +147,8 @@ The rules themselves stay where they are, in the core: where a task lands, what 
   - a carried card deleted from the file fades and the carry ends;
   - a menu's task deleted closes the menu;
   - a field whose task was deleted keeps its text until commit, which then fails with today's notice;
+  - pins hold ids, and a commit takes the task's current key, so a line Sync edited in place commits normally;
+  - a pinned card's content (its text, its marks) updates inside the pinned layout; only its place waits;
   - hidden by a new context is not deleted;
   - a line Sync rewrote so heavily that it has a new id counts as deleted, and that is accepted.
 - **Anything moving pins the layout under it:** a pointer gesture, a closing sheet, a sliding region.
@@ -156,7 +170,8 @@ The rules themselves stay where they are, in the core: where a task lands, what 
 **P8. Everything alive has an owner.**
 - A host (the leaf, a note block, the settings tab) mounts, owns and disposes every driver, observer, subscription, scope and timer it starts.
 - Host readiness (layout ready, Sync loaded, metadata cache resolved) and teardown arrive as messages.
-- A test mounts and unmounts each host and finds nothing left alive.
+- **Teardown ends what is under way:** a carry gets `endCarry`, so no stale carry stays in device storage. On the plugin's unload (a BRAT update unloads it), the persistence queue is drained before the runtime goes.
+- **A test** mounts and unmounts each host, including mid-gesture, and finds nothing left alive.
 
 ## Architecture
 
@@ -246,6 +261,8 @@ The plugin's own menus and sheets are Preact layers.
 | Root, rev 7: settings persistence | per-key patches; device keys in device storage (P3) |
 | Root, rev 7: the pending log | snapshot of every part, `nowMs` per call, bounds, a missing file (P3) |
 | Root, rev 7: per-call cost | the cross-call cache, budget tests, `carryAt` on a target change (P3) |
+| Root, rev 8: the log's references and rollback | ids mapped and resolved on replay; entries carry their inputs; only text, history and ids come from replay (P3) |
+| Root, rev 8: the dispatch loop | P2's loop: door calls right after `update`, answers fed back before render, views reach the model as data |
 
 ## Guards
 
@@ -299,7 +316,7 @@ The plugin's own menus and sheets are Preact layers.
 
 ## Migration: the new screens beside the old one, no parity layer
 
-The old screen keeps its own services, untouched, until it is deleted. The new screens run on the runtime. The two write the same file safely: each sees the other's writes as outside changes, and both rebase. The old services already do this inside `vault.process`, and the plugin and the iPhone app live this way today. No layer imitates the old services, so the old screen stays exactly as it is.
+The old screen keeps its own services, untouched, until it is deleted. While both live, each keeps its own undo history; undo takes back only that host's own writes, which is safe because undo applies over the current text. The shortcut goes to the focused host. The new screens run on the runtime. The two write the same file safely: each sees the other's writes as outside changes, and both rebase. The old services already do this inside `vault.process`, and the plugin and the iPhone app live this way today. No layer imitates the old services, so the old screen stays exactly as it is.
 
 | Slice | What | Release |
 |---|---|---|
@@ -321,6 +338,11 @@ The old screen keeps its own services, untouched, until it is deleted. The new s
    - midnight during a swipe;
    - bounds.
 2. **The runtime (unit):**
+   - a dependent call after a create that the replay gives a new id;
+   - Sync during a carry with a write pending (the carry and the chosen node stay);
+   - calls from before the day boundary replayed over a base tidied for the new day;
+   - a file renamed mid-write;
+   - the queue drained on unload;
    - door calls in order;
    - persistence with compare-and-set;
    - our own echo;
