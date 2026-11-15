@@ -8121,8 +8121,10 @@ ${at.reading}`;
   var NO_TASK_IDS = { next: 0, lines: [] };
   var TaskIdentity = class {
     /** `cache`: what identities settled on before, shared across the door's calls, so a reading from a state is matched once. */
-    constructor(state = NO_TASK_IDS, cache = null) {
+    /** `markers`: what the file's task lines are read by, so a line edited elsewhere is judged by its title alone. */
+    constructor(state = NO_TASK_IDS, cache = null, markers = () => DEFAULT_MARKERS) {
       this.cache = cache;
+      this.markers = markers;
       this.last = null;
       /** The ids an undo step gave the lines of its text, by line, until that text is read. */
       this.pending = null;
@@ -8241,7 +8243,7 @@ ${at.reading}`;
       const pairs = matchLines(
         old.map((l) => l.raw),
         outline.map((o) => o.raw),
-        (b, a) => old[b].task === outline[a].task && (!old[b].task || sameTaskLine(old[b].raw, outline[a].raw)),
+        (b, a) => old[b].task === outline[a].task && (!old[b].task || sameTaskLine(old[b].raw, outline[a].raw, this.markers())),
         true
       );
       const known = /* @__PURE__ */ new Map();
@@ -8252,17 +8254,44 @@ ${at.reading}`;
   function sameOutline(lines, outline) {
     return lines.length === outline.length && lines.every((line, i) => line.raw === outline[i].raw && line.task === outline[i].task);
   }
-  function titleWords(raw) {
-    const text = raw.replace(/^\s*[-*+]\s+\[.\]\s*/u, "").toLowerCase();
-    return new Set((text.match(/[\p{L}\p{N}]+/gu) ?? []).filter((word) => /\p{L}/u.test(word)));
+  function taskLineTitle(raw, markers) {
+    const parsed = parseTaskLine(raw, markers);
+    return plainText(parsed ? parsed.task.text : raw).toLowerCase().replace(/\s+/gu, " ").trim();
   }
-  function sameTaskLine(a, b) {
-    const x = titleWords(a);
-    const y = titleWords(b);
-    if (x.size === 0 || y.size === 0) return x.size === y.size;
+  function titleWords(title) {
+    return new Set(
+      title.split(" ").filter((word) => !word.startsWith("#")).flatMap((word) => word.match(/[\p{L}\p{N}]+/gu) ?? []).filter((word) => /\p{L}/u.test(word))
+    );
+  }
+  function lettersApart(a, b, most) {
+    const x = [...a];
+    const y = [...b];
+    if (Math.abs(x.length - y.length) > most) return most + 1;
+    const rows = Array.from({ length: x.length + 1 }, (_, i) => Array.from({ length: y.length + 1 }, (_2, j) => i === 0 ? j : j === 0 ? i : 0));
+    for (let i = 1; i <= x.length; i++) {
+      for (let j = 1; j <= y.length; j++) {
+        const change = x[i - 1] === y[j - 1] ? 0 : 1;
+        let best = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + change);
+        if (i > 1 && j > 1 && x[i - 1] === y[j - 2] && x[i - 2] === y[j - 1]) best = Math.min(best, rows[i - 2][j - 2] + 1);
+        rows[i][j] = best;
+      }
+    }
+    return rows[x.length][y.length];
+  }
+  var DEFAULT_MARKERS = markersOf(DEFAULT_SETTINGS);
+  function sameTaskLine(a, b, markers = DEFAULT_MARKERS) {
+    const x = taskLineTitle(a, markers);
+    const y = taskLineTitle(b, markers);
+    if (x === y) return true;
+    const most = Math.max(1, Math.floor(Math.max([...x].length, [...y].length) / 4));
+    if (lettersApart(x, y, most) <= most) return true;
+    const xw = titleWords(x);
+    const yw = titleWords(y);
+    const shorter = Math.min(xw.size, yw.size);
+    if (shorter === 0) return false;
     let shared = 0;
-    for (const word of x) if (y.has(word)) shared++;
-    return shared * 2 >= Math.min(x.size, y.size);
+    for (const word of xw) if (yw.has(word)) shared++;
+    return shared === shorter || shorter >= 3 && shared * 2 >= shorter;
   }
   function idNumber(id) {
     return Number(id.slice(1));
@@ -8413,7 +8442,7 @@ ${at.reading}`;
         onChange: () => () => void 0
       };
       this.store = store;
-      this.identity = new TaskIdentity(context.ids, cache);
+      this.identity = new TaskIdentity(context.ids, cache, () => cache === null ? markersOf(this.current) : cache.memo(this.current, "markers", () => markersOf(this.current)));
       this.rules = new TaskRules(store, clock, this.identity, context.ids !== void 0, { list: () => context.projects ?? NO_NOTES, ready: () => context.projectsReady !== false }, cache);
       this.reads = new TaskReads(this.rules, store, clock, { tree: () => this.tree(), screen: () => this.projectsScreen });
       this.writes = new TaskWrites(this.rules, this.reads);

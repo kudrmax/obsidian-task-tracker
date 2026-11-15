@@ -12,6 +12,14 @@ export { ENTRY_PLACES, type EntryAt, type EntryDrawing, type EntryProject, type 
 /** What the session reads from the service: the marks, the places and the writes. */
 export type QuickEntryTasks = EntryTasks & Pick<TaskService, "createWithId" | "createSection" | "edit"> & Partial<Pick<TaskService, "unfoldAbove">>;
 
+/** The writes a job's step names (`tasks.<method>`, `entryJobStep`), each the service's own call: only `unfoldAbove` may be missing. */
+const JOB_WRITES: { readonly [M in "createWithId" | "edit" | "createSection" | "unfoldAbove"]: (tasks: QuickEntryTasks, args: readonly unknown[]) => Promise<unknown> } = {
+	createWithId: (tasks, args) => tasks.createWithId(...(args as Parameters<QuickEntryTasks["createWithId"]>)),
+	edit: (tasks, args) => tasks.edit(...(args as Parameters<QuickEntryTasks["edit"]>)),
+	createSection: (tasks, args) => tasks.createSection(...(args as Parameters<QuickEntryTasks["createSection"]>)),
+	unfoldAbove: async (tasks, args) => (tasks.unfoldAbove ? tasks.unfoldAbove(...(args as Parameters<NonNullable<QuickEntryTasks["unfoldAbove"]>>)) : null),
+};
+
 /** What the session reads from the screen, and tells it. */
 export interface QuickEntryView extends EntryLook {
 	/**
@@ -226,11 +234,7 @@ export class QuickEntrySession {
 			else this.entry.done(id);
 			return { ok: true, result: null };
 		}
-		const write = (this.tasks as unknown as Record<string, ((...a: unknown[]) => Promise<unknown>) | undefined>)[name];
-		if (write === undefined) {
-			if (name === "unfoldAbove") return { ok: true, result: null };
-			throw new Error(`Task Calendar: the tasks service has no ${name}`);
-		}
-		return { ok: true, result: await write.apply(this.tasks, step.args as unknown[]) };
+		if (!Object.prototype.hasOwnProperty.call(JOB_WRITES, name)) throw new Error(`Task Calendar: a quick entry's job writes by no ${step.method}`);
+		return { ok: true, result: await JOB_WRITES[name as keyof typeof JOB_WRITES](this.tasks, step.args) };
 	}
 }
