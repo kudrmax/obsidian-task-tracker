@@ -14,8 +14,6 @@ export interface TaskCardOptions {
 	readonly over?: string | null;
 	/** The corner shows the due date; the Projects screen's By project puts the stage's mark there instead. */
 	readonly corner?: boolean;
-	/** The face drawn in place of the task's own (`TaskItem.card`): First step's folded card (`TaskItem.firstStepCard`). */
-	readonly face?: TaskCard;
 }
 
 /** A card of the list: the dot of a task in progress, the title fading out on the right, the subtask counter over the description mark, the due date; a card peeking out under it while its subtasks are folded away. */
@@ -52,8 +50,7 @@ export function fillCard(card: HTMLElement, task: TaskItem, opts: TaskCardOption
 	markColours(card, item);
 	card.classList.toggle("is-collapsed", item.collapsed);
 	showProgressDot(card, item);
-	if (opts.face) fillOwnFace(card, opts.face);
-	else fillFace(card, task, item, opts.over ?? null);
+	fillFace(card, task, item, opts.over ?? null);
 	renderProjectMark(card, item);
 	renderMeta(card, item);
 	const corner = opts.corner === false ? null : cardDue(item, opts.day);
@@ -90,16 +87,22 @@ function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: s
 	fillTitle(el(lines, "div", "tc-card-title"), step ? RenamedTexts.shown(step).text : shown.text);
 }
 
-/** A face given as it is: two lines when it has a small line over its title, else one. */
-function fillOwnFace(card: HTMLElement, face: TaskCard): void {
-	card.classList.toggle("is-two-line", face.over !== null);
-	if (face.over === null) {
-		fillTitle(el(card, "div", "tc-card-title"), face.text);
-		return;
+/**
+ * A drawn card shows `face` in place of its title, the rest of it as it stands (its counter, marks, date and what the list
+ * put on it): two lines when the face has a small line over its title, else one. First step's folded card
+ * (`TaskItem.firstStepCard`) is drawn so.
+ */
+export function showFace(card: HTMLElement, face: TaskCard): void {
+	const drawn = card.querySelector(":scope > .tc-card-lines, :scope > .tc-card-title");
+	const shown = face.over === null ? el(null, "div", "tc-card-title") : el(null, "div", "tc-card-lines");
+	if (face.over === null) fillTitle(shown, face.text);
+	else {
+		el(el(shown, "div", "tc-card-over"), "span", "tc-card-over-text", face.over);
+		fillTitle(el(shown, "div", "tc-card-title"), face.text);
 	}
-	const lines = el(card, "div", "tc-card-lines");
-	el(el(lines, "div", "tc-card-over"), "span", "tc-card-over-text", face.over);
-	fillTitle(el(lines, "div", "tc-card-title"), face.text);
+	card.classList.toggle("is-two-line", face.over !== null);
+	if (drawn) drawn.replaceWith(shown);
+	else card.prepend(shown);
 }
 
 /**

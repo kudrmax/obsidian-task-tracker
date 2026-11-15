@@ -35,7 +35,6 @@ function open(item: TaskItem, source: HTMLElement) {
 	FirstStepField.open({
 		item,
 		source,
-		day: TODAY,
 		titleField: fakeTitleField,
 		onDone: (text) => {
 			done.push(text);

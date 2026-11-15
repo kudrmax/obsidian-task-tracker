@@ -62,3 +62,19 @@ AI caller needs only a task key and a text.
 - **Backend, the card with the field.** `TaskItem.firstStepCard` is the card the field is drawn as: `over` the task's
   own title, plain (as `card.over` of a folded card), `text`/`title` empty (the field takes the step line), `step` null.
   The same for a task and a subtask at any depth, folded or not.
+- **Obsidian, the field.** The field is the quick entry's own field (`QuickField` with the title editor Rename uses), put in
+  place of the step line of the tapped card; the card draws `firstStepCard` in place of its title and keeps the rest as
+  it stands (counter, project mark, date, the fold's edge on a folded card). The card is ringed in the accent while the
+  field is open, as every typing field is. The empty field shows the hint «First step». No quick bar: the step takes no
+  place, section, project or repeat of its own, and a priority is typed as `p1 ` in the text.
+- **Obsidian, a long text.** The field wraps and the card grows downward with it, as Rename's field does; after Enter the
+  card is the folded card again, its step on one line fading out.
+- **Obsidian, the timeline.** A block draws only its step's line (no room for the over line), so on a block that line
+  itself becomes the field, the block's place and size kept; a long text grows the block downward over what is under it.
+  No over line is drawn on the block while typing. After Enter the block is named by the new step.
+- **Obsidian, the screen under the field.** While the field is open the screen draws nothing under it (as while a
+  section is named); after Enter or a tap away it draws the file as written, and the typed text stays on the step line
+  until then, so the old card never flashes back. Escape, or a blank text the core writes nothing for, draws the card
+  as it was.
+- **Obsidian, the row's icon.** First step's row has its own icon: a flight of steps (`M3.5 20h5v-5h5v-5h5V5h2`), right
+  after Add subtask's arrow.

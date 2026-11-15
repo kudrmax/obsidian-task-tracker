@@ -1187,7 +1187,6 @@ export class CalendarScreen extends Component {
 		FirstStepField.open({
 			item,
 			source,
-			day: source.closest(".tc-projects-list") ? null : this.selectedDate,
 			titleField: this.titleField,
 			onDone: async (text) => {
 				try {

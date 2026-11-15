@@ -1,8 +1,7 @@
 import type { TaskItem } from "../../../core/application/contracts";
 import { el } from "../dom";
-import { fillCard } from "../TaskCard";
+import { showFace } from "../TaskCard";
 import { fillTitle } from "../TaskTitle";
-import type { LocalDate } from "../types";
 import { QuickField, type QuickFieldHandle } from "./QuickField";
 import type { TitleFieldFactory } from "./TitleField";
 
@@ -10,8 +9,6 @@ export interface FirstStepFieldOptions {
 	readonly item: TaskItem;
 	/** The card the menu was opened from: a list's card, or a timeline block. */
 	readonly source: HTMLElement;
-	/** The day the card is shown on, as its list draws it. */
-	readonly day: LocalDate | null;
 	readonly titleField: TitleFieldFactory;
 	/** What was typed, on Enter or a tap elsewhere; null on Escape. Called once; resolves once the screen may draw again. */
 	onDone(text: string | null): Promise<void>;
@@ -39,10 +36,7 @@ export class FirstStepField {
 	private constructor(private readonly opts: FirstStepFieldOptions) {
 		const block = opts.source.querySelector<HTMLElement>(":scope > .tc-block-card");
 		this.card = block ?? opts.source;
-		if (!block) {
-			this.card.replaceChildren();
-			fillCard(this.card, opts.item, { day: opts.day, face: opts.item.firstStepCard });
-		}
+		if (!block) showFace(this.card, opts.item.firstStepCard);
 		this.card.classList.add(TYPING);
 		const title = this.card.querySelector<HTMLElement>(":scope > .tc-card-lines > .tc-card-title, :scope > .tc-card-title");
 		this.line = el(null, "div", "tc-first-step");
