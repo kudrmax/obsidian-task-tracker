@@ -30,7 +30,7 @@ import Testing
         let snapshot = try board.snapshot(day: Self.day, measures: Self.measures, now: at)
         let milk = try #require(snapshot.screen.inbox.first)
         let menu = try #require(snapshot.menus[milk.id])
-        #expect(menu.edits.suffix(2) == ["project", "subtask"])
+        #expect(menu.edits.suffix(3) == ["project", "subtask", "firstStep"])
         #expect(menu.project.noneLabel == "No project")
         #expect(menu.project.value == "No project")
     }
