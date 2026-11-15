@@ -138,5 +138,5 @@ export function List({ list, kind, column, marks = NO_MARKS, hidden, extra, foun
 
 /** A line typed and not yet written: a plain card, its title alone. */
 function unwritten(text: string) {
-	return { tint: null, stripes: [], folded: false, status: "todo" as const, over: null, title: titleParts(text), project: null, meta: null, due: null, stage: null };
+	return { tint: null, stripes: [], folded: false, status: "todo" as const, progressDot: false, over: null, title: titleParts(text), project: null, meta: null, due: null, stage: null };
 }

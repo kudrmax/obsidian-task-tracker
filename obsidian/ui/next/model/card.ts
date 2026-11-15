@@ -43,8 +43,10 @@ export interface CardFace {
 	readonly stripes: readonly PriorityColor[];
 	/** Its subtasks are folded away: a card peeks out under it. */
 	readonly folded: boolean;
-	/** The task's status, which the stylesheet paints (the dot of a task in progress). */
+	/** The task's status, which the full card's subtasks paint (a done one ticked, a given-up one struck through). */
 	readonly status: TaskItem["status"];
+	/** The dot in the card's left padding: the task is in progress (`TaskItem.marks`). */
+	readonly progressDot: boolean;
 	/** The small line over the title (a folded task's own title); null for a card of one line. */
 	readonly over: string | null;
 	readonly title: readonly TitlePart[];
@@ -87,6 +89,7 @@ function faceOf(item: TaskItem, day: LocalDate | null, stage: ProjectsStage | nu
 		stripes: colors.length > 1 ? colors : [],
 		folded: item.collapsed,
 		status: item.status,
+		progressDot: item.marks.progressDot,
 		over: step ? (face.over ?? "") : null,
 		title: titleParts(step ? step.text : item.text),
 		project: item.project?.mark ? item.project.name : null,
@@ -96,12 +99,8 @@ function faceOf(item: TaskItem, day: LocalDate | null, stage: ProjectsStage | nu
 	};
 }
 
-/**
- * The counter of the task's own subtasks and the description's mark, as the core gives them: a task «may add a
- * description» exactly while it has none (`TaskItem.can.addDescription`).
- */
+/** The counter of the task's own subtasks and the description's mark, as the core gives them (`TaskItem.marks`). */
 function metaOf(item: TaskItem): MetaFace | null {
-	const count = item.progress ? `${item.progress.done}/${item.progress.total}` : null;
-	const description = !item.can.addDescription;
+	const { count, description } = item.marks;
 	return count !== null || description ? { count, description } : null;
 }

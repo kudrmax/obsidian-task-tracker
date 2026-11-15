@@ -138,12 +138,13 @@ function Inside({ face, branch, rowKey, listed, links, full, pick, titled }: { r
 function CardDrawn({ rowKey, face, branch, as, states = {}, links = false, attributes, full = false, bare = false }: CardProps): JSX.Element {
 	const s = states;
 	const colours = colourAttributes(face);
+	const progress = face.progressDot ? "is-progress" : "";
 	const inside = (pick: boolean, listed: boolean, titled: boolean) => <Inside face={face} branch={branch} rowKey={rowKey} listed={listed} links={links} full={full} pick={pick} titled={titled} />;
 	switch (as) {
 		case "listed":
 			return (
 				<div
-					class={`tc-n-card ${face.folded ? "is-folded" : ""} ${s.away ? "is-away" : ""} ${s.picked ? "is-picked" : ""} ${s.picking ? "is-picking" : ""} ${s.waiting ? "is-waiting" : ""} ${s.arriving ? "is-arriving" : ""} ${s.found ? "is-found" : ""}`}
+					class={`tc-n-card ${progress} ${face.folded ? "is-folded" : ""} ${s.away ? "is-away" : ""} ${s.picked ? "is-picked" : ""} ${s.picking ? "is-picking" : ""} ${s.waiting ? "is-waiting" : ""} ${s.arriving ? "is-arriving" : ""} ${s.found ? "is-found" : ""}`}
 					data-n-key={rowKey}
 					data-row={rowKey}
 					data-status={face.status}
@@ -155,31 +156,31 @@ function CardDrawn({ rowKey, face, branch, as, states = {}, links = false, attri
 			);
 		case "plain":
 			return (
-				<div class={`tc-n-card ${s.found ? "is-found" : ""}`} data-n-key={rowKey} data-status={face.status} {...colours}>
+				<div class={`tc-n-card ${progress} ${s.found ? "is-found" : ""}`} data-n-key={rowKey} data-status={face.status} {...colours}>
 					{inside(!bare, false, false)}
 				</div>
 			);
 		case "float":
 			return (
-				<div class="tc-n-card" data-status={face.status} {...colours}>
+				<div class={`tc-n-card ${progress}`} data-status={face.status} {...colours}>
 					{inside(false, false, false)}
 				</div>
 			);
 		case "lifted":
 			return (
-				<div class={`tc-n-lifted ${s.stretched ? "is-stretched" : ""} ${s.selected ? "is-selected" : ""} ${s.measuring ? "is-measuring" : ""}`} data-n-key={rowKey} data-status={face.status} {...colours} {...attributes}>
+				<div class={`tc-n-lifted ${progress} ${s.stretched ? "is-stretched" : ""} ${s.selected ? "is-selected" : ""} ${s.measuring ? "is-measuring" : ""}`} data-n-key={rowKey} data-status={face.status} {...colours} {...attributes}>
 					{inside(false, false, true)}
 				</div>
 			);
 		case "whole":
 			return (
-				<div class={`tc-n-lifted tc-n-lifted-whole ${s.selected ? "is-selected" : ""} ${s.measuring ? "is-measuring" : ""}`} data-n-key={rowKey} data-status={face.status} {...colours} {...attributes}>
+				<div class={`tc-n-lifted tc-n-lifted-whole ${progress} ${s.selected ? "is-selected" : ""} ${s.measuring ? "is-measuring" : ""}`} data-n-key={rowKey} data-status={face.status} {...colours} {...attributes}>
 					{inside(false, false, true)}
 				</div>
 			);
 		case "probe":
 			return (
-				<div class="tc-n-lifted tc-n-lifted-whole tc-n-lifted-probe" data-status={face.status} {...colours} {...attributes}>
+				<div class={`tc-n-lifted tc-n-lifted-whole tc-n-lifted-probe ${progress}`} data-status={face.status} {...colours} {...attributes}>
 					{inside(false, false, true)}
 				</div>
 			);

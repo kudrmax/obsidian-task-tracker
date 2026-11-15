@@ -1760,7 +1760,7 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .task-calendar [data-priority] .tc-n-card-over { color: var(--tc-priority-meta); }
 .task-calendar .tc-n-link { color: var(--tc-accent); }
 .task-calendar .tc-n-progress-dot { position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-n-row-h, var(--tc-card-h)) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; visibility: hidden; }
-.task-calendar .tc-n-card[data-status="inProgress"] > .tc-n-progress-dot { visibility: visible; }
+.task-calendar .tc-n-card.is-progress > .tc-n-progress-dot { visibility: visible; }
 .task-calendar [data-priority] .tc-n-progress-dot { background: var(--tc-priority-meta); }
 .task-calendar .tc-n-project-mark { position: relative; width: var(--tc-project-mark-w); height: var(--tc-leading-card); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--tc-muted); }
 .task-calendar .tc-n-project-mark::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc((var(--tc-project-mark-w) - var(--tc-project-mark-hit)) / 2); right: calc((var(--tc-project-mark-w) - var(--tc-project-mark-hit)) / 2); }
@@ -1834,7 +1834,7 @@ body:not(.is-mobile) .task-calendar button.tc-n-btn:focus-visible { outline: var
 /* The carry in the block: the place a carried card waits at, the card a drop lands on, the lit plate, the drop line, the float. */
 .task-calendar .tc-n-stack { position: relative; }
 .task-calendar .tc-n-list > .tc-n-card.is-waiting { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
-.task-calendar .tc-n-card.is-waiting > *, .task-calendar .tc-n-card.is-arriving > *, .task-calendar .tc-n-card.is-waiting[data-status] > .tc-n-progress-dot, .task-calendar .tc-n-card.is-arriving[data-status] > .tc-n-progress-dot { visibility: hidden; }
+.task-calendar .tc-n-card.is-waiting > *, .task-calendar .tc-n-card.is-arriving > *, .task-calendar .tc-n-card.is-waiting.is-progress > .tc-n-progress-dot, .task-calendar .tc-n-card.is-arriving.is-progress > .tc-n-progress-dot { visibility: hidden; }
 .task-calendar .tc-n-list > .tc-n-card.is-arriving { background: none; box-shadow: none; }
 .task-calendar .tc-n-plate.is-hot { border-color: transparent; outline: var(--tc-hairline) solid var(--tc-accent); outline-offset: calc(-1 * var(--tc-hairline)); background: var(--tc-drop-bg); color: var(--tc-accent); }
 .task-calendar .tc-n-drop { position: absolute; left: 0; top: calc(var(--tc-n-drop-y, 0px) - var(--tc-drop-dot) / 2); height: var(--tc-drop-dot); width: var(--tc-n-drop-w, 0px); transform: translateX(var(--tc-n-drop-x, 0px)); z-index: var(--tc-layer-drop-gap); pointer-events: none; display: flex; align-items: center; }
@@ -1879,7 +1879,7 @@ body:not(.is-mobile) .task-calendar button.tc-n-btn:focus-visible { outline: var
 .task-calendar.is-blend .tc-n-lifted[data-labels="3"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1), var(--tc-label-fill-2)); }
 .task-calendar.is-blend .tc-n-lifted[data-labels="4"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1), var(--tc-label-fill-2), var(--tc-label-fill-3)); }
 .task-calendar .tc-n-lifted.is-selected { background: var(--tc-select-bg); }
-.task-calendar .tc-n-lifted[data-status="inProgress"] > .tc-n-progress-dot { visibility: visible; }
+.task-calendar .tc-n-lifted.is-progress > .tc-n-progress-dot { visibility: visible; }
 .task-calendar .tc-n-lifted .tc-n-link { pointer-events: auto; cursor: pointer; }
 .task-calendar .tc-n-lifted .tc-n-card-title { pointer-events: auto; cursor: text; -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 .task-calendar .tc-n-lifted.is-stretched .tc-n-card-title, .task-calendar .tc-n-lifted.tc-n-lifted-whole .tc-n-card-title { -webkit-mask-image: none; mask-image: none; }

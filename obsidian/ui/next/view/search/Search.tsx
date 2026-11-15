@@ -36,7 +36,7 @@ function HitCard({ hit, row, picked, paths }: { readonly hit: SearchHit; readonl
 		);
 		if (path !== null)
 			return (
-				<div class="tc-n-card" data-status={face.status} {...colourAttributes(face)}>
+				<div class={`tc-n-card ${face.progressDot ? "is-progress" : ""}`} data-status={face.status} {...colourAttributes(face)}>
 					<span class="tc-n-progress-dot" />
 					<div class="tc-n-card-lines">
 						<div class="tc-n-card-over">
@@ -62,7 +62,7 @@ function HitCard({ hit, row, picked, paths }: { readonly hit: SearchHit; readonl
 				</div>
 			);
 		return (
-			<div class="tc-n-card" data-status={face.status} {...colourAttributes(face)}>
+			<div class={`tc-n-card ${face.progressDot ? "is-progress" : ""}`} data-status={face.status} {...colourAttributes(face)}>
 				<span class="tc-n-progress-dot" />
 				{title}
 				{marks}

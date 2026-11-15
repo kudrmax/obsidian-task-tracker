@@ -37,6 +37,11 @@ describe("the full card over the note's block", () => {
 		expect(b.editors.last.text).toBe("- ");
 	});
 
+	it("shows no folder mark on its subtasks: the block is fixed to their project, as its lists show none", () => {
+		expect(document.querySelectorAll(".tc-n-full-list .tc-n-card")).toHaveLength(2);
+		expect(q(".tc-n-full-list .tc-n-project-mark")).toBeNull();
+	});
+
 	it("ticks a subtask done with its circle, and the card follows the file in the same loop", () => {
 		tap(document.querySelectorAll(".tc-n-full-list .tc-n-pick")[0]);
 		expect(q('.tc-n-full-list .tc-n-card[data-status="done"]')?.textContent).toContain("Child");

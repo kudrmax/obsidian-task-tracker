@@ -1,4 +1,4 @@
-import type { FullTree, TaskItem, TaskKey } from "../../../../core/application/contracts";
+import type { FullTree, ProjectsNodeId, TaskItem, TaskKey } from "../../../../core/application/contracts";
 import { type Answers, type Need, resultOf } from "./answers";
 
 /** A task on the full card: who it is (P6 pins hold ids), and its key and text as last read, which the door finds it by. */
@@ -93,13 +93,16 @@ export function shownTask(layer: FullLayer): FullTask | null {
 	return layer.stack.slice(-1).find(() => true) ?? null;
 }
 
-/** The views the full card needs (P2): its task found by id where it stands now, and the tree of its subtasks. */
-export function fullNeeds(layer: FullLayer | null, answers: Answers): readonly Need[] {
+/**
+ * The views the full card needs (P2): its task found by id where it stands now, and the tree of its subtasks, both read
+ * by the block's filter (`filter`): under a project's, no folder mark, as the block's lists show none.
+ */
+export function fullNeeds(layer: FullLayer | null, answers: Answers, filter: ProjectsNodeId | null): readonly Need[] {
 	const task = layer ? shownTask(layer) : null;
 	if (!layer || layer.closing || !task) return [];
-	const needs: Need[] = [{ key: FULL_TASK, method: "tasks.find", args: [task.key, task.text] }];
+	const needs: Need[] = [{ key: FULL_TASK, method: "tasks.find", args: [task.key, task.text, filter] }];
 	const item = fullItem(answers);
-	if (item && item.id === task.id) needs.push({ key: FULL_TREE, method: "tasks.fullTree", args: [item] });
+	if (item && item.id === task.id) needs.push({ key: FULL_TREE, method: "tasks.fullTree", args: [item, filter] });
 	return needs;
 }
 

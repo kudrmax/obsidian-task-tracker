@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
 import { render } from "preact";
-import { type Cmd, type EntryJobOutcome, type EntryJobs, entryJobStep, type HostSession, type Program, queuedEntryJobs, type RuntimeEvent, type Store, type Views } from "../../../../runtime/Runtime";
+import { type Cmd, type HostSession, type Program, type RuntimeEvent, type Store, type Views } from "../../../../runtime/Runtime";
 import type { Answers, Need } from "../../model/answers";
 import { Chrome } from "../../drivers/chrome";
 import { Focus } from "../../drivers/focus";
@@ -83,41 +83,8 @@ function lookOf(model: BlockModel, views: FreshViews): EntryLook | null {
 /** An `entry.*` call as the door takes it: the session the model holds and the look as it stands, then the call's own arguments. */
 function entryDoor(model: BlockModel, command: Extract<Command<BlockMsg>, { kind: "entryCall" }>, views: FreshViews): Cmd<BlockMsg> {
 	const look = lookOf(model, views);
-	return { kind: "door", method: command.method, args: [model.entry?.session ?? null, look, ...command.args], reply: (outcome) => command.reply(outcome.answer) };
-}
-
-/**
- * The quick entry's jobs run in the core's order (`entryJobStep`), one door call a message: the jobs an answer queued
- * join the queue; the step due (the next one after an outcome, or the first of a queue with none running) is asked for
- * and its outcome comes back as `stepped`. A step that only tells (`renamed`) is passed. Answers the model with the jobs
- * as they now stand and the call to make, if any.
- */
-function stepJobs(model: BlockModel, views: FreshViews): readonly [BlockModel, readonly Cmd<BlockMsg>[]] {
-	const entry = model.entry;
-	if (!entry || (entry.due === null && entry.queued.length === 0)) return [model, []];
-	let jobs = queuedEntryJobs(entry.jobs as EntryJobs, entry.queued as EntryJobs["queue"]);
-	const settled = (cmds: readonly Cmd<BlockMsg>[]): readonly [BlockModel, readonly Cmd<BlockMsg>[]] => [{ ...model, entry: { ...entry, jobs, queued: [], due: null } }, cmds];
-	if (entry.due === null && jobs.running !== null) return settled([]);
-	let outcome: EntryJobOutcome = entry.due?.outcome ?? null;
-	for (;;) {
-		const next = entryJobStep(jobs, outcome);
-		jobs = next.jobs;
-		const step = next.step;
-		if (step === null) return settled([]);
-		if (step.kind === "renamed") {
-			outcome = null;
-			continue;
-		}
-		const method = step.method;
-		const entryCall = method.startsWith("entry.");
-		const look = entryCall ? lookOf({ ...model, entry: { ...entry, jobs } }, views) : null;
-		const args = entryCall ? [entry.session, look, ...step.args, ...(step.coming && look ? [look.cards] : [])] : step.args;
-		const reply = (answer: { readonly ok: boolean; readonly result?: unknown; readonly error?: { readonly code: string; readonly message: string } }): BlockMsg => ({
-			kind: "entry",
-			msg: { kind: "stepped", outcome: answer.ok ? { ok: true, result: answer.result } : { ok: false }, method, error: answer.ok ? null : (answer.error ?? null) },
-		});
-		return settled([{ kind: "door", method, args, reply: (o) => reply(o.answer) }]);
-	}
+	const coming = command.coming && look ? [look.cards] : [];
+	return { kind: "door", method: command.method, args: [model.entry?.session ?? null, look, ...command.args, ...coming], reply: (outcome) => command.reply(outcome.answer) };
 }
 
 // The program --------------------------------------------------------------------------------------------------------
@@ -132,8 +99,7 @@ function blockProgram(effects: (command: Command<BlockMsg>, dispatch: (msg: Bloc
 				if (command.kind === "entryCall") return entryDoor(next, command, views);
 				return { kind: "effect", run: (dispatch) => effects(command, dispatch) };
 			};
-			const [stepped, jobs] = stepJobs(next, views);
-			return [stepped, [...commands.map(cmdOf), ...jobs]];
+			return [next, commands.map(cmdOf)];
 		},
 		needs: blockNeeds,
 		viewsChanged: (views: Views): BlockMsg => ({ kind: "views", answers: views }),

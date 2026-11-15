@@ -1,7 +1,7 @@
-import type { EntryList, EntryState, TaskItem } from "../../../../core/application/contracts";
+import { type EntryJobOutcome, entryJobStep, type EntryJobs, type EntryList, type EntryState, queuedEntryJobs, type TaskItem } from "../../../../core/application/contracts";
 import { type BlockModel, shownLists, taskById } from "../model/block";
 import type { Command } from "../model/commands";
-import { type EntryModel, type EntryMsg, entryModel, type EntryThen, type JobOutcome } from "../model/entry";
+import { type EntryModel, type EntryMsg, entryModel, type EntryThen } from "../model/entry";
 import { entryLists } from "../model/entry";
 import type { BlockMsg } from "../model/messages";
 import { assertNever } from "../model/assertNever";
@@ -11,7 +11,7 @@ import type { Step } from "./block";
 interface EntryAnswer {
 	readonly session: unknown;
 	readonly state: EntryState | null;
-	readonly jobs: readonly unknown[];
+	readonly jobs: EntryJobs["queue"];
 	readonly value: unknown;
 	readonly renamed: EntryState["renamed"];
 }
@@ -51,7 +51,7 @@ function itemOf(model: BlockModel, id: string): TaskItem | null {
 /**
  * The quick entry (quick-add spec §4.2–4.9): every message is a call of the core's `QuickEntry` behind the door, the
  * model keeping what it answers. The jobs the answers queue run in the core's order (`entryJobStep`), one step at a
- * time, by the block's program.
+ * time (`runEntryJobs`).
  */
 export function updateEntry(model: BlockModel, msg: EntryMsg): Step {
 	const entry = entryOf(model);
@@ -108,8 +108,6 @@ export function updateEntry(model: BlockModel, msg: EntryMsg): Step {
 			return answered(model, entry, msg.answer, msg.then);
 		case "stepped":
 			return stepped(model, entry, msg.outcome, msg.method, msg.error);
-		case "jobs":
-			return [withEntry(model, { ...entry, jobs: msg.jobs, queued: [], due: null }), []];
 		default:
 			return assertNever(msg);
 	}
@@ -138,14 +136,12 @@ function bar(model: BlockModel, entry: EntryModel, act: string, value: string | 
 	}
 }
 
-/** The kind of a job the core queued (`EntryJob.kind`). */
-const jobKind = (job: unknown): string | null => (typeof job === "object" && job !== null && "kind" in job && typeof job.kind === "string" ? job.kind : null);
 
 /** An `entry.*` answer taken: its session, the field's state, the renames waiting, the jobs it queued; then what follows it. */
 function answered(model: BlockModel, entry: EntryModel, answer: unknown, then: EntryThen): Step {
 	const ok = okAnswer(answer);
 	if (!ok) return [model, failure(answer)];
-	const created = then !== null && "enter" in then && ok.jobs.some((job) => jobKind(job) === "create");
+	const created = then !== null && "enter" in then && ok.jobs.some((job) => job.kind === "create");
 	const next: EntryModel = {
 		...entry,
 		session: ok.session,
@@ -171,7 +167,7 @@ function answered(model: BlockModel, entry: EntryModel, answer: unknown, then: E
  * A job step came to `outcome`: the next step is due. A write that made a task answers its id (`CreatedTask`): its card
  * takes the row of the line it was typed as (R4), so it stands where the text stood.
  */
-function stepped(model: BlockModel, entry: EntryModel, outcome: JobOutcome, method: string, error: { readonly code: string; readonly message: string } | null): Step {
+function stepped(model: BlockModel, entry: EntryModel, outcome: EntryJobOutcome, method: string, error: { readonly code: string; readonly message: string } | null): Step {
 	const answer = outcome?.ok && method.startsWith("entry.") ? okResult(outcome.result) : null;
 	const id = outcome?.ok && method === "tasks.createWithId" ? createdId(outcome.result) : null;
 	const [heir, ...heirs] = entry.heirs;
@@ -202,4 +198,35 @@ function createdId(result: unknown): string | null {
 function failure(answer: unknown): readonly Command<BlockMsg>[] {
 	const error = (answer as { readonly error?: { readonly code: string; readonly message: string } }).error;
 	return error ? [{ kind: "failure", error }] : [];
+}
+
+/** A job step's door call: its outcome comes back as `stepped`; an `entry.*` step takes the session and the look first. */
+function jobCall(method: string, args: readonly unknown[], coming: boolean): Command<BlockMsg> {
+	const reply = (answer: unknown): BlockMsg => {
+		const outcome = answer as { readonly ok: boolean; readonly result?: unknown; readonly error?: { readonly code: string; readonly message: string } };
+		return { kind: "entry", msg: { kind: "stepped", outcome: outcome.ok ? { ok: true, result: outcome.result } : { ok: false }, method, error: outcome.ok ? null : (outcome.error ?? null) } };
+	};
+	return method.startsWith("entry.") ? { kind: "entryCall", method, args, coming, reply } : { kind: "door", method, args, reply: (o) => reply(o.answer) };
+}
+
+/**
+ * The quick entry's jobs run in the core's order (`entryJobStep`), one door call a message: the jobs an answer queued
+ * join the queue; the step due (the next one after an outcome, or the first of a queue with none running) is asked for
+ * and its outcome comes back as `stepped`. A step that only tells (`renamed`) is passed.
+ */
+export function runEntryJobs(model: BlockModel): Step {
+	const entry = model.entry;
+	if (!entry || (entry.due === null && entry.queued.length === 0)) return [model, []];
+	let jobs = queuedEntryJobs(entry.jobs, entry.queued);
+	let outcome: EntryJobOutcome = entry.due?.outcome ?? null;
+	const settled = (commands: readonly Command<BlockMsg>[]): Step => [withEntry(model, { ...entry, jobs, queued: [], due: null }), commands];
+	if (entry.due === null && jobs.running !== null) return settled([]);
+	for (;;) {
+		const next = entryJobStep(jobs, outcome);
+		jobs = next.jobs;
+		const step = next.step;
+		if (step === null) return settled([]);
+		if (step.kind === "door") return settled([jobCall(step.method, step.args, step.coming === true)]);
+		outcome = null;
+	}
 }

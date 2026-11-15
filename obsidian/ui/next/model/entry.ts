@@ -1,4 +1,4 @@
-import { type EntryList, type EntryPart, type EntryInList, type EntryState, type GroupName, type Header, labelTitle, type ListCard, type Placement, type TaskItem, viewEntryLists } from "../../../../core/application/contracts";
+import { type EntryJobOutcome, type EntryJobs, type EntryList, NO_ENTRY_JOBS, type EntryPart, type EntryInList, type EntryState, type GroupName, type Header, labelTitle, type ListCard, type Placement, type TaskItem, viewEntryLists } from "../../../../core/application/contracts";
 
 /** What follows an `entry.*` answer: the field opened at the spot it answered (renaming a task, typing its subtask, naming a section), another call, or an Enter's own. */
 export type EntryThen = { readonly open: "rename" | "subtask" | "newSection"; readonly item: TaskItem } | { readonly after: string } | { readonly enter: true } | null;
@@ -18,12 +18,12 @@ export interface EntryModel {
 	readonly state: EntryState | null;
 	/** The renames entered and not yet written: each card shows its new text meanwhile. */
 	readonly renamed: EntryState["renamed"];
-	/** The core's `EntryJobs` (the jobs queued and the one under way), opaque here; the job order runs them one at a time. */
-	readonly jobs: unknown;
+	/** The core's `EntryJobs` (the jobs queued and the one under way); the job order (`entryJobStep`) runs them one at a time. */
+	readonly jobs: EntryJobs;
 	/** Jobs the last answer queued, not yet handed to the job order. */
-	readonly queued: readonly unknown[];
+	readonly queued: EntryJobs["queue"];
 	/** A job step is due: the outcome of the last one (null at a job's start). */
-	readonly due: { readonly outcome: JobOutcome } | null;
+	readonly due: { readonly outcome: EntryJobOutcome } | null;
 	/** The field's row key: the field after an Enter that wrote a line is a row of its own. */
 	readonly field: string;
 	readonly fields: number;
@@ -39,11 +39,6 @@ export interface EntryModel {
 	/** The bar's panel open: the levels and labels (`priority`), the places (`place`); null for none. */
 	readonly panel: string | null;
 }
-
-/** What a job step came to (`EntryJobOutcome`): a door call's result, a failure, or nothing. */
-export type JobOutcome = { readonly ok: true; readonly result: unknown } | { readonly ok: false } | null;
-
-export const NO_ENTRY_JOBS: unknown = { queue: [], running: null };
 
 export function entryModel(): EntryModel {
 	return { session: null, state: null, renamed: [], jobs: NO_ENTRY_JOBS, queued: [], due: null, field: "entry:0", fields: 0, heirs: [], bound: new Map(), focus: 0, panel: null };
@@ -76,9 +71,7 @@ export type EntryMsg =
 	/** A door answer of an `entry.*` call (`EntryAnswer`), and what follows it. */
 	| { readonly kind: "answered"; readonly answer: unknown; readonly job: boolean; readonly then: EntryThen }
 	/** A job step's outcome: the door method it called, its result, or its error. */
-	| { readonly kind: "stepped"; readonly outcome: JobOutcome; readonly method: string; readonly error: { readonly code: string; readonly message: string } | null }
-	/** The job order took the queued jobs and its next step: what it now stands at. */
-	| { readonly kind: "jobs"; readonly jobs: unknown };
+	| { readonly kind: "stepped"; readonly outcome: EntryJobOutcome; readonly method: string; readonly error: { readonly code: string; readonly message: string } | null };
 
 // The look --------------------------------------------------------------------------------------------------------
 

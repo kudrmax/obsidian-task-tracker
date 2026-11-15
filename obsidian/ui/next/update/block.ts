@@ -7,7 +7,7 @@ import type { ListRow } from "../model/lists";
 import { remapIds } from "./ids";
 import { actMessage } from "./acts";
 import { carryFollows, updateCarry } from "./carry";
-import { updateEntry } from "./entry";
+import { runEntryJobs, updateEntry } from "./entry";
 import { followFull, updateFull } from "./full";
 import { closeMenu, menuFollows, openInView, updateMenu } from "./menu";
 import { updateSearch } from "./search";
@@ -78,7 +78,8 @@ function pickWrite(model: BlockModel, method: string, args: readonly unknown[]):
  */
 export function updateBlock(model: BlockModel, msg: BlockMsg): Step {
 	const [next, commands] = step(model, msg);
-	return [withMotion(model, next), commands];
+	const [jobbed, jobs] = runEntryJobs(next);
+	return [withMotion(model, jobbed), [...commands, ...jobs]];
 }
 
 function step(model: BlockModel, msg: BlockMsg): Step {

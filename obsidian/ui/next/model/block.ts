@@ -89,7 +89,7 @@ export function blockNeeds(model: BlockModel): readonly Need[] {
 			for (const column of rowColumns(funnel.view)) needs.push({ key: ROW_KEY(column), method: "tasks.columnSections", args: [column, today] });
 		}
 	}
-	needs.push(...menuNeeds(model), ...fullNeeds(fullLayer(model.layers), model.answers), ...searchNeeds(model.search));
+	needs.push(...menuNeeds(model), ...fullNeeds(fullLayer(model.layers), model.answers, funnel?.filter?.node ?? null), ...searchNeeds(model.search));
 	return [...needs, ...entryNeeds(model)];
 }
 
