@@ -174,6 +174,7 @@ export class DemoTaskService implements TaskService {
 			subtasks: [],
 			allSubtasks: [],
 			progress: null,
+			marks: { progressDot: t.status === "inProgress", description: (t.description ?? null) !== null, count: null },
 			collapsed: false,
 			parentText: null,
 			parentKey: null,

@@ -4501,6 +4501,54 @@ ${key.title}`.toLowerCase();
     return slot >= groups.length ? "end" : { before: groups[slot] };
   }
 
+  // core/application/EntryJobs.ts
+  var NO_ENTRY_JOBS = { queue: [], running: null };
+  function writeMethod(call) {
+    return call.method === "createInPlace" ? "createWithId" : call.method;
+  }
+  function queuedEntryJobs(jobs, added) {
+    return added.length === 0 ? jobs : { ...jobs, queue: [...jobs.queue, ...added] };
+  }
+  function answeredJobs(outcome) {
+    return outcome?.ok ? outcome.result?.jobs ?? [] : [];
+  }
+  function entryJobStep(jobs, outcome) {
+    const running = jobs.running;
+    if (running === null) {
+      const [job2, ...queue] = jobs.queue;
+      if (!job2) return { jobs, step: null };
+      return { jobs: { queue, running: { job: job2, phase: "call" } }, step: { kind: "door", method: "entry.call", args: [job2.id], fresh: true } };
+    }
+    const { job } = running;
+    const failed = running.failed === true || outcome?.ok === false;
+    const queued = queuedEntryJobs(jobs, running.phase === "write" || running.phase === "renamed" ? [] : answeredJobs(outcome));
+    const at = (phase, step, call) => ({ jobs: { queue: queued.queue, running: { job, phase, ...call && { call }, ...failed && { failed } } }, step });
+    const unshown = (fresh = false) => at("unshown", { kind: "door", method: "entry.unshown", args: [job.id], ...fresh && { fresh: true } });
+    switch (running.phase) {
+      case "call": {
+        if (failed) return unshown();
+        const call = outcome.ok ? outcome.result.value ?? null : null;
+        if (call === null) return unshown(job.kind === "section");
+        return at("write", { kind: "door", method: `tasks.${writeMethod(call)}`, args: call.args }, call);
+      }
+      case "write": {
+        const call = running.call;
+        if (failed) return unshown();
+        const result = outcome.result;
+        if (call.method === "createInPlace") return at("shown", { kind: "door", method: "entry.shown", args: [job.id, result ?? null], coming: true, fresh: true });
+        if (call.method === "edit") return result && job.kind === "rename" ? at("renamed", { kind: "renamed", was: job.item, now: result }) : unshown();
+        return unshown(true);
+      }
+      case "shown":
+      case "renamed":
+        return unshown();
+      case "unshown":
+        return at("done", { kind: "door", method: "entry.done", args: [job.id] });
+      case "done":
+        return entryJobStep({ queue: queued.queue, running: null }, null);
+    }
+  }
+
   // core/application/repeatWords.ts
   function capital(text) {
     return text.charAt(0).toUpperCase() + text.slice(1);
@@ -4777,6 +4825,23 @@ ${key.title}`.toLowerCase();
     }
     return null;
   }
+  function marksOfCard(entry, described) {
+    const progress = progressOf(entry);
+    return { progressDot: entry.task.status === "inProgress", description: described, count: progress ? `${progress.done}/${progress.total}` : null };
+  }
+  function withFolderMark(item, mark) {
+    const ref = (project) => project.mark === mark ? project : { ...project, mark };
+    const step = (s) => s === null ? null : withFolderMark(s, mark);
+    return {
+      ...item,
+      project: item.project === null ? null : ref(item.project),
+      projects: item.projects.map(ref),
+      subtasks: item.subtasks.map((s) => withFolderMark(s, mark)),
+      allSubtasks: item.allSubtasks.map((s) => withFolderMark(s, mark)),
+      card: { ...item.card, step: step(item.card.step) },
+      block: { ...item.block, step: step(item.block.step) }
+    };
+  }
   function ownCard(item) {
     return { text: item.text, title: item.title, over: null, step: null };
   }
@@ -4841,6 +4906,7 @@ ${key.title}`.toLowerCase();
       subtasks: allSubtasks.filter((sub) => sub.open),
       allSubtasks,
       progress: progressOf(entry),
+      marks: marksOfCard(entry, description !== null),
       collapsed,
       description,
       parentText: parent?.task.text ?? null,
@@ -6527,6 +6593,9 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/TaskReads.ts
+  function showsFolderMark(filter) {
+    return filter === null || filter === void 0 || projectOfNode(filter) === null;
+  }
   var NO_PROJECT_SOURCE = { tree: () => ProjectTree.EMPTY, screen: () => ({}) };
   function sectionsOf2(doc, list) {
     return doc.groups(list).filter((g) => g.heading || g.entries.length > 0).map((g) => ({ id: g.name === null || g.id === null ? NO_SECTION_ID : g.id, name: g.name, empty: g.name !== null && g.entries.length === 0 }));
@@ -6664,7 +6733,7 @@ ${key.title}`.toLowerCase();
       const tree = projectTreeOf(doc);
       const node = filterNode(filter, tree);
       const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
-      const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
+      const item = this.itemOf(today, doc, showsFolderMark(node));
       const shown2 = (entries) => entries.filter(shows).map(item);
       const day = { date, list: shown2(dayList(doc, date, today, boundary)), slotted: shown2(slottedOn(doc, date, boundary)) };
       const sections = this.listSections(s);
@@ -6792,7 +6861,12 @@ ${key.title}`.toLowerCase();
       }
       return null;
     }
-    find({ doc, today }, key, text) {
+    /** `filter`, the view's: under a project's, the task shows no folder mark, as the view's lists. */
+    find({ doc, today }, key, text, filter) {
+      const found = this.foundAt(doc, key, text, today);
+      return found && !showsFolderMark(filter) ? withFolderMark(found, false) : found;
+    }
+    foundAt(doc, key, text, today) {
       const named = this.rules.named(doc, key);
       if (named !== void 0) return named ? this.itemAt(doc, named, today) : null;
       const atPlace = doc.find(key.section, key.index, key.path);
@@ -6862,8 +6936,9 @@ ${key.title}`.toLowerCase();
     carried(lifted2, picked2) {
       return carriedWith(lifted2, picked2);
     }
-    fullTree(item) {
-      return fullTree(item);
+    /** `filter`, the view's: under a project's, no card of the tree shows the folder mark; left out, `item`'s marks stand. */
+    fullTree(item, filter) {
+      return fullTree(filter === void 0 ? item : withFolderMark(item, showsFolderMark(filter)));
     }
     shownSpan(item, day) {
       return this.timeline().shown(slotted(item), day);
@@ -8702,11 +8777,11 @@ ${at.reading}`;
     setRepeat: (c, [key, rule]) => c.run(c.writes.setRepeat(key, rule ?? null)),
     stop: (c, [key]) => c.run(c.writes.stop(key)),
     rename: (c, [key, text]) => c.run(c.writes.rename(KEPT(c), key, text)),
-    fullTree: (c, [item]) => c.reads.fullTree(item),
+    fullTree: (c, [item, filter]) => c.reads.fullTree(item, filter),
     setDescription: (c, [key, markdown]) => c.run(c.writes.setDescription(key, markdown)),
     remove: (c, [key]) => c.run(c.writes.remove(key)),
     lineOf: (c, [key]) => c.ask(c.reads.lineOfRead(key)),
-    find: (c, [key, text]) => c.reads.find(KEPT(c), key, text),
+    find: (c, [key, text, filter]) => c.reads.find(KEPT(c), key, text, filter),
     moveBefore: (c, [key, before, date]) => c.run(c.writes.moveBefore(key, before ?? null, date)),
     nest: (c, [key, parent, before]) => c.run(c.writes.nest(key, parent, before ?? null)),
     setSlot: (c, [key, slot]) => c.run(c.writes.setSlot(key, slot)),
@@ -9151,9 +9226,11 @@ ${at.reading}`;
     allColumnsWidthAt,
     repeatValue,
     onTheDay,
-    canPick
+    canPick,
+    entryJobStep: (jobs, outcome) => entryJobStep(jobs, outcome ?? null),
+    queuedEntryJobs
   };
-  var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+  var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS, NO_ENTRY_JOBS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };

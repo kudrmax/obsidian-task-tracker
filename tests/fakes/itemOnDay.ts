@@ -7,11 +7,12 @@ import { plainText } from "../../core/domain/TaskText";
 import { ownCard } from "../../core/application/taskItems";
 
 /** A task item as the service reads it on `today`: its title, its duration, its day and what may be done to it follow from its fields, unless given; no labels (the colours from the priority and labels given), not collapsed, of no project and under no task's key unless given; its id its key's; all its subtasks the open ones unless given. */
-export function onDay(item: Omit<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "projects" | "id" | "card" | "block" | "drawnOn"> & Partial<Pick<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "projects" | "id" | "card" | "block" | "drawnOn">>, today: LocalDate): TaskItem {
+export function onDay(item: Omit<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "projects" | "id" | "card" | "block" | "drawnOn" | "marks"> & Partial<Pick<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "projects" | "id" | "card" | "block" | "drawnOn" | "marks">>, today: LocalDate): TaskItem {
 	const title = item.title ?? plainText(item.text);
 	return {
 		id: keyId(item.key),
 		drawnOn: null,
+		marks: { progressDot: item.status === "inProgress", description: item.description !== null, count: item.progress ? `${item.progress.done}/${item.progress.total}` : null },
 		card: { ...ownCard({ text: item.text, title }) },
 		block: { text: item.text, title, step: null },
 		labels: [],

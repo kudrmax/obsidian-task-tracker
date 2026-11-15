@@ -79,6 +79,7 @@ export const PURE_RULES: readonly string[] = [
 	"samePlacement", "sameRule", "sameSlot", "sameTaskTree", "sectionChoice", "shadesOf", "shiftLevel", "stackCorner", "stackTasks",
 	"stackedLists", "stackedRows", "stepFunnel", "swipeLanding", "textParts", "timeParts", "usableColor", "viewContext", "viewEntryLists",
 	"viewLayout", "wholeWidth", "zoomAfterPinch", "zoomShown",
+	"NO_ENTRY_JOBS", "entryJobStep", "queuedEntryJobs",
 ];
 
 /** What `contracts.ts` exports as values that is not a pure rule: the core's sessions and its errors, reached through the runtime. */
