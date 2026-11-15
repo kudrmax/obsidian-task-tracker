@@ -40,6 +40,16 @@ export class Measure {
 		return stack instanceof HTMLElement ? stack : null;
 	}
 
+	/** The box of the part the view anchors by `name` (`data-n-anchor`: the plus, a header); null when none is drawn. */
+	static anchor(root: ParentNode, name: string): Box | null {
+		for (const el of root.querySelectorAll<HTMLElement>("[data-n-anchor]")) {
+			if (el.dataset.nAnchor !== name) continue;
+			const r = el.getBoundingClientRect();
+			return { left: r.left, top: r.top, width: r.width, height: r.height };
+		}
+		return null;
+	}
+
 	static row(root: ParentNode, key: string): Box | null {
 		for (const el of root.querySelectorAll<HTMLElement>("[data-n-key]")) {
 			if (el.dataset.nKey !== key) continue;

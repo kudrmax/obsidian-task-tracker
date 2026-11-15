@@ -131,7 +131,10 @@ export class Motion {
 	 */
 	after(cause: "move" | "replace" | "none", vars: ReadonlyMap<string, Readonly<Record<string, string>>>, heirs: ReadonlyMap<string, string> = new Map()): void {
 		this.applyVars(vars);
-		if (cause !== "move") return;
+		if (cause !== "move") {
+			this.left = [];
+			return;
+		}
 		const ms = tokenMs(this.root, "--tc-duration-collapse");
 		if (ms <= 0) return;
 		const easing = this.root.ownerDocument.defaultView?.getComputedStyle(this.root).getPropertyValue("--tc-ease-out").trim() || "ease-out";
@@ -343,25 +346,54 @@ export class Motion {
 	 * place a cancel goes back to), taking its size and a resting card's look; with no `to`, fading where it is. `done`
 	 * once it has ended, or at once with nothing to fly.
 	 */
-	fly(host: ParentNode, key: string | null, done: () => void): void {
-		let to: Element | null = null;
-		if (key !== null) for (const el of this.root.querySelectorAll<HTMLElement>("[data-n-key]")) if (el.dataset.nKey === key) to = el;
+	fly(host: ParentNode, key: string | null, done: () => void, later = false): void {
+		const view = this.root.ownerDocument.defaultView;
+		if (later && view) {
+			view.requestAnimationFrame(() => this.fly(host, key, done));
+			return;
+		}
+		const to = key === null ? null : Motion.target(this.root, key);
 		const { card, all } = Motion.floats(host);
 		if (!card) return done();
 		const ms = tokenMs(this.root, "--tc-duration-fly");
-		const easing = this.root.ownerDocument.defaultView?.getComputedStyle(this.root).getPropertyValue("--tc-ease-out").trim() || "ease-out";
+		const easing = view?.getComputedStyle(this.root).getPropertyValue("--tc-ease-out").trim() || "ease-out";
 		for (const part of all) if (part !== card) part.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing, fill: "forwards" });
 		const from = card.getBoundingClientRect();
 		const box = to?.getBoundingClientRect() ?? null;
-		const frames: Keyframe[] = box
-			? [
-					{ transform: `translate3d(${from.left}px, ${from.top}px, 0)`, width: `${from.width}px`, height: `${from.height}px` },
-					{ transform: `translate3d(${box.left}px, ${box.top}px, 0)`, width: `${box.width}px`, height: `${box.height}px` },
-				]
-			: [{ opacity: 1 }, { opacity: 0 }];
+		const frames = Motion.flight(card.dataset.nFloatKind ?? "card", from, box, to !== null && to.hasAttribute("data-n-anchor") && !to.hasAttribute("data-n-key"));
 		const flight = card.animate(frames, { duration: ms, easing, fill: "forwards" });
 		this.running.push(flight);
 		flight.finished.then(done, done);
+	}
+
+	/** The element a flight ends on: the row keyed `key`, else the part the view anchors by that name. */
+	private static target(root: ParentNode, key: string): Element | null {
+		for (const el of root.querySelectorAll<HTMLElement>("[data-n-key]")) if (el.dataset.nKey === key) return el;
+		for (const el of root.querySelectorAll<HTMLElement>("[data-n-anchor]")) if (el.dataset.nAnchor === key) return el;
+		return null;
+	}
+
+	/**
+	 * A float's flight (the old screen's `FloatingCard`, `PlusFloat`, `SectionFloat`): a card onto the card where it landed,
+	 * taking its size; the plus back into its place (`home`), or into the field it opened, as tall as the field, fading
+	 * there; a section folding shut onto its header; with nowhere to go, fading where it is.
+	 */
+	private static flight(kind: string, from: DOMRect, box: DOMRect | null, home: boolean): Keyframe[] {
+		const at = `translate3d(${from.left}px, ${from.top}px, 0)`;
+		if (!box) return [{ opacity: 1 }, { opacity: 0 }];
+		if (kind === "plus") {
+			if (home) return [{ transform: at }, { transform: `translate3d(${box.left}px, ${box.top}px, 0)` }];
+			const scale = Math.min(1, box.height / (from.height || 1));
+			return [
+				{ transform: at, opacity: 1 },
+				{ transform: `translate3d(${box.left}px, ${box.top + box.height / 2 - (from.height * scale) / 2}px, 0) scale(${scale})`, opacity: 0 },
+			];
+		}
+		if (kind === "section") return [{ transform: at }, { transform: `translate3d(${box.left}px, ${box.top}px, 0) scale(1, 0)` }];
+		return [
+			{ transform: at, width: `${from.width}px`, height: `${from.height}px` },
+			{ transform: `translate3d(${box.left}px, ${box.top}px, 0)`, width: `${box.width}px`, height: `${box.height}px` },
+		];
 	}
 
 	private readonly stretched = new WeakSet<HTMLElement>();

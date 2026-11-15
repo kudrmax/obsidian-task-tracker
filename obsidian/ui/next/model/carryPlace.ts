@@ -100,3 +100,42 @@ function lineOf(gap: GapPlace, cards: readonly Placed[], heads: readonly PlacedH
 	if (waiting) return { left, right, y: waiting.top - geometry.cardGap / 2 };
 	return { left, right, y: Math.max(top - geometry.cardGap / 2, list.top + geometry.dot / 2) };
 }
+
+/** How far past the plus's ring the finger may stand and still be over it, px (the old screen's `plusRingReach`). */
+export const PLUS_RING_REACH = 24;
+
+/** Whether the finger at (`x`, `y`) is over the plus's ring (`ring`, its box on the screen): nearer its centre than its radius and the reach. */
+export function ringNear(ring: { readonly left: number; readonly top: number; readonly width: number; readonly height: number } | null, x: number, y: number): boolean {
+	if (!ring) return false;
+	return Math.hypot(x - (ring.left + ring.width / 2), y - (ring.top + ring.height / 2)) < ring.width / 2 + PLUS_RING_REACH;
+}
+
+/**
+ * Where each slot between a lifted section's list's sections stands (content pixels of the stack; the old screen's
+ * `nearestSlot`): the tops of the headers, then the list's end, measured at the lift with the section waiting in place;
+ * and the list's left and width, for the landing line drawn there. Null before the lift is measured.
+ */
+export function sectionSlots(carry: CarryModel, lists: BlockLists): { readonly tops: readonly number[]; readonly left: number; readonly width: number } | null {
+	const section = carry.section;
+	const geometry = carry.geometry;
+	if (!section || !geometry || lists.kind !== "rows") return null;
+	const measured = geometry.lists.find((list) => list.column === section.column);
+	const row = lists.rows.find((r) => r.column === section.column);
+	if (!measured || !row) return null;
+	const boxes = new Map(measured.rows.map((r) => [r.key, r] as const));
+	const tops = row.list.rows.flatMap((r) => (r.kind === "head" ? [boxes.get(r.key)?.top ?? null] : [])).filter((top): top is number => top !== null);
+	const last = measured.rows.slice(-1).find(() => true);
+	const end = last ? last.top + last.height : measured.top;
+	return { tops: [...tops, end], left: measured.left, width: measured.width };
+}
+
+/** The slot nearest a lifted section's finger (`y`, content pixels of the stack): before the section of that index, or past the last. */
+export function sectionSlotAt(carry: CarryModel, lists: BlockLists, y: number): number | null {
+	const slots = sectionSlots(carry, lists);
+	if (!slots) return null;
+	let best = 0;
+	slots.tops.forEach((top, slot) => {
+		if (Math.abs(top - y) < Math.abs((slots.tops.slice(best, best + 1).find(() => true) ?? top) - y)) best = slot;
+	});
+	return best;
+}

@@ -3,11 +3,13 @@ import type { Driver } from "./driver";
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** The block alone, old or new: Obsidian's note around it is never compared; 1 px of the old block's short height is cropped. */
-const BLOCK = { of: ".tc-project-block, .tc-n-block", fit: { px: 1, cut: { fromBottom: 71 } } } as const;
+/** Obsidian's own chrome that may stand over the block (its status bar, the phone's navigation): never compared (decision 41). */
+const CHROME = [".status-bar", ".mobile-navbar"];
+const BLOCK = { of: ".tc-project-block, .tc-n-block", fit: { px: 1, cut: { fromBottom: 71 } }, masks: CHROME } as const;
 /** The block with a field open: both blocks grow for the field and its bar (decision 56), the old one's shot cut at the window's foot. */
-const TYPING = { of: ".tc-project-block, .tc-n-block", fit: { px: 60, cut: "bottom" } } as const;
+const TYPING = { of: ".tc-project-block, .tc-n-block", fit: { px: 60, cut: "bottom" }, masks: CHROME } as const;
 /** A layer over the block (a menu): the whole page, the note and Obsidian's chrome as they stand under the sheet. */
-const PAGE = { of: "body" };
+const PAGE = { of: "body", masks: CHROME };
 
 /** The block's parts, old and new, by one selector each. */
 const SEL = {
@@ -17,7 +19,11 @@ const SEL = {
 	card: ":is(.tc-project-block .tc-card, .tc-n-block .tc-n-card)",
 	title: ":is(.tc-card-title, .tc-n-card-title)",
 	plus: ":is(.tc-project-block .tc-plus, .tc-n-block .tc-n-plus)",
+	head: ":is(.tc-project-block .tc-group-head, .tc-n-block .tc-n-group-head)",
 };
+
+/** The section the run writes into Soon over the note's last tasks there, so a header stands in the block to lift. */
+const SECTION = "E2E section";
 
 /** The note «Дружба.md» opened with its block, old or new (`newBlock`), scrolled so the block's foot shows. */
 export async function openBlock(d: Driver, newBlock: boolean): Promise<void> {
@@ -148,4 +154,52 @@ export async function block(d: Driver, newBlock: boolean): Promise<void> {
 	await d.step("a card carried up a list and let go", "interaction", () => d.drag(card, { x: card.x, y: card.y - card.h * 2 + 4 }, hold, 24, 20), { carried: [card.key], expectMotion: true });
 	await showBlock(d);
 	await d.shot("after a drop", BLOCK);
+
+	await plusCarried(d, cardAt, titles);
+	await sectionLifted(d);
+}
+
+type CardAt = (title: string) => Promise<{ x: number; y: number; w: number; h: number; key: string }>;
+
+/** The plus pressed and moved into a list: a new task's float carried, the field opened where it was let go, closed empty. */
+async function plusCarried(d: Driver, cardAt: CardAt, titles: readonly string[]): Promise<void> {
+	await showBlock(d);
+	const plus = await d.center(SEL.plus);
+	const target = await cardAt(titles[1]);
+	await d.step("the plus carried into a list and let go", "interaction", () => d.drag(plus, { x: target.x, y: target.y + target.h / 2 }, 0, 24, 20), { moves: "all", expectMotion: true });
+	await d.shot("field opened by the plus's drop", TYPING);
+	await d.step("the dropped field closes", "interaction", () => d.key("Escape"), { moves: "all" });
+	await showBlock(d);
+	await d.shot("after the plus's drop", BLOCK);
+}
+
+/** A section written into Soon, its header lifted and carried above No section, let go there. */
+async function sectionLifted(d: Driver): Promise<void> {
+	/** Written as Sync would bring it, before the steps: the file's change is not a gesture of the block. */
+	await d.page(`
+			const file = app.vault.getAbstractFileByPath("TODOs Tasks.md");
+			const text = await app.vault.read(file);
+			await app.vault.modify(file, text.replace("\\n- [ ] Подарок для Евы", "\\n### ${SECTION}\\n- [ ] Подарок для Евы"));
+			for (let i = 0; i < 50 && ![...document.querySelectorAll(${JSON.stringify(SEL.head)})].some((h) => h.textContent.includes(${JSON.stringify(SECTION)})); i++) await new Promise((r) => setTimeout(r, 100));
+			return true;`);
+	await d.page("return __e2e.rest()");
+	await showBlock(d);
+	await d.shot("block with a section", BLOCK);
+	const heads = await d.page<{ x: number; y: number; w: number; h: number; text: string }[]>(
+		`return [...document.querySelectorAll(${JSON.stringify(SEL.head)})].map((h) => { const r = h.getBoundingClientRect(); return { x: r.left + r.width / 3, y: r.top + r.height / 2, w: r.width, h: r.height, text: h.textContent.trim() }; })`,
+	);
+	const lifted = heads.find((h) => h.text.includes(SECTION));
+	const above = heads.find((h) => !h.text.includes(SECTION));
+	if (!lifted || !above) throw new Error(`the block shows no header to lift above: ${heads.map((h) => h.text).join(", ")}`);
+	/** The section's cards go with it while it is carried (they fold away and come back where it lands), as a carried card does. */
+	const carried = await d.page<string[]>(`
+		const head = [...document.querySelectorAll(${JSON.stringify(SEL.head)})].find((h) => h.textContent.includes(${JSON.stringify(SECTION)}));
+		const keys = [];
+		for (let row = head.nextElementSibling; row && !row.matches(${JSON.stringify(SEL.head)}); row = row.nextElementSibling)
+			if (row.matches(${JSON.stringify(SEL.card)})) keys.push((row.dataset.row ?? row.dataset.card ?? (row.querySelector(${JSON.stringify(SEL.title)})?.textContent ?? row.textContent).trim()) + "/1");
+		return keys;`);
+	const hold = d.platform === "phone" ? 450 : 0;
+	await d.step("a section lifted and carried above No section", "interaction", () => d.drag(lifted, { x: lifted.x, y: above.y - above.h }, hold, 24, 20), { carried, moves: "all", expectMotion: true });
+	await showBlock(d);
+	await d.shot("after a section's move", BLOCK);
 }

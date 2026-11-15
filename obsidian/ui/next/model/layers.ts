@@ -1,5 +1,6 @@
 import type { TaskMenuLayer } from "./taskMenu";
 import type { FullLayer } from "./full";
+import type { SectionMenuLayer } from "./section";
 
 /**
  * A layer over the block (P6): the stack's order is the order they opened; Escape and a tap outside close the top one.
@@ -9,7 +10,8 @@ export type Layer =
 	| { readonly kind: "viewMenu"; readonly closing: boolean }
 	| { readonly kind: "moreMenu"; readonly closing: boolean }
 	| TaskMenuLayer
-	| FullLayer;
+	| FullLayer
+	| SectionMenuLayer;
 
 export type LayerKind = Layer["kind"];
 

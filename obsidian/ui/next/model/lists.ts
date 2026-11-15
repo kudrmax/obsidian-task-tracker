@@ -41,6 +41,12 @@ export interface HeadRow {
 	readonly group: GroupName;
 	/** It opens its part for a drop (`ProjectsSection.opens`); a funnel's section header never does. */
 	readonly opens: boolean;
+	/** What its menu offers (`ListGroup.menu`): the section it names, renamed or removed; null: no menu (No section, By subprojects' parts). */
+	readonly menu: { readonly section: string; readonly rename: boolean; readonly remove: boolean } | null;
+	/** A long press lifts it among the list's sections (`ListGroup.reorder`); never By subprojects. */
+	readonly reorder: boolean;
+	/** The tasks under it, as its lifted copy counts them. */
+	readonly count: number;
 }
 
 /** The No tasks plate under an empty section, or of a list that draws nothing (`list`): a tap types a task there. */
@@ -130,7 +136,7 @@ export function funnelList(input: FunnelListInput): ListModel {
 	const view = listView(input.items, input.grouped, input.sections);
 	const rows: ListRow[] = [];
 	(view.groups as readonly ListGroup[]).forEach((group, part) => {
-		if (view.showsHeaders && group.header) rows.push({ kind: "head", key: `head:${group.id}`, part, name: group.name ?? input.ungrouped, ungrouped: group.name === null, group: group.name, opens: false });
+		if (view.showsHeaders && group.header) rows.push({ kind: "head", key: `head:${group.id}`, part, name: group.name ?? input.ungrouped, ungrouped: group.name === null, group: group.name, opens: false, menu: group.menu, reorder: group.reorder, count: group.items.length });
 		if (group.empty) rows.push({ kind: "plate", key: `plate:${group.id}`, part, words: input.emptyLabel, group: group.name, list: false });
 		for (const { item, level } of group.rows) rows.push({ kind: "card", key: item.id, part, item, level, group: group.name, branch: null, face: cardFace(item, input.day), owner: item.id, from: input.column, drop: null });
 	});
@@ -144,7 +150,7 @@ export function projectsList(view: ProjectsView): ListModel {
 	const rows: ListRow[] = [];
 	if (view.sections.length === 0) rows.push({ kind: "plate", key: "plate:none", part: -1, words: view.emptyLabel, group: null, list: true });
 	view.sections.forEach((section, part) => {
-		if (section.header && section.title !== null) rows.push({ kind: "head", key: `head:${section.key}`, part, name: section.title, ungrouped: false, group: section.group, opens: section.opens });
+		if (section.header && section.title !== null) rows.push({ kind: "head", key: `head:${section.key}`, part, name: section.title, ungrouped: false, group: section.group, opens: section.opens, menu: null, reorder: false, count: section.rows.length });
 		if (section.plate) rows.push({ kind: "plate", key: `plate:${section.key}`, part, words: view.emptyLabel, group: section.group, list: false });
 		let owner = "";
 		let from: MenuFrom = "done";

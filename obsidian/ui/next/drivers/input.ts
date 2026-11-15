@@ -4,7 +4,7 @@
  * gives it the focus first.
  */
 /** The parts of a card a press may lift it by: their taps come from the press recognizer, never as a click. */
-export const PRESSED: ReadonlySet<string> = new Set(["card", "counter", "mark"]);
+export const PRESSED: ReadonlySet<string> = new Set(["card", "counter", "mark", "head", "plus"]);
 
 /** A raw event of the pointer's stream, as the press recognizer reads it (`recognizers/press.ts`'s `PressInput`). */
 export type RawPress =
@@ -97,12 +97,15 @@ export class Input {
 		};
 		const at = (e: PointerEvent) => ({ x: e.clientX, y: e.clientY });
 		let held: number | null = null;
+		/** A finger's press the recognizer reads: its touch ends with no mouse events after it, so the click the browser would make lands on nothing a tap's outcome put under the finger (the field's room under the plus that just hid). */
+		let fingerHeld = false;
 		const down = (e: PointerEvent) => {
 			const target = mark(e.target) ?? { act: "", key: null };
 			const mouse = e.pointerType === "mouse";
 			feed({ kind: "down", id: e.pointerId, at: at(e), mouse, primary: e.isPrimary, button: e.button, target, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey });
 			if (held === null && e.isPrimary && e.button === 0 && PRESSED.has(target.act)) {
 				held = e.pointerId;
+				fingerHeld = !mouse;
 				capture(root, e.pointerId, true);
 				if (mouse) e.preventDefault();
 			}
@@ -125,13 +128,20 @@ export class Input {
 		const touch = (e: TouchEvent) => {
 			if (carrying()) e.preventDefault();
 		};
+		const touchEnd = (e: TouchEvent) => {
+			if (!fingerHeld) return;
+			fingerHeld = false;
+			e.preventDefault();
+		};
 		root.addEventListener("pointerdown", down);
 		root.addEventListener("pointermove", move);
 		root.addEventListener("pointerup", up);
 		root.addEventListener("pointercancel", up);
 		root.addEventListener("contextmenu", context);
 		root.addEventListener("touchmove", touch, { passive: false });
+		root.addEventListener("touchend", touchEnd, { passive: false });
 		this.stops.push(() => {
+			root.removeEventListener("touchend", touchEnd);
 			root.removeEventListener("pointerdown", down);
 			root.removeEventListener("pointermove", move);
 			root.removeEventListener("pointerup", up);

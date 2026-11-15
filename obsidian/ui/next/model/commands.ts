@@ -41,7 +41,7 @@ export type Command<Msg> =
 	 * The carried float's flight (P5, a declared transition): onto the row keyed `to` as drawn after this render, or, with
 	 * none, fading where it is; `done` once it has ended or was interrupted.
 	 */
-	| { readonly kind: "fly"; readonly to: string | null; readonly done: Msg };
+	| { readonly kind: "fly"; readonly to: string | null; readonly later?: boolean; readonly done: Msg };
 
 export type Commands<Msg> = readonly Command<Msg>[];
 

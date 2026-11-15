@@ -49,8 +49,14 @@ export type PressState =
 
 export const IDLE: PressState = { kind: "idle" };
 
-/** The parts of a card a press may lift it by (the card itself, its counter, its folder mark). */
-const LIFTS = new Set(["card", "counter", "mark"]);
+/** The parts of a card a press may lift it by (the card itself, its counter, its folder mark), and a section's header. */
+const LIFTS = new Set(["card", "counter", "mark", "head"]);
+
+/**
+ * The plus (the old screen's `PlusButton`): a tap opens the field; moved past the press tolerance, finger or mouse, it is
+ * carried at once, with no long press to wait out.
+ */
+const PLUS = "plus";
 
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -63,13 +69,18 @@ export function press(state: PressState, input: PressInput): { readonly state: P
 	switch (input.kind) {
 		case "down": {
 			if (state.kind === "pressing" && input.id !== state.id) return none(IDLE);
-			if (state.kind !== "idle" || !input.primary || input.button !== 0 || !LIFTS.has(input.target.act)) return none(state);
-			return { state: { kind: "pressing", id: input.id, from: input.at, last: input.at, mouse: input.mouse, target: input.target, mod: input.mod, shift: input.shift }, gesture: null, armTimer: !input.mouse };
+			const plus = input.target.act === PLUS;
+			if (state.kind !== "idle" || !input.primary || input.button !== 0 || !(plus || LIFTS.has(input.target.act))) return none(state);
+			return { state: { kind: "pressing", id: input.id, from: input.at, last: input.at, mouse: input.mouse, target: input.target, mod: input.mod, shift: input.shift }, gesture: null, armTimer: !input.mouse && !plus };
 		}
 		case "move": {
 			if (state.kind === "carrying") return input.id === state.id ? { state, gesture: { kind: "carry", at: input.at }, armTimer: false } : none(state);
 			if (state.kind !== "pressing" || input.id !== state.id) return none(state);
 			const moved = distance(input.at, state.from);
+			if (state.target.act === PLUS) {
+				if (moved <= PRESS_TOLERANCE) return { state: { ...state, last: input.at }, gesture: null, armTimer: false };
+				return { state: { kind: "carrying", id: state.id }, gesture: { kind: "lift", target: state.target, from: state.from, at: input.at, mouse: state.mouse }, armTimer: false };
+			}
 			if (state.mouse && moved > DRAG_START) return { state: { kind: "carrying", id: state.id }, gesture: { kind: "lift", target: state.target, from: state.from, at: input.at, mouse: true }, armTimer: false };
 			if (!state.mouse && moved > PRESS_TOLERANCE) return none(IDLE);
 			return { state: { ...state, last: input.at }, gesture: null, armTimer: false };
@@ -84,6 +95,7 @@ export function press(state: PressState, input: PressInput): { readonly state: P
 			if (state.kind === "carrying" && input.id === state.id) return { state: IDLE, gesture: { kind: "lost" }, armTimer: false };
 			return none(state.kind === "pressing" && input.id === state.id ? IDLE : state);
 		case "held":
+			if (state.kind === "pressing" && state.target.act === PLUS) return none(state);
 			if (state.kind !== "pressing" || state.mouse) return none(state.kind === "pressing" ? IDLE : state);
 			return { state: { kind: "carrying", id: state.id }, gesture: { kind: "lift", target: state.target, from: state.from, at: state.last, mouse: false }, armTimer: false };
 		case "context":

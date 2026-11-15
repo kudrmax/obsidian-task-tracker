@@ -33,24 +33,43 @@ export interface ListProps {
 	readonly extra?: ReadonlyMap<string, JSX.Element>;
 	/** The card the search led to: it wears the ring. */
 	readonly found?: string | null;
+	/** A section's name typed in place of its header: the header's row key, and the name it starts from. */
+	readonly renaming?: { readonly head: string; readonly name: string } | null;
 }
 
 /**
  * A column of rows, each keyed by who it is (P1): headers of sections, No tasks plates, cards with their subtasks under
  * them a level in, the branches running to each. Motion within it is `motion`'s, by the rows' keys.
  */
-export function List({ list, kind, column, marks = NO_MARKS, hidden, extra, found }: ListProps): JSX.Element {
+export function List({ list, kind, column, marks = NO_MARKS, hidden, extra, found, renaming }: ListProps): JSX.Element {
 	const row = (r: ListRow): JSX.Element => {
 		switch (r.kind) {
 			case "head":
+				if (renaming?.head === r.key)
+					return (
+						<div key={r.key} class="tc-n-group-field" data-n-key={r.key}>
+							<input
+								type="text"
+								class="tc-n-group-input"
+								placeholder=" "
+								aria-label="Section name"
+								defaultValue={renaming.name}
+								enterKeyHint="done"
+								data-n-field="section"
+								data-n-enter="section:named"
+								data-n-escape="section:unnamed"
+							/>
+							<span class="tc-n-group-hint">Section name</span>
+						</div>
+					);
 				return (
-					<div key={r.key} class={r.ungrouped ? "tc-n-group-head is-ungrouped" : "tc-n-group-head"} data-n-key={r.key}>
+					<div key={r.key} class={`tc-n-group-head ${r.ungrouped ? "is-ungrouped" : ""} ${marks.waiting.has(r.key) ? "is-waiting" : ""}`} data-n-key={r.key} data-n-anchor={r.key} data-n-act={r.menu !== null || r.reorder ? "head" : undefined}>
 						<span class="tc-n-group-name">{r.name}</span>
 					</div>
 				);
 			case "plate":
 				return (
-					<div key={r.key} class={marks.hot === r.key ? "tc-n-plate is-hot" : "tc-n-plate"} data-n-key={r.key} data-n-act="plate">
+					<div key={r.key} class={`tc-n-plate ${marks.hot === r.key ? "is-hot" : ""} ${marks.waiting.has(r.key) ? "is-waiting" : ""}`} data-n-key={r.key} data-n-act="plate">
 						{r.words}
 					</div>
 				);

@@ -12,6 +12,7 @@ import { followFull, updateFull } from "./full";
 import { closeMenu, menuFollows, openInView, updateMenu } from "./menu";
 import { updateSearch } from "./search";
 import { updateSelect } from "./select";
+import { updateSection } from "./section";
 
 export type BlockCommand = Command<BlockMsg>;
 export type Step = readonly [BlockModel, readonly BlockCommand[]];
@@ -147,6 +148,8 @@ function step(model: BlockModel, msg: BlockMsg): Step {
 			return updateCarry(model, msg.msg);
 		case "select":
 			return updateSelect(model, msg.msg);
+		case "section":
+			return updateSection(model, msg.msg);
 		case "search":
 			return updateSearch(model, msg.msg);
 		default:

@@ -56,8 +56,8 @@ describe("the press recognizer (inventory A4, A16)", () => {
 		expect(run([{ kind: "context", target: { act: "plus", key: null } }]).gestures).toEqual([]);
 	});
 
-	it("takes a press only on a card's parts, a primary pointer, the main button", () => {
-		expect(run([down(0, 0, true, { target: { act: "plus", key: null } }), up(0, 0)]).gestures).toEqual([]);
+	it("takes a press only on a card's parts, the plus and a header, a primary pointer, the main button", () => {
+		expect(run([down(0, 0, true, { target: { act: "add", key: null } }), up(0, 0)]).gestures).toEqual([]);
 		expect(run([down(0, 0, true, { button: 2 }), up(0, 0)]).gestures).toEqual([]);
 	});
 
@@ -69,5 +69,21 @@ describe("the press recognizer (inventory A4, A16)", () => {
 	it("carries the counter's and the folder's presses as the card's, their tap told by its part", () => {
 		const counter = { act: "counter", key: "t1" };
 		expect(run([down(0, 0, true, { target: counter }), up(0, 0)]).gestures).toEqual([{ kind: "tap", target: counter, mouse: true, mod: false, shift: false }]);
+	});
+
+	it("lifts the plus once moved past the press's tolerance, by a finger or a mouse, with no long press (the old PlusButton)", () => {
+		const plus = { act: "plus", key: null };
+		const finger = run([down(10, 10, false, { target: plus }), move(10, 30), move(10, 60), up(10, 60)]);
+		expect(finger.armed[0]).toBe(false);
+		expect(finger.gestures.map((g) => g.kind)).toEqual(["lift", "carry", "drop"]);
+		expect(run([down(10, 10, true, { target: plus }), move(30, 10), up(30, 10)]).gestures.map((g) => g.kind)).toEqual(["lift", "drop"]);
+		expect(run([down(10, 10, false, { target: plus }), { kind: "held" }, up(10, 10)]).gestures).toEqual([{ kind: "tap", target: plus, mouse: false, mod: false, shift: false }]);
+	});
+
+	it("lifts a section's header as a card: a finger held, a mouse moved; a tap is its menu", () => {
+		const head = { act: "head", key: "head:t14" };
+		expect(run([down(10, 10, false, { target: head }), { kind: "held" }, move(10, 60), up(10, 60)]).gestures.map((g) => g.kind)).toEqual(["lift", "carry", "drop"]);
+		expect(run([down(10, 10, true, { target: head }), move(10, 30), up(10, 30)]).gestures.map((g) => g.kind)).toEqual(["lift", "drop"]);
+		expect(run([down(10, 10, true, { target: head }), up(10, 10)]).gestures).toEqual([{ kind: "tap", target: head, mouse: true, mod: false, shift: false }]);
 	});
 });
