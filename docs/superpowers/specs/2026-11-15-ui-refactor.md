@@ -1,286 +1,275 @@
 # Plugin UI refactor: a model, a timeline, drivers
 
-Issue: kudrmax/obsidian-task-tracker#41 (takes in #40). Branch `ui-refactor`. Revision 4.
+Issue: kudrmax/obsidian-task-tracker#41 (takes in #40). Branch `ui-refactor`. Revision 5.
 
-**How this revision was made.** Revisions 1–3 were written top-down and each review found new holes. The cause was not too few reviews: the spec never started from what the plugin actually is. So this revision starts from a complete inventory of the current UI, made by reading every file:
+## How this spec is made
 
-- `ui-refactor/inventory-state-effects.md`:
+Revisions 1–3 were written top-down, and every review found new holes: the spec never started from what the plugin actually is. Since revision 4 it starts from a complete inventory of the current UI, made by reading every file:
+
+- [`ui-refactor/inventory-state-effects.md`](ui-refactor/inventory-state-effects.md):
   - 565 state locations; 45 facts held in more than one place;
-  - 819 effect call sites, 417 of them ordered by nothing;
-  - 180 event sources that redraw.
-- `ui-refactor/inventory-behaviour.md`: 203 inputs and gestures, 84 motions, 84 DOM measurements, 52 screen states.
+  - 819 effect call sites, 417 ordered by nothing;
+  - 180 event sources.
+- [`ui-refactor/inventory-behaviour.md`](ui-refactor/inventory-behaviour.md): 203 inputs, 84 motions, 84 measurements, 52 screen states.
 
-The spec derives a few principles from the root cause and builds the architecture from them. `ui-refactor/traceability.md` maps every inventory row to the mechanism that owns it; an unmapped row is a spec defect. A review finding is answered at the level of the principle or inventory that missed it, never with a one-off rule.
+[`ui-refactor/traceability.md`](ui-refactor/traceability.md) maps every one of those 2,032 rows to the mechanism that owns it. A row that does not fit is a defect of a principle, not of the row: revision 4 left 688 rows in 23 classes, and an independent architecture review found seven faults at the root. Revision 5 corrects the principles themselves; §Resolution shows where each of the 23 classes now lands. The traceability is rerun against every revision until no row is left over.
 
 ## The root cause
 
-**The UI has no model.** Truth lives in the DOM and in work in flight:
+**The UI has no model.** Truth lives in the DOM and in work in flight.
 
-| What should be a model | Where it is today | The defects it produces |
+| What should be in the model | Where it is today | Defects |
 |---|---|---|
-| **Facts:** what the screen shows | Class fields, CSS classes, `dataset`, inline styles, the DOM. The day shown lives in 9 places, the place on the strip in 11, an open field in 12. | Parts disagree: a hidden ribbon (D58), a title over old lists (D55), a mode jumping. |
-| **Time:** what happens in what order | Promise chains and flags: `act`, `changing`, `turning`, `drawnLanding`, `afterEntry`, `Picks`, `WriteQueue`, `ScreenParts`. 417 calls go through none of them. | Races: a deleted task flashes back (D77), a pick before the close (D81), `endCarry` before the drop (D75). |
-| **Geometry:** sizes and places | Read from the live DOM at the moment of need (84 places), often while something animates. | Gaps, jumps, measuring a ghost (A4, D60, D67, D76). |
-| **Motion:** what moves and why | Inferred by diffing geometry (FLIP over every row) or by CSS transitions on state classes. | Cards fly in on a context change (A3); rows jump on lift (A5); a context change animated (D61). |
-| **Interaction:** what the user is in the middle of | Each gesture's own flags plus an arbiter, and redraws deferred by hand. | A redraw under the finger, debris after a drag, a tap during a settle (D65, D66, c89c7ba8). |
+| **Facts:** what the screen shows | Fields, CSS classes, `dataset`, inline styles, the DOM. The shown day sits in 9 places, the strip's place in 11, an open field in 12. | Parts disagree (D58, D55) |
+| **Time:** what happens in what order | Eight promise chains and flags (`act`, `changing`, `turning`, `drawnLanding`, `afterEntry`, `Picks`, `WriteQueue`, `ScreenParts`); 417 calls under none | Races (D75, D77, D81) |
+| **Consistency:** which data a frame is drawn from | Each read applied as it lands; a frame may mix a new title with old lists, or one list read before a write with another read after it | A frame from two generations (D55, D56, D65, D84, D85) |
+| **Geometry:** sizes and places | Read from the live DOM when needed (84 places), often mid-animation | Gaps, jumps, measuring a ghost (A4, D60, D67, D76) |
+| **Motion:** what moves and why | Inferred by diffing geometry over every row, or by CSS transitions on state classes | Cards flying on a context change (A3), rows jumping on lift (A5), D61 |
+| **Interaction:** what the user is in the middle of | Each gesture's own flags, an arbiter, redraws deferred by hand | A redraw under the finger, debris after a drag, D66 |
 
-Every past defect traces back to one of these rows. The fix is to give the UI a model and make every one of these things part of it, or an input to it.
+Out of scope, and kept so: where a task lands, what a drop means and what a menu offers. These are rules, and they live in the core (`application`).
 
 ## Principles
 
-Each principle is an invariant and has a mechanism that enforces it. The guards are in §Guards.
+Every principle has a mechanism and a guard (§Guards).
 
 **P1. One model.**
-- Everything the screen shows is a pure function of one `Model` per screen: `view(model)`.
-- A fact has exactly one field. A derived fact is computed (a selector), never stored.
-- The DOM, CSS classes and inline styles are outputs only, never read back as truth.
+- What the screen shows is a pure function of the model: `view(model)`.
+- A fact has one field; a derived fact is a selector.
+- The DOM, classes and styles are outputs, never read back as truth.
+- The core's answers (`FunnelView`, `ViewChoice`, its sessions) are held as the core gives them, never copied.
+- The one exception is **typed text**: while a field has focus, the field owns its text (CodeMirror, an `<input>`). The model receives edits and never writes back into a focused field. This keeps the caret, IME and the iPhone keyboard intact.
 
 **P2. One timeline.**
-- The model changes only by messages, processed one at a time in arrival order: `update(model, msg) → [model, commands]`.
-- All work outside the model (core services, the vault, Obsidian, timers, the network) is a command. Its outcome comes back as a message.
-- File work is one plugin-wide sequence, shared by the leaf and every note block. A read knows the number of the last write before it.
-- **An interaction ends only when the read of its write lands.** Until then the interaction itself, which lives in the model (P5), shows its outcome:
-  - the dropped card stays where it landed;
-  - the renamed text stays typed;
-  - the new line stays a row.
+- The model changes only by messages, one at a time, in arrival order: `update(model, msg) → [model, commands]`.
+- Everything outside the model is a command, and its outcome is a message: core services, the vault, Obsidian, timers, the network.
+- **Dispatch is synchronous.** A message from a user's event is processed, and its focus and keyboard work is done, inside that same event. iOS raises the keyboard only within the tap.
+- **Every wait has a bound.** A command that waits for something has a timeout, and the timeout is a message.
 
-  So there is no separate optimistic layer to keep in sync.
+**P3. Every frame is one consistent snapshot.**
+- File work is one plugin-wide numbered sequence, shared by the leaf, every note block and the settings tab. A write takes its number **when the user's message is processed**, so the order of writes is the order of what the user did.
+- After every write the runtime reads the file back itself, so nothing depends on the vault watcher. Every read carries the number of the last write before it.
+- What a screen draws:
 
-**P3. Geometry is input.**
-- What only the browser knows (a text's wrapped height, the stage's size, the keyboard, where Obsidian's toolbar is) enters the model as a message from an observer.
-- Everything else (widths, shares, stacked heights, the ribbon per place, drop places) is computed from the model and the core's rules.
-- Nothing reads geometry to decide anything while drawing.
-- Pointer positions are input, like any other.
+  ```
+  shown = fold(pending writes, last read)
+  ```
 
-**P4. Motion is declared by its cause.**
-- A message that should move something says so: its result carries a `Transition` (what moves, from what, why), numbered.
-- Drivers execute each transition once.
-- A change without a transition is drawn in place: another context, an outside read, a re-render.
-- No motion is inferred from a diff, and no CSS transition animates layout.
+  - **A pending write** is the write's patch: the moved card at its landing, the renamed text, the new row. Pending writes are plugin-wide, so every screen shows them.
+  - **Retiring a write:** it leaves when a read numbered at or above it lands, and the read then takes over. If the write fails, its patch leaves with a reverse transition and a notice.
+  - **Several writes in flight** simply fold one over another.
+- **A context change is a transaction:** another filter, mode, day or place. The model keeps the change pending until every read the new context needs has landed, then switches in one message. A frame never mixes contexts.
 
-**P5. One interaction at a time, inside the model.** A gesture, typing, an open menu or sheet: each is a state machine in the model, at most one active.
-- Messages the interaction itself causes apply at once.
-- Outside changes (a vault read it didn't ask for, the minute tick) wait in the model and apply when it ends.
-- Who wins and who hands off is a property of the machines, not of an arbiter beside them.
+**P4. Geometry is input.**
+- **Sizes from the browser:** what only the browser knows enters the model as a message from an observer, and is never held back: text and card heights, the stage, the keyboard, Obsidian's toolbar, scroll positions where something depends on them.
+- **Everything else is computed** from the model and the core's rules: widths, shares, stacked heights, the ribbon per place, drop places.
+- **A frame has three phases:**
+  1. render the end state;
+  2. `measure` reads what changed;
+  3. `motion` animates from the declared start to the measured end.
 
-**P6. Imperative code lives only at the edges.**
-- `update` and `view` are pure.
-- DOM work that can't be declarative (animations, scroll, focus, measuring, Obsidian's `Menu`, `Modal`, CodeMirror, body classes) lives in a few **drivers**: each owns one kind of side effect, takes orders from the model and reports back with messages.
-- Services are called only from the **effect runner**.
+  All three run before the paint.
+- No other code reads geometry, ever.
+
+**P5. Motion only within one context.**
+- **Context change:** nothing moves; the screen is drawn in place, as `screen.md` says.
+- **Within one context:** a row moves only when its keyed position changed between two models (added, moved, removed, Undo, whether the change came from Max or from the file). The model diff decides what moves; DOM geometry only executes it.
+- **Interactions declare their own motions as transitions.** The carried card following the pointer, folds under a lift, room at a list's end, the drop and cancel flights, swipes, the panel slide, the divider snap, the keyboard ride. Each transition is numbered and runs once.
+- **No motion otherwise:** a re-render, a measurement or a resize without a declared transition is applied in place.
+- **Drivers report** `motionSettled(id)` or `motionInterrupted(id, at)`.
+- A row that is leaving, or an overlay that is closing, stays in the model until its motion settles.
+- Continuous gestures (divider, ribbon scrub, pinch, carry) go through a **transient channel**: the input driver passes the live value to `motion`, which lays out with the same pure selectors over the model plus that value. So there is no second layout engine. When a value crosses a step that changes what is drawn (a pinch zoom level, a divider snap), it dispatches.
+
+**P6. Interactions are layers, and they pin; they never freeze data.**
+- **The interaction state** is a stack of modal layers (screen → select mode → full card → field → menu or sheet) plus at most one pointer gesture. It is a statechart.
+  - Hand-offs are transitions: hold → drag; long press → pinch on a second finger; a sheet to the next sheet.
+  - Escape and tap order are reads of the stack.
+  - The arbitration rules A16 are its table.
+- **Data always applies at once:** reads, the minute tick, midnight, settings.
+- **What a layer pins:** each layer and gesture declares the entities it holds — the carried card with its lift place and drop places, the typed row, the menu's task, the full card's task. A change that touches a pinned entity becomes a message to that layer (`targetChanged`, `targetGone`), and the layer decides: cancel the carry, close the menu, keep the typed text.
+- **Only the active pointer gesture defers anything:** a re-layout that would move what is under the finger. Nothing else ever waits.
+
+**P7. Imperative code only at the edges.**
+- `update`, selectors and `view` are pure.
+- **Drivers** own the DOM work that is not declarative: each owns one kind of side effect, takes orders from the model and reports with messages.
+- **The effect runner** owns services.
+- **Pure core queries** that every draw or pointer move needs (`snap`, `menu`, `listName`, `relation`, `isPast`…) come through a `CoreQueries` port, with the clock taken from the model. They are allowed in selectors.
+- **The core's sessions** (`QuickEntrySession`, `SectionNameEntry`, `RepeatPage`, `DescriptionDraft`, the carry) are the machines themselves. The runtime holds them, a command calls them, and the model holds their latest snapshot. They are never re-implemented.
 
 ## Architecture
 
 ```
 obsidian/ui/next/
-  model/      Model, Msg (one discriminated union), selectors          pure
-  update/     update(model, msg) → [model, Cmd[]]; machines            pure
-  effects/    effect runner: Cmd → services/vault/Obsidian → Msg; the file sequence
-  view/       Preact components: view(model, dispatch)                  pure
-  drivers/    motion, scroll, focus, measure, input, chrome, islands   the only DOM side effects
-  host/       mounting into TaskCalendarView and ProjectBlocks; the plugin-wide runtime
+  model/       Model, Msg (one union), selectors, CoreQueries port        pure
+  update/      update(model, msg) → [model, Cmd[]]; layers; gestures      pure
+  recognizers/ pointer, touch and wheel streams → gesture messages        pure
+  effects/     the effect runner, the file sequence, pending writes,
+               the network lane, the core sessions                        services
+  view/        Preact components                                           pure
+  drivers/     motion, measure, scroll, focus, input, keys, chrome,
+               islands                                                     DOM
+  host/        the plugin runtime (main.ts), the leaf host, the note-block
+               host, the settings-tab host
 ```
 
-**Rendering: Preact 11, TSX.**
+**Preact 11, TSX.**
 - TSX is checked by the project's own TypeScript 7 and bundled by esbuild without a plugin. Tests run in vitest with happy-dom, and the guards already read `.tsx`.
-- Svelte was rejected: `svelte-check` requires TypeScript ≤6, and its `animate:flip` infers motion from geometry, which P4 forbids.
-- React is the same model at 10× the size.
+- Svelte is rejected: `svelte-check` requires TypeScript ≤6, and its `animate:flip` infers motion from geometry.
 
-**The runtime.**
-- One per plugin.
-- **The file sequence:** shared by every screen; strictly serial; jobs are numbered.
-- **The network lane:** calendar events, latest wins, cancelled through `AbortController`.
-- **Dispatch:** FIFO, never nested.
-- **Notification:** subscribers hear once per microtask, through selectors with an equality check. A component re-renders only when its slice changed, and rows are `memo` with stable props.
-- **Action log:** a ring buffer of the last 200 messages, dumped on any failure and attached to QA reports. A race found once becomes a replayed test.
+**The plugin runtime** (in `main.ts`, one per plugin):
+- **The file sequence** and the pending writes.
+- **The settings and device-store writes,** numbered like file writes. An echo of our own write is dropped by its number.
+- **The network lane:** calendar events, latest wins per day. A superseded fetch is abandoned (its result is ignored); no contract change is needed.
+- **Every screen's store:** dispatch is FIFO and never nested.
+  - Subscribers are notified once per microtask, through selectors with an equality check.
+  - Rows are `memo` with stable props.
+- **Action log:** a ring buffer of the last 200 messages, dumped on any failure and attached to QA reports. A race found once is replayed as a test.
 
 **Drivers.**
 
-| Driver | Owns | Takes from the model | Reports |
+| Driver | Owns | From the model | Reports |
 |---|---|---|---|
-| `motion` | Every animation (WAAPI) and every inline `style` or CSS variable set from the model | numbered `Transition`s; layout variables | `motionSettled(id)` |
-| `scroll` | Every programmatic scroll; anchoring while rows fold; `ScrollHold` | a scroll order (`reveal`, `toHour`, `keep`, `edge`) | `userScrolled(scroller)`, which hands scroll ownership to the user |
-| `focus` | Focus and the caret: `focus({ preventScroll: true })`; CodeMirror focus | the field to focus | `focused`, `blurred` |
-| `measure` | `ResizeObserver` on content boxes; text-width fits | which boxes to observe | `measured(sizes)`, held while a motion runs |
-| `input` | Pointer, touch, wheel and keys, turned into messages. Frame-rate positions go straight to the `motion` driver (the transient channel), never through `update`. It calls `preventDefault` synchronously from the active machine. | the active machine (read synchronously) | gesture messages at discrete steps |
-| `chrome` | Obsidian's body classes, `css-change`, the keyboard inset, the status bar room, toolbar placement, popout windows | — | `platform`, `theme`, `keyboard`, `toolbar` |
-| `islands` | Obsidian `Menu` and `Modal`, `MarkdownRenderer`, `EmbeddedEditor` (CodeMirror): each a host node created once and never diffed | which island is open, with its model | the pick only after the close; edits |
+| `motion` | WAAPI animations; every inline style and CSS variable from the model; reading the boxes it animates, in the commit phase only | transitions; layout variables; live values from the transient channel | `motionSettled`, `motionInterrupted` |
+| `measure` | `ResizeObserver`; text fits; scroll positions where needed | which boxes | `measured`, `scrolled` (quantised), `scrollSettled` |
+| `scroll` | every programmatic scroll; anchoring while rows fold; `ScrollHold` | scroll orders: `reveal`, `toHour`, `keep`, `edge`, `open` | `userScrolled` (ownership passes to the user) |
+| `focus` | focus with `preventScroll`; CodeMirror focus; done synchronously within a user event | the field to focus | `focused`, `blurred` |
+| `input` | pointer, touch, wheel; `preventDefault` decided synchronously from the gesture state | the gesture state | raw streams for `recognizers/` |
+| `keys` | Obsidian `Scope`s, `app.keymap.pushScope`, shortcuts per tab or block | the layer stack | key messages |
+| `chrome` | body classes, `css-change`, the keyboard inset, the status-bar room, the toolbar, popout windows, theme tokens per window | what to show in the chrome (body classes such as entering, keyboard up) | `platform`, `theme`, `keyboard`, `toolbar`, `window` |
+| `islands` | CodeMirror (`EmbeddedEditor`), `MarkdownRenderer` output, Obsidian `Modal`: host nodes made once, never diffed | which island, with its model | edits, close |
 
-## How the principles answer each part of the inventory
+The plugin's own menus and sheets (task, bulk, section, project, event, view, more, sources, search, the full card) are its own DOM, so they become **Preact layers**, not islands.
 
-**State (P1).**
-- The 45 duplicated facts each become one `Model` field or one selector over the core's answer; `traceability.md` names each.
-- The view mode, place, filter and panel stay where the core keeps them (`FunnelView`, `ViewChoice`): the model holds the core's last answer and never copies it into a second field.
-- The 565 locations fall into four kinds:
-  - **model fields:** facts;
-  - **selectors:** derived;
-  - **driver-local:** a running `Animation`, an observer, a pointer id;
-  - **gone:** caches of the DOM.
+**Picks**, made explicit:
+1. **A write pick** takes its sequence number at the tap. It runs after the closing sheet's motion settles, or immediately when nothing closes.
+2. **A typing pick** (rename, a new subtask, a section name) focuses the field synchronously inside the tap, so the iPhone keyboard rises.
+3. **A hand-over** (⋯ → Search, a subtask's menu) is one layer transition from one sheet to the next.
 
-**Effects (P2).**
-- The 819 call sites become commands, grouped in `traceability.md`: file reads, file writes, view changes, carry calls, undo, settings writes, calendars, Obsidian actions, notices, haptics.
-- The eight ordering mechanisms disappear into the timeline:
+## Resolution of the traceability classes
 
-  | Today | In the new layer |
-  |---|---|
-  | `act`, `changing`, `WriteQueue` | the file sequence |
-  | `Picks` | the islands driver |
-  | `afterEntry` | the entry machine holds a day or place switch until its write is read |
-  | `turning`, `drawnLanding` | the day-swipe machine |
-  | `ScreenParts`, arbiter deferral | P5: outside changes wait in the model |
-  | `Reload` | coalescing in the effect runner |
-
-- A write that fails is a `failed` message. The interaction that caused it ends with the old state and a notice command; a `StaleTaskError` or an undo `conflict` take the same path.
-- The 180 event sources are the inputs of the runtime: vault, settings, clock, visibility, focus, poll, `css-change`, resize.
-
-**Behaviour: inputs and gestures (P5).**
-- The 203 inputs map onto the machines, each a pure reducer inside `update`:
-  - **carry:** a card, subtasks, a section, the plus, a tree node, a selection;
-  - **timeline:** hold, select, menu, drag, resize, new slot;
-  - **ribbon swipe**, with trackpad glide and rubber band;
-  - **day swipe**, with the peek;
-  - **pinch**;
-  - **divider** and **tree divider**;
-  - **wheel drag**;
-  - **naming:** a section, a project, a new project;
-  - **entry:** quick bar, rename, subtask, section field;
-  - **menu or sheet:** task, bulk, section, project, event, view, more, sources, the full card, search;
-  - **select mode**.
-- The arbitration rules A16.1–A16.17 become one table of which machine may start from which, plus explicit hand-offs (hold → drag; long press → pinch on a second finger; a finger down during a settle catches the strip).
-- Escape and tap order are functions over the active machine.
-- The peek is part of the day-swipe machine's state, a read of its own, so no stale-context rule ever drops it.
-
-**Motions (P4).**
-- All 84 motions stay, approved and code-only alike: behaviour does not change. Each becomes a `Transition` kind emitted by the message that causes it, executed by `motion` or `scroll`:
-  - list slides, grow-in and fold-away after a user's write, in the lists it touched;
-  - the carried card following the pointer;
-  - subtasks or a section folding under a lift;
-  - a list giving room at its end;
-  - the drop flight and the cancel flight;
-  - the ribbon between places;
-  - the day slide;
-  - the docked panel sliding with the columns;
-  - the divider snap;
-  - stacked heights;
-  - menus rising and paging;
-  - the quick bar riding the keyboard;
-  - fades of overlays and blocks;
-  - scroll glides;
-  - auto-scroll at an edge.
-- A transition runs once, by its number. A re-render never animates.
-- `styles.css` keeps transitions only for colour, opacity and press feedback.
-
-**Measurements (P3).**
-- Of the 84, the ones only the browser can answer become `measure` messages:
-  - text and card heights for the stacked rows and the stops;
-  - the note block's height;
-  - menu sizes for placement;
-  - title widths for the whole-title copy;
-  - the stage size;
-  - the keyboard inset;
-  - the toolbar position.
-- Drop places are computed from the model, from measured row heights, at lift time and again after a read the carry asked for.
-- The rest are derived from the model and the core's rules (`layoutWidths`, `layoutShareAt`, `stackedLists`, `RibbonColumns`, `swipeLanding`).
-- Token reads (C8) are read once per theme change into the model.
-
-**Screens (P1).** The 52 screen states are `view(model)` compositions:
-- one layout component per `ViewChoice.layout`;
-- the note block as the same view in a block host;
-- the missing file, empty states and Done as model states.
-
-## Decisions that follow from the principles
-
-These answer every review finding on revisions 1–3, each from a principle rather than a patch:
-
-1. **Our own write read back by the watcher (P2).** The vault watcher's read is queued in the file sequence like any other. It carries the number of the last write before it, and so the write's transition. The order of arrival cannot change what moves.
-2. **Several writes in flight (P2, P5).** Each interaction holds its own outcome until the read with its write's number lands. Two drops show two held cards; nothing has to be merged.
-3. **A new task's identity (P1).** A typed row keeps its key for life. The create returns the new task: an additive contract change, `create*` → `CreatedTask` as `createWithId` does today. The model then records `taskId → rowKey`. The field never remounts, and the iPhone keyboard stays.
-4. **The ribbon (P3).** It is laid out per place from `RibbonColumns`. A swipe scrubs between the two places' layouts through the transient channel; the distance comes from the core rule, as `swipeLanding` expects.
-5. **The day peek (P5).** It is part of the day-swipe machine. When the swipe lands, the new day is read; the peek is never promoted.
-6. **Approved motions during a carry (P4).** They are transitions of the carry machine. "Nothing moves under the finger" means nothing moves that the carry didn't cause.
-7. **Drop targets after a read the carry asked for (P3, P5).** The carry machine recomputes them from the model when that read lands.
-8. **Pointer rate (P6).** Positions go from `input` to `motion` directly. Only discrete steps dispatch, and the render counter test proves it.
-9. **Rows heights (P3).** Rows are observed per card. The heights are held while a motion runs and applied on `motionSettled`. The observed boxes never get their size from the result, so there is no loop.
-10. **Islands (P6).** A menu's pick is delivered after its close, whatever order Obsidian fires them in.
+| Class | Rows | Where it lands now |
+|---|---|---|
+| M1 the settings tab | `SettingsTab`, `SettingsPage`, `RowReorder` | Its own host in the same architecture (step 6). Its writes go through the plugin runtime. |
+| M2 the plugin host | `main.ts` | The plugin runtime (architecture). |
+| M3 chrome both ways | body classes, tokens | The `chrome` driver takes the classes to show and reports platform and theme. |
+| M4 synchronous core reads | `snap`, `menu`, `relation`… | `CoreQueries` in selectors (P7). |
+| M5 the core's sessions | `QuickEntrySession`… | They are the machines (P7). |
+| M6 menus | the plugin's own menus | Preact layers (architecture). |
+| M7 pick timing | `pickNow`, hand-overs | Three kinds of pick; synchronous dispatch (P2). |
+| M8 one interaction | select mode, field, menu, full card | A stack of layers plus one gesture (P6). |
+| M9 motion by cause | added, moved, removed, Undo | A keyed diff within one context; no motion across contexts (P5). Changes from the file move as they do today. |
+| M10 leaving rows, closing overlays | | Stay in the model until `motionSettled` (P5). |
+| M11 heights held during motion | D76 | Measurements are never held. The commit phase animates them (P4). |
+| M12 continuous values | pinch grid, divider | The transient channel; dispatch on a step (P5). |
+| M13 positions as geometry | | `motion` reads the boxes it animates, in the commit phase only (P4). |
+| M14 scroll | anchors, peek scroll, carry offsets | `measure` reports scroll; `scroll` owns writes. |
+| M15 swipe settle | A7.6 | A tap does not stop a settle; it goes where it lands (`screen.md`). |
+| M16 unbounded waits | 1000 ms, 2000 ms, flight + 20 ms | Every wait has a timeout message (P2). |
+| M17 the device and settings stores | | Numbered writes, echoes dropped (runtime). |
+| M18 the network lane | | Latest wins per day; abandoned, not aborted. |
+| M19 cross-screen renames | `RenamedTexts` | Pending writes are plugin-wide (P3). |
+| M20 gesture recognition | | `recognizers/`, pure. |
+| M21 all service callers | `DayData`, `DayPeek`, `CarryReport`, `ProjectBlocks`, `BottomCapsule`, `viewSettings`, `SearchWindow`, `GroupNameField` and the rest | Every one joins the runtime in step 1. The guard then covers the whole of `obsidian/ui`. |
+| M22 a dropped card before its read | | Its pending write's patch (P3). |
+| M23 Obsidian key scopes | `pushScope` | The `keys` driver. |
 
 ## Guards
 
 `tests/uiRules.test.ts` covers `obsidian/ui/next`:
 
-- **Pure core:**
-  - `model/`, `update/` and `view/` import no DOM global, `obsidian`, service or driver.
-  - `view/` imports only `model/` selectors and `dispatch`.
-- **Edges:**
-  - Services are called only in `effects/`.
-  - Timers and animation frames only in `effects/` and `drivers/`.
-  - `.animate(`, `.style`, `setProperty`, scroll writes, `.focus(`, `getBoundingClientRect`, `offset*`, `client*` sizes, `getComputedStyle` and `ResizeObserver` only in their own driver. JSX `style` is not used.
-- **Classes and data:** `classList` and `dataset` writes only in `chrome`. Classes are computed in JSX, and no code reads a class to decide.
-- **Messages:** `Msg` is a union handled with `assertNever`.
-- **Windows:** no bare `document` or `window`; everything goes through the node's own window (popouts).
+- **Purity:**
+  - `model/`, `update/`, `recognizers/` and `view/` import no DOM global, `obsidian`, service or driver.
+  - `view/` imports only selectors, `CoreQueries` and `dispatch`.
+- **Services and timers:**
+  - Services only in `effects/` and `host/`.
+  - Timers and frames only in `effects/` and `drivers/`.
+- **DOM work, each only in its own driver:**
+  - `.animate(`, `.style`, `setProperty`, `getBoundingClientRect`, `offset*`, `client*` sizes and `getComputedStyle`: `motion` and `measure`.
+  - Scroll writes: `scroll`.
+  - `.focus(`: `focus`.
+  - `ResizeObserver`: `measure`.
+  - `classList` and `dataset` writes: `chrome`.
+  - Scopes: `keys`.
+
+  JSX `style` is not used, and no code reads a class to decide.
+- **Messages:** `Msg` is handled exhaustively (`assertNever`).
+- **Windows:** no bare `document` or `window`.
 
 `tests/styles.test.ts` also:
 - scans `.tsx`;
-- bans `transition` of `height`, `width`, `margin`, `padding`, `top`, `left` and `transform`;
+- bans a `transition` of `height`, `width`, `margin`, `padding`, `top`, `left` or `transform`;
 - bans state classes or pseudo-elements that change a box's size.
 
-`tests/uiFreeze.test.ts`: from step 0, `obsidian/ui` outside `next/` and the old rules of `styles.css` may only shrink.
-- It checks totals per directory and fails on a new file.
-- A growth needs an entry in `uiFreeze.allow.ts` with the commit and the reason.
+`tests/uiFreeze.test.ts`: the old `obsidian/ui` outside `next/` and its rules in `styles.css` may only shrink. It checks totals per directory and fails on a new file. A growth needs an entry in `uiFreeze.allow.ts` with the commit and the reason.
 
-| "Impossible by construction" | Enforced by |
+| Impossible by construction | Enforced by |
 |---|---|
-| Reading the file before an earlier write, in any screen | the file-sequence tests; services only in `effects/` (old callers join in step 1, after which the rule covers the whole of `obsidian/ui`) |
-| Moving something no cause declared | `Transition` tests; the frame recorder |
-| Animating a context change, or one cause twice | transition-number tests |
+| A write running out of the order Max acted in; a read before an earlier write | sequence tests; services only in `effects/` (the whole `obsidian/ui` from step 1) |
+| A frame mixing two contexts or two generations | transaction and fold tests |
+| A card flashing back after a drop or a rename | pending-write tests |
+| Motion across a context change; a transition running twice | `update` and `motion` tests; the frame recorder |
 | Re-rendering at pointer rate | the render-counter test |
-| One fact in two places | the purity and class guards; the `Model` type is the only state; `traceability.md` reviewed |
-| A redraw under the finger | the P5 tests: outside reads during each machine |
-| Focus scrolling the screen | `focus` driver only, with `preventScroll` |
+| A redraw under the finger | the gesture tests: a read during each gesture |
+| A screen going stale while a menu, field or the full card is open | the layer tests: reads apply under every layer |
+| One fact in two places | the purity and class guards; `traceability.md` rerun |
+| Focus scrolling the screen; the iPhone keyboard not rising on a pick | the `focus` driver tests; the phone checklist |
 
-## Migration
+## Migration: slices, not layers
 
-The new layer grows inside the old screen and takes it over part by part. The plugin works after every step, and each step merges green. Releases go out at ★.
+Cutting by layer would leave two truths alive for months, the old DOM state beside the new model: the very defect class. The new code is cut by host instead, and each slice is whole.
 
-| Step | Moves | Replaces |
+| Slice | What | Release |
 |---|---|---|
-| 0 | Contract: `create*` returns `CreatedTask` (`backend`). The runtime, the effect runner, the drivers' skeletons, the host mount, the guards, the freeze, the e2e harness. | — |
-| 1 | `Model`, `update`, the file sequence under the old drawing. Every service caller goes through commands (`CalendarScreen`, `QuickEntryController`, menus, full card, `main.ts`). Failures become messages. | `act`, `changing`, `Picks`, `WriteQueue`, `afterEntry`, the duplicated mode, place, panel and day fields. The old drawing reads the model through one adapter that compares references, so an unchanged read never redraws. |
-| 2 | Lists, cards and section headers as components; list transitions; the entry machine. Merged, not released. | `KeyedRows`, FLIP, `EntryRows`, `is-redrawn` |
-| 3 ★ | The carry machine with its transitions and computed drop places; tree lift; select mode. | `DragController`, `DragSession`, `ListDrop`, `GroupDrag`, `LongPress`, `BulkController` |
-| 4 ★ | Ribbon, both swipes with the peek, pager, divider, wheel, the docked panel slide. | `RibbonLayout`, `ScreenTracks`, `Swipe`, `ScreenPager`, `DayPeek`, `Divider`, `ColumnSwitch`, `turning`, `drawnLanding` |
-| 5 | Columns, Rows, By project, the projects panel and tree, the note block. | `ColumnsLayout`, `RowsLayout`, `ByProjectLayout`, `BlockHeight`, `projects/*` |
-| 6 ★ | Timeline and pinch; menus and sheets as islands; full card; search. | `Timeline`, `PinchZoom`, `menu/*`, `full/*`, `search/*` |
-| 7 ★ | Delete what was replaced; `CalendarScreen` gone; the freeze baselines reach zero. | — |
+| 1 | **The runtime under the old code:**<ul><li>contract change: `create*` → `CreatedTask` (`backend`);</li><li>the file sequence, pending writes and read-back;</li><li>numbered settings writes, the network lane, the action log;</li><li>every service caller in `obsidian/ui` goes through it.</li></ul>Replaces `act`, `changing`, `Picks`, `WriteQueue`, `Reload`. | ★ fixes the race class on its own |
+| 2 | **The guards and the freeze; the e2e harness** (old-against-new diff, frame recorder, budget, input driving). | — |
+| 3 | **The note block, whole, on the new architecture:** `host/block`, the Rows and By-subprojects layouts, lists, cards, the entry field, carry inside the block, menus, the full card. It has no swipe and stands still (D63, D82). | ★ |
+| 4 | **The leaf as a new screen behind a hidden setting** (`newScreen`, off). It is built region by region (lists and layouts, the timeline, the ribbon with both swipes and the peek, the panel and tree, the carry across all of them, select mode, search), with old-against-new e2e in the same build. Max's screen is untouched while it grows. | — |
+| 5 | **Switch.** When the leaf's e2e matrix passes and an independent QA finds nothing, `newScreen` turns on by default. | ★ with Max's phone checklist |
+| 6 | **The settings tab on the new architecture.** | ★ |
+| 7 | **Delete** the old screen, the setting and the freeze baselines. `CalendarScreen` is gone. | ★ |
 
 ## Tests
 
-1. **`update` (unit), including each machine:**
-   - every row of decisions 55–87 and of the fix commits, replayed as message logs;
-   - every arbitration rule A16;
-   - the review findings: watcher-first reads; several writes in flight; a failed write; undo conflict; two screens; a stale read; an outside read during each machine; the peek.
-2. **The runtime (unit):** sequence numbers; FIFO; coalescing; notification by selector.
-3. **Views (happy-dom):** what each draws for a model; the render counter; the caret and composition surviving an update.
-4. **Drivers (happy-dom):**
-   - a transition runs once;
-   - running motions are cancelled before the next one measures;
+1. **`update` (unit):**
+   - every decision 55–87 and fix commit as a replayed message log;
+   - every A16 arbitration rule as a layer or gesture transition;
+   - the transaction;
+   - folding pending writes, with several in flight and with a failure;
+   - a read under every layer and every gesture;
+   - pinned targets changed or gone;
+   - timeouts.
+2. **The runtime (unit):** numbers taken at the user's message; read-back; settings echoes; FIFO; notification by selector; the network lane.
+3. **Recognizers (unit):** every input of the inventory's section A as a stream.
+4. **Views (happy-dom):** what each draws for a model; the render counter; the caret and composition surviving updates.
+5. **Drivers (happy-dom):**
+   - transitions run once;
+   - running motions are cancelled before the next measure;
+   - interruption is reported;
    - scroll yields to the user;
-   - the island order.
-5. **End to end (`scripts/e2e/`, CDP against a test Obsidian with a copy of Max's real file):**
-   - **Old against new:** the old master and the branch run in turn on twin vaults, with a frozen clock, fixture calendars and the network stubbed. Screenshots are diffed per matrix state, at most 1 px per region, with masks listed.
-   - **Frame recorder:** every keyed row's box, relative to its list, and the layout parts, every frame. A row moving without a transition fails, as does overshoot, a rest more than 0.5 px off, gaps or overlaps, or a swipe landing two places away.
-   - **Budget:** under 8 ms of script per frame with 300 tasks at 4× CPU, and no long task over 16 ms.
-   - **Coverage:** each of the 203 inputs has a case, in modes × desktop and phone view × light and dark.
-6. **Max's phone checklist at each ★,** under 5 minutes, for what emulation cannot show: momentum scroll, the rubber band, the real keyboard, a lost lift. Anything found becomes a case above.
+   - focus happens within the event.
+6. **End to end (`scripts/e2e/`, CDP, a test Obsidian with a copy of Max's real file):**
+   - **Old against new** in one build, behind `newScreen`. Twin vaults, a frozen clock, fixture calendars, the network stubbed. Diff per state at most 1 px per region, with masks listed.
+   - **Frame recorder:** row boxes relative to their lists, plus the layout parts, every frame. It fails on:
+     - motion without a cause;
+     - motion across a context;
+     - overshoot;
+     - a rest more than 0.5 px off;
+     - gaps or overlaps;
+     - a swipe landing two places away.
+   - **Budget:** under 8 ms of script per frame with 300 tasks at 4× CPU; no long task over 16 ms.
+   - **Coverage:** each of the 203 inputs has a case, across modes, desktop and phone view, light and dark.
+7. **Max's phone checklist at each ★** (under 5 minutes): what emulation cannot show — momentum scroll, the rubber band, the real keyboard and the keyboard rising on a pick, a lost lift. A finding becomes a case above.
 
 ## Done when
 
-- `traceability.md` maps every inventory row and the reviewer finds none unmapped.
+- `traceability.md`, rerun against this revision, leaves no row over.
 - Every guard is green, and every row of the "impossible" table has its test.
-- The e2e matrix passes old against new, the frame budget holds, an independent QA pass on a copy of Max's real file finds no defect, and the phone checklist passes at every ★.
+- The e2e matrix passes old against new, the budget holds, an independent QA on a copy of Max's real file finds no defect, and the phone checklist passes at each ★.
 - `CalendarScreen` is gone, and `docs/plugin/` is unchanged.
 
 ## How it is built
 
-- `backend` makes the contract change in step 0. Each later step is one `frontend-obsidian` agent; the lead checks the diff, the tests and the screens.
-- After every step a fresh reviewer gets the diff, the principles and the traceability rows of that step. It is told to find where the code breaks a principle, not to list taste.
-- After steps 3–7 a fresh QA agent is told to break it on the e2e matrix.
-- A finding is answered by naming the principle or the inventory row that let it through and fixing that, never by adding a one-off rule.
+- `backend` makes the contract change in slice 1. After that, one `frontend-obsidian` agent per slice or region; the lead checks every diff, test and screen.
+- After each slice or region a fresh reviewer gets the diff, the principles and that part's traceability rows, and finds where the code breaks a principle.
+- After slices 3, 4 and 5 a fresh QA agent is told to break it on the e2e matrix.
+- A finding is answered by naming the principle or the inventory row that let it through, and fixing that.
