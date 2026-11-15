@@ -13,4 +13,6 @@ export type FreezeAllowance =
 	| { readonly commit: string; readonly reason: string; readonly file: string }
 	| { readonly commit: string; readonly reason: string; readonly cssBytes: number };
 
-export const ALLOWED: readonly FreezeAllowance[] = [];
+export const ALLOWED: readonly FreezeAllowance[] = [
+	{ commit: "e8e77bdc", reason: "The old screen's task links leave through outside() (browse), so the e2e build records them and nothing opens on Max's Mac", dir: "obsidian/ui", lines: 2 },
+];

@@ -63,13 +63,35 @@ const isCommit = (sha: string): boolean => {
 	}
 };
 
+const isShallow = (): boolean => {
+	try {
+		return execFileSync("git", ["rev-parse", "--is-shallow-repository"], { cwd: ROOT, encoding: "utf8" }).trim() === "true";
+	} catch {
+		return false;
+	}
+};
+
+/**
+ * Whether an allowance's commit is known. The baseline is facts kept in `uiFreeze.baseline.ts`, never a commit looked up,
+ * so the freeze holds in any clone. Only the allowances name commits: a shallow clone may lack an old one, and there the
+ * lookup gives way (with a note) to the rest of the check (the commit's form, the reason, the amount).
+ */
+export function commitCheck(lookup: (sha: string) => boolean, shallow: boolean, note: (text: string) => void): (sha: string) => boolean {
+	return (sha) => {
+		if (lookup(sha)) return true;
+		if (!shallow) return false;
+		note(`uiFreeze: ${sha} is not in this shallow clone; its allowance is checked for its form and reason only`);
+		return true;
+	};
+}
+
 describe("the old screen is frozen", () => {
 	it("grows nowhere past its baseline and allowances", () => {
 		expect(grown(measure(), FROZEN, ALLOWED)).toEqual([]);
 	});
 
 	it("allows growth only with a commit and a reason", () => {
-		expect(unexplained(ALLOWED, isCommit)).toEqual([]);
+		expect(unexplained(ALLOWED, commitCheck(isCommit, isShallow(), (text) => console.warn(text)))).toEqual([]);
 	});
 });
 
@@ -102,6 +124,16 @@ describe("the freeze guard itself", () => {
 		expect(unexplained([{ commit: "abc1234", reason: "fix", cssBytes: 1 }], () => true)).toHaveLength(1);
 		expect(unexplained([{ commit: "abc1234", reason: "Max asked for the drop line", cssBytes: 1 }], () => false)).toHaveLength(1);
 		expect(unexplained([{ commit: "abc1234", reason: "Max asked for the drop line", cssBytes: 1 }], () => true)).toEqual([]);
-		expect(isCommit("76d85642")).toBe(true);
+		const head = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+		expect(isCommit(head)).toBe(true);
+		expect(isCommit("0000000")).toBe(false);
+	});
+
+	it("needs no history for the baseline, and lets a shallow clone lack an allowance's commit with a note", () => {
+		const notes: string[] = [];
+		expect(commitCheck(() => false, false, (n) => notes.push(n))("abc1234")).toBe(false);
+		expect(commitCheck(() => false, true, (n) => notes.push(n))("abc1234")).toBe(true);
+		expect(notes).toEqual([expect.stringMatching(/shallow clone/)]);
+		expect(unexplained([{ commit: "nope", reason: "Max asked for the drop line", cssBytes: 1 }], commitCheck(() => false, true, () => undefined))).toHaveLength(1);
 	});
 });
