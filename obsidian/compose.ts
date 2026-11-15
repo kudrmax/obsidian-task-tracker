@@ -41,12 +41,14 @@ export interface Services extends Core {
 
 export interface ServicesHost {
 	readonly pluginDir: string;
+	/** An address in the browser (Google's login). */
+	browse(url: string): void;
 	readonly shortcuts: WorkCalendarShortcutHost;
 }
 
 export function createServices(app: App, host: ServicesHost, settings: SettingsStore, clock: Clock = systemClock, http: Http = obsidianHttp): Services {
 	const token = (fields: Record<string, string>) => requestToken(http, settings.get().google.clientId, settings.get().google.clientSecret, fields);
-	const login = new GoogleRedirectLogin(browserLoginDeps(token));
+	const login = new GoogleRedirectLogin(browserLoginDeps(token, (url) => host.browse(url)));
 	const auth = new GoogleAuth(settings, login, token, clock);
 	const googleApi = new GoogleCalendarApi(auth, settings, clock, http);
 	const watcher = new VaultPathWatcher(app.vault);

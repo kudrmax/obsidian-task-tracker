@@ -1,3 +1,5 @@
+import { HARNESS } from "./frames";
+
 /** A Chrome DevTools Protocol session over Node's own WebSocket: calls by id, events by name. */
 export class Cdp {
 	private nextId = 1;
@@ -59,10 +61,11 @@ export class Cdp {
 	}
 
 	/** Evaluates `expression` in the page (an async function body: `return` what it answers), by value. */
+	/** Runs `body` in the page as an async function; it marks its run in a trace (`HARNESS.evalBegin`…`evalEnd`), so the budget leaves the harness's own script out. */
 	async eval<T = unknown>(body: string, timeoutMs = 30_000): Promise<T> {
 		const answer = await this.call<{ result: { value?: unknown }; exceptionDetails?: { exception?: { description?: string }; text: string } }>(
 			"Runtime.evaluate",
-			{ expression: `(async () => {${body}\n})()`, awaitPromise: true, returnByValue: true },
+			{ expression: `(async () => { console.timeStamp("${HARNESS.evalBegin}"); try {${body}\n} finally { console.timeStamp("${HARNESS.evalEnd}"); } })()`, awaitPromise: true, returnByValue: true },
 			timeoutMs,
 		);
 		if (answer.exceptionDetails) throw new Error(`in the page: ${answer.exceptionDetails.exception?.description ?? answer.exceptionDetails.text}`);

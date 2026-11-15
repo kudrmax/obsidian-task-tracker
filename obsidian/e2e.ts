@@ -1,6 +1,6 @@
 import type { Clock } from "../core/application/ports";
 import type { Http, HttpRequest, HttpResponse } from "./infrastructure/Http";
-import TaskCalendarPlugin from "./main";
+import TaskCalendarPlugin, { type Outside } from "./main";
 import type { ViewDeps } from "./ui/TaskCalendarView";
 
 /**
@@ -69,8 +69,8 @@ export default class E2ETaskCalendarPlugin extends TaskCalendarPlugin {
 	 * link in a task) and the Mac's scripts (Calendar) are recorded, never opened. `window.open` and `location.assign`
 	 * are taken over in this test window for the same reason: the plugin's views and Google's login open through them.
 	 */
-	protected override outside(): { open(url: string): void; runScript(script: string, args: readonly string[]): void } {
-		return { open: (url) => void this.opened.push(url), runScript: (script) => void this.opened.push(`osascript: ${script.slice(0, 60)}`) };
+	protected override outside(): Outside {
+		return { open: (url) => void this.opened.push(url), browse: (url) => void this.opened.push(url), runScript: (script) => void this.opened.push(`osascript: ${script.slice(0, 60)}`) };
 	}
 
 	override async onload(): Promise<void> {

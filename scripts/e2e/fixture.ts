@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 import { calendarPath } from "../../core/application/calendarFile";
 import type { TaskCalendarSettings } from "../../core/settings";
 import type { E2EFixture } from "../../obsidian/e2e";
-import type { Paths } from "./paths";
+import { inVault, type Paths } from "./paths";
 
 /**
  * The fixture: a copy of Max's real tasks file and settings, taken once and kept (`--refresh-fixture` takes it again), so
@@ -81,7 +81,7 @@ function calendarsOf(day: string, now: Date, settings: TaskCalendarSettings): Pi
 export function takeFixture(p: Paths): void {
 	const data = JSON.parse(readFileSync(join(MAX_VAULT, ".obsidian/plugins/task-calendar/data.json"), "utf8")) as Record<string, unknown> & { tasksFile?: string; google?: Record<string, unknown>; projectTag?: string };
 	const tasksFile = data.tasksFile ?? "TODOs Tasks.md";
-	const tasks = readFileSync(join(MAX_VAULT, tasksFile), "utf8");
+	const tasks = readFileSync(inVault(MAX_VAULT, tasksFile), "utf8");
 	const settings = { ...data, google: { ...data.google, clientId: "e2e", clientSecret: "", refreshToken: "e2e" } };
 	const tag = (data.projectTag ?? "#task_project").replace(/^#/, "");
 	const notes: Record<string, string> = {};

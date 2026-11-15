@@ -268,7 +268,22 @@ function nothingMoved(step: StepLog): string[] {
 	return moved || changed ? [] : ["the gesture moved nothing"];
 }
 
-export const FRAME_RULES = { unsettled, nothingMoved, motionWithoutCause, rowsAnimatedAcrossContext, rowsAcrossContext, stillness, overshoot, continuity, restOff, snap, gapsAndOverlaps, swipeLanding };
+/** A row that leaves the screen for some frames and comes back: a remount drawn as a flash (the old one gone, the new one a frame or more later). */
+function flash(step: StepLog): string[] {
+	const out: string[] = [];
+	for (const t of tracks(step)) {
+		for (let i = 1; i < t.boxes.length; i++) {
+			const [before, after] = [t.boxes[i - 1].frame, t.boxes[i].frame];
+			if (after > before + 1) {
+				out.push(`a flash: ${t.key} was gone for ${after - before - 1} frame${after - before - 1 === 1 ? "" : "s"} (${before + 1}–${after - 1}) and came back`);
+				break;
+			}
+		}
+	}
+	return out;
+}
+
+export const FRAME_RULES = { unsettled, nothingMoved, flash, motionWithoutCause, rowsAnimatedAcrossContext, rowsAcrossContext, stillness, overshoot, continuity, restOff, snap, gapsAndOverlaps, swipeLanding };
 
 /** Every failure of a step, by the rules of §Tests 6. */
 export function judge(step: StepLog): string[] {
@@ -284,6 +299,8 @@ export interface BudgetFrame {
 
 export interface Budget {
 	readonly frames: readonly BudgetFrame[];
+	/** The page's own script events in the trace (the harness's evaluations, its frame sampler and the bare frame callbacks left out). */
+	readonly scriptEvents: number;
 	/** Every main-thread task over 16 ms, from the trace (not only the 50 ms the page's PerformanceObserver tells). */
 	readonly longTasks: readonly { readonly t: number; readonly ms: number }[];
 }
@@ -291,6 +308,8 @@ export interface Budget {
 /** The budget (§Tests 6): under 8 ms of script in any frame that ran script, no task over 16 ms. */
 export function judgeBudget(b: Budget): string[] {
 	const out: string[] = [];
+	if (b.frames.length === 0) out.push("the trace holds no frame: the gesture was not traced, or the page drew nothing");
+	if (b.scriptEvents === 0) out.push("the trace holds no script of the page: the gesture ran nothing, or the trace missed the page's thread");
 	const worked = b.frames.filter((f) => f.scriptMs > 0);
 	const worst = worked.reduce((m, f) => Math.max(m, f.scriptMs), 0);
 	if (worst >= 8) out.push(`${worst.toFixed(1)} ms of script in a frame (budget 8)`);
@@ -313,7 +332,34 @@ interface TraceEvent {
 	readonly dur?: number;
 	readonly pid: number;
 	readonly tid: number;
-	readonly args?: { readonly name?: string };
+	readonly args?: { readonly name?: string; readonly data?: { readonly message?: string; readonly functionName?: string } };
+}
+
+/** The marks every harness evaluation leaves in a trace (`Cdp.eval`, `console.timeStamp`) and its frame sampler's function (`page.ts`). */
+export const HARNESS = { evalBegin: "e2e:eval", evalEnd: "e2e:evaled", sampler: "__e2eTick" } as const;
+
+type Span = readonly [number, number];
+
+/** The union of spans, sorted and merged: nested ones counted once. */
+function union(spans: readonly Span[]): [number, number][] {
+	const out: [number, number][] = [];
+	for (const [s, e] of [...spans].sort((a, b) => a[0] - b[0])) {
+		const top = out[out.length - 1];
+		if (top && s <= top[1]) top[1] = Math.max(top[1], e);
+		else out.push([s, e]);
+	}
+	return out;
+}
+
+/** `spans` with `cut` taken out of them. */
+function minus(spans: readonly Span[], cut: readonly Span[]): [number, number][] {
+	let rest: [number, number][] = spans.map(([s, e]) => [s, e]);
+	for (const [cs, ce] of cut)
+		rest = rest.flatMap(([s, e]): [number, number][] => {
+			if (ce <= s || cs >= e) return [[s, e]];
+			return [...(cs > s ? [[s, cs] as [number, number]] : []), ...(ce < e ? [[ce, e] as [number, number]] : [])];
+		});
+	return rest;
 }
 
 const SCRIPT_EVENTS = new Set(["FunctionCall", "EvaluateScript", "v8.compile", "V8.Execute", "RunMicrotasks", "TimerFire", "FireAnimationFrame", "EventDispatch", "v8.callFunction"]);
@@ -330,13 +376,27 @@ export function budgetOfTrace(events: readonly TraceEvent[]): Budget {
 		.sort((a, b) => b.n - a.n)[0]?.id;
 	const main = events.filter((e) => `${e.pid}:${e.tid}` === busiest && e.ph === "X" && e.dur !== undefined);
 	const starts = main.filter((e) => e.name === "FireAnimationFrame").map((e) => e.ts).sort((a, b) => a - b);
-	const scripts = main.filter((e) => SCRIPT_EVENTS.has(e.name)).map((e) => [e.ts, e.ts + e.dur!] as const).sort((a, b) => a[0] - b[0]);
-	const merged: [number, number][] = [];
-	for (const [s, e] of scripts) {
-		const top = merged[merged.length - 1];
-		if (top && s <= top[1]) top[1] = Math.max(top[1], e);
-		else merged.push([s, e]);
+	const marks = events.filter((e) => `${e.pid}:${e.tid}` === busiest && e.name === "TimeStamp").sort((a, b) => a.ts - b.ts);
+	const harness: Span[] = [];
+	let open: number | null = null;
+	for (const m of marks) {
+		if (m.args?.data?.message === HARNESS.evalBegin) open = m.ts;
+		if (m.args?.data?.message === HARNESS.evalEnd && open !== null) {
+			harness.push([open, m.ts]);
+			open = null;
+		}
 	}
+	if (open !== null) harness.push([open, Number.POSITIVE_INFINITY]);
+	const scriptSpans = main.filter((e) => SCRIPT_EVENTS.has(e.name)).map((e) => [e.ts, e.ts + e.dur!] as const);
+	/** An evaluation's own script holds its marks: the whole event goes, with everything run between the marks. */
+	const evaluations = scriptSpans.filter(([s, e]) => harness.some(([hs, he]) => s <= he && e >= hs));
+	const sampler = main.filter((e) => e.name === "FunctionCall" && e.args?.data?.functionName === HARNESS.sampler).map((e) => [e.ts, e.ts + e.dur!] as const);
+	const cut = union([...harness, ...evaluations, ...sampler]);
+	const merged = minus(union(scriptSpans), cut).filter(([s, e]) => e > s);
+	/** The page's own work: what is left of its script once the harness's is cut, the frame callbacks' wrapper aside. */
+	const scriptEvents = main
+		.filter((e) => SCRIPT_EVENTS.has(e.name) && e.name !== "FireAnimationFrame")
+		.filter((e) => minus([[e.ts, e.ts + e.dur!]], cut).some(([a, b]) => b > a)).length;
 	const frames: BudgetFrame[] = [];
 	for (let i = 0; i + 1 < starts.length; i++) {
 		const [from, to] = [starts[i], starts[i + 1]];
@@ -344,5 +404,5 @@ export function budgetOfTrace(events: readonly TraceEvent[]): Budget {
 		frames.push({ start: from / 1000, interval: (to - from) / 1000, scriptMs: script / 1000 });
 	}
 	const longTasks = main.filter((e) => (e.name === "RunTask" || e.name === "ThreadControllerImpl::RunTask") && e.dur! > 16_000).map((e) => ({ t: e.ts / 1000, ms: e.dur! / 1000 }));
-	return { frames, longTasks };
+	return { frames, longTasks, scriptEvents };
 }

@@ -1,6 +1,7 @@
 /**
- * What a host leaves alive (P8): DOM listeners, observers, timers and frames, Obsidian's key scopes and event
- * references, and any subscription that answers its unsubscribe. Installed over a window before a host mounts; after it
+ * What a host leaves alive (P8): DOM listeners (added or set as an `on…` property), observers, timers, frames, idle
+ * callbacks, immediates and queued microtasks, running animations, Obsidian's key scopes and event references, and any
+ * subscription that answers its unsubscribe. Installed over a window before a host mounts; after it
  * unmounts, `alive()` names everything it started and did not end. The hosts of slices 3 and 4 (the note block, the
  * leaf, the settings tab) run under it in `tests/hostLifecycle.test.ts`.
  *
@@ -12,6 +13,11 @@
  *   …mount, act, unmount…
  *   expect(leaks.alive()).toEqual([]);
  *   leaks.uninstall();
+ *
+ * A promise's reactions are not counted, and need not be: a chain of them either ends (it has run by the time the test
+ * awaits the queued microtasks) or keeps queueing itself, and then the event loop never reaches a macrotask again, so
+ * the test never finishes and fails on its timeout. A promise left waiting forever holds nothing alive but what
+ * something else (a listener, a timer, a subscription) would have to resolve, and that is counted.
  */
 
 type Listener = EventListenerOrEventListenerObject;
@@ -25,7 +31,13 @@ const capture = (options?: boolean | AddEventListenerOptions | EventListenerOpti
 export class LeakCounter {
 	private readonly listeners = new Map<string, { target: EventTarget; type: string; listener: Listener; capture: boolean }>();
 	private readonly observers = new Map<object, { kind: string; targets: Set<unknown> }>();
-	private readonly timers = new Map<string, string>();
+	/** What runs later, by pool: a handle is cleared within its pool (`clearTimeout` clears an interval: one pool in browsers). */
+	private readonly pending = new Map<string, Map<unknown, string>>();
+	/** `on…` properties set before install (Obsidian's own, the test runner's): never the host's. */
+	private readonly handlersBefore = new WeakMap<object, Map<string, unknown>>();
+	private readonly mediaQueries: WeakRef<object>[] = [];
+	private readonly animations = new Set<{ playState: string; effect?: { target?: unknown } | null; constructor: { name: string } }>();
+	private readonly animationsBefore = new Set<unknown>();
 	private readonly scopes = new Set<unknown>();
 	private readonly refs = new Map<unknown, string>();
 	private readonly subscribed = new Map<symbol, string>();
@@ -38,9 +50,13 @@ export class LeakCounter {
 	constructor(private readonly win: Window & typeof globalThis) {
 		this.patchListeners();
 		for (const kind of ["ResizeObserver", "MutationObserver", "IntersectionObserver"] as const) this.patchObserver(kind);
+		if (typeof (this.win as unknown as Record<string, unknown>).PerformanceObserver === "function") this.patchObserver("PerformanceObserver");
 		this.patchTimers();
 		this.patchMediaListeners();
 		this.patchMicrotasks();
+		this.patchAnimations();
+		this.patchMatchMedia();
+		for (const target of this.handlerTargets()) this.handlersBefore.set(target, this.handlersOf(target));
 	}
 
 	/** Obsidian's key scopes, as `app.keymap`: a scope pushed and never popped is alive. */
@@ -86,12 +102,56 @@ export class LeakCounter {
 	alive(): string[] {
 		return [
 			...[...this.listeners.values()].map((l) => `listener ${l.type} on ${this.name(l.target)}`),
+			...this.handlerProperties(),
 			...[...this.observers.values()].filter((o) => o.targets.size > 0).map((o) => `${o.kind} observing ${o.targets.size}`),
-			...this.timers.values(),
+			...[...this.pending.values()].flatMap((pool) => [...pool.values()]),
+			...this.runningAnimations(),
 			...[...this.scopes].map(() => "a key scope pushed"),
 			...this.refs.values(),
 			...this.subscribed.values(),
 		];
+	}
+
+	/** Where an `on…` handler keeps something alive: the window, its document and every element in it, the visual viewport, the media queries asked. */
+	private handlerTargets(): object[] {
+		const viewport = (this.win as { visualViewport?: object | null }).visualViewport;
+		const media = this.mediaQueries.map((r) => r.deref()).filter((m): m is object => !!m);
+		return [this.win, this.win.document, ...Array.from(this.win.document.querySelectorAll("*")), ...(viewport ? [viewport] : []), ...media];
+	}
+
+	/** The `on…` properties holding a function, own or inherited, on one target. */
+	private handlersOf(target: object): Map<string, unknown> {
+		const names = new Set<string>();
+		for (let o: object | null = target; o && o !== Object.prototype; o = Object.getPrototypeOf(o) as object | null)
+			for (const name of Object.getOwnPropertyNames(o)) if (/^on[a-z]+$/.test(name)) names.add(name);
+		const out = new Map<string, unknown>();
+		for (const name of names) {
+			let value: unknown;
+			try {
+				value = (target as Record<string, unknown>)[name];
+			} catch {
+				continue;
+			}
+			if (typeof value === "function" || (typeof value === "object" && value !== null)) out.set(name, value);
+		}
+		return out;
+	}
+
+	private handlerProperties(): string[] {
+		return this.handlerTargets().flatMap((target) => {
+			const before = this.handlersBefore.get(target);
+			return [...this.handlersOf(target)].filter(([name, value]) => before?.get(name) !== value).map(([name]) => `a handler property ${name} on ${this.name(target as EventTarget)}`);
+		});
+	}
+
+	/** Animations started since install that still run or wait (an infinite one never ends by itself). */
+	private runningAnimations(): string[] {
+		const doc = this.win.document as Document & { getAnimations?: () => unknown[] };
+		const all = new Set<unknown>([...this.animations, ...(typeof doc.getAnimations === "function" ? doc.getAnimations() : []).filter((a) => !this.animationsBefore.has(a))]);
+		return [...all]
+			.map((a) => a as { playState: string; effect?: { target?: unknown } | null; constructor: { name: string } })
+			.filter((a) => a.playState === "running" || a.playState === "paused")
+			.map((a) => `an animation ${a.playState} (${a.constructor.name}${a.effect?.target ? ` on ${this.name(a.effect.target as EventTarget)}` : ""})`);
 	}
 
 	uninstall(): void {
@@ -173,7 +233,7 @@ export class LeakCounter {
 		);
 	}
 
-	private patchObserver(kind: "ResizeObserver" | "MutationObserver" | "IntersectionObserver"): void {
+	private patchObserver(kind: "ResizeObserver" | "MutationObserver" | "IntersectionObserver" | "PerformanceObserver"): void {
 		const Original = (this.win as unknown as Record<string, unknown>)[kind] as (new (...args: never[]) => { observe(t: unknown, o?: unknown): void; disconnect(): void; unobserve?(t: unknown): void }) | undefined;
 		const observers = this.observers;
 		const Counted = class {
@@ -203,38 +263,80 @@ export class LeakCounter {
 		if (globalThis !== (this.win as unknown)) this.patch(globalThis as unknown as Record<string, unknown>, kind, () => Counted);
 	}
 
+	private pool(name: string): Map<unknown, string> {
+		let pool = this.pending.get(name);
+		if (!pool) this.pending.set(name, (pool = new Map()));
+		return pool;
+	}
+
+	/**
+	 * Timeouts and intervals share one pool of handles (a browser's `clearTimeout` clears an interval, and the other way);
+	 * frames, idle callbacks and Node's immediates each have their own. A handle is kept as it is (Node's are objects).
+	 */
 	private patchTimers(): void {
-		const timers = this.timers;
 		const pairs = [
-			["setTimeout", "clearTimeout", "a timeout", true],
-			["setInterval", "clearInterval", "an interval", false],
-			["requestAnimationFrame", "cancelAnimationFrame", "a frame", true],
-			["requestIdleCallback", "cancelIdleCallback", "an idle callback", true],
+			["setTimeout", "clearTimeout", "timer", "a timeout", true],
+			["setInterval", "clearInterval", "timer", "an interval", false],
+			["requestAnimationFrame", "cancelAnimationFrame", "frame", "a frame", true],
+			["requestIdleCallback", "cancelIdleCallback", "idle", "an idle callback", true],
+			["setImmediate", "clearImmediate", "immediate", "an immediate", true],
 		] as const;
 		const targets = globalThis === (this.win as unknown) ? [this.win] : [this.win, globalThis as unknown as Window & typeof globalThis];
 		for (const target of targets)
-			for (const [set, clear, what, once] of pairs) {
+			for (const [set, clear, poolName, what, once] of pairs) {
 				const host = target as unknown as Record<string, unknown>;
 				if (typeof host[set] !== "function") continue;
+				const pool = this.pool(`${poolName} ${targets.indexOf(target)}`);
 				this.patch(host, set, (original) =>
 					((fn: (...a: unknown[]) => void, ...rest: unknown[]) => {
 						let handle: unknown;
 						const wrapped = (...a: unknown[]) => {
-							if (once) timers.delete(`${set} ${String(handle)}`);
-							fn(...a);
+							if (once) pool.delete(handle);
+							if (typeof fn === "function") fn(...a);
 						};
 						handle = (original as (...a: unknown[]) => unknown).call(target, wrapped, ...rest);
-						timers.set(`${set} ${String(handle)}`, what);
+						pool.set(handle, what);
 						return handle;
 					}) as unknown,
 				);
+				if (typeof host[clear] !== "function") continue;
 				this.patch(host, clear, (original) =>
 					((handle: unknown) => {
-						timers.delete(`${set} ${String(handle)}`);
+						pool.delete(handle);
 						return (original as (h: unknown) => unknown).call(target, handle);
 					}) as unknown,
 				);
 			}
+	}
+
+	/** Every animation an element starts (`animate`), tracked to its end; the ones already running at install are not the host's. */
+	private patchAnimations(): void {
+		const doc = this.win.document as Document & { getAnimations?: () => unknown[] };
+		if (typeof doc.getAnimations === "function") for (const a of doc.getAnimations()) this.animationsBefore.add(a);
+		const proto = (this.win as unknown as { Element: { prototype: Record<string, unknown> } }).Element.prototype;
+		if (typeof proto.animate !== "function") return;
+		const animations = this.animations;
+		this.patch(proto, "animate", (animate) =>
+			function (this: Element, ...args: unknown[]) {
+				const animation = (animate as (...a: unknown[]) => { playState: string; effect?: { target?: unknown } | null; constructor: { name: string } }).apply(this, args);
+				animations.add(animation);
+				return animation;
+			} as unknown as Record<string, unknown>[string],
+		);
+	}
+
+	/** The media queries asked, so a handler property left on one is seen. */
+	private patchMatchMedia(): void {
+		const host = this.win as unknown as Record<string, unknown>;
+		if (typeof host.matchMedia !== "function") return;
+		const queries = this.mediaQueries;
+		this.patch(host, "matchMedia", (matchMedia) =>
+			((query: string) => {
+				const list = (matchMedia as (q: string) => object).call(this.win, query);
+				queries.push(new WeakRef(list));
+				return list;
+			}) as unknown,
+		);
 	}
 
 	/** A media query's old listeners (`addListener`), which Safari and older code still use. */
@@ -271,7 +373,7 @@ export class LeakCounter {
 
 	/** A microtask queued and not yet run: it runs after the host is gone. */
 	private patchMicrotasks(): void {
-		const timers = this.timers;
+		const timers = this.pool("microtask");
 		let next = 0;
 		const targets = globalThis === (this.win as unknown) ? [this.win] : [this.win, globalThis as unknown as Window & typeof globalThis];
 		for (const target of targets) {
@@ -279,7 +381,7 @@ export class LeakCounter {
 			if (typeof host.queueMicrotask !== "function") continue;
 			this.patch(host, "queueMicrotask", (original) =>
 				((fn: () => void) => {
-					const id = `microtask ${next++}`;
+					const id = next++;
 					timers.set(id, "a microtask");
 					return (original as (f: () => void) => void).call(target, () => {
 						timers.delete(id);

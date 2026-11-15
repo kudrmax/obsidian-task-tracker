@@ -21,6 +21,15 @@ import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
 import { ShownSettingsStore, ViewSettingsStore } from "./ui/viewSettings";
 
+/** The plugin's reach outside Obsidian (`TaskCalendarPlugin.outside`). */
+export interface Outside {
+	/** A link to another app (Shortcuts, the iPhone app, Calendar): on the phone the page goes there, on the Mac a window opens it. */
+	open(url: string): void;
+	/** An address in the browser. */
+	browse(url: string): void;
+	runScript(script: string, args: readonly string[]): void;
+}
+
 /** obsidian://task-calendar-open: a tap on a reminder on the phone opens the calendar. */
 const OPEN_ACTION = "task-calendar-open";
 
@@ -97,6 +106,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			settings: this.shownSettings(),
 			clock,
 			openInCalendar: (event) => calendarApp.open(event),
+			browse: (url) => outside.browse(url),
 		};
 	}
 
@@ -120,15 +130,19 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		return this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
 	}
 
-	/** Where the plugin reaches outside Obsidian: links to other apps (Shortcuts, the iPhone app, a calendar) and the Mac's scripts. The e2e build records them instead. */
-	protected outside(): { open(url: string): void; runScript(script: string, args: readonly string[]): void } {
-		return { open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), runScript: runAppleScript };
+	/**
+	 * Where the plugin reaches outside Obsidian: links to other apps (Shortcuts, the iPhone app, a calendar), an address
+	 * in the browser (a task's link, Google's login) and the Mac's scripts. The e2e build records them instead.
+	 */
+	protected outside(): Outside {
+		return { open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), browse: (url) => void window.open(url), runScript: runAppleScript };
 	}
 
 	private servicesHost(): ServicesHost {
 		return {
 			pluginDir: this.pluginDir,
 			shortcuts: { isPhone: Platform.isIosApp, vaultName: this.app.vault.getName(), open: (url) => this.outside().open(url) },
+			browse: (url) => this.outside().browse(url),
 		};
 	}
 

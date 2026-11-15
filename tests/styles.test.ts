@@ -553,8 +553,25 @@ const STYLES = readFileSync(join(__dirname, "..", "styles.css"), "utf8");
 /** The CSS below the marker. */
 const nextPart = (css: string): string => css.slice(css.indexOf(NEXT_MARKER) + NEXT_MARKER.length);
 
-/** Properties that size or place a box in its flow: a change of one moves the rows around it. */
-const LAYOUT = /^(width|height|min-width|min-height|max-width|max-height|inline-size|block-size|min-inline-size|min-block-size|max-inline-size|max-block-size|top|right|bottom|left|inset(-[\w-]+)?|margin(-[\w-]+)?|padding(-[\w-]+)?|border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-width)?|flex|flex-basis|flex-grow|flex-shrink|gap|row-gap|column-gap|grid(-[\w-]+)?|font-size|line-height|letter-spacing|display|position|all)$/;
+/**
+ * Properties that size or place a box in its flow: a change of one moves the rows around it. The box's own sizes and
+ * margins, and all that sizes its content: the font (a weight or a family widens a line), the wrapping and clamping of
+ * its text, its overflow (a scrollbar takes room), how it is sized and contained, how it floats, flows and aligns.
+ */
+const LAYOUT = new RegExp(
+	"^(" +
+		[
+			"width|height|min-width|min-height|max-width|max-height|inline-size|block-size|min-inline-size|min-block-size|max-inline-size|max-block-size",
+			"top|right|bottom|left|inset(-[\\w-]+)?|margin(-[\\w-]+)?|padding(-[\\w-]+)?",
+			"border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-(width|style))?|border-(width|style)",
+			"flex|flex-basis|flex-grow|flex-shrink|flex-direction|flex-wrap|flex-flow|order|gap|row-gap|column-gap|grid(-[\\w-]+)?",
+			"(align|justify|place)-(content|items|self)|vertical-align",
+			"font|font-[\\w-]+|line-height|letter-spacing|word-spacing|text-transform|text-indent|text-wrap(-[\\w-]+)?|white-space(-collapse)?|word-break|overflow-wrap|word-wrap|hyphens|tab-size|-webkit-line-clamp|line-clamp|-webkit-box-orient|text-overflow",
+			"aspect-ratio|zoom|box-sizing|float|clear|overflow(-x|-y|-block|-inline)?|scrollbar-gutter|scrollbar-width|contain|contain-intrinsic-[\\w-]+|content-visibility|writing-mode|direction|columns|column-(count|width|fill|span)|list-style(-[\\w-]+)?|table-layout",
+			"display|position|all",
+		].join("|") +
+		")$",
+);
 /** Of those, what sizes a box (its place aside). */
 const SIZE = (property: string): boolean => LAYOUT.test(property) && !/^(top|right|bottom|left|inset(-[\w-]+)?|position|all)$/.test(property);
 
@@ -604,16 +621,29 @@ const classesOf = (selector: string): string[] => compoundsOf(selector).filter((
 /** The new screens' own classes: `tc-n-…` for a component, `is-…` for its state, and the screen's root `task-calendar`. */
 const NEXT_CLASS = /^(tc-n-[\w-]+|is-[\w-]+|task-calendar)$/;
 
+/** A selector with every functional pseudo-class's argument taken out (`:not(.task-calendar)` scopes nothing). */
+const withoutArguments = (selector: string): string => {
+	let out = "";
+	let depth = 0;
+	for (let i = 0; i < selector.length; i++) {
+		const c = selector[i];
+		if (c === "(") depth++;
+		if (depth === 0) out += c;
+		if (c === ")") depth = Math.max(0, depth - 1);
+	}
+	return out;
+};
+
 /** The custom properties a declaration's value reads. */
 const reads = (value: string): string[] => [...value.matchAll(/var\((--[\w-]+)/g)].map(([, name]) => name);
 
 /** The new rules of §Guards, each answering its offenders. */
 const NEXT_RULES = {
-	/** Every rule sits under `.task-calendar`, so nothing of ours meets Obsidian's or iPadOS's own. */
+	/** Every rule sits under `.task-calendar` (named outside any `:not()`, `:has()`, `:is()`…), so nothing of ours meets Obsidian's or iPadOS's own. */
 	scoped: (s: Stylesheet): string[] =>
 		s.declarations
 			.filter((d) => !keyframed(d) && !d.selector.startsWith("@"))
-			.filter((d) => selectorsOf(d.selector).some((part) => !/\.task-calendar(?![\w-])/.test(part)))
+			.filter((d) => selectorsOf(d.selector).some((part) => !/\.task-calendar(?![\w-])/.test(withoutArguments(part))))
 			.map(where),
 	/** Only the new screens' classes: the old screen's `tc-…` and Obsidian's own are never selected from here. */
 	namespaced: (s: Stylesheet): string[] =>
@@ -697,6 +727,13 @@ describe("the next CSS guard itself", () => {
 		expect(NEXT_RULES.scoped(of("@keyframes tc-x { from { opacity: 0; } to { opacity: 1; } } .task-calendar .tc-n-x { animation: tc-x; }"))).toEqual([]);
 	});
 
+	it("takes no .task-calendar inside :not(), :has() or :is() for the scope", () => {
+		expect(NEXT_RULES.scoped(of(":not(.task-calendar) .tc-n-card { color: var(--tc-x); }"))).not.toEqual([]);
+		expect(NEXT_RULES.scoped(of("body:has(.task-calendar) .tc-n-card { color: var(--tc-x); }"))).not.toEqual([]);
+		expect(NEXT_RULES.scoped(of(".x:not(.task-calendar .y) .tc-n-card { color: var(--tc-x); }"))).not.toEqual([]);
+		expect(NEXT_RULES.scoped(of(".task-calendar:not(.is-x) .tc-n-card { color: var(--tc-x); }"))).toEqual([]);
+	});
+
 	it("trips on a class outside the new screens' namespace", () => {
 		expect(NEXT_RULES.namespaced(of(".task-calendar .tc-card { color: var(--tc-x); }"))).not.toEqual([]);
 		expect(NEXT_RULES.namespaced(of(".task-calendar .markdown-preview-view { color: var(--tc-x); }"))).not.toEqual([]);
@@ -709,6 +746,7 @@ describe("the next CSS guard itself", () => {
 		expect(NEXT_RULES.layoutMotion(of(".task-calendar .x { transition: var(--tc-move); }"), tokens)).not.toEqual([]);
 		expect(NEXT_RULES.layoutMotion(of(".task-calendar .x { transition-property: opacity, margin-top; }"), tokens)).not.toEqual([]);
 		expect(NEXT_RULES.layoutMotion(of("@keyframes tc-grow { from { height: 0; } to { height: 10px; } }"), tokens)).not.toEqual([]);
+		expect(NEXT_RULES.layoutMotion(of(".task-calendar .x { transition: font-weight 200ms; }"), tokens)).not.toEqual([]);
 		expect(NEXT_RULES.layoutMotion(of(".task-calendar .x { transition: var(--tc-fade), transform 200ms; }"), tokens)).toEqual([]);
 	});
 
@@ -726,6 +764,8 @@ describe("the next CSS guard itself", () => {
 		trips(".task-calendar .tc-n-card.is-open { --tc-n-h: var(--tc-x); } .task-calendar .tc-n-card { height: var(--tc-n-h); }");
 		trips(".task-calendar .tc-n-list::after { content: ''; height: var(--tc-x); }");
 		trips(".task-calendar .tc-n-list::after { content: ''; }");
+		for (const property of ["font", "font-weight", "font-family", "aspect-ratio", "-webkit-line-clamp", "line-clamp", "white-space", "zoom", "box-sizing", "float", "overflow", "overflow-y", "contain-intrinsic-size", "border-style", "text-wrap", "word-break", "align-items", "flex-wrap"])
+			trips(`.task-calendar .tc-n-card.is-open { ${property}: var(--tc-x); }`);
 		passes(".task-calendar .tc-n-card.is-open { opacity: var(--tc-x); }");
 		passes("body.is-mobile .task-calendar .tc-n-card { height: var(--tc-x); }");
 		passes("body.is-mobile.theme-dark .task-calendar .tc-n-card { height: var(--tc-x); }");

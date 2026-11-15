@@ -21,6 +21,7 @@ export default class DemoTaskCalendarPlugin extends TaskCalendarPlugin {
 			settings: this.shownSettings(),
 			clock,
 			openInCalendar: () => undefined,
+			browse: (url) => void window.open(url),
 		};
 	}
 }
