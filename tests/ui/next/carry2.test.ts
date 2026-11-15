@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type BlockLists, type BlockModel, currentLists, projectsView } from "../../../obsidian/ui/next/model/block";
 import type { CarryGeometry, MeasuredList } from "../../../obsidian/ui/next/model/carry";
 import { ringNear, sectionSlotAt, targetAt } from "../../../obsidian/ui/next/model/carryPlace";
-import { sectionLanding } from "../../../obsidian/ui/next/model/carryView";
+import { dropLine, rowMarks } from "../../../obsidian/ui/next/model/carryView";
 import type { CardRow, HeadRow } from "../../../obsidian/ui/next/model/lists";
 import { listsOf, PLUS_ANCHOR } from "../../../obsidian/ui/next/update/carry";
 import { itemOf } from "../../runtime/harness";
@@ -122,7 +122,7 @@ describe("the plus carried (the old block's PlusButton, PlusFloat, PlusRing)", (
 });
 
 describe("a section lifted by its header (the old block's GroupDrag)", () => {
-	it("lifts the section with its cards out of the pinned lists, no core carry", async () => {
+	it("lifts the section with its cards, which wait where they stand: nothing under it moves (P6), no core carry", async () => {
 		const h = await projectHarness();
 		const { model, out, head } = sectionLifted(h, "Errands");
 		expect(out.doors).toEqual([]);
@@ -130,8 +130,11 @@ describe("a section lifted by its header (the old block's GroupDrag)", () => {
 		expect(model.carry?.kind).toBe("section");
 		expect(model.carry?.section).toMatchObject({ name: "Errands", count: 1, lifted: 1, gap: 1 });
 		const pinnedDay = listsOf(model.pinned!).find((l) => l.column === "day")!.list.rows.map((r) => r.key);
-		expect(pinnedDay).not.toContain(head.key);
-		expect(pinnedDay).toHaveLength(3);
+		expect(pinnedDay).toContain(head.key);
+		const waiting = rowMarks(model).waiting;
+		expect(waiting.has(head.key)).toBe(true);
+		expect(model.carry?.section?.rows.every((key) => waiting.has(key) && pinnedDay.includes(key))).toBe(true);
+		expect(model.carry?.section?.rows.length).toBe(2);
 	});
 
 	it("reads the nearest slot from the headers' places, its own slots drawing no landing", async () => {
@@ -140,11 +143,14 @@ describe("a section lifted by its header (the old block's GroupDrag)", () => {
 		const day = model.carry!.geometry!.lists.find((l) => l.column === "day")!;
 		expect(sectionSlotAt(model.carry!, model.pinned!, day.rows[0].top)).toBe(0);
 		/** Below the last section the end is its own place: the slot nearest is its own, nothing drawn. */
-		expect(sectionSlotAt(model.carry!, model.pinned!, day.rows[2].top + CARD + 40)).toBe(1);
+		const last = day.rows[day.rows.length - 1];
+		expect(sectionSlotAt(model.carry!, model.pinned!, last.top + last.height + 40)).toBe(2);
 		const top = pass(h, model, { kind: "carry", msg: { kind: "slot", gap: 0 } }).model;
-		expect(sectionLanding(top)).toEqual({ column: "day", index: 0 });
+		/** The landing is a drop line over the first header, as a carried card's: it takes no room, so no row moves. */
+		expect(dropLine(top)).toEqual({ x: day.left, y: day.rows[0].top, width: day.width });
+		expect(top.motion).toEqual(model.motion);
 		const own = pass(h, model, { kind: "carry", msg: { kind: "slot", gap: 2 } }).model;
-		expect(sectionLanding(own)).toBeNull();
+		expect(dropLine(own)).toBeNull();
 	});
 
 	it("moves the section where it was let go (tasks.moveGroup) and folds the float onto its header", async () => {

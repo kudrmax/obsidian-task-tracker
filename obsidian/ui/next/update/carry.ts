@@ -155,9 +155,7 @@ export function updateCarry(model: BlockModel, msg: CarryMsg): Step {
 		case "slot": {
 			const carry = model.carry;
 			if (!carry?.section || carry.phase !== "carried" || carry.section.gap === msg.gap) return [model, []];
-			/** The landing place opens at the new slot and closes behind: the rows around it slide (a drawing that moves). */
-			const motion = { ...model.motion, seq: model.motion.seq + 1, cause: "move" as const };
-			return [{ ...model, carry: { ...carry, section: { ...carry.section, gap: msg.gap } }, motion }, []];
+			return [{ ...model, carry: { ...carry, section: { ...carry.section, gap: msg.gap } } }, []];
 		}
 		case "measured":
 			return model.carry ? [{ ...model, carry: { ...model.carry, geometry: msg.geometry } }, []] : [model, []];
@@ -227,7 +225,11 @@ function sectionRows(list: ListModel, head: string): readonly string[] {
 	return list.rows.slice(at, next < 0 ? undefined : next).map((row) => row.key);
 }
 
-/** A section lifted by its header (the old screen's `GroupDrag`): its rows leave the pinned lists, the list closing over them. */
+/**
+ * A section lifted by its header (the old screen's `GroupDrag`): its rows wait where they stand in the pinned lists, as a
+ * carried card's do, so nothing under it moves while it is carried (P6); the old list closed over it and opened a place
+ * where it would land, every row under it leaving its place and coming back (decision 58).
+ */
 function liftedSection(model: BlockModel, key: string, at: { readonly x: number; readonly y: number }, box: CarryModel["box"]): Step {
 	if (model.carry) return [model, []];
 	const lists = currentLists(model);
@@ -240,7 +242,7 @@ function liftedSection(model: BlockModel, key: string, at: { readonly x: number;
 	const carry: CarryModel = {
 		kind: "section",
 		ring: false,
-		section: { column: row.column, list: row.sectionList, head: key, group: head.group, name: head.name, count: head.count, groups: heads.map((x) => x.group), heads: heads.map((x) => x.key), lifted, gap: lifted },
+		section: { column: row.column, list: row.sectionList, head: key, group: head.group, name: head.name, count: head.count, groups: heads.map((x) => x.group), heads: heads.map((x) => x.key), lifted, gap: lifted, rows: sectionRows(row.list, key) },
 		id: key,
 		ids: [],
 		rows: [],
@@ -254,7 +256,7 @@ function liftedSection(model: BlockModel, key: string, at: { readonly x: number;
 		phase: "carried",
 		lands: null,
 	};
-	return [{ ...model, carry, pinned: without(lists, new Set(sectionRows(row.list, key))) }, [{ kind: "haptic" }, { kind: "measureCarry", measured: (geometry) => carryMsg({ kind: "measured", geometry }) }]];
+	return [{ ...model, carry, pinned: lists }, [{ kind: "haptic" }, { kind: "measureCarry", measured: (geometry) => carryMsg({ kind: "measured", geometry }) }]];
 }
 
 /** A section named in a writing call: by its id (`SectionRef`, decision 1), No section as it is. */

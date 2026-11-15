@@ -72,6 +72,8 @@ export interface SectionCarry {
 	readonly lifted: number;
 	/** The slot nearest the finger: before the section of that index, or past the last. */
 	readonly gap: number;
+	/** The section's own rows (its header, its cards, its plate): they wait where they stand while it is carried, as a carried card does. */
+	readonly rows: readonly string[];
 }
 
 export interface CarryModel {

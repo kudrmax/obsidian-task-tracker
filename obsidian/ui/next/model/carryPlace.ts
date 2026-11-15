@@ -111,11 +111,11 @@ export function ringNear(ring: { readonly left: number; readonly top: number; re
 }
 
 /**
- * The slot nearest a lifted section's finger (`y`, content pixels of the stack; the old screen's `nearestSlot`): the
- * slots are the tops of the list's headers and its end, the lifted section's own two at the place it left, measured
- * at the lift with the section gone from the list.
+ * Where each slot between a lifted section's list's sections stands (content pixels of the stack; the old screen's
+ * `nearestSlot`): the tops of the headers, then the list's end, measured at the lift with the section waiting in place;
+ * and the list's left and width, for the landing line drawn there. Null before the lift is measured.
  */
-export function sectionSlotAt(carry: CarryModel, lists: BlockLists, y: number): number | null {
+export function sectionSlots(carry: CarryModel, lists: BlockLists): { readonly tops: readonly number[]; readonly left: number; readonly width: number } | null {
 	const section = carry.section;
 	const geometry = carry.geometry;
 	if (!section || !geometry || lists.kind !== "rows") return null;
@@ -126,9 +126,16 @@ export function sectionSlotAt(carry: CarryModel, lists: BlockLists, y: number): 
 	const tops = row.list.rows.flatMap((r) => (r.kind === "head" ? [boxes.get(r.key)?.top ?? null] : [])).filter((top): top is number => top !== null);
 	const last = measured.rows.slice(-1).find(() => true);
 	const end = last ? last.top + last.height : measured.top;
-	const left = [...tops, end];
-	const place = (slot: number): number => left.slice(slot <= section.lifted ? slot : slot - 1).find(() => true) ?? end;
+	return { tops: [...tops, end], left: measured.left, width: measured.width };
+}
+
+/** The slot nearest a lifted section's finger (`y`, content pixels of the stack): before the section of that index, or past the last. */
+export function sectionSlotAt(carry: CarryModel, lists: BlockLists, y: number): number | null {
+	const slots = sectionSlots(carry, lists);
+	if (!slots) return null;
 	let best = 0;
-	for (let slot = 0; slot <= section.groups.length; slot++) if (Math.abs(place(slot) - y) < Math.abs(place(best) - y)) best = slot;
+	slots.tops.forEach((top, slot) => {
+		if (Math.abs(top - y) < Math.abs((slots.tops.slice(best, best + 1).find(() => true) ?? top) - y)) best = slot;
+	});
 	return best;
 }

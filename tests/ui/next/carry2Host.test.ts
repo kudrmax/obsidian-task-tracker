@@ -103,18 +103,17 @@ describe("the plus carried and a section lifted, drawn", () => {
 		expect([...host.node.querySelectorAll(".tc-n-group-name")].map((x) => x.textContent)).toContain("Shops");
 	});
 
-	it("lifts a section by its header: the stack float, its rows gone, the landing drawn before the header it would stand above", async () => {
+	it("lifts a section by its header: the stack float, its rows waiting where they stand, the landing a line over the header it would stand above", async () => {
 		const errands = [...host.node.querySelectorAll<HTMLElement>("[data-n-act='head']")].find((x) => x.textContent === "Errands")!;
 		errands.dispatchEvent(pointer("pointerdown", 0, 0));
 		errands.dispatchEvent(pointer("pointermove", 0, 20));
 		expect(host.model.carry?.kind).toBe("section");
 		expect(document.querySelector("[data-n-float-kind='section'] .tc-n-section-card-name")?.textContent).toBe("Errands");
-		expect([...host.node.querySelectorAll(".tc-n-group-name")].map((x) => x.textContent)).toEqual(["No section"]);
+		expect([...host.node.querySelectorAll(".tc-n-group-name")].map((x) => x.textContent)).toEqual(["No section", "Errands"]);
+		expect(errands.closest("[data-n-key]")?.className).toContain("is-waiting");
 		carry({ kind: "measured", geometry: geometryOf(host.model.pinned!) });
 		carry({ kind: "slot", gap: 0 });
-		const day = host.node.querySelector(".tc-n-group-drop")!;
-		expect(day).not.toBeNull();
-		expect((day.nextElementSibling as HTMLElement).dataset.nKey).toBe("head:none");
+		expect(host.node.querySelector("[data-n-key='drop-line']")).not.toBeNull();
 		carry({ kind: "drop" });
 		await settle(h.runtime);
 		expect(listsOf(currentLists(host.model)).find((l) => l.column === "day")!.list.rows.flatMap((r) => (r.kind === "head" ? [r.name] : []))).toEqual(["Errands", "No section"]);
