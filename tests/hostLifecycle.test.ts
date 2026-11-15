@@ -120,10 +120,25 @@ function referenceHost(forget: Kind | null = null): HostCase {
 /** What a block's host is told besides its session: the words and the reach outside, which the test does not hear. */
 const BLOCK_WORDS = { failure: () => "", notice: () => undefined, openLink: () => undefined };
 
-/** The note `Дружба.md` attached to the project Дружба, so its view shows a block. */
-function attachNote(session: HostSession): void {
-	const answer = session.call("tasks.setProjectNote", ["Дружба", "Дружба"]).answer;
-	if (!answer.ok) throw new Error(answer.error.message);
+/** The note `Дружба.md` attached to the project Дружба, so its view shows a block, and a task of the project for its lists. */
+function attachNote(session: HostSession, key: TaskKey): void {
+	for (const [method, args] of [
+		["tasks.setProjectNote", ["Дружба", "Дружба"]],
+		["tasks.setProject", [[key], "Дружба"]],
+	] as const) {
+		const answer = session.call(method, args).answer;
+		if (!answer.ok) throw new Error(answer.error.message);
+	}
+}
+
+/** A mouse pressed on the block's first card and moved past the drag's start: the card lifts, the block's own carry starts. */
+function liftFirstCard(parent: HTMLElement): void {
+	const card = parent.querySelector<HTMLElement>(".tc-n-card[data-n-act='card']");
+	if (!card) throw new Error("the block drew no card to lift");
+	const win = parent.ownerDocument.defaultView!;
+	const at = (type: string, x: number, y: number) => new win.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse", isPrimary: true, button: 0, clientX: x, clientY: y });
+	card.dispatchEvent(at("pointerdown", 10, 10));
+	card.dispatchEvent(at("pointermove", 10, 30));
 }
 
 /** A note's block on its own: mounted, drawn, its gesture lifting a card (a carry), unmounted. */
@@ -131,15 +146,12 @@ const blockHost: HostCase = {
 	name: "a note's block",
 	file: "block/BlockHost.tsx",
 	mount({ session, parent, app, key }) {
-		attachNote(session);
+		attachNote(session, key);
 		const host = new BlockHost({ session, app: app as never, ...BLOCK_WORDS }, "Дружба.md", parent.ownerDocument);
 		parent.appendChild(host.node);
 		host.mount();
 		return {
-			startGesture() {
-				const answer = session.call("tasks.startCarry", [{ keys: [key] }, true]).answer;
-				if (!answer.ok) throw new Error(answer.error.message);
-			},
+			startGesture: () => liftFirstCard(parent),
 			unmount: () => host.dispose(),
 		};
 	},
@@ -149,8 +161,8 @@ const blockHost: HostCase = {
 const noteBlocks: HostCase = {
 	name: "the notes' blocks",
 	file: "block/NoteBlocks.ts",
-	mount({ session, parent, app, openSession }) {
-		attachNote(session);
+	mount({ session, parent, app, key, openSession }) {
+		attachNote(session, key);
 		const doc = parent.ownerDocument;
 		const container = parent.appendChild(doc.createElement("div"));
 		const sizer = container.appendChild(doc.createElement("div"));
@@ -169,10 +181,7 @@ const noteBlocks: HostCase = {
 		blocks.start();
 		if (!sizer.contains(doc.querySelector("[data-n-key], .tc-n-block"))) throw new Error("the note's block was not placed after the editor's content");
 		return {
-			startGesture() {
-				const answer = session.call("tasks.startCarry", [{ keys: [] }, true]).answer;
-				if (!answer.ok) throw new Error(answer.error.message);
-			},
+			startGesture: () => liftFirstCard(sizer),
 			unmount: () => {
 				blocks.dispose();
 				container.remove();

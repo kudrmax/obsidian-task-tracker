@@ -7,4 +7,7 @@ export interface TaskMenuLayer {
 }
 
 /** The task menu's messages (its pages, its picks). */
-export type MenuMsg = { readonly kind: "opened"; readonly id: string };
+export type MenuMsg =
+	| { readonly kind: "opened"; readonly id: string }
+	/** The picked cards' menu (`tasks.bulkMenu` over `model.select.picked`). */
+	| { readonly kind: "openedBulk" };

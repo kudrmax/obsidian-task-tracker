@@ -41,6 +41,8 @@ export interface CardProps {
 	readonly classes?: string;
 	/** Its links are pressed (a menu's copy of the card); on a list's card a tap anywhere is the card's. */
 	readonly links?: boolean;
+	/** A copy (the carried float): no row key, so `motion` moves no copy as a row. */
+	readonly copy?: boolean;
 }
 
 /** The colours of a card as attributes the stylesheet paints (`data-priority`, `data-label0…`, `data-labels`), as the old screen's `markColours`. */
@@ -56,16 +58,18 @@ export function colourAttributes(face: Pick<CardFace, "tint" | "stripes">): Reco
  * the right (a folded task's next step under its own small title), the folder of its project, the counter over the
  * description's mark, the due date or the stage; a card peeking out under it while its subtasks are folded away.
  */
-export function Card({ rowKey, face, branch, listed, classes, links }: CardProps): JSX.Element {
+export function Card({ rowKey, face, branch, listed, classes, links, copy }: CardProps): JSX.Element {
 	const cls = ["tc-n-card", listed ? "tc-n-listed" : "", face.over !== null ? "tc-n-card-two" : "", face.folded && listed ? "tc-n-card-folded" : "", classes ?? ""].filter(Boolean).join(" ");
 	return (
-		<div class={cls} data-n-key={rowKey} data-status={face.status} data-n-act={listed ? "card" : undefined} {...colourAttributes(face)}>
-			<span class="tc-n-pick">
-				<Icon name="check" />
-			</span>
+		<div class={cls} data-n-key={copy ? undefined : rowKey} data-status={face.status} data-n-act={listed ? "card" : undefined} {...colourAttributes(face)}>
+			{copy ? null : (
+				<span class="tc-n-pick">
+					<Icon name="check" />
+				</span>
+			)}
 			<span class="tc-n-progress-dot" />
 			{face.over === null ? (
-				<div class="tc-n-card-title">
+				<div class="tc-n-card-title" data-n-title="">
 					<Title parts={face.title} links={links} />
 				</div>
 			) : (
@@ -73,7 +77,7 @@ export function Card({ rowKey, face, branch, listed, classes, links }: CardProps
 					<div class="tc-n-card-over">
 						<span class="tc-n-card-over-text">{face.over}</span>
 					</div>
-					<div class="tc-n-card-title">
+					<div class="tc-n-card-title" data-n-title="">
 						<Title parts={face.title} links={links} />
 					</div>
 				</div>

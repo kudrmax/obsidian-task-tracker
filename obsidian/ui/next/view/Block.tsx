@@ -1,7 +1,9 @@
 import type { JSX } from "preact";
 import { type BlockModel, canUndo, shownLists, viewChoice } from "../model/block";
+import { dropLine, type Marks, rowMarks } from "../model/carryView";
 import { Icon, modeIcon } from "./icons";
 import { List } from "./List";
+import { SelectFoot } from "./carry/SelectFoot";
 
 /** The core's icon of a mode (a Lucide name) as the design draws it. */
 
@@ -10,7 +12,7 @@ export interface BlockProps {
 }
 
 /** The lists of the block's mode: Rows (each list under its label, stacked) or By subprojects (the project's parts). */
-function Lists({ model }: BlockProps): JSX.Element | null {
+function Lists({ model, marks }: BlockProps & { readonly marks: Marks }): JSX.Element | null {
 	const lists = shownLists(model);
 	switch (lists.kind) {
 		case "rows":
@@ -19,13 +21,13 @@ function Lists({ model }: BlockProps): JSX.Element | null {
 					{lists.rows.map((row) => (
 						<div key={row.column} class="tc-n-row">
 							<div class="tc-n-row-label">{row.label}</div>
-							<List list={row.list} classes="tc-n-row-list" />
+							<List list={row.list} classes="tc-n-row-list" column={row.column} marks={marks} />
 						</div>
 					))}
 				</>
 			);
 		case "byProject":
-			return <List list={lists.list} classes="tc-n-projects-list" />;
+			return <List list={lists.list} classes="tc-n-projects-list" column="projects" marks={marks} />;
 		case "none":
 			return null;
 	}
@@ -38,10 +40,18 @@ function Lists({ model }: BlockProps): JSX.Element | null {
 export function Block({ model }: BlockProps): JSX.Element {
 	const choice = viewChoice(model);
 	const icon = choice ? modeIcon(choice.icon) : undefined;
+	const line = dropLine(model);
+	if (model.select?.selecting) return <SelectBlock model={model} />;
 	return (
 		<>
-			<div class={shownLists(model).kind === "byProject" ? "tc-n-stack tc-n-stack-projects" : "tc-n-stack"}>
-				<Lists model={model} />
+			<div class={shownLists(model).kind === "byProject" ? "tc-n-stack tc-n-stack-projects" : "tc-n-stack"} data-n-stack="">
+				<Lists model={model} marks={rowMarks(model)} />
+				{line ? (
+					<div class="tc-n-drop" data-n-key="drop-line">
+						<div class="tc-n-drop-dot" />
+						<div class="tc-n-drop-line" />
+					</div>
+				) : null}
 			</div>
 			<div class="tc-n-fade" />
 			<div class="tc-n-capsule" data-n-anchor="capsule">
@@ -60,6 +70,19 @@ export function Block({ model }: BlockProps): JSX.Element {
 			<button class="tc-n-btn tc-n-round tc-n-plus" aria-label="New task" data-n-act="plus">
 				<Icon name="plus" />
 			</button>
+		</>
+	);
+}
+
+/** Select tasks: the lists with their circles, the capsule with the cross and the count, the actions button where the plus stood. */
+function SelectBlock({ model }: BlockProps): JSX.Element {
+	return (
+		<>
+			<div class={shownLists(model).kind === "byProject" ? "tc-n-stack tc-n-stack-projects" : "tc-n-stack"} data-n-stack="">
+				<Lists model={model} marks={rowMarks(model)} />
+			</div>
+			<div class="tc-n-fade" />
+			<SelectFoot picked={model.select?.picked.length ?? 0} />
 		</>
 	);
 }

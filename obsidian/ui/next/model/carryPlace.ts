@@ -1,0 +1,102 @@
+import { acceptsDrop, type GapPlace, type GroupName, levelAt, type ListCard, placeAt, type PlacedCard, type PlacedHead, placeOfDrop, placesInGap, projectsTakes, type ProjectsView, sameGap } from "../../../../core/application/contracts";
+import type { BlockLists } from "./block";
+import type { CarryModel, CarryTarget, MeasuredList, MeasuredRow } from "./carry";
+import type { CardRow, ListModel } from "./lists";
+
+/** How far past a place's edge the finger goes before the place flips to the other side, px (the old screen's `dropHysteresis`). */
+export const DROP_HYSTERESIS = 6;
+
+/** The same section: two gaps under one header (`sameGap` weighs a gap by its section alone at index 0). */
+export function sameSection(a: GroupName, b: GroupName): boolean {
+	return sameGap({ kind: "gap", index: 0, level: 0, group: a }, { kind: "gap", index: 0, level: 0, group: b });
+}
+
+/** The list a measured list draws, in the pinned lists. */
+function listModelOf(lists: BlockLists, column: MeasuredList["column"]): { readonly model: ListModel; readonly grouped: boolean } | null {
+	if (lists.kind === "byProject") return column === "projects" ? { model: lists.list, grouped: true } : null;
+	if (lists.kind !== "rows") return null;
+	const row = lists.rows.find((r) => r.column === column);
+	return row ? { model: row.list, grouped: row.grouped } : null;
+}
+
+/** A card of the list as a place sees it: its task, level and section, and where it stands (content pixels). */
+type Placed = ListCard & PlacedCard & { readonly row: CardRow };
+
+/**
+ * The list under the finger as the drop sees it: the cards that stay (the carried ones and their folded subtasks left
+ * out), the headers, the plates, where the carried card was lifted from in it.
+ */
+function listAt(carry: CarryModel, list: MeasuredList, model: ListModel) {
+	const boxes = new Map<string, MeasuredRow>(list.rows.map((row) => [row.key, row]));
+	const away = new Set([...carry.rows, ...carry.folded]);
+	const cards: Placed[] = [];
+	const heads: PlacedHead[] = [];
+	let home: GapPlace | null = null;
+	for (const row of model.rows) {
+		const box = boxes.get(row.key);
+		if (!box) continue;
+		if (row.kind === "card") {
+			if (away.has(row.key)) {
+				if (row.key === carry.id) home = { kind: "gap", index: cards.length, level: row.level, group: row.group };
+				continue;
+			}
+			cards.push({ key: row.item.key, id: row.item.id, level: row.level, group: row.group, top: box.top, height: box.height, row });
+		} else if (row.kind === "head") heads.push({ group: row.group, opens: row.opens, firstCard: cards.length, top: box.top, height: box.height });
+	}
+	return { cards, heads, home, boxes, waiting: boxes.get(carry.id) ?? null };
+}
+
+/**
+ * What lies under the finger at (`x`, `y`), content pixels of the block's stack: the list it is over and the place a
+ * drop there means, as the core's rules say (`placeAt`, `placeOfDrop`, `acceptsDrop`, `placesInGap`, `projectsTakes`),
+ * against the lists as they stood at the lift and the boxes measured then. `held` is the place shown now, which keeps
+ * the finger at a place's edge. Null over nothing that takes the cards.
+ */
+export function targetAt(carry: CarryModel, lists: BlockLists, projects: ProjectsView | null, x: number, y: number): CarryTarget | null {
+	const geometry = carry.geometry;
+	if (!geometry) return null;
+	const list = geometry.lists.find((l) => x >= l.left && x < l.left + l.width && y >= l.top && y < l.bottom);
+	if (!list) return null;
+	const shown = listModelOf(lists, list.column);
+	if (!shown) return null;
+	const column = list.column;
+	const takes = column === "projects" ? projects?.reorders === true : acceptsDrop(column, carry.origins);
+	if (!takes) return null;
+	const { cards, heads, home: liftedFrom, boxes, waiting } = listAt(carry, list, shown.model);
+	const many = carry.ids.length > 1;
+	const anywhere = column === "projects" || placesInGap(column, carry.origins.find(() => true) ?? "new", shown.grouped);
+	const held = carry.target?.column === column ? carry.target.gap : liftedFrom;
+	const gap: GapPlace = !anywhere
+		? { kind: "gap", index: cards.length, level: 0, group: null }
+		: placeAt(cards, y, levelAt(x, { left: list.left, width: list.width }, geometry.indent), 0, null, shown.grouped ? heads : [], held, DROP_HYSTERESIS);
+	if (column !== "projects" && !anywhere) return { column, gap, drop: { kind: "list", column, place: null }, plate: null, line: lineOf(gap, cards, heads, list, geometry, null) };
+	const asked = placeOfDrop(cards, gap, many ? null : liftedFrom);
+	if (asked === null) return { column, gap, drop: null, plate: null, line: null };
+	if (column === "projects" && !(projects !== null && projectsTakes(projects, carry.cards, asked))) return null;
+	const plate = shown.model.rows.find((row) => row.kind === "plate" && !row.list && sameSection(row.group, gap.group) && boxes.has(row.key)) ?? null;
+	const drop: CarryTarget["drop"] = column === "projects" ? { kind: "projects", place: asked } : { kind: "list", column, place: asked };
+	const over = !many && liftedFrom !== null && waiting !== null && sameGap(gap, liftedFrom) ? waiting : null;
+	return { column, gap, drop, plate: plate?.key ?? null, line: plate ? null : lineOf(gap, cards, heads, list, geometry, over) };
+}
+
+/**
+ * The drop line through a gap (the old screen's `ListDrop.lineRect`): from the left edge of the gap's level to the
+ * cards' right edge, through the middle of the gap between the cards; a card moved to another level where it stood has
+ * the line over its dashed place, never on it; never higher than its dot whole under the list's top.
+ */
+function lineOf(gap: GapPlace, cards: readonly Placed[], heads: readonly PlacedHead[], list: MeasuredList, geometry: NonNullable<CarryModel["geometry"]>, waiting: MeasuredRow | null): CarryTarget["line"] {
+	const rowBox = (card: Placed) => list.rows.find((row) => row.key === card.row.key);
+	const first = cards.find(() => true);
+	const firstBox = first ? rowBox(first) : undefined;
+	const base = first && firstBox ? firstBox.left - first.level * geometry.indent : list.left;
+	const left = base + gap.level * geometry.indent;
+	const right = firstBox ? firstBox.left + firstBox.width : list.left + list.width;
+	const at = cards.slice(gap.index, gap.index + 1).find(() => true);
+	const prev = gap.index > 0 ? cards.slice(gap.index - 1, gap.index).find(() => true) : undefined;
+	const inGroup = (card: Placed | undefined): boolean => card !== undefined && sameSection(card.group, gap.group);
+	const head = [...heads].reverse().find((h) => sameSection(h.group, gap.group));
+	const prevEnd = prev ? prev.top + prev.height : null;
+	const top = at && inGroup(at) ? at.top : prevEnd !== null && inGroup(prev) ? prevEnd + geometry.cardGap : head ? head.top + head.height : (heads.find(() => true)?.top ?? prevEnd ?? list.top);
+	if (waiting) return { left, right, y: waiting.top - geometry.cardGap / 2 };
+	return { left, right, y: Math.max(top - geometry.cardGap / 2, list.top + geometry.dot / 2) };
+}

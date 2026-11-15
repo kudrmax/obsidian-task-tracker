@@ -7,14 +7,14 @@
  */
 export const PAGE_SCRIPT = String.raw`
 (() => {
-	const ROWS = ".tc-card, .tc-quick-row";
+	const ROWS = ".tc-card, .tc-quick-row, .tc-n-card";
 	const COLUMNS = [["inbox", ".tc-inbox"], ["soon", ".tc-soon"], ["now", ".tc-left"], ["calendar", ".tc-right"]];
 	const PANEL = ".tc-tree-panel";
 	const DAY_TITLE = ".tc-day-nav";
 	const view = () => document.querySelector(".workspace-leaf.mod-active .task-calendar") ?? document.querySelector(".task-calendar");
 	const box = (r) => ({ x: r.left, y: r.top, w: r.width, h: r.height });
 	const visible = (r, within) => r.width > 0 && r.height > 0 && r.right > within.left + 1 && r.left < within.right - 1 && r.bottom > within.top + 1 && r.top < within.bottom - 1;
-	const titleOf = (el) => (el.querySelector(".tc-card-title")?.textContent ?? el.textContent ?? "").trim().slice(0, 60);
+	const titleOf = (el) => (el.querySelector(".tc-card-title, .tc-n-card-title")?.textContent ?? el.textContent ?? "").trim().slice(0, 60);
 
 	/**
 	 * Every visible row of the screen: a key (its title and its count among equals, the same in every mode), its list,
@@ -26,11 +26,11 @@ export const PAGE_SCRIPT = String.raw`
 		const root = view();
 		if (!root) return { rows: [], keyOf: new Map() };
 		const within = root.getBoundingClientRect();
-		const lists = [...root.querySelectorAll(".tc-list, .tc-rows-stack, .tc-project-group")];
+		const lists = [...root.querySelectorAll(".tc-list, .tc-rows-stack, .tc-project-group, .tc-n-list")];
 		const seen = new Map();
 		const found = [];
 		for (const el of root.querySelectorAll(ROWS)) {
-			if (el.closest(".tc-float, .tc-panel")) continue;
+			if (el.closest(".tc-float, .tc-panel, .tc-n-float, .tc-n-layers")) continue;
 			const r = el.getBoundingClientRect();
 			if (!visible(r, within)) continue;
 			const column = COLUMNS.find(([, sel]) => el.closest(sel));

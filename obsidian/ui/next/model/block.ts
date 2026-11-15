@@ -114,6 +114,8 @@ function rowColumns(view: ViewChoice): readonly DropColumn[] {
 export interface BlockRow {
 	readonly column: DropColumn;
 	readonly label: string;
+	/** The list shows its sections (`tasks.columnSections` answered some). */
+	readonly grouped: boolean;
 	readonly list: ListModel;
 }
 
@@ -162,7 +164,9 @@ export function currentLists(model: BlockModel): BlockLists {
 		return {
 			column,
 			label: titles.get(column) ?? dayTitle(day, "today", day),
+			grouped: sections !== null,
 			list: funnelList({
+				column,
 				items: itemsOf(screen, column),
 				day: column === "day" ? day : null,
 				grouped: sections !== null,

@@ -1,3 +1,4 @@
+import { wholeWidth } from "../../../../core/application/contracts";
 /**
  * The motion driver (§Architecture): every inline style and CSS variable the model gives, every animation, and the
  * reading of the boxes it animates, in the commit phase only. A drawing moves as the model says why it changed (P5):
@@ -173,6 +174,85 @@ export class Motion {
 			part.style.bottom = `${view.innerHeight - rect.top + gap}px`;
 		} else part.style.top = `${rect.bottom + gap}px`;
 		return above;
+	}
+
+	/** The carried float's parts in the overlay host (`data-n-float`). */
+	private static floats(host: ParentNode): { readonly card: HTMLElement | null; readonly all: readonly HTMLElement[] } {
+		const all = [...host.querySelectorAll<HTMLElement>("[data-n-float]")];
+		return { card: all.find((el) => el.dataset.nFloat === "card") ?? null, all };
+	}
+
+	/**
+	 * The transient channel (P5): the carried float under the finger at (`x`, `y`), held as it was grabbed (`grab`, from
+	 * the card's top left; a grab further right than the float reaches holds it by its middle), kept inside the window's
+	 * margin. Only transforms are written: nothing is laid out or drawn again.
+	 */
+	floatAt(host: ParentNode, x: number, y: number, grab: { readonly dx: number; readonly dy: number }): void {
+		const { card, all } = Motion.floats(host);
+		if (!card) return;
+		const view = card.ownerDocument.defaultView;
+		const margin = parseFloat(view?.getComputedStyle(card).getPropertyValue("--tc-whole-margin") ?? "") || 0;
+		if (!this.stretched.has(card)) {
+			this.stretched.add(card);
+			Motion.stretch(card, all, view?.innerWidth ?? 0, margin);
+		}
+		const width = card.offsetWidth;
+		const held = width > 0 && grab.dx > width ? width / 2 : grab.dx;
+		const room = view?.innerWidth ?? width;
+		const left = Math.max(margin, Math.min(x - held, room - margin - width));
+		const transform = `translate3d(${left}px, ${y - grab.dy}px, 0)`;
+		for (const part of all) part.style.transform = transform;
+	}
+
+	/**
+	 * The float's flight, a declared transition run once (P5): onto `to`'s box (the card where the drop landed, or its
+	 * place a cancel goes back to), taking its size and a resting card's look; with no `to`, fading where it is. `done`
+	 * once it has ended, or at once with nothing to fly.
+	 */
+	fly(host: ParentNode, to: Element | null, done: () => void): void {
+		const { card, all } = Motion.floats(host);
+		if (!card) return done();
+		const ms = tokenMs(this.root, "--tc-duration-fly");
+		const easing = this.root.ownerDocument.defaultView?.getComputedStyle(this.root).getPropertyValue("--tc-ease-out").trim() || "ease-out";
+		for (const part of all) if (part !== card) part.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing, fill: "forwards" });
+		const from = card.getBoundingClientRect();
+		const box = to?.getBoundingClientRect() ?? null;
+		const frames: Keyframe[] = box
+			? [
+					{ transform: `translate3d(${from.left}px, ${from.top}px, 0)`, width: `${from.width}px`, height: `${from.height}px` },
+					{ transform: `translate3d(${box.left}px, ${box.top}px, 0)`, width: `${box.width}px`, height: `${box.height}px` },
+				]
+			: [{ opacity: 1 }, { opacity: 0 }];
+		const flight = card.animate(frames, { duration: ms, easing, fill: "forwards" });
+		this.running.push(flight);
+		flight.finished.then(done, done);
+	}
+
+	private readonly stretched = new WeakSet<HTMLElement>();
+
+	/**
+	 * The float stretched to show its whole title on one line (the old screen's `stretchWhole`), as far as the core's
+	 * `wholeWidth` says inside the window's margin; the layers under it narrower by the same.
+	 */
+	private static stretch(card: HTMLElement, all: readonly HTMLElement[], room: number, margin: number): void {
+		const title = card.querySelector<HTMLElement>("[data-n-title]");
+		if (!title) return;
+		const range = card.ownerDocument.createRange();
+		range.selectNodeContents(title);
+		const fade = parseFloat(card.ownerDocument.defaultView?.getComputedStyle(card).getPropertyValue("--tc-fade-card") ?? "") || 0;
+		const width = card.offsetWidth;
+		const grown = wholeWidth({ width, titleWidth: title.clientWidth, textWidth: range.getBoundingClientRect().width, fade }, { width: room, margin });
+		if (!grown) return;
+		if (!grown.cut) card.style.setProperty("--tc-n-title-mask", "none");
+		const more = grown.width - width;
+		for (const part of all) if (part.dataset.nFloat !== "count") part.style.setProperty("width", `${part.offsetWidth + more}px`);
+		for (const part of all) if (part.dataset.nFloat === "count") part.style.setProperty("margin-left", `calc(${more}px + ${part.ownerDocument.defaultView?.getComputedStyle(part).marginLeft ?? "0px"})`);
+	}
+
+	/** The block's frame keeps the height it has while a carry stands (P6): what changes in the lists under the finger never refits it. */
+	static holdHeight(frame: HTMLElement, held: boolean): void {
+		if (!held) return void frame.style.removeProperty("height");
+		if (frame.style.getPropertyValue("height") === "") frame.style.setProperty("height", `${frame.getBoundingClientRect().height}px`);
 	}
 
 	dispose(): void {

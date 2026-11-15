@@ -3,6 +3,26 @@
  * block stops its presses at itself (the note's editor would put the cursor at its end), and a press anywhere in it
  * gives it the focus first.
  */
+/** The parts of a card a press may lift it by: their taps come from the press recognizer, never as a click. */
+export const PRESSED: ReadonlySet<string> = new Set(["card", "counter", "mark"]);
+
+/** A raw event of the pointer's stream, as the press recognizer reads it (`recognizers/press.ts`'s `PressInput`). */
+export type RawPress =
+	| { readonly kind: "down"; readonly id: number; readonly at: { readonly x: number; readonly y: number }; readonly mouse: boolean; readonly primary: boolean; readonly button: number; readonly target: { readonly act: string; readonly key: string | null }; readonly mod: boolean; readonly shift: boolean }
+	| { readonly kind: "move" | "up"; readonly id: number; readonly at: { readonly x: number; readonly y: number } }
+	| { readonly kind: "cancel"; readonly id: number; readonly at: { readonly x: number; readonly y: number } }
+	| { readonly kind: "context"; readonly target: { readonly act: string; readonly key: string | null } };
+
+/** The pointer kept by `el` (its moves and release heard there wherever it goes), or let go; a pointer the page no longer knows is no failure. */
+function capture(el: HTMLElement, id: number, on: boolean): void {
+	try {
+		if (on && el.isConnected) el.setPointerCapture(id);
+		else if (!on && el.hasPointerCapture(id)) el.releasePointerCapture(id);
+	} catch {
+		/* a pointer already gone (a finger lifted as the press began): nothing to keep */
+	}
+}
+
 export class Input {
 	private readonly stops: (() => void)[] = [];
 
@@ -21,12 +41,13 @@ export class Input {
 	 * Taps on what the view marked (`data-n-act`) inside `root`, told with the row they are in and the value they carry;
 	 * the sheet (`dismiss`) is told on its press, so what stands under it is never pressed through it.
 	 */
-	acts(root: HTMLElement, told: (act: { readonly act: string; readonly key: string | null; readonly value: string | null }) => void): void {
+	acts(root: HTMLElement, told: (act: { readonly act: string; readonly key: string | null; readonly value: string | null }) => void, pressed: ReadonlySet<string> = new Set()): void {
 		const read = (e: Event, press: boolean) => {
 			const target = e.target instanceof Element ? e.target : null;
 			const marked = target?.closest("[data-n-act]");
 			if (!(marked instanceof HTMLElement) || !root.contains(marked)) return;
 			const act = marked.dataset.nAct ?? "";
+			if (pressed.has(act)) return;
 			if ((act === "dismiss") !== press) return;
 			if (press && marked !== target) return;
 			const row = marked.closest("[data-n-key]");
@@ -41,6 +62,65 @@ export class Input {
 			() => root.removeEventListener("click", click, true),
 			() => root.removeEventListener("pointerdown", press, true),
 		);
+	}
+
+	/**
+	 * The pointer's stream over what the view marked (`data-n-act`) in `root`, for the press recognizer: each press, move
+	 * and release of the pointer that pressed (captured by `root`, so it is heard wherever it goes), a second pointer's
+	 * press, a right click. While `carrying()`, a finger's move scrolls nothing: `preventDefault` decided in the event
+	 * from the gesture's state.
+	 */
+	presses(root: HTMLElement, feed: (input: RawPress) => void, carrying: () => boolean): void {
+		const mark = (target: EventTarget | null) => {
+			const marked = target instanceof Element ? target.closest("[data-n-act]") : null;
+			if (!(marked instanceof HTMLElement) || !root.contains(marked)) return null;
+			const row = marked.closest("[data-n-key]");
+			return { act: marked.dataset.nAct ?? "", key: row instanceof HTMLElement ? (row.dataset.nKey ?? null) : null };
+		};
+		const at = (e: PointerEvent) => ({ x: e.clientX, y: e.clientY });
+		let held: number | null = null;
+		const down = (e: PointerEvent) => {
+			const target = mark(e.target) ?? { act: "", key: null };
+			const mouse = e.pointerType === "mouse";
+			feed({ kind: "down", id: e.pointerId, at: at(e), mouse, primary: e.isPrimary, button: e.button, target, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey });
+			if (held === null && e.isPrimary && e.button === 0 && PRESSED.has(target.act)) {
+				held = e.pointerId;
+				capture(root, e.pointerId, true);
+				if (mouse) e.preventDefault();
+			}
+		};
+		const move = (e: PointerEvent) => {
+			if (e.pointerId === held) feed({ kind: "move", id: e.pointerId, at: at(e) });
+		};
+		const up = (e: PointerEvent) => {
+			if (e.pointerId !== held) return;
+			held = null;
+			capture(root, e.pointerId, false);
+			feed({ kind: e.type === "pointercancel" ? "cancel" : "up", id: e.pointerId, at: at(e) });
+		};
+		const context = (e: MouseEvent) => {
+			const target = mark(e.target);
+			if (!target || !PRESSED.has(target.act)) return;
+			e.preventDefault();
+			feed({ kind: "context", target });
+		};
+		const touch = (e: TouchEvent) => {
+			if (carrying()) e.preventDefault();
+		};
+		root.addEventListener("pointerdown", down);
+		root.addEventListener("pointermove", move);
+		root.addEventListener("pointerup", up);
+		root.addEventListener("pointercancel", up);
+		root.addEventListener("contextmenu", context);
+		root.addEventListener("touchmove", touch, { passive: false });
+		this.stops.push(() => {
+			root.removeEventListener("pointerdown", down);
+			root.removeEventListener("pointermove", move);
+			root.removeEventListener("pointerup", up);
+			root.removeEventListener("pointercancel", up);
+			root.removeEventListener("contextmenu", context);
+			root.removeEventListener("touchmove", touch);
+		});
 	}
 
 	/** Escape pressed in `doc` while `wanted()`: taken (Obsidian would take it as a step back) and told. */
