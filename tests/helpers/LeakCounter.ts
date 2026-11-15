@@ -39,6 +39,8 @@ export class LeakCounter {
 		this.patchListeners();
 		for (const kind of ["ResizeObserver", "MutationObserver", "IntersectionObserver"] as const) this.patchObserver(kind);
 		this.patchTimers();
+		this.patchMediaListeners();
+		this.patchMicrotasks();
 	}
 
 	/** Obsidian's key scopes, as `app.keymap`: a scope pushed and never popped is alive. */
@@ -96,15 +98,19 @@ export class LeakCounter {
 		this.patches.splice(0).reverse().forEach((p) => p.restore());
 	}
 
-	/** The window's own world, its window and its nodes: not the test runner's signals. */
+	/** Every target of the window's world (the window, its nodes, a media query, the visual viewport): not an abort signal, the test runner's own. */
 	private counts(target: EventTarget): boolean {
-		return target === this.win || target instanceof this.win.Node;
+		const signals = [this.win.AbortSignal, globalThis.AbortSignal].filter((c): c is typeof AbortSignal => typeof c === "function");
+		return !signals.some((Signal) => target instanceof Signal);
 	}
 
 	private name(target: EventTarget): string {
 		if (target === this.win) return "window";
 		if (target === this.win.document) return "document";
 		const element = target as Partial<Element>;
+		if (target === (this.win as { visualViewport?: unknown }).visualViewport) return "the visual viewport";
+		const media = (target as { media?: unknown }).media;
+		if (typeof media === "string") return `the media query ${media}`;
 		if (typeof element.tagName === "string") return `<${element.tagName.toLowerCase()}${element.className ? ` class="${element.className}"` : ""}>`;
 		return "an event target";
 	}
@@ -124,7 +130,9 @@ export class LeakCounter {
 	/** Every prototype on the way from the window, its document and an element to Object that defines its own `addEventListener`. */
 	private listenerPrototypes(): EventTarget[] {
 		const found = new Set<EventTarget>();
-		for (const start of [this.win, this.win.document, this.win.document.createElement("div"), this.win.EventTarget.prototype] as object[])
+		const viewport = (this.win as { visualViewport?: object | null }).visualViewport;
+		const media = typeof this.win.matchMedia === "function" ? this.win.matchMedia("all") : null;
+		for (const start of [this.win, this.win.document, this.win.document.createElement("div"), this.win.EventTarget.prototype, viewport, media].filter((o): o is object => !!o))
 			for (let proto = Object.getPrototypeOf(start) as object | null; proto; proto = Object.getPrototypeOf(proto) as object | null)
 				if (Object.prototype.hasOwnProperty.call(proto, "addEventListener")) found.add(proto as EventTarget);
 		if (Object.prototype.hasOwnProperty.call(this.win, "addEventListener")) found.add(this.win);
@@ -201,6 +209,7 @@ export class LeakCounter {
 			["setTimeout", "clearTimeout", "a timeout", true],
 			["setInterval", "clearInterval", "an interval", false],
 			["requestAnimationFrame", "cancelAnimationFrame", "a frame", true],
+			["requestIdleCallback", "cancelIdleCallback", "an idle callback", true],
 		] as const;
 		const targets = globalThis === (this.win as unknown) ? [this.win] : [this.win, globalThis as unknown as Window & typeof globalThis];
 		for (const target of targets)
@@ -226,5 +235,58 @@ export class LeakCounter {
 					}) as unknown,
 				);
 			}
+	}
+
+	/** A media query's old listeners (`addListener`), which Safari and older code still use. */
+	private patchMediaListeners(): void {
+		if (typeof this.win.matchMedia !== "function") return;
+		const proto = Object.getPrototypeOf(this.win.matchMedia("all")) as Record<string, unknown>;
+		if (typeof proto.addListener !== "function") return;
+		const listeners = this.listeners;
+		const counter = this;
+		const key = (target: object, listener: unknown) => `${counter.id(target)} change ${counter.id(listener as object)} legacy`;
+		this.patch(proto, "addListener", (add) =>
+			function (this: MediaQueryList, listener: unknown) {
+				if (listener) listeners.set(key(this, listener), { target: this, type: "change", listener: listener as Listener, capture: false });
+				counter.depth++;
+				try {
+					return (add as (l: unknown) => unknown).call(this, listener);
+				} finally {
+					counter.depth--;
+				}
+			},
+		);
+		this.patch(proto, "removeListener", (remove) =>
+			function (this: MediaQueryList, listener: unknown) {
+				if (listener) listeners.delete(key(this, listener));
+				counter.depth++;
+				try {
+					return (remove as (l: unknown) => unknown).call(this, listener);
+				} finally {
+					counter.depth--;
+				}
+			},
+		);
+	}
+
+	/** A microtask queued and not yet run: it runs after the host is gone. */
+	private patchMicrotasks(): void {
+		const timers = this.timers;
+		let next = 0;
+		const targets = globalThis === (this.win as unknown) ? [this.win] : [this.win, globalThis as unknown as Window & typeof globalThis];
+		for (const target of targets) {
+			const host = target as unknown as Record<string, unknown>;
+			if (typeof host.queueMicrotask !== "function") continue;
+			this.patch(host, "queueMicrotask", (original) =>
+				((fn: () => void) => {
+					const id = `microtask ${next++}`;
+					timers.set(id, "a microtask");
+					return (original as (f: () => void) => void).call(target, () => {
+						timers.delete(id);
+						fn();
+					});
+				}) as unknown,
+			);
+		}
 	}
 }

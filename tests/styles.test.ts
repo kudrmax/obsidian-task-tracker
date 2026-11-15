@@ -574,16 +574,38 @@ const transitioned = (d: Declaration, tokens: Map<string, string>): string[] => 
 	});
 };
 
-/** The selector's compounds outside `body…` ones: Obsidian's body classes (platform, theme) are not a box's state. */
-const ownCompounds = (selector: string): string =>
-	selector
-		.split(/\s*[\s>+~]\s*(?![^(]*\))/)
-		.filter((compound) => !/^body\b/.test(compound))
-		.join(" ");
+/** Obsidian's own classes on `body`: the platform and the theme, set by Obsidian, not by a state of ours. */
+const OBSIDIAN_BODY = new Set(["is-mobile", "is-phone", "is-tablet", "is-ios", "is-android", "mod-macos", "mod-windows", "mod-linux", "is-frameless", "theme-dark", "theme-light"]);
 
-/** A state: a class of the `is-` kind, or a pseudo-class of what the user is doing. */
-const STATE = /\.is-[\w-]+|:(hover|active|focus|focus-visible|focus-within|checked|disabled|enabled|target|open|placeholder-shown)(?![\w-])|\[(open|data-state[^\]]*)\]/;
-const PSEUDO_ELEMENT = /::?(before|after|marker|placeholder|first-line|first-letter)\b/;
+/** The compounds of a selector (combinators split it; `:is()`, `:has()`… stay whole). */
+const compoundsOf = (selector: string): string[] => selector.split(/\s*[\s>+~]\s*(?![^(]*\))/).filter((c) => c !== "");
+
+/** A body compound that says only Obsidian's platform or theme: everything else on `body` (a class of the plugin's, `:has()`) is a state. */
+const plainBody = (compound: string): boolean =>
+	/^body(\.[\w-]+)*$/.test(compound) && [...compound.matchAll(/\.([\w-]+)/g)].every(([, name]) => OBSIDIAN_BODY.has(name));
+
+/**
+ * A state, anywhere in the selector but a plain body compound: a class of the `is-` kind (the only kind the chrome
+ * driver writes, `tests/uiRules.ts`), any attribute selector, `:has()`, a pseudo-class of what the user is doing, or a
+ * body class Obsidian does not set.
+ */
+const hasState = (selector: string): boolean =>
+	compoundsOf(selector).some(
+		(c) =>
+			!plainBody(c) &&
+			(/^body\b/.test(c) || /\.is-[\w-]+|\[|:has\(|:(hover|active|focus|focus-visible|focus-within|checked|disabled|enabled|target|open|placeholder-shown|empty|invalid|valid|user-invalid)(?![\w-])/.test(c)),
+	);
+const PSEUDO_ELEMENT = /::?(before|after|marker|placeholder|first-line|first-letter|backdrop)\b/;
+const pseudoElement = (selector: string): boolean => PSEUDO_ELEMENT.test(selector);
+
+/** The classes a selector names outside plain body compounds. */
+const classesOf = (selector: string): string[] => compoundsOf(selector).filter((c) => !plainBody(c)).flatMap((c) => [...c.matchAll(/\.([\w-]+)/g)].map(([, name]) => name));
+
+/** The new screens' own classes: `tc-n-…` for a component, `is-…` for its state, and the screen's root `task-calendar`. */
+const NEXT_CLASS = /^(tc-n-[\w-]+|is-[\w-]+|task-calendar)$/;
+
+/** The custom properties a declaration's value reads. */
+const reads = (value: string): string[] => [...value.matchAll(/var\((--[\w-]+)/g)].map(([, name]) => name);
 
 /** The new rules of §Guards, each answering its offenders. */
 const NEXT_RULES = {
@@ -593,6 +615,12 @@ const NEXT_RULES = {
 			.filter((d) => !keyframed(d) && !d.selector.startsWith("@"))
 			.filter((d) => selectorsOf(d.selector).some((part) => !/\.task-calendar(?![\w-])/.test(part)))
 			.map(where),
+	/** Only the new screens' classes: the old screen's `tc-…` and Obsidian's own are never selected from here. */
+	namespaced: (s: Stylesheet): string[] =>
+		s.declarations
+			.filter((d) => !keyframed(d) && !d.selector.startsWith("@"))
+			.filter((d) => selectorsOf(d.selector).some((part) => classesOf(part).some((name) => !NEXT_CLASS.test(name))))
+			.map(where),
 	/** No transition or keyframe of a layout property: what moves is `motion`'s, over transforms. */
 	layoutMotion: (s: Stylesheet, tokens: Map<string, string>): string[] => [
 		...s.rules
@@ -601,17 +629,24 @@ const NEXT_RULES = {
 			.map(where),
 		...s.declarations.filter((d) => keyframed(d) && LAYOUT.test(d.property)).map(where),
 	],
-	/** No state class or pseudo-element changes a box's size: an out-of-flow pseudo-element (absolute, fixed) may size itself. */
+	/**
+	 * No state or pseudo-element changes a box's size: not by a size property under a state, not by a custom property a
+	 * state sets and a size property reads, not by an in-flow pseudo-element (one that is not absolute or fixed) given
+	 * content or a size.
+	 */
 	sizeByState: (s: Stylesheet): string[] => {
 		const outOfFlow = new Set(s.rules.filter((d) => d.property === "position" && /^(absolute|fixed)$/.test(d.value)).map((d) => d.selector));
-		return s.rules
-			.filter((d) => !keyframed(d) && SIZE(d.property))
-			.filter((d) =>
-				selectorsOf(d.selector).some((part) => {
-					const own = ownCompounds(part);
-					return STATE.test(own) || (PSEUDO_ELEMENT.test(own) && !outOfFlow.has(d.selector));
-				}),
-			)
+		const rules = s.declarations.filter((d) => !keyframed(d) && !d.isToken);
+		const stateSet = new Set(rules.filter((d) => d.property.startsWith("--") && selectorsOf(d.selector).some(hasState)).map((d) => d.property));
+		const sizeReads = (d: Declaration) => SIZE(d.property) && reads(d.value).some((name) => stateSet.has(name));
+		return rules
+			.filter((d) => {
+				const parts = selectorsOf(d.selector);
+				if (SIZE(d.property) && parts.some(hasState)) return true;
+				if (sizeReads(d)) return true;
+				const inFlow = parts.some(pseudoElement) && !outOfFlow.has(d.selector);
+				return inFlow && (SIZE(d.property) || d.property === "content");
+			})
 			.map(where);
 	},
 };
@@ -626,6 +661,10 @@ describe("the new screens' CSS, below /* next */", () => {
 
 	it("puts every rule under .task-calendar", () => {
 		expect(NEXT_RULES.scoped(next)).toEqual([]);
+	});
+
+	it("selects only the new screens' classes (tc-n-…, is-…)", () => {
+		expect(NEXT_RULES.namespaced(next)).toEqual([]);
 	});
 
 	it("transitions and animates no layout property", () => {
@@ -652,10 +691,16 @@ describe("the next CSS guard itself", () => {
 	});
 
 	it("trips on a rule outside .task-calendar", () => {
-		expect(NEXT_RULES.scoped(of(".tc-card { color: var(--tc-x); }"))).not.toEqual([]);
-		expect(NEXT_RULES.scoped(of(".task-calendar .tc-card, .tc-row { color: var(--tc-x); }"))).not.toEqual([]);
-		expect(NEXT_RULES.scoped(of("body.is-mobile .task-calendar .tc-card { color: var(--tc-x); } @media (hover: hover) { .task-calendar-x .y { a: b; } }"))).toHaveLength(1);
-		expect(NEXT_RULES.scoped(of("@keyframes tc-x { from { opacity: 0; } to { opacity: 1; } } .task-calendar .x { animation: tc-x; }"))).toEqual([]);
+		expect(NEXT_RULES.scoped(of(".tc-n-card { color: var(--tc-x); }"))).not.toEqual([]);
+		expect(NEXT_RULES.scoped(of(".task-calendar .tc-n-card, .tc-n-row { color: var(--tc-x); }"))).not.toEqual([]);
+		expect(NEXT_RULES.scoped(of("body.is-mobile .task-calendar .tc-n-card { color: var(--tc-x); } @media (hover: hover) { .task-calendar-x .y { a: b; } }"))).toHaveLength(1);
+		expect(NEXT_RULES.scoped(of("@keyframes tc-x { from { opacity: 0; } to { opacity: 1; } } .task-calendar .tc-n-x { animation: tc-x; }"))).toEqual([]);
+	});
+
+	it("trips on a class outside the new screens' namespace", () => {
+		expect(NEXT_RULES.namespaced(of(".task-calendar .tc-card { color: var(--tc-x); }"))).not.toEqual([]);
+		expect(NEXT_RULES.namespaced(of(".task-calendar .markdown-preview-view { color: var(--tc-x); }"))).not.toEqual([]);
+		expect(NEXT_RULES.namespaced(of("body.is-mobile .task-calendar .tc-n-card.is-open { color: var(--tc-x); }"))).toEqual([]);
 	});
 
 	it("trips on a layout property moving", () => {
@@ -668,12 +713,23 @@ describe("the next CSS guard itself", () => {
 	});
 
 	it("trips on a state or a pseudo-element sizing a box", () => {
-		expect(NEXT_RULES.sizeByState(of(".task-calendar .tc-card.is-open { height: var(--tc-x); }"))).not.toEqual([]);
-		expect(NEXT_RULES.sizeByState(of(".task-calendar .tc-card:hover { padding: var(--tc-x); }"))).not.toEqual([]);
-		expect(NEXT_RULES.sizeByState(of(".task-calendar .tc-list::after { content: ''; height: var(--tc-x); }"))).not.toEqual([]);
-		expect(NEXT_RULES.sizeByState(of(".task-calendar.is-lifted .x { display: none; }"))).not.toEqual([]);
-		expect(NEXT_RULES.sizeByState(of(".task-calendar .tc-card.is-open { opacity: var(--tc-x); }"))).toEqual([]);
-		expect(NEXT_RULES.sizeByState(of("body.is-mobile .task-calendar .tc-card { height: var(--tc-x); }"))).toEqual([]);
-		expect(NEXT_RULES.sizeByState(of(".task-calendar .tc-card::before { content: ''; position: absolute; width: var(--tc-x); }"))).toEqual([]);
+		const trips = (css: string) => expect(NEXT_RULES.sizeByState(of(css)), css).not.toEqual([]);
+		const passes = (css: string) => expect(NEXT_RULES.sizeByState(of(css)), css).toEqual([]);
+		trips(".task-calendar .tc-n-card.is-open { height: var(--tc-x); }");
+		trips(".task-calendar .tc-n-card:hover { padding: var(--tc-x); }");
+		trips(".task-calendar.is-lifted .tc-n-x { display: none; }");
+		trips(".task-calendar .tc-n-card[data-open] { height: var(--tc-x); }");
+		trips(".task-calendar .tc-n-card[aria-expanded='true'] { height: var(--tc-x); }");
+		trips("body:has(.tc-n-sheet) .task-calendar .tc-n-list { padding-bottom: var(--tc-x); }");
+		trips("body.tc-n-carrying .task-calendar .tc-n-list { gap: var(--tc-x); }");
+		trips(".task-calendar .tc-n-list:has(> .tc-n-field) { height: var(--tc-x); }");
+		trips(".task-calendar .tc-n-card.is-open { --tc-n-h: var(--tc-x); } .task-calendar .tc-n-card { height: var(--tc-n-h); }");
+		trips(".task-calendar .tc-n-list::after { content: ''; height: var(--tc-x); }");
+		trips(".task-calendar .tc-n-list::after { content: ''; }");
+		passes(".task-calendar .tc-n-card.is-open { opacity: var(--tc-x); }");
+		passes("body.is-mobile .task-calendar .tc-n-card { height: var(--tc-x); }");
+		passes("body.is-mobile.theme-dark .task-calendar .tc-n-card { height: var(--tc-x); }");
+		passes(".task-calendar .tc-n-card::before { content: ''; position: absolute; width: var(--tc-x); }");
+		passes(".task-calendar .tc-n-card.is-open { --tc-n-tint: var(--tc-x); } .task-calendar .tc-n-card { color: var(--tc-n-tint); }");
 	});
 });

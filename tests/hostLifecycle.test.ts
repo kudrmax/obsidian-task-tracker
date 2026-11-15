@@ -30,7 +30,7 @@ export interface MountedHost {
 
 export interface HostCase {
 	readonly name: string;
-	/** Its file under `obsidian/ui/next/host/`, or null for the reference host. */
+	/** Its file's path under `obsidian/ui/next/host/` (`leaf/Leaf.tsx`), or null for the reference host. */
 	readonly file: string | null;
 	mount(context: HostContext): MountedHost;
 }
@@ -116,6 +116,11 @@ function referenceHost(forget: Kind | null = null): HostCase {
 /** Every host of the new screens. A host file under `obsidian/ui/next/host/` must be here. */
 const HOSTS: readonly HostCase[] = [referenceHost()];
 
+/** Microtasks queued before now have run: one queued at teardown is gone by then, one that keeps queueing itself is not. */
+const microtasksRun = async () => {
+	for (let i = 0; i < 5; i++) await Promise.resolve();
+};
+
 const HOST_DIR = join(__dirname, "..", "obsidian/ui/next/host");
 
 describe("every host leaves nothing alive", () => {
@@ -141,20 +146,26 @@ describe("every host leaves nothing alive", () => {
 	});
 
 	it("knows every host there is", () => {
-		const files = existsSync(HOST_DIR) ? readdirSync(HOST_DIR).filter((f) => /\.tsx?$/.test(f)) : [];
+		const files = existsSync(HOST_DIR)
+			? readdirSync(HOST_DIR, { recursive: true, encoding: "utf8" })
+					.map((f) => f.split("\\").join("/"))
+					.filter((f) => /\.tsx?$/.test(f) && !/\.d\.ts$/.test(f))
+			: [];
 		expect(files.filter((f) => !HOSTS.some((host) => host.file === f))).toEqual([]);
 	});
 
-	it.each(HOSTS.map((host) => [host.name, host] as const))("%s: mounted and unmounted", (_, host) => {
+	it.each(HOSTS.map((host) => [host.name, host] as const))("%s: mounted and unmounted", async (_, host) => {
 		host.mount(context).unmount();
+		await microtasksRun();
 		expect(leaks.alive()).toEqual([]);
 	});
 
-	it.each(HOSTS.map((host) => [host.name, host] as const))("%s: unmounted mid-gesture, its carry ended", (_, host) => {
+	it.each(HOSTS.map((host) => [host.name, host] as const))("%s: unmounted mid-gesture, its carry ended", async (_, host) => {
 		const mounted = host.mount(context);
 		mounted.startGesture();
 		expect(h.screens.get().carry).toBeDefined();
 		mounted.unmount();
+		await microtasksRun();
 		expect(leaks.alive()).toEqual([]);
 		expect(h.screens.get().carry).toBeUndefined();
 		expect(h.runtime.replica.state.projectsScreen.carry).toBeUndefined();
@@ -173,11 +184,32 @@ describe("every host leaves nothing alive", () => {
 			["event ref", /workspace\.on\("css-change"\)/],
 			["gesture listeners", /listener pointermove on document/],
 		];
-		it.each(kinds)("%s", (kind, named) => {
+		it.each(kinds)("%s", async (kind, named) => {
 			const mounted = referenceHost(kind).mount(context);
 			mounted.startGesture();
 			mounted.unmount();
+			await microtasksRun();
 			expect(leaks.alive().join("\n")).toMatch(named);
+		});
+
+		it("a media query's listener, both kinds", () => {
+			const query = window.matchMedia("(hover: hover)");
+			query.addEventListener("change", () => undefined);
+			query.addListener(() => undefined);
+			expect(leaks.alive().filter((a) => a.includes("media query"))).toHaveLength(2);
+		});
+
+		it("a microtask that keeps queueing itself", async () => {
+			let live = true;
+			const again = () => {
+				if (live) queueMicrotask(again);
+			};
+			queueMicrotask(again);
+			await microtasksRun();
+			expect(leaks.alive()).toContain("a microtask");
+			live = false;
+			await microtasksRun();
+			expect(leaks.alive()).not.toContain("a microtask");
 		});
 
 		it("carry: a session never torn down leaves the carry in the device's storage", () => {
@@ -194,5 +226,28 @@ describe("every host leaves nothing alive", () => {
 			await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 			expect(leaks.alive()).toEqual([]);
 		});
+	});
+});
+
+describe("the leak counter on what happy-dom lacks", () => {
+	it("counts the visual viewport's listeners and idle callbacks once the window has them", () => {
+		const win = window as unknown as { visualViewport?: EventTarget; requestIdleCallback?: (f: () => void) => number; cancelIdleCallback?: (id: number) => void };
+		const had = { viewport: win.visualViewport, idle: win.requestIdleCallback, cancel: win.cancelIdleCallback };
+		Object.defineProperty(window, "visualViewport", { value: new (window as unknown as { EventTarget: typeof EventTarget }).EventTarget(), configurable: true });
+		win.requestIdleCallback = (f) => window.setTimeout(f, 1);
+		win.cancelIdleCallback = (id) => window.clearTimeout(id);
+		const leaks = new LeakCounter(window);
+		try {
+			win.visualViewport!.addEventListener("resize", () => undefined);
+			const idle = win.requestIdleCallback!(() => undefined);
+			expect(leaks.alive().join("\n")).toMatch(/visual viewport[\s\S]*idle callback|idle callback[\s\S]*visual viewport/);
+			win.cancelIdleCallback!(idle);
+			expect(leaks.alive().join("\n")).not.toMatch(/idle callback/);
+		} finally {
+			leaks.uninstall();
+			Object.defineProperty(window, "visualViewport", { value: had.viewport, configurable: true });
+			win.requestIdleCallback = had.idle;
+			win.cancelIdleCallback = had.cancel;
+		}
 	});
 });

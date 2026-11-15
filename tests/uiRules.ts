@@ -146,6 +146,14 @@ export const HOST_WORK: readonly HostWork[] = [
 			attribute(/^(class|data-[\w-]+)$/)(r),
 	},
 	{
+		what: "a class that is not a literal is-… state (the CSS reads every class chrome writes as a state)",
+		owners: "nowhere",
+		matches: (r) =>
+			(member(["DOMTokenList"], ["add", "remove", "toggle", "replace"])(r) || member(["HTMLElement", "Element", "SVGElement"], ["addClass", "removeClass", "toggleClass"])(r)) &&
+			r.called &&
+			!(typeof r.firstArg === "string" && r.firstArg !== "dynamic" && /^is-[\w-]+$/.test(r.firstArg)),
+	},
+	{
 		what: "a class read (no code reads a class to decide: the model holds the fact)",
 		owners: "nowhere",
 		matches: (r) =>
