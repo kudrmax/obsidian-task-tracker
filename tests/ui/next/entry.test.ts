@@ -33,10 +33,10 @@ describe("the block's quick entry", () => {
 		await h.runtime.unload();
 	});
 
-	it("holds the block's height while its field is open, as the old block kept its frame and scrolled inside it", () => {
-		expect(holdsHeight(host.model)).toBe(false);
+	it("lets its field grow the block as any row does, as the old BlockHeight fitted the block to its stack (a carry alone holds it)", () => {
 		host.dispatch(act("plus"));
-		expect(holdsHeight(host.model)).toBe(true);
+		expect(host.model.entry?.state).not.toBeNull();
+		expect(holdsHeight(host.model)).toBe(false);
 	});
 
 	it("opens a field from the plus and focuses it inside the tap (a typing pick)", () => {

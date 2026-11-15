@@ -2003,6 +2003,8 @@ body.is-mobile .task-calendar .tc-n-fade-entering { height: calc(var(--tc-bar-h)
 .task-calendar .tc-n-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-bar-bottom); z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); display: flex; align-items: center; gap: var(--tc-space-8); background: var(--tc-bg); }
 .task-calendar .tc-n-bar-shifts { display: flex; flex-shrink: 1; min-width: 0; border-radius: var(--tc-radius-bar-btn); background: var(--tc-track-bg); }
 .task-calendar .tc-n-bar-spacer { flex: 1; }
+/* Each button paints whole over the one before it, as the old bar's: a shrunk shift is covered by the flag, not drawn over it. */
+.task-calendar .tc-n-bar > button, .task-calendar .tc-n-bar-shifts, .task-calendar .tc-n-bar-shifts > button { z-index: var(--tc-layer-bar-button); }
 .task-calendar button.tc-n-btn.tc-n-bar-btn { width: var(--tc-bar-btn-w); min-width: var(--tc-bar-btn-h); height: var(--tc-bar-btn-h); flex-shrink: 1; padding: 0; border-radius: var(--tc-radius-bar-btn); display: flex; align-items: center; justify-content: center; color: var(--tc-text); background: var(--tc-track-bg); }
 .task-calendar .tc-n-bar-shifts > button.tc-n-btn.tc-n-bar-btn { background: none; }
 .task-calendar button.tc-n-btn.tc-n-bar-btn:disabled { color: var(--tc-ink-dim); cursor: default; }

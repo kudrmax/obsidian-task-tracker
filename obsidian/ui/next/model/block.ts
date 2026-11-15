@@ -265,9 +265,9 @@ export function entering(model: BlockModel): boolean {
 }
 
 /**
- * The frame keeps the height it had (P6): while a card is carried, and while a field is open — as the old block, whose
- * field and its bar stood in the room under the rows and whose frame grew only once the field had closed.
+ * The frame keeps the height it had (P6) while a card is carried. A field open grows it as any row does, to the CSS's
+ * tallest, as the old `BlockHeight` fitted the block to what its stack held, the field and its room among it.
  */
 export function holdsHeight(model: BlockModel): boolean {
-	return model.carry !== null || (model.entry?.state ?? null) !== null;
+	return model.carry !== null;
 }
