@@ -4,7 +4,7 @@
 	"private": true,
 	"main": "main.js",
 	"scripts": {
-		"build": "tsc --noEmit && tsc -p obsidian/ui/next/tsconfig.pure.json && node esbuild.config.mjs production && node core/build.mjs",
+		"build": "tsc --noEmit && tsc -p tsconfig.next-pure.json && node esbuild.config.mjs production && node core/build.mjs",
 		"dev": "node esbuild.config.mjs",
 		"build:demo": "tsc --noEmit && node esbuild.config.mjs production demo",
 		"build:e2e": "node esbuild.config.mjs production e2e",

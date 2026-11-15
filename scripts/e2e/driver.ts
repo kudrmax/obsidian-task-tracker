@@ -170,10 +170,11 @@ export class Driver {
 	/** One swipe of the screen: a finger flicked on the phone, two fingers on the trackpad (a wheel along x) on the desktop. */
 	async swipe(at: Point, dx: number): Promise<void> {
 		if (this.platform === "phone") return this.drag(at, { x: at.x + dx, y: at.y }, 0, 8, 12);
-		const ticks = 12;
+		/** A trackpad's pace: a delta every 8 ms, a few dozen px each, so the content following it moves as under a real hand. */
+		const ticks = 30;
 		for (let i = 0; i < ticks; i++) {
 			await this.cdp.call("Input.dispatchMouseEvent", { type: "mouseWheel", x: at.x, y: at.y, deltaX: -dx / ticks, deltaY: 0 });
-			await sleep(16);
+			await sleep(8);
 		}
 	}
 
@@ -191,7 +192,7 @@ export class Driver {
 		await sleep(400);
 		const rest = await this.page<Row[]>("return __e2e.rows()");
 		const gap = await this.page<number>("return __e2e.cardGap()");
-		const carried = options.carried ? frames.flatMap((f) => f.rows.map((r) => r.key)).filter((k) => options.carried!.some((c) => k.includes(c))) : undefined;
+		const carried = options.carried ? [...new Set(frames.flatMap((f) => f.rows.map((r) => r.key)))].filter((k) => options.carried!.some((c) => k.startsWith(`${c}/`))) : undefined;
 		const log: StepLog = { name, cause, frames, started: [...this.started], rest, settled, gap, expectPlaces: options.expectPlaces, carried, tolerated: options.tolerated, expectMotion: options.expectMotion, moves: options.moves, maxStep: options.maxStep };
 		const failures = judge(log);
 		const file = join(this.dirs.run, this.combo, `${name}.frames.json`);

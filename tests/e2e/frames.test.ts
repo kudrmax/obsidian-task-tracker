@@ -68,6 +68,9 @@ describe("the frame rules on Max's past bugs", () => {
 		expect(FRAME_RULES.rowsAcrossContext(step([frame(from), frame([row("A/1", 50), row("B/1", 37)]), frame(to)], { cause: "context" }))).not.toEqual([]);
 		expect(FRAME_RULES.rowsAcrossContext(step([frame(from), frame([row("A/1", 50), row("B/1", 87)]), frame(to)], { cause: "swipe" }))).toEqual([]);
 		expect(FRAME_RULES.rowsAcrossContext(step([frame(from), frame([row("A/1", 50), row("B/1", 60)]), frame(to)], { cause: "swipe" }))).not.toEqual([]);
+		const columns = [row("A/1", 0, { list: "now#0" }), row("S/1", 0, { list: "soon#1" })];
+		const moved = (a: number, s: number) => [row("A/1", 0, { list: "now#0", x: 10 + a }), row("S/1", 0, { list: "soon#1", x: 10 + s })];
+		expect(FRAME_RULES.rowsAcrossContext(step([frame(columns), frame(moved(50, 80)), frame(moved(100, 160))], { cause: "swipe" }))).toEqual([]);
 	});
 
 	it("overshoot: a row passing its rest", () => {

@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["model/**/*.ts", "update/**/*.ts", "recognizers/**/*.ts"]
+  "include": ["obsidian/ui/next/model/**/*.ts", "obsidian/ui/next/update/**/*.ts", "obsidian/ui/next/recognizers/**/*.ts"]
 }

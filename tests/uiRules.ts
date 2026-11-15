@@ -9,7 +9,7 @@ import { TsProgram } from "./guards/TsProgram";
  * as text:
  *
  * - The pure parts (model, update, recognizers) compile in a project of their own with no DOM and no host
- *   (`obsidian/ui/next/tsconfig.pure.json`): a window, a document, a timer or an element cannot be named there at all.
+ *   (`tsconfig.next-pure.json`): a window, a document, a timer or an element cannot be named there at all.
  * - Everywhere in `next/`, every name and member is resolved to its declaration by TypeScript: an alias
  *   (`const s = el.style`), a string key (`win["requestAnimationFrame"]`), a destructuring (`const { replica } = runtime`)
  *   or a template literal all end at the same declaration (`CSSStyleProperties.height`, `Window.requestAnimationFrame`…),
@@ -20,7 +20,7 @@ import { TsProgram } from "./guards/TsProgram";
 export const ROOT = resolve(__dirname, "..");
 export const NEXT = "obsidian/ui/next";
 export const MAIN_CONFIG = join(ROOT, "tsconfig.json");
-export const PURE_CONFIG = join(ROOT, NEXT, "tsconfig.pure.json");
+export const PURE_CONFIG = join(ROOT, "tsconfig.next-pure.json");
 
 /** The pure parts: what they draw and decide is a function of the model. */
 export const PURE_PARTS = ["model", "update", "recognizers"] as const;
@@ -536,7 +536,7 @@ export function analyse(extra: readonly Source[] = []): Analysis {
 			if (place.part === "update") provenInUpdate += m.proven;
 			if (declaresMsg(sf)) msgs.push(file.path);
 			if (isPure(file.path)) {
-				if (!pure.program.getSourceFile(abs)) violations.push({ path: file.path, rule: "purity", what: "not in the pure project (tsconfig.pure.json)" });
+				if (!pure.program.getSourceFile(abs)) violations.push({ path: file.path, rule: "purity", what: "not in the pure project (tsconfig.next-pure.json)" });
 				else
 					for (const d of [...pure.program.getSyntacticDiagnostics(abs), ...pure.program.getSemanticDiagnostics(abs)])
 						violations.push({ path: file.path, rule: "purity", what: `does not compile without the DOM and the host: ${d.text}` });

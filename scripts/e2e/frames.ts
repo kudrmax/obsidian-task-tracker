@@ -49,7 +49,7 @@ export type Cause =
 	| "none"
 	/** Another mode, project or filter: drawn in place, no row moves or animates. */
 	| "context"
-	/** A place or day change: the region moves as a whole. */
+	/** A place or day change: the region moves as a whole, each column as one. */
 	| "swipe"
 	/** An interaction's declared motions: a lift, a drop, the panel's slide, a menu. */
 	| "interaction";
@@ -131,12 +131,12 @@ function rowsAnimatedAcrossContext(step: StepLog): string[] {
 	return animated.length ? [`rows animated across a context: ${animated.slice(0, 3).join("; ")}`] : [];
 }
 
-/** Rows standing, in a frame, between where they first showed and where they end: what is moving then, with its offset. */
-function inBetween(step: StepLog, frame: number): { key: string; dx: number; dy: number }[] {
+/** Rows standing, in a frame, between where they first showed and where they end: what is moving then, with its offset and column. */
+function inBetween(step: StepLog, frame: number): { key: string; column: string; dx: number; dy: number }[] {
 	return tracks(step).flatMap((t) => {
 		const at = t.boxes.find((b) => b.frame === frame);
 		if (!at || sameBox(at.row, first(t)) || sameBox(at.row, last(t))) return [];
-		return [{ key: t.key, dx: at.row.x - first(t).x, dy: at.row.y - first(t).y }];
+		return [{ key: t.key, column: at.row.list.split("#")[0], dx: at.row.x - first(t).x, dy: at.row.y - first(t).y }];
 	});
 }
 
@@ -146,7 +146,11 @@ function rowsAcrossContext(step: StepLog): string[] {
 		const moving = inBetween(step, i);
 		if (moving.length === 0) continue;
 		if (step.cause === "context") return [`single rows moving across a context at frame ${i}: ${moving.slice(0, 3).map((m) => m.key).join("; ")}`];
-		const whole = moving.every((m) => Math.abs(m.dx - moving[0].dx) <= 1 && Math.abs(m.dy - moving[0].dy) <= 1);
+		/** A place change moves each column as one (the columns may change their widths as they go: RibbonColumns). */
+		const whole = moving.every((m) => {
+			const lead = moving.find((o) => o.column === m.column)!;
+			return Math.abs(m.dx - lead.dx) <= 1 && Math.abs(m.dy - lead.dy) <= 1;
+		});
 		if (!whole) return [`single rows moving across a context at frame ${i}: ${moving.slice(0, 3).map((m) => `${m.key} by ${m.dx.toFixed(1)},${m.dy.toFixed(1)}`).join("; ")}`];
 	}
 	return [];
