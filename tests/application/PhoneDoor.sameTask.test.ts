@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ScreenView, TaskItem } from "../../core/application/contracts";
 import { callDoor, type DoorAnswer, type DoorContext } from "../../core/application/PhoneCalls";
+import { markersOf } from "../../core/application/documentText";
 import { sameTaskLine } from "../../core/application/TaskIdentity";
+import { settingsFrom } from "../../core/settings";
 
 /**
  * A task keeps its id across an edit made elsewhere only while it is plausibly the same task: a line edited in place
@@ -65,12 +67,43 @@ describe("the same task across an edit elsewhere", () => {
 });
 
 describe("sameTaskLine: the rule", () => {
-	it("counts a line the same while half the words of the shorter title stand in the other, marks, dates and times aside", () => {
-		expect(sameTaskLine("- [ ] Buy milk", "- [x] Buy bread ⏰ 2026-11-15 10:00-11:00")).toBe(true);
-		expect(sameTaskLine("- [ ] Call the bank", "- [ ] Fix the car")).toBe(false);
-		expect(sameTaskLine("- [ ] Idea", "- [ ] Buy milk")).toBe(false);
-		expect(sameTaskLine("\t- [ ] 📅 2026-11-15", "\t- [ ] 📅 2026-11-16")).toBe(true);
-		expect(sameTaskLine("- [ ] Позвонить в банк", "- [ ] Позвонить в банк завтра")).toBe(true);
+	const markers = markersOf(settingsFrom({ labels: [{ name: "Важное", color: "red" }, { name: "Срочное", color: "red" }] }));
+	const same = (a: string, b: string) => sameTaskLine(a, b, markers);
+
+	it("compares the titles alone: a repeat rule, projects, labels, dates and times shared are no likeness", () => {
+		expect(same("- [ ] Зал 📅 2026-11-09 🔁 every week on Mon, Wed, Fri", "- [ ] Бассейн 📅 2026-11-10 🔁 every week on Mon, Wed, Fri")).toBe(false);
+		expect(same("- [ ] Позвонить 🗂️ Работа Клиенты", "- [ ] Написать отчёт 🗂️ Работа Клиенты")).toBe(false);
+		expect(same("- [ ] Gym #label/Важное #label/Срочное", "- [ ] Dentist #label/Важное #label/Срочное")).toBe(false);
+		expect(same("\t- [ ] 📅 2026-11-15", "\t- [/] 📅 2026-11-16")).toBe(true);
+		expect(same("- [ ] Call 📅 2026-11-15 🔁 every day", "- [x] Call ⏰ 2026-11-16 10:00-11:00")).toBe(true);
+	});
+
+	it("keeps a title with a typo: a letter or two changed, swapped, added or dropped", () => {
+		expect(same("- [ ] Byu", "- [ ] Buy")).toBe(true);
+		expect(same("- [ ] Позвонить в бнак", "- [ ] Позвонить в банк")).toBe(true);
+		expect(same("- [ ] Buy milk", "- [ ] Buy mlik")).toBe(true);
+		expect(same("- [ ] Milk", "- [ ] Молоко")).toBe(false);
+		expect(same("- [ ] Buy milk", "- [ ] Buy bread")).toBe(false);
+	});
+
+	it("keeps a longer title with words added or changed while half the words of the shorter stand in the other", () => {
+		expect(same("- [ ] Позвонить в банк", "- [ ] Позвонить в банк завтра")).toBe(true);
+		expect(same("- [ ] Call the bank", "- [ ] Call a bank about the card")).toBe(true);
+		expect(same("- [ ] Later", "- [ ] Later edited")).toBe(true);
+		expect(same("- [ ] Call the bank", "- [ ] Fix the car")).toBe(false);
+		expect(same("- [ ] Idea", "- [ ] Buy milk")).toBe(false);
+	});
+});
+
+describe("a task written over another's line elsewhere, the two sharing a repeat rule", () => {
+	it("gets a new id: a call by the old task is stale, never closing the new one", () => {
+		const file = ["## Inbox", "", "- [ ] Зал 🔁 every week on Mon, Wed, Fri", "- [ ] Other", "", "## Now", "", "## Soon", "", "## Backlog", "", "## Done", ""].join("\n");
+		const before = read({ tasks: file, nowMs: NOW });
+		const gym = item(before.screen, "Зал");
+		const after = read({ ...before.context, tasks: before.context.tasks!.replace("Зал", "Бассейн") });
+		expect(item(after.screen, "Бассейн").id).not.toBe(gym.id);
+		expect(callDoor("tasks.freshArgs", [[gym.key, "done"], {}], after.context)).toMatchObject({ ok: false, error: { code: "staleTask" } });
+		expect(callDoor("tasks.setStatus", [gym.key, "done"], after.context)).toMatchObject({ ok: false, error: { code: "staleTask" } });
 	});
 });
 
