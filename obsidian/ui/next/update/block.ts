@@ -7,7 +7,7 @@ import { remapIds } from "./ids";
 import { actMessage } from "./acts";
 import { carryFollows, updateCarry } from "./carry";
 import { updateEntry } from "./entry";
-import { updateFull } from "./full";
+import { followFull, updateFull } from "./full";
 import { closeMenu, menuFollows, updateMenu } from "./menu";
 import { updateSearch } from "./search";
 import { updateSelect } from "./select";
@@ -67,9 +67,10 @@ function step(model: BlockModel, msg: BlockMsg): Step {
 		}
 		case "views":
 			{
-				const [menued, menuCommands] = menuFollows(model, { ...model, answers: msg.answers });
+				const [full, fullCommands] = followFull({ ...model, answers: msg.answers });
+				const [menued, menuCommands] = menuFollows(model, full);
 				const [carried, carryCommands] = carryFollows(menued);
-				return [carried, [...menuCommands, ...carryCommands]];
+				return [carried, [...fullCommands, ...menuCommands, ...carryCommands]];
 			}
 		case "rebased":
 			return [remapIds(model, msg.idMap), []];
@@ -89,6 +90,8 @@ function step(model: BlockModel, msg: BlockMsg): Step {
 		case "subprojectsPicked":
 			return pickWrite(model, "tasks.toggleSubprojects", []);
 		case "layerDismissed":
+			if (model.search && !model.search.closing) return updateSearch(model, { kind: "cancel" });
+			if (topLayer(model.layers)?.kind === "full") return updateFull(model, { kind: "close" });
 			return topLayer(model.layers)?.kind === "taskMenu" ? closeMenu(model) : [closeTop(model), []];
 		case "layerGone": {
 			const layers = model.layers.filter((layer, i) => !(layer.closing && i === model.layers.findIndex((l) => l.closing)));

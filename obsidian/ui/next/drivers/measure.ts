@@ -108,6 +108,23 @@ export class Measure {
 		return stop;
 	}
 
+	/**
+	 * Where the row of `key` inside `root` would show whole: the nearest of its ancestors that scrolls, and the top it
+	 * scrolls to (the least move: up to the row's top, or down until its bottom shows); null when it shows whole already.
+	 */
+	static toShow(root: ParentNode, key: string): { readonly scroller: HTMLElement; readonly top: number } | null {
+		let row: HTMLElement | null = null;
+		for (const el of root.querySelectorAll<HTMLElement>("[data-n-key]")) if (el.dataset.nKey === key) row = el;
+		let scroller = row?.parentElement ?? null;
+		while (scroller && scroller.scrollHeight <= scroller.clientHeight + 1) scroller = scroller.parentElement;
+		if (!row || !scroller || !root.contains(scroller)) return null;
+		const box = scroller.getBoundingClientRect();
+		const rect = row.getBoundingClientRect();
+		if (rect.top < box.top) return { scroller, top: scroller.scrollTop - (box.top - rect.top) };
+		if (rect.bottom > box.bottom) return { scroller, top: scroller.scrollTop + Math.min(rect.bottom - box.bottom, rect.top - box.top) };
+		return null;
+	}
+
 	dispose(): void {
 		[...this.stops].forEach((stop) => stop());
 	}

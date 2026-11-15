@@ -5,6 +5,7 @@ import { Icon, modeIcon } from "./icons";
 import { Backdrop, MenuGroup, Placed } from "./Sheet";
 import { CarryFloat } from "./carry/CarryFloat";
 import { TaskMenu } from "./menu/TaskMenu";
+import { SearchOver } from "./search/Search";
 
 
 interface LayerProps {
@@ -79,6 +80,7 @@ export function Layers({ model }: { readonly model: BlockModel }): JSX.Element {
 				<LayerView key={`${index}:${layer.kind}`} layer={layer} model={model} index={index} closing={layer.closing} />
 			))}
 			<CarryFloat model={model} />
+			<SearchOver model={model} />
 		</div>
 	);
 }

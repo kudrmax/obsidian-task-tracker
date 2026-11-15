@@ -15,6 +15,17 @@ export class Focus {
 		return false;
 	}
 
+	/** An element another driver made (an island's editor) takes the focus now. */
+	static element(el: HTMLElement): void {
+		el.focus({ preventScroll: true });
+	}
+
+	/** The focus leaves what it stands in inside `root`: the keyboard goes away. */
+	static leave(root: HTMLElement): void {
+		const active = root.ownerDocument.activeElement;
+		if (active instanceof HTMLElement && root.contains(active)) active.blur();
+	}
+
 	static holds(el: HTMLElement): boolean {
 		return el.contains(el.ownerDocument.activeElement);
 	}

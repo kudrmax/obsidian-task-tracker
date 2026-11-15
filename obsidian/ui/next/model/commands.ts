@@ -20,6 +20,10 @@ export type Command<Msg> =
 	| { readonly kind: "haptic" }
 	/** Focus lands on the field named, inside the user's event (a typing pick, P2). */
 	| { readonly kind: "focus"; readonly field: string }
+	/** The row of `key` brought into sight in what scrolls it (a found card), `then` told once it is. */
+	| { readonly kind: "show"; readonly key: string; readonly then: Msg }
+	/** The focus leaves whatever the block holds it in: the keyboard goes away (Done of the full card). */
+	| { readonly kind: "blur" }
 	/** A message after `ms` (a bound on a wait, a long press), cancelled by `cancelTimer` of the same name or the host's teardown. */
 	| { readonly kind: "timer"; readonly name: string; readonly ms: number; readonly msg: Msg }
 	| { readonly kind: "cancelTimer"; readonly name: string }

@@ -6,6 +6,8 @@ import { Bar } from "./entry/Bar";
 import { Icon, modeIcon } from "./icons";
 import { List } from "./List";
 import { SelectFoot } from "./carry/SelectFoot";
+import { FullCard } from "./full/FullCard";
+import { SearchInBlock } from "./search/Search";
 
 /** The core's icon of a mode (a Lucide name) as the design draws it. */
 
@@ -23,13 +25,13 @@ function Lists({ model, marks }: BlockProps & { readonly marks: Marks }): JSX.El
 					{lists.rows.map((row) => (
 						<div key={row.column} class="tc-n-row">
 							<div class="tc-n-row-label">{row.label}</div>
-							<List list={row.list} classes="tc-n-row-list" column={row.column} marks={marks} />
+							<List list={row.list} classes="tc-n-row-list" column={row.column} marks={marks} found={model.found?.id ?? null} />
 						</div>
 					))}
 				</>
 			);
 		case "byProject":
-			return <List list={lists.list} classes="tc-n-projects-list" column="projects" marks={marks} />;
+			return <List list={lists.list} classes="tc-n-projects-list" column="projects" marks={marks} found={model.found?.id ?? null} />;
 		case "none":
 			return null;
 	}
@@ -74,6 +76,8 @@ export function Block({ model }: BlockProps): JSX.Element {
 				<Icon name="plus" />
 			</button>
 			{model.entry ? <Bar entry={model.entry} wide={model.wide} placeTitle={placeTitle(model)} listName={(list) => listName(model, list)} /> : null}
+			<FullCard model={model} />
+			<SearchInBlock model={model} />
 		</>
 	);
 }

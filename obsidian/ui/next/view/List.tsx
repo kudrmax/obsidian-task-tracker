@@ -28,13 +28,17 @@ export interface ListProps {
 	readonly hidden?: ReadonlySet<string>;
 	/** What stands among the rows besides them (the field typed in this list), by the key it stands before; `end` after the last. */
 	readonly extra?: ReadonlyMap<string, JSX.Element>;
+	/** The card the search led to: it wears the ring. */
+	readonly found?: string | null;
+	/** Whose acts its cards' taps are (see `Card`). */
+	readonly scope?: string;
 }
 
 /**
  * A column of rows, each keyed by who it is (P1): headers of sections, No tasks plates, cards with their subtasks under
  * them a level in, the branches running to each. Motion within it is `motion`'s, by the rows' keys.
  */
-export function List({ list, classes, column, marks = NO_MARKS, hidden, extra }: ListProps): JSX.Element {
+export function List({ list, classes, column, marks = NO_MARKS, hidden, extra, found, scope }: ListProps): JSX.Element {
 	const cardClasses = (key: string): string | undefined => {
 		const all = [
 			marks.picking ? "tc-n-card-picking" : "",
@@ -42,6 +46,7 @@ export function List({ list, classes, column, marks = NO_MARKS, hidden, extra }:
 			marks.waiting.has(key) ? "is-waiting" : "",
 			marks.arriving === key ? "is-arriving" : "",
 			hidden?.has(key) ? "is-away" : "",
+			found === key ? "is-found" : "",
 		].filter(Boolean);
 		return all.length > 0 ? all.join(" ") : undefined;
 	};
@@ -68,6 +73,7 @@ export function List({ list, classes, column, marks = NO_MARKS, hidden, extra }:
 						branch={r.branch}
 						listed
 						classes={cardClasses(r.key)}
+						scope={scope}
 					/>
 				);
 			case "unwritten":

@@ -61,7 +61,6 @@ export type EntryMsg =
 	| { readonly kind: "newSection"; readonly id: string }
 	| { readonly kind: "plus" }
 	/** New section, from a task's Section page: the task waits at the end of its list under a field for the new section's name. */
-	| { readonly kind: "newSection"; readonly id: string }
 	| { readonly kind: "inSection"; readonly row: string; readonly group: GroupName; readonly list: boolean }
 	| { readonly kind: "atEnd"; readonly column: EntryList }
 	| { readonly kind: "typed"; readonly text: string }

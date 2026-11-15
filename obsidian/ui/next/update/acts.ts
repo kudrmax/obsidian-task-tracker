@@ -3,6 +3,7 @@ import { type BlockModel, shownLists } from "../model/block";
 import type { Act, BlockMsg } from "../model/messages";
 import type { ListRow } from "../model/lists";
 import { menuActMessage } from "./menu";
+import { fullAct } from "./fullActs";
 
 /** The rows the block draws now, by key. */
 function rowOf(model: BlockModel, key: string): ListRow | null {
@@ -58,7 +59,7 @@ export function actMessage(model: BlockModel, act: Act): BlockMsg | null {
 			return act.value === null ? null : { kind: "entry", msg: { kind: "atEnd", column: act.value as EntryList } };
 		default: {
 			if (act.act.startsWith("bar:")) return { kind: "entry", msg: { kind: "bar", act: act.act.slice("bar:".length), value: act.value } };
-			if (!act.act.startsWith("menu:")) return null;
+			if (!act.act.startsWith("menu:")) return fullAct(act);
 			const msg = menuActMessage(act.act.slice("menu:".length), act.value);
 			return msg ? { kind: "menu", msg } : null;
 		}

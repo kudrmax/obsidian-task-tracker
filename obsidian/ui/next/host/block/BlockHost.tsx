@@ -5,6 +5,12 @@ import type { Answers, Need } from "../../model/answers";
 import { Chrome } from "../../drivers/chrome";
 import { Focus } from "../../drivers/focus";
 import { Input, PRESSED } from "../../drivers/input";
+import { type EditorFactory, Editors } from "../../drivers/islands";
+import { Measure as MeasureOf } from "../../drivers/measure";
+import { Scroll } from "../../drivers/scroll";
+import { descriptionIsland } from "../../model/full";
+import { fullRowVars } from "../../model/fullList";
+import { searchFieldKey, SEARCH_FIELD } from "../../update/search";
 import { type BlockKey, Keys } from "../../drivers/keys";
 import { Measure } from "../../drivers/measure";
 import { Motion } from "../../drivers/motion";
@@ -45,6 +51,8 @@ export interface BlockDeps {
 	readonly openTasksFile: (line: number) => void;
 	/** The title field a task is typed in (Obsidian's editor, `obsidianTitleField`), its own keys made by the block's. */
 	readonly titleField: (keys: (onSwitch: () => void, lines: readonly Hotkey[]) => FieldKeys) => FieldFactory;
+	/** Obsidian's own editor for the full card's description; none (a test): no editor stands there. */
+	readonly editors?: EditorFactory;
 }
 
 // The quick entry's calls and jobs ----------------------------------------------------------------------------------
@@ -140,6 +148,8 @@ export class BlockHost {
 	readonly measure = new Measure();
 	private keys: Keys | null = null;
 	private readonly islands: Islands;
+	/** The full card's description editor. */
+	private readonly editors: Editors;
 	/** The typing pick the field last took the focus for. */
 	private focusedFor = 0;
 	private drawnSeq = -1;
@@ -164,6 +174,7 @@ export class BlockHost {
 		this.islands = new Islands(deps.titleField((onSwitch, lines) => this.keys?.field(onSwitch, lines) ?? { hold: () => undefined, dispose: () => undefined }));
 		const views: FreshViews = (needs) => deps.session.views(needs);
 		this.store = deps.session.store(blockProgram((command, dispatch) => this.run(command, dispatch), views), blockModel(note, Chrome.wide()), { render: (model) => this.draw(model) });
+		this.editors = new Editors(deps.editors ?? null);
 	}
 
 	/** The block is on the page: drawn at once, its presses and keys its own. */
@@ -177,6 +188,7 @@ export class BlockHost {
 			() => this.store.model.carry?.phase === "carried" || (this.store.model.select !== null && this.store.model.layers.length === 0),
 			() => this.dispatch(this.store.model.carry ? { kind: "carry", msg: { kind: "cancel" } } : { kind: "select", msg: { kind: "stop" } }),
 		);
+		for (const root of [this.node, this.overlay.node]) this.input.typing(root, (field, value) => this.typed(field, value), (field, key) => this.fieldKey(field, key));
 		this.store.flush();
 		this.input.fields(this.overlay.node, acted);
 		this.input.enter(
@@ -186,7 +198,7 @@ export class BlockHost {
 		);
 		this.input.escape(
 			this.node.ownerDocument,
-			() => this.store.model.layers.some((layer) => !layer.closing),
+			() => (this.store.model.layers.some((layer) => !layer.closing) || (this.store.model.search?.closing === false)) && !Focus.inField(this.node.ownerDocument),
 			() => this.dispatch({ kind: "layerDismissed" }),
 		);
 	}
@@ -205,13 +217,17 @@ export class BlockHost {
 		this.motion.before();
 		render(<BlockRoot model={model} layers={this.overlay.node} />, this.node);
 		this.drawnSeq = model.motion.seq;
-		this.motion.after(moved ? model.motion.cause : "none", new Map([...rowVars(drawnLists(model)), ...carryVars(model)]), model.entry?.bound);
+		this.motion.after(moved ? model.motion.cause : "none", new Map([...rowVars(drawnLists(model)), ...carryVars(model), ...fullRowVars(model)]), model.entry?.bound);
 		const frame = this.node.firstElementChild;
 		if (frame instanceof HTMLElement) Motion.holdHeight(frame, model.carry !== null);
 		this.motion.layerVars(this.overlay.node, menuVars(model));
 		const menu = openMenu(model);
 		this.motion.menu(this.overlay.node, this.node, menu?.place ?? null, (place) => this.dispatch({ kind: "menu", msg: { kind: "placed", place } }));
-		this.motion.layers(this.overlay.node, this.node, () => this.dispatch({ kind: "layerGone" }));
+		const gone = (layer: number) => this.dispatch(layer < 0 ? { kind: "search", msg: { kind: "gone" } } : { kind: "layerGone" });
+		this.motion.layers(this.overlay.node, this.node, gone);
+		this.motion.layers(this.node, this.node, gone);
+		const island = descriptionIsland(model.layers);
+		this.editors.sync(this.node, island ? [{ name: "description", ...island, hooks: this.descriptionHooks }] : []);
 		this.attach();
 		this.placeField(model);
 		if (this.frame) this.motion.besideField(this.frame);
@@ -247,7 +263,10 @@ export class BlockHost {
 		const frame = this.node.firstElementChild;
 		if (!(frame instanceof HTMLElement) || frame === this.frame) return;
 		this.frame = frame;
-		this.input.shield(frame, () => Focus.take(frame));
+		this.input.shield(frame, () => {
+			Focus.take(frame);
+			if (this.store.model.found) this.dispatch({ kind: "search", msg: { kind: "pressed" } });
+		});
 		this.keys = new Keys(this.deps.app as App, frame, (key) => this.key(key, frame));
 	}
 
@@ -327,6 +346,25 @@ export class BlockHost {
 		if (!sameTarget(target, carry.target)) this.carry({ kind: "over", target });
 	}
 
+	/** The description's editor tells what was typed, its focus, Escape (the keyboard goes, what was typed is written). */
+	private readonly descriptionHooks = {
+		change: (text: string) => this.dispatch({ kind: "full", msg: { kind: "typed", text } }),
+		focus: (focused: boolean) => this.dispatch({ kind: "full", msg: { kind: "editorFocus", focused } }),
+		escape: () => this.dispatch({ kind: "full", msg: { kind: "done" } }),
+	};
+
+	/** A field of the view typed in: the search's query. */
+	private typed(field: string, value: string): void {
+		if (field === SEARCH_FIELD) this.dispatch({ kind: "search", msg: { kind: "typed", query: value } });
+	}
+
+	/** A key in a field of the view: whether the block takes it (the search's arrows, Enter, Escape), so the field and Obsidian do not. */
+	private fieldKey(field: string, key: string): boolean {
+		const msg = field === SEARCH_FIELD ? searchFieldKey(key) : null;
+		if (msg) this.dispatch({ kind: "search", msg });
+		return msg !== null;
+	}
+
 	/** Cmd+Z and Cmd+Shift+Z in the block; in a field they stay the field's, taking typing back. */
 	private key(key: BlockKey, frame: HTMLElement): boolean {
 		if (key !== "find" && Focus.inField(frame.ownerDocument)) return true;
@@ -348,9 +386,20 @@ export class BlockHost {
 				return this.deps.notice(this.deps.failure(command.error));
 			case "haptic":
 				return;
-			case "focus":
+			case "focus": {
+				const island = this.editors.focusTarget(command.field);
+				if (island) return Focus.element(island);
 				this.focusing = command.field;
 				return this.focusNow();
+			}
+			case "blur":
+				return Focus.leave(this.node);
+			case "show": {
+				const target = MeasureOf.toShow(this.node, command.key);
+				if (target) Scroll.glide(target.scroller, target.top);
+				dispatch(command.then);
+				return;
+			}
 			case "timer":
 				return this.input.timer(this.node, command.name, command.ms, () => dispatch(command.msg));
 			case "cancelTimer":
@@ -386,6 +435,7 @@ export class BlockHost {
 		this.input.dispose();
 		this.islands.dispose();
 		this.keys?.dispose();
+		this.editors.dispose();
 		render(null, this.node);
 		this.overlay.dispose();
 		this.node.remove();
