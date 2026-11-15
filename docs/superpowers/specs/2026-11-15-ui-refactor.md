@@ -20,7 +20,7 @@ Revisions 1–3 were written top-down, and every review found new holes: the spe
 | 5 | 219 (7 classes) | 3 |
 | 6 | 155 (4 classes) | 3 |
 | 7 | 158 (5 classes) | 3 (settings persistence, the pending log, per-call cost) |
-| 8 | (rerun pending) | 2 (the pending log's references and rollback; the dispatch loop) |
+| 8 | 133 (4 classes) | 2 (the pending log's references and rollback; the dispatch loop) |
 | 9 | both corrected in P2 and P3, below | |
 
 The faults of revisions 5 and 6 had one cause. The spec treated the core as an asynchronous service the UI waits on, and built machinery around the waiting: read-back, previews, transactions, read-ahead, echoes. The core already has a **synchronous, pure door**, `callDoor(method, args, context) → answer` (`core/application/PhoneCalls.ts`). The iPhone app runs on it, and it covers every `TaskService`, `DayService`, undo, settings and calendar method (a typed coverage map, `PhoneCalls.ts:1077`). On Max's real tasks file (31 KB) a whole funnel view costs about 3 ms through it, JSON included (measured locally). Revision 7 puts the plugin on the same door, and the waiting is gone.
@@ -110,7 +110,13 @@ The rules themselves stay where they are, in the core: where a task lands, what 
   - `host`: the calendar choice carries over only on iOS, as `composeCore` does today;
   - `feedProblems`: Google failing or silent, for the sources dot;
   - `projectsReady`.
-- **Core classes the door leaves to the host** (the quick entry's job order, the calendars' refresh rule, `CalendarPolling`) are run by the runtime over its ports, unchanged. They are never rewritten.
+- **Core classes the door leaves to the host:**
+  - `CalendarPolling` is run by the runtime over its ports, unchanged.
+  - The quick entry's job order (`QuickEntrySession`) and the calendars' refresh rule (open, refresh, peek, the 15 s silence) are today written around async services and their own state. So `backend` gives each a synchronous form in the core:
+    - the job order as a step function over the door's `EntryAnswer`;
+    - the refresh rule as a pure decision the network lane asks, over the replica's calendar state.
+
+    The rules stay the core's, never rewritten in the UI.
 - **Calendars:** the network lane fetches events, latest wins per day, a superseded fetch abandoned. Their files go into the replica as data, cached first and fresh when they land.
 - **Synchronous rules** used per frame or per pointer move (`rules.*`: `snap`, `swipeLanding`, `layoutWidths`, `stackedLists`…) are called directly. They are pure.
 - **Cost.**
@@ -262,6 +268,10 @@ The plugin's own menus and sheets are Preact layers.
 | Root, rev 7: the pending log | snapshot of every part, `nowMs` per call, bounds, a missing file (P3) |
 | Root, rev 7: per-call cost | the cross-call cache, budget tests, `carryAt` on a target change (P3) |
 | Root, rev 8: the log's references and rollback | ids mapped and resolved on replay; entries carry their inputs; only text, history and ids come from replay (P3) |
+| R17 two in-memory copies while old and new coexist | never shipped together: both flags switch at once (Migration) |
+| R18 settings from outside writers | `PluginSettings.get()`, refreshed on `onChange` (P3) |
+| R19 entry job order and the refresh rule | synchronous forms in the core (P3) |
+| R20 replay rolling back the projects screen | only text, history and ids come from replay (P3) |
 | Root, rev 8: the dispatch loop | P2's loop: door calls right after `update`, answers fed back before render, views reach the model as data |
 
 ## Guards
@@ -316,15 +326,15 @@ The plugin's own menus and sheets are Preact layers.
 
 ## Migration: the new screens beside the old one, no parity layer
 
-The old screen keeps its own services, untouched, until it is deleted. While both live, each keeps its own undo history; undo takes back only that host's own writes, which is safe because undo applies over the current text. The shortcut goes to the focused host. The new screens run on the runtime. The two write the same file safely: each sees the other's writes as outside changes, and both rebase. The old services already do this inside `vault.process`, and the plugin and the iPhone app live this way today. No layer imitates the old services, so the old screen stays exactly as it is.
+The old screen keeps its own services, untouched, until it is deleted. **Old and new never run side by side for Max.** The new note block and the new leaf switch on together, in one release. Two copies of the core's in-memory state (undo history, ids, projects screen) would make undo skip the other screen's changes and cards fade instead of moving, so that pairing is never shipped. The flags exist for building and for the e2e comparison, never as a mixed setup. The new screens run on the runtime. The two write the same file safely: each sees the other's writes as outside changes, and both rebase. The old services already do this inside `vault.process`, and the plugin and the iPhone app live this way today. No layer imitates the old services, so the old screen stays exactly as it is.
 
 | Slice | What | Release |
 |---|---|---|
 | 1 | **The runtime and the core's part.** <ul><li>The replica, its stores, the pending log with replay and bounds, the network lane, readiness.</li><li>`backend`: the cross-call cache with budget tests; the host facts in `DoorContext`.</li></ul>Tested on its own, with nothing in the plugin using it yet. | — |
 | 2 | **Guards, freeze, the lifecycle test, the e2e harness.** | — |
-| 3 | **The note block, whole, behind `newBlock`:** Rows and By subprojects, lists, cards, entry, carry in the block, menus, the full card. | ★ after QA, `newBlock` on |
+| 3 | **The note block, whole, behind `newBlock` (off):** Rows and By subprojects, lists, cards, entry, carry in the block, menus, the full card. QA on the block. | — |
 | 4 | **The leaf as a new screen behind `newScreen` (off).** Built region by region: lists and layouts, the timeline, the ribbon and both swipes, the panel and tree, the carry across them, select mode, search. A smoke subset per region. | — |
-| 5 | **Switch:** once the release gate passes and an independent QA finds nothing, `newScreen` turns on. | ★ with Max's phone checklist |
+| 5 | **Switch:** once the release gate passes and an independent QA finds nothing, `newBlock` and `newScreen` turn on together. | ★ with Max's phone checklist |
 | 6 | **The settings tab.** | ★ |
 | 7 | **Delete** the old screen, its services' plugin wiring, `Picks`, `Reload`, `WriteQueue`, the flags and the freeze baselines. `CalendarScreen` is gone. | ★ |
 
