@@ -1,0 +1,17 @@
+{
+  "//": "The pure parts of the new screens (model, update, recognizers) compile with no DOM and no host: a window, a document, a timer or an element cannot even be named there (spec §Guards, purity). Checked by npm run build and tests/uiRules.test.ts.",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2021"],
+    "types": [],
+    "strict": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["model/**/*.ts", "update/**/*.ts", "recognizers/**/*.ts"]
+}

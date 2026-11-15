@@ -4,7 +4,7 @@
 	"private": true,
 	"main": "main.js",
 	"scripts": {
-		"build": "tsc --noEmit && node esbuild.config.mjs production && node core/build.mjs",
+		"build": "tsc --noEmit && tsc -p obsidian/ui/next/tsconfig.pure.json && node esbuild.config.mjs production && node core/build.mjs",
 		"dev": "node esbuild.config.mjs",
 		"build:demo": "tsc --noEmit && node esbuild.config.mjs production demo",
 		"build:e2e": "node esbuild.config.mjs production e2e",
@@ -20,7 +20,7 @@
 		"esbuild": "^0.28.2",
 		"happy-dom": "^21.0.4",
 		"obsidian": "^1.13.1",
-		"typescript": "^7.0.2",
+		"typescript": "7.0.2",
 		"vitest": "^5.0.2"
 	},
 	"dependencies": {
