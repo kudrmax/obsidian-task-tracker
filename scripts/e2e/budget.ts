@@ -8,10 +8,10 @@ import type { Platform, TestObsidian } from "./obsidian";
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** How long a trace runs on after the gesture: longer than any transition the screen runs (the slowest is under 400 ms). */
-const TRACE_TAIL_MS = 1200;
+export const TRACE_TAIL_MS = 1200;
 
 /** The page's trace while `act` runs (CDP Tracing: the timeline's tasks, script and frames). */
-async function traced(obsidian: TestObsidian, act: () => Promise<void>): Promise<Parameters<typeof budgetOfTrace>[0]> {
+export async function traced(obsidian: TestObsidian, act: () => Promise<void>): Promise<Parameters<typeof budgetOfTrace>[0]> {
 	const events: Parameters<typeof budgetOfTrace>[0][number][] = [];
 	const offData = obsidian.cdp.on("Tracing.dataCollected", (p) => void events.push(...(p.value as typeof events)));
 	const complete = new Promise<void>((resolve) => {

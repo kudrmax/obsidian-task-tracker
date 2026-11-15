@@ -8,12 +8,16 @@ import { type Platform, prepareVault, TestObsidian, type Theme } from "./obsidia
 import { type Paths, paths } from "./paths";
 import { smoke } from "./smoke";
 import { blockCarry } from "./blockCarry";
+import { block } from "./block";
+import { blockBudget } from "./blockBudget";
 
 const USAGE = `npm run e2e -- <command>
   smoke [--update] [--refresh-fixture]   the smoke set on desktop and phone view, dark and light; --update records the baselines
   budget                                 the budget run: 4x CPU, 300 tasks, script per frame and long tasks
   open                                   launch the test Obsidian and leave it running (for a look by hand)
   try <desktop|phone> <dark|light>       the smoke set once, in the running one
+  block [desktop|phone dark|light]      the note's block, old against new: the old block's baselines recorded, then the new block compared, each step judged
+  block-budget                          the note's block's budget: 4x CPU, 300 tasks in the project
   carry <desktop|phone> <dark|light> <old|new>  the note block's carry, in the running one (new: newBlock on)
   eval "<js>"                            evaluate in the running one (an async function body)
   shot <file.png>                        a screenshot of the running one
@@ -89,13 +93,13 @@ export async function main(argv: readonly string[]): Promise<number> {
 			obsidian.cdp.close();
 		}
 	}
-	if (!["smoke", "budget", "open"].includes(command)) {
+	if (!["smoke", "budget", "open", "block", "block-budget"].includes(command)) {
 		console.log(USAGE);
 		return 2;
 	}
 	const built = buildE2E(p.root, join(p.build, "main.js"));
 	const taken = fixture(p, argv.includes("--refresh-fixture"));
-	const fx = command === "budget" ? { ...taken, tasks: budgetTasks(taken.tasks) } : taken;
+	const fx = command === "budget" ? { ...taken, tasks: budgetTasks(taken.tasks) } : command === "block-budget" ? { ...taken, tasks: blockBudgetTasks(taken.tasks) } : taken;
 	prepareVault(p, fx, built);
 	const obsidian = await TestObsidian.launch(p);
 	if (command === "open") {
@@ -106,6 +110,24 @@ export async function main(argv: readonly string[]): Promise<number> {
 	const run = runDir(p);
 	try {
 		if (command === "budget") return report(await budget(obsidian, fx, run), run);
+		if (command === "block-budget") return report(await blockBudget(obsidian, fx, run), run);
+		if (command === "block") {
+			const combos = args.length === 2 ? [[args[0], args[1]] as [Platform, Theme]] : COMBOS;
+			const outcomes: Outcome[] = [];
+			for (const [platform, theme] of combos)
+				for (const which of ["old", "new"] as const) {
+					await obsidian.reset(platform, theme, { path: fx.tasksFile, text: fx.tasks });
+					const driver = new Driver(obsidian, platform, theme, { baselines: join(p.baselines, "block"), run: join(run, which) }, which === "old");
+					await driver.install();
+					try {
+						await block(driver, which === "new");
+					} catch (e) {
+						driver.outcomes.push({ combo: driver.combo, name: "the scenario", kind: "step", failures: [e instanceof Error ? e.message : String(e)] });
+					}
+					outcomes.push(...driver.outcomes.map((o) => ({ ...o, name: `${which}: ${o.name}` })));
+				}
+			return report(outcomes, run);
+		}
 		return report(await smokeIn(obsidian, fx, COMBOS, p, run, argv.includes("--update")), run);
 	} finally {
 		await obsidian.quit();
@@ -117,5 +139,16 @@ export function budgetTasks(text: string): string {
 	const count = (text.match(/^\s*- \[[ x-]\] /gm) ?? []).length;
 	const more = Array.from({ length: Math.max(0, 300 - count) }, (_, i) => `- [ ] Budget task ${i + 1}`);
 	if (more.length === 0) return text;
+	return /^## Backlog\s*$/m.test(text) ? text.replace(/^## Backlog\s*$/m, (h) => `${h}\n\n${more.join("\n")}`) : `${text}\n## Backlog\n\n${more.join("\n")}\n`;
+}
+
+/**
+ * The block's load: 300 tasks in the note's project (its Backlog), written with the project's tag so the block of
+ * «Дружба.md» shows them all.
+ */
+export function blockBudgetTasks(text: string): string {
+	const project = "Близкие";
+	const count = (text.match(/^\s*- \[[ x-]\] /gm) ?? []).length;
+	const more = Array.from({ length: Math.max(0, 300 - count) }, (_, i) => `- [ ] Budget task ${i + 1} 🗂️ ${project}`);
 	return /^## Backlog\s*$/m.test(text) ? text.replace(/^## Backlog\s*$/m, (h) => `${h}\n\n${more.join("\n")}`) : `${text}\n## Backlog\n\n${more.join("\n")}\n`;
 }

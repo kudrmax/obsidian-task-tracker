@@ -25,6 +25,14 @@ export interface StepOptions {
 }
 
 export interface ShotOptions {
+	/** What is shot: the screen's view (default), or another element by its selector (a note's block, the whole page). */
+	readonly of?: string;
+	/**
+	 * How many CSS pixels taller than its baseline the shot may be, cropped at the bottom to the baseline's size before it
+	 * is compared: the old note block is sometimes 1 px short of its rows (its stack scrolled by a pixel), and its baseline
+	 * is the old block's.
+	 */
+	readonly fit?: number;
 	/** Selectors whose boxes are masked out. */
 	readonly masks?: readonly string[];
 	/** Regions by selector, each with its tolerance. */
@@ -168,6 +176,18 @@ export class Driver {
 	}
 
 	/** One swipe of the screen: a finger flicked on the phone, two fingers on the trackpad (a wheel along x) on the desktop. */
+	/** Text typed into what has the focus, as a keyboard's committed text. */
+	async type(text: string): Promise<void> {
+		await this.cdp.call("Input.insertText", { text });
+	}
+
+	/** A key pressed and let go: Enter, Escape. */
+	async key(key: "Enter" | "Escape"): Promise<void> {
+		const code = key === "Enter" ? 13 : 27;
+		await this.cdp.call("Input.dispatchKeyEvent", { type: "keyDown", key, code: key, windowsVirtualKeyCode: code });
+		await this.cdp.call("Input.dispatchKeyEvent", { type: "keyUp", key, code: key, windowsVirtualKeyCode: code });
+	}
+
 	async swipe(at: Point, dx: number): Promise<void> {
 		if (this.platform === "phone") return this.drag(at, { x: at.x + dx, y: at.y }, 0, 8, 12);
 		/** A trackpad's pace: a delta every 8 ms, a few dozen px each, so the content following it moves as under a real hand. */
@@ -205,11 +225,11 @@ export class Driver {
 	/** The view at rest, shot and compared with its baseline (recorded instead with `--update` or when there is none). */
 	async shot(name: string, options: ShotOptions = {}): Promise<void> {
 		await this.page("return __e2e.rest()");
-		const view = await this.page<{ x: number; y: number; w: number; h: number } | null>(`return __e2e.rect("view")`);
-		if (!view) throw new Error("no view to shoot");
+		const view = await this.page<{ x: number; y: number; w: number; h: number } | null>(`return __e2e.rect(${JSON.stringify(options.of ?? "view")})`);
+		if (!view) throw new Error(`nothing to shoot: ${options.of ?? "view"}`);
 		const shot = await this.cdp.call<{ data: string }>("Page.captureScreenshot", { format: "png", clip: { x: view.x, y: view.y, width: view.w, height: view.h, scale: 1 }, captureBeyondViewport: false });
-		const png = Buffer.from(shot.data, "base64");
-		const image = decodePng(png);
+		let png: Buffer = Buffer.from(shot.data, "base64");
+		let image = decodePng(png);
 		const dpr = image.width / view.w;
 		const toImage = (r: { x: number; y: number; w: number; h: number }): Rect => ({ x: Math.floor((r.x - view.x) * dpr), y: Math.floor((r.y - view.y) * dpr), w: Math.ceil(r.w * dpr), h: Math.ceil(r.h * dpr) });
 		const masks = (await Promise.all((options.masks ?? []).map((s) => this.page<Rect[]>(`return __e2e.rects(${JSON.stringify(s)})`)))).flat().map(toImage);
@@ -236,8 +256,15 @@ export class Driver {
 			return;
 		}
 		const kept = JSON.parse(readFileSync(sidecar, "utf8")) as { masks: Rect[]; regions: Region[] };
+		const baseline = decodePng(readFileSync(baselineFile));
+		const over = image.height - baseline.height;
+		if (options.fit && image.width === baseline.width && over > 0 && over <= options.fit * dpr) {
+			image = cropTop(image, baseline.height);
+			png = encodePng(image);
+			writeFileSync(file, png);
+		}
 		const cluster = clusterFor(dpr);
-		const result = diffImages(decodePng(readFileSync(baselineFile)), image, { regions: kept.regions.length ? kept.regions : regions, rest: REST, masks: [...kept.masks, ...masks], cluster });
+		const result = diffImages(baseline, image, { regions: kept.regions.length ? kept.regions : regions, rest: REST, masks: [...kept.masks, ...masks], cluster });
 		const failures = result.sizeDiffers
 			? [`the shot is ${image.width}×${image.height}, the baseline another size`]
 			: [
@@ -247,4 +274,10 @@ export class Driver {
 		if (result.picture && result.failed) writeFileSync(join(dir, `${name}.diff.png`), encodePng(result.picture));
 		this.outcomes.push({ combo: this.combo, name, kind: "shot", failures, file });
 	}
+}
+
+/** The top `height` rows of an image. */
+function cropTop(image: ReturnType<typeof decodePng>, height: number): ReturnType<typeof decodePng> {
+	const row = image.data.length / image.height;
+	return { ...image, height, data: image.data.subarray(0, row * height) };
 }
