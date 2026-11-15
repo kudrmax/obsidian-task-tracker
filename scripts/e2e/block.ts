@@ -3,11 +3,13 @@ import type { Driver } from "./driver";
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** The block alone, old or new: Obsidian's note around it is never compared; 1 px of the old block's short height is cropped. */
-const BLOCK = { of: ".tc-project-block, .tc-n-block", fit: { px: 1, cut: { fromBottom: 71 } } } as const;
+/** Obsidian's own chrome that may stand over the block (its status bar, the phone's navigation): never compared (decision 41). */
+const CHROME = [".status-bar", ".mobile-navbar"];
+const BLOCK = { of: ".tc-project-block, .tc-n-block", fit: { px: 1, cut: { fromBottom: 71 } }, masks: CHROME } as const;
 /** The block with a field open: the new block grows for the field and its bar, the old one scrolled them in (decision 56). */
-const TYPING = { of: ".tc-project-block, .tc-n-block", fit: { px: 60, cut: "bottom" } } as const;
+const TYPING = { of: ".tc-project-block, .tc-n-block", fit: { px: 60, cut: "bottom" }, masks: CHROME } as const;
 /** A layer over the block (a menu): the whole page, the note and Obsidian's chrome as they stand under the sheet. */
-const PAGE = { of: "body" };
+const PAGE = { of: "body", masks: CHROME };
 
 /** The block's parts, old and new, by one selector each. */
 const SEL = {
