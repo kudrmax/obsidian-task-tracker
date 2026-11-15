@@ -1738,6 +1738,8 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .task-calendar .tc-n-card { position: relative; overflow: hidden; flex-shrink: 0; min-height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-n-pick-pad, var(--tc-card-pad-start)); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; cursor: pointer; }
 /* A card of two lines (a folded task's next step under its own small title) is as tall as its lines make it. */
 .task-calendar .tc-n-card > .tc-n-card-lines { min-height: var(--tc-card-two-h); }
+/* A card of two lines is a capsule of its own height: its corners, its dot's and its branch's middle are its height's (the old screen's `is-two-line`). */
+.task-calendar .tc-n-card:has(> .tc-n-card-lines) { --tc-radius-n-two: calc(var(--tc-card-two-h) / 2); border-radius: var(--tc-radius-n-two); --tc-n-row-h: var(--tc-card-two-h); }
 .task-calendar .tc-n-list > .tc-n-card { margin-left: calc(var(--tc-n-level, 0) * var(--tc-subtask-indent)); margin-bottom: var(--tc-n-fold, 0px); overflow: visible; clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 0 calc(-1 * var(--tc-n-level, 0) * var(--tc-subtask-indent))); }
 .task-calendar .tc-n-list > .tc-n-card.is-folded { box-shadow: var(--tc-shadow-fold); clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 calc(-1 * var(--tc-stack-step-y)) calc(-1 * var(--tc-n-level, 0) * var(--tc-subtask-indent))); }
 .task-calendar .tc-n-card[data-priority] { background: var(--tc-priority-fill); }
@@ -1757,7 +1759,7 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .task-calendar .tc-n-card-over-text { flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .task-calendar [data-priority] .tc-n-card-over { color: var(--tc-priority-meta); }
 .task-calendar .tc-n-link { color: var(--tc-accent); }
-.task-calendar .tc-n-progress-dot { position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; visibility: hidden; }
+.task-calendar .tc-n-progress-dot { position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-n-row-h, var(--tc-card-h)) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; visibility: hidden; }
 .task-calendar .tc-n-card[data-status="inProgress"] > .tc-n-progress-dot { visibility: visible; }
 .task-calendar [data-priority] .tc-n-progress-dot { background: var(--tc-priority-meta); }
 .task-calendar .tc-n-project-mark { position: relative; width: var(--tc-project-mark-w); height: var(--tc-leading-card); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--tc-muted); }
@@ -1768,7 +1770,7 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .task-calendar .tc-n-count, .task-calendar .tc-n-fold-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .task-calendar .tc-n-meta-pair > :is(.tc-n-count, .tc-n-fold-count) { line-height: var(--tc-leading-count-pair); }
 .task-calendar .tc-n-fold-count { position: relative; }
-.task-calendar .tc-n-fold-count::after { content: ""; position: absolute; left: calc(-1 * var(--tc-fold-hit-x)); right: calc(-1 * var(--tc-fold-hit-x)); top: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); bottom: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); }
+.task-calendar .tc-n-fold-count::after { content: ""; position: absolute; left: calc(-1 * var(--tc-fold-hit-x)); right: calc(-1 * var(--tc-fold-hit-x)); top: calc((var(--tc-leading-card) - var(--tc-n-row-h, var(--tc-card-h))) / 2); bottom: calc((var(--tc-leading-card) - var(--tc-n-row-h, var(--tc-card-h))) / 2); }
 @media (hover: hover) { body:not(.is-mobile) .task-calendar .tc-n-fold-count:hover { color: var(--tc-text); } }
 .task-calendar .tc-n-desc-mark { display: block; width: var(--tc-desc-mark); height: var(--tc-desc-mark); stroke-width: var(--tc-stroke-desc-mark); }
 .task-calendar .tc-n-meta-pair .tc-n-desc-mark { width: var(--tc-desc-mark-pair); height: var(--tc-desc-mark-pair); }
@@ -1782,7 +1784,7 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .task-calendar .tc-n-stage-mark svg { width: var(--tc-icon-s); height: var(--tc-icon-s); stroke-width: var(--tc-stroke-stage-mark); }
 .task-calendar .tc-n-branch, .task-calendar .tc-n-branch-end, .task-calendar .tc-n-branch-pass { position: absolute; top: calc(-1 * var(--tc-branch-rise)); height: calc(100% + var(--tc-branch-rise)); box-sizing: border-box; border-left: var(--tc-branch-w) solid var(--tc-branch); pointer-events: none; }
 .task-calendar .tc-n-branch, .task-calendar .tc-n-branch-end { left: calc(-1 * (var(--tc-subtask-indent) + var(--tc-branch-w)) / 2); width: calc((var(--tc-subtask-indent) + var(--tc-branch-w)) / 2); }
-.task-calendar .tc-n-branch::after { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--tc-branch-rise) + (var(--tc-card-h) - var(--tc-branch-w)) / 2); border-top: var(--tc-branch-w) solid var(--tc-branch); }
+.task-calendar .tc-n-branch::after { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--tc-branch-rise) + (var(--tc-n-row-h, var(--tc-card-h)) - var(--tc-branch-w)) / 2); border-top: var(--tc-branch-w) solid var(--tc-branch); }
 .task-calendar .tc-n-branch-end { height: calc(var(--tc-branch-rise) + 50% + var(--tc-branch-w) / 2); border-bottom: var(--tc-branch-w) solid var(--tc-branch); border-bottom-left-radius: var(--tc-radius-branch); }
 .task-calendar .tc-n-branch-pass { left: calc(-1 * (var(--tc-n-pass, 0) * var(--tc-subtask-indent) + (var(--tc-subtask-indent) + var(--tc-branch-w)) / 2)); width: var(--tc-branch-w); }
 
@@ -1818,6 +1820,7 @@ body:not(.is-mobile) .task-calendar button.tc-n-btn:focus-visible { outline: var
 .task-calendar .tc-n-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; }
 .task-calendar .tc-n-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-shadow-panel); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); overflow-anchor: none; -webkit-user-select: none; user-select: none; }
 .task-calendar .tc-n-panel.tc-n-panel-more { width: var(--tc-popover-w); }
+.task-calendar .tc-n-panel.tc-n-panel-view { width: var(--tc-view-menu-w); }
 .task-calendar .tc-n-menu-title { height: var(--tc-menu-title-h); box-sizing: border-box; padding: 0 var(--tc-space-16); border-bottom: var(--tc-band); display: flex; align-items: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); }
 .task-calendar .tc-n-menu-group + .tc-n-menu-group { border-top: var(--tc-band); }
 .task-calendar button.tc-n-menu-row { width: 100%; height: var(--tc-row); box-sizing: border-box; padding: 0 var(--tc-space-16); display: flex; align-items: center; gap: var(--tc-space-10); font-size: var(--tc-font-menu); text-align: left; }
@@ -1986,8 +1989,8 @@ body.is-mobile .task-calendar .tc-n-entry-row { margin-bottom: 0; }
 .task-calendar .tc-n-field.tc-n-section-field { font-weight: var(--tc-weight-semibold); }
 .task-calendar [data-priority] > .tc-n-progress-dot { background: var(--tc-priority-meta); }
 /* The phone keeps room at the list's end for the bar over the keyboard; the desktop under the field itself. */
-.task-calendar .tc-n-entry-room { flex-shrink: 0; height: 0; }
-body.is-mobile .task-calendar .tc-n-entry-room { height: var(--tc-row-entry-room); }
+.task-calendar .tc-n-entry-room { flex-shrink: 0; display: none; }
+body.is-mobile .task-calendar .tc-n-entry-room { display: block; height: var(--tc-row-entry-room); }
 
 /* While a task is typed the bottom row steps aside, and the foot fade gives the bar its room. */
 .task-calendar.tc-n-block.is-entering > :is(.tc-n-plus, .tc-n-capsule, .tc-n-view-btn) { opacity: 0; transform: scale(var(--tc-menu-scale)); visibility: hidden; pointer-events: none; }

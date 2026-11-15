@@ -28,11 +28,12 @@ export interface ShotOptions {
 	/** What is shot: the screen's view (default), or another element by its selector (a note's block, the whole page). */
 	readonly of?: string;
 	/**
-	 * How many CSS pixels taller than its baseline the shot may be, cropped at the bottom to the baseline's size before it
-	 * is compared: the old note block is sometimes 1 px short of its rows (its stack scrolled by a pixel), and its baseline
-	 * is the old block's.
+	 * How many CSS pixels taller than its baseline the shot may be, and where the extra rows are taken out before it is
+	 * compared: at the bottom (`bottom`: what the old block scrolled under a field it did not grow for), or a band of the
+	 * page's own ground `fromBottom` CSS pixels over the bottom (the old note block is at times 1 px short of its rows,
+	 * its stack scrolled by a pixel, so everything over its foot stands a pixel higher). The baseline is the old block's.
 	 */
-	readonly fit?: number;
+	readonly fit?: { readonly px: number; readonly cut: "bottom" | { readonly fromBottom: number } };
 	/** Selectors whose boxes are masked out. */
 	readonly masks?: readonly string[];
 	/** Regions by selector, each with its tolerance. */
@@ -74,6 +75,8 @@ export class Driver {
 	) {
 		obsidian.cdp.on("Animation.animationStarted", (p) => {
 			const a = p.animation as { name?: string; type?: string };
+			/** A caret's blink (CodeMirror's `cm-blink`) runs while a field has the focus: no motion of the screen's. */
+			if (/^cm-blink/.test(a.name ?? "")) return;
 			this.started.push({ name: a.name ?? "", type: a.type ?? "" });
 		});
 	}
@@ -258,8 +261,9 @@ export class Driver {
 		const kept = JSON.parse(readFileSync(sidecar, "utf8")) as { masks: Rect[]; regions: Region[] };
 		const baseline = decodePng(readFileSync(baselineFile));
 		const over = image.height - baseline.height;
-		if (options.fit && image.width === baseline.width && over > 0 && over <= options.fit * dpr) {
-			image = cropTop(image, baseline.height);
+		if (options.fit && image.width === baseline.width && over > 0 && over <= options.fit.px * dpr) {
+			const cut = options.fit.cut;
+			image = cut === "bottom" ? cropTop(image, baseline.height) : withoutRows(image, image.height - Math.round(cut.fromBottom * dpr) - over, over);
 			png = encodePng(image);
 			writeFileSync(file, png);
 		}
@@ -280,4 +284,13 @@ export class Driver {
 function cropTop(image: ReturnType<typeof decodePng>, height: number): ReturnType<typeof decodePng> {
 	const row = image.data.length / image.height;
 	return { ...image, height, data: image.data.subarray(0, row * height) };
+}
+
+/** An image with `count` rows taken out from row `at`. */
+function withoutRows(image: ReturnType<typeof decodePng>, at: number, count: number): ReturnType<typeof decodePng> {
+	const row = image.data.length / image.height;
+	const data = new Uint8Array(image.data.length - row * count);
+	data.set(image.data.subarray(0, row * at), 0);
+	data.set(image.data.subarray(row * (at + count)), row * at);
+	return { ...image, height: image.height - count, data };
 }

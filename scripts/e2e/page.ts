@@ -12,6 +12,8 @@ export const PAGE_SCRIPT = String.raw`
 	const PANEL = ".tc-tree-panel";
 	const DAY_TITLE = ".tc-day-nav";
 	const view = () => document.querySelector(".workspace-leaf.mod-active .task-calendar") ?? document.querySelector(".task-calendar");
+	/** An animation that moves or fades something, not a caret's blink (CodeMirror's \`cm-blink\`, which runs as long as a field has the focus). */
+	const motionOf = (a) => !/^cm-blink/.test(a.animationName ?? "");
 	const box = (r) => ({ x: r.left, y: r.top, w: r.width, h: r.height });
 	const visible = (r, within) => r.width > 0 && r.height > 0 && r.right > within.left + 1 && r.left < within.right - 1 && r.bottom > within.top + 1 && r.top < within.bottom - 1;
 	const titleOf = (el) => (el.querySelector(".tc-card-title, .tc-n-card-title")?.textContent ?? el.textContent ?? "").trim();
@@ -103,6 +105,7 @@ export const PAGE_SCRIPT = String.raw`
 	const animations = (keyOf) =>
 		document
 			.getAnimations()
+			.filter(motionOf)
 			.filter((a) => a.playState === "running")
 			.map((a) => {
 				const t = a.effect?.target ?? null;
@@ -177,7 +180,7 @@ export const PAGE_SCRIPT = String.raw`
 			while (performance.now() < until) {
 				await sleep(80);
 				const now = rows();
-				const moving = document.getAnimations().some((a) => a.playState === "running");
+				const moving = document.getAnimations().filter(motionOf).some((a) => a.playState === "running");
 				still = !moving && same(last, now) ? still + 1 : 0;
 				last = now;
 				if (still >= 3) return true;
