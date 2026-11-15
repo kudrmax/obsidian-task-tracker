@@ -131,6 +131,9 @@ export interface DoorContext {
 /** Where the door runs (`DoorContext.host`). */
 export type DoorHost = "ios" | "obsidian";
 
+/** What an id a call gave is (`DoorAnswer.createdKinds`). */
+export type CreatedKind = "task" | "section";
+
 /** A call's answer: the result, and what the host writes back; or the error, by its code. */
 export type DoorAnswer =
 	| {
@@ -150,6 +153,8 @@ export type DoorAnswer =
 			readonly ids?: TaskIdState;
 			/** The ids the call's writes gave the tasks and sections they made, in the order given; left out for none. */
 			readonly created?: readonly string[];
+			/** Each of `created`'s, in its order: a task's or a section's (a heading's). */
+			readonly createdKinds?: readonly CreatedKind[];
 	  }
 	| { readonly ok: false; readonly error: { readonly code: DoorErrorCode; readonly message: string } };
 
@@ -244,6 +249,7 @@ interface Effects {
 	projectsScreen?: ProjectsScreenState;
 	ids?: TaskIdState;
 	created?: string[];
+	createdKinds?: CreatedKind[];
 }
 
 /** One call's world: the rules under the settings given, at the moment given, over the texts given. */
@@ -364,7 +370,10 @@ class Call {
 		if (text === null) return false;
 		this.setText(text, true, { before: was, after: this.rules.idsOf(text) });
 		const made = this.identity.mintedSince(counter);
-		if (made.length > 0) this.kept.created = [...(this.kept.created ?? []), ...made];
+		if (made.length > 0) {
+			this.kept.created = [...(this.kept.created ?? []), ...made.map((line) => line.id)];
+			this.kept.createdKinds = [...(this.kept.createdKinds ?? []), ...made.map((line): CreatedKind => (line.task ? "task" : "section"))];
+		}
 		return true;
 	}
 

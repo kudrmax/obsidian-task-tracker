@@ -123,11 +123,8 @@ export class TaskIdentity {
 	 * The ids given since the counter stood at `next`, in the order given: each heading or task line of the state now
 	 * whose id was minted at or past it.
 	 */
-	mintedSince(next: number): string[] {
-		return this.current.lines
-			.filter((line) => idNumber(line.id) >= next)
-			.sort((a, b) => idNumber(a.id) - idNumber(b.id))
-			.map((line) => line.id);
+	mintedSince(next: number): TaskIdLine[] {
+		return this.current.lines.filter((line) => idNumber(line.id) >= next).sort((a, b) => idNumber(a.id) - idNumber(b.id));
 	}
 
 	/**
@@ -185,7 +182,8 @@ export class TaskIdentity {
 		const pairs = matchLines(
 			old.map((l) => l.raw),
 			outline.map((o) => o.raw),
-			(b, a) => old[b].task === outline[a].task,
+			(b, a) => old[b].task === outline[a].task && (!old[b].task || sameTaskLine(old[b].raw, outline[a].raw)),
+			true,
 		);
 		const known = new Map<number, string>();
 		for (const [b, a] of pairs) if (old[b].task === outline[a].task) known.set(outline[a].tag, old[b].id);
@@ -195,6 +193,26 @@ export class TaskIdentity {
 
 function sameOutline(lines: readonly TaskIdLine[], outline: readonly OutlineLine[]): boolean {
 	return lines.length === outline.length && lines.every((line, i) => line.raw === outline[i].raw && line.task === outline[i].task);
+}
+
+/** A title's words: letters and digits, lowercased; the checkbox, marks, tags' signs and numbers alone (dates, times) left out. */
+function titleWords(raw: string): Set<string> {
+	const text = raw.replace(/^\s*[-*+]\s+\[.\]\s*/u, "").toLowerCase();
+	return new Set((text.match(/[\p{L}\p{N}]+/gu) ?? []).filter((word) => /\p{L}/u.test(word)));
+}
+
+/**
+ * Two task lines are plausibly the same task, one edited into the other elsewhere: at least half the words of the
+ * shorter title stand in the other (its status, marks, dates and times aside). Titles of no words are the same only to
+ * each other. An edit of a word or two keeps a task; another task written over its line does not.
+ */
+export function sameTaskLine(a: string, b: string): boolean {
+	const x = titleWords(a);
+	const y = titleWords(b);
+	if (x.size === 0 || y.size === 0) return x.size === y.size;
+	let shared = 0;
+	for (const word of x) if (y.has(word)) shared++;
+	return shared * 2 >= Math.min(x.size, y.size);
 }
 
 /** The number an id was minted with (`t<n>`, n the counter then). */
