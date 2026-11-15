@@ -7,6 +7,9 @@ import type { Platform, TestObsidian } from "./obsidian";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** How long a trace runs on after the gesture: longer than any transition the screen runs (the slowest is under 400 ms). */
+const TRACE_TAIL_MS = 1200;
+
 /** The page's trace while `act` runs (CDP Tracing: the timeline's tasks, script and frames). */
 async function traced(obsidian: TestObsidian, act: () => Promise<void>): Promise<Parameters<typeof budgetOfTrace>[0]> {
 	const events: Parameters<typeof budgetOfTrace>[0][number][] = [];
@@ -62,12 +65,14 @@ export async function budget(obsidian: TestObsidian, fx: Fixture, run: string): 
 		try {
 			for (const [name, act] of gestures) {
 				await d.page("return __e2e.rest()");
+				await d.page("__e2e.start(true); return true");
+				/** The gesture and a fixed tail for what it set moving; the harness's wait for rest runs after the trace. */
 				const events = await traced(obsidian, async () => {
-					await d.page("__e2e.start(true); return true");
 					await act();
-					await d.page("return __e2e.rest(10000)");
-					await d.page("return __e2e.stop()");
+					await sleep(TRACE_TAIL_MS);
 				});
+				await d.page("return __e2e.rest(10000)");
+				await d.page("return __e2e.stop()");
 				const b = budgetOfTrace(events);
 				const failures = judgeBudget(b);
 				const dir = join(run, `budget-${platform}`);

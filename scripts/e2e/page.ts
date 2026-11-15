@@ -98,7 +98,8 @@ export const PAGE_SCRIPT = String.raw`
 		const { rows, keyOf } = sampleRows();
 		return { t: performance.now(), animations: animations(keyOf), rows, place: place() };
 	};
-	const tick = (t) => {
+	/** Named so the budget's trace leaves the sampler's own script out (frames.ts, HARNESS.sampler). */
+	const tick = function __e2eTick(t) {
 		if (!recorder.running) return;
 		recorder.times.push(t);
 		if (!recorder.light) recorder.frames.push(sample());
