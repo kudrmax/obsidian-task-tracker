@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { openBlock } from "./block";
+import { openBlock, showBlock } from "./block";
 import { TRACE_TAIL_MS, traced } from "./budget";
 import { Driver, type Outcome } from "./driver";
 import type { Fixture } from "./fixture";
@@ -54,12 +54,21 @@ export async function blockBudget(obsidian: TestObsidian, fx: Fixture, run: stri
 		];
 		try {
 			for (const [name, act] of gestures) {
+				await obsidian.cdp.call("Emulation.setCPUThrottlingRate", { rate: 1 });
+				await showBlock(d);
+				await obsidian.cdp.call("Emulation.setCPUThrottlingRate", { rate: 4 });
 				await d.page("return __e2e.rest()");
 				await d.page("__e2e.start(true); return true");
+				let failed: string | null = null;
 				const events = await traced(obsidian, async () => {
-					await act();
+					await act().catch((e: unknown) => void (failed = e instanceof Error ? e.message : String(e)));
 					await sleep(TRACE_TAIL_MS);
 				});
+				if (failed !== null) {
+					outcomes.push({ combo: `block-budget-${platform}`, name, kind: "step", failures: [failed] });
+					await d.key("Escape");
+					continue;
+				}
 				await d.page("return __e2e.rest(10000)");
 				await d.page("return __e2e.stop()");
 				const b = budgetOfTrace(events);
