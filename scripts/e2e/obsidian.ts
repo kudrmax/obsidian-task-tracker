@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Cdp, targets } from "./cdp";
 import type { Fixture } from "./fixture";
@@ -221,10 +221,5 @@ export class TestObsidian {
 			await sleep(500);
 		}
 		throw new Error("the test Obsidian did not quit");
-	}
-
-	/** Electron's error text on the page, if Obsidian showed one. */
-	async readText(): Promise<string> {
-		return readFileSync(join(this.p.profile, "obsidian.log"), "utf8");
 	}
 }
