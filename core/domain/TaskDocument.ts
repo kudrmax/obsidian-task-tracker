@@ -195,6 +195,12 @@ export class TaskDocument {
 	private readonly spans: ReadonlyMap<TaskEntry, Span>;
 	private readonly groupLists: ReadonlyMap<SectionKey, readonly TaskGroup[]>;
 	private readonly blockLists: ReadonlyMap<SectionKey, readonly Block[]>;
+	/** Every task by its id, the first in file order: made on the first `byId`, as the document never changes. */
+	private idIndex?: ReadonlyMap<string, TaskEntry>;
+	private everyTask?: readonly TaskEntry[];
+	private outlined?: readonly OutlineLine[];
+	private tree?: ProjectTree;
+	private treeLines?: ReturnType<typeof treeSpan>;
 
 	private constructor(
 		private readonly rows: readonly Row[],
@@ -243,10 +249,10 @@ export class TaskDocument {
 
 	/** The headings and the task lines, in file order, each with its tag's number. */
 	outline(): readonly OutlineLine[] {
-		return this.rows.flatMap((row, line): OutlineLine[] => {
+		return (this.outlined ??= this.rows.flatMap((row, line): OutlineLine[] => {
 			const task = isTaskLine(row.line);
 			return task || SECTION_HEADING_RE.test(row.line) || GROUP_HEADING_RE.test(row.line) ? [{ line, raw: row.line, task, tag: tagNumber(row.tag) }] : [];
-		});
+		}));
 	}
 
 	static empty(all: readonly string[]): string {
@@ -266,12 +272,16 @@ export class TaskDocument {
 
 	/** The projects of `## Projects`, as the file has them: none without the heading. */
 	projectTree(): ProjectTree {
-		return readTree(this.lines);
+		return (this.tree ??= readTree(this.lines));
+	}
+
+	private span(): ReturnType<typeof treeSpan> {
+		return (this.treeLines ??= treeSpan(this.lines));
 	}
 
 	/** The file has `## Projects`. */
 	hasProjectTree(): boolean {
-		return treeSpan(this.lines).heading !== null;
+		return this.span().heading !== null;
 	}
 
 	/**
@@ -280,7 +290,7 @@ export class TaskDocument {
 	 * file's end without Inbox). The same tree changes nothing.
 	 */
 	withProjectTree(tree: ProjectTree): TaskDocument {
-		const span = treeSpan(this.lines);
+		const span = this.span();
 		if (span.heading !== null && span.extra.length === 0 && tree.same(readTree(this.lines))) return this;
 		const mint = this.mint();
 		const lines = mint.rows(treeLines(tree, span.unit));
@@ -346,7 +356,12 @@ export class TaskDocument {
 
 	/** The task or subtask whose tag is `id`, wherever it stands; undefined when none has it. */
 	byId(id: string): TaskEntry | undefined {
-		return flatten(this.allTasks()).find((entry) => entry.id === id);
+		if (this.idIndex === undefined) {
+			const index = new Map<string, TaskEntry>();
+			for (const entry of flatten(this.allTasks())) if (!index.has(entry.id)) index.set(entry.id, entry);
+			this.idIndex = index;
+		}
+		return this.idIndex.get(id);
 	}
 
 	/** The task or subtask at that place, if there is one. */
@@ -362,7 +377,7 @@ export class TaskDocument {
 	}
 
 	allTasks(): readonly TaskEntry[] {
-		return SECTION_KEYS.flatMap((key) => this.tasks(key));
+		return (this.everyTask ??= SECTION_KEYS.flatMap((key) => this.tasks(key)));
 	}
 
 	/** Where the tags of the lines a change makes after this document begin: past every tag it has. */
@@ -856,7 +871,7 @@ export class TaskDocument {
 			const place: Place = parent ? { index: parent.index, path: [...parent.path, entries.length] } : { index: firstIndex + entries.length, path: [] };
 			const projects = parent ? (parentProjects ?? []) : parsed.task.projects;
 			const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, group, 0, spans, projects);
-			const entry: TaskEntry = { id: this.rows[i].tag, section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, projects, subtasks };
+			const entry: TaskEntry = { id: this.rows[i].tag, section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: children.length === 0 && parsed.task.children.length === 0 ? parsed.task : { ...parsed.task, children }, group, projects, subtasks };
 			entries.push(entry);
 			spans.set(entry, { line: i, lineCount: 1 + children.length });
 			i += 1 + children.length;

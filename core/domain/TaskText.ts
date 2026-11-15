@@ -25,6 +25,7 @@ const SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
 const TRAILING_PUNCTUATION_RE = /[.,;:!?)\]}'"»]+$/u;
 
 export function textParts(text: string): TextPart[] {
+	if (!text.includes("[") && !text.includes("http")) return text === "" ? [] : [{ kind: "text", text }];
 	const parts: TextPart[] = [];
 	const pushText = (s: string): void => {
 		if (s === "") return;

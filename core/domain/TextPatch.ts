@@ -185,24 +185,95 @@ export function sharedLines(b: readonly string[], a: readonly string[]): (readon
 	return (b.length + 1) * (a.length + 1) <= TABLE_CELLS ? tableLines(b, a) : myersLines(b, a);
 }
 
-/** The longest run of shared lines by a table, taking a line added before a line removed where both keep it as long. */
+/**
+ * The longest run of shared lines by a table, taking a line added before a line removed where both keep it as long. The
+ * table's cell for `b[i:]` and `a[j:]` is how many lines they share at most; its rows are kept a bit per line of `a`
+ * (Hyyrö's bit-parallel count), so a row costs a word per 32 lines.
+ */
 function tableLines(b: readonly string[], a: readonly string[]): (readonly [number, number])[] {
-	const width = a.length + 1;
-	const common = new Uint16Array((b.length + 1) * width);
-	for (let i = b.length - 1; i >= 0; i--) {
-		for (let j = a.length - 1; j >= 0; j--) {
-			common[i * width + j] = b[i] === a[j] ? common[(i + 1) * width + j + 1] + 1 : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
-		}
-	}
+	const common = new CommonRuns(b, a);
 	const pairs: (readonly [number, number])[] = [];
 	let i = 0;
 	let j = 0;
 	while (i < b.length || j < a.length) {
 		if (i < b.length && j < a.length && b[i] === a[j]) pairs.push([i++, j++]);
-		else if (j < a.length && (i === b.length || common[i * width + j + 1] >= common[(i + 1) * width + j])) j++;
+		else if (j < a.length && (i === b.length || common.at(i, j + 1) >= common.at(i + 1, j))) j++;
 		else i++;
 	}
 	return pairs;
+}
+
+const WORD = 32;
+
+/** How many lines `b[i:]` and `a[j:]` share at most, for every `i` and `j`. */
+class CommonRuns {
+	private readonly words: number;
+	private readonly width: number;
+	/** Row `i`: bit `p` clear where the count grows past line `a.length - 1 - p` of `a`, reading `b[i:]`. */
+	private readonly rows: Uint32Array;
+	/** Row `i`: the clear bits below each word. */
+	private readonly below: Uint32Array;
+
+	constructor(b: readonly string[], a: readonly string[]) {
+		const m = a.length;
+		const words = Math.max(1, Math.ceil(m / WORD));
+		this.words = words;
+		this.width = m;
+		const numbers = new Map<string, number>();
+		const masks: Uint32Array[] = [];
+		for (let p = 0; p < m; p++) {
+			const line = a[m - 1 - p];
+			let n = numbers.get(line);
+			if (n === undefined) {
+				n = numbers.size;
+				numbers.set(line, n);
+				masks.push(new Uint32Array(words));
+			}
+			masks[n][p >>> 5] |= 1 << (p & 31);
+		}
+		const rows = new Uint32Array((b.length + 1) * words);
+		rows.fill(0xffffffff, b.length * words);
+		for (let i = b.length - 1; i >= 0; i--) {
+			const row = i * words;
+			const next = row + words;
+			const n = numbers.get(b[i]);
+			if (n === undefined) {
+				rows.copyWithin(row, next, next + words);
+				continue;
+			}
+			const mask = masks[n];
+			let carry = 0;
+			for (let w = 0; w < words; w++) {
+				const v = rows[next + w];
+				const u = (v & mask[w]) >>> 0;
+				const sum = v + u + carry;
+				carry = sum > 0xffffffff ? 1 : 0;
+				rows[row + w] = ((sum >>> 0) | (v & ~mask[w])) >>> 0;
+			}
+		}
+		this.rows = rows;
+		const below = new Uint32Array((b.length + 1) * (words + 1));
+		for (let i = 0; i <= b.length; i++) {
+			for (let w = 0; w < words; w++) below[i * (words + 1) + w + 1] = below[i * (words + 1) + w] + WORD - bitCount(rows[i * words + w]);
+		}
+		this.below = below;
+	}
+
+	at(i: number, j: number): number {
+		const k = this.width - j;
+		const word = k >>> 5;
+		const bits = k & 31;
+		const before = this.below[i * (this.words + 1) + word];
+		if (bits === 0) return before;
+		const low = this.rows[i * this.words + word] & ((1 << bits) - 1);
+		return before + bits - bitCount(low >>> 0);
+	}
+}
+
+function bitCount(x: number): number {
+	x = x - ((x >>> 1) & 0x55555555);
+	x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
+	return Math.imul((x + (x >>> 4)) & 0x0f0f0f0f, 0x01010101) >>> 24;
 }
 
 /** Myers' shortest edit script, for a change too wide for the table: time and memory by the lines changed, not the file. */

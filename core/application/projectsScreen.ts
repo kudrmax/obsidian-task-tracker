@@ -83,11 +83,18 @@ function counts(entry: TaskEntry): boolean {
  * every subproject is done.
  */
 export function projectStatuses(tree: ProjectTree, doc: TaskDocument): ReadonlyMap<string, ProjectStatus> {
-	const tasks = tasksOf(doc).filter(counts);
+	const byProject = new Map<string, TaskEntry[]>();
+	for (const entry of tasksOf(doc).filter(counts)) {
+		for (const key of new Set(entry.task.projects.map(projectKey))) {
+			const own = byProject.get(key);
+			if (own) own.push(entry);
+			else byProject.set(key, [entry]);
+		}
+	}
 	const statuses = new Map<string, ProjectStatus>();
 	const visit = (node: ProjectNode): { status: ProjectStatus; tasks: number } => {
 		const children = node.children.map(visit);
-		const own = tasks.filter((entry) => namesProject(entry.task.projects, node.name));
+		const own = byProject.get(projectKey(node.name)) ?? [];
 		const total = own.length + children.reduce((sum, child) => sum + child.tasks, 0);
 		const status: ProjectStatus =
 			own.some((e) => isOpen(e.task.status)) || children.some((c) => c.status === "active")

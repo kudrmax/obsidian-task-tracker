@@ -42,7 +42,7 @@ if (!(version in json("versions.json"))) fail(`versions.json has no ${version}`)
 if (git("tag", "--list", version) !== "") fail(`tag ${version} already exists`);
 
 if (!existsSync("node_modules")) run("npm", ["ci"]);
-run("npx", ["vitest", "run"]);
+run("npm", ["test"]);
 run("npm", ["run", "test:apple"]);
 run("npm", ["run", "build"]);
 

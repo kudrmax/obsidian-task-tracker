@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { ScreenView, TaskItem } from "../../core/application/contracts";
 import { callDoor, callDoorJson, type DoorAnswer, type DoorContext, DOOR_COVERAGE, doorMethods, HOST_TASK_METHODS, KEPT_TASK_NAMES, plainJson } from "../../core/application/PhoneCalls";
+import { ReadingCache } from "../../core/application/ReadingCache";
 import { ScreenSettingsImpl } from "../../core/application/ScreenSettingsImpl";
 import { DEFAULT_ZOOM_LEVELS } from "../../core/application/timelineZoom";
 import { SettingsServiceImpl } from "../../core/application/SettingsServiceImpl";
@@ -725,6 +726,16 @@ describe("every answer of the door", () => {
 			expect({ method, answer }).toStrictEqual({ method, answer: JSON.parse(JSON.stringify(answer)) });
 			expect(JSON.parse(callDoorJson(method, JSON.stringify(args), JSON.stringify(context), true))).toStrictEqual(answer);
 			if (!answer.ok) expect({ method, code: answer.error.code }).toEqual({ method, code: expect.stringMatching(/^(staleTask|tasksFileMissing)$/) });
+		}
+	});
+
+	it("is the same from the cache across calls, cold or warm, as without it", async () => {
+		const screen = await service().svc.screen(T);
+		const cache = new ReadingCache();
+		for (const { method, args, context } of everyCall(screen)) {
+			const plain = callDoor(method, wire(args), context, null);
+			expect({ method, answer: callDoor(method, wire(args), context, cache) }).toEqual({ method, answer: plain });
+			expect({ method, answer: callDoor(method, wire(args), wire(context), cache) }).toEqual({ method, answer: plain });
 		}
 	});
 

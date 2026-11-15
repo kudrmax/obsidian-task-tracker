@@ -74,6 +74,7 @@ import { type UndoState, UndoSteps, type UndoWay } from "./UndoSteps";
 import { NO_TASK_IDS, TaskIdentity, type TaskIdState } from "./TaskIdentity";
 import type { PatchIds } from "../domain/TextPatch";
 import { snapMinute } from "./snapGrid";
+import { ReadingCache } from "./ReadingCache";
 import { dayOpening } from "./DayServiceImpl";
 import { repeatPageEnd } from "./RepeatPage";
 import { descriptionOpen, descriptionRead, descriptionSave, descriptionTyped } from "./DescriptionDraft";
@@ -203,6 +204,11 @@ export function settingsOf(json: string): TaskCalendarSettings {
 	return settingsFrom(json.trim() === "" ? null : JSON.parse(json));
 }
 
+const NO_NOTES: readonly ProjectNote[] = [];
+
+/** What the door's calls share: a call over a text and settings an earlier call read does not read them again. */
+const DOOR_CACHE = new ReadingCache();
+
 /** What a call ended with besides its result. */
 interface Effects {
 	tasks?: string;
@@ -231,9 +237,12 @@ class Call {
 	/** `data.json` as handed in: what a change of the settings is written over. */
 	private readonly settingsText: string;
 
-	constructor(readonly context: DoorContext) {
+	constructor(
+		readonly context: DoorContext,
+		private readonly cache: ReadingCache | null,
+	) {
 		this.settingsText = context.settings ?? "";
-		this.current = settingsOf(this.settingsText);
+		this.current = cache === null ? settingsOf(this.settingsText) : cache.settings(this.settingsText);
 		const clock: Clock = { now: () => new Date(context.nowMs) };
 		this.clock = clock;
 		const store: SettingsStore = {
@@ -242,8 +251,8 @@ class Call {
 			onChange: () => () => undefined,
 		};
 		this.store = store;
-		this.identity = new TaskIdentity(context.ids);
-		this.rules = new TaskRules(store, clock, this.identity, context.ids !== undefined, { list: () => context.projects ?? [], ready: () => true });
+		this.identity = new TaskIdentity(context.ids, cache);
+		this.rules = new TaskRules(store, clock, this.identity, context.ids !== undefined, { list: () => context.projects ?? NO_NOTES, ready: () => true }, cache);
 		this.reads = new TaskReads(this.rules, store, clock, { tree: () => this.tree(), screen: () => this.projectsScreen });
 		this.writes = new TaskWrites(this.rules, this.reads);
 		this.text = context.tasks ?? null;
@@ -267,7 +276,9 @@ class Call {
 
 	/** The projects of the file as this call has it, the tasks' own in the tree; none without a file. */
 	tree(): ProjectTree {
-		return this.text === null ? ProjectTree.EMPTY : projectTreeOf(this.snapshot().doc);
+		if (this.text === null) return ProjectTree.EMPTY;
+		const doc = this.snapshot().doc;
+		return this.cache === null ? projectTreeOf(doc) : this.cache.memo(doc, "tree", () => projectTreeOf(doc));
 	}
 
 	get settings(): TaskCalendarSettings {
@@ -1094,13 +1105,13 @@ export function doorMethods(): string[] {
 }
 
 /** The method's answer over the context, every value as it crosses the door. */
-export function callDoor(method: string, args: readonly unknown[], context: DoorContext): DoorAnswer {
+export function callDoor(method: string, args: readonly unknown[], context: DoorContext, cache: ReadingCache | null = DOOR_CACHE): DoorAnswer {
 	try {
 		const [space, name] = method.split(".");
 		const handler = SPACES[space]?.[name];
 		if (!handler || !Object.prototype.hasOwnProperty.call(SPACES, space) || !Object.prototype.hasOwnProperty.call(SPACES[space], name)) throw new DoorError("unknownMethod", `no method ${method}`);
 		if (!Array.isArray(args)) throw new DoorError("badArguments", "the arguments are a list");
-		const call = new Call(context);
+		const call = new Call(context, cache);
 		const result = handler(call, [...args]);
 		return { ok: true, result: result === undefined ? null : result, ...call.effects };
 	} catch (e) {

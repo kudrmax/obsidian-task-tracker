@@ -37,6 +37,7 @@ export interface LegacyNotes {
 }
 import type { Clock, SettingsStore } from "./ports";
 import type { TaskIdentity } from "./TaskIdentity";
+import type { ReadingCache, TextReading } from "./ReadingCache";
 import { isUnder, keyOf, sameLine, samePlace } from "./taskKeys";
 
 /** An action's change of the document read at `today`; it throws `StaleTaskError` when a task or section it names is gone. */
@@ -115,12 +116,14 @@ export class TaskRules {
 		private readonly identity: TaskIdentity | null = null,
 		private readonly keysById = identity !== null,
 		private readonly legacy: LegacyNotes = { list: () => [], ready: () => true },
+		private readonly cache: ReadingCache | null = null,
 	) {}
 
 	moment(): Moment {
 		const settings = this.settings.get();
 		const boundary = boundaryOf(settings);
-		return { settings, boundary, today: boundary.dayOf(this.clock.now()), reading: JSON.stringify([readingKey(settings), settings.dayStartHour, this.legacy.ready()]) };
+		const key = this.cache === null ? readingKey(settings) : this.cache.memo(settings, "readingKey", () => readingKey(settings));
+		return { settings, boundary, today: boundary.dayOf(this.clock.now()), reading: JSON.stringify([key, settings.dayStartHour, this.legacy.ready()]) };
 	}
 
 	today(): LocalDate {
@@ -137,6 +140,10 @@ export class TaskRules {
 	}
 
 	read(text: string, at: Moment = this.moment()): Reading {
+		if (this.cache !== null) {
+			const reading = this.textReading(this.cache, text, at);
+			return { doc: this.identified(text, reading.tidied, () => reading.tidied), changed: reading.changed };
+		}
 		const { settings } = at;
 		const parsed = parseText(text, settings);
 		const whole = parsed.ensureSections(sectionNames(settings));
@@ -147,6 +154,7 @@ export class TaskRules {
 
 	/** The text after `operation` on the document read and normalized; the result is normalized again. */
 	change(text: string, operation: Operation, at: Moment = this.moment()): TextChange {
+		if (this.cache !== null) return this.written(this.read(text, at).doc, operation, at);
 		const doc = this.tidied(parseText(text, at.settings).ensureSections(sectionNames(at.settings)), at);
 		return this.written(this.identified(text, doc, () => doc), operation, at);
 	}
@@ -161,6 +169,10 @@ export class TaskRules {
 
 	/** The document as the file has it, with every section, not normalized. */
 	asRead(text: string, at: Moment = this.moment()): TaskDocument {
+		if (this.cache !== null) {
+			const reading = this.textReading(this.cache, text, at);
+			return this.identified(text, reading.whole, () => reading.tidied);
+		}
 		const whole = parseText(text, at.settings).ensureSections(sectionNames(at.settings));
 		return this.identified(text, whole, () => this.tidied(whole, at));
 	}
@@ -168,6 +180,10 @@ export class TaskRules {
 	/** The text as the file has it, unnormalized and without the sections it lacks: where a line stands in it. */
 	parse(text: string): TaskDocument {
 		const at = this.moment();
+		if (this.cache !== null) {
+			const reading = this.textReading(this.cache, text, at);
+			return this.identified(text, reading.parsed, () => reading.tidied);
+		}
 		const parsed = parseText(text, at.settings);
 		return this.identified(text, parsed, () => this.tidied(parsed.ensureSections(sectionNames(at.settings)), at));
 	}
@@ -180,10 +196,31 @@ export class TaskRules {
 	/** `doc`, read from `text` with each line tagged by its line, tagged by who its lines are; `reading`, the text tidied for today. */
 	private identified(text: string, doc: TaskDocument, reading: () => TaskDocument): TaskDocument {
 		const ids = this.identity?.of(text, reading);
-		return ids ? doc.retagged(ids) : doc;
+		if (!ids) return doc;
+		return this.cache === null ? doc.retagged(ids) : this.cache.retagged(doc, ids);
+	}
+
+	/**
+	 * `text` parsed, with every section, and tidied at `at`, as `read` makes them, kept in `cache` by all they are made of:
+	 * the text, the settings, the day, whether the host's notes are complete, and the notes.
+	 */
+	private textReading(cache: ReadingCache, text: string, at: Moment): TextReading {
+		const notes = this.legacy.list();
+		const reading = `${cache.keyOf(at.settings)}\n${at.reading}`;
+		return cache.reading(text, reading, at.today, cache.keyOf(notes), () => {
+			const parsed = parseText(text, at.settings, cache.memo(at.settings, "markers", () => markersOf(at.settings)));
+			const whole = parsed.ensureSections(sectionNames(at.settings));
+			const tidied = this.tidied(whole, at);
+			const changed = whole === parsed ? tidied !== whole : this.tidied(parsed, at) !== parsed;
+			return { parsed, whole, tidied, changed };
+		});
 	}
 
 	private idsFor(text: string): LineIds | undefined {
+		if (this.cache !== null && this.identity !== null) {
+			const cache = this.cache;
+			return this.identity.of(text, () => this.textReading(cache, text, this.moment()).tidied);
+		}
 		return this.identity?.of(text, () => this.tidied(parseText(text, this.settings.get()).ensureSections(sectionNames(this.settings.get())), this.moment()));
 	}
 
