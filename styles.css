@@ -1717,3 +1717,5 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .task-calendar.is-note > .tc-capsule { left: var(--tc-block-inset); }
 /* In a note's block every list is as tall as its cards: the block grows, and past its tallest the stages scroll as one. */
 .task-calendar.is-note .tc-rows-stack { overflow-y: auto; scrollbar-width: none; padding-bottom: calc(var(--tc-plus-size) + var(--tc-block-inset) + var(--tc-space-20)); }
+
+/* next */
