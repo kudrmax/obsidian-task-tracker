@@ -1,5 +1,5 @@
 import { type BlockModel, currentLists } from "../model/block";
-import { write } from "../model/commands";
+import { type Command, write } from "../model/commands";
 import { topLayer } from "../model/layers";
 import type { BlockMsg } from "../model/messages";
 import { SECTION_FIELD, type SectionMsg } from "../model/section";
@@ -38,10 +38,9 @@ export function updateSection(model: BlockModel, msg: SectionMsg): Step {
 			return [closeTop(model), [write("tasks.removeGroup", [top.list, sectionRef(top.head)], failed)]];
 		}
 		case "named":
-			if (!model.sectionRename) return [model, []];
-			return [model, [{ kind: "door", method: "sectionName.end", args: [false, "enter", msg.text], reply: (outcome) => ({ kind: "section", msg: { kind: "ended", name: endName(outcome.answer) } }) }]];
+			return model.sectionRename ? [model, [nameEnd("enter", msg.text)]] : [model, []];
 		case "unnamed":
-			return model.sectionRename ? [{ ...model, sectionRename: null }, []] : [model, []];
+			return model.sectionRename ? [model, [nameEnd("escape", "")]] : [model, []];
 		case "ended": {
 			const rename = model.sectionRename;
 			if (!rename) return [model, []];
@@ -51,6 +50,11 @@ export function updateSection(model: BlockModel, msg: SectionMsg): Step {
 		default:
 			return assertNever(msg);
 	}
+}
+
+/** What the core says a key or a tap away ends a section's name with (`sectionName.end`): Enter the name typed, else nothing. */
+function nameEnd(event: "enter" | "escape", text: string): Command<BlockMsg> {
+	return { kind: "door", method: "sectionName.end", args: [false, event, text], reply: (outcome) => ({ kind: "section", msg: { kind: "ended", name: endName(outcome.answer) } }) };
 }
 
 /** The name `sectionName.end` answered to write; null for none. */
