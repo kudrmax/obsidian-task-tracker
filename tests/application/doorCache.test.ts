@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { ScreenView, TaskItem } from "../../core/application/contracts";
 import { callDoor, type DoorAnswer, type DoorContext } from "../../core/application/PhoneCalls";
 import { ReadingCache } from "../../core/application/ReadingCache";
+import { DEFAULT_ZOOM_LEVELS } from "../../core/application/timelineZoom";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { bigTasksFile } from "./bigTasksFile";
 
 /**
@@ -154,6 +156,75 @@ describe("the door's cache across calls", () => {
 			const context: DoorContext = { tasks: text, nowMs: NOW, projects };
 			expect(callDoor("tasks.screen", [DAY], context, cache)).toEqual(callDoor("tasks.screen", [DAY], context, null));
 		}
+	});
+
+	it("reads a list of notes changed in place between two calls as it now is", () => {
+		const cache = new ReadingCache();
+		const text = "## Inbox\n- [ ] Call 🗂️ [[Acme]]\n- [ ] Other\n";
+		const projects: { name: string; path: string; link: string }[] = [];
+		const context: DoorContext = { tasks: text, nowMs: NOW, projects };
+		expect(callDoor("tasks.normalize", [], context, cache)).toEqual(callDoor("tasks.normalize", [], context, null));
+		projects.push({ name: "Acme", path: "Clients/Acme.md", link: "Acme" });
+		const answer = callDoor("tasks.normalize", [], context, cache);
+		expect(answer).toEqual(callDoor("tasks.normalize", [], context, null));
+		expect((answer as Ok).tasks).toContain("- Acme [[Acme]]");
+	});
+
+	it("moves the file to projects once the host's notes are complete, over the same text", () => {
+		const cache = new ReadingCache();
+		const text = "## Inbox\n- [ ] Call 🗂️ [[Acme]]\n- [ ] Other\n";
+		const projects = [{ name: "Acme", path: "Clients/Acme.md", link: "Acme" }];
+		for (const projectsReady of [false, true, false, true]) {
+			const context: DoorContext = { tasks: text, nowMs: NOW, projects, projectsReady };
+			expect(callDoor("tasks.normalize", [], context, cache)).toEqual(callDoor("tasks.normalize", [], context, null));
+		}
+	});
+
+	it("reads ids a host changed in place between two calls as they now are", () => {
+		const cache = new ReadingCache();
+		const text = bigTasksFile(DAY);
+		const first = callDoor("tasks.normalize", [], { tasks: text, nowMs: NOW }, cache) as Ok;
+		const ids = JSON.parse(JSON.stringify(first.ids)) as { next: number; lines: { id: string }[] };
+		const context: DoorContext = { tasks: first.tasks ?? text, nowMs: NOW, ids: ids as never };
+		expect(callDoor("tasks.screen", [DAY], context, cache)).toEqual(callDoor("tasks.screen", [DAY], context, null));
+		for (const line of ids.lines) line.id = `${line.id}x`;
+		const answer = callDoor("tasks.screen", [DAY], context, cache);
+		expect(JSON.stringify(answer)).toMatch(/"id":"t\d+x"/);
+		expect(answer).toEqual(callDoor("tasks.screen", [DAY], context, null));
+	});
+
+	it("never lets a caller change what it keeps: an answer changed in place leaves the next answer as it would be", () => {
+		const cache = new ReadingCache();
+		const text = bigTasksFile(DAY);
+		const tidy = callDoor("tasks.normalize", [], { tasks: text, nowMs: NOW }, cache) as Ok;
+		const context: DoorContext = { tasks: tidy.tasks ?? text, nowMs: NOW, ids: tidy.ids };
+		const spoil = (value: unknown, depth = 0): void => {
+			if (depth > 6 || value === null || typeof value !== "object") return;
+			try {
+				if (Array.isArray(value)) value.push("spoilt");
+				else (value as Record<string, unknown>).spoilt = true;
+			} catch {
+				// frozen: it cannot be changed, which is as good
+			}
+			for (const v of Object.values(value)) spoil(v, depth + 1);
+		};
+		for (const method of ["tasks.screen", "tasks.funnelView", "tasks.projectsScreen", "screenSettings.get", "settings.form"]) {
+			const args = method === "tasks.screen" ? [DAY] : [];
+			spoil(callDoor(method, args, context, cache));
+			expect({ method, answer: callDoor(method, args, context, cache) }).toEqual({ method, answer: callDoor(method, args, context, null) });
+		}
+		const screen = (callDoor("tasks.screen", [DAY], context, cache) as Ok).result as ScreenView;
+		spoil(callDoor("tasks.setStatus", [screen.inbox[0].key, "done"], context, cache));
+		expect(callDoor("tasks.screen", [DAY], context, cache)).toEqual(callDoor("tasks.screen", [DAY], context, null));
+	});
+
+	it("freezes copies of the settings, never the defaults every read shares", () => {
+		new ReadingCache().settings("");
+		expect(Object.isFrozen(DEFAULT_SETTINGS.priorities)).toBe(false);
+		expect(Object.isFrozen(DEFAULT_SETTINGS.labels)).toBe(false);
+		expect(Object.isFrozen(DEFAULT_SETTINGS.groups.presets)).toBe(false);
+		expect(Object.isFrozen(DEFAULT_SETTINGS.google.calendarIds)).toBe(false);
+		expect(DEFAULT_ZOOM_LEVELS.some((level) => Object.isFrozen(level))).toBe(false);
 	});
 
 	it("keeps a task's id as the door without it does through every call", () => {

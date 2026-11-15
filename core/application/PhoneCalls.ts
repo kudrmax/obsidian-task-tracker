@@ -77,6 +77,7 @@ import { NO_TASK_IDS, TaskIdentity, type TaskIdState } from "./TaskIdentity";
 import type { PatchIds } from "../domain/TextPatch";
 import { snapMinute } from "./snapGrid";
 import { ReadingCache } from "./ReadingCache";
+import { deepFrozen } from "../domain/frozen";
 import { dayOpening } from "./DayServiceImpl";
 import { repeatPageEnd } from "./RepeatPage";
 import { descriptionOpen, descriptionRead, descriptionSave, descriptionTyped } from "./DescriptionDraft";
@@ -300,7 +301,7 @@ class Call {
 	tree(): ProjectTree {
 		if (this.text === null) return ProjectTree.EMPTY;
 		const doc = this.snapshot().doc;
-		return this.cache === null ? projectTreeOf(doc) : this.cache.memo(doc, "tree", () => projectTreeOf(doc));
+		return this.cache === null ? projectTreeOf(doc) : this.cache.memo(doc, "tree", () => deepFrozen(projectTreeOf(doc)));
 	}
 
 	get settings(): TaskCalendarSettings {
@@ -319,6 +320,12 @@ class Call {
 
 	hasTasks(): boolean {
 		return this.text !== null;
+	}
+
+	/** The host handed in who the tasks are: an id it names is one the door gave. Throws without a tasks file. */
+	knowsIds(): boolean {
+		this.tasks();
+		return this.context.ids !== undefined;
 	}
 
 	snapshot(): Snapshot {
@@ -595,14 +602,28 @@ function undone(c: Call, state: ProjectsScreenState, call: DroppedCall): Project
 		const name = c.rules.cleanName(to);
 		return name === null ? state : renamedIn(state, name, from);
 	}
-	/** A new project is chosen, its branch unfolded: the choice and the folds go back to those the call ran over. */
+	/**
+	 * A new project is chosen and the branches above it unfolded: the node chosen before comes back while the new one is
+	 * still chosen, and those branches fold again where they were folded before; a fold made or opened since stays.
+	 */
 	if (call.method === "tasks.createProject" && call.projectsScreen) {
-		const name = c.rules.cleanName(call.args[0] as string);
-		const made = name === null ? null : projectNodeOf(name);
-		if (made === null || state.selected === undefined || !sameNode(state.selected, made)) return state;
-		const { selected: _selected, folded: _folded, ...rest } = state;
-		const { selected, folded } = call.projectsScreen;
-		return { ...rest, ...(selected !== undefined && { selected }), ...(folded !== undefined && { folded }) };
+		const [typed, place] = call.args as [string, { readonly parent: string | null }];
+		const name = c.rules.cleanName(typed);
+		if (name === null) return state;
+		const before = call.projectsScreen;
+		let next = state;
+		if (state.selected !== undefined && sameNode(state.selected, projectNodeOf(name))) {
+			const { selected: _made, ...rest } = state;
+			next = before.selected === undefined ? rest : { ...rest, selected: before.selected };
+		}
+		const parent = place?.parent ? c.tree().find(place.parent) : null;
+		const above = (parent?.path ?? []).map(projectNodeOf);
+		const now = next.folded ?? [];
+		const opened = (before.folded ?? []).filter((node) => above.some((a) => sameNode(a, node)) && !now.some((n) => sameNode(n, node)));
+		if (opened.length === 0) return next;
+		const isOpened = (node: string) => opened.some((o) => sameNode(o, node));
+		const kept = (before.folded ?? []).filter((node) => isOpened(node) || now.some((n) => sameNode(n, node)));
+		return { ...next, folded: [...kept, ...now.filter((node) => !kept.some((k) => sameNode(k, node)))] };
 	}
 	return state;
 }
@@ -634,13 +655,18 @@ const REPLICA_TASKS: Readonly<Record<string, Handler>> = {
 		c.keepProjectsScreen(state);
 		return state;
 	},
-	/** The key of the task `id` names (`TaskItem.id`) in the file as read now, null when no task has it; nothing written. */
+	/**
+	 * The key of the task `id` names (`TaskItem.id`) in the file as read now, null when no task has it; nothing written.
+	 * Null without `ids` in the context too: the ids then are fresh, and one may name another task.
+	 */
 	keyOf: (c, [id]) => {
+		if (!c.knowsIds()) return null;
 		const entry = c.snapshot().doc.byId(id as string);
 		return entry ? keyOf(entry) : null;
 	},
-	/** The list and name of the section `id` names (`ListSection.id`) in the file as read now, null when no section has it. */
+	/** The list and name of the section `id` names (`ListSection.id`) in the file as read now, null when no section has it or without `ids`. */
 	sectionOf: (c, [id]) => {
+		if (!c.knowsIds()) return null;
 		const doc = c.snapshot().doc;
 		for (const list of GROUPED_LISTS) {
 			const group = doc.groups(list).find((g) => g.id === id && g.name !== null);
@@ -805,9 +831,10 @@ const CALENDARS_REFRESH: Readonly<Record<string, Handler>> = {
 	feedKey: (c) => feedKey(c.settings),
 	feedDue: (c, [last]) => feedDue((last ?? null) as FeedRun | null, c.context.nowMs, c.settings),
 	problem: (_c, [failure]) => {
-		if (failure instanceof Error) return feedProblem(failure);
-		const { problem, message } = (failure ?? {}) as { problem?: SourceProblem; message?: string };
-		return problem ?? { kind: "failed", detail: message ?? "" };
+		if (failure instanceof Error || failure === null || typeof failure !== "object") return feedProblem(failure);
+		const { problem, message } = failure as { problem?: SourceProblem; message?: unknown };
+		if (problem !== undefined) return problem;
+		return typeof message === "string" ? feedProblem(new Error(message)) : feedProblem(failure);
 	},
 	silence: () => ({ ms: FEED_SILENCE_MS, problem: feedSilence().problem }),
 };

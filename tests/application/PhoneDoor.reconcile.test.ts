@@ -89,7 +89,28 @@ describe("tasks.reconcile", () => {
 		expect(replica.context.projectsScreen).toMatchObject({ selected: "project:Старые друзья" });
 		replica.context = { ...replica.context, tasks: FILE };
 		const dropped = [{ method: "tasks.createProject", args: ["Старые друзья", { parent: "Дружба", before: null }], projectsScreen: before }];
-		expect(replica.ok("tasks.reconcile", [{}, dropped]).result).toEqual({ selected: "project:Дружба" });
+		expect(replica.ok("tasks.reconcile", [{}, dropped]).result).toEqual({ selected: "project:Дружба", folded: [] });
+	});
+
+	it("takes back only the folds a dropped new project opened: a branch folded since stays folded", () => {
+		const file = FILE.replace("\t- Small talk", "\t- Small talk\n- Other\n\t- Inner\n- Third\n\t- Deep");
+		const before: ProjectsScreenState = { selected: "project:Дружба", folded: ["project:Дружба", "project:Other"] };
+		const replica = new Replica({ tasks: file, nowMs, projectsScreen: before });
+		replica.ok("tasks.createProject", ["Старые друзья", { parent: "Дружба", before: null }]);
+		expect(replica.context.projectsScreen).toEqual({ selected: "project:Старые друзья", folded: ["project:Other"] });
+		replica.context = { ...replica.context, projectsScreen: { ...replica.context.projectsScreen, folded: ["project:Other", "project:Third"] } };
+		replica.context = { ...replica.context, tasks: file };
+		const dropped = [{ method: "tasks.createProject", args: ["Старые друзья", { parent: "Дружба", before: null }], projectsScreen: before }];
+		expect(replica.ok("tasks.reconcile", [{}, dropped]).result).toEqual({ selected: "project:Дружба", folded: ["project:Дружба", "project:Other", "project:Third"] });
+	});
+
+	it("leaves the node chosen since a dropped new project as it is", () => {
+		const before: ProjectsScreenState = { selected: "project:Дружба" };
+		const replica = new Replica({ tasks: FILE, nowMs, projectsScreen: before });
+		replica.ok("tasks.createProject", ["Старые друзья", { parent: "Дружба", before: null }]);
+		replica.context = { ...replica.context, tasks: FILE, projectsScreen: { ...replica.context.projectsScreen, selected: "project:Small talk" } };
+		const dropped = [{ method: "tasks.createProject", args: ["Старые друзья", { parent: "Дружба", before: null }], projectsScreen: before }];
+		expect(replica.ok("tasks.reconcile", [{}, dropped]).result).toEqual({ selected: "project:Small talk", folded: [] });
 	});
 
 	it("leaves a screen nothing touched as it is", () => {

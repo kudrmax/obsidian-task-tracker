@@ -227,6 +227,10 @@ export class QuickEntrySession {
 			return { ok: true, result: null };
 		}
 		const write = (this.tasks as unknown as Record<string, ((...a: unknown[]) => Promise<unknown>) | undefined>)[name];
-		return { ok: true, result: write ? await write.apply(this.tasks, step.args as unknown[]) : null };
+		if (write === undefined) {
+			if (name === "unfoldAbove") return { ok: true, result: null };
+			throw new Error(`Task Calendar: the tasks service has no ${name}`);
+		}
+		return { ok: true, result: await write.apply(this.tasks, step.args as unknown[]) };
 	}
 }

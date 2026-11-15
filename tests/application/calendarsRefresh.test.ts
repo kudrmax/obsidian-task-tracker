@@ -67,6 +67,8 @@ describe("the door's calendarsRefresh", () => {
 		expect(ok(callDoor("calendarsRefresh.problem", [{ problem: { kind: "loggedOut" } }], context))).toEqual({ kind: "loggedOut" });
 		expect(ok(callDoor("calendarsRefresh.problem", [{ message: "500" }], context))).toEqual({ kind: "failed", detail: "500" });
 		expect(ok(callDoor("calendarsRefresh.problem", [new Error("in-process")], context))).toEqual({ kind: "failed", detail: "in-process" });
+		expect(ok(callDoor("calendarsRefresh.problem", ["thrown as text"], context))).toEqual(feedProblem("thrown as text"));
+		expect(ok(callDoor("calendarsRefresh.problem", ["thrown as text"], context))).toEqual({ kind: "failed", detail: "thrown as text" });
 		expect(ok(callDoor("calendarsRefresh.silence", [], context))).toEqual({ ms: FEED_SILENCE_MS, problem: { kind: "noAnswer", seconds: 15 } });
 	});
 });
