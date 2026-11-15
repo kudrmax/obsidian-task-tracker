@@ -279,6 +279,11 @@ export class TestObsidian {
 		await TestObsidian.gone(p);
 	}
 
+	/** Ends this profile's own processes when it cannot be asked to quit (its page stopped answering). */
+	static async end(p: Paths): Promise<void> {
+		await endOwn(p);
+	}
+
 	static async gone(p: Paths): Promise<void> {
 		for (let i = 0; i < 60; i++) {
 			if (ownProcesses(p.profile).length === 0) return;
