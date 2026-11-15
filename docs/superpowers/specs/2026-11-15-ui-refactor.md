@@ -21,6 +21,7 @@ Revisions 1–3 were written top-down, and every review found new holes: the spe
 | 6 | 155 (4 classes) | 3 |
 | 7 | 158 (5 classes) | 3 (settings persistence, the pending log, per-call cost) |
 | 8 | 133 (4 classes) | 2 (the pending log's references and rollback; the dispatch loop) |
+| 10 | 14 (1 class, R23, closed below) | 0 |
 | 9 | 213 (2 classes: "the core" vs the pure rules; what views a screen needs) | 0: "ready to build from"; five wording fixes, made in revision 10 |
 
 The faults of revisions 5 and 6 had one cause. The spec treated the core as an asynchronous service the UI waits on, and built machinery around the waiting: read-back, previews, transactions, read-ahead, echoes. The core already has a **synchronous, pure door**, `callDoor(method, args, context) → answer` (`core/application/PhoneCalls.ts`). The iPhone app runs on it, and it covers every `TaskService`, `DayService`, undo, settings and calendar method (a typed coverage map, `PhoneCalls.ts:1077`). On Max's real tasks file (31 KB) a whole funnel view costs about 3 ms through it, JSON included (measured locally). Revision 7 puts the plugin on the same door, and the waiting is gone.
@@ -92,7 +93,7 @@ The rules themselves stay where they are, in the core: where a task lands, what 
   | **Calendar texts** | their files, read through the adapters | the network lane | the Scriptable and Shortcuts exports |
 - **The pending log.** It holds every call that changed the tasks text and is not yet persisted. Each entry records:
   - its method and arguments, with every task referred to by **id**, never by a stored key;
-  - the **inputs it read** besides the text: its own `nowMs`, and the projects screen and settings as they stood when it ran;
+  - the **inputs it read** besides the text: its own `nowMs`, and the projects screen as it stood when it ran;
   - the ids its creates produced.
 
   The log is based on the persisted text with the undo history and id state that went with it.
@@ -105,7 +106,7 @@ The rules themselves stay where they are, in the core: where a task lands, what 
     - Ids are never reused within a runtime's life. The replay continues from the current replica's id counter, so a line Sync added can never take an id a pin still holds.
   - **Inputs on replay:** each entry runs with its own recorded `nowMs` and projects screen (what the user saw), but with the **current** settings, which shape the file: section names, the day start.
   - **The tidy on a new base** runs before the replay and is not an entry of the log.
-  - **Reconciliation:** after a replay that dropped a call, the kept parts (projects screen, carry) are reconciled against the new text by a door call. Example: a node renamed by a dropped call goes back to its name.
+  - **Reconciliation:** after any replay that remapped an id or dropped a call, the runtime calls `projects.reconcile(idMap, dropped)` in the same message as the model's remap. This is a door method `backend` adds in slice 1. It maps the carry's keys and cards through the id map, and reverses a dropped call's effect on the projects screen: a node renamed by a dropped call goes back to its name.
   - A call that now fails (`staleTask`) is dropped with a notice and a reverse transition.
   - **Bounds:** at most two replays per write. Past that, the replica takes the file as it is, and the pending calls are dropped with a notice. The iPhone app's "busy after two tries" works this way, for one call at a time.
   - **A missing or moved file:** `fn` also checks that the file still sits at `tasksFile`, because `vault.process` holds a `TFile` that follows a rename. If the file has gone, the pending calls are dropped with a notice and the screen offers to create the file, as today.
@@ -113,7 +114,8 @@ The rules themselves stay where they are, in the core: where a task lands, what 
   - **`tasksFile` changed** (by another device's settings) is handled like a file that has gone.
 - **Tidy.** The core tidies inside its view reads (`ask` → `normalize`). The runtime calls `tasks.normalize` whenever the base changes or the core's day boundary passes (not midnight as such), before any view is drawn:
   - it adopts the answer's text and ids;
-  - it enters the log as an entry with its own `nowMs`, so calls from before the boundary replay over a base tidied for the new day.
+  - at the day boundary it enters the log as an entry with its own `nowMs`, so calls from before the boundary replay over a base tidied for the new day;
+  - on a new base it runs before the replay and stays out of the log.
 
   Views are memoised by (replica, minute).
 - **Readiness.** The runtime builds the replica only after the host is ready (P8): the layout is ready and Obsidian's metadata cache is resolved. It hands the door `projectsReady`, so the one move to projects never runs on an incomplete list (57562189).
@@ -196,7 +198,7 @@ The rules themselves stay where they are, in the core: where a task lands, what 
 
 ```
 obsidian/ui/next/
-  model/       Model, Msg (one union), selectors over the replica       pure
+  model/       Model, Msg (one union), selectors over the model          pure
   update/      update(model, msg) → [model, Cmd[]]; layers; gestures    pure
   recognizers/ pointer, touch and wheel streams → gesture messages      pure
   view/        Preact components                                         pure
@@ -243,7 +245,7 @@ The plugin's own menus and sheets are Preact layers.
 | M1 settings tab | its host (slice 6) |
 | M2 plugin host | the runtime |
 | M3 chrome | `chrome` |
-| M4 core reads per draw | door selectors and `rules.*` (P3) |
+| M4 core reads per draw | view answers through `needs(model)`; `rules.*` imported directly (P2) |
 | M5 sessions | door methods (P7) |
 | M6 menus | Preact layers |
 | M7, R1 picks and focus | three picks; a user's event handled to the end (P2) |
@@ -255,7 +257,7 @@ The plugin's own menus and sheets are Preact layers.
 | M14 scroll | `measure` and `scroll` |
 | M15 settle | P6 |
 | M16 waits | bounds as messages (P2) |
-| M17, R5 settings store | settings are part of the replica, persisted by the same queue, our own echo found by its text |
+| M17, R5 settings store | `PluginSettings.get()`, refreshed on `onChange`; per-key patches (P3) |
 | M18 network | the network lane (P3) |
 | M19 cross-screen renames | one replica for every screen |
 | M20 recognition | `recognizers/` |
@@ -276,15 +278,18 @@ The plugin's own menus and sheets are Preact layers.
 | R13 one persistence target | the table of the replica's parts (P3) |
 | R14 a replayed create's new id | row keys belong to the call and are rebound on replay (P3) |
 | R15 the facade changing the old screen | no facade: the old screen keeps its services (Migration) |
-| R16 core classes outside the door | the runtime runs them unchanged (P3) |
+| R16 core classes outside the door | `CalendarPolling` unchanged; synchronous core forms for the entry job order and the refresh rule (P3) |
 | Root, rev 7: settings persistence | per-key patches; device keys in device storage (P3) |
-| Root, rev 7: the pending log | snapshot of every part, `nowMs` per call, bounds, a missing file (P3) |
+| Root, rev 7: the pending log | entries by id with their inputs; text, history and ids from replay; bounds; a missing file (P3) |
 | Root, rev 7: per-call cost | the cross-call cache, budget tests, `carryAt` on a target change (P3) |
 | Root, rev 8: the log's references and rollback | ids mapped and resolved on replay; entries carry their inputs; only text, history and ids come from replay (P3) |
 | R17 two in-memory copies while old and new coexist | never shipped together: both flags switch at once (Migration) |
 | R18 settings from outside writers | `PluginSettings.get()`, refreshed on `onChange` (P3) |
 | R19 entry job order and the refresh rule | synchronous forms in the core (P3) |
 | R20 replay rolling back the projects screen | only text, history and ids come from replay (P3) |
+| R21 "the core" against the pure rules | the rules are imported directly; `callDoor` stays in the runtime (P2, §Guards) |
+| R22 what views a screen needs | `needs(model)` per screen, recomputed on every replica change (P2) |
+| R23 kept parts after a replay | `projects.reconcile(idMap, dropped)` (P3) |
 | Root, rev 8: the dispatch loop | P2's loop: door calls right after `update`, answers fed back before render, views reach the model as data |
 
 ## Guards
@@ -295,7 +300,7 @@ The plugin's own menus and sheets are Preact layers.
 - New CSS lives below a `/* next */` marker in `styles.css`; the new style rules apply there, and the freeze covers the old part above it.
 
 `tests/uiRules.test.ts`:
-- **Purity:** `model/`, `update/`, `recognizers/` and `view/` import no DOM global, `obsidian`, runtime or driver.
+- **Purity:** `model/`, `update/`, `recognizers/` and `view/` import no DOM global, `obsidian`, runtime or driver. They may import the core's types (`ScreenView`, `TaskKey`…) and its pure rules.
 - **Core calls:** `callDoor` and the replica only in the runtime. Outside it, the core may be imported only for the pure rules, which are listed in the guard. `view/` imports only selectors and `dispatch`.
 - **Timers and frames:** only in the runtime and `drivers/`.
 - **DOM work, each only in its own driver:**
@@ -366,6 +371,7 @@ The old screen keeps its own services, untouched, until it is deleted. **Old and
    - a section renamed on another device while calls are pending;
    - reconciliation after a dropped call;
    - Sync changing the task of an open full card, and the card updating in the same loop;
+   - create, lift, Sync adding a line above, a drop on a tree row: the drop lands;
    - Sync during a carry with a write pending (the carry and the chosen node stay);
    - calls from before the day boundary replayed over a base tidied for the new day;
    - a file renamed mid-write;
