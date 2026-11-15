@@ -1,6 +1,7 @@
 import { GROUPED_LISTS } from "./Lists";
 import { DayBoundary } from "./DayBoundary";
-import { isOpen, type LocalDate, type SectionKey, type Task } from "./Task";
+import { addDays, daysBetween } from "./LocalDate";
+import { isOpen, type LocalDate, type SectionKey, type Slot, type Task } from "./Task";
 import { hasOpenSubtask, presetPlace } from "./operations";
 import { recurClosed } from "./recurrence";
 import { flatten, type TaskDocument, type TaskEntry, ungroupedIndex } from "./TaskDocument";
@@ -14,12 +15,21 @@ function untilSettled(doc: TaskDocument, pass: (doc: TaskDocument) => TaskDocume
 	}
 }
 
-/** A slot of a past day goes; a task left without a date keeps that day as its due date, for `pastDatesToToday`. */
+/**
+ * A slot of a past day goes; a task left without a date keeps that day as its due date, for `pastDatesToToday`. A task
+ * that repeats keeps its hours: its slot moves to today, the same time of day.
+ */
 function erasePastSlots(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	return untilSettled(doc, (d) => {
 		const past = d.allTasks().filter((e) => isOpen(e.task.status) && e.task.slot !== null && boundary.dayOfSlot(e.task.slot) < today);
-		return d.replaceAll(past.map((e) => [e, { ...e.task, slot: null, dueDate: e.task.dueDate ?? boundary.dayOfSlot(e.task.slot!) }] as const));
+		return d.replaceAll(past.map((e) => [e, pastSlotSettled(e.task, e.task.slot!, today, boundary)] as const));
 	});
+}
+
+function pastSlotSettled(task: Task, slot: Slot, today: LocalDate, boundary: DayBoundary): Task {
+	const day = boundary.dayOfSlot(slot);
+	if (task.repeat !== null) return { ...task, slot: { ...slot, date: addDays(slot.date, daysBetween(day, today)) } };
+	return { ...task, slot: null, dueDate: task.dueDate ?? day };
 }
 
 /** What was left undone stays for today: a past due date becomes today's. */

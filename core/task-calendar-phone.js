@@ -2334,8 +2334,13 @@
   function erasePastSlots(doc, today, boundary) {
     return untilSettled(doc, (d) => {
       const past = d.allTasks().filter((e) => isOpen(e.task.status) && e.task.slot !== null && boundary.dayOfSlot(e.task.slot) < today);
-      return d.replaceAll(past.map((e) => [e, { ...e.task, slot: null, dueDate: e.task.dueDate ?? boundary.dayOfSlot(e.task.slot) }]));
+      return d.replaceAll(past.map((e) => [e, pastSlotSettled(e.task, e.task.slot, today, boundary)]));
     });
+  }
+  function pastSlotSettled(task, slot, today, boundary) {
+    const day = boundary.dayOfSlot(slot);
+    if (task.repeat !== null) return { ...task, slot: { ...slot, date: addDays(slot.date, daysBetween(day, today)) } };
+    return { ...task, slot: null, dueDate: task.dueDate ?? day };
   }
   function pastDatesToToday(doc, today) {
     return untilSettled(doc, (d) => {
