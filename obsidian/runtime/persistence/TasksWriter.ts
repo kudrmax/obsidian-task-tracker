@@ -15,6 +15,8 @@ export interface TasksWriterDeps {
 	readonly path: () => string | null;
 	/** A write or read failed for a reason of its own (the disk, a missing folder): told once per failure. */
 	readonly failed: (error: unknown) => void;
+	/** A read of the file landed: the replica stands on the file as it is (built, or the file gone). */
+	readonly landed: () => void;
 }
 
 /** How a drain ended: nothing left to write, the file left (the settings name another), or a failure. */
@@ -42,6 +44,8 @@ export class TasksWriter {
 	/** A read failure, told once until a read works again: it never stops the writes. */
 	private readFailure: unknown = null;
 	private recheckFirst = false;
+	/** The reads the writer started on its own (after a change event or a drain): waited for by `drained`. */
+	private readonly rereads = new Set<Promise<void>>();
 
 	constructor(private readonly deps: TasksWriterDeps) {}
 
@@ -86,15 +90,23 @@ export class TasksWriter {
 				if (this.recheck) {
 					const first = this.recheckFirst;
 					this.recheck = this.recheckFirst = false;
-					this.readOutside(first).catch((e: unknown) => this.readFailed(e));
+					this.reread(first);
 				}
 				if (end === "done" && this.dirty) this.schedule();
 			});
 	}
 
-	/** Resolves once nothing more can be written now: everything landed, or the queue waits on a failure (`stuck`). */
+	/** Resolves once nothing more can be written or read now: everything landed, or the queue waits on a failure (`stuck`). */
 	async drained(): Promise<void> {
-		while (this.running) await this.running;
+		while (this.running || this.rereads.size > 0) await Promise.all([this.running, ...this.rereads]);
+	}
+
+	/** A read the writer starts itself: its failure told, `drained` waiting for it. */
+	private reread(first = false): void {
+		const read: Promise<void> = this.readOutside(first)
+			.catch((e: unknown) => this.readFailed(e))
+			.finally(() => this.rereads.delete(read));
+		this.rereads.add(read);
 	}
 
 	/** Something to write: the replica's text is not the file's, or calls are in the log. */
@@ -132,7 +144,7 @@ export class TasksWriter {
 		const left = (change.kind === "rename" && change.oldPath === path) || (change.kind === "delete" && change.path === path);
 		if (!left && change.path !== path) return;
 		if (this.running) this.recheck = true;
-		else this.readOutside().catch((e: unknown) => this.readFailed(e));
+		else this.reread();
 	}
 
 	/**
@@ -141,7 +153,10 @@ export class TasksWriter {
 	 */
 	private async readOutside(first = false): Promise<void> {
 		const path = this.watched;
-		if (path === null) return;
+		if (path === null) {
+			this.deps.landed();
+			return;
+		}
 		const ticket = ++this.generation;
 		const text = await this.deps.vault.read(path);
 		if (ticket !== this.generation || path !== this.watched) return;
@@ -153,10 +168,9 @@ export class TasksWriter {
 		}
 		if (text === this.deps.log.base.text && !(first && text === null)) {
 			if (this.dirty) this.schedule();
-			return;
-		}
-		if (text === null) this.gone(path);
+		} else if (text === null) this.gone(path);
 		else this.adopt(text);
+		this.deps.landed();
 	}
 
 	private async drain(): Promise<DrainEnd> {

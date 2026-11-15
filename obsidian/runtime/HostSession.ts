@@ -1,5 +1,6 @@
 import type { DoorAnswer } from "../../core/application/PhoneCalls";
-import type { StoreRuntime } from "./dispatch/Program";
+import type { Program, StoreRuntime } from "./dispatch/Program";
+import { Store, type StoreOptions } from "./dispatch/Store";
 import type { Need, Views } from "./dispatch/ViewAnswers";
 import type { RuntimeEvent } from "./events";
 import type { ActionLog } from "./lifecycle/ActionLog";
@@ -21,12 +22,14 @@ export interface SessionRuntime {
 }
 
 /**
- * The runtime as one host sees it (P8): the leaf, a note's block, the settings tab. Its stores call and subscribe
- * through it; a carry it starts is its own; its teardown ends that carry and every subscription it made, and nothing of
- * another host's.
+ * The runtime as one host sees it (P8): the leaf, a note's block, the settings tab. A host makes its stores here
+ * (`store`), never on its own, so they call and subscribe through it; a carry it starts is its own. Its teardown disposes
+ * every store it made (no pass already scheduled renders into the gone host), ends that carry and every subscription it
+ * made, and touches nothing of another host's.
  */
 export class HostSession implements StoreRuntime {
 	private readonly subscriptions = new Set<() => void>();
+	private readonly stores = new Set<{ dispose(): void }>();
 
 	constructor(private readonly runtime: SessionRuntime) {}
 
@@ -59,8 +62,17 @@ export class HostSession implements StoreRuntime {
 		return once;
 	}
 
-	/** The host goes away: its carry ends (`endCarry`), and nothing it subscribed to is heard any more. */
+	/** A store of this host's: disposed with it. */
+	store<Model, Msg>(program: Program<Model, Msg>, initial: Model, options?: StoreOptions<Model>): Store<Model, Msg> {
+		const store = new Store(program, initial, this, options);
+		this.stores.add(store);
+		return store;
+	}
+
+	/** The host goes away: its stores are disposed, its carry ends (`endCarry`), and nothing it subscribed to is heard any more. */
 	teardown(): void {
+		[...this.stores].forEach((store) => store.dispose());
+		this.stores.clear();
 		this.runtime.endCarryOf(this);
 		[...this.subscriptions].forEach((off) => off());
 	}

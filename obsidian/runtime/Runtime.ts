@@ -63,8 +63,10 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 	private readonly clock: MinuteClock;
 	private readonly readiness: Readiness;
 	private readonly stops: (() => void)[] = [];
-	private readonly built: Promise<void>;
+	private built: Promise<void>;
 	private settleBuilt!: { resolve: () => void; reject: (e: unknown) => void };
+	/** The replica stood on the file once: what depends on it (the clock) runs. */
+	private isBuilt = false;
 	private disposed = false;
 	private carryOwner: object | null = null;
 
@@ -77,7 +79,7 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 		this.settings = new SettingsLink(deps.settings, this.replica, failed);
 		this.projectsScreen = new ProjectsScreenLink(deps.projectsScreen, this.replica);
 		const rebaser = new Rebaser({ door, replica: this.replica, log: this.pending, now, events: this.events, notices: deps.notices, keepProjectsScreen: (s) => this.projectsScreen.save(s) });
-		this.writer = new TasksWriter({ vault: deps.vault, replica: this.replica, log: this.pending, rebaser, path: () => this.tasksPath(), failed });
+		this.writer = new TasksWriter({ vault: deps.vault, replica: this.replica, log: this.pending, rebaser, path: () => this.tasksPath(), failed, landed: () => this.firstBuilt() });
 		this.calls = new ReplicaCalls(door, this.replica, this.pending, now, {
 			tasksChanged: () => this.writer.schedule(),
 			settingsChanged: (text, handed) => this.settings.save(text, handed),
@@ -106,7 +108,10 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 		this.readiness.arrive(fact);
 	}
 
-	/** Resolves once the replica is built (the file read and tidied), or the runtime unloaded first; rejects if building failed. */
+	/**
+	 * Resolves once the replica is first built (the file read and tidied), or the runtime unloaded first. Rejects if the
+	 * first build failed; asked after that, it waits for the first build that works (a later change of the file).
+	 */
 	ready(): Promise<void> {
 		return this.built;
 	}
@@ -189,14 +194,24 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 	private async build(): Promise<void> {
 		try {
 			await this.start();
-			this.settleBuilt.resolve();
 		} catch (e) {
 			this.failed(e);
+			if (this.isBuilt) return;
 			this.settleBuilt.reject(e);
+			this.built = new Promise((resolve, reject) => (this.settleBuilt = { resolve, reject }));
+			this.built.catch(() => undefined);
 		}
 	}
 
-	/** Watches what the replica follows, reads the file, starts the clock; stops at once if the runtime unloaded meanwhile. */
+	/** The replica first stands on the file, whichever read did it: what depends on it starts, and `ready()` resolves. */
+	private firstBuilt(): void {
+		if (this.isBuilt || this.disposed) return;
+		this.isBuilt = true;
+		this.settleBuilt.resolve();
+		this.clock.start();
+	}
+
+	/** Watches what the replica follows and reads the file (its first landing starts the clock); undone if the runtime unloaded meanwhile. */
 	private async start(): Promise<void> {
 		if (this.disposed) return;
 		const { projects } = this.deps;
@@ -216,11 +231,7 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 			this.deps.settings.onChange(() => this.writer.follow().catch((e: unknown) => this.failed(e))),
 		);
 		await this.writer.load();
-		if (this.disposed) {
-			this.stops.splice(0).forEach((stop) => stop());
-			return;
-		}
-		this.clock.start();
+		if (this.disposed) this.stops.splice(0).forEach((stop) => stop());
 	}
 
 	private tasksPath(): string | null {

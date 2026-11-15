@@ -123,7 +123,8 @@ describe("the pending log", () => {
 		vault.outside(PATH, FILE.replace("- [ ] Shop", "- [ ] Shop on the way"));
 		ok(runtime.call("tasks.rename", [itemOf(runtime, "Idea").key, "Idea, mine"]).answer);
 		vault.readGate = null;
-		await settle(runtime);
+		for (let i = 0; i < 10; i++) await macrotask();
+		expect(vault.text(PATH)).toContain("- [ ] Idea, mine");
 		open();
 		await settle(runtime);
 		expect(runtime.replica.state.tasks).toContain("- [ ] Idea, mine");

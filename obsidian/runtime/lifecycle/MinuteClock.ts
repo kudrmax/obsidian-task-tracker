@@ -30,8 +30,13 @@ export class MinuteClock {
 	constructor(private readonly deps: MinuteClockDeps) {}
 
 	start(): void {
-		this.day = this.deps.today();
-		this.arm();
+		try {
+			this.day = this.deps.today();
+		} catch (e) {
+			this.deps.failed(e);
+		} finally {
+			this.arm();
+		}
 	}
 
 	stop(): void {

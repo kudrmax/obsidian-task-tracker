@@ -52,6 +52,8 @@ export class CalendarLane {
 	private cached = false;
 	private stopped = false;
 	private readonly silences = new Set<number>();
+	/** Each feed's run under way: one at a time, a second ask joins it. */
+	private readonly running = new Map<CalendarSource, Promise<void>>();
 
 	constructor(private readonly deps: CalendarLaneDeps) {}
 
@@ -63,7 +65,7 @@ export class CalendarLane {
 		const ask = resultOf<CalendarsAsk>(this.deps.read("calendarsRefresh.ask", [reason, this.cached, byHand]), "calendarsRefresh.ask");
 		if (ask.exportFirst) this.deps.work.export();
 		const feeds = this.deps.feeds.filter((feed) => ask.feeds === "forced" || (ask.feeds === "due" && this.due(feed)));
-		const runs = feeds.map((feed) => this.run(feed).then(() => this.readFiles()));
+		const runs = feeds.map((feed) => this.runOnce(feed).then(() => this.readFiles()));
 		await Promise.all(ask.waitFeeds && runs.length > 0 ? runs : [this.readFiles(), ...runs]);
 	}
 
@@ -96,6 +98,15 @@ export class CalendarLane {
 	}
 
 	/** One feed run, bounded by the core's silence: a good run is remembered, a failure or a silence is the source's problem. */
+	/** The feed's run under way, joined; else a new one. */
+	private runOnce(feed: CalendarFeed): Promise<void> {
+		const under = this.running.get(feed.name);
+		if (under) return under;
+		const run = this.run(feed).finally(() => this.running.delete(feed.name));
+		this.running.set(feed.name, run);
+		return run;
+	}
+
 	private async run(feed: CalendarFeed): Promise<void> {
 		const key = resultOf<string>(this.deps.read("calendarsRefresh.feedKey", []), "calendarsRefresh.feedKey");
 		const silence = resultOf<{ ms: number; problem: SourceProblem }>(this.deps.read("calendarsRefresh.silence", []), "calendarsRefresh.silence");
