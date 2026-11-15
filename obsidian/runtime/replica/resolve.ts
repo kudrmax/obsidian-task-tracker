@@ -1,4 +1,4 @@
-import type { DoorAnswer, DoorContext } from "../../../core/application/PhoneCalls";
+import type { CreatedKind, DoorAnswer, DoorContext } from "../../../core/application/PhoneCalls";
 import type { Door } from "./Door";
 import { followSections, GoneSection, namedSections } from "./refs";
 
@@ -57,7 +57,15 @@ export function runNow(door: Door, call: DoorCall, context: DoorContext): Resolv
 	return runFresh(door, call, context);
 }
 
-/** The ids an answer's writes gave anew, in the order given (`DoorAnswer.created`). */
-export function createdBy(answer: DoorAnswer): readonly string[] {
-	return answer.ok ? (answer.created ?? []) : [];
+/** An id a call's writes gave, with what it names (`DoorAnswer.created`, `createdKinds`). */
+export interface CreatedId {
+	readonly id: string;
+	readonly kind: CreatedKind;
+}
+
+/** The ids an answer's writes gave anew, in the order given, each with its kind. */
+export function createdBy(answer: DoorAnswer): readonly CreatedId[] {
+	if (!answer.ok) return [];
+	const kinds = answer.createdKinds ?? [];
+	return (answer.created ?? []).map((id, i) => ({ id, kind: kinds[i] }));
 }

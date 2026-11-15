@@ -1,6 +1,7 @@
 import type { ProjectsScreenState } from "../../../core/application/contracts";
 import type { TaskIdState } from "../../../core/application/TaskIdentity";
 import type { UndoState } from "../../../core/application/UndoSteps";
+import type { CreatedId } from "../replica/resolve";
 
 /**
  * A call that changed the tasks text and is not yet persisted (P3): its method and arguments (tasks by id, sections by
@@ -13,7 +14,7 @@ export interface PendingCall {
 	readonly args: readonly unknown[];
 	readonly nowMs: number;
 	readonly projectsScreen: ProjectsScreenState;
-	readonly created: readonly string[];
+	readonly created: readonly CreatedId[];
 }
 
 /**

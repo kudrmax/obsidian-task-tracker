@@ -1,6 +1,6 @@
 import type { DoorContext } from "../../../core/application/PhoneCalls";
 import type { Door } from "../replica/Door";
-import { createdBy, runFresh } from "../replica/resolve";
+import { type CreatedId, createdBy, runFresh } from "../replica/resolve";
 import type { PendingCall } from "./PendingLog";
 
 /** What a replay leaves: the text, history and ids it ends with, the calls kept and dropped, and old id → new id. */
@@ -12,12 +12,18 @@ export interface ReplayResult {
 }
 
 /**
- * The ids a call gave the first time paired with those its replay gave, old → new: in order, and only when it gave as
- * many, so an id is never mapped to a line of another kind (a section's to a task's); a pair that did not change is left out.
+ * The ids a call gave the first time paired with those its replay gave, old → new, kind by kind: a task's with a task's,
+ * a section's with a section's, in order, and a kind only when the replay gave as many of it. An id is never mapped to a
+ * line of another kind; a pair that did not change is left out.
  */
-export function pairCreated(before: readonly string[], now: readonly string[]): [string, string][] {
-	if (before.length !== now.length) return [];
-	return before.flatMap((old, i) => (now[i] === old ? [] : [[old, now[i]] as [string, string]]));
+export function pairCreated(before: readonly CreatedId[], now: readonly CreatedId[]): [string, string][] {
+	const kinds = [...new Set(before.map((c) => c.kind))];
+	return kinds.flatMap((kind) => {
+		const old = before.filter((c) => c.kind === kind);
+		const fresh = now.filter((c) => c.kind === kind);
+		if (old.length !== fresh.length) return [];
+		return old.flatMap((c, i) => (fresh[i].id === c.id ? [] : [[c.id, fresh[i].id] as [string, string]]));
+	});
 }
 
 /**
