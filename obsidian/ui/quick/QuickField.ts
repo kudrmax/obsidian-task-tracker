@@ -10,6 +10,8 @@ export interface QuickFieldOptions {
 	readonly tint: PriorityColor | null;
 	/** The field the text is typed in. */
 	readonly titleField: TitleFieldFactory;
+	/** What the empty field shows: «New task» unless told. */
+	readonly placeholder?: string;
 	onInput(text: string): void;
 	onKey(key: QuickKey): void;
 	onBlur(): void;
@@ -42,7 +44,7 @@ export const QuickField = {
 	open(parent: HTMLElement, opts: QuickFieldOptions): QuickFieldHandle {
 		const title = opts.titleField(parent, {
 			text: opts.value,
-			placeholder: "New task",
+			placeholder: opts.placeholder ?? "New task",
 			events: {
 				onInput: () => opts.onInput(title.text),
 				onEnter: () => opts.onKey("enter"),
@@ -73,7 +75,7 @@ export const QuickField = {
 				title.focus();
 			},
 			setSection(on) {
-				title.setPlaceholder(on ? "Section name" : "New task");
+				title.setPlaceholder(on ? "Section name" : (opts.placeholder ?? "New task"));
 				title.el.classList.toggle("is-section", on);
 			},
 			setTint: tint,

@@ -1,4 +1,4 @@
-import { cardDue, type PriorityLevel, type TaskItem } from "../../core/application/contracts";
+import { cardDue, type PriorityLevel, type TaskCard, type TaskItem } from "../../core/application/contracts";
 import { LABEL_SLOTS } from "./priorityColors";
 import type { LocalDate } from "./types";
 import { dayOfMonth, monthAbbreviation } from "./dates";
@@ -14,6 +14,8 @@ export interface TaskCardOptions {
 	readonly over?: string | null;
 	/** The corner shows the due date; the Projects screen's By project puts the stage's mark there instead. */
 	readonly corner?: boolean;
+	/** The face drawn in place of the task's own (`TaskItem.card`): First step's folded card (`TaskItem.firstStepCard`). */
+	readonly face?: TaskCard;
 }
 
 /** A card of the list: the dot of a task in progress, the title fading out on the right, the subtask counter over the description mark, the due date; a card peeking out under it while its subtasks are folded away. */
@@ -50,7 +52,8 @@ export function fillCard(card: HTMLElement, task: TaskItem, opts: TaskCardOption
 	markColours(card, item);
 	card.classList.toggle("is-collapsed", item.collapsed);
 	showProgressDot(card, item);
-	fillFace(card, task, item, opts.over ?? null);
+	if (opts.face) fillOwnFace(card, opts.face);
+	else fillFace(card, task, item, opts.over ?? null);
 	renderProjectMark(card, item);
 	renderMeta(card, item);
 	const corner = opts.corner === false ? null : cardDue(item, opts.day);
@@ -85,6 +88,18 @@ function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: s
 	if (project !== null) over.appendChild(icon("project"));
 	el(over, "span", "tc-card-over-text", project ?? (shown === task ? face.over ?? "" : shown.title));
 	fillTitle(el(lines, "div", "tc-card-title"), step ? RenamedTexts.shown(step).text : shown.text);
+}
+
+/** A face given as it is: two lines when it has a small line over its title, else one. */
+function fillOwnFace(card: HTMLElement, face: TaskCard): void {
+	card.classList.toggle("is-two-line", face.over !== null);
+	if (face.over === null) {
+		fillTitle(el(card, "div", "tc-card-title"), face.text);
+		return;
+	}
+	const lines = el(card, "div", "tc-card-lines");
+	el(el(lines, "div", "tc-card-over"), "span", "tc-card-over-text", face.over);
+	fillTitle(el(lines, "div", "tc-card-title"), face.text);
 }
 
 /**

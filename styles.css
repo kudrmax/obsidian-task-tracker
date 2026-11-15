@@ -1086,6 +1086,14 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .task-calendar .tc-block.is-rename > .tc-quick-field { min-height: 100%; }
 .tc-field-time { position: absolute; top: var(--tc-block-pad-top); right: var(--tc-card-pad-end); font-size: var(--tc-font-block); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-accent); font-variant-numeric: tabular-nums; pointer-events: none; }
 .tc-block.is-renaming .tc-block-card { visibility: hidden; }
+/* First step typed on the card itself: a list's card is the folded card, its step line the field, ringed as a field is; a block's line is the field, the block growing down with it. */
+.tc-card.is-first-step, .tc-block-card.is-first-step { box-shadow: var(--tc-ring-selected); cursor: text; }
+.tc-card.is-first-step { height: auto; min-height: var(--tc-card-h); padding-top: calc((var(--tc-card-h) - var(--tc-leading-card-over) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card-over) - var(--tc-leading-card)) / 2); }
+.tc-block-card.is-first-step { bottom: auto; min-height: 100%; padding-bottom: var(--tc-block-pad-top); }
+.tc-block:has(> .tc-block-card.is-first-step) { z-index: var(--tc-layer-selected); }
+.tc-first-step { flex: 1; min-width: 0; }
+.tc-card-lines > .tc-first-step { flex: none; }
+.task-calendar .tc-first-step > .tc-quick-field { min-height: 0; padding: 0; border-radius: 0; background: none; box-shadow: none; }
 /* A renamed task in progress keeps its dot at the field's left, over the field. */
 .tc-quick-row > .tc-progress-dot { z-index: var(--tc-layer-progress-dot); }
 /* A card of a calendar menu's stack renamed in place: the field's row stands where the card was, over the blur. */
