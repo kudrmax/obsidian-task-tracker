@@ -28,6 +28,8 @@ export async function openBlock(d: Driver, newBlock: boolean): Promise<void> {
 		await app.workspace.getLeaf(false).openFile(app.vault.getAbstractFileByPath("Дружба.md"));
 		for (let i = 0; i < 50 && !document.querySelector(${JSON.stringify(SEL.block)}); i++) await new Promise((r) => setTimeout(r, 100));
 		document.querySelector(${JSON.stringify(SEL.block)}).scrollIntoView({ block: "end" });
+		/** The note opens with its editor focused, which on the phone raises Obsidian's toolbar over the block: Max reads the note first. */
+		app.workspace.activeEditor?.editor?.blur();
 		return true;`);
 	for (let i = 0; i < 50 && !(await d.page<boolean>("return __e2e.rows().length > 0")); i++) await sleep(100);
 	await d.page("return __e2e.rest()");
@@ -81,7 +83,9 @@ export async function block(d: Driver, newBlock: boolean): Promise<void> {
 	await showBlock(d);
 	await d.step("the plus opens a field", "interaction", () => d.tapOn(SEL.plus), { moves: "all" });
 	await d.shot("field open", TYPING);
-	if (!(await d.page<boolean>(`return !!document.activeElement?.closest(${JSON.stringify(SEL.block)})`))) throw new Error("the plus left the focus outside the block: no field to type in");
+	/** On the phone a tap's mouse events land where the plus stood once it hid under the field's bar; then the field is tapped, as Max would. */
+	if (!(await d.page<boolean>(`return !!document.activeElement?.closest(${JSON.stringify(SEL.block)})`))) await d.tapOn(":is(.tc-project-block .tc-quick-row, .tc-n-block [data-n-island])");
+	if (!(await d.page<boolean>(`return !!document.activeElement?.closest(${JSON.stringify(SEL.block)})`))) throw new Error("no field in the block takes the focus");
 	await d.step("a task typed and written", "interaction", async () => {
 		await d.type("E2E typed task");
 		await sleep(150);

@@ -1720,7 +1720,7 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 
 /* next */
 /* The note's block (slice 3, behind newBlock): the old block's look, rule for rule, in the new screens' names. */
-.task-calendar.tc-n-block { position: relative; height: auto; max-height: var(--tc-block-max-h); margin-top: calc(var(--tc-block-top) - var(--tc-block-lift)); margin-bottom: calc(var(--tc-chrome-room) + var(--tc-block-top)); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); overflow: clip; outline: none; display: flex; flex-direction: column; }
+.task-calendar.tc-n-block { position: relative; height: auto; max-height: var(--tc-block-max-h); margin-top: calc(var(--tc-block-top) - var(--tc-block-lift)); margin-bottom: calc(var(--tc-chrome-room) + var(--tc-block-top)); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); background-clip: padding-box; overflow: clip; outline: none; display: flex; flex-direction: column; }
 .task-calendar .tc-n-stack { flex: 0 1 auto; min-height: 0; margin-top: var(--tc-block-inset); padding: 0 var(--tc-block-inset) calc(var(--tc-plus-size) + var(--tc-block-inset) + var(--tc-space-20)); box-sizing: border-box; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
 .task-calendar .tc-n-stack::-webkit-scrollbar { display: none; }
 /* By subprojects the parts are one list, its room at the end the screen's foot fade, as the old block's list kept it. */
