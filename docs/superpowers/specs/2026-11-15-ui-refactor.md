@@ -83,7 +83,7 @@ input adapter ──► action ──► reduce(state, action) ──► state �
 
 CSS classes only reflect state (in JSX). Only the chrome adapter writes classes outside JSX, on `body` and `contentEl`, as `styles.test.ts` expects today.
 
-### 3. Work: lanes, revisions, optimism, failures
+### 3. Work: lanes, sequence, optimism, failures
 
 - **The file lane is one per plugin, not per screen.** The leaf and every note block (`ProjectBlocks.ts:32`) share it, so a read in any screen sees every write queued before it in any screen. Strictly serial.
   - It carries: writes, reads of the view and lists, view changes, carry calls, undo and redo.
