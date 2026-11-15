@@ -1,3 +1,4 @@
+import { deepFrozen } from "./frozen";
 import { Repeat } from "./Repeat";
 import { isValidLocalDate, MINUTES_PER_DAY, minutesToHHMM, parseHHMM } from "./LocalDate";
 import { labelsOfText, labelTags } from "./Label";
@@ -164,19 +165,19 @@ const readLines = new WeakMap<Markers, Map<string, ParsedTaskLine | null>>();
 /** Lines kept per set of markers before the store starts afresh. */
 const KEPT_LINES = 20_000;
 
-/** The task a line holds under `markers`, or null; the answer is shared, never to be changed. */
 /** A line with a checkbox: a task line under any markers. */
 export function isTaskLine(line: string): boolean {
 	return LINE_RE.test(line);
 }
 
+/** The task a line holds under `markers`, or null; the answer is shared, so frozen. */
 export function parseTaskLine(line: string, markers: Markers): ParsedTaskLine | null {
 	let kept = readLines.get(markers);
 	if (!kept) readLines.set(markers, (kept = new Map()));
 	const known = kept.get(line);
 	if (known !== undefined) return known;
 	if (kept.size >= KEPT_LINES) kept.clear();
-	const parsed = readTaskLine(line, markers);
+	const parsed = deepFrozen(readTaskLine(line, markers));
 	kept.set(line, parsed);
 	return parsed;
 }

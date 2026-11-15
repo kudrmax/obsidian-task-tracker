@@ -61,10 +61,13 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 **Calls are cheap when nothing changed.** The door keeps, across calls, what it read: the settings parsed from
 `data.json`, the tasks text parsed and tidied for the day, and the ids an identity settled on for it, each found only
 by everything it was made of (the text, the settings, the day, the notes handed in and their completeness, the ids
-handed in, compared by content, so a context that crossed JSON finds them too). An answer is exactly what reading anew
-gives; nothing of one host's file reaches another's. A view, a write and a step of a carry over a 30 KB file take
-under a millisecond once the door has read that text (`tests/budget/door.test.ts`, run on its own after the other
-tests by `npm test`); the first call over a new text (after a write, or Sync) reads it, about 0.7 ms on that file.
+handed in, all compared by content, so a host that changes in place what it handed in, or hands in a copy that crossed
+JSON, is read as it now is). What the door keeps and what it answers from it is frozen, so a caller changing an answer
+changes nothing kept. An answer is exactly what reading anew gives; nothing of one host's file reaches another's. A
+view, a write and a step of a carry over a 30 KB file take under a millisecond once the door has read that text
+(`tests/budget/door.test.ts`, run on its own after the other tests by `npm test`: it reports each call against 1 ms
+and fails only past 3 ms, so a busy machine never stops a release); the first call over a new text (after a write, or
+Sync) reads it, about 0.7 ms on that file.
 
 **Answer** (`DoorAnswer`):
 
@@ -517,10 +520,10 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
   `projectsScreen` over to the new name.
 - `tasks.keyOf(id)`: the `TaskKey` of the task with that id in the file as handed in, read as every read is (tidied
   for the day, nothing written: the answer has no `tasks`), or `null` when no task has it (gone, never was, or a
-  section's id). What a host that keeps tasks by id hands an action. Example: a pending `setStatus` of `t12`, the file
+  section's id), and `null` when the context has no `ids`: the ids are fresh then, and one may name another task. What a host that keeps tasks by id hands an action. Example: a pending `setStatus` of `t12`, the file
   changed by Sync since, replays as `tasks.setStatus(keyOf("t12"), "done")`.
 - `tasks.sectionOf(id)`: `{ list, name }` of the section with that id (`ListSection.id`), the name as the file has it
-  now, `null` when no section has it. Example: `sectionOf("t40")` → `{ list: "now", name: "Shopping" }` after another
+  now, `null` when no section has it or the context has no `ids`. Example: `sectionOf("t40")` → `{ list: "now", name: "Shopping" }` after another
   device renamed Errands; a pending `tasks.renameGroup("now", "Errands", …)` replays with the new name.
 - `tasks.reconcile(idMap, dropped)`: the device's `projectsScreen` after a host replayed its pending calls over a file
   changed elsewhere, answered as `result` and as the answer's `projectsScreen`; it writes no tasks. `idMap`
@@ -529,7 +532,9 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
   it now, so a drop on a row still lands. `dropped` (`[{ method, args, projectsScreen? }]`, as the host's pending log
   recorded them, `projectsScreen` the screen the call ran over): each one's change of the screen taken back, the last
   first: `tasks.renameProject(from, to)` gives the chosen node and the folds back their old name;
-  `tasks.createProject` puts back the node chosen and the folds the call ran over (when it recorded them). Any other
+  `tasks.createProject` (with its recorded screen) puts back the node chosen before, while the new one is still
+  chosen, and folds again the branches above the new project that were folded before; a fold made or opened since
+  stays. Any other
   call changed no screen. Example: a lifted new task replayed as `t31` instead of `t27` →
   `reconcile({ t27: "t31" }, [])`, then `carryOnNode("project:Дружба")` writes it there.
 - Twins (two identical lines) are two tasks with two ids: the door knows which line a write made of which.
@@ -551,7 +556,8 @@ For a host that fetches the calendars itself and holds their files (the plugin's
   well, ran under another key, the refresh interval (`google.refreshSeconds`, 0: always) passed by `nowMs`. Example:
   `feedDue({ atMs: nowMs - 30000, key: feedKey() })` → `false` with a 60 s interval.
 - `problem(failure)`: a feed's failure as its source shows it: `{ problem }` (a `SourceProblemError`'s) answers that
-  problem, `{ message }` `{ kind: "failed", detail: message }`; an `Error` handed in-process is read the same way.
+  problem, `{ message }` `{ kind: "failed", detail: message }`; anything else (an `Error` handed in-process, a text
+  thrown) as the plugin reads a failure: its message, or the value as text.
 - `silence()` → `{ ms: 15000, problem: { kind: "noAnswer", seconds: 15 } }`: a feed silent that long has failed; its
   file keeps what it had and the next refresh asks afresh.
 

@@ -268,6 +268,20 @@
     return date === addDays(today, -1) ? "yesterday" : "other";
   }
 
+  // core/domain/frozen.ts
+  function deepFrozen(value) {
+    if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+      Object.freeze(value);
+      for (const v of Object.values(value)) deepFrozen(v);
+    }
+    return value;
+  }
+  function plainCopy(value) {
+    if (value === null || typeof value !== "object") return value;
+    if (Array.isArray(value)) return value.map(plainCopy);
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, plainCopy(v)]));
+  }
+
   // core/domain/description.ts
   var INDENT_RE = /^[ \t]*/;
   var DESCRIPTION_TEMPLATE = "- ";
@@ -701,7 +715,7 @@
     const known = kept.get(line);
     if (known !== void 0) return known;
     if (kept.size >= KEPT_LINES) kept.clear();
-    const parsed = readTaskLine(line, markers);
+    const parsed = deepFrozen(readTaskLine(line, markers));
     kept.set(line, parsed);
     return parsed;
   }
@@ -1285,6 +1299,14 @@
         return { line: row.line, tag: ids.known.get(n) ?? `t${ids.next + n}` };
       });
       return new _TaskDocument(rows, this.eol, this.trailingEol, this.names, this.markers, ids.next + this.next);
+    }
+    /**
+     * The document with every task entry in it frozen, their tasks and places too: a document kept and read by several
+     * readers, whose answers hand entries' parts on. The document itself keeps making what it makes on first use.
+     */
+    frozen() {
+      for (const entry of this.spans.keys()) deepFrozen(entry);
+      return this;
     }
     /** The headings and the task lines, in file order, each with its tag's number. */
     outline() {
@@ -8235,7 +8257,7 @@ ${at.reading}`;
     settings(json) {
       const kept = this.settingsTexts.find((e) => e.text === json);
       if (kept) return kept.value;
-      const value = deepFreeze(settingsFrom(json.trim() === "" ? null : JSON.parse(json)));
+      const value = deepFrozen(plainCopy(settingsFrom(json.trim() === "" ? null : JSON.parse(json))));
       this.keep(this.settingsTexts, { text: json, value });
       return value;
     }
@@ -8243,17 +8265,23 @@ ${at.reading}`;
     reading(text, reading, today, notes, make) {
       const kept = this.readings.find((e) => e.text === text && e.reading === reading && e.today === today && e.notes === notes);
       if (kept) return kept.value;
-      const value = make();
+      const made = make();
+      const value = { parsed: made.parsed.frozen(), whole: made.whole.frozen(), tidied: made.tidied.frozen(), changed: made.changed };
       this.keep(this.readings, { text, reading, today, notes, value });
       return value;
     }
-    /** What an identity in `from` settles on reading `doc`, made by `make` the first time. */
+    /**
+     * What an identity in `from` settles on reading `doc`, made by `make` the first time. Kept as frozen copies, found by
+     * content: a host may change the state it handed in, and the state answered is handed on to hosts.
+     */
     settled(doc, from, make) {
       const entries = this.settledIds.get(doc) ?? [];
       const kept = entries.find((e) => sameIdState(e.from, from));
       if (kept) return kept.settled;
-      const settled = make();
-      this.keep(entries, { from, settled });
+      const made = make();
+      const was = deepFrozen(plainCopy(from));
+      const settled = { ...made, state: made.changed ? deepFrozen(plainCopy(made.state)) : was };
+      this.keep(entries, { from: was, settled });
       this.settledIds.set(doc, entries);
       return settled;
     }
@@ -8262,13 +8290,17 @@ ${at.reading}`;
       const entries = this.retaggedDocs.get(doc) ?? [];
       const kept = entries.find((e) => e.ids === ids);
       if (kept) return kept.doc;
-      const tagged = doc.retagged(ids);
+      const tagged = doc.retagged(ids).frozen();
       this.keep(entries, { ids, doc: tagged });
       this.retaggedDocs.set(doc, entries);
       return tagged;
     }
-    /** What `make` derives from `owner` under the name `slot`, made once for the same object. */
+    /**
+     * What `make` derives from `owner` under the name `slot`, made once for the same object: only for an object no caller
+     * changes, one this cache froze or a document it read; anything else is made anew.
+     */
     memo(owner, slot, make) {
+      if (!Object.isFrozen(owner) && !(owner instanceof TaskDocument)) return make();
       let slots = this.derived.get(owner);
       if (slots === void 0) this.derived.set(owner, slots = /* @__PURE__ */ new Map());
       if (slots.has(slot)) return slots.get(slot);
@@ -8276,8 +8308,9 @@ ${at.reading}`;
       slots.set(slot, value);
       return value;
     }
-    /** A value's JSON, made once for the same object. */
+    /** A value's JSON, made once for an object this cache froze; anything else, whose content may change, made anew. */
     keyOf(value) {
+      if (!Object.isFrozen(value)) return JSON.stringify(value);
       const kept = this.keys.get(value);
       if (kept !== void 0) return kept;
       const key = JSON.stringify(value);
@@ -8307,13 +8340,6 @@ ${at.reading}`;
       if (y === void 0 || x.length !== y.length || x.some((raw, i) => raw !== y[i])) return false;
     }
     return true;
-  }
-  function deepFreeze(value) {
-    if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
-      Object.freeze(value);
-      for (const v of Object.values(value)) deepFreeze(v);
-    }
-    return value;
   }
 
   // core/application/DayServiceImpl.ts
@@ -8373,7 +8399,7 @@ ${at.reading}`;
     tree() {
       if (this.text === null) return ProjectTree.EMPTY;
       const doc = this.snapshot().doc;
-      return this.cache === null ? projectTreeOf(doc) : this.cache.memo(doc, "tree", () => projectTreeOf(doc));
+      return this.cache === null ? projectTreeOf(doc) : this.cache.memo(doc, "tree", () => deepFrozen(projectTreeOf(doc)));
     }
     get settings() {
       return this.current;
@@ -8388,6 +8414,11 @@ ${at.reading}`;
     }
     hasTasks() {
       return this.text !== null;
+    }
+    /** The host handed in who the tasks are: an id it names is one the door gave. Throws without a tasks file. */
+    knowsIds() {
+      this.tasks();
+      return this.context.ids !== void 0;
     }
     snapshot() {
       const at = this.rules.moment();
@@ -8642,12 +8673,23 @@ ${at.reading}`;
       return name === null ? state : renamedIn(state, name, from);
     }
     if (call.method === "tasks.createProject" && call.projectsScreen) {
-      const name = c.rules.cleanName(call.args[0]);
-      const made = name === null ? null : projectNodeOf(name);
-      if (made === null || state.selected === void 0 || !sameNode(state.selected, made)) return state;
-      const { selected: _selected, folded: _folded, ...rest } = state;
-      const { selected: selected2, folded: folded2 } = call.projectsScreen;
-      return { ...rest, ...selected2 !== void 0 && { selected: selected2 }, ...folded2 !== void 0 && { folded: folded2 } };
+      const [typed2, place] = call.args;
+      const name = c.rules.cleanName(typed2);
+      if (name === null) return state;
+      const before = call.projectsScreen;
+      let next = state;
+      if (state.selected !== void 0 && sameNode(state.selected, projectNodeOf(name))) {
+        const { selected: _made, ...rest } = state;
+        next = before.selected === void 0 ? rest : { ...rest, selected: before.selected };
+      }
+      const parent = place?.parent ? c.tree().find(place.parent) : null;
+      const above = (parent?.path ?? []).map(projectNodeOf);
+      const now = next.folded ?? [];
+      const opened = (before.folded ?? []).filter((node) => above.some((a) => sameNode(a, node)) && !now.some((n) => sameNode(n, node)));
+      if (opened.length === 0) return next;
+      const isOpened = (node) => opened.some((o) => sameNode(o, node));
+      const kept = (before.folded ?? []).filter((node) => isOpened(node) || now.some((n) => sameNode(n, node)));
+      return { ...next, folded: [...kept, ...now.filter((node) => !kept.some((k) => sameNode(k, node)))] };
     }
     return state;
   }
@@ -8677,13 +8719,18 @@ ${at.reading}`;
       c.keepProjectsScreen(state);
       return state;
     },
-    /** The key of the task `id` names (`TaskItem.id`) in the file as read now, null when no task has it; nothing written. */
+    /**
+     * The key of the task `id` names (`TaskItem.id`) in the file as read now, null when no task has it; nothing written.
+     * Null without `ids` in the context too: the ids then are fresh, and one may name another task.
+     */
     keyOf: (c, [id]) => {
+      if (!c.knowsIds()) return null;
       const entry = c.snapshot().doc.byId(id);
       return entry ? keyOf(entry) : null;
     },
-    /** The list and name of the section `id` names (`ListSection.id`) in the file as read now, null when no section has it. */
+    /** The list and name of the section `id` names (`ListSection.id`) in the file as read now, null when no section has it or without `ids`. */
     sectionOf: (c, [id]) => {
+      if (!c.knowsIds()) return null;
       const doc = c.snapshot().doc;
       for (const list of GROUPED_LISTS) {
         const group = doc.groups(list).find((g) => g.id === id && g.name !== null);
@@ -8807,9 +8854,10 @@ ${at.reading}`;
     feedKey: (c) => feedKey(c.settings),
     feedDue: (c, [last]) => feedDue(last ?? null, c.context.nowMs, c.settings),
     problem: (_c, [failure]) => {
-      if (failure instanceof Error) return feedProblem(failure);
-      const { problem, message } = failure ?? {};
-      return problem ?? { kind: "failed", detail: message ?? "" };
+      if (failure instanceof Error || failure === null || typeof failure !== "object") return feedProblem(failure);
+      const { problem, message } = failure;
+      if (problem !== void 0) return problem;
+      return typeof message === "string" ? feedProblem(new Error(message)) : feedProblem(failure);
     },
     silence: () => ({ ms: FEED_SILENCE_MS, problem: feedSilence().problem })
   };

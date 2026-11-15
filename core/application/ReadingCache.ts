@@ -1,4 +1,5 @@
-import type { LineIds, TaskDocument } from "../domain/TaskDocument";
+import { type LineIds, TaskDocument } from "../domain/TaskDocument";
+import { deepFrozen, plainCopy } from "../domain/frozen";
 import type { LocalDate } from "../domain/Task";
 import { settingsFrom, type TaskCalendarSettings } from "../settings";
 import type { TaskIdState } from "./TaskIdentity";
@@ -51,7 +52,7 @@ export class ReadingCache {
 	settings(json: string): TaskCalendarSettings {
 		const kept = this.settingsTexts.find((e) => e.text === json);
 		if (kept) return kept.value;
-		const value = deepFreeze(settingsFrom(json.trim() === "" ? null : JSON.parse(json)));
+		const value = deepFrozen(plainCopy(settingsFrom(json.trim() === "" ? null : JSON.parse(json))));
 		this.keep(this.settingsTexts, { text: json, value });
 		return value;
 	}
@@ -60,18 +61,24 @@ export class ReadingCache {
 	reading(text: string, reading: string, today: LocalDate, notes: string, make: () => TextReading): TextReading {
 		const kept = this.readings.find((e) => e.text === text && e.reading === reading && e.today === today && e.notes === notes);
 		if (kept) return kept.value;
-		const value = make();
+		const made = make();
+		const value = { parsed: made.parsed.frozen(), whole: made.whole.frozen(), tidied: made.tidied.frozen(), changed: made.changed };
 		this.keep(this.readings, { text, reading, today, notes, value });
 		return value;
 	}
 
-	/** What an identity in `from` settles on reading `doc`, made by `make` the first time. */
+	/**
+	 * What an identity in `from` settles on reading `doc`, made by `make` the first time. Kept as frozen copies, found by
+	 * content: a host may change the state it handed in, and the state answered is handed on to hosts.
+	 */
 	settled(doc: TaskDocument, from: TaskIdState, make: () => SettledIds): SettledIds {
 		const entries = this.settledIds.get(doc) ?? [];
 		const kept = entries.find((e) => sameIdState(e.from, from));
 		if (kept) return kept.settled;
-		const settled = make();
-		this.keep(entries, { from, settled });
+		const made = make();
+		const was = deepFrozen(plainCopy(from));
+		const settled = { ...made, state: made.changed ? deepFrozen(plainCopy(made.state)) : was };
+		this.keep(entries, { from: was, settled });
 		this.settledIds.set(doc, entries);
 		return settled;
 	}
@@ -81,14 +88,18 @@ export class ReadingCache {
 		const entries = this.retaggedDocs.get(doc) ?? [];
 		const kept = entries.find((e) => e.ids === ids);
 		if (kept) return kept.doc;
-		const tagged = doc.retagged(ids);
+		const tagged = doc.retagged(ids).frozen();
 		this.keep(entries, { ids, doc: tagged });
 		this.retaggedDocs.set(doc, entries);
 		return tagged;
 	}
 
-	/** What `make` derives from `owner` under the name `slot`, made once for the same object. */
+	/**
+	 * What `make` derives from `owner` under the name `slot`, made once for the same object: only for an object no caller
+	 * changes, one this cache froze or a document it read; anything else is made anew.
+	 */
 	memo<T>(owner: object, slot: string, make: () => T): T {
+		if (!Object.isFrozen(owner) && !(owner instanceof TaskDocument)) return make();
 		let slots = this.derived.get(owner);
 		if (slots === undefined) this.derived.set(owner, (slots = new Map()));
 		if (slots.has(slot)) return slots.get(slot) as T;
@@ -97,8 +108,9 @@ export class ReadingCache {
 		return value;
 	}
 
-	/** A value's JSON, made once for the same object. */
+	/** A value's JSON, made once for an object this cache froze; anything else, whose content may change, made anew. */
 	keyOf(value: object): string {
+		if (!Object.isFrozen(value)) return JSON.stringify(value);
 		const kept = this.keys.get(value);
 		if (kept !== undefined) return kept;
 		const key = JSON.stringify(value);
@@ -131,12 +143,4 @@ export function sameIdState(a: TaskIdState, b: TaskIdState): boolean {
 		if (y === undefined || x.length !== y.length || x.some((raw, i) => raw !== y[i])) return false;
 	}
 	return true;
-}
-
-function deepFreeze<T>(value: T): T {
-	if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
-		Object.freeze(value);
-		for (const v of Object.values(value)) deepFreeze(v);
-	}
-	return value;
 }

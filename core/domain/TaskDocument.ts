@@ -1,3 +1,4 @@
+import { deepFrozen } from "./frozen";
 import { descriptionIndent, descriptionMarkdown, markdownLines } from "./description";
 import { DEFAULT_REMINDER, STATUS_CHARS, type GroupName, type SectionKey, type Task } from "./Task";
 import { formatTaskLine, isTaskLine, parseTaskLine, type Markers } from "./TaskLine";
@@ -245,6 +246,15 @@ export class TaskDocument {
 			return { line: row.line, tag: ids.known.get(n) ?? `t${ids.next + n}` };
 		});
 		return new TaskDocument(rows, this.eol, this.trailingEol, this.names, this.markers, ids.next + this.next);
+	}
+
+	/**
+	 * The document with every task entry in it frozen, their tasks and places too: a document kept and read by several
+	 * readers, whose answers hand entries' parts on. The document itself keeps making what it makes on first use.
+	 */
+	frozen(): this {
+		for (const entry of this.spans.keys()) deepFrozen(entry);
+		return this;
 	}
 
 	/** The headings and the task lines, in file order, each with its tag's number. */

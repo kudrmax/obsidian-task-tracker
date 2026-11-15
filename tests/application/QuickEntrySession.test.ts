@@ -690,6 +690,19 @@ describe("QuickEntrySession", () => {
 		expect(tasks.names).toEqual(["A:0", "first:0"]);
 	});
 
+	it("a service without the write a job needs fails the job, reported; only unfoldAbove may be missing", async () => {
+		const tasks = new FakeTasks([]);
+		const entry = tasks.entry();
+		delete (entry as unknown as { tasks: Record<string, unknown> }).tasks.createWithId;
+		entry.open(at(0));
+		entry.type("lost");
+		entry.enter();
+		await entry.idle();
+		expect(tasks.errors).toHaveLength(1);
+		expect(tasks.created).toEqual([]);
+		expect(entry.state).toMatchObject({ pending: [] });
+	});
+
 	it("a failed write is reported and the writes after it go on", async () => {
 		const tasks = new FakeTasks([]);
 		tasks.failing.add("bad");

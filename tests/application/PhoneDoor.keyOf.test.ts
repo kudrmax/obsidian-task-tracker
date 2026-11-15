@@ -42,6 +42,15 @@ describe("tasks.keyOf", () => {
 		expect(ok(callDoor("tasks.keyOf", [screen.sections.now.find((s) => s.name === "Errands")!.id], context)).result).toBeNull();
 	});
 
+	it("is null without the ids the host was given: fresh ids would name another task", () => {
+		const { context, screen } = read(FILE);
+		const child = item(screen, "Child");
+		const edited = context.tasks!.replace("- [ ] Idea\n", "- [ ] Idea\n- [ ] Written on another device\n");
+		expect(ok(callDoor("tasks.keyOf", [child.id], { tasks: edited, nowMs: NOW })).result).toBeNull();
+		const errands = screen.sections.now.find((s) => s.name === "Errands")!;
+		expect(ok(callDoor("tasks.sectionOf", [errands.id], { tasks: edited, nowMs: NOW })).result).toBeNull();
+	});
+
 	it("needs the tasks file", () => {
 		expect(callDoor("tasks.keyOf", ["t1"], { tasks: null, nowMs: NOW })).toMatchObject({ ok: false, error: { code: "tasksFileMissing" } });
 	});
