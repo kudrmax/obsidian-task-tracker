@@ -1,6 +1,7 @@
 import type { JSX } from "preact";
 import type { ListModel, ListRow } from "../model/lists";
-import { Card } from "./Card";
+import { Branches, Card } from "./Card";
+import { titleParts } from "../model/card";
 
 /** How the carry and the picks show on a list's rows. */
 export interface RowMarks {
@@ -20,7 +21,7 @@ export const NO_MARKS: RowMarks = { waiting: new Set(), arriving: null, hot: nul
 export interface ListProps {
 	readonly list: ListModel;
 	readonly classes?: string;
-	/** The list's column (or `projects`): what the carry's measure reads it as (`data-n-list`). */
+	/** The list's column (or `projects`): what the carry's measure reads it as (`data-n-list`), the entry's name for it (a double click on its free room types a task at its end). */
 	readonly column?: string;
 	readonly marks?: RowMarks;
 	/** Rows drawn as their place only (a carried card waiting where it stood, a renamed card under its field). */
@@ -69,6 +70,16 @@ export function List({ list, classes, column, marks = NO_MARKS, hidden, extra }:
 						classes={cardClasses(r.key)}
 					/>
 				);
+			case "unwritten":
+				return <Card key={r.key} rowKey={r.key} face={unwritten(r.text)} branch={r.branch} listed={false} />;
+			case "field":
+				return (
+					<div key={r.key} class={r.section ? "tc-n-entry-row tc-n-entry-section" : "tc-n-entry-row"} data-n-key={r.key} data-status={r.status ?? undefined}>
+						<span class="tc-n-progress-dot" />
+						<div class={r.section ? "tc-n-field is-section" : "tc-n-field"} data-priority={r.tint ?? undefined} data-n-island="field" />
+						{r.branch ? <Branches branch={r.branch} rowKey={r.key} /> : null}
+					</div>
+				);
 		}
 	};
 	const rows: JSX.Element[] = [];
@@ -79,9 +90,16 @@ export function List({ list, classes, column, marks = NO_MARKS, hidden, extra }:
 	}
 	const end = extra?.get("end");
 	if (end) rows.push(end);
+	/** The field's room at the list's end: on the phone the bar over the keyboard stands there. */
+	if (list.rows.some((r) => r.kind === "field")) rows.push(<div key="entry-room" class="tc-n-entry-room" />);
 	return (
-		<div class={classes ? `tc-n-list ${classes}` : "tc-n-list"} data-n-list={column}>
+		<div class={classes ? `tc-n-list ${classes}` : "tc-n-list"} data-n-list={column} data-n-dblact={column === undefined ? undefined : "room"} data-n-value={column}>
 			{rows}
 		</div>
 	);
+}
+
+/** A line typed and not yet written: a plain card, its title alone. */
+function unwritten(text: string) {
+	return { tint: null, stripes: [], folded: false, status: "todo" as const, over: null, title: titleParts(text), project: null, meta: null, due: null, stage: null };
 }

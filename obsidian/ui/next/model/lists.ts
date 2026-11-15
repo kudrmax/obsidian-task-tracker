@@ -1,4 +1,4 @@
-import { branchOf, type DropColumn, type GroupName, type MenuFrom, type ProjectsDrop, type ListGroup, type ListSection, listView, type ProjectsView, type TaskItem } from "../../../../core/application/contracts";
+import { branchOf, type DropColumn, type EntryPart, type GroupName, type Header, type ListCard, type ListGroup, type ListSection, listView, type MenuFrom, projectsEntryLook, type ProjectsDrop, type ProjectsView, type TaskItem } from "../../../../core/application/contracts";
 import type { LocalDate } from "./answers";
 import { type CardFace, cardFace } from "./card";
 
@@ -12,6 +12,8 @@ export interface Branch {
 /** Where a card stands in its list, as the core names a place: the list's section and its level. */
 export interface CardRow {
 	readonly kind: "card";
+	/** The index of its section among those the list draws (`ListModel.sections`): where the field stands by the core's `EntryAt`. */
+	readonly part: number;
 	/** The row's key: the task's id (`TaskItem.id`), who it is for its whole life (P1). */
 	readonly key: string;
 	readonly item: TaskItem;
@@ -30,6 +32,8 @@ export interface CardRow {
 /** A section's header. */
 export interface HeadRow {
 	readonly kind: "head";
+	/** The index of its section among those the list draws (`ListModel.sections`): where the field stands by the core's `EntryAt`. */
+	readonly part: number;
 	readonly key: string;
 	readonly name: string;
 	/** The tasks outside any section: the header is muted and opens nothing. */
@@ -42,6 +46,8 @@ export interface HeadRow {
 /** The No tasks plate under an empty section, or of a list that draws nothing (`list`): a tap types a task there. */
 export interface PlateRow {
 	readonly kind: "plate";
+	/** The index of its section among those the list draws (`ListModel.sections`): where the field stands by the core's `EntryAt`. */
+	readonly part: number;
 	readonly key: string;
 	readonly words: string;
 	readonly group: GroupName;
@@ -49,17 +55,51 @@ export interface PlateRow {
 	readonly list: boolean;
 }
 
-export type ListRow = CardRow | HeadRow | PlateRow;
+/**
+ * The field a task is typed in (the quick entry), at its level among the cards: a section's name stands as a header
+ * does. `tint`: the colour of the priority or the first label it is written with; `status` of the task it renames.
+ */
+export interface FieldRow {
+	readonly kind: "field";
+	readonly key: string;
+	readonly level: number;
+	readonly section: boolean;
+	readonly tint: string | null;
+	readonly status: TaskItem["status"] | null;
+	readonly branch: Branch | null;
+}
 
-/** A list as the view draws it: its rows in order, each keyed (P1). */
+/** A line entered and not yet written: a plain card with its text alone, at the level it was entered at. */
+export interface UnwrittenRow {
+	readonly kind: "unwritten";
+	readonly key: string;
+	readonly level: number;
+	readonly text: string;
+	readonly branch: Branch | null;
+}
+
+export type ListRow = CardRow | HeadRow | PlateRow | FieldRow | UnwrittenRow;
+
+type LevelRow = CardRow | FieldRow | UnwrittenRow;
+
+const levelled = (row: ListRow): row is LevelRow => row.kind === "card" || row.kind === "field" || row.kind === "unwritten";
+
+/** A list as the view draws it: its rows in order, each keyed (P1); and as the quick entry reads it (`EntryLook`). */
 export interface ListModel {
 	readonly rows: readonly ListRow[];
+	/** Its cards as places in it see them, each in the section it is drawn in. */
+	readonly cards: readonly ListCard[];
+	/** The sections it draws, in order (null: the part without a section). */
+	readonly sections: readonly Header[];
+	/** Its parts' own writes, where the list decides what a new task typed in it writes (By subprojects); none for a funnel's list. */
+	readonly parts: readonly EntryPart[];
 }
 
 const passesOf = (through: readonly boolean[]): number[] => through.flatMap((goesOn, i) => (goesOn ? [through.length - i] : []));
 
-function withBranches(rows: ListRow[]): ListRow[] {
-	const cards = rows.filter((row): row is CardRow => row.kind === "card");
+/** Each row at a level gets its branch from the rows around it, the field and the lines typed among them. */
+export function withBranches(rows: readonly ListRow[]): ListRow[] {
+	const cards = rows.filter(levelled);
 	const levels = cards.map((card) => card.level);
 	const branched = new Map(
 		cards.map((card, i) => {
@@ -67,7 +107,7 @@ function withBranches(rows: ListRow[]): ListRow[] {
 			return [card.key, lines ? { last: lines.last, passes: passesOf(lines.through) } : null] as const;
 		}),
 	);
-	return rows.map((row) => (row.kind === "card" ? { ...row, branch: branched.get(row.key) ?? null } : row));
+	return rows.map((row) => (levelled(row) ? { ...row, branch: branched.get(row.key) ?? null } : row));
 }
 
 export interface FunnelListInput {
@@ -89,22 +129,23 @@ export interface FunnelListInput {
 export function funnelList(input: FunnelListInput): ListModel {
 	const view = listView(input.items, input.grouped, input.sections);
 	const rows: ListRow[] = [];
-	for (const group of view.groups as readonly ListGroup[]) {
-		if (view.showsHeaders && group.header) rows.push({ kind: "head", key: `head:${group.id}`, name: group.name ?? input.ungrouped, ungrouped: group.name === null, group: group.name, opens: false });
-		if (group.empty) rows.push({ kind: "plate", key: `plate:${group.id}`, words: input.emptyLabel, group: group.name, list: false });
-		for (const { item, level } of group.rows) rows.push({ kind: "card", key: item.id, item, level, group: group.name, branch: null, face: cardFace(item, input.day), owner: item.id, from: input.column, drop: null });
-	}
-	if (rows.length === 0 && input.plate !== null) rows.push({ kind: "plate", key: "empty", words: input.plate, group: null, list: true });
-	return { rows: withBranches(rows) };
+	(view.groups as readonly ListGroup[]).forEach((group, part) => {
+		if (view.showsHeaders && group.header) rows.push({ kind: "head", key: `head:${group.id}`, part, name: group.name ?? input.ungrouped, ungrouped: group.name === null, group: group.name, opens: false });
+		if (group.empty) rows.push({ kind: "plate", key: `plate:${group.id}`, part, words: input.emptyLabel, group: group.name, list: false });
+		for (const { item, level } of group.rows) rows.push({ kind: "card", key: item.id, part, item, level, group: group.name, branch: null, face: cardFace(item, input.day), owner: item.id, from: input.column, drop: null });
+	});
+	if (rows.length === 0 && input.plate !== null) rows.push({ kind: "plate", key: "empty", part: -1, words: input.plate, group: null, list: true });
+	const cards = (view.groups as readonly ListGroup[]).flatMap((group) => group.rows.map(({ item, level }): ListCard => ({ key: item.key, id: item.id, level, group: group.name })));
+	return { rows: withBranches(rows), cards, sections: (view.groups as readonly ListGroup[]).map((group) => group.name), parts: [] };
 }
 
 /** The node's tasks in their parts (By subprojects), as the old screen's `ProjectTasks` draws them. */
 export function projectsList(view: ProjectsView): ListModel {
 	const rows: ListRow[] = [];
-	if (view.sections.length === 0) rows.push({ kind: "plate", key: "plate:none", words: view.emptyLabel, group: null, list: true });
-	for (const section of view.sections) {
-		if (section.header && section.title !== null) rows.push({ kind: "head", key: `head:${section.key}`, name: section.title, ungrouped: false, group: section.group, opens: section.opens });
-		if (section.plate) rows.push({ kind: "plate", key: `plate:${section.key}`, words: view.emptyLabel, group: section.group, list: false });
+	if (view.sections.length === 0) rows.push({ kind: "plate", key: "plate:none", part: -1, words: view.emptyLabel, group: null, list: true });
+	view.sections.forEach((section, part) => {
+		if (section.header && section.title !== null) rows.push({ kind: "head", key: `head:${section.key}`, part, name: section.title, ungrouped: false, group: section.group, opens: section.opens });
+		if (section.plate) rows.push({ kind: "plate", key: `plate:${section.key}`, part, words: view.emptyLabel, group: section.group, list: false });
 		let owner = "";
 		let from: MenuFrom = "done";
 		for (const row of section.rows) {
@@ -113,8 +154,9 @@ export function projectsList(view: ProjectsView): ListModel {
 				from = row.card.menuFrom;
 			}
 			if (owner === "") continue;
-			rows.push({ kind: "card", key: row.id, item: row.item, level: row.level, group: section.group, branch: null, face: cardFace(row.item, null, row.card?.stage ?? null), owner, from, drop: row.drop });
+			rows.push({ kind: "card", key: row.id, part, item: row.item, level: row.level, group: section.group, branch: null, face: cardFace(row.item, null, row.card?.stage ?? null), owner, from, drop: row.drop });
 		}
-	}
-	return { rows: withBranches(rows) };
+	});
+	const look = projectsEntryLook(view);
+	return { rows: withBranches(rows), cards: look.cards, sections: look.sections, parts: look.parts };
 }

@@ -45,7 +45,7 @@ function subtreeOf(list: ListModel, key: string): readonly string[] {
 /** The lists with these rows left out: a carried card's subtasks fold away under it while it is carried (P6). */
 function without(lists: BlockLists, rows: ReadonlySet<string>): BlockLists {
 	if (rows.size === 0) return lists;
-	const keep = (list: ListModel): ListModel => ({ rows: list.rows.filter((row: ListRow) => !rows.has(row.key)) });
+	const keep = (list: ListModel): ListModel => ({ ...list, rows: list.rows.filter((row: ListRow) => !rows.has(row.key)) });
 	if (lists.kind === "rows") return { ...lists, rows: lists.rows.map((row) => ({ ...row, list: keep(row.list) })) };
 	if (lists.kind === "byProject") return { ...lists, list: keep(lists.list) };
 	return lists;

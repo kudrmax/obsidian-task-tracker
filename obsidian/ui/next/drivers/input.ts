@@ -47,12 +47,30 @@ export class Input {
 			const marked = target?.closest("[data-n-act]");
 			if (!(marked instanceof HTMLElement) || !root.contains(marked)) return;
 			const act = marked.dataset.nAct ?? "";
+			if (press && marked.closest("[data-n-keep-focus]")) e.preventDefault();
 			if (pressed.has(act)) return;
 			if ((act === "dismiss") !== press) return;
 			if (press && marked !== target) return;
 			const row = marked.closest("[data-n-key]");
 			told({ act, key: row instanceof HTMLElement ? (row.dataset.nKey ?? null) : null, value: marked.dataset.nValue ?? null });
 		};
+		/** A double click on a list's own room (not on a row in it): the act it is marked with (`data-n-dblact`). */
+		const twice = (e: Event) => {
+			const target = e.target instanceof HTMLElement ? e.target : null;
+			if (!target || !root.contains(target) || target.dataset.nDblact === undefined) return;
+			told({ act: target.dataset.nDblact, key: null, value: target.dataset.nValue ?? null });
+		};
+		/** A press on what keeps the focus where it is (the bar of a field being typed): the field keeps typing. */
+		const keep = (e: Event) => {
+			const target = e.target instanceof Element ? e.target : null;
+			if (target?.closest("[data-n-keep-focus]")) e.preventDefault();
+		};
+		root.addEventListener("dblclick", twice, true);
+		root.addEventListener("mousedown", keep, true);
+		this.stops.push(
+			() => root.removeEventListener("dblclick", twice, true),
+			() => root.removeEventListener("mousedown", keep, true),
+		);
 		const click = (e: Event) => read(e, false);
 		const press = (e: Event) => read(e, true);
 		/** Heard on the way down: the block stops its presses at its frame, inside `root`. */

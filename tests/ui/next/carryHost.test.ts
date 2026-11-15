@@ -1,3 +1,4 @@
+import { fakeTitleFields } from "../../helpers/FakeTitleField";
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BlockHost } from "../../../obsidian/ui/next/host/block/BlockHost";
@@ -7,7 +8,7 @@ import { projectHarness } from "./blockHarness";
 
 /** Obsidian's key scopes as a block uses them. */
 const app = { keymap: { pushScope: () => undefined, popScope: () => undefined }, scope: {} } as never;
-const words = { failure: () => "", notice: () => undefined, openLink: () => undefined, openTasksFile: () => undefined };
+const words = { failure: () => "", notice: () => undefined, openLink: () => undefined, openTasksFile: () => undefined, titleField: () => fakeTitleFields().factory };
 
 const pointer = (type: string, x: number, y: number, pointerType = "mouse") => new window.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, pointerType, isPrimary: true, button: 0, clientX: x, clientY: y });
 

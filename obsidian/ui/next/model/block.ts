@@ -3,7 +3,7 @@ import type { LocalDate } from "./answers";
 import { type Answers, type Need, NO_ANSWERS, resultOf } from "./answers";
 import { funnelList, type ListModel, projectsList } from "./lists";
 import type { Layer } from "./layers";
-import type { EntryModel } from "./entry";
+import { type EntryModel, entryNeeds } from "./entry";
 import type { CarryModel } from "./carry";
 import type { SelectModel } from "./select";
 import type { SearchModel } from "./search";
@@ -78,7 +78,12 @@ export function blockNeeds(model: BlockModel): readonly Need[] {
 		}
 	}
 	needs.push(...menuNeeds(model));
-	return needs;
+	return [...needs, ...entryNeeds(model)];
+}
+
+/** The list of `column` shows its sections (`tasks.columnSections` answered some): a section's name may be typed in it. */
+export function sectioned(model: BlockModel, column: string): boolean {
+	return resultOf<ColumnSections | null>(model.answers, `sections:${column}`) !== null;
 }
 
 // Selectors --------------------------------------------------------------------------------------------------------
@@ -206,7 +211,7 @@ export function rowVars(lists: BlockLists): ReadonlyMap<string, Readonly<Record<
 	const vars = new Map<string, Readonly<Record<string, string>>>();
 	const rows = lists.kind === "rows" ? lists.rows.flatMap((row) => row.list.rows) : lists.kind === "byProject" ? lists.list.rows : [];
 	for (const row of rows) {
-		if (row.kind !== "card") continue;
+		if (row.kind !== "card" && row.kind !== "field" && row.kind !== "unwritten") continue;
 		if (row.level > 0) vars.set(row.key, { "--tc-n-level": String(row.level) });
 		for (const pass of row.branch?.passes ?? []) vars.set(`${row.key}/pass/${pass}`, { "--tc-n-pass": String(pass) });
 	}
@@ -215,5 +220,6 @@ export function rowVars(lists: BlockLists): ReadonlyMap<string, Readonly<Record<
 
 /** The root's own classes: a card of several labels blends them (`labelPaint`) on the block and over it alike. */
 export function rootClasses(model: BlockModel, part: string): string {
-	return settings(model)?.labelPaint === "blend" ? `task-calendar ${part} is-blend` : `task-calendar ${part}`;
+	const states = [settings(model)?.labelPaint === "blend" ? "is-blend" : "", model.entry?.state ? "is-entering" : ""].filter(Boolean);
+	return ["task-calendar", part, ...states].join(" ");
 }

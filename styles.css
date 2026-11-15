@@ -1961,3 +1961,68 @@ body:not(.is-mobile) .task-calendar button.tc-n-btn:focus-visible { outline: var
 .task-calendar .tc-n-name-field > input.tc-n-name-input { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); color: var(--tc-text); caret-color: var(--tc-accent); -webkit-user-select: text; user-select: text; }
 .task-calendar .tc-n-name-field > input.tc-n-name-input::placeholder { color: var(--tc-muted); font-weight: var(--tc-weight-normal); }
 .task-calendar .tc-n-name-field > input.tc-n-name-input::selection { background: var(--tc-selection); }
+/* next: entry */
+/* The field a task is typed in, among the cards: the old screen's quick row and its field, rule for rule. */
+.task-calendar .tc-n-entry-row { position: relative; flex-shrink: 0; min-height: var(--tc-card-h); margin-left: calc(var(--tc-n-level, 0) * var(--tc-subtask-indent)); margin-bottom: var(--tc-row-entry-room); overflow: visible; clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 0 calc(-1 * var(--tc-n-level, 0) * var(--tc-subtask-indent))); }
+body.is-mobile .task-calendar .tc-n-entry-row { margin-bottom: 0; }
+.task-calendar .tc-n-projects-list > .tc-n-entry-row { margin-bottom: 0; }
+.task-calendar .tc-n-entry-row.tc-n-entry-section { margin-top: var(--tc-section-gap); }
+.task-calendar .tc-n-entry-row > .tc-n-progress-dot { z-index: var(--tc-layer-progress-dot); }
+.task-calendar .tc-n-entry-row[data-status="inProgress"] > .tc-n-progress-dot { visibility: visible; }
+.task-calendar .tc-n-entry-row > .tc-n-branch.tc-n-branch-last { height: calc(var(--tc-branch-rise) + var(--tc-card-h) / 2 + var(--tc-branch-w) / 2); }
+.task-calendar .tc-n-field { display: block; width: 100%; min-height: var(--tc-card-h); box-sizing: border-box; margin: 0; padding: var(--tc-block-pad-top) var(--tc-card-pad-end) var(--tc-block-pad-top) var(--tc-card-pad-start); border: 0; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); box-shadow: var(--tc-ring-selected); outline: none; overflow: hidden; overflow-wrap: anywhere; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-card); color: var(--tc-text); caret-color: var(--tc-accent); cursor: text; -webkit-user-select: text; user-select: text; }
+.task-calendar .tc-n-field[data-priority] { background: var(--tc-priority-fill); }
+/* Obsidian's editor in the field keeps none of a note's margins (the phone pads its scroller by them). */
+.task-calendar .tc-n-field { --file-margins: 0; --view-top-spacing-markdown: 0; --view-bottom-spacing-markdown: 0; }
+.task-calendar .tc-n-field.is-section { font-weight: var(--tc-weight-semibold); }
+.task-calendar [data-priority] > .tc-n-progress-dot { background: var(--tc-priority-meta); }
+/* The phone keeps room at the list's end for the bar over the keyboard; the desktop under the field itself. */
+.task-calendar .tc-n-entry-room { flex-shrink: 0; height: 0; }
+body.is-mobile .task-calendar .tc-n-entry-room { height: var(--tc-row-entry-room); }
+
+/* While a task is typed the bottom row steps aside, and the foot fade gives the bar its room. */
+.task-calendar.tc-n-block.is-entering > :is(.tc-n-plus, .tc-n-capsule, .tc-n-view-btn) { opacity: 0; transform: scale(var(--tc-menu-scale)); visibility: hidden; pointer-events: none; }
+.task-calendar.tc-n-block.is-entering > .tc-n-fade { opacity: 0; }
+.task-calendar .tc-n-fade-entering { position: absolute; left: 0; right: 0; bottom: 0; height: var(--tc-block-inset); background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-half-ink), transparent) var(--tc-foot-fade-half), color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-deep-ink), transparent) var(--tc-foot-fade-deep), var(--tc-bg) var(--tc-foot-fade-solid)); z-index: var(--tc-layer-fade); pointer-events: none; opacity: 0; }
+body.is-mobile .task-calendar .tc-n-fade-entering { height: calc(var(--tc-bar-h) + var(--tc-bar-stand)); }
+.task-calendar.tc-n-block.is-entering > .tc-n-fade-entering { opacity: 1; }
+
+/* The bar: on the phone over the keyboard, the shifts left, the rest right; on the desktop a capsule by the field. */
+.task-calendar .tc-n-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-bar-bottom); z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); display: flex; align-items: center; gap: var(--tc-space-8); background: var(--tc-bg); }
+.task-calendar .tc-n-bar-shifts { display: flex; flex-shrink: 1; min-width: 0; border-radius: var(--tc-radius-bar-btn); background: var(--tc-track-bg); }
+.task-calendar .tc-n-bar-spacer { flex: 1; }
+.task-calendar button.tc-n-btn.tc-n-bar-btn { width: var(--tc-bar-btn-w); min-width: var(--tc-bar-btn-h); height: var(--tc-bar-btn-h); flex-shrink: 1; padding: 0; border-radius: var(--tc-radius-bar-btn); display: flex; align-items: center; justify-content: center; color: var(--tc-text); background: var(--tc-track-bg); }
+.task-calendar .tc-n-bar-shifts > button.tc-n-btn.tc-n-bar-btn { background: none; }
+.task-calendar button.tc-n-btn.tc-n-bar-btn:disabled { color: var(--tc-ink-dim); cursor: default; }
+.task-calendar .tc-n-bar-btn svg { width: var(--tc-bar-flag); height: var(--tc-bar-flag); stroke-width: var(--tc-stroke-bar); }
+.task-calendar .tc-n-bar-shifts .tc-n-bar-btn svg { width: var(--tc-bar-icon); height: var(--tc-bar-icon); }
+.task-calendar .tc-n-bar-btn.is-set { color: var(--tc-accent); }
+.task-calendar .tc-n-bar-btn[data-priority].is-set { color: var(--tc-priority-ink); }
+.task-calendar .tc-n-bar-btn[data-priority].is-set svg { fill: var(--tc-priority-ink); }
+.task-calendar .tc-n-bar-project.is-set svg { fill: var(--tc-accent); }
+.task-calendar button.tc-n-btn.tc-n-bar-place { width: var(--tc-place-w); box-sizing: border-box; padding: 0 var(--tc-space-12) 0 var(--tc-space-10); background: var(--tc-track-bg); gap: var(--tc-space-6); display: flex; align-items: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); height: var(--tc-bar-btn-h); border-radius: var(--tc-radius-bar-btn); flex-shrink: 0; }
+.task-calendar .tc-n-bar-place svg { width: var(--tc-place-icon); height: var(--tc-place-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-seg); }
+.task-calendar .tc-n-bar-place-label { overflow: hidden; white-space: nowrap; }
+.task-calendar .tc-n-bar.tc-n-bar-desk { right: auto; bottom: auto; height: var(--tc-seg); padding: var(--tc-seg-pad); gap: 0; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); }
+.task-calendar .tc-n-bar-desk .tc-n-bar-shifts { display: contents; }
+.task-calendar .tc-n-bar-desk button.tc-n-btn.tc-n-bar-btn, .task-calendar .tc-n-mode button.tc-n-btn.tc-n-bar-btn { width: var(--tc-desk-bar-btn-w); min-width: 0; height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: none; flex-shrink: 0; }
+.task-calendar .tc-n-bar-desk .tc-n-bar-btn svg, .task-calendar .tc-n-mode .tc-n-bar-btn svg { width: var(--tc-desk-bar-flag); height: var(--tc-desk-bar-flag); }
+.task-calendar .tc-n-bar-desk .tc-n-bar-shifts .tc-n-bar-btn svg { width: var(--tc-desk-bar-icon); height: var(--tc-desk-bar-icon); }
+.task-calendar .tc-n-bar-desk .tc-n-bar-spacer { flex: none; width: var(--tc-hairline); height: var(--tc-desk-bar-rule); margin: 0 var(--tc-space-2); background: var(--tc-separator); }
+.task-calendar .tc-n-bar-desk button.tc-n-btn.tc-n-bar-place { width: auto; min-width: var(--tc-desk-place-w); max-width: var(--tc-desk-place-max); height: var(--tc-seg-btn-h); padding: 0 var(--tc-space-10) 0 var(--tc-space-8); border-radius: var(--tc-radius-seg-btn); gap: var(--tc-space-5); font-size: var(--tc-font-desk-place); background: var(--tc-desk-place-bg); }
+.task-calendar .tc-n-bar-desk .tc-n-bar-place svg { width: var(--tc-desk-place-icon); height: var(--tc-desk-place-icon); }
+.task-calendar .tc-n-bar-desk .tc-n-bar-btn.is-open { background: var(--tc-hover); }
+.task-calendar .tc-n-bar-desk .tc-n-bar-place.is-open { background-color: var(--tc-place-on-bg); }
+.task-calendar .tc-n-mode { position: absolute; z-index: var(--tc-layer-bar); height: var(--tc-seg); box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); display: flex; align-items: center; }
+/* The bar's panel: the levels and labels as tiles, the places as tiles. */
+.task-calendar .tc-n-bar-panel { position: absolute; z-index: var(--tc-layer-bar-panel); right: var(--tc-space-8); bottom: calc(100% + var(--tc-space-8)); width: var(--tc-menu-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-shadow-panel); color: var(--tc-text); }
+.task-calendar .tc-n-bar-desk .tc-n-bar-panel { right: 0; bottom: auto; top: calc(100% + var(--tc-desk-bar-gap)); }
+.task-calendar .tc-n-tiles { display: flex; flex-direction: column; gap: var(--tc-space-8); padding: var(--tc-space-12); }
+.task-calendar .tc-n-tiles + .tc-n-tiles { border-top: var(--tc-band); }
+.task-calendar .tc-n-tile-row { display: flex; gap: var(--tc-space-8); }
+.task-calendar button.tc-n-btn.tc-n-tile { position: relative; flex: 1; min-width: 0; padding: 0; height: var(--tc-menu-tile-h); border-radius: var(--tc-radius-menu-tile); background: var(--tc-menu-tile-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-6); font-size: var(--tc-font-menu-tile); font-weight: var(--tc-weight-menu-tile); }
+.task-calendar button.tc-n-btn.tc-n-tile.is-on { background: var(--tc-priority-fill); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-priority-ink); }
+.task-calendar button.tc-n-btn.tc-n-tile:disabled { opacity: var(--tc-tile-off-opacity); }
+.task-calendar .tc-n-tile svg { width: var(--tc-menu-tile-icon); height: var(--tc-menu-tile-icon); stroke-width: var(--tc-stroke-menu); }
+.task-calendar .tc-n-tile[data-priority] svg { color: var(--tc-priority-ink); fill: var(--tc-priority-ink); }
+.task-calendar .tc-n-tile-label { max-width: 100%; overflow: hidden; white-space: nowrap; -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); }

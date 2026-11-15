@@ -23,6 +23,7 @@ import { ShownSettingsStore, ViewSettingsStore } from "./ui/viewSettings";
 import { composeRuntime, newScreensOf } from "./composeRuntime";
 import { failureText, NOTICE_WORDS } from "./ui/failureText";
 import { NoteBlocks, type NoteView, obsidianPlaces } from "./ui/next/host/block/NoteBlocks";
+import { obsidianTitleField } from "./ui/next/drivers/islands";
 
 /** obsidian://task-calendar-open: a tap on a reminder on the phone opens the calendar. */
 const OPEN_ACTION = "task-calendar-open";
@@ -117,6 +118,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			app: this.app,
 			failure: (error) => (error.code === "undoConflict" ? (error.message === "redo" ? "Can’t redo: the tasks file changed" : "Can’t undo: the tasks file changed") : error.code === "staleTask" ? NOTICE_WORDS.stale : failureText(new Error(error.message))),
 			notice: (text) => new Notice(text),
+			titleField: (keys) => obsidianTitleField(this.app, () => this.pluginSettings.get().tasksFile, keys),
 			openLink: (link) => {
 				if (link.kind === "url") this.outside().open(link.target);
 				else void this.app.workspace.openLinkText(link.target, this.pluginSettings.get().tasksFile, "tab");

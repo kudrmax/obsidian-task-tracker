@@ -12,6 +12,8 @@ type Boxes = ReadonlyMap<string, DOMRect>;
 
 /** A panel grows from its anchor's side: from its top left under the anchor, from its bottom left over it. */
 const ORIGIN_BELOW = "0 0";
+/** A side left to the other: a panel hanging from the bar stands by one of its edges only. */
+const AUTO = "auto";
 const ORIGIN_ABOVE = "0 100%";
 
 /** A token of the stylesheet as milliseconds (`150ms`, `0.3s`). */
@@ -49,7 +51,7 @@ export class Motion {
 	 * After the render: each row's variables from the model, then the drawing's motion. `move`: a row that stood elsewhere
 	 * slides from there, a row new to it fades in. `replace`: nothing moves.
 	 */
-	after(cause: "move" | "replace" | "none", vars: ReadonlyMap<string, Readonly<Record<string, string>>>): void {
+	after(cause: "move" | "replace" | "none", vars: ReadonlyMap<string, Readonly<Record<string, string>>>, heirs: ReadonlyMap<string, string> = new Map()): void {
 		this.applyVars(vars);
 		if (cause !== "move") return;
 		const ms = tokenMs(this.root, "--tc-duration-collapse");
@@ -58,7 +60,9 @@ export class Motion {
 		for (const el of this.root.querySelectorAll<HTMLElement>("[data-n-key]")) {
 			const key = keyOf(el);
 			if (key === null || key.includes("/")) continue;
-			const was = this.boxes.get(key);
+			/** A row new to the drawing that takes another's place (a written line's card, the field's) starts from that one's box. */
+			const heir = heirs.get(key);
+			const was = this.boxes.get(key) ?? (heir === undefined ? undefined : this.boxes.get(heir));
 			if (!was) {
 				if (this.boxes.size > 0) this.running.push(el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing }));
 				continue;
@@ -392,6 +396,51 @@ export class Motion {
 		const upper: PanelPlace | null = count > 0 && !whole ? { left, top: null, bottom: overY, maxHeight: fit(cut, above) } : null;
 		const lower: PanelPlace = whole ? { left, top: null, bottom: overY, maxHeight: fit(total, above) } : { left, top: anchor.bottom + gap, bottom: null, maxHeight: fit(total - cut, below) };
 		return { seq, copy, copies, above: count, panel: lower, upper, long };
+	}
+
+	/**
+	 * The parts that stand by the field a task is typed in (`data-n-place="field"`), inside `frame`: on the desktop the bar
+	 * right under the field, its right edge on the field's, or over the field where the frame shows no room under it; the
+	 * section's capsule on the bar's row by the field's left edge (the old screen's `barBesideField`).
+	 */
+	besideField(frame: HTMLElement): void {
+		const view = frame.ownerDocument.defaultView;
+		if (!view) return;
+		let field: HTMLElement | null = null;
+		for (const el of frame.querySelectorAll<HTMLElement>("[data-n-island]")) field = el;
+		const parts = [...frame.querySelectorAll<HTMLElement>("[data-n-place]")].filter((el) => el.dataset.nPlace === "field");
+		if (!field || parts.length === 0) return;
+		const box = frame.getBoundingClientRect();
+		const at = field.getBoundingClientRect();
+		const gap = parseFloat(view.getComputedStyle(frame).getPropertyValue("--tc-desk-bar-gap")) || 0;
+		const room = { top: box.top, bottom: box.bottom };
+		const bar = parts.find((el) => el.dataset.nHow === "beside") ?? null;
+		const size = bar?.getBoundingClientRect() ?? at;
+		let panel: HTMLElement | null = null;
+		for (const el of bar?.querySelectorAll<HTMLElement>("[data-n-panel]") ?? []) panel = el;
+		const below = at.bottom + gap;
+		const above = at.top - gap - size.height;
+		const fitsBelow = (extra: number) => below + size.height + extra <= room.bottom;
+		const fitsAbove = (extra: number) => above - extra >= room.top;
+		/** An open panel hangs from the bar away from the field: the side is chosen for the two while they fit on one, else for the bar. */
+		const extra = panel ? panel.offsetHeight + gap : 0;
+		const side = [extra, 0].map((more) => (fitsBelow(more) ? "below" : fitsAbove(more) ? "above" : null)).find((found) => found !== null) ?? "below";
+		const top = side === "below" ? below : above;
+		if (panel) {
+			const panelBelow = top + size.height + gap + panel.offsetHeight <= room.bottom;
+			const panelAbove = top - gap - panel.offsetHeight >= room.top;
+			const down = side === "below" ? panelBelow || !panelAbove : !(panelAbove || !panelBelow);
+			const off = `${size.height + gap}px`;
+			Motion.put(panel, "top", down ? off : AUTO);
+			Motion.put(panel, "bottom", down ? AUTO : off);
+		}
+		const barLeft = at.right - size.width;
+		for (const part of parts) {
+			const width = part.getBoundingClientRect().width;
+			const left = part === bar ? barLeft : bar ? Math.min(at.left, barLeft - gap - width) : at.left;
+			Motion.put(part, "left", `${left - box.left - frame.clientLeft}px`);
+			Motion.put(part, "top", `${top - box.top - frame.clientTop + frame.scrollTop}px`);
+		}
 	}
 
 	dispose(): void {
