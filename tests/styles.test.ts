@@ -412,6 +412,17 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.rules.filter((d) => strip.test(d.selector) && d.property.startsWith("overflow") && d.value !== "clip")).toEqual([]);
 	});
 
+	/**
+	 * Max, 2026-11-15: First step's field jumped and cut its text off, every time, on his desktop only. The Outliner plugin
+	 * hangs a 64px overlay inside every editor; it made the 18px field a scroll container, and the browser scrolled it 5px
+	 * to bring the caret into sight. A field clips what sticks out, it never scrolls.
+	 */
+	it("never lets the browser scroll a typing field to bring its caret into sight: it clips, it does not scroll", () => {
+		const field = sheet.rules.filter((d) => /\.tc-quick-field$/.test(d.selector) && /^overflow(-x|-y)?$/.test(d.property));
+		expect(field.length).toBeGreaterThan(0);
+		expect(field.map((d) => `${d.selector} { ${d.property}: ${d.value} }`)).toEqual(field.map((d) => `${d.selector} { ${d.property}: clip }`));
+	});
+
 	it("stands the switch and the plus in one row over Obsidian's chrome: the phone's navigation, or the desktop's status bar while it is shown", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-status-room")).toBe("0px");
