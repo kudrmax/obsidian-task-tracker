@@ -5,7 +5,7 @@ import type { BlockMsg } from "../model/messages";
 import { assertNever } from "../model/assertNever";
 import { remapIds } from "./ids";
 import { actMessage } from "./acts";
-import { updateCarry } from "./carry";
+import { carryFollows, updateCarry } from "./carry";
 import { updateEntry } from "./entry";
 import { updateFull } from "./full";
 import { updateMenu } from "./menu";
@@ -66,7 +66,7 @@ function step(model: BlockModel, msg: BlockMsg): Step {
 			return meant ? step(model, meant) : [model, []];
 		}
 		case "views":
-			return [{ ...model, answers: msg.answers }, []];
+			return carryFollows({ ...model, answers: msg.answers });
 		case "rebased":
 			return [remapIds(model, msg.idMap), []];
 		case "undoTapped":

@@ -1825,3 +1825,35 @@ body:not(.is-mobile) .task-calendar button.tc-n-btn:focus-visible { outline: var
 .task-calendar .tc-n-menu-choice > .tc-n-menu-label { flex: 1; overflow: hidden; white-space: nowrap; -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .task-calendar .tc-n-menu-row svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
 .task-calendar .tc-n-menu-choice svg { color: var(--tc-accent-ui); stroke-width: var(--tc-stroke-check); }
+
+/* next: carry */
+/* The carry in the block: the place a carried card waits at, the card a drop lands on, the lit plate, the drop line, the float. */
+.task-calendar .tc-n-stack { position: relative; }
+.task-calendar .tc-n-list > .tc-n-card.is-waiting { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
+.task-calendar .tc-n-card.is-waiting > *, .task-calendar .tc-n-card.is-arriving > * { visibility: hidden; }
+.task-calendar .tc-n-list > .tc-n-card.is-arriving { background: none; box-shadow: none; }
+.task-calendar .tc-n-plate.is-hot { border-style: solid; border-color: var(--tc-accent); background: var(--tc-drop-bg); color: var(--tc-accent); }
+.task-calendar .tc-n-drop { position: absolute; left: 0; top: calc(var(--tc-n-drop-y, 0px) - var(--tc-drop-dot) / 2); height: var(--tc-drop-dot); width: var(--tc-n-drop-w, 0px); transform: translateX(var(--tc-n-drop-x, 0px)); z-index: var(--tc-layer-drop-gap); pointer-events: none; display: flex; align-items: center; }
+.task-calendar .tc-n-drop-dot { width: var(--tc-drop-dot); height: var(--tc-drop-dot); flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-accent); }
+.task-calendar .tc-n-drop-line { flex: 1; height: var(--tc-now-line); background: var(--tc-accent); }
+.task-calendar .tc-n-float, .task-calendar .tc-n-float-under, .task-calendar .tc-n-float-count { position: fixed; left: 0; top: 0; z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; }
+.task-calendar .tc-n-float { width: var(--tc-float-w); height: var(--tc-float-h); }
+.task-calendar .tc-n-float > .tc-n-card { width: 100%; height: 100%; background: var(--tc-float-bg); border-radius: var(--tc-radius-float); box-shadow: var(--tc-shadow-lift); }
+.task-calendar .tc-n-float > .tc-n-card[data-priority] { background: var(--tc-priority-fill); }
+.task-calendar .tc-n-float .tc-n-due-mon, .task-calendar .tc-n-float .tc-n-due-repeat { color: var(--tc-float-month); }
+.task-calendar .tc-n-float-under { width: calc(var(--tc-float-w) - 2 * var(--tc-stack-step-x)); height: var(--tc-float-h); border-radius: var(--tc-radius-float); box-shadow: var(--tc-shadow-lift); }
+.task-calendar .tc-n-float-under-1 { margin: var(--tc-stack-step-y) 0 0 var(--tc-stack-step-x); background: var(--tc-stack-1); }
+.task-calendar .tc-n-float-under-2 { width: calc(var(--tc-float-w) - 2 * (2 * var(--tc-stack-step-x))); margin: calc(2 * var(--tc-stack-step-y)) 0 0 calc(2 * var(--tc-stack-step-x)); background: var(--tc-stack-2); }
+.task-calendar .tc-n-float-count { min-width: var(--tc-float-count-size); height: var(--tc-float-count-size); box-sizing: border-box; margin: calc(-1 * var(--tc-float-count-out)) 0 0 calc(var(--tc-float-w) + var(--tc-float-count-out) - var(--tc-float-count-size)); padding: 0 var(--tc-space-6); border-radius: var(--tc-radius-float-count); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: 0 0 0 var(--tc-float-count-ring) var(--tc-bg); font-family: var(--tc-font-ui); font-size: var(--tc-font-count); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+
+/* Select tasks: every card's circle, the picked ones checked on the accent's ground; the capsule's count and the actions button. */
+.task-calendar .tc-n-card.tc-n-card-picking { padding-left: var(--tc-pick-pad-start); }
+.task-calendar .tc-n-card-picking > .tc-n-pick { width: var(--tc-pick-size); margin-right: var(--tc-pick-gap); border-width: var(--tc-pick-ring); opacity: 1; }
+.task-calendar .tc-n-card-picking > .tc-n-progress-dot { opacity: 0; }
+.task-calendar .tc-n-list > .tc-n-card.is-picked { background: var(--tc-select-bg); }
+.task-calendar .tc-n-card.is-picked > .tc-n-pick { border-color: transparent; background: var(--tc-accent); }
+.task-calendar .tc-n-card.is-picked > .tc-n-pick svg { visibility: visible; }
+.task-calendar .tc-n-capsule .tc-n-btn.tc-n-select-num { font-size: var(--tc-text-17); font-weight: var(--tc-weight-bold); font-variant-numeric: tabular-nums; }
+.task-calendar button.tc-n-btn.tc-n-round.tc-n-select-menu { position: absolute; right: var(--tc-block-inset); bottom: calc(var(--tc-block-inset) + (var(--tc-wheel) - var(--tc-plus-size)) / 2); z-index: var(--tc-layer-plus); background: var(--tc-accent); color: var(--tc-on-accent); }
+.task-calendar button.tc-n-btn.tc-n-round.tc-n-select-menu.is-off { background: var(--tc-track-bg); color: var(--tc-ink-dim); }
+.task-calendar .tc-n-select-menu svg { stroke: none; fill: currentColor; }

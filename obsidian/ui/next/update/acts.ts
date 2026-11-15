@@ -39,6 +39,10 @@ export function actMessage(model: BlockModel, act: Act): BlockMsg | null {
 			return { kind: "searchPicked" };
 		case "select":
 			return { kind: "selectPicked" };
+		case "selectStop":
+			return { kind: "select", msg: { kind: "stop" } };
+		case "selectActions":
+			return { kind: "select", msg: { kind: "actions" } };
 		case "link":
 			return linkOf(act.value);
 		case "card":
