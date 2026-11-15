@@ -82,7 +82,8 @@ export async function block(d: Driver, newBlock: boolean): Promise<void> {
 	await d.step("a card's menu closes", "interaction", () => d.key("Escape"), { moves: [] });
 
 	/** A task with a description: its menu shows the description's start by the copy of its card (the old `DescriptionPeek`). */
-	const described = titles.find((t) => t.length > 0 && t !== first) ?? first;
+	/** A title written plainly in the file (no link), so its line is found by it. */
+	const described = first;
 	await d.page(`
 		const file = app.vault.getAbstractFileByPath(app.plugins.plugins["task-calendar"].pluginSettings.get().tasksFile);
 		await app.vault.process(file, (text) => text.split("\\n").map((line) => (/^- \\[.\\] /.test(line) && line.includes(${JSON.stringify(described)}) ? line + "\\n\\t- E2E description: what to bring, and [[Дружба]]" : line)).join("\\n"));
