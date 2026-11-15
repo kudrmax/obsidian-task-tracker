@@ -302,6 +302,12 @@ export class TaskRules {
 		return (doc, today) => ops.createSubtask(doc, this.entryOf(doc, parent), draft, today);
 	}
 
+	/** First step: `text` the task's first subtask, the task folded; null for a blank text. */
+	firstStep(key: TaskKey, text: string): Operation | null {
+		if (this.isBlank(text)) return null;
+		return (doc) => ops.firstStep(doc, this.entryOf(doc, key), text);
+	}
+
 	/** The task sheet's edit, and where the task stands after it (null before it ran); null for a blank title, a priority alone too. */
 	edit(key: TaskKey, draft: TaskDraft): { readonly operation: Operation; place(): TaskKey | null } | null {
 		if (this.isBlank(draft.text)) return null;

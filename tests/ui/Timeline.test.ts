@@ -188,6 +188,13 @@ describe("a field on the timeline", () => {
 		expect(view.itemsEl.contains(field)).toBe(false);
 	});
 
+	it("draws a block's line as the core gives it: empty while First step's field is open on it", () => {
+		const tasks = [{ ...task(0, 900, 960), block: { text: "", title: "", step: null } }, task(1, 1020, null)];
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, tasks);
+		const lines = [...view.itemsEl.querySelectorAll<HTMLElement>(".tc-block:not(.tc-quick-row) .tc-card-title")].map((line) => line.textContent);
+		expect(lines).toEqual(["", "T1"]);
+	});
+
 	it("turns a renamed task's card into the field: the card hides, the field takes its place and size", () => {
 		const tasks = [task(0, 900, 960), task(1, 1020, null)];
 		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, tasks);

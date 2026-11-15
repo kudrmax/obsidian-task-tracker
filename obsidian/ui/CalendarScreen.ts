@@ -38,6 +38,8 @@ import type { EditorOwner } from "./markdown/EmbeddedEditor";
 import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
 import { MarkdownTitleField } from "./quick/MarkdownTitleField";
 import { QuickEntryController } from "./quick/QuickEntryController";
+import { FirstStepTyping } from "./quick/FirstStepField";
+import type { TitleFieldFactory } from "./quick/TitleField";
 import { ObsidianChrome } from "./quick/ObsidianChrome";
 import { FullScreen } from "./full/FullScreen";
 import { MoreMenu } from "./menu/MoreMenu";
@@ -393,7 +395,7 @@ export class CalendarScreen extends Component {
 			tasks: this.deps.tasks,
 			arbiter: this.arbiter,
 			drag: this.drag,
-			titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts, this.where.keys),
+			titleField: this.titleField,
 			list: (column) => (column === "projects" ? (this.layout?.projects() ?? null) : this.listOf(column)),
 			sectioned: (column) => column !== "projects" && this.sectionsOf(column) !== null,
 			timeline: () => this.timeline,
@@ -1172,6 +1174,19 @@ export class CalendarScreen extends Component {
 		field.scrollIntoView({ block: "nearest" });
 	}
 
+	/** The field a task's title is typed in, wherever a title is typed on the screen. */
+	private readonly titleField: TitleFieldFactory = (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts, this.where.keys);
+
+	/** First step typed on the card its menu was opened from, the task drawn folded meanwhile (`FirstStepTyping`). */
+	private readonly firstStep = new FirstStepTyping({
+		arbiter: this.arbiter,
+		titleField: this.titleField,
+		fold: (key) => this.data.typeFirstStep(key),
+		draw: () => this.render(),
+		write: (key, text) => this.act(() => this.deps.tasks.firstStep(key, text)),
+		onError: (error) => this.reportFailure(error),
+	});
+
 	/** A section's menu, with what the group may be given; none for a group that may be given nothing (No section). */
 	private showGroupMenu(head: HTMLElement, list: GroupedList, group: ListGroup): void {
 		const menu = group.menu;
@@ -1322,7 +1337,7 @@ export class CalendarScreen extends Component {
 				tasks: this.deps.tasks,
 				undo: this.deps.undo,
 				surface: this.markdown,
-				titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts, this.where.keys),
+				titleField: this.titleField,
 				day: () => this.today(),
 				act: (change) => this.act(change),
 				onUndo: () => void this.undoStep("undo"),
@@ -1393,6 +1408,7 @@ export class CalendarScreen extends Component {
 				openDescription: (editing) => this.openFull(current, editing),
 				openFull: full?.holds(current) ? undefined : () => this.openFull(current, false),
 				addSubtask: (menu) => (full ? full.addSubtask(current) : this.quick?.addSubtask(current, menu)),
+				firstStep: () => this.firstStep.open(current, source),
 				remove: () => this.act(() => tasks.remove(current.key)),
 				openInObsidian: () => void this.openInObsidian(current),
 				openLink: (link) => this.openLink(link),

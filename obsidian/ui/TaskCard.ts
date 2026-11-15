@@ -69,14 +69,16 @@ export function renderDue(card: HTMLElement, date: LocalDate | null, repeats: bo
 
 /**
  * The card's title as the core draws it (`TaskItem.card`): a folded task with an open subtask on two lines, the task's own
- * title small over its next step's title; any other card its own title on one line. On the Projects screen By stage the
+ * title small over its next step's title; First step's card (`firstStepCard`) the task's title small over an empty step
+ * line, which the field takes; any other card its own title on one line. On the Projects screen By stage the
  * small line is the subproject, after the folder mark. A rename waiting to be written shows on whichever line it renames.
  */
 function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: string | null): void {
 	const face = task.card;
 	const step = face.step;
-	card.classList.toggle("is-two-line", step !== null || project !== null);
-	if (!step && project === null) {
+	const twoLines = face.over !== null || project !== null;
+	card.classList.toggle("is-two-line", twoLines);
+	if (!twoLines) {
 		fillTitle(el(card, "div", "tc-card-title"), shown.text);
 		return;
 	}
@@ -84,7 +86,7 @@ function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: s
 	const over = el(lines, "div", "tc-card-over");
 	if (project !== null) over.appendChild(icon("project"));
 	el(over, "span", "tc-card-over-text", project ?? (shown === task ? face.over ?? "" : shown.title));
-	fillTitle(el(lines, "div", "tc-card-title"), step ? RenamedTexts.shown(step).text : shown.text);
+	fillTitle(el(lines, "div", "tc-card-title"), step ? RenamedTexts.shown(step).text : face.over !== null ? face.text : shown.text);
 }
 
 /**

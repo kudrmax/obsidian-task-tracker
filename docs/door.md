@@ -153,6 +153,17 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   unless the file changed meanwhile. Don't keep the `ids` an answer gives over `tasks` before the drop is written.
   Example: `tasks.dropPreview([{ key, from: "soon" }], { kind: "list", column: "day", before: null }, "2026-11-09")`.
 - `tasks.toggleCollapsed(key)`: a tap on a card's subtask counter (offered while `item.can.fold`).
+- `tasks.firstStep(key, text)`: the menu's First step row (`firstStep` in `TaskMenuModel.edits`, offered while
+  `item.can.firstStep`, from a list column or the timeline). `text` becomes the task's first subtask, before every one
+  it has, and the task folds (`📁`); a blank text writes nothing (`tasks` comes back unchanged); one undo step. While
+  the field is open, draw `item.firstStepCard`: a folded card, `over` the task's own title, its step line the field.
+  Example: `tasks.firstStep(item.key, "Find the forms")`.
+- `tasks.firstStepScreen(view, key)` and `tasks.firstStepProjects(view, key)`: the screen as drawn from the First step
+  tap until the field closes. Hand in the `ScreenView` (or `ProjectsView`) being drawn and the task's key; the answer
+  is that view with the task, wherever it stands and at any depth, folded (`collapsed` true, so its subtask rows leave
+  the lists and its card shows the fold's edge even with no subtask yet), its `card` its `firstStepCard`, its `block`
+  empty with no step; the Projects list without its subtasks' rows. Reads no file; the view itself when the task is
+  not on it. Draw the read view again once the field closes. Example: `tasks.firstStepScreen(screen, item.key)`.
 - `tasks.snap(minute, hourPx, tolerancePx)`: the minute a drag, a drop or a stretch on the timeline stands at, the
   timeline drawn `hourPx` points an hour: the finest of 5, 15, 30 and 60 minutes a finger moves at least `tolerancePx`
   for, the host's own touch tolerance in the same points (the plugin passes 9). A resize is offered while `item.can.resize`.

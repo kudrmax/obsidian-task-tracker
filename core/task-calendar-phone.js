@@ -2096,6 +2096,12 @@
     const task = newTask(text, { dueDate, ...marks });
     return intoUnfolded(doc, parent, (d, same) => d.insertUnder(same(parent), task));
   }
+  function firstStep(doc, entry, typedText) {
+    const { text, ...marks } = typed(doc, typedText, null, []);
+    const inserted2 = doc.insertUnder(entry, newTask(text, marks), entry.subtasks[0] ?? null);
+    const task = sameEntryIn(inserted2, entry);
+    return patch(inserted2, task, { collapsed: true });
+  }
   function placeOnTimeline(doc, entry, slot, today, boundary = DayBoundary.MIDNIGHT) {
     const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
     if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return patch(doc, entry, { slot: clamped });
@@ -2727,6 +2733,82 @@ ${e.calendar}`;
     if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return a === b;
     const keys = Object.keys(a);
     return keys.length === Object.keys(b).length && keys.every((k) => Object.prototype.hasOwnProperty.call(b, k) && sameJson(a[k], b[k]));
+  }
+
+  // core/application/taskKeys.ts
+  function keyOf(entry) {
+    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
+  }
+  function samePlace2(a, b) {
+    return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
+  }
+  function sameLine(a, b) {
+    return a.raw === b.raw;
+  }
+  function sameTaskTree(a, b) {
+    return a.section === b.section && a.index === b.index;
+  }
+  function keyId(key) {
+    return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
+  }
+  function isUnder(a, b) {
+    return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
+  }
+
+  // core/application/firstStepTyping.ts
+  var FIELD_BLOCK = { text: "", title: "", step: null };
+  function typing(item) {
+    return { ...item, collapsed: true, card: item.firstStepCard, block: FIELD_BLOCK };
+  }
+  function typedIn(items, id) {
+    let changed2 = false;
+    const next = items.map((item) => {
+      const drawn = typedItem(item, id);
+      if (drawn !== item) changed2 = true;
+      return drawn;
+    });
+    return changed2 ? next : items;
+  }
+  function typedItem(item, id) {
+    if (keyId(item.key) === id) return typing(item);
+    const subtasks = typedIn(item.subtasks, id);
+    const allSubtasks = typedIn(item.allSubtasks, id);
+    return subtasks === item.subtasks && allSubtasks === item.allSubtasks ? item : { ...item, subtasks, allSubtasks };
+  }
+  function firstStepScreen(view, key) {
+    const id = keyId(key);
+    const list = typedIn(view.day.list, id);
+    const slotted2 = typedIn(view.day.slotted, id);
+    const soon = typedIn(view.soon, id);
+    const inbox = typedIn(view.inbox, id);
+    const backlog = typedIn(view.backlog, id);
+    const same = list === view.day.list && slotted2 === view.day.slotted && soon === view.soon && inbox === view.inbox && backlog === view.backlog;
+    return same ? view : { ...view, day: { ...view.day, list, slotted: slotted2 }, soon, inbox, backlog };
+  }
+  function typedRows(rows, id) {
+    const out = [];
+    let under = null;
+    for (const row of rows) {
+      if (under !== null && row.level > under) continue;
+      under = null;
+      if (keyId(row.item.key) !== id) {
+        out.push(row);
+        continue;
+      }
+      under = row.level;
+      out.push({ ...row, item: typing(row.item), card: row.card && { ...row.card, item: typing(row.card.item) } });
+    }
+    return out.length === rows.length && out.every((row, i) => row === rows[i]) ? rows : out;
+  }
+  function typedSection(section, id) {
+    const rows = typedRows(section.rows, id);
+    if (rows === section.rows) return section;
+    return { ...section, rows, cards: section.cards.map((card) => keyId(card.item.key) === id ? { ...card, item: typing(card.item) } : card) };
+  }
+  function firstStepProjects(view, key) {
+    const id = keyId(key);
+    const sections = view.sections.map((section) => typedSection(section, id));
+    return sections.every((section, i) => section === view.sections[i]) ? view : { ...view, sections };
   }
 
   // core/domain/RepeatDraft.ts
@@ -4177,26 +4259,6 @@ ${key.title}`.toLowerCase();
     return Math.min(end, list.wanted);
   }
 
-  // core/application/taskKeys.ts
-  function keyOf(entry) {
-    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
-  }
-  function samePlace2(a, b) {
-    return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
-  }
-  function sameLine(a, b) {
-    return a.raw === b.raw;
-  }
-  function sameTaskTree(a, b) {
-    return a.section === b.section && a.index === b.index;
-  }
-  function keyId(key) {
-    return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
-  }
-  function isUnder(a, b) {
-    return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
-  }
-
   // core/application/newTaskPlaces.ts
   function sameKey(a, b) {
     return a === null || b === null ? a === b : keyId(a) === keyId(b);
@@ -4514,6 +4576,7 @@ ${key.title}`.toLowerCase();
   }
   var A_LIST_CARD = { kind: "task", from: "day" };
   var COLUMNS = /* @__PURE__ */ new Set(["day", "soon", "inbox", "backlog"]);
+  var FIRST_STEP_FROM = /* @__PURE__ */ new Set([...COLUMNS, "timeline"]);
   function canPick(from) {
     return COLUMNS.has(from);
   }
@@ -4553,7 +4616,8 @@ ${key.title}`.toLowerCase();
       ["repeat", item.repeatable],
       ["section", sections !== null],
       ["project", true],
-      ["subtask", of.from !== "stack"]
+      ["subtask", of.from !== "stack"],
+      ["firstStep", item.can.firstStep && FIRST_STEP_FROM.has(of.from)]
     ];
     return edits.flatMap(([id, offered2]) => offered2 ? [id] : []);
   }
@@ -4687,7 +4751,7 @@ ${key.title}`.toLowerCase();
       durationMin: entry.task.slot && entry.task.slot.end !== null ? entry.task.slot.end - entry.task.slot.start : null,
       reminder: entry.task.reminder,
       repeat: entry.task.repeat?.rule ?? null,
-      open: isOpen(entry.task.status),
+      open,
       repeatable: repeatable(entry),
       priority,
       labels,
@@ -4709,10 +4773,12 @@ ${key.title}`.toLowerCase();
         addDescription: description === null,
         fold: hasOpenSubtask(entry),
         resize: entry.task.slot !== null,
-        setProject: entry.path.length === 0
+        setProject: entry.path.length === 0,
+        firstStep: open
       },
       card: cardOf2(own, step),
       block: blockOf(own, step),
+      firstStepCard: { text: "", title: "", over: own.title, step: null },
       drawnOn: drawn?.id === entry.id ? { key: keyOf(drawn.on), slot: drawn.on.task.slot } : null,
       subtasks: allSubtasks.filter((sub) => sub.open),
       allSubtasks,
@@ -7021,6 +7087,11 @@ ${key.title}`.toLowerCase();
       if (this.isBlank(draft.text)) return null;
       return (doc, today) => createSubtask(doc, this.entryOf(doc, parent), draft, today);
     }
+    /** First step: `text` the task's first subtask, the task folded; null for a blank text. */
+    firstStep(key, text) {
+      if (this.isBlank(text)) return null;
+      return (doc) => firstStep(doc, this.entryOf(doc, key), text);
+    }
     /** The task sheet's edit, and where the task stands after it (null before it ran); null for a blank title, a priority alone too. */
     edit(key, draft) {
       if (this.isBlank(draft.text)) return null;
@@ -7504,6 +7575,9 @@ ${key.title}`.toLowerCase();
     }
     createSubtask(parent, draft) {
       return nothing(this.rules.createSubtask(parent, draft));
+    }
+    firstStep(key, text) {
+      return nothing(this.rules.firstStep(key, text));
     }
     edit(key, draft) {
       const edit = this.rules.edit(key, draft);
@@ -8244,6 +8318,9 @@ ${key.title}`.toLowerCase();
     createWithId: (c, [text, priority, place, repeat, labels, project, filter]) => c.run(c.writes.createWithId(text, priority ?? null, place, repeat ?? null, labels ?? [], project, filter)),
     create: (c, [draft, slot]) => c.run(c.writes.create(draft, slot ?? void 0)),
     createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent, draft)),
+    firstStep: (c, [key, text]) => c.run(c.writes.firstStep(key, text)),
+    firstStepScreen: (_c, [view, key]) => firstStepScreen(view, key),
+    firstStepProjects: (_c, [view, key]) => firstStepProjects(view, key),
     edit: (c, [key, draft]) => c.run(c.writes.edit(key, draft)),
     placementOf: (c, [item]) => c.reads.placementOf(item),
     dayColumn: (c, [date]) => c.reads.dayColumn(date),

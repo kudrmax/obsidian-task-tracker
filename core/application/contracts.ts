@@ -279,12 +279,20 @@ export interface TaskItem {
 		readonly resize: boolean;
 		/** Put into a project, or taken out: a task; a subtask's is its parent's (its menu shows it, disabled; a drop on the tree takes none). */
 		readonly setProject: boolean;
+		/** Given a first step (`TaskService.firstStep`): an open task or subtask, at any depth. */
+		readonly firstStep: boolean;
 	};
 
 	/** How a list's card draws it and what the card's taps open: a folded task with an open subtask shows its next step. */
 	readonly card: TaskCard;
 	/** How the timeline's block draws it and whose menu a tap opens: a folded task's next step. */
 	readonly block: TaskBlock;
+	/**
+	 * The card First step's field is drawn as, from the menu's tap until the field closes: a folded card whose `over` is
+	 * the task's own title, plain, and whose step line (`text`, `title`, empty) is the field. `step` is null: the field
+	 * writes `TaskService.firstStep(key, text)`, not a status.
+	 */
+	readonly firstStepCard: TaskCard;
 	/**
 	 * A folded task's next step (`card.step`, `block.step`), drawn on that task's card and block: the folded task's key and
 	 * its slot, where a rename of the step stands when the step has no card of its own. Null for any other task.
@@ -617,7 +625,7 @@ export interface MenuReminder {
 }
 
 /** A row of the edit group. Project is in every menu, one task's and the bulk menu's, right after Section or where it would stand. */
-export type MenuEditId = "rename" | "reminder" | "description" | "repeat" | "section" | "project" | "subtask";
+export type MenuEditId = "rename" | "reminder" | "description" | "repeat" | "section" | "project" | "subtask" | "firstStep";
 /** A task menu's groups: the statuses, the priorities, the labels, the moves, the edit rows, Open full screen and Open in Obsidian, Delete. */
 export type MenuGroupId = "statuses" | "levels" | "labels" | "moves" | "edits" | "opens" | "remove";
 
@@ -701,7 +709,9 @@ export interface TaskMenuModel {
 	readonly project: MenuProject;
 	/**
 	 * One task's: Rename; Reminder (a task on a time); Add description (one without any); Repeat (one that may repeat);
-	 * Section (with `sections`); Project, always; Add subtask, except for a subtask of a timeline card's stack. The bulk
+	 * Section (with `sections`); Project, always; Add subtask, except for a subtask of a timeline card's stack; First step
+	 * (`firstStep`, right after Add subtask) on an open task (`can.firstStep`) opened from a list column or the timeline,
+	 * a folded card's for the whole task, never the step it shows (none from a stack, Done or the full screen). The bulk
 	 * menu's: Section (with `sections`), then Project. The result rows (`result.rows`) stand right after Project.
 	 */
 	readonly edits: readonly MenuEditId[];
@@ -1317,6 +1327,23 @@ export interface TaskService {
 	 * own; `now` gives it today's, `date` that date, `inbox` and `soon` none. It stays under the parent whatever the placement.
 	 */
 	createSubtask(parent: TaskKey, draft: TaskDraft): Promise<void>;
+	/**
+	 * First step (the menu's `firstStep` row, and later an AI that names the step): `text`, typed as the quick entry types
+	 * a task (one line, trimmed, a priority prefix read), becomes the task's first subtask, before every one it has, and
+	 * the task folds (`📁`), so its card shows that step. A task or a subtask at any depth, folded or not. A blank text
+	 * writes nothing. One write, one undo step; a stale key rejects with `StaleTaskError`.
+	 */
+	firstStep(key: TaskKey, text: string): Promise<void>;
+	/**
+	 * The screen as drawn while First step's field is open on the task `key` (Max, 11-15: the task folds at the tap, not at
+	 * Enter): the same `view` with that task, in the day's list, the timeline, Soon, Inbox or Backlog, at any depth,
+	 * folded (`collapsed`, so its subtasks leave the lists and its card shows the fold's edge even with no subtask yet),
+	 * its `card` its `firstStepCard` and its `block` the field's (empty, no step). Reads no file: the UI passes the view
+	 * it draws and the key, and draws `view` again once the field closes. `view` itself when the task is not on it.
+	 */
+	firstStepScreen(view: ScreenView, key: TaskKey): ScreenView;
+	/** The Projects screen's list the same way: the task's row (and card) folded, the rows of its subtasks left out; `view` itself when it is not on it. */
+	firstStepProjects(view: ProjectsView, key: TaskKey): ProjectsView;
 	/**
 	 * The task sheet on an existing task: new text and placement in one write. The slot stays. A placement equal to the
 	 * task's current one leaves its position in the file alone; a different one moves it as `create` would place it.

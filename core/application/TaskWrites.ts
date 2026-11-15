@@ -122,6 +122,10 @@ export class TaskWrites {
 		return nothing(this.rules.createSubtask(parent, draft));
 	}
 
+	firstStep(key: TaskKey, text: string): Write<void> {
+		return nothing(this.rules.firstStep(key, text));
+	}
+
 	edit(key: TaskKey, draft: TaskDraft): Write<TaskItem | null> {
 		const edit = this.rules.edit(key, draft);
 		return {

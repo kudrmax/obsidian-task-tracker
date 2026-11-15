@@ -75,6 +75,7 @@ export function editRows(item: TaskItem, model: TaskMenuModel): readonly EditRow
 		section: () => ({ id: "section", label: "Section", value: model.sections?.choice.current ?? "", icon: "section" }),
 		project: () => ({ id: "project", label: "Project", value: model.project.value, icon: "project", disabled: model.project.disabled }),
 		subtask: () => ({ id: "subtask", label: "Add subtask", value: "", icon: "subtask" }),
+		firstStep: () => ({ id: "firstStep", label: "First step", value: "", icon: "firstStep" }),
 	};
 	return model.edits.map((id) => rows[id]());
 }
@@ -129,6 +130,8 @@ export interface MenuActions {
 	openFull?(): void;
 	/** A timeline card's menu stays open for it, its stack may take the field (`openStack`); any other has closed. */
 	addSubtask(menu: TaskMenu): void;
+	/** The menu has closed in this same tap: the tapped card becomes the folded card whose step line is the field (`TaskItem.firstStepCard`). */
+	firstStep(): void;
 	remove(): Promise<void>;
 	/** The tasks file in Obsidian's editor, the cursor on the task's line. */
 	openInObsidian(): void;
@@ -355,6 +358,7 @@ export class TaskMenu extends LiftedMenu {
 				section: () => this.showSections(),
 				project: () => this.showProjects(),
 				subtask: this.stacks ? () => actions.addSubtask(this) : this.pickNow(() => actions.addSubtask(this)),
+				firstStep: this.pickNow(() => actions.firstStep()),
 			};
 			const draw: Record<MenuGroupId, () => void> = {
 				statuses: () => {

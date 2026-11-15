@@ -249,6 +249,17 @@ export function createSubtask(doc: TaskDocument, parent: TaskEntry, draft: TaskD
 	return intoUnfolded(doc, parent, (d, same) => d.insertUnder(same(parent), task));
 }
 
+/**
+ * The task's first step: `text`, typed as a new task is, becomes its first subtask, before every one it has, done ones
+ * too, and the task folds so its card shows that step. A subtask's projects are its parent's: the step takes none.
+ */
+export function firstStep(doc: TaskDocument, entry: TaskEntry, typedText: string): TaskDocument {
+	const { text, ...marks } = typed(doc, typedText, null, []);
+	const inserted = doc.insertUnder(entry, newTask(text, marks), entry.subtasks[0] ?? null);
+	const task = sameEntryIn(inserted, entry);
+	return patch(inserted, task, { collapsed: true });
+}
+
 function placeOnTimeline(doc: TaskDocument, entry: TaskEntry, slot: Slot, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
 	const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
 	if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return patch(doc, entry, { slot: clamped });

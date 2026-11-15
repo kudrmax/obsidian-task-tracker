@@ -179,19 +179,19 @@ describe("the edit group", () => {
 	const edits = (task: TaskItem, of: Parameters<typeof taskMenu>[5] = { kind: "task", from: "day" }, sections: SectionOffer | null = null) => taskMenu([task], T, [], [], sections, of).edits;
 
 	it("offers Rename, Add description, Repeat, Project and Add subtask to a task without a time or a description", () => {
-		expect(edits(item())).toEqual(["rename", "description", "repeat", "project", "subtask"]);
+		expect(edits(item())).toEqual(["rename", "description", "repeat", "project", "subtask", "firstStep"]);
 	});
 
 	it("offers the reminder of a task on a time, after Rename, by what the task may have", () => {
-		expect(edits(item({ description: "- note", can: { ...item().can, remind: true, addDescription: false } }))).toEqual(["rename", "reminder", "repeat", "project", "subtask"]);
+		expect(edits(item({ description: "- note", can: { ...item().can, remind: true, addDescription: false } }))).toEqual(["rename", "reminder", "repeat", "project", "subtask", "firstStep"]);
 	});
 
 	it("offers no Add description to a task that has one, no Repeat to one that may not repeat", () => {
-		expect(edits(item({ can: { ...item().can, addDescription: false }, repeatable: false }))).toEqual(["rename", "project", "subtask"]);
+		expect(edits(item({ can: { ...item().can, addDescription: false }, repeatable: false }))).toEqual(["rename", "project", "subtask", "firstStep"]);
 	});
 
 	it("offers Section, then Project, before Add subtask where the sections are offered", () => {
-		expect(edits(item({ description: "- note", can: { ...item().can, addDescription: false } }), { kind: "task", from: "day" }, offer)).toEqual(["rename", "repeat", "section", "project", "subtask"]);
+		expect(edits(item({ description: "- note", can: { ...item().can, addDescription: false } }), { kind: "task", from: "day" }, offer)).toEqual(["rename", "repeat", "section", "project", "subtask", "firstStep"]);
 	});
 
 	it("offers no Add subtask to a subtask opened from a timeline card's stack", () => {
