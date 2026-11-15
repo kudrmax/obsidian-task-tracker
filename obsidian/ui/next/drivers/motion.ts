@@ -49,16 +49,76 @@ export class Motion {
 	before(moving = true): void {
 		this.cancel();
 		const boxes = new Map<string, DOMRect>();
+		const cards = new Map<string, HTMLElement>();
+		this.left = [];
 		/** A drawing that moves nothing (a layer opened, another context) reads no box: nothing slides from where it stood. */
 		if (!moving) {
 			this.boxes = boxes;
+			this.cards = cards;
 			return;
 		}
-		for (const el of this.root.querySelectorAll("[data-n-key]")) {
+		for (const el of this.root.querySelectorAll<HTMLElement>("[data-n-key]")) {
 			const key = keyOf(el);
-			if (key !== null && !key.includes("/")) boxes.set(key, el.getBoundingClientRect());
+			if (key === null || key.includes("/")) continue;
+			boxes.set(key, el.getBoundingClientRect());
+			if (el.dataset.row !== undefined) cards.set(key, el);
 		}
 		this.boxes = boxes;
+		this.cards = cards;
+		const frame = this.root.firstElementChild;
+		this.frameHeight = frame ? frame.getBoundingClientRect().height : 0;
+	}
+
+	/** The frame's height before the drawing: held while a card leaves, as the old block's frame held until its row was gone. */
+	private frameHeight = 0;
+	/** The timer that lets the frame's height go once a leave has folded. */
+	private release = 0;
+
+	/** The frame keeps the height it had before the drawing over a card's leave (fade and fold), then fits its rows again. */
+	holdWhileLeaving(frame: HTMLElement): void {
+		const ms = tokenMs(this.root, "--tc-duration-collapse");
+		if (ms <= 0 || this.frameHeight <= 0 || frame.style.getPropertyValue("height") !== "") return;
+		frame.style.setProperty("height", `${this.frameHeight}px`);
+		const view = frame.ownerDocument.defaultView;
+		if (!view) return;
+		const held = `${this.frameHeight}px`;
+		view.clearTimeout(this.release);
+		this.release = view.setTimeout(() => {
+			this.release = 0;
+			if (frame.style.getPropertyValue("height") === held) frame.style.removeProperty("height");
+		}, 2 * ms);
+	}
+
+	/** A list's cards before the drawing, by key: one the drawing took away leaves as the old screen's did (`leave`). */
+	private cards = new Map<string, HTMLElement>();
+	/** The cards the last drawing took away, with where each stood: the host keeps each a moment for its leave. */
+	private left: { readonly node: HTMLElement; readonly box: DOMRect }[] = [];
+
+	/** The cards the last drawing took away (a write, Sync, an undo), each with the box it stood in. */
+	leftCards(): readonly { readonly node: HTMLElement; readonly box: DOMRect }[] {
+		return this.left;
+	}
+
+	/**
+	 * A card the drawing took away leaves as the old screen's `leave`: it fades where it stood over one collapse, then its
+	 * room folds over another, the rows under it moving up as it folds (they wait the fade: `after`). `node` is the card
+	 * as it was drawn, kept a moment over `frame` (placed by the host); `done` once it has faded.
+	 */
+	fadeAway(frame: HTMLElement, node: HTMLElement, box: DOMRect, done: () => void): void {
+		const ms = tokenMs(this.root, "--tc-duration-collapse");
+		const at = frame.getBoundingClientRect();
+		node.style.position = "absolute";
+		node.style.margin = "0";
+		node.style.left = `${box.left - at.left - frame.clientLeft}px`;
+		node.style.top = `${box.top - at.top - frame.clientTop}px`;
+		node.style.width = `${box.width}px`;
+		node.style.height = `${box.height}px`;
+		node.style.pointerEvents = "none";
+		if (ms <= 0) return done();
+		const easing = this.root.ownerDocument.defaultView?.getComputedStyle(this.root).getPropertyValue("--tc-ease-out").trim() || "ease-out";
+		const fade = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing, fill: "forwards" });
+		this.running.push(fade);
+		fade.finished.then(done, done);
 	}
 
 	/**
@@ -71,6 +131,10 @@ export class Motion {
 		const ms = tokenMs(this.root, "--tc-duration-collapse");
 		if (ms <= 0) return;
 		const easing = this.root.ownerDocument.defaultView?.getComputedStyle(this.root).getPropertyValue("--tc-ease-out").trim() || "ease-out";
+		const heirsOf = new Set(heirs.values());
+		this.left = [...this.cards].filter(([key, node]) => !node.isConnected && !heirsOf.has(key)).map(([key, node]) => ({ node, box: this.boxes.get(key)! }));
+		/** Rows under a card that leaves move up as its room folds, after its fade (the old `leave`: fade, then fold). */
+		const delay = this.left.length > 0 ? ms : 0;
 		for (const el of this.root.querySelectorAll<HTMLElement>("[data-n-key]")) {
 			const key = keyOf(el);
 			if (key === null || key.includes("/")) continue;
@@ -85,7 +149,7 @@ export class Motion {
 			const dx = was.left - now.left;
 			const dy = was.top - now.top;
 			if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
-			this.running.push(el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: ms, easing }));
+			this.running.push(el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: ms, delay, easing, fill: "backwards" }));
 		}
 	}
 
@@ -476,6 +540,8 @@ export class Motion {
 	}
 
 	dispose(): void {
+		if (this.release) this.root.ownerDocument.defaultView?.clearTimeout(this.release);
+		this.release = 0;
 		this.cancel();
 		this.set.clear();
 	}

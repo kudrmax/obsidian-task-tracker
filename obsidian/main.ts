@@ -22,6 +22,7 @@ import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarVie
 import { ShownSettingsStore, ViewSettingsStore } from "./ui/viewSettings";
 import { composeRuntime, newScreensOf } from "./composeRuntime";
 import { failureText, NOTICE_WORDS } from "./ui/failureText";
+import { StatusBarRoom } from "./ui/StatusBarRoom";
 import { NoteBlocks, type NoteView, obsidianPlaces } from "./ui/next/host/block/NoteBlocks";
 import { obsidianEditors, obsidianTitleField } from "./ui/next/drivers/islands";
 
@@ -125,6 +126,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		const runtime = composeRuntime(this.app, this.pluginSettings, services, clock, Platform.isIosApp);
 		const blocks = new NoteBlocks(obsidianPlaces(this.app, (view): view is NoteView => view instanceof MarkdownView), {
 			openSession: () => runtime.openHost(),
+			chromeRoom: (near) => StatusBarRoom.hold(near.ownerDocument ?? document),
 			app: this.app,
 			failure: (error) => (error.code === "undoConflict" ? (error.message === "redo" ? "Can’t redo: the tasks file changed" : "Can’t undo: the tasks file changed") : error.code === "staleTask" ? NOTICE_WORDS.stale : failureText(new Error(error.message))),
 			notice: (text) => new Notice(text),

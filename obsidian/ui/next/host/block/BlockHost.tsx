@@ -53,6 +53,11 @@ export interface BlockDeps {
 	readonly titleField: (keys: (onSwitch: () => void, lines: readonly Hotkey[]) => FieldKeys) => FieldFactory;
 	/** Obsidian's own editor for the full card's description; none (a test): no editor stands there. */
 	readonly editors?: EditorFactory;
+	/**
+	 * The room the window's chrome keeps under the block (the desktop's status bar while it shows), held while the block
+	 * stands, as the old block held it (`StatusBarRoom`): its frame's room under it is the same. None in a test.
+	 */
+	readonly chromeRoom?: (near: Node) => () => void;
 }
 
 // The quick entry's calls and jobs ----------------------------------------------------------------------------------
@@ -182,6 +187,7 @@ export class BlockHost {
 
 	/** The block is on the page: drawn at once, its presses and keys its own. */
 	mount(): void {
+		this.letChromeGo = this.deps.chromeRoom?.(this.node) ?? null;
 		const acted = (act: Act) => this.dispatch({ kind: "acted", act });
 		this.input.acts(this.node, acted, PRESSED);
 		this.input.acts(this.overlay.node, acted);
@@ -226,6 +232,12 @@ export class BlockHost {
 		this.motion.after(moved ? model.motion.cause : "none", new Map([...rowVars(drawnLists(model)), ...carryVars(model), ...fullRowVars(model), ...rootVars(model)]), model.entry?.bound);
 		const frame = this.node.firstElementChild;
 		if (frame instanceof HTMLElement) Motion.holdHeight(frame, holdsHeight(model));
+		if (frame instanceof HTMLElement && this.motion.leftCards().length > 0) this.motion.holdWhileLeaving(frame);
+		if (frame instanceof HTMLElement)
+			for (const { node, box } of this.motion.leftCards()) {
+				const drop = MountNode.keep(frame, node);
+				this.motion.fadeAway(frame, node, box, drop);
+			}
 		this.motion.layerVars(this.overlay.node, menuVars(model));
 		const menu = openMenu(model);
 		this.motion.menu(this.overlay.node, this.node, menu?.place ?? null, (place) => this.dispatch({ kind: "menu", msg: { kind: "placed", place } }));
@@ -426,9 +438,14 @@ export class BlockHost {
 	}
 
 	/** The block goes (its note closed, no project's any more, the plugin unloading): everything it started ends. */
+	/** Lets go of the chrome's room the block held. */
+	private letChromeGo: (() => void) | null = null;
+
 	dispose(): void {
 		if (this.disposed) return;
 		this.disposed = true;
+		this.letChromeGo?.();
+		this.letChromeGo = null;
 		this.endFinger();
 		this.deps.session.teardown();
 		this.motion.dispose();

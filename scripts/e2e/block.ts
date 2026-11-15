@@ -94,6 +94,13 @@ export async function block(d: Driver, newBlock: boolean): Promise<void> {
 	await showBlock(d);
 	await d.shot("after typing", BLOCK);
 
+	/** A card leaves its list (Done from its menu): it fades where it stood, then its room folds and the rows under it move up (P5, the old `leave`). */
+	await showBlock(d);
+	await d.step("the typed task's menu opens", "interaction", async () => d.tap(await cardAt("E2E typed task")), { moves: [] });
+	await d.step("a card done leaves its list", "interaction", () => d.tapOn(":is(.tc-menu-tile-label, .tc-n-menu-tile-label)", "Done"), { moves: "all", expectMotion: true });
+	await showBlock(d);
+	await d.shot("after a card left", BLOCK);
+
 	const last = titles[titles.length - 1];
 	await showBlock(d);
 	const card = await cardAt(last);

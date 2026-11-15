@@ -74,6 +74,12 @@ export class MountNode {
 	remove(): void {
 		this.node.remove();
 	}
+
+	/** A card the drawing took away, kept over `frame` a moment while it leaves (`Motion.fadeAway`), then taken out. */
+	static keep(frame: HTMLElement, card: HTMLElement): () => void {
+		frame.appendChild(card);
+		return () => card.remove();
+	}
 }
 
 export class Islands {
