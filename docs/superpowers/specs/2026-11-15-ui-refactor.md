@@ -1,6 +1,6 @@
 # Plugin UI refactor: one state, one queue, motion by cause, layout from rules
 
-Issue: kudrmax/obsidian-task-tracker#41 (takes in #40). Branch `ui-refactor`. Revision 2, after three adversarial reviews (architecture; the bug history of decisions 55–87 and 34 fix commits; Obsidian, iPhone and migration risk). Their findings are folded in below; the appendices list what each past defect maps to.
+Issue: kudrmax/obsidian-task-tracker#41 (takes in #40). Branch `ui-refactor`. Revision 3, after four adversarial reviews: architecture; the bug history of decisions 55–87 and 34 fix commits; Obsidian, iPhone and migration risk; a fresh review of revision 2. Their findings are folded in below. The appendices list what each past defect maps to.
 
 ## Why
 
@@ -19,7 +19,9 @@ Issue: kudrmax/obsidian-task-tracker#41 (takes in #40). Branch `ui-refactor`. Re
 
 - Every behaviour in `docs/plugin/` and every approved board, pixel for pixel, desktop and phone, light and dark. Appendix A lists the behaviours most at risk; each gets an e2e case.
 - The guarded behaviours: `rules.swipeLanding` (one swipe, one place) and Inbox and Soon split in half. Their tests are not touched.
-- `core/`, `contracts.ts`, `settings.ts`, the door. The guards `architecture.test.ts`, `uiDecides.test.ts` and `styles.test.ts` only get stricter.
+- `core/`, `settings.ts` and the door stay.
+- `contracts.ts` changes once, additively: every create returns the new task (`CreatedTask`, as `createWithId` does today: `createInList`, `createInSoon`, `createAtTime`, `create`, `createSubtask`). It is the `backend` agent's step 0; the iPhone app is not affected.
+- The guards `architecture.test.ts`, `uiDecides.test.ts` and `styles.test.ts` only get stricter.
 - The motions Max approved stay as they are:
   - a lifted card's subtasks fold under it;
   - a lifted section folds;
@@ -87,18 +89,22 @@ CSS classes only reflect state (in JSX). Only the chrome adapter writes classes 
   - It carries: writes, reads of the view and lists, view changes, carry calls, undo and redo.
   - It replaces: `act`, `changing`, `turning`, `Picks.settled`, `afterEntry`, `drawnLanding`, the `ScreenParts` deferrals, the quick bar's `WriteQueue`, and the 41 direct `deps.tasks.*` calls.
 - **The network lane:** calendar events, latest wins (`AbortController`). It never holds up a write.
-- **Revisions.**
-  - Every write effect returns the file's revision after it (the text's hash), and every read carries the revision it read.
-  - The vault watcher fires on our own writes too (`VaultPathWatcher.ts:21`). A read whose revision is the one a pending write produced belongs to that write, whichever path it came by: it takes the write's cause and clears its patch.
-  - Duplicate reads of one revision are dropped.
-- **Optimistic patches.** A write that would otherwise show the old state until the reread puts a patch over the read lists in the same reduce. Examples: a drop (D84), a rename (dd934060), a typed line becoming a card (D86). The patch is removed when the read of its revision lands.
+- **Sequence, not file hashes.** Every job in the file lane gets a number when it is queued.
+  - **Reads:** a read, including the one the vault watcher queues after our own write (`VaultPathWatcher.ts:21`), carries `after`: the number of the last write that ran before it. A read's result also depends on project notes, the stored view, settings and the day, so reads are never dropped as duplicates. `Reload` only coalesces reads that are still waiting in the queue.
+  - **Causes:** a read with `after` greater than what the screen last drew takes the union of the causes of the writes in between (their lists). It does not matter whether it came from the write's own request or from the watcher.
+  - **Several screens:** after a write, every screen queues its read in the same lane (coalesced). A change made in the leaf also shows in a note block, and the other way round.
+- **Optimistic patches.**
+  - Some writes would otherwise show the old state until the reread: a drop (D84), a rename (dd934060), a typed line becoming a card (D86). Such a write carries a patch, a pure function over the read lists.
+  - The shown lists are `fold(patches of writes not yet read back, last read)`, recomputed for every read. With several writes in flight, every unconfirmed patch is re-applied over each read.
+  - A patch is dropped once a read with `after ≥` its write's number lands.
+  - Tests: three writes in flight with their reads landing; a toggle then undo producing the same text.
 - **Failures.**
   - Every effect ends in `done` or `failed(error)`. `failed` removes the patch, queues a read, and asks the notice effect to show `failureText`; the reducer never shows anything itself.
   - A `StaleTaskError` and undo's `conflict` take this path.
 - **Context commits are atomic.** A change of filter, mode or day commits the view and its lists in one reduce. The new title never shows over the old lists (D55, D56).
-- **Stale results.** A read carries the context it was asked for. A result whose context is neither the state's nor the live peek's is dropped.
+- **Stale results.** A read carries the context it was asked for. A result whose context is neither the state's nor the live peek's is dropped. When a day swipe lands, the new day is read again: the peek is never promoted to the day's lists.
 - **Reads during a gesture.**
-  - Reads the gesture asks for itself apply at once (`carryAt`, the pause over a project, the peek: D65, D85).
+  - Reads the gesture asks for itself apply at once (`carryAt`, the pause over a project, the peek: D65, D85). The carry then takes a `retarget` step: it snapshots the drop targets again after that drawing, before the next pointer frame.
   - Outside reads (Sync, an agent edit) wait in `pending` and apply in the reduce that ends the gesture.
 - **Coalescing:** `Reload`'s coalescing of vault events stays, as part of the read effect.
 - **Timers:** effects never wait on an animation frame. Hidden pages get none, as `ScreenPager`'s `FRAME_SLACK_MS` already handles.
@@ -110,9 +116,11 @@ CSS classes only reflect state (in JSX). Only the chrome adapter writes classes 
 - **Islands Preact never diffs:**
   - `EmbeddedEditor` (CodeMirror), `MarkdownRenderer` output, Obsidian's `Menu` and `Modal`.
   - Each is a component that owns one host node, created once. Re-creating it would drop the iOS keyboard.
-  - The state opens and closes an island; the island's close and its pick come back as actions, in that order, in the file lane (decision 81 without `Picks`).
+  - The state opens and closes an island. The island adapter buffers a pick and dispatches it only after it has dispatched the close, whatever order Obsidian fires them in. Picks are actions; only the writes they cause enter the lane (decision 81 without `Picks`).
+  - CodeMirror's `focus()` takes no options, so the editor island is exempt from the `preventScroll` rule and reveals itself through `ScrollMotion`.
 - **Popouts:** every document, window, timer, frame and observer comes from the node's `ownerDocument.defaultView` (as `BlockHeight.ts:17-37` does). A guard bans bare `document` and `window` in `next/`.
-- **Budget:** a frame under 8 ms with 300 tasks at 4× CPU throttle. The e2e harness measures it on every milestone.
+- **Budget:** a frame under 8 ms of script with 300 tasks at 4× CPU throttle, and no long task over 16 ms. The e2e harness measures it on every milestone.
+- **Render counter:** in tests, a counter of component renders per dispatch. A test drives 120 pointer moves of a carry and a swipe and asserts zero list renders.
 
 ### 5. Motion: few owners, each by cause
 
@@ -139,6 +147,7 @@ When one reduce sees both a context change and a write, context wins.
 `ListMotion` rules:
 - **Measuring:** running slides are cancelled before the snapshot (as `Motion.ts:160-164` does). Positions are taken relative to the scroller, and only for the rows in view, and only when the cause lets the list move.
 - **Focus:** a row holding focus is never moved or reordered; the others are put around it (today's `KeyedRows` rule).
+- **Keys never change.** A row typed into the entry keeps its draft key for life. When the create returns the task's `CreatedTask`, the state records an alias `taskId → rowKey`. `ListMotion` and the focus rule resolve ids through it, so the field never remounts and the iPhone keyboard stays.
 - **Enter:** a row grows in.
 - **Leave:** a row stays until its fold ends and never takes part in measuring.
 - **Cross-list:** a task moved from one list to another leaves one list and enters the other. With a carry, `CarryMotion` flies the card itself.
@@ -162,7 +171,7 @@ When one reduce sees both a context change and a write, context wins.
   - **Tree lift.**
   - **Edge hold:** auto-scroll after a dwell.
 - **Only discrete steps go through the store:** lifted, over another target, dropped, cancelled, a settle's landing, a zoom commit.
-  - The pointer position, the swipe offset, the divider width and the pinch scale go through the **transient channel**. The input adapter writes them once per frame into CSS variables, through the motion owners.
+  - The pointer position, the swipe offset, the divider width and the pinch scale go through the **transient channel**: the input adapter calls the owner's method once per frame (`CarryMotion.follow`, `LayoutMotion.scrub`, `LayoutMotion.divider`, `ZoomMotion.scale`), and only the owner writes.
   - Nothing at pointer rate re-renders Preact.
 - **Drop targets** are snapshotted on lift; nothing measures during the carry.
 - **A layout without a swipe track attaches no wheel or touch listener for swiping.** This prevents the sideways jerk in All columns (A1, D63).
@@ -170,7 +179,7 @@ When one reduce sees both a context change and a write, context wins.
 ### 7. Text entry
 
 - **The machine:** `idle → typing(place, draftKey) → writing(draftKey) → landed(taskId) → idle`.
-- **One row:** the draft key is carried to the new task's id when the write's read lands. The field, the waiting text and the card are one keyed row (D86). Nothing flies in from a corner (5cca0ad9).
+- **One row:** the create returns the new task's id (the contract change above). The row keeps its draft key, aliased to that id (§5). The field, the waiting text and the card are one keyed row (D86). Nothing flies in from a corner (5cca0ad9).
 - **The machine owns:**
   - the room under the field (D57, D69);
   - when the list grows (D59);
@@ -190,13 +199,14 @@ When one reduce sees both a context change and a write, context wins.
 ### 9. Layout
 
 - **The ribbon is laid out per place**, from the core's `RibbonColumns` widths (Inbox and Soon half and half; Today by the divider) as CSS variables.
-  - A swipe interpolates between the two places' layouts, the way `StripTrack` scrubs today (`ScreenTracks.ts:133-167`). The values come from state, not from `getComputedStyle`.
+  - A swipe interpolates between the two places' layouts, the way `StripTrack` scrubs today (`ScreenTracks.ts:133-167`). `LayoutMotion.scrub(fraction)`, called by the swipe machine each frame, interpolates `RibbonColumns(from)` and `RibbonColumns(to)`. The values come from state, not from `getComputedStyle`. A test checks that Inbox and Soon stay half and half at every fraction.
   - The swipe distance is the one the core rule defines, and `swipeLanding` gets that same distance.
 - **Columns and By project:** CSS Grid with widths from `layoutWidths`/`layoutShareAt`.
 - **Rows:**
-  - `stackedLists` needs each list's wanted height and card stops (`core/application/stackedRows.ts:42-54`). Each list's **content box** reports them through `ResizeObserver` → action → core rule → CSS variable.
-  - The observed box is never one whose size is set from the result, so it cannot oscillate; a test proves it.
-  - A measurement taken while a motion runs waits until the motion settles.
+  - `stackedLists` needs each list's wanted height and each card's bottom (`core/application/stackedRows.ts:42-54`).
+  - **Measuring:** every row is observed, and the stops are computed from the reported sizes. The flow is `ResizeObserver` → action → core rule → `LayoutMotion` variable.
+  - **No feedback:** the observed boxes never get their size from the result, so the loop cannot oscillate; a test proves it.
+  - **During motion:** the latest measurement per list is kept while a motion runs and applied on `motionSettled`. An entry's growth ends a motion like any other.
 - **Note block:** its height is measured the same way (`BlockHeight` keeps its rule) and is never refit during a carry.
 - **Small layout logic left in the UI** moves into pure tested functions under `next/layout/`: the docked panel giving way on a narrow view (D79), the menu's height (6ce87a3c), the narrow arrows (D74).
 - **Platform quirks each get an adapter** with a test of its output: Obsidian's toolbar position (80ae0259), Live Preview stretching the block (D80), the keyboard inset, the status-bar room.
@@ -209,8 +219,8 @@ When one reduce sees both a context change and a write, context wins.
   - No `TaskService`, `DayService` or other service call outside the effect runner.
   - No `setTimeout`, `setInterval` or `requestAnimationFrame` outside the effect runner, the input adapter and the motion owners.
 - **Measuring and animation:**
-  - No `getBoundingClientRect`, `offset*`, `client*` or `getComputedStyle` outside the motion owners, the carry snapshot and the `ResizeObserver` adapter.
-  - No `.animate(` and no `.style` writes outside the motion owners and the input adapter.
+  - No `getBoundingClientRect`, `offsetTop/Left/Width/Height`, `clientWidth/Height` or `getComputedStyle` outside the motion owners, the carry snapshot and the `ResizeObserver` adapter. Pointer-event fields (`clientX`, `clientY`) are read only in the input adapter.
+  - No `.animate(` and no `.style` or `setProperty` writes outside the motion owners. Every CSS variable set from state is written by `LayoutMotion` (or `CssVars` under it). JSX `style={…}` is banned outright.
 - **DOM state:**
   - No `classList` or `dataset` writes outside the chrome adapter.
   - No reads of classes to decide anything.
@@ -219,12 +229,12 @@ When one reduce sees both a context change and a write, context wins.
 - **Boundaries:**
   - Components import selectors and `dispatch` only, never `Store` or services.
   - `next/state/` imports no DOM, `obsidian` or services; `architecture.test.ts` guards this.
-- **Size:** a file stays under 300 lines.
-- **Old code is frozen:** from step 0, files outside `next/` may only shrink. A test holds each one's line count at or below its baseline.
+- **Old code is frozen:** from step 0, `obsidian/ui` outside `next/` and the old classes' rules in `styles.css` may only shrink.
+  - The test holds each directory's total lines at or below its baseline, and fails on a new file outside `next/`.
+  - A growth is admitted only by an entry in `tests/uiFreeze.allow.ts` naming the commit and the reason: the steps' adapters, a defect fix on master.
 
 `tests/styles.test.ts` grows:
 - The code scanner reads `.tsx` too, so variables set from TSX count.
-- Bare numbers are banned in inline `style={{…}}`.
 - The transition and box-size rules of §5.
 
 ## Migration
@@ -233,10 +243,10 @@ The new layer grows inside the old screen (strangler). Each step merges into mas
 
 | Step | What moves | Replaces | Notes |
 |---|---|---|---|
-| 0 | `Store` (lanes, revisions, FIFO, selectors, action log), effect runner, input adapter, chrome adapter, Preact mount, guards, e2e harness | — | Old files frozen from here. |
-| 1 | `ScreenState`, reducer, the plugin-wide file lane under the existing drawing; patches and failures | `act`, `changing`, `Picks`, `afterEntry`, the duplicated mode, panel and place fields | The old drawing gets the state through an adapter that compares references, so an unchanged read never redraws (keeps what `DayData`'s diff gives). `turning` and `drawnLanding` stay until step 4. |
-| 2 ★ | `TaskList`, `TaskCard`, section headers with `ListMotion`; the text-entry machine and quick bar | `KeyedRows`, FLIP, `EntryRows`, `is-redrawn`, `WriteQueue` | Old drag reaches cards only through refs `KeyedList` exports. A test asserts no card node is replaced during a press. |
-| 3 | Carry machine, `CarryMotion`, drop targets, edge hold, tree lift, bulk carry | `DragController`, `DragSession`, `ListDrop` hit tests, `GroupDrag`, `LongPress` WeakMap | |
+| 0 | Contract: creates return `CreatedTask` (`backend`). `Store` (lanes, sequence numbers, FIFO, selectors, action log), effect runner, input adapter, chrome adapter, Preact mount, guards, e2e harness | — | Old files frozen from here. |
+| 1 | `ScreenState`, reducer, the plugin-wide file lane under the existing drawing; patches and failures. Every service caller joins the lane: `CalendarScreen`, `QuickEntryController`, menus, full card, `main.ts` commands | `act`, `changing`, `Picks`, `afterEntry`, the duplicated mode, panel and place fields | The old drawing gets the state through an adapter that compares references, so an unchanged read never redraws (keeps what `DayData`'s diff gives). `turning` and `drawnLanding` stay until step 4. A test fails on any `TaskService` call outside the effect runner, old code included, from the end of this step. |
+| 2 | `TaskList`, `TaskCard`, section headers with `ListMotion`; the text-entry machine and quick bar | `KeyedRows`, FLIP, `EntryRows`, `is-redrawn`, `WriteQueue` | Merged, not released: the old drag would toggle classes on nodes Preact owns. `ListMotion` stays off in Rows until step 5, so old `RowsLayout` never measures a folding row. |
+| 3 ★ | Carry machine, `CarryMotion`, drop targets, edge hold, tree lift, bulk carry | `DragController`, `DragSession`, `ListDrop` hit tests, `GroupDrag`, `LongPress` WeakMap | First release with the new lists: cards and carry go out together. |
 | 4 ★ | Ribbon, both swipes, day peek, pager, divider, column switch, wheel, `LayoutMotion` | `RibbonLayout`, `StripTrack`, `Swipe`, `ScreenPager`, `DayPeek`, `turning`, `drawnLanding` | One step: they can't ship apart. |
 | 5 | Columns, Rows, By project, the projects panel and tree, the note block | `ColumnsLayout`, `RowsLayout`, `ByProjectLayout`, `BlockHeight` measuring, `projects/*` | |
 | 6 ★ | Timeline and pinch, menus and islands, full card, search, bulk menu, settings effects | `Timeline`, `TaskMenu`/`MenuPanel` DOM, `FullScreen`, `SearchWindow`, `BulkController` | |
@@ -265,9 +275,12 @@ The new layer grows inside the old screen (strangler). Each step merges into mas
 **Machines (unit):** every transition of every gesture.
 
 **End to end (`scripts/e2e/`, CDP against the test Obsidian on port 9333, a copy of Max's real file):**
-1. **Old against new:** the old master and the branch on the same file, with a screenshot diff per matrix state at 0 px tolerance. This is the pixel-for-pixel bar.
+1. **Old against new:** the old master and the branch run in turn, each on its own copy of the same vault, since both are one plugin id.
+   - The clock is frozen, the calendars come from fixtures and the network is stubbed.
+   - Screenshots are diffed per matrix state, at most 1 px per region, with the masks listed in the harness (the now line, the caret).
+   - This is the pixel-for-pixel bar.
 2. **Frame recorder:** a recorder logs every keyed row's box, the carried card, the ribbon parts and the wheel on every frame. A run fails on:
-   - a row moving outside the write's lists;
+   - a row moving outside the write's lists, measured relative to its own list's box (layout motion is recorded and checked on its own);
    - overshoot or non-monotonic travel;
    - rest more than 0.5 px off;
    - gaps or overlaps beyond the gap token;
@@ -281,22 +294,25 @@ The new layer grows inside the old screen (strangler). Each step merges into mas
 ## Done when
 
 - **Impossible by construction, each with its guard or test:**
-  - reading the file before an earlier write, in any screen;
-  - moving a row no write touched;
-  - animating a change of context;
-  - animating one cause twice;
-  - re-rendering at pointer rate;
-  - one fact in two places;
-  - a box changing size from a CSS state class during a carry;
-  - focus scrolling the screen;
-  - a code scroll fighting a finger.
-- `CalendarScreen` is gone. The state, the effects, the machines and the components are separate and tested. No file is over 300 lines.
+
+  | Claim | Enforced by |
+  |---|---|
+  | Reading the file before an earlier write, in any screen | the lane tests; the no-service-call-outside-the-runner rule (from step 1) |
+  | Moving a row no write touched | `ListMotion` tests; the frame recorder |
+  | Animating a change of context; animating one cause twice | `rev` tests |
+  | Re-rendering at pointer rate | the render counter test |
+  | One fact in two places | no `classList` or `dataset` writes, no state fields in components (guard); `ScreenState` is the only store, and the view itself stays in the core |
+  | A box changing size from a CSS state class during a carry | `styles.test.ts` box-size rule; the frame recorder |
+  | Focus scrolling the screen | the `preventScroll` guard |
+
+- **Checked by Max on the phone, not by automation:** a code scroll yielding to a finger with momentum, the rubber band, the real keyboard, a lost lift.
+- `CalendarScreen` is gone. The state, the effects, the machines and the components are separate and tested.
 - The e2e matrix passes, old against new, pixel for pixel. The frame budget holds on the phone view. An independent QA pass on a copy of Max's real file finds no defect. Max's phone checklist passes at every ★.
 - `docs/plugin/` is unchanged. Any behaviour that changed is a defect.
 
 ## How it is built
 
-- Only `obsidian/` and `tests/` change, so one `frontend-obsidian` agent per step. The lead checks each step's diff, tests and screens before the next.
+- The `backend` agent makes the step 0 contract change. After that only `obsidian/` and `tests/` change, so one `frontend-obsidian` agent per step. The lead checks each step's diff, tests and screens before the next.
 - Steps 1–6 each end with a fresh QA agent told to break it, running the e2e matrix and the Appendix A list.
 - A rule found missing from the core goes to Max first as a contract change.
 
@@ -339,7 +355,7 @@ The new layer grows inside the old screen (strangler). Each step merges into mas
 | 50cf7279 rows not kept per id | keyed `memo` rows (§4) |
 | d53657d2, c89c7ba8 tap during a settle | swipe machine `settling` (§6) |
 | D55, D56 title over the old lists; empty column first | atomic context commit (§3) |
-| D84 drop flashes back; dd934060 pending rename not shown; D86 field, waiting text and card | optimistic patches by revision; the entry draft key (§3, §7) |
+| D84 drop flashes back; dd934060 pending rename not shown; D86 field, waiting text and card | optimistic patches confirmed by sequence; the entry draft key (§3, §7) |
 | D65, D85 a node opened mid-carry, its list read in the pause | gesture's own reads apply at once (§3) |
 | D64 panel slides with the columns; 28080aba a day's swipe moves only the day | `LayoutMotion` (§5) |
 | A1, D63 sideways jerk in All columns | no swipe listener without a track (§6) |
