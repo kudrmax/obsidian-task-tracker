@@ -7,7 +7,7 @@ import type { CardRow, ListModel, ListRow } from "../model/lists";
 import type { BlockMsg } from "../model/messages";
 import { assertNever } from "../model/assertNever";
 import type { Step } from "./block";
-import { updateMenu } from "./menu";
+import { openInView, updateMenu } from "./menu";
 import { updateSelect } from "./select";
 
 const failed = (error: { readonly code: string; readonly message: string }): BlockMsg => ({ kind: "failed", error });
@@ -98,15 +98,15 @@ function ended(model: BlockModel, how: "dropped" | "nowhere"): Step {
 	return [done, [write("tasks.endCarry", [how], failed)]];
 }
 
+/** How soon a second press makes a double click (the old screen's `LAYOUT.doubleClickMs`). */
+const DOUBLE_CLICK_MS = 250;
+
 /**
  * The carry inside the block (P6): a card lifted pins the lists as they stood, its place waiting dashed and its subtasks
  * folded away; the finger's target is read against the geometry measured at the lift; let go on a place, the drop is
  * the core's (`tasks.drop`, By subprojects `tasks.dropInProjects`) and the float flies onto the card where it now
  * stands; let go nowhere, called off, or its task gone from the file, it flies back or fades, and the carry ends.
  */
-/** How soon a second press makes a double click (the old screen's `LAYOUT.doubleClickMs`). */
-const DOUBLE_CLICK_MS = 250;
-
 export function updateCarry(model: BlockModel, msg: CarryMsg): Step {
 	switch (msg.kind) {
 		case "tap":
@@ -114,7 +114,7 @@ export function updateCarry(model: BlockModel, msg: CarryMsg): Step {
 		case "context": {
 			const picked = model.select?.picked ?? [];
 			if (picked.includes(msg.key) && picked.length > 1) return updateMenu(model, { kind: "openedBulk", at: { at: "beside", key: msg.key } });
-			return cardRowOf(currentLists(model), msg.key) ? updateMenu(model, { kind: "opened", id: msg.key }) : [model, []];
+			return cardRowOf(currentLists(model), msg.key) ? openInView(model, msg.key) : [model, []];
 		}
 		case "lift": {
 			const picked = model.select?.picked ?? [];
@@ -202,7 +202,7 @@ function tapped(model: BlockModel, msg: Extract<CarryMsg, { kind: "tap" }>): Ste
 	if (model.wide && select && select.picked.includes(msg.key) && select.picked.length > 1) return updateSelect(model, { kind: "actions" });
 	const cleared = select && !select.selecting ? { ...model, select: null } : model;
 	if (msg.act === "counter") return [cleared, [write("tasks.toggleCollapsed", [row.item.key], failed)]];
-	const [opened, commands] = updateMenu(cleared, { kind: "opened", id: msg.key });
+	const [opened, commands] = openInView(cleared, msg.key);
 	/** A click opens the menu at once; a second one right after, on the copy now over the card, makes it a double click that renames (desktop). */
 	const again: Command<BlockMsg>[] = msg.mouse === true ? [{ kind: "secondPress", ms: DOUBLE_CLICK_MS, msg: { kind: "menu", msg: { kind: "clickedAgain", id: msg.key } } }] : [];
 	return [opened, [...commands, ...again]];

@@ -425,6 +425,16 @@ export class BlockHost {
 			}
 			case "timer":
 				return this.input.timer(this.node, command.name, command.ms, () => dispatch(command.msg));
+			case "intoView": {
+				this.stopIntoView();
+				const glide = Motion.intoView(this.node, command.key);
+				if (!glide) return dispatch(command.then);
+				this.intoViewStop = Scroll.glideTo(glide.scroller, glide.from, glide.to, glide.ms, glide.ease, (how) => {
+					this.intoViewStop = null;
+					if (how === "arrived" && !this.disposed && Measure.row(this.node, command.key)) dispatch(command.then);
+				});
+				return;
+			}
 			case "secondPress":
 				return this.input.secondPress(this.node, command.ms, () => dispatch(command.msg));
 			case "cancelTimer":
@@ -456,6 +466,14 @@ export class BlockHost {
 		away: () => this.dispatch({ kind: "layerDismissed" }),
 	};
 
+	/** A card's scroll into view before its menu opens. */
+	private intoViewStop: (() => void) | null = null;
+
+	private stopIntoView(): void {
+		this.intoViewStop?.();
+		this.intoViewStop = null;
+	}
+
 	/** Lets go of the chrome's room the block held. */
 	private letChromeGo: (() => void) | null = null;
 
@@ -465,6 +483,7 @@ export class BlockHost {
 		this.letChromeGo?.();
 		this.letChromeGo = null;
 		this.rendered.dispose();
+		this.stopIntoView();
 		this.endFinger();
 		this.deps.session.teardown();
 		this.motion.dispose();

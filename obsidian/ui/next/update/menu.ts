@@ -27,6 +27,11 @@ const drawing = (model: BlockModel, layer: TaskMenuLayer): MenuDrawing | null =>
  * The menu begins to close: what it draws is kept while it fades, and the lists under it are pinned (P6, R10). What the
  * repeat page holds is written now (`repeatPage.end` decides whether it differs from the task's own rule).
  */
+/** A card's menu opens once the card is in view: its column scrolls it in first, as the old menu's (`scrollIntoColumn`). */
+export function openInView(model: BlockModel, id: string): Step {
+	return [model, [{ kind: "intoView", key: id, then: { kind: "menu", msg: { kind: "opened", id } } }]];
+}
+
 export function closeMenu(model: BlockModel): Step {
 	const layer = openMenu(model);
 	if (!layer) return [closeTop(model), []];

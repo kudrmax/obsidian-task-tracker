@@ -195,6 +195,32 @@ export class Motion {
 		return el.style.getPropertyValue(name);
 	}
 
+	/**
+	 * How the card `key` comes into view before its menu opens (the old menu's `scrollIntoColumn`): the nearest of its
+	 * ancestors that scrolls (overflow auto or scroll; the note's own scroller when the block does not), the part of it
+	 * that shows its content (inside its padding, not under the fade at its foot), and the top that shows the card whole,
+	 * or from its top when it is taller; with the glide's time and curve. Null when it shows whole already or nothing scrolls.
+	 */
+	static intoView(root: ParentNode, key: string): { readonly scroller: HTMLElement; readonly from: number; readonly to: number; readonly ms: number; readonly ease: string } | null {
+		let card: HTMLElement | null = null;
+		for (const el of root.querySelectorAll<HTMLElement>("[data-n-key]")) if (el.dataset.nKey === key) card = el;
+		const view = card?.ownerDocument.defaultView;
+		if (!card || !view) return null;
+		for (let node = card.parentElement; node; node = node.parentElement) {
+			const style = view.getComputedStyle(node);
+			if (style.overflowY !== "auto" && style.overflowY !== "scroll") continue;
+			const rect = node.getBoundingClientRect();
+			const top = rect.top + (parseFloat(style.paddingTop) || 0);
+			const bottom = rect.bottom - (parseFloat(style.paddingBottom) || 0);
+			const item = card.getBoundingClientRect();
+			const by = item.height > bottom - top || item.top < top ? item.top - top : Math.max(0, item.bottom - bottom);
+			const to = Math.max(0, Math.min(node.scrollTop + by, node.scrollHeight - node.clientHeight));
+			if (Math.abs(to - node.scrollTop) < 1) return null;
+			return { scroller: node, from: node.scrollTop, to, ms: tokenMs(node, "--tc-duration-collapse"), ease: view.getComputedStyle(node).getPropertyValue("--tc-ease-out") };
+		}
+		return null;
+	}
+
 	/** Layer parts shown, and the ones whose close has begun: each fades once. */
 	private readonly shown = new WeakSet<HTMLElement>();
 	private readonly leaving = new WeakSet<HTMLElement>();

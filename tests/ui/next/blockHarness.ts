@@ -50,6 +50,8 @@ export function pass(h: Harness, model: BlockModel, msg: BlockMsg): { readonly m
 		for (const command of commands) {
 			if (command.kind !== "door") {
 				effects.push(command);
+				/** No layout here: the card is in view already, as in a block that does not scroll. */
+				if (command.kind === "intoView") queue.push(command.then);
 				continue;
 			}
 			doors.push(command.method);
