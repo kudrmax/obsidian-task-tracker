@@ -64,6 +64,7 @@ import { listView, sectionChoice } from "./sections";
 import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
+import type { TaskDocument } from "../domain/TaskDocument";
 import { projectsPlusPlace, projectsPlusTakes, projectsTakes } from "./projectsDrop";
 import { cleared, PROJECTS_HOVER_MS, PROJECTS_INDENT, panelRows, picked, projectNodeOf, projectOfNode, projectsDrop, sameNode, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
 import { isTaskKey, keyId, keyOf, sameLine, samePlace, sameTaskTree } from "./taskKeys";
@@ -673,17 +674,20 @@ const REPLICA_TASKS: Readonly<Record<string, Handler>> = {
 	/**
 	 * `args` as the call takes them now: each id an earlier replayed create gave anew (`idMap`, old id → new id) mapped,
 	 * wherever an object carries it as `id`, and each task's key (`TaskKey`) the task's key as the file has it now, found
-	 * by its id; staleTask when such a task is gone. Without `ids` in the context, keys stay as they are.
+	 * by its id; staleTask when such a task is gone. Without `ids` in the context, keys stay as they are. The tasks file is
+	 * read only for a key: arguments that name no task need none.
 	 */
 	freshArgs: (c, [args, idMap]) => {
 		const ids = (idMap ?? {}) as Readonly<Record<string, string>>;
 		const moved = (id: string) => (Object.prototype.hasOwnProperty.call(ids, id) ? ids[id] : id);
-		const doc = c.knowsIds() ? c.snapshot().doc : null;
+		let read: { readonly doc: TaskDocument | null } | null = null;
+		const docNow = () => (read ??= { doc: c.knowsIds() ? c.snapshot().doc : null }).doc;
 		const fresh = (value: unknown): unknown => {
 			if (Array.isArray(value)) return value.map(fresh);
 			if (typeof value !== "object" || value === null) return value;
 			if (isTaskKey(value) && typeof value.id === "string") {
 				const id = moved(value.id);
+				const doc = docNow();
 				if (doc === null) return { ...value, id };
 				const entry = doc.byId(id);
 				if (!entry) throw new StaleTaskError();

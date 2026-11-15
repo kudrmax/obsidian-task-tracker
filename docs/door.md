@@ -533,6 +533,9 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
   changed since: each id in `idMap` (`{ oldId: newId }`, the `created` of a create replayed) replaced wherever an
   object carries it as `id`, and each task's key (`TaskKey`, recognised by the core) replaced by the task's key as the
   file has it now, found by its id; `staleTask` when such a task is gone. Without `ids` in the context the keys stay.
+  The tasks file is read only for a key: with no file, arguments that name no task come back with their ids mapped
+  and the rest as given (any call's arguments may pass through it), and `tasksFileMissing` only when a key must be
+  resolved.
   Example: `freshArgs([key of Idea, { lifted: { id: "t27" } }], { t27: "t31" })` → `[Idea's key now, { lifted: { id:
   "t31" } }]`. A host never has to tell a key from its other arguments.
 - `tasks.sectionOf(id)`: `{ list, name }` of the section with that id (`ListSection.id`), the name as the file has it

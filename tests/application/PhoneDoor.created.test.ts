@@ -147,6 +147,14 @@ describe("tasks.freshArgs: a call's arguments with its tasks as the file has the
 		expect(fresh.slice(2)).toEqual(["text", 5, null]);
 	});
 
+	it("needs no tasks file for arguments that name no task: ids mapped, the rest as given; one that names a task needs it", () => {
+		const context: DoorContext = { tasks: null, nowMs: NOW };
+		expect(callDoor("tasks.freshArgs", [["2026-11-15", 1, { lifted: { id: "old" } }], { old: "new" }], context)).toMatchObject({ ok: true, result: ["2026-11-15", 1, { lifted: { id: "new" } }] });
+		expect(callDoor("tasks.freshArgs", [[], {}], context)).toMatchObject({ ok: true, result: [] });
+		const key = { section: "inbox", index: 0, path: [], raw: "- [ ] Idea", id: "t1" };
+		expect(callDoor("tasks.freshArgs", [[key], {}], context)).toMatchObject({ ok: false, error: { code: "tasksFileMissing" } });
+	});
+
 	it("is staleTask when a task the call names is gone", () => {
 		const host = new Host();
 		const idea = host.item("Idea");
