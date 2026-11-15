@@ -49,3 +49,16 @@ AI caller needs only a task key and a text.
 ## Decisions
 
 (Filled by the agents as they build; each entry carried to both sides by the lead.)
+
+- **Backend, the text.** The step's text is typed as the quick entry types a task: one line, trimmed, a list or
+  checkbox marker at its start dropped, a priority prefix (`p1 `) read as the step's priority (the file reads it so
+  anyway). A blank text, a priority prefix alone too, writes nothing.
+- **Backend, the place.** «Before every subtask» means before the first subtask line of any status, done and given-up
+  ones too; the task's description (lines without a checkbox) stays above the subtasks.
+- **Backend, where the row is.** `can.firstStep` is true on every open task and subtask; the menu offers `firstStep`
+  (right after `subtask`) from a list column (`day`, `soon`, `inbox`, `backlog`) and the timeline only. Not from a
+  timeline card's stack (as Add subtask), not from Done, not from the full screen (it shows every subtask unfolded,
+  there is no folded card to type on), never in the bulk menu.
+- **Backend, the card with the field.** `TaskItem.firstStepCard` is the card the field is drawn as: `over` the task's
+  own title, plain (as `card.over` of a folded card), `text`/`title` empty (the field takes the step line), `step` null.
+  The same for a task and a subtask at any depth, folded or not.

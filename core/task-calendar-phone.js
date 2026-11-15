@@ -2096,6 +2096,12 @@
     const task = newTask(text, { dueDate, ...marks });
     return intoUnfolded(doc, parent, (d, same) => d.insertUnder(same(parent), task));
   }
+  function firstStep(doc, entry, typedText) {
+    const { text, ...marks } = typed(doc, typedText, null, []);
+    const inserted2 = doc.insertUnder(entry, newTask(text, marks), entry.subtasks[0] ?? null);
+    const task = sameEntryIn(inserted2, entry);
+    return patch(inserted2, task, { collapsed: true });
+  }
   function placeOnTimeline(doc, entry, slot, today, boundary = DayBoundary.MIDNIGHT) {
     const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
     if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return patch(doc, entry, { slot: clamped });
@@ -4514,6 +4520,7 @@ ${key.title}`.toLowerCase();
   }
   var A_LIST_CARD = { kind: "task", from: "day" };
   var COLUMNS = /* @__PURE__ */ new Set(["day", "soon", "inbox", "backlog"]);
+  var FIRST_STEP_FROM = /* @__PURE__ */ new Set([...COLUMNS, "timeline"]);
   function canPick(from) {
     return COLUMNS.has(from);
   }
@@ -4553,7 +4560,8 @@ ${key.title}`.toLowerCase();
       ["repeat", item.repeatable],
       ["section", sections !== null],
       ["project", true],
-      ["subtask", of.from !== "stack"]
+      ["subtask", of.from !== "stack"],
+      ["firstStep", item.can.firstStep && FIRST_STEP_FROM.has(of.from)]
     ];
     return edits.flatMap(([id, offered2]) => offered2 ? [id] : []);
   }
@@ -4687,7 +4695,7 @@ ${key.title}`.toLowerCase();
       durationMin: entry.task.slot && entry.task.slot.end !== null ? entry.task.slot.end - entry.task.slot.start : null,
       reminder: entry.task.reminder,
       repeat: entry.task.repeat?.rule ?? null,
-      open: isOpen(entry.task.status),
+      open,
       repeatable: repeatable(entry),
       priority,
       labels,
@@ -4709,10 +4717,12 @@ ${key.title}`.toLowerCase();
         addDescription: description === null,
         fold: hasOpenSubtask(entry),
         resize: entry.task.slot !== null,
-        setProject: entry.path.length === 0
+        setProject: entry.path.length === 0,
+        firstStep: open
       },
       card: cardOf2(own, step),
       block: blockOf(own, step),
+      firstStepCard: { text: "", title: "", over: own.title, step: null },
       drawnOn: drawn?.id === entry.id ? { key: keyOf(drawn.on), slot: drawn.on.task.slot } : null,
       subtasks: allSubtasks.filter((sub) => sub.open),
       allSubtasks,
@@ -7021,6 +7031,11 @@ ${key.title}`.toLowerCase();
       if (this.isBlank(draft.text)) return null;
       return (doc, today) => createSubtask(doc, this.entryOf(doc, parent), draft, today);
     }
+    /** First step: `text` the task's first subtask, the task folded; null for a blank text. */
+    firstStep(key, text) {
+      if (this.isBlank(text)) return null;
+      return (doc) => firstStep(doc, this.entryOf(doc, key), text);
+    }
     /** The task sheet's edit, and where the task stands after it (null before it ran); null for a blank title, a priority alone too. */
     edit(key, draft) {
       if (this.isBlank(draft.text)) return null;
@@ -7504,6 +7519,9 @@ ${key.title}`.toLowerCase();
     }
     createSubtask(parent, draft) {
       return nothing(this.rules.createSubtask(parent, draft));
+    }
+    firstStep(key, text) {
+      return nothing(this.rules.firstStep(key, text));
     }
     edit(key, draft) {
       const edit = this.rules.edit(key, draft);
@@ -8244,6 +8262,7 @@ ${key.title}`.toLowerCase();
     createWithId: (c, [text, priority, place, repeat, labels, project, filter]) => c.run(c.writes.createWithId(text, priority ?? null, place, repeat ?? null, labels ?? [], project, filter)),
     create: (c, [draft, slot]) => c.run(c.writes.create(draft, slot ?? void 0)),
     createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent, draft)),
+    firstStep: (c, [key, text]) => c.run(c.writes.firstStep(key, text)),
     edit: (c, [key, draft]) => c.run(c.writes.edit(key, draft)),
     placementOf: (c, [item]) => c.reads.placementOf(item),
     dayColumn: (c, [date]) => c.reads.dayColumn(date),

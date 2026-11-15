@@ -393,6 +393,10 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.createSubtask(parent, draft));
 	}
 
+	firstStep(key: TaskKey, text: string): Promise<void> {
+		return this.run(this.writes.firstStep(key, text));
+	}
+
 	edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null> {
 		return this.run(this.writes.edit(key, draft));
 	}

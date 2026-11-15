@@ -185,10 +185,11 @@ export class DemoTaskService implements TaskService {
 			isSubtask: false,
 			day: dayOfTask(section, t, this.today()),
 			repeatDay: t.dueDate ?? t.slot?.date ?? this.today(),
-			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false, resize: t.slot != null, setProject: true },
+			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false, resize: t.slot != null, setProject: true, firstStep: t.status === "todo" || t.status === "inProgress" },
 			drawnOn: null,
 			card: { text: t.text, title: plainText(t.text), over: null, step: null },
 			block: { text: t.text, title: plainText(t.text), step: null },
+			firstStepCard: { text: "", title: "", over: plainText(t.text), step: null },
 		};
 	}
 
@@ -289,6 +290,8 @@ export class DemoTaskService implements TaskService {
 
 	/** The board's tasks have no subtasks, and the pixel comparison makes none. */
 	async createSubtask(): Promise<void> {}
+
+	async firstStep(): Promise<void> {}
 
 	async nest(): Promise<void> {}
 

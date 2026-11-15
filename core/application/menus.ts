@@ -79,6 +79,9 @@ const A_LIST_CARD: MenuOf = { kind: "task", from: "day" };
 
 const COLUMNS: ReadonlySet<MenuFrom> = new Set<DropColumn>(["day", "soon", "inbox", "backlog"]);
 
+/** Where First step is offered: a card of a list column or of the timeline, the cards a folded task is drawn on. */
+const FIRST_STEP_FROM: ReadonlySet<MenuFrom> = new Set<MenuFrom>([...COLUMNS, "timeline"]);
+
 /** Whether Select tasks picks a card drawn there: a list column's; never the timeline's, Done's, a stack's or the whole screen's. */
 export function canPick(from: MenuFrom): boolean {
 	return COLUMNS.has(from);
@@ -138,6 +141,7 @@ function menuEdits(items: readonly TaskItem[], of: MenuOf, sections: MenuSection
 		["section", sections !== null],
 		["project", true],
 		["subtask", of.from !== "stack"],
+		["firstStep", item.can.firstStep && FIRST_STEP_FROM.has(of.from)],
 	];
 	return edits.flatMap(([id, offered]) => (offered ? [id] : []));
 }
