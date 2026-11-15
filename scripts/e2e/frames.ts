@@ -268,7 +268,22 @@ function nothingMoved(step: StepLog): string[] {
 	return moved || changed ? [] : ["the gesture moved nothing"];
 }
 
-export const FRAME_RULES = { unsettled, nothingMoved, motionWithoutCause, rowsAnimatedAcrossContext, rowsAcrossContext, stillness, overshoot, continuity, restOff, snap, gapsAndOverlaps, swipeLanding };
+/** A row that leaves the screen for some frames and comes back: a remount drawn as a flash (the old one gone, the new one a frame or more later). */
+function flash(step: StepLog): string[] {
+	const out: string[] = [];
+	for (const t of tracks(step)) {
+		for (let i = 1; i < t.boxes.length; i++) {
+			const [before, after] = [t.boxes[i - 1].frame, t.boxes[i].frame];
+			if (after > before + 1) {
+				out.push(`a flash: ${t.key} was gone for ${after - before - 1} frame${after - before - 1 === 1 ? "" : "s"} (${before + 1}–${after - 1}) and came back`);
+				break;
+			}
+		}
+	}
+	return out;
+}
+
+export const FRAME_RULES = { unsettled, nothingMoved, flash, motionWithoutCause, rowsAnimatedAcrossContext, rowsAcrossContext, stillness, overshoot, continuity, restOff, snap, gapsAndOverlaps, swipeLanding };
 
 /** Every failure of a step, by the rules of §Tests 6. */
 export function judge(step: StepLog): string[] {

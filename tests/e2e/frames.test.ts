@@ -44,6 +44,16 @@ describe("the frame rules on Max's past bugs", () => {
 		expect(FRAME_RULES.continuity(step(at(0, 20, 40, 60, 70), { cause: "swipe" }))).toEqual([]);
 	});
 
+	it("a row remounted with a flash: gone for some frames and back", () => {
+		const gone = [row("A/1", 0)];
+		const frames = [frame(still()), frame(gone), frame(gone), frame(still())];
+		expect(FRAME_RULES.flash(step(frames))).not.toEqual([]);
+		expect(judge(step(frames))).toContainEqual(expect.stringMatching(/a flash: B\/1 was gone for 2 frames/));
+		expect(FRAME_RULES.flash(step([frame(still()), frame(still()), frame(still())]))).toEqual([]);
+		expect(FRAME_RULES.flash(step([frame(still()), frame(gone), frame(gone)]))).toEqual([]);
+		expect(FRAME_RULES.flash(step(frames, { carried: ["B/1"] }))).toEqual([]);
+	});
+
 	it("a screen that never settles", () => {
 		expect(FRAME_RULES.unsettled(step([frame(still())], { settled: false }))).not.toEqual([]);
 	});

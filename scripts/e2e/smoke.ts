@@ -51,9 +51,10 @@ export async function smoke(d: Driver): Promise<void> {
 
 	/** A finger lifts a card by holding it; the mouse by moving it (holding opens its menu). */
 	const card = await d.center(".tc-left .tc-card");
-	const title = await d.page<string>(`return document.querySelector(".tc-left .tc-card .tc-card-title")?.textContent?.trim() ?? ""`);
-	await d.step("a card lifted and held", "interaction", () => d.liftAndHold(card, 900), { carried: [title], moves: [] });
-	await d.step("drag a card", "interaction", () => d.drag(card, { x: card.x, y: card.y + card.h * 2.6 }, d.platform === "phone" ? 450 : 0, 24, 20), { carried: [title], expectMotion: true });
+	const key = await d.page<string | null>(`return __e2e.keyAt(".tc-left .tc-card")`);
+	if (!key) throw new Error("no card in the day's list to lift");
+	await d.step("a card lifted and held", "interaction", () => d.liftAndHold(card, 900), { carried: [key], moves: [] });
+	await d.step("drag a card", "interaction", () => d.drag(card, { x: card.x, y: card.y + card.h * 2.6 }, d.platform === "phone" ? 450 : 0, 24, 20), { carried: [key], expectMotion: true });
 	await d.shot("dragged", SHOT);
 }
 

@@ -15,7 +15,7 @@ export interface Point {
 
 export interface StepOptions {
 	readonly expectPlaces?: number;
-	/** Row keys the step carries (exempt from the motion rules), as a prefix of the key. */
+	/** Row keys the step carries (exempt from the motion rules): each a whole key (`__e2e.keyAt`), never a cut title. */
 	readonly carried?: readonly string[];
 	readonly tolerated?: readonly string[];
 	readonly expectMotion?: boolean;
@@ -192,7 +192,7 @@ export class Driver {
 		await sleep(400);
 		const rest = await this.page<Row[]>("return __e2e.rows()");
 		const gap = await this.page<number>("return __e2e.cardGap()");
-		const carried = options.carried ? [...new Set(frames.flatMap((f) => f.rows.map((r) => r.key)))].filter((k) => options.carried!.some((c) => k.startsWith(`${c}/`))) : undefined;
+		const carried = options.carried ? [...new Set(frames.flatMap((f) => f.rows.map((r) => r.key)))].filter((k) => options.carried!.includes(k)) : undefined;
 		const log: StepLog = { name, cause, frames, started: [...this.started], rest, settled, gap, expectPlaces: options.expectPlaces, carried, tolerated: options.tolerated, expectMotion: options.expectMotion, moves: options.moves, maxStep: options.maxStep };
 		const failures = judge(log);
 		const file = join(this.dirs.run, this.combo, `${name}.frames.json`);
