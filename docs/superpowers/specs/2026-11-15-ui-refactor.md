@@ -106,7 +106,7 @@ The rules themselves stay where they are, in the core: where a task lands, what 
     - Ids are never reused within a runtime's life. The replay continues from the current replica's id counter, so a line Sync added can never take an id a pin still holds.
   - **Inputs on replay:** each entry runs with its own recorded `nowMs` and projects screen (what the user saw), but with the **current** settings, which shape the file: section names, the day start.
   - **The tidy on a new base** runs before the replay and is not an entry of the log.
-  - **Reconciliation:** after any replay that remapped an id or dropped a call, the runtime calls `projects.reconcile(idMap, dropped)` in the same message as the model's remap. This is a door method `backend` adds in slice 1. It maps the carry's keys and cards through the id map, and reverses a dropped call's effect on the projects screen: a node renamed by a dropped call goes back to its name.
+  - **Reconciliation:** after any replay that remapped an id or dropped a call, the runtime calls `tasks.reconcile(idMap, dropped)` in the same message as the model's remap. This is a door method `backend` adds in slice 1. It maps the carry's keys and cards through the id map, and reverses a dropped call's effect on the projects screen: a node renamed by a dropped call goes back to its name.
   - A call that now fails (`staleTask`) is dropped with a notice and a reverse transition.
   - **Bounds:** at most two replays per write. Past that, the replica takes the file as it is, and the pending calls are dropped with a notice. The iPhone app's "busy after two tries" works this way, for one call at a time.
   - **A missing or moved file:** `fn` also checks that the file still sits at `tasksFile`, because `vault.process` holds a `TFile` that follows a rename. If the file has gone, the pending calls are dropped with a notice and the screen offers to create the file, as today.
@@ -289,7 +289,7 @@ The plugin's own menus and sheets are Preact layers.
 | R20 replay rolling back the projects screen | only text, history and ids come from replay (P3) |
 | R21 "the core" against the pure rules | the rules are imported directly; `callDoor` stays in the runtime (P2, §Guards) |
 | R22 what views a screen needs | `needs(model)` per screen, recomputed on every replica change (P2) |
-| R23 kept parts after a replay | `projects.reconcile(idMap, dropped)` (P3) |
+| R23 kept parts after a replay | `tasks.reconcile(idMap, dropped)` (P3) |
 | Root, rev 8: the dispatch loop | P2's loop: door calls right after `update`, answers fed back before render, views reach the model as data |
 
 ## Guards
