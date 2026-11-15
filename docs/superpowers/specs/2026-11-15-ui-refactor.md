@@ -21,7 +21,7 @@ Revisions 1–3 were written top-down, and every review found new holes: the spe
 | 6 | 155 (4 classes) | 3 |
 | 7 | 158 (5 classes) | 3 (settings persistence, the pending log, per-call cost) |
 | 8 | 133 (4 classes) | 2 (the pending log's references and rollback; the dispatch loop) |
-| 9 | (rerun below) | 0: "ready to build from"; five wording fixes, made in revision 10 |
+| 9 | 213 (2 classes: "the core" vs the pure rules; what views a screen needs) | 0: "ready to build from"; five wording fixes, made in revision 10 |
 
 The faults of revisions 5 and 6 had one cause. The spec treated the core as an asynchronous service the UI waits on, and built machinery around the waiting: read-back, previews, transactions, read-ahead, echoes. The core already has a **synchronous, pure door**, `callDoor(method, args, context) → answer` (`core/application/PhoneCalls.ts`). The iPhone app runs on it, and it covers every `TaskService`, `DayService`, undo, settings and calendar method (a typed coverage map, `PhoneCalls.ts:1077`). On Max's real tasks file (31 KB) a whole funnel view costs about 3 ms through it, JSON included (measured locally). Revision 7 puts the plugin on the same door, and the waiting is gone.
 
@@ -59,7 +59,10 @@ The rules themselves stay where they are, in the core: where a task lands, what 
 - **The dispatch loop.** One loop, the same for every message:
   1. `update` returns the next model and its commands.
   2. The runtime runs the door commands at once, synchronously, and feeds each answer back as the next message, until the chain is drained.
-  3. The runtime computes the view answers the mounted screens need from the replica, memoised, and hands them to the model as data (`viewsChanged`). Selectors read the model only; they never call the core.
+  3. **What each screen needs.** Each screen has a pure selector, `needs(model)`. It lists the view answers that screen needs: its context's view, the neighbour day or place under a swipe, the task of an open full card or menu, the search's results. The runtime computes one answer per need from the replica, memoised by (replica, minute, need), and hands them to the model as data (`viewsChanged`).
+     - Any change of the replica recomputes every mounted need in the same loop, so an open card follows Sync at once.
+     - Selectors never call the door. Here "the core" means `callDoor`, the replica and the view answers.
+     - The core's **pure rules** (`rules.*`: `snap`, `swipeLanding`, `layoutWidths`, `stackedLists`, `layoutShareAt`…) are plain functions. They may be imported by `update/`, selectors and `motion`, since they are needed per frame and per pointer move.
   4. Render, then the drivers, then focus last.
 
   The chain has a bound on its depth; hitting it is a failure with the action log dumped.
@@ -293,7 +296,7 @@ The plugin's own menus and sheets are Preact layers.
 
 `tests/uiRules.test.ts`:
 - **Purity:** `model/`, `update/`, `recognizers/` and `view/` import no DOM global, `obsidian`, runtime or driver.
-- **Core calls:** only in the runtime. `view/` imports only selectors and `dispatch`.
+- **Core calls:** `callDoor` and the replica only in the runtime. Outside it, the core may be imported only for the pure rules, which are listed in the guard. `view/` imports only selectors and `dispatch`.
 - **Timers and frames:** only in the runtime and `drivers/`.
 - **DOM work, each only in its own driver:**
   - animation and style writes: `motion`;
@@ -362,6 +365,7 @@ The old screen keeps its own services, untouched, until it is deleted. **Old and
    - a pin on a created task surviving a replay re-id; ids never reused;
    - a section renamed on another device while calls are pending;
    - reconciliation after a dropped call;
+   - Sync changing the task of an open full card, and the card updating in the same loop;
    - Sync during a carry with a write pending (the carry and the chosen node stay);
    - calls from before the day boundary replayed over a base tidied for the new day;
    - a file renamed mid-write;
