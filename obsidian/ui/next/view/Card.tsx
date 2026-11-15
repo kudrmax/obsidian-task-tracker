@@ -70,7 +70,7 @@ export function Card({ rowKey, face, branch, listed, classes, links, copy, root,
 	const act = (name: string) => (listed ? `${scope ?? ""}${name}` : undefined);
 	const cls = [root ?? "tc-n-card", listed ? "tc-n-listed" : "", face.over !== null ? "tc-n-card-two" : "", face.folded && listed ? "tc-n-card-folded" : "", classes ?? ""].filter(Boolean).join(" ");
 	return (
-		<div class={cls} data-n-key={copy ? undefined : rowKey} data-status={face.status} data-n-act={act("card")} {...colourAttributes(face)} {...attributes}>
+		<div class={cls} data-n-key={copy ? undefined : rowKey} data-row={copy || !listed ? undefined : rowKey} data-status={face.status} data-n-act={act("card")} {...colourAttributes(face)} {...attributes}>
 			{copy || bare || root !== undefined ? null : (
 				<span class="tc-n-pick" data-n-act={scope ? `${scope}tick` : undefined}>
 					<Icon name="check" />

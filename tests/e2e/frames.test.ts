@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetOfTrace, type Frame, FRAME_RULES, judge, judgeBudget, type PageAnimation, type Row, type StepLog } from "../../scripts/e2e/frames";
+import { budgetOfTrace, type Frame, FRAME_RULES, HARNESS, judge, judgeBudget, type PageAnimation, type Row, type StepLog } from "../../scripts/e2e/frames";
 
 /**
  * The frame recorder's rules (spec §Tests 6), each shown to trip on a frame log made to reproduce one of Max's past
@@ -42,6 +42,16 @@ describe("the frame rules on Max's past bugs", () => {
 		expect(FRAME_RULES.continuity(step(at(0, 20, 40, 30, 60), { cause: "swipe" }))).not.toEqual([]);
 		expect(FRAME_RULES.continuity(step(at(0, 300, 310), { cause: "swipe" }))).not.toEqual([]);
 		expect(FRAME_RULES.continuity(step(at(0, 20, 40, 60, 70), { cause: "swipe" }))).toEqual([]);
+	});
+
+	it("a row remounted with a flash: gone for some frames and back", () => {
+		const gone = [row("A/1", 0)];
+		const frames = [frame(still()), frame(gone), frame(gone), frame(still())];
+		expect(FRAME_RULES.flash(step(frames))).not.toEqual([]);
+		expect(judge(step(frames))).toContainEqual(expect.stringMatching(/a flash: B\/1 was gone for 2 frames/));
+		expect(FRAME_RULES.flash(step([frame(still()), frame(still()), frame(still())]))).toEqual([]);
+		expect(FRAME_RULES.flash(step([frame(still()), frame(gone), frame(gone)]))).toEqual([]);
+		expect(FRAME_RULES.flash(step(frames, { carried: ["B/1"] }))).toEqual([]);
 	});
 
 	it("a screen that never settles", () => {
@@ -100,9 +110,44 @@ describe("the budget", () => {
 	const f = (scriptMs: number, interval = 16) => ({ start: 0, interval, scriptMs });
 
 	it("fails a frame with 8 ms of script or more, and any task over 16 ms, the 17–49 ms ones too", () => {
-		expect(judgeBudget({ frames: [f(2), f(9)], longTasks: [] })).not.toEqual([]);
-		expect(judgeBudget({ frames: [f(2)], longTasks: [{ t: 0, ms: 20 }] })).not.toEqual([]);
-		expect(judgeBudget({ frames: [f(2), f(7.9)], longTasks: [{ t: 0, ms: 15 }] })).toEqual([]);
+		expect(judgeBudget({ frames: [f(2), f(9)], longTasks: [], scriptEvents: 4 })).not.toEqual([]);
+		expect(judgeBudget({ frames: [f(2)], longTasks: [{ t: 0, ms: 20 }], scriptEvents: 4 })).not.toEqual([]);
+		expect(judgeBudget({ frames: [f(2), f(7.9)], longTasks: [{ t: 0, ms: 15 }], scriptEvents: 4 })).toEqual([]);
+	});
+
+	it("fails a trace with no frame or no script of the page: nothing passes on an empty recording", () => {
+		expect(judgeBudget({ frames: [], longTasks: [], scriptEvents: 4 }).join()).toMatch(/no frame/);
+		expect(judgeBudget({ frames: [f(0), f(0)], longTasks: [], scriptEvents: 0 }).join()).toMatch(/no script/);
+	});
+
+	it("leaves the harness's own evaluations and frame sampler out of the page's script", () => {
+		const M = { ph: "M", name: "thread_name", ts: 0, pid: 1, tid: 1, args: { name: "CrRendererMain" } };
+		const X = (name: string, ts: number, dur: number, functionName?: string) => ({ name, ph: "X", ts, dur, pid: 1, tid: 1, ...(functionName ? { args: { data: { functionName } } } : {}) });
+		const mark = (message: string, ts: number) => ({ name: "TimeStamp", ph: "I", ts, pid: 1, tid: 1, args: { data: { message } } });
+		const harnessOnly = budgetOfTrace([
+			M,
+			X("FireAnimationFrame", 0, 1000),
+			X("FunctionCall", 100, 800, HARNESS.sampler),
+			X("EvaluateScript", 2000, 9000),
+			mark(HARNESS.evalBegin, 2100),
+			X("FunctionCall", 2200, 8000),
+			mark(HARNESS.evalEnd, 10_500),
+			X("FireAnimationFrame", 16_000, 1000),
+			X("FunctionCall", 16_100, 800, HARNESS.sampler),
+			X("FireAnimationFrame", 32_000, 1000),
+		]);
+		expect(harnessOnly.frames[0].scriptMs).toBeCloseTo(0.2);
+		expect(harnessOnly.scriptEvents).toBe(0);
+		expect(judgeBudget(harnessOnly).join()).toMatch(/no script/);
+		const withPage = budgetOfTrace([
+			M,
+			X("FireAnimationFrame", 0, 6000),
+			X("FunctionCall", 100, 800, HARNESS.sampler),
+			X("FunctionCall", 1000, 5000),
+			X("FireAnimationFrame", 16_000, 1000),
+		]);
+		expect(withPage.frames[0].scriptMs).toBeCloseTo(5.2);
+		expect(withPage.scriptEvents).toBeGreaterThan(0);
 	});
 
 	it("reads frames, script and long tasks from a trace, nested script counted once", () => {

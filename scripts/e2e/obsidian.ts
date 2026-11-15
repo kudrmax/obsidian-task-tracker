@@ -1,9 +1,10 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { assertThisBuild } from "./build";
 import { Cdp, targets } from "./cdp";
 import type { Fixture } from "./fixture";
-import type { Paths } from "./paths";
+import { inVault, type Paths } from "./paths";
 
 /**
  * The harness's own test Obsidian (CLAUDE.md, «Trying a build»): its own profile and scratch vault, a free debugging
@@ -79,11 +80,11 @@ function write(path: string, text: string): void {
  * tasks): the tasks file, the settings, the plugin's e2e build, the calendars, the notes. Each platform and theme then
  * starts clean through `reset`.
  */
-export function prepareVault(p: Paths, fx: Fixture): void {
+export function prepareVault(p: Paths, fx: Fixture, buildStartedAt: number): void {
 	mkdirSync(p.vault, { recursive: true });
-	write(join(p.vault, fx.tasksFile), fx.tasks);
-	for (const [path, text] of Object.entries(fx.notes)) write(join(p.vault, path), text);
-	for (const [path, text] of Object.entries(fx.calendarFiles)) write(join(p.vault, path), text);
+	write(inVault(p.vault, fx.tasksFile), fx.tasks);
+	for (const [path, text] of Object.entries(fx.notes)) write(inVault(p.vault, path), text);
+	for (const [path, text] of Object.entries(fx.calendarFiles)) write(inVault(p.vault, path), text);
 	const config = join(p.vault, ".obsidian");
 	write(join(config, "community-plugins.json"), JSON.stringify([PLUGIN]));
 	write(join(config, "app.json"), JSON.stringify({ promptDelete: false, alwaysUpdateLinks: true }));
@@ -91,6 +92,7 @@ export function prepareVault(p: Paths, fx: Fixture): void {
 	const plugin = join(config, "plugins", PLUGIN);
 	mkdirSync(plugin, { recursive: true });
 	copyFileSync(join(p.build, "main.js"), join(plugin, "main.js"));
+	assertThisBuild(join(plugin, "main.js"), p.root, buildStartedAt);
 	copyFileSync(join(p.root, "manifest.json"), join(plugin, "manifest.json"));
 	copyFileSync(join(p.root, "styles.css"), join(plugin, "styles.css"));
 	write(join(plugin, "data.json"), JSON.stringify(fx.settings, null, "\t"));

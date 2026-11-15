@@ -103,9 +103,9 @@ export class GoogleRedirectLogin {
 }
 
 /** The deps of a real Obsidian window. */
-export function browserLoginDeps(exchange: RedirectLoginDeps["exchange"]): RedirectLoginDeps {
+export function browserLoginDeps(exchange: RedirectLoginDeps["exchange"], browse: (url: string) => void): RedirectLoginDeps {
 	return {
-		open: (url) => void window.open(url),
+		open: browse,
 		exchange,
 		random: (bytes) => crypto.getRandomValues(new Uint8Array(bytes)),
 		sha256: async (text) => new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))),

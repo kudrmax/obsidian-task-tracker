@@ -14,20 +14,45 @@ export const PAGE_SCRIPT = String.raw`
 	const view = () => document.querySelector(".workspace-leaf.mod-active .task-calendar") ?? document.querySelector(".task-calendar");
 	const box = (r) => ({ x: r.left, y: r.top, w: r.width, h: r.height });
 	const visible = (r, within) => r.width > 0 && r.height > 0 && r.right > within.left + 1 && r.left < within.right - 1 && r.bottom > within.top + 1 && r.top < within.bottom - 1;
-	const titleOf = (el) => (el.querySelector(".tc-card-title, .tc-n-card-title")?.textContent ?? el.textContent ?? "").trim().slice(0, 60);
+	const titleOf = (el) => (el.querySelector(".tc-card-title, .tc-n-card-title")?.textContent ?? el.textContent ?? "").trim();
 
 	/**
-	 * Every visible row of the screen: a key (its title and its count among equals, the same in every mode), its list,
-	 * its box, the row before it in the DOM. A row's box takes in its own margin below: the room it claims under itself
-	 * (a folded parent draws its fold there), so the gap to the next row is the list's card gap. Also the elements by key,
-	 * so an animation is told to its row.
+	 * A row's key, the same in every frame and every mode: the key the view gives it (\`data-row\`, the model's row key;
+	 * the old screen's \`data-card\`, its task's id), or its whole title where it has neither, with a count among rows
+	 * of the same base. An element keeps the key it was first given, so two rows of one title never swap numbers as they
+	 * move; a key goes to another element only once its own left the DOM, so a row remounted keeps its key (and a
+	 * remount that flashes shows as one row gone and back).
+	 */
+	const rowKeys = new WeakMap();
+	const holders = new Map();
+	const baseOf = (el) => el.dataset.row ?? el.dataset.card ?? titleOf(el);
+	const keyFor = (el, taken) => {
+		const base = baseOf(el);
+		const kept = rowKeys.get(el);
+		if (kept && kept.startsWith(base + "/") && !taken.has(kept)) return kept;
+		const heldElsewhere = (key) => {
+			const holder = holders.get(key)?.deref();
+			return holder && holder !== el && holder.isConnected;
+		};
+		let n = 1;
+		while (taken.has(base + "/" + n) || heldElsewhere(base + "/" + n)) n++;
+		const key = base + "/" + n;
+		rowKeys.set(el, key);
+		holders.set(key, new WeakRef(el));
+		return key;
+	};
+
+	/**
+	 * Every visible row of the screen: its key (keyFor), its list, its box, the row before it in the DOM. A row's box
+	 * takes in its own margin below: the room it claims under itself (a folded parent draws its fold there), so the gap
+	 * to the next row is the list's card gap. Also the elements by key, so an animation is told to its row.
 	 */
 	const sampleRows = () => {
 		const root = view();
 		if (!root) return { rows: [], keyOf: new Map() };
 		const within = root.getBoundingClientRect();
 		const lists = [...root.querySelectorAll(".tc-list, .tc-rows-stack, .tc-project-group, .tc-n-list")];
-		const seen = new Map();
+		const taken = new Set();
 		const found = [];
 		for (const el of root.querySelectorAll(ROWS)) {
 			if (el.closest(".tc-float, .tc-panel, .tc-n-float, .tc-n-layers")) continue;
@@ -36,11 +61,10 @@ export const PAGE_SCRIPT = String.raw`
 			const column = COLUMNS.find(([, sel]) => el.closest(sel));
 			const container = el.parentElement;
 			const list = (column ? column[0] : "list") + "#" + (lists.includes(container) ? lists.indexOf(container) : "p" + lists.length);
-			const base = titleOf(el);
-			const n = (seen.get(base) ?? 0) + 1;
-			seen.set(base, n);
+			const key = keyFor(el, taken);
+			taken.add(key);
 			const below = parseFloat(getComputedStyle(el).marginBottom) || 0;
-			found.push({ el, row: { key: base + "/" + n, list, x: r.left, y: r.top, w: r.width, h: r.height + below } });
+			found.push({ el, row: { key, list, x: r.left, y: r.top, w: r.width, h: r.height + below } });
 		}
 		const keyOf = new Map(found.map(({ el, row }) => [el, row.key]));
 		return { rows: found.map(({ el, row }) => ({ ...row, prev: (el.previousElementSibling && keyOf.get(el.previousElementSibling)) ?? null })), keyOf };
@@ -88,7 +112,7 @@ export const PAGE_SCRIPT = String.raw`
 					kind: a.constructor.name,
 					state: a.playState,
 					target: t ? t.tagName.toLowerCase() + (typeof t.className === "string" && t.className ? "." + t.className.split(" ").slice(0, 2).join(".") : "") : null,
-					row: rowEl ? (keyOf.get(rowEl) ?? titleOf(rowEl)) : null,
+					row: rowEl ? (keyOf.get(rowEl) ?? rowKeys.get(rowEl) ?? baseOf(rowEl)) : null,
 				};
 			});
 
@@ -98,7 +122,8 @@ export const PAGE_SCRIPT = String.raw`
 		const { rows, keyOf } = sampleRows();
 		return { t: performance.now(), animations: animations(keyOf), rows, place: place() };
 	};
-	const tick = (t) => {
+	/** Named so the budget's trace leaves the sampler's own script out (frames.ts, HARNESS.sampler). */
+	const tick = function __e2eTick(t) {
 		if (!recorder.running) return;
 		recorder.times.push(t);
 		if (!recorder.light) recorder.frames.push(sample());
@@ -124,6 +149,13 @@ export const PAGE_SCRIPT = String.raw`
 			if (!el) return null;
 			const r = el.getBoundingClientRect();
 			return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
+		},
+		/** The key of the first row matching the selector that shows (the one a step carries), as the frames will name it. */
+		keyAt(selector) {
+			const el = [...document.querySelectorAll(selector)].find((e) => e.getBoundingClientRect().width > 0);
+			if (!el) return null;
+			const shown = new Set(sampleRows().rows.map((r) => r.key));
+			return rowKeys.get(el) ?? keyFor(el, shown);
 		},
 		/** The texts of the elements matching a selector that show. */
 		texts(selector) {
