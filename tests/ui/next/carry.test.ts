@@ -144,3 +144,29 @@ describe("the carry in the block (P6, inventory A4, A6)", () => {
 	});
 
 });
+
+describe("the carry By subprojects", () => {
+	it("lifts a part's card with what the core takes for it, and drops it between the parts' cards (tasks.dropInProjects)", async () => {
+		const h = await projectHarness();
+		let model = noteModel(h);
+		model = pass(h, model, { kind: "modePicked", mode: "byProject" }).model;
+		model = pass(h, model, { kind: "layerGone" }).model;
+		expect(currentLists(model).kind).toBe("byProject");
+		const key = cardKey(model, "Shop");
+		model = pass(h, model, { kind: "carry", msg: { kind: "lift", key, at: { x: 10, y: 10 }, box } }).model;
+		expect(model.carry?.cards.length).toBe(1);
+		model = pass(h, model, { kind: "carry", msg: { kind: "measured", geometry: geometryOf(model.pinned!) } }).model;
+		const list = model.carry!.geometry!.lists[0];
+		expect(list.column).toBe("projects");
+		/** Over Inbox's cards a day's card is refused (it would change stage into a list that refuses it: `projectsTakes`). */
+		expect(targetAt(model.carry!, model.pinned!, projectsView(model), 150, list.top + 2)).toBeNull();
+		const parentTop = list.rows.find((r) => r.key === cardKey(model, "Parent"))!.top;
+		const target = targetAt(model.carry!, model.pinned!, projectsView(model), 150, parentTop + 4);
+		expect(target?.drop?.kind).toBe("projects");
+		model = pass(h, model, { kind: "carry", msg: { kind: "over", target } }).model;
+		const out = pass(h, model, { kind: "carry", msg: { kind: "drop" } });
+		expect(out.doors).toEqual(["tasks.dropInProjects", "tasks.endCarry"]);
+		const titles = listsOf(currentLists(out.model)).flatMap(({ list: l }) => l.rows.flatMap((r) => (r.kind === "card" ? [r.item.title] : [])));
+		expect(titles.slice(0, 4)).toEqual(["Idea", "Call the bank", "Shop", "Parent"]);
+	});
+});

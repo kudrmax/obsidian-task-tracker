@@ -1,3 +1,4 @@
+import { wholeWidth } from "../../../../core/application/contracts";
 /**
  * The motion driver (§Architecture): every inline style and CSS variable the model gives, every animation, and the
  * reading of the boxes it animates, in the commit phase only. A drawing moves as the model says why it changed (P5):
@@ -190,8 +191,12 @@ export class Motion {
 		const { card, all } = Motion.floats(host);
 		if (!card) return;
 		const view = card.ownerDocument.defaultView;
-		const width = card.offsetWidth;
 		const margin = parseFloat(view?.getComputedStyle(card).getPropertyValue("--tc-whole-margin") ?? "") || 0;
+		if (!this.stretched.has(card)) {
+			this.stretched.add(card);
+			Motion.stretch(card, all, view?.innerWidth ?? 0, margin);
+		}
+		const width = card.offsetWidth;
 		const held = width > 0 && grab.dx > width ? width / 2 : grab.dx;
 		const room = view?.innerWidth ?? width;
 		const left = Math.max(margin, Math.min(x - held, room - margin - width));
@@ -221,6 +226,27 @@ export class Motion {
 		const flight = card.animate(frames, { duration: ms, easing, fill: "forwards" });
 		this.running.push(flight);
 		flight.finished.then(done, done);
+	}
+
+	private readonly stretched = new WeakSet<HTMLElement>();
+
+	/**
+	 * The float stretched to show its whole title on one line (the old screen's `stretchWhole`), as far as the core's
+	 * `wholeWidth` says inside the window's margin; the layers under it narrower by the same.
+	 */
+	private static stretch(card: HTMLElement, all: readonly HTMLElement[], room: number, margin: number): void {
+		const title = card.querySelector<HTMLElement>("[data-n-title]");
+		if (!title) return;
+		const range = card.ownerDocument.createRange();
+		range.selectNodeContents(title);
+		const fade = parseFloat(card.ownerDocument.defaultView?.getComputedStyle(card).getPropertyValue("--tc-fade-card") ?? "") || 0;
+		const width = card.offsetWidth;
+		const grown = wholeWidth({ width, titleWidth: title.clientWidth, textWidth: range.getBoundingClientRect().width, fade }, { width: room, margin });
+		if (!grown) return;
+		if (!grown.cut) card.style.setProperty("--tc-n-title-mask", "none");
+		const more = grown.width - width;
+		for (const part of all) if (part.dataset.nFloat !== "count") part.style.setProperty("width", `${part.offsetWidth + more}px`);
+		for (const part of all) if (part.dataset.nFloat === "count") part.style.setProperty("margin-left", `calc(${more}px + ${part.ownerDocument.defaultView?.getComputedStyle(part).marginLeft ?? "0px"})`);
 	}
 
 	/** The block's frame keeps the height it has while a carry stands (P6): what changes in the lists under the finger never refits it. */

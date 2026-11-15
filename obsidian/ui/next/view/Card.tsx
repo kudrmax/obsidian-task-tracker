@@ -62,12 +62,14 @@ export function Card({ rowKey, face, branch, listed, classes, links, copy }: Car
 	const cls = ["tc-n-card", listed ? "tc-n-listed" : "", face.over !== null ? "tc-n-card-two" : "", face.folded && listed ? "tc-n-card-folded" : "", classes ?? ""].filter(Boolean).join(" ");
 	return (
 		<div class={cls} data-n-key={copy ? undefined : rowKey} data-status={face.status} data-n-act={listed ? "card" : undefined} {...colourAttributes(face)}>
-			<span class="tc-n-pick">
-				<Icon name="check" />
-			</span>
+			{copy ? null : (
+				<span class="tc-n-pick">
+					<Icon name="check" />
+				</span>
+			)}
 			<span class="tc-n-progress-dot" />
 			{face.over === null ? (
-				<div class="tc-n-card-title">
+				<div class="tc-n-card-title" data-n-title="">
 					<Title parts={face.title} links={links} />
 				</div>
 			) : (
@@ -75,7 +77,7 @@ export function Card({ rowKey, face, branch, listed, classes, links, copy }: Car
 					<div class="tc-n-card-over">
 						<span class="tc-n-card-over-text">{face.over}</span>
 					</div>
-					<div class="tc-n-card-title">
+					<div class="tc-n-card-title" data-n-title="">
 						<Title parts={face.title} links={links} />
 					</div>
 				</div>

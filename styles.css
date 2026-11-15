@@ -1830,7 +1830,7 @@ body:not(.is-mobile) .task-calendar button.tc-n-btn:focus-visible { outline: var
 /* The carry in the block: the place a carried card waits at, the card a drop lands on, the lit plate, the drop line, the float. */
 .task-calendar .tc-n-stack { position: relative; }
 .task-calendar .tc-n-list > .tc-n-card.is-waiting { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
-.task-calendar .tc-n-card.is-waiting > *, .task-calendar .tc-n-card.is-arriving > * { visibility: hidden; }
+.task-calendar .tc-n-card.is-waiting > *, .task-calendar .tc-n-card.is-arriving > *, .task-calendar .tc-n-card.is-waiting[data-status] > .tc-n-progress-dot, .task-calendar .tc-n-card.is-arriving[data-status] > .tc-n-progress-dot { visibility: hidden; }
 .task-calendar .tc-n-list > .tc-n-card.is-arriving { background: none; box-shadow: none; }
 .task-calendar .tc-n-plate.is-hot { border-style: solid; border-color: var(--tc-accent); background: var(--tc-drop-bg); color: var(--tc-accent); }
 .task-calendar .tc-n-drop { position: absolute; left: 0; top: calc(var(--tc-n-drop-y, 0px) - var(--tc-drop-dot) / 2); height: var(--tc-drop-dot); width: var(--tc-n-drop-w, 0px); transform: translateX(var(--tc-n-drop-x, 0px)); z-index: var(--tc-layer-drop-gap); pointer-events: none; display: flex; align-items: center; }
@@ -1840,6 +1840,7 @@ body:not(.is-mobile) .task-calendar button.tc-n-btn:focus-visible { outline: var
 .task-calendar .tc-n-float { width: var(--tc-float-w); height: var(--tc-float-h); }
 .task-calendar .tc-n-float > .tc-n-card { width: 100%; height: 100%; background: var(--tc-float-bg); border-radius: var(--tc-radius-float); box-shadow: var(--tc-shadow-lift); }
 .task-calendar .tc-n-float > .tc-n-card[data-priority] { background: var(--tc-priority-fill); }
+.task-calendar .tc-n-float .tc-n-card-title { -webkit-mask-image: var(--tc-n-title-mask, var(--tc-fade-card-end)); mask-image: var(--tc-n-title-mask, var(--tc-fade-card-end)); }
 .task-calendar .tc-n-float .tc-n-due-mon, .task-calendar .tc-n-float .tc-n-due-repeat { color: var(--tc-float-month); }
 .task-calendar .tc-n-float-under { width: calc(var(--tc-float-w) - 2 * var(--tc-stack-step-x)); height: var(--tc-float-h); border-radius: var(--tc-radius-float); box-shadow: var(--tc-shadow-lift); }
 .task-calendar .tc-n-float-under-1 { margin: var(--tc-stack-step-y) 0 0 var(--tc-stack-step-x); background: var(--tc-stack-1); }

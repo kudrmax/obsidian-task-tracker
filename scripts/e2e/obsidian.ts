@@ -239,6 +239,14 @@ export class TestObsidian {
 			app.workspace.detachLeavesOfType("${PLUGIN}");
 			await app.vault.adapter.write(${JSON.stringify(tasks.path)}, ${JSON.stringify(tasks.text)});
 			for (const key of Object.keys(localStorage)) if (!key.startsWith("enable-plugin-")) localStorage.removeItem(key);
+			/** The plugin tidies the file it was just given (a write of its own): the page reloads only once that write has landed, never in the middle of it, which would leave the file cut short. */
+			let last = "";
+			for (let still = 0, i = 0; still < 3 && i < 50; i++) {
+				await new Promise((r) => setTimeout(r, 200));
+				const now = await app.vault.adapter.read(${JSON.stringify(tasks.path)});
+				still = now === last ? still + 1 : 0;
+				last = now;
+			}
 			return true;
 		`);
 		const { width, height } = SIZES[platform];

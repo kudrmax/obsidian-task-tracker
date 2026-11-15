@@ -1,4 +1,4 @@
-import { canPick, type DroppedTask, endsSelection, type ProjectsDrop, type TaskKey } from "../../../../core/application/contracts";
+import { canPick, type DropColumn, type DroppedTask, endsSelection, type ProjectsDrop, type TaskKey } from "../../../../core/application/contracts";
 import { okResult } from "../model/answers";
 import { type BlockLists, type BlockModel, currentLists, noteView, taskById, today } from "../model/block";
 import type { CarryModel, CarryMsg } from "../model/carry";
@@ -14,7 +14,7 @@ const failed = (error: { readonly code: string; readonly message: string }): Blo
 const carryMsg = (msg: CarryMsg): BlockMsg => ({ kind: "carry", msg });
 
 /** Every list the lists draw, by what each is (a funnel's column, or By subprojects' parts). */
-export function listsOf(lists: BlockLists): readonly { readonly column: CardRow["from"] | "projects"; readonly list: ListModel }[] {
+export function listsOf(lists: BlockLists): readonly { readonly column: DropColumn | "projects"; readonly list: ListModel }[] {
 	if (lists.kind === "rows") return lists.rows.map((row) => ({ column: row.column, list: row.list }));
 	if (lists.kind === "byProject") return [{ column: "projects", list: lists.list }];
 	return [];

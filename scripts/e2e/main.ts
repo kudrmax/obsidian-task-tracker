@@ -7,12 +7,14 @@ import { type Fixture, fixture } from "./fixture";
 import { type Platform, prepareVault, TestObsidian, type Theme } from "./obsidian";
 import { type Paths, paths } from "./paths";
 import { smoke } from "./smoke";
+import { blockCarry } from "./blockCarry";
 
 const USAGE = `npm run e2e -- <command>
   smoke [--update] [--refresh-fixture]   the smoke set on desktop and phone view, dark and light; --update records the baselines
   budget                                 the budget run: 4x CPU, 300 tasks, script per frame and long tasks
   open                                   launch the test Obsidian and leave it running (for a look by hand)
   try <desktop|phone> <dark|light>       the smoke set once, in the running one
+  carry <desktop|phone> <dark|light> <old|new>  the note block's carry, in the running one (new: newBlock on)
   eval "<js>"                            evaluate in the running one (an async function body)
   shot <file.png>                        a screenshot of the running one
   quit                                   quit the running one
@@ -55,7 +57,7 @@ export async function main(argv: readonly string[]): Promise<number> {
 	const p = paths();
 	const command = argv.find((a) => !a.startsWith("--")) ?? "smoke";
 	const args = argv.slice(argv.indexOf(command) + 1).filter((a) => !a.startsWith("--"));
-	if (["eval", "shot", "quit", "try"].includes(command)) {
+	if (["eval", "shot", "quit", "try", "carry"].includes(command)) {
 		const obsidian = await TestObsidian.attach(p);
 		try {
 			if (command === "eval") console.log(JSON.stringify(await obsidian.cdp.eval(args[0]), null, 1));
@@ -66,6 +68,20 @@ export async function main(argv: readonly string[]): Promise<number> {
 			if (command === "try") {
 				const run = runDir(p);
 				return report(await smokeIn(obsidian, fixture(p, false), [[args[0] as Platform, args[1] as Theme]], p, run, argv.includes("--update")), run);
+			}
+			if (command === "carry") {
+				const run = runDir(p);
+				const fx = fixture(p, false);
+				const [platform, theme, which] = args as [Platform, Theme, string];
+				await obsidian.reset(platform, theme, { path: fx.tasksFile, text: fx.tasks });
+				const driver = new Driver(obsidian, platform, theme, { baselines: join(p.baselines, "block"), run: join(run, which) }, argv.includes("--update"));
+				await driver.install();
+				try {
+					await blockCarry(driver, which === "new");
+				} catch (e) {
+					driver.outcomes.push({ combo: driver.combo, name: "the scenario", kind: "step", failures: [e instanceof Error ? e.message : String(e)] });
+				}
+				return report(driver.outcomes, run);
 			}
 			if (command === "quit") await obsidian.quit();
 			return 0;
