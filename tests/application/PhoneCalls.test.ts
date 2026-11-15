@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { ScreenView, TaskItem } from "../../core/application/contracts";
-import { callDoor, callDoorJson, type DoorAnswer, type DoorContext, DOOR_COVERAGE, doorMethods, HOST_TASK_METHODS, KEPT_TASK_NAMES, plainJson } from "../../core/application/PhoneCalls";
+import { REPLICA_TASK_NAMES, callDoor, callDoorJson, type DoorAnswer, type DoorContext, DOOR_COVERAGE, doorMethods, HOST_TASK_METHODS, KEPT_TASK_NAMES, plainJson } from "../../core/application/PhoneCalls";
 import { ReadingCache } from "../../core/application/ReadingCache";
 import { ScreenSettingsImpl } from "../../core/application/ScreenSettingsImpl";
 import { DEFAULT_ZOOM_LEVELS } from "../../core/application/timelineZoom";
@@ -297,7 +297,7 @@ describe("the door's tasks.* calls", () => {
 	it("cover every method of TaskService but the host's own", () => {
 		const declared = interfaceMethods("TaskService");
 		const offered = doorMethods().filter((m) => m.startsWith("tasks.")).map((m) => m.slice("tasks.".length));
-		const services = offered.filter((m) => !KEPT_TASK_NAMES.includes(m));
+		const services = offered.filter((m) => !KEPT_TASK_NAMES.includes(m) && !REPLICA_TASK_NAMES.includes(m));
 		expect([...services, ...HOST_TASK_METHODS].sort()).toEqual(declared.sort());
 		expect(new Set(TASK_CASES.map((c) => c.method))).toEqual(new Set(services));
 		expect(new Set(KEPT_CASES.map((c) => c.method))).toEqual(new Set(KEPT_TASK_NAMES));
@@ -357,7 +357,7 @@ describe("the door's coverage", () => {
 
 	it("answers in no space no interface names", () => {
 		const spaces = new Set(Object.values(DOOR_COVERAGE).flatMap((c) => ("space" in c ? [c.space] : [])));
-		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline", "notes", "projects"];
+		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline", "notes", "projects", "calendarsRefresh"];
 		expect(new Set(doorMethods().map((m) => m.split(".")[0]))).toEqual(new Set([...spaces, ...own]));
 	});
 });
@@ -529,7 +529,12 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 	const look = { cards: { day: [card("Parent"), card("Child one", 1), card("In progress")], soon: [card("Later"), card("Dated")] }, sections: { day: [null, "Errands"] }, sectioned: { day: true }, day: T, shown: ["day"] };
 	const gap = { kind: "gap", index: 1, level: 1, group: null };
 	const rule = { kind: "afterDone", every: 1, unit: "day", days: [], dayOfMonth: null, from: null };
-	const tasks = [...TASK_CASES, ...KEPT_CASES].map((c) => ({ method: `tasks.${c.method}`, args: c.args(screen), context: context(c.text === undefined ? FILE : c.text) }));
+	const byId: readonly Case[] = [
+		{ method: "keyOf", args: () => [named(screen, "Child one").id] },
+		{ method: "sectionOf", args: () => [screen.sections.now.find((s) => s.name === "Errands")!.id] },
+		{ method: "reconcile", args: () => [{}, [{ method: "tasks.renameProject", args: ["Окружение", "Среда"] }]] },
+	];
+	const tasks = [...TASK_CASES, ...KEPT_CASES, ...byId].map((c) => ({ method: `tasks.${c.method}`, args: c.args(screen), context: context(c.text === undefined ? FILE : c.text) }));
 	const plain = (method: string, ...args: unknown[]) => ({ method, args, context: context(FILE, { calendars: CALENDARS }) });
 	const entry = (method: string, ...args: unknown[]) => plain(`entry.${method}`, null, look, ...args);
 	const opened = callDoor("entry.openAtEnd", wire([null, look, "day"]), context()) as Extract<DoorAnswer, { ok: true }>;
@@ -583,6 +588,11 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("description.typed", { file: "- a", typed: false }),
 		plain("description.save", { file: "- a", typed: true }),
 		plain("description.read", { file: "- a", typed: true }, "- b", { focused: false, pending: false }),
+		plain("calendarsRefresh.ask", "open", true),
+		plain("calendarsRefresh.feedKey"),
+		plain("calendarsRefresh.feedDue", { atMs: NOW.getTime() - 1000, key: "[]" }),
+		plain("calendarsRefresh.problem", { message: "500" }),
+		plain("calendarsRefresh.silence"),
 		plain("rules.constants"),
 		plain("rules.nextProgress", ["todo", "inProgress"]),
 		plain("rules.sameSlot", { date: T, start: 1, end: null }, { date: T, start: 1, end: null }),

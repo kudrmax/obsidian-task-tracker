@@ -1,7 +1,8 @@
 import type { GroupName, Slot } from "../domain/Task";
 import type { RepeatRule } from "../domain/Repeat";
 import type { Placement } from "../domain/Placement";
-import type { DropTo, NewTaskPlace, TaskItem, TaskKey, TaskService } from "./contracts";
+import type { CreatedTask, DropTo, NewTaskPlace, TaskItem, TaskKey, TaskService } from "./contracts";
+import { type EntryJobOutcome, type EntryJobs, type EntryJobStep, entryJobStep } from "./EntryJobs";
 import type { ListCard, ListPlace } from "./nesting";
 import type { EntryList } from "./screenPlaces";
 import { type EntryDrawing, type EntryJob, type EntryLook, type EntrySpot, type EntryState, type EntryTasks, type ListEntry, type PendingRename, type PlaceMove, QuickEntry, type StackEntry } from "./QuickEntry";
@@ -183,37 +184,49 @@ export class QuickEntrySession {
 		return this.entry.placeOf(column, result, placement);
 	}
 
-	/** A job, once the lists show the writes before it; whatever happens, its spot stops following the cards after it. */
+	/**
+	 * A job, run step by step in the order `entryJobStep` gives: its call once the lists show the writes before it, the
+	 * write, the new task shown; whatever happens, its spot stops following the cards after it and it is done. A step that
+	 * failed is reported once the job is done.
+	 */
 	private async run(job: EntryJob): Promise<void> {
-		try {
-			await this.view.fresh();
-			await this.write(job);
-		} finally {
-			this.entry.unshown(job.id);
-			this.entry.done(job.id);
+		let jobs: EntryJobs = { queue: [job], running: null };
+		let outcome: EntryJobOutcome = null;
+		let failure: { readonly error: unknown } | null = null;
+		for (;;) {
+			const next = entryJobStep(jobs, outcome);
+			jobs = next.jobs;
+			if (next.step === null) break;
+			try {
+				outcome = await this.take(next.step);
+			} catch (error) {
+				failure ??= { error };
+				outcome = { ok: false };
+			}
 		}
+		if (failure) throw failure.error;
 	}
 
-	private async write(job: EntryJob): Promise<void> {
-		const call = this.entry.call(job.id);
-		if (!call) return void (job.kind === "section" && (await this.view.fresh()));
-		switch (call.method) {
-			case "createInPlace": {
-				const created = await this.tasks.createWithId(...call.args);
-				return this.view.fresh((coming) => this.entry.shown(job.id, created, coming));
-			}
-			case "edit": {
-				const now = await this.tasks.edit(...call.args);
-				if (now && job.kind === "rename") this.view.renamed?.(job.item, now);
-				return;
-			}
-			case "createSection":
-				await this.tasks.createSection(...call.args);
-				await this.view.fresh();
-				return;
-			case "unfoldAbove":
-				await this.tasks.unfoldAbove?.(...call.args);
-				await this.view.fresh();
+	/** One step of a job, over this session's entry and service. */
+	private async take(step: EntryJobStep): Promise<EntryJobOutcome> {
+		if (step.kind === "renamed") {
+			this.view.renamed?.(step.was, step.now);
+			return null;
 		}
+		const [space, name] = step.method.split(".");
+		const [id, ...args] = step.args as [string, ...unknown[]];
+		if (space === "entry" && name === "shown") {
+			await this.view.fresh((coming) => this.entry.shown(id, args[0] as CreatedTask | null, coming));
+			return { ok: true, result: null };
+		}
+		if (step.fresh) await this.view.fresh();
+		if (space === "entry") {
+			if (name === "call") return { ok: true, result: { value: this.entry.call(id), jobs: [] } };
+			if (name === "unshown") this.entry.unshown(id);
+			else this.entry.done(id);
+			return { ok: true, result: null };
+		}
+		const write = (this.tasks as unknown as Record<string, ((...a: unknown[]) => Promise<unknown>) | undefined>)[name];
+		return { ok: true, result: write ? await write.apply(this.tasks, step.args as unknown[]) : null };
 	}
 }

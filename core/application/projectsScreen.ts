@@ -60,7 +60,7 @@ export function projectOfNode(node: ProjectsNodeId): string | null {
 	return node.startsWith(PROJECT_PREFIX) ? node.slice(PROJECT_PREFIX.length) : null;
 }
 
-function sameNode(a: ProjectsNodeId, b: ProjectsNodeId): boolean {
+export function sameNode(a: ProjectsNodeId, b: ProjectsNodeId): boolean {
 	const x = projectOfNode(a);
 	const y = projectOfNode(b);
 	return x !== null && y !== null ? projectKey(x) === projectKey(y) : a === b;

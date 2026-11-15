@@ -3313,6 +3313,31 @@ ${key.title}`.toLowerCase();
     return parts.join(" ");
   }
 
+  // core/application/calendarsRefresh.ts
+  var SECOND_MS = 1e3;
+  var FEED_SILENCE_MS = 15e3;
+  function calendarsAsk(reason, cached) {
+    if (reason === "refresh") return { feeds: "forced", waitFeeds: true };
+    if (reason === "peek" && cached) return { feeds: "none", waitFeeds: false };
+    return { feeds: "due", waitFeeds: false };
+  }
+  function feedKey(settings) {
+    const { clientId, refreshToken } = settings.google;
+    return JSON.stringify([clientId, refreshToken]);
+  }
+  function feedDue(last, nowMs, settings) {
+    const seconds = settings.google.refreshSeconds;
+    if (seconds <= 0 || last === null || last.key !== feedKey(settings)) return true;
+    return nowMs - last.atMs >= seconds * SECOND_MS;
+  }
+  function feedProblem(e) {
+    if (e instanceof SourceProblemError) return e.problem;
+    return { kind: "failed", detail: e instanceof Error ? e.message : String(e) };
+  }
+  function feedSilence() {
+    return new SourceProblemError({ kind: "noAnswer", seconds: FEED_SILENCE_MS / SECOND_MS }, `no answer in ${FEED_SILENCE_MS / SECOND_MS} s`);
+  }
+
   // core/application/cardDue.ts
   function cardDue(item, day) {
     const date = item.dueDate !== null && item.dueDate !== day ? item.dueDate : null;
@@ -8326,7 +8351,7 @@ ${at.reading}`;
       };
       this.store = store;
       this.identity = new TaskIdentity(context.ids, cache);
-      this.rules = new TaskRules(store, clock, this.identity, context.ids !== void 0, { list: () => context.projects ?? NO_NOTES, ready: () => true }, cache);
+      this.rules = new TaskRules(store, clock, this.identity, context.ids !== void 0, { list: () => context.projects ?? NO_NOTES, ready: () => context.projectsReady !== false }, cache);
       this.reads = new TaskReads(this.rules, store, clock, { tree: () => this.tree(), screen: () => this.projectsScreen });
       this.writes = new TaskWrites(this.rules, this.reads);
       this.text = context.tasks ?? null;
@@ -8610,6 +8635,65 @@ ${at.reading}`;
       c.effects.tasks = c.rules.emptyFile();
     }
   };
+  function undone(c, state, call) {
+    if (call.method === "tasks.renameProject") {
+      const [from, to] = call.args;
+      const name = c.rules.cleanName(to);
+      return name === null ? state : renamedIn(state, name, from);
+    }
+    if (call.method === "tasks.createProject" && call.projectsScreen) {
+      const name = c.rules.cleanName(call.args[0]);
+      const made = name === null ? null : projectNodeOf(name);
+      if (made === null || state.selected === void 0 || !sameNode(state.selected, made)) return state;
+      const { selected: _selected, folded: _folded, ...rest } = state;
+      const { selected: selected2, folded: folded2 } = call.projectsScreen;
+      return { ...rest, ...selected2 !== void 0 && { selected: selected2 }, ...folded2 !== void 0 && { folded: folded2 } };
+    }
+    return state;
+  }
+  var REPLICA_TASKS = {
+    /**
+     * The device's Projects screen after a host replayed its pending calls over a file changed elsewhere: `idMap` (old id
+     * → new id) the ids the replay gave the tasks its creates made again; the carry's tasks follow them and stand as the
+     * file has them now; `dropped`, the calls the replay dropped, their changes of the screen taken back, the last first.
+     * Writes no tasks; answers the screen, which the answer's `projectsScreen` carries too.
+     */
+    reconcile: (c, [idMap, dropped]) => {
+      const ids = idMap ?? {};
+      const doc = c.hasTasks() ? c.snapshot().doc : null;
+      const moved2 = (id) => Object.prototype.hasOwnProperty.call(ids, id) ? ids[id] : id;
+      const fresh = (key) => {
+        if (key.id === void 0) return key;
+        const entry = doc?.byId(moved2(key.id));
+        return entry ? keyOf(entry) : { ...key, id: moved2(key.id) };
+      };
+      let state = c.projectsScreen;
+      for (const call of [...dropped ?? []].reverse()) state = undone(c, state, call);
+      const carry = state.carry;
+      if (carry) {
+        const cards = carry.cards?.map((card) => ({ ...card, key: fresh(card.key), ...card.lifted && { lifted: { ...card.lifted, id: moved2(card.lifted.id) } } }));
+        state = { ...state, carry: { ...carry, keys: carry.keys.map(fresh), ...cards && { cards } } };
+      }
+      c.keepProjectsScreen(state);
+      return state;
+    },
+    /** The key of the task `id` names (`TaskItem.id`) in the file as read now, null when no task has it; nothing written. */
+    keyOf: (c, [id]) => {
+      const entry = c.snapshot().doc.byId(id);
+      return entry ? keyOf(entry) : null;
+    },
+    /** The list and name of the section `id` names (`ListSection.id`) in the file as read now, null when no section has it. */
+    sectionOf: (c, [id]) => {
+      const doc = c.snapshot().doc;
+      for (const list of GROUPED_LISTS) {
+        const group = doc.groups(list).find((g) => g.id === id && g.name !== null);
+        if (group) return { list, name: group.name };
+      }
+      return null;
+    }
+  };
+  var REPLICA_TASK_NAMES = Object.keys(REPLICA_TASKS);
+  var HOST_TASK_METHODS = ["onChange"];
   var KEPT_TASKS = {
     /** `pickProjectNode` on a wide screen. */
     tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node)),
@@ -8642,6 +8726,7 @@ ${at.reading}`;
     /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
     boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
   };
+  var HOST_DAY_METHODS = ["onDayChange", "catchUp"];
   var BOUNDARY = {
     startHour: (c) => boundaryOf2(c).startHour,
     dayOf: (c, [ms]) => boundaryOf2(c).dayOf(new Date(ms)),
@@ -8687,12 +8772,12 @@ ${at.reading}`;
       }
     }
     const fetched = c.context.fetched ?? FETCHED_BY_DEFAULT;
-    return { sources: CALENDAR_SOURCES, files, problem: (s) => problems.get(s) ?? null, fed: (s) => fetched.includes(s) };
+    return { sources: CALENDAR_SOURCES, files, problem: (s) => problems.get(s) ?? c.context.feedProblems?.[s] ?? null, fed: (s) => fetched.includes(s) };
   }
   function calendarDay(c) {
     const reading = readingOf(c);
     const day = new CalendarDay(reading, c.settings, c.now);
-    const carried = day.carryOver(true);
+    const carried = day.carryOver((c.context.host ?? "ios") === "ios");
     if (!carried) return day;
     c.saveSettings(carried);
     return new CalendarDay(reading, c.settings, c.now);
@@ -8717,6 +8802,19 @@ ${at.reading}`;
   function meetings(c, fromMs, toMs) {
     return calendarDay(c).timedBetween(new Date(fromMs), new Date(toMs)).map((e) => ({ title: e.title, startMs: e.start.getTime(), endMs: e.end.getTime() }));
   }
+  var CALENDARS_REFRESH = {
+    ask: (_c, [reason, cached]) => calendarsAsk(reason, cached === true),
+    feedKey: (c) => feedKey(c.settings),
+    feedDue: (c, [last]) => feedDue(last ?? null, c.context.nowMs, c.settings),
+    problem: (_c, [failure]) => {
+      if (failure instanceof Error) return feedProblem(failure);
+      const { problem, message } = failure ?? {};
+      return problem ?? { kind: "failed", detail: message ?? "" };
+    },
+    silence: () => ({ ms: FEED_SILENCE_MS, problem: feedSilence().problem })
+  };
+  var PHONE_CALENDAR_METHODS = ["files", "sources", "meetings"];
+  var HOST_CALENDAR_METHODS = ["onChange", "keepFresh"];
   var SETTINGS_METHODS = [
     "form",
     "setTasksFile",
@@ -8758,6 +8856,7 @@ ${at.reading}`;
       }
     ])
   );
+  var HOST_SETTINGS_METHODS = ["bindClientSecret"];
   var SCREEN_SETTINGS = {
     get: (c) => screenSettingsOf(c.settings)
   };
@@ -8996,13 +9095,14 @@ ${at.reading}`;
     return `obsidian://open?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(file)}`;
   }
   var SPACES = {
-    tasks: { ...TASKS, ...KEPT_TASKS },
+    tasks: { ...TASKS, ...KEPT_TASKS, ...REPLICA_TASKS },
     days: { ...DAYS, stepScreen: (c, [from, shift]) => {
       const at = from;
       return stepFunnel({ mode: at.mode === "projects" ? "done" : at.mode, date: at.date }, shift, c.rules.today());
     } },
     boundary: BOUNDARY,
     calendars: CALENDARS,
+    calendarsRefresh: CALENDARS_REFRESH,
     history: HISTORY,
     settings: SETTINGS,
     screenSettings: SCREEN_SETTINGS,
@@ -9016,6 +9116,20 @@ ${at.reading}`;
     notes: NOTES,
     projects: PROJECTS,
     rules: { ...Object.fromEntries(Object.entries({ ...RULES, ...KEPT_RULES }).map(([name, fn]) => [name, (_c, args) => fn(...args)])), constants: () => CONSTANTS }
+  };
+  var DOOR_COVERAGE = {
+    TaskService: { space: "tasks", host: HOST_TASK_METHODS, own: [...KEPT_TASK_NAMES, ...REPLICA_TASK_NAMES] },
+    DayService: { space: "days", host: HOST_DAY_METHODS, own: ["stepScreen"] },
+    UndoService: { space: "history", host: ["onChange"] },
+    CalendarService: { space: "calendars", host: HOST_CALENDAR_METHODS, own: PHONE_CALENDAR_METHODS },
+    SettingsService: { space: "settings", host: HOST_SETTINGS_METHODS },
+    ScreenSettingsStore: { space: "screenSettings", host: ["onChange"] },
+    GoogleAccount: { hostOwned: "Google's login is a browser's consent and a token fetched over the network, and whether one is kept goes with it: the door makes no request" },
+    WorkCalendarSetup: { hostOwned: "the Scriptable script and the Shortcuts export are the Obsidian plugin's fallback on the iPhone; an app writes calendar/iphone.json itself (iphoneCalendarText)" },
+    DayEventsAsk: { hostOwned: "`calendars.events` answers the day over the files handed in; fetching them afresh is the host's" },
+    PolledScreen: { hostOwned: "the frontend implements it for keepFresh, which is the host's" },
+    CalendarPoll: { hostOwned: "keepFresh answers it, and polling is the host's" },
+    SecretField: { hostOwned: "the frontend implements it for bindClientSecret, which is the host's" }
   };
   function doorMethods() {
     return Object.entries(SPACES).flatMap(([space, handlers]) => Object.keys(handlers).map((name) => `${space}.${name}`));
