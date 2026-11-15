@@ -1,19 +1,11 @@
 import type { ProjectsScreenState } from "../../../core/application/contracts";
 import type { TaskIdState } from "../../../core/application/TaskIdentity";
+import { resultOf } from "../replica/Door";
 import type { Door } from "../replica/Door";
 import { contextOf, type Replica } from "../replica/Replica";
 import { NOTICE_WORDS, type Notices, type RuntimeEvents } from "../events";
 import type { PendingCall, PendingLog } from "./PendingLog";
 import { replay } from "./Replay";
-
-/**
- * The ids a new base is read with: those that went with the old base (so a task the pending calls name is found by its
- * id), going on from the replica's counter, so no id is ever given twice in the runtime's life.
- */
-function baseIds(base: TaskIdState | undefined, now: TaskIdState | undefined): TaskIdState | undefined {
-	if (base === undefined || now === undefined || now.next <= base.next) return base ?? now;
-	return { ...base, next: now.next };
-}
 
 export interface RebaserDeps {
 	readonly door: Door;
@@ -37,7 +29,10 @@ export class Rebaser {
 	/** The file was read at `text`: it becomes the base, and the pending calls run again over it. */
 	rebase(text: string, dropped: readonly PendingCall[] = []): void {
 		const { door, replica, log } = this.deps;
-		const start = { ...contextOf(replica.state, this.deps.now()), tasks: text, history: log.base.history, ids: baseIds(log.base.ids, replica.state.ids) };
+		const context = contextOf(replica.state, this.deps.now());
+		/** The ids that went with the old base (a task the pending calls name is found by its id), going on from the replica's counter: none is given twice. */
+		const ids = resultOf<TaskIdState | null>(door.call("ids.continueFrom", [log.base.ids ?? null, replica.state.ids ?? null], context), "ids.continueFrom") ?? undefined;
+		const start = { ...context, tasks: text, history: log.base.history, ids };
 		const tidy = door.call("tasks.normalize", [], start);
 		const tidied = tidy.ok ? { ...start, tasks: tidy.tasks ?? text, ids: tidy.ids ?? start.ids } : start;
 		log.rebase(text, tidied.ids);

@@ -1,7 +1,6 @@
-import type { TaskKey } from "../../../core/application/contracts";
 import type { DoorAnswer, DoorContext } from "../../../core/application/PhoneCalls";
 import type { Door } from "../replica/Door";
-import { createdIds, GoneRef, mapIds, type RefResolver, resolveRefs } from "../replica/refs";
+import { followSections, GoneSection, namedSections } from "../replica/refs";
 import type { PendingCall } from "./PendingLog";
 
 /** What a replay leaves: the text, history and ids it ends with, the calls kept and dropped, and old id → new id. */
@@ -12,28 +11,40 @@ export interface ReplayResult {
 	readonly idMap: ReadonlyMap<string, string>;
 }
 
-/** Each reference of a call resolved over the text as the call is about to run on it. */
-export function resolverOver(door: Door, context: DoorContext): RefResolver {
-	const ask = (method: string, id: string): unknown => {
-		const answer = door.call(method, [id], context);
-		return answer.ok ? answer.result : null;
-	};
-	return {
-		key: (id) => ask("tasks.keyOf", id) as TaskKey | null,
-		section: (id) => (ask("tasks.sectionOf", id) as { readonly name: string } | null)?.name ?? null,
-	};
+/** A call's run: its arguments as they now stand (tasks by their current keys, sections still by ref), and the door's answer. */
+export interface ResolvedRun {
+	readonly args: readonly unknown[];
+	readonly answer: DoorAnswer;
 }
 
-/** The door's answer to a call over `context`, its references resolved first; a reference gone is a stale task. */
-export function runResolved(door: Door, call: { readonly method: string; readonly args: readonly unknown[] }, context: DoorContext, keys: boolean): DoorAnswer {
-	let args: readonly unknown[];
+const stale = (message: string): DoorAnswer => ({ ok: false, error: { code: "staleTask", message } });
+
+/**
+ * The door's answer to a call over `context`: its ids mapped through `idMap` and its tasks' keys made current by the door
+ * (`tasks.freshArgs`), its section refs named (`tasks.sectionOf`). A task or section gone is a stale task.
+ */
+export function runResolved(door: Door, call: { readonly method: string; readonly args: readonly unknown[] }, context: DoorContext, idMap: ReadonlyMap<string, string> = new Map()): ResolvedRun {
+	const followed = followSections(call.args, idMap);
+	/** Without a file no task can be named, and the door's `freshArgs` needs one. */
+	const fresh: DoorAnswer = context.tasks === null ? { ok: true, result: followed } : door.call("tasks.freshArgs", [followed, Object.fromEntries(idMap)], context);
+	if (!fresh.ok) return { args: call.args, answer: fresh };
+	const args = fresh.result as readonly unknown[];
+	let named: readonly unknown[];
 	try {
-		args = resolveRefs(call.args, resolverOver(door, context), keys);
+		named = namedSections(args, (id) => {
+			const answer = door.call("tasks.sectionOf", [id], context);
+			return answer.ok ? ((answer.result as { readonly name: string } | null)?.name ?? null) : null;
+		});
 	} catch (e) {
-		if (e instanceof GoneRef) return { ok: false, error: { code: "staleTask", message: e.message } };
+		if (e instanceof GoneSection) return { args, answer: stale(e.message) };
 		throw e;
 	}
-	return door.call(call.method, args, context);
+	return { args, answer: door.call(call.method, named, context) };
+}
+
+/** The ids an answer's writes gave anew, in the order given (`DoorAnswer.created`). */
+export function createdBy(answer: DoorAnswer): readonly string[] {
+	return answer.ok ? (answer.created ?? []) : [];
 }
 
 /**
@@ -47,14 +58,13 @@ export function replay(door: Door, start: DoorContext, calls: readonly PendingCa
 	const dropped: PendingCall[] = [];
 	const idMap = new Map<string, string>();
 	for (const call of calls) {
-		const args = mapIds(call.args, idMap);
 		const over: DoorContext = { ...context, nowMs: call.nowMs, projectsScreen: call.projectsScreen };
-		const answer = runResolved(door, { method: call.method, args }, over, true);
+		const { args, answer } = runResolved(door, call, over, idMap);
 		if (!answer.ok) {
 			dropped.push(call);
 			continue;
 		}
-		const created = createdIds(context.ids, answer.ids);
+		const created = createdBy(answer);
 		call.created.forEach((old, i) => {
 			if (created[i] !== undefined && created[i] !== old) idMap.set(old, created[i]);
 		});

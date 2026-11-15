@@ -2,8 +2,7 @@ import type { ProjectsScreenState } from "../../../core/application/contracts";
 import type { DoorAnswer } from "../../../core/application/PhoneCalls";
 import type { Door } from "./Door";
 import type { PendingCall, PendingLog } from "../persistence/PendingLog";
-import { runResolved } from "../persistence/Replay";
-import { createdIds } from "./refs";
+import { createdBy, runResolved } from "../persistence/Replay";
 import type { Replica, ReplicaState } from "./Replica";
 
 /** A call's answer, and the pending call it made when it changed the tasks text (its `seq` names it in a replay's `dropped`). */
@@ -38,7 +37,7 @@ export class ReplicaCalls {
 		const state = this.replica.state;
 		const nowMs = this.now();
 		const context = this.replica.context(nowMs);
-		const answer = runResolved(this.door, { method, args }, context, true);
+		const { answer } = runResolved(this.door, { method, args }, context);
 		if (!answer.ok) return { answer, pending: null };
 		const pending = this.logged(state, answer, { method, args, nowMs });
 		this.replica.update({
@@ -55,12 +54,12 @@ export class ReplicaCalls {
 
 	/** A read over the replica: nothing of its answer is taken (views never write; the replica is tidied before). */
 	read(method: string, args: readonly unknown[]): DoorAnswer {
-		return runResolved(this.door, { method, args }, this.replica.context(this.now()), true);
+		return runResolved(this.door, { method, args }, this.replica.context(this.now())).answer;
 	}
 
 	/** A change of the text over a file that is there enters the log; the text of a file being created is no call to replay. */
 	private logged(state: ReplicaState, answer: Extract<DoorAnswer, { ok: true }>, call: { method: string; args: readonly unknown[]; nowMs: number }): PendingCall | null {
 		if (answer.tasks === undefined || state.tasks === null) return null;
-		return this.log.append({ ...call, projectsScreen: state.projectsScreen, created: createdIds(state.ids, answer.ids) });
+		return this.log.append({ ...call, projectsScreen: state.projectsScreen, created: createdBy(answer) });
 	}
 }

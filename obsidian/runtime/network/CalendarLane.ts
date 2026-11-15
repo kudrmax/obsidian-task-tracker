@@ -1,5 +1,6 @@
 import type { CalendarSource, EventsReason, SourceProblem } from "../../../core/application/contracts";
 import type { CalendarsAsk, FeedRun } from "../../../core/application/calendarsRefresh";
+import { SourceProblemError } from "../../../core/application/EventSource";
 import type { Timers } from "../../../core/application/ports";
 import type { DoorAnswer } from "../../../core/application/PhoneCalls";
 import { resultOf } from "../replica/Door";
@@ -74,8 +75,10 @@ export class CalendarLane {
 		return resultOf<boolean>(this.deps.read("calendarsRefresh.feedDue", [this.runs.get(feed.name) ?? null]), "calendarsRefresh.feedDue");
 	}
 
+	/** A failure as the door reads it: plain data (`{ problem }` of a source's own problem, else `{ message }`), as on the wire. */
 	private problemOf(error: unknown): SourceProblem {
-		return resultOf<SourceProblem>(this.deps.read("calendarsRefresh.problem", [error]), "calendarsRefresh.problem");
+		const failure = error instanceof SourceProblemError ? { problem: error.problem } : { message: error instanceof Error ? error.message : String(error) };
+		return resultOf<SourceProblem>(this.deps.read("calendarsRefresh.problem", [failure]), "calendarsRefresh.problem");
 	}
 
 	/** One feed run, bounded by the core's silence: a good run is remembered, a failure or a silence is the source's problem. */
