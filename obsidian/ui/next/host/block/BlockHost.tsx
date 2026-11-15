@@ -16,7 +16,7 @@ import { Measure } from "../../drivers/measure";
 import { Motion } from "../../drivers/motion";
 import { OverlayHost } from "../../drivers/overlay";
 import { EdgeScroll } from "../../drivers/scroll";
-import { type BlockModel, blockModel, blockNeeds, currentLists, projectsView, rootVars, rowVars, sectioned, settings } from "../../model/block";
+import { type BlockModel, blockModel, blockNeeds, holdsHeight, currentLists, projectsView, rootVars, rowVars, sectioned, settings } from "../../model/block";
 import type { CarryMsg, CarryTarget } from "../../model/carry";
 import { targetAt } from "../../model/carryPlace";
 import { carryVars } from "../../model/carryView";
@@ -218,11 +218,14 @@ export class BlockHost {
 		if (this.disposed) return;
 		const moved = model.motion.seq !== this.drawnSeq;
 		this.motion.before(moved && model.motion.cause === "move");
+		/** A hold starts at the height the frame has before this drawing (a field's row must not grow it first). */
+		const drawn = this.node.firstElementChild;
+		if (drawn instanceof HTMLElement && holdsHeight(model)) Motion.holdHeight(drawn, true);
 		render(<BlockRoot model={model} layers={this.overlay.node} />, this.node);
 		this.drawnSeq = model.motion.seq;
 		this.motion.after(moved ? model.motion.cause : "none", new Map([...rowVars(drawnLists(model)), ...carryVars(model), ...fullRowVars(model), ...rootVars(model)]), model.entry?.bound);
 		const frame = this.node.firstElementChild;
-		if (frame instanceof HTMLElement) Motion.holdHeight(frame, model.carry !== null);
+		if (frame instanceof HTMLElement) Motion.holdHeight(frame, holdsHeight(model));
 		this.motion.layerVars(this.overlay.node, menuVars(model));
 		const menu = openMenu(model);
 		this.motion.menu(this.overlay.node, this.node, menu?.place ?? null, (place) => this.dispatch({ kind: "menu", msg: { kind: "placed", place } }));

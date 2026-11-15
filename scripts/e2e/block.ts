@@ -4,8 +4,6 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** The block alone, old or new: Obsidian's note around it is never compared; 1 px of the old block's short height is cropped. */
 const BLOCK = { of: ".tc-project-block, .tc-n-block", fit: { px: 1, cut: { fromBottom: 71 } } } as const;
-/** The block with a field open: the new block grows for the field and its bar, the old one scrolled them in (decision 56). */
-const TYPING = { of: ".tc-project-block, .tc-n-block", fit: { px: 60, cut: "bottom" } } as const;
 /** A layer over the block (a menu): the whole page, the note and Obsidian's chrome as they stand under the sheet. */
 const PAGE = { of: "body" };
 
@@ -83,7 +81,7 @@ export async function block(d: Driver, newBlock: boolean): Promise<void> {
 
 	await showBlock(d);
 	await d.step("the plus opens a field", "interaction", () => d.tapOn(SEL.plus), { moves: "all" });
-	await d.shot("field open", TYPING);
+	await d.shot("field open", BLOCK);
 	/** On the phone a tap's mouse events land where the plus stood once it hid under the field's bar; then the field is tapped, as Max would. */
 	if (!(await d.page<boolean>(`return !!document.activeElement?.closest(${JSON.stringify(SEL.block)})`))) await d.tapOn(":is(.tc-project-block .tc-quick-row, .tc-n-block [data-n-island])");
 	if (!(await d.page<boolean>(`return !!document.activeElement?.closest(${JSON.stringify(SEL.block)})`))) throw new Error("no field in the block takes the focus");

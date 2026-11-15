@@ -263,3 +263,11 @@ export function blends(model: BlockModel): boolean {
 export function entering(model: BlockModel): boolean {
 	return model.entry?.state != null;
 }
+
+/**
+ * The frame keeps the height it had (P6): while a card is carried, and while a field is open — as the old block, whose
+ * field and its bar stood in the room under the rows and whose frame grew only once the field had closed.
+ */
+export function holdsHeight(model: BlockModel): boolean {
+	return model.carry !== null || (model.entry?.state ?? null) !== null;
+}
