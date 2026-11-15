@@ -10,6 +10,8 @@ import { systemClock, type Clock, type SettingsStore } from "../core/application
 import { SettingsServiceImpl } from "../core/application/SettingsServiceImpl";
 import { ScreenSettingsImpl } from "../core/application/ScreenSettingsImpl";
 import { createServices, type Services, type ServicesHost } from "./compose";
+import type { Http } from "./infrastructure/Http";
+import { obsidianHttp } from "./infrastructure/ObsidianHttp";
 import { SETTINGS_FILE, type StoredSettings } from "./settingsFile";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { clearPriorityColors, showLabelPaint, showPriorityColors } from "./ui/priorityColors";
@@ -67,9 +69,9 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		this.addCommand({ id: "open", name: "Open Task Calendar", callback: () => void this.openView() });
 	}
 
-	/** The real services over the vault and the network; the demo build replaces them with fakes. */
-	protected createDeps(clock: Clock = systemClock): ViewDeps {
-		const services = createServices(this.app, this.servicesHost(), this, clock);
+	/** The real services over the vault and the network; the demo build replaces them with fakes, the e2e build gives its clock and network. */
+	protected createDeps(clock: Clock = systemClock, http: Http = obsidianHttp): ViewDeps {
+		const services = createServices(this.app, this.servicesHost(), this, clock, http);
 		this.services = services;
 		this.app.workspace.onLayoutReady(() => this.register(services.keepWorkExportInstalled()));
 		this.registerObsidianProtocolHandler(PROTOCOL_ACTION, (params) => {

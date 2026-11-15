@@ -7,6 +7,9 @@
 		"build": "tsc --noEmit && node esbuild.config.mjs production && node core/build.mjs",
 		"dev": "node esbuild.config.mjs",
 		"build:demo": "tsc --noEmit && node esbuild.config.mjs production demo",
+		"build:e2e": "node esbuild.config.mjs production e2e",
+		"e2e": "node scripts/e2e/run.mjs",
+		"e2e:smoke": "node scripts/e2e/run.mjs smoke",
 		"test": "vitest run && vitest run --config vitest.budget.config.mts",
 		"test:apple": "swift test --package-path apple/Core",
 		"release": "node scripts/release.mjs"

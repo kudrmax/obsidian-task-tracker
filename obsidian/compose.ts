@@ -11,6 +11,7 @@ import { GoogleCalendarApi } from "./infrastructure/GoogleCalendarApi";
 import { GoogleCalendarFeed } from "./infrastructure/GoogleCalendarFeed";
 import { browserLoginDeps, GoogleRedirectLogin } from "./infrastructure/GoogleRedirectLogin";
 import { requestToken } from "./infrastructure/GoogleToken";
+import type { Http } from "./infrastructure/Http";
 import { obsidianHttp } from "./infrastructure/ObsidianHttp";
 import { ObsidianSync } from "./infrastructure/ObsidianSync";
 import { PhoneCalendarRefresh } from "./infrastructure/PhoneCalendarRefresh";
@@ -43,11 +44,11 @@ export interface ServicesHost {
 	readonly shortcuts: WorkCalendarShortcutHost;
 }
 
-export function createServices(app: App, host: ServicesHost, settings: SettingsStore, clock: Clock = systemClock): Services {
-	const token = (fields: Record<string, string>) => requestToken(obsidianHttp, settings.get().google.clientId, settings.get().google.clientSecret, fields);
+export function createServices(app: App, host: ServicesHost, settings: SettingsStore, clock: Clock = systemClock, http: Http = obsidianHttp): Services {
+	const token = (fields: Record<string, string>) => requestToken(http, settings.get().google.clientId, settings.get().google.clientSecret, fields);
 	const login = new GoogleRedirectLogin(browserLoginDeps(token));
 	const auth = new GoogleAuth(settings, login, token, clock);
-	const googleApi = new GoogleCalendarApi(auth, settings, clock, obsidianHttp);
+	const googleApi = new GoogleCalendarApi(auth, settings, clock, http);
 	const watcher = new VaultPathWatcher(app.vault);
 	const calendarFile = (source: CalendarSource) => new CalendarFileSource(source, () => calendarPath(source, settings.get()), app.vault.adapter, watcher);
 	const calendarFiles = { google: calendarFile("google"), iphone: calendarFile("iphone"), work: calendarFile("work") };
