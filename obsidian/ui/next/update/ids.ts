@@ -9,8 +9,14 @@ export function movedId(idMap: Readonly<Record<string, string>>, id: string): st
 function remapLayer(layer: Layer, idMap: Readonly<Record<string, string>>): Layer {
 	switch (layer.kind) {
 		case "taskMenu":
-		case "full":
 			return { ...layer, id: movedId(idMap, layer.id) };
+		case "full":
+			return {
+				...layer,
+				id: movedId(idMap, layer.id),
+				stack: layer.stack.map((task) => ({ ...task, id: movedId(idMap, task.id) })),
+				description: layer.description ? { ...layer.description, id: movedId(idMap, layer.description.id) } : null,
+			};
 		default:
 			return layer;
 	}
@@ -26,5 +32,6 @@ export function remapIds(model: BlockModel, idMap: Readonly<Record<string, strin
 		...model,
 		layers: model.layers.map((layer) => remapLayer(layer, idMap)),
 		carry: model.carry ? { ...model.carry, id: movedId(idMap, model.carry.id) } : null,
+		found: model.found ? { ...model.found, id: movedId(idMap, model.found.id) } : null,
 	};
 }

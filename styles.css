@@ -1825,3 +1825,57 @@ body:not(.is-mobile) .task-calendar button.tc-n-btn:focus-visible { outline: var
 .task-calendar .tc-n-menu-choice > .tc-n-menu-label { flex: 1; overflow: hidden; white-space: nowrap; -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .task-calendar .tc-n-menu-row svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
 .task-calendar .tc-n-menu-choice svg { color: var(--tc-accent-ui); stroke-width: var(--tc-stroke-check); }
+
+/* next: full */
+/* The full card over the block (the old FullScreen), its bar, its column, its subtasks with the circle that ticks them, its description's editor. */
+.task-calendar .tc-n-sheet { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); }
+.task-calendar .tc-n-sheet-bar { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-sheet-bar); padding: 0 var(--tc-space-10); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }
+.task-calendar .tc-n-full > .tc-n-sheet-bar { max-width: var(--tc-full-w); margin: 0 auto; }
+.task-calendar .tc-n-sheet-bar > button.tc-n-btn.tc-n-text { height: var(--tc-sheet-bar); padding: 0 var(--tc-space-10); border-radius: var(--tc-radius-text-btn); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
+.task-calendar .tc-n-sheet-bar > button.tc-n-btn.tc-n-strong { font-weight: var(--tc-weight-semibold); }
+.task-calendar .tc-n-sheet-bar > button.tc-n-btn.is-hidden { visibility: hidden; }
+.task-calendar .tc-n-full-body { position: absolute; left: 0; right: 0; top: var(--tc-sheet-bar); bottom: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.task-calendar .tc-n-full-body::-webkit-scrollbar { display: none; }
+.task-calendar .tc-n-full-column { max-width: var(--tc-full-w); margin: 0 auto; padding: var(--tc-desc-top) var(--tc-sheet-side) var(--tc-full-foot); display: flex; flex-direction: column; }
+.task-calendar button.tc-n-btn.tc-n-full-parent { align-self: flex-start; height: var(--tc-full-parent-h); margin-bottom: var(--tc-space-8); padding: 0; display: flex; align-items: center; gap: var(--tc-full-parent-gap); font-size: var(--tc-font-full-parent); color: var(--tc-muted); }
+.task-calendar .tc-n-full-parent svg { width: var(--tc-full-parent-icon); height: var(--tc-full-parent-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-ring); }
+.task-calendar button.tc-n-btn.tc-n-full-project { align-self: flex-start; max-width: 100%; height: var(--tc-full-parent-h); margin-top: var(--tc-space-8); padding: 0; display: flex; align-items: center; gap: var(--tc-full-parent-gap); font-size: var(--tc-font-full-parent); color: var(--tc-muted); }
+.task-calendar .tc-n-full-project svg { width: var(--tc-full-parent-icon); height: var(--tc-full-parent-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-project-mark); }
+.task-calendar .tc-n-full-project-text { min-width: 0; overflow: hidden; white-space: nowrap; }
+.task-calendar .tc-n-full-title { font-size: var(--tc-font-desc-title); line-height: var(--tc-leading-desc-title); font-weight: var(--tc-weight-bold); color: var(--tc-text); overflow-wrap: anywhere; }
+.task-calendar .tc-n-list.tc-n-full-list { flex: none; margin-top: var(--tc-desc-title-gap); padding-top: 0; overflow: visible; }
+.task-calendar .tc-n-full-list > .tc-n-card { padding-left: var(--tc-pick-pad-start); }
+.task-calendar .tc-n-full-list > .tc-n-card > .tc-n-pick { width: var(--tc-pick-size); margin-right: var(--tc-pick-gap); border-width: var(--tc-pick-ring); opacity: 1; cursor: pointer; }
+.task-calendar .tc-n-full-list > .tc-n-card > .tc-n-progress-dot { opacity: 0; }
+.task-calendar .tc-n-full-list > .tc-n-card[data-status="done"] > .tc-n-pick { border-color: transparent; background: var(--tc-accent); }
+.task-calendar .tc-n-full-list > .tc-n-card[data-status="done"] > .tc-n-pick svg { visibility: visible; }
+.task-calendar .tc-n-full-list > .tc-n-card:is([data-status="done"], [data-status="cancelled"]) > .tc-n-card-title { color: var(--tc-muted); text-decoration: line-through; }
+.task-calendar .tc-n-desc { font-family: var(--tc-font-desc); font-size: var(--tc-desc-size); line-height: var(--tc-desc-leading); color: var(--tc-desc-ink); overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; --file-margins: 0; --view-top-spacing-markdown: 0; --view-bottom-spacing-markdown: 0; }
+.task-calendar .tc-n-full-desc { margin-top: var(--tc-full-desc-gap); }
+.task-calendar.tc-n-block .tc-n-full > .tc-n-capsule, .task-calendar.tc-n-block .tc-n-full > button.tc-n-btn.tc-n-plus { position: absolute; bottom: calc(var(--tc-block-inset) + (var(--tc-wheel) - var(--tc-plus-size)) / 2); z-index: var(--tc-layer-plus); }
+.task-calendar.tc-n-block .tc-n-full > .tc-n-capsule { left: var(--tc-space-16); }
+.task-calendar.tc-n-block .tc-n-full > button.tc-n-btn.tc-n-plus { right: var(--tc-space-16); }
+.task-calendar .tc-n-full.tc-n-full-typing > :is(.tc-n-capsule, .tc-n-plus) { visibility: hidden; }
+
+/* The search: over the block on the phone, the field at the bottom; on the desktop a panel hanging from the block's top. A found card wears the ring. */
+.task-calendar .tc-n-card.is-found, .task-calendar .tc-n-hit-row.is-picked > .tc-n-card { box-shadow: var(--tc-ring-selected); }
+.task-calendar .tc-n-list > .tc-n-card.tc-n-card-folded.is-found { box-shadow: var(--tc-ring-selected), var(--tc-shadow-fold); }
+.task-calendar .tc-n-search { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); }
+.task-calendar .tc-n-search-results { display: flex; flex-direction: column; gap: var(--tc-card-gap); overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; scrollbar-width: none; }
+.task-calendar.tc-n-block .tc-n-search > .tc-n-search-results { position: absolute; left: 0; right: 0; top: 0; bottom: calc(var(--tc-search-bottom) + var(--tc-bar-h)); box-sizing: border-box; padding: var(--tc-space-16) var(--tc-space-10) var(--tc-space-8); }
+.task-calendar .tc-n-search-results > * { flex-shrink: 0; }
+.task-calendar .tc-n-search-results > .tc-n-group-head:first-child { margin-top: 0; }
+.task-calendar .tc-n-search-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-search-bottom); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); background: var(--tc-bg); display: flex; align-items: center; gap: var(--tc-space-8); }
+.task-calendar .tc-n-search-field { flex: 1; min-width: 0; height: var(--tc-bar-btn-h); box-sizing: border-box; padding: 0 var(--tc-search-field-pad); border-radius: var(--tc-radius-bar-btn); background: var(--tc-card-bg); color: var(--tc-muted); display: flex; align-items: center; gap: var(--tc-space-6); }
+.task-calendar .tc-n-search-field svg { width: var(--tc-icon-m); height: var(--tc-icon-m); flex-shrink: 0; stroke: currentColor; stroke-width: var(--tc-stroke-ring); }
+.task-calendar .tc-n-search-field > input.tc-n-search-input { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); color: var(--tc-text); caret-color: var(--tc-accent); -webkit-user-select: text; user-select: text; }
+.task-calendar .tc-n-search-bar > button.tc-n-btn.tc-n-search-cancel { height: var(--tc-bar-btn-h); flex-shrink: 0; padding: 0 var(--tc-space-10); border-radius: var(--tc-radius-text-btn); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
+.task-calendar .tc-n-search-empty { margin: auto 0; text-align: center; color: var(--tc-muted); font-size: var(--tc-font-body); }
+.task-calendar .tc-n-search.tc-n-search-desk { position: fixed; inset: auto; z-index: var(--tc-layer-panel); left: var(--tc-n-hang-left); top: calc(var(--tc-n-hang-top) + var(--tc-space-16)); width: var(--tc-search-w); max-height: calc(var(--tc-n-hang-room) - 2 * var(--tc-space-16)); margin-left: calc(-1 * var(--tc-search-w) / 2); box-sizing: border-box; padding: var(--tc-space-8); border-radius: var(--tc-radius-panel); background: var(--tc-panel-bg); box-shadow: var(--tc-shadow-panel); color: var(--tc-text); font-family: var(--tc-font-ui); display: flex; flex-direction: column; gap: var(--tc-space-8); }
+.task-calendar .tc-n-search-desk .tc-n-search-field { flex: none; background: var(--tc-track-bg); }
+.task-calendar .tc-n-search-desk > .tc-n-search-results { min-height: 0; }
+.task-calendar mark.tc-n-hit { background: var(--tc-selection); color: inherit; font-weight: var(--tc-weight-semibold); }
+.task-calendar .tc-n-card.tc-n-card-snippet { height: auto; min-height: var(--tc-card-h); padding-top: var(--tc-space-6); padding-bottom: var(--tc-space-6); }
+.task-calendar .tc-n-hit-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.task-calendar .tc-n-hit-desc { white-space: nowrap; overflow: hidden; font-size: var(--tc-font-block); line-height: var(--tc-leading-block); color: var(--tc-muted); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.task-calendar .tc-n-card-over svg { width: var(--tc-font-card-over); height: var(--tc-font-card-over); flex-shrink: 0; stroke-width: var(--tc-stroke-card-over); }

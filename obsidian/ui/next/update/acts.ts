@@ -2,6 +2,7 @@ import type { ViewMode } from "../../../../core/application/contracts";
 import { type BlockModel, shownLists } from "../model/block";
 import type { Act, BlockMsg } from "../model/messages";
 import type { ListRow } from "../model/lists";
+import { fullAct } from "./fullActs";
 
 /** The rows the block draws now, by key. */
 function rowOf(model: BlockModel, key: string): ListRow | null {
@@ -50,6 +51,6 @@ export function actMessage(model: BlockModel, act: Act): BlockMsg | null {
 			return row?.kind === "plate" ? { kind: "plateTapped", row: row.key, group: row.group, list: row.list } : null;
 		}
 		default:
-			return null;
+			return fullAct(act);
 	}
 }

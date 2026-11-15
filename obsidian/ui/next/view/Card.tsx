@@ -41,6 +41,10 @@ export interface CardProps {
 	readonly classes?: string;
 	/** Its links are pressed (a menu's copy of the card); on a list's card a tap anywhere is the card's. */
 	readonly links?: boolean;
+	/** Whose acts its taps are (`full:` on the full card, whose circle ticks the task); the screen's own when left out. */
+	readonly scope?: string;
+	/** Drawn without the circle select mode shows (a found task's card, as the old search drew it). */
+	readonly bare?: boolean;
 }
 
 /** The colours of a card as attributes the stylesheet paints (`data-priority`, `data-label0…`, `data-labels`), as the old screen's `markColours`. */
@@ -56,13 +60,16 @@ export function colourAttributes(face: Pick<CardFace, "tint" | "stripes">): Reco
  * the right (a folded task's next step under its own small title), the folder of its project, the counter over the
  * description's mark, the due date or the stage; a card peeking out under it while its subtasks are folded away.
  */
-export function Card({ rowKey, face, branch, listed, classes, links }: CardProps): JSX.Element {
+export function Card({ rowKey, face, branch, listed, classes, links, scope, bare }: CardProps): JSX.Element {
+	const act = (name: string) => (listed ? `${scope ?? ""}${name}` : undefined);
 	const cls = ["tc-n-card", listed ? "tc-n-listed" : "", face.over !== null ? "tc-n-card-two" : "", face.folded && listed ? "tc-n-card-folded" : "", classes ?? ""].filter(Boolean).join(" ");
 	return (
-		<div class={cls} data-n-key={rowKey} data-status={face.status} data-n-act={listed ? "card" : undefined} {...colourAttributes(face)}>
-			<span class="tc-n-pick">
-				<Icon name="check" />
-			</span>
+		<div class={cls} data-n-key={rowKey} data-status={face.status} data-n-act={act("card")} {...colourAttributes(face)}>
+			{bare ? null : (
+				<span class="tc-n-pick" data-n-act={scope ? `${scope}tick` : undefined}>
+					<Icon name="check" />
+				</span>
+			)}
 			<span class="tc-n-progress-dot" />
 			{face.over === null ? (
 				<div class="tc-n-card-title">
@@ -79,14 +86,14 @@ export function Card({ rowKey, face, branch, listed, classes, links }: CardProps
 				</div>
 			)}
 			{face.project !== null ? (
-				<span class="tc-n-project-mark" aria-label={face.project} title={face.project} data-n-act={listed ? "mark" : undefined}>
+				<span class="tc-n-project-mark" aria-label={face.project} title={face.project} data-n-act={act("mark")}>
 					<Icon name="project" />
 				</span>
 			) : null}
 			{face.meta ? (
 				<span class={face.meta.count !== null && face.meta.description ? "tc-n-meta tc-n-meta-pair" : "tc-n-meta"}>
 					{face.meta.count !== null ? (
-						<span class={listed ? "tc-n-count tc-n-count-fold" : "tc-n-count"} data-n-act={listed ? "counter" : undefined}>
+						<span class={listed ? "tc-n-count tc-n-count-fold" : "tc-n-count"} data-n-act={act("counter")}>
 							{face.meta.count}
 						</span>
 					) : null}

@@ -1,6 +1,7 @@
 import type { Clock } from "../core/application/ports";
 import type { Http, HttpRequest, HttpResponse } from "./infrastructure/Http";
 import TaskCalendarPlugin from "./main";
+import type { NoteBlocks } from "./ui/next/host/block/NoteBlocks";
 import type { ViewDeps } from "./ui/TaskCalendarView";
 
 /**
@@ -61,7 +62,12 @@ export function fixtureHttp(fixture: E2EFixture, asked: HttpRequest[]): Http {
 export default class E2ETaskCalendarPlugin extends TaskCalendarPlugin {
 	private fixture: E2EFixture | null = null;
 	/** What the harness reads and moves over CDP: the clock, every request the plugin made, every reach outside Obsidian. */
-	e2e: { readonly clock: FrozenClock; readonly asked: HttpRequest[]; readonly opened: string[] } | null = null;
+	e2e: { readonly clock: FrozenClock; readonly asked: HttpRequest[]; readonly opened: string[]; blocks?: NoteBlocks } | null = null;
+
+	/** The new note blocks, for the harness to reach their hosts (`blocks.blocks`, each `host.dispatch`). */
+	protected override blocksMade(blocks: NoteBlocks): void {
+		if (this.e2e) this.e2e.blocks = blocks;
+	}
 	private readonly opened: string[] = [];
 
 	/**

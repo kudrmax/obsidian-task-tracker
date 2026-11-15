@@ -7,7 +7,7 @@ import { remapIds } from "./ids";
 import { actMessage } from "./acts";
 import { updateCarry } from "./carry";
 import { updateEntry } from "./entry";
-import { updateFull } from "./full";
+import { followFull, updateFull } from "./full";
 import { updateMenu } from "./menu";
 import { updateSearch } from "./search";
 import { updateSelect } from "./select";
@@ -66,7 +66,7 @@ function step(model: BlockModel, msg: BlockMsg): Step {
 			return meant ? step(model, meant) : [model, []];
 		}
 		case "views":
-			return [{ ...model, answers: msg.answers }, []];
+			return followFull({ ...model, answers: msg.answers });
 		case "rebased":
 			return [remapIds(model, msg.idMap), []];
 		case "undoTapped":
@@ -85,6 +85,8 @@ function step(model: BlockModel, msg: BlockMsg): Step {
 		case "subprojectsPicked":
 			return pickWrite(model, "tasks.toggleSubprojects", []);
 		case "layerDismissed":
+			if (model.search && !model.search.closing) return updateSearch(model, { kind: "cancel" });
+			if (topLayer(model.layers)?.kind === "full") return updateFull(model, { kind: "close" });
 			return [closeTop(model), []];
 		case "layerGone": {
 			const layers = model.layers.filter((layer, i) => !(layer.closing && i === model.layers.findIndex((l) => l.closing)));

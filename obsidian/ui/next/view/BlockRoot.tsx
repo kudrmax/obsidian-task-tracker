@@ -13,7 +13,7 @@ export interface BlockRootProps {
 /** The block's frame at the note's end, and its layers in the overlay host. */
 export function BlockRoot({ model, layers }: BlockRootProps): JSX.Element {
 	return (
-		<div class={rootClasses(model, "tc-n-block")} tabIndex={-1}>
+		<div class={rootClasses(model, "tc-n-block")} tabIndex={-1} data-n-anchor="block">
 			<Block model={model} />
 			{createPortal(<Layers model={model} />, layers)}
 		</div>

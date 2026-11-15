@@ -6,7 +6,8 @@ import type { Layer } from "./layers";
 import type { EntryModel } from "./entry";
 import type { CarryModel } from "./carry";
 import type { SelectModel } from "./select";
-import type { SearchModel } from "./search";
+import { type Found, type SearchModel, searchNeeds } from "./search";
+import { fullLayer, fullNeeds } from "./full";
 
 /**
  * A note's block (D3): the view fixed to the note's project, at the end of the note. Every fact is a field here or a
@@ -29,6 +30,8 @@ export interface BlockModel {
 	readonly select: SelectModel | null;
 	/** The search over the block. */
 	readonly search: SearchModel | null;
+	/** The task the search led to: its card wears the ring until the next press. */
+	readonly found: Found | null;
 	/**
 	 * The lists as they stood when something began to move (a carry, a closing sheet): drawn while it moves, so nothing
 	 * under the finger or the sheet is redrawn (P6). Null when nothing pins them.
@@ -49,7 +52,7 @@ export interface Motion {
 }
 
 export function blockModel(note: string, wide: boolean): BlockModel {
-	return { note, wide, answers: NO_ANSWERS, layers: [], entry: null, carry: null, select: null, search: null, pinned: null, motion: { seq: 0, cause: "replace", context: null } };
+	return { note, wide, answers: NO_ANSWERS, layers: [], entry: null, carry: null, select: null, search: null, found: null, pinned: null, motion: { seq: 0, cause: "replace", context: null } };
 }
 
 // Needs ------------------------------------------------------------------------------------------------------------
@@ -75,6 +78,7 @@ export function blockNeeds(model: BlockModel): readonly Need[] {
 			for (const column of rowColumns(funnel.view)) needs.push({ key: ROW_KEY(column), method: "tasks.columnSections", args: [column, today] });
 		}
 	}
+	needs.push(...fullNeeds(fullLayer(model.layers), model.answers), ...searchNeeds(model.search));
 	return needs;
 }
 

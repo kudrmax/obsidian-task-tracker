@@ -11,6 +11,8 @@ type Boxes = ReadonlyMap<string, DOMRect>;
 /** A panel grows from its anchor's side: from its top left under the anchor, from its bottom left over it. */
 const ORIGIN_BELOW = "0 0";
 const ORIGIN_ABOVE = "0 100%";
+/** A panel hanging from its anchor's top grows from its own top middle. */
+const ORIGIN_TOP = "50% 0";
 
 /** A token of the stylesheet as milliseconds (`150ms`, `0.3s`). */
 export function tokenMs(el: Element, token: string): number {
@@ -132,11 +134,17 @@ export class Motion {
 			if (this.shown.has(part)) continue;
 			this.shown.add(part);
 			const above = this.place(part, screen, view);
-			if (part.dataset.nPart === "panel") {
+			const kind = part.dataset.nPart;
+			if (kind === "panel") {
 				const rise = parseFloat(style.getPropertyValue("--tc-menu-rise")) || 0;
 				const scale = style.getPropertyValue("--tc-menu-scale").trim() || "1";
-				part.style.transformOrigin = above ? ORIGIN_ABOVE : ORIGIN_BELOW;
+				part.style.transformOrigin = part.dataset.nHow === "top" ? ORIGIN_TOP : above ? ORIGIN_ABOVE : ORIGIN_BELOW;
 				part.animate([{ opacity: 0, transform: `translate3d(0, ${above ? rise : -rise}px, 0) scale(${scale})` }, { opacity: 1, transform: "none" }], { duration: menuMs, easing });
+			} else if (kind === "sheet" || kind === "search") {
+				/** A sheet over the block (the full card; the phone's search) rises in as it shows. */
+				const rise = parseFloat(style.getPropertyValue("--tc-rise")) || 0;
+				const ms = kind === "sheet" ? tokenMs(this.root, "--tc-duration-fade") : menuMs;
+				part.animate([{ opacity: 0, transform: `translate3d(0, ${rise}px, 0)` }, { opacity: 1, transform: "none" }], { duration: ms, easing });
 			} else part.animate([{ opacity: 0 }, { opacity: 1 }], { duration: menuMs, easing });
 		}
 		for (const [layer, fades] of closing) void Promise.all(fades).then(() => gone(layer));
@@ -151,6 +159,13 @@ export class Motion {
 		if (!anchor) return false;
 		const rect = anchor.getBoundingClientRect();
 		const how = part.dataset.nHow;
+		if (how === "top") {
+			/** Hanging from the anchor's top, in its middle (the desktop's search over the block). */
+			part.style.setProperty("--tc-n-hang-left", `${rect.left + rect.width / 2}px`);
+			part.style.setProperty("--tc-n-hang-top", `${rect.top}px`);
+			part.style.setProperty("--tc-n-hang-room", `${rect.height}px`);
+			return false;
+		}
 		if (how === "copy") {
 			part.style.left = `${rect.left}px`;
 			part.style.top = `${rect.top}px`;

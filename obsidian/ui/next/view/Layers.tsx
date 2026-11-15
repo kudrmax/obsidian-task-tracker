@@ -3,6 +3,7 @@ import { type BlockModel, canUndo, rootClasses, viewChoice } from "../model/bloc
 import type { Layer } from "../model/layers";
 import { Icon, modeIcon } from "./icons";
 import { Backdrop, MenuGroup, Placed } from "./Sheet";
+import { SearchOver } from "./search/Search";
 
 
 interface LayerProps {
@@ -75,6 +76,7 @@ export function Layers({ model }: { readonly model: BlockModel }): JSX.Element {
 			{model.layers.map((layer, index) => (
 				<LayerView key={`${index}:${layer.kind}`} layer={layer} model={model} index={index} closing={layer.closing} />
 			))}
+			<SearchOver model={model} />
 		</div>
 	);
 }

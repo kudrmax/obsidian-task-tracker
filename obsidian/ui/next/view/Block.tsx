@@ -2,6 +2,8 @@ import type { JSX } from "preact";
 import { type BlockModel, canUndo, shownLists, viewChoice } from "../model/block";
 import { Icon, modeIcon } from "./icons";
 import { List } from "./List";
+import { FullCard } from "./full/FullCard";
+import { SearchInBlock } from "./search/Search";
 
 /** The core's icon of a mode (a Lucide name) as the design draws it. */
 
@@ -19,13 +21,13 @@ function Lists({ model }: BlockProps): JSX.Element | null {
 					{lists.rows.map((row) => (
 						<div key={row.column} class="tc-n-row">
 							<div class="tc-n-row-label">{row.label}</div>
-							<List list={row.list} classes="tc-n-row-list" />
+							<List list={row.list} classes="tc-n-row-list" found={model.found?.id ?? null} />
 						</div>
 					))}
 				</>
 			);
 		case "byProject":
-			return <List list={lists.list} classes="tc-n-projects-list" />;
+			return <List list={lists.list} classes="tc-n-projects-list" found={model.found?.id ?? null} />;
 		case "none":
 			return null;
 	}
@@ -60,6 +62,8 @@ export function Block({ model }: BlockProps): JSX.Element {
 			<button class="tc-n-btn tc-n-round tc-n-plus" aria-label="New task" data-n-act="plus">
 				<Icon name="plus" />
 			</button>
+			<FullCard model={model} />
+			<SearchInBlock model={model} />
 		</>
 	);
 }

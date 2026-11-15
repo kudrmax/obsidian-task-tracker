@@ -27,7 +27,7 @@ export class Input {
 			const marked = target?.closest("[data-n-act]");
 			if (!(marked instanceof HTMLElement) || !root.contains(marked)) return;
 			const act = marked.dataset.nAct ?? "";
-			if ((act === "dismiss") !== press) return;
+			if (act.endsWith("dismiss") !== press) return;
 			if (press && marked !== target) return;
 			const row = marked.closest("[data-n-key]");
 			told({ act, key: row instanceof HTMLElement ? (row.dataset.nKey ?? null) : null, value: marked.dataset.nValue ?? null });
@@ -40,6 +40,33 @@ export class Input {
 		this.stops.push(
 			() => root.removeEventListener("click", click, true),
 			() => root.removeEventListener("pointerdown", press, true),
+		);
+	}
+
+	/**
+	 * The view's fields (`data-n-field`) inside `root`: each input told with the field's text; each key offered first to
+	 * `key`, which answers whether the block takes it (then the field and Obsidian never see it).
+	 */
+	fields(root: HTMLElement, typed: (field: string, value: string) => void, key: (field: string, key: string) => boolean): void {
+		const fieldOf = (e: Event): HTMLInputElement | null => {
+			const target = e.target;
+			return target instanceof HTMLInputElement && target.dataset.nField !== undefined && root.contains(target) ? target : null;
+		};
+		const input = (e: Event) => {
+			const field = fieldOf(e);
+			if (field) typed(field.dataset.nField ?? "", field.value);
+		};
+		const down = (e: KeyboardEvent) => {
+			const field = fieldOf(e);
+			if (!field || e.isComposing || !key(field.dataset.nField ?? "", e.key)) return;
+			e.preventDefault();
+			e.stopPropagation();
+		};
+		root.addEventListener("input", input);
+		root.addEventListener("keydown", down);
+		this.stops.push(
+			() => root.removeEventListener("input", input),
+			() => root.removeEventListener("keydown", down),
 		);
 	}
 
