@@ -15,10 +15,9 @@ export interface ReplicaState {
 	readonly host: DoorHost;
 	readonly feedProblems: Partial<Record<CalendarSource, SourceProblem>>;
 	readonly projectsReady: boolean;
+	/** The calendar sources the host fetches itself: those it has feeds for. */
+	readonly fetched: readonly CalendarSource[];
 }
-
-/** The calendar sources the plugin fetches itself: Google's. */
-const FETCHED: readonly CalendarSource[] = ["google"];
 
 export const EMPTY_REPLICA: ReplicaState = {
 	tasks: null,
@@ -29,6 +28,7 @@ export const EMPTY_REPLICA: ReplicaState = {
 	host: "obsidian",
 	feedProblems: {},
 	projectsReady: false,
+	fetched: [],
 };
 
 /** The door's context over a replica at a moment. */
@@ -38,7 +38,7 @@ export function contextOf(state: ReplicaState, nowMs: number): DoorContext {
 		settings: state.settings,
 		nowMs,
 		calendars: state.calendars,
-		fetched: FETCHED,
+		fetched: state.fetched,
 		history: state.history,
 		projects: state.projects,
 		projectsScreen: state.projectsScreen,

@@ -16,6 +16,7 @@ export interface MinuteClockDeps {
 	readonly minute: () => void;
 	/** The core's day boundary passed: the file is tidied for the new day. */
 	readonly newDay: () => void;
+	readonly failed: (error: unknown) => void;
 }
 
 /**
@@ -44,14 +45,20 @@ export class MinuteClock {
 		this.timer = this.deps.timers.set(() => this.tick(), next - now);
 	}
 
+	/** A tick that fails (the door, a write) still leaves the next one armed; its failure goes to `failed`. */
 	private tick(): void {
 		this.timer = null;
-		const today = this.deps.today();
-		if (today !== this.day) {
-			this.day = today;
-			this.deps.newDay();
+		try {
+			const today = this.deps.today();
+			if (today !== this.day) {
+				this.day = today;
+				this.deps.newDay();
+			}
+			this.deps.minute();
+		} catch (e) {
+			this.deps.failed(e);
+		} finally {
+			this.arm();
 		}
-		this.deps.minute();
-		this.arm();
 	}
 }

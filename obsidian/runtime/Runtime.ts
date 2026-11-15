@@ -19,6 +19,13 @@ import { type Door, InProcessDoor, resultOf } from "./replica/Door";
 import { hostOf, type HostReadiness, Readiness } from "./replica/HostFacts";
 import { Replica } from "./replica/Replica";
 import { type CallOutcome, ReplicaCalls } from "./replica/ReplicaCalls";
+import { HostSession } from "./HostSession";
+
+export type { CallOutcome, Need, Views, RuntimeEvent, HostReadiness };
+export type { Cmd, Program, Scheduler } from "./dispatch/Program";
+export { Store, type StoreOptions } from "./dispatch/Store";
+export { HostSession };
+export { sectionRef, type SectionRef } from "./replica/refs";
 
 export interface RuntimeDeps<S extends TaskCalendarSettings> {
 	readonly vault: TasksVault;
@@ -59,12 +66,13 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 	private readonly built: Promise<void>;
 	private settleBuilt!: { resolve: () => void; reject: (e: unknown) => void };
 	private disposed = false;
+	private carryOwner: object | null = null;
 
 	constructor(private readonly deps: RuntimeDeps<S>) {
 		const door = deps.door ?? new InProcessDoor();
 		const now = () => deps.clock.now().getTime();
 		this.log = new ActionLog(now);
-		this.replica = new Replica({ host: hostOf(deps.isIosApp) });
+		this.replica = new Replica({ host: hostOf(deps.isIosApp), fetched: deps.feeds.map((f) => f.name) });
 		const failed = (e: unknown) => this.failed(e);
 		this.settings = new SettingsLink(deps.settings, this.replica, failed);
 		this.projectsScreen = new ProjectsScreenLink(deps.projectsScreen, this.replica);
@@ -76,17 +84,20 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 			projectsScreenChanged: (state) => this.projectsScreen.save(state),
 		});
 		this.viewAnswers = new ViewAnswers({ state: () => this.replica.state, minute: () => minuteOf(now()), read: (m, a) => this.calls.read(m, a) });
-		this.calendars = new CalendarLane({ replica: this.replica, read: (m, a) => this.calls.read(m, a), feeds: deps.feeds, texts: deps.calendarTexts, work: deps.work, timers: deps.timers, now });
+		this.calendars = new CalendarLane({ replica: this.replica, read: (m, a) => this.calls.read(m, a), feeds: deps.feeds, texts: deps.calendarTexts, work: deps.work, timers: deps.timers, now, failed });
 		this.clock = new MinuteClock({
 			timers: deps.timers,
 			now,
 			today: () => resultOf<string>(this.calls.read("days.today", []), "days.today"),
 			minute: () => this.events.emit({ kind: "minute" }),
 			newDay: () => this.call("tasks.normalize", []),
+			failed,
 		});
 		this.built = new Promise((resolve, reject) => (this.settleBuilt = { resolve, reject }));
 		this.built.catch(() => undefined);
-		this.readiness = new Readiness(() => void this.build());
+		this.readiness = new Readiness(() => {
+			this.build().catch((e: unknown) => this.failed(e));
+		});
 	}
 
 	/** The host told a fact of its readiness: the replica is built once the layout is ready and the metadata cache resolved. */
@@ -142,8 +153,25 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 		return this.calendars.refresh(reason);
 	}
 
-	/** A host going away ends what is under way: a carry gets `endCarry`, so none stays in the device's storage. */
-	teardown(): void {
+	/** A host's own view of the runtime (the leaf, a note's block, the settings tab): its teardown ends only what it started. */
+	openHost(): HostSession {
+		return new HostSession({
+			log: this.log,
+			call: (m, a) => this.call(m, a),
+			read: (m, a) => this.read(m, a),
+			views: (n) => this.views(n),
+			subscribe: (l) => this.subscribe(l),
+			carrying: () => this.replica.state.projectsScreen.carry !== undefined,
+			claimCarry: (owner) => (this.carryOwner = owner),
+			endCarryOf: (owner) => {
+				if (this.carryOwner === owner) this.endCarry();
+			},
+		});
+	}
+
+	/** A carry under way ends (`endCarry`), so none stays in the device's storage. */
+	private endCarry(): void {
+		this.carryOwner = null;
 		if (this.replica.state.projectsScreen.carry) this.call("tasks.endCarry", ["nowhere"]);
 	}
 
@@ -151,8 +179,9 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 	unload(): Promise<void> {
 		this.disposed = true;
 		this.settleBuilt.resolve();
-		this.teardown();
+		this.endCarry();
 		this.clock.stop();
+		this.calendars.stop();
 		this.stops.splice(0).forEach((stop) => stop());
 		return this.writer.drained();
 	}
@@ -184,13 +213,13 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 			}),
 			this.writer.watch(),
 			this.calendars.watch(),
+			this.deps.settings.onChange(() => this.writer.follow().catch((e: unknown) => this.failed(e))),
 		);
 		await this.writer.load();
 		if (this.disposed) {
 			this.stops.splice(0).forEach((stop) => stop());
 			return;
 		}
-		this.stops.push(this.deps.settings.onChange(() => void this.writer.follow()));
 		this.clock.start();
 	}
 

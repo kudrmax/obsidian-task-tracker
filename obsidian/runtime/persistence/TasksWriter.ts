@@ -35,8 +35,13 @@ export class TasksWriter {
 	private watched: string | null = null;
 	/** Bumped by every read started and every base a write or a replay set: a read lands only while it is the newest. */
 	private generation = 0;
-	/** The failure the queue waits on; null while it writes freely. */
+	/** Which file the queue writes: bumped whenever the file goes or another is read; a write that landed under an older one is thrown away. */
+	private epoch = 0;
+	/** The write failure the queue waits on; null while it writes freely. */
 	private failure: unknown = null;
+	/** A read failure, told once until a read works again: it never stops the writes. */
+	private readFailure: unknown = null;
+	private recheckFirst = false;
 
 	constructor(private readonly deps: TasksWriterDeps) {}
 
@@ -45,8 +50,9 @@ export class TasksWriter {
 		return this.failure;
 	}
 
-	/** The file at the path read: the replica's base (the first build, and a new `tasksFile`). */
+	/** The file at the path read: the replica's base (the first build, and a new `tasksFile`). A read that fails throws. */
 	async load(): Promise<void> {
+		this.epoch++;
 		this.watched = this.deps.path();
 		await this.readOutside(true);
 	}
@@ -58,7 +64,7 @@ export class TasksWriter {
 			if (this.failure !== null) this.schedule();
 			return;
 		}
-		if (old !== null) this.deps.rebaser.gone(old);
+		if (old !== null) this.gone(old);
 		await this.load();
 	}
 
@@ -78,8 +84,9 @@ export class TasksWriter {
 			.finally(() => {
 				this.running = null;
 				if (this.recheck) {
-					this.recheck = false;
-					void this.readOutside();
+					const first = this.recheckFirst;
+					this.recheck = this.recheckFirst = false;
+					this.readOutside(first).catch((e: unknown) => this.readFailed(e));
 				}
 				if (end === "done" && this.dirty) this.schedule();
 			});
@@ -101,6 +108,18 @@ export class TasksWriter {
 		this.failure = error;
 	}
 
+	private readFailed(error: unknown): void {
+		if (this.readFailure === null) this.deps.failed(error);
+		this.readFailure = error;
+	}
+
+	/** The file went: the pending calls drop, and nothing under way for it lands any more. */
+	private gone(path: string): void {
+		this.epoch++;
+		this.generation++;
+		this.deps.rebaser.gone(path);
+	}
+
 	private adopt(text: string): void {
 		this.generation++;
 		this.deps.rebaser.rebase(text);
@@ -113,31 +132,30 @@ export class TasksWriter {
 		const left = (change.kind === "rename" && change.oldPath === path) || (change.kind === "delete" && change.path === path);
 		if (!left && change.path !== path) return;
 		if (this.running) this.recheck = true;
-		else void this.readOutside();
+		else this.readOutside().catch((e: unknown) => this.readFailed(e));
 	}
 
-	/** The file read: our own echo or nothing new (a retry of a write that waits), a new base, or gone (told on a first read too). */
+	/**
+	 * The file read: our own echo or nothing new (a retry of a write that waits), a new base, or gone (told on a first read
+	 * too). A read that fails throws; it lands nowhere once a newer read, a write or another file came.
+	 */
 	private async readOutside(first = false): Promise<void> {
 		const path = this.watched;
 		if (path === null) return;
 		const ticket = ++this.generation;
-		let text: string | null;
-		try {
-			text = await this.deps.vault.read(path);
-		} catch (e) {
-			this.fail(e);
-			return;
-		}
+		const text = await this.deps.vault.read(path);
 		if (ticket !== this.generation || path !== this.watched) return;
+		this.readFailure = null;
 		if (this.running) {
 			this.recheck = true;
+			this.recheckFirst ||= first;
 			return;
 		}
 		if (text === this.deps.log.base.text && !(first && text === null)) {
 			if (this.dirty) this.schedule();
 			return;
 		}
-		if (text === null) this.deps.rebaser.gone(path);
+		if (text === null) this.gone(path);
 		else this.adopt(text);
 	}
 
@@ -145,6 +163,7 @@ export class TasksWriter {
 		let replays = 0;
 		for (;;) {
 			const path = this.watched;
+			const epoch = this.epoch;
 			const { log, replica, rebaser } = this.deps;
 			if (path === null || !this.dirty) return "done";
 			const state = replica.state;
@@ -153,7 +172,7 @@ export class TasksWriter {
 				continue;
 			}
 			if (log.base.text === null) {
-				await this.create(path);
+				if (!(await this.create(path, epoch))) return "away";
 				continue;
 			}
 			const write: { taken: { readonly state: typeof replica.state; readonly seq: number } | null; away: boolean } = { taken: null, away: false };
@@ -167,9 +186,9 @@ export class TasksWriter {
 				write.taken = { state: now, seq: log.lastSeq };
 				return now.tasks;
 			});
-			if (write.away) return "away";
+			if (write.away || epoch !== this.epoch) return "away";
 			if (outcome.kind === "moved" || outcome.kind === "missing") {
-				if (path === this.watched) rebaser.gone(path);
+				this.gone(path);
 				return "away";
 			}
 			this.generation++;
@@ -188,21 +207,27 @@ export class TasksWriter {
 		}
 	}
 
-	/** A file the door's `createFile` made: created at the path; one Sync brought meanwhile is read instead. */
-	private async create(path: string): Promise<void> {
+	/**
+	 * A file the door's `createFile` made: created at the path; one Sync brought meanwhile is read instead. False when the
+	 * file changed under it (another `tasksFile`): what it made lands nowhere.
+	 */
+	private async create(path: string, epoch: number): Promise<boolean> {
 		const { replica, log, vault } = this.deps;
 		const { tasks, history, ids } = replica.state;
-		if (tasks === null) return;
+		if (tasks === null) return true;
 		const seq = log.lastSeq;
 		try {
 			await vault.create(path, tasks);
+			if (epoch !== this.epoch) return false;
 			log.persisted(tasks, history, ids, seq);
 			this.failure = null;
 		} catch (e) {
 			const found = await vault.read(path);
+			if (epoch !== this.epoch) return false;
 			if (found === null) throw e;
 			this.generation++;
 			this.deps.rebaser.rebase(found);
 		}
+		return true;
 	}
 }

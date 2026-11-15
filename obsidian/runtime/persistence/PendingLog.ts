@@ -71,6 +71,11 @@ export class PendingLog {
 		this.calls = [...calls];
 	}
 
+	/** The undo steps changed with no change of the text (an undo that met a conflict): with nothing pending, the base has them now. */
+	keepHistory(history: UndoState | undefined): void {
+		this.current = { ...this.current, history };
+	}
+
 	/** The file went: no base, and no history of steps over it (an undo must never reach another file). */
 	forget(): void {
 		this.current = { text: null };

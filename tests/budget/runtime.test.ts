@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { DoorAnswer } from "../../core/application/PhoneCalls";
+import { callDoor, type DoorAnswer, type DoorContext } from "../../core/application/PhoneCalls";
+import { ReadingCache } from "../../core/application/ReadingCache";
 import { bigTasksFile } from "../application/bigTasksFile";
 import { DAY, harness, itemOf, ok } from "../runtime/harness";
 
 /**
  * The runtime's own share on top of the door (the replica's context, a key found by its id, the answer taken, the call
  * logged): a view, a read naming a task, a step of a carry and a write over a 30 KB file, warm, against the door's target;
- * the gate fails only far past it. The write's persistence runs after, outside the event.
+ * the gate fails only far past it. The write's persistence runs after, outside the event. A write over a text that changes
+ * with every call costs the door about as much as the target itself; the runtime's own share on top of it is measured apart.
  */
 const BUDGET_MS = 1;
 const GATE_MS = 3 * BUDGET_MS;
@@ -42,4 +44,19 @@ describe("a call through the runtime on a 30 KB tasks file, warm", async () => {
 			expect(ms, `${name} took ${ms.toFixed(3)} ms`).toBeLessThan(GATE_MS);
 		});
 	}
+
+	it("tasks.setStatus: the runtime's own share on top of the door making the same writes is small", () => {
+		const cache = new ReadingCache();
+		let context: DoorContext = runtime.replica.context(new Date(2026, 10, 15, 12, 0).getTime());
+		let on = false;
+		const doorOnly = (): DoorAnswer => {
+			const answer = callDoor("tasks.setStatus", [written.key, (on = !on) ? "inProgress" : "todo"], context, cache);
+			if (answer.ok) context = { ...context, tasks: answer.tasks ?? context.tasks, history: answer.history ?? context.history, ids: answer.ids ?? context.ids };
+			return answer;
+		};
+		const door = fastestMs(doorOnly);
+		const through = fastestMs(write);
+		console.log(`setStatus over a text that changes each call: door ${door.toFixed(3)} ms, through the runtime ${through.toFixed(3)} ms`);
+		expect(through - door, "the runtime's own share").toBeLessThan(BUDGET_MS / 2);
+	});
 });

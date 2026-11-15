@@ -7,6 +7,7 @@ import type { RuntimeEvent } from "../../obsidian/runtime/events";
 import type { CalendarFeed } from "../../obsidian/runtime/network/CalendarLane";
 import { ObsidianTasksVault, type ObsidianVault } from "../../obsidian/runtime/persistence/TasksVault";
 import { Runtime } from "../../obsidian/runtime/Runtime";
+import type { Door } from "../../obsidian/runtime/replica/Door";
 import { SETTINGS_FILE, type StoredSettings } from "../../obsidian/settingsFile";
 import { FakeTimers } from "../fakes/FakeTimers";
 
@@ -187,6 +188,8 @@ export interface HarnessOptions {
 	/** The calendar files' reads, when a test holds or fails them. */
 	readonly readCalendar?: (path: string) => Promise<string | null>;
 	readonly projects?: { list(): []; ready(): boolean; onChange(listener: () => void): () => void };
+	readonly door?: Door;
+	readonly isIosApp?: boolean;
 	readonly clock?: ManualClock;
 	readonly ready?: boolean;
 }
@@ -211,7 +214,8 @@ export async function harness(options: HarnessOptions = {}): Promise<Harness> {
 		settings,
 		projectsScreen: screens,
 		projects: options.projects ?? { list: () => [], ready: () => true, onChange: () => () => undefined },
-		isIosApp: false,
+		isIosApp: options.isIosApp ?? false,
+		door: options.door,
 		feeds: options.feeds ?? [],
 		calendarTexts: {
 			read: options.readCalendar ?? (async (path) => texts.get(path) ?? null),

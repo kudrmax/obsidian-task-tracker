@@ -28,6 +28,8 @@ export interface CalendarLaneDeps {
 	readonly work: { export(): void };
 	readonly timers: Timers;
 	readonly now: () => number;
+	/** A failure no caller hears (a file change's read): told, never thrown unheard. */
+	readonly failed: (error: unknown) => void;
 }
 
 class Silent extends Error {}
@@ -48,6 +50,8 @@ export class CalendarLane {
 	private reads = 0;
 	private applied = 0;
 	private cached = false;
+	private stopped = false;
+	private readonly silences = new Set<number>();
 
 	constructor(private readonly deps: CalendarLaneDeps) {}
 
@@ -63,8 +67,15 @@ export class CalendarLane {
 	/** Reads the files again whenever one of them changes. Returns the unsubscribe. */
 	watch(): () => void {
 		return this.deps.texts.watch((path) => {
-			if (this.sources().some((s) => s.path === path)) void this.readFiles();
+			if (this.sources().some((s) => s.path === path)) this.readFiles().catch((e: unknown) => this.deps.failed(e));
 		});
+	}
+
+	/** The runtime unloads: no silence timer stays armed, and nothing under way lands any more. */
+	stop(): void {
+		this.stopped = true;
+		this.silences.forEach((timer) => this.deps.timers.clear(timer));
+		this.silences.clear();
 	}
 
 	private sources(): { source: CalendarSource; path: string }[] {
@@ -88,16 +99,20 @@ export class CalendarLane {
 		let timer = 0;
 		const silent = new Promise<never>((_, reject) => {
 			timer = this.deps.timers.set(() => reject(new Silent()), silence.ms);
+			this.silences.add(timer);
 		});
 		try {
 			await Promise.race([feed.refresh(true), silent]);
+			if (this.stopped) return;
 			this.runs.set(feed.name, { atMs: this.deps.now(), key });
 			delete this.feedFailures[feed.name];
 		} catch (e) {
+			if (this.stopped) return;
 			this.feedFailures[feed.name] = e instanceof Silent ? silence.problem : this.problemOf(e);
 		} finally {
 			this.deps.timers.clear(timer);
-			this.showProblems();
+			this.silences.delete(timer);
+			if (!this.stopped) this.showProblems();
 		}
 	}
 
@@ -120,7 +135,7 @@ export class CalendarLane {
 				}
 			}),
 		);
-		if (ticket <= this.applied) return;
+		if (this.stopped || ticket <= this.applied) return;
 		this.applied = ticket;
 		this.cached = true;
 		const calendars = { ...this.deps.replica.state.calendars };

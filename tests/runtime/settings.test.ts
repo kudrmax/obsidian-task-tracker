@@ -60,9 +60,18 @@ describe("the host's facts", () => {
 	it("end a carry when a host goes: no stale carry stays in the device's storage", async () => {
 		const { runtime, screens } = await harness();
 		const key = (ok(runtime.read("tasks.screen", ["2026-11-15"])) as { inbox: { key: unknown }[] }).inbox[0].key;
-		ok(runtime.call("tasks.startCarry", [{ keys: [key] }, true]).answer);
+		const host = runtime.openHost();
+		ok(host.call("tasks.startCarry", [{ keys: [key] }, true]).answer);
 		expect(screens.get().carry).toBeDefined();
-		runtime.teardown();
+		host.teardown();
+		expect(screens.get().carry).toBeUndefined();
+	});
+
+	it("end a carry under way on unload, whoever started it", async () => {
+		const { runtime, screens } = await harness();
+		const key = (ok(runtime.read("tasks.screen", ["2026-11-15"])) as { inbox: { key: unknown }[] }).inbox[0].key;
+		ok(runtime.call("tasks.startCarry", [{ keys: [key] }, true]).answer);
+		await runtime.unload();
 		expect(screens.get().carry).toBeUndefined();
 	});
 });
