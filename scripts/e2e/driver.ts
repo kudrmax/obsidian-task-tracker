@@ -111,8 +111,8 @@ export class Driver {
 		return this.cdp.call("Input.dispatchTouchEvent", { type, touchPoints: points.map((p) => ({ x: p.x, y: p.y, id: 1, radiusX: 4, radiusY: 4, force: 1 })) });
 	}
 
-	private mouse(type: string, p: Point, buttons = 0) {
-		return this.cdp.call("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, button: type === "mouseMoved" ? (buttons ? "left" : "none") : "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1 });
+	private mouse(type: string, p: Point, buttons = 0, clickCount = 1) {
+		return this.cdp.call("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, button: type === "mouseMoved" ? (buttons ? "left" : "none") : "left", buttons, clickCount: type === "mouseMoved" ? 0 : clickCount });
 	}
 
 	async tap(at: Point): Promise<void> {
@@ -125,6 +125,17 @@ export class Driver {
 			await this.mouse("mousePressed", at, 1);
 			await sleep(40);
 			await this.mouse("mouseReleased", at);
+		}
+	}
+
+	/** Two clicks of the mouse at `at`, the second counted as a double click (the desktop only). */
+	async doubleClick(at: Point): Promise<void> {
+		await this.mouse("mouseMoved", at);
+		for (const count of [1, 2]) {
+			await this.mouse("mousePressed", at, 1, count);
+			await sleep(40);
+			await this.mouse("mouseReleased", at, 0, count);
+			if (count === 1) await sleep(60);
 		}
 	}
 
