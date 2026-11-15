@@ -1,5 +1,11 @@
 import type { GroupName, ViewMode } from "../../../../core/application/contracts";
 import type { Answers } from "./answers";
+import type { CarryMsg } from "./carry";
+import type { EntryMsg } from "./entry";
+import type { FullMsg } from "./full";
+import type { SearchMsg } from "./search";
+import type { SelectMsg } from "./select";
+import type { MenuMsg } from "./taskMenu";
 
 /** A link in a title, tapped: a note opens in a new tab, an address in the browser. */
 export interface Link {
@@ -50,6 +56,13 @@ export type BlockMsg =
 	/** «⋯»'s rows. */
 	| { readonly kind: "searchPicked" }
 	| { readonly kind: "selectPicked" }
+	/** Each part's own messages, handled by its own update (`update/<part>.ts`). */
+	| { readonly kind: "menu"; readonly msg: MenuMsg }
+	| { readonly kind: "entry"; readonly msg: EntryMsg }
+	| { readonly kind: "full"; readonly msg: FullMsg }
+	| { readonly kind: "carry"; readonly msg: CarryMsg }
+	| { readonly kind: "select"; readonly msg: SelectMsg }
+	| { readonly kind: "search"; readonly msg: SearchMsg }
 	/** A door call failed: told in the plugin's words. */
 	| { readonly kind: "failed"; readonly error: { readonly code: string; readonly message: string } };
 

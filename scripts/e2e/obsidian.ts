@@ -193,6 +193,12 @@ export class TestObsidian {
 			await this.cdp.call("Input.dispatchMouseEvent", { type: "mouseReleased", x: at.x, y: at.y, button: "left", buttons: 0, clickCount: 1 });
 			await sleep(200);
 		}
+		/** A dialog with no close button of that kind (Obsidian 1.13's trust question on a vault opened the first time) takes Escape, as a person would close it. */
+		for (let i = 0; i < 3 && (await this.cdp.eval<number>(`return document.querySelectorAll(".modal-container").length`)) > 0; i++) {
+			await this.cdp.call("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+			await this.cdp.call("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+			await sleep(200);
+		}
 	}
 
 	/** Reloads the page (after `emulateMobile`, a theme…) and settles again. */

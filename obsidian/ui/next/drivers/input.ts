@@ -34,11 +34,12 @@ export class Input {
 		};
 		const click = (e: Event) => read(e, false);
 		const press = (e: Event) => read(e, true);
-		root.addEventListener("click", click);
-		root.addEventListener("pointerdown", press);
+		/** Heard on the way down: the block stops its presses at its frame, inside `root`. */
+		root.addEventListener("click", click, true);
+		root.addEventListener("pointerdown", press, true);
 		this.stops.push(
-			() => root.removeEventListener("click", click),
-			() => root.removeEventListener("pointerdown", press),
+			() => root.removeEventListener("click", click, true),
+			() => root.removeEventListener("pointerdown", press, true),
 		);
 	}
 

@@ -5,3 +5,6 @@ export interface TaskMenuLayer {
 	/** The card's row key (the task's id) the menu opened from. */
 	readonly id: string;
 }
+
+/** The task menu's messages (its pages, its picks). */
+export type MenuMsg = { readonly kind: "opened"; readonly id: string };

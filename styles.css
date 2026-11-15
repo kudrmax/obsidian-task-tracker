@@ -1723,6 +1723,9 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .task-calendar.tc-n-block { position: relative; height: auto; max-height: var(--tc-block-max-h); margin-top: calc(var(--tc-block-top) - var(--tc-block-lift)); margin-bottom: calc(var(--tc-chrome-room) + var(--tc-block-top)); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); overflow: clip; outline: none; display: flex; flex-direction: column; }
 .task-calendar .tc-n-stack { flex: 0 1 auto; min-height: 0; margin-top: var(--tc-block-inset); padding: 0 var(--tc-block-inset) calc(var(--tc-plus-size) + var(--tc-block-inset) + var(--tc-space-20)); box-sizing: border-box; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
 .task-calendar .tc-n-stack::-webkit-scrollbar { display: none; }
+/* By subprojects the parts are one list, its room at the end the screen's foot fade, as the old block's list kept it. */
+.task-calendar .tc-n-stack.tc-n-stack-projects { padding-bottom: calc(var(--tc-switch-row) + var(--tc-block-inset) + var(--tc-space-8) + var(--tc-card-gap)); }
+.task-calendar .tc-n-list.tc-n-projects-list { padding-top: 0; }
 .task-calendar .tc-n-row { flex: none; min-height: 0; display: flex; flex-direction: column; }
 .task-calendar .tc-n-row + .tc-n-row { margin-top: var(--tc-section-gap); }
 .task-calendar .tc-n-row-label { flex-shrink: 0; height: var(--tc-group-head-h); box-sizing: border-box; padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); display: flex; align-items: flex-end; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); white-space: nowrap; overflow: hidden; }

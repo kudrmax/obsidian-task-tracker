@@ -5,6 +5,12 @@ import type { BlockMsg } from "../model/messages";
 import { assertNever } from "../model/assertNever";
 import { remapIds } from "./ids";
 import { actMessage } from "./acts";
+import { updateCarry } from "./carry";
+import { updateEntry } from "./entry";
+import { updateFull } from "./full";
+import { updateMenu } from "./menu";
+import { updateSearch } from "./search";
+import { updateSelect } from "./select";
 
 export type BlockCommand = Command<BlockMsg>;
 export type Step = readonly [BlockModel, readonly BlockCommand[]];
@@ -67,7 +73,7 @@ function step(model: BlockModel, msg: BlockMsg): Step {
 			if (!canUndo(model)) return [model, []];
 			return [model, [undoStep("undo")]];
 		case "key":
-			if (msg.key === "find") return [model, []];
+			if (msg.key === "find") return updateSearch(model, { kind: "open" });
 			return [model, [undoStep(msg.key)]];
 		case "viewButtonTapped":
 			if (!viewChoice(model)) return [model, []];
@@ -89,18 +95,32 @@ function step(model: BlockModel, msg: BlockMsg): Step {
 			const task = taskById(model, msg.key);
 			if (!task) return [model, []];
 			if (msg.part === "counter") return [model, [write("tasks.toggleCollapsed", [task.key], failed)]];
-			return [open(model, { kind: "taskMenu", closing: false, id: msg.key }), []];
+			return updateMenu(model, { kind: "opened", id: msg.key });
 		}
 		case "linkTapped":
 			return [model, [{ kind: "openLink", link: msg.link }]];
 		case "plateTapped":
+			return updateEntry(model, { kind: "inSection", row: msg.row, group: msg.group, list: msg.list });
 		case "plusTapped":
-			return [model, []];
+			return updateEntry(model, { kind: "plus" });
 		case "searchPicked":
+			return updateSearch(closeTop(model), { kind: "open" });
 		case "selectPicked":
-			return [closeTop(model), []];
+			return updateSelect(closeTop(model), { kind: "start" });
 		case "failed":
 			return [model, [{ kind: "failure", error: msg.error }]];
+		case "menu":
+			return updateMenu(model, msg.msg);
+		case "entry":
+			return updateEntry(model, msg.msg);
+		case "full":
+			return updateFull(model, msg.msg);
+		case "carry":
+			return updateCarry(model, msg.msg);
+		case "select":
+			return updateSelect(model, msg.msg);
+		case "search":
+			return updateSearch(model, msg.msg);
 		default:
 			return assertNever(msg);
 	}

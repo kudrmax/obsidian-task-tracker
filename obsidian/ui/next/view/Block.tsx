@@ -25,7 +25,7 @@ function Lists({ model }: BlockProps): JSX.Element | null {
 				</>
 			);
 		case "byProject":
-			return <List list={lists.list} classes="tc-n-row-list" />;
+			return <List list={lists.list} classes="tc-n-projects-list" />;
 		case "none":
 			return null;
 	}
@@ -40,7 +40,7 @@ export function Block({ model }: BlockProps): JSX.Element {
 	const icon = choice ? modeIcon(choice.icon) : undefined;
 	return (
 		<>
-			<div class="tc-n-stack">
+			<div class={shownLists(model).kind === "byProject" ? "tc-n-stack tc-n-stack-projects" : "tc-n-stack"}>
 				<Lists model={model} />
 			</div>
 			<div class="tc-n-fade" />
