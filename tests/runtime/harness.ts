@@ -38,7 +38,7 @@ export const FILE = [
 	"",
 ].join("\n");
 
-type Listener = (file: TAbstractFile, oldPath?: string) => void;
+type Listener = (file: TAbstractFile, oldPath: string) => void;
 
 /**
  * Obsidian's vault as the runtime uses it, in memory: a `TFile` follows a rename, `process` reads and writes in one step
@@ -86,7 +86,7 @@ export class MemoryObsidianVault implements ObsidianVault {
 		return file;
 	}
 
-	on(name: string, callback: Listener): EventRef {
+	on(name: "modify" | "create" | "delete" | "rename", callback: Listener): EventRef {
 		const ref = {} as EventRef;
 		this.listeners.set(ref, { name, callback });
 		return ref;
@@ -129,7 +129,7 @@ export class MemoryObsidianVault implements ObsidianVault {
 	}
 
 	private emit(name: string, file: TFile, oldPath?: string): void {
-		for (const l of [...this.listeners.values()]) if (l.name === name) l.callback(file as TAbstractFile, oldPath);
+		for (const l of [...this.listeners.values()]) if (l.name === name) l.callback(file as TAbstractFile, oldPath ?? "");
 	}
 }
 

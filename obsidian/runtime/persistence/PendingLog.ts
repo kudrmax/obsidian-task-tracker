@@ -1,4 +1,5 @@
 import type { ProjectsScreenState } from "../../../core/application/contracts";
+import type { TaskIdState } from "../../../core/application/TaskIdentity";
 import type { UndoState } from "../../../core/application/UndoSteps";
 
 /**
@@ -15,10 +16,14 @@ export interface PendingCall {
 	readonly created: readonly string[];
 }
 
-/** What the pending calls are based on: the tasks file's text as last persisted or read, and the undo history that went with it. */
+/**
+ * What the pending calls are based on: the tasks file's text as last persisted or read, and the undo history and the ids
+ * that went with it (the ids of its reading, so a replay finds by id every task the pending calls name).
+ */
 export interface PendingBase {
 	readonly text: string | null;
 	readonly history?: UndoState;
+	readonly ids?: TaskIdState;
 }
 
 /** The pending calls over their base, in the order Max made them. */
@@ -50,14 +55,14 @@ export class PendingLog {
 		return entry;
 	}
 
-	/** A new base the file was read at: the calls stay, to be replayed over it. */
-	rebase(text: string | null): void {
-		this.current = { ...this.current, text };
+	/** A new base the file was read at, with the ids its reading settled on: the calls stay, to be replayed over it. */
+	rebase(text: string | null, ids?: TaskIdState): void {
+		this.current = { ...this.current, text, ids };
 	}
 
-	/** The calls up to `seq` are in the file now, written as `text` with `history`. */
-	persisted(text: string, history: UndoState | undefined, seq: number): void {
-		this.current = { text, history };
+	/** The calls up to `seq` are in the file now, written as `text` with `history` and `ids`. */
+	persisted(text: string, history: UndoState | undefined, ids: TaskIdState | undefined, seq: number): void {
+		this.current = { text, history, ids };
 		this.calls = this.calls.filter((c) => c.seq > seq);
 	}
 

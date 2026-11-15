@@ -81,14 +81,16 @@ export class Store<Model, Msg> {
 		this.running = true;
 		try {
 			do {
-				while (this.queue.length > 0) this.chain(this.queue.shift()!);
-				this.refreshViews();
+				do {
+					while (this.queue.length > 0) this.chain(this.queue.shift()!);
+					this.refreshViews();
+				} while (this.queue.length > 0);
+				if (this.current !== this.drawn) {
+					this.drawn = this.current;
+					this.options.render?.(this.current);
+				}
+				for (const effect of this.effects.splice(0)) effect.run(this.post);
 			} while (this.queue.length > 0);
-			if (this.current !== this.drawn) {
-				this.drawn = this.current;
-				this.options.render?.(this.current);
-			}
-			for (const effect of this.effects.splice(0)) effect.run(this.post);
 		} finally {
 			this.running = false;
 		}

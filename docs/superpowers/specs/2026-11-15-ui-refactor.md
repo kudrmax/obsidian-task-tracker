@@ -414,3 +414,20 @@ The old screen keeps its own services, untouched, until it is deleted. **Old and
 - After each slice or region, a fresh reviewer gets the diff, the principles and that part's traceability rows, and finds where the code breaks a principle.
 - After slices 3, 4 and 5, a fresh QA agent is told to break it.
 - A finding is answered by naming the principle or the inventory row that let it through, and fixing that.
+
+## Decisions
+
+Made while building slice 1's runtime (`obsidian/runtime/`), each from the closest existing pattern:
+
+1. **A section in a call's arguments is a `SectionRef` (`{ sectionRef: id }`)**, resolved to its name by `tasks.sectionOf` every time the call runs, the first time and on replay. A screen never hands a section's name to a writing call.
+2. **Every task key in a call's or a view's arguments is resolved by its id (`tasks.keyOf`) every time it runs**, not only on replay: a pin commits on the task's current key (P6), and a view need naming a task follows a line Sync edited in place.
+3. **The pending log's base keeps its ids** with its text and history. A new base is read with the base's ids and the replica's counter (`next`), not with the replica's current ids: those describe the pending writes, so the identity would not match the pending calls' tasks in the new text and they would drop. Ids still never repeat.
+4. **The ids a call gave anew** are the ids in its answer's `ids` that its context lacked, in counter order; on replay they are paired in order with the call's recorded ones. Every create counts: `createWithId`, `createSection`, a repeating task's next occurrence.
+5. **`tasks.createFile` is not a pending call:** with no file the writer creates the text the door made; a file Sync brought meanwhile becomes the base instead.
+6. **The runtime tells screens three events:** `rebased` (the id map and the dropped calls, their `seq` naming the call whose reverse transition runs), `fileGone`, `minute`. `tasks.reconcile` runs before `rebased` is told, so the remap and the reconciled projects screen reach a store's model in one pass of its loop.
+7. **Values a screen writes** (list share, zoom, tree width) go through `Runtime.updateSettings(patch)`: the same per-key patch, device keys to device storage.
+8. **Projects becoming ready mid-session** (the metadata cache settles late) is a `tasks.normalize` call, a pending call like the day-boundary tidy, so the one move to projects runs then.
+9. **Notices** reuse the old screen's words: a dropped call "The task changed in the file; the view was refreshed"; a file gone "Tasks file not found: <path>"; past two replays "The tasks file kept changing; your last changes were not saved".
+10. **`obsidian/runtime` imports** the core's `application`, `core/settings.ts` and Obsidian's packages only; Obsidian's vault, `PluginSettings`, `LocalProjectsScreenStore` and the feeds reach it as structural ports, composed in `obsidian/` root. `infrastructure` and `ui` may not import it (`tests/architecture.test.ts`).
+11. **`LocalProjectsScreenStore.set` of the state it holds** writes nothing and tells nobody; `compose.ts` exposes the one instance as `Services.projectsScreenStore`.
+12. **The network lane keeps each feed's last good run** and runs a feed (`refresh(true)`) when `calendarsRefresh.ask`/`feedDue` say so. Polling by the refresh interval (`CalendarPolling`/`keepFresh`) starts with a mounted screen (slices 3–4), as the old screen's does today.

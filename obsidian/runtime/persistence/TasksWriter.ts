@@ -136,7 +136,7 @@ export class TasksWriter {
 			}
 			if (outcome.kind === "written" && write.taken !== null) {
 				const { text, state, seq } = write.taken;
-				log.persisted(text, state.history, seq);
+				log.persisted(text, state.history, state.ids, seq);
 				replays = 0;
 				continue;
 			}
@@ -151,12 +151,12 @@ export class TasksWriter {
 	/** A file the door's `createFile` made: created at the path; one Sync brought meanwhile is read instead. */
 	private async create(path: string): Promise<void> {
 		const { replica, log, vault } = this.deps;
-		const { tasks, history } = replica.state;
+		const { tasks, history, ids } = replica.state;
 		if (tasks === null) return;
 		const seq = log.lastSeq;
 		try {
 			await vault.create(path, tasks);
-			log.persisted(tasks, history, seq);
+			log.persisted(tasks, history, ids, seq);
 		} catch (e) {
 			const found = await vault.read(path);
 			if (found === null) throw e;
