@@ -8757,17 +8757,20 @@ ${at.reading}`;
     /**
      * `args` as the call takes them now: each id an earlier replayed create gave anew (`idMap`, old id → new id) mapped,
      * wherever an object carries it as `id`, and each task's key (`TaskKey`) the task's key as the file has it now, found
-     * by its id; staleTask when such a task is gone. Without `ids` in the context, keys stay as they are.
+     * by its id; staleTask when such a task is gone. Without `ids` in the context, keys stay as they are. The tasks file is
+     * read only for a key: arguments that name no task need none.
      */
     freshArgs: (c, [args, idMap]) => {
       const ids = idMap ?? {};
       const moved2 = (id) => Object.prototype.hasOwnProperty.call(ids, id) ? ids[id] : id;
-      const doc = c.knowsIds() ? c.snapshot().doc : null;
+      let read = null;
+      const docNow = () => (read ??= { doc: c.knowsIds() ? c.snapshot().doc : null }).doc;
       const fresh = (value) => {
         if (Array.isArray(value)) return value.map(fresh);
         if (typeof value !== "object" || value === null) return value;
         if (isTaskKey(value) && typeof value.id === "string") {
           const id = moved2(value.id);
+          const doc = docNow();
           if (doc === null) return { ...value, id };
           const entry = doc.byId(id);
           if (!entry) throw new StaleTaskError();
