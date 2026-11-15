@@ -1,4 +1,5 @@
 import { calendarFileText, type FileCalendar, GOOGLE_CALENDAR_FILE, readCalendarFile } from "../../core/application/calendarFile";
+import { type FeedRun, feedDue, feedKey } from "../../core/application/calendarsRefresh";
 import type { CalendarEvent } from "../../core/application/contracts";
 import { type EventFeed, SourceProblemError } from "../../core/application/EventSource";
 import type { Clock, SettingsStore } from "../../core/application/ports";
@@ -35,7 +36,7 @@ function eventsText(events: readonly CalendarEvent[]): string {
 export class GoogleCalendarFeed implements EventFeed {
 	readonly name = "google" as const;
 	/** The last successful run: when, and under which settings. */
-	private last: { readonly at: number; readonly key: string } | null = null;
+	private last: FeedRun | null = null;
 
 	constructor(
 		private readonly api: Pick<GoogleCalendarApi, "export">,
@@ -47,9 +48,10 @@ export class GoogleCalendarFeed implements EventFeed {
 	) {}
 
 	async refresh(force: boolean): Promise<void> {
-		const key = this.key();
+		const settings = this.settings.get();
+		const key = feedKey(settings);
 		const now = this.clock.now();
-		if (!force && this.fresh(key, now)) return;
+		if (!force && !feedDue(this.last, now.getTime(), settings)) return;
 		const from = daysFrom(now, -PAST_DAYS);
 		const to = daysFrom(now, FUTURE_DAYS + 1);
 		if (!this.auth.isLoggedIn()) {
@@ -58,19 +60,7 @@ export class GoogleCalendarFeed implements EventFeed {
 		}
 		const exported = await this.api.export(from, to);
 		await this.write(exported.calendars, exported.events, now, from, to);
-		this.last = { at: now.getTime(), key };
-	}
-
-	private fresh(key: string, now: Date): boolean {
-		const seconds = this.settings.get().google.refreshSeconds;
-		if (seconds <= 0 || !this.last || this.last.key !== key) return false;
-		return now.getTime() - this.last.at < seconds * 1000;
-	}
-
-	/** The settings the file's events depend on: written under others, it is not fresh. */
-	private key(): string {
-		const { clientId, refreshToken } = this.settings.get().google;
-		return JSON.stringify([clientId, refreshToken]);
+		this.last = { atMs: now.getTime(), key };
 	}
 
 	private async write(calendars: readonly FileCalendar[], events: readonly CalendarEvent[], now: Date, from: Date, to: Date): Promise<void> {

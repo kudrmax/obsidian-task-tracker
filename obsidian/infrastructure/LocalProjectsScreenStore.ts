@@ -12,6 +12,7 @@ export const PROJECTS_SCREEN_KEY = "task-calendar:projects-screen";
 /** The Projects screen as this device left it (the node chosen, the segment, the folded branches), in Obsidian's local storage: never in data.json. */
 export class LocalProjectsScreenStore implements ProjectsScreenStore {
 	private state: ProjectsScreenState;
+	private readonly listeners = new Set<() => void>();
 
 	constructor(private readonly storage: LocalStorage) {
 		this.state = readState(storage.loadLocalStorage(PROJECTS_SCREEN_KEY));
@@ -22,8 +23,16 @@ export class LocalProjectsScreenStore implements ProjectsScreenStore {
 	}
 
 	set(state: ProjectsScreenState): void {
+		if (state === this.state) return;
 		this.state = state;
 		this.storage.saveLocalStorage(PROJECTS_SCREEN_KEY, JSON.stringify(state));
+		for (const listener of [...this.listeners]) listener();
+	}
+
+	/** Every screen sharing this store follows a change any of them made. Returns the unsubscribe. */
+	onChange(listener: () => void): () => void {
+		this.listeners.add(listener);
+		return () => this.listeners.delete(listener);
 	}
 }
 

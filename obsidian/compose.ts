@@ -26,6 +26,8 @@ import { WorkCalendarShortcut, type WorkCalendarShortcutHost } from "./infrastru
 export interface Services extends Core {
 	readonly google: GoogleAccount;
 	readonly work: WorkCalendarSetup;
+	/** What this device keeps of the Projects screen: one instance, which the runtime's replica follows too. */
+	readonly projectsScreenStore: LocalProjectsScreenStore;
 	/** Google's answer from the obsidian:// handler, turned into the refresh token. */
 	receiveLogin(params: Record<string, string>): Promise<void>;
 	/** Keeps the work calendar export in the plugin's folder for Scriptable. Returns the unsubscribe. */
@@ -57,6 +59,7 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	const syncRoundTrip = new SyncRoundTrip({ host: { ...host.shortcuts, notice: showNotice }, sync, wait: new SyncWait(sync, windowTimers, documentHidden) });
 	const work: WorkCalendarSetup = { scriptableLoader: () => workExport.loader, export: () => phoneRefresh.export() };
 	const tasksPath = () => tasksFilePath(settings.get()) ?? "";
+	const projectsScreenStore = new LocalProjectsScreenStore(app);
 	const projects = new VaultProjects(new ObsidianNoteIndex(app, tasksPath), () => settings.get().projectTag, (listener) => settings.onChange(listener));
 	const core = composeCore({
 		tasksFile: new VaultTaskFileStore(app, tasksPath),
@@ -69,12 +72,13 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		work,
 		isPhone: () => host.shortcuts.isPhone,
 		projects,
-		projectsScreen: new LocalProjectsScreenStore(app),
+		projectsScreen: projectsScreenStore,
 	});
 	return {
 		...core,
 		google: new GoogleAccountService(auth),
 		work,
+		projectsScreenStore,
 		receiveLogin: (params) => login.receive(params),
 		keepWorkExportInstalled: () => workExport.keepInstalled(),
 		syncForApp: () => syncRoundTrip.run(),
