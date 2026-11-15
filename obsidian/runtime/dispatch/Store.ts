@@ -17,7 +17,9 @@ export interface StoreOptions<Model> {
  * pass of the loop: each message's `update`, its door commands run at once with their answers fed back until the chain
  * is drained; then the views the screen needs, read from the replica and handed in as `viewsChanged`; then the render,
  * then the effects. A user's event runs the pass inside the event (`dispatch`); a message from elsewhere, and any change
- * of the replica, run it once per microtask (`post`).
+ * of the replica, run it once per microtask (`post`). A store draws its first frame on its own, in the microtask after it
+ * is made (its views read, then the render), with no message; a host that must draw at once, inside the event that
+ * mounted it, calls `flush`.
  */
 export class Store<Model, Msg> {
 	private current: Model;
@@ -44,6 +46,12 @@ export class Store<Model, Msg> {
 			if (msg !== null) this.queue.push(msg);
 			this.schedule();
 		});
+		this.schedule();
+	}
+
+	/** The pass now: a host mounting the store inside a user's event draws its first frame there. */
+	flush(): void {
+		this.pass();
 	}
 
 	get model(): Model {

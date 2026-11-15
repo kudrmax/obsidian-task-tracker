@@ -11,9 +11,10 @@ export interface CalendarFeed {
 	refresh(force: boolean): Promise<void>;
 }
 
-/** The calendars' files as text, by path from the vault's folder; null for none. */
+/** The calendars' files as text, by path from the vault's folder (null for none), and their changes by path. */
 export interface CalendarTexts {
 	read(path: string): Promise<string | null>;
+	watch(listener: (path: string) => void): () => void;
 }
 
 export interface CalendarLaneDeps {
@@ -22,49 +23,59 @@ export interface CalendarLaneDeps {
 	readonly read: (method: string, args: readonly unknown[]) => DoorAnswer;
 	readonly feeds: readonly CalendarFeed[];
 	readonly texts: CalendarTexts;
+	/** The phone's export of its calendars (Scriptable, Shortcuts, the app): asked first by a refresh, as the old screen's Refresh now. */
+	readonly work: { export(): void };
 	readonly timers: Timers;
 	readonly now: () => number;
 }
 
 class Silent extends Error {}
 
+type Problems = Partial<Record<CalendarSource, SourceProblem>>;
+
 /**
  * The network lane (P3): fetches the calendars and reads their files into the replica, asking the core's refresh rule
- * (`calendarsRefresh.*`) what to fetch. Per day the latest ask wins: one superseded by a newer ask of the same day is
- * abandoned, and what it brings is never applied. A feed's failure, or its silence past the core's bound, becomes the
+ * (`calendarsRefresh.*`) what to fetch. The files are read again after every feed run and on every change of a file
+ * (an export, another device), and the newest read wins: a read overtaken by a newer one is abandoned, never applied
+ * over newer texts. A feed's failure, its silence past the core's bound, and a file that cannot be read become the
  * replica's `feedProblems`.
  */
 export class CalendarLane {
-	private readonly latest = new Map<string, number>();
 	private readonly runs = new Map<CalendarSource, FeedRun>();
-	private tickets = 0;
+	private readonly feedFailures: Problems = {};
+	private readonly readFailures: Problems = {};
+	private reads = 0;
+	private applied = 0;
 	private cached = false;
 
 	constructor(private readonly deps: CalendarLaneDeps) {}
 
-	/** A day's events asked for a reason: the files read into the replica, fetched first or behind as the rule says. */
-	async refresh(day: string, reason: EventsReason): Promise<void> {
-		const ticket = ++this.tickets;
-		this.latest.set(day, ticket);
+	/** The calendars asked for a reason (open, peek, refresh): the files read now, or once the feeds the rule asks have run. */
+	async refresh(reason: EventsReason): Promise<void> {
+		if (reason === "refresh") this.deps.work.export();
 		const ask = resultOf<CalendarsAsk>(this.deps.read("calendarsRefresh.ask", [reason, this.cached]), "calendarsRefresh.ask");
 		const feeds = this.deps.feeds.filter((feed) => ask.feeds === "forced" || (ask.feeds === "due" && this.due(feed)));
-		const runs = feeds.map((feed) => this.run(feed));
-		if (ask.waitFeeds) {
-			await Promise.all(runs);
-			await this.readFiles(day, ticket);
-			return;
-		}
-		const now = this.readFiles(day, ticket);
-		const behind = runs.length > 0 ? Promise.all(runs).then(() => this.readFiles(day, ticket)) : Promise.resolve();
-		await Promise.all([now, behind]);
+		const runs = feeds.map((feed) => this.run(feed).then(() => this.readFiles()));
+		await Promise.all(ask.waitFeeds && runs.length > 0 ? runs : [this.readFiles(), ...runs]);
 	}
 
-	private current(day: string, ticket: number): boolean {
-		return this.latest.get(day) === ticket;
+	/** Reads the files again whenever one of them changes. Returns the unsubscribe. */
+	watch(): () => void {
+		return this.deps.texts.watch((path) => {
+			if (this.sources().some((s) => s.path === path)) void this.readFiles();
+		});
+	}
+
+	private sources(): { source: CalendarSource; path: string }[] {
+		return resultOf(this.deps.read("calendars.sources", []), "calendars.sources");
 	}
 
 	private due(feed: CalendarFeed): boolean {
 		return resultOf<boolean>(this.deps.read("calendarsRefresh.feedDue", [this.runs.get(feed.name) ?? null]), "calendarsRefresh.feedDue");
+	}
+
+	private problemOf(error: unknown): SourceProblem {
+		return resultOf<SourceProblem>(this.deps.read("calendarsRefresh.problem", [error]), "calendarsRefresh.problem");
 	}
 
 	/** One feed run, bounded by the core's silence: a good run is remembered, a failure or a silence is the source's problem. */
@@ -78,28 +89,46 @@ export class CalendarLane {
 		try {
 			await Promise.race([feed.refresh(true), silent]);
 			this.runs.set(feed.name, { atMs: this.deps.now(), key });
-			this.problem(feed.name, null);
+			delete this.feedFailures[feed.name];
 		} catch (e) {
-			this.problem(feed.name, e instanceof Silent ? silence.problem : resultOf<SourceProblem>(this.deps.read("calendarsRefresh.problem", [e]), "calendarsRefresh.problem"));
+			this.feedFailures[feed.name] = e instanceof Silent ? silence.problem : this.problemOf(e);
 		} finally {
 			this.deps.timers.clear(timer);
+			this.showProblems();
 		}
 	}
 
-	private problem(source: CalendarSource, problem: SourceProblem | null): void {
-		const { [source]: _was, ...rest } = this.deps.replica.state.feedProblems;
-		this.deps.replica.update({ feedProblems: problem === null ? rest : { ...rest, [source]: problem } });
+	/** The problems as the replica has them, written only when they changed: a new value would read every view again. */
+	private showProblems(): void {
+		const problems = { ...this.feedFailures, ...this.readFailures };
+		if (JSON.stringify(problems) === JSON.stringify(this.deps.replica.state.feedProblems)) return;
+		this.deps.replica.update({ feedProblems: problems });
 	}
 
-	/** The calendars' files read; applied only while this is still the day's latest ask. */
-	private async readFiles(day: string, ticket: number): Promise<void> {
-		const sources = resultOf<{ source: CalendarSource; path: string }[]>(this.deps.read("calendars.sources", []), "calendars.sources");
-		const texts = await Promise.all(sources.map(async ({ source, path }) => [source, await this.deps.texts.read(path)] as const));
-		if (!this.current(day, ticket)) return;
-		const calendars = { ...this.deps.replica.state.calendars };
-		for (const [source, text] of texts) calendars[source] = text;
+	/** The calendars' files read; applied only while no newer read was applied. */
+	private async readFiles(): Promise<void> {
+		const ticket = ++this.reads;
+		const read = await Promise.all(
+			this.sources().map(async ({ source, path }) => {
+				try {
+					return { source, text: await this.deps.texts.read(path) };
+				} catch (e) {
+					return { source, error: e };
+				}
+			}),
+		);
+		if (ticket <= this.applied) return;
+		this.applied = ticket;
 		this.cached = true;
-		if (texts.every(([source, text]) => this.deps.replica.state.calendars[source] === text)) return;
-		this.deps.replica.update({ calendars });
+		const calendars = { ...this.deps.replica.state.calendars };
+		for (const r of read) {
+			if ("error" in r) this.readFailures[r.source] = this.problemOf(r.error);
+			else {
+				delete this.readFailures[r.source];
+				calendars[r.source] = r.text;
+			}
+		}
+		this.showProblems();
+		if (read.some((r) => "text" in r && this.deps.replica.state.calendars[r.source] !== r.text)) this.deps.replica.update({ calendars });
 	}
 }

@@ -42,7 +42,8 @@ type Listener = (file: TAbstractFile, oldPath: string) => void;
 
 /**
  * Obsidian's vault as the runtime uses it, in memory: a `TFile` follows a rename, `process` reads and writes in one step
- * (after `gate`, and after a hook that stands for another device writing in between), and every change is an event.
+ * (after `gate`, and after a hook that stands for another device writing in between) and, as Obsidian does, writes and
+ * tells whatever `fn` answers, the same text too; every change is an event.
  */
 export class MemoryObsidianVault implements ObsidianVault {
 	private readonly texts = new Map<TFile, string>();
@@ -61,20 +62,24 @@ export class MemoryObsidianVault implements ObsidianVault {
 		return file ? this.texts.get(file) : undefined;
 	}
 
+	/** While set, a read takes the text as it is when asked and answers once the gate opens: a slow disk. */
+	readGate: Promise<void> | null = null;
+	/** Every change event told, by kind. */
+	readonly told: string[] = [];
+
 	async read(file: TFile): Promise<string> {
-		return this.texts.get(file)!;
+		const text = this.texts.get(file)!;
+		if (this.readGate) await this.readGate;
+		return text;
 	}
 
 	async process(file: TFile, fn: (data: string) => string): Promise<string> {
 		if (this.gate) await this.gate;
 		this.between.shift()?.();
-		const before = this.texts.get(file)!;
-		const next = fn(before);
-		if (next !== before) {
-			this.texts.set(file, next);
-			this.written.push(next);
-			this.emit("modify", file);
-		}
+		const next = fn(this.texts.get(file)!);
+		this.texts.set(file, next);
+		this.written.push(next);
+		this.emit("modify", file);
 		return next;
 	}
 
@@ -129,6 +134,7 @@ export class MemoryObsidianVault implements ObsidianVault {
 	}
 
 	private emit(name: string, file: TFile, oldPath?: string): void {
+		this.told.push(name);
 		for (const l of [...this.listeners.values()]) if (l.name === name) l.callback(file as TAbstractFile, oldPath ?? "");
 	}
 }
@@ -168,12 +174,19 @@ export interface Harness {
 	readonly clock: ManualClock;
 	readonly notices: string[];
 	readonly events: RuntimeEvent[];
+	/** A calendar file changed in the vault (an export, another device). */
+	readonly calendarChanged: (path: string) => void;
+	/** How many times the phone's export was asked. */
+	readonly exports: () => number;
 }
 
 export interface HarnessOptions {
 	readonly file?: string | null;
 	readonly feeds?: readonly CalendarFeed[];
 	readonly calendarTexts?: Map<string, string>;
+	/** The calendar files' reads, when a test holds or fails them. */
+	readonly readCalendar?: (path: string) => Promise<string | null>;
+	readonly projects?: { list(): []; ready(): boolean; onChange(listener: () => void): () => void };
 	readonly clock?: ManualClock;
 	readonly ready?: boolean;
 }
@@ -191,14 +204,23 @@ export async function harness(options: HarnessOptions = {}): Promise<Harness> {
 	const clock = options.clock ?? new ManualClock();
 	const notices: string[] = [];
 	const texts = options.calendarTexts ?? new Map<string, string>();
+	const calendarListeners = new Set<(path: string) => void>();
+	let exports = 0;
 	const runtime = new Runtime<StoredSettings>({
 		vault: new ObsidianTasksVault(vault),
 		settings,
 		projectsScreen: screens,
-		projects: { list: () => [], ready: () => true, onChange: () => () => undefined },
+		projects: options.projects ?? { list: () => [], ready: () => true, onChange: () => () => undefined },
 		isIosApp: false,
 		feeds: options.feeds ?? [],
-		calendarTexts: { read: async (path) => texts.get(path) ?? null },
+		calendarTexts: {
+			read: options.readCalendar ?? (async (path) => texts.get(path) ?? null),
+			watch: (listener) => {
+				calendarListeners.add(listener);
+				return () => calendarListeners.delete(listener);
+			},
+		},
+		work: { export: () => void exports++ },
 		clock,
 		timers,
 		notices: { show: (text) => notices.push(text) },
@@ -211,7 +233,8 @@ export async function harness(options: HarnessOptions = {}): Promise<Harness> {
 		await runtime.ready();
 		await settle(runtime);
 	}
-	return { runtime, vault, host, settings, screens, timers, clock, notices, events };
+	const calendarChanged = (path: string) => calendarListeners.forEach((l) => l(path));
+	return { runtime, vault, host, settings, screens, timers, clock, notices, events, calendarChanged, exports: () => exports };
 }
 
 /** Every write and read the runtime started has landed. */

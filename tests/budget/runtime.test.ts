@@ -4,8 +4,9 @@ import { bigTasksFile } from "../application/bigTasksFile";
 import { DAY, harness, itemOf, ok } from "../runtime/harness";
 
 /**
- * The runtime's own share on top of the door (the replica's context, a key found by its id, the answer taken): a view, a
- * read naming a task, and a step of a carry over a 30 KB file, warm, against the door's target; the gate fails only far past it.
+ * The runtime's own share on top of the door (the replica's context, a key found by its id, the answer taken, the call
+ * logged): a view, a read naming a task, a step of a carry and a write over a 30 KB file, warm, against the door's target;
+ * the gate fails only far past it. The write's persistence runs after, outside the event.
  */
 const BUDGET_MS = 1;
 const GATE_MS = 3 * BUDGET_MS;
@@ -25,11 +26,15 @@ describe("a call through the runtime on a 30 KB tasks file, warm", async () => {
 	const { runtime } = await harness({ file: bigTasksFile(DAY) });
 	const item = itemOf(runtime, "Inbox idea number 3 about something to sort later");
 	ok(runtime.call("tasks.startCarry", [{ keys: [item.key] }, false]).answer);
+	const written = itemOf(runtime, "Inbox idea number 5 about something to sort later");
+	let done = false;
+	const write = () => runtime.call("tasks.setStatus", [written.key, (done = !done) ? "inProgress" : "todo"]).answer;
 
 	for (const [name, call] of [
 		["tasks.screen", () => runtime.read("tasks.screen", [DAY])],
 		["tasks.fullTree", () => runtime.read("tasks.fullTree", [item])],
 		["tasks.carryAt", () => runtime.call("tasks.carryAt", [{ edge: true, node: null }, 1000]).answer],
+		["tasks.setStatus", write],
 	] as const) {
 		it(`${name}: target ${BUDGET_MS} ms, fails past ${GATE_MS} ms`, () => {
 			const ms = fastestMs(call);

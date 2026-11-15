@@ -28,6 +28,13 @@ export interface TasksVault {
 	watch(listener: (change: VaultChange) => void): () => void;
 }
 
+/** A write that leaves the file as it is: thrown out of `process`, so Obsidian writes nothing and tells no change. */
+class LeftAsIs extends Error {
+	constructor(readonly outcome: WriteOutcome) {
+		super(outcome.kind);
+	}
+}
+
 /** What the runtime uses of Obsidian's `Vault`. */
 export interface ObsidianVault {
 	getFileByPath(path: string): TFile | null;
@@ -41,7 +48,8 @@ export interface ObsidianVault {
 
 /**
  * The tasks file in Obsidian's vault. A write runs inside `vault.process`, so nothing lands between reading the file and
- * writing it; the `TFile` it holds follows a rename, so the write also checks that the file still sits at the path.
+ * writing it; the `TFile` it holds follows a rename, so the write also checks that the file still sits at the path. A
+ * write refused (not the base, or the file moved) leaves `process` by throwing, so the file is not written again.
  */
 export class ObsidianTasksVault implements TasksVault {
 	constructor(private readonly vault: ObsidianVault) {}
@@ -54,14 +62,18 @@ export class ObsidianTasksVault implements TasksVault {
 	async write(path: string, change: (current: string) => string | null): Promise<WriteOutcome> {
 		const file = this.vault.getFileByPath(path);
 		if (!file) return { kind: "missing" };
-		let outcome: WriteOutcome = { kind: "moved" };
-		await this.vault.process(file, (current) => {
-			if (file.path !== path) return current;
-			const next = change(current);
-			outcome = next === null ? { kind: "kept", current } : { kind: "written", text: next };
-			return next ?? current;
-		});
-		return outcome;
+		try {
+			const text = await this.vault.process(file, (current) => {
+				if (file.path !== path) throw new LeftAsIs({ kind: "moved" });
+				const next = change(current);
+				if (next === null) throw new LeftAsIs({ kind: "kept", current });
+				return next;
+			});
+			return { kind: "written", text };
+		} catch (e) {
+			if (e instanceof LeftAsIs) return e.outcome;
+			throw e;
+		}
 	}
 
 	async create(path: string, text: string): Promise<void> {

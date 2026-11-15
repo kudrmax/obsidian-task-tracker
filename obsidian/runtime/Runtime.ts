@@ -29,6 +29,8 @@ export interface RuntimeDeps<S extends TaskCalendarSettings> {
 	readonly isIosApp: boolean;
 	readonly feeds: readonly CalendarFeed[];
 	readonly calendarTexts: CalendarTexts;
+	/** The phone's export of its calendars, asked first by a refresh (`WorkCalendarSetup.export`). */
+	readonly work: { export(): void };
 	readonly clock: Clock;
 	readonly timers: Timers;
 	readonly notices: Notices;
@@ -55,7 +57,8 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 	private readonly readiness: Readiness;
 	private readonly stops: (() => void)[] = [];
 	private readonly built: Promise<void>;
-	private builtNow!: () => void;
+	private settleBuilt!: { resolve: () => void; reject: (e: unknown) => void };
+	private disposed = false;
 
 	constructor(private readonly deps: RuntimeDeps<S>) {
 		const door = deps.door ?? new InProcessDoor();
@@ -73,7 +76,7 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 			projectsScreenChanged: (state) => this.projectsScreen.save(state),
 		});
 		this.viewAnswers = new ViewAnswers({ state: () => this.replica.state, minute: () => minuteOf(now()), read: (m, a) => this.calls.read(m, a) });
-		this.calendars = new CalendarLane({ replica: this.replica, read: (m, a) => this.calls.read(m, a), feeds: deps.feeds, texts: deps.calendarTexts, timers: deps.timers, now });
+		this.calendars = new CalendarLane({ replica: this.replica, read: (m, a) => this.calls.read(m, a), feeds: deps.feeds, texts: deps.calendarTexts, work: deps.work, timers: deps.timers, now });
 		this.clock = new MinuteClock({
 			timers: deps.timers,
 			now,
@@ -81,8 +84,9 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 			minute: () => this.events.emit({ kind: "minute" }),
 			newDay: () => this.call("tasks.normalize", []),
 		});
-		this.built = new Promise((resolve) => (this.builtNow = resolve));
-		this.readiness = new Readiness(() => void this.start().then(this.builtNow, (e: unknown) => this.failed(e)));
+		this.built = new Promise((resolve, reject) => (this.settleBuilt = { resolve, reject }));
+		this.built.catch(() => undefined);
+		this.readiness = new Readiness(() => void this.build());
 	}
 
 	/** The host told a fact of its readiness: the replica is built once the layout is ready and the metadata cache resolved. */
@@ -91,7 +95,7 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 		this.readiness.arrive(fact);
 	}
 
-	/** Resolves once the replica is built (the file read and tidied). */
+	/** Resolves once the replica is built (the file read and tidied), or the runtime unloaded first; rejects if building failed. */
 	ready(): Promise<void> {
 		return this.built;
 	}
@@ -123,14 +127,19 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 		this.settings.save(JSON.stringify({ ...JSON.parse(handed === "" ? "{}" : handed), ...patch }), handed);
 	}
 
-	/** Resolves once every write started so far has landed. */
+	/** Resolves once nothing more can be written now: every write landed, or the queue waits on a failure (`stuck`). */
 	persisted(): Promise<void> {
 		return this.writer.drained();
 	}
 
-	/** A day's calendars asked for a reason (open, peek, refresh). */
-	refreshCalendars(day: string, reason: EventsReason): Promise<void> {
-		return this.calendars.refresh(day, reason);
+	/** What the tasks file's writes wait on (a disk error, a missing folder) until the next call, file event or settings change; null for nothing. */
+	get stuck(): unknown {
+		return this.writer.stuck;
+	}
+
+	/** The calendars asked for a reason (open, peek, refresh). */
+	refreshCalendars(reason: EventsReason): Promise<void> {
+		return this.calendars.refresh(reason);
 	}
 
 	/** A host going away ends what is under way: a carry gets `endCarry`, so none stays in the device's storage. */
@@ -140,13 +149,27 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 
 	/** The plugin unloads: nothing is watched any more, but the persistence queue runs on until it is empty. */
 	unload(): Promise<void> {
+		this.disposed = true;
+		this.settleBuilt.resolve();
 		this.teardown();
 		this.clock.stop();
 		this.stops.splice(0).forEach((stop) => stop());
 		return this.writer.drained();
 	}
 
+	private async build(): Promise<void> {
+		try {
+			await this.start();
+			this.settleBuilt.resolve();
+		} catch (e) {
+			this.failed(e);
+			this.settleBuilt.reject(e);
+		}
+	}
+
+	/** Watches what the replica follows, reads the file, starts the clock; stops at once if the runtime unloaded meanwhile. */
 	private async start(): Promise<void> {
+		if (this.disposed) return;
 		const { projects } = this.deps;
 		const facts = () => this.replica.update({ projects: projects.list(), projectsReady: this.readiness.has("metadata") && projects.ready() });
 		let ready = projects.ready();
@@ -160,8 +183,13 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 				ready = projects.ready();
 			}),
 			this.writer.watch(),
+			this.calendars.watch(),
 		);
 		await this.writer.load();
+		if (this.disposed) {
+			this.stops.splice(0).forEach((stop) => stop());
+			return;
+		}
 		this.stops.push(this.deps.settings.onChange(() => void this.writer.follow()));
 		this.clock.start();
 	}

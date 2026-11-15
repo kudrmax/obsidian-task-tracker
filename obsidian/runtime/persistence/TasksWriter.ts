@@ -13,39 +13,51 @@ export interface TasksWriterDeps {
 	readonly rebaser: Rebaser;
 	/** The tasks file's path by the settings now; null for none. */
 	readonly path: () => string | null;
-	/** A write that failed for a reason of its own (the disk): told, and the queue goes on. */
+	/** A write or read failed for a reason of its own (the disk, a missing folder): told once per failure. */
 	readonly failed: (error: unknown) => void;
 }
+
+/** How a drain ended: nothing left to write, the file left (the settings name another), or a failure. */
+type DrainEnd = "done" | "away";
 
 /**
  * The tasks text's persistence (P3): one serial queue writing the replica's text over the base it was made from, compared
  * and set inside `vault.process`, so an outside write landing between the base and the write is never overwritten: the
  * file becomes the new base and the pending calls replay over it, at most twice a write. It also reads the file when it
- * changes elsewhere (our own echo finds the base and does nothing), creates a missing file, and drops the pending calls
- * when the file goes. It outlives the plugin object until it is empty (`drained`).
+ * changes elsewhere (our own echo finds the base and does nothing; a read overtaken by a newer read or a write lands
+ * nowhere), creates a missing file, and drops the pending calls when the file goes. A write that fails waits for the next
+ * call, file event or settings change, told once; it never retries on its own. It outlives the plugin object until
+ * nothing more can be written (`drained`).
  */
 export class TasksWriter {
 	private running: Promise<void> | null = null;
 	private recheck = false;
 	private watched: string | null = null;
+	/** Bumped by every read started and every base a write or a replay set: a read lands only while it is the newest. */
+	private generation = 0;
+	/** The failure the queue waits on; null while it writes freely. */
+	private failure: unknown = null;
 
 	constructor(private readonly deps: TasksWriterDeps) {}
 
-	/** The file at the path read: the replica's base (the first build, and a new `tasksFile`). */
-	async load(): Promise<void> {
-		const path = this.deps.path();
-		this.watched = path;
-		if (path === null) return;
-		const text = await this.deps.vault.read(path);
-		if (path !== this.watched) return;
-		if (text === null) this.deps.rebaser.gone(path);
-		else this.adopt(text);
+	/** What the queue is stuck on (it waits for a call, a file event or a settings change to try again); null for nothing. */
+	get stuck(): unknown {
+		return this.failure;
 	}
 
-	/** The settings name another tasks file: like a file that has gone, then the new one is read. */
+	/** The file at the path read: the replica's base (the first build, and a new `tasksFile`). */
+	async load(): Promise<void> {
+		this.watched = this.deps.path();
+		await this.readOutside(true);
+	}
+
+	/** The settings changed: another tasks file is like a file that has gone, then the new one is read; the same one, a retry. */
 	async follow(): Promise<void> {
 		const old = this.watched;
-		if (this.deps.path() === old) return;
+		if (this.deps.path() === old) {
+			if (this.failure !== null) this.schedule();
+			return;
+		}
 		if (old !== null) this.deps.rebaser.gone(old);
 		await this.load();
 	}
@@ -54,32 +66,43 @@ export class TasksWriter {
 		return this.deps.vault.watch((change) => this.changed(change));
 	}
 
-	/** The replica's text differs from the file's: a write is queued unless one runs, which picks it up. */
+	/** The replica's text or log changed: a write is queued unless one runs, which picks it up. */
 	schedule(): void {
 		if (this.running) return;
+		let end: DrainEnd | "failed" = "failed";
 		this.running = this.drain()
-			.catch((e: unknown) => this.deps.failed(e))
+			.then((how) => {
+				end = how;
+			})
+			.catch((e: unknown) => this.fail(e))
 			.finally(() => {
 				this.running = null;
 				if (this.recheck) {
 					this.recheck = false;
 					void this.readOutside();
 				}
-				if (this.dirty) this.schedule();
+				if (end === "done" && this.dirty) this.schedule();
 			});
 	}
 
-	/** Resolves once nothing is left to write. */
+	/** Resolves once nothing more can be written now: everything landed, or the queue waits on a failure (`stuck`). */
 	async drained(): Promise<void> {
 		while (this.running) await this.running;
 	}
 
+	/** Something to write: the replica's text is not the file's, or calls are in the log. */
 	private get dirty(): boolean {
 		const tasks = this.deps.replica.state.tasks;
-		return this.watched !== null && tasks !== null && tasks !== this.deps.log.base.text;
+		return this.watched !== null && tasks !== null && (tasks !== this.deps.log.base.text || this.deps.log.size > 0);
+	}
+
+	private fail(error: unknown): void {
+		if (this.failure === null) this.deps.failed(error);
+		this.failure = error;
 	}
 
 	private adopt(text: string): void {
+		this.generation++;
 		this.deps.rebaser.rebase(text);
 		this.schedule();
 	}
@@ -93,54 +116,71 @@ export class TasksWriter {
 		else void this.readOutside();
 	}
 
-	/** The file read after a change event: our own echo, nothing new, a new base, or gone. */
-	private async readOutside(): Promise<void> {
+	/** The file read: our own echo or nothing new (a retry of a write that waits), a new base, or gone (told on a first read too). */
+	private async readOutside(first = false): Promise<void> {
 		const path = this.watched;
 		if (path === null) return;
-		const text = await this.deps.vault.read(path);
-		if (path !== this.watched) return;
+		const ticket = ++this.generation;
+		let text: string | null;
+		try {
+			text = await this.deps.vault.read(path);
+		} catch (e) {
+			this.fail(e);
+			return;
+		}
+		if (ticket !== this.generation || path !== this.watched) return;
 		if (this.running) {
 			this.recheck = true;
 			return;
 		}
-		if (text === this.deps.log.base.text) return;
+		if (text === this.deps.log.base.text && !(first && text === null)) {
+			if (this.dirty) this.schedule();
+			return;
+		}
 		if (text === null) this.deps.rebaser.gone(path);
 		else this.adopt(text);
 	}
 
-	private async drain(): Promise<void> {
+	private async drain(): Promise<DrainEnd> {
 		let replays = 0;
 		for (;;) {
 			const path = this.watched;
 			const { log, replica, rebaser } = this.deps;
-			if (path === null || !this.dirty) return;
+			if (path === null || !this.dirty) return "done";
+			const state = replica.state;
+			if (state.tasks === log.base.text) {
+				log.persisted(state.tasks!, state.history, state.ids, log.lastSeq);
+				continue;
+			}
 			if (log.base.text === null) {
 				await this.create(path);
 				continue;
 			}
-			const write: { taken: { readonly text: string; readonly state: typeof replica.state; readonly seq: number } | null; away: boolean } = { taken: null, away: false };
+			const write: { taken: { readonly state: typeof replica.state; readonly seq: number } | null; away: boolean } = { taken: null, away: false };
 			const outcome = await this.deps.vault.write(path, (current) => {
 				if (this.deps.path() !== path) {
 					write.away = true;
 					return null;
 				}
-				const state = replica.state;
-				if (current !== log.base.text || state.tasks === null) return null;
-				write.taken = { text: state.tasks, state, seq: log.lastSeq };
-				return state.tasks;
+				const now = replica.state;
+				if (current !== log.base.text || now.tasks === null) return null;
+				write.taken = { state: now, seq: log.lastSeq };
+				return now.tasks;
 			});
-			if (write.away) return;
+			if (write.away) return "away";
 			if (outcome.kind === "moved" || outcome.kind === "missing") {
 				if (path === this.watched) rebaser.gone(path);
-				return;
+				return "away";
 			}
+			this.generation++;
 			if (outcome.kind === "written" && write.taken !== null) {
-				const { text, state, seq } = write.taken;
-				log.persisted(text, state.history, state.ids, seq);
+				const { state: taken, seq } = write.taken;
+				log.persisted(taken.tasks!, taken.history, taken.ids, seq);
+				this.failure = null;
 				replays = 0;
 				continue;
 			}
-			if (outcome.kind !== "kept") return;
+			if (outcome.kind !== "kept") return "done";
 			if (++replays > MAX_REPLAYS) {
 				rebaser.giveUp(outcome.current);
 				replays = 0;
@@ -157,9 +197,11 @@ export class TasksWriter {
 		try {
 			await vault.create(path, tasks);
 			log.persisted(tasks, history, ids, seq);
+			this.failure = null;
 		} catch (e) {
 			const found = await vault.read(path);
 			if (found === null) throw e;
+			this.generation++;
 			this.deps.rebaser.rebase(found);
 		}
 	}

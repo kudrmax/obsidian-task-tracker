@@ -71,6 +71,11 @@ export class PendingLog {
 		this.calls = [...calls];
 	}
 
+	/** The file went: no base, and no history of steps over it (an undo must never reach another file). */
+	forget(): void {
+		this.current = { text: null };
+	}
+
 	/** Every pending call dropped: the file is taken as it is. Answers them. */
 	dropAll(): PendingCall[] {
 		const dropped = this.calls;

@@ -59,8 +59,8 @@ export class Rebaser {
 	gone(path: string): void {
 		const { log, replica } = this.deps;
 		const dropped = log.dropAll();
-		log.rebase(null);
-		replica.update({ tasks: null });
+		log.forget();
+		replica.update({ tasks: null, history: undefined });
 		if (dropped.length > 0) this.deps.notices.show(NOTICE_WORDS.gone(path));
 		this.settle(new Map(), dropped);
 		this.deps.events.emit({ kind: "fileGone", path });
