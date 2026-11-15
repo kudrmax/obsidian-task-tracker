@@ -681,7 +681,7 @@ export class Timeline {
 		const card = el(block, "div", "tc-block-card");
 		markColours(card, item);
 		showProgressDot(card, item);
-		fillTitle(el(card, "div", "tc-card-title"), RenamedTexts.shown(item.block.step ?? item).text);
+		fillTitle(el(card, "div", "tc-card-title"), blockText(item));
 		renderProjectMark(card, item);
 		renderMeta(card, item);
 		const meta = el(card, "span", "tc-block-meta is-hidden");
@@ -693,6 +693,14 @@ export class Timeline {
 		this.deps.onBlock?.(block, item, taken.listening.signal);
 		return { el: block, item, meta, pill };
 	}
+}
+
+/** A block's line as the core draws it (`TaskItem.block`), under its new text while a rename of the task or its step waits to be written. */
+function blockText(item: TaskItem): string {
+	const step = item.block.step;
+	if (step) return RenamedTexts.shown(step).text;
+	const shown = RenamedTexts.shown(item);
+	return shown === item ? item.block.text : shown.text;
 }
 
 function noDropShown(): DropShown {

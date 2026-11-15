@@ -1,5 +1,5 @@
 import { NO_DAY_EVENTS } from "../../core/application/contracts";
-import type { CalendarAlert, CalendarEvent, DayWords, CalendarService, DayEvents, DayView, DropColumn, DropTo, FunnelView, GroupedList, ListSection, ProjectRef, ProjectsView, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
+import type { CalendarAlert, CalendarEvent, DayWords, CalendarService, DayEvents, DayView, DropColumn, DropTo, FunnelView, GroupedList, ListSection, ProjectRef, ProjectsView, SectionOffer, SourceStatus, TaskItem, TaskKey, TaskService } from "../../core/application/contracts";
 import { Reload } from "./Reload";
 import type { LocalDate } from "./types";
 
@@ -57,7 +57,12 @@ const NO_OFFER: SectionOffer = { lists: { now: [], soon: [], inbox: [], backlog:
  * A change to a task never waits for the calendars.
  */
 export class DayData {
-	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true, projectTree: [], titleDrops: null, funnel: null, projects: null };
+	/** The tasks as read from the file. */
+	private readState: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true, projectTree: [], titleDrops: null, funnel: null, projects: null };
+	/** The tasks as the screen draws them: as read, or with the task First step's field is open on folded. */
+	private state: TasksState = this.readState;
+	/** The task First step's field is open on; null while none is. */
+	private typing: TaskKey | null = null;
 	private dayEvents: DayEvents = NO_DAY_EVENTS;
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
@@ -67,7 +72,7 @@ export class DayData {
 	private around = false;
 
 	constructor(private readonly deps: DayDataDeps) {
-		this.taskReload = new Reload(() => this.readTasks(), (state, hooks) => this.show(() => (this.state = state), hooks));
+		this.taskReload = new Reload(() => this.readTasks(), (state, hooks) => this.show(() => this.take(state), hooks));
 		this.eventReload = new Reload(
 			() => {
 				const ask = deps.calendars.events(deps.date(), this.around ? "open" : "refresh");
@@ -76,6 +81,32 @@ export class DayData {
 			},
 			(events, hooks) => this.show(() => (this.dayEvents = events), hooks),
 		);
+	}
+
+	/**
+	 * First step's field opens on the task `key` (null: it closed): from now on the data is the screen as the core draws it
+	 * while the field is open (`TaskService.firstStepScreen`, `firstStepProjects`), the task folded, until it closes. The
+	 * screen draws it itself, in the tap that opened the field.
+	 */
+	typeFirstStep(key: TaskKey | null): void {
+		this.typing = key;
+		this.take(this.readState);
+		this.shown.tasks = this.drawnOf("tasks");
+	}
+
+	private take(read: TasksState): void {
+		this.readState = read;
+		this.state = this.typed(read);
+	}
+
+	private typed(read: TasksState): TasksState {
+		const key = this.typing;
+		if (!key || !read.day || !read.titleDrops) return read;
+		const tasks = this.deps.tasks;
+		const { day, soon, inbox, backlog, done, sections, offer, missing, calendars, projectTree, titleDrops } = read;
+		const screen = tasks.firstStepScreen({ day, soon, inbox, backlog, done, sections, offer, missing, calendars, projectTree, titleDrops }, key);
+		const projects = read.projects && tasks.firstStepProjects(read.projects, key);
+		return { ...read, day: screen.day, soon: screen.soon, inbox: screen.inbox, backlog: screen.backlog, projects };
 	}
 
 	get day(): DayView | null {

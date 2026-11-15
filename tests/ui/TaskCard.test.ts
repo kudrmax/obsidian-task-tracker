@@ -24,6 +24,14 @@ const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({
 }, "2026-11-01");
 
 describe("renderTaskCard", () => {
+	it("draws First step's card as the core gives it: the task's title small on top over an empty step line", () => {
+		const task = item();
+		const card = renderTaskCard(null, { ...task, collapsed: true, card: task.firstStepCard }, { day: null });
+		expect(card.classList.contains("is-two-line")).toBe(true);
+		expect(card.querySelector(".tc-card-over")?.textContent).toBe("Купить билеты в Белград");
+		expect(card.querySelector(".tc-card-lines > .tc-card-title")?.textContent).toBe("");
+	});
+
 	it("puts the subtask counter and the description mark in one column, the mark under the counter", () => {
 		const both = renderTaskCard(document.createElement("div"), item({ progress: { done: 1, total: 4 }, description: "- note" }), { day: null });
 		const meta = both.querySelector(".tc-meta");

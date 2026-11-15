@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { dayWords } from "../../core/application/sourceWords";
-import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, type DayEventsAsk, type EventsReason, type FunnelView, type ScreenView, type TaskService } from "../../core/application/contracts";
+import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, type DayEventsAsk, type EventsReason, type FunnelView, type ScreenView, type TaskKey, type TaskService } from "../../core/application/contracts";
 import { DayData, type DayPart } from "../../obsidian/ui/DayData";
 import type { LocalDate } from "../../obsidian/ui/types";
 import { DemoTaskService } from "../fakes/DemoTaskService";
@@ -387,3 +387,39 @@ describe("DayData", () => {
 	});
 });
 
+
+describe("DayData while First step's field is open", () => {
+	it("is the screen the core draws for the field's task until the field closes, and the file as read after", async () => {
+		const tasks = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
+		const { data } = setup(tasks);
+		await data.tasks();
+		const read = data.soon;
+		const key = read[0].key;
+		const folded = [{ ...read[0], collapsed: true }, ...read.slice(1)];
+		const asked: unknown[] = [];
+		const service: TaskService = tasks;
+		service.firstStepScreen = (view: ScreenView, at: TaskKey) => {
+			asked.push(at);
+			return { ...view, soon: folded };
+		};
+		data.typeFirstStep(key);
+		expect(asked).toEqual([key]);
+		expect(data.soon).toBe(folded);
+		data.typeFirstStep(null);
+		expect(data.soon).toBe(read);
+	});
+
+	it("draws a read that lands while the field is open as the core draws it for the field too", async () => {
+		const tasks = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
+		const { data } = setup(tasks);
+		await data.tasks();
+		const marked: string[] = [];
+		vi.spyOn(tasks, "firstStepScreen").mockImplementation((view: ScreenView) => {
+			marked.push("typed");
+			return view;
+		});
+		data.typeFirstStep(data.soon[0].key);
+		await data.tasks();
+		expect(marked).toEqual(["typed", "typed"]);
+	});
+});

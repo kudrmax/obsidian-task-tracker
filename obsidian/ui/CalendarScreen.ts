@@ -38,7 +38,7 @@ import type { EditorOwner } from "./markdown/EmbeddedEditor";
 import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
 import { MarkdownTitleField } from "./quick/MarkdownTitleField";
 import { QuickEntryController } from "./quick/QuickEntryController";
-import { FirstStepField } from "./quick/FirstStepField";
+import { FirstStepTyping } from "./quick/FirstStepField";
 import type { TitleFieldFactory } from "./quick/TitleField";
 import { ObsidianChrome } from "./quick/ObsidianChrome";
 import { FullScreen } from "./full/FullScreen";
@@ -1177,29 +1177,15 @@ export class CalendarScreen extends Component {
 	/** The field a task's title is typed in, wherever a title is typed on the screen. */
 	private readonly titleField: TitleFieldFactory = (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts, this.where.keys);
 
-	/**
-	 * First step on the card its menu was opened from (`FirstStepField`): the screen draws nothing under the field while it
-	 * is open, as while a section is named; what was typed is written (`TaskService.firstStep`), and the screen then draws
-	 * the task as the file has it, the card back as it was when nothing was written.
-	 */
-	private typeFirstStep(item: TaskItem, source: HTMLElement): void {
-		if (!source.isConnected || !this.arbiter.claim(NAMING)) return;
-		FirstStepField.open({
-			item,
-			source,
-			titleField: this.titleField,
-			onDone: async (text) => {
-				try {
-					if (text !== null) await this.act(() => this.deps.tasks.firstStep(item.key, text));
-				} catch (error) {
-					this.reportFailure(error);
-				} finally {
-					this.arbiter.release(NAMING);
-					this.render();
-				}
-			},
-		});
-	}
+	/** First step typed on the card its menu was opened from, the task drawn folded meanwhile (`FirstStepTyping`). */
+	private readonly firstStep = new FirstStepTyping({
+		arbiter: this.arbiter,
+		titleField: this.titleField,
+		fold: (key) => this.data.typeFirstStep(key),
+		draw: () => this.render(),
+		write: (key, text) => this.act(() => this.deps.tasks.firstStep(key, text)),
+		onError: (error) => this.reportFailure(error),
+	});
 
 	/** A section's menu, with what the group may be given; none for a group that may be given nothing (No section). */
 	private showGroupMenu(head: HTMLElement, list: GroupedList, group: ListGroup): void {
@@ -1422,7 +1408,7 @@ export class CalendarScreen extends Component {
 				openDescription: (editing) => this.openFull(current, editing),
 				openFull: full?.holds(current) ? undefined : () => this.openFull(current, false),
 				addSubtask: (menu) => (full ? full.addSubtask(current) : this.quick?.addSubtask(current, menu)),
-				firstStep: () => this.typeFirstStep(current, source),
+				firstStep: () => this.firstStep.open(current, source),
 				remove: () => this.act(() => tasks.remove(current.key)),
 				openInObsidian: () => void this.openInObsidian(current),
 				openLink: (link) => this.openLink(link),
