@@ -2,6 +2,7 @@ import type { ViewMode } from "../../../../core/application/contracts";
 import { type BlockModel, shownLists } from "../model/block";
 import type { Act, BlockMsg } from "../model/messages";
 import type { ListRow } from "../model/lists";
+import { menuActMessage } from "./menu";
 
 /** The rows the block draws now, by key. */
 function rowOf(model: BlockModel, key: string): ListRow | null {
@@ -49,7 +50,10 @@ export function actMessage(model: BlockModel, act: Act): BlockMsg | null {
 			const row = act.key === null ? null : rowOf(model, act.key);
 			return row?.kind === "plate" ? { kind: "plateTapped", row: row.key, group: row.group, list: row.list } : null;
 		}
-		default:
-			return null;
+		default: {
+			if (!act.act.startsWith("menu:")) return null;
+			const msg = menuActMessage(act.act.slice("menu:".length), act.value);
+			return msg ? { kind: "menu", msg } : null;
+		}
 	}
 }

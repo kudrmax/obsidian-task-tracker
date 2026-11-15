@@ -7,6 +7,7 @@ import type { EntryModel } from "./entry";
 import type { CarryModel } from "./carry";
 import type { SelectModel } from "./select";
 import type { SearchModel } from "./search";
+import { menuNeeds } from "./menuNeeds";
 
 /**
  * A note's block (D3): the view fixed to the note's project, at the end of the note. Every fact is a field here or a
@@ -69,12 +70,14 @@ export function blockNeeds(model: BlockModel): readonly Need[] {
 	const today = resultOf<LocalDate>(model.answers, "today");
 	if (funnel && today) {
 		const node = funnel.filter?.node ?? null;
+		/** The screen's read is the menus' too (the sections and projects they offer), By subprojects as well. */
+		needs.push({ key: "screen", method: "tasks.screen", args: [today, node] });
 		if (funnel.view.source === "projectsScreen" && node !== null) needs.push({ key: "projects", method: "tasks.projectsScreen", args: [node] });
 		else {
-			needs.push({ key: "screen", method: "tasks.screen", args: [today, node] });
 			for (const column of rowColumns(funnel.view)) needs.push({ key: ROW_KEY(column), method: "tasks.columnSections", args: [column, today] });
 		}
 	}
+	needs.push(...menuNeeds(model));
 	return needs;
 }
 
@@ -163,6 +166,7 @@ export function currentLists(model: BlockModel): BlockLists {
 			column,
 			label: titles.get(column) ?? dayTitle(day, "today", day),
 			list: funnelList({
+				column,
 				items: itemsOf(screen, column),
 				day: column === "day" ? day : null,
 				grouped: sections !== null,

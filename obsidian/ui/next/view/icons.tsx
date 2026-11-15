@@ -88,3 +88,8 @@ const MODE_ICONS: ReadonlyMap<string, IconName> = new Map<string, IconName>([
 export function modeIcon(name: string): IconName | undefined {
 	return MODE_ICONS.get(name);
 }
+
+/** An icon named by the model (a string of the design's names): nothing for a name the set lacks. */
+export function NamedIcon({ name, cls }: { readonly name: string | null; readonly cls?: string }): JSX.Element | null {
+	return name !== null && Object.prototype.hasOwnProperty.call(DRAWINGS, name) ? <Icon name={name as IconName} cls={cls} /> : null;
+}

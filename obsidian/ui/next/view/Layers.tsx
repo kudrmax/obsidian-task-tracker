@@ -3,6 +3,7 @@ import { type BlockModel, canUndo, rootClasses, viewChoice } from "../model/bloc
 import type { Layer } from "../model/layers";
 import { Icon, modeIcon } from "./icons";
 import { Backdrop, MenuGroup, Placed } from "./Sheet";
+import { TaskMenu } from "./menu/TaskMenu";
 
 
 interface LayerProps {
@@ -63,6 +64,7 @@ function LayerView(props: LayerProps & { readonly layer: Layer }): JSX.Element |
 		case "moreMenu":
 			return <MoreMenu {...props} />;
 		case "taskMenu":
+			return <TaskMenu model={props.model} layer={props.layer} index={props.index} />;
 		case "full":
 			return null;
 	}

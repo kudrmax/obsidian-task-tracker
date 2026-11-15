@@ -12,6 +12,7 @@ import { type BlockModel, blockModel, blockNeeds, rowVars, shownLists } from "..
 import type { Command } from "../../model/commands";
 import type { Act, BlockMsg } from "../../model/messages";
 import { updateBlock } from "../../update/block";
+import { menuVars, openMenu } from "../../model/menuNeeds";
 import { BlockRoot } from "../../view/BlockRoot";
 
 /** What a block's host is told by the plugin: Obsidian's app as far as a block uses it, and the plugin's words for a failure. */
@@ -24,6 +25,8 @@ export interface BlockDeps {
 	readonly notice: (text: string) => void;
 	/** A link of a title: a note in a new tab, an address in the browser. */
 	readonly openLink: (link: { readonly kind: "note" | "url"; readonly target: string }) => void;
+	/** The tasks file in Obsidian's editor, in a new tab, the cursor at the start of `line` (a menu's Open in Obsidian). */
+	readonly openTasksFile: (line: number) => void;
 }
 
 /** The block's program for the runtime's store (P2): the model's update, its needs, the runtime's events as messages. */
@@ -56,6 +59,8 @@ export class BlockHost {
 	readonly measure = new Measure();
 	private keys: Keys | null = null;
 	private drawnSeq = -1;
+	/** A field a typing pick asked to focus that could not take it yet (still hidden for measuring). */
+	private focusing: string | null = null;
 	private frame: HTMLElement | null = null;
 	private disposed = false;
 
@@ -76,6 +81,12 @@ export class BlockHost {
 		this.input.acts(this.node, acted);
 		this.input.acts(this.overlay.node, acted);
 		this.store.flush();
+		this.input.fields(this.overlay.node, acted);
+		this.input.enter(
+			this.node.ownerDocument,
+			() => openMenu(this.store.model)?.asking != null,
+			() => this.dispatch({ kind: "menu", msg: { kind: "confirm" } }),
+		);
 		this.input.escape(
 			this.node.ownerDocument,
 			() => this.store.model.layers.some((layer) => !layer.closing),
@@ -98,8 +109,20 @@ export class BlockHost {
 		render(<BlockRoot model={model} layers={this.overlay.node} />, this.node);
 		this.drawnSeq = model.motion.seq;
 		this.motion.after(moved ? model.motion.cause : "none", rowVars(shownLists(model)));
+		this.motion.layerVars(this.overlay.node, menuVars(model));
+		const menu = openMenu(model);
+		this.motion.menu(this.overlay.node, this.node, menu?.place ?? null, (place) => this.dispatch({ kind: "menu", msg: { kind: "placed", place } }));
 		this.motion.layers(this.overlay.node, this.node, () => this.dispatch({ kind: "layerGone" }));
 		this.attach();
+		this.focusNow();
+	}
+
+	/**
+	 * The field a typing pick asked for takes the focus as soon as it can: a menu's page measured before it shows draws
+	 * once more in the same pass, still inside the user's event (P2).
+	 */
+	private focusNow(): void {
+		if (this.focusing !== null && Focus.field(this.node.ownerDocument, this.focusing)) this.focusing = null;
 	}
 
 	/** The block's frame, drawn once: its presses stop at it, a press focuses it, its keys stand over Obsidian's while it holds the focus. */
@@ -133,14 +156,16 @@ export class BlockHost {
 			case "haptic":
 				return;
 			case "focus":
-				Focus.field(this.node.ownerDocument, command.field);
-				return;
+				this.focusing = command.field;
+				return this.focusNow();
 			case "timer":
 				return this.input.timer(this.node, command.name, command.ms, () => dispatch(command.msg));
 			case "cancelTimer":
 				return this.input.cancelTimer(command.name);
 			case "noteSearch":
 				return;
+			case "openTasksFile":
+				return this.deps.openTasksFile(command.line);
 		}
 	}
 

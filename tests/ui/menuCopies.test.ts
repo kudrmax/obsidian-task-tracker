@@ -4,21 +4,26 @@ import { describe, expect, it } from "vitest";
 
 const root = join(__dirname, "..", "..", "obsidian", "ui");
 
-function sources(dir: string): { path: string; code: string }[] {
+/** The old screen's sources, or the new screens' (`next/`): each says each word once. */
+function sources(dir: string, next = false): { path: string; code: string }[] {
 	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
 		const path = join(dir, entry.name);
-		if (entry.isDirectory()) return sources(path);
-		if (!entry.name.endsWith(".ts")) return [];
+		if (entry.isDirectory()) return !next && relative(root, path) === "next" ? [] : sources(path, next);
+		if (!/\.tsx?$/.test(entry.name)) return [];
 		const code = readFileSync(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
 		return [{ path: relative(root, path), code }];
 	});
 }
 
-const where = (pattern: RegExp) => sources(root).flatMap(({ path, code }) => Array.from(code.matchAll(pattern), () => path));
+const where = (pattern: RegExp, next = false) => sources(next ? join(root, "next") : root, next).flatMap(({ path, code }) => Array.from(code.matchAll(pattern), () => path));
 
 describe("the submenus are built once", () => {
 	it("Remove due date is written once", () => {
 		expect(where(/"Remove due date"/g)).toEqual(["menu/DatePage.ts"]);
+	});
+
+	it("the new screens say Remove due date once too, in the menu's model", () => {
+		expect(where(/"Remove due date"/g, true)).toEqual(["next/model/taskMenu.ts"]);
 	});
 
 	it("the Section submenu's way back only in SectionChooser", () => {

@@ -1,4 +1,4 @@
-import { branchOf, type GroupName, type ListGroup, type ListSection, listView, type ProjectsView, type TaskItem } from "../../../../core/application/contracts";
+import { branchOf, type DropColumn, type GroupName, type ListGroup, type ListSection, listView, type MenuFrom, type ProjectsView, type TaskItem } from "../../../../core/application/contracts";
 import type { LocalDate } from "./answers";
 import { type CardFace, cardFace } from "./card";
 
@@ -21,6 +21,8 @@ export interface CardRow {
 	readonly face: CardFace;
 	/** The task whose card and menu this row stands for in a list of parts (By subprojects: its part's card); its own id elsewhere. */
 	readonly owner: string;
+	/** Where its menu is opened from (`tasks.menu`): its list's column, By subprojects its part's card's (`ProjectsCard.menuFrom`). */
+	readonly from: MenuFrom;
 }
 
 /** A section's header. */
@@ -65,6 +67,8 @@ function withBranches(rows: ListRow[]): ListRow[] {
 }
 
 export interface FunnelListInput {
+	/** The list's column: where its cards' menus open from. */
+	readonly column: DropColumn;
 	readonly items: readonly TaskItem[];
 	/** The day its cards leave out of their corner; null for a list of no day. */
 	readonly day: LocalDate | null;
@@ -84,7 +88,7 @@ export function funnelList(input: FunnelListInput): ListModel {
 	for (const group of view.groups as readonly ListGroup[]) {
 		if (view.showsHeaders && group.header) rows.push({ kind: "head", key: `head:${group.id}`, name: group.name ?? input.ungrouped, ungrouped: group.name === null, group: group.name });
 		if (group.empty) rows.push({ kind: "plate", key: `plate:${group.id}`, words: input.emptyLabel, group: group.name, list: false });
-		for (const { item, level } of group.rows) rows.push({ kind: "card", key: item.id, item, level, group: group.name, branch: null, face: cardFace(item, input.day), owner: item.id });
+		for (const { item, level } of group.rows) rows.push({ kind: "card", key: item.id, item, level, group: group.name, branch: null, face: cardFace(item, input.day), owner: item.id, from: input.column });
 	}
 	if (rows.length === 0 && input.plate !== null) rows.push({ kind: "plate", key: "empty", words: input.plate, group: null, list: true });
 	return { rows: withBranches(rows) };
@@ -98,10 +102,14 @@ export function projectsList(view: ProjectsView): ListModel {
 		if (section.header && section.title !== null) rows.push({ kind: "head", key: `head:${section.key}`, name: section.title, ungrouped: false, group: section.group });
 		if (section.plate) rows.push({ kind: "plate", key: `plate:${section.key}`, words: view.emptyLabel, group: section.group, list: false });
 		let owner = "";
+		let from: MenuFrom = "done";
 		for (const row of section.rows) {
-			if (row.card) owner = row.id;
+			if (row.card) {
+				owner = row.id;
+				from = row.card.menuFrom;
+			}
 			if (owner === "") continue;
-			rows.push({ kind: "card", key: row.id, item: row.item, level: row.level, group: section.group, branch: null, face: cardFace(row.item, null, row.card?.stage ?? null), owner });
+			rows.push({ kind: "card", key: row.id, item: row.item, level: row.level, group: section.group, branch: null, face: cardFace(row.item, null, row.card?.stage ?? null), owner, from });
 		}
 	}
 	return { rows: withBranches(rows) };
