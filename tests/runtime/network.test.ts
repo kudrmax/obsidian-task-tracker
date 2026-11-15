@@ -62,11 +62,15 @@ describe("the network lane", () => {
 		expect(runtime.replica.state.calendars.google).toBe("cached");
 	});
 
-	it("asks the phone's export first on a refresh, as Refresh now does", async () => {
-		const { runtime, exports } = await harness();
+	it("asks the phone's export first only on Max's Refresh now: never on polling, an open or a source changing", async () => {
+		const texts = new Map([["calendar/iphone.json", "x"]]);
+		const { runtime, exports, calendarChanged } = await harness({ calendarTexts: texts });
 		await runtime.refreshCalendars("open");
-		expect(exports()).toBe(0);
 		await runtime.refreshCalendars("refresh");
+		calendarChanged("calendar/iphone.json");
+		await tick();
+		expect(exports()).toBe(0);
+		await runtime.refreshCalendars("refresh", true);
 		expect(exports()).toBe(1);
 	});
 

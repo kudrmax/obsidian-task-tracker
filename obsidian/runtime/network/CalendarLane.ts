@@ -24,7 +24,7 @@ export interface CalendarLaneDeps {
 	readonly read: (method: string, args: readonly unknown[]) => DoorAnswer;
 	readonly feeds: readonly CalendarFeed[];
 	readonly texts: CalendarTexts;
-	/** The phone's export of its calendars (Scriptable, Shortcuts, the app): asked first by a refresh, as the old screen's Refresh now. */
+	/** The phone's export of its calendars (Scriptable, Shortcuts, the app): asked first when the rule says (`exportFirst`: Refresh now). */
 	readonly work: { export(): void };
 	readonly timers: Timers;
 	readonly now: () => number;
@@ -55,10 +55,13 @@ export class CalendarLane {
 
 	constructor(private readonly deps: CalendarLaneDeps) {}
 
-	/** The calendars asked for a reason (open, peek, refresh): the files read now, or once the feeds the rule asks have run. */
-	async refresh(reason: EventsReason): Promise<void> {
-		if (reason === "refresh") this.deps.work.export();
-		const ask = resultOf<CalendarsAsk>(this.deps.read("calendarsRefresh.ask", [reason, this.cached]), "calendarsRefresh.ask");
+	/**
+	 * The calendars asked for a reason (open, peek, refresh): the files read now, or once the feeds the rule asks have run.
+	 * `byHand`: Max asked (Refresh now), not the clock or a source changing; only then is the phone asked to export first.
+	 */
+	async refresh(reason: EventsReason, byHand = false): Promise<void> {
+		const ask = resultOf<CalendarsAsk>(this.deps.read("calendarsRefresh.ask", [reason, this.cached, byHand]), "calendarsRefresh.ask");
+		if (ask.exportFirst) this.deps.work.export();
 		const feeds = this.deps.feeds.filter((feed) => ask.feeds === "forced" || (ask.feeds === "due" && this.due(feed)));
 		const runs = feeds.map((feed) => this.run(feed).then(() => this.readFiles()));
 		await Promise.all(ask.waitFeeds && runs.length > 0 ? runs : [this.readFiles(), ...runs]);

@@ -148,9 +148,9 @@ export class Runtime<S extends TaskCalendarSettings = TaskCalendarSettings> impl
 		return this.writer.stuck;
 	}
 
-	/** The calendars asked for a reason (open, peek, refresh). */
-	refreshCalendars(reason: EventsReason): Promise<void> {
-		return this.calendars.refresh(reason);
+	/** The calendars asked for a reason (open, peek, refresh); `byHand` for Max's Refresh now, which asks the phone to export first. */
+	refreshCalendars(reason: EventsReason, byHand = false): Promise<void> {
+		return this.calendars.refresh(reason, byHand);
 	}
 
 	/** A host's own view of the runtime (the leaf, a note's block, the settings tab): its teardown ends only what it started. */
