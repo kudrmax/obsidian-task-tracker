@@ -93,6 +93,8 @@ export interface ViewDeps {
 	readonly clock: Clock;
 	/** Apple's Calendar at the event. */
 	openInCalendar(event: CalendarEvent): void;
+	/** An address in the browser: the plugin's one way out (`outside()`), recorded by the e2e build. */
+	browse(url: string): void;
 }
 
 /** What the screen reads of the settings, and the only ones it sets: where its window stands, its divider and its zoom. */
@@ -1432,7 +1434,7 @@ export class CalendarScreen extends Component {
 
 	/** A note opens in a new tab, so the calendar stays where it is; an address goes to the browser. */
 	private openLink(link: TaskLink): void {
-		if (link.kind === "url") window.open(link.target);
+		if (link.kind === "url") this.deps.browse(link.target);
 		else void this.app.workspace.openLinkText(link.target, this.settings.tasksFile, "tab");
 	}
 
