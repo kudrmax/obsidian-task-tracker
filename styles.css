@@ -2003,16 +2003,19 @@ body.is-mobile .task-calendar .tc-n-fade-entering { height: calc(var(--tc-bar-h)
 .task-calendar .tc-n-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-bar-bottom); z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); display: flex; align-items: center; gap: var(--tc-space-8); background: var(--tc-bg); }
 .task-calendar .tc-n-bar-shifts { display: flex; flex-shrink: 1; min-width: 0; border-radius: var(--tc-radius-bar-btn); background: var(--tc-track-bg); }
 .task-calendar .tc-n-bar-spacer { flex: 1; }
+/* Each button paints whole over the one before it, as the old bar's: a shrunk shift is covered by the flag, not drawn over it. */
+.task-calendar .tc-n-bar > button, .task-calendar .tc-n-bar-shifts, .task-calendar .tc-n-bar-shifts > button { z-index: var(--tc-layer-bar-button); }
 .task-calendar button.tc-n-btn.tc-n-bar-btn { width: var(--tc-bar-btn-w); min-width: var(--tc-bar-btn-h); height: var(--tc-bar-btn-h); flex-shrink: 1; padding: 0; border-radius: var(--tc-radius-bar-btn); display: flex; align-items: center; justify-content: center; color: var(--tc-text); background: var(--tc-track-bg); }
 .task-calendar .tc-n-bar-shifts > button.tc-n-btn.tc-n-bar-btn { background: none; }
 .task-calendar button.tc-n-btn.tc-n-bar-btn:disabled { color: var(--tc-ink-dim); cursor: default; }
 .task-calendar .tc-n-bar-btn svg { width: var(--tc-bar-flag); height: var(--tc-bar-flag); stroke-width: var(--tc-stroke-bar); }
 .task-calendar .tc-n-bar-shifts .tc-n-bar-btn svg { width: var(--tc-bar-icon); height: var(--tc-bar-icon); }
-.task-calendar .tc-n-bar-btn.is-set { color: var(--tc-accent); }
-.task-calendar .tc-n-bar-btn[data-priority].is-set { color: var(--tc-priority-ink); }
+.task-calendar button.tc-n-btn.tc-n-bar-btn.is-set { color: var(--tc-accent); }
+.task-calendar button.tc-n-btn.tc-n-bar-btn[data-priority].is-set { color: var(--tc-priority-ink); }
 .task-calendar .tc-n-bar-btn[data-priority].is-set svg { fill: var(--tc-priority-ink); }
+.task-calendar button.tc-n-btn.tc-n-bar-project.is-set { color: var(--tc-accent); }
 .task-calendar .tc-n-bar-project.is-set svg { fill: var(--tc-accent); }
-.task-calendar button.tc-n-btn.tc-n-bar-place { width: var(--tc-place-w); box-sizing: border-box; padding: 0 var(--tc-space-12) 0 var(--tc-space-10); background: var(--tc-track-bg); gap: var(--tc-space-6); display: flex; align-items: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); height: var(--tc-bar-btn-h); border-radius: var(--tc-radius-bar-btn); flex-shrink: 0; }
+.task-calendar button.tc-n-btn.tc-n-bar-place { width: var(--tc-place-w); box-sizing: border-box; padding: 0 var(--tc-space-12) 0 var(--tc-space-10); background: var(--tc-track-bg); gap: var(--tc-space-6); display: flex; align-items: center; justify-content: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); height: var(--tc-bar-btn-h); border-radius: var(--tc-radius-bar-btn); flex-shrink: 0; }
 .task-calendar .tc-n-bar-place svg { width: var(--tc-place-icon); height: var(--tc-place-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-seg); }
 .task-calendar .tc-n-bar-place-label { overflow: hidden; white-space: nowrap; }
 .task-calendar .tc-n-bar.tc-n-bar-desk { right: auto; bottom: auto; height: var(--tc-seg); padding: var(--tc-seg-pad); gap: 0; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); }
@@ -2057,7 +2060,8 @@ body.is-mobile .task-calendar .tc-n-fade-entering { height: calc(var(--tc-bar-h)
 .task-calendar .tc-n-full-title { font-size: var(--tc-font-desc-title); line-height: var(--tc-leading-desc-title); font-weight: var(--tc-weight-bold); color: var(--tc-text); overflow-wrap: anywhere; }
 .task-calendar .tc-n-list.tc-n-full-list { flex: none; margin-top: var(--tc-desc-title-gap); padding-top: 0; overflow: visible; }
 .task-calendar .tc-n-full-list > .tc-n-card { padding-left: var(--tc-pick-pad-start); }
-.task-calendar .tc-n-full-list > .tc-n-card > .tc-n-pick { width: var(--tc-pick-size); margin-right: var(--tc-pick-gap); border-width: var(--tc-pick-ring); opacity: 1; cursor: pointer; }
+/* The circle stands as the old full card's does: its place kept (no width, as the old CSS), pressed through the card's left padding. */
+.task-calendar .tc-n-full-list > .tc-n-card > .tc-n-pick { cursor: pointer; }
 .task-calendar .tc-n-full-list > .tc-n-card > .tc-n-progress-dot { opacity: 0; }
 .task-calendar .tc-n-full-list > .tc-n-card[data-status="done"] > .tc-n-pick { border-color: transparent; background: var(--tc-accent); }
 .task-calendar .tc-n-full-list > .tc-n-card[data-status="done"] > .tc-n-pick svg { visibility: visible; }
@@ -2091,3 +2095,10 @@ body.is-mobile .task-calendar .tc-n-fade-entering { height: calc(var(--tc-bar-h)
 .task-calendar .tc-n-hit-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .task-calendar .tc-n-hit-desc { white-space: nowrap; overflow: hidden; font-size: var(--tc-font-block); line-height: var(--tc-leading-block); color: var(--tc-muted); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .task-calendar .tc-n-card-over svg { width: var(--tc-font-card-over); height: var(--tc-font-card-over); flex-shrink: 0; stroke-width: var(--tc-stroke-card-over); }
+
+/* next: restore */
+/* The start of a task's description over its card's copy in the menu (the old `DescriptionPeek`); motion stands it, cuts it and keeps it away without room. */
+.task-calendar .tc-n-desc-peek { position: fixed; z-index: var(--tc-layer-panel); display: flex; flex-direction: column; width: var(--tc-menu-w); max-height: var(--tc-desc-peek-max); box-sizing: border-box; padding: var(--tc-n-peek-pad, var(--tc-desc-peek-pad)); border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-level-ring); visibility: var(--tc-n-peek-shown, visible); cursor: pointer; pointer-events: auto; }
+.task-calendar .tc-n-desc-peek > .tc-n-desc-text { --font-text-size: var(--tc-font-desc-peek); flex: 1 1 auto; min-height: 0; overflow: hidden; font-family: var(--tc-font-desc); font-size: var(--tc-font-desc-peek); line-height: var(--tc-desc-leading); color: var(--tc-desc-ink); overflow-wrap: anywhere; -webkit-mask-image: var(--tc-n-peek-mask, none); mask-image: var(--tc-n-peek-mask, none); }
+.task-calendar .tc-n-desc-peek > .tc-n-desc-text > :first-child { margin-top: 0; }
+.task-calendar .tc-n-desc-peek > .tc-n-desc-text > :last-child { margin-bottom: 0; }

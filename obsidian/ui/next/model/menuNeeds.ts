@@ -1,8 +1,8 @@
 import type { MenuScreen, PickedTask, TaskItem, TaskMenuModel } from "../../../../core/application/contracts";
 import { resultOf, type Need } from "./answers";
-import { type BlockModel, currentLists, screenView, today } from "./block";
+import { type BlockModel, currentLists, screenView, shownDay, today } from "./block";
 import type { CardRow } from "./lists";
-import type { MenuInput, TaskMenuLayer } from "./taskMenu";
+import { type MenuDrawing, type MenuInput, panelModel, type TaskMenuLayer } from "./taskMenu";
 
 /** The card rows the block draws now, by key. */
 export function cardRows(model: BlockModel): ReadonlyMap<string, CardRow> {
@@ -32,9 +32,10 @@ export function menuTasks(model: BlockModel, layer: TaskMenuLayer): readonly Tas
 
 /** The screen a menu opens over (`tasks.menu`'s `screen`): today, the day it shows, the sections and projects it offers. */
 export function menuScreen(model: BlockModel): MenuScreen | null {
-	const day = today(model);
+	const now = today(model);
+	const day = shownDay(model);
 	const screen = screenView(model);
-	return day && screen ? { today: day, day, offer: screen.offer, projects: screen.projectTree } : null;
+	return now && day && screen ? { today: now, day, offer: screen.offer, projects: screen.projectTree } : null;
 }
 
 /** The core's model of the open menu (`tasks.menu`, `tasks.bulkMenu`), a view answer while the menu stands (P2). */
@@ -65,4 +66,21 @@ export function menuVars(model: BlockModel): ReadonlyMap<string, Readonly<Record
 	if (!layer || !input || layer.page !== "projects") return vars;
 	for (const option of input.menu.project.options) vars.set(`option/project:${option.project.name}`, { "--tc-n-depth": String(option.depth) });
 	return vars;
+}
+
+/** What an open menu draws: its panel, the cards it lifts, the start of the task's description. Null while any of it is missing. */
+export function menuDrawing(model: BlockModel, layer: TaskMenuLayer): MenuDrawing | null {
+	if (layer.frozen) return layer.frozen;
+	const input = menuInput(model, layer);
+	const cards = menuCards(model, layer);
+	if (!input || !cards) return null;
+	const [task] = input.tasks;
+	const peek = layer.bulk === null && layer.page !== "projectName" ? (task?.description ?? null) : null;
+	return { panel: panelModel(layer, input), cards: cards.map((card) => ({ key: card.key, face: card.face })), peek };
+}
+
+/** The description a menu shows by its card (the open menu's, or the one fading out): Obsidian draws it (`Rendered`). */
+export function menuPeek(model: BlockModel): string | null {
+	const layer = model.layers.filter((l): l is TaskMenuLayer => l.kind === "taskMenu").slice(-1).find(() => true);
+	return layer ? (menuDrawing(model, layer)?.peek ?? null) : null;
 }

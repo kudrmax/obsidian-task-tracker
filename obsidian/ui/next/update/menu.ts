@@ -2,10 +2,10 @@ import { repeatDraft, type TaskItem, type TaskMenuModel } from "../../../../core
 import { resultOf } from "../model/answers";
 import type { BlockModel } from "../model/block";
 import type { Layer } from "../model/layers";
-import { menuCards, menuInput, openMenu } from "../model/menuNeeds";
+import { menuCards, menuDrawing, menuInput, openMenu } from "../model/menuNeeds";
 import type { BlockMsg } from "../model/messages";
 import { monthAfter } from "../model/monthGrid";
-import { type MenuDrawing, type MenuMsg, panelModel, pickerMonth, repeatEdited, type TaskMenuLayer } from "../model/taskMenu";
+import { type MenuDrawing, type MenuMsg, pickerMonth, repeatEdited, type TaskMenuLayer } from "../model/taskMenu";
 import { assertNever } from "../model/assertNever";
 import { type BlockCommand, closeTop, type Step } from "./block";
 import { updateEntry } from "./entry";
@@ -21,17 +21,17 @@ function changed(model: BlockModel, layer: TaskMenuLayer, next: Partial<TaskMenu
 }
 
 /** What the menu draws now, kept as its close begins. */
-function drawing(model: BlockModel, layer: TaskMenuLayer): MenuDrawing | null {
-	const input = menuInput(model, layer);
-	const cards = menuCards(model, layer);
-	if (!input || !cards) return null;
-	return { panel: panelModel(layer, input), cards: cards.map((card) => ({ key: card.key, face: card.face })) };
-}
+const drawing = (model: BlockModel, layer: TaskMenuLayer): MenuDrawing | null => menuDrawing(model, { ...layer, frozen: null });
 
 /**
  * The menu begins to close: what it draws is kept while it fades, and the lists under it are pinned (P6, R10). What the
  * repeat page holds is written now (`repeatPage.end` decides whether it differs from the task's own rule).
  */
+/** A card's menu opens once the card is in view: its column scrolls it in first, as the old menu's (`scrollIntoColumn`). */
+export function openInView(model: BlockModel, id: string): Step {
+	return [model, [{ kind: "intoView", key: id, then: { kind: "menu", msg: { kind: "opened", id } } }]];
+}
+
 export function closeMenu(model: BlockModel): Step {
 	const layer = openMenu(model);
 	if (!layer) return [closeTop(model), []];
@@ -96,6 +96,7 @@ export function updateMenu(model: BlockModel, msg: MenuMsg): Step {
 		const [first] = model.select?.picked ?? [];
 		return first === undefined ? [model, []] : opened(model, fresh(first, "done", msg.at));
 	}
+	if (msg.kind === "clickedAgain") return openMenu(model)?.id === msg.id && openMenu(model)?.bulk === null ? updateMenu(model, { kind: "edit", id: "rename" }) : [model, []];
 	if (msg.kind === "repeatEnd") return [model, msg.end ? [write("tasks.setRepeat", [msg.key, msg.end.rule])] : []];
 	if (msg.kind === "openTasksFile") return [model, [{ kind: "openTasksFile", line: msg.line }]];
 	const layer = openMenu(model);

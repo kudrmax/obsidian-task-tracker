@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BlockHost } from "../../../obsidian/ui/next/host/block/BlockHost";
+import { holdsHeight } from "../../../obsidian/ui/next/model/block";
 import { harness, type Harness, PATH, settle } from "../../runtime/harness";
 import { type FakeField, fakeTitleFields } from "../../helpers/FakeTitleField";
 import type { BlockMsg } from "../../../obsidian/ui/next/model/messages";
@@ -30,6 +31,12 @@ describe("the block's quick entry", () => {
 	afterEach(async () => {
 		host.dispose();
 		await h.runtime.unload();
+	});
+
+	it("lets its field grow the block as any row does, as the old BlockHeight fitted the block to its stack (a carry alone holds it)", () => {
+		host.dispatch(act("plus"));
+		expect(host.model.entry?.state).not.toBeNull();
+		expect(holdsHeight(host.model)).toBe(false);
 	});
 
 	it("opens a field from the plus and focuses it inside the tap (a typing pick)", () => {
@@ -89,6 +96,13 @@ describe("the block's quick entry", () => {
 		await settle(h.runtime);
 		expect(h.vault.text(PATH)).toContain("- [ ] Idea, better");
 		expect(titles()).toContain("Idea, better");
+	});
+
+	it("a rename's field stands where its card stood, not at its list's end (the old screen's rename in place)", () => {
+		const id = rowKeys().find((k) => titles()[0] === "Idea" && k !== "head" && !k.startsWith("entry"))!;
+		host.dispatch({ kind: "entry", msg: { kind: "rename", id } });
+		const order = [...host.node.querySelectorAll("[data-n-island=field], .tc-n-card .tc-n-card-title")].map((el) => (el.matches("[data-n-island=field]") ? "field" : el.textContent));
+		expect(order).toEqual(["field", "Call"]);
 	});
 
 	it("a subtask is typed under its task, a level in", async () => {

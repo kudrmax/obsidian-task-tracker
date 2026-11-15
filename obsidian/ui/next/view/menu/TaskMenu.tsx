@@ -1,7 +1,7 @@
 import type { ComponentChildren, JSX } from "preact";
 import type { BlockModel } from "../../model/block";
-import { menuCards, menuInput } from "../../model/menuNeeds";
-import { kindLabel, type MenuDrawing, type MenuRow, type MenuTile, type PanelModel, type PanelPart, panelModel, type TaskMenuLayer, unitLabel } from "../../model/taskMenu";
+import { menuDrawing } from "../../model/menuNeeds";
+import { kindLabel, type MenuRow, type MenuTile, type PanelModel, type PanelPart, type TaskMenuLayer, unitLabel } from "../../model/taskMenu";
 import { Card } from "../Card";
 import { Icon, NamedIcon } from "../icons";
 import { Backdrop } from "../Sheet";
@@ -251,12 +251,7 @@ interface MenuProps {
 }
 
 /** What the menu draws: as it stands, or as it stood when its close began (`frozen`). */
-function drawingOf(model: BlockModel, layer: TaskMenuLayer): MenuDrawing | null {
-	if (layer.frozen) return layer.frozen;
-	const input = menuInput(model, layer);
-	const cards = menuCards(model, layer);
-	return input && cards ? { panel: panelModel(layer, input), cards: cards.map((card) => ({ key: card.key, face: card.face })) } : null;
-}
+const drawingOf = menuDrawing;
 
 /** The panel's box: a menu's, the date page's, the repeat page's (with Remove repeat at its foot, or without): each laid out its own way. */
 function PanelBox({ panel, measuring, attributes, children }: { readonly panel: PanelModel; readonly measuring: boolean; readonly attributes: Readonly<Record<string, string | undefined>>; readonly children: ComponentChildren }): JSX.Element {
@@ -352,6 +347,11 @@ export function TaskMenu({ model, layer, index }: MenuProps): JSX.Element | null
 					<Part key={part.key} part={part} long={long} />
 				))}
 			</PanelBox>
+			{drawn.peek !== null && !measuring ? (
+				<div class="tc-n-desc-peek" data-n-part="peek" data-n-own="" {...common}>
+					<div class="tc-n-desc-text markdown-rendered" data-n-island="peek" />
+				</div>
+			) : null}
 			</div>
 			{measuring ? <div class="tc-n-safe-probe" data-n-probe="safe" /> : null}
 		</>

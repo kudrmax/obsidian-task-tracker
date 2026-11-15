@@ -4,7 +4,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** The block alone, old or new: Obsidian's note around it is never compared; 1 px of the old block's short height is cropped. */
 const BLOCK = { of: ".tc-project-block, .tc-n-block", fit: { px: 1, cut: { fromBottom: 71 } } } as const;
-/** The block with a field open: the new block grows for the field and its bar, the old one scrolled them in (decision 56). */
+/** The block with a field open: both blocks grow for the field and its bar (decision 56), the old one's shot cut at the window's foot. */
 const TYPING = { of: ".tc-project-block, .tc-n-block", fit: { px: 60, cut: "bottom" } } as const;
 /** A layer over the block (a menu): the whole page, the note and Obsidian's chrome as they stand under the sheet. */
 const PAGE = { of: "body" };
@@ -81,6 +81,43 @@ export async function block(d: Driver, newBlock: boolean): Promise<void> {
 	await d.shot("task menu", PAGE);
 	await d.step("a card's menu closes", "interaction", () => d.key("Escape"), { moves: [] });
 
+	/** A task with a description: its menu shows the description's start by the copy of its card (the old `DescriptionPeek`). */
+	/** A title written plainly in the file (no link), so its line is found by it. */
+	const described = first;
+	await d.page(`
+		const file = app.vault.getAbstractFileByPath(app.plugins.plugins["task-calendar"].pluginSettings.get().tasksFile);
+		await app.vault.process(file, (text) => text.split("\\n").map((line) => (/^- \\[.\\] /.test(line) && line.includes(${JSON.stringify(described)}) ? line + "\\n\\t- E2E description: what to bring, and [[Дружба]]" : line)).join("\\n"));
+		return true;`);
+	await d.page("return __e2e.rest()");
+	await showBlock(d);
+	await d.step("a described card's menu opens", "interaction", async () => d.tap(await cardAt(described)), { moves: [] });
+	await d.shot("task menu with a description", PAGE);
+	await d.step("the described card's menu closes", "interaction", () => d.key("Escape"), { moves: [] });
+
+	/** A card half under the window's top: the note scrolls it into view, then its menu opens (the old `scrollIntoColumn`). */
+	await showBlock(d);
+	await d.page(`
+		const c = [...document.querySelectorAll(${JSON.stringify(SEL.card)})].find((e) => e.textContent.includes(${JSON.stringify(first)}));
+		const s = c.closest(".cm-scroller, .markdown-preview-view");
+		const top = s.getBoundingClientRect().top;
+		s.scrollTop += c.getBoundingClientRect().top - top + c.getBoundingClientRect().height / 2;
+		return true;`);
+	await d.page("return __e2e.rest()");
+	await d.step("a card half out of view scrolls in, then its menu opens", "interaction", async () => {
+		const at = await cardAt(first);
+		await d.tap({ x: at.x, y: at.y + at.h / 4 });
+	}, { moves: "all", expectMotion: true });
+	await d.shot("task menu after scrolling in", PAGE);
+	await d.step("the scrolled-in card's menu closes", "interaction", () => d.key("Escape"), { moves: [] });
+
+	/** On the desktop a double click on a card renames it: its field opens with its title (the old `dblclick`). */
+	if (d.platform === "desktop") {
+		await showBlock(d);
+		await d.step("a double click renames", "interaction", async () => d.doubleClick(await cardAt(first)), { moves: "all" });
+		await d.shot("rename field", TYPING);
+		await d.step("the rename field closes", "interaction", () => d.key("Escape"), { moves: "all" });
+	}
+
 	await showBlock(d);
 	await d.step("the plus opens a field", "interaction", () => d.tapOn(SEL.plus), { moves: "all" });
 	await d.shot("field open", TYPING);
@@ -95,6 +132,13 @@ export async function block(d: Driver, newBlock: boolean): Promise<void> {
 	await d.step("the field closes", "interaction", () => d.key("Escape"), { moves: "all" });
 	await showBlock(d);
 	await d.shot("after typing", BLOCK);
+
+	/** A card leaves its list (Done from its menu): it fades where it stood, then its room folds and the rows under it move up (P5, the old `leave`). */
+	await showBlock(d);
+	await d.step("the typed task's menu opens", "interaction", async () => d.tap(await cardAt("E2E typed task")), { moves: [] });
+	await d.step("a card done leaves its list", "interaction", () => d.tapOn(":is(.tc-menu-tile-label, .tc-n-menu-tile-label)", "Done"), { moves: "all", expectMotion: true });
+	await showBlock(d);
+	await d.shot("after a card left", BLOCK);
 
 	const last = titles[titles.length - 1];
 	await showBlock(d);

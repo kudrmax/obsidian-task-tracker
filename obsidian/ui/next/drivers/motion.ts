@@ -12,6 +12,10 @@ type Boxes = ReadonlyMap<string, DOMRect>;
 
 /** A panel grows from its anchor's side: from its top left under the anchor, from its bottom left over it. */
 const ORIGIN_BELOW = "0 0";
+/** The description's start stands this far from the copy of its card (the old `LAYOUT.descPeekGap`, 10). */
+const PEEK_GAP = "--tc-space-10";
+/** With less room than two menu rows (the old `LAYOUT.descPeekLeast`, 88) it stays away. */
+const PEEK_LEAST_ROWS = 2;
 /** A side left to the other: a panel hanging from the bar stands by one of its edges only. */
 const AUTO = "auto";
 const ORIGIN_ABOVE = "0 100%";
@@ -49,16 +53,76 @@ export class Motion {
 	before(moving = true): void {
 		this.cancel();
 		const boxes = new Map<string, DOMRect>();
+		const cards = new Map<string, HTMLElement>();
+		this.left = [];
 		/** A drawing that moves nothing (a layer opened, another context) reads no box: nothing slides from where it stood. */
 		if (!moving) {
 			this.boxes = boxes;
+			this.cards = cards;
 			return;
 		}
-		for (const el of this.root.querySelectorAll("[data-n-key]")) {
+		for (const el of this.root.querySelectorAll<HTMLElement>("[data-n-key]")) {
 			const key = keyOf(el);
-			if (key !== null && !key.includes("/")) boxes.set(key, el.getBoundingClientRect());
+			if (key === null || key.includes("/")) continue;
+			boxes.set(key, el.getBoundingClientRect());
+			if (el.dataset.row !== undefined) cards.set(key, el);
 		}
 		this.boxes = boxes;
+		this.cards = cards;
+		const frame = this.root.firstElementChild;
+		this.frameHeight = frame ? frame.getBoundingClientRect().height : 0;
+	}
+
+	/** The frame's height before the drawing: held while a card leaves, as the old block's frame held until its row was gone. */
+	private frameHeight = 0;
+	/** The timer that lets the frame's height go once a leave has folded. */
+	private release = 0;
+
+	/** The frame keeps the height it had before the drawing over a card's leave (fade and fold), then fits its rows again. */
+	holdWhileLeaving(frame: HTMLElement): void {
+		const ms = tokenMs(this.root, "--tc-duration-collapse");
+		if (ms <= 0 || this.frameHeight <= 0 || frame.style.getPropertyValue("height") !== "") return;
+		frame.style.setProperty("height", `${this.frameHeight}px`);
+		const view = frame.ownerDocument.defaultView;
+		if (!view) return;
+		const held = `${this.frameHeight}px`;
+		view.clearTimeout(this.release);
+		this.release = view.setTimeout(() => {
+			this.release = 0;
+			if (frame.style.getPropertyValue("height") === held) frame.style.removeProperty("height");
+		}, 2 * ms);
+	}
+
+	/** A list's cards before the drawing, by key: one the drawing took away leaves as the old screen's did (`leave`). */
+	private cards = new Map<string, HTMLElement>();
+	/** The cards the last drawing took away, with where each stood: the host keeps each a moment for its leave. */
+	private left: { readonly node: HTMLElement; readonly box: DOMRect }[] = [];
+
+	/** The cards the last drawing took away (a write, Sync, an undo), each with the box it stood in. */
+	leftCards(): readonly { readonly node: HTMLElement; readonly box: DOMRect }[] {
+		return this.left;
+	}
+
+	/**
+	 * A card the drawing took away leaves as the old screen's `leave`: it fades where it stood over one collapse, then its
+	 * room folds over another, the rows under it moving up as it folds (they wait the fade: `after`). `node` is the card
+	 * as it was drawn, kept a moment over `frame` (placed by the host); `done` once it has faded.
+	 */
+	fadeAway(frame: HTMLElement, node: HTMLElement, box: DOMRect, done: () => void): void {
+		const ms = tokenMs(this.root, "--tc-duration-collapse");
+		const at = frame.getBoundingClientRect();
+		node.style.position = "absolute";
+		node.style.margin = "0";
+		node.style.left = `${box.left - at.left - frame.clientLeft}px`;
+		node.style.top = `${box.top - at.top - frame.clientTop}px`;
+		node.style.width = `${box.width}px`;
+		node.style.height = `${box.height}px`;
+		node.style.pointerEvents = "none";
+		if (ms <= 0) return done();
+		const easing = this.root.ownerDocument.defaultView?.getComputedStyle(this.root).getPropertyValue("--tc-ease-out").trim() || "ease-out";
+		const fade = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing, fill: "forwards" });
+		this.running.push(fade);
+		fade.finished.then(done, done);
 	}
 
 	/**
@@ -71,6 +135,10 @@ export class Motion {
 		const ms = tokenMs(this.root, "--tc-duration-collapse");
 		if (ms <= 0) return;
 		const easing = this.root.ownerDocument.defaultView?.getComputedStyle(this.root).getPropertyValue("--tc-ease-out").trim() || "ease-out";
+		const heirsOf = new Set(heirs.values());
+		this.left = [...this.cards].filter(([key, node]) => !node.isConnected && !heirsOf.has(key)).map(([key, node]) => ({ node, box: this.boxes.get(key)! }));
+		/** Rows under a card that leaves move up as its room folds, after its fade (the old `leave`: fade, then fold). */
+		const delay = this.left.length > 0 ? ms : 0;
 		for (const el of this.root.querySelectorAll<HTMLElement>("[data-n-key]")) {
 			const key = keyOf(el);
 			if (key === null || key.includes("/")) continue;
@@ -85,7 +153,7 @@ export class Motion {
 			const dx = was.left - now.left;
 			const dy = was.top - now.top;
 			if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
-			this.running.push(el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: ms, easing }));
+			this.running.push(el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: ms, delay, easing, fill: "backwards" }));
 		}
 	}
 
@@ -125,6 +193,32 @@ export class Motion {
 	/** An inline value Obsidian set on its own element: the room Live Preview keeps past the note's end (`.cm-content`'s padding). */
 	static inline(el: HTMLElement, name: string): string {
 		return el.style.getPropertyValue(name);
+	}
+
+	/**
+	 * How the card `key` comes into view before its menu opens (the old menu's `scrollIntoColumn`): the nearest of its
+	 * ancestors that scrolls (overflow auto or scroll; the note's own scroller when the block does not), the part of it
+	 * that shows its content (inside its padding, not under the fade at its foot), and the top that shows the card whole,
+	 * or from its top when it is taller; with the glide's time and curve. Null when it shows whole already or nothing scrolls.
+	 */
+	static intoView(root: ParentNode, key: string): { readonly scroller: HTMLElement; readonly from: number; readonly to: number; readonly ms: number; readonly ease: string } | null {
+		let card: HTMLElement | null = null;
+		for (const el of root.querySelectorAll<HTMLElement>("[data-n-key]")) if (el.dataset.nKey === key) card = el;
+		const view = card?.ownerDocument.defaultView;
+		if (!card || !view) return null;
+		for (let node = card.parentElement; node; node = node.parentElement) {
+			const style = view.getComputedStyle(node);
+			if (style.overflowY !== "auto" && style.overflowY !== "scroll") continue;
+			const rect = node.getBoundingClientRect();
+			const top = rect.top + (parseFloat(style.paddingTop) || 0);
+			const bottom = rect.bottom - (parseFloat(style.paddingBottom) || 0);
+			const item = card.getBoundingClientRect();
+			const by = item.height > bottom - top || item.top < top ? item.top - top : Math.max(0, item.bottom - bottom);
+			const to = Math.max(0, Math.min(node.scrollTop + by, node.scrollHeight - node.clientHeight));
+			if (Math.abs(to - node.scrollTop) < 1) return null;
+			return { scroller: node, from: node.scrollTop, to, ms: tokenMs(node, "--tc-duration-collapse"), ease: view.getComputedStyle(node).getPropertyValue("--tc-ease-out") };
+		}
+		return null;
 	}
 
 	/** Layer parts shown, and the ones whose close has begun: each fades once. */
@@ -329,13 +423,69 @@ export class Motion {
 		const easing = style.getPropertyValue("--tc-ease-out").trim() || "ease-out";
 		const rise = parseFloat(style.getPropertyValue("--tc-menu-rise")) || 0;
 		const scale = style.getPropertyValue("--tc-menu-scale").trim() || "1";
-		for (const part of [panel, upper]) {
+		const peek = host.querySelector<HTMLElement>('[data-n-part="peek"]');
+		const under = peek && place.copy ? this.placePeek(peek, place.copy.box, panel, place.upper !== null ? upper : null, place.panel.top === null, view) : false;
+		for (const part of [panel, upper, peek]) {
 			if (!part || this.shown.has(part)) continue;
 			this.shown.add(part);
-			const over = part === upper || place.panel.top === null;
+			const over = part === peek ? !under : part === upper || place.panel.top === null;
 			part.style.transformOrigin = over ? ORIGIN_ABOVE : ORIGIN_BELOW;
 			part.animate([{ opacity: 0, transform: `translate3d(0, ${over ? rise : -rise}px, 0) scale(${scale})` }, { opacity: 1, transform: "none" }], { duration: ms, easing });
 		}
+	}
+
+	/**
+	 * The start of the description by the copy of its card and the menu (the old `DescriptionPeek.place`/`placeBeside`):
+	 * the side of the copy the menu leaves free, else the far side of the menu; beside a split menu's upper part; away
+	 * with less than its least room. What does not fit fades out at its bottom. Answers whether it stands under the copy.
+	 */
+	private placePeek(peek: HTMLElement, copy: { readonly left: number; readonly top: number; readonly width: number; readonly height: number }, menu: HTMLElement, upper: HTMLElement | null, menuAbove: boolean, view: Window): boolean {
+		const style = view.getComputedStyle(peek);
+		const gap = parseFloat(style.getPropertyValue(PEEK_GAP)) || 0;
+		const least = PEEK_LEAST_ROWS * (parseFloat(style.getPropertyValue("--tc-row")) || 0);
+		const margin = parseFloat(style.getPropertyValue("--tc-whole-margin")) || 0;
+		const most = parseFloat(style.getPropertyValue("--tc-desc-peek-max")) || 0;
+		const height = view.innerHeight;
+		const bottom = copy.top + copy.height;
+		const freeAbove = copy.top - gap - margin;
+		const freeBelow = height - bottom - gap - margin;
+		let room = 0;
+		let under = false;
+		let left = copy.left;
+		const over = (edge: number, free: number) => {
+			peek.style.top = "auto";
+			peek.style.bottom = `${height - edge}px`;
+			room = free;
+		};
+		const below = (edge: number, free: number) => {
+			peek.style.bottom = "auto";
+			peek.style.top = `${edge}px`;
+			room = free;
+			under = true;
+		};
+		if (upper) {
+			const start = parseFloat(upper.style.left) + upper.offsetWidth + (parseFloat(view.getComputedStyle(upper).getPropertyValue("--tc-menu-gap")) || 0);
+			const fits = start + peek.offsetWidth <= view.innerWidth - margin;
+			if (fits && freeAbove >= least) over(copy.top - gap, freeAbove);
+			else if (fits) below(bottom + gap, freeBelow);
+			left = start;
+		} else {
+			const menuSpan = (parseFloat(view.getComputedStyle(menu).getPropertyValue("--tc-menu-gap")) || 0) + menu.offsetHeight;
+			if (!menuAbove && freeAbove >= least) over(copy.top - gap, freeAbove);
+			else if (menuAbove && freeBelow >= least) below(bottom + gap, freeBelow);
+			else if (menuAbove) over(copy.top - menuSpan - gap, copy.top - menuSpan - gap - margin);
+			else below(bottom + menuSpan + gap, height - bottom - menuSpan - gap - margin);
+			left = Math.max(margin, Math.min(copy.left, view.innerWidth - margin - peek.offsetWidth));
+		}
+		const away = room < least;
+		peek.style.left = `${left}px`;
+		peek.style.maxHeight = `${Math.max(0, Math.min(most, room))}px`;
+		Motion.put(peek, "--tc-n-peek-shown", away ? "hidden" : "");
+		const text = peek.firstElementChild;
+		const cut = text instanceof HTMLElement && text.scrollHeight > text.clientHeight;
+		Motion.put(peek, "--tc-n-peek-pad", cut ? "var(--tc-desc-peek-pad-cut)" : "");
+		Motion.put(peek, "--tc-n-peek-mask", cut ? "var(--tc-fade-peek-bottom)" : "");
+		return under;
 	}
 
 	private box(el: HTMLElement, box: { readonly left: number; readonly top: number; readonly width: number; readonly height: number }): void {
@@ -476,6 +626,8 @@ export class Motion {
 	}
 
 	dispose(): void {
+		if (this.release) this.root.ownerDocument.defaultView?.clearTimeout(this.release);
+		this.release = 0;
 		this.cancel();
 		this.set.clear();
 	}

@@ -61,6 +61,8 @@ export class BlockLoop {
 			for (const command of commands) {
 				if (command.kind !== "door") {
 					this.effects.push(command);
+					/** No layout here: the card is in view already, as in a block that does not scroll. */
+					if (command.kind === "intoView") queue.push(command.then);
 					continue;
 				}
 				this.calls.push(command.method);

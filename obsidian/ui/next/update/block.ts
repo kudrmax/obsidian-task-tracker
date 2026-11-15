@@ -9,7 +9,7 @@ import { actMessage } from "./acts";
 import { carryFollows, updateCarry } from "./carry";
 import { updateEntry } from "./entry";
 import { followFull, updateFull } from "./full";
-import { closeMenu, menuFollows, updateMenu } from "./menu";
+import { closeMenu, menuFollows, openInView, updateMenu } from "./menu";
 import { updateSearch } from "./search";
 import { updateSelect } from "./select";
 
@@ -123,7 +123,7 @@ function step(model: BlockModel, msg: BlockMsg): Step {
 			const task = taskById(model, msg.key);
 			if (!task) return [model, []];
 			if (msg.part === "counter") return [model, [write("tasks.toggleCollapsed", [task.key], failed)]];
-			return updateMenu(model, { kind: "opened", id: msg.key });
+			return openInView(model, msg.key);
 		}
 		case "linkTapped":
 			return [model, [{ kind: "openLink", link: msg.link }]];

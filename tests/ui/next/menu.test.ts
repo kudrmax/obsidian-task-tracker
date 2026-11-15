@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { currentLists, shownLists } from "../../../obsidian/ui/next/model/block";
-import { cardRows, menuInput, openMenu } from "../../../obsidian/ui/next/model/menuNeeds";
+import { cardRows, menuInput, menuPeek, openMenu } from "../../../obsidian/ui/next/model/menuNeeds";
 import { type MenuMsg, type PanelPart, panelModel, type TaskMenuLayer } from "../../../obsidian/ui/next/model/taskMenu";
 import { monthGrid } from "../../../obsidian/ui/next/model/monthGrid";
 import { menuActMessage } from "../../../obsidian/ui/next/update/menu";
-import { BlockLoop } from "./blockLoop";
+import { BLOCK_FILE, BlockLoop } from "./blockLoop";
 
 const keyOf = (loop: BlockLoop, title: string): string => {
 	const row = [...cardRows(loop.model).values()].find((r) => r.item.title === title);
@@ -140,6 +140,48 @@ describe("a task's menu in the block", () => {
 		menu(loop, { kind: "level", prefix: "!" });
 		expect(loop.calls.length).toBe(calls);
 		expect(openMenu(loop.model)).toBeNull();
+	});
+});
+
+describe("the menu as the old screen had it (restored)", () => {
+	it("a click opens it and waits for a second one: on the copy over the card it renames, as a double click did (desktop)", async () => {
+		const loop = await BlockLoop.open();
+		const key = keyOf(loop, "Idea");
+		loop.send({ kind: "carry", msg: { kind: "tap", key, act: "card", mod: false, shift: false, mouse: true } });
+		expect(layerOf(loop).id).toBe(key);
+		expect(loop.effects).toContainEqual({ kind: "secondPress", ms: expect.any(Number), msg: { kind: "menu", msg: { kind: "clickedAgain", id: key } } });
+		menu(loop, { kind: "clickedAgain", id: key });
+		expect(layerOf(loop).closing).toBe(true);
+		expect(loop.effects).toContainEqual(expect.objectContaining({ kind: "entryCall", method: "entry.renameSpot" }));
+	});
+
+	it("a touch waits for no second press", async () => {
+		const loop = await BlockLoop.open();
+		const key = keyOf(loop, "Idea");
+		loop.send({ kind: "carry", msg: { kind: "tap", key, act: "card", mod: false, shift: false } });
+		expect(loop.effects.some((c) => c.kind === "secondPress")).toBe(false);
+	});
+
+	it("a second press for another card, or once the menu has gone, renames nothing", async () => {
+		const { loop, key } = await opened();
+		menu(loop, { kind: "clickedAgain", id: keyOf(loop, "Call the bank") });
+		expect(layerOf(loop).closing).toBe(false);
+		loop.send({ kind: "layerDismissed" });
+		loop.send({ kind: "layerGone" });
+		menu(loop, { kind: "clickedAgain", id: key });
+		expect(loop.effects.some((c) => c.kind === "entryCall")).toBe(false);
+	});
+
+	it("shows the start of the task's description by its card, none for a task without one or on the project page", async () => {
+		const loop = await BlockLoop.open(BLOCK_FILE.replace("- [ ] Idea 🗂️ Дружба", "- [ ] Idea 🗂️ Дружба\n\t- Call first\n\t- then write"));
+		expect(menuPeek(loop.model)).toBeNull();
+		loop.send({ kind: "cardTapped", key: keyOf(loop, "Idea"), part: "card" });
+		expect(menuPeek(loop.model)).toContain("Call first");
+		menu(loop, { kind: "page", page: "projectName" });
+		expect(menuPeek(loop.model)).toBeNull();
+		loop.send({ kind: "layerDismissed" });
+		loop.send({ kind: "cardTapped", key: keyOf(loop, "Call the bank"), part: "card" });
+		expect(menuPeek(loop.model)).toBeNull();
 	});
 });
 

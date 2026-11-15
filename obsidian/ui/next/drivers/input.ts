@@ -217,6 +217,32 @@ export class Input {
 		);
 	}
 
+	/**
+	 * The next press anywhere in `near`'s window within `ms` is taken, pressing nothing under it (nor the click after it),
+	 * and told: a double click's second press over what the first one opened (the old `onClickedAgain`).
+	 */
+	secondPress(near: Node, ms: number, told: () => void): void {
+		const doc = near.ownerDocument;
+		if (!doc) return;
+		const stop = (e: Event) => {
+			e.preventDefault();
+			e.stopPropagation();
+		};
+		const end = () => {
+			doc.removeEventListener("pointerdown", press, true);
+			this.cancelTimer("secondPress");
+		};
+		const press = (e: PointerEvent) => {
+			end();
+			stop(e);
+			doc.addEventListener("click", stop, { capture: true, once: true });
+			told();
+		};
+		doc.addEventListener("pointerdown", press, true);
+		this.stops.push(end);
+		this.timer(near, "secondPress", ms, end);
+	}
+
 	/** Escape pressed in the window of `near` while `wanted()`: taken (Obsidian would take it as a step back) and told. */
 	escape(near: Node, wanted: () => boolean, told: () => void): () => void {
 		const doc = near.ownerDocument;

@@ -27,6 +27,10 @@ export type Command<Msg> =
 	/** A message after `ms` (a bound on a wait, a long press), cancelled by `cancelTimer` of the same name or the host's teardown. */
 	| { readonly kind: "timer"; readonly name: string; readonly ms: number; readonly msg: Msg }
 	| { readonly kind: "cancelTimer"; readonly name: string }
+	/** The next press anywhere within `ms` is taken (it presses nothing under it) and told as `msg`: a double click's second press. */
+	| { readonly kind: "secondPress"; readonly ms: number; readonly msg: Msg }
+	/** The card `key` comes into view in the column it scrolls in, with one smooth scroll, whole or from its top; then `then`. A finger taking the column calls it off. */
+	| { readonly kind: "intoView"; readonly key: string; readonly then: Msg }
 	/** The tasks file in Obsidian's editor, in a new tab, the cursor at the start of line `line` (Open in Obsidian). */
 	| { readonly kind: "openTasksFile"; readonly line: number }
 	/** An Obsidian modal over the block (the notes to attach): its answer comes back as `pick`. */

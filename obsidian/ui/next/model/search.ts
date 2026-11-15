@@ -1,4 +1,4 @@
-import type { FoundPart, SearchGroup, SearchHit } from "../../../../core/application/contracts";
+import type { FoundPart, SearchGroup, SearchHit, TaskScreen } from "../../../../core/application/contracts";
 import { type Answers, type Need, resultOf } from "./answers";
 
 /**
@@ -13,6 +13,8 @@ export interface SearchModel {
 	readonly closing: boolean;
 	/** The found task picked: the block goes to it once the window has gone. */
 	readonly chosen: SearchHit | null;
+	/** Where the core says the picked task stands (`tasks.reveal`): Done opens the full card, anything else rings its card. */
+	readonly screen: TaskScreen | null;
 }
 
 /** The task the search led to: its card wears the ring until the next press anywhere, the first drawing brings it into sight. */
@@ -37,7 +39,11 @@ export type SearchMsg =
 	/** A press anywhere: the found card lets its ring go. */
 	| { readonly kind: "pressed" }
 	/** The found card was brought into sight. */
-	| { readonly kind: "shown" };
+	| { readonly kind: "shown" }
+	/** The core unfolded the found task's tasks and said where it stands (`tasks.reveal`). */
+	| { readonly kind: "revealed"; readonly screen: TaskScreen }
+	/** Whether the block's filter hides the found task (`tasks.filterHides`). */
+	| { readonly kind: "hides"; readonly hides: boolean };
 
 const SEARCH = "search";
 

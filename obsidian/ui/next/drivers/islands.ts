@@ -1,6 +1,6 @@
 import { Compartment, EditorState, type Extension, Prec, type Transaction, type TransactionSpec } from "@codemirror/state";
 import { EditorView, keymap, placeholder, type ViewUpdate } from "@codemirror/view";
-import type { App, Editor, Modifier, TFile } from "obsidian";
+import { type App, Component, type Editor, MarkdownRenderer, type Modifier, type TFile } from "obsidian";
 import { Focus } from "./focus";
 import { type LineKeys, lineKeys } from "./keys";
 import { LINE_BREAK, oneLine } from "../../../../core/application/contracts";
@@ -73,6 +73,12 @@ export class MountNode {
 
 	remove(): void {
 		this.node.remove();
+	}
+
+	/** A card the drawing took away, kept over `frame` a moment while it leaves (`Motion.fadeAway`), then taken out. */
+	static keep(frame: HTMLElement, card: HTMLElement): () => void {
+		frame.appendChild(card);
+		return () => card.remove();
 	}
 }
 
@@ -565,6 +571,69 @@ export function obsidianEditors(app: App, sourcePath: () => string): EditorFacto
 				editor.unload();
 				editor.cm.destroy();
 			},
+		};
+	};
+}
+
+/** What a rendered description tells: a tap on its text, a note's link in it (its target, as Obsidian resolves it), an address followed. */
+export interface RenderedHooks {
+	read(): void;
+	note(target: string): void;
+	away(): void;
+}
+
+/** Draws `markdown` into `el` as Obsidian does in a note's reading view; the answer takes it down. */
+export type MarkdownFactory = (el: HTMLElement, markdown: string) => () => void;
+
+/**
+ * Markdown Obsidian draws inside the block (a description's start over a menu's copy, the old `DescriptionPeek`): one
+ * host node the view leaves empty (`data-n-island`), drawn again only when its text changes, taken down with its place.
+ */
+export class Rendered {
+	private shown: { readonly el: HTMLElement; readonly markdown: string; readonly unload: () => void; readonly stop: () => void } | null = null;
+
+	constructor(private readonly make: MarkdownFactory | null) {}
+
+	sync(root: ParentNode, name: string, markdown: string | null, hooks: RenderedHooks): void {
+		let spot: HTMLElement | null = null;
+		for (const el of root.querySelectorAll<HTMLElement>("[data-n-island]")) if (el.dataset.nIsland === name) spot = el;
+		if (this.shown && (this.shown.el !== spot || this.shown.markdown !== markdown)) this.drop();
+		if (!spot || markdown === null || !this.make || this.shown) return;
+		const el = spot;
+		/** A link opens as in a note (a note by its target); the rest of the text reads the whole description. */
+		const click = (e: MouseEvent) => {
+			const link = e.target instanceof Element ? e.target.closest("a") : null;
+			e.stopPropagation();
+			if (!link) return hooks.read();
+			const target = link instanceof HTMLElement ? link.dataset.href : undefined;
+			if (target === undefined) return hooks.away();
+			e.preventDefault();
+			hooks.note(target);
+		};
+		el.addEventListener("click", click);
+		this.shown = { el, markdown, unload: this.make(el, markdown), stop: () => el.removeEventListener("click", click) };
+	}
+
+	drop(): void {
+		this.shown?.stop();
+		this.shown?.unload();
+		this.shown = null;
+	}
+
+	dispose(): void {
+		this.drop();
+	}
+}
+
+/** Obsidian's markdown renderer, links resolved from the tasks file; a component of its own holds what it draws. */
+export function obsidianRenderer(app: App, sourcePath: () => string): MarkdownFactory {
+	return (el, markdown) => {
+		const owner = new Component();
+		owner.load();
+		void MarkdownRenderer.render(app, markdown, el, sourcePath(), owner);
+		return () => {
+			owner.unload();
+			el.replaceChildren();
 		};
 	};
 }

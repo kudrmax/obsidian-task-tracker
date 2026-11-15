@@ -94,11 +94,15 @@ export interface TaskMenuLayer {
 export interface MenuDrawing {
 	readonly panel: PanelModel;
 	readonly cards: readonly { readonly key: string; readonly face: CardFace }[];
+	/** The start of the task's description over its card's copy (the old `DescriptionPeek`): one task's menu, never while a name is typed in it. */
+	readonly peek: string | null;
 }
 
 /** Where `motion` reports the menu's parts stand (`placed`), and the menu's own messages. */
 export type MenuMsg =
 	| { readonly kind: "opened"; readonly id: string }
+	/** A mouse pressed again right after the click that opened the menu: a double click, which renames (the old `onClickedAgain`). */
+	| { readonly kind: "clickedAgain"; readonly id: string }
 	| { readonly kind: "openedBulk"; readonly at: BulkAt }
 	| { readonly kind: "placed"; readonly place: MenuPlace }
 	| { readonly kind: "status"; readonly id: MenuStatusId }
