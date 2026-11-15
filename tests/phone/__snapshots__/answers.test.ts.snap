@@ -168,7 +168,7 @@ exports[`TaskCalendarPhone's answers > to actions on a task that is no longer th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -409,7 +409,7 @@ exports[`TaskCalendarPhone's answers > to actions on a task that is no longer th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -649,7 +649,7 @@ exports[`TaskCalendarPhone's answers > to actions on a task that is no longer th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 🔕 2026-11-05 08:00
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -31003,7 +31003,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -31165,7 +31165,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -31244,7 +31244,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -31324,7 +31324,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -31404,7 +31404,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -31484,7 +31484,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -31649,7 +31649,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -31892,7 +31892,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -32011,7 +32011,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -32131,7 +32131,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -32251,7 +32251,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -32371,7 +32371,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -32616,7 +32616,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -32940,7 +32940,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -33099,7 +33099,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -33259,7 +33259,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -33419,7 +33419,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -33579,7 +33579,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -33729,6 +33729,47 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "complete · plain · blankJson · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+- [ ] Gym 📅 2026-11-06 🔁 every day
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Gym 🚨 2026-11-05 07:00
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "complete · plain · blankJson · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -33743,7 +33784,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -33824,7 +33865,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -33986,7 +34027,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -34065,7 +34106,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -34145,7 +34186,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -34225,7 +34266,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -34305,7 +34346,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -34470,7 +34511,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -34713,7 +34754,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -34832,7 +34873,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -34952,7 +34993,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -35072,7 +35113,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -35192,7 +35233,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -35437,7 +35478,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -35761,7 +35802,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -35920,7 +35961,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -36080,7 +36121,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -36240,7 +36281,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -36400,7 +36441,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -36550,6 +36591,47 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "complete · plain · defaults · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+- [ ] Gym 📅 2026-11-06 🔁 every day
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Gym 🚨 2026-11-05 07:00
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "complete · plain · defaults · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -36564,7 +36646,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -36605,7 +36687,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -36645,7 +36727,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -36670,6 +36752,88 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [x] Long ago
 ",
   },
+  "complete · plain · early · beforeDayStart · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at beforeDayStart": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+- [ ] Gym 📅 2026-11-06 🔁 every day
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Gym 🚨 2026-11-05 07:00
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
+  "complete · plain · early · beforeDayStart · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+- [ ] Gym 📅 2026-11-06 🔁 every day
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Gym 🚨 2026-11-05 07:00
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "complete · plain · early · beforeDayStart · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at beforeDayStart": {
     "changed": true,
     "text": "## Inbox
@@ -36684,7 +36848,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -36724,7 +36888,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -36765,7 +36929,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -36845,7 +37009,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37008,7 +37172,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37088,7 +37252,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37127,7 +37291,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37207,7 +37371,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37247,7 +37411,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37327,7 +37491,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37367,7 +37531,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37447,7 +37611,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37487,7 +37651,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37567,7 +37731,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37656,7 +37820,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37776,7 +37940,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -37980,7 +38144,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38100,7 +38264,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38139,7 +38303,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38259,7 +38423,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38299,7 +38463,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38419,7 +38583,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38459,7 +38623,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38579,7 +38743,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38619,7 +38783,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38739,7 +38903,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38868,7 +39032,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38893,6 +39057,47 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [x] Long ago
 ",
   },
+  "complete · plain · early · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+- [ ] Gym 📅 2026-11-06 🔁 every day
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Gym 🚨 2026-11-05 07:00
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "complete · plain · early · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -38907,7 +39112,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -38987,7 +39192,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -39147,7 +39352,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -39225,7 +39430,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -39305,7 +39510,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -39382,7 +39587,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -39461,7 +39666,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -39540,7 +39745,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -39702,7 +39907,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -39941,7 +40146,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -40058,7 +40263,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -40177,7 +40382,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -40293,7 +40498,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -40411,7 +40616,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -40529,7 +40734,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -40769,7 +40974,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -41087,7 +41292,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -41243,7 +41448,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -41401,7 +41606,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -41556,7 +41761,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -41713,7 +41918,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -41870,7 +42075,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -42017,6 +42222,47 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "complete · plain · late · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop #label/Fast 📅 2026-11-05
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+- [ ] Gym 📅 2026-11-06 🔁 every day
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Gym 🚨 2026-11-05 07:00
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "complete · plain · late · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -42031,7 +42277,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -43064,6 +43310,15 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
   ],
   "reminders · plain · blankJson · nextMorning": [
     {
+      "body": "07:00",
+      "date": "2026-11-05",
+      "dayEndMs": "2026-11-06 05:00",
+      "id": "- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day",
+      "kind": "alarm",
+      "startMs": "2026-11-05 07:00",
+      "title": "Gym",
+    },
+    {
       "body": "09:00",
       "date": "2026-11-05",
       "dayEndMs": "2026-11-06 05:00",
@@ -43324,6 +43579,15 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
   ],
   "reminders · plain · defaults · nextMorning": [
     {
+      "body": "07:00",
+      "date": "2026-11-05",
+      "dayEndMs": "2026-11-06 05:00",
+      "id": "- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day",
+      "kind": "alarm",
+      "startMs": "2026-11-05 07:00",
+      "title": "Gym",
+    },
+    {
       "body": "09:00",
       "date": "2026-11-05",
       "dayEndMs": "2026-11-06 05:00",
@@ -43342,6 +43606,15 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
       "kind": "alarm",
       "startMs": "2026-11-05 01:00",
       "title": "After midnight",
+    },
+    {
+      "body": "07:00",
+      "date": "2026-11-05",
+      "dayEndMs": "2026-11-06 00:00",
+      "id": "- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day",
+      "kind": "alarm",
+      "startMs": "2026-11-05 07:00",
+      "title": "Gym",
     },
     {
       "body": "09:00",
@@ -43528,6 +43801,15 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
       "kind": "alarm",
       "startMs": "2026-11-05 01:00",
       "title": "After midnight",
+    },
+    {
+      "body": "07:00",
+      "date": "2026-11-05",
+      "dayEndMs": "2026-11-06 00:00",
+      "id": "- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day",
+      "kind": "alarm",
+      "startMs": "2026-11-05 07:00",
+      "title": "Gym",
     },
     {
       "body": "09:00",
@@ -43816,6 +44098,15 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     },
   ],
   "reminders · plain · late · nextMorning": [
+    {
+      "body": "07:00",
+      "date": "2026-11-05",
+      "dayEndMs": "2026-11-06 04:00",
+      "id": "- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day",
+      "kind": "alarm",
+      "startMs": "2026-11-05 07:00",
+      "title": "Gym",
+    },
     {
       "body": "09:00",
       "date": "2026-11-05",
@@ -44285,7 +44576,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -44365,7 +44656,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -44445,7 +44736,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -44525,7 +44816,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -44605,7 +44896,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -44685,7 +44976,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -44765,7 +45056,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -44929,7 +45220,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -45049,7 +45340,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -45169,7 +45460,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -45289,7 +45580,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -45409,7 +45700,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -45529,7 +45820,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -45649,7 +45940,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -45893,7 +46184,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -46053,7 +46344,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -46213,7 +46504,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -46373,7 +46664,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -46533,7 +46824,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -46693,7 +46984,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -46853,7 +47144,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -47002,6 +47293,46 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "silence · plain · blankJson · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "silence · plain · blankJson · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -47017,7 +47348,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -47097,7 +47428,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -47177,7 +47508,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -47257,7 +47588,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -47337,7 +47668,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -47417,7 +47748,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -47497,7 +47828,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -47577,7 +47908,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -47741,7 +48072,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -47861,7 +48192,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -47981,7 +48312,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -48101,7 +48432,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -48221,7 +48552,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -48341,7 +48672,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -48461,7 +48792,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -48705,7 +49036,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -48865,7 +49196,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -49025,7 +49356,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -49185,7 +49516,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -49345,7 +49676,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -49505,7 +49836,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -49665,7 +49996,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -49814,6 +50145,46 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "silence · plain · defaults · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "silence · plain · defaults · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -49829,7 +50200,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -49869,7 +50240,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -49909,12 +50280,92 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
 - [ ] Late night 📅 2026-11-05
 - [ ] After midnight 🔕 2026-11-05 01:00
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
+  "silence · plain · early · beforeDayStart · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at beforeDayStart": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
+  "silence · plain · early · beforeDayStart · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
 - [ ] Yesterday's 📅 2026-11-05
 ### Errands
 - [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
@@ -49949,7 +50400,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -49989,7 +50440,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50029,7 +50480,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50109,7 +50560,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50149,7 +50600,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50229,7 +50680,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50269,7 +50720,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50349,7 +50800,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50389,7 +50840,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50469,7 +50920,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50509,7 +50960,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50589,7 +51040,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50629,7 +51080,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50709,7 +51160,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50749,7 +51200,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50829,7 +51280,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -50917,7 +51368,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51037,7 +51488,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51077,7 +51528,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51197,7 +51648,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51237,7 +51688,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51357,7 +51808,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51397,7 +51848,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51517,7 +51968,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51557,7 +52008,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51677,7 +52128,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51717,7 +52168,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51837,7 +52288,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51877,7 +52328,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -51997,7 +52448,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -52125,12 +52576,52 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
 - [ ] Late night 📅 2026-11-05
 - [ ] After midnight 🔕 2026-11-05 01:00
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
+  "silence · plain · early · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
 - [ ] Yesterday's 📅 2026-11-05
 ### Errands
 - [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
@@ -52165,7 +52656,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -52244,7 +52735,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -52323,7 +52814,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -52402,7 +52893,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -52481,7 +52972,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -52560,7 +53051,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -52639,7 +53130,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -52718,7 +53209,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -52797,7 +53288,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -52958,7 +53449,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -53076,7 +53567,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -53194,7 +53685,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -53312,7 +53803,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -53430,7 +53921,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -53548,7 +54039,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -53666,7 +54157,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -53784,7 +54275,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -54023,7 +54514,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -54180,7 +54671,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -54337,7 +54828,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -54494,7 +54985,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -54651,7 +55142,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -54808,7 +55299,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -54965,7 +55456,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -55122,7 +55613,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -55268,6 +55759,46 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "silence · plain · late · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🔕 2026-11-05 07:00 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop #label/Fast 📅 2026-11-05
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "silence · plain · late · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -55283,7 +55814,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -56254,7 +56785,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -56414,7 +56945,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -56494,7 +57025,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 07:45
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -56574,7 +57105,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -56654,7 +57185,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -56734,7 +57265,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -56898,7 +57429,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -57138,7 +57669,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -57258,7 +57789,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 07:45
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -57378,7 +57909,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -57498,7 +58029,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -57618,7 +58149,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -57862,7 +58393,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -58182,7 +58713,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -58342,7 +58873,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 07:45
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -58502,7 +59033,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -58662,7 +59193,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -58822,7 +59353,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -58971,6 +59502,46 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "snooze 15 · plain · blankJson · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 07:45 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "snooze 15 · plain · blankJson · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -58986,7 +59557,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -59066,7 +59637,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -59226,7 +59797,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -59306,7 +59877,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 07:45
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -59386,7 +59957,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -59466,7 +60037,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -59546,7 +60117,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -59710,7 +60281,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -59950,7 +60521,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -60070,7 +60641,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 07:45
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -60190,7 +60761,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -60310,7 +60881,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -60430,7 +61001,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -60674,7 +61245,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -60994,7 +61565,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -61154,7 +61725,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 07:45
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -61314,7 +61885,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -61474,7 +62045,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -61634,7 +62205,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -61783,6 +62354,46 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "snooze 15 · plain · defaults · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 07:45 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "snooze 15 · plain · defaults · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -61798,7 +62409,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -61838,7 +62449,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -61878,12 +62489,92 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
 - [ ] Late night 📅 2026-11-05
 - [ ] After midnight 🚨 2026-11-05 07:45
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
+  "snooze 15 · plain · early · beforeDayStart · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at beforeDayStart": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 03:15 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
+  "snooze 15 · plain · early · beforeDayStart · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 07:45 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
 - [ ] Yesterday's 📅 2026-11-05
 ### Errands
 - [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
@@ -61918,7 +62609,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -61958,7 +62649,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -61998,7 +62689,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62078,7 +62769,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62238,7 +62929,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62318,7 +63009,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62358,7 +63049,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 03:15
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62438,7 +63129,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 07:45
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62478,7 +63169,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62558,7 +63249,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62598,7 +63289,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62678,7 +63369,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62718,7 +63409,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62798,7 +63489,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -62886,7 +63577,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -63006,7 +63697,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -63206,7 +63897,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -63326,7 +64017,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -63366,7 +64057,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 03:15
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -63486,7 +64177,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 07:45
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -63526,7 +64217,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -63646,7 +64337,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -63686,7 +64377,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -63806,7 +64497,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -63846,7 +64537,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -63966,7 +64657,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -64094,12 +64785,52 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
 - [ ] Late night 📅 2026-11-05
 - [ ] After midnight 🚨 2026-11-05 07:45
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
+  "snooze 15 · plain · early · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 07:45 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
 - [ ] Yesterday's 📅 2026-11-05
 ### Errands
 - [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
@@ -64134,7 +64865,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -64213,7 +64944,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -64371,7 +65102,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -64450,7 +65181,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 07:45
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -64529,7 +65260,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -64607,7 +65338,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -64686,7 +65417,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -64765,7 +65496,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -64926,7 +65657,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -65162,7 +65893,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -65280,7 +66011,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 07:45
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -65398,7 +66129,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -65515,7 +66246,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -65633,7 +66364,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -65751,7 +66482,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -65990,7 +66721,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -66304,7 +67035,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -66461,7 +67192,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 07:45
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -66618,7 +67349,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -66774,7 +67505,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -66931,7 +67662,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -67088,7 +67819,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -67234,6 +67965,46 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "snooze 15 · plain · late · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 07:45 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop #label/Fast 📅 2026-11-05
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "snooze 15 · plain · late · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -67249,7 +68020,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -68217,7 +68988,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -68377,7 +69148,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -68457,7 +69228,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 09:00
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -68537,7 +69308,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -68617,7 +69388,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -68697,7 +69468,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -68861,7 +69632,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -69101,7 +69872,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -69221,7 +69992,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 09:00
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -69341,7 +70112,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -69461,7 +70232,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -69581,7 +70352,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -69825,7 +70596,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -70145,7 +70916,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -70305,7 +71076,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 09:00
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -70465,7 +71236,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -70625,7 +71396,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -70785,7 +71556,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -70934,6 +71705,46 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "snooze 90 · plain · blankJson · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 09:00 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "snooze 90 · plain · blankJson · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -70949,7 +71760,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -71029,7 +71840,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -71189,7 +72000,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -71269,7 +72080,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 09:00
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -71349,7 +72160,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -71429,7 +72240,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -71509,7 +72320,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -71673,7 +72484,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -71913,7 +72724,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -72033,7 +72844,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 09:00
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -72153,7 +72964,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -72273,7 +73084,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -72393,7 +73204,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -72637,7 +73448,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -72957,7 +73768,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -73117,7 +73928,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 09:00
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -73277,7 +74088,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -73437,7 +74248,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -73597,7 +74408,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -73746,6 +74557,46 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "snooze 90 · plain · defaults · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 09:00 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "snooze 90 · plain · defaults · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -73761,7 +74612,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -73801,7 +74652,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -73841,12 +74692,92 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
 - [ ] Late night 📅 2026-11-05
 - [ ] After midnight 🚨 2026-11-05 09:00
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
+  "snooze 90 · plain · early · beforeDayStart · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at beforeDayStart": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 04:30 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
+  "snooze 90 · plain · early · beforeDayStart · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 09:00 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
 - [ ] Yesterday's 📅 2026-11-05
 ### Errands
 - [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
@@ -73881,7 +74812,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -73921,7 +74852,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -73961,7 +74892,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74041,7 +74972,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74201,7 +75132,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74281,7 +75212,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74321,7 +75252,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 04:30
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74401,7 +75332,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 09:00
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74441,7 +75372,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74521,7 +75452,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74561,7 +75492,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74641,7 +75572,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74681,7 +75612,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74761,7 +75692,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74849,7 +75780,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -74969,7 +75900,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -75169,7 +76100,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -75289,7 +76220,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -75329,7 +76260,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 04:30
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -75449,7 +76380,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 09:00
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -75489,7 +76420,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -75609,7 +76540,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -75649,7 +76580,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -75769,7 +76700,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -75809,7 +76740,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -75929,7 +76860,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -76057,12 +76988,52 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
 - [ ] Late night 📅 2026-11-05
 - [ ] After midnight 🚨 2026-11-05 09:00
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
+  "snooze 90 · plain · early · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 09:00 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 🚨 2026-11-05 01:00
 - [ ] Yesterday's 📅 2026-11-05
 ### Errands
 - [ ] Shop ⏰ 2026-11-04 16:00 #label/Fast
@@ -76097,7 +77068,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -76176,7 +77147,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -76334,7 +77305,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -76413,7 +77384,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 09:00
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -76492,7 +77463,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -76570,7 +77541,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -76649,7 +77620,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -76728,7 +77699,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -76889,7 +77860,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -77125,7 +78096,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -77243,7 +78214,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 09:00
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -77361,7 +78332,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -77478,7 +78449,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -77596,7 +78567,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -77714,7 +78685,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -77953,7 +78924,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -78267,7 +79238,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -78424,7 +79395,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📌 2026-11-05 09:00
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -78581,7 +79552,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -78737,7 +79708,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -78894,7 +79865,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -79051,7 +80022,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child
@@ -79197,6 +80168,46 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
     "changed": false,
     "reason": "stale",
   },
+  "snooze 90 · plain · late · nextMorning · - [ ] Gym 🚨 2026-11-05 07:00 🔁 every day · at nextMorning": {
+    "changed": true,
+    "text": "## Inbox
+
+- [ ] Old
+
+## Now
+
+- [ ] Tomorrow's slot ⏰ 2026-11-05 09:00
+- [ ] p2 Ring later 📅 2026-11-05
+- [ ] p1 Call [[Mom]] 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Wake 📅 2026-11-05
+- [ ] Quiet 📅 2026-11-05
+- [ ] Pinned 📅 2026-11-05
+- [ ] Gym 🚨 2026-11-05 09:00 🔁 every day
+- [ ] Parent 📅 2026-11-05
+	- [ ] Child ⏰ 2026-11-04 15:00
+		A note under the child
+- [ ] Late night 📅 2026-11-05
+- [ ] After midnight 📅 2026-11-05
+- [ ] Yesterday's 📅 2026-11-05
+### Errands
+- [ ] Shop #label/Fast 📅 2026-11-05
+
+## Soon
+
+- [ ] Later
+- [ ] Dated 📅 2026-11-07
+
+## Backlog
+
+- [ ] Someday
+
+## Done
+
+- [x] Closed ⏰ 2026-11-04 14:00
+- [x] Long ago
+",
+  },
   "snooze 90 · plain · late · nextMorning · - [ ] Tomorrow's slot ⏰ 2026-11-05 09:00 · at nextMorning": {
     "changed": true,
     "text": "## Inbox
@@ -79212,7 +80223,7 @@ exports[`TaskCalendarPhone's answers > to reminders and their actions stay as th
 - [ ] Wake 📅 2026-11-05
 - [ ] Quiet 📅 2026-11-05
 - [ ] Pinned 📅 2026-11-05
-- [ ] Gym 📅 2026-11-05 🔁 every day
+- [ ] Gym 🚨 2026-11-05 07:00 🔁 every day
 - [ ] Parent 📅 2026-11-05
 	- [ ] Child ⏰ 2026-11-04 15:00
 		A note under the child

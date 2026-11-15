@@ -145,3 +145,26 @@ describe("the next copy keeps the task's labels", () => {
 		expect(recurClosed(doc, "2026-10-30", DayBoundary.MIDNIGHT).serialize()).toContain("## Soon\n- [ ] Зал #label/Важное 📅 2026-10-31 🔁 every day\n");
 	});
 });
+
+/** Max asked for this: an undone repeating task keeps its time when the day passes; every other task loses it. */
+describe("a past day's slot of a repeating task", () => {
+	it("moves to today at the same hours", () => {
+		const doc = normalize(parse(file({ now: `- [ ] Зал ⏰ 2026-11-04 19:00-20:30 ${ZAL}` })), T);
+		expect(doc.serialize()).toBe(file({ now: `- [ ] Зал ⏰ 2026-11-05 19:00-20:30 ${ZAL}` }));
+	});
+
+	it("moves from several days back, with its due date, and brings the Soon task to Now", () => {
+		const doc = normalize(parse(file({ soon: `- [/] Зал 📅 2026-11-01 ⏰ 2026-11-01 07:00 ${ZAL}` })), T);
+		expect(doc.serialize()).toBe(file({ now: `- [/] Зал 📅 2026-11-05 ⏰ 2026-11-05 07:00 ${ZAL}` }));
+	});
+
+	it("keeps a slot after midnight on the clock date after its day", () => {
+		const doc = normalize(parse(file({ now: `- [ ] Зал ⏰ 2026-11-04 01:00-02:00 ${ZAL}` })), T, new DayBoundary(4));
+		expect(doc.serialize()).toBe(file({ now: `- [ ] Зал ⏰ 2026-11-06 01:00-02:00 ${ZAL}` }));
+	});
+
+	it("still goes for a task that does not repeat", () => {
+		const doc = normalize(parse(file({ now: "- [ ] Зал ⏰ 2026-11-04 19:00-20:30" })), T);
+		expect(doc.serialize()).toBe(file({ now: "- [ ] Зал 📅 2026-11-05" }));
+	});
+});
