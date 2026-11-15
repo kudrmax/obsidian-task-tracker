@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { diffImages, type Rect, type Region } from "./diff";
+import { clusterFor, diffImages, type Rect, type Region } from "./diff";
 import { type Cause, type Frame, judge, type Row, type StepLog } from "./frames";
 import type { Platform, TestObsidian, Theme } from "./obsidian";
 import { PAGE_SCRIPT } from "./page";
@@ -236,10 +236,14 @@ export class Driver {
 			return;
 		}
 		const kept = JSON.parse(readFileSync(sidecar, "utf8")) as { masks: Rect[]; regions: Region[] };
-		const result = diffImages(decodePng(readFileSync(baselineFile)), image, { regions: kept.regions.length ? kept.regions : regions, rest: REST, masks: [...kept.masks, ...masks] });
+		const cluster = clusterFor(dpr);
+		const result = diffImages(decodePng(readFileSync(baselineFile)), image, { regions: kept.regions.length ? kept.regions : regions, rest: REST, masks: [...kept.masks, ...masks], cluster });
 		const failures = result.sizeDiffers
 			? [`the shot is ${image.width}×${image.height}, the baseline another size`]
-			: result.regions.filter((r) => r.failed).map((r) => `${r.name}: ${r.differing} of ${r.pixels} pixels differ`);
+			: [
+					...result.regions.filter((r) => r.failed).map((r) => `${r.name}: ${r.differing} of ${r.pixels} pixels differ`),
+					...(result.largestCluster && result.largestCluster.pixels > cluster ? [`${result.largestCluster.pixels} differing pixels lie together at ${result.largestCluster.x},${result.largestCluster.y} (at most ${cluster}): something drawn moved`] : []),
+				];
 		if (result.picture && result.failed) writeFileSync(join(dir, `${name}.diff.png`), encodePng(result.picture));
 		this.outcomes.push({ combo: this.combo, name, kind: "shot", failures, file });
 	}
