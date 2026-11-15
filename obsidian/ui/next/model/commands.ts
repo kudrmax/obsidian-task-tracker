@@ -27,6 +27,8 @@ export type Command<Msg> =
 	/** A message after `ms` (a bound on a wait, a long press), cancelled by `cancelTimer` of the same name or the host's teardown. */
 	| { readonly kind: "timer"; readonly name: string; readonly ms: number; readonly msg: Msg }
 	| { readonly kind: "cancelTimer"; readonly name: string }
+	/** The next press anywhere within `ms` is taken (it presses nothing under it) and told as `msg`: a double click's second press. */
+	| { readonly kind: "secondPress"; readonly ms: number; readonly msg: Msg }
 	/** The tasks file in Obsidian's editor, in a new tab, the cursor at the start of line `line` (Open in Obsidian). */
 	| { readonly kind: "openTasksFile"; readonly line: number }
 	/** An Obsidian modal over the block (the notes to attach): its answer comes back as `pick`. */

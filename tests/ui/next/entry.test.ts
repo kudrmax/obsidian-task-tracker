@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BlockHost } from "../../../obsidian/ui/next/host/block/BlockHost";
+import { holdsHeight } from "../../../obsidian/ui/next/model/block";
 import { harness, type Harness, PATH, settle } from "../../runtime/harness";
 import { type FakeField, fakeTitleFields } from "../../helpers/FakeTitleField";
 import type { BlockMsg } from "../../../obsidian/ui/next/model/messages";
@@ -30,6 +31,12 @@ describe("the block's quick entry", () => {
 	afterEach(async () => {
 		host.dispose();
 		await h.runtime.unload();
+	});
+
+	it("holds the block's height while its field is open, as the old block kept its frame and scrolled inside it", () => {
+		expect(holdsHeight(host.model)).toBe(false);
+		host.dispatch(act("plus"));
+		expect(holdsHeight(host.model)).toBe(true);
 	});
 
 	it("opens a field from the plus and focuses it inside the tap (a typing pick)", () => {

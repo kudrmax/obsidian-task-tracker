@@ -104,6 +104,9 @@ function ended(model: BlockModel, how: "dropped" | "nowhere"): Step {
  * the core's (`tasks.drop`, By subprojects `tasks.dropInProjects`) and the float flies onto the card where it now
  * stands; let go nowhere, called off, or its task gone from the file, it flies back or fades, and the carry ends.
  */
+/** How soon a second press makes a double click (the old screen's `LAYOUT.doubleClickMs`). */
+const DOUBLE_CLICK_MS = 250;
+
 export function updateCarry(model: BlockModel, msg: CarryMsg): Step {
 	switch (msg.kind) {
 		case "tap":
@@ -199,7 +202,10 @@ function tapped(model: BlockModel, msg: Extract<CarryMsg, { kind: "tap" }>): Ste
 	if (model.wide && select && select.picked.includes(msg.key) && select.picked.length > 1) return updateSelect(model, { kind: "actions" });
 	const cleared = select && !select.selecting ? { ...model, select: null } : model;
 	if (msg.act === "counter") return [cleared, [write("tasks.toggleCollapsed", [row.item.key], failed)]];
-	return updateMenu(cleared, { kind: "opened", id: msg.key });
+	const [opened, commands] = updateMenu(cleared, { kind: "opened", id: msg.key });
+	/** A click opens the menu at once; a second one right after, on the copy now over the card, makes it a double click that renames (desktop). */
+	const again: Command<BlockMsg>[] = msg.mouse === true ? [{ kind: "secondPress", ms: DOUBLE_CLICK_MS, msg: { kind: "menu", msg: { kind: "clickedAgain", id: msg.key } } }] : [];
+	return [opened, [...commands, ...again]];
 }
 
 /**

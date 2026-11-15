@@ -5,7 +5,7 @@ import type { Answers, Need } from "../../model/answers";
 import { Chrome } from "../../drivers/chrome";
 import { Focus } from "../../drivers/focus";
 import { Input, PRESSED } from "../../drivers/input";
-import { type EditorFactory, Editors, MountNode } from "../../drivers/islands";
+import { type EditorFactory, Editors, type MarkdownFactory, MountNode, Rendered } from "../../drivers/islands";
 import { Measure as MeasureOf } from "../../drivers/measure";
 import { Scroll } from "../../drivers/scroll";
 import { descriptionIsland } from "../../model/full";
@@ -24,7 +24,7 @@ import { type Gesture, IDLE, press, type PressInput, type PressState } from "../
 import type { Command } from "../../model/commands";
 import type { Act, BlockMsg } from "../../model/messages";
 import { updateBlock } from "../../update/block";
-import { menuVars, openMenu } from "../../model/menuNeeds";
+import { menuVars, openMenu, menuPeek } from "../../model/menuNeeds";
 import { BlockRoot } from "../../view/BlockRoot";
 import { type FieldFactory, type FieldKeys, type Hotkey, Islands } from "../../drivers/islands";
 import { drawnLists, type EntryLook, entryLook } from "../../model/entry";
@@ -58,6 +58,8 @@ export interface BlockDeps {
 	 * stands, as the old block held it (`StatusBarRoom`): its frame's room under it is the same. None in a test.
 	 */
 	readonly chromeRoom?: (near: Node) => () => void;
+	/** Obsidian's markdown renderer for a description's start over a menu's card (`obsidianRenderer`); none (a test): none drawn. */
+	readonly markdown?: MarkdownFactory;
 }
 
 // The quick entry's calls and jobs ----------------------------------------------------------------------------------
@@ -156,6 +158,8 @@ export class BlockHost {
 	private readonly islands: Islands;
 	/** The full card's description editor. */
 	private readonly editors: Editors;
+	/** The description's start a menu shows by its card, drawn by Obsidian. */
+	private readonly rendered: Rendered;
 	/** The typing pick the field last took the focus for. */
 	private focusedFor = 0;
 	private drawnSeq = -1;
@@ -183,6 +187,7 @@ export class BlockHost {
 		const views: FreshViews = (needs) => deps.session.views(needs);
 		this.store = deps.session.store(blockProgram((command, dispatch) => this.run(command, dispatch), views), blockModel(note, Chrome.wide()), { render: (model) => this.draw(model) });
 		this.editors = new Editors(deps.editors ?? null);
+		this.rendered = new Rendered(deps.markdown ?? null);
 	}
 
 	/** The block is on the page: drawn at once, its presses and keys its own. */
@@ -239,6 +244,7 @@ export class BlockHost {
 				this.motion.fadeAway(frame, node, box, drop);
 			}
 		this.motion.layerVars(this.overlay.node, menuVars(model));
+		this.rendered.sync(this.overlay.node, "peek", menuPeek(model), this.peekHooks);
 		const menu = openMenu(model);
 		this.motion.menu(this.overlay.node, this.node, menu?.place ?? null, (place) => this.dispatch({ kind: "menu", msg: { kind: "placed", place } }));
 		const gone = (layer: number) => this.dispatch(layer < 0 ? { kind: "search", msg: { kind: "gone" } } : { kind: "layerGone" });
@@ -309,7 +315,7 @@ export class BlockHost {
 	private gesture(gesture: Gesture): void {
 		switch (gesture.kind) {
 			case "tap":
-				if (gesture.target.key !== null) this.carry({ kind: "tap", key: gesture.target.key, act: gesture.target.act, mod: gesture.mod, shift: gesture.shift });
+				if (gesture.target.key !== null) this.carry({ kind: "tap", key: gesture.target.key, act: gesture.target.act, mod: gesture.mod, shift: gesture.shift, mouse: gesture.mouse });
 				return;
 			case "menu":
 				if (gesture.target.key !== null) this.carry({ kind: "context", key: gesture.target.key });
@@ -419,6 +425,8 @@ export class BlockHost {
 			}
 			case "timer":
 				return this.input.timer(this.node, command.name, command.ms, () => dispatch(command.msg));
+			case "secondPress":
+				return this.input.secondPress(this.node, command.ms, () => dispatch(command.msg));
 			case "cancelTimer":
 				return this.input.cancelTimer(command.name);
 			case "noteSearch":
@@ -438,6 +446,16 @@ export class BlockHost {
 	}
 
 	/** The block goes (its note closed, no project's any more, the plugin unloading): everything it started ends. */
+	/** A tap on the description's start reads it whole (the full card); a note's link in it opens and the menu goes. */
+	private readonly peekHooks = {
+		read: () => this.dispatch({ kind: "menu", msg: { kind: "full" } }),
+		note: (target: string) => {
+			this.deps.openLink({ kind: "note", target });
+			this.dispatch({ kind: "layerDismissed" });
+		},
+		away: () => this.dispatch({ kind: "layerDismissed" }),
+	};
+
 	/** Lets go of the chrome's room the block held. */
 	private letChromeGo: (() => void) | null = null;
 
@@ -446,6 +464,7 @@ export class BlockHost {
 		this.disposed = true;
 		this.letChromeGo?.();
 		this.letChromeGo = null;
+		this.rendered.dispose();
 		this.endFinger();
 		this.deps.session.teardown();
 		this.motion.dispose();

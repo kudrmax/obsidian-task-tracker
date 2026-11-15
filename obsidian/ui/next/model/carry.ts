@@ -80,7 +80,7 @@ export interface CarryModel {
 /** The carry's messages: the press's gestures as the recognizer read them, the geometry, the target, the flight's end. */
 export type CarryMsg =
 	/** A card tapped (released before anything started): its menu, a pick, a fold, as the part and the keys held say. */
-	| { readonly kind: "tap"; readonly key: string; readonly act: string; readonly mod: boolean; readonly shift: boolean }
+	| { readonly kind: "tap"; readonly key: string; readonly act: string; readonly mod: boolean; readonly shift: boolean; readonly mouse?: boolean }
 	/** A right click on a card: its menu, or the picked cards' when it is one of several picked. */
 	| { readonly kind: "context"; readonly key: string }
 	/** A card lifted at the finger (screen pixels), the card's box read at the lift (the float starts as it). */

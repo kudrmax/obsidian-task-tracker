@@ -2093,3 +2093,10 @@ body.is-mobile .task-calendar .tc-n-fade-entering { height: calc(var(--tc-bar-h)
 .task-calendar .tc-n-hit-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .task-calendar .tc-n-hit-desc { white-space: nowrap; overflow: hidden; font-size: var(--tc-font-block); line-height: var(--tc-leading-block); color: var(--tc-muted); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .task-calendar .tc-n-card-over svg { width: var(--tc-font-card-over); height: var(--tc-font-card-over); flex-shrink: 0; stroke-width: var(--tc-stroke-card-over); }
+
+/* next: restore */
+/* The start of a task's description over its card's copy in the menu (the old `DescriptionPeek`); motion stands it, cuts it and keeps it away without room. */
+.task-calendar .tc-n-desc-peek { position: fixed; z-index: var(--tc-layer-panel); display: flex; flex-direction: column; width: var(--tc-menu-w); max-height: var(--tc-desc-peek-max); box-sizing: border-box; padding: var(--tc-n-peek-pad, var(--tc-desc-peek-pad)); border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-level-ring); visibility: var(--tc-n-peek-shown, visible); cursor: pointer; pointer-events: auto; }
+.task-calendar .tc-n-desc-peek > .tc-n-desc-text { --font-text-size: var(--tc-font-desc-peek); flex: 1 1 auto; min-height: 0; overflow: hidden; font-family: var(--tc-font-desc); font-size: var(--tc-font-desc-peek); line-height: var(--tc-desc-leading); color: var(--tc-desc-ink); overflow-wrap: anywhere; -webkit-mask-image: var(--tc-n-peek-mask, none); mask-image: var(--tc-n-peek-mask, none); }
+.task-calendar .tc-n-desc-peek > .tc-n-desc-text > :first-child { margin-top: 0; }
+.task-calendar .tc-n-desc-peek > .tc-n-desc-text > :last-child { margin-bottom: 0; }

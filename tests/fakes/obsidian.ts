@@ -332,3 +332,23 @@ export class Scope {
 
 /** Obsidian's platform: the tests run as the desktop. */
 export const Platform = { isMobile: false, isIosApp: false, isDesktopApp: true, isMacOS: true };
+
+/** Obsidian's component as a renderer's owner: loaded and unloaded. */
+export class Component {
+	loaded = false;
+	load(): void {
+		this.loaded = true;
+	}
+	unload(): void {
+		this.loaded = false;
+	}
+}
+
+/** Obsidian's markdown renderer: the text as it is, in a paragraph. */
+export const MarkdownRenderer = {
+	async render(_app: unknown, markdown: string, el: HTMLElement): Promise<void> {
+		const p = el.ownerDocument.createElement("p");
+		p.textContent = markdown;
+		el.appendChild(p);
+	},
+};

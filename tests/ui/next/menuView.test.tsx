@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { cardRows } from "../../../obsidian/ui/next/model/menuNeeds";
 import type { TaskMenuLayer } from "../../../obsidian/ui/next/model/taskMenu";
 import { Layers } from "../../../obsidian/ui/next/view/Layers";
-import { BlockLoop } from "./blockLoop";
+import { BLOCK_FILE, BlockLoop } from "./blockLoop";
 
 const drawn = (loop: BlockLoop): HTMLElement => {
 	const host = document.createElement("div");
@@ -45,6 +45,17 @@ describe("the task menu as the view draws it", () => {
 		expect(lower.dataset.nMeasure).toBeUndefined();
 		expect(host.querySelector('[data-n-part="lifted"]')!.className).toContain("tc-n-lifted-whole");
 		expect(host.querySelector(".tc-n-menu-tile-label.is-long")).not.toBeNull();
+	});
+
+	it("draws the start of the description by the copy, once placed, for Obsidian to render into", async () => {
+		const loop = await BlockLoop.open(BLOCK_FILE.replace("- [ ] Idea 🗂️ Дружба", "- [ ] Idea 🗂️ Дружба\n\t- Call first"));
+		const key = [...cardRows(loop.model).values()][0].key;
+		loop.send({ kind: "cardTapped", key, part: "card" });
+		expect(drawn(loop).querySelector('[data-n-part="peek"]')).toBeNull();
+		const place = { seq: layerOf(loop).seq, copy: { box: { left: 0, top: 100, width: 200, height: 35 }, stretched: false, whole: true }, copies: new Map(), above: 0, panel: { left: 0, top: 140, bottom: null, maxHeight: null }, upper: null, long: [] };
+		loop.send({ kind: "menu", msg: { kind: "placed", place } });
+		const peek = drawn(loop).querySelector<HTMLElement>('[data-n-part="peek"]')!;
+		expect(peek.querySelector('[data-n-island="peek"]')).not.toBeNull();
 	});
 
 	it("asks first in place of Delete: the task named, Cancel and the danger button", async () => {

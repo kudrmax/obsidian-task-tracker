@@ -12,6 +12,10 @@ type Boxes = ReadonlyMap<string, DOMRect>;
 
 /** A panel grows from its anchor's side: from its top left under the anchor, from its bottom left over it. */
 const ORIGIN_BELOW = "0 0";
+/** The description's start stands this far from the copy of its card (the old `LAYOUT.descPeekGap`, 10). */
+const PEEK_GAP = "--tc-space-10";
+/** With less room than two menu rows (the old `LAYOUT.descPeekLeast`, 88) it stays away. */
+const PEEK_LEAST_ROWS = 2;
 /** A side left to the other: a panel hanging from the bar stands by one of its edges only. */
 const AUTO = "auto";
 const ORIGIN_ABOVE = "0 100%";
@@ -393,13 +397,69 @@ export class Motion {
 		const easing = style.getPropertyValue("--tc-ease-out").trim() || "ease-out";
 		const rise = parseFloat(style.getPropertyValue("--tc-menu-rise")) || 0;
 		const scale = style.getPropertyValue("--tc-menu-scale").trim() || "1";
-		for (const part of [panel, upper]) {
+		const peek = host.querySelector<HTMLElement>('[data-n-part="peek"]');
+		const under = peek && place.copy ? this.placePeek(peek, place.copy.box, panel, place.upper !== null ? upper : null, place.panel.top === null, view) : false;
+		for (const part of [panel, upper, peek]) {
 			if (!part || this.shown.has(part)) continue;
 			this.shown.add(part);
-			const over = part === upper || place.panel.top === null;
+			const over = part === peek ? !under : part === upper || place.panel.top === null;
 			part.style.transformOrigin = over ? ORIGIN_ABOVE : ORIGIN_BELOW;
 			part.animate([{ opacity: 0, transform: `translate3d(0, ${over ? rise : -rise}px, 0) scale(${scale})` }, { opacity: 1, transform: "none" }], { duration: ms, easing });
 		}
+	}
+
+	/**
+	 * The start of the description by the copy of its card and the menu (the old `DescriptionPeek.place`/`placeBeside`):
+	 * the side of the copy the menu leaves free, else the far side of the menu; beside a split menu's upper part; away
+	 * with less than its least room. What does not fit fades out at its bottom. Answers whether it stands under the copy.
+	 */
+	private placePeek(peek: HTMLElement, copy: { readonly left: number; readonly top: number; readonly width: number; readonly height: number }, menu: HTMLElement, upper: HTMLElement | null, menuAbove: boolean, view: Window): boolean {
+		const style = view.getComputedStyle(peek);
+		const gap = parseFloat(style.getPropertyValue(PEEK_GAP)) || 0;
+		const least = PEEK_LEAST_ROWS * (parseFloat(style.getPropertyValue("--tc-row")) || 0);
+		const margin = parseFloat(style.getPropertyValue("--tc-whole-margin")) || 0;
+		const most = parseFloat(style.getPropertyValue("--tc-desc-peek-max")) || 0;
+		const height = view.innerHeight;
+		const bottom = copy.top + copy.height;
+		const freeAbove = copy.top - gap - margin;
+		const freeBelow = height - bottom - gap - margin;
+		let room = 0;
+		let under = false;
+		let left = copy.left;
+		const over = (edge: number, free: number) => {
+			peek.style.top = "auto";
+			peek.style.bottom = `${height - edge}px`;
+			room = free;
+		};
+		const below = (edge: number, free: number) => {
+			peek.style.bottom = "auto";
+			peek.style.top = `${edge}px`;
+			room = free;
+			under = true;
+		};
+		if (upper) {
+			const start = parseFloat(upper.style.left) + upper.offsetWidth + (parseFloat(view.getComputedStyle(upper).getPropertyValue("--tc-menu-gap")) || 0);
+			const fits = start + peek.offsetWidth <= view.innerWidth - margin;
+			if (fits && freeAbove >= least) over(copy.top - gap, freeAbove);
+			else if (fits) below(bottom + gap, freeBelow);
+			left = start;
+		} else {
+			const menuSpan = (parseFloat(view.getComputedStyle(menu).getPropertyValue("--tc-menu-gap")) || 0) + menu.offsetHeight;
+			if (!menuAbove && freeAbove >= least) over(copy.top - gap, freeAbove);
+			else if (menuAbove && freeBelow >= least) below(bottom + gap, freeBelow);
+			else if (menuAbove) over(copy.top - menuSpan - gap, copy.top - menuSpan - gap - margin);
+			else below(bottom + menuSpan + gap, height - bottom - menuSpan - gap - margin);
+			left = Math.max(margin, Math.min(copy.left, view.innerWidth - margin - peek.offsetWidth));
+		}
+		const away = room < least;
+		peek.style.left = `${left}px`;
+		peek.style.maxHeight = `${Math.max(0, Math.min(most, room))}px`;
+		Motion.put(peek, "--tc-n-peek-shown", away ? "hidden" : "");
+		const text = peek.firstElementChild;
+		const cut = text instanceof HTMLElement && text.scrollHeight > text.clientHeight;
+		Motion.put(peek, "--tc-n-peek-pad", cut ? "var(--tc-desc-peek-pad-cut)" : "");
+		Motion.put(peek, "--tc-n-peek-mask", cut ? "var(--tc-fade-peek-bottom)" : "");
+		return under;
 	}
 
 	private box(el: HTMLElement, box: { readonly left: number; readonly top: number; readonly width: number; readonly height: number }): void {

@@ -24,7 +24,7 @@ import { composeRuntime, newScreensOf } from "./composeRuntime";
 import { failureText, NOTICE_WORDS } from "./ui/failureText";
 import { StatusBarRoom } from "./ui/StatusBarRoom";
 import { NoteBlocks, type NoteView, obsidianPlaces } from "./ui/next/host/block/NoteBlocks";
-import { obsidianEditors, obsidianTitleField } from "./ui/next/drivers/islands";
+import { obsidianEditors, obsidianRenderer, obsidianTitleField } from "./ui/next/drivers/islands";
 
 /** The plugin's reach outside Obsidian (`TaskCalendarPlugin.outside`). */
 export interface Outside {
@@ -132,6 +132,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			notice: (text) => new Notice(text),
 			titleField: (keys) => obsidianTitleField(this.app, () => this.pluginSettings.get().tasksFile, keys),
 			editors: obsidianEditors(this.app, () => this.pluginSettings.get().tasksFile),
+			markdown: obsidianRenderer(this.app, () => this.pluginSettings.get().tasksFile),
 			openLink: (link) => {
 				if (link.kind === "url") this.outside().open(link.target);
 				else void this.app.workspace.openLinkText(link.target, this.pluginSettings.get().tasksFile, "tab");
