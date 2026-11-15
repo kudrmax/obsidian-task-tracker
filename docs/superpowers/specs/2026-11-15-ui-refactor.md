@@ -1,6 +1,6 @@
 # Plugin UI refactor: the plugin becomes a host of the core's door
 
-Issue: kudrmax/obsidian-task-tracker#41 (takes in #40). Branch `ui-refactor`. Revision 7.
+Issue: kudrmax/obsidian-task-tracker#41 (takes in #40). Branch `ui-refactor`. Revision 8.
 
 ## How this spec is made
 
@@ -19,7 +19,8 @@ Revisions 1–3 were written top-down, and every review found new holes: the spe
 | 4 | 688 (23 classes) | 7 |
 | 5 | 219 (7 classes) | 3 |
 | 6 | 155 (4 classes) | 3 |
-| 7 | the faults of revision 6 dissolved at their cause, below | |
+| 7 | 158 (5 classes) | 3 (settings persistence, the pending log, per-call cost) |
+| 8 | the five classes and the three faults corrected in P3 and in the migration, below | |
 
 The faults of revisions 5 and 6 had one cause. The spec treated the core as an asynchronous service the UI waits on, and built machinery around the waiting: read-back, previews, transactions, read-ahead, echoes. The core already has a **synchronous, pure door**, `callDoor(method, args, context) → answer` (`core/application/PhoneCalls.ts`). The iPhone app runs on it, and it covers every `TaskService`, `DayService`, undo, settings and calendar method (a typed coverage map, `PhoneCalls.ts:1077`). On Max's real tasks file (31 KB) a whole funnel view costs about 3 ms through it, JSON included (measured locally). Revision 7 puts the plugin on the same door, and the waiting is gone.
 
@@ -67,15 +68,44 @@ The rules themselves stay where they are, in the core: where a task lands, what 
   - **A write is visible at once,** with its real outcome: where the card landed, the new task's id. There is no preview to compute and no optimistic layer.
   - **Tidying the file** (today a hidden write inside a read) is the answer's new `tasks` text with `step: false`. It is persisted like any write, and the read stays pure.
   - **Ids have one lineage,** carried in the replica.
-- **Persistence:** one plugin-wide serial queue writes the answers' texts to the vault, with compare-and-set (`vault.process`, which writes only if the file still holds the text the replica was based on, as `DoorAnswer.tasks` already specifies).
-- **Outside changes:** Sync, an agent, another device.
-  - When the file's text differs from the last text the runtime persisted or read, it becomes the new base.
-  - The calls since the last persisted base (the **pending calls**, kept as method and arguments) are replayed in order through the door over it, and the replica becomes the result.
-  - A replayed call that now fails (`staleTask`) is dropped with a notice and a reverse transition; the rest stand.
-  - Our own write's change event finds its own text and does nothing.
+- **The replica's parts and where each is kept:**
+
+  | Part | Kept in | Written by | Outside writers |
+  |---|---|---|---|
+  | **Tasks text** | the vault file at `tasksFile` | a serial queue. Each write runs inside `vault.process(fn)`, and `fn` checks that the current text is the base. If not, it returns the text unchanged and the runtime replays. A missing file is created through the door's `createFile`. | Sync, agents, other devices, the old screen during the migration |
+  | **Synced settings** | `data.json` | a per-key patch: the runtime compares the answer's settings with what it handed in and calls `PluginSettings.update(patch)`, which merges over a fresh read | `GoogleAuth`'s refresh token, the place hand-over, the calendars' migration. These go through the runtime's settings port, so the replica sees them. |
+  | **Device values** (`DEVICE_KEYS`: list share, zoom, tree width…) | device storage, never `data.json` | the same per-key patch, routed by `PluginSettings.partition` | — |
+  | **Projects screen** | device storage | on every change | — |
+  | **Undo history, id state** | memory, as today | the answers | — |
+  | **Calendar texts** | their files, read through the adapters | the network lane | the Scriptable and Shortcuts exports |
+- **The pending log.** Each call that changed the tasks text and is not yet persisted is kept with:
+  - its method and arguments;
+  - its own `nowMs`;
+  - the row keys it made.
+
+  The log starts from a snapshot of every part of the replica at the base (text, history, ids, projects screen).
+- **Outside changes.** When the file's text differs from the last text persisted or read:
+  - It becomes the new base.
+  - The log is replayed through the door from the snapshot, each call at its own `nowMs`.
+  - A replayed create rebinds its row keys to the ids the replay answers (P1: the row key belongs to the call, not to an id).
+  - A call that now fails (`staleTask`) is dropped with a notice and a reverse transition.
+  - **Bounds:** at most two replays per write. Past that, the replica takes the file as it is, and the pending calls are dropped with a notice. The iPhone app's "busy after two tries" works this way.
+  - **A missing file:** if the file disappears (renamed, deleted), the pending calls are dropped with a notice, and the screen offers to create the file, as today.
+  - **Our own echo:** our write's change event finds our text and does nothing.
+- **Tidy.** The core tidies inside its view reads (`ask` → `normalize`). The runtime calls `tasks.normalize` once whenever the base or the day changes, before any view is drawn, and persists the answer's text. Views are memoised by (replica, minute).
+- **Readiness.** The runtime builds the replica only after the host is ready (P8): the layout is ready and Obsidian's metadata cache is resolved. It hands the door `projectsReady`, so the one move to projects never runs on an incomplete list (57562189).
+- **Facts the door is told about its host.** These are added to `DoorContext` by `backend`; the app's defaults stay:
+  - `host`: the calendar choice carries over only on iOS, as `composeCore` does today;
+  - `feedProblems`: Google failing or silent, for the sources dot;
+  - `projectsReady`.
+- **Core classes the door leaves to the host** (the quick entry's job order, the calendars' refresh rule, `CalendarPolling`) are run by the runtime over its ports, unchanged. They are never rewritten.
 - **Calendars:** the network lane fetches events, latest wins per day, a superseded fetch abandoned. Their files go into the replica as data, cached first and fresh when they land.
 - **Synchronous rules** used per frame or per pointer move (`rules.*`: `snap`, `swipeLanding`, `layoutWidths`, `stackedLists`…) are called directly. They are pure.
-- **Cost:** a full view on Max's file costs about 3 ms. The core caches the parsed document by text, so views over an unchanged text don't parse again (a core task in slice 1, with a budget test).
+- **Cost.**
+  - Each door call today rebuilds its world: it parses the settings, builds the rules and identity, and parses and tidies the text. A view costs 2–3 ms on Max's file; a pure state change such as `endCarry` costs 1.6 ms.
+  - `backend` adds a cross-call cache keyed by (text, settings reading, today). It covers the parsed document, the tree, the identity reading and the parsed settings, and state-only calls reuse it.
+  - **Budget tests:** a view, a write and a carry step under 1 ms each on a 30 KB file once warm.
+  - **`carryAt`** is called when the target under the finger changes, not on every move (as `CarryReport` does today).
 
 **P4. Geometry is input.**
 - **Sizes from the browser:** what only the browser knows enters the model as a message from an observer, never held back: text and card heights, the stage, the keyboard, the toolbar, scroll positions where something depends on them.
@@ -143,8 +173,6 @@ obsidian/runtime/
   Runtime      the replica; door calls; pending calls and replay; the
                persistence queue; the network lane; Obsidian's events;
                the action log
-  TaskServiceFacade   TaskService (and Day, Undo, Settings) over the
-                      runtime, for the old screen during the migration
 ```
 
 **Preact 11, TSX.**
@@ -197,7 +225,7 @@ The plugin's own menus and sheets are Preact layers.
 | M18 network | the network lane (P3) |
 | M19 cross-screen renames | one replica for every screen |
 | M20 recognition | `recognizers/` |
-| M21 service callers | the facade in slice 1 |
+| M21 service callers | new screens call only the runtime; the old screen keeps its services until deleted |
 | M22, R3, R8 outcome of a write; preview core | the door gives the real outcome at once (P3) |
 | M23 key scopes | `keys` |
 | R4 identity | `CreatedTask` id at once, bound to the row key (P1) |
@@ -210,12 +238,20 @@ The plugin's own menus and sheets are Preact layers.
 | Root, rev 6: transactions | gone: views are synchronous (P3) |
 | Root, rev 6: the gesture snapshot against D65 and D84 | re-pin on the gesture's own context changes (P6) |
 | Root, rev 6: lifecycle | P8 |
+| R12 door answering as the phone's host | host facts in `DoorContext` (P3) |
+| R13 one persistence target | the table of the replica's parts (P3) |
+| R14 a replayed create's new id | row keys belong to the call and are rebound on replay (P3) |
+| R15 the facade changing the old screen | no facade: the old screen keeps its services (Migration) |
+| R16 core classes outside the door | the runtime runs them unchanged (P3) |
+| Root, rev 7: settings persistence | per-key patches; device keys in device storage (P3) |
+| Root, rev 7: the pending log | snapshot of every part, `nowMs` per call, bounds, a missing file (P3) |
+| Root, rev 7: per-call cost | the cross-call cache, budget tests, `carryAt` on a target change (P3) |
 
 ## Guards
 
 **Scope.**
 - `uiRules` covers `obsidian/ui/next` from slice 2.
-- Its rule "core calls only through the runtime" covers all of `obsidian/ui` from the end of slice 1.
+- The old screen is frozen and exempt until slice 7, which deletes it.
 - New CSS lives below a `/* next */` marker in `styles.css`; the new style rules apply there, and the freeze covers the old part above it.
 
 `tests/uiRules.test.ts`:
@@ -261,17 +297,19 @@ The plugin's own menus and sheets are Preact layers.
 | Something alive after its host | the lifecycle test |
 | Focus scrolling the screen; the keyboard not rising on a pick | `focus` tests; the phone checklist |
 
-## Migration: the runtime first, then hosts
+## Migration: the new screens beside the old one, no parity layer
+
+The old screen keeps its own services, untouched, until it is deleted. The new screens run on the runtime. The two write the same file safely: each sees the other's writes as outside changes, and both rebase. The old services already do this inside `vault.process`, and the plugin and the iPhone app live this way today. No layer imitates the old services, so the old screen stays exactly as it is.
 
 | Slice | What | Release |
 |---|---|---|
-| 1 | **The runtime and the facade under the old screen:**<ul><li>the replica, door calls, persistence with compare-and-set, replay of pending calls, the network lane;</li><li>`TaskServiceFacade` gives the old screen the same `TaskService`, `DayService`, `UndoService` and settings interfaces over the runtime;</li><li>core: tidy as an answer's text, a parsed-document cache, and anything the door lacks for the plugin (`backend`; the door's existing names and answers unchanged);</li><li>`chrome` and the overlay host shared.</li></ul>The old `act`, `changing`, `Picks`, `WriteQueue`, `Reload` and the services' own file reads go. The old screen keeps drawing as it does, now from one replica in one order. Done in caller groups (lists, quick entry, menus, carry, timeline, projects, settings), each with its own guard. | ★ the race class gone on the old screen |
+| 1 | **The runtime and the core's part.** <ul><li>The replica, its stores, the pending log with replay and bounds, the network lane, readiness.</li><li>`backend`: the cross-call cache with budget tests; the host facts in `DoorContext`.</li></ul>Tested on its own, with nothing in the plugin using it yet. | — |
 | 2 | **Guards, freeze, the lifecycle test, the e2e harness.** | — |
-| 3 | **The note block, whole, on the new architecture, behind `newBlock`:** Rows and By subprojects, lists, cards, entry, carry in the block, menus, the full card. | ★ after QA |
-| 4 | **The leaf as a new screen behind `newScreen` (off).** Built region by region: lists and layouts, the timeline, the ribbon and both swipes, the panel and tree, the carry across them, select mode, search. A smoke subset of e2e per region. | — |
-| 5 | **Switch:** once the release gate passes and an independent QA finds nothing, both flags turn on. | ★ with Max's phone checklist |
+| 3 | **The note block, whole, behind `newBlock`:** Rows and By subprojects, lists, cards, entry, carry in the block, menus, the full card. | ★ after QA, `newBlock` on |
+| 4 | **The leaf as a new screen behind `newScreen` (off).** Built region by region: lists and layouts, the timeline, the ribbon and both swipes, the panel and tree, the carry across them, select mode, search. A smoke subset per region. | — |
+| 5 | **Switch:** once the release gate passes and an independent QA finds nothing, `newScreen` turns on. | ★ with Max's phone checklist |
 | 6 | **The settings tab.** | ★ |
-| 7 | **Delete** the old screen, the facade, the async services the plugin no longer uses, the flags and the freeze baselines. | ★ |
+| 7 | **Delete** the old screen, its services' plugin wiring, `Picks`, `Reload`, `WriteQueue`, the flags and the freeze baselines. `CalendarScreen` is gone. | ★ |
 
 ## Tests
 
@@ -329,5 +367,5 @@ The plugin's own menus and sheets are Preact layers.
 
 - `backend` makes the core part of slice 1. One `frontend-obsidian` agent per slice or region after that. The lead checks every diff, test and screen.
 - After each slice or region, a fresh reviewer gets the diff, the principles and that part's traceability rows, and finds where the code breaks a principle.
-- After slices 1, 3, 4 and 5, a fresh QA agent is told to break it.
+- After slices 3, 4 and 5, a fresh QA agent is told to break it.
 - A finding is answered by naming the principle or the inventory row that let it through, and fixing that.
