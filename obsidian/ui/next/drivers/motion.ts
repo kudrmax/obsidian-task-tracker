@@ -10,6 +10,8 @@ type Boxes = ReadonlyMap<string, DOMRect>;
 
 /** A panel grows from its anchor's side: from its top left under the anchor, from its bottom left over it. */
 const ORIGIN_BELOW = "0 0";
+/** A side left to the other: a panel hanging from the bar stands by one of its edges only. */
+const AUTO = "auto";
 const ORIGIN_ABOVE = "0 100%";
 
 /** A token of the stylesheet as milliseconds (`150ms`, `0.3s`). */
@@ -195,9 +197,24 @@ export class Motion {
 		const room = { top: box.top, bottom: box.bottom };
 		const bar = parts.find((el) => el.dataset.nHow === "beside") ?? null;
 		const size = bar?.getBoundingClientRect() ?? at;
+		let panel: HTMLElement | null = null;
+		for (const el of bar?.querySelectorAll<HTMLElement>("[data-n-panel]") ?? []) panel = el;
 		const below = at.bottom + gap;
 		const above = at.top - gap - size.height;
-		const top = below + size.height <= room.bottom || above < room.top ? below : above;
+		const fitsBelow = (extra: number) => below + size.height + extra <= room.bottom;
+		const fitsAbove = (extra: number) => above - extra >= room.top;
+		/** An open panel hangs from the bar away from the field: the side is chosen for the two while they fit on one, else for the bar. */
+		const extra = panel ? panel.offsetHeight + gap : 0;
+		const side = [extra, 0].map((more) => (fitsBelow(more) ? "below" : fitsAbove(more) ? "above" : null)).find((found) => found !== null) ?? "below";
+		const top = side === "below" ? below : above;
+		if (panel) {
+			const panelBelow = top + size.height + gap + panel.offsetHeight <= room.bottom;
+			const panelAbove = top - gap - panel.offsetHeight >= room.top;
+			const down = side === "below" ? panelBelow || !panelAbove : !(panelAbove || !panelBelow);
+			const off = `${size.height + gap}px`;
+			Motion.put(panel, "top", down ? off : AUTO);
+			Motion.put(panel, "bottom", down ? AUTO : off);
+		}
 		const barLeft = at.right - size.width;
 		for (const part of parts) {
 			const width = part.getBoundingClientRect().width;

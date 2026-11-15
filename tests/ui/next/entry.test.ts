@@ -108,4 +108,22 @@ describe("the block's quick entry", () => {
 		expect(host.model.entry!.state!.marks.priority?.prefix).toBe(level.mark.prefix);
 		expect(host.node.querySelector("[data-n-island=field]")?.getAttribute("data-priority")).toBe(level.mark.color);
 	});
+
+	it("Option+Tab turns the field into a section's name, written where it stands", async () => {
+		host.dispatch(act("plus"));
+		host.dispatch({ kind: "entry", msg: { kind: "key", key: "altTab" } });
+		expect(host.model.entry!.state!.section).toBe(true);
+		expect(field().input.placeholder).toBe("Section name");
+		field().type("Errands");
+		host.dispatch({ kind: "entry", msg: { kind: "key", key: "enter" } });
+		await settle(h.runtime);
+		expect(h.vault.text(PATH)).toMatch(/### Errands/);
+		expect(host.model.entry?.state).toBeNull();
+	});
+
+	it("a double click on a list's own room types a task at its end", () => {
+		host.dispatch({ kind: "acted", act: { act: "room", key: null, value: "inbox" } });
+		expect(host.model.entry?.state?.spot).toMatchObject({ kind: "list", column: "inbox" });
+		expect(document.activeElement).toBe(field().input);
+	});
 });

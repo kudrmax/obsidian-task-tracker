@@ -69,7 +69,7 @@ export function Bar({ entry, wide, placeTitle, listName }: { readonly entry: Ent
 						</button>
 					) : null}
 					{tiles.length > 0 ? (
-						<div class="tc-n-bar-panel">
+						<div class="tc-n-bar-panel" data-n-panel="">
 							{tiles.map((group, i) => (
 								<Tiles key={i} tiles={group} />
 							))}
