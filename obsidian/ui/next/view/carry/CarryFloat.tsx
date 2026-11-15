@@ -16,7 +16,7 @@ export function CarryFloat({ model }: { readonly model: BlockModel }): JSX.Eleme
 			{float.stacked ? <div class="tc-n-float-under tc-n-float-under-2" data-n-float="under" /> : null}
 			{float.stacked ? <div class="tc-n-float-under tc-n-float-under-1" data-n-float="under" /> : null}
 			<div class="tc-n-float" data-n-float="card">
-				<Card rowKey="float" face={float.face} branch={null} listed={false} copy />
+				<Card rowKey="float" face={float.face} branch={null} as="float" />
 			</div>
 			{float.count > 1 ? (
 				<div class="tc-n-float-count" data-n-float="count">

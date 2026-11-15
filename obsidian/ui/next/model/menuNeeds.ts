@@ -8,7 +8,8 @@ import type { MenuInput, TaskMenuLayer } from "./taskMenu";
 export function cardRows(model: BlockModel): ReadonlyMap<string, CardRow> {
 	const lists = currentLists(model);
 	const rows = lists.kind === "rows" ? lists.rows.flatMap((row) => row.list.rows) : lists.kind === "byProject" ? lists.list.rows : [];
-	return new Map(rows.flatMap((row) => (row.kind === "card" ? [[row.key, row] as const] : [])));
+	const cards = rows.filter((row): row is CardRow => row.kind === "card");
+	return new Map(cards.map((row) => [row.key, row] as const));
 }
 
 /** The task menu standing open (its close not begun): the one the menu's messages act on. */

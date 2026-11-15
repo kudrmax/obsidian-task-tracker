@@ -1,3 +1,4 @@
+import { tokenPx } from "./motion";
 /**
  * The measure driver (§Architecture): every observer, and the sizes only the browser knows. Each watch tells at most
  * once a frame and stops with `dispose`.
@@ -30,10 +31,15 @@ function offsetIn(el: HTMLElement, ancestor: HTMLElement): { readonly left: numb
 	return { left, top };
 }
 
-const px = (value: string): number => parseFloat(value) || 0;
 
 export class Measure {
 	/** The box of the row keyed `key` inside `root` as it stands now; null when none is drawn. */
+	/** The stack of the block's lists in `root` (`data-n-stack`): what scrolls them. */
+	static stack(root: ParentNode): HTMLElement | null {
+		const stack = root.querySelector("[data-n-stack]");
+		return stack instanceof HTMLElement ? stack : null;
+	}
+
 	static row(root: ParentNode, key: string): Box | null {
 		for (const el of root.querySelectorAll<HTMLElement>("[data-n-key]")) {
 			if (el.dataset.nKey !== key) continue;
@@ -73,8 +79,7 @@ export class Measure {
 			}
 			lists.push({ column, left: at.left, top: at.top, width: list.offsetWidth, bottom: at.top + list.offsetHeight, rows });
 		}
-		const style = stack.ownerDocument.defaultView?.getComputedStyle(stack);
-		const token = (name: string) => px(style?.getPropertyValue(name) ?? "");
+		const token = (name: string) => tokenPx(stack, name);
 		return { lists, indent: token("--tc-subtask-indent"), cardHeight: token("--tc-card-h"), cardGap: token("--tc-card-gap"), dot: token("--tc-drop-dot") };
 	}
 

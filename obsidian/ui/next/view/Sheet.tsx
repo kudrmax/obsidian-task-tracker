@@ -13,12 +13,37 @@ export function Backdrop({ layer, closing }: { readonly layer: number; readonly 
 /** Where `motion` stands a part: over its anchor (`data-n-anchor`), its copy on it, a panel centred on it or by its left edge. */
 export type PlaceHow = "copy" | "centre" | "start";
 
-export function Placed({ layer, closing, anchor, how, part, classes, children }: { readonly layer: number; readonly closing: boolean; readonly anchor: string; readonly how: PlaceHow; readonly part: string; readonly classes: string; readonly children: ComponentChildren }): JSX.Element {
-	return (
-		<div class={classes} data-n-part={part} data-n-layer={layer} data-n-place={anchor} data-n-how={how} data-n-closing={closing ? "" : undefined}>
-			{children}
-		</div>
-	);
+/** What a placed part is: the view button's copy, the capsule's copy, the view menu's panel, «⋯»'s panel. */
+export type PlacedKind = "viewCopy" | "capsuleCopy" | "viewPanel" | "morePanel";
+
+export function Placed({ layer, closing, anchor, how, part, kind, children }: { readonly layer: number; readonly closing: boolean; readonly anchor: string; readonly how: PlaceHow; readonly part: string; readonly kind: PlacedKind; readonly children: ComponentChildren }): JSX.Element {
+	const at = { "data-n-part": part, "data-n-layer": layer, "data-n-place": anchor, "data-n-how": how, "data-n-closing": closing ? "" : undefined };
+	switch (kind) {
+		case "viewCopy":
+			return (
+				<div class="tc-n-btn tc-n-round tc-n-view-btn tc-n-copy" {...at}>
+					{children}
+				</div>
+			);
+		case "capsuleCopy":
+			return (
+				<div class="tc-n-capsule tc-n-copy" {...at}>
+					{children}
+				</div>
+			);
+		case "viewPanel":
+			return (
+				<div class="tc-n-panel tc-n-panel-view" {...at}>
+					{children}
+				</div>
+			);
+		case "morePanel":
+			return (
+				<div class="tc-n-panel tc-n-panel-more" {...at}>
+					{children}
+				</div>
+			);
+	}
 }
 
 export interface RowSpec {
@@ -34,10 +59,17 @@ export interface RowSpec {
 /** A row of a panel: the label, the icon on the right. */
 export function MenuRow({ spec }: { readonly spec: RowSpec }): JSX.Element {
 	return (
-		<button class={spec.choice ? "tc-n-btn tc-n-menu-row tc-n-menu-choice" : "tc-n-btn tc-n-menu-row"} data-n-act={spec.act} data-n-value={spec.value}>
-			<span class="tc-n-menu-label">{spec.label}</span>
-			{spec.icon ? <Icon name={spec.icon} /> : null}
-		</button>
+		spec.choice ? (
+			<button class="tc-n-btn tc-n-menu-row tc-n-menu-choice" data-n-act={spec.act} data-n-value={spec.value}>
+				<span class="tc-n-menu-label">{spec.label}</span>
+				{spec.icon ? <Icon name={spec.icon} /> : null}
+			</button>
+		) : (
+			<button class="tc-n-btn tc-n-menu-row" data-n-act={spec.act} data-n-value={spec.value}>
+				<span class="tc-n-menu-label">{spec.label}</span>
+				{spec.icon ? <Icon name={spec.icon} /> : null}
+			</button>
+		)
 	);
 }
 

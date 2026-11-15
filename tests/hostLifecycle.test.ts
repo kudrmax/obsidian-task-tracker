@@ -148,7 +148,7 @@ const blockHost: HostCase = {
 	file: "block/BlockHost.tsx",
 	mount({ session, parent, app, key }) {
 		attachNote(session, key);
-		const host = new BlockHost({ session, app: app as never, ...BLOCK_WORDS }, "Дружба.md", parent.ownerDocument);
+		const host = new BlockHost({ session, app: app as never, ...BLOCK_WORDS }, "Дружба.md", parent);
 		parent.appendChild(host.node);
 		host.mount();
 		return {

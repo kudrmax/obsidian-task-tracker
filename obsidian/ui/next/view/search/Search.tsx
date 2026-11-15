@@ -3,7 +3,7 @@ import type { JSX } from "preact";
 import { type BlockModel, noteView, settings } from "../../model/block";
 import { cardFace } from "../../model/card";
 import { pathOf, pickedRow, searchGroups, snippetOf } from "../../model/search";
-import { Card, colourAttributes, Title } from "../Card";
+import { Card, colourAttributes, Due, Meta, Title } from "../Card";
 import { Icon } from "../icons";
 
 /** The found words picked out of the text they stand in. */
@@ -19,24 +19,25 @@ function Parts({ parts }: { readonly parts: readonly FoundPart[] }): JSX.Element
 function HitCard({ hit, row, picked, paths }: { readonly hit: SearchHit; readonly row: number; readonly picked: boolean; readonly paths: boolean }): JSX.Element {
 	const face = cardFace(hit.item, null);
 	const path = pathOf(hit, paths);
-	const ring = picked ? " is-picked" : "";
-	if (path === null && face.over !== null) {
-		return (
-			<div class={`tc-n-hit-row${ring}`} data-n-act="search:pick" data-n-value={String(row)}>
-				<Card rowKey={`hit:${row}`} face={face} branch={null} listed={false} classes="tc-n-hit-card" bare />
-			</div>
+	const card = (): JSX.Element => {
+		if (path === null && face.over !== null) return <Card rowKey={`hit:${row}`} face={face} branch={null} as="plain" bare />;
+		const snippet = path === null ? snippetOf(hit) : null;
+		const title = <div class="tc-n-card-title">{hit.title.length > 0 && !(path !== null && hit.item.card.step) ? <Parts parts={hit.title} /> : <Title parts={face.title} />}</div>;
+		const marks = (
+			<>
+				{path === null && face.project !== null ? (
+					<span class="tc-n-project-mark" aria-label={face.project} title={face.project}>
+						<Icon name="project" />
+					</span>
+				) : null}
+				{face.meta ? <Meta meta={face.meta} fold={false} full={false} /> : null}
+				{face.due ? <Due due={face.due} /> : null}
+			</>
 		);
-	}
-	const snippet = path === null ? snippetOf(hit) : null;
-	const title = (
-		<div class="tc-n-card-title">{hit.title.length > 0 && !(path !== null && hit.item.card.step) ? <Parts parts={hit.title} /> : <Title parts={face.title} />}</div>
-	);
-	const cls = ["tc-n-card", "tc-n-hit-card", path !== null ? "tc-n-card-two" : "", snippet ? "tc-n-card-snippet" : ""].filter(Boolean).join(" ");
-	return (
-		<div class={`tc-n-hit-row${ring}`} data-n-act="search:pick" data-n-value={String(row)}>
-			<div class={cls} data-status={face.status} {...colourAttributes(face)}>
-				<span class="tc-n-progress-dot" />
-				{path !== null ? (
+		if (path !== null)
+			return (
+				<div class="tc-n-card" data-status={face.status} {...colourAttributes(face)}>
+					<span class="tc-n-progress-dot" />
 					<div class="tc-n-card-lines">
 						<div class="tc-n-card-over">
 							<Icon name="project" />
@@ -44,41 +45,33 @@ function HitCard({ hit, row, picked, paths }: { readonly hit: SearchHit; readonl
 						</div>
 						{title}
 					</div>
-				) : snippet ? (
+					{marks}
+				</div>
+			);
+		if (snippet)
+			return (
+				<div class="tc-n-card tc-n-card-snippet" data-status={face.status} {...colourAttributes(face)}>
+					<span class="tc-n-progress-dot" />
 					<div class="tc-n-hit-text">
 						{title}
-						<div class={hit.project ? "tc-n-hit-desc tc-n-hit-project" : "tc-n-hit-desc"}>
+						<div class="tc-n-hit-desc">
 							<Parts parts={snippet} />
 						</div>
 					</div>
-				) : (
-					title
-				)}
-				{path === null && face.project !== null ? (
-					<span class="tc-n-project-mark" aria-label={face.project} title={face.project}>
-						<Icon name="project" />
-					</span>
-				) : null}
-				{face.meta ? (
-					<span class={face.meta.count !== null && face.meta.description ? "tc-n-meta tc-n-meta-pair" : "tc-n-meta"}>
-						{face.meta.count !== null ? <span class="tc-n-count">{face.meta.count}</span> : null}
-						{face.meta.description ? <Icon name="description" cls="tc-n-desc-mark" /> : null}
-					</span>
-				) : null}
-				{face.due ? (
-					<span class={face.due.day === null ? "tc-n-due tc-n-due-repeat-only" : "tc-n-due"}>
-						{face.due.repeats ? (
-							<span class="tc-n-due-top">
-								{face.due.day !== null ? <span class="tc-n-due-day">{face.due.day}</span> : null}
-								<Icon name="repeat" cls="tc-n-due-repeat" />
-							</span>
-						) : face.due.day !== null ? (
-							<span class="tc-n-due-day">{face.due.day}</span>
-						) : null}
-						{face.due.month !== null ? <span class="tc-n-due-mon">{face.due.month}</span> : null}
-					</span>
-				) : null}
+					{marks}
+				</div>
+			);
+		return (
+			<div class="tc-n-card" data-status={face.status} {...colourAttributes(face)}>
+				<span class="tc-n-progress-dot" />
+				{title}
+				{marks}
 			</div>
+		);
+	};
+	return (
+		<div class={picked ? "tc-n-hit-row is-picked" : "tc-n-hit-row"} data-n-act="search:pick" data-n-value={String(row)}>
+			{card()}
 		</div>
 	);
 }

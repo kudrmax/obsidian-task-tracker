@@ -24,7 +24,7 @@ describe("the carry's transient channel (P5): the finger moves the float, never 
 
 	it("renders once on the lift and never per move; the float follows each move through motion", async () => {
 		h = await projectHarness();
-		host = new BlockHost({ session: h.runtime.openHost(), app, ...words }, "Дружба.md", document);
+		host = new BlockHost({ session: h.runtime.openHost(), app, ...words }, "Дружба.md", document.body);
 		document.body.appendChild(host.node);
 		host.mount();
 		const card = host.node.querySelector<HTMLElement>("[data-n-act='card']")!;
@@ -44,7 +44,7 @@ describe("the carry's transient channel (P5): the finger moves the float, never 
 
 	it("taps a card's counter to fold its subtasks, no menu and no carry", async () => {
 		h = await projectHarness();
-		host = new BlockHost({ session: h.runtime.openHost(), app, ...words }, "Дружба.md", document);
+		host = new BlockHost({ session: h.runtime.openHost(), app, ...words }, "Дружба.md", document.body);
 		document.body.appendChild(host.node);
 		host.mount();
 		const counter = host.node.querySelector<HTMLElement>("[data-n-act='counter']")!;

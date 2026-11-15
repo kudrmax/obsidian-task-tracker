@@ -97,7 +97,7 @@ export class NoteBlocks {
 	}
 
 	private make(view: NoteView, path: string): Placed {
-		const host = new BlockHost({ ...this.deps, session: this.deps.openSession() }, path, view.containerEl.ownerDocument);
+		const host = new BlockHost({ ...this.deps, session: this.deps.openSession() }, path, view.containerEl);
 		const placed: Placed = { host, path, stopWatch: () => undefined, content: null };
 		this.blocks.set(view, placed);
 		placed.stopWatch = host.measure.watchPage(view.containerEl, () => host.node, () => {
@@ -119,7 +119,7 @@ export class NoteBlocks {
 		if (!parent) return;
 		const node = placed.host.node;
 		const first = !node.isConnected;
-		if (node.parentElement !== parent || (node.nextSibling !== before && node !== before)) parent.insertBefore(node, before);
+		placed.host.mountNode.place(parent, before);
 		const next = reading ? null : content;
 		if (placed.content !== next) {
 			if (placed.content) Motion.put(placed.content, "flex-grow", "");

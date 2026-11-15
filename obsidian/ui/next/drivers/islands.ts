@@ -1,6 +1,7 @@
-import { EditorState, type Extension, Prec, type Transaction, type TransactionSpec } from "@codemirror/state";
+import { Compartment, EditorState, type Extension, Prec, type Transaction, type TransactionSpec } from "@codemirror/state";
 import { EditorView, keymap, placeholder, type ViewUpdate } from "@codemirror/view";
 import type { App, Editor, Modifier, TFile } from "obsidian";
+import { Focus } from "./focus";
 import { type LineKeys, lineKeys } from "./keys";
 import { LINE_BREAK, oneLine } from "../../../../core/application/contracts";
 
@@ -45,6 +46,34 @@ export interface IslandState {
 	readonly placeholder: string;
 	/** The field takes the focus now (a typing pick: once, inside the tap). */
 	readonly focus: boolean;
+}
+
+/**
+ * The node a host mounts its view into, made once in the window of `near` and placed by the host where it belongs (a
+ * note's end), never diffed by anyone but the view rendered into it.
+ */
+export class MountNode {
+	readonly node: HTMLElement;
+
+	constructor(near: Node) {
+		this.node = (near.ownerDocument ?? (near as Document)).createElement("div");
+	}
+
+	/** Placed in `parent` before `before` (null: last), unless it stands there already; answers whether it moved. */
+	place(parent: Node, before: Node | null): boolean {
+		if (this.node.parentNode === parent && (this.node.nextSibling === before || this.node === before)) return false;
+		parent.insertBefore(this.node, before);
+		return true;
+	}
+
+	/** Placed last in `parent` (a test's page, a host with no other place). */
+	into(parent: Node): void {
+		parent.appendChild(this.node);
+	}
+
+	remove(): void {
+		this.node.remove();
+	}
 }
 
 export class Islands {
@@ -257,7 +286,9 @@ export interface FieldKeys {
 export function obsidianTitleField(app: App, sourcePath: () => string, keys: (onSwitch: () => void, lineHotkeys: readonly Hotkey[]) => FieldKeys): FieldFactory {
 	return (doc, events) => {
 		const container = doc.createElement("div");
-		const hint = doc.createElement("span");
+		/** The hint shown while the field is empty, which the model words (`New task`, `Section name`). */
+		const hint = new Compartment();
+		let hinted = "";
 		let quiet = true;
 		let composing = false;
 		const take = (run: () => void) => () => {
@@ -287,7 +318,8 @@ export function obsidianTitleField(app: App, sourcePath: () => string, keys: (on
 				const own = ownKeys.map(({ key, run, shift }) => ({ key, run: () => !searching() && run(), shift: shift && (() => !searching() && shift()), stopPropagation: true }));
 				return [
 					...super.buildLocalExtensions(),
-					placeholder(() => hint),
+					hint.of(placeholder(hinted)),
+					EditorView.contentAttributes.of({ enterkeyhint: "next" }),
 					EditorState.transactionFilter.of(oneLineFilter),
 					FIELD_THEME,
 					Prec.highest(EditorView.domEventHandlers({ keydown: (e) => void (composing = e.isComposing || e.keyCode === COMPOSING_KEY_CODE) })),
@@ -298,7 +330,7 @@ export function obsidianTitleField(app: App, sourcePath: () => string, keys: (on
 
 			override onUpdate(update: ViewUpdate, changed: boolean): void {
 				super.onUpdate(update, changed);
-				if (changed && !quiet) events.typed(oneLine(this.editor.getValue()));
+				if (changed && !quiet) events.typed(oneLine(update.state.doc.toString()));
 			}
 		}
 		const editor = new FieldEditor(app, container, owner);
@@ -311,7 +343,6 @@ export function obsidianTitleField(app: App, sourcePath: () => string, keys: (on
 			if (!composing) events.key("altTab");
 		}, lines);
 		const content = editor.cm.contentDOM;
-		content.setAttribute("enterkeyhint", "next");
 		const focused = () => fieldKeys.hold(true);
 		const blurred = () => {
 			fieldKeys.hold(false);
@@ -322,10 +353,10 @@ export function obsidianTitleField(app: App, sourcePath: () => string, keys: (on
 		return {
 			el: container,
 			get text() {
-				return oneLine(editor.editor.getValue());
+				return oneLine(editor.cm.state.doc.toString());
 			},
 			get focused() {
-				return editor.cm.root.activeElement === content;
+				return Focus.holds(content);
 			},
 			setText(text) {
 				const cm = editor.cm;
@@ -338,7 +369,9 @@ export function obsidianTitleField(app: App, sourcePath: () => string, keys: (on
 				}
 			},
 			setPlaceholder(text) {
-				if (hint.textContent !== text) hint.textContent = text;
+				if (hinted === text) return;
+				hinted = text;
+				editor.cm.dispatch({ effects: hint.reconfigure(placeholder(text)) });
 			},
 			focusEnd() {
 				const cm = editor.cm;
@@ -496,7 +529,7 @@ export function obsidianEditors(app: App, sourcePath: () => string): EditorFacto
 
 			override onUpdate(update: ViewUpdate, changed: boolean): void {
 				super.onUpdate(update, changed);
-				if (changed) hooks.change(this.editor.getValue());
+				if (changed) hooks.change(update.state.doc.toString());
 			}
 		};
 		const editor = new Extended(app, container, owner);

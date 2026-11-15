@@ -88,7 +88,7 @@ export async function mountBlock(options: { readonly wide?: boolean } = {}): Pro
 			editors: editors.factory,
 		},
 		"Дружба.md",
-		document,
+		document.body,
 	);
 	document.body.appendChild(host.node);
 	host.mount();

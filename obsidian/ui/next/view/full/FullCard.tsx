@@ -28,7 +28,7 @@ export function FullCard({ model }: { readonly model: BlockModel }): JSX.Element
 	const subtasks = shown ? fullList(model) : null;
 	return (
 		<div
-			class={typing ? "tc-n-sheet tc-n-full tc-n-full-typing" : "tc-n-sheet tc-n-full"}
+			class={typing ? "tc-n-sheet tc-n-full is-typing" : "tc-n-sheet tc-n-full"}
 			data-n-part="sheet"
 			data-n-layer={layerIndex(model)}
 			data-n-closing={layer.closing ? "" : undefined}
@@ -58,7 +58,7 @@ export function FullCard({ model }: { readonly model: BlockModel }): JSX.Element
 							<span class="tc-n-full-project-text">{tree.project.name}</span>
 						</button>
 					) : null}
-					{subtasks && subtasks.rows.length > 0 ? <List list={subtasks} classes="tc-n-full-list" scope="full:" /> : null}
+					{subtasks && subtasks.rows.length > 0 ? <List list={subtasks} kind="full" /> : null}
 					{layer.closing ? <div class="tc-n-desc tc-n-full-desc" /> : <div key={layer.id} class="tc-n-desc tc-n-full-desc" data-n-island="description" />}
 				</div>
 			</div>

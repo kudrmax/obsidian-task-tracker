@@ -18,6 +18,12 @@ const ORIGIN_ABOVE = "0 100%";
 /** A panel hanging from its anchor's top grows from its own top middle. */
 const ORIGIN_TOP = "50% 0";
 
+/** A token of the stylesheet as pixels (`12px`), 0 when it says no number. */
+export function tokenPx(el: Element, token: string): number {
+	const view = el.ownerDocument.defaultView;
+	return parseFloat(view ? view.getComputedStyle(el).getPropertyValue(token) : "") || 0;
+}
+
 /** A token of the stylesheet as milliseconds (`150ms`, `0.3s`). */
 export function tokenMs(el: Element, token: string): number {
 	const view = el.ownerDocument.defaultView;
@@ -234,7 +240,9 @@ export class Motion {
 	 * place a cancel goes back to), taking its size and a resting card's look; with no `to`, fading where it is. `done`
 	 * once it has ended, or at once with nothing to fly.
 	 */
-	fly(host: ParentNode, to: Element | null, done: () => void): void {
+	fly(host: ParentNode, key: string | null, done: () => void): void {
+		let to: Element | null = null;
+		if (key !== null) for (const el of this.root.querySelectorAll<HTMLElement>("[data-n-key]")) if (el.dataset.nKey === key) to = el;
 		const { card, all } = Motion.floats(host);
 		if (!card) return done();
 		const ms = tokenMs(this.root, "--tc-duration-fly");

@@ -101,7 +101,7 @@ describe("the full card over the note's block", () => {
 
 	it("shows Done while the description is typed in, hiding the bottom row; Done writes and puts the keyboard away", () => {
 		b.editors.last.hooks.focus(true);
-		expect(q(".tc-n-full")?.classList.contains("tc-n-full-typing")).toBe(true);
+		expect(q(".tc-n-full")?.classList.contains("is-typing")).toBe(true);
 		expect(q('[data-n-act="full:done"]')?.classList.contains("is-hidden")).toBe(false);
 		b.editors.last.hooks.change("- Done typing");
 		tap(q('[data-n-act="full:done"]'));

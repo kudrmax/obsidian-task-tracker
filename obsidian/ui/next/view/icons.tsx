@@ -63,16 +63,43 @@ const DRAWINGS = {
 
 export type IconName = keyof typeof DRAWINGS;
 
-/** An icon: its strokes in the current colour, its solid part filled; stroke widths come from the stylesheet. */
-export function Icon({ name, cls }: { readonly name: IconName; readonly cls?: string }): JSX.Element {
+/** An icon's strokes in the current colour and its solid part filled, for an `<svg>` of the icon's box. */
+function Paths({ name }: { readonly name: IconName }): JSX.Element {
 	const spec: IconSpec = DRAWINGS[name];
 	const strokes = typeof spec.d === "string" ? [spec.d] : spec.d;
 	return (
-		<svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		<>
 			{strokes.map((d) => (
 				<path key={d} d={d} />
 			))}
 			{spec.fill ? <path d={spec.fill} fill="currentColor" stroke="none" /> : null}
+		</>
+	);
+}
+
+/** An icon: stroke widths and its size come from the stylesheet, by what holds it. */
+export function Icon({ name }: { readonly name: IconName }): JSX.Element {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<Paths name={name} />
+		</svg>
+	);
+}
+
+/** The description's mark under a card's counter. */
+export function DescriptionMark(): JSX.Element {
+	return (
+		<svg class="tc-n-desc-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<Paths name="description" />
+		</svg>
+	);
+}
+
+/** The repeat's mark beside a card's due day. */
+export function RepeatMark(): JSX.Element {
+	return (
+		<svg class="tc-n-due-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<Paths name="repeat" />
 		</svg>
 	);
 }
@@ -90,6 +117,6 @@ export function modeIcon(name: string): IconName | undefined {
 }
 
 /** An icon named by the model (a string of the design's names): nothing for a name the set lacks. */
-export function NamedIcon({ name, cls }: { readonly name: string | null; readonly cls?: string }): JSX.Element | null {
-	return name !== null && Object.prototype.hasOwnProperty.call(DRAWINGS, name) ? <Icon name={name as IconName} cls={cls} /> : null;
+export function NamedIcon({ name }: { readonly name: string | null }): JSX.Element | null {
+	return name !== null && Object.prototype.hasOwnProperty.call(DRAWINGS, name) ? <Icon name={name as IconName} /> : null;
 }

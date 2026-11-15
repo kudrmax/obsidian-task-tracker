@@ -5,7 +5,7 @@ import type { Answers, Need } from "../../model/answers";
 import { Chrome } from "../../drivers/chrome";
 import { Focus } from "../../drivers/focus";
 import { Input, PRESSED } from "../../drivers/input";
-import { type EditorFactory, Editors } from "../../drivers/islands";
+import { type EditorFactory, Editors, MountNode } from "../../drivers/islands";
 import { Measure as MeasureOf } from "../../drivers/measure";
 import { Scroll } from "../../drivers/scroll";
 import { descriptionIsland } from "../../model/full";
@@ -16,7 +16,7 @@ import { Measure } from "../../drivers/measure";
 import { Motion } from "../../drivers/motion";
 import { OverlayHost } from "../../drivers/overlay";
 import { EdgeScroll } from "../../drivers/scroll";
-import { type BlockModel, blockModel, blockNeeds, currentLists, projectsView, rowVars, sectioned, settings } from "../../model/block";
+import { type BlockModel, blockModel, blockNeeds, currentLists, projectsView, rootVars, rowVars, sectioned, settings } from "../../model/block";
 import type { CarryMsg, CarryTarget } from "../../model/carry";
 import { targetAt } from "../../model/carryPlace";
 import { carryVars } from "../../model/carryView";
@@ -141,6 +141,7 @@ function blockProgram(effects: (command: Command<BlockMsg>, dispatch: (msg: Bloc
 export class BlockHost {
 	/** The node the block stands in: the host places it at the note's end. */
 	readonly node: HTMLElement;
+	readonly mountNode: MountNode;
 	private readonly store: Store<BlockModel, BlockMsg>;
 	private readonly overlay: OverlayHost;
 	private readonly motion: Motion;
@@ -166,10 +167,12 @@ export class BlockHost {
 	constructor(
 		private readonly deps: BlockDeps,
 		note: string,
-		doc: Document,
+		/** An element of the window the block stands in: its node is made there. */
+		near: HTMLElement,
 	) {
-		this.node = doc.createElement("div");
-		this.overlay = new OverlayHost(doc);
+		this.mountNode = new MountNode(near);
+		this.node = this.mountNode.node;
+		this.overlay = new OverlayHost(near);
 		this.motion = new Motion(this.node);
 		this.islands = new Islands(deps.titleField((onSwitch, lines) => this.keys?.field(onSwitch, lines) ?? { hold: () => undefined, dispose: () => undefined }));
 		const views: FreshViews = (needs) => deps.session.views(needs);
@@ -184,7 +187,7 @@ export class BlockHost {
 		this.input.acts(this.overlay.node, acted);
 		this.input.presses(this.node, (raw) => this.feed(raw), () => this.store.model.carry !== null);
 		this.input.escape(
-			this.node.ownerDocument,
+			this.node,
 			() => this.store.model.carry?.phase === "carried" || (this.store.model.select !== null && this.store.model.layers.length === 0),
 			() => this.dispatch(this.store.model.carry ? { kind: "carry", msg: { kind: "cancel" } } : { kind: "select", msg: { kind: "stop" } }),
 		);
@@ -192,13 +195,13 @@ export class BlockHost {
 		this.store.flush();
 		this.input.fields(this.overlay.node, acted);
 		this.input.enter(
-			this.node.ownerDocument,
+			this.node,
 			() => openMenu(this.store.model)?.asking != null,
 			() => this.dispatch({ kind: "menu", msg: { kind: "confirm" } }),
 		);
 		this.input.escape(
-			this.node.ownerDocument,
-			() => (this.store.model.layers.some((layer) => !layer.closing) || (this.store.model.search?.closing === false)) && !Focus.inField(this.node.ownerDocument),
+			this.node,
+			() => (this.store.model.layers.some((layer) => !layer.closing) || (this.store.model.search?.closing === false)) && !Focus.inField(this.node),
 			() => this.dispatch({ kind: "layerDismissed" }),
 		);
 	}
@@ -217,7 +220,7 @@ export class BlockHost {
 		this.motion.before();
 		render(<BlockRoot model={model} layers={this.overlay.node} />, this.node);
 		this.drawnSeq = model.motion.seq;
-		this.motion.after(moved ? model.motion.cause : "none", new Map([...rowVars(drawnLists(model)), ...carryVars(model), ...fullRowVars(model)]), model.entry?.bound);
+		this.motion.after(moved ? model.motion.cause : "none", new Map([...rowVars(drawnLists(model)), ...carryVars(model), ...fullRowVars(model), ...rootVars(model)]), model.entry?.bound);
 		const frame = this.node.firstElementChild;
 		if (frame instanceof HTMLElement) Motion.holdHeight(frame, model.carry !== null);
 		this.motion.layerVars(this.overlay.node, menuVars(model));
@@ -239,7 +242,7 @@ export class BlockHost {
 	 * once more in the same pass, still inside the user's event (P2).
 	 */
 	private focusNow(): void {
-		if (this.focusing !== null && Focus.field(this.node.ownerDocument, this.focusing)) this.focusing = null;
+		if (this.focusing !== null && Focus.field(this.node, this.focusing)) this.focusing = null;
 	}
 
 	/**
@@ -284,8 +287,7 @@ export class BlockHost {
 	}
 
 	private stack(): HTMLElement | null {
-		const stack = this.node.querySelector("[data-n-stack]");
-		return stack instanceof HTMLElement ? stack : null;
+		return Measure.stack(this.node);
 	}
 
 	/** A gesture the recognizer read: a tap or a right click is the card's; a lift, a move and a drop are the carry's. */
@@ -367,7 +369,7 @@ export class BlockHost {
 
 	/** Cmd+Z and Cmd+Shift+Z in the block; in a field they stay the field's, taking typing back. */
 	private key(key: BlockKey, frame: HTMLElement): boolean {
-		if (key !== "find" && Focus.inField(frame.ownerDocument)) return true;
+		if (key !== "find" && Focus.inField(frame)) return true;
 		this.dispatch({ kind: "key", key });
 		return false;
 	}
@@ -413,12 +415,8 @@ export class BlockHost {
 				this.over();
 				return;
 			}
-			case "fly": {
-				let to: Element | null = null;
-				if (command.to !== null) for (const el of this.node.querySelectorAll<HTMLElement>("[data-n-key]")) if (el.dataset.nKey === command.to) to = el;
-				this.motion.fly(this.overlay.node, to, () => dispatch(command.done));
-				return;
-			}
+			case "fly":
+				return this.motion.fly(this.overlay.node, command.to, () => dispatch(command.done));
 			case "openTasksFile":
 				return this.deps.openTasksFile(command.line);
 		}
@@ -438,6 +436,6 @@ export class BlockHost {
 		this.editors.dispose();
 		render(null, this.node);
 		this.overlay.dispose();
-		this.node.remove();
+		this.mountNode.remove();
 	}
 }

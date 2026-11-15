@@ -1,4 +1,4 @@
-import type { JSX } from "preact";
+import type { ComponentChildren, JSX } from "preact";
 import { type BlockModel, canUndo, shownLists, viewChoice } from "../model/block";
 import { dropLine, type Marks, rowMarks } from "../model/carryView";
 import { drawnLists, listName, placeTitle } from "../model/entry";
@@ -8,8 +8,6 @@ import { List } from "./List";
 import { SelectFoot } from "./carry/SelectFoot";
 import { FullCard } from "./full/FullCard";
 import { SearchInBlock } from "./search/Search";
-
-/** The core's icon of a mode (a Lucide name) as the design draws it. */
 
 export interface BlockProps {
 	readonly model: BlockModel;
@@ -25,13 +23,13 @@ function Lists({ model, marks }: BlockProps & { readonly marks: Marks }): JSX.El
 					{lists.rows.map((row) => (
 						<div key={row.column} class="tc-n-row">
 							<div class="tc-n-row-label">{row.label}</div>
-							<List list={row.list} classes="tc-n-row-list" column={row.column} marks={marks} found={model.found?.id ?? null} />
+							<List list={row.list} kind="row" column={row.column} marks={marks} found={model.found?.id ?? null} />
 						</div>
 					))}
 				</>
 			);
 		case "byProject":
-			return <List list={lists.list} classes="tc-n-projects-list" column="projects" marks={marks} found={model.found?.id ?? null} />;
+			return <List list={lists.list} kind="projects" column="projects" marks={marks} found={model.found?.id ?? null} />;
 		case "none":
 			return null;
 	}
@@ -48,7 +46,7 @@ export function Block({ model }: BlockProps): JSX.Element {
 	if (model.select?.selecting) return <SelectBlock model={model} />;
 	return (
 		<>
-			<div class={shownLists(model).kind === "byProject" ? "tc-n-stack tc-n-stack-projects" : "tc-n-stack"} data-n-stack="">
+			<Stack model={model}>
 				<Lists model={model} marks={rowMarks(model)} />
 				{line ? (
 					<div class="tc-n-drop" data-n-key="drop-line">
@@ -56,7 +54,7 @@ export function Block({ model }: BlockProps): JSX.Element {
 						<div class="tc-n-drop-line" />
 					</div>
 				) : null}
-			</div>
+			</Stack>
 			<div class="tc-n-fade" />
 			<div class="tc-n-fade-entering" />
 			<div class="tc-n-capsule" data-n-anchor="capsule">
@@ -86,11 +84,24 @@ export function Block({ model }: BlockProps): JSX.Element {
 function SelectBlock({ model }: BlockProps): JSX.Element {
 	return (
 		<>
-			<div class={shownLists(model).kind === "byProject" ? "tc-n-stack tc-n-stack-projects" : "tc-n-stack"} data-n-stack="">
+			<Stack model={model}>
 				<Lists model={model} marks={rowMarks(model)} />
-			</div>
+			</Stack>
 			<div class="tc-n-fade" />
 			<SelectFoot picked={model.select?.picked.length ?? 0} />
 		</>
+	);
+}
+
+/** What scrolls the block's lists: By subprojects one list whose room at its end is the foot fade's, a stack of its own. */
+function Stack({ model, children }: BlockProps & { readonly children: ComponentChildren }): JSX.Element {
+	return shownLists(model).kind === "byProject" ? (
+		<div class="tc-n-stack tc-n-stack-projects" data-n-stack="">
+			{children}
+		</div>
+	) : (
+		<div class="tc-n-stack" data-n-stack="">
+			{children}
+		</div>
 	);
 }

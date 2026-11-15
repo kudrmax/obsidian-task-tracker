@@ -176,8 +176,10 @@ export class Input {
 		);
 	}
 
-	/** Enter pressed in `doc` while `wanted()`, outside a field: taken and told (a question's confirm). */
-	enter(doc: Document, wanted: () => boolean, told: () => void): void {
+	/** Enter pressed in the window of `near` while `wanted()`, outside a field: taken and told (a question's confirm). */
+	enter(near: Node, wanted: () => boolean, told: () => void): void {
+		const doc = near.ownerDocument;
+		if (!doc) return;
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key !== "Enter" || !wanted() || (e.target instanceof HTMLInputElement && e.target.dataset.nField !== undefined)) return;
 			e.preventDefault();
@@ -215,8 +217,10 @@ export class Input {
 		);
 	}
 
-	/** Escape pressed in `doc` while `wanted()`: taken (Obsidian would take it as a step back) and told. */
-	escape(doc: Document, wanted: () => boolean, told: () => void): () => void {
+	/** Escape pressed in the window of `near` while `wanted()`: taken (Obsidian would take it as a step back) and told. */
+	escape(near: Node, wanted: () => boolean, told: () => void): () => void {
+		const doc = near.ownerDocument;
+		if (!doc) return () => undefined;
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key !== "Escape" || !wanted()) return;
 			/** A field that takes Escape itself (a name typed on a menu's page goes back a page). */

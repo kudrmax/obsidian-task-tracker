@@ -5,8 +5,10 @@ export class Focus {
 		if (!el.contains(el.ownerDocument.activeElement)) el.focus({ preventScroll: true });
 	}
 
-	/** A field named by the view (`data-n-field`) takes the focus now, its caret at its end. */
-	static field(root: ParentNode, name: string): boolean {
+	/** A field named by the view (`data-n-field`) in the window of `near` takes the focus now, its caret at its end. */
+	static field(near: Node, name: string): boolean {
+		const root = near.ownerDocument;
+		if (!root) return false;
 		for (const el of root.querySelectorAll<HTMLElement>("[data-n-field]")) {
 			if (el.dataset.nField !== name) continue;
 			el.focus({ preventScroll: true });
@@ -30,9 +32,9 @@ export class Focus {
 		return el.contains(el.ownerDocument.activeElement);
 	}
 
-	/** Whether the focus is in a field typed in (a field keeps Cmd+Z for its typing). */
-	static inField(doc: Document): boolean {
-		const focus = doc.activeElement;
+	/** Whether the focus in the window of `near` is in a field typed in (a field keeps Cmd+Z for its typing). */
+	static inField(near: Node): boolean {
+		const focus = near.ownerDocument?.activeElement ?? null;
 		return focus instanceof HTMLElement && (focus.isContentEditable || focus.tagName === "INPUT" || focus.tagName === "TEXTAREA");
 	}
 }

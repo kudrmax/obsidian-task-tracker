@@ -44,7 +44,7 @@ describe("the task menu as the view draws it", () => {
 		expect(lower.children.length).toBe(all - 2);
 		expect(lower.dataset.nMeasure).toBeUndefined();
 		expect(host.querySelector('[data-n-part="lifted"]')!.className).toContain("tc-n-lifted-whole");
-		expect(host.querySelector(".tc-n-menu-tile-label-long")).not.toBeNull();
+		expect(host.querySelector(".tc-n-menu-tile-label.is-long")).not.toBeNull();
 	});
 
 	it("asks first in place of Delete: the task named, Cancel and the danger button", async () => {

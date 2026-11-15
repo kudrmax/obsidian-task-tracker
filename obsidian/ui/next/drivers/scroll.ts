@@ -38,12 +38,12 @@ export class EdgeScroll {
 		this.lastY = y;
 		const towards = from !== null && (y === from ? this.scrolling || this.arrived !== null : velocity > 0 === y > from);
 		if (velocity === 0 || !towards) return this.stop();
-		const now = view.performance.now();
-		this.arrived ??= now;
 		if (this.frame) return;
-		this.frame = view.requestAnimationFrame(() => {
+		/** The dwell counts from the first frame the finger is seen heading for the edge there. */
+		this.frame = view.requestAnimationFrame((now) => {
 			this.frame = 0;
-			if (!this.scrolling && view.performance.now() - (this.arrived ?? 0) < DWELL_MS) return this.follow(y);
+			this.arrived ??= now;
+			if (!this.scrolling && now - this.arrived < DWELL_MS) return this.follow(y);
 			this.scrolling = true;
 			this.scroller.scrollTop += velocity;
 			this.scrolled();

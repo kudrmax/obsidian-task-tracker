@@ -1,6 +1,6 @@
 import type { JSX } from "preact";
 import { createPortal } from "preact/compat";
-import { type BlockModel, rootClasses } from "../model/block";
+import { type BlockModel, blends, entering } from "../model/block";
 import { Block } from "./Block";
 import { Layers } from "./Layers";
 
@@ -13,7 +13,7 @@ export interface BlockRootProps {
 /** The block's frame at the note's end, and its layers in the overlay host. */
 export function BlockRoot({ model, layers }: BlockRootProps): JSX.Element {
 	return (
-		<div class={rootClasses(model, "tc-n-block")} tabIndex={-1} data-n-anchor="block">
+		<div class={`task-calendar tc-n-block ${blends(model) ? "is-blend" : ""} ${entering(model) ? "is-entering" : ""}`} tabIndex={-1} data-n-anchor="block" data-n-key="root/block">
 			<Block model={model} />
 			{createPortal(<Layers model={model} />, layers)}
 		</div>

@@ -18,9 +18,12 @@ export interface RowMarks {
 
 export const NO_MARKS: RowMarks = { waiting: new Set(), arriving: null, hot: null, picking: false, picked: new Set() };
 
+/** Which list it is: a row's list (Rows), the parts By subprojects, the full card's subtasks. */
+export type ListKind = "row" | "projects" | "full";
+
 export interface ListProps {
 	readonly list: ListModel;
-	readonly classes?: string;
+	readonly kind: ListKind;
 	/** The list's column (or `projects`): what the carry's measure reads it as (`data-n-list`), the entry's name for it (a double click on its free room types a task at its end). */
 	readonly column?: string;
 	readonly marks?: RowMarks;
@@ -30,31 +33,18 @@ export interface ListProps {
 	readonly extra?: ReadonlyMap<string, JSX.Element>;
 	/** The card the search led to: it wears the ring. */
 	readonly found?: string | null;
-	/** Whose acts its cards' taps are (see `Card`). */
-	readonly scope?: string;
 }
 
 /**
  * A column of rows, each keyed by who it is (P1): headers of sections, No tasks plates, cards with their subtasks under
  * them a level in, the branches running to each. Motion within it is `motion`'s, by the rows' keys.
  */
-export function List({ list, classes, column, marks = NO_MARKS, hidden, extra, found, scope }: ListProps): JSX.Element {
-	const cardClasses = (key: string): string | undefined => {
-		const all = [
-			marks.picking ? "tc-n-card-picking" : "",
-			marks.picked.has(key) ? "is-picked" : "",
-			marks.waiting.has(key) ? "is-waiting" : "",
-			marks.arriving === key ? "is-arriving" : "",
-			hidden?.has(key) ? "is-away" : "",
-			found === key ? "is-found" : "",
-		].filter(Boolean);
-		return all.length > 0 ? all.join(" ") : undefined;
-	};
+export function List({ list, kind, column, marks = NO_MARKS, hidden, extra, found }: ListProps): JSX.Element {
 	const row = (r: ListRow): JSX.Element => {
 		switch (r.kind) {
 			case "head":
 				return (
-					<div key={r.key} class={r.ungrouped ? "tc-n-group-head tc-n-group-head-ungrouped" : "tc-n-group-head"} data-n-key={r.key}>
+					<div key={r.key} class={r.ungrouped ? "tc-n-group-head is-ungrouped" : "tc-n-group-head"} data-n-key={r.key}>
 						<span class="tc-n-group-name">{r.name}</span>
 					</div>
 				);
@@ -71,18 +61,24 @@ export function List({ list, classes, column, marks = NO_MARKS, hidden, extra, f
 						rowKey={r.key}
 						face={r.face}
 						branch={r.branch}
-						listed
-						classes={cardClasses(r.key)}
-						scope={scope}
+						as="listed"
+						full={kind === "full"}
+						states={{ picking: marks.picking, picked: marks.picked.has(r.key), waiting: marks.waiting.has(r.key), arriving: marks.arriving === r.key, away: hidden?.has(r.key) === true, found: found === r.key }}
 					/>
 				);
 			case "unwritten":
-				return <Card key={r.key} rowKey={r.key} face={unwritten(r.text)} branch={r.branch} listed={false} />;
+				return <Card key={r.key} rowKey={r.key} face={unwritten(r.text)} branch={r.branch} as="plain" />;
 			case "field":
-				return (
-					<div key={r.key} class={r.section ? "tc-n-entry-row tc-n-entry-section" : "tc-n-entry-row"} data-n-key={r.key} data-status={r.status ?? undefined}>
+				return r.section ? (
+					<div key={r.key} class="tc-n-entry-row tc-n-entry-section" data-n-key={r.key} data-status={r.status ?? undefined}>
 						<span class="tc-n-progress-dot" />
-						<div class={r.section ? "tc-n-field is-section" : "tc-n-field"} data-priority={r.tint ?? undefined} data-n-island="field" />
+						<div class="tc-n-field tc-n-section-field" data-priority={r.tint ?? undefined} data-n-island="field" />
+						{r.branch ? <Branches branch={r.branch} rowKey={r.key} /> : null}
+					</div>
+				) : (
+					<div key={r.key} class="tc-n-entry-row" data-n-key={r.key} data-status={r.status ?? undefined}>
+						<span class="tc-n-progress-dot" />
+						<div class="tc-n-field" data-priority={r.tint ?? undefined} data-n-island="field" />
 						{r.branch ? <Branches branch={r.branch} rowKey={r.key} /> : null}
 					</div>
 				);
@@ -98,11 +94,27 @@ export function List({ list, classes, column, marks = NO_MARKS, hidden, extra, f
 	if (end) rows.push(end);
 	/** The field's room at the list's end: on the phone the bar over the keyboard stands there. */
 	if (list.rows.some((r) => r.kind === "field")) rows.push(<div key="entry-room" class="tc-n-entry-room" />);
-	return (
-		<div class={classes ? `tc-n-list ${classes}` : "tc-n-list"} data-n-list={column} data-n-dblact={column === undefined ? undefined : "room"} data-n-value={column}>
-			{rows}
-		</div>
-	);
+	const room = column === undefined ? undefined : "room";
+	switch (kind) {
+		case "row":
+			return (
+				<div class="tc-n-list tc-n-row-list" data-n-list={column} data-n-dblact={room} data-n-value={column}>
+					{rows}
+				</div>
+			);
+		case "projects":
+			return (
+				<div class="tc-n-list tc-n-projects-list" data-n-list={column} data-n-dblact={room} data-n-value={column}>
+					{rows}
+				</div>
+			);
+		case "full":
+			return (
+				<div class="tc-n-list tc-n-full-list" data-n-list={column} data-n-dblact={room} data-n-value={column}>
+					{rows}
+				</div>
+			);
+	}
 }
 
 /** A line typed and not yet written: a plain card, its title alone. */

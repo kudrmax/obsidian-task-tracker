@@ -215,14 +215,28 @@ export function rowVars(lists: BlockLists): ReadonlyMap<string, Readonly<Record<
 	const rows = lists.kind === "rows" ? lists.rows.flatMap((row) => row.list.rows) : lists.kind === "byProject" ? lists.list.rows : [];
 	for (const row of rows) {
 		if (row.kind !== "card" && row.kind !== "field" && row.kind !== "unwritten") continue;
-		if (row.level > 0) vars.set(row.key, { "--tc-n-level": String(row.level) });
+		const own: Record<string, string> = {};
+		if (row.level > 0) own["--tc-n-level"] = String(row.level);
+		/** A card whose subtasks are folded away keeps the room under it the card peeking out takes. */
+		if (row.kind === "card" && row.face.folded) own["--tc-n-fold"] = "var(--tc-stack-step-y)";
+		if (Object.keys(own).length > 0) vars.set(row.key, own);
 		for (const pass of row.branch?.passes ?? []) vars.set(`${row.key}/pass/${pass}`, { "--tc-n-pass": String(pass) });
 	}
 	return vars;
 }
 
-/** The root's own classes: a card of several labels blends them (`labelPaint`) on the block and over it alike. */
-export function rootClasses(model: BlockModel, part: string): string {
-	const states = [settings(model)?.labelPaint === "blend" ? "is-blend" : "", model.entry?.state ? "is-entering" : ""].filter(Boolean);
-	return ["task-calendar", part, ...states].join(" ");
+/** The block's own variables (`motion` writes them on its frame, `root/block`): while Select tasks is on, each card's circle takes its room. */
+export function rootVars(model: BlockModel): ReadonlyMap<string, Readonly<Record<string, string>>> {
+	if (model.select?.selecting !== true) return new Map();
+	return new Map([["root/block", { "--tc-n-pick-pad": "var(--tc-pick-pad-start)", "--tc-n-pick-w": "var(--tc-pick-size)", "--tc-n-pick-gap": "var(--tc-pick-gap)", "--tc-n-pick-ring": "var(--tc-pick-ring)" }]]);
+}
+
+/** A card of several labels blends them (`labelPaint`), on the block and over it alike. */
+export function blends(model: BlockModel): boolean {
+	return settings(model)?.labelPaint === "blend";
+}
+
+/** A task is being typed: the bottom row steps aside. */
+export function entering(model: BlockModel): boolean {
+	return model.entry?.state != null;
 }

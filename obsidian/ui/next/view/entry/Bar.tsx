@@ -1,12 +1,17 @@
-import type { JSX } from "preact";
+import type { ComponentChildren, JSX } from "preact";
 import type { EntryModel } from "../../model/entry";
 import { type BarTile, barTiles, placeIcon } from "../../model/entry";
 import { Icon, type IconName } from "../icons";
 
 /** A button of the bar: what a tap on it is (`bar:<act>`), its value. A press on the bar never takes the focus from the field. */
-function BarButton({ act, value, icon, label, title, classes, disabled, data }: { readonly act: string; readonly value?: string; readonly icon: IconName; readonly label: string; readonly title?: string; readonly classes?: string; readonly disabled?: boolean; readonly data?: Readonly<Record<string, string>> }): JSX.Element {
-	return (
-		<button class={classes ? `tc-n-btn tc-n-bar-btn ${classes}` : "tc-n-btn tc-n-bar-btn"} aria-label={label} title={title ?? label} data-n-act={`bar:${act}`} data-n-value={value} disabled={disabled} {...data}>
+function BarButton({ act, value, icon, label, title, project = false, set = false, open = false, disabled, data }: { readonly act: string; readonly value?: string; readonly icon: IconName; readonly label: string; readonly title?: string; readonly project?: boolean; readonly set?: boolean; readonly open?: boolean; readonly disabled?: boolean; readonly data?: Readonly<Record<string, string>> }): JSX.Element {
+	const at = { "aria-label": label, title: title ?? label, "data-n-act": `bar:${act}`, "data-n-value": value, disabled, ...data };
+	return project ? (
+		<button class={`tc-n-btn tc-n-bar-btn tc-n-bar-project ${set ? "is-set" : ""} ${open ? "is-open" : ""}`} {...at}>
+			<Icon name={icon} />
+		</button>
+	) : (
+		<button class={`tc-n-btn tc-n-bar-btn ${set ? "is-set" : ""} ${open ? "is-open" : ""}`} {...at}>
 			<Icon name={icon} />
 		</button>
 	);
@@ -39,7 +44,7 @@ export function Bar({ entry, wide, placeTitle, listName }: { readonly entry: Ent
 	if (!state) return null;
 	const section = state.section === true;
 	const panel = entry.panel;
-	const sectionButton = state.section === null ? null : <BarButton act="section" icon="section" label="Section" title="Section (⌥Tab)" classes={section ? "tc-n-bar-section is-set" : "tc-n-bar-section"} />;
+	const sectionButton = state.section === null ? null : <BarButton act="section" icon="section" label="Section" title="Section (⌥Tab)" set={section} />;
 	const tint = state.marks.tint;
 	const tiles = barTiles(state, panel, listName);
 	return (
@@ -50,7 +55,7 @@ export function Bar({ entry, wide, placeTitle, listName }: { readonly entry: Ent
 				</div>
 			) : null}
 			{wide && section ? null : (
-				<div class={wide ? "tc-n-bar tc-n-bar-desk" : "tc-n-bar"} data-n-keep-focus="" data-n-place={wide ? "field" : undefined} data-n-how={wide ? "beside" : undefined}>
+				<BarBox wide={wide}>
 					{wide ? null : sectionButton}
 					{state.indents ? (
 						<span class="tc-n-bar-shifts">
@@ -59,9 +64,9 @@ export function Bar({ entry, wide, placeTitle, listName }: { readonly entry: Ent
 						</span>
 					) : null}
 					<span class="tc-n-bar-spacer" />
-					{state.markable ? <BarButton act="panel" value="priority" icon="priority" label="Priority" classes={[tint ? "is-set" : "", panel === "priority" ? "is-open" : ""].filter(Boolean).join(" ")} data={tint ? { "data-priority": tint } : undefined} /> : null}
-					{state.project ? <BarButton act="panel" value="project" icon="project" label="Project" classes={["tc-n-bar-project", state.project.lit ? "is-set" : "", panel === "project" ? "is-open" : ""].filter(Boolean).join(" ")} /> : null}
-					{state.repeatable ? <BarButton act="panel" value="repeat" icon="repeat" label="Repeat" classes={[state.repeat ? "is-set" : "", panel === "repeat" ? "is-open" : ""].filter(Boolean).join(" ")} /> : null}
+					{state.markable ? <BarButton act="panel" value="priority" icon="priority" label="Priority" set={tint !== null} open={panel === "priority"} data={tint ? { "data-priority": tint } : undefined} /> : null}
+					{state.project ? <BarButton act="panel" value="project" icon="project" label="Project" project set={state.project.lit} open={panel === "project"} /> : null}
+					{state.repeatable ? <BarButton act="panel" value="repeat" icon="repeat" label="Repeat" set={state.repeat !== null} open={panel === "repeat"} /> : null}
 					{state.place ? (
 						<button class={panel === "place" ? "tc-n-btn tc-n-bar-place is-open" : "tc-n-btn tc-n-bar-place"} aria-label="Place" title="Place" data-n-act="bar:panel" data-n-value="place">
 							<Icon name={placeIcon(state.place)} />
@@ -75,8 +80,21 @@ export function Bar({ entry, wide, placeTitle, listName }: { readonly entry: Ent
 							))}
 						</div>
 					) : null}
-				</div>
+				</BarBox>
 			)}
 		</>
+	);
+}
+
+/** The bar's box: on the desktop a capsule by the field, stood there by `motion`; on the phone a row over the keyboard. */
+function BarBox({ wide, children }: { readonly wide: boolean; readonly children: ComponentChildren }): JSX.Element {
+	return wide ? (
+		<div class="tc-n-bar tc-n-bar-desk" data-n-keep-focus="" data-n-place="field" data-n-how="beside">
+			{children}
+		</div>
+	) : (
+		<div class="tc-n-bar" data-n-keep-focus="">
+			{children}
+		</div>
 	);
 }

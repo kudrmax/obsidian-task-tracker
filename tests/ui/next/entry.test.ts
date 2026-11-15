@@ -22,7 +22,7 @@ describe("the block's quick entry", () => {
 	beforeEach(async () => {
 		h = await harness({ file: FILE });
 		fields = fakeTitleFields();
-		host = new BlockHost({ session: h.runtime.openHost(), app: { keymap } as never, failure: (e) => e.message, notice: () => undefined, openLink: () => undefined, openTasksFile: () => undefined, titleField: () => fields.factory }, "Дружба.md", document);
+		host = new BlockHost({ session: h.runtime.openHost(), app: { keymap } as never, failure: (e) => e.message, notice: () => undefined, openLink: () => undefined, openTasksFile: () => undefined, titleField: () => fields.factory }, "Дружба.md", document.body);
 		document.body.appendChild(host.node);
 		host.mount();
 	});

@@ -1,5 +1,5 @@
 import type { JSX } from "preact";
-import { type BlockModel, canUndo, rootClasses, viewChoice } from "../model/block";
+import { type BlockModel, blends, canUndo, viewChoice } from "../model/block";
 import type { Layer } from "../model/layers";
 import { Icon, modeIcon } from "./icons";
 import { Backdrop, MenuGroup, Placed } from "./Sheet";
@@ -22,10 +22,10 @@ function ViewMenu({ model, index, closing }: LayerProps): JSX.Element | null {
 	return (
 		<>
 			<Backdrop layer={index} closing={closing} />
-			<Placed layer={index} closing={closing} anchor="view" how="copy" part="copy" classes="tc-n-btn tc-n-round tc-n-view-btn tc-n-copy">
+			<Placed layer={index} closing={closing} anchor="view" how="copy" part="copy" kind="viewCopy">
 				<Icon name={icon} />
 			</Placed>
-			<Placed layer={index} closing={closing} anchor="view" how="centre" part="panel" classes="tc-n-panel tc-n-panel-view">
+			<Placed layer={index} closing={closing} anchor="view" how="centre" part="panel" kind="viewPanel">
 				<div class="tc-n-menu-title">View</div>
 				<MenuGroup rows={choice.modes.map((option) => ({ label: option.label, icon: option.checked ? "check" : undefined, choice: true, act: "mode", value: option.mode }))} />
 				{choice.subprojects ? <MenuGroup rows={[{ label: choice.subprojects.label, icon: choice.subprojects.checked ? "check" : undefined, choice: true, act: "subprojects" }]} /> : null}
@@ -39,7 +39,7 @@ function MoreMenu({ model, index, closing }: LayerProps): JSX.Element {
 	return (
 		<>
 			<Backdrop layer={index} closing={closing} />
-			<Placed layer={index} closing={closing} anchor="capsule" how="copy" part="copy" classes="tc-n-capsule tc-n-copy">
+			<Placed layer={index} closing={closing} anchor="capsule" how="copy" part="copy" kind="capsuleCopy">
 				<span class={canUndo(model) ? "tc-n-btn tc-n-undo" : "tc-n-btn tc-n-undo is-off"}>
 					<Icon name="undo" />
 				</span>
@@ -47,7 +47,7 @@ function MoreMenu({ model, index, closing }: LayerProps): JSX.Element {
 					<Icon name="more" />
 				</span>
 			</Placed>
-			<Placed layer={index} closing={closing} anchor="capsule" how="start" part="panel" classes="tc-n-panel tc-n-panel-more">
+			<Placed layer={index} closing={closing} anchor="capsule" how="start" part="panel" kind="morePanel">
 				<MenuGroup
 					rows={[
 						{ label: "Search", icon: "search", act: "search" },
@@ -75,7 +75,7 @@ function LayerView(props: LayerProps & { readonly layer: Layer }): JSX.Element |
 /** Every layer over the block, bottom first, in the overlay host; the whole set under the screen's root class. */
 export function Layers({ model }: { readonly model: BlockModel }): JSX.Element {
 	return (
-		<div class={rootClasses(model, "tc-n-layers")}>
+		<div class={blends(model) ? "task-calendar tc-n-layers is-blend" : "task-calendar tc-n-layers"}>
 			{model.layers.map((layer, index) => (
 				<LayerView key={`${index}:${layer.kind}`} layer={layer} model={model} index={index} closing={layer.closing} />
 			))}
