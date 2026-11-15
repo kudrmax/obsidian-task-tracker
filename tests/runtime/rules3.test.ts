@@ -133,3 +133,44 @@ describe("a call never lands on another task that took its line", () => {
 		expect(vault.text(PATH)).not.toContain("- [x]");
 	});
 });
+
+/** A file with a repeating task and a task with projects, for lines replaced in place by another task with the same marks. */
+const MARKED = FILE.replace("- [ ] Idea", "- [ ] Зал 🔁 every week on Mon, Wed, Fri").replace("- [ ] Call the bank", "- [ ] Позвонить 🗂️ Дружба");
+
+describe("a line replaced in place by another task with the same marks", () => {
+	for (const [what, from, to, title] of [
+		["a repeating task (same 🔁 rule)", "- [ ] Зал 🔁 every week on Mon, Wed, Fri", "- [ ] Бассейн 🔁 every week on Mon, Wed, Fri", "Зал"],
+		["a task with projects (same 🗂️)", "- [ ] Позвонить 🗂️ Дружба", "- [ ] Написать отчёт 🗂️ Дружба", "Позвонить"],
+	] as const) {
+		it(`${what}: a call on the old key is stale on the rerun path, nothing written to the other task`, async () => {
+			const { runtime, vault } = await harness({ file: MARKED });
+			const key = itemOf(runtime, title).key;
+			vault.outside(PATH, vault.text(PATH)!.replace(from, to));
+			await settle(runtime);
+			expect(runtime.call("tasks.setStatus", [key, "done"]).answer).toMatchObject({ ok: false, error: { code: "staleTask" } });
+			await settle(runtime);
+			expect(vault.text(PATH)).toContain(to);
+			expect(vault.text(PATH)).not.toContain("- [x]");
+		});
+
+		it(`${what}: a pending call replayed over it drops with the notice, nothing written to the other task`, async () => {
+			const { runtime, vault, notices } = await harness({ file: MARKED });
+			const synced = vault.text(PATH)!.replace(from, to);
+			vault.between.push(() => vault.outside(PATH, synced, false));
+			ok(runtime.call("tasks.setStatus", [itemOf(runtime, title).key, "done"]).answer);
+			await settle(runtime);
+			expect(notices).toEqual([NOTICE_WORDS.stale]);
+			expect(vault.text(PATH)).toBe(synced);
+		});
+	}
+
+	it("a typo fixed on another device while a call is pending is the same task: the call lands on it", async () => {
+		const { runtime, vault, notices } = await harness({ file: FILE.replace("- [ ] Idea", "- [ ] Byu milk") });
+		vault.between.push(() => vault.outside(PATH, vault.text(PATH)!.replace("- [ ] Byu milk", "- [ ] Buy milk"), false));
+		ok(runtime.call("tasks.setStatus", [itemOf(runtime, "Byu milk").key, "done"]).answer);
+		await settle(runtime);
+		expect(notices).toEqual([]);
+		expect(vault.text(PATH)).toContain("- [x] Buy milk");
+		expect(vault.text(PATH)).not.toContain("Byu");
+	});
+});
