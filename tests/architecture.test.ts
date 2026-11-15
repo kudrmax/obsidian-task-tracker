@@ -6,22 +6,31 @@ import { doorMethods } from "../core/application/PhoneCalls";
 
 const ROOT = resolve(__dirname, "..");
 
-type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root";
+type Layer = "domain" | "application" | "infrastructure" | "runtime" | "host" | "ui" | "phone" | "settings" | "root";
 
 /** Obsidian's own packages: the app provides them at run time (`external` in esbuild.config.mjs). */
-const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view", "preact", "preact/hooks", "preact/jsx-runtime"];
+const PROVIDED_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
+/** Preact, which the views are written in: bundled into main.js, a dependency of the plugin's own. */
+const BUNDLED_PACKAGES = ["preact", "preact/hooks", "preact/jsx-runtime"];
+/** The packages the plugin's code may import: Obsidian's and Preact. */
+const OBSIDIAN_PACKAGES = [...PROVIDED_PACKAGES, ...BUNDLED_PACKAGES];
 
 function layerOf(file: string): Layer | null {
 	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";
 	if (file === "core/settings.ts") return "settings";
-	const m = /^(?:core|obsidian)\/(domain|application|infrastructure|ui|phone)\//.exec(file);
+	if (file.startsWith(HOSTS)) return "host";
+	const m = /^(?:core|obsidian)\/(domain|application|infrastructure|runtime|ui|phone)\//.exec(file);
 	return m ? (m[1] as Layer) : null;
 }
 
 /** The folder each layer lives in: the core (`core/`) or the Obsidian frontend (`obsidian/`). */
-const HOME: Readonly<Record<string, string>> = { domain: "core", application: "core", phone: "core", ui: "obsidian", infrastructure: "obsidian" };
+const HOME: Readonly<Record<string, string>> = { domain: "core", application: "core", phone: "core", ui: "obsidian", infrastructure: "obsidian", runtime: "obsidian" };
 
 const under = (target: string, dir: string): boolean => target.startsWith(`${HOME[dir]}/${dir}/`);
+
+/** The new screens' hosts (the leaf, a note's block, the settings tab): they mount, own and dispose, and reach the core only through the runtime's facade. */
+const HOSTS = "obsidian/ui/next/host/";
+const RUNTIME_FACADE = "obsidian/runtime/Runtime.ts";
 
 /** What the iOS app's entry may use besides the contract: the door, which reaches the same rules the services write with. */
 const PHONE_DOOR = "core/application/PhoneDoor.ts";
@@ -30,7 +39,11 @@ const PHONE_DOOR = "core/application/PhoneDoor.ts";
 const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	domain: (t) => under(t, "domain"),
 	application: (t) => under(t, "domain") || under(t, "application") || t === "core/settings.ts",
-	infrastructure: (t) => !under(t, "ui") && !under(t, "phone") && layerOf(t) !== "root",
+	infrastructure: (t) => !under(t, "ui") && !under(t, "phone") && !under(t, "runtime") && layerOf(t) !== "root",
+	/** The plugin's runtime: the core's application (the door, its cache and rules), the settings, and Obsidian; no screen, no infrastructure class. */
+	runtime: (t) => under(t, "runtime") || under(t, "application") || t === "core/settings.ts" || OBSIDIAN_PACKAGES.includes(t),
+	/** A host: the runtime's facade alone (its exported types with it), the new screens it mounts, and Obsidian. */
+	host: (t) => t === RUNTIME_FACADE || t.startsWith("obsidian/ui/next/") || OBSIDIAN_PACKAGES.includes(t),
 	ui: (t) => under(t, "ui") || t === "core/application/contracts.ts" || OBSIDIAN_PACKAGES.includes(t),
 	phone: (t) => under(t, "phone") || t === "core/application/contracts.ts" || t === PHONE_DOOR,
 	settings: (t) => under(t, "domain"),
@@ -118,6 +131,19 @@ describe("the guard itself", () => {
 		expect(MAY_IMPORT.infrastructure("core/phone/main.ts")).toBe(false);
 		expect(MAY_IMPORT.infrastructure("obsidian/compose.ts")).toBe(false);
 		expect(MAY_IMPORT.infrastructure("obsidian/ui/TaskCard.ts")).toBe(false);
+		expect(MAY_IMPORT.infrastructure("obsidian/runtime/Runtime.ts")).toBe(false);
+		expect(MAY_IMPORT.ui("obsidian/runtime/Runtime.ts")).toBe(false);
+		expect(MAY_IMPORT.runtime("obsidian/ui/TaskCard.ts")).toBe(false);
+		expect(MAY_IMPORT.runtime("obsidian/infrastructure/PluginSettings.ts")).toBe(false);
+		expect(MAY_IMPORT.runtime("core/domain/TaskDocument.ts")).toBe(false);
+		expect(MAY_IMPORT.runtime("core/application/PhoneCalls.ts")).toBe(true);
+		expect(layerOf("obsidian/ui/next/host/Leaf.tsx")).toBe("host");
+		expect(MAY_IMPORT.host("obsidian/runtime/Runtime.ts")).toBe(true);
+		expect(MAY_IMPORT.host("obsidian/runtime/replica/Replica.ts")).toBe(false);
+		expect(MAY_IMPORT.host("obsidian/runtime/dispatch/Store.ts")).toBe(false);
+		expect(MAY_IMPORT.host("core/application/PhoneCalls.ts")).toBe(false);
+		expect(MAY_IMPORT.host("obsidian/infrastructure/PluginSettings.ts")).toBe(false);
+		expect(MAY_IMPORT.ui("obsidian/runtime/dispatch/Store.ts")).toBe(false);
 		expect(target("obsidian/ui/x.ts", "./TaskCard")).toBe("obsidian/ui/TaskCard.ts");
 	});
 });

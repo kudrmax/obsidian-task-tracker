@@ -126,6 +126,18 @@ describe("LocalProjectsScreenStore", () => {
 		expect(typeof saved.get(PROJECTS_SCREEN_KEY)).toBe("string");
 	});
 
+	it("tells every screen sharing it of a change, once per new state", () => {
+		const store = new LocalProjectsScreenStore({ loadLocalStorage: () => null, saveLocalStorage: () => undefined });
+		const heard: string[] = [];
+		const off = store.onChange(() => heard.push(store.get().selected ?? "none"));
+		const state = { selected: "project:Дружба" as const };
+		store.set(state);
+		store.set(state);
+		off();
+		store.set({});
+		expect(heard).toEqual(["project:Дружба"]);
+	});
+
 	it("starts afresh from a spoiled entry", () => {
 		const store = new LocalProjectsScreenStore({ loadLocalStorage: () => "{", saveLocalStorage: () => undefined });
 		expect(store.get()).toEqual({});

@@ -71,6 +71,17 @@ function feed() {
 const written = (adapter: MemoryAdapter) => readCalendarFile(adapter.files.get(PATH)!, "google");
 
 describe("GoogleCalendarFeed", () => {
+	it("keeps the one record of its last good run: the runtime's lane reads it, a failed run leaves it", async () => {
+		const { google, clock, settings } = feed();
+		expect(google.lastRun()).toBeNull();
+		await google.refresh(true);
+		expect(google.lastRun()).toEqual({ atMs: clock.now().getTime(), key: JSON.stringify(["", "r"]) });
+		const before = google.lastRun();
+		await settings.update({ google: { ...settings.get().google, refreshToken: "" } });
+		await expect(google.refresh(true)).rejects.toThrow("not logged in");
+		expect(google.lastRun()).toBe(before);
+	});
+
 	it("writes the events of a month back to three months ahead into calendar/google.json", async () => {
 		const { google, adapter, api } = feed();
 		await google.refresh(true);
