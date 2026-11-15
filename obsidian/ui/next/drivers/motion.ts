@@ -1,4 +1,5 @@
-import { wholeWidth } from "../../../../core/application/contracts";
+import { grownStart, wholeWidth } from "../../../../core/application/contracts";
+import type { MenuPlace, PanelPlace } from "../model/taskMenu";
 /**
  * The motion driver (§Architecture): every inline style and CSS variable the model gives, every animation, and the
  * reading of the boxes it animates, in the commit phase only. A drawing moves as the model says why it changed (P5):
@@ -75,10 +76,15 @@ export class Motion {
 		for (const animation of this.running.splice(0)) animation.cancel();
 	}
 
+	/** The variables of the overlay host's keyed parts (a project's depth on a menu's page), as `after` writes the screen's. */
+	layerVars(host: HTMLElement, vars: ReadonlyMap<string, Readonly<Record<string, string>>>): void {
+		this.applyVars(vars, host);
+	}
+
 	/** Each keyed element's variables as the model gives them; a variable the model no longer gives is taken away. */
-	private applyVars(vars: ReadonlyMap<string, Readonly<Record<string, string>>>): void {
+	private applyVars(vars: ReadonlyMap<string, Readonly<Record<string, string>>>, root: HTMLElement = this.root): void {
 		const seen = new Set<HTMLElement>();
-		for (const el of this.root.querySelectorAll<HTMLElement>("[data-n-key]")) {
+		for (const el of root.querySelectorAll<HTMLElement>("[data-n-key]")) {
 			const key = keyOf(el);
 			const given = key === null ? undefined : vars.get(key);
 			const had = this.set.get(el);
@@ -89,7 +95,7 @@ export class Motion {
 			for (const [name, value] of Object.entries(given ?? {})) if (el.style.getPropertyValue(name) !== value) el.style.setProperty(name, value);
 			this.set.set(el, names);
 		}
-		for (const el of [...this.set.keys()]) if (!seen.has(el)) this.set.delete(el);
+		for (const el of [...this.set.keys()]) if (!el.isConnected || (root.contains(el) && !seen.has(el))) this.set.delete(el);
 	}
 
 	/** One variable or property on an element the host places (the block's room over Live Preview's end). */
@@ -130,7 +136,7 @@ export class Motion {
 				closing.set(layer, [...(closing.get(layer) ?? []), fade.finished.catch(() => undefined)]);
 				continue;
 			}
-			if (this.shown.has(part)) continue;
+			if (this.shown.has(part) || part.dataset.nOwn !== undefined) continue;
 			this.shown.add(part);
 			const above = this.place(part, screen, view);
 			if (part.dataset.nPart === "panel") {
@@ -255,8 +261,158 @@ export class Motion {
 		if (frame.style.getPropertyValue("height") === "") frame.style.setProperty("height", `${frame.getBoundingClientRect().height}px`);
 	}
 
+	/**
+	 * A task's menu or the bulk menu in the overlay host, after the render. Drawn for a panel not yet measured
+	 * (`data-n-measure` holds its seq), it is measured and `report`ed where its parts stand (P4): the copy of the card grown
+	 * to show its title (`wholeWidth`, `grownStart`), the panel under the copy or over it, split when it fits on neither
+	 * side, the labels too long for their boxes. Drawn for one measured (`place`), its parts are stood there, and grow in
+	 * the first time they show.
+	 */
+	menu(host: HTMLElement, screen: ParentNode, measured: MenuPlace | null, report: (place: MenuPlace) => void): void {
+		const view = host.ownerDocument.defaultView;
+		const panel = host.querySelector<HTMLElement>('[data-n-part="menu-panel"]');
+		if (!view || !panel || panel.dataset.nClosing !== undefined) return;
+		const seq = panel.dataset.nMeasure;
+		if (seq !== undefined) {
+			report(this.measureMenu(host, screen, panel, Number(seq), view, measured?.copy ?? null));
+			return;
+		}
+		const place = measured;
+		if (!place) return;
+		const lifted = host.querySelector<HTMLElement>('[data-n-part="lifted"]');
+		if (lifted && place.copy) this.box(lifted, place.copy.box);
+		for (const copy of host.querySelectorAll<HTMLElement>('[data-n-part="lifted-copy"]')) {
+			const box = place.copies.get(copy.dataset.nKey ?? "");
+			if (box) this.box(copy, box);
+		}
+		this.stand(panel, place.panel);
+		const upper = host.querySelector<HTMLElement>('[data-n-part="menu-upper"]');
+		if (upper && place.upper) this.stand(upper, place.upper);
+		const style = view.getComputedStyle(this.root);
+		const ms = tokenMs(this.root, "--tc-duration-menu");
+		const easing = style.getPropertyValue("--tc-ease-out").trim() || "ease-out";
+		const rise = parseFloat(style.getPropertyValue("--tc-menu-rise")) || 0;
+		const scale = style.getPropertyValue("--tc-menu-scale").trim() || "1";
+		for (const part of [panel, upper]) {
+			if (!part || this.shown.has(part)) continue;
+			this.shown.add(part);
+			const over = part === upper || place.panel.top === null;
+			part.style.transformOrigin = over ? ORIGIN_ABOVE : ORIGIN_BELOW;
+			part.animate([{ opacity: 0, transform: `translate3d(0, ${over ? rise : -rise}px, 0) scale(${scale})` }, { opacity: 1, transform: "none" }], { duration: ms, easing });
+		}
+	}
+
+	private box(el: HTMLElement, box: { readonly left: number; readonly top: number; readonly width: number; readonly height: number }): void {
+		el.style.left = `${box.left}px`;
+		el.style.top = `${box.top}px`;
+		el.style.width = `${box.width}px`;
+		el.style.height = `${box.height}px`;
+	}
+
+	private stand(el: HTMLElement, place: PanelPlace): void {
+		el.style.left = `${place.left}px`;
+		el.style.top = place.top === null ? "auto" : `${place.top}px`;
+		el.style.bottom = place.bottom === null ? "auto" : `${place.bottom}px`;
+		el.style.maxHeight = place.maxHeight === null ? "" : `${place.maxHeight}px`;
+	}
+
+	/** `copy`: where the copy of the card stands already (a page changed in place): it stays there, measured once a menu. */
+	private measureMenu(host: HTMLElement, screen: ParentNode, panel: HTMLElement, seq: number, view: Window, kept: MenuPlace["copy"]): MenuPlace {
+		/** Measured by its layout, whole: a room it was kept to before is no part of it. */
+		panel.style.maxHeight = "";
+		const margin = parseFloat(view.getComputedStyle(panel).getPropertyValue("--tc-whole-margin")) || 0;
+		const gap = parseFloat(view.getComputedStyle(panel).getPropertyValue("--tc-menu-gap")) || 0;
+		const probe = host.querySelector<HTMLElement>('[data-n-probe="safe"]');
+		const safe = probe ? view.getComputedStyle(probe) : null;
+		const room = { top: (parseFloat(safe?.paddingTop ?? "") || 0) + margin, bottom: view.innerHeight - (parseFloat(safe?.paddingBottom ?? "") || 0) - margin, right: view.innerWidth, height: view.innerHeight };
+		const anchorOf = (key: string): DOMRect | null => {
+			for (const el of screen.querySelectorAll<HTMLElement>("[data-n-key]")) if (el.dataset.nKey === key) return el.getBoundingClientRect();
+			return null;
+		};
+		const copies = new Map<string, { left: number; top: number; width: number; height: number }>();
+		for (const copy of host.querySelectorAll<HTMLElement>('[data-n-part="lifted-copy"]')) {
+			const key = copy.dataset.nKey ?? "";
+			const rect = anchorOf(key);
+			if (rect && rect.width > 0 && rect.bottom >= 0 && rect.top <= view.innerHeight) copies.set(key, { left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+		}
+		const lifted = host.querySelector<HTMLElement>('[data-n-part="lifted"]');
+		let copy: MenuPlace["copy"] = null;
+		let anchor: { left: number; top: number; bottom: number } | null = null;
+		const cardKey = panel.dataset.nAnchorKey;
+		const card = cardKey === undefined ? null : anchorOf(cardKey);
+		if (kept) {
+			copy = kept;
+			anchor = { left: kept.box.left, top: kept.box.top, bottom: kept.box.top + kept.box.height };
+		} else if (lifted && card) {
+			this.box(lifted, { left: card.left, top: card.top, width: card.width, height: card.height });
+			const title = lifted.querySelector<HTMLElement>('[data-n-part="title"]');
+			const range = host.ownerDocument.createRange();
+			if (title) range.selectNodeContents(title);
+			const fade = parseFloat(view.getComputedStyle(lifted).getPropertyValue("--tc-fade-card")) || 0;
+			const grown = title ? wholeWidth({ width: card.width, titleWidth: title.clientWidth, textWidth: range.getBoundingClientRect().width, fade }, { width: view.innerWidth, margin }) : null;
+			const width = grown?.width ?? card.width;
+			let height = card.height;
+			if (grown?.cut) {
+				const whole = host.querySelector<HTMLElement>('[data-n-probe="whole"]');
+				if (whole) {
+					whole.style.width = `${width}px`;
+					height = Math.max(card.height, Math.ceil(whole.getBoundingClientRect().height));
+				}
+			}
+			const box = { left: grownStart(card.left, card.width, width, view.innerWidth, margin), top: grownStart(card.top, card.height, height, view.innerHeight, margin), width, height };
+			copy = { box, stretched: grown !== null && !grown.cut, whole: grown?.cut === true };
+			anchor = { left: box.left, top: box.top, bottom: box.top + box.height };
+		} else {
+			const named = panel.dataset.nAnchor;
+			let rect: DOMRect | null = null;
+			for (const el of screen.querySelectorAll<HTMLElement>("[data-n-anchor]")) if (el.dataset.nAnchor === named) rect = el.getBoundingClientRect();
+			const beside = copies.size > 0 && named === undefined ? [...copies.values()].find(() => true) : undefined;
+			if (rect) anchor = { left: rect.right - panel.offsetWidth, top: rect.top, bottom: rect.bottom };
+			else if (beside) {
+				const column = panel.dataset.nBeside !== undefined ? anchorOf(panel.dataset.nBeside) : null;
+				anchor = { left: (column?.right ?? beside.left + beside.width) + gap, top: beside.top - gap, bottom: beside.top - gap };
+			}
+		}
+		anchor ??= { left: margin, top: room.top, bottom: room.top };
+		const long: string[] = [];
+		for (const label of host.querySelectorAll<HTMLElement>("[data-n-long]")) if (label.scrollWidth > label.clientWidth) long.push(label.dataset.nLong ?? "");
+		const groups = [...panel.children].filter((child): child is HTMLElement => child instanceof HTMLElement);
+		const total = panel.offsetHeight;
+		const cuts = groups.slice(1).map((group) => group.offsetTop);
+		const above = anchor.top - gap - room.top;
+		const below = room.bottom - anchor.bottom - gap;
+		const keep = panel.dataset.nKeep;
+		const split = panel.dataset.nSplit !== undefined && groups.length > 1;
+		const count = keep !== undefined ? Math.min(Number(keep), groups.length) : groupsAbove(cuts, total, above, below, split);
+		const left = Math.max(0, Math.min(anchor.left, room.right - gap - panel.offsetWidth));
+		const overY = room.height - anchor.top + gap;
+		const whole = count === groups.length && groups.length > 0;
+		const fit = (height: number, space: number) => (height > space ? Math.max(0, space) : null);
+		const cut = count > 0 && !whole ? (cuts.slice(count - 1).find(() => true) ?? 0) : 0;
+		const upper: PanelPlace | null = count > 0 && !whole ? { left, top: null, bottom: overY, maxHeight: fit(cut, above) } : null;
+		const lower: PanelPlace = whole ? { left, top: null, bottom: overY, maxHeight: fit(total, above) } : { left, top: anchor.bottom + gap, bottom: null, maxHeight: fit(total - cut, below) };
+		return { seq, copy, copies, above: count, panel: lower, upper, long };
+	}
+
 	dispose(): void {
 		this.cancel();
 		this.set.clear();
 	}
+}
+
+/**
+ * How many of a panel's groups stand over the anchor: none (the panel under it), all (over it), or the first few, the
+ * rest under it, when the whole fits on neither side. `cuts` are the heights of the panel down to each inner border
+ * between groups, `total` its whole height. The first way that fits wins, in that order and with the fewest groups over
+ * the anchor; when none fits, the one that leaves the least to scroll. A panel that can't split goes whole to one side.
+ */
+export function groupsAbove(cuts: readonly number[], total: number, above: number, below: number, canSplit: boolean): number {
+	const groups = cuts.length + 1;
+	const over = (height: number, space: number) => Math.max(0, height - space);
+	const ways = [
+		{ count: 0, overflow: over(total, below) },
+		{ count: groups, overflow: over(total, above) },
+		...(canSplit ? cuts.map((cut, i) => ({ count: i + 1, overflow: over(cut, above) + over(total - cut, below) })) : []),
+	];
+	return (ways.find((way) => way.overflow === 0) ?? ways.reduce((best, way) => (way.overflow < best.overflow ? way : best))).count;
 }

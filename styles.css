@@ -1858,3 +1858,106 @@ body:not(.is-mobile) .task-calendar button.tc-n-btn:focus-visible { outline: var
 .task-calendar button.tc-n-btn.tc-n-round.tc-n-select-menu { position: absolute; right: var(--tc-block-inset); bottom: calc(var(--tc-block-inset) + (var(--tc-wheel) - var(--tc-plus-size)) / 2); z-index: var(--tc-layer-plus); background: var(--tc-accent); color: var(--tc-on-accent); }
 .task-calendar button.tc-n-btn.tc-n-round.tc-n-select-menu.is-off { background: var(--tc-track-bg); color: var(--tc-ink-dim); }
 .task-calendar .tc-n-select-menu svg { stroke: none; fill: currentColor; }
+/* next: menu */
+/* A task's menu and the bulk menu: the copy of the card over the sheet, the panel, its pages. The old menu's look, rule for rule. */
+.task-calendar .tc-n-panel-view .tc-n-menu-title { border-bottom: var(--tc-rule); }
+.task-calendar .is-measuring { visibility: hidden; }
+.task-calendar .tc-n-safe-probe { position: fixed; visibility: hidden; pointer-events: none; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+.task-calendar .tc-n-level { position: fixed; inset: 0; z-index: var(--tc-layer-panel); pointer-events: none; filter: var(--tc-level-shadow); }
+.task-calendar .tc-n-level > .tc-n-panel { pointer-events: auto; box-shadow: var(--tc-level-ring); }
+.task-calendar .tc-n-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-body); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); overflow: hidden; pointer-events: none; }
+.task-calendar .tc-n-lifted.tc-n-lifted-probe { left: 0; top: 0; visibility: hidden; }
+.task-calendar .tc-n-lifted[data-priority] { background: var(--tc-priority-fill); }
+.task-calendar .tc-n-lifted[data-labels="2"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2)); }
+.task-calendar .tc-n-lifted[data-labels="3"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2), var(--tc-label-fill-2) var(--tc-label-stripe-2) var(--tc-label-stripe-3)); }
+.task-calendar .tc-n-lifted[data-labels="4"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2), var(--tc-label-fill-2) var(--tc-label-stripe-2) var(--tc-label-stripe-3), var(--tc-label-fill-3) var(--tc-label-stripe-3) var(--tc-label-stripe-4)); }
+.task-calendar.is-blend .tc-n-lifted[data-labels="2"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1)); }
+.task-calendar.is-blend .tc-n-lifted[data-labels="3"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1), var(--tc-label-fill-2)); }
+.task-calendar.is-blend .tc-n-lifted[data-labels="4"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1), var(--tc-label-fill-2), var(--tc-label-fill-3)); }
+.task-calendar .tc-n-lifted.tc-n-lifted-selected { background: var(--tc-select-bg); }
+.task-calendar .tc-n-lifted[data-status="inProgress"] > .tc-n-progress-dot { visibility: visible; }
+.task-calendar .tc-n-lifted .tc-n-link { pointer-events: auto; cursor: pointer; }
+.task-calendar .tc-n-lifted .tc-n-card-title { pointer-events: auto; cursor: text; -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+.task-calendar .tc-n-lifted.tc-n-lifted-stretched .tc-n-card-title, .task-calendar .tc-n-lifted.tc-n-lifted-whole .tc-n-card-title { -webkit-mask-image: none; mask-image: none; }
+.task-calendar .tc-n-lifted.tc-n-lifted-whole { max-width: calc(100% - 2 * var(--tc-whole-margin)); align-items: flex-start; padding-top: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); }
+.task-calendar .tc-n-lifted.tc-n-lifted-whole.tc-n-card-two { padding-top: calc((var(--tc-card-h) - var(--tc-leading-card-over) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card-over) - var(--tc-leading-card)) / 2); }
+.task-calendar .tc-n-lifted.tc-n-lifted-whole .tc-n-card-title { white-space: normal; overflow-wrap: anywhere; line-height: var(--tc-leading-card); }
+.task-calendar .tc-n-lifted.tc-n-lifted-whole .tc-n-meta.tc-n-meta-pair { margin-top: calc((var(--tc-card-h) - var(--tc-leading-count-pair) - var(--tc-meta-gap) - var(--tc-desc-mark-pair)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
+.task-calendar .tc-n-lifted.tc-n-lifted-whole .tc-n-due { margin-top: calc((var(--tc-card-h) - var(--tc-leading-due-day) - var(--tc-due-gap) - var(--tc-leading-due-mon)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
+.task-calendar .tc-n-lifted.tc-n-lifted-whole .tc-n-due.tc-n-due-repeat-only { margin-top: calc((var(--tc-card-h) - var(--tc-leading-due-day)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
+.task-calendar .tc-n-panel.tc-n-panel-menu { width: var(--tc-menu-w); overflow-y: auto; overscroll-behavior: contain; }
+.task-calendar .tc-n-panel.tc-n-panel-picker { padding: var(--tc-space-12) var(--tc-space-12) var(--tc-space-4); }
+.task-calendar .tc-n-panel.tc-n-panel-repeat { padding: var(--tc-space-8); display: flex; flex-direction: column; gap: var(--tc-space-8); }
+.task-calendar .tc-n-panel.tc-n-panel-repeat.tc-n-panel-has-remove { padding-bottom: 0; }
+.task-calendar .tc-n-menu-tiles { padding: var(--tc-space-8); display: flex; flex-direction: column; gap: var(--tc-space-6); }
+.task-calendar .tc-n-menu-tiles + .tc-n-menu-tiles, .task-calendar .tc-n-menu-tiles + .tc-n-menu-group, .task-calendar .tc-n-menu-group + .tc-n-menu-tiles { border-top: var(--tc-band); }
+.task-calendar .tc-n-menu-tile-row { display: flex; gap: var(--tc-space-6); }
+.task-calendar button.tc-n-btn.tc-n-menu-tile { position: relative; flex: 1; min-width: 0; padding: 0; height: var(--tc-menu-tile-h); border-radius: var(--tc-radius-menu-tile); background: var(--tc-menu-tile-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-6); }
+.task-calendar button.tc-n-btn.tc-n-menu-tile.is-on { background: var(--tc-priority-fill); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-priority-ink); }
+.task-calendar button.tc-n-btn.tc-n-menu-tile:disabled { opacity: var(--tc-tile-off-opacity); }
+.task-calendar .tc-n-menu-tile > svg { width: var(--tc-menu-tile-icon); height: var(--tc-menu-tile-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
+.task-calendar .tc-n-menu-tile[data-priority] > svg { color: var(--tc-priority-ink); fill: var(--tc-priority-ink); }
+.task-calendar .tc-n-tiles-move .tc-n-menu-tile > svg { color: var(--tc-accent-ui); }
+.task-calendar .tc-n-menu-tile-label { width: 100%; box-sizing: border-box; padding: 0 var(--tc-space-8); overflow: hidden; white-space: nowrap; text-align: center; font-size: var(--tc-font-menu-tile); font-weight: var(--tc-weight-menu-tile); }
+.task-calendar .tc-n-menu-tile-label.tc-n-menu-tile-label-wide { width: calc(100% + var(--tc-space-6)); padding: 0; }
+.task-calendar .tc-n-menu-tile-label.tc-n-menu-tile-label-long { text-align: left; -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); }
+.task-calendar .tc-n-menu-badge { position: absolute; top: var(--tc-menu-badge-inset); right: var(--tc-menu-badge-inset); width: var(--tc-menu-badge); height: var(--tc-menu-badge); border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); color: var(--tc-menu-badge-ink); display: flex; align-items: center; justify-content: center; }
+.task-calendar .tc-n-menu-badge svg { width: var(--tc-menu-badge-icon); height: var(--tc-menu-badge-icon); stroke-width: var(--tc-stroke-badge); }
+.task-calendar .tc-n-menu-row.tc-n-menu-danger { color: var(--tc-danger); }
+.task-calendar .tc-n-menu-row.tc-n-menu-quiet { color: var(--tc-muted); }
+.task-calendar .tc-n-menu-row.tc-n-menu-apart { border-top: var(--tc-band); }
+.task-calendar .tc-n-panel > .tc-n-menu-row.tc-n-menu-apart:first-child { border-top: 0; }
+.task-calendar button.tc-n-btn.tc-n-menu-row:disabled { opacity: var(--tc-tile-off-opacity); cursor: default; }
+.task-calendar .tc-n-menu-add svg { color: var(--tc-accent-ui); stroke-width: var(--tc-stroke-add); }
+.task-calendar button.tc-n-btn.tc-n-menu-row.tc-n-menu-option { padding-left: calc(var(--tc-space-16) + var(--tc-n-depth, 0) * var(--tc-tree-indent)); }
+.task-calendar .tc-n-menu-value { min-width: 0; overflow: hidden; white-space: nowrap; font-size: var(--tc-font-value); color: var(--tc-muted); }
+.task-calendar .tc-n-menu-value.tc-n-menu-value-long { -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.task-calendar .tc-n-menu-week { display: flex; gap: var(--tc-menu-week-gap); }
+.task-calendar .tc-n-menu-weekday { width: var(--tc-menu-weekday-w); text-align: center; font-size: var(--tc-font-caption); font-weight: var(--tc-weight-semibold); color: var(--tc-ink-dim); }
+.task-calendar .tc-n-menu-weekday.is-on { color: var(--tc-text); }
+.task-calendar button.tc-n-btn.tc-n-menu-back { width: 100%; height: var(--tc-row); box-sizing: border-box; padding: 0 var(--tc-space-16) 0 var(--tc-space-10); border-bottom: var(--tc-band); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
+.task-calendar .tc-n-menu-back svg { width: var(--tc-back-icon); height: var(--tc-back-icon); stroke-width: var(--tc-stroke-chevron); }
+.task-calendar .tc-n-menu-ask { padding: var(--tc-space-8); display: flex; flex-direction: column; gap: var(--tc-space-8); }
+.task-calendar .tc-n-panel > * + .tc-n-menu-ask, .task-calendar .tc-n-menu-ask + .tc-n-menu-tiles, .task-calendar .tc-n-menu-ask + .tc-n-menu-group { border-top: var(--tc-band); }
+.task-calendar .tc-n-menu-ask-question { padding: 0 var(--tc-space-8); display: flex; font-size: var(--tc-font-ask); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); white-space: nowrap; }
+.task-calendar .tc-n-menu-ask-question > span { flex-shrink: 0; }
+.task-calendar .tc-n-menu-ask-question > .tc-n-menu-ask-title { flex-shrink: 1; min-width: 0; overflow: hidden; }
+.task-calendar .tc-n-menu-ask-title.tc-n-menu-ask-title-long { -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); }
+.task-calendar .tc-n-menu-ask-buttons { display: flex; gap: var(--tc-space-6); }
+.task-calendar button.tc-n-btn.tc-n-pill { height: var(--tc-row); padding: 0; border-radius: var(--tc-radius-menu-tile); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-8); font-size: var(--tc-font-menu); background: var(--tc-menu-tile-bg); color: var(--tc-text); }
+.task-calendar button.tc-n-btn.tc-n-pill.tc-n-pill-strong { background: var(--tc-ink-strong); color: var(--tc-on-strong); font-weight: var(--tc-weight-semibold); }
+.task-calendar button.tc-n-btn.tc-n-pill.tc-n-pill-danger { background: var(--tc-danger); color: var(--tc-on-danger); font-weight: var(--tc-weight-semibold); }
+.task-calendar button.tc-n-btn.tc-n-menu-ask-btn { flex: 1; min-width: 0; }
+.task-calendar .tc-n-menu-ask-btn > svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
+.task-calendar button.tc-n-btn.tc-n-icon-btn { padding: 0; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; color: var(--tc-accent-ui); }
+.task-calendar .tc-n-picker-head { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--tc-space-4) var(--tc-space-8); }
+.task-calendar .tc-n-picker-title { font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
+.task-calendar .tc-n-picker-nav { display: flex; gap: var(--tc-space-4); }
+.task-calendar button.tc-n-btn.tc-n-picker-arrow { width: var(--tc-month-btn); height: var(--tc-month-btn); }
+.task-calendar .tc-n-picker-arrow svg { width: var(--tc-month-icon); height: var(--tc-month-icon); stroke-width: var(--tc-stroke-month); }
+.task-calendar .tc-n-picker-grid { display: grid; grid-template-columns: repeat(var(--tc-grid-columns), minmax(0, 1fr)); row-gap: var(--tc-grid-gap); }
+.task-calendar .tc-n-weekday { height: var(--tc-weekday-h); text-align: center; font-size: var(--tc-font-weekday); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); }
+.task-calendar button.tc-n-btn.tc-n-day { justify-self: center; padding: 0; display: flex; align-items: center; justify-content: center; width: var(--tc-day); height: var(--tc-day); border-radius: var(--tc-radius-day); font-size: var(--tc-font-day); font-weight: var(--tc-weight-normal); font-variant-numeric: tabular-nums; color: var(--tc-text); }
+.task-calendar button.tc-n-btn.tc-n-day.is-other { color: var(--tc-ink-dim); }
+.task-calendar button.tc-n-btn.tc-n-day.is-today { color: var(--tc-accent-ui); font-weight: var(--tc-weight-bold); }
+.task-calendar button.tc-n-btn.tc-n-day.is-selected { background: var(--tc-accent-ui); color: var(--tc-text); font-weight: var(--tc-weight-bold); }
+.task-calendar button.tc-n-btn.tc-n-menu-row.tc-n-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-rule); }
+.task-calendar .tc-n-repeat-seg { height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-menu-tile-bg); display: flex; }
+.task-calendar button.tc-n-btn.tc-n-repeat-seg-btn { flex: 1; min-width: 0; height: var(--tc-seg-btn-h); padding: 0; border-radius: var(--tc-radius-seg-btn); display: flex; align-items: center; justify-content: center; color: var(--tc-text); font-size: var(--tc-font-caption); font-weight: var(--tc-weight-semibold); white-space: nowrap; }
+.task-calendar button.tc-n-btn.tc-n-repeat-seg-btn.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
+.task-calendar .tc-n-repeat-every { height: var(--tc-seg); flex-shrink: 0; padding-left: var(--tc-space-8); display: flex; align-items: center; gap: var(--tc-space-4); font-size: var(--tc-font-menu); }
+.task-calendar .tc-n-repeat-every-label { flex: 1; }
+.task-calendar button.tc-n-btn.tc-n-repeat-step { width: var(--tc-repeat-step); height: var(--tc-repeat-step); }
+.task-calendar button.tc-n-btn.tc-n-repeat-step.is-off { color: var(--tc-ink-dim); }
+.task-calendar .tc-n-repeat-step svg { width: var(--tc-repeat-step-icon); height: var(--tc-repeat-step-icon); stroke-width: var(--tc-stroke-repeat-step); }
+.task-calendar .tc-n-repeat-count { min-width: var(--tc-repeat-count-w); text-align: center; font-weight: var(--tc-weight-semibold); font-variant-numeric: tabular-nums; }
+.task-calendar .tc-n-repeat-week { display: flex; justify-content: space-between; }
+.task-calendar button.tc-n-btn.tc-n-repeat-day { width: var(--tc-day); height: var(--tc-day); padding: 0; border-radius: var(--tc-radius-day); display: flex; align-items: center; justify-content: center; color: var(--tc-text); font-size: var(--tc-font-caption); font-weight: var(--tc-weight-repeat-day); }
+.task-calendar button.tc-n-btn.tc-n-repeat-day.is-on { background: var(--tc-accent-ui); color: var(--tc-on-accent); font-weight: var(--tc-weight-bold); }
+.task-calendar .tc-n-repeat-month { height: var(--tc-day); padding-left: var(--tc-space-8); display: flex; align-items: center; font-size: var(--tc-font-menu); }
+.task-calendar button.tc-n-btn.tc-n-menu-row.tc-n-repeat-remove { margin-top: calc(var(--tc-repeat-remove-gap) - var(--tc-space-8)); padding: 0 var(--tc-space-8); border-top: var(--tc-rule); }
+.task-calendar .tc-n-project-name { padding: var(--tc-space-12); }
+.task-calendar .tc-n-name-field { height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); box-shadow: var(--tc-ring-selected); padding: 0 var(--tc-card-pad-start); display: flex; align-items: center; }
+.task-calendar .tc-n-name-field > input.tc-n-name-input { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); color: var(--tc-text); caret-color: var(--tc-accent); -webkit-user-select: text; user-select: text; }
+.task-calendar .tc-n-name-field > input.tc-n-name-input::placeholder { color: var(--tc-muted); font-weight: var(--tc-weight-normal); }
+.task-calendar .tc-n-name-field > input.tc-n-name-input::selection { background: var(--tc-selection); }

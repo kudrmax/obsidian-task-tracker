@@ -43,7 +43,7 @@ export function updateSelect(model: BlockModel, msg: SelectMsg): Step {
 			return [{ ...model, select: next.length === 0 && !selecting ? null : { selecting, picked: next } }, []];
 		}
 		case "actions":
-			return (select?.picked.length ?? 0) > 0 ? updateMenu(model, { kind: "openedBulk" }) : [model, []];
+			return (select?.picked.length ?? 0) > 0 ? updateMenu(model, { kind: "openedBulk", at: { at: "over" } }) : [model, []];
 		case "pressedAway":
 			return select && !select.selecting && model.layers.length === 0 ? [{ ...model, select: null }, []] : [model, []];
 		default:

@@ -71,7 +71,7 @@ function withBranches(rows: ListRow[]): ListRow[] {
 }
 
 export interface FunnelListInput {
-	/** The column the list is. */
+	/** The list's column: where its cards' menus open from. */
 	readonly column: DropColumn;
 	readonly items: readonly TaskItem[];
 	/** The day its cards leave out of their corner; null for a list of no day. */
@@ -106,7 +106,7 @@ export function projectsList(view: ProjectsView): ListModel {
 		if (section.header && section.title !== null) rows.push({ kind: "head", key: `head:${section.key}`, name: section.title, ungrouped: false, group: section.group, opens: section.opens });
 		if (section.plate) rows.push({ kind: "plate", key: `plate:${section.key}`, words: view.emptyLabel, group: section.group, list: false });
 		let owner = "";
-		let from: MenuFrom = "inbox";
+		let from: MenuFrom = "done";
 		for (const row of section.rows) {
 			if (row.card) {
 				owner = row.id;

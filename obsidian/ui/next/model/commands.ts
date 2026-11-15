@@ -18,6 +18,8 @@ export type Command<Msg> =
 	/** A message after `ms` (a bound on a wait, a long press), cancelled by `cancelTimer` of the same name or the host's teardown. */
 	| { readonly kind: "timer"; readonly name: string; readonly ms: number; readonly msg: Msg }
 	| { readonly kind: "cancelTimer"; readonly name: string }
+	/** The tasks file in Obsidian's editor, in a new tab, the cursor at the start of line `line` (Open in Obsidian). */
+	| { readonly kind: "openTasksFile"; readonly line: number }
 	/** An Obsidian modal over the block (the notes to attach): its answer comes back as `pick`. */
 	| { readonly kind: "noteSearch"; readonly pick: (link: string) => Msg }
 	/** The lists as drawn now measured (rows' boxes, the stack's content pixels) for a carry: the geometry comes back as `measured` (P4). */

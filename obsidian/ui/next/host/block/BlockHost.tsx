@@ -17,6 +17,7 @@ import { type Gesture, IDLE, press, type PressInput, type PressState } from "../
 import type { Command } from "../../model/commands";
 import type { Act, BlockMsg } from "../../model/messages";
 import { updateBlock } from "../../update/block";
+import { menuVars, openMenu } from "../../model/menuNeeds";
 import { BlockRoot } from "../../view/BlockRoot";
 
 /** How long a finger holds a card still before it lifts, ms, while the settings are not read yet (the settings' default). */
@@ -37,6 +38,8 @@ export interface BlockDeps {
 	readonly notice: (text: string) => void;
 	/** A link of a title: a note in a new tab, an address in the browser. */
 	readonly openLink: (link: { readonly kind: "note" | "url"; readonly target: string }) => void;
+	/** The tasks file in Obsidian's editor, in a new tab, the cursor at the start of `line` (a menu's Open in Obsidian). */
+	readonly openTasksFile: (line: number) => void;
 }
 
 /** The block's program for the runtime's store (P2): the model's update, its needs, the runtime's events as messages. */
@@ -74,6 +77,8 @@ export class BlockHost {
 	/** The finger of the carry under way, last seen (client pixels): a scroll of the stack reads the target there again. */
 	private finger: { readonly x: number; readonly y: number } | null = null;
 	private edge: EdgeScroll | null = null;
+	/** A field a typing pick asked to focus that could not take it yet (still hidden for measuring). */
+	private focusing: string | null = null;
 	private frame: HTMLElement | null = null;
 	private disposed = false;
 
@@ -100,6 +105,12 @@ export class BlockHost {
 			() => this.dispatch(this.store.model.carry ? { kind: "carry", msg: { kind: "cancel" } } : { kind: "select", msg: { kind: "stop" } }),
 		);
 		this.store.flush();
+		this.input.fields(this.overlay.node, acted);
+		this.input.enter(
+			this.node.ownerDocument,
+			() => openMenu(this.store.model)?.asking != null,
+			() => this.dispatch({ kind: "menu", msg: { kind: "confirm" } }),
+		);
 		this.input.escape(
 			this.node.ownerDocument,
 			() => this.store.model.layers.some((layer) => !layer.closing),
@@ -124,8 +135,20 @@ export class BlockHost {
 		this.motion.after(moved ? model.motion.cause : "none", new Map([...rowVars(shownLists(model)), ...carryVars(model)]));
 		const frame = this.node.firstElementChild;
 		if (frame instanceof HTMLElement) Motion.holdHeight(frame, model.carry !== null);
+		this.motion.layerVars(this.overlay.node, menuVars(model));
+		const menu = openMenu(model);
+		this.motion.menu(this.overlay.node, this.node, menu?.place ?? null, (place) => this.dispatch({ kind: "menu", msg: { kind: "placed", place } }));
 		this.motion.layers(this.overlay.node, this.node, () => this.dispatch({ kind: "layerGone" }));
 		this.attach();
+		this.focusNow();
+	}
+
+	/**
+	 * The field a typing pick asked for takes the focus as soon as it can: a menu's page measured before it shows draws
+	 * once more in the same pass, still inside the user's event (P2).
+	 */
+	private focusNow(): void {
+		if (this.focusing !== null && Focus.field(this.node.ownerDocument, this.focusing)) this.focusing = null;
 	}
 
 	/** The block's frame, drawn once: its presses stop at it, a press focuses it, its keys stand over Obsidian's while it holds the focus. */
@@ -235,8 +258,8 @@ export class BlockHost {
 			case "haptic":
 				return;
 			case "focus":
-				Focus.field(this.node.ownerDocument, command.field);
-				return;
+				this.focusing = command.field;
+				return this.focusNow();
 			case "timer":
 				return this.input.timer(this.node, command.name, command.ms, () => dispatch(command.msg));
 			case "cancelTimer":
@@ -255,6 +278,8 @@ export class BlockHost {
 				this.motion.fly(this.overlay.node, to, () => dispatch(command.done));
 				return;
 			}
+			case "openTasksFile":
+				return this.deps.openTasksFile(command.line);
 		}
 	}
 

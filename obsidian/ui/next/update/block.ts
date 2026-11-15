@@ -8,7 +8,7 @@ import { actMessage } from "./acts";
 import { carryFollows, updateCarry } from "./carry";
 import { updateEntry } from "./entry";
 import { updateFull } from "./full";
-import { updateMenu } from "./menu";
+import { closeMenu, menuFollows, updateMenu } from "./menu";
 import { updateSearch } from "./search";
 import { updateSelect } from "./select";
 
@@ -66,7 +66,11 @@ function step(model: BlockModel, msg: BlockMsg): Step {
 			return meant ? step(model, meant) : [model, []];
 		}
 		case "views":
-			return carryFollows({ ...model, answers: msg.answers });
+			{
+				const [menued, menuCommands] = menuFollows(model, { ...model, answers: msg.answers });
+				const [carried, carryCommands] = carryFollows(menued);
+				return [carried, [...menuCommands, ...carryCommands]];
+			}
 		case "rebased":
 			return [remapIds(model, msg.idMap), []];
 		case "undoTapped":
@@ -85,7 +89,7 @@ function step(model: BlockModel, msg: BlockMsg): Step {
 		case "subprojectsPicked":
 			return pickWrite(model, "tasks.toggleSubprojects", []);
 		case "layerDismissed":
-			return [closeTop(model), []];
+			return topLayer(model.layers)?.kind === "taskMenu" ? closeMenu(model) : [closeTop(model), []];
 		case "layerGone": {
 			const layers = model.layers.filter((layer, i) => !(layer.closing && i === model.layers.findIndex((l) => l.closing)));
 			const still = layers.some((layer) => layer.closing) || model.carry !== null;

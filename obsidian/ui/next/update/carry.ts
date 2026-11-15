@@ -110,7 +110,7 @@ export function updateCarry(model: BlockModel, msg: CarryMsg): Step {
 			return tapped(model, msg);
 		case "context": {
 			const picked = model.select?.picked ?? [];
-			if (picked.includes(msg.key) && picked.length > 1) return updateMenu(model, { kind: "openedBulk" });
+			if (picked.includes(msg.key) && picked.length > 1) return updateMenu(model, { kind: "openedBulk", at: { at: "beside", key: msg.key } });
 			return cardRowOf(currentLists(model), msg.key) ? updateMenu(model, { kind: "opened", id: msg.key }) : [model, []];
 		}
 		case "lift": {

@@ -121,6 +121,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 				if (link.kind === "url") this.outside().open(link.target);
 				else void this.app.workspace.openLinkText(link.target, this.pluginSettings.get().tasksFile, "tab");
 			},
+			openTasksFile: (line) => void this.openTasksFileAt(line),
 		});
 		this.app.workspace.onLayoutReady(() => runtime.hostReady("layout"));
 		/** The notes' metadata read (`VaultProjects.ready`, which knows a plugin loaded into an indexed vault hears no `resolved`). */
@@ -138,6 +139,20 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			blocks.dispose();
 			void runtime.unload();
 		});
+	}
+
+	/** The tasks file opens in a new tab, as a link does, the cursor at the start of `line` and the line in the middle (a menu's Open in Obsidian). */
+	private async openTasksFileAt(line: number): Promise<void> {
+		const file = this.app.vault.getFileByPath(this.pluginSettings.get().tasksFile);
+		if (!file) return;
+		const leaf = this.app.workspace.getLeaf("tab");
+		await leaf.openFile(file, { active: true, state: { mode: "source" }, eState: { line } });
+		const view = leaf.view;
+		if (!(view instanceof MarkdownView)) return;
+		const at = { line, ch: 0 };
+		view.editor.setCursor(at);
+		view.editor.scrollIntoView({ from: at, to: at }, true);
+		view.editor.focus();
 	}
 
 	/**

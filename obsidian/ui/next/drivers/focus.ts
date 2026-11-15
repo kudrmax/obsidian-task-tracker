@@ -10,7 +10,7 @@ export class Focus {
 		for (const el of root.querySelectorAll<HTMLElement>("[data-n-field]")) {
 			if (el.dataset.nField !== name) continue;
 			el.focus({ preventScroll: true });
-			return true;
+			return el.ownerDocument.activeElement === el;
 		}
 		return false;
 	}

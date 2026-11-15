@@ -118,7 +118,7 @@ function referenceHost(forget: Kind | null = null): HostCase {
 }
 
 /** What a block's host is told besides its session: the words and the reach outside, which the test does not hear. */
-const BLOCK_WORDS = { failure: () => "", notice: () => undefined, openLink: () => undefined };
+const BLOCK_WORDS = { failure: () => "", notice: () => undefined, openLink: () => undefined, openTasksFile: () => undefined };
 
 /** The note `Дружба.md` attached to the project Дружба, so its view shows a block, and a task of the project for its lists. */
 function attachNote(session: HostSession, key: TaskKey): void {

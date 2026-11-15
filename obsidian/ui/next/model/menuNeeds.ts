@@ -1,0 +1,67 @@
+import type { MenuScreen, PickedTask, TaskItem, TaskMenuModel } from "../../../../core/application/contracts";
+import { resultOf, type Need } from "./answers";
+import { type BlockModel, currentLists, screenView, today } from "./block";
+import type { CardRow } from "./lists";
+import type { MenuInput, TaskMenuLayer } from "./taskMenu";
+
+/** The card rows the block draws now, by key. */
+export function cardRows(model: BlockModel): ReadonlyMap<string, CardRow> {
+	const lists = currentLists(model);
+	const rows = lists.kind === "rows" ? lists.rows.flatMap((row) => row.list.rows) : lists.kind === "byProject" ? lists.list.rows : [];
+	return new Map(rows.flatMap((row) => (row.kind === "card" ? [[row.key, row] as const] : [])));
+}
+
+/** The task menu standing open (its close not begun): the one the menu's messages act on. */
+export function openMenu(model: BlockModel): TaskMenuLayer | null {
+	const top = model.layers.slice(-1).find(() => true);
+	return top?.kind === "taskMenu" && !top.closing ? top : null;
+}
+
+/** The menu's cards as they stand now (one task's, or the picked ones), each with where its menu opens from; none gone. */
+export function menuCards(model: BlockModel, layer: TaskMenuLayer): readonly CardRow[] | null {
+	const rows = cardRows(model);
+	const ids = layer.bulk ? (model.select?.picked ?? []) : [layer.id];
+	const cards = ids.map((id) => rows.get(id) ?? null);
+	return cards.length === 0 || cards.some((card) => card === null) ? null : (cards as CardRow[]);
+}
+
+export function menuTasks(model: BlockModel, layer: TaskMenuLayer): readonly TaskItem[] | null {
+	return menuCards(model, layer)?.map((card) => card.item) ?? null;
+}
+
+/** The screen a menu opens over (`tasks.menu`'s `screen`): today, the day it shows, the sections and projects it offers. */
+export function menuScreen(model: BlockModel): MenuScreen | null {
+	const day = today(model);
+	const screen = screenView(model);
+	return day && screen ? { today: day, day, offer: screen.offer, projects: screen.projectTree } : null;
+}
+
+/** The core's model of the open menu (`tasks.menu`, `tasks.bulkMenu`), a view answer while the menu stands (P2). */
+export function menuNeeds(model: BlockModel): readonly Need[] {
+	const layer = model.layers.filter((l): l is TaskMenuLayer => l.kind === "taskMenu").slice(-1).find(() => true);
+	if (!layer) return [];
+	const cards = menuCards(model, layer);
+	const screen = menuScreen(model);
+	if (!cards || !screen) return [];
+	if (layer.bulk) return [{ key: "menu", method: "tasks.bulkMenu", args: [cards.map((card): PickedTask => ({ item: card.item, from: card.from })), screen] }];
+	const [card] = cards;
+	return [{ key: "menu", method: "tasks.menu", args: [card.item, card.from, screen] }];
+}
+
+/** What the open menu draws from: its tasks, the core's model of them, today. Null while any of it is missing. */
+export function menuInput(model: BlockModel, layer: TaskMenuLayer): MenuInput | null {
+	const tasks = menuTasks(model, layer);
+	const menu = resultOf<TaskMenuModel>(model.answers, "menu");
+	const day = today(model);
+	return tasks && menu && day ? { tasks, menu, today: day, full: layer.bulk === null } : null;
+}
+
+/** The variables the menu's parts carry to the stylesheet (`motion` writes them): a project's depth on the Project page. */
+export function menuVars(model: BlockModel): ReadonlyMap<string, Readonly<Record<string, string>>> {
+	const vars = new Map<string, Readonly<Record<string, string>>>();
+	const layer = openMenu(model);
+	const input = layer ? menuInput(model, layer) : null;
+	if (!layer || !input || layer.page !== "projects") return vars;
+	for (const option of input.menu.project.options) vars.set(`option/project:${option.project.name}`, { "--tc-n-depth": String(option.depth) });
+	return vars;
+}

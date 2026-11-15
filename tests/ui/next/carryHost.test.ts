@@ -7,7 +7,7 @@ import { projectHarness } from "./blockHarness";
 
 /** Obsidian's key scopes as a block uses them. */
 const app = { keymap: { pushScope: () => undefined, popScope: () => undefined }, scope: {} } as never;
-const words = { failure: () => "", notice: () => undefined, openLink: () => undefined };
+const words = { failure: () => "", notice: () => undefined, openLink: () => undefined, openTasksFile: () => undefined };
 
 const pointer = (type: string, x: number, y: number, pointerType = "mouse") => new window.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, pointerType, isPrimary: true, button: 0, clientX: x, clientY: y });
 
