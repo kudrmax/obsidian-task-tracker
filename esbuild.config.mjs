@@ -7,6 +7,8 @@ const { version } = JSON.parse(await readFile("manifest.json", "utf8"));
 
 const production = process.argv.includes("production");
 const demo = process.argv.includes("demo");
+/** The e2e build (`scripts/e2e`): its frozen clock and fixture network, beside main.js, never in its place. */
+const e2e = process.argv.includes("e2e");
 
 /** `import text from "./file?raw"`: the file's text, as Vite (and so the tests) reads it. */
 const raw = {
@@ -18,18 +20,18 @@ const raw = {
 };
 
 const context = await esbuild.context({
-  entryPoints: [demo ? "obsidian/demo.ts" : "obsidian/main.ts"],
+  entryPoints: [e2e ? "obsidian/e2e.ts" : demo ? "obsidian/demo.ts" : "obsidian/main.ts"],
   bundle: true,
   external: ["obsidian", "electron", "@codemirror/state", "@codemirror/view", ...builtinModules],
   format: "cjs",
   target: "es2020",
   sourcemap: production ? false : "inline",
   treeShaking: true,
-  outfile: "main.js",
+  outfile: e2e ? ".e2e/build/main.js" : "main.js",
   logLevel: "info",
   plugins: [raw],
   // The release checks it: a main.js left from an older build carries another version.
-  banner: { js: `// task-calendar ${version}` },
+  banner: { js: `// task-calendar ${version}${e2e ? " e2e" : ""}` },
 });
 
 if (production) {

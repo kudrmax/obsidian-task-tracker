@@ -10,6 +10,8 @@ interface Declaration {
 	readonly property: string;
 	readonly value: string;
 	readonly isToken: boolean;
+	/** The rules it is nested in, outermost first (an `@media`, an `@keyframes`). */
+	readonly within: readonly string[];
 }
 
 const LIGHT = "body.theme-light";
@@ -58,10 +60,13 @@ class Stylesheet {
 		for (const part of body.split(";")) {
 			const colon = part.indexOf(":");
 			if (colon < 0 || !part.trim()) continue;
-			this.declarations.push({ selector, property: part.slice(0, colon).trim(), value: part.slice(colon + 1).trim(), isToken });
+			this.declarations.push({ selector, property: part.slice(0, colon).trim(), value: part.slice(colon + 1).trim(), isToken, within: stack.slice(0, -1) });
 		}
 	}
 }
+
+/** A file of the plugin's own TypeScript: the old screen's `.ts` and the new screens' `.tsx`. */
+const isCode = (path: string): boolean => /\.tsx?$/.test(path);
 
 /** The plugin's own TypeScript. */
 class Code {
@@ -69,7 +74,7 @@ class Code {
 
 	constructor(root: string) {
 		this.files = readdirSync(root, { recursive: true, encoding: "utf8" })
-			.filter((path) => path.endsWith(".ts"))
+			.filter(isCode)
 			.map((path) => ({ path, text: readFileSync(join(root, path), "utf8") }));
 	}
 
@@ -538,5 +543,193 @@ describe("a plain card", () => {
 	it.each(GROUNDS)("leaves a plain card standing out from the ground as much as the board's, %s", (_, tokens, [boardCard, boardGround]) => {
 		const t = tokens();
 		expect(contrast(resolve(t, "var(--tc-card-bg)"), resolve(t, "var(--tc-bg)"))).toBeGreaterThanOrEqual(contrast(boardCard, boardGround) - 0.01);
+	});
+});
+
+/** Where the new screens' CSS starts (§Guards): the rules below it keep the new rules; the old part above it is frozen. */
+const NEXT_MARKER = "/* next */";
+const STYLES = readFileSync(join(__dirname, "..", "styles.css"), "utf8");
+
+/** The CSS below the marker. */
+const nextPart = (css: string): string => css.slice(css.indexOf(NEXT_MARKER) + NEXT_MARKER.length);
+
+/** Properties that size or place a box in its flow: a change of one moves the rows around it. */
+const LAYOUT = /^(width|height|min-width|min-height|max-width|max-height|inline-size|block-size|min-inline-size|min-block-size|max-inline-size|max-block-size|top|right|bottom|left|inset(-[\w-]+)?|margin(-[\w-]+)?|padding(-[\w-]+)?|border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-width)?|flex|flex-basis|flex-grow|flex-shrink|gap|row-gap|column-gap|grid(-[\w-]+)?|font-size|line-height|letter-spacing|display|position|all)$/;
+/** Of those, what sizes a box (its place aside). */
+const SIZE = (property: string): boolean => LAYOUT.test(property) && !/^(top|right|bottom|left|inset(-[\w-]+)?|position|all)$/.test(property);
+
+const keyframed = (d: Declaration) => d.within.some((w) => w.startsWith("@keyframes"));
+
+/** `var(--x)` replaced by the tokens' values, so a transition written as a token is read as what it says. */
+const resolved = (value: string, tokens: Map<string, string>, depth = 0): string =>
+	depth > 8 ? value : value.replace(/var\((--[\w-]+)(?:,[^)]*)?\)/g, (match, name: string) => (tokens.has(name) ? resolved(tokens.get(name)!, tokens, depth + 1) : match));
+
+/** The properties a transition's value names: `all` for a part that names none. */
+const transitioned = (d: Declaration, tokens: Map<string, string>): string[] => {
+	const value = resolved(d.value, tokens);
+	if (d.property === "transition-property") return value.split(",").map((p) => p.trim());
+	return value.split(/,(?![^(]*\))/).map((part) => {
+		const first = part.trim().split(/\s+/)[0] ?? "";
+		return /^(-?[\d.]+m?s|var\(|cubic-bezier|steps|ease|linear)/.test(first) || first === "" ? "all" : first;
+	});
+};
+
+/** Obsidian's own classes on `body`: the platform and the theme, set by Obsidian, not by a state of ours. */
+const OBSIDIAN_BODY = new Set(["is-mobile", "is-phone", "is-tablet", "is-ios", "is-android", "mod-macos", "mod-windows", "mod-linux", "is-frameless", "theme-dark", "theme-light"]);
+
+/** The compounds of a selector (combinators split it; `:is()`, `:has()`… stay whole). */
+const compoundsOf = (selector: string): string[] => selector.split(/\s*[\s>+~]\s*(?![^(]*\))/).filter((c) => c !== "");
+
+/** A body compound that says only Obsidian's platform or theme: everything else on `body` (a class of the plugin's, `:has()`) is a state. */
+const plainBody = (compound: string): boolean =>
+	/^body(\.[\w-]+)*$/.test(compound) && [...compound.matchAll(/\.([\w-]+)/g)].every(([, name]) => OBSIDIAN_BODY.has(name));
+
+/**
+ * A state, anywhere in the selector but a plain body compound: a class of the `is-` kind (the only kind the chrome
+ * driver writes, `tests/uiRules.ts`), any attribute selector, `:has()`, a pseudo-class of what the user is doing, or a
+ * body class Obsidian does not set.
+ */
+const hasState = (selector: string): boolean =>
+	compoundsOf(selector).some(
+		(c) =>
+			!plainBody(c) &&
+			(/^body\b/.test(c) || /\.is-[\w-]+|\[|:has\(|:(hover|active|focus|focus-visible|focus-within|checked|disabled|enabled|target|open|placeholder-shown|empty|invalid|valid|user-invalid)(?![\w-])/.test(c)),
+	);
+const PSEUDO_ELEMENT = /::?(before|after|marker|placeholder|first-line|first-letter|backdrop)\b/;
+const pseudoElement = (selector: string): boolean => PSEUDO_ELEMENT.test(selector);
+
+/** The classes a selector names outside plain body compounds. */
+const classesOf = (selector: string): string[] => compoundsOf(selector).filter((c) => !plainBody(c)).flatMap((c) => [...c.matchAll(/\.([\w-]+)/g)].map(([, name]) => name));
+
+/** The new screens' own classes: `tc-n-…` for a component, `is-…` for its state, and the screen's root `task-calendar`. */
+const NEXT_CLASS = /^(tc-n-[\w-]+|is-[\w-]+|task-calendar)$/;
+
+/** The custom properties a declaration's value reads. */
+const reads = (value: string): string[] => [...value.matchAll(/var\((--[\w-]+)/g)].map(([, name]) => name);
+
+/** The new rules of §Guards, each answering its offenders. */
+const NEXT_RULES = {
+	/** Every rule sits under `.task-calendar`, so nothing of ours meets Obsidian's or iPadOS's own. */
+	scoped: (s: Stylesheet): string[] =>
+		s.declarations
+			.filter((d) => !keyframed(d) && !d.selector.startsWith("@"))
+			.filter((d) => selectorsOf(d.selector).some((part) => !/\.task-calendar(?![\w-])/.test(part)))
+			.map(where),
+	/** Only the new screens' classes: the old screen's `tc-…` and Obsidian's own are never selected from here. */
+	namespaced: (s: Stylesheet): string[] =>
+		s.declarations
+			.filter((d) => !keyframed(d) && !d.selector.startsWith("@"))
+			.filter((d) => selectorsOf(d.selector).some((part) => classesOf(part).some((name) => !NEXT_CLASS.test(name))))
+			.map(where),
+	/** No transition or keyframe of a layout property: what moves is `motion`'s, over transforms. */
+	layoutMotion: (s: Stylesheet, tokens: Map<string, string>): string[] => [
+		...s.rules
+			.filter((d) => d.property === "transition" || d.property === "transition-property")
+			.filter((d) => transitioned(d, tokens).some((p) => LAYOUT.test(p)))
+			.map(where),
+		...s.declarations.filter((d) => keyframed(d) && LAYOUT.test(d.property)).map(where),
+	],
+	/**
+	 * No state or pseudo-element changes a box's size: not by a size property under a state, not by a custom property a
+	 * state sets and a size property reads, not by an in-flow pseudo-element (one that is not absolute or fixed) given
+	 * content or a size.
+	 */
+	sizeByState: (s: Stylesheet): string[] => {
+		const outOfFlow = new Set(s.rules.filter((d) => d.property === "position" && /^(absolute|fixed)$/.test(d.value)).map((d) => d.selector));
+		const rules = s.declarations.filter((d) => !keyframed(d) && !d.isToken);
+		const stateSet = new Set(rules.filter((d) => d.property.startsWith("--") && selectorsOf(d.selector).some(hasState)).map((d) => d.property));
+		const sizeReads = (d: Declaration) => SIZE(d.property) && reads(d.value).some((name) => stateSet.has(name));
+		return rules
+			.filter((d) => {
+				const parts = selectorsOf(d.selector);
+				if (SIZE(d.property) && parts.some(hasState)) return true;
+				if (sizeReads(d)) return true;
+				const inFlow = parts.some(pseudoElement) && !outOfFlow.has(d.selector);
+				return inFlow && (SIZE(d.property) || d.property === "content");
+			})
+			.map(where);
+	},
+};
+
+describe("the new screens' CSS, below /* next */", () => {
+	const tokens = sheet.tokens;
+	const next = new Stylesheet(nextPart(STYLES));
+
+	it("has the marker once, the old CSS above it", () => {
+		expect(STYLES.split(NEXT_MARKER).length - 1).toBe(1);
+	});
+
+	it("puts every rule under .task-calendar", () => {
+		expect(NEXT_RULES.scoped(next)).toEqual([]);
+	});
+
+	it("selects only the new screens' classes (tc-n-…, is-…)", () => {
+		expect(NEXT_RULES.namespaced(next)).toEqual([]);
+	});
+
+	it("transitions and animates no layout property", () => {
+		expect(NEXT_RULES.layoutMotion(next, tokens)).toEqual([]);
+	});
+
+	it("lets no state class or pseudo-element change a box's size", () => {
+		expect(NEXT_RULES.sizeByState(next)).toEqual([]);
+	});
+});
+
+describe("the next CSS guard itself", () => {
+	const tokens = new Map([["--tc-move", "height var(--tc-dur)"], ["--tc-dur", "200ms"], ["--tc-fade", "opacity 200ms"]]);
+	const of = (css: string) => new Stylesheet(css);
+
+	it("scans the new screens' .tsx with the old .ts", () => {
+		expect(isCode("ui/next/view/Card.tsx")).toBe(true);
+		expect(isCode("ui/TaskCard.ts")).toBe(true);
+		expect(isCode("ui/notes.md")).toBe(false);
+	});
+
+	it("reads only what is below the marker", () => {
+		expect(nextPart(".a { b: c; }\n/* next */\n.task-calendar .x { d: e; }")).toBe("\n.task-calendar .x { d: e; }");
+	});
+
+	it("trips on a rule outside .task-calendar", () => {
+		expect(NEXT_RULES.scoped(of(".tc-n-card { color: var(--tc-x); }"))).not.toEqual([]);
+		expect(NEXT_RULES.scoped(of(".task-calendar .tc-n-card, .tc-n-row { color: var(--tc-x); }"))).not.toEqual([]);
+		expect(NEXT_RULES.scoped(of("body.is-mobile .task-calendar .tc-n-card { color: var(--tc-x); } @media (hover: hover) { .task-calendar-x .y { a: b; } }"))).toHaveLength(1);
+		expect(NEXT_RULES.scoped(of("@keyframes tc-x { from { opacity: 0; } to { opacity: 1; } } .task-calendar .tc-n-x { animation: tc-x; }"))).toEqual([]);
+	});
+
+	it("trips on a class outside the new screens' namespace", () => {
+		expect(NEXT_RULES.namespaced(of(".task-calendar .tc-card { color: var(--tc-x); }"))).not.toEqual([]);
+		expect(NEXT_RULES.namespaced(of(".task-calendar .markdown-preview-view { color: var(--tc-x); }"))).not.toEqual([]);
+		expect(NEXT_RULES.namespaced(of("body.is-mobile .task-calendar .tc-n-card.is-open { color: var(--tc-x); }"))).toEqual([]);
+	});
+
+	it("trips on a layout property moving", () => {
+		expect(NEXT_RULES.layoutMotion(of(".task-calendar .x { transition: height 200ms; }"), tokens)).not.toEqual([]);
+		expect(NEXT_RULES.layoutMotion(of(".task-calendar .x { transition: 200ms; }"), tokens)).not.toEqual([]);
+		expect(NEXT_RULES.layoutMotion(of(".task-calendar .x { transition: var(--tc-move); }"), tokens)).not.toEqual([]);
+		expect(NEXT_RULES.layoutMotion(of(".task-calendar .x { transition-property: opacity, margin-top; }"), tokens)).not.toEqual([]);
+		expect(NEXT_RULES.layoutMotion(of("@keyframes tc-grow { from { height: 0; } to { height: 10px; } }"), tokens)).not.toEqual([]);
+		expect(NEXT_RULES.layoutMotion(of(".task-calendar .x { transition: var(--tc-fade), transform 200ms; }"), tokens)).toEqual([]);
+	});
+
+	it("trips on a state or a pseudo-element sizing a box", () => {
+		const trips = (css: string) => expect(NEXT_RULES.sizeByState(of(css)), css).not.toEqual([]);
+		const passes = (css: string) => expect(NEXT_RULES.sizeByState(of(css)), css).toEqual([]);
+		trips(".task-calendar .tc-n-card.is-open { height: var(--tc-x); }");
+		trips(".task-calendar .tc-n-card:hover { padding: var(--tc-x); }");
+		trips(".task-calendar.is-lifted .tc-n-x { display: none; }");
+		trips(".task-calendar .tc-n-card[data-open] { height: var(--tc-x); }");
+		trips(".task-calendar .tc-n-card[aria-expanded='true'] { height: var(--tc-x); }");
+		trips("body:has(.tc-n-sheet) .task-calendar .tc-n-list { padding-bottom: var(--tc-x); }");
+		trips("body.tc-n-carrying .task-calendar .tc-n-list { gap: var(--tc-x); }");
+		trips(".task-calendar .tc-n-list:has(> .tc-n-field) { height: var(--tc-x); }");
+		trips(".task-calendar .tc-n-card.is-open { --tc-n-h: var(--tc-x); } .task-calendar .tc-n-card { height: var(--tc-n-h); }");
+		trips(".task-calendar .tc-n-list::after { content: ''; height: var(--tc-x); }");
+		trips(".task-calendar .tc-n-list::after { content: ''; }");
+		passes(".task-calendar .tc-n-card.is-open { opacity: var(--tc-x); }");
+		passes("body.is-mobile .task-calendar .tc-n-card { height: var(--tc-x); }");
+		passes("body.is-mobile.theme-dark .task-calendar .tc-n-card { height: var(--tc-x); }");
+		passes(".task-calendar .tc-n-card::before { content: ''; position: absolute; width: var(--tc-x); }");
+		passes(".task-calendar .tc-n-card.is-open { --tc-n-tint: var(--tc-x); } .task-calendar .tc-n-card { color: var(--tc-n-tint); }");
 	});
 });

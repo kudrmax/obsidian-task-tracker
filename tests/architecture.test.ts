@@ -16,7 +16,7 @@ const BUNDLED_PACKAGES = ["preact", "preact/hooks", "preact/jsx-runtime"];
 const OBSIDIAN_PACKAGES = [...PROVIDED_PACKAGES, ...BUNDLED_PACKAGES];
 
 function layerOf(file: string): Layer | null {
-	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";
+	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/e2e.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";
 	if (file === "core/settings.ts") return "settings";
 	if (file.startsWith(HOSTS)) return "host";
 	const m = /^(?:core|obsidian)\/(domain|application|infrastructure|runtime|ui|phone)\//.exec(file);

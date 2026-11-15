@@ -1,5 +1,7 @@
 node_modules
 main.js
+# The e2e harness's build, fixture (a copy of Max's tasks file), baselines and runs: private, never committed
+.e2e/
 .DS_Store
 .worktrees
 docs/design/reference/.chrome-profile

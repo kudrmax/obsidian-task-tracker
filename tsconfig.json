@@ -27,6 +27,7 @@
     "obsidian/**/*.tsx",
     "tests/**/*.ts",
     "tests/**/*.tsx",
+    "scripts/e2e/**/*.ts",
     "vitest.config.mts",
     "vitest.budget.config.mts"
   ]

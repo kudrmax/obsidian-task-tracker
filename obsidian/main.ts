@@ -10,6 +10,8 @@ import { systemClock, type Clock, type SettingsStore } from "../core/application
 import { SettingsServiceImpl } from "../core/application/SettingsServiceImpl";
 import { ScreenSettingsImpl } from "../core/application/ScreenSettingsImpl";
 import { createServices, type Services, type ServicesHost } from "./compose";
+import type { Http } from "./infrastructure/Http";
+import { obsidianHttp } from "./infrastructure/ObsidianHttp";
 import { SETTINGS_FILE, type StoredSettings } from "./settingsFile";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { clearPriorityColors, showLabelPaint, showPriorityColors } from "./ui/priorityColors";
@@ -67,9 +69,9 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		this.addCommand({ id: "open", name: "Open Task Calendar", callback: () => void this.openView() });
 	}
 
-	/** The real services over the vault and the network; the demo build replaces them with fakes. */
-	protected createDeps(clock: Clock = systemClock): ViewDeps {
-		const services = createServices(this.app, this.servicesHost(), this, clock);
+	/** The real services over the vault and the network; the demo build replaces them with fakes, the e2e build gives its clock and network. */
+	protected createDeps(clock: Clock = systemClock, http: Http = obsidianHttp): ViewDeps {
+		const services = createServices(this.app, this.servicesHost(), this, clock, http);
 		this.services = services;
 		this.app.workspace.onLayoutReady(() => this.register(services.keepWorkExportInstalled()));
 		this.registerObsidianProtocolHandler(PROTOCOL_ACTION, (params) => {
@@ -85,7 +87,8 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars });
 		this.addSettingTab(settingsTab);
 		this.register(() => settingsTab.closePage());
-		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), runScript: runAppleScript });
+		const outside = this.outside();
+		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => outside.open(url), runScript: (script, args) => outside.runScript(script, args) });
 		return {
 			tasks: services.tasks,
 			days: services.days,
@@ -117,10 +120,15 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		return this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
 	}
 
+	/** Where the plugin reaches outside Obsidian: links to other apps (Shortcuts, the iPhone app, a calendar) and the Mac's scripts. The e2e build records them instead. */
+	protected outside(): { open(url: string): void; runScript(script: string, args: readonly string[]): void } {
+		return { open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), runScript: runAppleScript };
+	}
+
 	private servicesHost(): ServicesHost {
 		return {
 			pluginDir: this.pluginDir,
-			shortcuts: { isPhone: Platform.isIosApp, vaultName: this.app.vault.getName(), open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }) },
+			shortcuts: { isPhone: Platform.isIosApp, vaultName: this.app.vault.getName(), open: (url) => this.outside().open(url) },
 		};
 	}
 
