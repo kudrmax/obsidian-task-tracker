@@ -25,8 +25,7 @@ const stale = (message: string): DoorAnswer => ({ ok: false, error: { code: "sta
  */
 export function runResolved(door: Door, call: { readonly method: string; readonly args: readonly unknown[] }, context: DoorContext, idMap: ReadonlyMap<string, string> = new Map()): ResolvedRun {
 	const followed = followSections(call.args, idMap);
-	/** Without a file no task can be named, and the door's `freshArgs` needs one. */
-	const fresh: DoorAnswer = context.tasks === null ? { ok: true, result: followed } : door.call("tasks.freshArgs", [followed, Object.fromEntries(idMap)], context);
+	const fresh = door.call("tasks.freshArgs", [followed, Object.fromEntries(idMap)], context);
 	if (!fresh.ok) return { args: call.args, answer: fresh };
 	const args = fresh.result as readonly unknown[];
 	let named: readonly unknown[];

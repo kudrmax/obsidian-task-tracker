@@ -69,6 +69,14 @@ describe("persistence of the tasks text", () => {
 		expect(vault.written).toEqual([]);
 	});
 
+	it("answers what needs no tasks file while it is missing: the day, the calendars, the minute's tick", async () => {
+		const { runtime, timers } = await harness({ file: null });
+		expect(ok(runtime.read("days.today", []))).toBe("2026-11-15");
+		expect(ok(runtime.read("calendars.sources", []))).toEqual(expect.arrayContaining([expect.objectContaining({ source: "google" })]));
+		expect(runtime.read("calendars.events", ["2026-11-15"]).ok).toBe(true);
+		expect(() => timers.fire()).not.toThrow();
+	});
+
 	it("creates a missing file through the door's createFile", async () => {
 		const { runtime, vault, events } = await harness({ file: null });
 		expect(events).toContainEqual({ kind: "fileGone", path: PATH });
