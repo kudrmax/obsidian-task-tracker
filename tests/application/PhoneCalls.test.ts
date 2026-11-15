@@ -357,7 +357,7 @@ describe("the door's coverage", () => {
 
 	it("answers in no space no interface names", () => {
 		const spaces = new Set(Object.values(DOOR_COVERAGE).flatMap((c) => ("space" in c ? [c.space] : [])));
-		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline", "notes", "projects", "calendarsRefresh"];
+		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline", "notes", "projects", "calendarsRefresh", "ids"];
 		expect(new Set(doorMethods().map((m) => m.split(".")[0]))).toEqual(new Set([...spaces, ...own]));
 	});
 });
@@ -533,6 +533,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		{ method: "keyOf", args: () => [named(screen, "Child one").id] },
 		{ method: "sectionOf", args: () => [screen.sections.now.find((s) => s.name === "Errands")!.id] },
 		{ method: "reconcile", args: () => [{}, [{ method: "tasks.renameProject", args: ["Окружение", "Среда"] }]] },
+		{ method: "freshArgs", args: (s) => [[key(s, "Idea"), "text"], {}] },
 	];
 	const tasks = [...TASK_CASES, ...KEPT_CASES, ...byId].map((c) => ({ method: `tasks.${c.method}`, args: c.args(screen), context: context(c.text === undefined ? FILE : c.text) }));
 	const plain = (method: string, ...args: unknown[]) => ({ method, args, context: context(FILE, { calendars: CALENDARS }) });
@@ -593,6 +594,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("calendarsRefresh.feedDue", { atMs: NOW.getTime() - 1000, key: "[]" }),
 		plain("calendarsRefresh.problem", { message: "500" }),
 		plain("calendarsRefresh.silence"),
+		plain("ids.continueFrom", { next: 3, lines: [] }, { next: 9, lines: [] }),
 		plain("rules.constants"),
 		plain("rules.nextProgress", ["todo", "inProgress"]),
 		plain("rules.sameSlot", { date: T, start: 1, end: null }, { date: T, start: 1, end: null }),

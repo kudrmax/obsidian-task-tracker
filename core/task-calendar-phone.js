@@ -4299,6 +4299,11 @@ ${key.title}`.toLowerCase();
   function keyOf(entry) {
     return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw, id: entry.id };
   }
+  function isTaskKey(value) {
+    if (typeof value !== "object" || value === null) return false;
+    const v = value;
+    return typeof v.section === "string" && typeof v.index === "number" && Array.isArray(v.path) && typeof v.raw === "string";
+  }
   function samePlace2(a, b) {
     return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
   }
@@ -8178,6 +8183,21 @@ ${at.reading}`;
       this.pending = { text: after, ids };
       this.last = null;
     }
+    /**
+     * The ids given since the counter stood at `next`, in the order given: each heading or task line of the state now
+     * whose id was minted at or past it.
+     */
+    mintedSince(next) {
+      return this.current.lines.filter((line) => idNumber(line.id) >= next).sort((a, b) => idNumber(a.id) - idNumber(b.id)).map((line) => line.id);
+    }
+    /**
+     * `base`, who a base's tasks and sections are, going on from `from`'s counter when it is further: a new base read
+     * with it keeps its tasks' ids, and no id `from` gave is given again.
+     */
+    static continued(base, from) {
+      if (base === null || from === null || from.next <= base.next) return base ?? from;
+      return { ...base, next: from.next };
+    }
     /** Whether `raw` is a line the task `id` has, or had before this identity's own writes rewrote it into the line it has. */
     held(id, raw) {
       return this.current.lines.some((line) => line.id === id && line.raw === raw) || (this.current.held?.[id]?.includes(raw) ?? false);
@@ -8229,6 +8249,9 @@ ${at.reading}`;
   };
   function sameOutline(lines, outline) {
     return lines.length === outline.length && lines.every((line, i) => line.raw === outline[i].raw && line.task === outline[i].task);
+  }
+  function idNumber(id) {
+    return Number(id.slice(1));
   }
 
   // core/application/snapGrid.ts
@@ -8444,9 +8467,12 @@ ${at.reading}`;
     write(make) {
       const before = this.tasks();
       const was = this.rules.idsOf(before);
+      const counter = this.identity.state.next;
       const text = make(before);
       if (text === null) return false;
       this.setText(text, true, { before: was, after: this.rules.idsOf(text) });
+      const made = this.identity.mintedSince(counter);
+      if (made.length > 0) this.kept.created = [...this.kept.created ?? [], ...made];
       return true;
     }
     /** A write as one action: its operation over the text, the new text a step of the history. */
@@ -8728,6 +8754,30 @@ ${at.reading}`;
       const entry = c.snapshot().doc.byId(id);
       return entry ? keyOf(entry) : null;
     },
+    /**
+     * `args` as the call takes them now: each id an earlier replayed create gave anew (`idMap`, old id → new id) mapped,
+     * wherever an object carries it as `id`, and each task's key (`TaskKey`) the task's key as the file has it now, found
+     * by its id; staleTask when such a task is gone. Without `ids` in the context, keys stay as they are.
+     */
+    freshArgs: (c, [args, idMap]) => {
+      const ids = idMap ?? {};
+      const moved2 = (id) => Object.prototype.hasOwnProperty.call(ids, id) ? ids[id] : id;
+      const doc = c.knowsIds() ? c.snapshot().doc : null;
+      const fresh = (value) => {
+        if (Array.isArray(value)) return value.map(fresh);
+        if (typeof value !== "object" || value === null) return value;
+        if (isTaskKey(value) && typeof value.id === "string") {
+          const id = moved2(value.id);
+          if (doc === null) return { ...value, id };
+          const entry = doc.byId(id);
+          if (!entry) throw new StaleTaskError();
+          return keyOf(entry);
+        }
+        const parts = Object.fromEntries(Object.entries(value).map(([k, v]) => [k, k === "id" && typeof v === "string" ? moved2(v) : fresh(v)]));
+        return parts;
+      };
+      return fresh(args ?? []);
+    },
     /** The list and name of the section `id` names (`ListSection.id`) in the file as read now, null when no section has it or without `ids`. */
     sectionOf: (c, [id]) => {
       if (!c.knowsIds()) return null;
@@ -8860,6 +8910,10 @@ ${at.reading}`;
       return typeof message === "string" ? feedProblem(new Error(message)) : feedProblem(failure);
     },
     silence: () => ({ ms: FEED_SILENCE_MS, problem: feedSilence().problem })
+  };
+  var IDS = {
+    /** `base` going on from `current`'s counter: the ids a new base is read with, so no id is ever given twice. */
+    continueFrom: (_c, [base, current]) => TaskIdentity.continued(base ?? null, current ?? null)
   };
   var PHONE_CALENDAR_METHODS = ["files", "sources", "meetings"];
   var HOST_CALENDAR_METHODS = ["onChange", "keepFresh"];
@@ -9151,6 +9205,7 @@ ${at.reading}`;
     boundary: BOUNDARY,
     calendars: CALENDARS,
     calendarsRefresh: CALENDARS_REFRESH,
+    ids: IDS,
     history: HISTORY,
     settings: SETTINGS,
     screenSettings: SCREEN_SETTINGS,

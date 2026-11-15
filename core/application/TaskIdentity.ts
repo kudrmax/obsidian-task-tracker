@@ -119,6 +119,26 @@ export class TaskIdentity {
 		this.last = null;
 	}
 
+	/**
+	 * The ids given since the counter stood at `next`, in the order given: each heading or task line of the state now
+	 * whose id was minted at or past it.
+	 */
+	mintedSince(next: number): string[] {
+		return this.current.lines
+			.filter((line) => idNumber(line.id) >= next)
+			.sort((a, b) => idNumber(a.id) - idNumber(b.id))
+			.map((line) => line.id);
+	}
+
+	/**
+	 * `base`, who a base's tasks and sections are, going on from `from`'s counter when it is further: a new base read
+	 * with it keeps its tasks' ids, and no id `from` gave is given again.
+	 */
+	static continued(base: TaskIdState | null, from: TaskIdState | null): TaskIdState | null {
+		if (base === null || from === null || from.next <= base.next) return base ?? from;
+		return { ...base, next: from.next };
+	}
+
 	/** Whether `raw` is a line the task `id` has, or had before this identity's own writes rewrote it into the line it has. */
 	held(id: string, raw: string): boolean {
 		return this.current.lines.some((line) => line.id === id && line.raw === raw) || (this.current.held?.[id]?.includes(raw) ?? false);
@@ -175,4 +195,9 @@ export class TaskIdentity {
 
 function sameOutline(lines: readonly TaskIdLine[], outline: readonly OutlineLine[]): boolean {
 	return lines.length === outline.length && lines.every((line, i) => line.raw === outline[i].raw && line.task === outline[i].task);
+}
+
+/** The number an id was minted with (`t<n>`, n the counter then). */
+function idNumber(id: string): number {
+	return Number(id.slice(1));
 }
