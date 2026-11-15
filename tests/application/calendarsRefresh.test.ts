@@ -15,17 +15,23 @@ const ok = (answer: DoorAnswer) => (answer as Extract<DoorAnswer, { ok: true }>)
 
 describe("calendarsAsk", () => {
 	it("refresh: every feed afresh, the files read once they answered", () => {
-		expect(calendarsAsk("refresh", true)).toEqual({ feeds: "forced", waitFeeds: true });
-		expect(calendarsAsk("refresh", false)).toEqual({ feeds: "forced", waitFeeds: true });
+		expect(calendarsAsk("refresh", true)).toEqual({ feeds: "forced", waitFeeds: true, exportFirst: false });
+		expect(calendarsAsk("refresh", false)).toEqual({ feeds: "forced", waitFeeds: true, exportFirst: false });
+	});
+
+	it("Refresh now, by hand: asks the phone's work export first, then every feed afresh; the polling and a source that changed do not", () => {
+		expect(calendarsAsk("refresh", true, true)).toEqual({ feeds: "forced", waitFeeds: true, exportFirst: true });
+		expect(calendarsAsk("refresh", true, false)).toEqual({ feeds: "forced", waitFeeds: true, exportFirst: false });
+		expect(calendarsAsk("open", false, true)).toEqual({ feeds: "due", waitFeeds: false, exportFirst: false });
 	});
 
 	it("open: the files at once, a feed due runs behind", () => {
-		expect(calendarsAsk("open", true)).toEqual({ feeds: "due", waitFeeds: false });
+		expect(calendarsAsk("open", true)).toEqual({ feeds: "due", waitFeeds: false, exportFirst: false });
 	});
 
 	it("peek: nothing while there are events read before; as open when there are none", () => {
-		expect(calendarsAsk("peek", true)).toEqual({ feeds: "none", waitFeeds: false });
-		expect(calendarsAsk("peek", false)).toEqual({ feeds: "due", waitFeeds: false });
+		expect(calendarsAsk("peek", true)).toEqual({ feeds: "none", waitFeeds: false, exportFirst: false });
+		expect(calendarsAsk("peek", false)).toEqual({ feeds: "due", waitFeeds: false, exportFirst: false });
 	});
 });
 
@@ -56,7 +62,8 @@ describe("the door's calendarsRefresh", () => {
 	const context = { tasks: null, nowMs: 1_000_000 + 30_000, settings: JSON.stringify(google(60)) };
 
 	it("answers the ask, a feed's due over the settings and moment handed in, and its key", () => {
-		expect(ok(callDoor("calendarsRefresh.ask", ["peek", true], context))).toEqual({ feeds: "none", waitFeeds: false });
+		expect(ok(callDoor("calendarsRefresh.ask", ["peek", true], context))).toEqual({ feeds: "none", waitFeeds: false, exportFirst: false });
+		expect(ok(callDoor("calendarsRefresh.ask", ["refresh", true, true], context))).toEqual({ feeds: "forced", waitFeeds: true, exportFirst: true });
 		const key = ok(callDoor("calendarsRefresh.feedKey", [], context));
 		expect(key).toBe(feedKey(google(60)));
 		expect(ok(callDoor("calendarsRefresh.feedDue", [{ atMs: 1_000_000, key }], context))).toBe(false);
