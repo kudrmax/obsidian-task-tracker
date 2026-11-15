@@ -514,6 +514,19 @@ quick entry renames it.
 off the lines). So did grouping by project in the lists, a project's own view and the project parts of places, the
 Project tag and Result mark settings, and the notes «New project…» once wrote (`notes.newProject`, `notes.projectText`).
 
+#### A card's marks and a task read again by the view's filter
+
+- `TaskItem.marks` (`CardMarks`, every item of every read): `{ progressDot, description, count }`, what a card draws
+  beside its title, the task's own: `progressDot` the dot in its left padding (the task is in progress),
+  `description` the description's mark (it has one), `count` the subtask counter `"1/2"` (null without subtasks). A
+  frontend draws these and reads no status or `can` field for them. Example: `- [/] Going` with one of two subtasks
+  done → `{ progressDot: true, description: false, count: "1/2" }`.
+- `tasks.find(key, text, filter?)` and `tasks.fullTree(item, filter?)` take the view's filter
+  (`FunnelView.filter.node`) as the lists' reads do: under a project's filter the task and every card of its tree show
+  no folder mark (`ProjectRef.mark` false), as that view's lists show none; under none, All, No project or Done they
+  show it. Left out: `find` shows the mark, `fullTree` keeps the marks `item` came with, as before. Example: a note
+  block of `project:Работа` asks `fullTree(item, "project:Работа")`.
+
 #### Ids: who a task or a section is
 
 - `TaskItem.id` (every task and subtask, wherever it is shown: `tasks.screen`'s lists, the timeline, `tasks.search`'s
@@ -870,7 +883,10 @@ call's `createInPlace`, so the new task's id is known at once), `tasks.edit`, `t
 `tasks.unfoldAbove` → `entry.shown` (a new task) or `renamed` (a rename) → `entry.unshown` → `entry.done`; a step that
 failed skips to `entry.unshown`, and the next job still runs. The plugin's `QuickEntrySession` runs its jobs by the same
 function. Example: two tasks entered → `entry.call`, `tasks.createWithId`, `entry.shown`, `entry.unshown`,
-`entry.done`, twice.
+`entry.done`, twice. The door answers the same functions as `rules.entryJobStep(jobs, outcome)` and
+`rules.queuedEntryJobs(jobs, added)`, the empty jobs as `rules.constants().NO_ENTRY_JOBS`; `contracts.ts` exports
+them (`entryJobStep`, `queuedEntryJobs`, `NO_ENTRY_JOBS`, the types `EntryJobs`, `EntryJobStep`, `EntryJobOutcome`)
+for a frontend's pure update.
 
 ### `sectionName.end(ended, event, text)`
 

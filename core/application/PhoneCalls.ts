@@ -38,6 +38,7 @@ import {
 	type EventsReason,
 	type GroupedList,
 	type ProjectNote,
+	type ProjectsNodeId,
 	type ProjectsScreenState,
 	type ViewMode,
 	StaleTaskError,
@@ -78,6 +79,7 @@ import { NO_TASK_IDS, TaskIdentity, type TaskIdState } from "./TaskIdentity";
 import type { PatchIds } from "../domain/TextPatch";
 import { snapMinute } from "./snapGrid";
 import { ReadingCache } from "./ReadingCache";
+import { entryJobStep, NO_ENTRY_JOBS, queuedEntryJobs } from "./EntryJobs";
 import { markersOf } from "./documentText";
 import { deepFrozen } from "../domain/frozen";
 import { dayOpening } from "./DayServiceImpl";
@@ -568,11 +570,11 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	setRepeat: (c, [key, rule]) => c.run(c.writes.setRepeat(key as A, (rule ?? null) as A)),
 	stop: (c, [key]) => c.run(c.writes.stop(key as A)),
 	rename: (c, [key, text]) => c.run(c.writes.rename(KEPT(c), key as A, text as string)),
-	fullTree: (c, [item]) => c.reads.fullTree(item as A),
+	fullTree: (c, [item, filter]) => c.reads.fullTree(item as A, filter as ProjectsNodeId | null | undefined),
 	setDescription: (c, [key, markdown]) => c.run(c.writes.setDescription(key as A, markdown as string)),
 	remove: (c, [key]) => c.run(c.writes.remove(key as A)),
 	lineOf: (c, [key]) => c.ask(c.reads.lineOfRead(key as A)),
-	find: (c, [key, text]) => c.reads.find(KEPT(c), key as A, text as string),
+	find: (c, [key, text, filter]) => c.reads.find(KEPT(c), key as A, text as string, filter as ProjectsNodeId | null | undefined),
 	moveBefore: (c, [key, before, date]) => c.run(c.writes.moveBefore(key as A, (before ?? null) as A, date as string)),
 	nest: (c, [key, parent, before]) => c.run(c.writes.nest(key as A, parent as A, (before ?? null) as A)),
 	setSlot: (c, [key, slot]) => c.run(c.writes.setSlot(key as A, slot as A)),
@@ -1109,10 +1111,12 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	repeatValue,
 	onTheDay,
 	canPick,
+	entryJobStep: (jobs, outcome) => entryJobStep(jobs, outcome ?? null),
+	queuedEntryJobs,
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+const CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS, NO_ENTRY_JOBS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {

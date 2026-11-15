@@ -58,6 +58,7 @@ describe("toItem", () => {
 			drawnOn: null,
 			card: { text: "Slotted today", title: "Slotted today", over: null, step: null },
 			block: { text: "Slotted today", title: "Slotted today", step: null },
+			marks: { progressDot: true, description: false, count: null },
 			subtasks: [],
 			allSubtasks: [],
 			progress: null,
@@ -113,6 +114,14 @@ describe("toItem", () => {
 		const d = TaskDocument.parse("## Now\n- [ ] A 📁\n  - [ ] B\n- [ ] C 📁\n  - [x] D\n- [ ] E\n  - [ ] F\n", SECTIONS, { ...M, collapsed: "📁" });
 		expect(d.tasks("now").map((e) => toItem(e, T).collapsed)).toEqual([true, false, false]);
 		expect(toItem(d.tasks("now")[0], T).subtasks.map((s) => s.text)).toEqual(["B"]);
+	});
+
+	it("gives the card's marks ready: the dot of a task in progress, the description's mark, the subtask counter", () => {
+		const doc = parse("## Now\n- [/] Going\n  - [x] B\n  - [ ] C\n- [ ] Still\n");
+		expect(toItem(doc.tasks("now")[0], T).marks).toEqual({ progressDot: true, description: false, count: "1/2" });
+		expect(toItem(doc.tasks("now")[1], T).marks).toEqual({ progressDot: false, description: false, count: null });
+		expect(toItem(described.tasks("now")[0], T).marks.description).toBe(true);
+		expect(toItem(described.tasks("now")[1], T).marks.description).toBe(false);
 	});
 
 	it("carries the description of the task and of its subtasks", () => {

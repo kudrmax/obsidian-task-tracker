@@ -350,6 +350,9 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	REPEAT_WORDS: "./repeatWords",
 	dayMonth: "./dayLabels",
 	canPick: "./menus",
+	entryJobStep: "./EntryJobs",
+	queuedEntryJobs: "./EntryJobs",
+	NO_ENTRY_JOBS: "./EntryJobs",
 };
 
 /**
@@ -382,6 +385,7 @@ const DOOR_OF_RUNTIME: Readonly<Record<string, string>> = {
 	REPEAT_WORDS: "rules.constants",
 	DIVIDER_SNAP: "rules.constants",
 	MOST_CARD_COLORS: "rules.constants",
+	NO_ENTRY_JOBS: "rules.constants",
 	LINE_BREAK: "rules.oneLine",
 	DayBoundary: "boundary.dayOf",
 	QuickEntrySession: "entry.enter",

@@ -9,7 +9,8 @@ import { bigTasksFile } from "./bigTasksFile";
 /**
  * The door's cache across calls changes no answer: a host that hands every answer back, through writes, undo, a change
  * of the settings, the next day, an edit made elsewhere and ids that crossed JSON, gets from a door with the cache
- * exactly what a door without one answers, warm or cold, and whatever else the cache saw in between.
+ * exactly what a door without one answers, warm or cold, and whatever else the cache saw in between. Each test plays a
+ * whole day of calls on a 30 KB file, twice: under the full suite's load that takes longer than vitest's default wait.
  */
 
 const DAY = "2026-11-15";
@@ -112,7 +113,7 @@ const answersOf = (cache: ReadingCache | null, json = false, tasks = bigTasksFil
 	return host.answers;
 };
 
-describe("the door's cache across calls", () => {
+describe("the door's cache across calls", { timeout: 30_000 }, () => {
 	const without = answersOf(null);
 
 	it("answers every call of a day as the door without it does", () => {
