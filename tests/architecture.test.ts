@@ -11,12 +11,12 @@ type Layer = "domain" | "application" | "infrastructure" | "runtime" | "host" | 
 /** Obsidian's own packages: the app provides them at run time (`external` in esbuild.config.mjs). */
 const PROVIDED_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
 /** Preact, which the views are written in: bundled into main.js, a dependency of the plugin's own. */
-const BUNDLED_PACKAGES = ["preact", "preact/hooks", "preact/jsx-runtime"];
+const BUNDLED_PACKAGES = ["preact", "preact/hooks", "preact/jsx-runtime", "preact/compat"];
 /** The packages the plugin's code may import: Obsidian's and Preact. */
 const OBSIDIAN_PACKAGES = [...PROVIDED_PACKAGES, ...BUNDLED_PACKAGES];
 
 function layerOf(file: string): Layer | null {
-	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/e2e.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";
+	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/e2e.ts", "obsidian/compose.ts", "obsidian/composeRuntime.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";
 	if (file === "core/settings.ts") return "settings";
 	if (file.startsWith(HOSTS)) return "host";
 	const m = /^(?:core|obsidian)\/(domain|application|infrastructure|runtime|ui|phone)\//.exec(file);

@@ -29,6 +29,8 @@ export interface Services extends Core {
 	readonly work: WorkCalendarSetup;
 	/** What this device keeps of the Projects screen: one instance, which the runtime's replica follows too. */
 	readonly projectsScreenStore: LocalProjectsScreenStore;
+	/** The notes that had the project tag: one reader, which the runtime's replica follows too. */
+	readonly projects: VaultProjects;
 	/** Google's answer from the obsidian:// handler, turned into the refresh token. */
 	receiveLogin(params: Record<string, string>): Promise<void>;
 	/** Keeps the work calendar export in the plugin's folder for Scriptable. Returns the unsubscribe. */
@@ -80,6 +82,7 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		google: new GoogleAccountService(auth),
 		work,
 		projectsScreenStore,
+		projects,
 		receiveLogin: (params) => login.receive(params),
 		keepWorkExportInstalled: () => workExport.keepInstalled(),
 		syncForApp: () => syncRoundTrip.run(),

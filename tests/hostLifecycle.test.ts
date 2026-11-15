@@ -6,6 +6,8 @@ import type { TaskKey } from "../core/application/contracts";
 import type { HostSession, Program } from "../obsidian/runtime/Runtime";
 import { LeakCounter } from "./helpers/LeakCounter";
 import { harness, type Harness } from "./runtime/harness";
+import { BlockHost } from "../obsidian/ui/next/host/block/BlockHost";
+import { NoteBlocks, type NoteView } from "../obsidian/ui/next/host/block/NoteBlocks";
 
 /**
  * P8: every host, mounted and unmounted (mid-gesture too), leaves no listener, observer, scope, timer or subscription,
@@ -20,6 +22,8 @@ export interface HostContext {
 	readonly app: { readonly keymap: { pushScope(scope: unknown): void; popScope(scope: unknown): void }; readonly workspace: FakeEvents };
 	/** A task a gesture may lift. */
 	readonly key: TaskKey;
+	/** A session of its own for each part a host makes (a note's blocks, each its own). */
+	readonly openSession: () => HostSession;
 }
 
 export interface MountedHost {
@@ -113,8 +117,72 @@ function referenceHost(forget: Kind | null = null): HostCase {
 	};
 }
 
+/** What a block's host is told besides its session: the words and the reach outside, which the test does not hear. */
+const BLOCK_WORDS = { failure: () => "", notice: () => undefined, openLink: () => undefined };
+
+/** The note `Дружба.md` attached to the project Дружба, so its view shows a block. */
+function attachNote(session: HostSession): void {
+	const answer = session.call("tasks.setProjectNote", ["Дружба", "Дружба"]).answer;
+	if (!answer.ok) throw new Error(answer.error.message);
+}
+
+/** A note's block on its own: mounted, drawn, its gesture lifting a card (a carry), unmounted. */
+const blockHost: HostCase = {
+	name: "a note's block",
+	file: "block/BlockHost.tsx",
+	mount({ session, parent, app, key }) {
+		attachNote(session);
+		const host = new BlockHost({ session, app: app as never, ...BLOCK_WORDS }, "Дружба.md", parent.ownerDocument);
+		parent.appendChild(host.node);
+		host.mount();
+		return {
+			startGesture() {
+				const answer = session.call("tasks.startCarry", [{ keys: [key] }, true]).answer;
+				if (!answer.ok) throw new Error(answer.error.message);
+			},
+			unmount: () => host.dispose(),
+		};
+	},
+};
+
+/** The blocks of every open note: one note's view open, its block placed after the editor's content, then all closed. */
+const noteBlocks: HostCase = {
+	name: "the notes' blocks",
+	file: "block/NoteBlocks.ts",
+	mount({ session, parent, app, openSession }) {
+		attachNote(session);
+		const doc = parent.ownerDocument;
+		const container = parent.appendChild(doc.createElement("div"));
+		const sizer = container.appendChild(doc.createElement("div"));
+		const content = sizer.appendChild(doc.createElement("div"));
+		const contentDOM = content.appendChild(doc.createElement("div"));
+		const view: NoteView = { file: { path: "Дружба.md" }, getMode: () => "source", containerEl: container, editor: { cm: { contentDOM } } };
+		const blocks = new NoteBlocks(
+			{
+				views: () => [view],
+				on: (name, callback) => app.workspace.on(name, callback) as never,
+				onRename: (callback) => app.workspace.on("rename", callback as () => void) as never,
+				offref: (ref) => app.workspace.offref(ref),
+			},
+			{ openSession, app: app as never, ...BLOCK_WORDS },
+		);
+		blocks.start();
+		if (!sizer.contains(doc.querySelector("[data-n-key], .tc-n-block"))) throw new Error("the note's block was not placed after the editor's content");
+		return {
+			startGesture() {
+				const answer = session.call("tasks.startCarry", [{ keys: [] }, true]).answer;
+				if (!answer.ok) throw new Error(answer.error.message);
+			},
+			unmount: () => {
+				blocks.dispose();
+				container.remove();
+			},
+		};
+	},
+};
+
 /** Every host of the new screens. A host file under `obsidian/ui/next/host/` must be here. */
-const HOSTS: readonly HostCase[] = [referenceHost()];
+const HOSTS: readonly HostCase[] = [referenceHost(), blockHost, noteBlocks];
 
 /** Microtasks queued before now have run: one queued at teardown is gone by then, one that keeps queueing itself is not. */
 const microtasksRun = async () => {
@@ -137,7 +205,7 @@ describe("every host leaves nothing alive", () => {
 		const screen = h.runtime.read("tasks.screen", ["2026-11-15"]);
 		if (!screen.ok) throw new Error(screen.error.message);
 		const key = (screen.result as { inbox: { key: TaskKey }[] }).inbox[0].key;
-		context = { session: h.runtime.openHost(), parent: document.body, app: { keymap: leaks.keymap, workspace }, key };
+		context = { session: h.runtime.openHost(), parent: document.body, app: { keymap: leaks.keymap, workspace }, key, openSession: () => h.runtime.openHost() };
 	});
 
 	afterEach(async () => {

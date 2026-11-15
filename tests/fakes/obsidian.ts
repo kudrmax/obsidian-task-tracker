@@ -314,3 +314,21 @@ export class TFile {
 		readonly extension = "md",
 	) {}
 }
+
+/** Obsidian's key scope as hosts use it: handlers registered, and unregistered. */
+export class Scope {
+	readonly keys: { modifiers: string[]; key: string; run: () => boolean | void }[] = [];
+	constructor(readonly parent?: unknown) {}
+	register(modifiers: string[], key: string, run: () => boolean | void): object {
+		const handler = { modifiers, key, run };
+		this.keys.push(handler);
+		return handler;
+	}
+	unregister(handler: object): void {
+		const at = this.keys.indexOf(handler as (typeof this.keys)[number]);
+		if (at >= 0) this.keys.splice(at, 1);
+	}
+}
+
+/** Obsidian's platform: the tests run as the desktop. */
+export const Platform = { isMobile: false, isIosApp: false, isDesktopApp: true, isMacOS: true };

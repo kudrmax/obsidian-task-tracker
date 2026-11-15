@@ -1719,3 +1719,106 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .task-calendar.is-note .tc-rows-stack { overflow-y: auto; scrollbar-width: none; padding-bottom: calc(var(--tc-plus-size) + var(--tc-block-inset) + var(--tc-space-20)); }
 
 /* next */
+/* The note's block (slice 3, behind newBlock): the old block's look, rule for rule, in the new screens' names. */
+.task-calendar.tc-n-block { position: relative; height: auto; max-height: var(--tc-block-max-h); margin-top: calc(var(--tc-block-top) - var(--tc-block-lift)); margin-bottom: calc(var(--tc-chrome-room) + var(--tc-block-top)); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); overflow: clip; outline: none; display: flex; flex-direction: column; }
+.task-calendar .tc-n-stack { flex: 0 1 auto; min-height: 0; margin-top: var(--tc-block-inset); padding: 0 var(--tc-block-inset) calc(var(--tc-plus-size) + var(--tc-block-inset) + var(--tc-space-20)); box-sizing: border-box; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.task-calendar .tc-n-stack::-webkit-scrollbar { display: none; }
+.task-calendar .tc-n-row { flex: none; min-height: 0; display: flex; flex-direction: column; }
+.task-calendar .tc-n-row + .tc-n-row { margin-top: var(--tc-section-gap); }
+.task-calendar .tc-n-row-label { flex-shrink: 0; height: var(--tc-group-head-h); box-sizing: border-box; padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); display: flex; align-items: flex-end; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); white-space: nowrap; overflow: hidden; }
+.task-calendar .tc-n-list { position: relative; flex: 0 1 auto; min-height: 0; box-sizing: border-box; padding-top: var(--tc-card-gap); overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; touch-action: pan-y; scrollbar-width: none; display: flex; flex-direction: column; gap: var(--tc-card-gap); }
+.task-calendar .tc-n-list::-webkit-scrollbar { display: none; }
+.task-calendar .tc-n-list > * { flex-shrink: 0; }
+.task-calendar .tc-n-fade { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--tc-switch-row) + var(--tc-block-inset) + var(--tc-space-8)); background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-half-ink), transparent) var(--tc-foot-fade-half), color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-deep-ink), transparent) var(--tc-foot-fade-deep), var(--tc-bg) var(--tc-foot-fade-solid)); z-index: var(--tc-layer-fade); pointer-events: none; }
+
+/* A card. */
+.task-calendar .tc-n-card { position: relative; overflow: hidden; flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; cursor: pointer; }
+.task-calendar .tc-n-card.tc-n-card-two { height: var(--tc-card-two-h); }
+.task-calendar .tc-n-list > .tc-n-card { margin-left: calc(var(--tc-n-level, 0) * var(--tc-subtask-indent)); overflow: visible; clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 0 calc(-1 * var(--tc-n-level, 0) * var(--tc-subtask-indent))); }
+.task-calendar .tc-n-list > .tc-n-card.tc-n-card-folded { margin-bottom: var(--tc-stack-step-y); box-shadow: var(--tc-shadow-fold); clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 calc(-1 * var(--tc-stack-step-y)) calc(-1 * var(--tc-n-level, 0) * var(--tc-subtask-indent))); }
+.task-calendar .tc-n-card[data-priority] { background: var(--tc-priority-fill); }
+.task-calendar .tc-n-card[data-labels="2"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2)); }
+.task-calendar .tc-n-card[data-labels="3"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2), var(--tc-label-fill-2) var(--tc-label-stripe-2) var(--tc-label-stripe-3)); }
+.task-calendar .tc-n-card[data-labels="4"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2), var(--tc-label-fill-2) var(--tc-label-stripe-2) var(--tc-label-stripe-3), var(--tc-label-fill-3) var(--tc-label-stripe-3) var(--tc-label-stripe-4)); }
+.task-calendar.is-blend .tc-n-card[data-labels="2"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1)); }
+.task-calendar.is-blend .tc-n-card[data-labels="3"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1), var(--tc-label-fill-2)); }
+.task-calendar.is-blend .tc-n-card[data-labels="4"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1), var(--tc-label-fill-2), var(--tc-label-fill-3)); }
+.task-calendar .tc-n-card.is-away { visibility: hidden; }
+.task-calendar .tc-n-pick { display: flex; width: 0; height: var(--tc-pick-size); flex-shrink: 0; box-sizing: border-box; margin-right: 0; border: 0 solid var(--tc-muted); border-radius: var(--tc-radius-circle); color: var(--tc-on-accent); align-items: center; justify-content: center; opacity: 0; overflow: hidden; }
+.task-calendar .tc-n-pick svg { width: var(--tc-pick-check); height: var(--tc-pick-check); stroke: currentColor; stroke-width: var(--tc-stroke-pick); visibility: hidden; }
+.task-calendar .tc-n-card-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.task-calendar .tc-n-card-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.task-calendar .tc-n-card-lines > .tc-n-card-title { flex: none; line-height: var(--tc-leading-card); }
+.task-calendar .tc-n-card-over { position: relative; display: flex; align-items: center; gap: var(--tc-card-over-gap); min-width: 0; height: var(--tc-leading-card-over); font-size: var(--tc-font-card-over); line-height: var(--tc-leading-card-over); color: var(--tc-muted); white-space: nowrap; }
+.task-calendar .tc-n-card-over-text { flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.task-calendar [data-priority] .tc-n-card-over { color: var(--tc-priority-meta); }
+.task-calendar .tc-n-link { color: var(--tc-accent); }
+.task-calendar .tc-n-progress-dot { position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; visibility: hidden; }
+.task-calendar .tc-n-card[data-status="inProgress"] > .tc-n-progress-dot { visibility: visible; }
+.task-calendar [data-priority] .tc-n-progress-dot { background: var(--tc-priority-meta); }
+.task-calendar .tc-n-project-mark { position: relative; width: var(--tc-project-mark-w); height: var(--tc-leading-card); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--tc-muted); }
+.task-calendar .tc-n-project-mark::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc((var(--tc-project-mark-w) - var(--tc-project-mark-hit)) / 2); right: calc((var(--tc-project-mark-w) - var(--tc-project-mark-hit)) / 2); }
+.task-calendar .tc-n-project-mark svg { width: var(--tc-icon-s); height: var(--tc-icon-s); stroke-width: var(--tc-stroke-project-mark); }
+.task-calendar [data-priority] .tc-n-project-mark { color: var(--tc-priority-meta); }
+.task-calendar .tc-n-meta { flex-shrink: 0; min-width: var(--tc-meta-min); display: flex; flex-direction: column; align-items: center; gap: var(--tc-meta-gap); color: var(--tc-muted); }
+.task-calendar .tc-n-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
+.task-calendar .tc-n-meta-pair .tc-n-count { line-height: var(--tc-leading-count-pair); }
+.task-calendar .tc-n-count-fold { position: relative; }
+.task-calendar .tc-n-count-fold::after { content: ""; position: absolute; left: calc(-1 * var(--tc-fold-hit-x)); right: calc(-1 * var(--tc-fold-hit-x)); top: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); bottom: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); }
+@media (hover: hover) { body:not(.is-mobile) .task-calendar .tc-n-count-fold:hover { color: var(--tc-text); } }
+.task-calendar .tc-n-desc-mark { display: block; width: var(--tc-desc-mark); height: var(--tc-desc-mark); stroke-width: var(--tc-stroke-desc-mark); }
+.task-calendar .tc-n-meta-pair .tc-n-desc-mark { width: var(--tc-desc-mark-pair); height: var(--tc-desc-mark-pair); }
+.task-calendar .tc-n-due { width: var(--tc-due-w); flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: var(--tc-due-gap); }
+.task-calendar .tc-n-due-day { font-size: var(--tc-font-due-day); line-height: var(--tc-leading-due-day); font-weight: var(--tc-weight-bold); color: var(--tc-ink-strong); font-variant-numeric: tabular-nums; }
+.task-calendar .tc-n-due-top { display: flex; align-items: center; justify-content: center; gap: var(--tc-due-repeat-gap); height: var(--tc-leading-due-day); }
+.task-calendar .tc-n-due-repeat { display: block; flex-shrink: 0; width: var(--tc-due-repeat-size); height: var(--tc-due-repeat-size); stroke-width: var(--tc-stroke-due-repeat); color: var(--tc-muted); }
+.task-calendar [data-priority] .tc-n-due-repeat { color: var(--tc-priority-meta); }
+.task-calendar .tc-n-due-mon { font-size: var(--tc-font-due-mon); line-height: var(--tc-leading-due-mon); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); letter-spacing: var(--tc-tracking-mon); }
+.task-calendar .tc-n-stage-mark { width: var(--tc-stage-mark-w); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--tc-muted); }
+.task-calendar .tc-n-stage-mark svg { width: var(--tc-icon-s); height: var(--tc-icon-s); stroke-width: var(--tc-stroke-stage-mark); }
+.task-calendar .tc-n-branch, .task-calendar .tc-n-branch-pass { position: absolute; top: calc(-1 * var(--tc-branch-rise)); height: calc(100% + var(--tc-branch-rise)); box-sizing: border-box; border-left: var(--tc-branch-w) solid var(--tc-branch); pointer-events: none; }
+.task-calendar .tc-n-branch { left: calc(-1 * (var(--tc-subtask-indent) + var(--tc-branch-w)) / 2); width: calc((var(--tc-subtask-indent) + var(--tc-branch-w)) / 2); }
+.task-calendar .tc-n-branch.tc-n-branch-mid::after { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--tc-branch-rise) + (var(--tc-card-h) - var(--tc-branch-w)) / 2); border-top: var(--tc-branch-w) solid var(--tc-branch); }
+.task-calendar .tc-n-branch.tc-n-branch-last { height: calc(var(--tc-branch-rise) + 50% + var(--tc-branch-w) / 2); border-bottom: var(--tc-branch-w) solid var(--tc-branch); border-bottom-left-radius: var(--tc-radius-branch); }
+.task-calendar .tc-n-branch-pass { left: calc(-1 * (var(--tc-n-pass, 0) * var(--tc-subtask-indent) + (var(--tc-subtask-indent) + var(--tc-branch-w)) / 2)); width: var(--tc-branch-w); }
+
+/* Sections and plates. */
+.task-calendar .tc-n-group-head { flex-shrink: 0; height: var(--tc-group-head-h); box-sizing: border-box; margin-top: var(--tc-section-gap); margin-bottom: calc(-1 * var(--tc-card-gap)); padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); display: flex; align-items: flex-end; white-space: nowrap; overflow: hidden; touch-action: pan-y; cursor: pointer; }
+.task-calendar .tc-n-group-head:first-child { margin-top: 0; }
+.task-calendar .tc-n-group-head.tc-n-group-head-ungrouped { cursor: default; }
+.task-calendar .tc-n-group-name { flex: 1; min-width: 0; overflow: hidden; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.task-calendar .tc-n-group-head-ungrouped .tc-n-group-name { color: var(--tc-muted); }
+.task-calendar .tc-n-plate { flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; overflow: hidden; border: var(--tc-hairline) dashed var(--tc-dash); border-radius: var(--tc-radius-card); background: var(--tc-bg); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; white-space: nowrap; font-size: var(--tc-font-body); color: var(--tc-muted); cursor: pointer; touch-action: pan-y; }
+
+/* Buttons: the plugin's one button, Obsidian's own look taken off. */
+.task-calendar button.tc-n-btn { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
+.task-calendar button.tc-n-btn:active { opacity: var(--tc-pressed); }
+@media (hover: hover) { body:not(.is-mobile) .task-calendar button.tc-n-btn:hover { background-image: linear-gradient(var(--tc-hover), var(--tc-hover)); } }
+body:not(.is-mobile) .task-calendar button.tc-n-btn:focus-visible { outline: var(--tc-focus-ring); outline-offset: var(--tc-focus-offset); }
+.task-calendar .tc-n-round, .task-calendar button.tc-n-btn.tc-n-round { width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; padding: 0; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; background: var(--tc-track-bg); color: var(--tc-text); box-shadow: var(--tc-shadow-control); }
+.task-calendar .tc-n-round svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; }
+.task-calendar button.tc-n-btn.tc-n-plus { position: absolute; right: var(--tc-block-inset); bottom: calc(var(--tc-block-inset) + (var(--tc-wheel) - var(--tc-plus-size)) / 2); z-index: var(--tc-layer-plus); background: var(--tc-accent); color: var(--tc-on-accent); touch-action: none; }
+.task-calendar .tc-n-plus svg { stroke-width: var(--tc-stroke-plus); }
+.task-calendar button.tc-n-btn.tc-n-view-btn { position: absolute; bottom: calc(var(--tc-block-inset) + (var(--tc-wheel) - var(--tc-plus-size)) / 2); left: calc(var(--tc-stage-mid) - var(--tc-plus-size) / 2); z-index: var(--tc-layer-switch); }
+.task-calendar .tc-n-view-btn svg { stroke-width: var(--tc-stroke-view); }
+.task-calendar .tc-n-capsule { height: var(--tc-plus-size); border-radius: var(--tc-radius-capsule); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); display: flex; overflow: hidden; }
+.task-calendar.tc-n-block > .tc-n-capsule { position: absolute; left: var(--tc-block-inset); bottom: calc(var(--tc-block-inset) + (var(--tc-wheel) - var(--tc-plus-size)) / 2); z-index: var(--tc-layer-plus); }
+.task-calendar .tc-n-capsule .tc-n-btn { width: var(--tc-capsule-btn); height: 100%; padding: 0; border-radius: 0; display: flex; align-items: center; justify-content: center; color: var(--tc-text); }
+.task-calendar .tc-n-capsule .tc-n-btn.is-off { color: var(--tc-ink-dim); }
+.task-calendar .tc-n-capsule svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-ring); }
+.task-calendar .tc-n-capsule .tc-n-more svg { stroke: none; fill: currentColor; }
+
+/* Layers over the block: the sheet, the copy of what was pressed, the panel. Motion fades them in and out. */
+.task-calendar.tc-n-layers { position: static; height: 0; overflow: clip; background: none; }
+.task-calendar .tc-n-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); }
+.task-calendar .tc-n-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; }
+.task-calendar .tc-n-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-shadow-panel); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); overflow-anchor: none; -webkit-user-select: none; user-select: none; }
+.task-calendar .tc-n-panel.tc-n-panel-more { width: var(--tc-popover-w); }
+.task-calendar .tc-n-menu-title { height: var(--tc-menu-title-h); box-sizing: border-box; padding: 0 var(--tc-space-16); border-bottom: var(--tc-band); display: flex; align-items: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); }
+.task-calendar .tc-n-menu-group + .tc-n-menu-group { border-top: var(--tc-band); }
+.task-calendar button.tc-n-menu-row { width: 100%; height: var(--tc-row); box-sizing: border-box; padding: 0 var(--tc-space-16); display: flex; align-items: center; gap: var(--tc-space-10); font-size: var(--tc-font-menu); text-align: left; }
+.task-calendar .tc-n-menu-group .tc-n-menu-row:not(:last-child) { border-bottom: var(--tc-rule); }
+.task-calendar .tc-n-menu-label { flex: 1 0 auto; min-width: 0; }
+.task-calendar .tc-n-menu-choice > .tc-n-menu-label { flex: 1; overflow: hidden; white-space: nowrap; -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.task-calendar .tc-n-menu-row svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
+.task-calendar .tc-n-menu-choice svg { color: var(--tc-accent-ui); stroke-width: var(--tc-stroke-check); }

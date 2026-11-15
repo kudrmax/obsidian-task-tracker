@@ -1,4 +1,4 @@
-import { Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
+import { MarkdownView, Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
 import { AppleCalendar } from "./infrastructure/AppleCalendar";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 import { openOutside } from "./infrastructure/OutsideLink";
@@ -20,6 +20,9 @@ import { ProjectBlocks } from "./ui/ProjectBlocks";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
 import { ShownSettingsStore, ViewSettingsStore } from "./ui/viewSettings";
+import { composeRuntime, newScreensOf } from "./composeRuntime";
+import { failureText, NOTICE_WORDS } from "./ui/failureText";
+import { NoteBlocks, type NoteView, obsidianPlaces } from "./ui/next/host/block/NoteBlocks";
 
 /** obsidian://task-calendar-open: a tap on a reminder on the phone opens the calendar. */
 const OPEN_ACTION = "task-calendar-open";
@@ -64,7 +67,8 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		});
 		const deps = this.createDeps();
 		this.registerView(VIEW_TYPE, (leaf) => new TaskCalendarView(leaf, deps));
-		this.addChild(new ProjectBlocks(this.app, deps));
+		if (newScreensOf(this.app).newBlock) this.startNewBlocks(deps.clock);
+		else this.addChild(new ProjectBlocks(this.app, deps));
 		this.addRibbonIcon("calendar-days", "Task Calendar", () => void this.openView());
 		this.addCommand({ id: "open", name: "Open Task Calendar", callback: () => void this.openView() });
 	}
@@ -98,6 +102,42 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			clock,
 			openInCalendar: (event) => calendarApp.open(event),
 		};
+	}
+
+	/**
+	 * The new note blocks (spec §Migration, slice 3, behind `newBlock`): on the runtime, which is built once the layout is
+	 * ready and the metadata cache resolved; on unload the blocks go first, then the runtime, whose queue writes on.
+	 */
+	private startNewBlocks(clock: Clock): void {
+		const services = this.services;
+		if (!services) return;
+		const runtime = composeRuntime(this.app, this.pluginSettings, services, clock, Platform.isIosApp);
+		const blocks = new NoteBlocks(obsidianPlaces(this.app, (view): view is NoteView => view instanceof MarkdownView), {
+			openSession: () => runtime.openHost(),
+			app: this.app,
+			failure: (error) => (error.code === "undoConflict" ? (error.message === "redo" ? "Can’t redo: the tasks file changed" : "Can’t undo: the tasks file changed") : error.code === "staleTask" ? NOTICE_WORDS.stale : failureText(new Error(error.message))),
+			notice: (text) => new Notice(text),
+			openLink: (link) => {
+				if (link.kind === "url") this.outside().open(link.target);
+				else void this.app.workspace.openLinkText(link.target, this.pluginSettings.get().tasksFile, "tab");
+			},
+		});
+		this.app.workspace.onLayoutReady(() => runtime.hostReady("layout"));
+		/** The notes' metadata read (`VaultProjects.ready`, which knows a plugin loaded into an indexed vault hears no `resolved`). */
+		let told = false;
+		const metadata = () => {
+			if (told || !services.projects.ready()) return;
+			told = true;
+			runtime.hostReady("metadata");
+		};
+		this.app.workspace.onLayoutReady(metadata);
+		this.registerEvent(this.app.metadataCache.on("resolved", metadata));
+		this.register(services.projects.onChange(metadata));
+		void runtime.ready().then(() => blocks.start(), () => undefined);
+		this.register(() => {
+			blocks.dispose();
+			void runtime.unload();
+		});
 	}
 
 	/**

@@ -289,10 +289,11 @@ describe("styles.css keeps to its design system", () => {
 		expect(offenders).toEqual([]);
 	});
 
-	it("resets a button and dims it pressed only on .tc-btn", () => {
-		expect(sheet.rules.filter((d) => d.property === "appearance").map((d) => d.selector)).toEqual(["button.tc-btn"]);
+	it("resets a button and dims it pressed only on .tc-btn, and on the new screens' .tc-n-btn", () => {
+		const appearance = sheet.rules.filter((d) => d.property === "appearance").map((d) => d.selector);
+		expect(appearance).toEqual(["button.tc-btn", ".task-calendar button.tc-n-btn"]);
 		const pressed = sheet.rules.filter((d) => d.property === "opacity" && d.value === "var(--tc-pressed)" && d.selector.includes(":active"));
-		expect(pressed.map((d) => d.selector)).toEqual(["button.tc-btn:not(:disabled):active"]);
+		expect(pressed.map((d) => d.selector)).toEqual(["button.tc-btn:not(:disabled):active", ".task-calendar button.tc-n-btn:active"]);
 	});
 
 	it("gives a button its padding, ground and shadow at Obsidian's iPad and tap weight (0,2,1) or more, after the tap answer", () => {
