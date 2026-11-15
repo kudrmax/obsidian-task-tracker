@@ -3,8 +3,9 @@
 `core/task-calendar-phone.js` is the plugin's core built for JavaScriptCore. A host (the Apple apps in `apple/`) evaluates it once
 and calls the functions of `globalThis.TaskCalendarPhone` synchronously (`JSValue.invokeMethod`). Every rule of the
 task manager lives behind this door: a host draws, reads and writes its files, and asks the door for everything else.
-The door keeps nothing between calls; what must last (the undo steps, a quick entry being typed) the door hands back
-to the host as plain JSON, and the host hands it in again.
+The door keeps nothing between calls but a cache of what it read, which changes no answer («Calls are cheap when nothing
+changed»); what must last (the undo steps, a quick entry being typed) the door hands back to the host as plain JSON,
+and the host hands it in again.
 
 Built from `core/phone/main.ts` → `core/application/PhoneDoor.ts` (the functions) and `core/application/PhoneCalls.ts`
 (`call`). TypeScript types named below are in `core/application/contracts.ts` unless said otherwise.
@@ -53,6 +54,20 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 | `projects` | the notes that had the project tag, `ProjectNote` `{ name, path, link }`, as `rules.projectNotes` answers them over the vault's notes: read only by the one move to projects (at the first read of a file without `## Projects`, and whenever old `🗂️ [[…]]` fields appear: see «Projects»). The door takes them as complete. Left out: none |
 | `projectsScreen` | `ProjectsScreenState`, what this device keeps of the Projects screen (the node chosen, the segment, the folded branches), as the last answer gave it; left out: All chosen, By project, nothing folded |
 | `ids` | `TaskIdState`, who the tasks and sections are, as the last answer gave it; left out before the first (every task and section then gets a new id) |
+| `host` | where the door runs: `"ios"` (the iPhone app, or Obsidian on the iPhone) or `"obsidian"` (Obsidian on a computer). Only on iOS do the phone's and Google's calendar files meet, so only there is the old choice of calendars carried over once (`calendarsMigrated`), as the plugin's `CalendarServiceImpl` does. Left out: `"ios"`, as the app always was |
+| `feedProblems` | `{ google?, iphone?, work? }`: why a calendar the host fetches itself failed on its last try (`SourceProblem`: Google failing, `{ kind: "noAnswer", seconds: 15 }` when silent, `calendarsRefresh.problem` and `calendarsRefresh.silence` answer them). A source whose file reads well shows it on its row and in the day's dot; a file's own problem (missing, unreadable) comes first, and Google logged out first of all. Left out: none |
+| `projectsReady` | whether the host has read every note that had the project tag (`projects`): until it has, the one move to projects does not run and the file is read as it is (the plugin waits for Obsidian's metadata cache). `true` when left out |
+
+**Calls are cheap when nothing changed.** The door keeps, across calls, what it read: the settings parsed from
+`data.json`, the tasks text parsed and tidied for the day, and the ids an identity settled on for it, each found only
+by everything it was made of (the text, the settings, the day, the notes handed in and their completeness, the ids
+handed in, all compared by content, so a host that changes in place what it handed in, or hands in a copy that crossed
+JSON, is read as it now is). What the door keeps and what it answers from it is frozen, so a caller changing an answer
+changes nothing kept. An answer is exactly what reading anew gives; nothing of one host's file reaches another's. A
+view, a write and a step of a carry over a 30 KB file take under a millisecond once the door has read that text
+(`tests/budget/door.test.ts`, run on its own after the other tests by `npm test`: it reports each call against 1 ms
+and fails only past 3 ms, so a busy machine never stops a release); the first call over a new text (after a write, or
+Sync) reads it, about 0.7 ms on that file.
 
 **Answer** (`DoorAnswer`):
 
@@ -503,7 +518,50 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
   gets a new one; No section's is `"none"` in every list. A header is keyed by it, never by its name.
 - A project is named by its name (`ProjectsRow.node`, `"project:<name>"`); `tasks.renameProject` carries the device's
   `projectsScreen` over to the new name.
+- `tasks.keyOf(id)`: the `TaskKey` of the task with that id in the file as handed in, read as every read is (tidied
+  for the day, nothing written: the answer has no `tasks`), or `null` when no task has it (gone, never was, or a
+  section's id), and `null` when the context has no `ids`: the ids are fresh then, and one may name another task. What a host that keeps tasks by id hands an action. Example: a pending `setStatus` of `t12`, the file
+  changed by Sync since, replays as `tasks.setStatus(keyOf("t12"), "done")`.
+- `tasks.sectionOf(id)`: `{ list, name }` of the section with that id (`ListSection.id`), the name as the file has it
+  now, `null` when no section has it or the context has no `ids`. Example: `sectionOf("t40")` → `{ list: "now", name: "Shopping" }` after another
+  device renamed Errands; a pending `tasks.renameGroup("now", "Errands", …)` replays with the new name.
+- `tasks.reconcile(idMap, dropped)`: the device's `projectsScreen` after a host replayed its pending calls over a file
+  changed elsewhere, answered as `result` and as the answer's `projectsScreen`; it writes no tasks. `idMap`
+  (`{ oldId: newId }`): the ids the replay's creates gave the tasks they made again; a carry under way
+  (`projectsScreen.carry`: its `keys`, its `cards` and their `lifted`) follows them, each key standing as the file has
+  it now, so a drop on a row still lands. `dropped` (`[{ method, args, projectsScreen? }]`, as the host's pending log
+  recorded them, `projectsScreen` the screen the call ran over): each one's change of the screen taken back, the last
+  first: `tasks.renameProject(from, to)` gives the chosen node and the folds back their old name;
+  `tasks.createProject` (with its recorded screen) puts back the node chosen before, while the new one is still
+  chosen, and folds again the branches above the new project that were folded before; a fold made or opened since
+  stays. Any other
+  call changed no screen. Example: a lifted new task replayed as `t31` instead of `t27` →
+  `reconcile({ t27: "t31" }, [])`, then `carryOnNode("project:Дружба")` writes it there.
 - Twins (two identical lines) are two tasks with two ids: the door knows which line a write made of which.
+
+### `calendarsRefresh.*`: when to fetch the calendars
+
+For a host that fetches the calendars itself and holds their files (the plugin's network lane): the rule
+`CalendarServiceImpl` runs by, as a decision.
+
+- `ask(reason, cached)` → `{ feeds, waitFeeds }` for a day's events by `EventsReason` (`open`, `peek`, `refresh`),
+  `cached` when the files were read before. `feeds`: `"forced"` (every feed afresh: `refresh`), `"due"` (only a feed
+  that `feedDue` says: `open`, and `peek` with nothing read yet), `"none"` (`peek` with events read: nothing).
+  `waitFeeds`: the fresh events wait for the feeds before the files are read (`refresh`); otherwise the files are read
+  at once and a feed runs behind, its file's change drawing the day again. Example: `ask("peek", true)` →
+  `{ feeds: "none", waitFeeds: false }`.
+- `feedKey()`: what a feed's file depends on in the settings handed in (Google's client and token): a run under another
+  key is not fresh.
+- `feedDue(last)`: whether a feed asked unforced runs, `last` its last good run `{ atMs, key }` or `null`: never ran
+  well, ran under another key, the refresh interval (`google.refreshSeconds`, 0: always) passed by `nowMs`. Example:
+  `feedDue({ atMs: nowMs - 30000, key: feedKey() })` → `false` with a 60 s interval.
+- `problem(failure)`: a feed's failure as its source shows it: `{ problem }` (a `SourceProblemError`'s) answers that
+  problem, `{ message }` `{ kind: "failed", detail: message }`; anything else (an `Error` handed in-process, a text
+  thrown) as the plugin reads a failure: its message, or the value as text.
+- `silence()` → `{ ms: 15000, problem: { kind: "noAnswer", seconds: 15 } }`: a feed silent that long has failed; its
+  file keeps what it had and the next refresh asks afresh.
+
+The host keeps each feed's `feedProblems` and last good run, and hands the problems in with every `calendars.*` call.
 
 ### `days.*`: `DayService`
 
@@ -758,6 +816,19 @@ in order, each once its lists show every write before it:
 
 After a rename's `edit`, the task as it now stands is its answer (the plugin keeps it open on the full screen).
 
+**The order as a step function** (`core/application/EntryJobs.ts`, for a host that runs the door in its own serial
+dispatch, with nothing to wait on): `queuedEntryJobs(jobs, answer.jobs)` adds the jobs each `entry.*` answer queued;
+`entryJobStep(jobs, outcome)` answers `{ jobs, step }`, `outcome` what the last step came to (`{ ok: true, result }`
+or `{ ok: false }` from the door's answer, `null` at the start and after `renamed`). A step is
+`{ kind: "door", method, args, coming?, fresh? }` (an `entry.*` method takes `session, look` before `args`; `coming`
+adds the cards each list now draws last; `fresh`: the lists must show every write before it) or
+`{ kind: "renamed", was, now }`; `null` when no job is left. One job runs `entry.call` → `tasks.createWithId` (the
+call's `createInPlace`, so the new task's id is known at once), `tasks.edit`, `tasks.createSection` or
+`tasks.unfoldAbove` → `entry.shown` (a new task) or `renamed` (a rename) → `entry.unshown` → `entry.done`; a step that
+failed skips to `entry.unshown`, and the next job still runs. The plugin's `QuickEntrySession` runs its jobs by the same
+function. Example: two tasks entered → `entry.call`, `tasks.createWithId`, `entry.shown`, `entry.unshown`,
+`entry.done`, twice.
+
 ### `sectionName.end(ended, event, text)`
 
 A section's name typed in place: `event` is `"enter"`, `"escape"` or `"blur"`. Answers `{ ended: true, end?: { name } }`:
@@ -876,7 +947,8 @@ one the table misses.
 tasks outside any section. A task's and the bulk menu's `remove` is null when Delete is not offered; the plugin's
 Open full screen and Open in Obsidian are its own rows, outside the model.
 
-`DOOR_COVERAGE`'s `own` names a space's methods beside its interface's: `calendars.files` and `calendars.meetings`.
+`DOOR_COVERAGE`'s `own` names a space's methods beside its interface's: `calendars.files` and `calendars.meetings`;
+`tasks.keyOf`, `tasks.sectionOf` and `tasks.reconcile` for a host's replica.
 
 - `GoogleAccount` (`isLoggedIn`, `login`, `logout`): the login is a browser's consent and a token fetched over the network;
   the door makes no request.

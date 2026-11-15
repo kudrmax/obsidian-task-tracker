@@ -37,12 +37,13 @@ export function sectionNames(settings: TaskCalendarSettings): readonly string[] 
 	return [s.inbox, s.now, s.soon, s.backlog, s.done];
 }
 
-export function parseText(text: string, settings: TaskCalendarSettings): TaskDocument {
+/** `markers`: `markersOf(settings)` made once for these settings, so the lines read under it are read once. */
+export function parseText(text: string, settings: TaskCalendarSettings, markers: Markers = markersOf(settings)): TaskDocument {
 	const s = settings.sections;
 	return TaskDocument.parse(
 		text,
 		{ inbox: s.inbox, backlog: s.backlog, now: s.now, soon: s.soon, done: s.done, ungrouped: settings.groups.ungrouped },
-		markersOf(settings),
+		markers,
 	);
 }
 

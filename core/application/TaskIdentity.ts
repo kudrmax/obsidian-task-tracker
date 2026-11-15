@@ -1,5 +1,6 @@
 import { matchLines } from "../domain/LineMatch";
 import type { LineIds, OutlineLine, TaskDocument } from "../domain/TaskDocument";
+import type { ReadingCache } from "./ReadingCache";
 
 /** A heading or a task line of the text the ids are for, in file order, with its id. */
 export interface TaskIdLine {
@@ -49,7 +50,11 @@ export class TaskIdentity {
 	/** The ids an undo step gave the lines of its text, by line, until that text is read. */
 	private pending: { readonly text: string; readonly ids: ReadonlyMap<number, string> } | null = null;
 
-	constructor(state: TaskIdState = NO_TASK_IDS) {
+	/** `cache`: what identities settled on before, shared across the door's calls, so a reading from a state is matched once. */
+	constructor(
+		state: TaskIdState = NO_TASK_IDS,
+		private readonly cache: ReadingCache | null = null,
+	) {
 		this.current = state;
 	}
 
@@ -63,7 +68,19 @@ export class TaskIdentity {
 	 */
 	of(text: string, read: () => TaskDocument): LineIds {
 		if (this.last?.text === text) return this.last.ids;
+		if (this.cache === null || this.pending !== null) return this.settled(text, read());
 		const doc = read();
+		const from = this.current;
+		const settled = this.cache.settled(doc, from, () => {
+			const ids = this.settled(text, doc);
+			return { state: this.current, changed: this.current !== from, ids };
+		});
+		if (settled.changed) this.current = settled.state;
+		this.last = { text, ids: settled.ids };
+		return settled.ids;
+	}
+
+	private settled(text: string, doc: TaskDocument): LineIds {
 		const outline = doc.outline();
 		const next = this.current.next;
 		const own = this.pending?.text === text;

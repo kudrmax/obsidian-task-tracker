@@ -15,6 +15,7 @@ import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_CARD_SIZE, sameLevels, settingsFrom, t
 import { CalendarDay, type CalendarReading, NO_DAY_EVENTS } from "./calendarDay";
 import { CALENDAR_SOURCES, type CalendarFile, calendarPath, readCalendarFile } from "./calendarFile";
 import { captureTitle } from "./captureTitle";
+import { calendarsAsk, FEED_SILENCE_MS, type FeedRun, feedDue, feedKey, feedProblem, feedSilence } from "./calendarsRefresh";
 import { cardDue } from "./cardDue";
 import { dayMonth, dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
@@ -34,6 +35,7 @@ import {
 	type CalendarAlert,
 	type DayEvents,
 	type DayWords,
+	type EventsReason,
 	type GroupedList,
 	type ProjectNote,
 	type ProjectsScreenState,
@@ -63,8 +65,8 @@ import { ProjectIndex, projectNotesOfTexts, projectTreeOf } from "./projects";
 import { noteTags } from "../domain/NoteTags";
 import { ProjectTree } from "../domain/ProjectTree";
 import { projectsPlusPlace, projectsPlusTakes, projectsTakes } from "./projectsDrop";
-import { cleared, PROJECTS_HOVER_MS, PROJECTS_INDENT, panelRows, picked, projectNodeOf, projectOfNode, projectsDrop, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
-import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
+import { cleared, PROJECTS_HOVER_MS, PROJECTS_INDENT, panelRows, picked, projectNodeOf, projectOfNode, projectsDrop, sameNode, projectsGap, projectsLevels, hovered, renamedIn, selected, tapped, unfolded } from "./projectsScreen";
+import { keyId, keyOf, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { MOST_CARD_COLORS } from "./marks";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
 import { type Operation, TaskRules } from "./TaskRules";
@@ -74,6 +76,8 @@ import { type UndoState, UndoSteps, type UndoWay } from "./UndoSteps";
 import { NO_TASK_IDS, TaskIdentity, type TaskIdState } from "./TaskIdentity";
 import type { PatchIds } from "../domain/TextPatch";
 import { snapMinute } from "./snapGrid";
+import { ReadingCache } from "./ReadingCache";
+import { deepFrozen } from "../domain/frozen";
 import { dayOpening } from "./DayServiceImpl";
 import { repeatPageEnd } from "./RepeatPage";
 import { descriptionOpen, descriptionRead, descriptionSave, descriptionTyped } from "./DescriptionDraft";
@@ -104,7 +108,27 @@ export interface DoorContext {
 	readonly projectsScreen?: ProjectsScreenState;
 	/** Who the tasks are (`TaskItem.id`), as the door last answered it; left out before the first: every task a new id. */
 	readonly ids?: TaskIdState;
+	/**
+	 * Where the door runs. `ios`: on iOS, the iPhone app or Obsidian on the iPhone, where the phone's and Google's calendar
+	 * files meet, so the old choice of calendars is carried over once (`calendarsMigrated`). `obsidian`: Obsidian on a
+	 * computer, where it is not. Left out: `ios`, as the app always was.
+	 */
+	readonly host?: DoorHost;
+	/**
+	 * Why a calendar the host fetches failed on its last try (Google failing, or silent for 15 s:
+	 * `calendarsRefresh.problem`), by source: its source's row and the day's dot show it while its file reads well.
+	 * None when left out.
+	 */
+	readonly feedProblems?: Partial<Record<CalendarSource, SourceProblem>>;
+	/**
+	 * Whether the host has read every note that had the project tag (`projects`): until it has, the one move to projects
+	 * does not run and the file is read as it is. True when left out.
+	 */
+	readonly projectsReady?: boolean;
 }
+
+/** Where the door runs (`DoorContext.host`). */
+export type DoorHost = "ios" | "obsidian";
 
 /** A call's answer: the result, and what the host writes back; or the error, by its code. */
 export type DoorAnswer =
@@ -203,6 +227,11 @@ export function settingsOf(json: string): TaskCalendarSettings {
 	return settingsFrom(json.trim() === "" ? null : JSON.parse(json));
 }
 
+const NO_NOTES: readonly ProjectNote[] = [];
+
+/** What the door's calls share: a call over a text and settings an earlier call read does not read them again. */
+const DOOR_CACHE = new ReadingCache();
+
 /** What a call ended with besides its result. */
 interface Effects {
 	tasks?: string;
@@ -231,9 +260,12 @@ class Call {
 	/** `data.json` as handed in: what a change of the settings is written over. */
 	private readonly settingsText: string;
 
-	constructor(readonly context: DoorContext) {
+	constructor(
+		readonly context: DoorContext,
+		private readonly cache: ReadingCache | null,
+	) {
 		this.settingsText = context.settings ?? "";
-		this.current = settingsOf(this.settingsText);
+		this.current = cache === null ? settingsOf(this.settingsText) : cache.settings(this.settingsText);
 		const clock: Clock = { now: () => new Date(context.nowMs) };
 		this.clock = clock;
 		const store: SettingsStore = {
@@ -242,8 +274,8 @@ class Call {
 			onChange: () => () => undefined,
 		};
 		this.store = store;
-		this.identity = new TaskIdentity(context.ids);
-		this.rules = new TaskRules(store, clock, this.identity, context.ids !== undefined, { list: () => context.projects ?? [], ready: () => true });
+		this.identity = new TaskIdentity(context.ids, cache);
+		this.rules = new TaskRules(store, clock, this.identity, context.ids !== undefined, { list: () => context.projects ?? NO_NOTES, ready: () => context.projectsReady !== false }, cache);
 		this.reads = new TaskReads(this.rules, store, clock, { tree: () => this.tree(), screen: () => this.projectsScreen });
 		this.writes = new TaskWrites(this.rules, this.reads);
 		this.text = context.tasks ?? null;
@@ -267,7 +299,9 @@ class Call {
 
 	/** The projects of the file as this call has it, the tasks' own in the tree; none without a file. */
 	tree(): ProjectTree {
-		return this.text === null ? ProjectTree.EMPTY : projectTreeOf(this.snapshot().doc);
+		if (this.text === null) return ProjectTree.EMPTY;
+		const doc = this.snapshot().doc;
+		return this.cache === null ? projectTreeOf(doc) : this.cache.memo(doc, "tree", () => deepFrozen(projectTreeOf(doc)));
 	}
 
 	get settings(): TaskCalendarSettings {
@@ -286,6 +320,12 @@ class Call {
 
 	hasTasks(): boolean {
 		return this.text !== null;
+	}
+
+	/** The host handed in who the tasks are: an id it names is one the door gave. Throws without a tasks file. */
+	knowsIds(): boolean {
+		this.tasks();
+		return this.context.ids !== undefined;
 	}
 
 	snapshot(): Snapshot {
@@ -548,6 +588,97 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	},
 };
 
+/** A call a host's replay dropped, as its pending log recorded it: the Projects screen it ran over, when kept. */
+export interface DroppedCall {
+	readonly method: string;
+	readonly args: readonly unknown[];
+	readonly projectsScreen?: ProjectsScreenState;
+}
+
+/** The Projects screen with a dropped call's change of it taken back; a call that changed none leaves it. */
+function undone(c: Call, state: ProjectsScreenState, call: DroppedCall): ProjectsScreenState {
+	if (call.method === "tasks.renameProject") {
+		const [from, to] = call.args as [string, string];
+		const name = c.rules.cleanName(to);
+		return name === null ? state : renamedIn(state, name, from);
+	}
+	/**
+	 * A new project is chosen and the branches above it unfolded: the node chosen before comes back while the new one is
+	 * still chosen, and those branches fold again where they were folded before; a fold made or opened since stays.
+	 */
+	if (call.method === "tasks.createProject" && call.projectsScreen) {
+		const [typed, place] = call.args as [string, { readonly parent: string | null }];
+		const name = c.rules.cleanName(typed);
+		if (name === null) return state;
+		const before = call.projectsScreen;
+		let next = state;
+		if (state.selected !== undefined && sameNode(state.selected, projectNodeOf(name))) {
+			const { selected: _made, ...rest } = state;
+			next = before.selected === undefined ? rest : { ...rest, selected: before.selected };
+		}
+		const parent = place?.parent ? c.tree().find(place.parent) : null;
+		const above = (parent?.path ?? []).map(projectNodeOf);
+		const now = next.folded ?? [];
+		const opened = (before.folded ?? []).filter((node) => above.some((a) => sameNode(a, node)) && !now.some((n) => sameNode(n, node)));
+		if (opened.length === 0) return next;
+		const isOpened = (node: string) => opened.some((o) => sameNode(o, node));
+		const kept = (before.folded ?? []).filter((node) => isOpened(node) || now.some((n) => sameNode(n, node)));
+		return { ...next, folded: [...kept, ...now.filter((node) => !kept.some((k) => sameNode(k, node)))] };
+	}
+	return state;
+}
+
+/** What a host that keeps a replica and replays its pending calls asks: who a task or a section is now, and the screen after a replay. */
+const REPLICA_TASKS: Readonly<Record<string, Handler>> = {
+	/**
+	 * The device's Projects screen after a host replayed its pending calls over a file changed elsewhere: `idMap` (old id
+	 * → new id) the ids the replay gave the tasks its creates made again; the carry's tasks follow them and stand as the
+	 * file has them now; `dropped`, the calls the replay dropped, their changes of the screen taken back, the last first.
+	 * Writes no tasks; answers the screen, which the answer's `projectsScreen` carries too.
+	 */
+	reconcile: (c, [idMap, dropped]) => {
+		const ids = (idMap ?? {}) as Readonly<Record<string, string>>;
+		const doc = c.hasTasks() ? c.snapshot().doc : null;
+		const moved = (id: string) => (Object.prototype.hasOwnProperty.call(ids, id) ? ids[id] : id);
+		const fresh = (key: TaskKey): TaskKey => {
+			if (key.id === undefined) return key;
+			const entry = doc?.byId(moved(key.id));
+			return entry ? keyOf(entry) : { ...key, id: moved(key.id) };
+		};
+		let state = c.projectsScreen;
+		for (const call of [...((dropped ?? []) as DroppedCall[])].reverse()) state = undone(c, state, call);
+		const carry = state.carry;
+		if (carry) {
+			const cards = carry.cards?.map((card) => ({ ...card, key: fresh(card.key), ...(card.lifted && { lifted: { ...card.lifted, id: moved(card.lifted.id) } }) }));
+			state = { ...state, carry: { ...carry, keys: carry.keys.map(fresh), ...(cards && { cards }) } };
+		}
+		c.keepProjectsScreen(state);
+		return state;
+	},
+	/**
+	 * The key of the task `id` names (`TaskItem.id`) in the file as read now, null when no task has it; nothing written.
+	 * Null without `ids` in the context too: the ids then are fresh, and one may name another task.
+	 */
+	keyOf: (c, [id]) => {
+		if (!c.knowsIds()) return null;
+		const entry = c.snapshot().doc.byId(id as string);
+		return entry ? keyOf(entry) : null;
+	},
+	/** The list and name of the section `id` names (`ListSection.id`) in the file as read now, null when no section has it or without `ids`. */
+	sectionOf: (c, [id]) => {
+		if (!c.knowsIds()) return null;
+		const doc = c.snapshot().doc;
+		for (const list of GROUPED_LISTS) {
+			const group = doc.groups(list).find((g) => g.id === id && g.name !== null);
+			if (group) return { list, name: group.name };
+		}
+		return null;
+	},
+};
+
+/** The door's `tasks.*` calls for a host's replica, no service's methods. */
+export const REPLICA_TASK_NAMES: readonly string[] = Object.keys(REPLICA_TASKS);
+
 /** The TaskService methods the door leaves to the host: it is the host that watches its files. */
 export const HOST_TASK_METHODS: readonly string[] = ["onChange"];
 
@@ -651,14 +782,14 @@ function readingOf(c: Call): CalendarReading {
 		}
 	}
 	const fetched = c.context.fetched ?? FETCHED_BY_DEFAULT;
-	return { sources: CALENDAR_SOURCES, files, problem: (s) => problems.get(s) ?? null, fed: (s) => fetched.includes(s) };
+	return { sources: CALENDAR_SOURCES, files, problem: (s) => problems.get(s) ?? c.context.feedProblems?.[s] ?? null, fed: (s) => fetched.includes(s) };
 }
 
-/** The calendars' rules over the files handed in. On the phone the old choice of calendars is carried over once, as the plugin does there. */
+/** The calendars' rules over the files handed in. On iOS the old choice of calendars is carried over once, as the plugin does there. */
 function calendarDay(c: Call): CalendarDay {
 	const reading = readingOf(c);
 	const day = new CalendarDay(reading, c.settings, c.now);
-	const carried = day.carryOver(true);
+	const carried = day.carryOver((c.context.host ?? "ios") === "ios");
 	if (!carried) return day;
 	c.saveSettings(carried);
 	return new CalendarDay(reading, c.settings, c.now);
@@ -690,6 +821,23 @@ function meetings(c: Call, fromMs: number, toMs: number): WireMeeting[] {
 		.timedBetween(new Date(fromMs), new Date(toMs))
 		.map((e) => ({ title: e.title, startMs: e.start.getTime(), endMs: e.end.getTime() }));
 }
+
+/**
+ * The calendars' refresh rule for a host that fetches them itself (`calendarsRefresh`): what a day's events ask of the
+ * feeds, whether a feed is due, and what a failure or a silence shows on its source.
+ */
+const CALENDARS_REFRESH: Readonly<Record<string, Handler>> = {
+	ask: (_c, [reason, cached]) => calendarsAsk(reason as EventsReason, cached === true),
+	feedKey: (c) => feedKey(c.settings),
+	feedDue: (c, [last]) => feedDue((last ?? null) as FeedRun | null, c.context.nowMs, c.settings),
+	problem: (_c, [failure]) => {
+		if (failure instanceof Error || failure === null || typeof failure !== "object") return feedProblem(failure);
+		const { problem, message } = failure as { problem?: SourceProblem; message?: unknown };
+		if (problem !== undefined) return problem;
+		return typeof message === "string" ? feedProblem(new Error(message)) : feedProblem(failure);
+	},
+	silence: () => ({ ms: FEED_SILENCE_MS, problem: feedSilence().problem }),
+};
 
 /** The door's own calendar calls for the phone, beside CalendarService's. */
 const PHONE_CALENDAR_METHODS: readonly string[] = ["files", "sources", "meetings"];
@@ -1044,13 +1192,14 @@ export function noteUrl(link: string, vault: string): string {
 }
 
 const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
-	tasks: { ...TASKS, ...KEPT_TASKS },
+	tasks: { ...TASKS, ...KEPT_TASKS, ...REPLICA_TASKS },
 	days: { ...DAYS, stepScreen: (c, [from, shift]) => {
 		const at = from as { readonly mode: string; readonly date: string };
 		return stepFunnel({ mode: at.mode === "projects" ? "done" : (at.mode as FunnelSpot), date: at.date }, shift as -1 | 1, c.rules.today());
 	} },
 	boundary: BOUNDARY,
 	calendars: CALENDARS,
+	calendarsRefresh: CALENDARS_REFRESH,
 	history: HISTORY,
 	settings: SETTINGS,
 	screenSettings: SCREEN_SETTINGS,
@@ -1074,7 +1223,7 @@ export type DoorCoverage = { readonly space: string; readonly host: readonly str
 
 /** Every interface of contracts.ts with a method: where the door answers it, or why a host keeps it. */
 export const DOOR_COVERAGE: Readonly<Record<string, DoorCoverage>> = {
-	TaskService: { space: "tasks", host: HOST_TASK_METHODS, own: KEPT_TASK_NAMES },
+	TaskService: { space: "tasks", host: HOST_TASK_METHODS, own: [...KEPT_TASK_NAMES, ...REPLICA_TASK_NAMES] },
 	DayService: { space: "days", host: HOST_DAY_METHODS, own: ["stepScreen"] },
 	UndoService: { space: "history", host: ["onChange"] },
 	CalendarService: { space: "calendars", host: HOST_CALENDAR_METHODS, own: PHONE_CALENDAR_METHODS },
@@ -1094,13 +1243,13 @@ export function doorMethods(): string[] {
 }
 
 /** The method's answer over the context, every value as it crosses the door. */
-export function callDoor(method: string, args: readonly unknown[], context: DoorContext): DoorAnswer {
+export function callDoor(method: string, args: readonly unknown[], context: DoorContext, cache: ReadingCache | null = DOOR_CACHE): DoorAnswer {
 	try {
 		const [space, name] = method.split(".");
 		const handler = SPACES[space]?.[name];
 		if (!handler || !Object.prototype.hasOwnProperty.call(SPACES, space) || !Object.prototype.hasOwnProperty.call(SPACES[space], name)) throw new DoorError("unknownMethod", `no method ${method}`);
 		if (!Array.isArray(args)) throw new DoorError("badArguments", "the arguments are a list");
-		const call = new Call(context);
+		const call = new Call(context, cache);
 		const result = handler(call, [...args]);
 		return { ok: true, result: result === undefined ? null : result, ...call.effects };
 	} catch (e) {

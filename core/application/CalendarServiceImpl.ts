@@ -15,17 +15,11 @@ import type {
 	SourceProblem,
 	WorkCalendarSetup,
 } from "./contracts";
-import { type EventFeed, type EventFile, SourceProblemError } from "./EventSource";
+import type { EventFeed, EventFile } from "./EventSource";
+import { calendarsAsk, FEED_SILENCE_MS, feedProblem, feedSilence } from "./calendarsRefresh";
 import type { Clock, SettingsStore, Timers } from "./ports";
 
 const SECOND_MS = 1000;
-/** A feed silent this long counts as failed: its file keeps what it had, and the next refresh asks afresh. */
-const ANSWER_TIMEOUT_MS = 15_000;
-
-function problemOf(e: unknown): SourceProblem {
-	if (e instanceof SourceProblemError) return e.problem;
-	return { kind: "failed", detail: e instanceof Error ? e.message : String(e) };
-}
 
 /**
  * The events of a day as the calendars' files hold them: the files are the truth, the feeds only write them. A file
@@ -59,9 +53,9 @@ export class CalendarServiceImpl implements CalendarService {
 
 	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
 		const cached = this.cached(date);
-		if (reason === "refresh") return { cached, fresh: () => this.eventsOn(date) };
-		if (reason === "peek" && cached) return { cached, fresh: null };
-		return { cached, fresh: () => this.eventsAround(date) };
+		const ask = calendarsAsk(reason, cached !== null);
+		if (ask.feeds === "none") return { cached, fresh: null };
+		return { cached, fresh: () => (ask.waitFeeds ? this.eventsOn(date) : this.eventsAround(date)) };
 	}
 
 	isPast(event: CalendarEvent): boolean {
@@ -115,9 +109,9 @@ export class CalendarServiceImpl implements CalendarService {
 	private refreshFeeds(force: boolean): Promise<void> {
 		return Promise.all(
 			this.feeds.map((feed) =>
-				this.answerWithin(feed.refresh(force), ANSWER_TIMEOUT_MS).then(
+				this.answerWithin(feed.refresh(force), FEED_SILENCE_MS).then(
 					() => this.feedProblems.delete(feed.name),
-					(e) => this.feedProblems.set(feed.name, problemOf(e)),
+					(e) => this.feedProblems.set(feed.name, feedProblem(e)),
 				),
 			),
 		).then(() => undefined);
@@ -131,7 +125,7 @@ export class CalendarServiceImpl implements CalendarService {
 						this.lastRead.set(file.name, read);
 						this.fileProblems.delete(file.name);
 					},
-					(e) => this.fileProblems.set(file.name, problemOf(e)),
+					(e) => this.fileProblems.set(file.name, feedProblem(e)),
 				),
 			),
 		).then(() => this.carryOver());
@@ -157,7 +151,7 @@ export class CalendarServiceImpl implements CalendarService {
 	private answerWithin<T>(answer: Promise<T>, ms: number): Promise<T> {
 		let timer: number | undefined;
 		const silence = new Promise<never>((_, reject) => {
-			timer = this.timers.set(() => reject(new SourceProblemError({ kind: "noAnswer", seconds: ms / SECOND_MS }, `no answer in ${ms / SECOND_MS} s`)), ms);
+			timer = this.timers.set(() => reject(feedSilence()), ms);
 		});
 		return Promise.race([answer, silence]).finally(() => {
 			if (timer !== undefined) this.timers.clear(timer);

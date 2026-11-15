@@ -268,6 +268,20 @@
     return date === addDays(today, -1) ? "yesterday" : "other";
   }
 
+  // core/domain/frozen.ts
+  function deepFrozen(value) {
+    if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+      Object.freeze(value);
+      for (const v of Object.values(value)) deepFrozen(v);
+    }
+    return value;
+  }
+  function plainCopy(value) {
+    if (value === null || typeof value !== "object") return value;
+    if (Array.isArray(value)) return value.map(plainCopy);
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, plainCopy(v)]));
+  }
+
   // core/domain/description.ts
   var INDENT_RE = /^[ \t]*/;
   var DESCRIPTION_TEMPLATE = "- ";
@@ -701,7 +715,7 @@
     const known = kept.get(line);
     if (known !== void 0) return known;
     if (kept.size >= KEPT_LINES) kept.clear();
-    const parsed = readTaskLine(line, markers);
+    const parsed = deepFrozen(readTaskLine(line, markers));
     kept.set(line, parsed);
     return parsed;
   }
@@ -867,22 +881,77 @@
     return (b.length + 1) * (a.length + 1) <= TABLE_CELLS ? tableLines(b, a) : myersLines(b, a);
   }
   function tableLines(b, a) {
-    const width = a.length + 1;
-    const common = new Uint16Array((b.length + 1) * width);
-    for (let i2 = b.length - 1; i2 >= 0; i2--) {
-      for (let j2 = a.length - 1; j2 >= 0; j2--) {
-        common[i2 * width + j2] = b[i2] === a[j2] ? common[(i2 + 1) * width + j2 + 1] + 1 : Math.max(common[(i2 + 1) * width + j2], common[i2 * width + j2 + 1]);
-      }
-    }
+    const common = new CommonRuns(b, a);
     const pairs = [];
     let i = 0;
     let j = 0;
     while (i < b.length || j < a.length) {
       if (i < b.length && j < a.length && b[i] === a[j]) pairs.push([i++, j++]);
-      else if (j < a.length && (i === b.length || common[i * width + j + 1] >= common[(i + 1) * width + j])) j++;
+      else if (j < a.length && (i === b.length || common.at(i, j + 1) >= common.at(i + 1, j))) j++;
       else i++;
     }
     return pairs;
+  }
+  var WORD = 32;
+  var CommonRuns = class {
+    constructor(b, a) {
+      const m = a.length;
+      const words = Math.max(1, Math.ceil(m / WORD));
+      this.words = words;
+      this.width = m;
+      const numbers = /* @__PURE__ */ new Map();
+      const masks = [];
+      for (let p = 0; p < m; p++) {
+        const line = a[m - 1 - p];
+        let n = numbers.get(line);
+        if (n === void 0) {
+          n = numbers.size;
+          numbers.set(line, n);
+          masks.push(new Uint32Array(words));
+        }
+        masks[n][p >>> 5] |= 1 << (p & 31);
+      }
+      const rows = new Uint32Array((b.length + 1) * words);
+      rows.fill(4294967295, b.length * words);
+      for (let i = b.length - 1; i >= 0; i--) {
+        const row = i * words;
+        const next = row + words;
+        const n = numbers.get(b[i]);
+        if (n === void 0) {
+          rows.copyWithin(row, next, next + words);
+          continue;
+        }
+        const mask = masks[n];
+        let carry = 0;
+        for (let w = 0; w < words; w++) {
+          const v = rows[next + w];
+          const u = (v & mask[w]) >>> 0;
+          const sum = v + u + carry;
+          carry = sum > 4294967295 ? 1 : 0;
+          rows[row + w] = (sum >>> 0 | v & ~mask[w]) >>> 0;
+        }
+      }
+      this.rows = rows;
+      const below = new Uint32Array((b.length + 1) * (words + 1));
+      for (let i = 0; i <= b.length; i++) {
+        for (let w = 0; w < words; w++) below[i * (words + 1) + w + 1] = below[i * (words + 1) + w] + WORD - bitCount(rows[i * words + w]);
+      }
+      this.below = below;
+    }
+    at(i, j) {
+      const k = this.width - j;
+      const word = k >>> 5;
+      const bits = k & 31;
+      const before = this.below[i * (this.words + 1) + word];
+      if (bits === 0) return before;
+      const low = this.rows[i * this.words + word] & (1 << bits) - 1;
+      return before + bits - bitCount(low >>> 0);
+    }
+  };
+  function bitCount(x) {
+    x = x - (x >>> 1 & 1431655765);
+    x = (x & 858993459) + (x >>> 2 & 858993459);
+    return Math.imul(x + (x >>> 4) & 252645135, 16843009) >>> 24;
   }
   function myersLines(b, a) {
     const n = b.length;
@@ -1231,9 +1300,17 @@
       });
       return new _TaskDocument(rows, this.eol, this.trailingEol, this.names, this.markers, ids.next + this.next);
     }
+    /**
+     * The document with every task entry in it frozen, their tasks and places too: a document kept and read by several
+     * readers, whose answers hand entries' parts on. The document itself keeps making what it makes on first use.
+     */
+    frozen() {
+      for (const entry of this.spans.keys()) deepFrozen(entry);
+      return this;
+    }
     /** The headings and the task lines, in file order, each with its tag's number. */
     outline() {
-      return this.rows.flatMap((row, line) => {
+      return this.outlined ??= this.rows.flatMap((row, line) => {
         const task = isTaskLine(row.line);
         return task || SECTION_HEADING_RE.test(row.line) || GROUP_HEADING_RE.test(row.line) ? [{ line, raw: row.line, task, tag: tagNumber(row.tag) }] : [];
       });
@@ -1250,11 +1327,14 @@
     }
     /** The projects of `## Projects`, as the file has them: none without the heading. */
     projectTree() {
-      return readTree(this.lines);
+      return this.tree ??= readTree(this.lines);
+    }
+    span() {
+      return this.treeLines ??= treeSpan(this.lines);
     }
     /** The file has `## Projects`. */
     hasProjectTree() {
-      return treeSpan(this.lines).heading !== null;
+      return this.span().heading !== null;
     }
     /**
      * The file with `tree` as its `## Projects`: the list's lines in place of the ones it had (where the first stood, else
@@ -1262,7 +1342,7 @@
      * file's end without Inbox). The same tree changes nothing.
      */
     withProjectTree(tree) {
-      const span = treeSpan(this.lines);
+      const span = this.span();
       if (span.heading !== null && span.extra.length === 0 && tree.same(readTree(this.lines))) return this;
       const mint = this.mint();
       const lines = mint.rows(treeLines(tree, span.unit));
@@ -1322,7 +1402,12 @@
     }
     /** The task or subtask whose tag is `id`, wherever it stands; undefined when none has it. */
     byId(id) {
-      return flatten(this.allTasks()).find((entry) => entry.id === id);
+      if (this.idIndex === void 0) {
+        const index = /* @__PURE__ */ new Map();
+        for (const entry of flatten(this.allTasks())) if (!index.has(entry.id)) index.set(entry.id, entry);
+        this.idIndex = index;
+      }
+      return this.idIndex.get(id);
     }
     /** The task or subtask at that place, if there is one. */
     find(section, index, path) {
@@ -1335,7 +1420,7 @@
       return this.spanOf(entry).line;
     }
     allTasks() {
-      return SECTION_KEYS.flatMap((key) => this.tasks(key));
+      return this.everyTask ??= SECTION_KEYS.flatMap((key) => this.tasks(key));
     }
     /** Where the tags of the lines a change makes after this document begin: past every tag it has. */
     nextTag() {
@@ -1776,7 +1861,7 @@
         const place = parent ? { index: parent.index, path: [...parent.path, entries.length] } : { index: firstIndex + entries.length, path: [] };
         const projects = parent ? parentProjects ?? [] : parsed.task.projects;
         const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, group, 0, spans, projects);
-        const entry = { id: this.rows[i].tag, section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, projects, subtasks };
+        const entry = { id: this.rows[i].tag, section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: children.length === 0 && parsed.task.children.length === 0 ? parsed.task : { ...parsed.task, children }, group, projects, subtasks };
         entries.push(entry);
         spans.set(entry, { line: i, lineCount: 1 + children.length });
         i += 1 + children.length;
@@ -2539,12 +2624,12 @@
     const s = settings.sections;
     return [s.inbox, s.now, s.soon, s.backlog, s.done];
   }
-  function parseText(text, settings) {
+  function parseText(text, settings, markers = markersOf(settings)) {
     const s = settings.sections;
     return TaskDocument.parse(
       text,
       { inbox: s.inbox, backlog: s.backlog, now: s.now, soon: s.soon, done: s.done, ungrouped: settings.groups.ungrouped },
-      markersOf(settings)
+      markers
     );
   }
   function readingKey(settings) {
@@ -2795,6 +2880,7 @@ ${e.calendar}`;
   var SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
   var TRAILING_PUNCTUATION_RE = /[.,;:!?)\]}'"»]+$/u;
   function textParts(text) {
+    if (!text.includes("[") && !text.includes("http")) return text === "" ? [] : [{ kind: "text", text }];
     const parts = [];
     const pushText = (s) => {
       if (s === "") return;
@@ -3249,6 +3335,31 @@ ${key.title}`.toLowerCase();
     return parts.join(" ");
   }
 
+  // core/application/calendarsRefresh.ts
+  var SECOND_MS = 1e3;
+  var FEED_SILENCE_MS = 15e3;
+  function calendarsAsk(reason, cached) {
+    if (reason === "refresh") return { feeds: "forced", waitFeeds: true };
+    if (reason === "peek" && cached) return { feeds: "none", waitFeeds: false };
+    return { feeds: "due", waitFeeds: false };
+  }
+  function feedKey(settings) {
+    const { clientId, refreshToken } = settings.google;
+    return JSON.stringify([clientId, refreshToken]);
+  }
+  function feedDue(last, nowMs, settings) {
+    const seconds = settings.google.refreshSeconds;
+    if (seconds <= 0 || last === null || last.key !== feedKey(settings)) return true;
+    return nowMs - last.atMs >= seconds * SECOND_MS;
+  }
+  function feedProblem(e) {
+    if (e instanceof SourceProblemError) return e.problem;
+    return { kind: "failed", detail: e instanceof Error ? e.message : String(e) };
+  }
+  function feedSilence() {
+    return new SourceProblemError({ kind: "noAnswer", seconds: FEED_SILENCE_MS / SECOND_MS }, `no answer in ${FEED_SILENCE_MS / SECOND_MS} s`);
+  }
+
   // core/application/cardDue.ts
   function cardDue(item, day) {
     const date = item.dueDate !== null && item.dueDate !== day ? item.dueDate : null;
@@ -3607,11 +3718,18 @@ ${key.title}`.toLowerCase();
     return isOpen(entry.task.status) ? entry.section !== "done" : true;
   }
   function projectStatuses(tree, doc) {
-    const tasks = tasksOf(doc).filter(counts);
+    const byProject = /* @__PURE__ */ new Map();
+    for (const entry of tasksOf(doc).filter(counts)) {
+      for (const key of new Set(entry.task.projects.map(projectKey))) {
+        const own = byProject.get(key);
+        if (own) own.push(entry);
+        else byProject.set(key, [entry]);
+      }
+    }
     const statuses = /* @__PURE__ */ new Map();
     const visit = (node) => {
       const children = node.children.map(visit);
-      const own = tasks.filter((entry) => namesProject(entry.task.projects, node.name));
+      const own = byProject.get(projectKey(node.name)) ?? [];
       const total = own.length + children.reduce((sum, child) => sum + child.tasks, 0);
       const status = own.some((e) => isOpen(e.task.status)) || children.some((c) => c.status === "active") ? "active" : total === 0 || children.some((c) => c.status !== "done") ? "waiting" : "done";
       statuses.set(projectKey(node.name), status);
@@ -6858,17 +6976,19 @@ ${key.title}`.toLowerCase();
      * service's; the door's when the host hands its ids back), so a key's task is found by its id. Otherwise an id means
      * nothing here and a key names its task by place and line alone.
      */
-    constructor(settings, clock, identity = null, keysById = identity !== null, legacy = { list: () => [], ready: () => true }) {
+    constructor(settings, clock, identity = null, keysById = identity !== null, legacy = { list: () => [], ready: () => true }, cache = null) {
       this.settings = settings;
       this.clock = clock;
       this.identity = identity;
       this.keysById = keysById;
       this.legacy = legacy;
+      this.cache = cache;
     }
     moment() {
       const settings = this.settings.get();
       const boundary = boundaryOf(settings);
-      return { settings, boundary, today: boundary.dayOf(this.clock.now()), reading: JSON.stringify([readingKey(settings), settings.dayStartHour, this.legacy.ready()]) };
+      const key = this.cache === null ? readingKey(settings) : this.cache.memo(settings, "readingKey", () => readingKey(settings));
+      return { settings, boundary, today: boundary.dayOf(this.clock.now()), reading: JSON.stringify([key, settings.dayStartHour, this.legacy.ready()]) };
     }
     today() {
       return this.moment().today;
@@ -6881,6 +7001,10 @@ ${key.title}`.toLowerCase();
       return isBlankTitle(text, this.priorityLevels().map((l) => l.prefix));
     }
     read(text, at = this.moment()) {
+      if (this.cache !== null) {
+        const reading = this.textReading(this.cache, text, at);
+        return { doc: this.identified(text, reading.tidied, () => reading.tidied), changed: reading.changed };
+      }
       const { settings } = at;
       const parsed = parseText(text, settings);
       const whole = parsed.ensureSections(sectionNames(settings));
@@ -6890,6 +7014,7 @@ ${key.title}`.toLowerCase();
     }
     /** The text after `operation` on the document read and normalized; the result is normalized again. */
     change(text, operation, at = this.moment()) {
+      if (this.cache !== null) return this.written(this.read(text, at).doc, operation, at);
       const doc = this.tidied(parseText(text, at.settings).ensureSections(sectionNames(at.settings)), at);
       return this.written(this.identified(text, doc, () => doc), operation, at);
     }
@@ -6902,12 +7027,20 @@ ${key.title}`.toLowerCase();
     }
     /** The document as the file has it, with every section, not normalized. */
     asRead(text, at = this.moment()) {
+      if (this.cache !== null) {
+        const reading = this.textReading(this.cache, text, at);
+        return this.identified(text, reading.whole, () => reading.tidied);
+      }
       const whole = parseText(text, at.settings).ensureSections(sectionNames(at.settings));
       return this.identified(text, whole, () => this.tidied(whole, at));
     }
     /** The text as the file has it, unnormalized and without the sections it lacks: where a line stands in it. */
     parse(text) {
       const at = this.moment();
+      if (this.cache !== null) {
+        const reading = this.textReading(this.cache, text, at);
+        return this.identified(text, reading.parsed, () => reading.tidied);
+      }
       const parsed = parseText(text, at.settings);
       return this.identified(text, parsed, () => this.tidied(parsed.ensureSections(sectionNames(at.settings)), at));
     }
@@ -6918,9 +7051,30 @@ ${key.title}`.toLowerCase();
     /** `doc`, read from `text` with each line tagged by its line, tagged by who its lines are; `reading`, the text tidied for today. */
     identified(text, doc, reading) {
       const ids = this.identity?.of(text, reading);
-      return ids ? doc.retagged(ids) : doc;
+      if (!ids) return doc;
+      return this.cache === null ? doc.retagged(ids) : this.cache.retagged(doc, ids);
+    }
+    /**
+     * `text` parsed, with every section, and tidied at `at`, as `read` makes them, kept in `cache` by all they are made of:
+     * the text, the settings, the day, whether the host's notes are complete, and the notes.
+     */
+    textReading(cache, text, at) {
+      const notes = this.legacy.list();
+      const reading = `${cache.keyOf(at.settings)}
+${at.reading}`;
+      return cache.reading(text, reading, at.today, cache.keyOf(notes), () => {
+        const parsed = parseText(text, at.settings, cache.memo(at.settings, "markers", () => markersOf(at.settings)));
+        const whole = parsed.ensureSections(sectionNames(at.settings));
+        const tidied = this.tidied(whole, at);
+        const changed2 = whole === parsed ? tidied !== whole : this.tidied(parsed, at) !== parsed;
+        return { parsed, whole, tidied, changed: changed2 };
+      });
     }
     idsFor(text) {
+      if (this.cache !== null && this.identity !== null) {
+        const cache = this.cache;
+        return this.identity.of(text, () => this.textReading(cache, text, this.moment()).tidied);
+      }
       return this.identity?.of(text, () => this.tidied(parseText(text, this.settings.get()).ensureSections(sectionNames(this.settings.get())), this.moment()));
     }
     /**
@@ -7960,7 +8114,9 @@ ${key.title}`.toLowerCase();
   var HELD = 8;
   var NO_TASK_IDS = { next: 0, lines: [] };
   var TaskIdentity = class {
-    constructor(state = NO_TASK_IDS) {
+    /** `cache`: what identities settled on before, shared across the door's calls, so a reading from a state is matched once. */
+    constructor(state = NO_TASK_IDS, cache = null) {
+      this.cache = cache;
       this.last = null;
       /** The ids an undo step gave the lines of its text, by line, until that text is read. */
       this.pending = null;
@@ -7975,7 +8131,18 @@ ${key.title}`.toLowerCase();
      */
     of(text, read) {
       if (this.last?.text === text) return this.last.ids;
+      if (this.cache === null || this.pending !== null) return this.settled(text, read());
       const doc = read();
+      const from = this.current;
+      const settled = this.cache.settled(doc, from, () => {
+        const ids = this.settled(text, doc);
+        return { state: this.current, changed: this.current !== from, ids };
+      });
+      if (settled.changed) this.current = settled.state;
+      this.last = { text, ids: settled.ids };
+      return settled.ids;
+    }
+    settled(text, doc) {
       const outline = doc.outline();
       const next = this.current.next;
       const own = this.pending?.text === text;
@@ -8075,6 +8242,106 @@ ${key.title}`.toLowerCase();
     return Math.min(MINUTES_PER_DAY, Math.max(0, Math.round(minute / step) * step));
   }
 
+  // core/application/ReadingCache.ts
+  var ReadingCache = class {
+    constructor(size = 6) {
+      this.size = size;
+      this.settingsTexts = [];
+      this.readings = [];
+      this.settledIds = /* @__PURE__ */ new WeakMap();
+      this.retaggedDocs = /* @__PURE__ */ new WeakMap();
+      this.keys = /* @__PURE__ */ new WeakMap();
+      this.derived = /* @__PURE__ */ new WeakMap();
+    }
+    /** The plugin's settings from its `data.json`, or the defaults for nothing; frozen, as the calls share them. */
+    settings(json) {
+      const kept = this.settingsTexts.find((e) => e.text === json);
+      if (kept) return kept.value;
+      const value = deepFrozen(plainCopy(settingsFrom(json.trim() === "" ? null : JSON.parse(json))));
+      this.keep(this.settingsTexts, { text: json, value });
+      return value;
+    }
+    /** The text read for `today` under the reading `reading` with the notes `notes`, made by `make` the first time. */
+    reading(text, reading, today, notes, make) {
+      const kept = this.readings.find((e) => e.text === text && e.reading === reading && e.today === today && e.notes === notes);
+      if (kept) return kept.value;
+      const made = make();
+      const value = { parsed: made.parsed.frozen(), whole: made.whole.frozen(), tidied: made.tidied.frozen(), changed: made.changed };
+      this.keep(this.readings, { text, reading, today, notes, value });
+      return value;
+    }
+    /**
+     * What an identity in `from` settles on reading `doc`, made by `make` the first time. Kept as frozen copies, found by
+     * content: a host may change the state it handed in, and the state answered is handed on to hosts.
+     */
+    settled(doc, from, make) {
+      const entries = this.settledIds.get(doc) ?? [];
+      const kept = entries.find((e) => sameIdState(e.from, from));
+      if (kept) return kept.settled;
+      const made = make();
+      const was = deepFrozen(plainCopy(from));
+      const settled = { ...made, state: made.changed ? deepFrozen(plainCopy(made.state)) : was };
+      this.keep(entries, { from: was, settled });
+      this.settledIds.set(doc, entries);
+      return settled;
+    }
+    /** `doc` retagged by `ids`, made once for the same ids. */
+    retagged(doc, ids) {
+      const entries = this.retaggedDocs.get(doc) ?? [];
+      const kept = entries.find((e) => e.ids === ids);
+      if (kept) return kept.doc;
+      const tagged = doc.retagged(ids).frozen();
+      this.keep(entries, { ids, doc: tagged });
+      this.retaggedDocs.set(doc, entries);
+      return tagged;
+    }
+    /**
+     * What `make` derives from `owner` under the name `slot`, made once for the same object: only for an object no caller
+     * changes, one this cache froze or a document it read; anything else is made anew.
+     */
+    memo(owner, slot, make) {
+      if (!Object.isFrozen(owner) && !(owner instanceof TaskDocument)) return make();
+      let slots = this.derived.get(owner);
+      if (slots === void 0) this.derived.set(owner, slots = /* @__PURE__ */ new Map());
+      if (slots.has(slot)) return slots.get(slot);
+      const value = make();
+      slots.set(slot, value);
+      return value;
+    }
+    /** A value's JSON, made once for an object this cache froze; anything else, whose content may change, made anew. */
+    keyOf(value) {
+      if (!Object.isFrozen(value)) return JSON.stringify(value);
+      const kept = this.keys.get(value);
+      if (kept !== void 0) return kept;
+      const key = JSON.stringify(value);
+      this.keys.set(value, key);
+      return key;
+    }
+    keep(entries, entry) {
+      entries.unshift(entry);
+      if (entries.length > this.size) entries.length = this.size;
+    }
+  };
+  function sameIdState(a, b) {
+    if (a === b) return true;
+    if (a.next !== b.next || a.lines.length !== b.lines.length) return false;
+    for (let i = 0; i < a.lines.length; i++) {
+      const x = a.lines[i];
+      const y = b.lines[i];
+      if (x.id !== y.id || x.raw !== y.raw || x.task !== y.task) return false;
+    }
+    const ah = a.held ?? {};
+    const bh = b.held ?? {};
+    const keys = Object.keys(ah);
+    if (keys.length !== Object.keys(bh).length) return false;
+    for (const key of keys) {
+      const x = ah[key];
+      const y = bh[key];
+      if (y === void 0 || x.length !== y.length || x.some((raw, i) => raw !== y[i])) return false;
+    }
+    return true;
+  }
+
   // core/application/DayServiceImpl.ts
   function dayOpening(date, boundary, today, now, hour) {
     return date === today ? { kind: "now", minute: boundary.offsetOf(date, now) } : { kind: "hour", minute: boundary.offsetOfHour(hour) };
@@ -8090,14 +8357,17 @@ ${key.title}`.toLowerCase();
   function settingsOf(json) {
     return settingsFrom(json.trim() === "" ? null : JSON.parse(json));
   }
+  var NO_NOTES = [];
+  var DOOR_CACHE = new ReadingCache();
   var Call = class {
-    constructor(context) {
+    constructor(context, cache) {
       this.context = context;
+      this.cache = cache;
       /** What the call changed of the settings, every key it wrote. */
       this.changed = {};
       this.kept = {};
       this.settingsText = context.settings ?? "";
-      this.current = settingsOf(this.settingsText);
+      this.current = cache === null ? settingsOf(this.settingsText) : cache.settings(this.settingsText);
       const clock = { now: () => new Date(context.nowMs) };
       this.clock = clock;
       const store = {
@@ -8106,8 +8376,8 @@ ${key.title}`.toLowerCase();
         onChange: () => () => void 0
       };
       this.store = store;
-      this.identity = new TaskIdentity(context.ids);
-      this.rules = new TaskRules(store, clock, this.identity, context.ids !== void 0, { list: () => context.projects ?? [], ready: () => true });
+      this.identity = new TaskIdentity(context.ids, cache);
+      this.rules = new TaskRules(store, clock, this.identity, context.ids !== void 0, { list: () => context.projects ?? NO_NOTES, ready: () => context.projectsReady !== false }, cache);
       this.reads = new TaskReads(this.rules, store, clock, { tree: () => this.tree(), screen: () => this.projectsScreen });
       this.writes = new TaskWrites(this.rules, this.reads);
       this.text = context.tasks ?? null;
@@ -8127,7 +8397,9 @@ ${key.title}`.toLowerCase();
     }
     /** The projects of the file as this call has it, the tasks' own in the tree; none without a file. */
     tree() {
-      return this.text === null ? ProjectTree.EMPTY : projectTreeOf(this.snapshot().doc);
+      if (this.text === null) return ProjectTree.EMPTY;
+      const doc = this.snapshot().doc;
+      return this.cache === null ? projectTreeOf(doc) : this.cache.memo(doc, "tree", () => deepFrozen(projectTreeOf(doc)));
     }
     get settings() {
       return this.current;
@@ -8142,6 +8414,11 @@ ${key.title}`.toLowerCase();
     }
     hasTasks() {
       return this.text !== null;
+    }
+    /** The host handed in who the tasks are: an id it names is one the door gave. Throws without a tasks file. */
+    knowsIds() {
+      this.tasks();
+      return this.context.ids !== void 0;
     }
     snapshot() {
       const at = this.rules.moment();
@@ -8389,6 +8666,81 @@ ${key.title}`.toLowerCase();
       c.effects.tasks = c.rules.emptyFile();
     }
   };
+  function undone(c, state, call) {
+    if (call.method === "tasks.renameProject") {
+      const [from, to] = call.args;
+      const name = c.rules.cleanName(to);
+      return name === null ? state : renamedIn(state, name, from);
+    }
+    if (call.method === "tasks.createProject" && call.projectsScreen) {
+      const [typed2, place] = call.args;
+      const name = c.rules.cleanName(typed2);
+      if (name === null) return state;
+      const before = call.projectsScreen;
+      let next = state;
+      if (state.selected !== void 0 && sameNode(state.selected, projectNodeOf(name))) {
+        const { selected: _made, ...rest } = state;
+        next = before.selected === void 0 ? rest : { ...rest, selected: before.selected };
+      }
+      const parent = place?.parent ? c.tree().find(place.parent) : null;
+      const above = (parent?.path ?? []).map(projectNodeOf);
+      const now = next.folded ?? [];
+      const opened = (before.folded ?? []).filter((node) => above.some((a) => sameNode(a, node)) && !now.some((n) => sameNode(n, node)));
+      if (opened.length === 0) return next;
+      const isOpened = (node) => opened.some((o) => sameNode(o, node));
+      const kept = (before.folded ?? []).filter((node) => isOpened(node) || now.some((n) => sameNode(n, node)));
+      return { ...next, folded: [...kept, ...now.filter((node) => !kept.some((k) => sameNode(k, node)))] };
+    }
+    return state;
+  }
+  var REPLICA_TASKS = {
+    /**
+     * The device's Projects screen after a host replayed its pending calls over a file changed elsewhere: `idMap` (old id
+     * → new id) the ids the replay gave the tasks its creates made again; the carry's tasks follow them and stand as the
+     * file has them now; `dropped`, the calls the replay dropped, their changes of the screen taken back, the last first.
+     * Writes no tasks; answers the screen, which the answer's `projectsScreen` carries too.
+     */
+    reconcile: (c, [idMap, dropped]) => {
+      const ids = idMap ?? {};
+      const doc = c.hasTasks() ? c.snapshot().doc : null;
+      const moved2 = (id) => Object.prototype.hasOwnProperty.call(ids, id) ? ids[id] : id;
+      const fresh = (key) => {
+        if (key.id === void 0) return key;
+        const entry = doc?.byId(moved2(key.id));
+        return entry ? keyOf(entry) : { ...key, id: moved2(key.id) };
+      };
+      let state = c.projectsScreen;
+      for (const call of [...dropped ?? []].reverse()) state = undone(c, state, call);
+      const carry = state.carry;
+      if (carry) {
+        const cards = carry.cards?.map((card) => ({ ...card, key: fresh(card.key), ...card.lifted && { lifted: { ...card.lifted, id: moved2(card.lifted.id) } } }));
+        state = { ...state, carry: { ...carry, keys: carry.keys.map(fresh), ...cards && { cards } } };
+      }
+      c.keepProjectsScreen(state);
+      return state;
+    },
+    /**
+     * The key of the task `id` names (`TaskItem.id`) in the file as read now, null when no task has it; nothing written.
+     * Null without `ids` in the context too: the ids then are fresh, and one may name another task.
+     */
+    keyOf: (c, [id]) => {
+      if (!c.knowsIds()) return null;
+      const entry = c.snapshot().doc.byId(id);
+      return entry ? keyOf(entry) : null;
+    },
+    /** The list and name of the section `id` names (`ListSection.id`) in the file as read now, null when no section has it or without `ids`. */
+    sectionOf: (c, [id]) => {
+      if (!c.knowsIds()) return null;
+      const doc = c.snapshot().doc;
+      for (const list of GROUPED_LISTS) {
+        const group = doc.groups(list).find((g) => g.id === id && g.name !== null);
+        if (group) return { list, name: group.name };
+      }
+      return null;
+    }
+  };
+  var REPLICA_TASK_NAMES = Object.keys(REPLICA_TASKS);
+  var HOST_TASK_METHODS = ["onChange"];
   var KEPT_TASKS = {
     /** `pickProjectNode` on a wide screen. */
     tapProjectNode: (c, [node]) => c.keepProjectsScreen(tapped(c.projectsScreen, c.tree(), node)),
@@ -8421,6 +8773,7 @@ ${key.title}`.toLowerCase();
     /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
     boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
   };
+  var HOST_DAY_METHODS = ["onDayChange", "catchUp"];
   var BOUNDARY = {
     startHour: (c) => boundaryOf2(c).startHour,
     dayOf: (c, [ms]) => boundaryOf2(c).dayOf(new Date(ms)),
@@ -8466,12 +8819,12 @@ ${key.title}`.toLowerCase();
       }
     }
     const fetched = c.context.fetched ?? FETCHED_BY_DEFAULT;
-    return { sources: CALENDAR_SOURCES, files, problem: (s) => problems.get(s) ?? null, fed: (s) => fetched.includes(s) };
+    return { sources: CALENDAR_SOURCES, files, problem: (s) => problems.get(s) ?? c.context.feedProblems?.[s] ?? null, fed: (s) => fetched.includes(s) };
   }
   function calendarDay(c) {
     const reading = readingOf(c);
     const day = new CalendarDay(reading, c.settings, c.now);
-    const carried = day.carryOver(true);
+    const carried = day.carryOver((c.context.host ?? "ios") === "ios");
     if (!carried) return day;
     c.saveSettings(carried);
     return new CalendarDay(reading, c.settings, c.now);
@@ -8496,6 +8849,20 @@ ${key.title}`.toLowerCase();
   function meetings(c, fromMs, toMs) {
     return calendarDay(c).timedBetween(new Date(fromMs), new Date(toMs)).map((e) => ({ title: e.title, startMs: e.start.getTime(), endMs: e.end.getTime() }));
   }
+  var CALENDARS_REFRESH = {
+    ask: (_c, [reason, cached]) => calendarsAsk(reason, cached === true),
+    feedKey: (c) => feedKey(c.settings),
+    feedDue: (c, [last]) => feedDue(last ?? null, c.context.nowMs, c.settings),
+    problem: (_c, [failure]) => {
+      if (failure instanceof Error || failure === null || typeof failure !== "object") return feedProblem(failure);
+      const { problem, message } = failure;
+      if (problem !== void 0) return problem;
+      return typeof message === "string" ? feedProblem(new Error(message)) : feedProblem(failure);
+    },
+    silence: () => ({ ms: FEED_SILENCE_MS, problem: feedSilence().problem })
+  };
+  var PHONE_CALENDAR_METHODS = ["files", "sources", "meetings"];
+  var HOST_CALENDAR_METHODS = ["onChange", "keepFresh"];
   var SETTINGS_METHODS = [
     "form",
     "setTasksFile",
@@ -8537,6 +8904,7 @@ ${key.title}`.toLowerCase();
       }
     ])
   );
+  var HOST_SETTINGS_METHODS = ["bindClientSecret"];
   var SCREEN_SETTINGS = {
     get: (c) => screenSettingsOf(c.settings)
   };
@@ -8775,13 +9143,14 @@ ${key.title}`.toLowerCase();
     return `obsidian://open?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(file)}`;
   }
   var SPACES = {
-    tasks: { ...TASKS, ...KEPT_TASKS },
+    tasks: { ...TASKS, ...KEPT_TASKS, ...REPLICA_TASKS },
     days: { ...DAYS, stepScreen: (c, [from, shift]) => {
       const at = from;
       return stepFunnel({ mode: at.mode === "projects" ? "done" : at.mode, date: at.date }, shift, c.rules.today());
     } },
     boundary: BOUNDARY,
     calendars: CALENDARS,
+    calendarsRefresh: CALENDARS_REFRESH,
     history: HISTORY,
     settings: SETTINGS,
     screenSettings: SCREEN_SETTINGS,
@@ -8796,16 +9165,30 @@ ${key.title}`.toLowerCase();
     projects: PROJECTS,
     rules: { ...Object.fromEntries(Object.entries({ ...RULES, ...KEPT_RULES }).map(([name, fn]) => [name, (_c, args) => fn(...args)])), constants: () => CONSTANTS }
   };
+  var DOOR_COVERAGE = {
+    TaskService: { space: "tasks", host: HOST_TASK_METHODS, own: [...KEPT_TASK_NAMES, ...REPLICA_TASK_NAMES] },
+    DayService: { space: "days", host: HOST_DAY_METHODS, own: ["stepScreen"] },
+    UndoService: { space: "history", host: ["onChange"] },
+    CalendarService: { space: "calendars", host: HOST_CALENDAR_METHODS, own: PHONE_CALENDAR_METHODS },
+    SettingsService: { space: "settings", host: HOST_SETTINGS_METHODS },
+    ScreenSettingsStore: { space: "screenSettings", host: ["onChange"] },
+    GoogleAccount: { hostOwned: "Google's login is a browser's consent and a token fetched over the network, and whether one is kept goes with it: the door makes no request" },
+    WorkCalendarSetup: { hostOwned: "the Scriptable script and the Shortcuts export are the Obsidian plugin's fallback on the iPhone; an app writes calendar/iphone.json itself (iphoneCalendarText)" },
+    DayEventsAsk: { hostOwned: "`calendars.events` answers the day over the files handed in; fetching them afresh is the host's" },
+    PolledScreen: { hostOwned: "the frontend implements it for keepFresh, which is the host's" },
+    CalendarPoll: { hostOwned: "keepFresh answers it, and polling is the host's" },
+    SecretField: { hostOwned: "the frontend implements it for bindClientSecret, which is the host's" }
+  };
   function doorMethods() {
     return Object.entries(SPACES).flatMap(([space, handlers]) => Object.keys(handlers).map((name) => `${space}.${name}`));
   }
-  function callDoor(method, args, context) {
+  function callDoor(method, args, context, cache = DOOR_CACHE) {
     try {
       const [space, name] = method.split(".");
       const handler = SPACES[space]?.[name];
       if (!handler || !Object.prototype.hasOwnProperty.call(SPACES, space) || !Object.prototype.hasOwnProperty.call(SPACES[space], name)) throw new DoorError("unknownMethod", `no method ${method}`);
       if (!Array.isArray(args)) throw new DoorError("badArguments", "the arguments are a list");
-      const call = new Call(context);
+      const call = new Call(context, cache);
       const result = handler(call, [...args]);
       return { ok: true, result: result === void 0 ? null : result, ...call.effects };
     } catch (e) {
