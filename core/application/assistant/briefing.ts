@@ -5,18 +5,28 @@ import type { TaskItem } from "../contracts";
 
 /** What a question tells the model of the tasks, and which task each ref names (`TaskItem.id`). Plain data. */
 export interface Briefing {
-	/** JSON: today and the tasks, each by its ref. */
+	/** JSON: today and the candidates, each by its ref. */
 	readonly input: string;
-	/** Ref → `TaskItem.id`. */
+	/** Ref → `TaskItem.id`, the candidates only. */
 	readonly refs: Readonly<Record<string, string>>;
 }
 
-/** A task as the model reads it: words, not codes. */
-export interface BriefedTask {
-	readonly ref: string;
+/** Something Max can start now: a task, a folded task's next step, or an unfolded task's subtask. */
+export interface Candidate {
+	readonly item: TaskItem;
+	/** The task at the top of its tree: its list is the candidate's. */
+	readonly top: TaskItem;
+	/** The tasks above it, the top one first. */
+	readonly goals: readonly TaskItem[];
+	/** For a folded task's next step: the open tasks of that folded branch after the step, file order, depth first. */
+	readonly after: readonly TaskItem[];
+}
+
+/** What a goal tells the model: what it is for, not something to choose. */
+export interface BriefedGoal {
 	readonly title: string;
-	readonly list: "today" | "soon" | "inbox" | "backlog" | "done";
-	readonly inProgress: boolean;
+	/** Its nested lines without a checkbox, Markdown. */
+	readonly description: string | null;
 	/** Its priority's prefix. */
 	readonly priority: string | null;
 	/** Its due date, ISO. */
@@ -25,27 +35,76 @@ export interface BriefedTask {
 	readonly time: string | null;
 	readonly projects: readonly string[];
 	readonly labels: readonly string[];
-	/** The ref of the task it is a step of. */
-	readonly parent: string | null;
 }
 
-const LIST_WORDS: Readonly<Record<SectionKey, BriefedTask["list"]>> = { now: "today", soon: "soon", inbox: "inbox", backlog: "backlog", done: "done" };
+/** A candidate as the model reads it: words, not codes. */
+export interface BriefedCandidate extends BriefedGoal {
+	readonly ref: string;
+	/** Its top task's list. */
+	readonly list: "today" | "soon" | "inbox" | "backlog" | "done";
+	readonly inProgress: boolean;
+	readonly goals: readonly BriefedGoal[];
+	/** Titles of the steps after it in its folded branch. */
+	readonly after: readonly string[];
+}
 
-/** The briefing of `tasks` (each with its open subtasks below it) on `today`: refs t1, t2… in the order sent, a subtask right after its task. */
-export function briefingOf(today: string, tasks: readonly TaskItem[]): Briefing {
-	const briefed: BriefedTask[] = [];
-	const refs: Record<string, string> = {};
+const LIST_WORDS: Readonly<Record<SectionKey, BriefedCandidate["list"]>> = { now: "today", soon: "soon", inbox: "inbox", backlog: "backlog", done: "done" };
+
+/**
+ * What Max can start now among `tasks` (open, each with its open subtasks), in file order: a task with no open subtask
+ * itself; a folded task only its next step, the one its card shows; an unfolded task with open subtasks not itself but
+ * each open subtask by these same rules. A task met twice is a candidate once.
+ */
+export function candidatesOf(tasks: readonly TaskItem[]): readonly Candidate[] {
+	const found: Candidate[] = [];
 	const seen = new Set<string>();
-	const add = (item: TaskItem, parent: string | null): void => {
-		if (!item.open || seen.has(item.id)) return;
-		seen.add(item.id);
-		const ref = `t${briefed.length + 1}`;
-		refs[ref] = item.id;
-		briefed.push(briefedTask(item, ref, parent, today));
-		for (const sub of item.subtasks) add(sub, ref);
+	const add = (candidate: Candidate): void => {
+		if (seen.has(candidate.item.id)) return;
+		seen.add(candidate.item.id);
+		found.push(candidate);
 	};
-	for (const item of tasks) add(item, null);
-	return { input: JSON.stringify({ today, tasks: briefed }), refs };
+	const walk = (item: TaskItem, top: TaskItem, goals: readonly TaskItem[]): void => {
+		if (!item.open) return;
+		const step = item.collapsed ? item.card.step : null;
+		if (step) add(stepOf(item, step, top, goals));
+		else if (item.subtasks.length === 0) add({ item, top, goals, after: [] });
+		else for (const sub of item.subtasks) walk(sub, top, [...goals, item]);
+	};
+	for (const item of tasks) walk(item, item, []);
+	return found;
+}
+
+/** The next step of the folded `folded`: the tasks between them are its goals too, the open ones after it its `after`. */
+function stepOf(folded: TaskItem, step: TaskItem, top: TaskItem, goals: readonly TaskItem[]): Candidate {
+	const flat: { item: TaskItem; above: readonly TaskItem[] }[] = [];
+	const flatten = (item: TaskItem, above: readonly TaskItem[]): void => {
+		flat.push({ item, above });
+		for (const sub of item.subtasks) flatten(sub, [...above, item]);
+	};
+	for (const sub of folded.subtasks) flatten(sub, [folded]);
+	const at = flat.findIndex((entry) => entry.item.id === step.id);
+	return { item: step, top, goals: [...goals, ...flat[at].above], after: flat.slice(at + 1).map((entry) => entry.item) };
+}
+
+/** The briefing of the candidates among `tasks` on `today`: refs t1, t2… in the order sent. */
+export function briefingOf(today: string, tasks: readonly TaskItem[]): Briefing {
+	const refs: Record<string, string> = {};
+	const candidates = candidatesOf(tasks).map((candidate, index): BriefedCandidate => {
+		const ref = `t${index + 1}`;
+		refs[ref] = candidate.item.id;
+		const { title, description, ...marks } = briefedGoal(candidate.item, today);
+		return {
+			ref,
+			title,
+			list: LIST_WORDS[candidate.top.list],
+			inProgress: candidate.item.status === "inProgress",
+			...marks,
+			description,
+			goals: candidate.goals.map((goal) => briefedGoal(goal, today)),
+			after: candidate.after.map((item) => item.title),
+		};
+	});
+	return { input: JSON.stringify({ today, candidates }), refs };
 }
 
 /** No task to send. */
@@ -53,17 +112,15 @@ export function isEmptyBriefing(briefing: Briefing): boolean {
 	return Object.keys(briefing.refs).length === 0;
 }
 
-function briefedTask(item: TaskItem, ref: string, parent: string | null, today: string): BriefedTask {
+function briefedGoal(item: TaskItem, today: string): BriefedGoal {
 	return {
-		ref,
 		title: item.title,
-		list: LIST_WORDS[item.list],
-		inProgress: item.status === "inProgress",
+		description: item.description,
 		priority: item.priority?.prefix ?? null,
 		due: item.dueDate,
 		time: item.slot ? `${item.slot.date === today ? "" : `${item.slot.date}T`}${minutesToHHMM(item.slot.start)}` : null,
 		projects: item.projects.map((project) => project.name),
 		labels: item.labels.map((label) => labelTitle(label.name)),
-		parent,
 	};
 }
+

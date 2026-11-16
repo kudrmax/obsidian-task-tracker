@@ -286,7 +286,7 @@ What the popup draws, ready (titles and words included):
 
 ```ts
 type AssistantOutcome =
-  | { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly note: string }
+  | { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly card: TaskCard; readonly note: string }   // card drawn with task's marks
   | { readonly kind: "failed"; readonly title: string; readonly words: string; readonly detail: string }   // the frontend logs detail
   | { readonly kind: "stopped" };
 ```
@@ -603,6 +603,18 @@ No Swift stage (R6).
 - **Backend:** the door gets no assistant method now; `DOOR_COVERAGE` marks `AssistantService` host-owned until the
   iPhone app's assistant. `data.json` writes `assistant` after `resultMark` (`obsidian/settingsFile.ts`' key order, one
   line, with its byte-for-byte test).
+- **Backend (steps):** the `task` outcome carries the card to draw, ready: `{ kind: "task"; title; task: TaskItem; card:
+  TaskCard; note }`. The popup draws `card` with the marks of `task` (as a list card draws `task.card`). A folded task's
+  next step: `task` is that folded task (the topmost folded task above the step, the one it was chosen from) and `card`
+  its own `card` (`over` its title, the step's title below); any other subtask: `task` is the subtask, `card` its own
+  title with its parent's title in `over`, `step` null; a task: `over` null. It is worked out from the tasks as they
+  are when the answer comes (`drawnAnswer`, `TaskLookup.above`), so a fold changed during the wait draws as it is now.
+- **Backend (steps):** the candidate rules belong to the briefing, so every button sends candidates, not only Best task;
+  a task met twice (two scopes overlapping) is one candidate. A folded task's next step is `TaskItem.card.step`, the
+  very item its card shows; the tasks between the folded task and the step are goals too (Move to Belgrade → Find a
+  flat → Pick districts: both are goals), and `after` holds the open tasks of the folded branch after the step in file
+  order, their own subtasks included. A goal's or a step-after's id answered as a ref is `badAnswer`: refs hold the
+  candidates only.
 - **Frontend-obsidian:** the transport logs nothing itself: every failure's detail goes back in the reply, and the
   frontend writes the outcome's `detail` to the console once (a transport that logged too gave the same line twice).
   `ModelTransport`'s doc comment («Logs its own detail») can say so the next time the core is touched.

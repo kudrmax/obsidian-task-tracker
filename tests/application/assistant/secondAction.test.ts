@@ -45,7 +45,7 @@ describe("a second button, added in this file alone", () => {
 		const { question } = transport.asked[0];
 		expect(question.instructions).toBe("Suggest the first small step of this task.");
 		expect(question.answerSchema).toBe(firstStep.answerSchema);
-		expect(JSON.parse(question.input).tasks.map((t: { title: string }) => t.title)).toEqual(["Call the bank", "Find the contract"]);
+		expect(JSON.parse(question.input).candidates.map((t: { title: string }) => t.title)).toEqual(["Find the contract"]);
 		transport.answer({ taskRef: "t1", step: "Find the number." });
 		expect(await outcome).toMatchObject({ kind: "task", title: "First step", note: "Find the number." });
 	});

@@ -185,9 +185,9 @@ describe("AssistantAnswers", () => {
 		new AssistantAnswers(assistant, plainMarkdown(), vi.fn()).press("bestTask");
 		await settle();
 		expect(document.querySelector(".tc-panel.is-answer")).toBeNull();
-		transport.answer({ taskRef: transport.refOf("Write the offer"), reason: "It pays." });
+		transport.answer({ taskRef: transport.refOf("Read a book"), reason: "It rests." });
 		await settle();
-		expect(document.querySelector(".tc-panel.is-answer .tc-card-title")?.textContent).toBe("Write the offer");
+		expect(document.querySelector(".tc-panel.is-answer .tc-card-title")?.textContent).toBe("Read a book");
 	});
 });
 

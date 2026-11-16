@@ -11,28 +11,27 @@ async function listed() {
 const titles = (items: readonly { title: string }[]) => items.map((i) => i.title);
 
 describe("the briefing", () => {
-	it("names each open task by a ref in the order sent, its open subtasks right after it, in words", async () => {
+	it("names each candidate by a ref in the order sent, in words: an unfolded task's open subtask, never the task itself", async () => {
 		const tasks = await listed();
 		const briefing = briefingOf(tasks.today, tasksIn({ kind: "lists", lists: ["now", "soon"] }, { place: "more" }, tasks));
 		const input = JSON.parse(briefing.input);
 		expect(input.today).toBe(TODAY);
-		expect(input.tasks).toEqual([
-			{ ref: "t1", title: "Write the offer", list: "today", inProgress: true, priority: "p1", due: null, time: "14:00", projects: ["Offers"], labels: [], parent: null },
-			{ ref: "t2", title: "Find the template", list: "today", inProgress: false, priority: null, due: null, time: null, projects: ["Offers"], labels: [], parent: "t1" },
-			{ ref: "t3", title: "Pay rent", list: "today", inProgress: false, priority: null, due: null, time: null, projects: ["Home"], labels: [], parent: null },
-			{ ref: "t4", title: "Call the bank", list: "soon", inProgress: false, priority: null, due: "2026-11-20", time: null, projects: [], labels: [], parent: null },
-			{ ref: "t5", title: "Find the contract", list: "soon", inProgress: false, priority: null, due: null, time: null, projects: [], labels: [], parent: "t4" },
-			{ ref: "t6", title: "Read a book", list: "soon", inProgress: false, priority: null, due: null, time: null, projects: [], labels: ["Good fun"], parent: null },
-			{ ref: "t7", title: "Dentist", list: "soon", inProgress: false, priority: null, due: null, time: "2026-11-03T10:00", projects: [], labels: [], parent: null },
+		const offer = { title: "Write the offer", description: null, priority: "p1", due: null, time: "14:00", projects: ["Offers"], labels: [] };
+		const bank = { title: "Call the bank", description: null, priority: null, due: "2026-11-20", time: null, projects: [], labels: [] };
+		expect(input.candidates).toEqual([
+			{ ref: "t1", title: "Find the template", list: "today", inProgress: false, priority: null, due: null, time: null, projects: ["Offers"], labels: [], description: null, goals: [offer], after: [] },
+			{ ref: "t2", title: "Pay rent", list: "today", inProgress: false, priority: null, due: null, time: null, projects: ["Home"], labels: [], description: null, goals: [], after: [] },
+			{ ref: "t3", title: "Find the contract", list: "soon", inProgress: false, priority: null, due: null, time: null, projects: [], labels: [], description: null, goals: [bank], after: [] },
+			{ ref: "t4", title: "Read a book", list: "soon", inProgress: false, priority: null, due: null, time: null, projects: [], labels: ["Good fun"], description: null, goals: [], after: [] },
+			{ ref: "t5", title: "Dentist", list: "soon", inProgress: false, priority: null, due: null, time: "2026-11-03T10:00", projects: [], labels: [], description: null, goals: [], after: [] },
 		]);
 	});
 
-	it("maps each ref to the task's id, and sends no description", async () => {
+	it("maps each ref to the candidate's id", async () => {
 		const tasks = await listed();
 		const sent = tasksIn({ kind: "lists", lists: ["now"] }, { place: "more" }, tasks);
 		const briefing = briefingOf(tasks.today, sent);
-		expect(briefing.refs).toEqual({ t1: sent[0].id, t2: sent[0].subtasks[0].id, t3: sent[1].id });
-		expect(briefing.input).not.toContain("description");
+		expect(briefing.refs).toEqual({ t1: sent[0].subtasks[0].id, t2: sent[1].id });
 	});
 
 	it("survives JSON both ways: plain data", async () => {
@@ -67,7 +66,7 @@ describe("the scopes", () => {
 		const sent = tasksIn({ kind: "target" }, { place: "selection", taskIds: [step.id, closed.id, offer.id] }, tasks);
 		expect(titles(sent)).toEqual(["Write the offer"]);
 		const briefing = JSON.parse(briefingOf(tasks.today, sent).input);
-		expect(titles(briefing.tasks)).toEqual(["Write the offer", "Find the template"]);
+		expect(titles(briefing.candidates)).toEqual(["Find the template"]);
 		expect(titles(tasksIn({ kind: "target" }, { place: "task", taskIds: [step.id] }, tasks))).toEqual(["Find the template"]);
 	});
 
