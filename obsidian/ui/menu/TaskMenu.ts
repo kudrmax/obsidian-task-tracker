@@ -124,8 +124,8 @@ export interface MenuActions {
 	setRepeat(rule: RepeatRule | null): Promise<void>;
 	/** The menu of a card in a calendar menu's stack stays open for it, its card may become the field (`openRename`); any other has closed. */
 	rename(menu: TaskMenu): void;
-	/** The task on the whole screen: to read its description, or with the caret straight in it. */
-	openDescription(editing: boolean): void;
+	/** The task, or `task` the description by the menu is of (`TaskMenuModel.peek`), on the whole screen: to read its description, or with the caret straight in it. */
+	openDescription(editing: boolean, task?: TaskItem): void;
 	/** The task on the whole screen; none where it already is. */
 	openFull?(): void;
 	/** A timeline card's menu stays open for it, its stack may take the field (`openStack`); any other has closed. */
@@ -327,11 +327,12 @@ export class TaskMenu extends LiftedMenu {
 		}
 	}
 
-	/** The start of the description, over the copy; a tap on it reads the whole, a link in it opens as it is. */
+	/** The start of the description the menu's model names (a folded card's step's), over the copy; a tap on it reads the whole, a link in it opens as it is. */
 	private peekOf(context: TaskMenuContext): DescriptionPeek | null {
 		const { item, markdown, actions } = context;
-		return DescriptionPeek.open(this.overlay, this.picks, markdown ?? null, item.description, {
-			onRead: () => actions.openDescription(false),
+		const task = context.menu(item).peek;
+		return DescriptionPeek.open(this.overlay, this.picks, markdown ?? null, task?.description ?? null, {
+			onRead: () => actions.openDescription(false, task ?? undefined),
 			onLink: () => this.close(),
 		});
 	}

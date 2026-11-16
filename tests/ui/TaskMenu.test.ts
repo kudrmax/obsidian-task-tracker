@@ -674,7 +674,7 @@ describe("the menu", () => {
 		document.body.innerHTML = "";
 		const again = open(item({ description: "- note" }));
 		(document.querySelector(".tc-desc-peek p") as HTMLElement).click();
-		expect(again.openDescription).toHaveBeenCalledWith(false);
+		expect(again.openDescription).toHaveBeenCalledWith(false, expect.objectContaining({ description: "- note" }));
 	});
 
 	it("opens the description's editor from Add description", () => {
