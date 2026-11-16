@@ -1,4 +1,5 @@
-import { Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
+import { Component, MarkdownRenderer, Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
+import { AssistantAnswers, type MarkdownHost } from "./ui/assistant/AssistantAnswers";
 import { AppleCalendar } from "./infrastructure/AppleCalendar";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 import { openOutside } from "./infrastructure/OutsideLink";
@@ -81,8 +82,9 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
 		this.registerObsidianProtocolHandler(SYNC_ACTION, () => services.syncForApp());
 		this.register(() => services.stopSyncForApp());
+		this.register(() => services.assistant.stopAll());
 		this.handOverPlace(services);
-		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars });
+		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars, assistant: services.assistant });
 		this.addSettingTab(settingsTab);
 		this.register(() => settingsTab.closePage());
 		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), runScript: runAppleScript });
@@ -93,7 +95,18 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			calendars: services.calendars,
 			settings: this.shownSettings(),
 			clock,
+			assistant: new AssistantAnswers(services.assistant, this.markdown()),
 			openInCalendar: (event) => calendarApp.open(event),
+		};
+	}
+
+	/** Obsidian's markdown in a popup of the plugin's: drawn in a component of its own, let go when the popup closes. */
+	private markdown(): MarkdownHost {
+		return (el, text) => {
+			const component = new Component();
+			component.load();
+			el.empty();
+			return { done: MarkdownRenderer.render(this.app, text, el, "", component), release: () => component.unload() };
 		};
 	}
 

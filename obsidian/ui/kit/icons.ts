@@ -54,6 +54,8 @@ const DRAWINGS = {
 	refresh: { d: "M20 12a8 8 0 1 1-2.3-5.7 M20 4v4.5h-4.5" },
 	repeat: { d: "M17 2.5l3.5 3.5-3.5 3.5 M3.5 11.5V10a4 4 0 0 1 4-4h13 M7 21.5L3.5 18 7 14.5 M20.5 12.5V14a4 4 0 0 1-4 4h-13" },
 	stop: { d: `${CIRCLE} M9.5 9.5h5v5h-5z` },
+	/** The assistant: a large spark and a small one. */
+	sparkles: { d: "M10 3.5l1.6 4.4 4.4 1.6-4.4 1.6L10 15.5l-1.6-4.4L4 9.5l4.4-1.6z M18 14l.8 2.2 2.2.8-2.2.8L18 20l-.8-2.2-2.2-.8 2.2-.8z" },
 	/** The view modes (board «Режим вида внизу», variant 1): two columns, all columns, rows, by project. */
 	columns2: { d: "M4.5 4.5h6v15h-6z M13.5 4.5h6v15h-6z" },
 	columns4: { d: "M3 4.5h3v15H3z M8 4.5h3v15H8z M13 4.5h3v15h-3z M18 4.5h3v15h-3z" },
@@ -64,6 +66,11 @@ const DRAWINGS = {
 export type IconName = keyof typeof DRAWINGS;
 
 export const ICONS: Readonly<Record<IconName, IconSpec>> = DRAWINGS;
+
+/** A name the core hands over (an assistant row's icon) is one of the drawings. */
+export function isIconName(name: string): name is IconName {
+	return Object.prototype.hasOwnProperty.call(DRAWINGS, name);
+}
 
 function path(svg: SVGSVGElement, d: string): SVGPathElement {
 	const shape = document.createElementNS(NS, "path");

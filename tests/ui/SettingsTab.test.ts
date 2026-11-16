@@ -7,6 +7,7 @@ import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../.
 import { DEFAULT_SETTINGS } from "../../core/settings";
 import { SETTINGS_FILE, type StoredSettings } from "../../obsidian/settingsFile";
 import { TaskCalendarSettingsTab } from "../../obsidian/ui/SettingsTab";
+import { rig } from "../application/assistant/assistantFakes";
 
 type FileSettings = Omit<StoredSettings, "listShare" | "zoom" | "treeWidth">;
 
@@ -91,7 +92,7 @@ async function open(file: unknown = START, google: GoogleAccount = loggedOut): P
 	disk = new Disk(file);
 	settings = new PluginSettings(disk, FILE, SETTINGS_FILE);
 	await settings.load();
-	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work, calendars });
+	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work, calendars, assistant: rig().assistant });
 	tab.display();
 }
 

@@ -447,6 +447,16 @@ body {
 	--tc-level-hex-w: 88px;
 	--tc-level-hex-pad: calc(var(--tc-space-10) + 1ch);
 	--tc-font-code: var(--font-monospace);
+	/* The assistant: the ring that spins in «⋯» and in its row while a question waits, and the answer's popup in the middle of the window. */
+	--tc-duration-spin: 900ms;
+	--tc-turn: 1turn;
+	--tc-spinner-capsule: var(--tc-icon-l);
+	--tc-spinner-row: var(--tc-icon-m);
+	--tc-stroke-spinner: var(--tc-stroke-2);
+	--tc-answer-w: 360px;
+	--tc-answer-pad: var(--tc-space-16);
+	--tc-answer-gap: var(--tc-space-12);
+	--tc-font-answer-title: var(--tc-font-caption);
 	--tc-month-btn: 32px;
 	--tc-month-icon: var(--tc-icon-m);
 	--tc-day: 36px;
@@ -1344,6 +1354,23 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel button.tc-menu-ask-btn { flex: 1; min-width: 0; }
 .tc-menu-ask-btn > svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
 .tc-panel .tc-menu-title { height: var(--tc-menu-title-h); box-sizing: border-box; padding: 0 var(--tc-space-16); border-bottom: var(--tc-band); display: flex; align-items: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); }
+/* The assistant: «⋯» turns into a ring while a question waits; its row says Stop with the ring in its icon's place. */
+.tc-spinner { display: block; flex-shrink: 0; box-sizing: border-box; border: var(--tc-stroke-spinner) solid var(--tc-muted); border-top-color: transparent; border-radius: var(--tc-radius-circle); animation: tc-spin var(--tc-duration-spin) linear infinite; }
+@keyframes tc-spin { to { transform: rotate(var(--tc-turn)); } }
+.tc-capsule .tc-more-open > .tc-spinner { display: none; width: var(--tc-spinner-capsule); height: var(--tc-spinner-capsule); }
+.tc-capsule .tc-more-open.is-busy > svg { display: none; }
+.tc-capsule .tc-more-open.is-busy > .tc-spinner { display: block; }
+.tc-menu-row > .tc-spinner { width: var(--tc-spinner-row); height: var(--tc-spinner-row); margin: 0 calc((var(--tc-menu-icon) - var(--tc-spinner-row)) / 2); }
+/* The answer: a panel in the middle of the window, its title small, the task's card as in the list, the reason as a description reads, Close. */
+.tc-panel.is-answer { inset: 0; margin: auto; width: var(--tc-answer-w); max-width: calc(100% - 2 * var(--tc-whole-margin)); height: fit-content; max-height: calc(100% - 2 * var(--tc-whole-margin)); overflow-y: auto; overscroll-behavior: contain; padding: var(--tc-answer-pad); display: flex; flex-direction: column; gap: var(--tc-answer-gap); color: var(--tc-text); font-family: var(--tc-font-ui); transform-origin: 50% 50%; transform: scale(var(--tc-menu-scale)); }
+.tc-panel.is-answer.is-shown { transform: none; }
+.tc-answer-title { font-size: var(--tc-font-answer-title); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); }
+.tc-answer-card { cursor: default; }
+.tc-panel.is-answer .tc-answer-note { overflow: visible; }
+.tc-answer-note > :first-child { margin-top: 0; }
+.tc-answer-note > :last-child { margin-bottom: 0; }
+.tc-answer-foot { display: flex; }
+.tc-panel.is-answer button.tc-answer-close { flex: 1; min-width: 0; }
 .tc-panel button.tc-menu-back { width: 100%; height: var(--tc-row); box-sizing: border-box; padding: 0 var(--tc-space-16) 0 var(--tc-space-10); border-bottom: var(--tc-band); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
 .tc-menu-back svg { width: var(--tc-back-icon); height: var(--tc-back-icon); stroke-width: var(--tc-stroke-chevron); }
 
@@ -1542,6 +1569,9 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 .setting-item.tc-settings-link { cursor: pointer; }
 /* On its page the rows stand flat, not in Obsidian's cards: a heading starts on their edge. */
 .tc-settings-page .setting-item-heading { padding-inline: 0; }
+/* More → Assistant: what this Mac found for a field (the path of claude) in the code's type, a prompt across the page's width under its name. */
+.tc-assistant-hint { font-family: var(--tc-font-code); }
+.tc-assistant-prompt { display: block; width: 100%; box-sizing: border-box; margin-bottom: var(--tc-answer-gap); resize: vertical; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); line-height: var(--tc-leading-card); }
 
 /* The tree (board TreeC, variant В). */
 .tc-tree { position: relative; flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: none; display: flex; flex-direction: column; gap: var(--tc-tree-gap); }
