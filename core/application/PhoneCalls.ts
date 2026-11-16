@@ -1090,6 +1090,7 @@ export const DOOR_COVERAGE: Readonly<Record<string, DoorCoverage>> = {
 	PolledScreen: { hostOwned: "the frontend implements it for keepFresh, which is the host's" },
 	CalendarPoll: { hostOwned: "keepFresh answers it, and polling is the host's" },
 	SecretField: { hostOwned: "the frontend implements it for bindClientSecret, which is the host's" },
+	AssistantService: { hostOwned: "no Apple app asks a model yet: prepare and finish come into the door with the iPhone app's assistant (assistant spec, «Platforms»)" },
 };
 
 /** Every method the door answers, `space.name`, in order. */

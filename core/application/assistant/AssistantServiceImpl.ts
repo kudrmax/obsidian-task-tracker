@@ -1,0 +1,281 @@
+import { ASSISTANT_TIMEOUTS, type AssistantSettings, sizeOf } from "../../settings";
+import type {
+	AssistantField,
+	AssistantOffer,
+	AssistantOutcome,
+	AssistantPage,
+	AssistantService,
+	AssistantSetting,
+	PreparedQuestion,
+} from "../contracts";
+import type { SettingsStore, Timers } from "../ports";
+import type { AssistantAction } from "./actions/action";
+import { ASSISTANT_ACTIONS } from "./actions";
+import { briefingOf, isEmptyBriefing } from "./briefing";
+import { ModelChoice } from "./ModelChoice";
+import { type HostModels, type ModelReply, NO_MODELS, StopSwitch } from "./model";
+import { MODEL_PROFILES } from "./models";
+import type { ModelProfile, SettingField } from "./models/profile";
+import { failed, failureWords, goneWords, NO_MODEL_WORDS, STOPPED } from "./outcomes";
+import { type AssistantPlace, type AssistantTarget, tasksIn } from "./scope";
+import { type AssistantTasks, TaskLookup } from "./tasks";
+
+/** How long a transport stopped by the timeout may take to say why before the run ends as a timeout anyway. */
+export const TIMEOUT_GRACE_MS = 5000;
+
+const MORE: AssistantTarget = { place: "more" };
+
+/** What the assistant is put together from: the host's ports, and the buttons and models it knows. */
+export interface AssistantDeps {
+	readonly tasks: AssistantTasks;
+	readonly settings: SettingsStore;
+	readonly timers: Timers;
+	readonly models?: HostModels;
+	readonly actions?: readonly AssistantAction[];
+	readonly profiles?: readonly ModelProfile[];
+}
+
+interface Run {
+	readonly stop: StopSwitch;
+}
+
+/** The assistant over the task service, the settings and the host's models. */
+export class AssistantServiceImpl implements AssistantService {
+	private readonly runs = new Map<string, Run>();
+	private readonly listeners = new Set<() => void>();
+	private unsubscribeSettings: (() => void) | null = null;
+	private readonly choice: ModelChoice;
+	private readonly actions: readonly AssistantAction[];
+	private readonly tasks: AssistantTasks;
+	private readonly settings: SettingsStore;
+	private readonly timers: Timers;
+
+	constructor(deps: AssistantDeps) {
+		this.tasks = deps.tasks;
+		this.settings = deps.settings;
+		this.timers = deps.timers;
+		this.actions = deps.actions ?? ASSISTANT_ACTIONS;
+		this.choice = new ModelChoice(deps.profiles ?? MODEL_PROFILES, deps.models ?? NO_MODELS, () => this.assistant());
+	}
+
+	get busy(): boolean {
+		return this.runs.size > 0;
+	}
+
+	offers(place: AssistantPlace, target: AssistantTarget = { place }): readonly AssistantOffer[] {
+		if (this.choice.chosen() === null) return [];
+		return this.actions
+			.filter((action) => action.places.includes(place))
+			.map((action) => {
+				const running = this.runs.has(runKey(action.id, target));
+				return { actionId: action.id, label: running ? action.labels.running : action.labels.idle, icon: action.icon, running };
+			});
+	}
+
+	press(actionId: string, target: AssistantTarget = MORE): Promise<AssistantOutcome> {
+		const action = this.actionOf(actionId);
+		const key = runKey(action.id, target);
+		const running = this.runs.get(key);
+		if (running) {
+			running.stop.stop("user");
+			return Promise.resolve(STOPPED);
+		}
+		return this.start(action, target, key);
+	}
+
+	stopAll(): void {
+		for (const run of [...this.runs.values()]) run.stop.stop("user");
+	}
+
+	onChange(listener: () => void): () => void {
+		this.listeners.add(listener);
+		this.unsubscribeSettings ??= this.settings.onChange(() => this.emit());
+		return () => {
+			this.listeners.delete(listener);
+			if (this.listeners.size > 0) return;
+			this.unsubscribeSettings?.();
+			this.unsubscribeSettings = null;
+		};
+	}
+
+	async page(): Promise<AssistantPage> {
+		const settings = this.assistant();
+		const named = this.choice.named();
+		const chosen = this.choice.chosen();
+		const available = this.choice.available().map((profile) => ({ id: profile.id, name: profile.name, available: true }));
+		const unserved = chosen ? [] : [{ id: settings.model, name: named?.name ?? settings.model, available: false }];
+		return {
+			models: [...available, ...unserved],
+			chosen: settings.model,
+			unavailable: chosen ? null : (named?.unavailable ?? NO_MODEL_WORDS),
+			fields: named ? await this.fieldsOf(named, chosen !== null) : [],
+			timeoutSeconds: settings.timeoutSeconds,
+			prompts: this.actions.map((action) => {
+				const saved = settings.prompts[action.id];
+				const isDefault = saved === undefined || saved.trim() === "";
+				return { actionId: action.id, title: action.title, prompt: isDefault ? action.defaultPrompt : saved, isDefault };
+			}),
+		};
+	}
+
+	async set(change: AssistantSetting): Promise<void> {
+		const settings = this.assistant();
+		await this.settings.update({ assistant: changed(settings, change) });
+	}
+
+	async prepare(actionId: string, target: AssistantTarget = MORE): Promise<PreparedQuestion | AssistantOutcome> {
+		const action = this.actionOf(actionId);
+		const profile = this.choice.chosen();
+		if (profile === null) return failed(action, this.choice.named()?.unavailable ?? NO_MODEL_WORDS, `model "${this.assistant().model}" is not served here`);
+		const listed = await this.tasks.listed();
+		const briefing = briefingOf(listed.today, tasksIn(action.scope, target, listed));
+		if (isEmptyBriefing(briefing)) return failed(action, action.emptyWords, "no open tasks to send");
+		return {
+			kind: "question",
+			actionId: action.id,
+			modelId: profile.id,
+			target,
+			question: { instructions: this.promptOf(action), input: briefing.input, answerSchema: action.answerSchema },
+			refs: briefing.refs,
+		};
+	}
+
+	async finish(prepared: PreparedQuestion, reply: ModelReply): Promise<AssistantOutcome> {
+		const action = this.actionOf(prepared.actionId);
+		const profile = this.choice.profileOf(prepared.modelId);
+		if (profile === null) return failed(action, NO_MODEL_WORDS, `model "${prepared.modelId}" has no profile`);
+		if (!reply.ok) {
+			const { kind, detail } = reply.failure;
+			return kind === "stopped" ? STOPPED : failed(action, failureWords(profile, kind, this.assistant().timeoutSeconds), detail);
+		}
+		const tasks = new TaskLookup(await this.tasks.listed());
+		const result = action.read(reply.answer, { input: prepared.question.input, refs: prepared.refs }, tasks);
+		if (result.kind === "task") return { kind: "task", title: action.title, task: tasks.find(result.taskId)!, note: result.note };
+		const answer = `answer: ${JSON.stringify(reply.answer)}`;
+		if (result.why === "gone") return failed(action, goneWords(profile), `the task named is closed or gone; ${answer}`);
+		return failed(action, failureWords(profile, "badAnswer", this.assistant().timeoutSeconds), `the answer names no task sent; ${answer}`);
+	}
+
+	/** A run: under way from now (the spinner), stopped by the timeout or by Max, ended once, whichever comes first. */
+	private start(action: AssistantAction, target: AssistantTarget, key: string): Promise<AssistantOutcome> {
+		const stop = new StopSwitch();
+		const timeoutMs = this.assistant().timeoutSeconds * 1000;
+		let grace: number | null = null;
+		let settle!: (outcome: AssistantOutcome) => void;
+		const outcome = new Promise<AssistantOutcome>((resolve) => (settle = resolve));
+		let ended = false;
+		const end = (result: AssistantOutcome): void => {
+			if (ended) return;
+			ended = true;
+			this.timers.clear(timer);
+			if (grace !== null) this.timers.clear(grace);
+			this.runs.delete(key);
+			this.emit();
+			settle(result);
+		};
+		const timer = this.timers.set(() => {
+			stop.stop("timeout");
+			grace = this.timers.set(() => end(this.timedOut(action)), TIMEOUT_GRACE_MS);
+		}, timeoutMs);
+		stop.onStop((reason) => {
+			if (reason === "user") end(STOPPED);
+		});
+		this.runs.set(key, { stop });
+		this.emit();
+		this.work(action, target, stop).then(end, (error: unknown) => end(failed(action, this.unknownWords(), `the run failed: ${String(error)}`)));
+		return outcome;
+	}
+
+	private async work(action: AssistantAction, target: AssistantTarget, stop: StopSwitch): Promise<AssistantOutcome> {
+		const prepared = await this.prepare(action.id, target);
+		if (prepared.kind !== "question") return prepared;
+		if (stop.stopped !== null) return this.finish(prepared, stoppedReply(stop.stopped));
+		const profile = this.choice.profileOf(prepared.modelId)!;
+		const loader = this.choice.loader(profile.id);
+		if (!loader) return failed(action, profile.unavailable, `no transport for model "${profile.id}" on this host`);
+		const transport = await loader();
+		if (stop.stopped !== null) return this.finish(prepared, stoppedReply(stop.stopped));
+		const reply = await transport.ask(prepared.question, this.choice.settingsOf(profile), stop);
+		return this.finish(prepared, stop.stopped === "timeout" && !reply.ok && reply.failure.kind === "stopped" ? stoppedReply("timeout") : reply);
+	}
+
+	private timedOut(action: AssistantAction): AssistantOutcome {
+		const profile = this.choice.chosen() ?? this.choice.named();
+		const words = profile ? failureWords(profile, "timeout", this.assistant().timeoutSeconds) : NO_MODEL_WORDS;
+		return failed(action, words, "no reply after the timeout stopped the run");
+	}
+
+	private unknownWords(): string {
+		const profile = this.choice.chosen() ?? this.choice.named();
+		return profile ? failureWords(profile, "unknown", this.assistant().timeoutSeconds) : NO_MODEL_WORDS;
+	}
+
+	private async fieldsOf(profile: ModelProfile, served: boolean): Promise<readonly AssistantField[]> {
+		const settings = this.choice.settingsOf(profile);
+		const loader = served ? this.choice.loader(profile.id) : undefined;
+		const transport = loader ? await loader().catch(() => null) : null;
+		const hintOf = async (field: SettingField): Promise<string | null> => (transport?.hint ? transport.hint(field.key, settings).catch(() => null) : null);
+		return Promise.all(
+			profile.fields.map(async (field) => ({
+				key: field.key,
+				label: field.label,
+				kind: field.kind,
+				choices: field.choices ?? [],
+				value: settings[field.key],
+				note: field.note ?? null,
+				hint: await hintOf(field),
+			})),
+		);
+	}
+
+	private promptOf(action: AssistantAction): string {
+		const saved = this.assistant().prompts[action.id];
+		return saved !== undefined && saved.trim() !== "" ? saved : action.defaultPrompt;
+	}
+
+	private actionOf(id: string): AssistantAction {
+		const action = this.actions.find((a) => a.id === id);
+		if (!action) throw new Error(`no assistant action "${id}"`);
+		return action;
+	}
+
+	private assistant(): AssistantSettings {
+		return this.settings.get().assistant;
+	}
+
+	private emit(): void {
+		for (const listener of [...this.listeners]) listener();
+	}
+}
+
+/** One run per button and target: the target's place, tasks and project. */
+function runKey(actionId: string, target: AssistantTarget): string {
+	return JSON.stringify([actionId, target.place, [...(target.taskIds ?? [])].sort(), target.projectId ?? null]);
+}
+
+/** What a stopped run replies for itself: Max's Stop shows nothing; the timeout says so. */
+function stoppedReply(reason: "user" | "timeout"): ModelReply {
+	return reason === "user"
+		? { ok: false, failure: { kind: "stopped", detail: "stopped by the user" } }
+		: { ok: false, failure: { kind: "timeout", detail: "stopped by the timeout" } };
+}
+
+/** The assistant's settings after a change on its page. */
+function changed(settings: AssistantSettings, change: AssistantSetting): AssistantSettings {
+	switch (change.kind) {
+		case "model":
+			return { ...settings, model: change.id };
+		case "timeout":
+			return { ...settings, timeoutSeconds: sizeOf(change.seconds, ASSISTANT_TIMEOUTS, settings.timeoutSeconds) };
+		case "prompt":
+			return { ...settings, prompts: withKey(settings.prompts, change.actionId, change.value) };
+		case "field":
+			return { ...settings, models: { ...settings.models, [change.modelId]: withKey(settings.models[change.modelId] ?? {}, change.key, change.value) } };
+	}
+}
+
+/** `map` with `key` set to `value`; null or blank takes the key off (the default again). */
+function withKey(map: Readonly<Record<string, string>>, key: string, value: string | null): Readonly<Record<string, string>> {
+	const { [key]: _old, ...rest } = map;
+	return value === null || value.trim() === "" ? rest : { ...rest, [key]: value };
+}

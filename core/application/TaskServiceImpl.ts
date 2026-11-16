@@ -70,6 +70,7 @@ import type { UndoHistory } from "./UndoHistory";
 import { TaskIdentity } from "./TaskIdentity";
 import type { ResizeEdge, StretchSpan } from "./TimelineSpans";
 import { snapMinute } from "./snapGrid";
+import type { ListedTasks } from "./assistant/tasks";
 
 /** The file's text read last, normalized: `changed` when normalizing it changes what the file says. */
 interface Normalized {
@@ -140,6 +141,11 @@ export class TaskServiceImpl implements TaskService {
 
 	withPriority(text: string, prefix: string | null): string {
 		return this.reads.withPriority(text, prefix);
+	}
+
+	/** Every task of each list, each with its subtasks, and today: what the assistant reads (`AssistantTasks`). */
+	listed(): Promise<ListedTasks> {
+		return this.ask(this.reads.listedRead());
 	}
 
 	screen(date: LocalDate, filter?: ProjectsNodeId | null): Promise<ScreenView> {

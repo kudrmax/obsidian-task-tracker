@@ -19,9 +19,9 @@ export interface BriefedTask {
 	readonly inProgress: boolean;
 	/** Its priority's prefix. */
 	readonly priority: string | null;
-	/** Its due date, else the day of its time: ISO. */
+	/** Its due date, ISO. */
 	readonly due: string | null;
-	/** The time it is put on, HH:MM. */
+	/** The time it is put on: HH:MM today, else ISO, `2026-11-20T10:00`. */
 	readonly time: string | null;
 	readonly projects: readonly string[];
 	readonly labels: readonly string[];
@@ -41,7 +41,7 @@ export function briefingOf(today: string, tasks: readonly TaskItem[]): Briefing 
 		seen.add(item.id);
 		const ref = `t${briefed.length + 1}`;
 		refs[ref] = item.id;
-		briefed.push(briefedTask(item, ref, parent));
+		briefed.push(briefedTask(item, ref, parent, today));
 		for (const sub of item.subtasks) add(sub, ref);
 	};
 	for (const item of tasks) add(item, null);
@@ -53,15 +53,15 @@ export function isEmptyBriefing(briefing: Briefing): boolean {
 	return Object.keys(briefing.refs).length === 0;
 }
 
-function briefedTask(item: TaskItem, ref: string, parent: string | null): BriefedTask {
+function briefedTask(item: TaskItem, ref: string, parent: string | null, today: string): BriefedTask {
 	return {
 		ref,
 		title: item.title,
 		list: LIST_WORDS[item.list],
 		inProgress: item.status === "inProgress",
 		priority: item.priority?.prefix ?? null,
-		due: item.dueDate ?? item.slot?.date ?? null,
-		time: item.slot ? minutesToHHMM(item.slot.start) : null,
+		due: item.dueDate,
+		time: item.slot ? `${item.slot.date === today ? "" : `${item.slot.date}T`}${minutesToHHMM(item.slot.start)}` : null,
 		projects: item.projects.map((project) => project.name),
 		labels: item.labels.map((label) => labelTitle(label.name)),
 		parent,

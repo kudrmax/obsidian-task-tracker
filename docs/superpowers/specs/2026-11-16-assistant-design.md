@@ -535,3 +535,31 @@ No Swift stage (R6).
   above (`tools: []`, `settingSources: []`, `json_schema`): `haiku` answered `structured_output` in 2.2 s, two internal
   turns; the stream was `system/init`, `assistant`, `user`, `rate_limit_event`, `result/success`. A subscription login
   reports `apiKeySource: "none"`. Without the `events` wrapper the SDK throws at once in the window.
+- **Backend:** `prepare`, `finish` and `set` return promises: the service reads the tasks file and writes the settings,
+  both asynchronous. The door, later, runs the same pure parts (`tasksIn`, `briefingOf`, the action's `read`) over the
+  text it is handed, synchronously.
+- **Backend:** `offers(place, target?)`: a task's menu passes its task, so its row says Stop only while that task's run is
+  under way; left out, the place alone (`{ place }`). `press(actionId, target?)` left out is `{ place: "more" }`.
+- **Backend:** `stopAll()` on the contract: the plugin's unload stops every run, each press resolving `stopped`.
+- **Backend:** `press` never rejects but for an action id no button has (a bug). A transport that fails to load is
+  `unknown`, its error in `detail`.
+- **Backend:** nothing to send (empty lists, no tasks file) is a `failed` outcome: the action's `failureTitle` and its
+  `emptyWords`. The chosen model not served here, or served without a transport (the door's case), pressed anyway:
+  `failed` with the profile's `unavailable`. A model id no profile has: «No model is set for the assistant. Choose one in
+  Settings → Assistant.», and the page lists it by its id, unavailable, with no fields.
+- **Backend:** a transport stopped by the timeout that replies `stopped` reads as `timeout`; one that doesn't reply within
+  5 s of the timeout (`TIMEOUT_GRACE_MS`) ends the run as `timeout` anyway, so a hung call never keeps the spinner.
+- **Backend:** an action's `read` gets a `TaskLookup` (`find(id)`: every list, Done too, every depth), not `TaskReads`.
+  The tasks come from `TaskServiceImpl.listed()` (every task of every list as the screen's `TaskItem`, and today), behind
+  the assistant's own port `AssistantTasks`; `TaskService`'s contract is unchanged.
+- **Backend:** the briefing's `due` is the due date only; `time` is `HH:MM` for a time today and `2026-11-20T10:00` for
+  another day (the spec's example: a time today, `due` null). Labels by the name the screen shows (`Good_fun` → «Good
+  fun»). `all`, `project` and `target` read Today, Soon, Inbox, Backlog in that order, open tasks only.
+- **Backend:** `AssistantTarget.projectId` is the project's name; a task is in it when one of its projects has it on its
+  path (subprojects included). A `target` task named under another named task is sent once, under it.
+- **Backend:** a model field set blank is its default again (the key goes, as a prompt's Reset); a blank saved value
+  reads as the default. The transport gets every field's value with defaults filled.
+- **Backend:** `onChange` also fires on every settings change (the chosen model changes the offers).
+- **Backend:** the door gets no assistant method now; `DOOR_COVERAGE` marks `AssistantService` host-owned until the
+  iPhone app's assistant. `data.json` writes `assistant` after `resultMark` (`obsidian/settingsFile.ts`' key order, one
+  line, with its byte-for-byte test).

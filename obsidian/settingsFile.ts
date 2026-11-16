@@ -37,6 +37,7 @@ const FILE_ORDER: readonly (keyof StoredSettings)[] = [
 	"cardGap",
 	"projectTag",
 	"resultMark",
+	"assistant",
 ];
 
 /** The saved object over the defaults of both parts, the keys in the file's order and any unknown one after them. */
