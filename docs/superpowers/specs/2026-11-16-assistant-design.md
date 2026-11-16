@@ -626,6 +626,8 @@ No Swift stage (R6).
   (`face`, default `task.card`), so the popup passes `outcome.card` with `outcome.task`'s marks, one mechanism, no copy.
   A face handed in is drawn as given: its `over` never gives way to a rename waiting to be written (that rename is the
   task's, not the parent's), and its title line is the task's own (a waiting rename shown) unless it shows a step.
+  Whether the face is handed in is said by the option (`face` given), never by object identity (the review: a copied
+  card of the same shape drew the other way).
 - **Frontend-obsidian:** the transport logs nothing itself: every failure's detail goes back in the reply, and the
   frontend writes the outcome's `detail` to the console once (a transport that logged too gave the same line twice).
   `ModelTransport`'s doc comment («Logs its own detail») can say so the next time the core is touched.
