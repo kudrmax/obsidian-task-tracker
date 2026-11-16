@@ -213,26 +213,46 @@ Soon list, dated ones too.
 
 ### Briefing
 
-Lines have no ids in the file, so each question gives each task a short ref, `t1`, `t2`… in the order sent, mapped to
-`TaskItem.id`. That id holds through the plugin's own writes (moves, renames, folds) and through an edit elsewhere that
-keeps the line in place; a task cut and pasted by another editor during the wait gets a new id and reads as not found.
+The model chooses among what Max can **start now**, never among goals (Max, 2026-11-17: «по факту я не буду делать все
+это одновременно, я буду делать именно первый подпункт»). From each open task of the scope's lists, by how it lies in
+the file (`candidatesOf`, the core):
+
+- a task with no open subtask: the task itself;
+- a folded task (`collapsed`): only its next step, the one its card shows (`nextStep`): its subtasks are done in order;
+- an unfolded task with open subtasks: not itself (it is a goal, not an action), but each open subtask by these same
+  rules, at any depth: a folded subtask gives its next step.
+
+Each candidate comes with what it is for, so the model understands the result without ranking by it:
+
+- `goals`: the chain of tasks above it, the top one first, each with its title, description, priority, due date, time,
+  projects and labels;
+- `after`: for the next step of a folded task, the open tasks of that folded branch that come after the step, in file
+  order (depth first), titles only; empty otherwise;
+- its own `description`: the nested lines without a checkbox (`TaskItem.description`), as Markdown.
+
+Lines have no ids in the file, so each question gives each candidate a short ref, `t1`, `t2`… in the order sent, mapped
+to `TaskItem.id`; goals and steps after have no ref and cannot be the answer. The id holds through the plugin's own
+writes (moves, renames, folds) and through an edit elsewhere that keeps the line in place; a task cut and pasted by
+another editor during the wait gets a new id and reads as not found.
 
 ```json
 {
-  "today": "2026-11-16",
-  "tasks": [
+  "today": "2026-11-17",
+  "candidates": [
     { "ref": "t1", "title": "Write the offer", "list": "today", "inProgress": true, "priority": "p1",
-      "due": null, "time": "14:00", "projects": ["Job"], "labels": [], "parent": null },
-    { "ref": "t2", "title": "Call the bank", "list": "soon", "inProgress": false, "priority": null,
-      "due": "2026-11-20", "time": null, "projects": [], "labels": [], "parent": null },
-    { "ref": "t3", "title": "Find the contract", "list": "soon", "parent": "t2", "...": "..." }
+      "due": null, "time": "14:00", "projects": ["Job"], "labels": [], "description": null, "goals": [], "after": [] },
+    { "ref": "t2", "title": "Find the contract", "list": "soon", "inProgress": false, "priority": null, "due": null,
+      "time": null, "projects": [], "labels": [], "description": null,
+      "goals": [{ "title": "Call the bank", "description": "- ask about the fee", "priority": null,
+                  "due": "2026-11-20", "time": null, "projects": [], "labels": [] }],
+      "after": ["Write down the questions", "Call"] }
   ]
 }
 ```
 
-Words, not codes: `list` is today / soon / inbox / backlog, a priority by its prefix, projects by name, dates ISO.
-Descriptions are not sent in v1 (long, private, not needed to rank). A briefing is plain data:
-`{ input: string, refs: Readonly<Record<string, string>> }`.
+Words, not codes: `list` is today / soon / inbox / backlog (a candidate's list is its top task's), a priority by its
+prefix, projects by name, dates ISO. A briefing is plain data: `{ input: string, refs: Readonly<Record<string, string>> }`,
+`refs` holding the candidates only.
 
 ### Actions
 
@@ -464,15 +484,21 @@ the prompts still editable (they sync).
 - places `["more"]`; labels Best task / Stop; title Best task; failure title Couldn't find the best task;
 - scope `{ kind: "lists", lists: ["now", "soon"] }`;
 - schema `{ taskRef: string, reason: string }`, both required, no other fields;
-- read: `taskRef` is a ref of this briefing and its task exists and is open → `task`; a ref not in the briefing →
-  `badAnswer`; a ref whose task is closed or no longer found → `gone`;
+- read: `taskRef` is a candidate's ref and its task exists and is open → `task`; a ref not among the candidates (a goal
+  named, a made-up ref) → `badAnswer`, never a silent swap for a step; a ref whose task is closed or no longer found →
+  `gone`;
+- the popup shows the chosen candidate as the screen draws it: the next step of a folded task on that folded task's
+  two-line card (its own title small above, the step below), any other candidate on its own card with the title of the
+  task right above it small (`over`), a top task alone; the card's marks are its card's;
 - empty Today and Soon → no call, «Today and Soon have no open tasks.»
 - default prompt:
 
-> You help me choose what to do. Below are my tasks for today and for soon. If I could do only one of them and nothing
-> else, which one would make the biggest difference? Weigh impact over urgency; a task in progress or with a time
-> today counts for more only if it truly matters more. Answer with its ref, and in two or three short sentences in the
-> language of my tasks, say why this one.
+> You help me choose what to do next. Below is each thing I could start now: a task, or the next step of a bigger
+> task, with the goals it leads to and, for a step, the steps that come after it. If I could do only one of them and
+> nothing else, which one would make the biggest difference? Judge what doing this one now gives: a goal adds weight
+> only as far as this step truly moves it, and the steps after it are not done by it. Weigh impact over urgency; one in
+> progress or with a time today counts for more only if it truly matters more. Answer with its ref, and in two or three
+> short sentences in the language of my tasks, say why this one.
 
 ## Platforms
 
@@ -533,7 +559,10 @@ No Swift stage (R6).
 - **Lead:** Stop is the same row, not a cancel on the spinner: the spinner stays a sign, one place to act.
 - **Lead:** default Claude model `sonnet` (one call per tap; ranking needs judgement); `haiku` and `opus` a setting
   away.
-- **Lead:** descriptions not sent in v1; a subtask can be the answer.
+- **Lead:** ~~descriptions not sent in v1; a subtask can be the answer~~ replaced on 2026-11-17: the answer is a
+  candidate (a task, or a folded task's next step, or an unfolded task's subtask), never a goal; descriptions are sent,
+  they say what a goal is for. Found on Max's tasks: sonnet chose the whole Belgrade plan for its well-written goal
+  while Max would start its first five-minute step.
 - **Lead:** no silent fallback to another model.
 - **Spike (2026-11-16):** the bundled SDK ran in the test Obsidian's window with the system `claude` and the options
   above (`tools: []`, `settingSources: []`, `json_schema`): `haiku` answered `structured_output` in 2.2 s, two internal
