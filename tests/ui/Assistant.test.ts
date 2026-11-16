@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AssistantOffer, AssistantOutcome, UndoService } from "../../core/application/contracts";
+import type { AssistantOffer, AssistantOutcome, AssistantService, UndoService } from "../../core/application/contracts";
 import { AssistantAnswers, type MarkdownHost } from "../../obsidian/ui/assistant/AssistantAnswers";
 import { AssistantSettingsPage } from "../../obsidian/ui/assistant/AssistantPage";
 import { BottomCapsule } from "../../obsidian/ui/BottomCapsule";
-import { MoreMenu } from "../../obsidian/ui/menu/MoreMenu";
+import { type AssistantMenuRows, MoreMenu } from "../../obsidian/ui/menu/MoreMenu";
 import { rig, settle } from "../application/assistant/assistantFakes";
 
 const NO_UNDO: UndoService = { undo: async () => "nothing", redo: async () => "nothing", canUndo: () => false, canRedo: () => false, onChange: () => () => undefined };
@@ -27,32 +27,79 @@ afterEach(() => {
 
 describe("«⋯» and the assistant", () => {
 	const rows = () => [...document.querySelectorAll<HTMLElement>(".tc-panel.is-more .tc-menu-row")];
-	const open = (assistant: readonly AssistantOffer[]) => {
-		const on = { onSearch: vi.fn(), onSelect: vi.fn(), onAssistant: vi.fn() };
-		MoreMenu.open({ anchor: document.body.appendChild(document.createElement("div")), assistant, ...on });
-		return on;
-	};
+	/** Rows offered as given, and what the menu asked of them. */
+	const fixed = (offers: readonly AssistantOffer[]) => ({ offers: () => offers, onChange: () => () => undefined, press: vi.fn(), stop: vi.fn() });
+	const open = (assistant: AssistantMenuRows) => MoreMenu.open({ anchor: document.body.appendChild(document.createElement("div")), onSearch: vi.fn(), onSelect: vi.fn(), assistant });
+	/** The menu over the real service, as CalendarScreen wires it. */
+	const served = (service: AssistantService): AssistantMenuRows => ({
+		offers: () => service.offers("more"),
+		onChange: (listener) => service.onChange(listener),
+		press: (id) => void service.press(id),
+		stop: (id) => service.stop(id),
+	});
 
 	it("draws the core's rows after Search and Select tasks, label and icon from the offer; a tap closes the menu and presses it", () => {
-		const on = open([{ actionId: "bestTask", label: "Best task", icon: "sparkles", running: false }]);
+		const assistant = fixed([{ actionId: "bestTask", label: "Best task", icon: "sparkles", running: false }]);
+		open(assistant);
 		expect(rows().map((r) => r.textContent?.trim())).toEqual(["Search", "Select tasks", "Best task"]);
 		expect(rows()[2].querySelector("svg")).not.toBeNull();
 		expect(rows()[2].querySelector(".tc-spinner")).toBeNull();
 		rows()[2].click();
-		expect(on.onAssistant).toHaveBeenCalledWith("bestTask");
+		expect(assistant.press).toHaveBeenCalledWith("bestTask");
+		expect(assistant.stop).not.toHaveBeenCalled();
 		expect(document.querySelector(".tc-panel.is-more")?.classList.contains("is-closing")).toBe(true);
 	});
 
-	it("a running row shows its own label with the ring in its icon's place", () => {
-		open([{ actionId: "bestTask", label: "Stop", icon: "sparkles", running: true }]);
+	it("a running row shows its own label with the ring in its icon's place, and a tap on it stops, never presses", () => {
+		const assistant = fixed([{ actionId: "bestTask", label: "Stop", icon: "sparkles", running: true }]);
+		open(assistant);
 		expect(rows()[2].textContent?.trim()).toBe("Stop");
 		expect(rows()[2].querySelector("svg")).toBeNull();
 		expect(rows()[2].querySelector(".tc-spinner")).not.toBeNull();
+		rows()[2].click();
+		expect(assistant.stop).toHaveBeenCalledWith("bestTask");
+		expect(assistant.press).not.toHaveBeenCalled();
 	});
 
 	it("no offers, no row: the phone", () => {
-		open([]);
+		open(fixed([]));
 		expect(rows().map((r) => r.textContent?.trim())).toEqual(["Search", "Select tasks"]);
+	});
+
+	it("while it is open, the run's end turns Stop back into Best task; a tap then starts no stale stop", async () => {
+		const { assistant, transport } = rig();
+		const run = assistant.press("bestTask");
+		await settle();
+		const menu = served(assistant);
+		const stop = vi.spyOn(menu, "stop");
+		open(menu);
+		expect(rows()[2].textContent?.trim()).toBe("Stop");
+		transport.answer({ taskRef: transport.refOf("Pay rent"), reason: "Rent is due." });
+		await run;
+		expect(rows()[2].textContent?.trim()).toBe("Best task");
+		expect(rows()[2].querySelector(".tc-spinner")).toBeNull();
+		expect(stop).not.toHaveBeenCalled();
+	});
+
+	it("a Stop left from a run that ended starts no call: the service's stop does nothing", async () => {
+		const { assistant, transport } = rig();
+		const run = assistant.press("bestTask");
+		await settle();
+		transport.answer({ taskRef: transport.refOf("Pay rent"), reason: "Rent is due." });
+		await run;
+		assistant.stop("bestTask");
+		await settle();
+		expect(transport.asked).toHaveLength(1);
+		expect(assistant.busy).toBe(false);
+	});
+
+	it("stops following the core once it closes", () => {
+		const listeners = new Set<() => void>();
+		const assistant = { ...fixed([]), onChange: (listener: () => void) => (listeners.add(listener), () => void listeners.delete(listener)) };
+		const menu = open(assistant);
+		expect(listeners.size).toBe(1);
+		menu.close();
+		expect(listeners.size).toBe(0);
 	});
 
 	it("«⋯» spins while a run is under way, and stops spinning when it ends; everything stays pressable", async () => {
@@ -178,6 +225,36 @@ describe("More → Assistant", () => {
 		await new AssistantSettingsPage(assistant, vi.fn()).build(root);
 		expect(root.querySelector(".tc-assistant-unavailable")?.textContent).toBe("Claude works in Obsidian on the Mac.");
 		expect(root.querySelector("select")!.options[0].disabled).toBe(true);
+		expect(names(root)).toEqual(["Model", "Timeout", "Prompts", "Best task"]);
 		expect(root.querySelector("textarea")).not.toBeNull();
+	});
+
+	it("draws the page's own words as the core gives them", async () => {
+		const { assistant } = rig();
+		const words = { model: "M", timeout: "T", timeoutNote: "TN", prompts: "P", promptsNote: "PN", reset: "R" };
+		const page = await assistant.page();
+		const worded: AssistantService = Object.assign(Object.create(assistant) as AssistantService, { page: async () => ({ ...page, words }) });
+		const root = document.body.appendChild(document.createElement("div"));
+		await new AssistantSettingsPage(worded, vi.fn()).build(root);
+		expect(names(root)).toEqual(["M", "Claude", "Model", "Path to claude", "T", "P", "Best task"]);
+		expect(root.textContent).toContain("TN");
+		expect(root.textContent).toContain("PN");
+		expect(root.querySelector(".tc-assistant-prompt-head button")!.textContent).toBe("R");
+	});
+
+	it("a blank or unreadable Timeout writes nothing and shows the saved one again", async () => {
+		const { assistant, settings } = rig();
+		const redraw = vi.fn();
+		const root = document.body.appendChild(document.createElement("div"));
+		await new AssistantSettingsPage(assistant, redraw).build(root);
+		const timeout = root.querySelectorAll<HTMLInputElement>("input")[2];
+		for (const typed of ["", "  ", "abc"]) {
+			timeout.value = typed;
+			timeout.dispatchEvent(new Event("change"));
+			await settle();
+			expect(timeout.value).toBe("120");
+		}
+		expect(settings.get().assistant.timeoutSeconds).toBe(120);
+		expect(redraw).not.toHaveBeenCalled();
 	});
 });

@@ -6,8 +6,10 @@ export interface AssistantRows {
 	offers(place: AssistantPlace): readonly AssistantOffer[];
 	readonly busy: boolean;
 	onChange(listener: () => void): () => void;
-	/** A tap on a row: the run starts (or stops), and its outcome shows when it comes, wherever Max is by then. */
+	/** A tap on a row: the run starts, and its outcome shows when it comes, wherever Max is by then. */
 	press(actionId: string): void;
+	/** A tap on a running row (Stop): its run stops and nothing shows; nothing happens once it has ended. */
+	stop(actionId: string): void;
 }
 
 /** Draws markdown for as long as a popup shows it; the returned function lets go of it. */
@@ -38,6 +40,10 @@ export class AssistantAnswers implements AssistantRows {
 
 	press(actionId: string): void {
 		void this.service.press(actionId).then((outcome) => this.show(outcome));
+	}
+
+	stop(actionId: string): void {
+		this.service.stop(actionId);
 	}
 
 	show(outcome: AssistantOutcome): AnswerPopup | null {

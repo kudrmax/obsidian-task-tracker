@@ -8,7 +8,7 @@ import type { ViewDeps } from "./ui/TaskCalendarView";
 import type { AssistantRows } from "./ui/assistant/AssistantAnswers";
 
 /** The demo asks no model: «⋯» offers no assistant row. */
-const NO_ASSISTANT: AssistantRows = { offers: () => [], busy: false, onChange: () => () => undefined, press: () => undefined };
+const NO_ASSISTANT: AssistantRows = { offers: () => [], busy: false, onChange: () => () => undefined, press: () => undefined, stop: () => undefined };
 
 const NO_UNDO: UndoService = { undo: async () => "nothing", redo: async () => "nothing", canUndo: () => false, canRedo: () => false, onChange: () => () => undefined };
 

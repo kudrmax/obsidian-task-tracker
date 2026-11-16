@@ -25,12 +25,12 @@ export class AssistantSettingsPage {
 		const chosen = page.models.find((model) => model.id === page.chosen);
 		if (chosen && page.fields.length > 0) new Setting(place).setName(chosen.name).setHeading();
 		for (const field of page.fields) this.field(place, page.chosen, field);
-		this.timeout(place, page.timeoutSeconds);
+		this.timeout(place, page);
 		this.prompts(place, page);
 	}
 
 	private models(parent: HTMLElement, page: AssistantPage): void {
-		const row = new Setting(parent).setName("Model").addDropdown((d) => {
+		const row = new Setting(parent).setName(page.words.model).addDropdown((d) => {
 			for (const model of page.models) d.addOption(model.id, model.name);
 			page.models.forEach((model, i) => (d.selectEl.options[i].disabled = !model.available));
 			d.setValue(page.chosen).onChange((id) => void this.service.set({ kind: "model", id }).then(this.redraw));
@@ -75,16 +75,19 @@ export class AssistantSettingsPage {
 		}
 	}
 
-	private timeout(parent: HTMLElement, seconds: number): void {
+	/** How long to wait: a whole number of seconds typed; a blank or a non-number is not written, the saved value comes back. */
+	private timeout(parent: HTMLElement, page: AssistantPage): void {
 		new Setting(parent)
-			.setName("Timeout")
-			.setDesc("Seconds to wait for an answer.")
+			.setName(page.words.timeout)
+			.setDesc(page.words.timeoutNote)
 			.addText((t) => {
 				t.inputEl.type = "number";
-				t.setValue(String(seconds));
+				t.setValue(String(page.timeoutSeconds));
 				t.inputEl.addEventListener("change", () => {
-					const typed = Number(t.getValue());
-					if (Number.isFinite(typed)) void this.service.set({ kind: "timeout", seconds: typed }).then(this.redraw);
+					const typed = t.getValue().trim();
+					const seconds = Number(typed);
+					if (typed === "" || !Number.isFinite(seconds)) t.setValue(String(page.timeoutSeconds));
+					else void this.service.set({ kind: "timeout", seconds }).then(this.redraw);
 				});
 			});
 	}
@@ -92,11 +95,11 @@ export class AssistantSettingsPage {
 	/** Each button's prompt: the whole width under its name, Reset to default beside the name. */
 	private prompts(parent: HTMLElement, page: AssistantPage): void {
 		if (page.prompts.length === 0) return;
-		new Setting(parent).setName("Prompts").setDesc("What each button asks. The shape of the answer is the plugin's own.").setHeading();
+		new Setting(parent).setName(page.words.prompts).setDesc(page.words.promptsNote).setHeading();
 		for (const prompt of page.prompts) {
 			let reset: ButtonComponent | null = null;
 			const row = new Setting(parent).setName(prompt.title).addButton((b) => {
-				reset = b.setButtonText("Reset to default").onClick(() => void this.service.set({ kind: "prompt", actionId: prompt.actionId, value: null }).then(this.redraw));
+				reset = b.setButtonText(page.words.reset).onClick(() => void this.service.set({ kind: "prompt", actionId: prompt.actionId, value: null }).then(this.redraw));
 				b.setDisabled(prompt.isDefault);
 			});
 			row.settingEl.classList.add("tc-assistant-prompt-head");

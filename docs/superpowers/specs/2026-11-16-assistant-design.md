@@ -596,3 +596,11 @@ No Swift stage (R6).
   read «Model»); a `choice` field is a text field with its choices offered under it (a datalist); a model not served
   here is listed in the dropdown, disabled; Timeout is written when the field is left, a prompt as it is typed, and
   Reset to default lights up as soon as the prompt differs from the default.
+- **Frontend-obsidian (review):** «⋯» follows the core while it is open: its assistant rows are drawn again on every
+  `onChange`, so a run that ends while the menu stands turns Stop back into Best task; the menu stops listening when it
+  closes (or hands its sheet to Search). A running row calls `stop`, any other `press`.
+- **Frontend-obsidian (review):** a blank or non-numeric Timeout is not written: the field shows the saved value again
+  (it used to write 0, which the core kept as 10 s).
+- **Frontend-obsidian (review):** the page's own words (Model, Timeout and its line, Prompts and its line, Reset to
+  default) are `page.words`; where the chosen model isn't served the page draws no model fields, only the unavailable
+  words, Timeout and the prompts.

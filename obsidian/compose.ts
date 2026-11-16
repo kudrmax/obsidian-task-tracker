@@ -88,10 +88,11 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
  * loads at the first question or the first look at the Assistant page, never at the plugin's start.
  */
 function hostModels(app: App, pluginDir: string): HostModels {
-	const transports: Record<string, TransportLoader> =
-		Platform.isDesktopApp && Platform.isMacOS
-			? { claude: () => import("./infrastructure/assistant/ClaudeTransport").then((m) => new m.ClaudeTransport(absolute(app, pluginDir))) }
-			: {};
+	const mac = Platform.isDesktopApp && Platform.isMacOS;
+	const transports: Record<string, TransportLoader> = {
+		/** A model every platform reaches (a local one over HTTP) goes here, outside the Mac's part. */
+		...(mac ? { claude: () => import("./infrastructure/assistant/ClaudeTransport").then((m) => new m.ClaudeTransport(absolute(app, pluginDir))) } : {}),
+	};
 	return { ids: Object.keys(transports), transport: (id) => transports[id] };
 }
 
