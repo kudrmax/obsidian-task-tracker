@@ -76,7 +76,9 @@ export class MoreMenu {
 		draw();
 		if (assistant) {
 			this.unsubscribe = assistant.onChange(() => {
-				if (!this.overlay.isClosed) draw();
+				if (this.overlay.isClosed) return;
+				draw();
+				copy.el.replaceChildren(...[...opts.anchor.childNodes].map((node) => node.cloneNode(true)));
 			});
 		}
 		this.overlay.show();

@@ -598,7 +598,8 @@ No Swift stage (R6).
   Reset to default lights up as soon as the prompt differs from the default.
 - **Frontend-obsidian (review):** «⋯» follows the core while it is open: its assistant rows are drawn again on every
   `onChange`, so a run that ends while the menu stands turns Stop back into Best task; the menu stops listening when it
-  closes (or hands its sheet to Search). A running row calls `stop`, any other `press`.
+  closes (or hands its sheet to Search). A running row calls `stop`, any other `press`. The capsule's copy over the sheet
+  is drawn again with them, so its ring goes when the run ends.
 - **Frontend-obsidian (review):** a blank or non-numeric Timeout is not written: the field shows the saved value again
   (it used to write 0, which the core kept as 10 s).
 - **Frontend-obsidian (review):** the page's own words (Model, Timeout and its line, Prompts and its line, Reset to

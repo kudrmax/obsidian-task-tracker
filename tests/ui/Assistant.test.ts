@@ -72,12 +72,16 @@ describe("«⋯» and the assistant", () => {
 		await settle();
 		const menu = served(assistant);
 		const stop = vi.spyOn(menu, "stop");
-		open(menu);
+		const capsule = new BottomCapsule(document.body, NO_UNDO, { onUndo: vi.fn(), onMore: vi.fn() }, assistant);
+		MoreMenu.open({ anchor: capsule.el, onSearch: vi.fn(), onSelect: vi.fn(), assistant: menu });
+		const copyBusy = () => document.querySelector(".tc-control-copy .tc-more-open")!.classList.contains("is-busy");
+		expect(copyBusy()).toBe(true);
 		expect(rows()[2].textContent?.trim()).toBe("Stop");
 		transport.answer({ taskRef: transport.refOf("Pay rent"), reason: "Rent is due." });
 		await run;
 		expect(rows()[2].textContent?.trim()).toBe("Best task");
 		expect(rows()[2].querySelector(".tc-spinner")).toBeNull();
+		expect(copyBusy()).toBe(false);
 		expect(stop).not.toHaveBeenCalled();
 	});
 
