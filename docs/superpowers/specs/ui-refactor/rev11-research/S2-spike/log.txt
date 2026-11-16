@@ -1,0 +1,304 @@
+
+## desktop
+saved rows: {"kind":"rows","cards":307}
+saved byProject: {"kind":"byProject","cards":307}
+geometry: {"stackH":610,"viewH":800,"cardH":35}
+### 1. cold render
+cold byProject #0: longest 77.33 ms, event→commit 104.06 ms; in-page {"mark":"cold-byProject-0","scriptMs":26.3,"toAfterFrameMs":104.1,"cards":307,"nodes":2772}
+    tasks≥2ms: [+-0.04 26.78ms s26.77 st0 l0 p0 c0 gc0] [+26.75 77.33ms s0.63 st48.54 l10.38 p14.01 c1.01 gc0]
+cold byProject #1: longest 74.78 ms, event→commit 100.11 ms; in-page {"mark":"cold-byProject-1","scriptMs":25.3,"toAfterFrameMs":100.6,"cards":307,"nodes":2772}
+    tasks≥2ms: [+-0.01 25.36ms s25.36 st0 l0 p0 c0 gc0] [+25.35 74.78ms s0.23 st48.61 l9.63 p14.07 c0.49 gc0]
+cold byProject #2: longest 79.83 ms, event→commit 108.03 ms; in-page {"mark":"cold-byProject-2","scriptMs":27.4,"toAfterFrameMs":108.1,"cards":307,"nodes":2772}
+    tasks≥2ms: [+-0.01 28.23ms s28.23 st0 l0 p0 c0 gc0] [+28.22 79.83ms s0.27 st49.72 l10.84 p15.18 c1.65 gc0] [+109.05 3.34ms s0 st0 l0 p0 c0 gc3.32] [+114.36 3.45ms s0 st0 l0 p0 c0 gc0] [+118.71 17.39ms s0 st0 l0 p0 c0 gc17.32] [+137 5.65ms s0 st0 l0 p0 c0 gc0] [+142.66 5.01ms s0 st0 l0 p0 c0 gc0] [+147.68 5.17ms s0 st0 l0 p0 c0 gc0]
+cold rows #0: longest 54.96 ms, event→commit 75.89 ms; in-page {"mark":"cold-rows-0","scriptMs":21,"toAfterFrameMs":75.9,"cards":307,"nodes":1864}
+    tasks≥2ms: [+-0.02 20.97ms s20.97 st0 l0 p0 c0 gc0] [+20.96 54.96ms s0.64 st34.67 l7.55 p9.17 c0.38 gc0]
+cold rows #1: longest 53.82 ms, event→commit 70.5 ms; in-page {"mark":"cold-rows-1","scriptMs":16.7,"toAfterFrameMs":70.6,"cards":307,"nodes":1864}
+    tasks≥2ms: [+-0.01 16.71ms s16.71 st0 l0 p0 c0 gc0] [+16.71 53.82ms s0.11 st33.59 l6.91 p9.8 c0.1 gc0]
+cold rows #2: longest 55.45 ms, event→commit 75.02 ms; in-page {"mark":"cold-rows-2","scriptMs":19.5,"toAfterFrameMs":75,"cards":307,"nodes":1864}
+    tasks≥2ms: [+-0.47 20.05ms s20.04 st0 l0 p0 c0 gc0] [+19.58 55.45ms s0.04 st33.44 l7.99 p10.57 c1.77 gc0] [+75.23 2.06ms s0 st0 l0 p0 c0 gc0] [+79.55 3.09ms s0 st0 l0 p0 c0 gc0] [+83.63 11.78ms s0 st0 l0 p0 c0 gc11.74] [+95.45 5.4ms s0 st0 l0 p0 c0 gc0]
+### 2. reveal of a mounted hidden subtree (hide Rows, show By project)
+reveal cv shownBefore=false #0: longest 77.47 ms, event→commit 77.99 ms; in-page {"mark":"rev-cv-false-0","scriptMs":0.1,"toAfterFrameMs":78.4}
+    tasks≥2ms: [+0.54 77.47ms s0.59 st49.87 l9.81 p13.89 c1.3 gc0] [+83.57 3.16ms s0 st0 l0 p0 c0 gc0] [+87.55 9.98ms s0 st0 l0 p0 c0 gc9.67] [+97.59 2.88ms s0 st0 l0 p0 c0 gc0]
+reveal cv shownBefore=false #1: longest 78.09 ms, event→commit 78.83 ms; in-page {"mark":"rev-cv-false-1","scriptMs":0,"toAfterFrameMs":78.9}
+    tasks≥2ms: [+0.77 78.09ms s0.08 st49.29 l9.79 p13.19 c2.02 gc0]
+reveal cv shownBefore=false #2: longest 79.05 ms, event→commit 79.39 ms; in-page {"mark":"rev-cv-false-2","scriptMs":0.1,"toAfterFrameMs":79.5}
+    tasks≥2ms: [+0.36 79.05ms s0.64 st49.42 l10.72 p14.36 c1.74 gc0]
+reveal cv shownBefore=true #0: longest 18.57 ms, event→commit 19.55 ms; in-page {"mark":"rev-cv-true-0","scriptMs":0.8,"toAfterFrameMs":19.5}
+    tasks≥2ms: [+1 18.57ms s0.04 st2.55 l0.57 p11.65 c1.37 gc0]
+reveal cv shownBefore=true #1: longest 16.95 ms, event→commit 17.87 ms; in-page {"mark":"rev-cv-true-1","scriptMs":0,"toAfterFrameMs":17.9}
+    tasks≥2ms: [+0.93 16.95ms s0.04 st1.7 l0.78 p11.56 c1.56 gc0]
+reveal cv shownBefore=true #2: longest 16.88 ms, event→commit 17.7 ms; in-page {"mark":"rev-cv-true-2","scriptMs":0,"toAfterFrameMs":17.7}
+    tasks≥2ms: [+0.84 16.88ms s0.67 st1.48 l0.78 p10.86 c1.26 gc0]
+reveal none shownBefore=false #0: longest 76.16 ms, event→commit 76.56 ms; in-page {"mark":"rev-none-false-0","scriptMs":0,"toAfterFrameMs":77}
+    tasks≥2ms: [+0.85 76.16ms s0.37 st49.77 l9.5 p12.94 c1.11 gc0]
+reveal none shownBefore=false #1: longest 78.31 ms, event→commit 78.5 ms; in-page {"mark":"rev-none-false-1","scriptMs":0.7,"toAfterFrameMs":79.1}
+    tasks≥2ms: [+0.74 78.31ms s0.7 st50.79 l9.74 p12.13 c1.03 gc0] [+81.2 2.54ms s0 st0 l0 p0 c0 gc0] [+87.41 10.64ms s0 st0 l0 p0 c0 gc10.59] [+98.06 5.06ms s0 st0 l0 p0 c0 gc0]
+reveal none shownBefore=false #2: longest 78.58 ms, event→commit 79.06 ms; in-page {"mark":"rev-none-false-2","scriptMs":0.1,"toAfterFrameMs":79.1}
+    tasks≥2ms: [+0.5 78.58ms s0.62 st51.26 l9.59 p12.9 c2.01 gc0]
+reveal none shownBefore=true #0: longest 81.14 ms, event→commit 81.85 ms; in-page {"mark":"rev-none-true-0","scriptMs":0,"toAfterFrameMs":81.9}
+    tasks≥2ms: [+0.73 81.14ms s0.49 st51.9 l10.44 p13.92 c2.02 gc0]
+reveal none shownBefore=true #1: longest 77.97 ms, event→commit 78.58 ms; in-page {"mark":"rev-none-true-1","scriptMs":0.1,"toAfterFrameMs":78.7}
+    tasks≥2ms: [+0.64 77.97ms s0.04 st50.91 l9.97 p12.87 c1.54 gc0] [+83.31 3.06ms s0 st0 l0 p0 c0 gc0] [+87.42 15.65ms s0 st0 l0 p0 c0 gc15.63] [+103.91 5.5ms s0 st0 l0 p0 c0 gc0] [+109.41 5.13ms s0 st0 l0 p0 c0 gc0] [+114.55 5.14ms s0 st0 l0 p0 c0 gc0]
+reveal none shownBefore=true #2: longest 78.45 ms, event→commit 79.19 ms; in-page {"mark":"rev-none-true-2","scriptMs":0,"toAfterFrameMs":79.2}
+    tasks≥2ms: [+0.77 78.45ms s0.26 st50.68 l9.85 p13.58 c1.67 gc0]
+### 3. mounted subtrees: memory and a write
+mounted 1 (cv): {"nodes":5084,"cards":307} heap 20.4 MB, DOM nodes 7028
+write k=1 cv share=true #0: longest 1.89 ms, event→commit 2.33 ms; in-page {"mark":"w-1-cv-true-0","scriptMs":1.8,"toAfterFrameMs":2.3}
+    tasks≥2ms: 
+write k=1 cv share=true #1: longest 2.5 ms, event→commit 4.27 ms; in-page {"mark":"w-1-cv-true-1","scriptMs":1,"toAfterFrameMs":4.3}
+    tasks≥2ms: [+1.78 2.5ms s0.02 st0 l0 p0.01 c2.04 gc0]
+write k=1 cv share=false #0: longest 9.79 ms, event→commit 10.3 ms; in-page {"mark":"w-1-cv-false-0","scriptMs":9.8,"toAfterFrameMs":10.8}
+    tasks≥2ms: [+-0.01 9.79ms s9.78 st0 l0 p0 c0 gc1.27]
+write k=1 cv share=false #1: longest 6.78 ms, event→commit 8.1 ms; in-page {"mark":"w-1-cv-false-1","scriptMs":6.7,"toAfterFrameMs":8.1}
+    tasks≥2ms: [+-0.01 6.78ms s6.77 st0 l0 p0 c0 gc0]
+mounted 2 (cv): {"nodes":7857,"cards":614} heap 21.7 MB, DOM nodes 10114
+write k=2 cv share=true #0: longest 3.2 ms, event→commit 3.9 ms; in-page {"mark":"w-2-cv-true-0","scriptMs":2.4,"toAfterFrameMs":4.3}
+    tasks≥2ms: [+-0.72 3.2ms s3.2 st0 l0 p0 c0 gc0]
+write k=2 cv share=true #1: longest 2.71 ms, event→commit 4.46 ms; in-page {"mark":"w-2-cv-true-1","scriptMs":2.7,"toAfterFrameMs":4.5}
+    tasks≥2ms: [+-0.01 2.71ms s2.71 st0 l0 p0 c0 gc0]
+write k=2 cv share=false #0: longest 20.51 ms, event→commit 23.93 ms; in-page {"mark":"w-2-cv-false-0","scriptMs":20.5,"toAfterFrameMs":24}
+    tasks≥2ms: [+-0.01 20.51ms s20.5 st0 l0 p0 c0 gc1.18] [+21.34 2.6ms s0.03 st0 l0 p0.01 c2.03 gc0]
+write k=2 cv share=false #1: longest 18.19 ms, event→commit 19.83 ms; in-page {"mark":"w-2-cv-false-1","scriptMs":18.1,"toAfterFrameMs":19.8}
+    tasks≥2ms: [+-0.01 18.19ms s18.18 st0 l0 p0 c0 gc0.98]
+mounted 3 (cv): {"nodes":9722,"cards":921} heap 22.6 MB, DOM nodes 12298
+write k=3 cv share=true #0: longest 3.17 ms, event→commit 6.38 ms; in-page {"mark":"w-3-cv-true-0","scriptMs":3.1,"toAfterFrameMs":6.4}
+    tasks≥2ms: [+-0.01 3.17ms s3.17 st0 l0 p0 c0 gc0] [+3.9 2.49ms s0.03 st0 l0 p0.01 c1.82 gc0]
+write k=3 cv share=true #1: longest 2.78 ms, event→commit 4.07 ms; in-page {"mark":"w-3-cv-true-1","scriptMs":2.7,"toAfterFrameMs":4}
+    tasks≥2ms: [+-0.01 2.78ms s2.78 st0 l0 p0 c0 gc0]
+write k=3 cv share=false #0: longest 23.52 ms, event→commit 24.3 ms; in-page {"mark":"w-3-cv-false-0","scriptMs":23,"toAfterFrameMs":24.5}
+    tasks≥2ms: [+-0.01 23.52ms s23.5 st0 l0 p0 c0 gc1.76]
+write k=3 cv share=false #1: longest 21.07 ms, event→commit 24.25 ms; in-page {"mark":"w-3-cv-false-1","scriptMs":21,"toAfterFrameMs":24.2}
+    tasks≥2ms: [+-0.01 21.07ms s21.06 st0 l0 p0 c0 gc0] [+21.87 2.39ms s0.01 st0 l0 p0.01 c1.62 gc0]
+mounted 4 (cv): {"nodes":12495,"cards":1228} heap 23.8 MB, DOM nodes 15384
+write k=4 cv share=true #0: longest 4.62 ms, event→commit 6.51 ms; in-page {"mark":"w-4-cv-true-0","scriptMs":4.6,"toAfterFrameMs":6.5}
+    tasks≥2ms: [+-0.01 4.62ms s4.61 st0 l0 p0 c0 gc0]
+write k=4 cv share=true #1: longest 3.94 ms, event→commit 8.04 ms; in-page {"mark":"w-4-cv-true-1","scriptMs":3.9,"toAfterFrameMs":8.1}
+    tasks≥2ms: [+-0.01 3.94ms s3.93 st0 l0 p0 c0 gc0] [+5.07 2.98ms s0.01 st0 l0 p0.01 c2.18 gc0]
+write k=4 cv share=false #0: longest 30.94 ms, event→commit 32.54 ms; in-page {"mark":"w-4-cv-false-0","scriptMs":30.9,"toAfterFrameMs":32.5}
+    tasks≥2ms: [+-0.01 30.94ms s30.93 st0 l0 p0 c0 gc1.43]
+write k=4 cv share=false #1: longest 32.13 ms, event→commit 32.94 ms; in-page {"mark":"w-4-cv-false-1","scriptMs":32.1,"toAfterFrameMs":33}
+    tasks≥2ms: [+-0.02 32.13ms s32.12 st0 l0 p0 c0 gc1.06] [+37.89 3.07ms s0 st0 l0 p0 c0 gc0] [+41.34 7.81ms s0 st0 l0 p0 c0 gc7.76]
+mounted 1 (none): {"nodes":5084,"cards":307} heap 20.4 MB, DOM nodes 7028
+write k=1 none share=true #0: longest 1.08 ms, event→commit 2.3 ms; in-page {"mark":"w-1-none-true-0","scriptMs":1.1,"toAfterFrameMs":2.3}
+    tasks≥2ms: 
+write k=1 none share=true #1: longest 1.56 ms, event→commit 2.42 ms; in-page {"mark":"w-1-none-true-1","scriptMs":1.6,"toAfterFrameMs":2.5}
+    tasks≥2ms: 
+write k=1 none share=false #0: longest 8.58 ms, event→commit 9.35 ms; in-page {"mark":"w-1-none-false-0","scriptMs":8.1,"toAfterFrameMs":9.4}
+    tasks≥2ms: [+-0.5 8.58ms s8.57 st0 l0 p0 c0 gc1.29]
+write k=1 none share=false #1: longest 6.19 ms, event→commit 7.17 ms; in-page {"mark":"w-1-none-false-1","scriptMs":6.2,"toAfterFrameMs":7.2}
+    tasks≥2ms: [+-0.01 6.19ms s6.18 st0 l0 p0 c0 gc0]
+mounted 2 (none): {"nodes":7857,"cards":614} heap 21.7 MB, DOM nodes 10114
+write k=2 none share=true #0: longest 2.75 ms, event→commit 5.96 ms; in-page {"mark":"w-2-none-true-0","scriptMs":2.7,"toAfterFrameMs":6}
+    tasks≥2ms: [+-0.01 2.75ms s2.74 st0 l0 p0 c0 gc0] [+3.33 2.64ms s0.01 st0 l0 p0.01 c2.36 gc0]
+write k=2 none share=true #1: longest 2.47 ms, event→commit 3.09 ms; in-page {"mark":"w-2-none-true-1","scriptMs":1.9,"toAfterFrameMs":3.2}
+    tasks≥2ms: [+-0.43 2.47ms s2.47 st0 l0 p0 c0 gc0]
+write k=2 none share=false #0: longest 17.32 ms, event→commit 17.96 ms; in-page {"mark":"w-2-none-false-0","scriptMs":16.9,"toAfterFrameMs":18}
+    tasks≥2ms: [+-0.01 17.32ms s16.85 st0 l0 p0 c0 gc2.06]
+write k=2 none share=false #1: longest 17.04 ms, event→commit 19.76 ms; in-page {"mark":"w-2-none-false-1","scriptMs":17,"toAfterFrameMs":19.7}
+    tasks≥2ms: [+-0.01 17.04ms s17.02 st0 l0 p0 c0 gc0.83] [+17.32 2.45ms s0.02 st0 l0 p0.01 c2.27 gc0]
+mounted 3 (none): {"nodes":9722,"cards":921} heap 22.6 MB, DOM nodes 12298
+write k=3 none share=true #0: longest 3.49 ms, event→commit 4.29 ms; in-page {"mark":"w-3-none-true-0","scriptMs":3.4,"toAfterFrameMs":5.1}
+    tasks≥2ms: [+-0.01 3.49ms s3.48 st0 l0 p0 c0 gc0]
+write k=3 none share=true #1: longest 2.92 ms, event→commit 5.91 ms; in-page {"mark":"w-3-none-true-1","scriptMs":2.9,"toAfterFrameMs":6}
+    tasks≥2ms: [+-0.01 2.92ms s2.91 st0 l0 p0 c0 gc0] [+3.36 2.56ms s0.01 st0 l0 p0.01 c1.99 gc0]
+write k=3 none share=false #0: longest 23.63 ms, event→commit 25.4 ms; in-page {"mark":"w-3-none-false-0","scriptMs":23.6,"toAfterFrameMs":25.4}
+    tasks≥2ms: [+-0.01 23.63ms s23.62 st0 l0 p0 c0 gc2.43]
+write k=3 none share=false #1: longest 20.99 ms, event→commit 23.6 ms; in-page {"mark":"w-3-none-false-1","scriptMs":20.9,"toAfterFrameMs":23.6}
+    tasks≥2ms: [+-0.01 20.99ms s20.98 st0 l0 p0 c0 gc0] [+28.52 3.1ms s0 st0 l0 p0 c0 gc0] [+31.69 8.33ms s0 st0 l0 p0 c0 gc7.99]
+mounted 4 (none): {"nodes":12495,"cards":1228} heap 23.8 MB, DOM nodes 15384
+write k=4 none share=true #0: longest 4.38 ms, event→commit 6.11 ms; in-page {"mark":"w-4-none-true-0","scriptMs":4.3,"toAfterFrameMs":6.1}
+    tasks≥2ms: [+-0.01 4.38ms s4.37 st0 l0 p0 c0 gc0]
+write k=4 none share=true #1: longest 4.05 ms, event→commit 6 ms; in-page {"mark":"w-4-none-true-1","scriptMs":4,"toAfterFrameMs":6}
+    tasks≥2ms: [+-0.01 4.05ms s4.04 st0 l0 p0 c0 gc0]
+write k=4 none share=false #0: longest 38.25 ms, event→commit 43.09 ms; in-page {"mark":"w-4-none-false-0","scriptMs":37.9,"toAfterFrameMs":43.2}
+    tasks≥2ms: [+-0.31 38.25ms s38.23 st0 l0 p0 c0 gc2.75] [+38.72 4.39ms s0.03 st0 l0 p0.01 c3.58 gc0]
+write k=4 none share=false #1: longest 32.42 ms, event→commit 33.46 ms; in-page {"mark":"w-4-none-false-1","scriptMs":32.5,"toAfterFrameMs":33.6}
+    tasks≥2ms: [+-0.01 32.42ms s32.41 st0 l0 p0 c0 gc1.43] [+33.84 2.48ms s0 st0 l0 p0 c0 gc0] [+38.95 7.61ms s0 st0 l0 p0 c0 gc7.59]
+### 4. editor: new vs re-keyed
+new Obsidian field #0: longest 58.47 ms, event→commit 100.55 ms; in-page {"mark":"ed-new-0","scriptMs":53.5,"toAfterFrameMs":102}
+    tasks≥2ms: [+-0.01 58.47ms s46.04 st10.95 l1.27 p0 c0 gc0] [+58.47 42.12ms s0.58 st0 l0 p3.54 c2.76 gc0] [+102.43 3.97ms s1.23 st0.39 l0 p1.27 c0.08 gc0] [+259.68 5.75ms s0 st1.11 l0.54 p1.49 c0.09 gc0]
+new Obsidian field #1: longest 22.36 ms, event→commit 29.56 ms; in-page {"mark":"ed-new-1","scriptMs":20.2,"toAfterFrameMs":30}
+    tasks≥2ms: [+-0.01 22.36ms s13.43 st8.11 l0.8 p0 c0 gc0] [+22.36 7.23ms s0.03 st0.01 l0 p2.72 c0.5 gc0] [+29.98 2.8ms s0.98 st0.06 l0 p0.2 c0.84 gc0] [+35.78 3.01ms s0.01 st0.03 l0 p2.2 c0.16 gc0] [+223.79 5.23ms s0 st0.84 l0.54 p0.2 c0.4 gc0]
+new Obsidian field #2: longest 22.51 ms, event→commit 29.27 ms; in-page {"mark":"ed-new-2","scriptMs":19.8,"toAfterFrameMs":29.6}
+    tasks≥2ms: [+-0.01 22.51ms s12.34 st8.77 l1.38 p0 c0 gc0] [+22.5 7.4ms s0.03 st0.02 l0 p3.43 c0.06 gc0] [+30.06 3.02ms s0.84 st0.07 l0 p1.19 c0.04 gc0] [+35.65 2.59ms s0.01 st0.5 l0 p1.56 c0.03 gc0] [+223.43 4.54ms s0 st0.56 l0.09 p0.12 c1.39 gc0]
+re-key warm field #3: longest 9.79 ms, event→commit 16.02 ms; in-page {"mark":"ed-rk-3","scriptMs":8.9,"toAfterFrameMs":16.3}
+    tasks≥2ms: [+-0.01 9.79ms s6.88 st1.72 l1.17 p0 c0 gc0] [+9.78 6.51ms s0.02 st0 l0 p3.35 c0.78 gc0] [+16.47 3ms s0.15 st0.07 l0 p0.79 c0.6 gc0] [+24.09 3.39ms s0.02 st0 l0 p1.86 c0.05 gc0] [+210.99 6.92ms s0.75 st1.43 l0.63 p0.97 c0.74 gc0]
+re-key warm field #4: longest 9.29 ms, event→commit 15.17 ms; in-page {"mark":"ed-rk-4","scriptMs":8.8,"toAfterFrameMs":15.2}
+    tasks≥2ms: [+-0.01 9.29ms s5.67 st2.25 l1.35 p0 c0 gc0] [+9.28 5.92ms s0.03 st0 l0 p3.55 c0.06 gc0] [+15.27 2.5ms s0.39 st0.22 l0 p0.98 c0.04 gc0] [+20.28 2.61ms s0.01 st0.01 l0 p1.57 c0.03 gc0] [+219.21 4.81ms s0.03 st0.12 l0.79 p0.5 c0.53 gc0]
+re-key warm field #5: longest 9.49 ms, event→commit 16.25 ms; in-page {"mark":"ed-rk-5","scriptMs":9,"toAfterFrameMs":17.2}
+    tasks≥2ms: [+-0.01 9.49ms s5.78 st1.7 l1.99 p0 c0 gc0] [+9.48 7.53ms s0.02 st0 l0 p3.13 c0.94 gc0] [+23.28 2.73ms s0.03 st0.02 l0 p1.31 c0.03 gc0] [+210.89 3.83ms s0.42 st0.07 l0.88 p0.58 c0.06 gc0]
+new bare EditorView #0: longest 17.53 ms, event→commit 28.45 ms; in-page {"mark":"ed-bare-0","scriptMs":10.8,"toAfterFrameMs":28.5}
+    tasks≥2ms: [+-0.01 10.91ms s4.08 st4.7 l2.12 p0 c0 gc0] [+10.92 17.53ms s1.67 st0.04 l0 p12.57 c0.64 gc0] [+29.36 2.42ms s0 st0 l0 p0 c0 gc0]
+new bare EditorView #1: longest 17.15 ms, event→commit 27.74 ms; in-page {"mark":"ed-bare-1","scriptMs":10.6,"toAfterFrameMs":28.3}
+    tasks≥2ms: [+-0.52 11.11ms s3.69 st6.07 l1.34 p0 c0 gc0] [+10.6 17.15ms s0.22 st0.76 l0 p12.07 c1.62 gc0]
+new bare EditorView #2: longest 16.43 ms, event→commit 27.46 ms; in-page {"mark":"ed-bare-2","scriptMs":11.8,"toAfterFrameMs":28.3}
+    tasks≥2ms: [+-0.01 11.81ms s3.32 st6.03 l2.45 p0 c0 gc0] [+11.8 16.43ms s0.82 st0.01 l0 p12.48 c0.06 gc0]
+### 5. chunked rendering (byProject)
+chunked first=20 chunk=20 #0: longest 20.82 ms, event→commit 24.78 ms; in-page {"steps":[{"n":20,"ms":3.1},{"n":40,"ms":1.6},{"n":60,"ms":2},{"n":80,"ms":1.6},{"n":100,"ms":1.7},{"n":120,"ms":1.5},{"n":140,"ms":2.1},{"n":160,"ms":2},{"n":180,"ms":1.8},{"n":200,"ms":1.8},{"n":220,"ms":1.9},{"n":240,"ms":2.4},{"n":260,"ms":2.3},{"n":280,"ms":2.3},{"n":300,"ms":2.3},{"n":307,"ms":2}],"firstPaint":13.1,"done":191.7,"sameInView":true,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.05 4.02ms s4.02 st0 l0 p0 c0 gc0] [+3.97 20.82ms s2.4 st8.29 l2.17 p4.51 c0.79 gc0] [+24.8 12.94ms s2.68 st3.72 l0.85 p3.72 c0.48 gc0] [+37.77 11.03ms s1.69 st3.97 l0.79 p2.32 c0.03 gc0] [+48.81 10.52ms s1.71 st3.48 l0.76 p2.63 c0.03 gc0] [+59.35 11.62ms s1.63 st3.66 l0.9 p3.51 c0.31 gc0] [+70.98 10.86ms s2.22 st3.21 l0.75 p2.98 c0.02 gc0] [+81.85 10.08ms s2 st3.37 l0.81 p2.22 c0.02 gc0] [+91.95 10.78ms s1.84 st3.68 l0.89 p2.44 c0.02 gc0] [+102.75 11.02ms s2.27 st3.29 l1.18 p2.4 c0.02 gc0] [+113.78 11.25ms s1.93 st3.22 l1.53 p2.75 c0.02 gc0] [+125.05 11.5ms s2.49 st3.32 l1.08 p2.12 c0.02 gc0] [+136.57 12.65ms s2.39 st3.48 l1.49 p2.62 c0.55 gc0] [+149.23 12.9ms s2.33 st4.28 l0.84 p3.05 c0.04 gc0] [+162.16 13.91ms s2.82 st3.41 l1.91 p2.83 c0.03 gc0] [+176.08 13.03ms s2.05 st3.58 l1.8 p1.9 c0.03 gc0] [+189.92 2.72ms s2.71 st0 l0 p0 c0 gc0]
+chunked first=20 chunk=20 #1: longest 21.42 ms, event→commit 24.7 ms; in-page {"steps":[{"n":20,"ms":2.6},{"n":40,"ms":1.5},{"n":60,"ms":2},{"n":80,"ms":1.9},{"n":100,"ms":2},{"n":120,"ms":2.1},{"n":140,"ms":2.1},{"n":160,"ms":2.3},{"n":180,"ms":1.5},{"n":200,"ms":1.4},{"n":220,"ms":2.3},{"n":240,"ms":2.4},{"n":260,"ms":2.1},{"n":280,"ms":1.8},{"n":300,"ms":1.9},{"n":307,"ms":1.8}],"firstPaint":12.6,"done":191.9,"sameInView":true,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.01 2.67ms s2.67 st0 l0 p0 c0 gc0] [+3.29 21.42ms s1.84 st8 l2.96 p4.8 c0.76 gc0] [+24.71 11.35ms s2.01 st3.81 l1.07 p2.64 c0.71 gc0] [+36.08 10.64ms s1.88 st3.57 l0.51 p2.35 c0.02 gc0] [+46.73 10.33ms s2.02 st3.33 l0.84 p3.11 c0.02 gc0] [+57.08 12.82ms s2.1 st3.8 l0.82 p3.12 c0.04 gc0] [+69.91 13.33ms s2.15 st3.23 l1.26 p3.16 c0.72 gc0] [+83.28 12.01ms s2.35 st3.78 l0.86 p3.19 c0.73 gc0] [+95.31 11.69ms s2.21 st3.15 l1.44 p1.96 c0.02 gc0] [+107.02 11.49ms s1.4 st3.59 l1.5 p3.26 c0.02 gc0] [+118.52 11.67ms s2.3 st3.58 l1.52 p2.25 c0.03 gc0] [+130.57 11.77ms s2.46 st3.81 l0.84 p2.6 c0.31 gc0] [+142.36 11.7ms s2.07 st4.12 l1.63 p2.2 c0.02 gc0] [+154.08 12.79ms s2.24 st3.56 l1.16 p3.16 c0.02 gc0] [+166.89 12.35ms s1.91 st3.85 l1.92 p1.69 c0.03 gc0] [+180.03 10.54ms s1.83 st2.29 l1.57 p1.89 c0.56 gc0] [+191.72 2.12ms s1.9 st0 l0 p0 c0 gc0]
+chunked first=20 chunk=40 #0: longest 28.59 ms, event→commit 31.6 ms; in-page {"steps":[{"n":20,"ms":2.5},{"n":60,"ms":4.1},{"n":100,"ms":3.9},{"n":140,"ms":3.9},{"n":180,"ms":3.9},{"n":220,"ms":3.9},{"n":260,"ms":3.8},{"n":300,"ms":3.9},{"n":307,"ms":1}],"firstPaint":12.8,"done":164.7,"sameInView":true,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.53 3.55ms s3.55 st0 l0 p0 c0 gc0] [+3.02 28.59ms s4.17 st11.72 l2.86 p6.38 c0.12 gc0] [+31.62 21.01ms s4.37 st7.14 l1.86 p4.14 c0.04 gc0] [+52.65 19ms s4.04 st6.75 l1.32 p3.55 c0.55 gc0] [+71.67 19.62ms s4.48 st7.05 l1.86 p2.98 c0.05 gc0] [+91.31 20.79ms s4.35 st7.15 l2.12 p3.2 c0.49 gc0] [+112.13 18.43ms s3.82 st7.21 l2.15 p2.97 c0.03 gc0] [+130.58 20.23ms s3.87 st6.92 l2.51 p2.5 c0.49 gc0] [+150.84 12.43ms s1.04 st2.5 l1.78 p2.69 c1.39 gc0] [+166 3.14ms s0 st0 l0 p0 c0 gc2.93]
+chunked first=20 chunk=40 #1: longest 29 ms, event→commit 32.23 ms; in-page {"steps":[{"n":20,"ms":3},{"n":60,"ms":3.3},{"n":100,"ms":3.9},{"n":140,"ms":3.4},{"n":180,"ms":3.6},{"n":220,"ms":4.1},{"n":260,"ms":3.8},{"n":300,"ms":3.8},{"n":307,"ms":1.4}],"firstPaint":13,"done":154.3,"sameInView":true,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.01 3.22ms s3.21 st0 l0 p0 c0 gc0] [+3.24 29ms s4.4 st11.08 l2.72 p5.79 c0.75 gc0] [+32.24 20.78ms s3.98 st7.17 l1.94 p4.2 c0.49 gc0] [+53.23 18.07ms s3.42 st6.86 l1.53 p2.8 c0.78 gc0] [+71.33 17.91ms s3.6 st7.87 l1.53 p3.08 c0.03 gc0] [+89.26 17.04ms s4.09 st6.41 l2.18 p3.27 c0.02 gc0] [+106.31 18.12ms s3.87 st6.82 l2.04 p2.9 c0.02 gc0] [+124.45 18.68ms s3.87 st6.91 l2.09 p1.91 c0.67 gc0] [+143.14 10.23ms s1.45 st2.27 l1.52 p2.3 c0.02 gc0] [+158.23 3.16ms s0 st0 l0 p0 c0 gc0] [+163.08 14.61ms s0 st0 l0 p0 c0 gc14.21] [+177.7 5.34ms s0 st0 l0 p0 c0 gc0] [+183.04 5.01ms s0 st0 l0 p0 c0 gc0] [+188.05 3.94ms s0 st0 l0 p0 c0 gc0]
+chunked first=30 chunk=30 #0: longest 26.35 ms, event→commit 30.8 ms; in-page {"steps":[{"n":30,"ms":4.4},{"n":60,"ms":2.7},{"n":90,"ms":3.3},{"n":120,"ms":3.3},{"n":150,"ms":2.3},{"n":180,"ms":3.1},{"n":210,"ms":2.7},{"n":240,"ms":3.2},{"n":270,"ms":3.4},{"n":300,"ms":2.8},{"n":307,"ms":2}],"firstPaint":14.3,"done":170.9,"sameInView":true,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.01 4.47ms s4.47 st0 l0 p0 c0 gc0] [+4.46 26.35ms s3.55 st10.7 l2.94 p5.15 c0.67 gc0] [+30.82 16.65ms s3.35 st5.74 l1.41 p4.21 c0.04 gc0] [+47.86 16.17ms s3.33 st5.41 l1.3 p3.97 c0.67 gc0] [+64.05 14.26ms s2.38 st4.83 l1.67 p1.96 c0.03 gc0] [+78.33 13.46ms s3.26 st4.82 l1.37 p1.97 c0.03 gc0] [+91.8 14.51ms s2.85 st5.07 l1.15 p2.47 c0.68 gc0] [+106.33 15.68ms s3.22 st5.42 l1.56 p2.25 c0.03 gc0] [+122.02 16.22ms s3.34 st5.48 l1.45 p3.21 c0.03 gc0] [+138.26 18.3ms s3.18 st5.48 l2.09 p1.98 c0.49 gc0] [+156.59 13.01ms s1.96 st2.61 l2.02 p1.44 c0.7 gc0] [+170.82 2.18ms s2.18 st0 l0 p0 c0 gc0]
+chunked first=30 chunk=30 #1: longest 27.78 ms, event→commit 32.01 ms; in-page {"steps":[{"n":30,"ms":4},{"n":60,"ms":2.4},{"n":90,"ms":2.5},{"n":120,"ms":2.9},{"n":150,"ms":2.8},{"n":180,"ms":3.2},{"n":210,"ms":2.4},{"n":240,"ms":2.3},{"n":270,"ms":3},{"n":300,"ms":3},{"n":307,"ms":1.5}],"firstPaint":15.2,"done":166.2,"sameInView":true,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.02 4.26ms s3.95 st0 l0 p0 c0 gc0] [+4.24 27.78ms s3.46 st10.27 l3.36 p6.32 c1.01 gc0] [+32.03 16.79ms s3.17 st5.55 l1.52 p4.18 c0.52 gc0] [+48.83 15.84ms s3.36 st5.1 l1.47 p3.79 c0.03 gc0] [+64.69 15.05ms s2.69 st4.76 l1.51 p3.02 c0.04 gc0] [+79.76 15.15ms s3.25 st5.72 l1.23 p3.2 c0.35 gc0] [+94.93 14.7ms s3.01 st5.64 l1.27 p3.62 c0.02 gc0] [+109.64 14.59ms s2.4 st5.16 l2.06 p2.69 c0.02 gc0] [+124.25 14.91ms s3.05 st4.96 l1.71 p2.38 c0.02 gc0] [+139.18 15.59ms s3.39 st5.26 l1.69 p2.94 c0.02 gc0] [+154.79 10.46ms s1.56 st1.88 l1.43 p2.13 c0.02 gc0] [+166.14 2.05ms s2.04 st0 l0 p0 c0 gc0]
+chunked first=40 chunk=60 #0: longest 41.9 ms, event→commit 46.24 ms; in-page {"steps":[{"n":40,"ms":4.3},{"n":100,"ms":5.1},{"n":160,"ms":5.2},{"n":220,"ms":5.4},{"n":280,"ms":5.7},{"n":307,"ms":3.2}],"firstPaint":17.2,"done":148.3,"sameInView":true,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.01 4.34ms s4.33 st0 l0 p0 c0 gc0] [+4.36 41.9ms s5.91 st17.64 l4.73 p9.75 c0.42 gc0] [+46.27 28.46ms s6.05 st10.77 l2.78 p4.54 c0.79 gc0] [+74.76 26.69ms s5.44 st10.67 l2.58 p3.19 c0.04 gc0] [+101.47 27.48ms s5.71 st11.2 l2.46 p4.49 c0.84 gc0] [+128.97 18.06ms s3.35 st5.3 l2.55 p3.11 c0.58 gc0] [+148 2.01ms s2 st0 l0 p0 c0 gc0]
+chunked first=40 chunk=60 #1: longest 43.09 ms, event→commit 48.55 ms; in-page {"steps":[{"n":40,"ms":4.8},{"n":100,"ms":6.9},{"n":160,"ms":7.9},{"n":220,"ms":6.6},{"n":280,"ms":5.5},{"n":307,"ms":5.6}],"firstPaint":18.8,"done":154.1,"sameInView":true,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.01 5.49ms s5.48 st0 l0 p0 c0 gc0] [+5.48 43.09ms s7.75 st17.8 l4 p9.55 c0.46 gc0] [+48.58 29.35ms s8.1 st9.91 l2.6 p4.82 c0.06 gc0] [+78.03 26.77ms s7.37 st10.04 l2.94 p3.95 c0.04 gc0] [+104.83 24.86ms s5.53 st10.01 l2.54 p2.73 c0.03 gc0] [+129.71 22.97ms s5.72 st5.59 l2.88 p3.01 c0.06 gc2.75] [+153.93 2.05ms s2.04 st0 l0 p0 c0 gc0] [+162.15 3.08ms s0 st0 l0 p0 c0 gc0] [+165.76 16.59ms s0 st0 l0 p0 c0 gc16.19] [+182.36 5.07ms s0 st0 l0 p0 c0 gc0] [+187.43 5.68ms s0 st0 l0 p0 c0 gc0] [+193.11 3.21ms s0 st0 l0 p0 c0 gc0]
+
+## phone
+saved rows: {"kind":"rows","cards":307}
+saved byProject: {"kind":"byProject","cards":307}
+geometry: {"stackH":626,"viewH":844,"cardH":35}
+### 1. cold render
+cold byProject #0: longest 79.14 ms, event→commit 104.58 ms; in-page {"mark":"cold-byProject-0","scriptMs":25.4,"toAfterFrameMs":104.7,"cards":307,"nodes":2772}
+    tasks≥2ms: [+-0.03 25.47ms s25.46 st0 l0 p0 c0 gc0] [+25.45 79.14ms s0.05 st52.06 l10.72 p13.21 c0.74 gc0] [+105.93 2.32ms s0 st0 l0 p1.51 c0.12 gc0] [+113.58 3.22ms s0 st0 l0 p0 c0 gc0] [+119.34 16.36ms s0 st0 l0 p0 c0 gc16.31] [+136.74 5.01ms s0 st0 l0 p0 c0 gc0] [+141.75 5.47ms s0 st0 l0 p0 c0 gc0] [+147.23 5.39ms s0 st0 l0 p0 c0 gc0]
+cold byProject #1: longest 71.1 ms, event→commit 99.42 ms; in-page {"mark":"cold-byProject-1","scriptMs":27.8,"toAfterFrameMs":99.9,"cards":307,"nodes":2772}
+    tasks≥2ms: [+-0.01 27.75ms s27.74 st0 l0 p0 c0 gc0] [+28.34 71.1ms s0.05 st48.1 l8.81 p11.71 c0.78 gc0]
+cold byProject #2: longest 73.66 ms, event→commit 98.94 ms; in-page {"mark":"cold-byProject-2","scriptMs":24.9,"toAfterFrameMs":98.7,"cards":307,"nodes":2772}
+    tasks≥2ms: [+-0.01 25.31ms s25.3 st0 l0 p0 c0 gc0] [+25.3 73.66ms s0.03 st48.95 l9.64 p11.81 c2.07 gc0]
+cold rows #0: longest 52.83 ms, event→commit 72.84 ms; in-page {"mark":"cold-rows-0","scriptMs":20.1,"toAfterFrameMs":72.9,"cards":307,"nodes":1864}
+    tasks≥2ms: [+-0.01 20.05ms s20.04 st0 l0 p0 c0 gc0] [+20.04 52.83ms s0.03 st33.38 l8.32 p8.5 c0.71 gc0]
+cold rows #1: longest 53.24 ms, event→commit 70.39 ms; in-page {"mark":"cold-rows-1","scriptMs":17.1,"toAfterFrameMs":70.4,"cards":307,"nodes":1864}
+    tasks≥2ms: [+-0.56 17.73ms s17.72 st0 l0 p0 c0 gc0] [+17.17 53.24ms s0.03 st34.43 l7.98 p8.95 c0.75 gc0]
+cold rows #2: longest 56.33 ms, event→commit 74.12 ms; in-page {"mark":"cold-rows-2","scriptMs":17,"toAfterFrameMs":74.1,"cards":307,"nodes":1864}
+    tasks≥2ms: [+-0.01 17.83ms s17.82 st0 l0 p0 c0 gc0] [+17.81 56.33ms s0.03 st35.37 l7.97 p9.49 c1.98 gc0]
+### 2. reveal of a mounted hidden subtree (hide Rows, show By project)
+reveal cv shownBefore=false #0: longest 79.64 ms, event→commit 80.84 ms; in-page {"mark":"rev-cv-false-0","scriptMs":0.6,"toAfterFrameMs":81.2}
+    tasks≥2ms: [+1.58 79.64ms s0.03 st51.95 l10.62 p12.81 c1.3 gc0]
+reveal cv shownBefore=false #1: longest 78.37 ms, event→commit 79 ms; in-page {"mark":"rev-cv-false-1","scriptMs":0.1,"toAfterFrameMs":79.1}
+    tasks≥2ms: [+0.65 78.37ms s0.04 st51.28 l9.8 p14.24 c1.95 gc0]
+reveal cv shownBefore=false #2: longest 79.48 ms, event→commit 79.85 ms; in-page {"mark":"rev-cv-false-2","scriptMs":0.1,"toAfterFrameMs":80.6}
+    tasks≥2ms: [+0.39 79.48ms s0.03 st51.56 l10.6 p13.56 c1.01 gc0]
+reveal cv shownBefore=true #0: longest 15.85 ms, event→commit 16.54 ms; in-page {"mark":"rev-cv-true-0","scriptMs":0.7,"toAfterFrameMs":16.6}
+    tasks≥2ms: [+0.71 15.85ms s0.03 st1.95 l0.11 p11.31 c1.48 gc0]
+reveal cv shownBefore=true #1: longest 15.3 ms, event→commit 16.16 ms; in-page {"mark":"rev-cv-true-1","scriptMs":0,"toAfterFrameMs":16.1}
+    tasks≥2ms: [+0.87 15.3ms s0.04 st1.6 l0.48 p10.88 c1.99 gc0]
+reveal cv shownBefore=true #2: longest 16.77 ms, event→commit 17.28 ms; in-page {"mark":"rev-cv-true-2","scriptMs":0.4,"toAfterFrameMs":17.3}
+    tasks≥2ms: [+0.52 16.77ms s0.03 st2.08 l0.77 p10.96 c1.22 gc0]
+reveal none shownBefore=false #0: longest 77.59 ms, event→commit 78.1 ms; in-page {"mark":"rev-none-false-0","scriptMs":0,"toAfterFrameMs":78.5}
+    tasks≥2ms: [+0.53 77.59ms s0.26 st51.23 l10 p12.74 c1.76 gc0]
+reveal none shownBefore=false #1: longest 81.3 ms, event→commit 82.12 ms; in-page {"mark":"rev-none-false-1","scriptMs":0,"toAfterFrameMs":82.2}
+    tasks≥2ms: [+0.84 81.3ms s0.03 st54.45 l10.2 p13.65 c1.63 gc0]
+reveal none shownBefore=false #2: longest 83.93 ms, event→commit 84.73 ms; in-page {"mark":"rev-none-false-2","scriptMs":0.1,"toAfterFrameMs":85.3}
+    tasks≥2ms: [+0.82 83.93ms s0.04 st57.78 l9.99 p12.14 c1.13 gc0]
+reveal none shownBefore=true #0: longest 76.29 ms, event→commit 77.06 ms; in-page {"mark":"rev-none-true-0","scriptMs":0.1,"toAfterFrameMs":77}
+    tasks≥2ms: [+0.79 76.29ms s0.03 st50.41 l10.15 p12.39 c1.51 gc0]
+reveal none shownBefore=true #1: longest 78.41 ms, event→commit 79.12 ms; in-page {"mark":"rev-none-true-1","scriptMs":0,"toAfterFrameMs":79.1}
+    tasks≥2ms: [+0.73 78.41ms s0.03 st51.35 l10.28 p14.36 c1.09 gc0]
+reveal none shownBefore=true #2: longest 78.73 ms, event→commit 79.33 ms; in-page {"mark":"rev-none-true-2","scriptMs":0.1,"toAfterFrameMs":79.5}
+    tasks≥2ms: [+0.62 78.73ms s0.03 st52.33 l9.81 p13.88 c1.71 gc0]
+### 3. mounted subtrees: memory and a write
+mounted 1 (cv): {"nodes":5118,"cards":307} heap 20.4 MB, DOM nodes 10488
+write k=1 cv share=true #0: longest 3.7 ms, event→commit 2.67 ms; in-page {"mark":"w-1-cv-true-0","scriptMs":1.6,"toAfterFrameMs":2.6}
+    tasks≥2ms: [+-0.59 2.27ms s2.26 st0 l0 p0 c0 gc0] [+2.74 3.7ms s0 st0 l0 p0 c0 gc0]
+write k=1 cv share=true #1: longest 2.13 ms, event→commit 4.15 ms; in-page {"mark":"w-1-cv-true-1","scriptMs":1.4,"toAfterFrameMs":4.1}
+    tasks≥2ms: [+-0.46 2.06ms s2.05 st0 l0 p0 c0 gc0] [+2.03 2.13ms s0.02 st0 l0 p0.01 c1.69 gc0]
+write k=1 cv share=false #0: longest 9.31 ms, event→commit 10.24 ms; in-page {"mark":"w-1-cv-false-0","scriptMs":9.2,"toAfterFrameMs":10.2}
+    tasks≥2ms: [+-0.01 9.31ms s9.3 st0 l0 p0 c0 gc1.59]
+write k=1 cv share=false #1: longest 7.58 ms, event→commit 8.07 ms; in-page {"mark":"w-1-cv-false-1","scriptMs":7.2,"toAfterFrameMs":8.2}
+    tasks≥2ms: [+-0.02 7.58ms s7.58 st0 l0 p0 c0 gc0.79]
+mounted 2 (cv): {"nodes":7891,"cards":614} heap 21.7 MB, DOM nodes 13574
+write k=2 cv share=true #0: longest 3.71 ms, event→commit 4.83 ms; in-page {"mark":"w-2-cv-true-0","scriptMs":3.7,"toAfterFrameMs":4.8}
+    tasks≥2ms: [+-0.02 3.71ms s3.71 st0 l0 p0 c0 gc0]
+write k=2 cv share=true #1: longest 3.38 ms, event→commit 4.52 ms; in-page {"mark":"w-2-cv-true-1","scriptMs":3.3,"toAfterFrameMs":4.6}
+    tasks≥2ms: [+-0.02 3.38ms s3.38 st0 l0 p0 c0 gc0]
+write k=2 cv share=false #0: longest 19.21 ms, event→commit 22.11 ms; in-page {"mark":"w-2-cv-false-0","scriptMs":19.1,"toAfterFrameMs":23}
+    tasks≥2ms: [+-0.01 19.21ms s19.2 st0 l0 p0 c0 gc2.2] [+20.04 2.08ms s0.33 st0 l0 p0.01 c1.61 gc0]
+write k=2 cv share=false #1: longest 15.65 ms, event→commit 18.66 ms; in-page {"mark":"w-2-cv-false-1","scriptMs":15.6,"toAfterFrameMs":18.7}
+    tasks≥2ms: [+-0.01 15.65ms s15.65 st0 l0 p0 c0 gc0]
+mounted 3 (cv): {"nodes":9756,"cards":921} heap 22.6 MB, DOM nodes 15758
+write k=3 cv share=true #0: longest 5.2 ms, event→commit 6.76 ms; in-page {"mark":"w-3-cv-true-0","scriptMs":3.4,"toAfterFrameMs":6.8}
+    tasks≥2ms: [+-0.01 3.42ms s3.42 st0 l0 p0 c0 gc0] [+4 2.76ms s0.02 st0 l0 p0.01 c2.56 gc0] [+7.18 5.2ms s0 st0 l0 p0 c0 gc0]
+write k=3 cv share=true #1: longest 3.09 ms, event→commit 5.36 ms; in-page {"mark":"w-3-cv-true-1","scriptMs":3,"toAfterFrameMs":5.4}
+    tasks≥2ms: [+-0.01 3.09ms s3.09 st0 l0 p0 c0 gc0]
+write k=3 cv share=false #0: longest 21.64 ms, event→commit 22.97 ms; in-page {"mark":"w-3-cv-false-0","scriptMs":21.6,"toAfterFrameMs":22.9}
+    tasks≥2ms: [+-0.01 21.64ms s21.64 st0 l0 p0 c0 gc1.58]
+write k=3 cv share=false #1: longest 22.12 ms, event→commit 24.2 ms; in-page {"mark":"w-3-cv-false-1","scriptMs":22,"toAfterFrameMs":26.2}
+    tasks≥2ms: [+-0.01 22.12ms s22.11 st0 l0 p0 c0 gc1.82] [+24.21 2.01ms s0 st0 l0 p0 c0 gc0] [+27.81 8.39ms s0 st0 l0 p0 c0 gc8.37]
+mounted 4 (cv): {"nodes":12529,"cards":1228} heap 23.9 MB, DOM nodes 18844
+write k=4 cv share=true #0: longest 3.82 ms, event→commit 5.52 ms; in-page {"mark":"w-4-cv-true-0","scriptMs":3.8,"toAfterFrameMs":5.5}
+    tasks≥2ms: [+-0.01 3.82ms s3.81 st0 l0 p0 c0 gc0]
+write k=4 cv share=true #1: longest 4.81 ms, event→commit 7.9 ms; in-page {"mark":"w-4-cv-true-1","scriptMs":4.7,"toAfterFrameMs":7.9}
+    tasks≥2ms: [+-0.01 4.81ms s4.69 st0 l0 p0 c0 gc1.12] [+4.9 3.01ms s0.01 st0 l0 p0.01 c2.09 gc0]
+write k=4 cv share=false #0: longest 33.22 ms, event→commit 34.45 ms; in-page {"mark":"w-4-cv-false-0","scriptMs":33.2,"toAfterFrameMs":34.4}
+    tasks≥2ms: [+-0.01 33.22ms s33.21 st0 l0 p0 c0 gc2.86]
+write k=4 cv share=false #1: longest 30 ms, event→commit 31.88 ms; in-page {"mark":"w-4-cv-false-1","scriptMs":30,"toAfterFrameMs":31.9}
+    tasks≥2ms: [+-0.01 30ms s30 st0 l0 p0 c0 gc0.92] [+35.18 3.08ms s0 st0 l0 p0 c0 gc0] [+38.87 7.8ms s0 st0 l0 p0 c0 gc7.78]
+mounted 1 (none): {"nodes":5118,"cards":307} heap 20.5 MB, DOM nodes 10488
+write k=1 none share=true #0: longest 2.39 ms, event→commit 2.66 ms; in-page {"mark":"w-1-none-true-0","scriptMs":1.5,"toAfterFrameMs":2.7}
+    tasks≥2ms: [+2.73 2.39ms s0 st0 l0 p0 c0 gc0]
+write k=1 none share=true #1: longest 1.59 ms, event→commit 2.04 ms; in-page {"mark":"w-1-none-true-1","scriptMs":1.6,"toAfterFrameMs":2.1}
+    tasks≥2ms: 
+write k=1 none share=false #0: longest 7.66 ms, event→commit 8.48 ms; in-page {"mark":"w-1-none-false-0","scriptMs":7.6,"toAfterFrameMs":8.4}
+    tasks≥2ms: [+-0.01 7.66ms s7.65 st0 l0 p0 c0 gc1.48]
+write k=1 none share=false #1: longest 6.96 ms, event→commit 7.92 ms; in-page {"mark":"w-1-none-false-1","scriptMs":6.9,"toAfterFrameMs":7.9}
+    tasks≥2ms: [+-0.02 6.96ms s6.96 st0 l0 p0 c0 gc0.86]
+mounted 2 (none): {"nodes":7891,"cards":614} heap 21.7 MB, DOM nodes 13574
+write k=2 none share=true #0: longest 2.65 ms, event→commit 5.38 ms; in-page {"mark":"w-2-none-true-0","scriptMs":1.9,"toAfterFrameMs":5.4}
+    tasks≥2ms: [+-0.66 2.65ms s2.64 st0 l0 p0 c0 gc0] [+2.92 2.47ms s0.02 st0 l0 p0.01 c2.23 gc0]
+write k=2 none share=true #1: longest 2 ms, event→commit 2.51 ms; in-page {"mark":"w-2-none-true-1","scriptMs":1.7,"toAfterFrameMs":2.6}
+    tasks≥2ms: [+-0.3 2ms s1.99 st0 l0 p0 c0 gc0]
+write k=2 none share=false #0: longest 17.19 ms, event→commit 19.06 ms; in-page {"mark":"w-2-none-false-0","scriptMs":17.1,"toAfterFrameMs":19.2}
+    tasks≥2ms: [+-0.01 17.19ms s17.18 st0 l0 p0 c0 gc1.78]
+write k=2 none share=false #1: longest 15.27 ms, event→commit 18.28 ms; in-page {"mark":"w-2-none-false-1","scriptMs":14.6,"toAfterFrameMs":18.4}
+    tasks≥2ms: [+-0.66 15.27ms s15.26 st0 l0 p0 c0 gc0] [+15.65 2.64ms s0.02 st0 l0 p0.01 c1.79 gc0]
+mounted 3 (none): {"nodes":9756,"cards":921} heap 22.6 MB, DOM nodes 15758
+write k=3 none share=true #0: longest 3.77 ms, event→commit 5.08 ms; in-page {"mark":"w-3-none-true-0","scriptMs":3.2,"toAfterFrameMs":5.1}
+    tasks≥2ms: [+-0.5 3.77ms s3.76 st0 l0 p0 c0 gc0] [+5.15 3.3ms s0 st0 l0 p0 c0 gc0]
+write k=3 none share=true #1: longest 2.79 ms, event→commit 6.29 ms; in-page {"mark":"w-3-none-true-1","scriptMs":2.3,"toAfterFrameMs":6.3}
+    tasks≥2ms: [+-0.51 2.79ms s2.79 st0 l0 p0 c0 gc0] [+3.77 2.53ms s0.01 st0 l0 p0.01 c1.98 gc0]
+write k=3 none share=false #0: longest 21.55 ms, event→commit 22.82 ms; in-page {"mark":"w-3-none-false-0","scriptMs":21.5,"toAfterFrameMs":22.9}
+    tasks≥2ms: [+-0.01 21.55ms s21.54 st0 l0 p0 c0 gc1.5]
+write k=3 none share=false #1: longest 23.7 ms, event→commit 24.99 ms; in-page {"mark":"w-3-none-false-1","scriptMs":23.8,"toAfterFrameMs":25.1}
+    tasks≥2ms: [+-0.01 23.7ms s23.69 st0 l0 p0 c0 gc2.66] [+30.28 3.06ms s0 st0 l0 p0 c0 gc0] [+33.83 8.6ms s0 st0 l0 p0 c0 gc8.02]
+mounted 4 (none): {"nodes":12529,"cards":1228} heap 23.9 MB, DOM nodes 18844
+write k=4 none share=true #0: longest 3.47 ms, event→commit 5.16 ms; in-page {"mark":"w-4-none-true-0","scriptMs":2.9,"toAfterFrameMs":5.1}
+    tasks≥2ms: [+-0.01 3.47ms s3.46 st0 l0 p0 c0 gc0]
+write k=4 none share=true #1: longest 5.62 ms, event→commit 6.47 ms; in-page {"mark":"w-4-none-true-1","scriptMs":4.9,"toAfterFrameMs":6.4}
+    tasks≥2ms: [+-0.65 5.62ms s5.61 st0 l0 p0 c0 gc1.96]
+write k=4 none share=false #0: longest 31.08 ms, event→commit 34.15 ms; in-page {"mark":"w-4-none-false-0","scriptMs":31.1,"toAfterFrameMs":34.2}
+    tasks≥2ms: [+-0.01 31.08ms s31.07 st0 l0 p0 c0 gc2.13] [+31.68 2.49ms s0.02 st0 l0 p0.01 c2.25 gc0]
+write k=4 none share=false #1: longest 31.71 ms, event→commit 32.44 ms; in-page {"mark":"w-4-none-false-1","scriptMs":31,"toAfterFrameMs":32.5}
+    tasks≥2ms: [+-0.57 31.71ms s31.7 st0 l0 p0 c0 gc1.55] [+36.18 3.06ms s0 st0 l0 p0 c0 gc0] [+39.67 8.17ms s0 st0 l0 p0 c0 gc8.14]
+### 4. editor: new vs re-keyed
+new Obsidian field #0: longest 63.16 ms, event→commit 70.69 ms; in-page {"mark":"ed-new-0","scriptMs":58.6,"toAfterFrameMs":79.5}
+    tasks≥2ms: [+-0.01 63.16ms s43.09 st17.7 l2.34 p0 c0 gc0] [+63.16 7.57ms s0.03 st0 l0 p2.69 c1.58 gc0] [+70.78 8.16ms s8.15 st0 l0 p0 c0 gc0] [+79.5 15.76ms s3.12 st6.4 l0.76 p3.22 c0.9 gc0] [+97.17 2.37ms s0 st0 l0 p0 c0 gc0] [+263.79 2.61ms s0 st1.82 l0 p0.01 c0.04 gc0]
+new Obsidian field #1: longest 28.53 ms, event→commit 34.95 ms; in-page {"mark":"ed-new-1","scriptMs":25.7,"toAfterFrameMs":36.4}
+    tasks≥2ms: [+-0.01 28.53ms s16.55 st10.42 l1.54 p0 c0 gc0] [+28.52 6.45ms s0.03 st0.02 l0 p2.69 c0.07 gc0] [+36.76 4.16ms s2.48 st0 l0 p0.78 c0.05 gc0] [+43.67 2.4ms s0.01 st0.01 l0 p1.5 c0.75 gc0] [+229.6 3.89ms s0 st2.63 l0 p0.01 c0.08 gc0]
+new Obsidian field #2: longest 22.8 ms, event→commit 28.54 ms; in-page {"mark":"ed-new-2","scriptMs":20.1,"toAfterFrameMs":29.2}
+    tasks≥2ms: [+-0.01 22.8ms s12.47 st8.57 l1.73 p0 c0 gc0] [+22.79 5.77ms s0.03 st0.04 l0 p3.1 c0.46 gc0] [+29.45 3.69ms s1.91 st0.05 l0 p0.21 c0.04 gc0] [+223.17 4.26ms s0 st2.11 l0 p0.01 c1.85 gc0]
+re-key warm field #3: longest 11.11 ms, event→commit 15.6 ms; in-page {"mark":"ed-rk-3","scriptMs":9.8,"toAfterFrameMs":16}
+    tasks≥2ms: [+-0.01 11.11ms s7.04 st2.71 l1.32 p0 c0 gc0] [+11.1 4.52ms s0.02 st0.02 l0 p2.91 c0.07 gc0] [+16.26 6.45ms s1.91 st0.71 l0 p2.53 c0.67 gc0] [+212.4 2.55ms s0 st1.52 l0 p0.01 c0.05 gc0]
+re-key warm field #4: longest 10.3 ms, event→commit 14.91 ms; in-page {"mark":"ed-rk-4","scriptMs":9.7,"toAfterFrameMs":16.5}
+    tasks≥2ms: [+-0.01 10.3ms s6.15 st2.88 l1.24 p0 c0 gc0] [+10.29 4.64ms s0.02 st0 l0 p3.15 c0.06 gc0] [+17.19 4.4ms s1.52 st0.02 l0 p2 c0.17 gc0] [+211.39 2.58ms s0 st2.33 l0 p0 c0.03 gc0]
+re-key warm field #5: longest 10.49 ms, event→commit 16.13 ms; in-page {"mark":"ed-rk-5","scriptMs":9.3,"toAfterFrameMs":16.6}
+    tasks≥2ms: [+-0.01 10.49ms s5.94 st2.4 l1.44 p0 c0 gc0] [+10.48 5.68ms s0.32 st0.01 l0 p1.96 c1.62 gc0] [+16.7 5.34ms s1.85 st0.97 l0 p1.55 c0.04 gc0] [+211.39 3.78ms s0 st2.49 l0 p0.01 c0.39 gc0]
+new bare EditorView #0: longest 15.52 ms, event→commit 27.22 ms; in-page {"mark":"ed-bare-0","scriptMs":11.7,"toAfterFrameMs":27.4}
+    tasks≥2ms: [+-0.01 11.7ms s3.54 st6.15 l2.01 p0 c0 gc0] [+11.71 15.52ms s0.89 st0.71 l0 p11.7 c0.4 gc0]
+new bare EditorView #1: longest 16.08 ms, event→commit 26.36 ms; in-page {"mark":"ed-bare-1","scriptMs":10.3,"toAfterFrameMs":26.8}
+    tasks≥2ms: [+-0.01 10.3ms s2.91 st5.51 l1.87 p0 c0 gc0] [+10.29 16.08ms s0.9 st0.03 l0 p11.71 c2.25 gc0] [+30.25 2.02ms s0.12 st0.76 l0 p0 c0.04 gc0]
+new bare EditorView #2: longest 13.88 ms, event→commit 23.61 ms; in-page {"mark":"ed-bare-2","scriptMs":10.4,"toAfterFrameMs":24.6}
+    tasks≥2ms: [+-0.01 10.46ms s3.4 st5.59 l1.47 p0 c0 gc0] [+10.45 13.88ms s0.72 st0.01 l0 p11.22 c0.06 gc0]
+### 5. chunked rendering (byProject)
+chunked first=20 chunk=20 #0: longest 22.95 ms, event→commit 26.21 ms; in-page {"steps":[{"n":20,"ms":2.6},{"n":40,"ms":2},{"n":60,"ms":2.1},{"n":80,"ms":2.5},{"n":100,"ms":2},{"n":120,"ms":1.8},{"n":140,"ms":1.8},{"n":160,"ms":2.6},{"n":180,"ms":1.8},{"n":200,"ms":2.4},{"n":220,"ms":2.3},{"n":240,"ms":6.1},{"n":260,"ms":2.6},{"n":280,"ms":2.3},{"n":300,"ms":2.1},{"n":307,"ms":1.4}],"firstPaint":13.1,"done":209.5,"sameInView":false,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.05 3.32ms s3.31 st0 l0 p0 c0 gc0] [+3.27 22.95ms s2.63 st9.65 l2.65 p4.84 c1.05 gc0] [+26.22 12.51ms s2.24 st4.36 l1.44 p3.03 c0.16 gc0] [+39.3 12.49ms s2.55 st4.13 l1.25 p2.64 c0.04 gc0] [+51.8 11.1ms s2.08 st3.87 l1.22 p2.61 c0.03 gc0] [+63.63 11.63ms s1.98 st4.19 l0.93 p2.81 c0.03 gc0] [+75.27 11.35ms s1.88 st3.86 l1.55 p3.17 c0.02 gc0] [+86.64 12.6ms s2.53 st4.44 l1.28 p2.13 c0.03 gc0] [+99.26 12.21ms s1.88 st4.6 l1.23 p1.83 c0.03 gc0] [+111.48 11.56ms s2.46 st3.98 l1.43 p2.44 c0.03 gc0] [+123.06 12.69ms s2.31 st4.53 l1.3 p2.76 c0.03 gc0] [+135.76 18.49ms s6.55 st5.34 l1.64 p2.69 c0.05 gc3.35] [+155.01 13.61ms s2.59 st4.8 l1.76 p2.63 c0.04 gc0] [+169.25 13.4ms s2.35 st4.41 l2 p2.75 c0.03 gc0] [+182.66 12.89ms s2.41 st4.51 l1.5 p1.73 c0.03 gc0] [+195.56 11.82ms s1.33 st4.46 l1.68 p1.98 c0.03 gc0] [+207.49 2.97ms s2.97 st0 l0 p0 c0 gc0] [+214.09 3.07ms s0 st0 l0 p0 c0 gc0] [+217.68 10.44ms s0 st0 l0 p0 c0 gc9.71] [+228.99 5.63ms s0 st0 l0 p0 c0 gc0] [+234.63 4.52ms s0 st0 l0 p0 c0 gc0]
+chunked first=20 chunk=20 #1: longest 19.99 ms, event→commit 23.18 ms; in-page {"steps":[{"n":20,"ms":2.4},{"n":40,"ms":2.1},{"n":60,"ms":2},{"n":80,"ms":2.2},{"n":100,"ms":2.1},{"n":120,"ms":2.2},{"n":140,"ms":2.5},{"n":160,"ms":2.2},{"n":180,"ms":3.2},{"n":200,"ms":2.6},{"n":220,"ms":1.5},{"n":240,"ms":1.8},{"n":260,"ms":2.7},{"n":280,"ms":3},{"n":300,"ms":2.4},{"n":307,"ms":1.8}],"firstPaint":9.3,"done":224.9,"sameInView":false,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.01 3.21ms s3.2 st0 l0 p0 c0 gc0] [+3.2 19.99ms s3.05 st8.61 l1.98 p3.16 c0.1 gc0] [+25.33 12.38ms s2.03 st4.53 l1.09 p3.46 c0.05 gc0] [+37.72 13.86ms s2.55 st5.09 l1.19 p2.98 c0.46 gc0] [+51.61 14.42ms s2.53 st4.3 l1.32 p3.65 c1.12 gc0] [+66.2 14.05ms s2.29 st5.13 l1.48 p4.33 c0.05 gc0] [+80.28 14.02ms s2.61 st4.34 l1.94 p3.1 c0.34 gc0] [+94.32 12.93ms s2.51 st4.26 l1.65 p3.02 c0.23 gc0] [+107.27 16.19ms s3.49 st5.14 l1.87 p1.79 c0.17 gc0] [+124.03 14.53ms s2.62 st4.87 l1.76 p3.21 c0.05 gc0] [+138.59 13.63ms s2.81 st4.57 l1.28 p2.8 c0.26 gc0] [+152.37 14.07ms s2.59 st4.68 l1.69 p2.63 c0.53 gc0] [+166.46 14.77ms s2.63 st4.89 l2.14 p2.2 c0.05 gc0] [+181.26 15.73ms s3.09 st5.58 l1.96 p3.17 c0.04 gc0] [+197.34 15.21ms s3.12 st5.12 l1.97 p3.01 c0.04 gc0] [+212.56 11.91ms s2.49 st3.11 l1.77 p2.9 c0.04 gc0] [+224.96 3.08ms s3.07 st0 l0 p0 c0 gc0]
+chunked first=20 chunk=40 #0: longest 24.46 ms, event→commit 27.01 ms; in-page {"steps":[{"n":20,"ms":2.1},{"n":60,"ms":3.4},{"n":100,"ms":3.3},{"n":140,"ms":2.9},{"n":180,"ms":3.3},{"n":220,"ms":3.7},{"n":260,"ms":3.8},{"n":300,"ms":3.6},{"n":307,"ms":1.8}],"firstPaint":8.8,"done":150.7,"sameInView":false,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.01 2.57ms s2.56 st0 l0 p0 c0 gc0] [+2.56 24.46ms s3.56 st10.93 l2.63 p4.61 c0.71 gc0] [+27.02 18.77ms s3.38 st7.89 l1.74 p3.87 c0.04 gc0] [+45.82 17.96ms s3.32 st7.35 l1.95 p2.88 c0.04 gc0] [+64 16.89ms s3.55 st7.19 l1.68 p3.05 c0.03 gc0] [+80.91 18.99ms s3.87 st7.26 l1.97 p3.1 c0.83 gc0] [+100.57 17.76ms s3.84 st7.67 l1.57 p3.16 c0.03 gc0] [+118.35 19.48ms s4.76 st7.27 l2.46 p3.1 c0.04 gc0] [+137.85 12.01ms s2.45 st2.86 l1.82 p2.73 c0.03 gc0]
+chunked first=20 chunk=40 #1: longest 25.57 ms, event→commit 29.43 ms; in-page {"steps":[{"n":20,"ms":1.8},{"n":60,"ms":3.5},{"n":100,"ms":3},{"n":140,"ms":3.5},{"n":180,"ms":4},{"n":220,"ms":3.1},{"n":260,"ms":3.3},{"n":300,"ms":4.6},{"n":307,"ms":1.9}],"firstPaint":10.6,"done":158.6,"sameInView":false,"inView":20,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+1.84 2.02ms s0 st0 l0 p0 c0 gc1.28] [+3.86 25.57ms s3.66 st11.45 l2.56 p5.16 c0.49 gc0] [+29.44 19.51ms s2.9 st7.82 l1.88 p4.64 c0.04 gc0] [+49.55 18.47ms s3.62 st7.53 l1.98 p3.92 c0.03 gc0] [+68.04 18.48ms s4.01 st7.74 l1.76 p2.28 c0.51 gc0] [+86.63 17.27ms s3.78 st7.32 l1.78 p2.71 c0.03 gc0] [+103.92 18.37ms s3.34 st7.45 l1.58 p3.04 c0.04 gc0] [+122.31 22.45ms s4.56 st9.04 l2.52 p3.34 c0.39 gc0] [+144.78 12.95ms s2.02 st3.09 l2.05 p2.94 c0.77 gc0] [+158.39 2.2ms s2.2 st0 l0 p0 c0 gc0]
+chunked first=30 chunk=30 #0: longest 27.03 ms, event→commit 31.49 ms; in-page {"steps":[{"n":30,"ms":3.1},{"n":60,"ms":2.7},{"n":90,"ms":3.2},{"n":120,"ms":2.9},{"n":150,"ms":3.2},{"n":180,"ms":3.1},{"n":210,"ms":3.6},{"n":240,"ms":3.2},{"n":270,"ms":3.4},{"n":300,"ms":3.8},{"n":307,"ms":1.9}],"firstPaint":14.2,"done":194.9,"sameInView":true,"inView":23,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.02 4.49ms s4.49 st0 l0 p0 c0 gc0] [+4.48 27.03ms s3.22 st12.77 l2.14 p4.69 c0.72 gc0] [+31.52 17.23ms s3.29 st6.13 l1.82 p4.19 c0.75 gc0] [+49.06 20.42ms s3.71 st6.95 l1.95 p5.45 c0.89 gc0] [+69.5 18.32ms s3.22 st6.87 l1.39 p3.77 c0.04 gc0] [+87.84 19.45ms s3.69 st7.61 l2.21 p3.09 c0.38 gc0] [+107.34 18.21ms s4 st6.59 l2.35 p3.08 c0.06 gc0] [+125.97 18.08ms s3.62 st6.99 l1.77 p3.24 c0.04 gc0] [+144.07 17.55ms s3.58 st6.5 l2.39 p2.87 c0.04 gc0] [+162.18 19.47ms s4.15 st6.8 l2.55 p3.72 c0.21 gc0] [+181.68 12.37ms s2.02 st3.46 l1.49 p2.42 c0.04 gc0] [+194.75 2.56ms s2.55 st0 l0 p0 c0 gc0] [+202.33 3.15ms s0 st0 l0 p0 c0 gc0] [+205.85 17.59ms s0 st0 l0 p0 c0 gc17.49] [+223.45 5.11ms s0 st0 l0 p0 c0 gc0] [+228.56 5.48ms s0 st0 l0 p0 c0 gc0] [+234.05 4.44ms s0 st0 l0 p0 c0 gc0]
+chunked first=30 chunk=30 #1: longest 26.01 ms, event→commit 31.07 ms; in-page {"steps":[{"n":30,"ms":5.1},{"n":60,"ms":2.6},{"n":90,"ms":3.2},{"n":120,"ms":2.7},{"n":150,"ms":2.6},{"n":180,"ms":2.8},{"n":210,"ms":2.8},{"n":240,"ms":2.6},{"n":270,"ms":3},{"n":300,"ms":3.1},{"n":307,"ms":1.6}],"firstPaint":13.8,"done":172.3,"sameInView":true,"inView":23,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.01 5.09ms s5.08 st0 l0 p0 c0 gc0] [+5.07 26.01ms s3.5 st11.32 l3.3 p4.12 c0.72 gc0] [+31.09 16.41ms s3.31 st6.11 l1.64 p3.66 c0.05 gc0] [+47.53 16.32ms s3.51 st5.7 l1.52 p4.06 c0.04 gc0] [+63.87 14.44ms s2.63 st6.3 l1.06 p2.61 c0.03 gc0] [+78.98 14.48ms s2.8 st5.73 l1.5 p2.09 c0.76 gc0] [+93.48 14.15ms s2.96 st5.67 l0.88 p2.11 c0.03 gc0] [+107.84 15.93ms s2.62 st6.59 l2.05 p3.2 c0.05 gc0] [+124.36 15.58ms s3 st5.71 l1.79 p2.91 c0.04 gc0] [+140.59 18.27ms s3.17 st6.58 l2.49 p3.47 c0.05 gc0] [+158.89 13.19ms s2.44 st2.96 l2.45 p3.27 c0.04 gc0] [+172.22 2.56ms s2.55 st0 l0 p0 c0 gc0] [+174.78 3.81ms s0 st0 l0 p0 c0 gc0]
+chunked first=40 chunk=60 #0: longest 35.66 ms, event→commit 39.7 ms; in-page {"steps":[{"n":40,"ms":3.3},{"n":100,"ms":4.5},{"n":160,"ms":4.2},{"n":220,"ms":5.4},{"n":280,"ms":5.4},{"n":307,"ms":3.5}],"firstPaint":13.9,"done":138.6,"sameInView":true,"inView":23,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.01 3.46ms s3.46 st0 l0 p0 c0 gc0] [+4.04 35.66ms s5.47 st16.27 l4.32 p6.72 c0.1 gc0] [+39.71 24.33ms s5.53 st10.07 l2.64 p3.84 c0.04 gc0] [+64.07 26.62ms s5.93 st11.3 l2.81 p3.82 c0.37 gc0] [+90.71 27ms s5.48 st11.7 l3.27 p4.2 c0.4 gc0] [+117.73 20.3ms s3.64 st6.48 l2.81 p2.84 c1.78 gc0] [+138.45 2.01ms s2.01 st0 l0 p0 c0 gc0]
+chunked first=40 chunk=60 #1: longest 40.2 ms, event→commit 44.42 ms; in-page {"steps":[{"n":40,"ms":4.1},{"n":100,"ms":4.9},{"n":160,"ms":5.5},{"n":220,"ms":5},{"n":280,"ms":6.6},{"n":307,"ms":3.3}],"firstPaint":16.2,"done":143.1,"sameInView":true,"inView":23,"scrollH":11438,"cards":307}
+    tasks≥2ms: [+-0.56 4.79ms s4.79 st0 l0 p0 c0 gc0] [+4.24 40.2ms s6.11 st18.32 l3.88 p8.37 c0.8 gc0] [+44.44 26.73ms s5.75 st11.68 l2.34 p4.85 c0.04 gc0] [+71.2 24.66ms s5.16 st10.7 l2.33 p3.28 c0.04 gc0] [+95.88 27.96ms s7.14 st11.79 l2.53 p4.39 c0.46 gc1.84] [+123.87 18.18ms s3.32 st6.77 l1.99 p2.92 c0.7 gc0] [+145.65 2.78ms s0 st0 l0 p0 c0 gc0] [+151.05 14.71ms s0 st0 l0 p0 c0 gc14.06] [+165.78 5.48ms s0 st0 l0 p0 c0 gc0] [+171.26 5.34ms s0 st0 l0 p0 c0 gc0]

@@ -1,0 +1,73 @@
+diff --git a/obsidian/ui/next/host/block/BlockHost.tsx b/obsidian/ui/next/host/block/BlockHost.tsx
+index 3275f90b..aeb842c7 100644
+--- a/obsidian/ui/next/host/block/BlockHost.tsx
++++ b/obsidian/ui/next/host/block/BlockHost.tsx
+@@ -1,5 +1,8 @@
+ import type { App } from "obsidian";
+-import { render } from "preact";
++import { render, h, Fragment } from "preact";
++import { List as SpikeList } from "../../view/List";
++import { EditorView as SpikeEditorView } from "@codemirror/view";
++import { EditorState as SpikeEditorState } from "@codemirror/state";
+ import { type Cmd, type HostSession, type Program, type RuntimeEvent, type Store, type Views } from "../../../../runtime/Runtime";
+ import type { Answers, Need } from "../../model/answers";
+ import { Chrome } from "../../drivers/chrome";
+@@ -155,6 +158,7 @@ export class BlockHost {
+ 		this.store = deps.session.store(blockProgram((command, dispatch) => this.run(command, dispatch), views), blockModel(note, Chrome.wide()), { render: (model) => this.draw(model) });
+ 		this.editors = new Editors(deps.editors ?? null);
+ 		this.rendered = new Rendered(deps.markdown ?? null);
++		(globalThis as unknown as { __spike: unknown }).__spike = { h, render, Fragment, List: SpikeList, host: this, drawnLists, titleField: deps.titleField, EditorView: SpikeEditorView, EditorState: SpikeEditorState };
+ 	}
+ 
+ 	/** The block is on the page: drawn at once, its presses and keys its own. */
+diff --git a/scripts/e2e/main.ts b/scripts/e2e/main.ts
+index 658aafdf..4d9d9485 100644
+--- a/scripts/e2e/main.ts
++++ b/scripts/e2e/main.ts
+@@ -11,6 +11,7 @@ import { smoke } from "./smoke";
+ import { blockCarry } from "./blockCarry";
+ import { block } from "./block";
+ import { blockBudget } from "./blockBudget";
++import { spike } from "./spike";
+ 
+ const USAGE = `npm run e2e -- <command>
+   smoke [--update] [--refresh-fixture]   the smoke set on desktop and phone view, dark and light; --update records the baselines
+@@ -94,13 +95,13 @@ export async function main(argv: readonly string[]): Promise<number> {
+ 			obsidian.cdp.close();
+ 		}
+ 	}
+-	if (!["smoke", "budget", "open", "block", "block-budget"].includes(command)) {
++	if (!["smoke", "budget", "open", "block", "block-budget", "spike"].includes(command)) {
+ 		console.log(USAGE);
+ 		return 2;
+ 	}
+ 	const built = buildE2E(p.root, join(p.build, "main.js"));
+ 	const taken = fixture(p, argv.includes("--refresh-fixture"));
+-	const fx = command === "budget" ? { ...taken, tasks: budgetTasks(taken.tasks) } : command === "block-budget" ? { ...taken, tasks: blockBudgetTasks(taken.tasks) } : taken;
++	const fx = command === "budget" ? { ...taken, tasks: budgetTasks(taken.tasks) } : command === "spike" ? { ...taken, tasks: blockBudgetTasks(taken.tasks, 300) } : command === "block-budget" ? { ...taken, tasks: blockBudgetTasks(taken.tasks) } : taken;
+ 	prepareVault(p, fx, built);
+ 	let obsidian = await TestObsidian.launch(p);
+ 	if (command === "open") {
+@@ -111,6 +112,10 @@ export async function main(argv: readonly string[]): Promise<number> {
+ 	const run = runDir(p);
+ 	try {
+ 		if (command === "budget") return report(await budget(obsidian, fx, run), run);
++		if (command === "spike") {
++			await spike(obsidian, fx, run, process.env.SPIKE_OUT!, p.root);
++			return 0;
++		}
+ 		if (command === "block-budget") return report(await blockBudget(obsidian, fx, run), run);
+ 		if (command === "block") {
+ 			const combos = args.length === 2 ? [[args[0], args[1]] as [Platform, Theme]] : COMBOS;
+@@ -157,9 +162,9 @@ export function budgetTasks(text: string): string {
+  * The block's load: 300 tasks in the note's project (its Backlog), written with the project's tag so the block of
+  * «Дружба.md» shows them all.
+  */
+-export function blockBudgetTasks(text: string): string {
++export function blockBudgetTasks(text: string, add?: number): string {
+ 	const project = "Близкие";
+ 	const count = (text.match(/^\s*- \[[ x-]\] /gm) ?? []).length;
+-	const more = Array.from({ length: Math.max(0, 300 - count) }, (_, i) => `- [ ] Budget task ${i + 1} 🗂️ ${project}`);
++	const more = Array.from({ length: add ?? Math.max(0, 300 - count) }, (_, i) => `- [ ] Budget task ${i + 1} 🗂️ ${project}`);
+ 	return /^## Backlog\s*$/m.test(text) ? text.replace(/^## Backlog\s*$/m, (h) => `${h}\n\n${more.join("\n")}`) : `${text}\n## Backlog\n\n${more.join("\n")}\n`;
+ }

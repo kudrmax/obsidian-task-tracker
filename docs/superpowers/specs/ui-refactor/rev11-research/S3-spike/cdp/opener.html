@@ -1,0 +1,21 @@
+<!doctype html><html><head><title>opener</title></head><body><p>opener</p>
+<script>
+window.openPopout = async () => {
+  const t = performance.now(); const w = window.open("about:blank", "_blank", "width=400,height=300"); const openMs = performance.now() - t;
+  const r = { opened: !!w, openMs: Math.round(openMs) };
+  if (!w) return r;
+  r.syncTrap = !!(w.Element && w.Element.prototype.animate.__trap);
+  const d = w.document.createElement("div");
+  w.document.body.appendChild(d);
+  d.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 50 });
+  r.syncLedger = (w.__ledger || []).length;
+  await new Promise((res) => setTimeout(res, 0));
+  r.afterTick = !!w.Element.prototype.animate.__trap;
+  await new Promise((res) => setTimeout(res, 500));
+  r.after500 = !!w.Element.prototype.animate.__trap;
+  d.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 50 });
+  r.ledgerAfter500 = (w.__ledger || []).length;
+  r.popupHref = w.location.href;
+  return r;
+};
+</script></body></html>

@@ -1,0 +1,23 @@
+compdef:153: _comps: assignment to invalid subscript range
+[1mClone found (typescript)[22m
+ - [1m[32mdrivers/islands.ts[39m[22m [142:12 - 167:2] (26 lines, 119 tokens)
+   drivers/islands.ts [482:21 - 508:2]
+[1mClone found (typescript)[22m
+ - [1m[32mdrivers/islands.ts[39m[22m [214:1 - 237:3] (24 lines, 55 tokens)
+   drivers/keys.ts [75:1 - 98:3]
+[1mClone found (typescript)[22m
+ - [1m[32mupdate/carry.ts[39m[22m [211:18 - 220:36] (10 lines, 61 tokens)
+   update/carry.ts [253:13 - 262:36]
+[90m┌────────────┬────────────────┬─────────────┬──────────────┬──────────────┬──────────────────┬───────────────────┐[39m
+[90m│[39m[31m Format     [39m[90m│[39m[31m Files analyzed [39m[90m│[39m[31m Total lines [39m[90m│[39m[31m Total tokens [39m[90m│[39m[31m Clones found [39m[90m│[39m[31m Duplicated lines [39m[90m│[39m[31m Duplicated tokens [39m[90m│[39m
+[90m├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤[39m
+[90m│[39m tsx        [90m│[39m 14             [90m│[39m 2116        [90m│[39m 18242        [90m│[39m 0            [90m│[39m 0 (0.00%)        [90m│[39m 0 (0.00%)         [90m│[39m
+[90m├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤[39m
+[90m│[39m typescript [90m│[39m 40             [90m│[39m 6253        [90m│[39m 57882        [90m│[39m 3            [90m│[39m 60 (0.96%)       [90m│[39m 235 (0.41%)       [90m│[39m
+[90m├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤[39m
+[90m│[39m [1mTotal:[22m     [90m│[39m 54             [90m│[39m 8369        [90m│[39m 76124        [90m│[39m 3            [90m│[39m 60 (0.72%)       [90m│[39m 235 (0.31%)       [90m│[39m
+[90m└────────────┴────────────────┴─────────────┴──────────────┴──────────────┴──────────────────┴───────────────────┘[39m
+[90mFound 3 clones.[39m
+[32mJSON report saved to /private/tmp/claude-501/-Users-mdmkudryashov-projects-obsidian-my-own-plugins-obsidian-task-tracker/10b8c134-2d84-49f9-9c81-48ded7b4dd36/scratchpad/spike-tooling/jscpd/report/jscpd-report.json[39m
+ERROR: jscpd found too many duplicates (0.7%) over threshold (0.0%)
+[90mtime: 13.567ms[39m

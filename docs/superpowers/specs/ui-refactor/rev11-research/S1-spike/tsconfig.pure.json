@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "composite": true, "declaration": true, "emitDeclarationOnly": true, "outDir": ".tsbuild/pure", "rootDir": ".",
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler",
+    "lib": ["es2024"], "types": [], "strict": true, "isolatedModules": true, "skipLibCheck": false,
+    "paths": { "*": ["./blocked/none"] }
+  },
+  "references": [{ "path": "./core" }],
+  "include": ["obsidian/ui/next/screen/**/*.ts", "obsidian/ui/next/model/**/*.ts", "obsidian/ui/next/update/**/*.ts"]
+}

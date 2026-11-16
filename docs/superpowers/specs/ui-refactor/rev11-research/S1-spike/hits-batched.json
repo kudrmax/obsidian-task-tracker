@@ -1,0 +1,1171 @@
+[
+ {
+  "path": "obsidian/ui/next/model/block.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 248,
+  "text": "row.level > 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/block.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 251,
+  "text": "Object.keys(own).length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/card.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 81,
+  "text": "item.colors.slice(0, MOST_CARD_COLORS)"
+ },
+ {
+  "path": "obsidian/ui/next/model/card.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 89,
+  "text": "colors.length > 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "order",
+  "op": ">=",
+  "line": 58,
+  "text": "x >= l.left"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 58,
+  "text": "x < l.left + l.width"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 58,
+  "text": "l.left + l.width"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "order",
+  "op": ">=",
+  "line": 58,
+  "text": "y >= l.top"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 58,
+  "text": "y < l.bottom"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 66,
+  "text": "carry.ids.length > 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 91,
+  "text": "firstBox.left - first.level * geometry.indent"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "*",
+  "line": 91,
+  "text": "first.level * geometry.indent"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 92,
+  "text": "base + gap.level * geometry.indent"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "*",
+  "line": 92,
+  "text": "gap.level * geometry.indent"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 93,
+  "text": "firstBox.left + firstBox.width"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 93,
+  "text": "list.left + list.width"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 94,
+  "text": "cards.slice(gap.index, gap.index + 1)"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 94,
+  "text": "gap.index + 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 95,
+  "text": "gap.index > 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 95,
+  "text": "cards.slice(gap.index - 1, gap.index)"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 95,
+  "text": "gap.index - 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 98,
+  "text": "prev.top + prev.height"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 99,
+  "text": "prevEnd + geometry.cardGap"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 99,
+  "text": "head.top + head.height"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 100,
+  "text": "waiting.top - geometry.cardGap / 2"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "/",
+  "line": 100,
+  "text": "geometry.cardGap / 2"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 101,
+  "text": "top - geometry.cardGap / 2"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "/",
+  "line": 101,
+  "text": "geometry.cardGap / 2"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 101,
+  "text": "list.top + geometry.dot / 2"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "/",
+  "line": 101,
+  "text": "geometry.dot / 2"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 110,
+  "text": "Math.hypot(x - (ring.left + ring.width / 2), y - (ring.top + ring.height / 2)) < ring.width / 2 + PLUS_RING_RE"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 110,
+  "text": "x - (ring.left + ring.width / 2)"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 110,
+  "text": "ring.left + ring.width / 2"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "/",
+  "line": 110,
+  "text": "ring.width / 2"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 110,
+  "text": "y - (ring.top + ring.height / 2)"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 110,
+  "text": "ring.top + ring.height / 2"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "/",
+  "line": 110,
+  "text": "ring.height / 2"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 110,
+  "text": "ring.width / 2 + PLUS_RING_REACH"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "/",
+  "line": 110,
+  "text": "ring.width / 2"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 128,
+  "text": "last.top + last.height"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 138,
+  "text": "Math.abs(top - y) < Math.abs((slots.tops.slice(best, best + 1).find(() => true) ?? top) - y)"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 138,
+  "text": "top - y"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 138,
+  "text": "(slots.tops.slice(best, best + 1).find(() => true) ?? top) - y"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 138,
+  "text": "slots.tops.slice(best, best + 1)"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 138,
+  "text": "best + 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 101,
+  "text": "Math.max(top - geometry.cardGap / 2, list.top + geometry.dot / 2)"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 110,
+  "text": "Math.hypot(x - (ring.left + ring.width / 2), y - (ring.top + ring.height / 2))"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 138,
+  "text": "Math.abs(top - y)"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryPlace.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 138,
+  "text": "Math.abs((slots.tops.slice(best, best + 1).find(() => true) ?? top) - y)"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryView.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 38,
+  "text": "slots?.tops.slice(section.gap, section.gap + 1)"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryView.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 38,
+  "text": "section.gap + 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryView.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 45,
+  "text": "line.right - line.left"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryView.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 69,
+  "text": "carry.rows.length > 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryView.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 69,
+  "text": "carry.folded.length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/carryView.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 45,
+  "text": "Math.max(0, line.right - line.left)"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 170,
+  "text": "from < 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 171,
+  "text": "i + 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 173,
+  "text": "from < 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 182,
+  "text": "head < 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 187,
+  "text": "list.cards.slice(at.card, at.card + 1)"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 187,
+  "text": "at.card + 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "order",
+  "op": ">=",
+  "line": 190,
+  "text": "index >= 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 219,
+  "text": "rows.slice(0, at)"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "order",
+  "op": ">=",
+  "line": 220,
+  "text": "i >= plate.from"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "arith",
+  "op": "-=",
+  "line": 221,
+  "text": "at -= before.length - kept.length"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 221,
+  "text": "before.length - kept.length"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 222,
+  "text": "rows.slice(before.length)"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 236,
+  "text": "rows.slice(0, at)"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 236,
+  "text": "rows.slice(at)"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "arith",
+  "op": "/",
+  "line": 274,
+  "text": "tiles.length / Math.ceil(tiles.length / TILES_PER_ROW)"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "arith",
+  "op": "/",
+  "line": 274,
+  "text": "tiles.length / TILES_PER_ROW"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 276,
+  "text": "i < tiles.length"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "arith",
+  "op": "+=",
+  "line": 276,
+  "text": "i += perRow"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 276,
+  "text": "tiles.slice(i, i + perRow)"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 276,
+  "text": "i + perRow"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 293,
+  "text": "group.length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 225,
+  "text": "Math.min(at, rows.length)"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 274,
+  "text": "Math.ceil(tiles.length / Math.ceil(tiles.length / TILES_PER_ROW))"
+ },
+ {
+  "path": "obsidian/ui/next/model/entry.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 274,
+  "text": "Math.ceil(tiles.length / TILES_PER_ROW)"
+ },
+ {
+  "path": "obsidian/ui/next/model/lists.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 104,
+  "text": "through.length - i"
+ },
+ {
+  "path": "obsidian/ui/next/model/monthGrid.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 13,
+  "text": "i + 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/monthGrid.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 22,
+  "text": "d.getMonth() + 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/monthGrid.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 27,
+  "text": "Number(month.slice(5, 7)) - 1 + months"
+ },
+ {
+  "path": "obsidian/ui/next/model/monthGrid.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 27,
+  "text": "Number(month.slice(5, 7)) - 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/monthGrid.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 33,
+  "text": "Number(month.slice(5, 7)) - 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/monthGrid.ts",
+  "rule": "arith",
+  "op": "%",
+  "line": 35,
+  "text": "(weekday + 6) % 7"
+ },
+ {
+  "path": "obsidian/ui/next/model/monthGrid.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 35,
+  "text": "weekday + 6"
+ },
+ {
+  "path": "obsidian/ui/next/model/monthGrid.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 38,
+  "text": "1 - back + i"
+ },
+ {
+  "path": "obsidian/ui/next/model/monthGrid.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 38,
+  "text": "1 - back"
+ },
+ {
+  "path": "obsidian/ui/next/model/monthGrid.ts",
+  "rule": "date",
+  "op": "Date",
+  "line": 21,
+  "text": "d = new Date(year, month, day)"
+ },
+ {
+  "path": "obsidian/ui/next/model/monthGrid.ts",
+  "rule": "date",
+  "op": "Date",
+  "line": 34,
+  "text": "new Date(year, index, 1).getDay"
+ },
+ {
+  "path": "obsidian/ui/next/model/search.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 82,
+  "text": "hits.length - 1"
+ },
+ {
+  "path": "obsidian/ui/next/model/search.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 82,
+  "text": "Math.min(hits.length - 1, Math.max(0, search.picked))"
+ },
+ {
+  "path": "obsidian/ui/next/model/search.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 82,
+  "text": "Math.max(0, search.picked)"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 255,
+  "text": "tiles.length > 3"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "arith",
+  "op": "/",
+  "line": 268,
+  "text": "tiles.length / Math.ceil(tiles.length / 3)"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "arith",
+  "op": "/",
+  "line": 268,
+  "text": "tiles.length / 3"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 270,
+  "text": "i < tiles.length"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "arith",
+  "op": "+=",
+  "line": 270,
+  "text": "i += perRow"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 270,
+  "text": "tiles.slice(i, i + perRow)"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 270,
+  "text": "i + perRow"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 311,
+  "text": "tiles.length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 316,
+  "text": "tiles.length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 326,
+  "text": "tiles.length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 268,
+  "text": "Math.ceil(tiles.length / Math.ceil(tiles.length / 3))"
+ },
+ {
+  "path": "obsidian/ui/next/model/taskMenu.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 268,
+  "text": "Math.ceil(tiles.length / 3)"
+ },
+ {
+  "path": "obsidian/ui/next/update/acts.ts",
+  "rule": "seqcall-string",
+  "op": ".slice()",
+  "line": 19,
+  "text": "value.slice(0, at)"
+ },
+ {
+  "path": "obsidian/ui/next/update/acts.ts",
+  "rule": "seqcall-string",
+  "op": ".slice()",
+  "line": 20,
+  "text": "value.slice(at + 1)"
+ },
+ {
+  "path": "obsidian/ui/next/update/acts.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 20,
+  "text": "at + 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/acts.ts",
+  "rule": "seqcall-string",
+  "op": ".slice()",
+  "line": 69,
+  "text": "act.act.slice(\"bar:\".length)"
+ },
+ {
+  "path": "obsidian/ui/next/update/acts.ts",
+  "rule": "seqcall-string",
+  "op": ".slice()",
+  "line": 71,
+  "text": "act.act.slice(\"menu:\".length)"
+ },
+ {
+  "path": "obsidian/ui/next/update/block.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 31,
+  "text": "before.motion.seq + 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/block.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 48,
+  "text": "y.slice(i, i + 1)"
+ },
+ {
+  "path": "obsidian/ui/next/update/block.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 48,
+  "text": "i + 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 39,
+  "text": "list.rows.slice(at + 1)"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 39,
+  "text": "at + 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "order",
+  "op": "<=",
+  "line": 40,
+  "text": "next.level <= row.level"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 74,
+  "text": "at.x - box.left"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 74,
+  "text": "at.y - box.top"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 82,
+  "text": "projects.length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 120,
+  "text": "picked.length > 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 213,
+  "text": "at.x - box.left"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 213,
+  "text": "at.y - box.top"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 226,
+  "text": "at < 0"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 227,
+  "text": "i > at"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 228,
+  "text": "list.rows.slice(at, next < 0 ? undefined : next)"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 228,
+  "text": "next < 0"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 255,
+  "text": "at.x - box.left"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 255,
+  "text": "at.y - box.top"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "index",
+  "op": "[i]",
+  "line": 267,
+  "text": "section.heads[index]"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "index",
+  "op": "[i]",
+  "line": 268,
+  "text": "section.groups[index]"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "seqcall-string",
+  "op": ".slice()",
+  "line": 268,
+  "text": "head.slice(\"head:\".length)"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 323,
+  "text": "(select?.picked.length ?? 0) > 0"
+ },
+ {
+  "path": "obsidian/ui/next/update/carry.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 324,
+  "text": "select.picked.length > 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/entry.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 37,
+  "text": "entry.focus + 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/entry.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 153,
+  "text": "entry.fields + 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/entry.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 153,
+  "text": "entry.fields + 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/full.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 22,
+  "text": "at < 0"
+ },
+ {
+  "path": "obsidian/ui/next/update/full.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 101,
+  "text": "layer.stack.length > 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/full.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 155,
+  "text": "(description.replace?.seq ?? 0) + 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/full.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 172,
+  "text": "layer.stack.length > 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/fullActs.ts",
+  "rule": "seqcall-string",
+  "op": ".slice()",
+  "line": 7,
+  "text": "key.slice(FULL_ROW.length)"
+ },
+ {
+  "path": "obsidian/ui/next/update/menu.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 19,
+  "text": "layer.seq + 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/search.ts",
+  "rule": "arith",
+  "op": "-",
+  "line": 41,
+  "text": "rows - 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/search.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 41,
+  "text": "pickedRow(model.wide, model.search, model.answers) + msg.step"
+ },
+ {
+  "path": "obsidian/ui/next/update/search.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 45,
+  "text": "row < 0"
+ },
+ {
+  "path": "obsidian/ui/next/update/search.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 41,
+  "text": "Math.min(rows - 1, Math.max(0, pickedRow(model.wide, model.search, model.answers) + msg.step))"
+ },
+ {
+  "path": "obsidian/ui/next/update/search.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 41,
+  "text": "Math.max(0, pickedRow(model.wide, model.search, model.answers) + msg.step)"
+ },
+ {
+  "path": "obsidian/ui/next/update/section.ts",
+  "rule": "seqcall-string",
+  "op": ".slice()",
+  "line": 12,
+  "text": "head.slice(\"head:\".length)"
+ },
+ {
+  "path": "obsidian/ui/next/update/select.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 35,
+  "text": "picked.length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/update/select.ts",
+  "rule": "order",
+  "op": "<",
+  "line": 39,
+  "text": "from < 0"
+ },
+ {
+  "path": "obsidian/ui/next/update/select.ts",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 39,
+  "text": "column.slice(Math.min(from, to), Math.max(from, to) + 1)"
+ },
+ {
+  "path": "obsidian/ui/next/update/select.ts",
+  "rule": "arith",
+  "op": "+",
+  "line": 39,
+  "text": "Math.max(from, to) + 1"
+ },
+ {
+  "path": "obsidian/ui/next/update/select.ts",
+  "rule": "order",
+  "op": ">",
+  "line": 46,
+  "text": "(select?.picked.length ?? 0) > 0"
+ },
+ {
+  "path": "obsidian/ui/next/update/select.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 39,
+  "text": "Math.min(from, to)"
+ },
+ {
+  "path": "obsidian/ui/next/update/select.ts",
+  "rule": "math",
+  "op": "Math",
+  "line": 39,
+  "text": "Math.max(from, to)"
+ },
+ {
+  "path": "obsidian/ui/next/view/Card.tsx",
+  "rule": "order",
+  "op": ">",
+  "line": 87,
+  "text": "face.stripes.length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/view/Card.tsx",
+  "rule": "index",
+  "op": "[i]",
+  "line": 241,
+  "text": "b.passes[i]"
+ },
+ {
+  "path": "obsidian/ui/next/view/carry/CarryFloat.tsx",
+  "rule": "order",
+  "op": ">",
+  "line": 40,
+  "text": "float.count > 1"
+ },
+ {
+  "path": "obsidian/ui/next/view/entry/Bar.tsx",
+  "rule": "order",
+  "op": ">",
+  "line": 76,
+  "text": "tiles.length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/view/full/FullCard.tsx",
+  "rule": "order",
+  "op": ">",
+  "line": 61,
+  "text": "subtasks.rows.length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/view/menu/TaskMenu.tsx",
+  "rule": "order",
+  "op": "<",
+  "line": 298,
+  "text": "place.above < parts.length"
+ },
+ {
+  "path": "obsidian/ui/next/view/menu/TaskMenu.tsx",
+  "rule": "order",
+  "op": ">",
+  "line": 324,
+  "text": "above > 0"
+ },
+ {
+  "path": "obsidian/ui/next/view/menu/TaskMenu.tsx",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 326,
+  "text": "parts.slice(0, above)"
+ },
+ {
+  "path": "obsidian/ui/next/view/menu/TaskMenu.tsx",
+  "rule": "seqcall",
+  "op": ".slice()",
+  "line": 346,
+  "text": "parts.slice(above)"
+ },
+ {
+  "path": "obsidian/ui/next/view/search/Search.tsx",
+  "rule": "order",
+  "op": ">",
+  "line": 25,
+  "text": "hit.title.length > 0"
+ },
+ {
+  "path": "obsidian/ui/next/view/search/Search.tsx",
+  "rule": "unary",
+  "op": "++",
+  "line": 95,
+  "text": "row++"
+ }
+]

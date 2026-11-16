@@ -1,0 +1,26 @@
+
+## desktop dark
+saved byProject: {"kind":"byProject","cards":307}
+shadow host: {"rules":1105,"hostRules":29}
+pixels: document 1400x1248, shadow 1400x1248, differing 5 in {"x0":32,"y0":328,"x1":40,"y1":336}
+field inside: {"rooted":null,"state":{"text":"Typed [[Дру","focused":false,"events":[["typed","Typed [[Дру"]],"docActive":"sp-shadow theme-dark mod-macos is-framel","editorFocusedClass":false,"contentFont":"15px -apple-system, \"system-ui\", \"S rgb(255, 255, 255)","caretColor":"rgb(149, 128, 255)","lineH":18,"editorH":18,"cmStylesInRoot":2,"placeholderShown":false},"suggest":{"suggestOpen":false,"items":0}}
+field inside+setRoot: {"rooted":{"rootIsShadow":true,"hasFocus":true,"cmStylesInRoot":3},"state":{"text":"Typed [[Дру","focused":false,"events":[["typed","Typed [[Дру"]],"docActive":"sp-shadow theme-dark mod-macos is-framel","editorFocusedClass":true,"contentFont":"15px -apple-system, \"system-ui\", \"S rgb(255, 255, 255)","caretColor":"rgb(0, 0, 0)","lineH":18,"editorH":18,"cmStylesInRoot":3,"placeholderShown":false},"suggest":{"suggestOpen":false,"items":0}}
+field outside: {"rooted":null,"state":{"text":"Typed [[Дру","focused":true,"events":[["typed","Typed [[Дру"]],"docActive":"cm-content cm-lineWrapping","editorFocusedClass":true,"contentFont":"15px -apple-system, \"system-ui\", \"S rgb(255, 255, 255)","caretColor":"rgb(218, 218, 218)","lineH":18,"editorH":18,"cmStylesInRoot":2,"placeholderShown":false},"suggest":{"suggestOpen":true,"items":1}}
+
+## desktop light
+saved byProject: {"kind":"byProject","cards":307}
+shadow host: {"rules":1105,"hostRules":29}
+pixels: document 1400x1248, shadow 1400x1248, differing 10 in {"x0":32,"y0":624,"x1":40,"y1":928}
+
+## phone dark
+saved byProject: {"kind":"byProject","cards":307}
+shadow host: {"rules":1105,"hostRules":29}
+pixels: document 684x1280, shadow 684x1280, differing 73054 in {"x0":0,"y0":0,"x1":683,"y1":181}
+field inside: {"rooted":null,"state":{"text":"Typed [[Дру","focused":false,"events":[["typed","Typed [[Дру"]],"docActive":"sp-shadow mod-macos is-frameless is-hidd","editorFocusedClass":false,"contentFont":"15px -apple-system, \"system-ui\", \"S rgb(255, 255, 255)","caretColor":"rgb(149, 128, 255)","lineH":18,"editorH":18,"cmStylesInRoot":2,"placeholderShown":false},"suggest":{"suggestOpen":false,"items":0}}
+field inside+setRoot: {"rooted":{"rootIsShadow":true,"hasFocus":true,"cmStylesInRoot":3},"state":{"text":"Typed [[Дру","focused":false,"events":[["typed","Typed [[Дру"]],"docActive":"sp-shadow mod-macos is-frameless is-hidd","editorFocusedClass":true,"contentFont":"15px -apple-system, \"system-ui\", \"S rgb(255, 255, 255)","caretColor":"rgb(0, 0, 0)","lineH":18,"editorH":18,"cmStylesInRoot":3,"placeholderShown":false},"suggest":{"suggestOpen":false,"items":0}}
+field outside: {"rooted":null,"state":{"text":"Typed [[Дру","focused":true,"events":[["typed","Typed [[Дру"]],"docActive":"cm-content cm-lineWrapping","editorFocusedClass":true,"contentFont":"15px -apple-system, \"system-ui\", \"S rgb(255, 255, 255)","caretColor":"rgb(166, 138, 249)","lineH":18,"editorH":18,"cmStylesInRoot":2,"placeholderShown":false},"suggest":{"suggestOpen":true,"items":1}}
+
+## phone light
+saved byProject: {"kind":"byProject","cards":307}
+shadow host: {"rules":1105,"hostRules":29}
+pixels: document 684x1280, shadow 684x1280, differing 41529 in {"x0":0,"y0":0,"x1":683,"y1":1076}

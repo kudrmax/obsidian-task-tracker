@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "composite": true, "declaration": true, "emitDeclarationOnly": true, "outDir": "../.tsbuild/core",
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler",
+    "lib": ["es2024"], "types": [], "strict": true, "isolatedModules": true
+  },
+  "include": ["**/*.ts"]
+}

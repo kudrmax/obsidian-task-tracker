@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "composite": true, "declaration": true, "emitDeclarationOnly": true, "outDir": ".tsbuild/host", "rootDir": ".",
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler",
+    "lib": ["es2024", "DOM", "DOM.Iterable"], "types": [], "strict": true, "isolatedModules": true, "skipLibCheck": true,
+    "jsx": "react-jsx", "jsxImportSource": "tc-jsx",
+    "paths": { "tc-jsx/jsx-runtime": ["./obsidian/ui/next/view/jsx/jsx-runtime.ts"] }
+  },
+  "references": [{ "path": "./tsconfig.kit.json" }],
+  "include": ["obsidian/ui/next/engines/**/*.ts", "obsidian/ui/next/host/**/*.ts", "obsidian/ui/next/view/jsx/jsx-runtime.ts", "obsidian/main.ts"]
+}

@@ -1,0 +1,5 @@
+unclassified: []
+(a) hits=58 sites=31 by rule={'seqcall': 7, 'order': 14, 'arith': 25, 'math': 10, 'date': 2}
+(b) hits=62 sites=51 by rule={'order': 27, 'seqcall': 10, 'arith': 13, 'math': 1, 'seqcall-string': 7, 'index': 3, 'unary': 1}
+(c) hits=47 sites=15 by rule={'order': 6, 'arith': 35, 'seqcall': 1, 'math': 5}
+(b) buckets by hits: {'emptiness/count': 22, 'index/neighbour/split': 23, 'string key parsing': 10, 'sequence/counter': 7}
