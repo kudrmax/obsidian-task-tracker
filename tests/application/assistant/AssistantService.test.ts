@@ -17,9 +17,9 @@ describe("pressing Best task", () => {
 		expect(loads.count).toBe(1);
 		expect(transport.asked).toHaveLength(1);
 		const { question, settings } = transport.asked[0];
-		expect(question.instructions).toMatch(/^You help me choose what to do\./);
+		expect(question.instructions).toMatch(/^You help me choose what to do next\./);
 		expect(question.answerSchema).toEqual({ type: "object", properties: { taskRef: { type: "string" }, reason: { type: "string" } }, required: ["taskRef", "reason"], additionalProperties: false });
-		expect(JSON.parse(question.input).tasks.map((t: { title: string }) => t.title)).toEqual(["Write the offer", "Find the template", "Pay rent", "Call the bank", "Find the contract", "Read a book", "Dentist"]);
+		expect(JSON.parse(question.input).candidates.map((t: { title: string }) => t.title)).toEqual(["Find the template", "Pay rent", "Find the contract", "Read a book", "Dentist"]);
 		expect(settings).toEqual({ model: "sonnet", path: "" });
 	});
 
@@ -33,13 +33,13 @@ describe("pressing Best task", () => {
 		expect(result.kind === "task" && result.task.title).toBe("Pay rent");
 	});
 
-	it("a step can be the answer", async () => {
+	it("a step of an unfolded task can be the answer, drawn with its task's title above", async () => {
 		const { assistant, transport } = rig();
 		const outcome = assistant.press(BEST);
 		await settle();
 		transport.answer({ taskRef: transport.refOf("Find the contract"), reason: "First step." });
 		const result = await outcome;
-		expect(result.kind === "task" && result.task.title).toBe("Find the contract");
+		expect(result.kind === "task" && [result.task.title, result.card.over]).toEqual(["Find the contract", "Call the bank"]);
 	});
 
 	it("a ref the question never sent is a bad answer", async () => {
@@ -84,13 +84,13 @@ describe("pressing Best task", () => {
 		const { assistant, transport, tasks } = rig();
 		const outcome = assistant.press(BEST);
 		await settle();
-		const bank = (await tasks.listed()).lists.soon.find((t) => t.title === "Call the bank")!;
-		await tasks.moveToEnd(bank.key, "backlog");
-		const moved = (await tasks.listed()).lists.backlog.find((t) => t.title === "Call the bank")!;
-		await tasks.rename(moved.key, "Call the bank about the loan");
-		transport.answer({ taskRef: transport.refOf("Call the bank"), reason: "Money." });
+		const book = (await tasks.listed()).lists.soon.find((t) => t.title === "Read a book")!;
+		await tasks.moveToEnd(book.key, "backlog");
+		const moved = (await tasks.listed()).lists.backlog.find((t) => t.title === "Read a book")!;
+		await tasks.rename(moved.key, "Read a good book");
+		transport.answer({ taskRef: transport.refOf("Read a book"), reason: "Rest." });
 		const result = await outcome;
-		expect(result.kind === "task" && [result.task.title, result.task.list, result.task.id]).toEqual(["Call the bank about the loan", "backlog", bank.id]);
+		expect(result.kind === "task" && [result.task.title, result.task.list, result.task.id]).toEqual(["Read a good book", "backlog", book.id]);
 	});
 
 	it("with Today and Soon empty asks nothing and says so", async () => {

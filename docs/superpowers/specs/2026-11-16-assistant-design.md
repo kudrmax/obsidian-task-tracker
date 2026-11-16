@@ -213,26 +213,48 @@ Soon list, dated ones too.
 
 ### Briefing
 
-Lines have no ids in the file, so each question gives each task a short ref, `t1`, `t2`… in the order sent, mapped to
-`TaskItem.id`. That id holds through the plugin's own writes (moves, renames, folds) and through an edit elsewhere that
-keeps the line in place; a task cut and pasted by another editor during the wait gets a new id and reads as not found.
+The model chooses among what Max can **start now**, never among goals (Max, 2026-11-17: «по факту я не буду делать все
+это одновременно, я буду делать именно первый подпункт»). From each open task of the scope's lists, by how it lies in
+the file (`candidatesOf`, the core). This is the action's choice (`briefing: "candidates"`, Best task's); an action about
+the tasks pressed on (`briefing: "tasks"`) sends them as they are, each open subtask right after its task with `parent`:
+
+- a task with no open subtask: the task itself;
+- a folded task (`collapsed`): only its next step, the one its card shows (`nextStep`): its subtasks are done in order;
+- an unfolded task with open subtasks: not itself (it is a goal, not an action), but each open subtask by these same
+  rules, at any depth: a folded subtask gives its next step.
+
+Each candidate comes with what it is for, so the model understands the result without ranking by it:
+
+- `goals`: the chain of tasks above it, the top one first, each with its title, description, priority, due date, time,
+  projects and labels;
+- `after`: for the next step of a folded task, the open tasks of that folded branch that come after the step, in file
+  order (depth first), each with its title and description (a task is always both, Max, 2026-11-17); empty otherwise;
+- its own `description`: the nested lines without a checkbox (`TaskItem.description`), as Markdown.
+
+Lines have no ids in the file, so each question gives each candidate a short ref, `t1`, `t2`… in the order sent, mapped
+to `TaskItem.id`; goals and steps after have no ref and cannot be the answer. The id holds through the plugin's own
+writes (moves, renames, folds) and through an edit elsewhere that keeps the line in place; a task cut and pasted by
+another editor during the wait gets a new id and reads as not found.
 
 ```json
 {
-  "today": "2026-11-16",
-  "tasks": [
+  "today": "2026-11-17",
+  "candidates": [
     { "ref": "t1", "title": "Write the offer", "list": "today", "inProgress": true, "priority": "p1",
-      "due": null, "time": "14:00", "projects": ["Job"], "labels": [], "parent": null },
-    { "ref": "t2", "title": "Call the bank", "list": "soon", "inProgress": false, "priority": null,
-      "due": "2026-11-20", "time": null, "projects": [], "labels": [], "parent": null },
-    { "ref": "t3", "title": "Find the contract", "list": "soon", "parent": "t2", "...": "..." }
+      "due": null, "time": "14:00", "projects": ["Job"], "labels": [], "description": null, "goals": [], "after": [] },
+    { "ref": "t2", "title": "Find the contract", "list": "soon", "inProgress": false, "priority": null, "due": null,
+      "time": null, "projects": [], "labels": [], "description": null,
+      "goals": [{ "title": "Call the bank", "description": "- ask about the fee", "priority": null,
+                  "due": "2026-11-20", "time": null, "projects": [], "labels": [] }],
+      "after": [{ "title": "Write down the questions", "description": "- the fee, the term" },
+                { "title": "Call", "description": null }] }
   ]
 }
 ```
 
-Words, not codes: `list` is today / soon / inbox / backlog, a priority by its prefix, projects by name, dates ISO.
-Descriptions are not sent in v1 (long, private, not needed to rank). A briefing is plain data:
-`{ input: string, refs: Readonly<Record<string, string>> }`.
+Words, not codes: `list` is today / soon / inbox / backlog (a candidate's list is its top task's), a priority by its
+prefix, projects by name, dates ISO. A briefing is plain data: `{ input: string, refs: Readonly<Record<string, string>> }`,
+`refs` holding the candidates only.
 
 ### Actions
 
@@ -245,6 +267,7 @@ interface AssistantAction {
   readonly title: string;                               // the popup's title: "Best task"
   readonly failureTitle: string;                        // "Couldn't find the best task"
   readonly scope: TaskScope;
+  readonly briefing: "candidates" | "tasks";             // how its tasks are shown to the model: "candidates"
   readonly defaultPrompt: string;
   readonly answerSchema: JsonSchema;
   /** No tasks to send: the words shown instead of a call. */
@@ -266,7 +289,7 @@ What the popup draws, ready (titles and words included):
 
 ```ts
 type AssistantOutcome =
-  | { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly note: string }
+  | { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly card: TaskCard; readonly note: string }   // card drawn with task's marks
   | { readonly kind: "failed"; readonly title: string; readonly words: string; readonly detail: string }   // the frontend logs detail
   | { readonly kind: "stopped" };
 ```
@@ -464,15 +487,21 @@ the prompts still editable (they sync).
 - places `["more"]`; labels Best task / Stop; title Best task; failure title Couldn't find the best task;
 - scope `{ kind: "lists", lists: ["now", "soon"] }`;
 - schema `{ taskRef: string, reason: string }`, both required, no other fields;
-- read: `taskRef` is a ref of this briefing and its task exists and is open → `task`; a ref not in the briefing →
-  `badAnswer`; a ref whose task is closed or no longer found → `gone`;
+- read: `taskRef` is a candidate's ref and its task exists and is open → `task`; a ref not among the candidates (a goal
+  named, a made-up ref) → `badAnswer`, never a silent swap for a step; a ref whose task is closed or no longer found →
+  `gone`;
+- the popup shows the chosen candidate as the screen draws it: the next step of a folded task on that folded task's
+  two-line card (its own title small above, the step below), any other candidate on its own card with the title of the
+  task right above it small (`over`), a top task alone; the card's marks are its card's;
 - empty Today and Soon → no call, «Today and Soon have no open tasks.»
 - default prompt:
 
-> You help me choose what to do. Below are my tasks for today and for soon. If I could do only one of them and nothing
-> else, which one would make the biggest difference? Weigh impact over urgency; a task in progress or with a time
-> today counts for more only if it truly matters more. Answer with its ref, and in two or three short sentences in the
-> language of my tasks, say why this one.
+> You help me choose what to do next. Below is each thing I could start now: a task, or the next step of a bigger
+> task, with the goals it leads to and, for a step, the steps that come after it. If I could do only one of them and
+> nothing else, which one would make the biggest difference? Judge what doing this one now gives: a goal adds weight
+> only as far as this step truly moves it, and the steps after it are not done by it. Weigh impact over urgency; one in
+> progress or with a time today counts for more only if it truly matters more. Answer with its ref, and in two or three
+> short sentences in the language of my tasks, say why this one.
 
 ## Platforms
 
@@ -533,7 +562,10 @@ No Swift stage (R6).
 - **Lead:** Stop is the same row, not a cancel on the spinner: the spinner stays a sign, one place to act.
 - **Lead:** default Claude model `sonnet` (one call per tap; ranking needs judgement); `haiku` and `opus` a setting
   away.
-- **Lead:** descriptions not sent in v1; a subtask can be the answer.
+- **Lead:** ~~descriptions not sent in v1; a subtask can be the answer~~ replaced on 2026-11-17: the answer is a
+  candidate (a task, or a folded task's next step, or an unfolded task's subtask), never a goal; descriptions are sent,
+  they say what a goal is for. Found on Max's tasks: sonnet chose the whole Belgrade plan for its well-written goal
+  while Max would start its first five-minute step.
 - **Lead:** no silent fallback to another model.
 - **Spike (2026-11-16):** the bundled SDK ran in the test Obsidian's window with the system `claude` and the options
   above (`tools: []`, `settingSources: []`, `json_schema`): `haiku` answered `structured_output` in 2.2 s, two internal
@@ -574,6 +606,28 @@ No Swift stage (R6).
 - **Backend:** the door gets no assistant method now; `DOOR_COVERAGE` marks `AssistantService` host-owned until the
   iPhone app's assistant. `data.json` writes `assistant` after `resultMark` (`obsidian/settingsFile.ts`' key order, one
   line, with its byte-for-byte test).
+- **Backend (steps):** the `task` outcome carries the card to draw, ready: `{ kind: "task"; title; task: TaskItem; card:
+  TaskCard; note }`. The popup draws `card` with the marks of `task` (as a list card draws `task.card`). A folded task's
+  next step: `task` is that folded task (the topmost folded task above the step, the one it was chosen from) and `card`
+  its own `card` (`over` its title, the step's title below); any other subtask: `task` is the subtask, `card` its own
+  title with its parent's title in `over`, `step` null; a task: `over` null. It is worked out from the tasks as they
+  are when the answer comes (`drawnAnswer`, `TaskLookup.above`), so a fold changed during the wait draws as it is now.
+- **Backend (steps):** the candidate rules are the action's choice (the lead, at the review): `AssistantAction.briefing`
+  is `"candidates"` (Best task: `{ today, candidates }`) or `"tasks"` (an action on the tasks pressed on: `{ today,
+  tasks }`, each open task by a ref with its open subtasks right after it, `parent` naming its task's ref, as before, now
+  with `description` too, since a task is always its title and description). A task met twice is one candidate, or
+  one task sent. A folded task's next step is `TaskItem.card.step`, the
+  very item its card shows; the tasks between the folded task and the step are goals too (Move to Belgrade → Find a
+  flat → Pick districts: both are goals), and `after` holds the open tasks of the folded branch after the step in file
+  order, their own subtasks included, each as `{ title, description }` (description null when none), as goals carry
+  theirs. A goal's or a step-after's id answered as a ref is `badAnswer`: refs hold the
+  candidates only.
+- **Frontend-obsidian (steps):** the list card's renderer draws the answer: `renderTaskCard` takes the face to draw
+  (`face`, default `task.card`), so the popup passes `outcome.card` with `outcome.task`'s marks, one mechanism, no copy.
+  A face handed in is drawn as given: its `over` never gives way to a rename waiting to be written (that rename is the
+  task's, not the parent's), and its title line is the task's own (a waiting rename shown) unless it shows a step.
+  Whether the face is handed in is said by the option (`face` given), never by object identity (the review: a copied
+  card of the same shape drew the other way).
 - **Frontend-obsidian:** the transport logs nothing itself: every failure's detail goes back in the reply, and the
   frontend writes the outcome's `detail` to the console once (a transport that logged too gave the same line twice).
   `ModelTransport`'s doc comment («Logs its own detail») can say so the next time the core is touched.

@@ -1,4 +1,4 @@
-import { cardDue, type PriorityLevel, type TaskItem } from "../../core/application/contracts";
+import { cardDue, type PriorityLevel, type TaskCard, type TaskItem } from "../../core/application/contracts";
 import { LABEL_SLOTS } from "./priorityColors";
 import type { LocalDate } from "./types";
 import { dayOfMonth, monthAbbreviation } from "./dates";
@@ -14,6 +14,12 @@ export interface TaskCardOptions {
 	readonly over?: string | null;
 	/** The corner shows the due date; the Projects screen's By project puts the stage's mark there instead. */
 	readonly corner?: boolean;
+	/**
+	 * A face handed in, drawn as given in place of the task's own (`task.card`), with the task's marks: the assistant's
+	 * answer (`AssistantOutcome.card`). Its small line stays as given; a rename waiting to be written shows on its title
+	 * line only (the step's, else the task's own).
+	 */
+	readonly face?: TaskCard;
 }
 
 /** A card of the list: the dot of a task in progress, the title fading out on the right, the subtask counter over the description mark, the due date; a card peeking out under it while its subtasks are folded away. */
@@ -50,7 +56,7 @@ export function fillCard(card: HTMLElement, task: TaskItem, opts: TaskCardOption
 	markColours(card, item);
 	card.classList.toggle("is-collapsed", item.collapsed);
 	showProgressDot(card, item);
-	fillFace(card, task, item, opts.over ?? null);
+	fillFace(card, task, item, opts.over ?? null, opts.face ?? null);
 	renderProjectMark(card, item);
 	renderMeta(card, item);
 	const corner = opts.corner === false ? null : cardDue(item, opts.day);
@@ -72,9 +78,11 @@ export function renderDue(card: HTMLElement, date: LocalDate | null, repeats: bo
  * title small over its next step's title; First step's card (`firstStepCard`) the task's title small over an empty step
  * line, which the field takes; any other card its own title on one line. On the Projects screen By stage the
  * small line is the subproject, after the folder mark. A rename waiting to be written shows on whichever line it renames.
+ * A face handed in (`TaskCardOptions.face`) is drawn as given, its title line the task's own unless it shows a step.
  */
-function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: string | null): void {
-	const face = task.card;
+function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: string | null, handedIn: TaskCard | null): void {
+	const face = handedIn ?? task.card;
+	const own = handedIn === null;
 	const step = face.step;
 	const twoLines = face.over !== null || project !== null;
 	card.classList.toggle("is-two-line", twoLines);
@@ -85,8 +93,8 @@ function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: s
 	const lines = el(card, "div", "tc-card-lines");
 	const over = el(lines, "div", "tc-card-over");
 	if (project !== null) over.appendChild(icon("project"));
-	el(over, "span", "tc-card-over-text", project ?? (shown === task ? face.over ?? "" : shown.title));
-	fillTitle(el(lines, "div", "tc-card-title"), step ? RenamedTexts.shown(step).text : face.over !== null ? face.text : shown.text);
+	el(over, "span", "tc-card-over-text", project ?? (shown === task || !own ? face.over ?? "" : shown.title));
+	fillTitle(el(lines, "div", "tc-card-title"), step ? RenamedTexts.shown(step).text : face.over !== null && own ? face.text : shown.text);
 }
 
 /**
