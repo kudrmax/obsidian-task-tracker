@@ -531,6 +531,9 @@ public struct TaskMenuModel: Decodable, Hashable, Sendable {
     public let statuses: [MenuStatus]
     /// The tasks a status row writes and its question names: a folded card's shown step, else the menu's own task.
     public let statusTasks: [TaskItem]
+    /// The task whose description stands over one task's menu, a tap opening it on the whole screen: a folded card's
+    /// shown step, else the menu's own task; nil without a description, and in the bulk menu.
+    public let peek: TaskItem?
     public let levels: MenuTiles
     public let labels: MenuTiles
     public let moves: [QuickMove]

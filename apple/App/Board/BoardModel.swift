@@ -1970,15 +1970,15 @@ final class BoardModel {
         let item = card.item
         guard let menu = snapshot?.menus[item.id] ?? doneMenus[item.id] ?? projects.menu(item) else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        let nodes = lead(item, from: from) + TaskMenu(items: [item], menu: menu, model: self, selectsText: true).nodes
+        let nodes = lead(item, menu: menu, from: from) + TaskMenu(items: [item], menu: menu, model: self, selectsText: true).nodes
         return MenuNode.uiMenu(nodes, later: later) { [weak self] in self?.ink($0, dark: dark) }
     }
 
-    /// What the plugin shows between a card and its menu, as the menu's first groups: `item`'s description, and on the
+    /// What the plugin shows between a card and its menu, as the menu's first groups: the description `menu.peek` names, and on the
     /// calendar its open subtasks.
-    private func lead(_ item: TaskItem, from: String) -> [MenuNode] {
+    private func lead(_ item: TaskItem, menu: TaskMenuModel, from: String) -> [MenuNode] {
         var lead: [MenuNode] = []
-        if let peek = descriptionPeek(item) { lead.append(.group(row: false, children: peek)) }
+        if let task = menu.peek, let peek = descriptionPeek(task) { lead.append(.group(row: false, children: peek)) }
         if from == "timeline", !item.subtasks.isEmpty {
             lead.append(.group(row: false, children: item.subtasks.map(stackRow)))
         }
@@ -1999,7 +1999,7 @@ final class BoardModel {
         return TaskMenu(items: [item], menu: menu, model: self).nodes
     }
 
-    /// The start of a task's description, as the plugin's peek: its lines as they read (links by their words, no
+    /// The start of the description the menu's model names (a folded card's step's), as the plugin's peek: its lines as they read (links by their words, no
     /// markup), the menu cutting it at its own height, a tap opening the task on the whole screen; under it each link of
     /// it, a tap opening the link.
     private func descriptionPeek(_ item: TaskItem) -> [MenuNode]? {

@@ -211,6 +211,7 @@ export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: r
 		groups: MENU_GROUPS,
 		statuses: menuStatuses(statusFor, of),
 		statusTasks: statusFor,
+		peek: of.kind === "task" && statusFor[0]?.description != null ? statusFor[0] : null,
 		levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
 		labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },
 		moves: sharedMoves(items, today),

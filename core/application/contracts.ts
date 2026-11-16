@@ -690,6 +690,12 @@ export interface TaskMenuModel {
 	 * row is for the menu's own tasks, a folded one with all its subtasks.
 	 */
 	readonly statusTasks: readonly TaskItem[];
+	/**
+	 * The task whose description stands by one task's menu, a tap on it opening that task on the whole screen: the task
+	 * the status tiles write (a folded card's shown step, else the task itself), when it has a description. Null without
+	 * one, and in the bulk menu.
+	 */
+	readonly peek: TaskItem | null;
 	/** In the settings' order; `disabled` while none of the tasks may have a priority (they carry labels). */
 	readonly levels: { readonly tiles: readonly MenuLevel[]; readonly disabled: boolean };
 	/** In the settings' order; `disabled` while none of the tasks may carry labels (they have a priority). */

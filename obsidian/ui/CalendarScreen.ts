@@ -1425,7 +1425,7 @@ export class CalendarScreen extends Component {
 				setReminder: (kind) => this.act(() => tasks.setReminder(current.key, kind)),
 				setRepeat: (rule) => this.act(() => tasks.setRepeat(current.key, rule)),
 				rename: (menu) => (full ? full.rename(current) : this.quick?.rename(current, menu)),
-				openDescription: (editing) => this.openFull(current, editing),
+				openDescription: (editing, task) => this.openFull(task ?? current, editing),
 				openFull: full?.holds(current) ? undefined : () => this.openFull(current, false),
 				addSubtask: (menu) => (full ? full.addSubtask(current) : this.quick?.addSubtask(current, menu)),
 				firstStep: () => this.firstStep.open(current, source),
