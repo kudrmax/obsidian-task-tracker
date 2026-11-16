@@ -1999,14 +1999,17 @@ final class BoardModel {
         return TaskMenu(items: [item], menu: menu, model: self).nodes
     }
 
-    /// The start of the description the menu's model names (a folded card's step's), as the plugin's peek: its lines as they read (links by their words, no
+    /// The start of the description the menu's model names (a folded card's step's), as the plugin's peek: its lines as they read (`DescriptionText.lines`: a bullet or number, links by their words, no
     /// markup), the menu cutting it at its own height, a tap opening the task on the whole screen; under it each link of
     /// it, a tap opening the link.
     private func descriptionPeek(_ item: TaskItem) -> [MenuNode]? {
         guard let description = item.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty else { return nil }
-        let start = description.split(separator: "\n", omittingEmptySubsequences: true).joined(separator: "\n")
-        let parts = ruleNow("rules.textParts", [.string(start)]) ?? [TextPart(text: start)]
-        let shown = parts.map { $0.isLink ? $0.shown : Self.readable($0.text ?? "") }.joined()
+        let lines = DescriptionText.lines(description) { [weak self] text -> [TextPart] in self?.ruleNow("rules.textParts", [.string(text)]) ?? [TextPart(text: text)] }
+        guard !lines.isEmpty else { return nil }
+        let shown = lines.map { line in
+            (line.mark.map { "\($0) " } ?? "") + line.parts.map { $0.isLink ? $0.shown : Self.readable($0.text ?? "") }.joined()
+        }.joined(separator: "\n")
+        let parts = lines.flatMap(\.parts)
         var rows: [MenuNode] = [.action(title: shown, symbol: "text.alignleft", opens: true) { [weak self] in Task { await self?.openFullScreen(item) } }]
         var seen: Set<String> = []
         for link in parts where link.isLink {
