@@ -5,6 +5,10 @@ import { DemoTaskService } from "../tests/fakes/DemoTaskService";
 import TaskCalendarPlugin from "./main";
 import type { UndoService } from "../core/application/contracts";
 import type { ViewDeps } from "./ui/TaskCalendarView";
+import type { AssistantRows } from "./ui/assistant/AssistantAnswers";
+
+/** The demo asks no model: «⋯» offers no assistant row. */
+const NO_ASSISTANT: AssistantRows = { offers: () => [], busy: false, onChange: () => () => undefined, press: () => undefined, stop: () => undefined };
 
 const NO_UNDO: UndoService = { undo: async () => "nothing", redo: async () => "nothing", canUndo: () => false, canRedo: () => false, onChange: () => () => undefined };
 
@@ -20,6 +24,7 @@ export default class DemoTaskCalendarPlugin extends TaskCalendarPlugin {
 			calendars: new DemoCalendarService(clock),
 			settings: this.shownSettings(),
 			clock,
+			assistant: NO_ASSISTANT,
 			openInCalendar: () => undefined,
 		};
 	}

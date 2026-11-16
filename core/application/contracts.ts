@@ -2089,3 +2089,127 @@ export interface SettingsService {
 	bindClientSecret(field: SecretField): void;
 	setWorkCalendarFile(path: string): Promise<void>;
 }
+
+import type { ModelQuestion, ModelReply } from "./assistant/model";
+import type { AssistantPlace, AssistantTarget } from "./assistant/scope";
+export type { FailureKind, HostModels, JsonSchema, JsonValue, ModelFailure, ModelQuestion, ModelReply, ModelTransport, StopReason, StopSignal, TransportLoader } from "./assistant/model";
+export type { AssistantPlace, AssistantTarget, TaskScope } from "./assistant/scope";
+
+/** A row a place offers: its label and icon for its state; `running`, the row stops its run and the icon spins. */
+export interface AssistantOffer {
+	readonly actionId: string;
+	readonly label: string;
+	readonly icon: string;
+	readonly running: boolean;
+}
+
+/** What a run comes to, ready to draw: the popup's title and words included. */
+export type AssistantOutcome =
+	| { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly note: string }
+	/** `detail` is for the console: the frontend writes it there. */
+	| { readonly kind: "failed"; readonly title: string; readonly words: string; readonly detail: string }
+	/** Stopped by Max: nothing is shown. */
+	| { readonly kind: "stopped" };
+
+/** The first half of a run, for a host that asks the model itself: plain data, travels to the host and back. */
+export interface PreparedQuestion {
+	readonly kind: "question";
+	readonly actionId: string;
+	readonly modelId: string;
+	readonly target: AssistantTarget | null;
+	readonly question: ModelQuestion;
+	readonly refs: Readonly<Record<string, string>>;
+}
+
+/** A setting of the chosen model, as the Assistant page draws it. */
+export interface AssistantField {
+	readonly key: string;
+	readonly label: string;
+	readonly kind: "text" | "choice";
+	/** Offered; typing another is allowed. Empty for a text field. */
+	readonly choices: readonly string[];
+	readonly value: string;
+	readonly note: string | null;
+	/** Found on this host (Claude's path: the `claude` found); null for none. */
+	readonly hint: string | null;
+}
+
+/** The Assistant page's own words, ready to draw. */
+export interface AssistantPageWords {
+	/** The model choice's row. */
+	readonly model: string;
+	readonly timeout: string;
+	readonly timeoutNote: string;
+	/** The prompts' heading and its line. */
+	readonly prompts: string;
+	readonly promptsNote: string;
+	/** A prompt's button back to its default. */
+	readonly reset: string;
+}
+
+/** The Assistant page, ready. */
+export interface AssistantPage {
+	/** The models this host serves, and the chosen one even when it doesn't serve it. */
+	readonly models: readonly { readonly id: string; readonly name: string; readonly available: boolean }[];
+	readonly chosen: string;
+	/** Why the chosen model isn't asked here; null when it is. */
+	readonly unavailable: string | null;
+	/** The chosen model's settings; none when this host doesn't serve it (the phone: `unavailable` says why). */
+	readonly fields: readonly AssistantField[];
+	readonly timeoutSeconds: number;
+	readonly words: AssistantPageWords;
+	/** Each button's prompt, in the order of the buttons. */
+	readonly prompts: readonly { readonly actionId: string; readonly title: string; readonly prompt: string; readonly isDefault: boolean }[];
+}
+
+/** A change on the Assistant page. */
+export type AssistantSetting =
+	| { readonly kind: "model"; readonly id: string }
+	/** A blank value: the field's default again. */
+	| { readonly kind: "field"; readonly modelId: string; readonly key: string; readonly value: string }
+	/** Null or blank: Reset to the default. */
+	| { readonly kind: "prompt"; readonly actionId: string; readonly value: string | null }
+	/** Kept within 10..600. */
+	| { readonly kind: "timeout"; readonly seconds: number };
+
+/**
+ * The assistant: buttons that send some of the tasks to a model with a prompt and read its answer. Every button, model,
+ * label, word and default is the core's; a frontend draws `offers`, a spinner while `busy`, the outcome and the page.
+ */
+export interface AssistantService {
+	/**
+	 * The rows `place` offers now, their labels and icons for their state included; empty with no model here. `target`, what
+	 * the place is on (a task's menu: that task); left out, the place alone, as «⋯».
+	 */
+	offers(place: AssistantPlace, target?: AssistantTarget): readonly AssistantOffer[];
+	/** Any run under way: «⋯» spins. */
+	readonly busy: boolean;
+	/**
+	 * A tap on a row whose offer is not `running`: runs it. Never stops anything: pressed while its run is under way, it
+	 * waits for that run's outcome and asks nothing again. One run at a time per button and target; another target is
+	 * another run. Rejects only for an action id no button has. `target` left out: `{ place: "more" }`.
+	 */
+	press(actionId: string, target?: AssistantTarget): Promise<AssistantOutcome>;
+	/**
+	 * A tap on a row whose offer is `running` (Stop): its run resolves `stopped` at once. Nothing under way (the answer came
+	 * while the menu stayed open): nothing happens, so a stale Stop never starts a call.
+	 */
+	stop(actionId: string, target?: AssistantTarget): void;
+	/** Stops every run, each resolving `stopped`: the plugin's unload. */
+	stopAll(): void;
+	/** Fires when `busy` or an offer changes, the chosen model included. Returns the unsubscribe. */
+	onChange(listener: () => void): () => void;
+
+	/** The Assistant page, ready: the models, the chosen one, its fields with values and hints, the timeout, the prompts. */
+	page(): Promise<AssistantPage>;
+	/** Writes the chosen model, a model's field, a prompt or the timeout. */
+	set(change: AssistantSetting): Promise<void>;
+
+	/**
+	 * The first half of a run, for a host that asks the model itself (the iPhone app, later through the door): the question,
+	 * or the outcome when there is none to ask (no tasks, no model here). Stateless.
+	 */
+	prepare(actionId: string, target?: AssistantTarget): Promise<PreparedQuestion | AssistantOutcome>;
+	/** The second half: the model's reply read against the tasks as they are now. */
+	finish(prepared: PreparedQuestion, reply: ModelReply): Promise<AssistantOutcome>;
+}

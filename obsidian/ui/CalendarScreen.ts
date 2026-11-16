@@ -43,6 +43,7 @@ import type { TitleFieldFactory } from "./quick/TitleField";
 import { ObsidianChrome } from "./quick/ObsidianChrome";
 import { FullScreen } from "./full/FullScreen";
 import { MoreMenu } from "./menu/MoreMenu";
+import type { AssistantRows } from "./assistant/AssistantAnswers";
 import type { CloseHow, Overlay } from "./menu/Overlay";
 import type { TaskLink } from "./TaskTitle";
 import { SourcesPopover } from "./sources/SourcesPopover";
@@ -93,6 +94,8 @@ export interface ViewDeps {
 	readonly calendars: CalendarService;
 	readonly settings: ShownSettingsSource;
 	readonly clock: Clock;
+	/** The assistant's rows in «⋯», and its runs: none offered where no model is served. */
+	readonly assistant: AssistantRows;
 	/** Apple's Calendar at the event. */
 	openInCalendar(event: CalendarEvent): void;
 }
@@ -431,10 +434,27 @@ export class CalendarScreen extends Component {
 		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
 		this.unsubscribe.push(() => keyboard.destroy());
 		{
-			const capsule = new BottomCapsule(root, this.deps.undo, {
-				onUndo: () => void this.undoStep("undo"),
-				onMore: (anchor) => MoreMenu.open({ anchor, onSearch: (sheet) => this.openSearch(sheet), onSelect: () => this.bulk.start() }),
-			});
+			const assistant = this.deps.assistant;
+			const capsule = new BottomCapsule(
+				root,
+				this.deps.undo,
+				{
+					onUndo: () => void this.undoStep("undo"),
+					onMore: (anchor) =>
+						MoreMenu.open({
+							anchor,
+							onSearch: (sheet) => this.openSearch(sheet),
+							onSelect: () => this.bulk.start(),
+							assistant: {
+								offers: () => assistant.offers("more"),
+								onChange: (listener) => assistant.onChange(listener),
+								press: (actionId) => assistant.press(actionId),
+								stop: (actionId) => assistant.stop(actionId),
+							},
+						}),
+				},
+				assistant,
+			);
 			this.unsubscribe.push(() => capsule.destroy());
 		}
 		this.bulk.mount();

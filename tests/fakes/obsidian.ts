@@ -196,6 +196,11 @@ export class ButtonComponent {
 		this.buttonEl.addEventListener("click", () => void listener());
 		return this;
 	}
+
+	setDisabled(disabled: boolean): this {
+		this.buttonEl.disabled = disabled;
+		return this;
+	}
 }
 
 export class ToggleComponent {

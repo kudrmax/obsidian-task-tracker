@@ -1,5 +1,5 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
-import { type CalendarService, type CountField, type GoogleAccount, isPresetColor, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../../core/application/contracts";
+import { type AssistantService, type CalendarService, type CountField, type GoogleAccount, isPresetColor, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../../core/application/contracts";
 import type { Theme } from "./eventColors";
 import { inkOf, showPriorityColors } from "./priorityColors";
 import { formatTime } from "./dates";
@@ -7,12 +7,14 @@ import { Button } from "./kit/Button";
 import { el } from "./dom";
 import { RowReorder } from "./RowReorder";
 import { SettingsPage } from "./SettingsPage";
+import { AssistantSettingsPage } from "./assistant/AssistantPage";
 
 export interface SettingsTabDeps {
 	readonly settings: SettingsService;
 	readonly google: GoogleAccount;
 	readonly work: WorkCalendarSetup;
 	readonly calendars: Pick<CalendarService, "known" | "setShown">;
+	readonly assistant: AssistantService;
 }
 
 const MINUTES_PER_HOUR = 60;
@@ -90,6 +92,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		this.pageRow(el, "Calendars", "Which calendars show, the Google account, the work calendar from the iPhone.", (page, redraw) => this.calendarsPage(page, redraw));
 		this.pageRow(el, "Day and timeline", "When a day starts, the hour a day opens at, long press, zoom levels.", (page) => this.dayPage(page));
 		this.pageRow(el, "Tasks file", this.settings.tasksFile, (page) => this.tasksFilePage(page));
+		this.pageRow(el, "Assistant", "The model the assistant asks, how long it waits, each button's prompt.", (page, redraw) => void new AssistantSettingsPage(this.deps.assistant, redraw).build(page));
 	}
 
 	private pageRow(el: HTMLElement, name: string, desc: string, build: (page: HTMLElement, redraw: () => void) => void): void {

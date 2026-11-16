@@ -1,8 +1,8 @@
-import { Notice, type App } from "obsidian";
+import { Notice, Platform, type App } from "obsidian";
 import { calendarPath } from "../core/application/calendarFile";
 import { composeCore, type Core } from "../core/application/composeCore";
 import { tasksFilePath } from "../core/application/documentText";
-import type { CalendarSource, GoogleAccount, WorkCalendarSetup } from "../core/application/contracts";
+import type { CalendarSource, GoogleAccount, HostModels, TransportLoader, WorkCalendarSetup } from "../core/application/contracts";
 import { GoogleAccountService } from "../core/application/GoogleAccountService";
 import { systemClock, type Clock, type SettingsStore, type Ticker, type Timers } from "../core/application/ports";
 import { CalendarFileSource } from "./infrastructure/CalendarFileSource";
@@ -70,6 +70,7 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		isPhone: () => host.shortcuts.isPhone,
 		projects,
 		projectsScreen: new LocalProjectsScreenStore(app),
+		models: hostModels(app, host.pluginDir),
 	});
 	return {
 		...core,
@@ -80,6 +81,25 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		syncForApp: () => syncRoundTrip.run(),
 		stopSyncForApp: () => syncRoundTrip.stop(),
 	};
+}
+
+/**
+ * The models this host asks: Claude on the Mac only (its SDK needs Node's child_process, which the phone lacks). The SDK
+ * loads at the first question or the first look at the Assistant page, never at the plugin's start.
+ */
+function hostModels(app: App, pluginDir: string): HostModels {
+	const mac = Platform.isDesktopApp && Platform.isMacOS;
+	const transports: Record<string, TransportLoader> = {
+		/** A model every platform reaches (a local one over HTTP) goes here, outside the Mac's part. */
+		...(mac ? { claude: () => import("./infrastructure/assistant/ClaudeTransport").then((m) => new m.ClaudeTransport(absolute(app, pluginDir))) } : {}),
+	};
+	return { ids: Object.keys(transports), transport: (id) => transports[id] };
+}
+
+/** A vault path as the file system has it: the desktop's adapter knows the vault's folder. */
+function absolute(app: App, path: string): string {
+	const adapter = app.vault.adapter as { getBasePath?: () => string };
+	return adapter.getBasePath ? `${adapter.getBasePath()}/${path}` : path;
 }
 
 /** The window's interval timer. */

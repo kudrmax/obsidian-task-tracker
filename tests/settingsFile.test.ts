@@ -92,8 +92,11 @@ class Disk implements SettingsPersistence {
 	}
 }
 
-/** The same defaults written now: the project tag, a setting since Projects, and the result mark, since Results, after the keys of 0.4.155. */
-const FILE = OLD_FILE.replace('"cardGap": 2\n}', '"cardGap": 2,\n  "projectTag": "#project",\n  "resultMark": "🎯"\n}');
+/** The assistant's defaults as data.json writes them, after the result mark. */
+const ASSISTANT = '  "assistant": {\n    "model": "claude",\n    "timeoutSeconds": 120,\n    "prompts": {},\n    "models": {}\n  }';
+
+/** The same defaults written now: the project tag, a setting since Projects, the result mark, since Results, and the assistant, after the keys of 0.4.155. */
+const FILE = OLD_FILE.replace('"cardGap": 2\n}', `"cardGap": 2,\n  "projectTag": "#project",\n  "resultMark": "🎯",\n${ASSISTANT}\n}`);
 
 async function opened(disk: Disk) {
 	const settings = new PluginSettings(disk, "data.json", SETTINGS_FILE);
@@ -127,7 +130,7 @@ describe("data.json", () => {
 		const disk = new Disk(OLD_FILE.replace('"cardGap": 2\n}', '"cardGap": 2,\n  "future": 1\n}'));
 		const settings = await opened(disk);
 		await settings.update({ treeWidth: 300, cardGap: 3 });
-		expect(disk.text).toBe(OLD_FILE.replace('"cardGap": 2\n}', '"cardGap": 3,\n  "projectTag": "#project",\n  "resultMark": "🎯",\n  "future": 1\n}'));
+		expect(disk.text).toBe(OLD_FILE.replace('"cardGap": 2\n}', `"cardGap": 3,\n  "projectTag": "#project",\n  "resultMark": "🎯",\n${ASSISTANT},\n  "future": 1\n}`));
 		expect(disk.local.get(DEVICE_STATE_KEY)).toEqual({ treeWidth: 300 });
 	});
 });

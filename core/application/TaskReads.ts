@@ -50,6 +50,7 @@ import { filterTest, hasSubprojects, noteProject } from "./projectFilter";
 import { firstViewOf, viewChoice } from "./viewModes";
 import { panelReason } from "./projectsCarry";
 import { funnelPlaceOf } from "./screenPlaces";
+import type { ListedTasks } from "./assistant/tasks";
 import type { PlusChoice, ViewChoice, ViewMode } from "./contracts";
 
 /** The file as one read sees it: normalized for `today`, the day beginning at `boundary`; `text` as the file holds it. */
@@ -312,6 +313,20 @@ export class TaskReads {
 	/** The day's list and timeline, only the tasks `filter` lets through: `screen(s, date, filter).day`. */
 	dayView(s: Snapshot, date: LocalDate, filter?: ProjectsNodeId | null): DayView {
 		return this.screen(s, date, filter).day;
+	}
+
+	/** Every task of each list, each with its subtasks, and today, the file tidied first: what the assistant reads. No file: every list empty. */
+	listedRead(): Read<ListedTasks> {
+		const lists = (of: (key: SectionKey) => readonly TaskItem[]) => Object.fromEntries(SEARCH_ORDER.map((key) => [key, of(key)])) as Record<SectionKey, readonly TaskItem[]>;
+		return {
+			reads: true,
+			tidies: true,
+			missing: () => ({ today: this.today(), lists: lists(() => []) }),
+			answer: (s) => {
+				const item = this.itemOf(s!.today, s!.doc);
+				return { today: s!.today, lists: lists((key) => s!.doc.tasks(key).map(item)) };
+			},
+		};
 	}
 
 	soonWithoutDateView({ doc, today }: Snapshot): readonly TaskItem[] {

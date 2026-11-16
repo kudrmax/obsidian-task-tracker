@@ -32,6 +32,8 @@ export interface MenuRowSpec {
 	readonly cls?: string;
 	/** Shown but not pressed: Project for subtasks, whose project is their parent's. */
 	readonly disabled?: boolean;
+	/** Something it started is under way: the spinning ring stands in its icon's place. */
+	readonly busy?: boolean;
 }
 
 function rowClass(spec: MenuRowSpec): string {
@@ -49,11 +51,19 @@ export function menuRow(parent: HTMLElement, spec: MenuRowSpec): HTMLButtonEleme
 		el(row, "span", "tc-menu-label", spec.label);
 		if (spec.value) el(row, "span", "tc-menu-value", spec.value);
 		if (spec.days) weekLetters(row, spec.days);
-		if (spec.icon) row.appendChild(icon(spec.icon));
+		if (spec.busy) spinner(row);
+		else if (spec.icon) row.appendChild(icon(spec.icon));
 	}
 	row.disabled = spec.disabled === true;
 	row.addEventListener("click", spec.onPick);
 	return row;
+}
+
+/** The ring that spins while something runs: an assistant's question waiting for its answer. */
+export function spinner(parent: HTMLElement): HTMLElement {
+	const ring = el(parent, "span", "tc-spinner");
+	ring.setAttribute("aria-hidden", "true");
+	return ring;
 }
 
 const WEEK = [

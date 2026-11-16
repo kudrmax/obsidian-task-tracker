@@ -114,8 +114,22 @@ export interface ProjectSettings {
 	readonly projectTag: string;
 }
 
+/** The assistant: the model asked, how long it may think, and the prompts and model settings by key, never by name. */
+export interface AssistantSettings {
+	/** The chosen model's id ("claude"); no other is asked in its place. */
+	readonly model: string;
+	readonly timeoutSeconds: number;
+	/** By action id; missing or blank: the action's default. */
+	readonly prompts: Readonly<Record<string, string>>;
+	/** By model id, by field key; missing: the field's default. */
+	readonly models: Readonly<Record<string, Readonly<Record<string, string>>>>;
+}
+
+/** The bounds the assistant's timeout is kept in, seconds. */
+export const ASSISTANT_TIMEOUTS = { min: 10, max: 600 } as const;
+
 /** The settings every frontend shares: the plugin's data.json holds them, with the TS view's own beside them. */
-export type TaskCalendarSettings = FileFormatSettings & ScreenBehaviour & SourceSettings & ProjectSettings & CardPaintSettings & TimelineSettings;
+export type TaskCalendarSettings = FileFormatSettings & ScreenBehaviour & SourceSettings & ProjectSettings & CardPaintSettings & TimelineSettings & { readonly assistant: AssistantSettings };
 
 export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	tasksFile: "TODOs Tasks.md",
@@ -149,6 +163,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	zoomLevels: DEFAULT_ZOOM_LEVELS,
 	projectTag: "#project",
 	groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
+	assistant: { model: "claude", timeoutSeconds: 120, prompts: {}, models: {} },
 };
 
 /** Merges saved data over the defaults, one level deep for the nested objects. */
@@ -165,7 +180,31 @@ export function settingsFrom(saved: unknown): TaskCalendarSettings {
 		cardHeight: sizeOf(s.cardHeight, CARD_HEIGHTS, DEFAULT_SETTINGS.cardHeight),
 		cardGap: sizeOf(s.cardGap, CARD_GAPS, DEFAULT_SETTINGS.cardGap),
 		zoomLevels: zoomLevelsOf(saved),
+		assistant: assistantOf((s as { assistant?: unknown }).assistant),
 	};
+}
+
+/** The assistant as saved, field by field over the defaults: prompts and each model's map keep only their strings. */
+export function assistantOf(saved: unknown): AssistantSettings {
+	const fallback = DEFAULT_SETTINGS.assistant;
+	if (!isRecord(saved)) return fallback;
+	const models = isRecord(saved.models) ? saved.models : {};
+	return {
+		model: typeof saved.model === "string" ? saved.model : fallback.model,
+		timeoutSeconds: sizeOf(saved.timeoutSeconds, ASSISTANT_TIMEOUTS, fallback.timeoutSeconds),
+		prompts: stringsOf(saved.prompts),
+		models: Object.fromEntries(Object.entries(models).filter(([, fields]) => isRecord(fields)).map(([id, fields]) => [id, stringsOf(fields)])),
+	};
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** The string values of a saved map; nothing for anything else. */
+function stringsOf(saved: unknown): Readonly<Record<string, string>> {
+	if (!isRecord(saved)) return {};
+	return Object.fromEntries(Object.entries(saved).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
 }
 
 /** A size as saved: a whole number within its bounds, or the default for anything that is no number. */

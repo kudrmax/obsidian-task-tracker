@@ -2461,6 +2461,7 @@
   var CARD_GAPS = { min: 0, max: 10 };
   var DEFAULT_CARD_SIZE = { height: 35, gap: 2 };
   var DEFAULT_ZOOM_LEVELS = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
+  var ASSISTANT_TIMEOUTS = { min: 10, max: 600 };
   var DEFAULT_SETTINGS = {
     tasksFile: "TODOs Tasks.md",
     sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
@@ -2492,7 +2493,8 @@
     cardGap: DEFAULT_CARD_SIZE.gap,
     zoomLevels: DEFAULT_ZOOM_LEVELS,
     projectTag: "#project",
-    groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" }
+    groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
+    assistant: { model: "claude", timeoutSeconds: 120, prompts: {}, models: {} }
   };
   function settingsFrom(saved) {
     const s = saved ?? {};
@@ -2506,8 +2508,27 @@
       resultMark: typeof s.resultMark === "string" ? s.resultMark : DEFAULT_SETTINGS.resultMark,
       cardHeight: sizeOf(s.cardHeight, CARD_HEIGHTS, DEFAULT_SETTINGS.cardHeight),
       cardGap: sizeOf(s.cardGap, CARD_GAPS, DEFAULT_SETTINGS.cardGap),
-      zoomLevels: zoomLevelsOf(saved)
+      zoomLevels: zoomLevelsOf(saved),
+      assistant: assistantOf(s.assistant)
     };
+  }
+  function assistantOf(saved) {
+    const fallback = DEFAULT_SETTINGS.assistant;
+    if (!isRecord(saved)) return fallback;
+    const models = isRecord(saved.models) ? saved.models : {};
+    return {
+      model: typeof saved.model === "string" ? saved.model : fallback.model,
+      timeoutSeconds: sizeOf(saved.timeoutSeconds, ASSISTANT_TIMEOUTS, fallback.timeoutSeconds),
+      prompts: stringsOf(saved.prompts),
+      models: Object.fromEntries(Object.entries(models).filter(([, fields]) => isRecord(fields)).map(([id, fields]) => [id, stringsOf(fields)]))
+    };
+  }
+  function isRecord(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+  function stringsOf(saved) {
+    if (!isRecord(saved)) return {};
+    return Object.fromEntries(Object.entries(saved).filter((entry) => typeof entry[1] === "string"));
   }
   function sizeOf(saved, bounds, fallback) {
     if (typeof saved !== "number" || !Number.isFinite(saved)) return fallback;
@@ -6659,6 +6680,19 @@ ${key.title}`.toLowerCase();
     /** The day's list and timeline, only the tasks `filter` lets through: `screen(s, date, filter).day`. */
     dayView(s, date, filter) {
       return this.screen(s, date, filter).day;
+    }
+    /** Every task of each list, each with its subtasks, and today, the file tidied first: what the assistant reads. No file: every list empty. */
+    listedRead() {
+      const lists = (of) => Object.fromEntries(SEARCH_ORDER.map((key) => [key, of(key)]));
+      return {
+        reads: true,
+        tidies: true,
+        missing: () => ({ today: this.today(), lists: lists(() => []) }),
+        answer: (s) => {
+          const item = this.itemOf(s.today, s.doc);
+          return { today: s.today, lists: lists((key) => s.doc.tasks(key).map(item)) };
+        }
+      };
     }
     soonWithoutDateView({ doc, today }) {
       return soonWithoutDate(doc).map(this.itemOf(today, doc));

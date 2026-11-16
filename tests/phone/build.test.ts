@@ -34,6 +34,10 @@ describe(BUNDLE, () => {
 		expect(committed).not.toMatch(/\b(setTimeout|clearTimeout|setInterval|clearInterval|requestAnimationFrame|fetch)\(|\b(window|document)\./);
 	});
 
+	it("carries no model SDK: the assistant asks a model only through a host's transport", () => {
+		expect(committed).not.toMatch(/claude-agent-sdk|ClaudeTransport|AbortController/);
+	});
+
 	it("every function runs on its own, with nothing of the host: no timers, no window, no fetch", () => {
 		const sandbox: { TaskCalendarPhone?: Phone } = {};
 		runInNewContext(committed, sandbox);

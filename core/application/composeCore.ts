@@ -1,6 +1,8 @@
 import { CalendarServiceImpl } from "./CalendarServiceImpl";
 import { CALENDAR_SOURCES } from "./calendarFile";
-import type { CalendarService, CalendarSource, DayService, TaskService, UndoService, WorkCalendarSetup } from "./contracts";
+import { AssistantServiceImpl } from "./assistant/AssistantServiceImpl";
+import type { HostModels } from "./assistant/model";
+import type { AssistantService, CalendarService, CalendarSource, DayService, TaskService, UndoService, WorkCalendarSetup } from "./contracts";
 import { DayServiceImpl } from "./DayServiceImpl";
 import type { EventFeed, EventFile } from "./EventSource";
 import type { Clock, Projects, ProjectsScreenStore, SettingsStore, TaskFileStore, Ticker, Timers } from "./ports";
@@ -27,6 +29,8 @@ export interface CorePorts {
 	readonly projects?: Projects;
 	/** What this device keeps of the Projects screen; kept in memory when left out. */
 	readonly projectsScreen?: ProjectsScreenStore;
+	/** The models this host serves and how it asks them; none when left out (the door, the phone plugin). */
+	readonly models?: HostModels;
 }
 
 /** The services every frontend talks to. */
@@ -35,6 +39,7 @@ export interface Core {
 	readonly days: DayService;
 	readonly undo: UndoService;
 	readonly calendars: CalendarService;
+	readonly assistant: AssistantService;
 }
 
 /** The services over a host's ports: the one place they are put together, the calendars in the order they are read. */
@@ -48,5 +53,6 @@ export function composeCore(ports: CorePorts): Core {
 		days: new DayServiceImpl(ports.clock, ports.settings, tasks, ports.ticker),
 		undo,
 		calendars: new CalendarServiceImpl(files, ports.feeds, ports.clock, ports.settings, ports.timers, ports.work, { canMigrate: ports.isPhone }),
+		assistant: new AssistantServiceImpl({ tasks, settings: ports.settings, timers: ports.timers, models: ports.models }),
 	};
 }
