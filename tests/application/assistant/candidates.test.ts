@@ -27,6 +27,7 @@ const PLAN = [
 	"\t\t- [ ] Pick districts",
 	"\t\t\t- near the river",
 	"\t\t- [ ] Write to agents",
+	"\t\t\t- two or three, by phone",
 	"\t- [ ] Buy tickets",
 	"- [ ] Learn Serbian",
 	"\t- [ ] Find a teacher 📁",
@@ -68,7 +69,7 @@ describe("what Best task chooses among: what Max can start now", () => {
 		expect(JSON.parse(briefing.input).tasks).toBeUndefined();
 	});
 
-	it("a folded task's step: its goals top first, with their words; the steps after it in that branch, depth first", async () => {
+	it("a folded task's step: its goals top first, with their words; the steps after it in that branch, depth first, each with its description", async () => {
 		const [, districts] = (await input()).candidates;
 		expect(districts).toEqual({
 			ref: "t2",
@@ -85,14 +86,17 @@ describe("what Best task chooses among: what Max can start now", () => {
 				{ title: "Move to Belgrade", description: "- Start in January, before the lease ends", priority: "p1", due: "2026-12-01", time: null, projects: ["Life"], labels: [] },
 				{ title: "Find a flat", description: null, priority: null, due: null, time: null, projects: ["Life"], labels: [] },
 			],
-			after: ["Write to agents", "Buy tickets"],
+			after: [
+				{ title: "Write to agents", description: "- two or three, by phone" },
+				{ title: "Buy tickets", description: null },
+			],
 		});
 	});
 
 	it("an unfolded goal with a folded step: the step of the folded one, both goals above it; a plain subtask: its goal, nothing after", async () => {
 		const [, , friends, book] = (await input()).candidates;
 		expect(friends.goals.map((g: { title: string }) => g.title)).toEqual(["Learn Serbian", "Find a teacher"]);
-		expect(friends.after).toEqual(["Book a trial"]);
+		expect(friends.after).toEqual([{ title: "Book a trial", description: null }]);
 		expect(book.goals.map((g: { title: string }) => g.title)).toEqual(["Learn Serbian"]);
 		expect(book.after).toEqual([]);
 	});

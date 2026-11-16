@@ -22,11 +22,15 @@ export interface Candidate {
 	readonly after: readonly TaskItem[];
 }
 
-/** What a goal tells the model: what it is for, not something to choose. */
-export interface BriefedGoal {
+/** A step after the candidate, as the model reads it: a task is always its title and its description. */
+export interface BriefedStep {
 	readonly title: string;
 	/** Its nested lines without a checkbox, Markdown. */
 	readonly description: string | null;
+}
+
+/** What a goal tells the model: what it is for, not something to choose. */
+export interface BriefedGoal extends BriefedStep {
 	/** Its priority's prefix. */
 	readonly priority: string | null;
 	/** Its due date, ISO. */
@@ -44,8 +48,8 @@ export interface BriefedCandidate extends BriefedGoal {
 	readonly list: "today" | "soon" | "inbox" | "backlog" | "done";
 	readonly inProgress: boolean;
 	readonly goals: readonly BriefedGoal[];
-	/** Titles of the steps after it in its folded branch. */
-	readonly after: readonly string[];
+	/** The steps after it in its folded branch. */
+	readonly after: readonly BriefedStep[];
 }
 
 const LIST_WORDS: Readonly<Record<SectionKey, BriefedCandidate["list"]>> = { now: "today", soon: "soon", inbox: "inbox", backlog: "backlog", done: "done" };
@@ -101,7 +105,7 @@ export function briefingOf(today: string, tasks: readonly TaskItem[]): Briefing 
 			...marks,
 			description,
 			goals: candidate.goals.map((goal) => briefedGoal(goal, today)),
-			after: candidate.after.map((item) => item.title),
+			after: candidate.after.map((item) => ({ title: item.title, description: item.description })),
 		};
 	});
 	return { input: JSON.stringify({ today, candidates }), refs };

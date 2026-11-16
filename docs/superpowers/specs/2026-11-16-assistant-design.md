@@ -227,7 +227,7 @@ Each candidate comes with what it is for, so the model understands the result wi
 - `goals`: the chain of tasks above it, the top one first, each with its title, description, priority, due date, time,
   projects and labels;
 - `after`: for the next step of a folded task, the open tasks of that folded branch that come after the step, in file
-  order (depth first), titles only; empty otherwise;
+  order (depth first), each with its title and description (a task is always both, Max, 2026-11-17); empty otherwise;
 - its own `description`: the nested lines without a checkbox (`TaskItem.description`), as Markdown.
 
 Lines have no ids in the file, so each question gives each candidate a short ref, `t1`, `t2`… in the order sent, mapped
@@ -245,7 +245,8 @@ another editor during the wait gets a new id and reads as not found.
       "time": null, "projects": [], "labels": [], "description": null,
       "goals": [{ "title": "Call the bank", "description": "- ask about the fee", "priority": null,
                   "due": "2026-11-20", "time": null, "projects": [], "labels": [] }],
-      "after": ["Write down the questions", "Call"] }
+      "after": [{ "title": "Write down the questions", "description": "- the fee, the term" },
+                { "title": "Call", "description": null }] }
   ]
 }
 ```
@@ -613,7 +614,8 @@ No Swift stage (R6).
   a task met twice (two scopes overlapping) is one candidate. A folded task's next step is `TaskItem.card.step`, the
   very item its card shows; the tasks between the folded task and the step are goals too (Move to Belgrade → Find a
   flat → Pick districts: both are goals), and `after` holds the open tasks of the folded branch after the step in file
-  order, their own subtasks included. A goal's or a step-after's id answered as a ref is `badAnswer`: refs hold the
+  order, their own subtasks included, each as `{ title, description }` (description null when none), as goals carry
+  theirs. A goal's or a step-after's id answered as a ref is `badAnswer`: refs hold the
   candidates only.
 - **Frontend-obsidian (steps):** the list card's renderer draws the answer: `renderTaskCard` takes the face to draw
   (`face`, default `task.card`), so the popup passes `outcome.card` with `outcome.task`'s marks, one mechanism, no copy.
