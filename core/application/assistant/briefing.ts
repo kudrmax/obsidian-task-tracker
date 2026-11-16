@@ -3,11 +3,18 @@ import { minutesToHHMM } from "../../domain/LocalDate";
 import type { SectionKey } from "../../domain/Task";
 import type { TaskItem } from "../contracts";
 
+/**
+ * How an action shows the model its tasks. `candidates`: only what Max can start now (`candidatesOf`), each with its
+ * goals and the steps after it; for an action that chooses what to do. `tasks`: the tasks sent as they are, each open
+ * subtask right after its task; for an action about the tasks pressed on.
+ */
+export type BriefingKind = "candidates" | "tasks";
+
 /** What a question tells the model of the tasks, and which task each ref names (`TaskItem.id`). Plain data. */
 export interface Briefing {
-	/** JSON: today and the candidates, each by its ref. */
+	/** JSON: today and the candidates (or the tasks), each by its ref. */
 	readonly input: string;
-	/** Ref → `TaskItem.id`, the candidates only. */
+	/** Ref → `TaskItem.id`: the candidates only, or every task sent. */
 	readonly refs: Readonly<Record<string, string>>;
 }
 
@@ -52,6 +59,14 @@ export interface BriefedCandidate extends BriefedGoal {
 	readonly after: readonly BriefedStep[];
 }
 
+/** A task sent as it is: its ref, its words, and the ref of the task it is a step of. */
+export interface BriefedTask extends BriefedGoal {
+	readonly ref: string;
+	readonly list: BriefedCandidate["list"];
+	readonly inProgress: boolean;
+	readonly parent: string | null;
+}
+
 const LIST_WORDS: Readonly<Record<SectionKey, BriefedCandidate["list"]>> = { now: "today", soon: "soon", inbox: "inbox", backlog: "backlog", done: "done" };
 
 /**
@@ -90,8 +105,31 @@ function stepOf(folded: TaskItem, step: TaskItem, top: TaskItem, goals: readonly
 	return { item: step, top, goals: [...goals, ...flat[at].above], after: flat.slice(at + 1).map((entry) => entry.item) };
 }
 
-/** The briefing of the candidates among `tasks` on `today`: refs t1, t2… in the order sent. */
-export function briefingOf(today: string, tasks: readonly TaskItem[]): Briefing {
+/** The briefing of `tasks` on `today`, the action's kind: refs t1, t2… in the order sent. */
+export function briefingOf(kind: BriefingKind, today: string, tasks: readonly TaskItem[]): Briefing {
+	return kind === "candidates" ? candidatesBriefing(today, tasks) : tasksBriefing(today, tasks);
+}
+
+/** Each open task of `tasks` with its open subtasks right after it, a task met twice sent once. */
+function tasksBriefing(today: string, tasks: readonly TaskItem[]): Briefing {
+	const briefed: BriefedTask[] = [];
+	const refs: Record<string, string> = {};
+	const seen = new Set<string>();
+	const add = (item: TaskItem, top: TaskItem, parent: string | null): void => {
+		if (!item.open || seen.has(item.id)) return;
+		seen.add(item.id);
+		const ref = `t${briefed.length + 1}`;
+		refs[ref] = item.id;
+		const { title, description, ...marks } = briefedGoal(item, today);
+		briefed.push({ ref, title, list: LIST_WORDS[top.list], inProgress: item.status === "inProgress", ...marks, description, parent });
+		for (const sub of item.subtasks) add(sub, top, ref);
+	};
+	for (const item of tasks) add(item, item, null);
+	return { input: JSON.stringify({ today, tasks: briefed }), refs };
+}
+
+/** What Max can start now among `tasks`, each with what it is for. */
+function candidatesBriefing(today: string, tasks: readonly TaskItem[]): Briefing {
 	const refs: Record<string, string> = {};
 	const candidates = candidatesOf(tasks).map((candidate, index): BriefedCandidate => {
 		const ref = `t${index + 1}`;

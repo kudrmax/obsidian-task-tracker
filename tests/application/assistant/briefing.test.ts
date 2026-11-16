@@ -13,7 +13,7 @@ const titles = (items: readonly { title: string }[]) => items.map((i) => i.title
 describe("the briefing", () => {
 	it("names each candidate by a ref in the order sent, in words: an unfolded task's open subtask, never the task itself", async () => {
 		const tasks = await listed();
-		const briefing = briefingOf(tasks.today, tasksIn({ kind: "lists", lists: ["now", "soon"] }, { place: "more" }, tasks));
+		const briefing = briefingOf("candidates", tasks.today, tasksIn({ kind: "lists", lists: ["now", "soon"] }, { place: "more" }, tasks));
 		const input = JSON.parse(briefing.input);
 		expect(input.today).toBe(TODAY);
 		const offer = { title: "Write the offer", description: null, priority: "p1", due: null, time: "14:00", projects: ["Offers"], labels: [] };
@@ -30,13 +30,24 @@ describe("the briefing", () => {
 	it("maps each ref to the candidate's id", async () => {
 		const tasks = await listed();
 		const sent = tasksIn({ kind: "lists", lists: ["now"] }, { place: "more" }, tasks);
-		const briefing = briefingOf(tasks.today, sent);
+		const briefing = briefingOf("candidates", tasks.today, sent);
 		expect(briefing.refs).toEqual({ t1: sent[0].subtasks[0].id, t2: sent[1].id });
+	});
+
+	it("an action that sends tasks as they are: each open task by a ref, its open subtasks right after it, with descriptions", async () => {
+		const tasks = await listed();
+		const sent = tasksIn({ kind: "lists", lists: ["soon"] }, { place: "more" }, tasks);
+		const briefing = briefingOf("tasks", tasks.today, sent);
+		expect(JSON.parse(briefing.input).tasks.slice(0, 2)).toEqual([
+			{ ref: "t1", title: "Call the bank", list: "soon", inProgress: false, priority: null, due: "2026-11-20", time: null, projects: [], labels: [], description: null, parent: null },
+			{ ref: "t2", title: "Find the contract", list: "soon", inProgress: false, priority: null, due: null, time: null, projects: [], labels: [], description: null, parent: "t1" },
+		]);
+		expect(briefing.refs).toMatchObject({ t1: sent[0].id, t2: sent[0].subtasks[0].id });
 	});
 
 	it("survives JSON both ways: plain data", async () => {
 		const tasks = await listed();
-		const briefing = briefingOf(tasks.today, tasksIn({ kind: "all" }, { place: "more" }, tasks));
+		const briefing = briefingOf("candidates", tasks.today, tasksIn({ kind: "all" }, { place: "more" }, tasks));
 		expect(JSON.parse(JSON.stringify(briefing))).toEqual(briefing);
 	});
 });
@@ -65,8 +76,8 @@ describe("the scopes", () => {
 		const step = offer.subtasks[0];
 		const sent = tasksIn({ kind: "target" }, { place: "selection", taskIds: [step.id, closed.id, offer.id] }, tasks);
 		expect(titles(sent)).toEqual(["Write the offer"]);
-		const briefing = JSON.parse(briefingOf(tasks.today, sent).input);
-		expect(titles(briefing.candidates)).toEqual(["Find the template"]);
+		const briefing = JSON.parse(briefingOf("tasks", tasks.today, sent).input);
+		expect(titles(briefing.tasks)).toEqual(["Write the offer", "Find the template"]);
 		expect(titles(tasksIn({ kind: "target" }, { place: "task", taskIds: [step.id] }, tasks))).toEqual(["Find the template"]);
 	});
 

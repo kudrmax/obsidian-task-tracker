@@ -10,6 +10,7 @@ export const bestTask: AssistantAction = {
 	title: "Best task",
 	failureTitle: "Couldn't find the best task",
 	scope: { kind: "lists", lists: ["now", "soon"] },
+	briefing: "candidates",
 	defaultPrompt:
 		"You help me choose what to do next. Below is each thing I could start now: a task, or the next step of a bigger task, with the goals it leads to and, for a step, the steps that come after it. If I could do only one of them and nothing else, which one would make the biggest difference? Judge what doing this one now gives: a goal adds weight only as far as this step truly moves it, and the steps after it are not done by it. Weigh impact over urgency; one in progress or with a time today counts for more only if it truly matters more. Answer with its ref, and in two or three short sentences in the language of my tasks, say why this one.",
 	answerSchema: {

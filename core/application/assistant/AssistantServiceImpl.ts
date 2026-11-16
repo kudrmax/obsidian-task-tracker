@@ -130,7 +130,7 @@ export class AssistantServiceImpl implements AssistantService {
 		const profile = this.choice.chosen();
 		if (profile === null) return failed(action, this.choice.named()?.unavailable ?? NO_MODEL_WORDS, `model "${this.assistant().model}" is not served here`);
 		const listed = await this.tasks.listed();
-		const briefing = briefingOf(listed.today, tasksIn(action.scope, target, listed));
+		const briefing = briefingOf(action.briefing, listed.today, tasksIn(action.scope, target, listed));
 		if (isEmptyBriefing(briefing)) return failed(action, action.emptyWords, "no open tasks to send");
 		return {
 			kind: "question",

@@ -215,7 +215,8 @@ Soon list, dated ones too.
 
 The model chooses among what Max can **start now**, never among goals (Max, 2026-11-17: «по факту я не буду делать все
 это одновременно, я буду делать именно первый подпункт»). From each open task of the scope's lists, by how it lies in
-the file (`candidatesOf`, the core):
+the file (`candidatesOf`, the core). This is the action's choice (`briefing: "candidates"`, Best task's); an action about
+the tasks pressed on (`briefing: "tasks"`) sends them as they are, each open subtask right after its task with `parent`:
 
 - a task with no open subtask: the task itself;
 - a folded task (`collapsed`): only its next step, the one its card shows (`nextStep`): its subtasks are done in order;
@@ -266,6 +267,7 @@ interface AssistantAction {
   readonly title: string;                               // the popup's title: "Best task"
   readonly failureTitle: string;                        // "Couldn't find the best task"
   readonly scope: TaskScope;
+  readonly briefing: "candidates" | "tasks";             // how its tasks are shown to the model: "candidates"
   readonly defaultPrompt: string;
   readonly answerSchema: JsonSchema;
   /** No tasks to send: the words shown instead of a call. */
@@ -610,8 +612,11 @@ No Swift stage (R6).
   its own `card` (`over` its title, the step's title below); any other subtask: `task` is the subtask, `card` its own
   title with its parent's title in `over`, `step` null; a task: `over` null. It is worked out from the tasks as they
   are when the answer comes (`drawnAnswer`, `TaskLookup.above`), so a fold changed during the wait draws as it is now.
-- **Backend (steps):** the candidate rules belong to the briefing, so every button sends candidates, not only Best task;
-  a task met twice (two scopes overlapping) is one candidate. A folded task's next step is `TaskItem.card.step`, the
+- **Backend (steps):** the candidate rules are the action's choice (the lead, at the review): `AssistantAction.briefing`
+  is `"candidates"` (Best task: `{ today, candidates }`) or `"tasks"` (an action on the tasks pressed on: `{ today,
+  tasks }`, each open task by a ref with its open subtasks right after it, `parent` naming its task's ref, as before, now
+  with `description` too, since a task is always its title and description). A task met twice is one candidate, or
+  one task sent. A folded task's next step is `TaskItem.card.step`, the
   very item its card shows; the tasks between the folded task and the step are goals too (Move to Belgrade → Find a
   flat → Pick districts: both are goals), and `after` holds the open tasks of the folded branch after the step in file
   order, their own subtasks included, each as `{ title, description }` (description null when none), as goals carry
