@@ -47,7 +47,7 @@ export interface StopSignal {
 	onStop(fn: (reason: StopReason) => void): () => void;
 }
 
-/** How a host asks one model. Never throws: every failure is a reply. Logs its own detail. */
+/** How a host asks one model. Never throws: every failure is a reply, its detail in the failure (the frontend logs the outcome's). */
 export interface ModelTransport {
 	ask(question: ModelQuestion, modelSettings: Readonly<Record<string, string>>, stop: StopSignal): Promise<ModelReply>;
 	/** A hint for a settings field, found on this host (Claude: the path of `claude` found, or «not found»). */

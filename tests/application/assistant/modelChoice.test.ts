@@ -53,12 +53,25 @@ describe("the Assistant page", () => {
 		expect(page.prompts[0].prompt).toMatch(/^You help me choose/);
 	});
 
-	it("on a host without the model: the fields with no hints, the prompts still editable", async () => {
+	it("on a host without the model (the phone): why, no fields, the prompts still editable", async () => {
 		const { assistant, loads } = rig({ models: () => ({ ids: [] }) });
 		const page = await assistant.page();
-		expect(page.fields.map((f) => [f.key, f.value, f.hint])).toEqual([["model", "sonnet", null], ["path", "", null]]);
+		expect(page.unavailable).toBe("Claude works in Obsidian on the Mac.");
+		expect(page.fields).toEqual([]);
 		expect(page.prompts[0].isDefault).toBe(true);
 		expect(loads.count).toBe(0);
+	});
+
+	it("brings its own words, so no frontend writes them", async () => {
+		const { assistant } = rig();
+		expect((await assistant.page()).words).toEqual({
+			model: "Model",
+			timeout: "Timeout",
+			timeoutNote: "Seconds to wait for an answer.",
+			prompts: "Prompts",
+			promptsNote: "What each button asks. The shape of the answer is the plugin's own.",
+			reset: "Reset to default",
+		});
 	});
 
 	it("a hint that fails is no hint", async () => {

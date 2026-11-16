@@ -163,31 +163,56 @@ describe("a run under way", () => {
 		expect(assistant.offers("more")).toEqual([]);
 	});
 
-	it("a second tap stops it: both taps come back stopped at once, nothing shown, the spinner gone", async () => {
+	it("stop stops it: the run comes back stopped at once, nothing shown, the spinner gone", async () => {
 		const { assistant, transport } = rig();
-		const first = assistant.press(BEST);
+		const run = assistant.press(BEST);
 		await settle();
-		const second = assistant.press(BEST);
+		assistant.stop(BEST);
 		expect(assistant.busy).toBe(false);
-		expect(await second).toEqual({ kind: "stopped" });
-		expect(await first).toEqual({ kind: "stopped" });
+		expect(await run).toEqual({ kind: "stopped" });
 		expect(transport.asked[0].stop.stopped).toBe("user");
 	});
 
 	it("stopped before the question goes out, asks nothing", async () => {
 		const { assistant, transport } = rig();
-		const first = assistant.press(BEST);
-		void assistant.press(BEST);
-		expect(await first).toEqual({ kind: "stopped" });
+		const run = assistant.press(BEST);
+		assistant.stop(BEST);
+		expect(await run).toEqual({ kind: "stopped" });
 		await settle();
 		expect(transport.asked).toEqual([]);
 	});
 
-	it("one run at a time per button: a tap after the stop starts a new one", async () => {
+	it("a press while the run is under way never stops it and never asks again: it waits for the same outcome", async () => {
+		const { assistant, transport } = rig();
+		const first = assistant.press(BEST);
+		await settle();
+		const second = assistant.press(BEST);
+		await settle();
+		expect(transport.asked).toHaveLength(1);
+		expect(assistant.busy).toBe(true);
+		transport.answer({ taskRef: "t3", reason: "." });
+		const [a, b] = await Promise.all([first, second]);
+		expect(a).toMatchObject({ kind: "task" });
+		expect(b).toEqual(a);
+	});
+
+	it("a stale Stop, tapped after the answer came, does nothing: no new call (Max's menu left open)", async () => {
+		const { assistant, transport } = rig();
+		const run = assistant.press(BEST);
+		await settle();
+		transport.answer({ taskRef: "t1", reason: "." });
+		await run;
+		assistant.stop(BEST);
+		await settle();
+		expect(assistant.busy).toBe(false);
+		expect(transport.asked).toHaveLength(1);
+	});
+
+	it("one run at a time per button: a press after the stop starts a new one", async () => {
 		const { assistant, transport } = rig();
 		void assistant.press(BEST);
 		await settle();
-		void assistant.press(BEST);
+		assistant.stop(BEST);
 		const again = assistant.press(BEST);
 		await settle();
 		expect(transport.asked).toHaveLength(2);
@@ -195,14 +220,14 @@ describe("a run under way", () => {
 		expect(await again).toMatchObject({ kind: "task" });
 	});
 
-	it("the same button on two targets: two runs side by side", async () => {
+	it("the same button on two targets: two runs side by side, each stopped alone", async () => {
 		const { assistant, transport, tasks } = rig({});
 		const [offer, rent] = (await tasks.listed()).lists.now;
 		const one = assistant.press(BEST, { place: "task", taskIds: [offer.id] });
 		const two = assistant.press(BEST, { place: "task", taskIds: [rent.id] });
 		await settle();
 		expect(transport.asked).toHaveLength(2);
-		void assistant.press(BEST, { place: "task", taskIds: [offer.id] });
+		assistant.stop(BEST, { place: "task", taskIds: [offer.id] });
 		expect(await one).toEqual({ kind: "stopped" });
 		expect(assistant.busy).toBe(true);
 		transport.answer({ taskRef: "t3", reason: "." }, 1);
@@ -248,7 +273,7 @@ describe("the timeout", () => {
 		const stopped = rig();
 		const run = stopped.assistant.press(BEST);
 		await settle();
-		void stopped.assistant.press(BEST);
+		stopped.assistant.stop(BEST);
 		expect(await run).toEqual({ kind: "stopped" });
 	});
 

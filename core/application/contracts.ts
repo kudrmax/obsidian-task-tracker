@@ -2134,6 +2134,19 @@ export interface AssistantField {
 	readonly hint: string | null;
 }
 
+/** The Assistant page's own words, ready to draw. */
+export interface AssistantPageWords {
+	/** The model choice's row. */
+	readonly model: string;
+	readonly timeout: string;
+	readonly timeoutNote: string;
+	/** The prompts' heading and its line. */
+	readonly prompts: string;
+	readonly promptsNote: string;
+	/** A prompt's button back to its default. */
+	readonly reset: string;
+}
+
 /** The Assistant page, ready. */
 export interface AssistantPage {
 	/** The models this host serves, and the chosen one even when it doesn't serve it. */
@@ -2141,9 +2154,10 @@ export interface AssistantPage {
 	readonly chosen: string;
 	/** Why the chosen model isn't asked here; null when it is. */
 	readonly unavailable: string | null;
-	/** The chosen model's settings. */
+	/** The chosen model's settings; none when this host doesn't serve it (the phone: `unavailable` says why). */
 	readonly fields: readonly AssistantField[];
 	readonly timeoutSeconds: number;
+	readonly words: AssistantPageWords;
 	/** Each button's prompt, in the order of the buttons. */
 	readonly prompts: readonly { readonly actionId: string; readonly title: string; readonly prompt: string; readonly isDefault: boolean }[];
 }
@@ -2171,10 +2185,16 @@ export interface AssistantService {
 	/** Any run under way: «⋯» spins. */
 	readonly busy: boolean;
 	/**
-	 * A tap on a row: runs it, or stops it while it runs (that press and the run's both resolve `stopped`). One run at a time
-	 * per button and target; another target is another run. Never rejects. `target` left out: `{ place: "more" }`.
+	 * A tap on a row whose offer is not `running`: runs it. Never stops anything: pressed while its run is under way, it
+	 * waits for that run's outcome and asks nothing again. One run at a time per button and target; another target is
+	 * another run. Rejects only for an action id no button has. `target` left out: `{ place: "more" }`.
 	 */
 	press(actionId: string, target?: AssistantTarget): Promise<AssistantOutcome>;
+	/**
+	 * A tap on a row whose offer is `running` (Stop): its run resolves `stopped` at once. Nothing under way (the answer came
+	 * while the menu stayed open): nothing happens, so a stale Stop never starts a call.
+	 */
+	stop(actionId: string, target?: AssistantTarget): void;
 	/** Stops every run, each resolving `stopped`: the plugin's unload. */
 	stopAll(): void;
 	/** Fires when `busy` or an offer changes, the chosen model included. Returns the unsubscribe. */
