@@ -350,8 +350,9 @@ Called straight from the plugin, no proxy process or server (R8).
   API key instead of the subscription), with `/opt/homebrew/bin` and `/usr/local/bin` added to `PATH` (an npm-installed
   `claude` is a node script and needs `node` from the Dock's empty `PATH`). The SDK replaces the environment entirely
   when `env` is given, so it is spread from `process.env`.
-- The init message's `apiKeySource` must say the login is Claude's own (OAuth); anything else stops the run as
-  `noAccess` before a model answers. The spike records which value an OAuth login gives.
+- The init message's `apiKeySource` must say no API key is in use: `"none"` (what a subscription login gives, seen in
+  the spike) or `"oauth"`. Any other value (`ANTHROPIC_API_KEY`, `apiKeyHelper`, `/login managed key`, `user`,
+  `project`, `org`, `temporary`) stops the run as `noAccess` before a model answers.
 
 ### Claude: the call
 
@@ -394,6 +395,11 @@ Build changes (from the experiments):
 
 - `esbuild.config.mjs`: `external` also lists the `node:`-prefixed builtins; `define: { "import.meta.url":
   '"file:///task-calendar/main.js"' }` (the SDK calls `createRequire(import.meta.url)` at load; in cjs it is undefined).
+- An `events` wrapper for the bundle (an esbuild plugin resolving `events` / `node:events` to
+  `obsidian/infrastructure/assistant/eventsInWindow.js`): the SDK calls `events.setMaxListeners(n, new
+  AbortController().signal)`, and in Obsidian's window `AbortController` is Chromium's, which Node's `events` rejects
+  (`ERR_INVALID_ARG_TYPE`, before any call). The wrapper passes everything through and skips only a target Node
+  rejects with that code; `setMaxListeners` only raises a warning threshold. Found in the spike.
 - `main.js` grows from about 1 MB to about 2.5 MB. Accepted; if the phone's start suffers, the next step is a second
   file loaded from the plugin folder on the Mac only.
 
@@ -525,3 +531,7 @@ No Swift stage (R6).
   away.
 - **Lead:** descriptions not sent in v1; a subtask can be the answer.
 - **Lead:** no silent fallback to another model.
+- **Spike (2026-11-16):** the bundled SDK ran in the test Obsidian's window with the system `claude` and the options
+  above (`tools: []`, `settingSources: []`, `json_schema`): `haiku` answered `structured_output` in 2.2 s, two internal
+  turns; the stream was `system/init`, `assistant`, `user`, `rate_limit_event`, `result/success`. A subscription login
+  reports `apiKeySource: "none"`. Without the `events` wrapper the SDK throws at once in the window.
