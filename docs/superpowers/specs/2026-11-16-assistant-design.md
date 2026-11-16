@@ -615,6 +615,10 @@ No Swift stage (R6).
   flat → Pick districts: both are goals), and `after` holds the open tasks of the folded branch after the step in file
   order, their own subtasks included. A goal's or a step-after's id answered as a ref is `badAnswer`: refs hold the
   candidates only.
+- **Frontend-obsidian (steps):** the list card's renderer draws the answer: `renderTaskCard` takes the face to draw
+  (`face`, default `task.card`), so the popup passes `outcome.card` with `outcome.task`'s marks, one mechanism, no copy.
+  A face handed in is drawn as given: its `over` never gives way to a rename waiting to be written (that rename is the
+  task's, not the parent's), and its title line is the task's own (a waiting rename shown) unless it shows a step.
 - **Frontend-obsidian:** the transport logs nothing itself: every failure's detail goes back in the reply, and the
   frontend writes the outcome's `detail` to the console once (a transport that logged too gave the same line twice).
   `ModelTransport`'s doc comment («Logs its own detail») can say so the next time the core is touched.

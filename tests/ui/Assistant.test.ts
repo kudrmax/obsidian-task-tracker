@@ -146,6 +146,55 @@ describe("AssistantAnswers", () => {
 		expect(markdown.released).toBe(1);
 	});
 
+	describe("the chosen card as the screen draws it", () => {
+		const STEPS = [
+			"## Now",
+			"",
+			"- [ ] Move to Belgrade 📁",
+			"\t- [ ] Find a flat",
+			"\t\t- [ ] Pick districts",
+			"\t- [ ] Book the movers",
+			"- [ ] Call the bank",
+			"\t- [ ] Find the contract",
+			"- [ ] Pay rent",
+			"",
+			"## Soon",
+			"",
+			"## Done",
+			"",
+		].join("\n");
+		const shown = async (title: string) => {
+			const { assistant, transport } = rig({ text: STEPS });
+			const run = assistant.press("bestTask");
+			await settle();
+			transport.answer({ taskRef: transport.refOf(title), reason: "Because." });
+			new AssistantAnswers(assistant, plainMarkdown(), vi.fn()).show(await run);
+			const card = document.querySelector<HTMLElement>(".tc-panel.is-answer .tc-card")!;
+			return { over: card.querySelector(".tc-card-over-text")?.textContent ?? null, title: card.querySelector(".tc-card-title")?.textContent, card };
+		};
+
+		it("a folded task's next step: on the folded task's card, its title small above the step", async () => {
+			const { over, title, card } = await shown("Pick districts");
+			expect(over).toBe("Move to Belgrade");
+			expect(title).toBe("Pick districts");
+			expect(card.classList.contains("is-two-line")).toBe(true);
+		});
+
+		it("a subtask of an unfolded task: its parent's title small above its own", async () => {
+			const { over, title, card } = await shown("Find the contract");
+			expect(over).toBe("Call the bank");
+			expect(title).toBe("Find the contract");
+			expect(card.classList.contains("is-two-line")).toBe(true);
+		});
+
+		it("a top task: its own title alone, no line above", async () => {
+			const { over, title, card } = await shown("Pay rent");
+			expect(over).toBeNull();
+			expect(title).toBe("Pay rent");
+			expect(card.classList.contains("is-two-line")).toBe(false);
+		});
+	});
+
 	it("a press that joins a run under way shows its answer once", async () => {
 		const { assistant, transport } = rig();
 		const answers = new AssistantAnswers(assistant, plainMarkdown(), vi.fn());
