@@ -31,8 +31,6 @@ export interface ClaudeHost {
 	exists(path: string): boolean;
 	readonly home: string;
 	readonly env: Readonly<Record<string, string | undefined>>;
-	/** Each call's failure detail, besides the outcome's own: the console. */
-	log(detail: string): void;
 }
 
 const macHost = (): ClaudeHost => ({
@@ -40,7 +38,6 @@ const macHost = (): ClaudeHost => ({
 	exists: existsSync,
 	home: homedir(),
 	env: process.env,
-	log: (detail) => console.warn(`Task Calendar assistant: ${detail}`),
 });
 
 /** Claude through Max's subscription: the agent SDK runs the system's Claude Code, straight from the plugin (spec, «Claude»). */
@@ -51,10 +48,9 @@ export class ClaudeTransport implements ModelTransport {
 		private readonly host: ClaudeHost = macHost(),
 	) {}
 
+	/** Every failure's detail goes back in the reply: the outcome carries it to the console, once (AssistantAnswers). */
 	async ask(question: ModelQuestion, modelSettings: Readonly<Record<string, string>>, stop: StopSignal): Promise<ModelReply> {
-		const reply = await this.call(question, modelSettings, stop);
-		if (!reply.ok && reply.failure.kind !== "stopped") this.host.log(reply.failure.detail);
-		return reply;
+		return this.call(question, modelSettings, stop);
 	}
 
 	async hint(fieldKey: string, modelSettings: Readonly<Record<string, string>>): Promise<string | null> {

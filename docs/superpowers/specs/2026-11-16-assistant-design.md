@@ -563,3 +563,25 @@ No Swift stage (R6).
 - **Backend:** the door gets no assistant method now; `DOOR_COVERAGE` marks `AssistantService` host-owned until the
   iPhone app's assistant. `data.json` writes `assistant` after `resultMark` (`obsidian/settingsFile.ts`' key order, one
   line, with its byte-for-byte test).
+- **Frontend-obsidian:** the transport logs nothing itself: every failure's detail goes back in the reply, and the
+  frontend writes the outcome's `detail` to the console once (a transport that logged too gave the same line twice).
+  `ModelTransport`'s doc comment («Logs its own detail») can say so the next time the core is touched.
+- **Frontend-obsidian:** «connection was lost» is read from any assistant error, not only `server_error`: the CLI's
+  words «Connection lost…», «…went to sleep before a response…» and «Unable to connect to API…» (Claude Code 2.1.325)
+  are `offline` whatever code they come with.
+- **Frontend-obsidian:** the `path` hint is the `claude` a call would run (the path set if it exists, else the first
+  found), or «Not found». Other fields have no hint.
+- **Frontend-obsidian:** the transport's `cwd` is the plugin's folder as the file system has it (the vault's base path
+  joined with the plugin's folder).
+- **Frontend-obsidian:** the popup is the plugin's own overlay and panel (`Overlay`, `Panel`, class `is-answer`), centred
+  in the window, 360 wide at most; the reason is drawn as a description is (`tc-desc-text`), selectable; a failure's
+  words are markdown too, so `claude` reads as code; Close is the strong pill across the panel. The card in it is not
+  pressable. The popup lives with the plugin (`AssistantAnswers`, built in `main.ts`), so it comes with the view closed.
+- **Frontend-obsidian:** the spinning ring is one CSS ring in `--tc-muted`, 2 px, a turn in 900 ms: 20 px in place of
+  «⋯»'s dots, 18 px in place of a row's icon (the row keeps the icon's room).
+- **Frontend-obsidian:** an offer's `icon` is a drawing's name in `kit/icons.ts` (`sparkles` added); a name with no
+  drawing draws the row without an icon.
+- **Frontend-obsidian:** More → Assistant: the chosen model's name stands as a heading over its fields (else two rows
+  read «Model»); a `choice` field is a text field with its choices offered under it (a datalist); a model not served
+  here is listed in the dropdown, disabled; Timeout is written when the field is left, a prompt as it is typed, and
+  Reset to default lights up as soon as the prompt differs from the default.

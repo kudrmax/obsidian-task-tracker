@@ -22,6 +22,8 @@ export class AssistantSettingsPage {
 		const place = el(parent, "div", "tc-assistant-page");
 		const page = await this.service.page();
 		this.models(place, page);
+		const chosen = page.models.find((model) => model.id === page.chosen);
+		if (chosen && page.fields.length > 0) new Setting(place).setName(chosen.name).setHeading();
 		for (const field of page.fields) this.field(place, page.chosen, field);
 		this.timeout(place, page.timeoutSeconds);
 		this.prompts(place, page);

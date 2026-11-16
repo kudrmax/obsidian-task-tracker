@@ -136,7 +136,7 @@ describe("More → Assistant", () => {
 		transport.hints = { path: "/opt/homebrew/bin/claude" };
 		const root = document.body.appendChild(document.createElement("div"));
 		await new AssistantSettingsPage(assistant, vi.fn()).build(root);
-		expect(names(root)).toEqual(["Model", "Model", "Path to claude", "Timeout", "Prompts", "Best task"]);
+		expect(names(root)).toEqual(["Model", "Claude", "Model", "Path to claude", "Timeout", "Prompts", "Best task"]);
 		const select = root.querySelector("select")!;
 		expect([...select.options].map((o) => [o.value, o.textContent, o.disabled])).toEqual([["claude", "Claude", false]]);
 		const inputs = root.querySelectorAll<HTMLInputElement>("input");

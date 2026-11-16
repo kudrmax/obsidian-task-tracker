@@ -16,7 +16,6 @@ const success = as({ type: "result", subtype: "success", is_error: false, result
 /** The Mac as a test sets it up: the files that exist, the stream a call gets, the options it was given. */
 class FakeMac implements ClaudeHost {
 	readonly calls: { prompt: string; options: Options }[] = [];
-	readonly logged: string[] = [];
 	readonly home = HOME;
 	env: Record<string, string | undefined> = { PATH: "/usr/bin:/bin", HOME, ANTHROPIC_API_KEY: "sk-key", ANTHROPIC_AUTH_TOKEN: "token", CLAUDE_CONFIG_DIR: "/x" };
 	/** Read as the call reads them: after each message the next one waits for the test. */
@@ -36,9 +35,6 @@ class FakeMac implements ClaudeHost {
 		return this.files.includes(path);
 	}
 
-	log(detail: string): void {
-		this.logged.push(detail);
-	}
 }
 
 describe("ClaudeTransport", () => {
@@ -83,7 +79,6 @@ describe("ClaudeTransport", () => {
 		const reply = await new ClaudeTransport("/p", mac).ask(QUESTION, SETTINGS, new StopSwitch());
 		expect(reply).toMatchObject({ ok: false, failure: { kind: "notInstalled" } });
 		expect(mac.calls).toEqual([]);
-		expect(mac.logged).toHaveLength(1);
 	});
 
 	it("hints the path field with the claude found, or says none was", async () => {
@@ -107,7 +102,7 @@ describe("ClaudeTransport", () => {
 		expect(aborted).toBe(false);
 	});
 
-	it("a stop aborts the call: Max's replies stopped, logged nowhere; the timeout's says why by the last retry", async () => {
+	it("a stop aborts the call: Max's replies stopped; the timeout's says why by the last retry", async () => {
 		for (const [reason, expected] of [["user", "stopped"], ["timeout", "busy"]] as const) {
 			const mac = new FakeMac();
 			const stop = new StopSwitch();
@@ -120,7 +115,6 @@ describe("ClaudeTransport", () => {
 			};
 			const reply = await new ClaudeTransport("/p", mac).ask(QUESTION, SETTINGS, stop);
 			expect(reply).toMatchObject({ ok: false, failure: { kind: expected } });
-			expect(mac.logged).toHaveLength(reason === "user" ? 0 : 1);
 		}
 	});
 
