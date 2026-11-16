@@ -20,7 +20,8 @@ Five days of hand-written animation, several drag controllers, per-place code an
 | Rendering | **React** (replaces Preact) | The most standard choice; Obsidian's plugin docs show it; no `preact/compat` risk with the libraries below. |
 | State | **Zustand**, one store per screen | Components subscribe to a slice by selector, so a changed card re-renders only that card (the 16 ms budget), and the runtime can push into it from outside React. |
 | Animation | **Motion** (`motion/react`) | `layout` and `AnimatePresence` animate any position change and any enter/exit with no code of ours. |
-| Drag and drop | **dnd-kit** (`@dnd-kit/core`, `@dnd-kit/sortable`) | Sortable lists, moves between columns and sections, droppable time grid, touch/mouse/keyboard sensors, auto-scroll. |
+| Drag and drop | **dnd-kit**, the classic documented line (`@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/modifiers`) | Sortable lists, moves between columns and sections, droppable time grid, touch/mouse/keyboard sensors with a delay for long press, auto-scroll, snap modifiers. |
+| Gestures that are not drag and drop | **@use-gesture/react** with **Motion** springs | Ribbon and day swipes (drag and wheel), divider drag, timeline pinch zoom, resizing a task on the timeline: one hook per gesture, no pointer listeners of ours. |
 | Popovers, menus | **Floating UI** | Positioning, flipping and dismissal of anything that floats. |
 | Long lists | **TanStack Virtual** | Only if measurement shows the need. |
 | Layout | **CSS** flex/grid with the `--tc-…` tokens in `styles.css` | Plain class names under the `tc-` prefix; `tests/styles.test.ts` keeps guarding the tokens. |
@@ -51,8 +52,10 @@ hosts: the main screen leaf, the note block
 
 | Problem | Solved by |
 |---|---|
-| Card animations | Every card is a `motion` element with `layout` and a stable key (the task id), inside `AnimatePresence`. Drag, keyboard, new task, sync: same animation, because it is driven by the state change, not by its cause. |
-| Drag between lists | One `DndContext` per screen. Lists are `SortableContext`s, the time grid is a droppable. The app handles only `onDragEnd` and dispatches one move action. The same serves settings row reordering. |
+| Card animations | Every card is a `motion` element with `layout` and a stable key (the task id), inside `AnimatePresence`. Drag, keyboard, new task, sync: same animation, because it is driven by the state change, not by its cause. The card being dragged is shown in dnd-kit's `DragOverlay` and has layout animation off, so the two libraries never move the same element. |
+| Drag between lists | One `DndContext` per screen. Lists are `SortableContext`s, the time grid is a droppable with a snap modifier to the zoom's step. The app handles only `onDragEnd` and dispatches one move action. The same serves settings row reordering. The project tree nests by a sideways move, as dnd-kit's documented sortable tree does. |
+| Swipes, divider, day slide, resize | @use-gesture reports the gesture; the core decides where it lands (`rules.swipeLanding`: one swipe, one place); a Motion spring takes the ribbon or the divider there. The day changes through `AnimatePresence` with a direction. Resizing a task is `useDrag` on its handle, the new length from the core. |
+| Fading cards at the scroll edge | CSS `mask-image`, switched by a class the list sets from its scroll position. |
 | Same behaviour in the note and the main screen | Both mount the same `TaskScreen`; only props differ. |
 | Phone vs desktop | CSS media and container queries for layout; the platform as a prop; dnd-kit's touch and pointer sensors for input. The ribbon is CSS scroll-snap; where a swipe lands (one place, never two) stays the core's `rules.swipeLanding`. |
 | Menus and popups | One `Menu`/`Popover` component on Floating UI; its items come ready from the core. |
@@ -67,7 +70,8 @@ Replaced wholesale, then deleted (`trash`): `obsidian/ui/` motion, drag, layouts
 
 - Every behaviour described in `docs/plugin/` works on the phone and on the desktop, in light and dark, checked in the test Obsidian.
 - No long task over 16 ms on normal interactions (tap, drag, drop, typing, switching place) with ~300 tasks, measured with the Performance panel over CDP.
-- No hand-written animation or drag code. One lint rule over `obsidian/ui/` fails on `animate(`, `getBoundingClientRect` and pointer/touch/mouse event listeners; the only allowed exception is the `ObsidianEditor` component.
+- No hand-written animation, drag or gesture code. One lint rule over `obsidian/ui/` fails on `animate(`, `getBoundingClientRect` and `addEventListener`; React's own handlers (`onClick`, `onDoubleClick`, `onContextMenu`) are fine. The only exception is the `ObsidianEditor` component. Gestures come from dnd-kit and @use-gesture.
+- Works in Obsidian's pop-out windows (the libraries get that window's document) and on iOS (long-press drag without the system text menu or page scroll fighting it).
 - All tests green: core, architecture, styles, `uiDecides`, and `npm run test:apple`.
 
 ## Rough stages
