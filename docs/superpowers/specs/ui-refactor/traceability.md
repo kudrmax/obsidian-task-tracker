@@ -1,6 +1,6 @@
 # UI refactor: traceability
 
-This file maps every row of the two inventories to the mechanism of `../2026-11-15-ui-refactor.md` (**revision 13**: one screen; one engine per concern; every natural route to a second implementation checked, and every change to a guard made visible) that owns it, the principle behind it and the stage that rebuilds it.
+This file maps every row of the two inventories to the mechanism of `../2026-11-15-ui-refactor.md` (**revision 14**: one screen; one engine per concern; the UI decides nothing; a selector of behaviour has one reader; ownership named exactly; every weakening of a guard made visible) that owns it, the principle behind it and the stage that rebuilds it.
 
 Inputs:
 - `inventory-state-effects.md`: A.1 (45 facts), A.2 (565 locations), B.1–B.5 (819 effect call sites), B.6 (180 event sources);
@@ -10,11 +10,11 @@ Doubts were checked in code at `aa0c20f6`:
 - `core/application`: `PhoneCalls.ts` (the door), `composeCore.ts`, `TaskServiceImpl.ts`, `CalendarServiceImpl.ts`, `calendarDay.ts`, `UndoHistory.ts`, `TaskIdentity.ts`, `TaskRules.ts`, `UndoSteps.ts`, `QuickEntrySession.ts`, `CalendarPolling.ts`, `SettingsServiceImpl.ts`, `contracts.ts` (`TaskKey`, `ProjectsScreenState`, `CarryState`), `projectsScreen.ts`, `screenPlaces.ts`, `viewLayout.ts`, `stackedRows.ts`;
 - `obsidian/`: `main.ts`, `compose.ts`, `infrastructure/` (`VaultTaskFileStore`, `PluginSettings`, `LocalProjectsScreenStore`, `VaultProjects`, `GoogleAuth`), `ui/` (`CalendarScreen`, `DayData`, `DayPeek`, `Reload`, `Swipe`, `layouts/`, `SettingsTab`, `kit/Panel`).
 
-**Revisions 11, 12 and 13's rerun.** Every row was re-examined for one question: is its owner a concern of the one screen, or a place? Revision 10's owners were already mechanisms (a driver, the layer stack, a gesture, a selector, the runtime), with one exception: the lines owned by "the block host", "the settings-tab host" or `model.place = {kind: "block"…}` (31 lines of the tables below: 20 of the note, 11 of the settings tab).
+**Revisions 11 to 14's rerun.** Every row was re-examined for one question: is its owner a concern of the one screen, or a place? Revision 10's owners were already mechanisms (a driver, the layer stack, a gesture, a selector, the runtime), with one exception: the lines owned by "the block host", "the settings-tab host" or `model.place = {kind: "block"…}` (31 lines of the tables below: 20 of the note, 11 of the settings tab).
 - Rows of embedding a note (its registry, placement among Live Preview and Reading view, `--tc-block-lift`, presses kept from the editor) are owned by the note adapter and the mount engine, the only per-place code the spec allows (§Architecture); their stage is 5. Every other row of the note (its height, its keys, its focus, its modes) is owned by the same concern as on the main screen, with the note's `Place` gating it (`Layout`).
 - Rows of the settings tab (revision 12, after review R3): its page and controls are owned by the settings adapter on Obsidian's own `Setting` (`host/settings.ts`), its clipboard, Google sign-in and Scriptable loader by `hostServices`, its colour preview and body tokens by `chrome`; its row reorder by the one carry at `Places.rows(list)` (payload `settingsRow`, look `self`), its step aside by the motion cause `stepAside`, its slots by the core's hit test over the adopted rows; stage 6.
 - `islands` is the editors engine, `recognizers/` grows into the gesture machine (`update/gesture/machine.ts`, held by the input engine, revision 13), `motion` reads boxes through the measure engine, the hit test is the gesture concern's (revision 13; the drop rules stay the core's), and drivers are engines (the engine table). R3's six inconsistencies are fixed (the settings lump split; the reorder as the carry; `stepAside`; the block's fit frame gone; the handler and layout-component words).
-- Stage numbers are revision 11's (below). Rows tagged 3 were built for the block in slice 3 and are reshaped onto the one screen in stage 3 (revision 13 splits it into 3a, the core's part; 3b, the construction; 3c, the reshape; a row tagged 3 is rebuilt in 3c, its core part in 3a); nothing in a row's owner changes with that.
+- Stage numbers are revision 11's (below). Rows tagged 3 were built for the block in slice 3 and are reshaped onto the one screen in stage 3 (revision 14 splits it into 3a, the core's part, the core only; 3b, the construction on fixtures; 3c1, the lists and entry; 3c2, the carry, menus, selection, search and the full card; a row tagged 3 is rebuilt in 3c1 or 3c2 by its concern, its core part in 3a); nothing in a row's owner changes with that.
 - A new class, R24 (§Earlier classes), records the ownership fault and its resolution. No row is left over.
 
 **How revision 10's rerun was made.** Every row was re-examined against revision 10, not only the 213 rows left over from revision 9.
@@ -476,7 +476,7 @@ Row ids number the rows of each domain table of `inventory-state-effects.md` in 
 | A.2.537 | `ScreenParts.waiting` | gone: data applies at once; anything moving draws the layout it pinned when it began | P6 | 3, 4 |
 | A.2.539 | `FramePass` | `measure` / `scroll` frame scheduling | P7 | 3 |
 | A.2.540-541 | arbiter holder, idle listeners | `interaction.gesture`; pinned layout snapshot applied on its end (P6) | P6, P8 | 3 |
-| A.2.543-544 | `MonthPicker` month, day marks | overlay page `{month}`; JSX | P6 | 4 |
+| A.2.543-544 | `MonthPicker` month, day marks | overlay page `{month}`; the grid the core's `rules.monthGrid` (revision 14) | P6, P3 | 4 |
 | A.2.545 | click listener per render | `editors` (MarkdownRenderer, created once) | P7, P8 | 3 |
 | A.2.546 | kit `Button` classes | JSX | P1 | 3 |
 | A.2.547,551 | per-block / per-row `listening` | gone: no listener per row; the input engine delegates by the kit's `act` (decision 45) | P7 | 3 |
@@ -789,13 +789,13 @@ Row ids are the ids of `inventory-behaviour.md` (it has no C1.16; C1 holds 23 ro
 |---|---|---|---|---|
 | A1.1-2 | open the tab (ribbon icon, command) | the leaf adapter opens the view; `ScreenHost` mounts the one screen with `Places.main()` | P7 | 1, 3 |
 | A1.3 | note block appears | the note adapter mounts the one screen with `Places.note(path)` | P7 | 3, 5 |
-| A1.4 | several tabs, popouts | one runtime per plugin: one replica, one tasks queue, one pending log; `chrome` per window | P2, P3, P7, P8 | 1 |
+| A1.4 | several tabs, popouts | one runtime per plugin: one replica, one tasks queue, one pending log; `chrome` per window; a `WindowHost` per window with its frame clock (revision 14) | P2, P3, P7, P8 | 1 |
 | A2.1 | tap a card → task menu after reveal | tap the gesture machine → overlay `task` with `revealing` (`scroll` orders; `measure` reports scroll) | P6 | 3 |
 | A2.2 | counter tap folds subtasks | Cmd `toggleCollapsed`; fold motion by cause (keyed diff within one context) | P2, P5 | 3 |
 | A2.3 | folder mark tap → filter | Cmd `selectProjectNode` | P2 | 3 |
 | A2.4,8-9 | right click / click with selection → bulk or task menu | tap order function over `model.selection`; overlay | P6 | 4 |
 | A2.5 | double click → rename | overlay `task` → entry rename (second press within 250 ms) | P6 | 3 |
-| A2.6-7,10 | Cmd-click, Shift-click, tap in select mode | `model.selection`; select mode (layer stack; data applies at once) | P6 | 4 |
+| A2.6-7,10 | Cmd-click, Shift-click, tap in select mode | `model.selection`; select mode (layer stack; data applies at once); the Shift range the core's `rules.pickRange` (revision 14) | P6 | 4 |
 | A2.11-15 | long press / mouse drag lift, cancel, second finger, redraw during press | the gesture machine → carry gesture; hand-off to pinch | P6, P7 | 3 |
 | A2.16-17 | Done / immovable by-project cards | card `can` from the core; tap only | P1 | 3, 4 |
 | A2.18-21 | double click free room, plates | `input` → entry `openAtEnd` / `openIn` | P6 | 3, 4 |
@@ -968,8 +968,8 @@ Row ids are the ids of `inventory-behaviour.md` (it has no C1.16; C1 holds 23 ro
 | C2.5 | bar resting top through transforms | `chrome` + `measure` | P4 | 3 |
 | C2.7-8 | by-project / tree scroll reset / keep | `scroll` orders (`scroll` orders; `measure` reports scroll) | P7 | 4 |
 | C2.9 | peek over the shown columns, same scroll | view draws the neighbour's layout from its need's answer (the screen's `needs(model)`); scroll copy (`scroll` orders; `measure` reports scroll) | P2, P3, P4 | 4 |
-| C3.1-18 | drag hit tests and flight boxes | the list or row under the finger by the gesture concern's one hit test over `model.measured` and `scrolled`, the place in it by the core's drop rules; a flight's end box read by `motion` in the commit phase | P4, P7 | 3, 4 |
-| C3.19 | settings row rects | the gesture concern's hit test over the adopted rows' measured boxes, the slot by the core's rule (units from the measure engine), at `Places.rows(list)` | P4, P7 | 6 |
+| C3.1-18 | drag hit tests and flight boxes | the list or row under the finger by the gateway's `within` over `model.measured` and `scrolled` (revision 14), the place in it by the core's drop rules (`nearestSlot` among them); a flight's end box read by `motion` in the commit phase | P4, P7 | 3, 4 |
+| C3.19 | settings row rects | the gateway's `within` over the adopted rows' measured boxes, the slot by the core's rule (units from the measure engine), at `Places.rows(list)` | P4, P7 | 6 |
 | C3.20 | whole-title copy width | `measure` text width | P4 | 3 |
 | C4.1-2 | timeline resize, visible height | `measure` | P4 | 4 |
 | C4.3 | zoom anchor rect | computed from the pointer, `scrolled` and `model.zoom` | P4 | 4 |
@@ -1142,7 +1142,7 @@ None.
 | **Any category (a row counted once)** | **0** | **0** |
 | Rows that fit as mapped | | 2032 |
 
-Against revision 4: 23 classes and 688 rows did not fit. Against revision 5: 7 classes and 219 rows. Against revision 6: 4 classes and 155 rows. Against revision 7: 5 classes and 158 rows. Against revision 8: 4 classes and 133 rows. Against revision 9: 2 classes and 213 rows. Against revision 10: 1 class and 14 rows (R23 14); fact 17 of A.1, tagged with it, is not counted as a row. Against revision 11: 0 classes and 0 rows; 31 table lines changed owner from a place's host to a concern of the one screen or an adapter (R24). Against revisions 12 and 13: 0 classes and 0 rows.
+Against revision 4: 23 classes and 688 rows did not fit. Against revision 5: 7 classes and 219 rows. Against revision 6: 4 classes and 155 rows. Against revision 7: 5 classes and 158 rows. Against revision 8: 4 classes and 133 rows. Against revision 9: 2 classes and 213 rows. Against revision 10: 1 class and 14 rows (R23 14); fact 17 of A.1, tagged with it, is not counted as a row. Against revision 11: 0 classes and 0 rows; 31 table lines changed owner from a place's host to a concern of the one screen or an adapter (R24). Against revisions 12, 13 and 14: 0 classes and 0 rows.
 
 ## Summary
 
@@ -1153,3 +1153,5 @@ Revision 10 with `aa0c20f6` resolves R21 (the pure rules may be imported by `upd
 **Revision 12.** No row changes its behaviour. The settings tab's lines are split by owner (the settings adapter on Obsidian's `Setting`, `hostServices`, `chrome`, and the one carry at `Places.rows(list)` for the reorder), the settings rows' step aside is the motion cause `stepAside`, the block's fit frame is gone (decision 44), drivers are engines, the hit test is the core's, and the words that named per-row handlers or a layout component per mode now name the kit's `act` and `Layout.regions`. Every row still maps once: 0 left over, 2,032 fit.
 
 **Revision 13.** No row changes its behaviour or leaves its concern. What changes is how a row's owner is held unique and some owners' words: the recogniser is the gesture machine, whose state the input engine holds and whose slop, hold and edge speed are design tokens (17 table lines); the drag hit test is the gesture concern's, the place within a list stays the core's (C3.1-19); Live Preview's and the status bar's mutations are the mount engine's `MutationObserver` (C1.18-19); view needs are cached on the replica parts they read (R22); stage 3's rows are rebuilt in 3c with their core parts in 3a. The matrix registry is now derived from this file's rows (`tests/matrix/rows.json`, G5), so every row a concern must show in a place is a cell. Every row still maps once: 0 left over, 2,032 fit.
+
+**Revision 14.** No row changes its behaviour or leaves its concern. Owners' words change where the UI computed a decision, which is now the core's through the gateway: the month grid (A.2.543-544), the Shift range (A2.6-7,10), the slot nearest the finger and what is under it (C3.1-19, by the gateway's `within`); and popouts gain a `WindowHost` with its own frame clock (A1.4). The search's step, a section's span under a lift, the branch lines' passes and the entry field's row were slice 3's code, not rows of the old UI's inventory; they move to the core in 3a with no row of their own. Stage 3's rows are rebuilt in 3c1 or 3c2. The matrix registry still derives from this file's rows, now with a second check that every union member appears in a scenario. Every row still maps once: 0 left over, 2,032 fit.
