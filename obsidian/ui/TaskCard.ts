@@ -14,7 +14,11 @@ export interface TaskCardOptions {
 	readonly over?: string | null;
 	/** The corner shows the due date; the Projects screen's By project puts the stage's mark there instead. */
 	readonly corner?: boolean;
-	/** The card's face to draw in place of the task's own (`task.card`), with the task's marks: the assistant's answer (`AssistantOutcome.card`). */
+	/**
+	 * A face handed in, drawn as given in place of the task's own (`task.card`), with the task's marks: the assistant's
+	 * answer (`AssistantOutcome.card`). Its small line stays as given; a rename waiting to be written shows on its title
+	 * line only (the step's, else the task's own).
+	 */
 	readonly face?: TaskCard;
 }
 
@@ -52,7 +56,7 @@ export function fillCard(card: HTMLElement, task: TaskItem, opts: TaskCardOption
 	markColours(card, item);
 	card.classList.toggle("is-collapsed", item.collapsed);
 	showProgressDot(card, item);
-	fillFace(card, task, item, opts.over ?? null, opts.face ?? task.card);
+	fillFace(card, task, item, opts.over ?? null, opts.face ?? null);
 	renderProjectMark(card, item);
 	renderMeta(card, item);
 	const corner = opts.corner === false ? null : cardDue(item, opts.day);
@@ -76,8 +80,9 @@ export function renderDue(card: HTMLElement, date: LocalDate | null, repeats: bo
  * small line is the subproject, after the folder mark. A rename waiting to be written shows on whichever line it renames.
  * A face handed in (`TaskCardOptions.face`) is drawn as given, its title line the task's own unless it shows a step.
  */
-function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: string | null, face: TaskCard): void {
-	const own = face === task.card;
+function fillFace(card: HTMLElement, task: TaskItem, shown: TaskItem, project: string | null, handedIn: TaskCard | null): void {
+	const face = handedIn ?? task.card;
+	const own = handedIn === null;
 	const step = face.step;
 	const twoLines = face.over !== null || project !== null;
 	card.classList.toggle("is-two-line", twoLines);
