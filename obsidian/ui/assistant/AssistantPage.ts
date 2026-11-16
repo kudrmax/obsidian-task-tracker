@@ -41,7 +41,7 @@ export class AssistantSettingsPage {
 		}
 	}
 
-	/** A model's own setting: typed, the offered values listed under the field; its note, and what this Mac found, each a line of its own. */
+	/** A model's own setting: a choice is a dropdown, a text is typed; its note, and what this Mac found, each a line of its own. */
 	private field(parent: HTMLElement, modelId: string, field: AssistantField): void {
 		const row = new Setting(parent).setName(field.label);
 		clear(row.descEl);
@@ -49,16 +49,15 @@ export class AssistantSettingsPage {
 		const hint = el(row.descEl, "div", "tc-assistant-hint");
 		this.showHint(hint, field.hint);
 		this.hints.set(field.key, hint);
-		row.addText((t) => {
-			t.setValue(field.value);
-			if (field.choices.length > 0) {
-				const list = el(row.controlEl, "datalist");
-				list.id = `tc-assistant-${modelId}-${field.key}`;
-				for (const choice of field.choices) el(list, "option").value = choice;
-				t.inputEl.setAttribute("list", list.id);
-			}
-			t.onChange((value) => void this.service.set({ kind: "field", modelId, key: field.key, value }).then(() => this.refreshHints()));
-		});
+		const save = (value: string): void => void this.service.set({ kind: "field", modelId, key: field.key, value }).then(() => this.refreshHints());
+		if (field.kind === "choice") {
+			row.addDropdown((d) => {
+				for (const choice of new Set([...field.choices, field.value])) d.addOption(choice, choice);
+				d.setValue(field.value).onChange(save);
+			});
+			return;
+		}
+		row.addText((t) => t.setValue(field.value).onChange(save));
 	}
 
 	private showHint(hint: HTMLElement, text: string | null): void {

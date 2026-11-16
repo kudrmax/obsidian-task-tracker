@@ -593,7 +593,8 @@ No Swift stage (R6).
 - **Frontend-obsidian:** an offer's `icon` is a drawing's name in `kit/icons.ts` (`sparkles` added); a name with no
   drawing draws the row without an icon.
 - **Frontend-obsidian:** More → Assistant: the chosen model's name stands as a heading over its fields (else two rows
-  read «Model»); a `choice` field is a text field with its choices offered under it (a datalist); a model not served
+  read «Model»); a `choice` field is a dropdown of its choices (the lead, at the check: a datalist hid the choices behind a typed
+  value; a saved value outside the choices stays listed); a model not served
   here is listed in the dropdown, disabled; Timeout is written when the field is left, a prompt as it is typed, and
   Reset to default lights up as soon as the prompt differs from the default.
 - **Frontend-obsidian (review):** «⋯» follows the core while it is open: its assistant rows are drawn again on every

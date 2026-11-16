@@ -202,12 +202,13 @@ describe("More → Assistant", () => {
 		expect(names(root)).toEqual(["Model", "Claude", "Model", "Path to claude", "Timeout", "Prompts", "Best task"]);
 		const select = root.querySelector("select")!;
 		expect([...select.options].map((o) => [o.value, o.textContent, o.disabled])).toEqual([["claude", "Claude", false]]);
+		const model = root.querySelectorAll("select")[1];
+		expect(model.value).toBe("sonnet");
+		expect([...model.options].map((o) => o.value)).toEqual(["sonnet", "opus", "haiku"]);
 		const inputs = root.querySelectorAll<HTMLInputElement>("input");
-		expect(inputs[0].value).toBe("sonnet");
-		expect([...root.querySelectorAll("datalist option")].map((o) => (o as HTMLOptionElement).value)).toEqual(["sonnet", "opus", "haiku"]);
 		expect(root.querySelector(".tc-assistant-note")?.textContent).toBe("Empty: found by itself");
 		expect([...root.querySelectorAll<HTMLElement>(".tc-assistant-hint")].filter((h) => !h.hidden).map((h) => h.textContent)).toEqual(["/opt/homebrew/bin/claude"]);
-		expect(inputs[2].value).toBe("120");
+		expect(inputs[1].value).toBe("120");
 		expect(root.querySelector("textarea")!.value).toMatch(/^You help me choose what to do/);
 		expect(root.querySelector<HTMLButtonElement>(".tc-assistant-prompt-head button")!.disabled).toBe(true);
 	});
@@ -217,14 +218,15 @@ describe("More → Assistant", () => {
 		const redraw = vi.fn();
 		const root = document.body.appendChild(document.createElement("div"));
 		await new AssistantSettingsPage(assistant, redraw).build(root);
+		const model = root.querySelectorAll("select")[1];
+		model.value = "haiku";
+		model.dispatchEvent(new Event("change"));
 		const inputs = root.querySelectorAll<HTMLInputElement>("input");
-		inputs[0].value = "haiku";
-		inputs[0].dispatchEvent(new Event("input"));
 		const area = root.querySelector("textarea")!;
 		area.value = "Pick the cheapest.";
 		area.dispatchEvent(new Event("input"));
-		inputs[2].value = "60";
-		inputs[2].dispatchEvent(new Event("change"));
+		inputs[1].value = "60";
+		inputs[1].dispatchEvent(new Event("change"));
 		await settle();
 		expect(settings.get().assistant).toMatchObject({ timeoutSeconds: 60, prompts: { bestTask: "Pick the cheapest." }, models: { claude: { model: "haiku" } } });
 		const reset = root.querySelector<HTMLButtonElement>(".tc-assistant-prompt-head button")!;
@@ -263,7 +265,7 @@ describe("More → Assistant", () => {
 		const redraw = vi.fn();
 		const root = document.body.appendChild(document.createElement("div"));
 		await new AssistantSettingsPage(assistant, redraw).build(root);
-		const timeout = root.querySelectorAll<HTMLInputElement>("input")[2];
+		const timeout = [...root.querySelectorAll(".setting-item")].find((item) => item.querySelector(".setting-item-name")?.textContent === "Timeout")!.querySelector("input")!;
 		for (const typed of ["", "  ", "abc"]) {
 			timeout.value = typed;
 			timeout.dispatchEvent(new Event("change"));
