@@ -119,7 +119,7 @@ type FailureKind =
 type StopReason = "user" | "timeout";
 interface StopSignal { readonly stopped: StopReason | null; onStop(fn: (reason: StopReason) => void): () => void }
 
-/** How a host asks one model. Never throws: every failure is a reply. Logs its own detail. */
+/** How a host asks one model. Never throws: every failure is a reply, its detail in it (the frontend logs the outcome's). */
 interface ModelTransport {
   ask(question: ModelQuestion, modelSettings: Readonly<Record<string, string>>, stop: StopSignal): Promise<ModelReply>;
   /** A hint for a settings field, found on this host (Claude: the path of `claude` found, or «not found»). */
@@ -287,8 +287,10 @@ interface AssistantService {
   offers(place: AssistantPlace): readonly AssistantOffer[];
   /** Any run under way: «⋯» spins. */
   readonly busy: boolean;
-  /** A tap on a row: runs it, or stops it while it runs. Resolves with what to show. */
+  /** A tap on a row that isn't running: runs it; while its run is under way, waits for that run. Never stops. */
   press(actionId: string, target?: AssistantTarget): Promise<AssistantOutcome>;
+  /** A tap on a running row (Stop): stops its run; nothing under way, nothing happens. */
+  stop(actionId: string, target?: AssistantTarget): void;
   onChange(listener: () => void): () => void;
 
   /** The Assistant page, ready: the models, the chosen one, its fields with values and hints, the prompts, or why none. */
@@ -331,7 +333,9 @@ type AssistantSetting =
 ```
 
 `press` while idle = `prepare` → (an outcome: done) → load the chosen transport → `ask` → `finish`. `press` on a
-running run stops it (that press resolves `stopped`, as does the run's). A run is keyed by its action and target: one
+running run asks nothing again and resolves with that run's outcome; `stop` stops it (the run resolves `stopped`). The
+frontend calls `stop` for an offer with `running: true`, `press` otherwise, so a Stop left on screen after the answer
+came starts nothing. A run is keyed by its action and target: one
 at a time per key (the same button on another task is another run). A run outlives the view; the plugin's unload
 stops every run.
 
@@ -540,6 +544,13 @@ No Swift stage (R6).
   text it is handed, synchronously.
 - **Backend:** `offers(place, target?)`: a task's menu passes its task, so its row says Stop only while that task's run is
   under way; left out, the place alone (`{ place }`). `press(actionId, target?)` left out is `{ place: "more" }`.
+- **Backend (review):** `press` never stops; `stop(actionId, target?)` does, and is a no-op with nothing under way. A
+  press during a run waits for that run's outcome with no second call. Found by the review: «⋯» drawn once and left open
+  showed a stale Stop that, as a toggle, started a new paid call after the answer came.
+- **Backend (review):** on a host that doesn't serve the chosen model, `page().fields` is empty: the page shows the
+  `unavailable` words and the prompts only («Settings»).
+- **Backend (review):** the page's own words come from the core in `AssistantPage.words` (`model`, `timeout`,
+  `timeoutNote`, `prompts`, `promptsNote`, `reset`), so neither frontend writes them.
 - **Backend:** `stopAll()` on the contract: the plugin's unload stops every run, each press resolving `stopped`.
 - **Backend:** `press` never rejects but for an action id no button has (a bug). A transport that fails to load is
   `unknown`, its error in `detail`.

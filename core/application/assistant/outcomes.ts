@@ -1,4 +1,4 @@
-import type { AssistantOutcome } from "../contracts";
+import type { AssistantOutcome, AssistantPageWords } from "../contracts";
 import type { AssistantAction } from "./actions/action";
 import type { FailureKind } from "./model";
 import type { ModelProfile } from "./models/profile";
@@ -10,6 +10,16 @@ const GONE_WORDS = "That task was closed while {model} was thinking.";
 
 /** The settings name a model no profile has. */
 export const NO_MODEL_WORDS = "No model is set for the assistant. Choose one in Settings → Assistant.";
+
+/** The Assistant page's own words: every frontend draws these, none writes them. */
+export const PAGE_WORDS: AssistantPageWords = {
+	model: "Model",
+	timeout: "Timeout",
+	timeoutNote: "Seconds to wait for an answer.",
+	prompts: "Prompts",
+	promptsNote: "What each button asks. The shape of the answer is the plugin's own.",
+	reset: "Reset to default",
+};
 
 /** A timeout in words: whole minutes as minutes, else seconds. */
 export function durationWords(seconds: number): string {

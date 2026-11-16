@@ -16,7 +16,7 @@ import { ModelChoice } from "./ModelChoice";
 import { type HostModels, type ModelReply, NO_MODELS, StopSwitch } from "./model";
 import { MODEL_PROFILES } from "./models";
 import type { ModelProfile, SettingField } from "./models/profile";
-import { failed, failureWords, goneWords, NO_MODEL_WORDS, STOPPED } from "./outcomes";
+import { failed, failureWords, goneWords, NO_MODEL_WORDS, PAGE_WORDS, STOPPED } from "./outcomes";
 import { type AssistantPlace, type AssistantTarget, tasksIn } from "./scope";
 import { type AssistantTasks, TaskLookup } from "./tasks";
 
@@ -37,6 +37,7 @@ export interface AssistantDeps {
 
 interface Run {
 	readonly stop: StopSwitch;
+	readonly outcome: Promise<AssistantOutcome>;
 }
 
 /** The assistant over the task service, the settings and the host's models. */
@@ -75,12 +76,11 @@ export class AssistantServiceImpl implements AssistantService {
 	press(actionId: string, target: AssistantTarget = MORE): Promise<AssistantOutcome> {
 		const action = this.actionOf(actionId);
 		const key = runKey(action.id, target);
-		const running = this.runs.get(key);
-		if (running) {
-			running.stop.stop("user");
-			return Promise.resolve(STOPPED);
-		}
-		return this.start(action, target, key);
+		return this.runs.get(key)?.outcome ?? this.start(action, target, key);
+	}
+
+	stop(actionId: string, target: AssistantTarget = MORE): void {
+		this.runs.get(runKey(this.actionOf(actionId).id, target))?.stop.stop("user");
 	}
 
 	stopAll(): void {
@@ -108,8 +108,9 @@ export class AssistantServiceImpl implements AssistantService {
 			models: [...available, ...unserved],
 			chosen: settings.model,
 			unavailable: chosen ? null : (named?.unavailable ?? NO_MODEL_WORDS),
-			fields: named ? await this.fieldsOf(named, chosen !== null) : [],
+			fields: chosen ? await this.fieldsOf(chosen) : [],
 			timeoutSeconds: settings.timeoutSeconds,
+			words: PAGE_WORDS,
 			prompts: this.actions.map((action) => {
 				const saved = settings.prompts[action.id];
 				const isDefault = saved === undefined || saved.trim() === "";
@@ -180,7 +181,7 @@ export class AssistantServiceImpl implements AssistantService {
 		stop.onStop((reason) => {
 			if (reason === "user") end(STOPPED);
 		});
-		this.runs.set(key, { stop });
+		this.runs.set(key, { stop, outcome });
 		this.emit();
 		this.work(action, target, stop).then(end, (error: unknown) => end(failed(action, this.unknownWords(), `the run failed: ${String(error)}`)));
 		return outcome;
@@ -210,9 +211,9 @@ export class AssistantServiceImpl implements AssistantService {
 		return profile ? failureWords(profile, "unknown", this.assistant().timeoutSeconds) : NO_MODEL_WORDS;
 	}
 
-	private async fieldsOf(profile: ModelProfile, served: boolean): Promise<readonly AssistantField[]> {
+	private async fieldsOf(profile: ModelProfile): Promise<readonly AssistantField[]> {
 		const settings = this.choice.settingsOf(profile);
-		const loader = served ? this.choice.loader(profile.id) : undefined;
+		const loader = this.choice.loader(profile.id);
 		const transport = loader ? await loader().catch(() => null) : null;
 		const hintOf = async (field: SettingField): Promise<string | null> => (transport?.hint ? transport.hint(field.key, settings).catch(() => null) : null);
 		return Promise.all(
