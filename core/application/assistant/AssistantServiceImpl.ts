@@ -74,7 +74,8 @@ export class AssistantServiceImpl implements AssistantService {
 	}
 
 	press(actionId: string, target: AssistantTarget = MORE): Promise<AssistantOutcome> {
-		const action = this.actionOf(actionId);
+		const action = this.actions.find((each) => each.id === actionId);
+		if (!action) return Promise.reject(new Error(`No assistant action "${actionId}".`));
 		const key = runKey(action.id, target);
 		return this.runs.get(key)?.outcome ?? this.start(action, target, key);
 	}

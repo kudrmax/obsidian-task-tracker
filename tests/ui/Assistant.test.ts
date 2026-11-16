@@ -146,6 +146,18 @@ describe("AssistantAnswers", () => {
 		expect(markdown.released).toBe(1);
 	});
 
+	it("a press that joins a run under way shows its answer once", async () => {
+		const { assistant, transport } = rig();
+		const answers = new AssistantAnswers(assistant, plainMarkdown(), vi.fn());
+		answers.press("bestTask");
+		await settle();
+		answers.press("bestTask");
+		transport.answer({ taskRef: transport.refOf("Pay rent"), reason: "Rent." });
+		await settle();
+		expect(transport.asked).toHaveLength(1);
+		expect(document.querySelectorAll(".tc-panel.is-answer")).toHaveLength(1);
+	});
+
 	it("Escape closes it", async () => {
 		new AssistantAnswers(rig().assistant, plainMarkdown(), vi.fn()).show(await TASK_OUTCOME());
 		document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));

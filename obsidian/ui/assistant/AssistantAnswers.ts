@@ -20,6 +20,9 @@ export type MarkdownHost = (el: HTMLElement, markdown: string) => { readonly don
  * answer or a failure opens the popup; a failure's detail goes to the console (the core has none); Stop shows nothing.
  */
 export class AssistantAnswers implements AssistantRows {
+	/** A press that joins a run under way gets that run's outcome: it shows once. */
+	private readonly awaited = new Set<Promise<AssistantOutcome>>();
+
 	constructor(
 		private readonly service: AssistantService,
 		private readonly markdown: MarkdownHost,
@@ -39,7 +42,13 @@ export class AssistantAnswers implements AssistantRows {
 	}
 
 	press(actionId: string): void {
-		void this.service.press(actionId).then((outcome) => this.show(outcome));
+		const run = this.service.press(actionId);
+		if (this.awaited.has(run)) return;
+		this.awaited.add(run);
+		void run.then((outcome) => {
+			this.awaited.delete(run);
+			this.show(outcome);
+		});
 	}
 
 	stop(actionId: string): void {

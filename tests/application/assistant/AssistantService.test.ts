@@ -116,6 +116,15 @@ describe("pressing Best task", () => {
 		expect(blank.transport.asked[0].question.instructions).toMatch(/^You help me choose/);
 	});
 
+	it("rejects, never throws, for an action no button has", async () => {
+		const { assistant } = rig();
+		let outcome: Promise<unknown> | undefined;
+		expect(() => {
+			outcome = assistant.press("noSuchAction");
+		}).not.toThrow();
+		await expect(outcome).rejects.toThrow(/noSuchAction/);
+	});
+
 	it("never rejects when the transport fails to load", async () => {
 		const { assistant } = rig({ models: () => ({ ids: ["claude"], transport: () => () => Promise.reject(new Error("no sdk")) }) });
 		const result = await assistant.press(BEST);
