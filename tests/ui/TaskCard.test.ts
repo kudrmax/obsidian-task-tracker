@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../core/application/contracts";
+import { RenamedTexts } from "../../obsidian/ui/RenamedTexts";
 import { markColours, renderTaskCard } from "../../obsidian/ui/TaskCard";
 import { TaskList } from "../../obsidian/ui/TaskList";
 import { onDay } from "../fakes/itemOnDay";
@@ -30,6 +31,22 @@ describe("renderTaskCard", () => {
 		expect(card.classList.contains("is-two-line")).toBe(true);
 		expect(card.querySelector(".tc-card-over")?.textContent).toBe("Купить билеты в Белград");
 		expect(card.querySelector(".tc-card-lines > .tc-card-title")?.textContent).toBe("");
+	});
+
+	it("a face handed in is drawn as given, whether or not it is the task's own card object; a waiting rename shows on its title line only", () => {
+		const sub = item({ id: "sub", text: "Find the contract", title: "Find the contract" });
+		const face = { text: sub.text, title: sub.title, over: "Call the bank", step: null };
+		const drawn = (card: HTMLElement) => [card.querySelector(".tc-card-over-text")?.textContent, card.querySelector(".tc-card-title")?.textContent];
+		expect(drawn(renderTaskCard(null, sub, { day: null, face }))).toEqual(["Call the bank", "Find the contract"]);
+		const own = { ...sub, card: face };
+		expect(drawn(renderTaskCard(null, own, { day: null, face: own.card }))).toEqual(drawn(renderTaskCard(null, own, { day: null, face: { ...face } })));
+		const stop = RenamedTexts.add(() => [{ id: "sub", text: "Find the lease", title: "Find the lease" }]);
+		try {
+			expect(drawn(renderTaskCard(null, sub, { day: null, face }))).toEqual(["Call the bank", "Find the lease"]);
+			expect(drawn(renderTaskCard(null, own, { day: null, face: own.card }))).toEqual(["Call the bank", "Find the lease"]);
+		} finally {
+			stop();
+		}
 	});
 
 	it("puts the subtask counter and the description mark in one column, the mark under the counter", () => {

@@ -71,10 +71,10 @@ export class FakeTransport implements ModelTransport {
 		return this.hints[key] ?? null;
 	}
 
-	/** The last question's refs by title, read from its input. */
+	/** The last question's candidates' refs by title, read from its input. */
 	refOf(title: string, at = this.asked.length - 1): string {
-		const tasks = JSON.parse(this.asked[at].question.input).tasks as { ref: string; title: string }[];
-		return tasks.find((t) => t.title === title)!.ref;
+		const candidates = JSON.parse(this.asked[at].question.input).candidates as { ref: string; title: string }[];
+		return candidates.find((t) => t.title === title)!.ref;
 	}
 
 	reply(reply: ModelReply, at = 0): void {

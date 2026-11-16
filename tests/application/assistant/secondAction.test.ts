@@ -13,6 +13,7 @@ const firstStep: AssistantAction = {
 	title: "First step",
 	failureTitle: "Couldn't suggest a first step",
 	scope: { kind: "target" },
+	briefing: "tasks",
 	defaultPrompt: "Suggest the first small step of this task.",
 	answerSchema: { type: "object", properties: { taskRef: { type: "string" }, step: { type: "string" } }, required: ["taskRef", "step"] },
 	emptyWords: "This task is closed.",
@@ -47,7 +48,9 @@ describe("a second button, added in this file alone", () => {
 		expect(question.answerSchema).toBe(firstStep.answerSchema);
 		expect(JSON.parse(question.input).tasks.map((t: { title: string }) => t.title)).toEqual(["Call the bank", "Find the contract"]);
 		transport.answer({ taskRef: "t1", step: "Find the number." });
-		expect(await outcome).toMatchObject({ kind: "task", title: "First step", note: "Find the number." });
+		const result = await outcome;
+		expect(result).toMatchObject({ kind: "task", title: "First step", note: "Find the number." });
+		expect(result.kind === "task" && [result.task.id, result.card.over]).toEqual([bank.id, null]);
 	});
 
 	it("has its prompt on the page", async () => {

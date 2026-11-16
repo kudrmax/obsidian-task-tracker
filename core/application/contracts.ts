@@ -2105,7 +2105,12 @@ export interface AssistantOffer {
 
 /** What a run comes to, ready to draw: the popup's title and words included. */
 export type AssistantOutcome =
-	| { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly note: string }
+	/**
+	 * The chosen task drawn as the screen draws it: `card` on the card of `task`, whose marks it keeps. A folded task's next
+	 * step: `task` is that folded task, `card` its two-line card (`over` its title, the step below). Any other subtask: `task`
+	 * is the subtask, `card` its own with its task's title in `over`. A task: alone, `over` null.
+	 */
+	| { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly card: TaskCard; readonly note: string }
 	/** `detail` is for the console: the frontend writes it there. */
 	| { readonly kind: "failed"; readonly title: string; readonly words: string; readonly detail: string }
 	/** Stopped by Max: nothing is shown. */

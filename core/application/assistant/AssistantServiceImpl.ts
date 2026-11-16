@@ -18,7 +18,7 @@ import { MODEL_PROFILES } from "./models";
 import type { ModelProfile, SettingField } from "./models/profile";
 import { failed, failureWords, goneWords, NO_MODEL_WORDS, PAGE_WORDS, STOPPED } from "./outcomes";
 import { type AssistantPlace, type AssistantTarget, tasksIn } from "./scope";
-import { type AssistantTasks, TaskLookup } from "./tasks";
+import { type AssistantTasks, drawnAnswer, TaskLookup } from "./tasks";
 
 /** How long a transport stopped by the timeout may take to say why before the run ends as a timeout anyway. */
 export const TIMEOUT_GRACE_MS = 5000;
@@ -130,7 +130,7 @@ export class AssistantServiceImpl implements AssistantService {
 		const profile = this.choice.chosen();
 		if (profile === null) return failed(action, this.choice.named()?.unavailable ?? NO_MODEL_WORDS, `model "${this.assistant().model}" is not served here`);
 		const listed = await this.tasks.listed();
-		const briefing = briefingOf(listed.today, tasksIn(action.scope, target, listed));
+		const briefing = briefingOf(action.briefing, listed.today, tasksIn(action.scope, target, listed));
 		if (isEmptyBriefing(briefing)) return failed(action, action.emptyWords, "no open tasks to send");
 		return {
 			kind: "question",
@@ -152,7 +152,7 @@ export class AssistantServiceImpl implements AssistantService {
 		}
 		const tasks = new TaskLookup(await this.tasks.listed());
 		const result = action.read(reply.answer, { input: prepared.question.input, refs: prepared.refs }, tasks);
-		if (result.kind === "task") return { kind: "task", title: action.title, task: tasks.find(result.taskId)!, note: result.note };
+		if (result.kind === "task") return { kind: "task", title: action.title, ...drawnAnswer(tasks.find(result.taskId)!, tasks), note: result.note };
 		const answer = `answer: ${JSON.stringify(reply.answer)}`;
 		if (result.why === "gone") return failed(action, goneWords(profile), `the task named is closed or gone; ${answer}`);
 		return failed(action, failureWords(profile, "badAnswer", this.assistant().timeoutSeconds), `the answer names no task sent; ${answer}`);

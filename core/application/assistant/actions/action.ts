@@ -1,4 +1,4 @@
-import type { Briefing } from "../briefing";
+import type { Briefing, BriefingKind } from "../briefing";
 import type { JsonSchema } from "../model";
 import type { AssistantPlace, TaskScope } from "../scope";
 import type { TaskLookup } from "../tasks";
@@ -20,6 +20,8 @@ export interface AssistantAction {
 	readonly title: string;
 	readonly failureTitle: string;
 	readonly scope: TaskScope;
+	/** How its tasks are shown to the model: what Max can start now, or the tasks as they are. */
+	readonly briefing: BriefingKind;
 	readonly defaultPrompt: string;
 	readonly answerSchema: JsonSchema;
 	/** No tasks to send: the words shown instead of a call. */
