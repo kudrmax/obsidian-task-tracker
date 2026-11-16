@@ -1,6 +1,6 @@
 # Plugin UI refactor: one screen, one mechanism per concern, on the core's door
 
-Issue: kudrmax/obsidian-task-tracker#41 (takes in #40). Branch `ui-refactor`. Revision 11.
+Issue: kudrmax/obsidian-task-tracker#41 (takes in #40). Branch `ui-refactor`. Revision 12.
 
 ## How this spec is made
 
@@ -23,7 +23,8 @@ Revisions 1–3 were written top-down, and every review found new holes: the spe
 | 8 | 133 (4 classes) | 2 (the pending log's references and rollback; the dispatch loop) |
 | 9 | 213 (2 classes: "the core" vs the pure rules; what views a screen needs) | 0: "ready to build from"; five wording fixes, made in revision 10 |
 | 10 | 14 (1 class, R23, closed in P3) | 0 by the architect; **1 found by building**: the work was owned by place (§Why revision 11) |
-| 11 | 0: every row's owner is now a concern of the one screen, never a place | — |
+| 11 | 0: every row's owner a concern of the one screen | **The guarantee did not hold:** three reviews (`rev11-research/R1–R3`) found it enumerated what is forbidden, and every list leaked |
+| 12 | 0 | — : the guarantee is the compiler's (§The one mechanism) |
 
 The faults of revisions 5 and 6 had one cause. The spec treated the core as an asynchronous service the UI waits on, and built machinery around the waiting: read-back, previews, transactions, read-ahead, echoes. The core already has a **synchronous, pure door**, `callDoor(method, args, context) → answer` (`core/application/PhoneCalls.ts`). The iPhone app runs on it, and it covers every `TaskService`, `DayService`, undo, settings and calendar method (a typed coverage map, `PhoneCalls.ts:1077`). On Max's real tasks file (31 KB) a whole funnel view costs about 3 ms through it, JSON included (measured locally). Revision 7 puts the plugin on the same door, and the waiting is gone.
 
@@ -35,12 +36,14 @@ Max stopped the work after slice 3. Slice 3 built the new UI around the note's b
 
 **The common cause** (report B, §4): each spec stated "one mechanism" as a principle and then sliced, owned and checked the work **by place**. Each slice was asked to finish a whole place, so it built a whole mechanism for that place. No artifact named the single code owner of each concern for every place to use, and every check that existed tested behaviour or layering, which two correct copies both pass.
 
-So revision 11 moves the guarantee from the principles into the code's shape and into machine checks:
+So the guarantee moves from the principles into the code's construction:
 
-- **The screen is one:** one root, one model type, one message union, one update, one host. A place is data (G1, G2).
-- **Each concern has one owner,** named in a frozen table that the guards read; every other file is denied the APIs that concern needs (G3, G4).
-- **Use is mandatory:** every concern is exercised in every place and form, in unit tests and in the test Obsidian (G5), and a runtime trap catches what static analysis cannot see (G6).
-- **The checks are tested** (G7), **old and new never coexist on master** (G8), and **each stage gets a structural review** whose findings become checks (G9).
+- **The screen is one:** one root, one model type, one message union, one router, one host; the UI code cannot name the host at all (C1).
+- **Each concern that touches the platform has one engine,** in a frozen table; only that engine is compiled with the host types it needs (C2).
+- **Rules live in the core, numbers are units** the UI cannot compute with (C3), and **the place is opaque** outside the one function that derives its layout (C4).
+- **Use is mandatory:** every concern in every place, form and payload, in unit tests and in the test Obsidian (G5); a runtime trap and its effect ledger catch what the compiler cannot type, and the guards sit outside the code's reach (C5); **old and new never coexist on master** (G8); **each stage gets a structural review** whose findings become checks (G9).
+
+**Revision 12.** Three independent reviews of revision 11 (`rev11-research/R1-redteam-rev11.md`, `R2-architect-rev11.md`, `R3-behaviour-rev11.md`) showed that the guarantee did not hold: a red team found twenty changes that pass every check, because revision 11 listed what is forbidden (APIs per owner, place names, CSS properties, private folders, the shape of a condition), and a list always leaks. Revision 12 keeps the decided product and turns the guarantee around: the UI code **cannot express** an effect, a rule of the core or a read of the place, so nothing has to be forbidden one by one (§The one mechanism, C1–C5). It adds P9 (render cost scales with what changed), keeps the settings tab on Obsidian's own chrome with only its row reorder on the one carry, and withdraws three product changes revision 11 had made without saying so.
 
 The behaviour of revision 10 (P1–P8: the model, the loop, the runtime over the door, the replica, the pending log and its replay, the persistence queue, geometry as input, motion by cause, layers and pins, lifecycle) stands. What changes is who builds it and how its uniqueness is proven.
 
@@ -68,7 +71,7 @@ The rules themselves stay where they are, in the core: where a task lands, what 
 
 **P1. One model.**
 - What the screen shows is a pure function of the model: `view(model)`.
-- **One model type for every place:** `Model`, with the place it is shown in as data (`model.place`, G1). Each mounted screen is one store of that type; no place has a model, a message union or an update of its own.
+- **One model type for every place:** `Model`, with the place it is shown in as data (`model.place`, an opaque token, C4). Each mounted screen is one store of that type; no place has a model, a message union or an update of its own.
 - A fact has one field; a derived fact is a selector.
 - The DOM, classes and styles are outputs, never read back as truth.
 - **Identity is model state:** a row's key is given when the user's message makes it. The core's `CreatedTask` id (known at once, P3) is bound to that key, so one row lives from field to card.
@@ -81,11 +84,11 @@ The rules themselves stay where they are, in the core: where a task lands, what 
 - **The dispatch loop.** One loop, the same for every message:
   1. `update` returns the next model and its commands.
   2. The runtime runs the door commands at once, synchronously, and feeds each answer back as the next message, until the chain is drained.
-  3. **What the screen needs.** The screen has one pure selector, `needs(model)`. It lists the view answers the screen needs: its root view (the funnel, a note's view or the settings, which `layoutOf` gives as data, G1), the neighbour day or place under a swipe, the task of an open full card or menu, the search's results. The runtime computes one answer per need from the replica, memoised by (replica, minute, need), and hands them to the model as data (`viewsChanged`).
+  3. **What the screen needs.** The screen has one pure selector, `needs(model)`. It lists the view answers the screen needs: its root view (the funnel, a note's view or the settings, which `layoutOf` gives as data, C4), the neighbour day or place under a swipe, the task of an open full card or menu, the search's results. The runtime computes one answer per need from the replica, memoised by (replica, minute, need), and hands them to the model as data (`viewsChanged`).
      - Any change of the replica recomputes every mounted need in the same loop, so an open card follows Sync at once.
      - Selectors never call the door. Here "the core" means `callDoor`, the replica and the view answers.
-     - The core's **pure rules** (`rules.*`: `snap`, `swipeLanding`, `layoutWidths`, `stackedLists`, `layoutShareAt`…) are plain functions. They are imported by the owner the owner table assigns each to (G4), since they are needed per frame and per pointer move.
-  4. `ScreenHost` draws, in one order for every place: render, measure, motion, scroll, focus last (G2).
+     - The core's **pure rules** (`rules.*`: `snap`, `swipeLanding`, `layoutWidths`, `stackedLists`, `layoutShareAt`…) are plain functions. They are reached through one gateway, `screen/rules.ts` (C3), since they are needed per frame and per pointer move.
+  4. `ScreenHost` draws, in one order for every place: render, measure, motion, scroll, focus last (§Architecture).
 
   The chain has a bound on its depth; hitting it is a failure with the action log dumped.
 
@@ -174,11 +177,11 @@ The rules themselves stay where they are, in the core: where a task lands, what 
 - **Across contexts:** no row moves on its own. Another project, mode or filter draws in place. A day or place change is one whole-region transition between two complete views (the day slide, the ribbon), as `screen.md` says.
 - **Interactions declare their motions as numbered transitions:** the carried card, folds under a lift, room at a list's end, the drop and cancel flights, the panel slide, the divider snap, the keyboard ride. Each runs once.
 - **Everything else** (a re-render, a measurement, a resize) applies in place.
-- **Drivers report** `motionSettled(id)` or `motionInterrupted(id, at)`.
-- **Continuous gestures** go through a transient channel. The input driver passes the live value to `motion`, which lays out with the same pure selectors plus that value. Crossing a step that changes what is drawn dispatches.
+- **The motion engine reports** `motionSettled(id)` or `motionInterrupted(id, at)`.
+- **Continuous gestures** go through a transient channel. The input engine passes the live value, as units, to the motion engine, which applies it to the layout the same selectors computed (the core's rules through the gateway). Crossing a step that changes what is drawn dispatches.
 
 **P6. Interactions are layers; what moves pins what is under it; data never freezes.**
-- **The stack:** a stack of modal layers (screen → select mode → full card → field → menu or sheet) plus at most one pointer gesture. It is a statechart, one for every place (`update/layers.ts` and `update/gesture.ts`); the carry is one statechart whatever is carried and wherever it lands (`update/carry.ts`).
+- **The stack:** a stack of modal layers (screen → select mode → full card → field → menu or sheet) plus at most one pointer gesture. It is a statechart, one for every place (the layers and gesture concerns); the carry is one statechart whatever is carried and wherever it lands (the carry concern).
   - Hand-offs are transitions: hold → drag; long press → pinch; one sheet to the next.
   - Escape and tap order are reads of the stack. The arbitration rules A16 are its table.
   - A tap during a swipe's settle does not stop it; the tap goes where it lands (`screen.md`).
@@ -199,8 +202,8 @@ The rules themselves stay where they are, in the core: where a task lands, what 
 
 **P7. Imperative code only at the edges.**
 - `update`, selectors and `view` are pure.
-- **Effect owners** (`drivers/`, one file per concern, §The owner table) own the DOM work that is not declarative; nothing else in `obsidian/` reaches it (G3).
-- **Motion has one engine:** no CSS transition, animation or `@keyframes` outside the motion owner's classes (G4).
+- **Engines** (`engines/`, one file per concern, §The engine table) own the DOM work that is not declarative; nothing else in the bundle can name it (C1, C2).
+- **Motion has one engine:** no time- or scroll-driven CSS outside the motion engine's classes (C2, decision 34).
 - **The runtime** owns the replica, the door calls, persistence, the network and Obsidian's events.
 - **The core's sessions** (`entry.*`, `sectionName`, `repeatPage`, `description`, the carry) are door methods over the replica, never re-implemented.
 - **Host CSS is scoped:**
@@ -209,168 +212,131 @@ The rules themselves stay where they are, in the core: where a task lands, what 
   - body classes are written only by `chrome`.
 
 **P8. Everything alive has an owner.**
-- `ScreenHost` mounts, owns and disposes every driver, observer, subscription, scope and timer of a screen, the same for every place. An adapter (the leaf, a note, the settings tab) owns only its registration with Obsidian (G2).
+- `ScreenHost` mounts, owns and disposes every engine, observer, subscription, scope and timer of a screen, the same for every place. An adapter (the leaf, a note, the settings tab) owns only its registration with Obsidian (§Architecture).
 - Host readiness (layout ready, Sync loaded, metadata cache resolved) and teardown arrive as messages.
 - **Teardown ends what is under way:** a carry gets `endCarry`, so no stale carry stays in device storage.
 - **Unload:** Obsidian does not await `onunload` (a BRAT update unloads the plugin). The persistence queue, with its ability to replay, outlives the plugin object until it is empty, and nothing disposes it before that.
 - **After the switch** the old `CalendarService` polling is not started; the network lane is the only fetcher.
 - **A test** mounts and unmounts each adapter in each form, including mid-gesture, and finds nothing left alive.
 
+**P9. Render cost scales with what changed.** A write of one line must not redraw every card (review R2.1: today `ViewAnswers` caches on the whole replica's identity, every need is recomputed, fresh `TaskItem` objects break every card's memo, and motion reads every row's box).
+- **Structural sharing from the core.** The door and the replica give the same object for what did not change: a task line unchanged (by id and line) keeps its `TaskItem`; the ids, the history and the projects screen keep their identity when a call did not change them (`Replica.update` compares those parts by value, not by identity). `backend` makes the door's answers share, in stage 3.
+- **Each need is cached on the parts it reads.** A need declares the replica parts it reads (the tasks text, the projects screen, settings, the calendars, the minute); it is recomputed only when one of them changed. A carry step that writes only the projects screen recomputes no list.
+- **Every derived structure is memoised on its inputs:** `layoutOf`, the lists, a card's face. The render engine writes a custom property only when its value differs.
+- **Motion measures only what its cause names.** A motion cause carries the keys it may move; the measure engine reads only those boxes.
+- **Budget tests** (`tests/budget/`): one write on a 300-task file at 4× CPU re-renders at most the cards whose line changed or whose place moved (counted by the render counter), and a carry step re-renders none but the float and the target's indicator; P3's per-call budgets stand.
+
 ## The one mechanism
 
-P1–P8 say what the screen is. G1–G9 say how it is built **once**. Each is enforced by construction (the second thing cannot be written: the compiler or a guard rejects it), by a required matrix (the thing must be used everywhere it applies, or the build fails), or by a runtime trap (a call from the wrong code fails the end-to-end run). Each names which. None rests on a reviewer or on a promise.
+P1–P9 say what the screen is. C1–C5 say why it can be built only **once**.
 
-**G1. One screen; places are data.**
-- The whole UI is one root component, `Screen` (`view/Screen.tsx`), of one model type, `Model` (`model/Model.ts`), changed by one message union, `Msg` (`model/Msg.ts`), through one `update` (`update/update.ts`). The main screen, a note's block and the settings tab are that screen with a different `Place`.
-- `Place` (`screen/place.ts`) is closed and data only: no function, no component, no element, no class. Its constructors are the only way to make one: `Places.main()`, `Places.note(path)`, `Places.settings()`.
-- `Place` and `form` are read in exactly one module, `screen/layout.ts`, which derives a `Layout` value (§Architecture). Nothing else reads a member of `Place` or anything that names a place; Obsidian's `Platform` is read only by `drivers/chrome.ts`, which reports the form.
-- **A capability only gates.** Outside `screen/layout.ts`, a `Layout` field may decide only whether a behaviour happens, never which of two behaviours happens. It is read in exactly two forms, which the guard recognises: an early return of the unchanged input (`if (!layout.gates.x) return unchanged(model)`), or `gated(layout.gates.x, thing)`, which gives one command, message or element or nothing (a carry in a note runs whole and only its `startCarry` command is gated). Two drawings of one thing (the keyboard bar or the desktop capsule; the search sheet or panel) are one kit component taking a variant prop, and only the kit switches on it.
-- A note's block owns its own filter, day and carry: they are fields of its own store, gated by its `Layout`. It never writes the device's filter, funnel place or carry (report C, §3, items 1–4).
-- Building starts from the main screen, the full case: every region exists there (§Migration's stage order).
-- *Enforced by construction:* `tests/onePlace.test.ts` (one `Model`, one `Msg`, one `update`, one `Program` instantiation, `Place` read only by `layout.ts`, the gate-only rule, no identifier or path naming a place or a form outside `screen/place.ts`, `screen/layout.ts`, `drivers/chrome.ts` and `host/adapters/`).
+Revision 11 listed what is forbidden: APIs per owner, names, CSS properties, private folders, shapes of a condition. Three reviews (`rev11-research/R1–R3`) showed that such a list always leaks. A name ban misses `"tasks.setNoteViewMode"` written as a string; a gate rule misses `?? openFull`; a folder rule invites `drivers/motion/ribbonFlip.ts` back. Revision 12 works the other way, as Elm, Google's safe types and the design systems of report D do: **the UI code cannot express an effect, a decision of the core or a read of the place at all**, so there is nothing to forbid one by one. The compiler is the guard; the few rules left guard the compiler's configuration and the edges the compiler cannot type.
 
-**G2. One generic host; thin adapters.**
-- `host/ScreenHost.ts` is the one controller of a mounted screen: it opens the runtime session and the one store, runs the draw order (P2 step 4), interprets every command (an exhaustive table from command kind to the one effect owner that runs it), and routes every input stream into messages. Hit testing is not in it: the target under a pointer is a pure function of measured geometry (`screen/carryGeometry.ts`), called from `update`.
-- `ScreenHost` holds no interaction state: its fields are `readonly` and typed as the store, the session or an effect owner's handle; no module-level `let`. Everything the user is in the middle of is in `Model` (P1, P6).
-- The adapters `host/adapters/leaf.ts`, `host/adapters/note.ts` and `host/adapters/settings.ts` may only: name a mount target (data: a leaf's content, a Markdown view, a settings tab), give a `Place` from its constructor, run the lifecycle (open, close, rename) and turn Obsidian's events into messages (`placeChanged`, `hostShown`, `hostHidden`).
-- *Enforced by construction:* `tests/hosts.test.ts`. An adapter imports only `host/ScreenHost.ts`, `screen/place.ts` and `obsidian` (an allowlist), stays under 120 lines, and declares no class field that is not `readonly`. `ScreenHost` imports only `update/update.ts`, `view/Screen.tsx`, `model/`'s types, `screen/place.ts` (to complete a seed with the form `chrome` reports), the effect owners and `obsidian/runtime/Runtime.ts`, and makes no decision a `Layout`, `Place` or `Msg` field could drive (it switches only on `Command["kind"]`).
+Each part below says how it is enforced: by **construction** (the second thing does not compile), by the **matrix** (the thing must be used everywhere it applies, or the build fails), or by the **trap** (an effect the plugin did not order fails the end-to-end run). None rests on a reviewer or on a promise.
 
-**G3. One owner per concern.**
-- §The owner table names, for each concern, its one **pure owner** (state, rules, the messages it handles: one file), its one **effect owner** where it reaches the platform (one file), the platform, Obsidian and library APIs only that effect owner may call, and the intent-level names it exports.
-- **An owner is one public file.** It may keep private parts in a folder of the same name beside it (`update/carry/…` for `update/carry.ts`), importable only by that file. A folder is never an owner, and any file in `obsidian/ui/next/` that the table does not name (as an owner, an owner's private part, a kit component or a composition of the screen) fails the build. A copy of a concern in a new file is therefore an unknown file.
-- **Deny by default across `obsidian/`.** The compiler-based guard (`tests/uiRules.ts`, decision 33) covers all of `obsidian/`, not only `obsidian/ui/next`: the hosts, the adapters, `main.ts`, `compose.ts`, `composeRuntime.ts`, the runtime and the infrastructure. Each listed API is reachable only from its owner. The old UI is exempt only while it is frozen by content (G8).
-- **Owners cannot re-export raw calls.** An owner's exports are exactly the intents the table lists: their types hold no DOM, Obsidian or host type (no element, `DOMRect`, `Scope`, `EditorView`), and no callback that receives one. `export … from` of a host module is rejected.
-- **Messages and state have one owner each.** `Msg` is the union of each pure owner's own union; the router `ROUTES: { [K in Msg["kind"]]: Concern }` is total, and a kind in two unions fails to compile (`Disjoint<…>`). A pure owner's handler reads the whole model and returns only its own slice of `Model`, its commands and follow-up messages, so a slice has one writer.
-- **The table is frozen and protected** as CLAUDE.md protects «Behaviours Max had to ask for twice»: it is data (`tests/guards/owners.ts`) whose hash is pinned in `tests/ownership.test.ts`, a test that names Max in its doc comment. It is never changed, and never routed around, without him. Approving this spec approves the table as written below.
-- *Enforced by construction:* `tests/ownership.test.ts` (every row's APIs, the export surfaces, the unknown-file rule, the hash), on `tests/uiRules.ts`.
+**C1. The UI is pure by construction.**
+- **One screen.** The whole UI is one root, `Screen` (`view/Screen.tsx`), of one model type, `Model`, changed by one message union, `Msg`, through one `update`. The main screen, a note's block and a settings list are that screen with a different `Place` (C4).
+- **Pure code cannot name the host.** `screen/`, `model/`, `update/` and `view/Screen.tsx` are one TypeScript project (`tsconfig.next-pure.json`, extended to the views) with `lib: ["es2024"]`, `types: []` and no DOM, Obsidian, Preact or CodeMirror types. A window, an element, an event, `Scope`, `Menu`, a hook or a timer cannot be named there: it does not compile.
+- **The screen's JSX knows only the kit.** The pure project's `jsxImportSource` is the plugin's own (`view/screen-jsx`), whose `JSX.IntrinsicElements` holds only the kit's elements (`<tc-list>`, `<tc-card>`, `<tc-field>`…) with closed props. A raw `<div>`, `autofocus`, `<dialog>`, `draggable`, `<form>`, SVG `<animate>` or an `onClick` does not compile. No hooks exist to import.
+- **The kit draws, and only draws.** `view/kit/` is a project of its own with a second JSX dialect (`view/kit-jsx`): an allowlist of DOM elements and attributes (no `style`, `autofocus`, `popover`, `draggable`, `contenteditable`, `tabindex`, `<form>`, `<dialog>`, `<details>`, SVG animation), classes typed as `tc-n-…` or `is-…` literals, and no `preact/hooks` in its paths. A kit component is a function from its props to elements.
+- **Intents are typed data on kit elements.** A kit element that can move, take focus, scroll or be measured carries a required prop for it: `motion`, `focus`, `scroll`, `measure` (a key, or `"none"`). Absence does not compile. The render engine turns them into data attributes the engines read.
+- **Everything that crosses is closed data.** `Model`, `Msg`, `Command`, the kit's props and `Layout` hold no function, `any`, `unknown`, index signature or bare `number`, and every discriminant is a string literal. A type test (`tests/types/closed.ts`, `AssertClosed<T>`) fails to compile otherwise. `Model` is deep-readonly.
+- **No module state.** In the pure project and the kit, a module's top level holds only declarations: functions, types and `as const` data.
+- **Messages route once.** `Msg` is the union of each concern's own union. `ROUTES: { [K in Msg["kind"]]: Concern }` is total, and a kind in two unions does not compile (`Disjoint`). A concern's handler returns only its own slice of `Model`, its commands and its follow-up messages. **Runtime events** (`viewsChanged`, `rebased`, `fileGone`, `minute`, `shown`, `hidden`, `chrome`) are a closed class of broadcasts, delivered to every concern, each returning only its own slice (P3's re-id map reaches every slice in one pass).
+- **The router and the root do nothing else.** `update.ts` is `ROUTES[msg.kind]` plus the broadcast loop; `Screen.tsx` maps `Layout.regions` to kit elements. Both are generated from the concern list (`npm run gen:screen`), and the test fails if the checked-in file differs from what the generator writes.
 
-**G4. A closed kit; motion as data.**
-- **Views are built from the kit.** Only `view/kit/` writes intrinsic JSX (`<div>`, `<input>`…). Everything else in `view/` composes kit components. Kit props are closed (discriminated unions and literals; no `string` class, no `style`, no handler, no `any`), as decision 45 already requires for handlers.
-- **Intents are data on nodes, and required.** A kit node that can move, take focus, scroll or be measured declares it with a required prop: `motion` (a `MotionKey` or `"none"`), `focus` (a `FocusKey` or `"none"`), `scroll` (a `ScrollKey` or `"none"`), `measure` (a `MeasureKey` or `"none"`). Absence is a compile error, so a list cannot forget to animate and a field cannot forget to ask for focus.
-- **Motion causes are a closed union** (`MotionCause`, in `update/motion.ts`): rows within a context, a leave, a context drawn still, a whole-region slide (day, ribbon), the lift, the fold under a lift, room at a list's end, the drop and cancel flights, the panel slide, the divider snap, the keyboard ride, a layer opening and closing, the fade aside of the foot, into view. Only `update/motion.ts` makes one; only `drivers/motion.ts` turns one into an animation, by an exhaustive switch. A new animation is a new member of the union, handled in exactly those two files.
-- **CSS has no motion of its own.** Below `/* next */`, `transition`, `animation`, `@keyframes`, `scroll-behavior` and `will-change` appear only in rules whose selector is a class the motion owner declares (`tc-m-…`, listed in `drivers/motion.ts` as `MOTION_CLASSES`), and durations and easings only as `--tc-motion-…` tokens. Decision 34's allowance of opacity and transform transitions on states is revoked, and slice 3's state transition of the foot (`styles.css`, `.tc-n-block.is-carrying > …`) becomes the motion cause `fadeAside`.
-- **Geometry arithmetic has three owners.** Every size or position in the model is a branded `Px` (from `screen/px.ts`): `measure` produces it, the pointer's coordinates arrive as it. Arithmetic, `Math.*` or a comparison on a `Px` value, and turning a `Px` into a plain number, are allowed only in `drivers/measure.ts`, `screen/carryGeometry.ts` and `screen/layout.ts` (and in `drivers/motion.ts` to apply them). `update/`, `view/` and the hosts can hold and pass a `Px`, never compute with one.
-- **The core's pure rules are required, never redone.** The owner table assigns each rule of `PURE_RULES` to the owner that must call it (`placeAt`, `levelAt`, `gapAt` to carry geometry; `layoutWidths`, `stackedLists`, `swipeLanding`, `dividerAt` to layout; `entryJobStep` to entry…). A rule its owner does not reference fails; a rule referenced by an owner it is not assigned to fails. With arithmetic on geometry denied everywhere else, a second drop rule or width rule has nowhere to be written.
-- *Enforced by construction:* `tests/kit.test.ts` (intrinsic JSX, closed props, required intents), `tests/styles.test.ts` (the CSS motion rule), `tests/geometry.test.ts` (the `Px` rule), `tests/pureRules.test.ts` (required use).
+**C2. Engines: a closed, frozen set.**
+- **One engine per concern that touches the platform, one file each, no private folders** (§The engine table). An engine is the only module compiled with the host types its row names: each is its own TypeScript project, its `types` and `paths` limited to its row (only `editors` sees CodeMirror; only `render` sees Preact; only `chrome`, `keys`, `mount` and `editors` see Obsidian's module), and `uiRules` (decision 33) limits its DOM members to its row.
+- **An engine is a function of data.** It takes declarative data only: kit props (through the render engine's attributes) and commands. It keeps no gesture state; what a gesture is in the middle of is model state, through messages. Its only fields are `readonly` maps of the host handles it made, keyed by model keys. Each event it hears becomes exactly one message carrying unit-branded raw data (C3); it compares nothing.
+- **One call site per effect API.** `animate`, `scrollTo`, `focus`, `requestAnimationFrame`, `setTimeout`, `new ResizeObserver`, `getBoundingClientRect`, `new Scope`… each has exactly one call site in the bundle, inside its engine, fed by a closed spec (`AnimationSpec`: a keyframe kind, a duration token, an easing token; `ScrollSpec` with `behavior: "instant"`). A second FLIP needs a second call site or a new spec kind, and the spec kinds are the engine's frozen variants.
+- **Listeners are owned by event type:** `pointer*`, `touch*`, `wheel`, `click`, `dblclick`, `contextmenu`, `dragover`, `drop` by `input`; `key*` by `keys`; `scroll` by `measure`; `focus*`/`blur` by `focus`; `animation*`/`transition*` by `motion`; `visibilitychange`, window `focus`, `css-change` and the phone keyboard's events by `chrome`.
+- **Libraries come in through one engine, configured to delegate.** CodeMirror lives only in `editors`, with no default keymap (its keys emit intents to the key table), `EditorView.scrollHandler` and focus requests turned into scroll and focus intents, and its own measuring confined to its own subtree. `MarkdownRenderer` lives only in `editors`. Obsidian's `Menu` and `Modal` are **not used**: every menu and sheet is a kit layer in the one layer stack. Obsidian's `Setting` lives only in the settings adapter (the settings tab in §The one mechanism).
+- **The frozen table freezes concerns and engines, not file names.** `tests/guards/engines.ts` lists each concern, its engine file, the host types and packages it is compiled with and the effect APIs it may call. It is protected as CLAUDE.md protects «Behaviours Max had to ask for twice»: a test that names Max (`tests/engines.test.ts`) pins it through the manifest (C5), and it is never changed or routed around without him. Pure code is organised by concern (`update/<concern>/`, any files), which Max never has to approve.
 
-**G5. Mandatory use: the concern × place × form matrix.**
-- `tests/matrix/registry.ts` is a total type, `Record<Concern, Record<PlaceName, Record<Form, Cell>>>`, over the concerns of the owner table, the constructors of `Places` and both forms. A concern or a place added without its cells does not compile.
-- A cell is either scenarios or `notOffered(gate)`. `notOffered` names the `Layout` field that turns the concern off there, and the test checks that `layoutOf` really turns it off for that place and form: "not offered" is proven, not claimed.
-- **Unit (model level):** every scenario runs as a message log through the one `update` with that place's model, and checks the model, the commands and the motion causes (`tests/matrix/model.test.ts`).
-- **End to end (the test Obsidian):** the same registry drives `scripts/e2e/matrix.ts`, in phone view and a desktop window, in light and dark. Each cell runs its scenarios under the frame recorder (decision 40) and the trap (G6), and the trap's record must show the concern's effect owner was the caller.
-- **Across places:** a concern offered in several places runs the same scenario in each, and their frame logs must have the same shape (the same causes, in the same order, on the same keys). Two implementations that each match the old screen no longer pass (report B, U11, H20).
-- *Enforced by a required matrix.*
+**C3. Rules live in the core; numbers are units.**
+- **Every rule that decides** a place, a landing, a drop, a width, a share, a snap, a slop, a flick, an edge speed or a zoom **is a core function**: a door call, or one of the core's pure rules (`rules.*`) for what runs per frame and per pointer move. The UI never computes one. Rules the UI still computes today (the press slop, the edge-scroll speed, the hit test of a point against measured lists and the tree) move to the core, added by `backend` in stage 3.
+- **The core's pure rules are reached only through one gateway**, `screen/rules.ts`: each export is one call of one core rule, its arguments unwrapped from units and its result wrapped (a generated file, checked like `Screen.tsx`).
+- **Numbers are units.** Every quantity in `Model`, `Msg`, `Command`, `Layout` and kit props is an opaque unit (`Px`, `Ms`, `Minutes`, `Ratio`, `Count`), declared in `screen/units.ts` as a phantom object type. TypeScript refuses `+`, `-`, `<` and `Math.*` on an object type, so a unit cannot be computed with or compared at all, except through the module's few operations:
+  - `delta(a, b)`, `offset(p, d)`, `speed(d, t)`, `ratio(a, b)`, `scale(d, r)`;
+  - `exceeds(v, limit)`, where a `Limit` is made only by the gateway from a core constant (the slop, `SWIPE_FLICK_SPEED`, `DIVIDER_SNAP`).
+  Units are made only by the measure and input engines (from `DOMRect`, `clientX`, `timeStamp`) and unwrapped only by the engines and the gateway (`screen/units.ts` exports `raw` to those importers only, the import graph's one rule for it). So the recognizer's slop, the edge speed and the pinch ratio are unit operations, and a second drop rule, width rule or swipe landing has no numbers to be written with.
 
-**G6. A runtime trap.**
-- The e2e build (decision 37) wraps every API the owner table lists: the prototypes (`Element.prototype.animate`, `focus`, `scrollTo`, `getBoundingClientRect`, `addEventListener` for pointer and key events, `ResizeObserver`…), the globals (`requestAnimationFrame`, timers) and Obsidian's constructors (`Scope`, `Menu`, `Modal`, `Notice`).
-- Each call finds its nearest stack frame from the plugin's own source (`obsidian/`), through the e2e build's source map; frames of bundled libraries are skipped, and a call with no frame of ours is Obsidian's and ignored. If that source file is not the API's owner in `tests/guards/owners.ts`, the step fails with the API, the file and the stack.
-- It catches what the compiler cannot see on the paths the matrix runs: a cast, a dynamic access, a library we bundle that touches the DOM for us.
-- *Enforced by a runtime trap* (`obsidian/e2e/trap.ts`, its own unit test `tests/e2e/trap.test.ts`).
+**C4. The place is opaque.**
+- `Place` is an opaque token. Its record and its constructors (`Places.main()`, `Places.note(path)`, `Places.rows(list)`) and `layoutOf` live in one file, `screen/layout.ts`, which exports the token type but not its record: nothing else can read a field of it, by type.
+- **Every input that correlates with the place or the form has exactly one reader, by type:** the chrome slice (`form`, the keyboard, the toolbar) and the root answer's place facts (`filter.clearable`, `panel`, `topRow`, `plus`, `ViewChoice.*`) are opaque tokens opened only by `layoutOf`; the pointer kind of an input message is opened only by the gesture concern. Owners see the root answer without its place facts.
+- **`Layout` is split by concern, and the router hands each concern only its part:** `handle(model, msg, layoutOf(model.place, …)[concern])`. The model holds no `Layout`. A concern cannot see another concern's part, and the `Screen` sees only `regions`.
+- **Real alternatives are closed variants with one consumer each**, never booleans to branch on in many places: `search.reveal: "clearFilter" | "openFull"`, `search.dayOfFind: "moveDay" | "openFull"`, `context.writesPlace: "write" | "keep"`, `carry.device: "report" | "silent"`, `full.projectTap: "closeAndFilter" | "close"`, `entry.bar: "keyboardBar" | "capsule"`, `entry.placeMoves: "follow" | "stay"`, `scroll.chain: Scroller[]`, `keys.policy: "tab" | "focus" | "none"`. A variant changes only its own concern's behaviour.
+- **The matrix's comparator follows the variants.** Across places, forms and payloads, one concern's logs must be equal after removing exactly the differences its declared variants predict for that cell (each variant value lists the commands and motion causes it adds or removes, in the registry). A difference no variant declares fails (G5 of revision 11, made consistent).
 
-**G7. The guards are tested.**
-- **Negative fixtures:** every hole of report B (H1–H20) and every failure of the three earlier specs that code can show is a fixture under `tests/guards/fixtures/<rule>/reject/`, named for it (`H07-leaf-host-targetAt.ts`), and must be rejected by the rule it names. **Positive fixtures** under `…/accept/` must pass.
-- **No rule is vacuous:** every rule must match at least one real file of the tree and have at least one reject and one accept fixture (`tests/guards.test.ts`).
-- **Mutation testing** (StrykerJS, `npm run test:guards:mutation`) runs over the guard code (`tests/uiRules.ts`, `tests/guards/`, `obsidian/e2e/trap.ts`) and must score 100 %. A mutant that cannot be killed is marked where it lives with a reason; the count of such marks is pinned in `tests/ownership.test.ts` and may only fall.
-- **A bypass found later becomes a fixture before its fix:** the commit that fixes it adds the reject fixture first, and the fixture must fail on the commit before.
-- **jscpd at threshold 0** over `obsidian/` and the CSS below `/* next */` (`npm run dup`, in `npm test`): a copied block fails, whichever file it is in. Until stage 7 only clones whose both sides lie in the frozen old UI are reported without failing.
-- *Enforced by construction:* the guards are code under test like any other.
+**C5. The guards are outside the code's reach.**
+- **A manifest of hashes** (`guards.manifest.json`) covers every guard file, the engine table, the matrix registry, the trap, every `tsconfig*.json`, the JSX dialects, `vitest*.config*`, `esbuild.config.mjs`, `stryker.config.mjs`, `.jscpd.json`, `package.json`'s scripts and the mutation floor. `npm test` and `npm run release` stop when any of them differs from the manifest. The manifest is re-pinned only by `npm run guards:pin`, which refuses a commit without a `Guards-approved-by: Max` trailer quoting his message, and `tests/engines.test.ts`, which names Max, checks the manifest's own hash. No guard changes silently.
+- **No escape hatches** (`uiRules`, in every scanned file): no `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`, `jscpd:ignore`, `eslint-disable`, `Stryker disable`; no `.skip`, `.only` or `.todo` in tests; no `as` cast except `as const` (and inside `screen/units.ts`); no ambient `declare global`/`declare module` outside the dialect files.
+- **The scope is the bundle.** The guard reads esbuild's metafile: every input that is not in `node_modules` is scanned, whatever its folder or extension (`.js` and `.d.ts` included). Outside `obsidian/` that is `core/`, under its own architecture rules.
+- **The trap sees every window and every frame.** It is installed in each window realm before a screen mounts there, and counts every frame outside `node_modules` as ours; a library's frame counts as the engine that admitted the library.
+- **Mutation testing** runs over the guard code; its score may only rise (a floor in the manifest), from stage 3's first score to 100 % by stage 7.
 
-**G8. No coexistence.**
-- **No flags per place.** The old `newBlock` device value (decision 43) and the planned `newScreen` are gone. The new UI is chosen by one build constant, `UI` (`"old" | "next"`, esbuild's `define`), read once in `obsidian/main.ts`; with `next` every adapter mounts the one screen. The release build refuses `next` until stage 7, so Max never runs both.
-- **master never contains both.** The work lives on `ui-refactor` (it merges master in as master moves). It reaches master in one merge, at stage 7, which switches to the new UI and deletes the old UI, its CSS above `/* next */`, `UI`, the freeze and its baselines. A tree with both fails `tests/oneSwitch.test.ts` once `UI` is gone.
-- **The old code is frozen by content.** `tests/uiFreeze.baseline.ts` lists every old-UI file and the old CSS with the git blob id of its content. On the branch a file may change only to the content master holds for it at a commit the list names (Max's fixes on master, merged in), and every such change carries an entry in `tests/uiFreeze.ported.ts` naming the master commit and the new UI's test that covers the same fix. Otherwise the list may only shrink. The line allowances of decision 35 are gone. Without the history the check fails; it never gives way.
-- *Enforced by construction:* `tests/uiFreeze.test.ts`, `tests/oneSwitch.test.ts`.
-
-**G9. Structural review per stage.**
-- Besides the behaviour review (§How it is built), each stage gets a fresh reviewer who has not seen the work. It gets the owner table, the whole `obsidian/` tree at the stage's head (never a diff) and the guards, and one task: find a concern implemented twice, or a branch on the place or the form outside `screen/layout.ts`.
-- Each finding becomes a G7 reject fixture first, failing on the stage's head, and then the fix; the fix is judged at the principle that let it through (§How it is built).
-- A stage ends only when a second fresh reviewer finds nothing.
-- The reviewer is how unknown bypasses are found; the guarantee is the fixture each finding leaves behind.
+**The settings tab.** It keeps Obsidian's own chrome and look (the design excepts Obsidian's chrome, and a rework keeps today's behaviour): `host/settings.ts` builds it from Obsidian's `Setting`, its toggles, dropdowns, sliders, colour wells and buttons, registers no key scope, and reaches the clipboard, Google's sign-in and the Scriptable loader through `hostServices`. Only its three reorderable lists (priorities, labels, presets) move rows, and they move them with **the one carry and the one motion engine**: each list mounts one `ScreenHost` at `Places.rows(list)`. That place's `Layout` has one region, `adopted`: the mount engine **adopts** the rows Obsidian's `Setting` drew (it tags each with its row's key and its grip with an act), so the measure, input and motion engines work on them as on any kit element, and the screen draws nothing of its own. The carry's payload is `settingsRow`, its look `self` (the row follows the finger, the others step aside: the motion cause `stepAside`), and its grip starts the carry on a press with no hold (`settings.md:9`). The drop is the door's `settings.move…`; the adapter then redraws its `Setting` rows, as today. Keys: `keys.policy` `none`.
 
 ## Architecture
 
 ```
 obsidian/ui/next/
-  screen/      place.ts     Place, its constructors                             pure
-               layout.ts    layoutOf(place, view, measured, device) → Layout:
-                            the only reader of Place and form; lists, regions,
-                            widths, timeline lanes; the layout rules             pure
-               carryGeometry.ts  the target under a point, from measured Px     pure
-               px.ts        the Px brand                                         pure
-  model/       Model.ts (the one model), Msg.ts (the one union), Command.ts,
-               selectors that read the model                                    pure
-  update/      update.ts (the router) and one file per concern                  pure
-  view/        Screen.tsx (the one root), compositions of the kit; kit/         pure
-  drivers/     one file per effect owner                                         DOM
-  host/        ScreenHost.ts; adapters/leaf.ts, note.ts, settings.ts
+  screen/      layout.ts    Place (opaque), Places, layoutOf → Layout parts      pure
+               units.ts     the units and their operations                       pure
+               rules.ts     the gateway to the core's pure rules (generated)     pure
+  model/       Model, Msg, Command, the broadcasts                               pure (types)
+  update/      update.ts (generated router); <concern>/ any files                pure
+  view/        Screen.tsx (generated); screen-jsx/, kit-jsx/ (the dialects);
+               kit/ (the kit's components)                                       pure / kit
+  engines/     one file per engine (§The engine table)                           host
+  host/        ScreenHost.ts; adapters/leaf.ts, note.ts; settings.ts;
+               registration.ts
 obsidian/runtime/
   Runtime      the replica; door calls; pending calls and replay; the
                persistence queue; the network lane; Obsidian's events;
-               timers; the action log
+               the time engine; the action log
 ```
 
-**`Place`** (start from report C, §4; `form` is filled by `ScreenHost` from `chrome`, the adapter gives the rest):
+**`Place`** (report C, §4), private to `screen/layout.ts`:
 
 ```ts
-/** Where the one screen is shown. Closed, data only; made only by `Places`; read only by `screen/layout.ts`. */
-export interface Place {
-	/** Obsidian's `is-mobile` as `chrome` reports it (an iPad is "phone"); the core's `wide`. Never decides a gesture:
-	 *  the pointer kind travels with each event. */
-	readonly form: "phone" | "desktop";
-	/** fill: the whole view, each list scrolls by itself. inline: inside a note, as tall as its content up to
-	 *  `--tc-block-max-h`, the stack scrolling as one, the note's scroller the outer scroller of edge scroll and reveal. */
-	readonly frame: "fill" | "inline";
-	/** tab: the view's Scope while it is active. focus: a Scope while the focus is inside, presses kept from the host. */
-	readonly keys: "tab" | "focus";
-	readonly content: TasksContent | SettingsContent;
-}
-export interface TasksContent {
-	readonly kind: "tasks";
-	/** funnel: `tasks.funnelView`, the mode in `state.view`. note: `tasks.projectNoteView(path)`, the mode in `state.noteView`. */
-	readonly source: { readonly kind: "funnel" } | { readonly kind: "note"; readonly path: string };
-	/** The timeline, events, all-day rows, the now line, zoom, timeline drops, new slots. false: none drawn or needed. */
-	readonly calendar: boolean;
-	/** any: arrows, the title, day swipes, a find or a typed task may open a day. today: the day list is today's. */
-	readonly days: "any" | "today";
-	/** The folder button, the panel, tree drops and lift, the left-edge reveal, the device's carry (`startCarry`). */
-	readonly tree: boolean;
-	/** chosen: the device's node, with title, cross and project menu; a find it hides clears it.
-	 *  fixed: the note's project; a find it hides opens on the full card; the device's filter is never written. */
-	readonly filter: "chosen" | "fixed";
-	/** Whether the screen writes the device's funnel place (`setFunnelPlace`). */
-	readonly writesPlace: boolean;
-}
-export interface SettingsContent { readonly kind: "settings" }
+/** Opaque outside this file: the record is not exported. */
+declare const placeToken: unique symbol;
+export type Place = { readonly [placeToken]: true };
 
-type Seed = Omit<Place, "form">;
+interface PlaceRecord {
+	readonly form: "phone" | "desktop";        // from `chrome`; an iPad is "phone"; the core's `wide`
+	readonly frame: "fill" | "inline";         // inline: as tall as its content up to `--tc-block-max-h`
+	readonly content:
+		| { readonly kind: "tasks";
+		    readonly source: { readonly kind: "funnel" } | { readonly kind: "note"; readonly path: string };
+		    readonly calendar: boolean; readonly days: "any" | "today"; readonly tree: boolean;
+		    readonly filter: "chosen" | "fixed"; readonly writesPlace: boolean;
+		    readonly keys: "tab" | "focus" }
+		| { readonly kind: "rows"; readonly list: "priorities" | "labels" | "presets" };
+}
 export const Places = {
-	main: (): Seed => ({ frame: "fill", keys: "tab", content: { kind: "tasks", source: { kind: "funnel" },
-		calendar: true, days: "any", tree: true, filter: "chosen", writesPlace: true } }),
-	note: (path: string): Seed => ({ frame: "inline", keys: "focus", content: { kind: "tasks", source: { kind: "note", path },
-		calendar: false, days: "today", tree: false, filter: "fixed", writesPlace: false } }),
-	settings: (): Seed => ({ frame: "fill", keys: "focus", content: { kind: "settings" } }),
-} as const;
+	main: (): Seed => …,            // fill; funnel; calendar, any day, tree, chosen filter, writes the place; tab keys
+	note: (path: string): Seed => …,// inline; note; no calendar, today, no tree, fixed filter, keeps the place; focus keys
+	rows: (list: …): Seed => …,     // the adopted rows of a settings list; no keys
+};
+export function layoutOf(place: Place, root: RootAnswer, chrome: ChromeState, measured: Measured): Layout;
 ```
 
-Report C's `sheets` is left out: in every place a sheet (the full card, the search) mounts over the screen's own frame, as today (decision 52). The settings tab is a third place, not a screen of its own, so its row reorder is the one carry and its fields the one entry (report A, §3: `RowReorder` is a fifth drag loop today).
+Report C's `sheets` is left out: a sheet (the full card, the search) mounts over the screen's own frame in every place, as today (decision 52).
 
-**`Layout`** is what every other part reads instead of the place. `layoutOf` is memoised by its inputs and is a selector, never stored:
-- `root`: the view need the screen reads (P2 step 3), and `modeWrite`: the door method that keeps the mode (`tasks.setViewMode`, `tasks.setNoteViewMode` or none). Data, so no part branches to choose them.
-- `regions`: what is drawn, in order (ribbon pages, columns, lists with their rows, the timeline lane, the panel, the foot, the settings' groups), with their geometry in `Px`, computed by the layout rules.
-- `targets`: where a carry may land (list gaps, plates, titles, the timeline, tree rows, section slots, settings rows); `scrollers`: the scrollers in chain order, inner first (inline: the stack, then the note's).
-- `variants`: kit variant props (`entry: "bar" | "capsule"`, `search: "sheet" | "panel"`, `panel: "docked" | "overlay" | null`, `frame`).
-- `gates`: capabilities, each turning one behaviour off (`hover`, `modifierPick`, `dayMoves`, `filterClears`, `writesPlace`, `deviceCarry`, `blurEndsEntry`, `searchArrows`…).
-- `keys`, read by the keys owner only, and `door`: the facts handed to the core (`wide`).
+**`Layout`**, one part per concern, each handed only to its concern by the router: `regions` (to `Screen`: what is drawn, in order, with its geometry in `Px` from the layout rules), `root` (the view need and `modeWrite`, data), `carry` (targets, the device variant, the look per payload), `scroll` (the scroller chain, inner first), `search`, `context`, `full`, `entry`, `keys`, `door` (the facts handed to the core). A place without a project (a note not attached to one) has a `Layout` with no regions: the screen draws nothing.
 
-The core already answers most per-place questions (`FunnelView.panel`, `filter.clearable`, `topRow`, `searchPaths`, `plus`, `ViewChoice.{modes, wheel, ribbon, layout, plates, subprojects}`, report C, §0). `layoutOf` passes the place's facts to the core and takes those answers; it never derives them again.
+**The one loop, run by `ScreenHost`:** an engine's message → the router → a concern's handler with its `Layout` part → the runtime's door calls (P2) → `needs(model)` → render `Screen` → `measure` (only the keys the loop's motion causes name, and what the observers report) → `motion` → `scroll` → `focus`. The same for every place.
 
-**The one loop, run by `ScreenHost`:** an input stream from `drivers/input.ts` → the recognizer (`update/gesture.ts`) → `update` → the router → the concern's pure owner → the runtime's door calls (P2) → `needs(model)` → render `Screen` → `measure` → `motion` → `scroll` → `focus`. The same for every place; a place changes only the data `layoutOf` gives.
+**`ScreenHost`** (`host/ScreenHost.ts`) is the one controller of a mounted screen: it opens the session and the one store, completes the place's seed with the form, runs the loop's draw order, hands each command to the one engine its kind names (a total table over `Command["kind"]`), and passes each engine's messages to the store. It holds no state but `readonly` handles. **Its public surface is frozen to lifecycle intents:** `mount(target, seed)`, `renamed(path)`, `shown()`, `hidden()`, `command(c: HostCommand)` (a closed union: `undo`, `redo`, `find`, `newTask`), `dispose()`. No `dispatch` and no `Msg` reach an adapter.
+
+**The adapters** register with Obsidian and nothing else. `host/registration.ts` holds the plugin's registrations (`registerView`, `addCommand`, `addRibbonIcon`, `registerObsidianProtocolHandler`, `addSettingTab`, the workspace's events) and routes a command to the active screen's `ScreenHost.command`. `host/adapters/leaf.ts` mounts one `ScreenHost` per leaf at `Places.main()`. `host/adapters/note.ts` mounts **one `ScreenHost` per Markdown view**, at `Places.note(path)`, and tells it `renamed` and `shown` on a rename, a mode switch (Live Preview, Reading) or a view change; whether the note belongs to a project is the root answer (the core's project-note check, indexed by path in the door's cache, so each view's check is cheap), and a note that does not draws nothing. `host/settings.ts` is the settings tab (the settings tab in §The one mechanism). The mount engine places the screen's node among Obsidian's (a leaf's content; after `.cm-contentContainer` or first in `.mod-footer`).
 
 **Preact 11, TSX.**
 - It is checked by TypeScript 7 and bundled by esbuild as is. Svelte is rejected: `svelte-check` needs TypeScript ≤6, and its `animate:flip` infers motion from geometry.
 - A user's event renders synchronously (the runtime flushes Preact's `debounceRendering`).
-
-The plugin's own menus and sheets are kit layers in the one overlay.
+- Preact is reached only by the render engine; the two JSX dialects compile to its calls there.
 
 **Picks.**
 1. **A write pick** runs its door call at the tap. The list's change shows when the sheet's close settles (P6 pins the layout under the closing sheet).
@@ -379,159 +345,156 @@ The plugin's own menus and sheets are kit layers in the one overlay.
 
 **Undo** is a door call like any other: instant, its result visible at once, with `canUndo` from the replica's history.
 
-## The owner table
+## The engine table
 
-One row per concern. "Pure owner" holds the concern's state slice, its rules, its messages and the commands it asks for. "Effect owner" is the only file in `obsidian/` that may reach the APIs listed. "Required rules" are the core's pure rules the owner must call (G4). "Exports" are its whole public surface. A dash means none: the concern reaches the platform only through another row's intents.
+The frozen set. One row per engine: the concern it serves, its file, the host types and packages its project is compiled with, and the effect APIs it alone calls (each from one call site). Concerns with no engine (layout, carry, search, sections, selection, full card, context, entry's rules, layers' stack) are pure concerns under `update/<concern>/`; they reach the platform only through the commands these engines run.
 
-| # | Concern | Pure owner | Effect owner and the only APIs it may call | Required rules | Exports (intents) |
+| # | Engine | File | Compiled with | The only effect APIs it calls | Serves |
 |---|---|---|---|---|---|
-| 1 | **Layout** of columns and lists: ribbon pages, columns, lists and their rows, dividers, the timeline's lanes, the panel, the frame, the settings' groups | `screen/layout.ts` (private: `screen/layout/lists.ts` for `funnelList`, `projectsList`, `withBranches`) | — | `layoutWidths`, `layoutShareAt`, `listWidths`, `allColumnsWidths`, `allColumnsShare`, `allColumnsWidthAt`, `allColumnsDividerAt`, `dividerAt`, `stackedLists`, `stackedRows`, `swipeLanding`, `stackTasks`, `stackCorner`, `eventLeft`, `eventLevels`, `funnelPlaceShowing` | `layoutOf`, `Layout`, `Region`, `rowsOf` |
-| 2 | **Drag and drop**: the carry of a card, subtasks, picked cards, the plus, a section, a tree node, a settings row, a timeline block; the drop and cancel; hover-open; the door's carry | `update/carry.ts` | — (the float through motion, edge scroll through scroll, `startCarry`/`carryAt`/`drop` as door commands) | `canPick`, `endsSelection`, `sameSlot`, `PROJECTS_HOVER_MS` | carry messages |
-| 3 | **Carry geometry**: the target under a point | `screen/carryGeometry.ts` | — | `placeAt`, `levelAt`, `levelRange`, `gapAt`, `gapBranch`, `gapOfPlace`, `placeOfGap`, `placesInGap`, `sameGap`, `projectsDrop`, `projectsGap`, `projectsLevels`, `groupPlaceOf`, `acceptsDrop`, `carriedMiddle`, `gridAt`, `placeOfDrop` | `targetAt`, `Target` |
-| 4 | **Motion** | `update/motion.ts`: the only maker of `MotionCause`, transition numbers, the transient channel's values | `drivers/motion.ts`: `Element.animate`, `getAnimations`, `Animation`, `requestAnimationFrame`, `cancelAnimationFrame`, every inline style and custom property write, the `tc-m-…` classes; the only selectors with CSS motion | — | `MotionCause`, `motionSettled`, `motionInterrupted` |
-| 5 | **Measurement** | `update/measure.ts`: the `measured` slice, in `Px`, keyed by `MeasureKey` | `drivers/measure.ts`: `getBoundingClientRect`, `getClientRects`, `offset…`/`client…`/`scroll…` reads, `getComputedStyle`, `ResizeObserver`, `IntersectionObserver`, `visualViewport` sizes | — | `measured`, `boxesNow(keys)` (for `motion`'s commit-phase reads) |
-| 6 | **Scroll**: reveal, hold while rows fold, edge scroll in a carry, glides, the chain to the host's scroller | `update/scroll.ts` | `drivers/scroll.ts`: `scrollTo`, `scrollBy`, `scrollIntoView`, `scrollTop`/`scrollLeft` writes | — | `ScrollIntent`, `userScrolled`, `scrollSettled` |
-| 7 | **Focus** | `update/focus.ts`: the one focus target, taken last in the loop | `drivers/focus.ts`: `focus`, `blur`, `activeElement`, `tabIndex` writes, `hasFocus` | — | `FocusIntent`, `focused`, `blurred` |
-| 8 | **Keys**: the key table over the layer stack (the Escape order, A16.16; ⌘Z, ⌘⇧Z, ⌘F, Enter, arrows) | `update/keys.ts` | `drivers/keys.ts`: Obsidian `Scope`, `Keymap`, `keydown`/`keyup` listeners | — | key messages |
-| 9 | **Input and gestures**: press, hold, lift, swipe, pinch, wheel, divider drag, double click; the one gesture slot and the arbitration table A16 | `update/gesture.ts` (private: `update/gesture/press.ts`, today's `recognizers/press.ts`) | `drivers/input.ts`: pointer, mouse, touch, wheel, click, double-click and context-menu listeners, `setPointerCapture`, `releasePointerCapture`, `preventDefault`/`stopPropagation` on those events | `SWIPE_FLICK_SPEED`, `DIVIDER_SNAP` | gesture messages |
-| 10 | **Entry**: the quick entry, rename, section and project names, the search's query, the full card's subtasks, settings fields | `update/entry.ts` | `drivers/editors.ts` (today's `islands`): CodeMirror (`EditorView`, `EditorState`), `MarkdownRenderer`, Obsidian `Component`, `input`/`beforeinput`/composition events, `value`/`checked` writes, `setSelectionRange`, `Selection`, `Range` | `entryJobStep`, `queuedEntryJobs`, `NO_ENTRY_JOBS`, `projectsEntryLook`, `viewEntryLists`, `oneLine`, `LINE_BREAK` | entry messages, `EditorIntent` |
-| 11 | **Menus and layers**: the one layer stack; task, bulk, section, project, event, view, ⋯, sources menus; their pages | `update/layers.ts` | `drivers/overlay.ts`: the one mount node per window, Obsidian `Menu` and `Modal` | `sectionChoice`, `repeatDraft`, `repeatParts`, `repeatValue`, `editRepeat` | `LayerIntent`, `layerGone` |
-| 12 | **Search** | `update/search.ts` | — | — | search messages |
-| 13 | **Sections**: header menu, naming, lift slots | `update/section.ts` | — | — | section messages |
-| 14 | **Selection** | `update/select.ts` | — | — | select messages |
-| 15 | **Full card** | `update/full.ts` | — (editors through row 10) | `sameTaskTree` | full-card messages |
-| 16 | **Context**: the day, the funnel place, the filter, the mode, Subprojects, the panel open | `update/context.ts` | — (door calls; each write gated by `Layout.gates`, its method from `Layout.modeWrite`) | `stepFunnel`, `funnelPlaceOf`, `viewContext`, `zoomAfterPinch`, `zoomShown`, `fitLevel` | context messages |
-| 17 | **Chrome**: the form, theme, keyboard inset, toolbar, status bar, windows, body classes, haptics | `update/chrome.ts` | `drivers/chrome.ts`: Obsidian `Platform`, `body` class writes, `css-change`, `visualViewport` events, popout windows, the haptics port | — | `platform`, `theme`, `keyboard`, `toolbar`, `window` |
-| 18 | **Mounting**: Preact's `render`, the screen's node in its host (a leaf's content; after `.cm-contentContainer` or first in `.mod-footer`), writes to Obsidian's nodes (`--tc-block-lift`, `.cm-content`) | — | `drivers/mount.ts`: Preact `render`, `createElement`, `append`/`insertBefore`/`remove` of the screen's own node | — | `MountTarget`, `mount`, `unmount` |
-| 19 | **Time** | — | `obsidian/runtime/lifecycle/Timers.ts`: `setTimeout`, `setInterval`, their clears, `requestIdleCallback`, `queueMicrotask` | — | `session.after(ms, msg)`, the minute |
-| 20 | **Host services**: notices, opening a note or a link, the reach outside Obsidian | — | `obsidian/hostServices.ts`: Obsidian `Notice`, `workspace.openLinkText`, `getLeaf`, `outside()` (`open`, `browse`, `runScript`, decision 37) | — | `notice`, `openNote`, `outside` |
-| 21 | **The tasks file and the core** | the runtime (P3) | `obsidian/runtime/persistence/TasksVault.ts`: `vault.process`, `vault.read`, `vault.create`; `obsidian/runtime/replica/Door.ts`: `callDoor`; `obsidian/runtime/network/CalendarLane.ts`: `Http` | — | `Runtime`, `HostSession` |
+| 1 | **Render** | `engines/render.ts` | DOM, Preact | Preact's `render`; static custom properties (layout at rest), written only on difference | the screen and the kit; layout's regions |
+| 2 | **Motion** | `engines/motion.ts` | DOM | `Element.animate`, `getAnimations`, the transient channel's variables, the `tc-m-…` classes; CSS motion only under `tc-m-…` | motion: one `AnimationSpec` per `MotionCause` |
+| 3 | **Measure** | `engines/measure.ts` | DOM | `getBoundingClientRect`, `getClientRects`, `offset…`/`client…`/`scroll…` reads, `getComputedStyle`, `ResizeObserver`, `IntersectionObserver`, `scroll` listeners; makes `Px` | measurement; the boxes motion asks for |
+| 4 | **Scroll** | `engines/scroll.ts` | DOM | `scrollTo` (`behavior: "instant"`; glides frame by frame on the time engine), `scrollTop`/`scrollLeft` writes | scroll: reveal, hold, edge scroll, glides, the chain to a note's scroller |
+| 5 | **Focus** | `engines/focus.ts` | DOM | `focus({ preventScroll })`, `blur`, `activeElement`, `focus*`/`blur` listeners | focus, taken last in the loop |
+| 6 | **Keys** | `engines/keys.ts` | DOM, Obsidian | Obsidian `Scope`, `Keymap`, `key*` listeners | keys: the key table is the keys concern's (pure) |
+| 7 | **Input** | `engines/input.ts` | DOM | pointer, touch, wheel, click, double-click, context-menu, external `dragover`/`drop` listeners on the screen's root and the window (outside presses); `setPointerCapture`; `preventDefault` decided from model data; makes `Px` and `Ms` | input and gestures: the recognizer is the gesture concern's (pure) |
+| 8 | **Editors** | `engines/editors.ts` | DOM, CodeMirror, Obsidian | `EditorView`, `EditorState`, `MarkdownRenderer`, Obsidian `Component`; `input`/`beforeinput`/composition events; `value`/`checked` writes; `setSelectionRange`, `Selection`, `Range` | entry, the full card's description, the description peek |
+| 9 | **Mount** | `engines/mount.ts` | DOM, Obsidian (views' DOM only) | the screen's own node in its host; adopting a settings list's rows; writes to Obsidian's nodes around it (`--tc-block-lift`, `.cm-content`'s growth); the one overlay node per window | mounting, the layer host |
+| 10 | **Chrome** | `engines/chrome.ts` | DOM, Obsidian | Obsidian `Platform`; `body` class writes; per-window theme and card-size tokens and the colour preview (`<style>` per document); `css-change`, `visibilitychange`, window `focus`, the phone keyboard's show and hide, popout windows; Capacitor haptics | chrome: form, theme, keyboard, toolbar, status bar, visibility, haptics |
+| 11 | **Time** | `obsidian/runtime/lifecycle/Time.ts` | DOM | `requestAnimationFrame` (`onFrame`), `setTimeout`/`setInterval` (`after`, the minute), their cancels | the frame clock and timers for every engine and the runtime; engines get it as a handle from `ScreenHost` |
+| 12 | **Host services** | `obsidian/hostServices.ts` | Obsidian | `Notice`, `workspace.openLinkText`, `getLeaf`, the clipboard, Google's sign-in through `GoogleAuth`, `outside()` (`open`, `browse`, `runScript`) | notices, links, copy, sign-in |
+| 13 | **Settings chrome** | `host/settings.ts` | DOM, Obsidian | `PluginSettingTab`, `Setting` and its toggles, dropdowns, sliders, colour wells and buttons, `setIcon`, the tab's own DOM; no key scope | the settings tab in Obsidian's own look; its reorderable lists mount `Places.rows(list)` |
+| 14 | **The file and the core** | `obsidian/runtime/persistence/TasksVault.ts`, `replica/Door.ts`, `network/CalendarLane.ts` | Obsidian | `vault.process`/`read`/`create`; `callDoor` (one `Door` per runtime); `Http` | P3 |
 
-Rules that only format what is drawn (`dayTitle`, `dueLabel`, `cardDue`, `dayMonth`, `timeParts`, `durationParts`, colours and paints, `textParts`…) are assigned to `view/` as a whole; stage 3 writes the full assignment of `PURE_RULES` into `tests/guards/owners.ts`, where it is part of the frozen table.
-
-The view kit (`view/kit/`) has one component per thing drawn, each fed by its concern: `Frame`, `Ribbon`, `Column`, `List`, `Card`, `SectionHead`, `Plate`, `Timeline`, `Panel`, `Tree`, `Foot` (capsule, view button, wheel, plus), `Field`, `Bar`, `Sheet`, `Menu`, `Float`, `SearchPanel`, `FullCard`, `SettingsRows`. `view/Screen.tsx` is the one root; it draws `Layout.regions` with them.
+Rules the core must give, each a core function the UI reaches through the gateway: the layout rules (`layoutWidths`, `layoutShareAt`, `allColumnsWidths`, `dividerAt`, `stackedLists`, `swipeLanding`, `stackTasks`, `eventLeft`…), the drop rules (`placeAt`, `levelAt`, `gapAt`, `projectsDrop`, `groupPlaceOf`, `acceptsDrop`…), the entry's job order (`entryJobStep`), the zoom (`zoomAfterPinch`), and, added in stage 3, the hit test of a point against measured lists and the tree, the press slop and hold, and the edge-scroll speed.
 
 ## Guarantee
 
-Per concern: the owner, the test files that enforce it, what they rule out, and how anything a static check cannot see is closed. The guards common to every row are `tests/ownership.test.ts` (the APIs, the exports, unknown files, the frozen table), `tests/onePlace.test.ts` (one model, one union, one update; `Place` read once; capabilities only gate), `tests/kit.test.ts`, jscpd, the matrix (G5) and the trap (G6).
+Per concern: what makes a second implementation **impossible to write** (C1–C5), and what the matrix and the trap cover beyond that. "Pure" in the second column means the concern's handler, selectors and kit components compile in the pure or kit project.
 
-| Concern | Owner | Enforced by | Rules out | The rest closed by |
-|---|---|---|---|---|
-| Layout | `screen/layout.ts` | `onePlace`, `pureRules`, `geometry`, `kit` | a second list builder (`leafRows`, H15); width or share computed in a view; a layout chosen by reading the place (H1) | **construction:** `Px` arithmetic only here; regions are data drawn by one `Screen`; **matrix:** layout × every place × form, frame logs compared across places |
-| Drag and drop | `update/carry.ts` | `ownership` (unknown file), `onePlace` (one union, one router) | a second carry statechart (`leafCarry`, H1; four drag loops of the old UI; section drag apart, D-9; the settings' `RowReorder`) | **construction:** one `Carry` payload union; the router routes every carry message here; **matrix:** carry of each payload in each place offering it; **trap:** pointer capture only from `input` |
-| Carry geometry | `screen/carryGeometry.ts` | `geometry`, `pureRules`, `hosts` | a host computing the target (H7, BlockHost today); per-host coordinate conversion (H6); drop places redone without `placeAt` (U18) | **construction:** `Px` arithmetic denied elsewhere; required rules; `ScreenHost` holds no state |
-| Motion | `update/motion.ts`, `drivers/motion.ts` | `ownership`, `styles`, `kit` (required `motion`), the exhaustive switch | a second FLIP (`ribbonFlip`, H3; `SnapGlide`, `DayTurn` vs `.turn`, M7); CSS state transitions (H4, U16); a cause decided anywhere else | **construction:** closed `MotionCause`; CSS motion only under `tc-m-…`; **trap:** `animate`, `requestAnimationFrame`, style writes; **matrix:** frame recorder per cell, logs equal across places |
-| Measurement | `update/measure.ts`, `drivers/measure.ts` | `ownership`, `geometry`, exports frozen | `Measure.leafColumns` beside `Measure.carry` (H6); motion's own box reads (report A: two today); 40 readers of the old UI | **construction:** exports frozen to `measured` and `boxesNow`; **trap:** every geometry read |
-| Scroll | `update/scroll.ts`, `drivers/scroll.ts` | `ownership`, `kit` (required `scroll`) | `RibbonGlide` beside `EdgeScroll` (H9); `ScrollHold` and `ScrollGlide` side by side (M4); the native smooth path beside the glide (report A) | **construction:** one file; scroll writes denied elsewhere; **trap:** `scrollTo`, `scrollTop` writes; **matrix:** reveal and edge scroll in each place, with the note's outer scroller |
-| Focus | `update/focus.ts`, `drivers/focus.ts` | `ownership`, `hosts` (readonly fields), `kit` (required `focus`) | a host's own `focusing` and `focusNow` (H10); nine focusers of the old UI | **construction:** focus is a model field taken last by the loop; **trap:** `focus`, `blur` |
-| Keys | `update/keys.ts`, `drivers/keys.ts` | `ownership`, exports frozen | `Keys.leaf` beside `Keys` (H8); keys registered twice by place (old `TaskCalendarView` and `ProjectBlocks`) | **construction:** the policy is `Layout.keys`, read only here; **trap:** `Scope`, key listeners; **matrix:** keys × place × form |
-| Input and gestures | `update/gesture.ts`, `drivers/input.ts` | `ownership`, `hosts` | a host's `pressed`, `finger`, `edge` state (U20); a second recognizer; a place-shaped long-press timer | **construction:** one gesture slot in the model; the long press is a timer command; **trap:** pointer listeners, capture |
-| Entry | `update/entry.ts`, `drivers/editors.ts` | `ownership`, `pureRules` (`entryJobStep`) | `leafEntry` with its own look and `coming` (H11); a second engine in the full card (old `FullScreen`); the entry look in a host | **construction:** the look comes from `Layout`; the full card's subtasks route to the same owner; **matrix:** entry in each place and form (the phone bar in a note included) |
-| Menus and layers | `update/layers.ts`, `drivers/overlay.ts` | `ownership`, `kit` | `LeafMenu` with its own placement (H12); the separate bulk menu of the old UI | **construction:** one stack, one kit `Menu`; placement is `measure` + `motion`; **trap:** `Menu`, `Modal` |
-| Search | `update/search.ts` | `ownership` | `leafSearch` with its own reveal (H13); a per-screen reveal (decision 53) | **construction:** one reveal, gated by `filterClears`, `dayMoves`, `writesPlace`; **matrix:** search × place × form |
-| Sections | `update/section.ts` | `ownership` | `leafSection` (H14); headers drawn by two renderers (old `TaskList` and `ProjectTasks`) | **construction:** one kit `SectionHead`; the lift is a carry payload |
-| Selection | `update/select.ts` | `ownership` | a second picking path per place | **construction:** ⌘ and Shift picks gated by `modifierPick`; **matrix** |
-| Full card | `update/full.ts` | `ownership` | a full card per place | **construction:** one kit `FullCard`, mounted where the screen's frame is; **matrix** |
-| Context | `update/context.ts` | `ownership`, `onePlace` | a note writing the device's filter, place or carry (report C, §3); `setNoteViewMode` chosen by a branch | **construction:** the writes are gated; the mode's method is `Layout.modeWrite`; **matrix:** the note's cells assert the device's state unchanged |
-| Chrome | `update/chrome.ts`, `drivers/chrome.ts` | `ownership` (`Platform` only here) | `is-mobile` read in six places (old UI); body classes written elsewhere | **construction:** `form` enters once, through `Place`; **trap:** class writes on `body` |
-| Mounting | `drivers/mount.ts` | `ownership`, `hosts` | an adapter writing the DOM; a second render root | **construction:** `render` only here; adapters name a target as data |
-| Time | `runtime/lifecycle/Timers.ts` | `ownership` | timers in drivers, hosts or views; a host arming its own long press (U20) | **construction:** timers are commands and the session's `after`; **trap:** timer globals |
-| Host services | `obsidian/hostServices.ts` | `ownership` | notices and links opened from anywhere | **trap:** `Notice`, `open` |
-| The file and the core | the runtime | `architecture.test.ts`, decision 10 | a second replica or core instance (D-6) | **construction:** `Door` instantiated once per runtime |
-
-**The screen as a whole:** one `Model`, one `Msg`, one `update`, one `Program` instantiation, one `Screen`, one `ScreenHost` (`onePlace`, `hosts`); a place is data and a new place is a new constructor plus its matrix column, nothing else (§Migration, stage 5 checks that its diff touches no owner).
-
-## What each earlier failure meets
-
-Every item of report B: the three specs' failures (M1–M9, D-1–D-9, U1–U20) and the twenty holes (H1–H20). Each meets the guarantee at the principle that let it through. The iPhone spec's items (D-…) concern the Swift frontend; what they teach is applied here to the plugin, and their Swift counterparts stay with `frontend-swift`.
-
-| Item | What let a second mechanism in | Killed by |
+| Concern | A second implementation cannot be written because | Beyond that |
 |---|---|---|
-| M1 | "One" meant one per class of jump, not per concern across screens | G3: one row per concern in a frozen table |
-| M2 | "One renderer" as a list of places | G1: one `Screen`; G4: the kit is the only renderer |
-| M3 | New renderer under the old draws, never removed | G8: one switch deletes the old UI |
-| M4 | "Every scroll through one scroll" with no guard | G3 row 6; G6 |
-| M5 | Decisions naming new classes with no owner | G3: unknown files fail; G9 |
-| M6 | Interruption fixed per class | G4: one motion owner; `motionInterrupted` is one message |
-| M7 | Two day turns found at a merge | G3, G7 (jscpd), G9 per stage |
-| M8 | Two drop answers, one per frontend | G4: required rules; the core answers once |
-| M9 | Done when measured behaviour only | §Done when: the owner table, guards with fixtures, the matrix, the trap |
-| D-1 | "One mechanism" scoped to one host | G1, G5: every place in the matrix |
-| D-2 | Two core answers for one question | G4: one assigned rule per question |
-| D-3 | A drop path kept beside the one | G3 row 2; unknown files |
-| D-4 | Custom code allowed if reported | G3: no exemption list; the table frozen |
-| D-5 | Removals not revisited after the premise changed | G8: the freeze may only shrink; G9 |
-| D-6 | A second core instance | Row 21: one `Door` per runtime |
-| D-7 | Divergence written as policy | G1: places differ only in `Place` data |
-| D-8 | No check on surviving flags or owners | G3, G8 (`oneSwitch`) |
-| D-9 | Section drag a variant held by decisions | G4/G3: the section is a carry payload |
-| U1 | Migration by host | G1, §Migration: by concern, the main screen first, the note as data |
-| U2 | Flags per place | G8 |
-| U3 | Tree split by layer, not concern | G3: files named by concern, unknown files fail |
-| U4 | "One model" never defined as one type | G1: one `Model`, one `Program` instantiation |
-| U5 | `needs(model)` per screen | P2 step 3: one `needs`; the root need is `Layout` data |
-| U6 | No owner of the frame order | G2: `ScreenHost` |
-| U7 | The host as effect runner; stores plural | G2; decision 31 rewritten: one store |
-| U8 | A block-shaped carry | G3 rows 2–3; decision 54 rewritten |
-| U9 | Decisions phrased "in the block" | §Decisions, reviewed |
-| U10 | Reviews of one diff against principles | G9: the whole tree, one structural question |
-| U11 | E2E old against new, per place | G5: logs compared across places |
-| U12 | Done when without ownership | §Done when |
-| U13 | Traceability counts rows | Traceability rerun: owners are concerns of the one screen |
-| U14 | The freeze lets old code live and grow | G8: content hashes, master's versions only |
-| U15 | No uniqueness guard | G3, G1 |
-| U16 | CSS state transitions | G4 CSS rule; decision 34 revised |
-| U17 | Any file under a driver's folder | G3: an owner is one file |
-| U18 | Pure rules listed, not required | G4: required use |
-| U19 | Block-shaped driver APIs | G3: exports frozen to intents; `Measure.stack` reshaped (§Migration) |
-| U20 | The host holds interaction state | G2: readonly fields; G3 rows 5, 9, 19 |
-| H1 | `LeafModel`, `leafCarry`, `LeafMsg` | G1 (one `Model`, `Msg`, `update`; place names banned), G3 (unknown files; one router) |
-| H2 | `LeafHost` with its own draw and `run` | G2: adapters import only `ScreenHost`, `place`, `obsidian`; 120 lines |
-| H3 | `drivers/motion/ribbonFlip.ts` | G3: an owner is one file; `animate` denied elsewhere; G6 |
-| H4 | CSS `transition` on `is-entering` | G4 CSS rule |
-| H5 | Two stores for one screen | G1: one `Program` instantiation; decision 31 |
-| H6 | `Measure.leafColumns`, per-host coordinates | G3 exports frozen; G4 `Px` |
-| H7 | A host's own `targetAt` | G2: host imports; G4 `Px` arithmetic; row 3 |
-| H8 | `LeafKey`, `Keys.leaf` | G3 exports frozen; `Layout.keys` |
-| H9 | `drivers/scroll/RibbonGlide.ts` | G3: one file; G6 |
-| H10 | A host's own focus timing | G2 readonly fields; G3 row 7 |
-| H11 | `leafEntry` with its own look | G3 unknown files; the look from `Layout` |
-| H12 | `LeafMenu` with its own placement | G3 unknown files; G4 kit `Menu` |
-| H13 | `leafSearch` with its own reveal | G3 unknown files; one `needs` |
-| H14 | `leafSection` | G3 unknown files |
-| H15 | `leafRows` instead of `funnelList` | G3 unknown files; row 1 owns the list builder |
-| H16 | A freeze allowance to grow the old UI | G8: allowances gone; content only from master |
-| H17 | DOM work outside `obsidian/ui/next` | G3: the guard covers all of `obsidian/`; G6 |
-| H18 | A second device flag | G8: one build constant; `oneSwitch` |
-| H19 | The reviewer sees only the diff | G9: the whole tree |
-| H20 | Each place matches the old one apart | G5: the same scenario across places, logs equal |
+| **Layout** of columns and lists | Pure: it can compute no width, share or landing (units; C3); the rules are reachable only through the gateway; regions are one `Layout` part drawn by one generated `Screen`; places are opaque | matrix: every region in every place and form; logs equal across places |
+| **Drag and drop** | Pure: one `Carry` slice and one set of messages, routed once (C1); hit test, drop and landing are core rules (C3); each payload's look and start are a closed variant (`float+place`, `float+line`, `self+stepAside`; `hold` or `press`) | matrix keyed by payload × target × place × form; logs equal across payloads after the declared look; trap: pointer capture only from `input` |
+| **Motion** | Every animation is `engines/motion.ts`'s one `animate` call over a closed `AnimationSpec`; causes are a closed union; no CSS motion outside `tc-m-…`; kit elements declare `motion`; the frame clock is one call site | trap: an animation the ledger cannot match to a command fails; frame recorder per cell |
+| **Measurement** | Only the measure and input engines make units; pure code cannot read a box; `motion` measures only the keys its cause names | trap: geometry reads |
+| **Scroll** | One `scrollTo` call site with `behavior: "instant"`; `overflow-anchor` and `scroll-snap-type` set to `none` on the root and nothing else may set them (CSS); focus never scrolls (`preventScroll`); CodeMirror's scroll requests become intents | trap: a scroll offset change the ledger cannot match to a command or the user's input fails; matrix: reveal and edge scroll with the note's outer scroller |
+| **Focus** | One `focus` call site; the kit dialect has no `autofocus`, `tabindex`, `<label for>` or `<form>`; CodeMirror's focus requests become intents | trap: an `activeElement` change the ledger cannot match |
+| **Keys** | One `Scope` constructor and one key listener, in `keys`; CodeMirror has no default keymap; the key table is one pure concern, its policy one `Layout` variant | matrix: keys × place × form (the settings rows: none) |
+| **Input and gestures** | `input` only translates (no comparison, no state); the recognizer is one pure concern whose slop, hold and flick are core limits (C3); listeners by event type | trap: listeners |
+| **Entry** | One field engine (`editors`); the entry's rules are the core's `entry.*` and `entryJobStep`; the full card's subtasks and every field route to the same concern | matrix: entry in every place and form |
+| **Menus and layers** | One layer stack; no `Menu` or `Modal` (not in any engine's row); the kit dialect has no `<dialog>`, `popover` or `<details>` | matrix; trap: no Obsidian menu is constructed |
+| **Search** | Pure, one concern; its reveal's alternatives are closed variants (`reveal`, `dayOfFind`) with one consumer | matrix with declared variance |
+| **Sections** | Pure, one concern; the lift is a carry payload; one kit `SectionHead` | matrix |
+| **Selection** | Pure, one concern; ⌘ and Shift picks are input data read by one concern | matrix |
+| **Full card** | Pure, one concern; one kit `FullCard`; its project tap a closed variant | matrix |
+| **Context** | Pure, one concern; the place's writes are variants (`writesPlace`, the filter), the mode's door method is data | matrix: a note's cells assert the device's filter, place and carry unchanged |
+| **Chrome** | `Platform` and `body` classes only in `chrome`; the form enters once, through the opaque place | trap: class writes on `body` |
+| **Mounting** | `render` only in `render`; adapters name a target as data and reach `ScreenHost`'s lifecycle surface only | — |
+| **Time** | One `requestAnimationFrame` and one `setTimeout` call site | trap: timer globals |
+| **The file and the core** | One `Door` per runtime; `callDoor` only in the runtime | runtime tests |
+
+**The screen as a whole:** one `Model`, `Msg`, router, `Screen` and `ScreenHost`; a new place is a new constructor in `screen/layout.ts`, its variants' values and its matrix column, nothing else.
+
+**What the compiler cannot type, and how it is closed.** Effects with no call (a CSS transition, scroll anchoring, a library's own scroll or focus) are caught by the trap's **effect ledger**: in each frame, every changed scroll offset, every change of `activeElement` and every new entry of `document.getAnimations()` must match a command its engine ran in that loop, or a user's input. Code the matrix never runs is covered by requiring each cell to show its concern's whole signature (every message and command of the concern at least once across the cell) and by 100 % branch coverage of `obsidian/ui/next` over the matrix in the e2e build. Duplicated plumbing in pure code (two statecharts in one concern's folder) cannot compute anything (C3) and is caught by the matrix's equal logs across places, forms and payloads.
+
+## What each finding meets
+
+Every attack of the red team on revision 11 (R1: S1-1–S1-6, S2-1–S2-12, S3-1–S3-2, and its unbuildable items U-1–U-6), every architect finding (R2), every behaviour finding (R3), the twenty holes of report B (H1–H20) and the three earlier specs' failures (M, D, U of report B).
+
+| Finding | What let it through | Killed by |
+|---|---|---|
+| R1 S1-1 | A private folder holds a second FLIP or a second carry | C2: engines are one file, one call site per API over a closed spec; C3: a pure folder can compute nothing; matrix equality across payloads |
+| R1 S1-2 | `Px` opt-in; bare numbers free; motion allowed arithmetic | C1/C3: no bare `number` crosses; units are opaque objects with no operators; `motion` gets finished specs |
+| R1 S1-3 | Gate-only by code shape; which-of-two needed | Dropped: closed variants with one consumer, per-concern `Layout` parts (C4); the comparator follows declared variance |
+| R1 S1-4 | Place proxies (core answer fields, pointer kind, chrome, `closest`) | C4: every correlated input opaque, one reader by type; engines traverse only inside their root, `mount` alone sees Obsidian's DOM |
+| R1 S1-5 | CodeMirror and `Menu`/`Modal` carry whole concerns | C2: libraries configured to delegate; `Menu`/`Modal` not used; the ledger judges library effects |
+| R1 S1-6 | The guards' guards in the agent's write path | C5: the manifest stops tests and releases; suppressions, skips and casts banned |
+| R1 S2-1 | Engines hold state and recognise | C2: engines translate only, fields are handles, one message per event, no comparison (units) |
+| R1 S2-2 | Any engine may add any listener | C2: listeners by event type |
+| R1 S2-3 | Hooks, module state, native behaviours in the kit | C1: the two JSX dialects, no hooks in reach, declarations-only module scope |
+| R1 S2-4 | CSS motion and place branches the rule did not name | §Guards: the CSS rule is an allowlist; `overflow-anchor`/`scroll-snap-type` `none`; no host ancestors or media queries |
+| R1 S2-5 | A structural type of an engine's own hides a host call | C2: a host value flows only into host-declared types, engines included; one call site per API |
+| R1 S2-6 | Unscanned `.js`, `.d.ts`, files outside `obsidian/` | C5: scope by the metafile; no ambient declarations; the trap counts every non-`node_modules` frame |
+| R1 S2-7 | Popouts, effects with no call, unrun paths | C5: the trap per realm; the effect ledger; branch coverage over the matrix |
+| R1 S2-8 | The matrix satisfied trivially | G5: cells keyed by the concerns' closed unions; each cell shows the concern's signature; `notOffered` cells run and assert absence; logs by key roles, empty logs fail |
+| R1 S2-9 | A new cause with its own engine; causes with free payloads | C2: one `animate` call site, specs of tokens; causes carry keys only (no units) |
+| R1 S2-10 | `model/` and the router as logic zones | C1: `model/` holds types; router and `Screen` generated |
+| R1 S2-11 | Adapters dispatch messages | C1: `ScreenHost`'s surface frozen to lifecycle intents |
+| R1 S2-12 | Dynamic kinds, bags, casts | C1: closed types (`AssertClosed`), deep-readonly model; C5: no `as` |
+| R1 S3-1 | A master "fix" keeps the old UI alive | G8: a ported entry names a test that must exist, sit in the matrix and fail when the new UI's fix is reverted; `failureText` moves out of the old UI before stage 7 |
+| R1 S3-2 | jscpd sold as a guarantee | Kept as a backstop only; uniqueness is C1–C3 |
+| R1 U-1 | Gate-only against decision 53 | C4 variants |
+| R1 U-2 | The trap fails CodeMirror's own listeners | C2/C5: the library's frames count as `editors`; its own subtree is its own |
+| R1 U-3 | The `Px` rule against the recognizer, edge scroll, pinch | C3: unit operations; slop and speed are core limits and rules |
+| R1 U-4 | Name bans hit host and core names | Dropped: no name bans; opaque types do the work |
+| R1 U-5 | A frozen table of every file name | C2: concerns and engines frozen, pure files free |
+| R1 U-6 | 100 % mutation at once | C5: a floor that only rises |
+| R2.1, R2.10 | A write re-renders every card | P9 |
+| R2.2 | One route per kind against `rebased`/`viewsChanged` | C1: broadcasts |
+| R2.3 | The note adapter cannot decide or scale | §Architecture: one `ScreenHost` per Markdown view; "not a project" draws nothing; the check indexed |
+| R2.4 | rAF and timers in "kept" drivers | The time engine; §Migration's kept list corrected |
+| R2.5, R2.6 | Arithmetic ban misplaces code; gates can't express alternatives | C3 units; C4 variants |
+| R2.7, R3 §4 | The settings tab as a full place | the settings tab in §The one mechanism |
+| R2.8 | Registration, commands, clipboard, visibility, outside press, keyboard events, haptics, external drop | §The engine table rows 7, 10, 12; `host/registration.ts` |
+| R2.9 | Name ban too broad | Dropped |
+| R2.11 | Stage 3 too big; the note hostless | §Migration: mutation floor; the note mounted from stage 3 |
+| R2.12 | God files | Pure concerns are folders with any files; engines are small translators |
+| R3 §1.1–1.6 | Settings lumped; reorder as a transition; wrong cause; fit frame measured; stale words; stage 6 rule | Traceability rerun; the settings tab in §The one mechanism; `stepAside`; decision 44; §Migration |
+| R3 decisions 51, 52, 54 | Undeclared product changes | Decisions 51, 52, 54 rewritten; §Old bugs 15–17 |
+| R3 old bug 3 | The open field in a note | §Old bugs 3 |
+| M1–M9, D-1–D-9 | "One" per class or per host; parity by cross-reference; custom code allowed | C1–C3: one screen, one engine per concern, rules in the core; the frozen table has no exemption list |
+| U1–U20 | Migration and ownership by place; host-owned logic; flags; per-place e2e | C1, C2, C4, G5, G8, G9; §Migration |
+| H1 | `LeafModel`, `leafCarry`, `LeafMsg` | C1: one `Model`, one `Msg` routed once; a second carry has no slice, no messages and no rules to compute |
+| H2 | `LeafHost` with its own draw and `run` | `ScreenHost` is the one controller; adapters reach only its lifecycle surface |
+| H3 | `drivers/motion/ribbonFlip.ts` | C2: one file, one `animate` call site, closed specs |
+| H4 | CSS `transition` on a state | CSS allowlist: motion only under `tc-m-…`, never with a state |
+| H5 | Two stores for one screen | C1: one `Program` instantiation, in `ScreenHost` |
+| H6 | `Measure.leafColumns`, per-host coordinates | C3: only engines make and unwrap units; the hit test is the core's |
+| H7 | A host's own `targetAt` | `ScreenHost` holds handles only; the hit test is the core's |
+| H8 | `Keys.leaf` | C2: one `Scope` call site; the policy a variant |
+| H9 | `RibbonGlide` | C2: one `scrollTo` call site; glides on the one frame clock |
+| H10 | A host's own focus timing | C2: one `focus` call site; focus taken last by the loop |
+| H11 | `leafEntry` with its own look | C4: the look is the entry's `Layout` part |
+| H12 | `LeafMenu` with its own placement | One layer stack; placement by measure and motion |
+| H13–H15 | `leafSearch`, `leafSection`, `leafRows` | C1/C4: one concern each, routed once, its alternatives variants |
+| H16 | A freeze allowance | G8 |
+| H17 | DOM work outside `obsidian/ui/next` | C2: the engine table covers the bundle; C5: scope by metafile |
+| H18 | A second flag | G8: one build constant |
+| H19 | The reviewer sees only the diff | G9 |
+| H20 | Each place matches the old one apart | G5: logs equal across places after declared variance |
 
 ## Guards
 
-**Scope.**
-- `uiRules` covers all of `obsidian/` (G3). The old UI and the CSS above `/* next */` are frozen by content (G8) and exempt from the other rules until stage 7 deletes them.
-- New CSS lives below a `/* next */` marker in `styles.css`.
-- The guards' own data (`tests/guards/owners.ts`: the owner table, the API lists, the rule assignments, the kit list) is read by the static guards, the matrix and the trap alike, so the three never disagree.
+The guarantee is the compiler's; these keep the compiler's configuration honest and cover what it cannot type. Every file listed is in the manifest (C5).
 
-| Test file | What it checks | G |
+| Check | What it checks | Part |
 |---|---|---|
-| `tests/uiRules.ts`, `tests/uiRules.test.ts` | Decision 33's compiler-based reading, deny by default, extended to all of `obsidian/` and to the owner table's API lists; purity of `model/`, `update/`, `screen/`; `callDoor` and the replica only in the runtime; no bare `document` or `window`; `Msg` handled exhaustively. Its `Place` (a file's part and driver) is renamed `PartOf`, so it never reads as the screen's `Place` | G3 |
-| `tests/ownership.test.ts` | Every API only from its effect owner; every export surface equal to the table's; no re-export of a host module; every file of `obsidian/ui/next` named by the table; private folders imported only by their owner; the table's hash and the count of mutation marks, pinned (names Max) | G3, G7 |
-| `tests/onePlace.test.ts` | One `Model`, one `Msg` (the union of the owners' unions, disjoint), one total router, one `Program` instantiation, one `Screen`; `Place` and `Platform` read only by `screen/layout.ts` and `drivers/chrome.ts`; the gate-only rule; no identifier or path naming a place or a form (`leaf`, `block`, `isNote`, `noteView`, `phone`, `desktop`, `mobile`, `wide`, any case) outside `screen/place.ts`, `screen/layout.ts`, `drivers/chrome.ts` and `host/adapters/`; a timeline's task block is a `slot` in code | G1 |
-| `tests/hosts.test.ts` | `ScreenHost`'s imports, readonly fields and its one switch over `Command["kind"]`; each adapter's allowlist and 120 lines | G2 |
-| `tests/kit.test.ts` | Intrinsic JSX only in `view/kit/`; kit props closed; `motion`, `focus`, `scroll`, `measure` required | G4 |
-| `tests/styles.test.ts` (below `/* next */`) | It scans `.tsx`; every rule under `.task-calendar`; decision 34's names and states; CSS motion only under `tc-m-…` with `--tc-motion-…` tokens; no state class or pseudo-element that changes a box's size | G4 |
-| `tests/geometry.test.ts` | `Px` arithmetic, comparisons and unbranding only in the three geometry owners and `motion` | G4 |
-| `tests/pureRules.test.ts` | Every rule of `PURE_RULES` assigned to one owner; each referenced by it and by no other owner | G4 |
-| `tests/matrix/registry.ts`, `tests/matrix/model.test.ts`; `scripts/e2e/matrix.ts` | The total matrix; `notOffered` proven by `layoutOf`; scenarios at model level and in the test Obsidian; logs equal across places | G5 |
-| `obsidian/e2e/trap.ts`, `tests/e2e/trap.test.ts` | The trap, and that it catches a planted call from a non-owner and lets an owner's through | G6 |
-| `tests/guards.test.ts`, `tests/guards/fixtures/` | Every reject fixture rejected by its rule, every accept fixture passing; every rule matching a real file and having both kinds | G7 |
-| `stryker.config.mjs` (`npm run test:guards:mutation`) | 100 % on the guard code | G7 |
-| `.jscpd.json` (`npm run dup`) | No copied block in `obsidian/` or the new CSS | G7 |
-| `tests/uiFreeze.test.ts`, `tests/uiFreeze.baseline.ts`, `tests/uiFreeze.ported.ts` | The old UI by blob id, master's versions only, each with its port; the list may only shrink | G8 |
-| `tests/oneSwitch.test.ts` | `UI` read once in `main.ts`; no device or synced value chooses a UI; the release build refuses `next` until stage 7; after it, no `UI` and no old UI | G8 |
-| `tests/hostLifecycle.test.ts` | Every adapter in each form mounted and unmounted, mid-gesture too, leaves nothing alive (decision 36) | P8 |
-| `tests/architecture.test.ts`, `tests/uiDecides.test.ts` | Unchanged: the layers and the UI deciding nothing | — |
+| `tsconfig.next-pure.json`, `view/screen-jsx` | The pure project: no host types; the screen's JSX knows only the kit | C1 |
+| `tsconfig.next-kit.json`, `view/kit-jsx` | The kit's dialect: allowed elements, attributes and class literals | C1 |
+| `tsconfig.engine-<name>.json` | Each engine's host types and packages | C2 |
+| `tests/types/closed.ts` | `Model`, `Msg`, `Command`, kit props, `Layout`: closed, no bare `number`; `ROUTES` total and `Disjoint` | C1, C3 |
+| `npm run gen:screen` check | `update.ts`, `Screen.tsx` and `screen/rules.ts` equal what the generator writes | C1, C3 |
+| `tests/uiRules.ts` (decision 33) | Deny by default over the metafile's inputs: each engine's DOM members, listeners by event type, one call site per effect API, a host value only into host-declared types; module scope declarations only; the import graph's two rules (`units.raw` and the core's pure rules only through their gateway); no suppressions, skips, `as` or ambient declarations | C2, C3, C5 |
+| `tests/engines.test.ts` | The engine table equals the code's; names Max; checks the manifest's hash | C2, C5 |
+| `tests/styles.test.ts` (below `/* next */`) | An allowlist: `.task-calendar` the leftmost compound; no `body` or host-class ancestor but the theme's; no `@media`/`@container` outside the tokens; time- or scroll-driven properties (transitions, animations, keyframes, `@starting-style`, view transitions, scroll timelines, scroll snapping, `scroll-behavior`, `will-change`) only under `tc-m-…`, never combined with a state or a user-action pseudo-class; a variant class styles its own element only; `overflow-anchor: none` and `scroll-snap-type: none` on the root; decision 34's names, states and size rule | C1, C2 |
+| `tests/matrix/registry.ts`, `tests/matrix/model.test.ts`, `scripts/e2e/matrix.ts` | G5 below | — |
+| `obsidian/e2e/trap.ts`, `tests/e2e/trap.test.ts` | The trap and its effect ledger, per realm | C5 |
+| `tests/guards.test.ts`, `tests/guards/fixtures/` | Every finding above that code can show is a reject fixture of the check that kills it; accept fixtures pass; every check matches a real input | — |
+| `stryker.config.mjs` | The mutation floor | C5 |
+| `.jscpd.json` | A backstop: no copied block | — |
+| `tests/uiFreeze.test.ts`, `tests/oneSwitch.test.ts` | G8 below | — |
+| `tests/hostLifecycle.test.ts` | Every adapter in each form, mid-gesture too, leaves nothing alive | P8 |
+| `tests/budget/` | P9's budgets | P9 |
+| `tests/architecture.test.ts`, `tests/uiDecides.test.ts` | Unchanged | — |
+
+**Dropped as redundant** (each was a list that leaked; the compiler now does its work): the identifier and path bans on place names (C4's opaque types); the rule that only `layout.ts` reads `Place`'s members (the record is not exported); the gate-only shape rule (variants); the `Px` arithmetic allowances and `geometry.test` (opaque units); `kit.test`'s intrinsic-JSX and closed-props checks (the dialects); the per-API lists for pure code (no host types there); the unknown-file rule and the private-folder exception (engines are one file; pure code is free within its concern); `pureRules`' reference counting (the gateway); the export-surface freeze of pure owners; jscpd as a guarantee.
+
+**G5. The matrix.** `tests/matrix/registry.ts` is a total type over the concerns, the places' constructors, both forms and each concern's own closed unions (a carry's payload × target kinds, every `MotionCause`, every message kind of the concern), so a new payload, cause, message or place adds required cells by type. A cell is scenarios, or `notOffered(variant)`, which runs the same scenarios and asserts the concern's commands and causes are absent. Each cell must show its concern's signature. Scenarios run as message logs through the one `update` (model level) and in the test Obsidian under the frame recorder and the trap (both forms, light and dark). One concern's logs are compared across places, forms and payloads by key roles (lifted, landed on, neighbour), after removing exactly what its variants declare; an empty log fails. The settings rows have their own cells: carry, motion (`stepAside`, the drop), measure and input at `Places.rows(list)` in both forms; every other concern `notOffered` there.
+
+**G8. No coexistence.** No flags per place: one build constant, `UI` (`"old" | "next"`), read once in `main.ts`; the release build refuses `next` until stage 7. master never holds both: the work reaches master in one merge, at stage 7, which switches and deletes the old UI, its CSS, `UI` and the freeze. Until then the old UI is frozen by content: every old file by blob id, changed on the branch only to master's version at a commit the list names, each change with a port in `tests/uiFreeze.ported.ts` whose named test must exist, sit in the matrix and fail when the new UI's fix is reverted; otherwise the list may only shrink.
+
+**G9. Structural review per stage.** A fresh reviewer gets the engine table, the whole tree at the stage's head and the guards, and one task: find a concern implemented twice, an effect the plugin did not order, or a place read outside `layoutOf`. Each finding becomes a reject fixture first, then a fix at the part (C1–C5) that let it through. A stage ends when a second fresh reviewer finds nothing.
 
 | Impossible by construction | Enforced by |
 |---|---|
@@ -540,23 +503,23 @@ Every item of report B: the three specs' failures (M1–M9, D-1–D-9, U1–U20)
 | A card flashing back after a drop or a rename | runtime tests: a write's outcome is in the same message |
 | An outside edit lost, or overwriting a pending write | replay tests: Sync during three pending calls, one of which goes stale |
 | Single rows moving across a context; a transition twice | `update` and `motion` tests; the frame recorder |
-| Re-rendering at pointer rate | the render-counter test |
+| Re-rendering at pointer rate; every card re-rendered by one write | the render-counter test; P9's budget |
 | A redraw under the finger | the pin tests |
 | A screen going stale under a layer | the layer tests |
 | A row remounting from field to card | identity tests |
 | Something alive after its host | the lifecycle test |
-| Focus scrolling the screen; the keyboard not rising on a pick | `focus` tests; the phone checklist |
-| A second implementation of a concern | `ownership`, `onePlace`, `kit`, `geometry`, `pureRules`, jscpd; the matrix's cross-place logs; the trap |
-| A place deciding anything but data | `onePlace` (the place read once; capabilities only gate); `hosts` |
+| Focus scrolling the screen; the keyboard not rising on a pick | the focus engine's one call; the phone checklist |
+| A second implementation of a concern | C1–C3 (the compiler), one call site per effect API, the matrix's equal logs, the trap's ledger |
+| A place deciding anything but its variants | C4 (opaque place, one reader per correlated input) |
 | A note writing the device's filter, place, day or carry | the note's matrix cells |
 | Old and new UI on master together | `oneSwitch`, `uiFreeze` |
-| A guard that checks nothing | `guards.test.ts` (non-vacuity), mutation testing |
+| A guard changed or switched off | C5: the manifest, the bans on escape hatches |
 
 ## Resolution
 
 | Class | Where it lands |
 |---|---|
-| M1 settings tab | `Places.settings()`: the same screen, its own place (stage 6) |
+| M1 settings tab | Obsidian's own `Setting` chrome; its row reorder on the one carry at `Places.rows(list)` (stage 6) |
 | M2 plugin host | the runtime |
 | M3 chrome | `chrome` |
 | M4 core reads per draw | view answers through `needs(model)`; `rules.*` imported directly (P2) |
@@ -580,7 +543,7 @@ Every item of report B: the three specs' failures (M1–M9, D-1–D-9, U1–U20)
 | M23 key scopes | `keys` |
 | R4 identity | `CreatedTask` id at once, bound to the row key (P1) |
 | R6, R11 what a context shows meanwhile; events | nothing is waited for; events cached first (P3) |
-| R7 guard scope | §Guards: all of `obsidian/` (G3) |
+| R7 guard scope | §Guards: the bundle's metafile (C5) |
 | R9 calls that read projects-screen state | every core call runs in message order on one replica (P3) |
 | R10 a write pick's motion | the closing sheet pins the layout under it (P6) |
 | Root, rev 6: reads that write | tidy is the answer's text, persisted like a write (P3) |
@@ -605,34 +568,37 @@ Every item of report B: the three specs' failures (M1–M9, D-1–D-9, U1–U20)
 | R22 what views a screen needs | `needs(model)` per screen, recomputed on every replica change (P2) |
 | R23 kept parts after a replay | `tasks.reconcile(idMap, dropped)` (P3) |
 | Root, rev 8: the dispatch loop | P2's loop: door calls right after `update`, answers fed back before render, views reach the model as data |
-| Root, rev 10: the work owned by place (report B) | G1–G9; §What each earlier failure meets |
-| A note sharing the device's filter, place, day and carry (report C, §3) | the note's `Place` gates them (G1); §Old bugs and contradictions |
-| R24 the UI's mechanisms not unique (the traceability's class for revision 11) | §The owner table; every row's owner is a concern of the one screen |
+| Root, rev 10: the work owned by place (report B) | C1–C5, G5, G8, G9; §What each finding meets |
+| Root, rev 11: the guarantee enumerated what is forbidden (R1–R3) | C1–C5: the compiler is the guard |
+| R2.1 render cost | P9 |
+| A note sharing the device's filter, place, day and carry (report C, §3) | the note's `Layout` variants (C4); §Old bugs and contradictions |
+| R24 the UI's mechanisms not unique (the traceability's class for revisions 11–12) | §The one mechanism, §The engine table; every row's owner is a concern of the one screen |
 
 ## Migration: by concern, the main screen first, one switch
 
-The old screen keeps its own services, untouched, until it is deleted. Nothing of the new UI reaches master, or Max, before stage 7, which switches every place at once and deletes the old UI in the same merge (G8). Until then the e2e build holds both, behind the build constant `UI`: each sees the other's writes as outside changes and rebases, as the plugin and the iPhone app do (revision 10's reasoning stands). Stages 1 and 2 are built; stages 3–7 replace revision 10's slices 3–7.
+The old screen keeps its own services, untouched, until it is deleted. Nothing of the new UI reaches master, or Max, before stage 7, which switches every place at once and deletes the old UI in the same merge (G8). Until then the e2e build holds both, behind the build constant `UI`: each sees the other's writes as outside changes and rebases, as the plugin and the iPhone app do. Stages 1 and 2 are built; stages 3–7 replace revision 10's slices 3–7.
 
-**Every stage ends the same way:** every guard green with its fixtures, the matrix complete for the places that exist, the trap clean, mutation at 100 %, jscpd at 0, the behaviour review done and a structural review (G9) clean. A stage that touches the core is led by `backend` first, as revision 10 says.
+**Every stage ends the same way:** the compiler and every check of §Guards green, the matrix complete for the places and payloads that exist, the trap and its ledger clean, the mutation score at or above its floor (raised to it), the behaviour review done and a structural review (G9) clean. A stage that needs the core starts with `backend`.
 
 | Stage | What | Release |
 |---|---|---|
-| 1 | **The runtime and the core's part** (built, kept as is). | — |
-| 2 | **Guards, freeze, the lifecycle test, the e2e harness** (built, kept; extended in stage 3). | — |
-| 3 | **The guarantee, and slice 3 reshaped onto the one screen.** <ul><li>The owner table into `tests/guards/owners.ts`, with every guard of §Guards, their fixtures (H1–H20 and the code-shaped items of M, D and U first), mutation, jscpd, the trap, the matrix's registry, `UI`, the content freeze.</li><li>Slice 3's code onto `Model`, `Msg`, `update`, `Screen`, `ScreenHost`, `Layout` and the kit (below), with `Places.main()` the only place: the main screen's Rows and By project lists, cards, sections, entry, menus, selection, search, the full card and the carry between lists, in a fill frame. No note adapter yet.</li></ul> | — |
-| 4 | **The main screen, region by region**, each region adding to the existing owners only: <ol><li>the timeline (lanes, events, the now line, zoom, slots, its drops and stretches);</li><li>Two columns and the ribbon, the wheel, both swipes, the day turn, the Done column;</li><li>All columns and the dividers;</li><li>the panel and the tree, the filter and its title, the tree's lift and drops, the hover-open, the left-edge reveal;</li><li>the carry across every target, select mode across columns, the bulk menu, the sources and event menus, the missing file.</li></ol>Each region ends with its matrix cells and its smoke subset. | — |
-| 5 | **The note as a `Place`.** `Places.note(path)`, its gates in `layoutOf`, `host/adapters/note.ts` (today's `NoteBlocks` without its DOM work, which goes to `drivers/mount.ts`), the inline frame in the kit's `Frame` and the scroll chain. Its matrix column. **The stage's diff touches no pure owner but `screen/layout.ts`**, and no effect owner but `mount` and `scroll`'s chain: a place that needs more is a missing capability, added at stage 4's owner, never a branch here (`tests/onePlace.test.ts` checks the diff against the stage's base). | — |
-| 6 | **The settings tab as a `Place`.** `Places.settings()`, `host/adapters/settings.ts`; its rows reorder as a carry payload, its fields through entry, its menus through layers. Its matrix column. The same diff rule as stage 5. | — |
-| 7 | **One switch, and the old UI deleted in the same merge.** The release gate passes, an independent QA on a copy of Max's real file finds nothing, then one merge into master: `main.ts` mounts the new UI for every place; `UI`, the old UI (`CalendarScreen` and everything only it uses), the old CSS above `/* next */`, `Picks`, `Reload`, `WriteQueue`, the old services' plugin wiring, `createServices` for the UI, the freeze and its baselines are deleted; `oneSwitch` turns to its final form. | ★ with Max's phone checklist |
+| 1 | **The runtime and the core's part** (built, kept). | — |
+| 2 | **Guards, freeze, the lifecycle test, the e2e harness** (built; reshaped in stage 3). | — |
+| 3 | **The construction, and slice 3 reshaped onto it.** <ul><li>`backend`: structural sharing and per-part need caches (P9); the hit test, the press slop and hold, and the edge-scroll speed as core rules (C3); the project-note check indexed by path.</li><li>The pure, kit and engine projects; the two JSX dialects; `units`, the gateway and the generators; the engine table and the manifest; `uiRules` over the metafile; the CSS allowlist; the closed-type test; the trap with its ledger; the matrix registry; the reject fixtures of every finding in §What each finding meets; the mutation floor at its first score; `UI` and the content freeze.</li><li>Slice 3's code onto them, with `Places.main()` and `Places.note(path)` both mounted under `UI=next` from the start (the note adapter one `ScreenHost` per Markdown view): lists, cards, sections, entry, menus, selection, search, the full card, the carry between lists.</li></ul> | — |
+| 4 | **The main screen, region by region**, each adding to the existing concerns and engines: <ol><li>the timeline (lanes, events, the now line, zoom, slots, its drops and stretches);</li><li>Two columns and the ribbon, the wheel, both swipes, the day turn, the Done column;</li><li>All columns and the dividers;</li><li>the panel and the tree, the filter and its title, the tree's lift and drops, the hover-open, the left-edge reveal;</li><li>the carry across every target, select mode across columns, the bulk menu, the sources and event menus, the missing file.</li></ol>Each region ends with its matrix cells and its smoke subset. | — |
+| 5 | **The note completed.** Its variants (§Old bugs 1–5, 13, 14), the inline frame, the scroll chain to the note's scroller, its matrix column complete. Its diff adds values to existing variants and nothing else: no new concern, engine, message or command. | — |
+| 6 | **The settings tab.** First the behaviour inventory gains the tab's inputs it lacks (the colour well's live preview, the code field, swatches, bins, Add buttons, sliders, dropdowns, More's rows, the login row, Copy; R3 §4). Then `host/settings.ts` on Obsidian's `Setting` as today, and `Places.rows(list)` with the adopted rows, the `settingsRow` payload, its `self` look and `stepAside` (the settings tab in §The one mechanism). Its matrix cells. | — |
+| 7 | **One switch, and the old UI deleted in the same merge.** The release gate passes, an independent QA on a copy of Max's real file finds nothing, the mutation score is 100 %, then one merge into master: `main.ts` mounts the new UI everywhere; `UI`, the old UI (`CalendarScreen` and everything only it uses, the old `SettingsTab`), the old CSS above `/* next */`, `Picks`, `Reload`, `WriteQueue`, the old services' plugin wiring, the freeze and its baselines are deleted; `obsidian/ui/failureText.ts` has moved out of the old UI first. | ★ with Max's phone checklist |
 
-**What of slices 1–3 is kept, renamed or reshaped** (report A):
+**What of slices 1–3 is kept, renamed or reshaped** (report A, corrected by R2.4):
 
 | Fate | What |
 |---|---|
-| **Kept as is** | The whole runtime (23 files): `Program`, `Store`, `HostSession` are generic; the `Program` is instantiated once, by `ScreenHost`. `model/`: `answers`, `assertNever`, `card`, `monthGrid`, `section`, `select`, `taskMenu`, `layers`, `search`, `full`, `commands`. `recognizers/press.ts` (as `update/gesture/press.ts`). View leaves `Card`, `List`, `Sheet`, `icons`, `entry/Bar`, `carry/SelectFoot` (into `view/kit/`). Drivers `focus`, `keys`, `overlay`, `chrome`, `input`, `scroll`. The e2e harness, the recorder, the shots, the budget. |
-| **Renamed** (the logic is generic, the types say block) | `BlockMsg` → `Msg`, split into the owners' unions; `update/menu`, `full`, `ids`, `fullActs`; `view/menu/TaskMenu`, `full/FullCard`, `carry/CarryFloat`; `drivers/islands` → `drivers/editors`; `BlockKey` → `KeyIntent`; the CSS root `tc-n-block` → `tc-n-screen` with the frame's variant a kit prop. |
-| **Reshaped** | `model/block.ts` → `model/Model.ts` (with `place`) and `screen/layout.ts`; `BlockLists` → `Layout.regions`, and its eight hand-written flatteners → `rowsOf(layout)`. `model/lists.ts` → layout's private part. `model/carry`, `carryPlace`, `carryView` → `update/carry.ts` and `screen/carryGeometry.ts`: per-list scrollers, timeline, tree, section and settings targets, `Px`. `model/entry.ts` (`entryLook` from `Layout`), `menuNeeds.ts`. `update/block.ts` → `update/update.ts` (the router), `update/motion.ts` (`withMotion`, `sameRows`) and `update/context.ts` (`modePicked` through `Layout.modeWrite`). `update/search`, `select`, `section`, `acts` read `Layout`, not `noteView(model)`. `view/Block.tsx`, `BlockRoot`, `Layers`, `search/Search` → `view/Screen.tsx` and the kit's `Frame`, `Foot`, `SearchPanel`. `drivers/measure.ts`: `Measure.stack`/`carry(stack)` → boxes per `MeasureKey`. `drivers/motion.ts`: the block frame's height hold → the pin (P6) under the motion cause of the lift; its own box reads → `measure.boxesNow`; the `put`/`inline` helpers → `mount`. `host/block/BlockHost.tsx` → `host/ScreenHost.ts` (`draw`, `run`, the input routing; `blockProgram` and `entryDoor` gone into `update`), its gesture state into `Model`, its long-press timer a command. `NoteBlocks.ts` → `host/adapters/note.ts` (stage 5). `composeRuntime.ts`: no `NewScreens`, the feeds always given. |
-| **Deleted** | The `newBlock` device value (`task-calendar:new-screens`), `NewScreens`, every block-shaped name the guard bans. |
+| **Kept as is** | The whole runtime (23 files): `Program`, `Store`, `HostSession` are generic; the `Program` is instantiated once, by `ScreenHost`. Pure models `answers`, `assertNever`, `card`, `monthGrid`, `section`, `select`, `taskMenu`, `layers`, `search`, `full`, `commands`, into their concerns' folders. `recognizers/press.ts`, into the gesture concern. The e2e harness, the recorder, the shots, the budget. |
+| **Kept, reshaped at their edges** | The drivers become engines: `focus`, `keys`, `overlay` (into `mount`), `chrome`. `scroll` (its frames and timeouts, `scroll.ts:43,130-134`, go to the time engine), `input` (its timeout, `input.ts:281`, goes to the time engine; its comparisons to the gesture concern), `islands` → `editors` (its timeout, `islands.ts:124`, to the time engine; CodeMirror configured to delegate keys, focus and scroll). The view leaves `Card`, `List`, `Sheet`, `icons`, `entry/Bar`, `carry/SelectFoot` into `view/kit/` under the kit dialect. |
+| **Renamed** | `BlockMsg` → `Msg`, split into the concerns' unions; `update/menu`, `full`, `ids`, `fullActs`; `view/menu/TaskMenu`, `full/FullCard`, `carry/CarryFloat`; `BlockKey` → a key intent; the CSS root `tc-n-block` → `tc-n-screen`. |
+| **Reshaped** | `model/block.ts` → `Model` (with the opaque `place`) and `screen/layout.ts`; `BlockLists` → `Layout.regions`, its eight flatteners → one selector of the layout concern; `model/carry`, `carryPlace`, `carryView` → the carry concern, its geometry through the core's hit test and units; `update/block.ts` → the generated router, the motion concern (`withMotion`) and the context concern (`modePicked` through `root.modeWrite`); `update/search`, `select`, `section`, `acts` read their `Layout` parts; `view/Block.tsx`, `BlockRoot`, `Layers`, `search/Search` → the generated `Screen` and kit elements; `drivers/measure.ts` → boxes per key, units made here; `drivers/motion.ts` → one `animate` over specs, its height hold → the pin, its box reads → measure, its `put`/`inline` → mount; `BlockHost.tsx` → `ScreenHost.ts` (`blockProgram`, `entryDoor` into `update`; its gesture state into `Model`; its long-press timer a command); `NoteBlocks.ts` → `host/adapters/note.ts`, one `ScreenHost` per Markdown view; `composeRuntime.ts`: no `NewScreens`, the feeds always given. |
+| **Deleted** | The `newBlock` device value (`task-calendar:new-screens`), `NewScreens`. |
 
 ## Tests
 
@@ -643,7 +609,8 @@ The old screen keeps its own services, untouched, until it is deleted. Nothing o
    - identity across create, rename and undo;
    - midnight during a swipe;
    - bounds;
-   - every model-level cell of the matrix (G5), each place's model through the one `update`.
+   - every model-level cell of the matrix (G5), each place's model through the one `update`;
+   - P9's render counts: one write re-renders only the cards it changed.
 2. **The runtime (unit):**
    - a dependent call after a create that the replay gives a new id;
    - a pin on a created task surviving a replay re-id; ids never reused;
@@ -665,7 +632,7 @@ The old screen keeps its own services, untouched, until it is deleted. Nothing o
    - the parsed-document cache's budget on a 30 KB file.
 3. **Recognizers (unit):** every input of the inventory's section A as a stream.
 4. **Views (happy-dom):** what each draws for a model; the render counter; the caret and composition surviving updates.
-5. **Drivers (happy-dom):**
+5. **Engines (happy-dom):**
    - transitions run once;
    - running motions are cancelled before the next measure;
    - interruption;
@@ -674,7 +641,7 @@ The old screen keeps its own services, untouched, until it is deleted. Nothing o
 6. **End to end (`scripts/e2e/`, CDP, a test Obsidian with a copy of Max's real file):**
    - **Geometry against the design boards** at rest, with a tolerance.
    - **Old against new** at rest where the behaviour is meant to be the same, in the e2e build, which alone holds both UIs (G8).
-   - **The matrix** (G5): every cell's scenarios, with the frame logs of one concern compared across places, and **the trap** (G6) armed on every e2e run.
+   - **The matrix** (G5): every cell's scenarios, with the frame logs of one concern compared across places, and **the trap** (C5) armed on every e2e run.
    - **Clock and network:** the clock is frozen through the core's clock (never CDP virtual time), and calendars come from fixtures through a stubbed `Http` in the test build.
    - **Frame recorder** from `document.getAnimations()` and the CDP Animation domain, with row boxes sampled. It fails on:
      - motion without a cause;
@@ -689,75 +656,82 @@ The old screen keeps its own services, untouched, until it is deleted. Nothing o
      - a risk-ranked subset gates each region;
      - the release gate is every input, in each mode, on desktop and phone view, in light and dark;
      - the full matrix runs before the switch.
-7. **The guards' own tests** (G7): the fixtures, non-vacuity, mutation at 100 %, jscpd.
+7. **The guards' own tests:** the fixtures, non-vacuity, mutation at or above its floor, jscpd as a backstop, the manifest.
 8. **Max's phone checklist at the ★** (under 5 minutes): momentum scroll, the rubber band, the real keyboard and its rising on a pick, a lost lift.
 
 ## Done when
 
-- Every concern of the owner table has its owner and no other code reaches its APIs; the table's hash is the one Max approved.
-- Every guard of §Guards is green; every hole of report B has its reject fixture; every rule matches real files; mutation scores 100 %; jscpd finds nothing.
-- The matrix is complete for every place and form, at model level and in the test Obsidian, with logs equal across places and the trap clean.
+- The engine table is the code's, its hash the one Max approved, and the manifest unchanged since his last approval.
+- The pure, kit and engine projects compile under their configurations; every check of §Guards is green; every finding of §What each finding meets has its reject fixture; mutation is at 100 %.
+- The matrix is complete for every place, form and payload, at model level and in the test Obsidian, logs equal after declared variance, branch coverage 100 %, the trap and its ledger clean in every realm.
+- P9's budgets hold.
 - The traceability, rerun against the final revision, leaves no row over and maps every row to a concern of the one screen.
-- The release gate passes, the budget holds, an independent QA on a copy of Max's real file finds no defect, and the phone checklist passes at the ★.
-- The old UI is gone in the merge that switched, master never held both, and `docs/plugin/` says what the screen does (the fixes of §Old bugs included).
+- The release gate passes, an independent QA on a copy of Max's real file finds no defect, and the phone checklist passes at the ★.
+- The old UI is gone in the merge that switched, master never held both, and `docs/plugin/` says what the screen does (§Old bugs' doc changes included).
 - The last structural review found nothing.
 
 ## How it is built
 
 - `backend` makes the core part of each stage that needs one. One `frontend-obsidian` agent per stage or region after that. The lead checks every diff, test and screen.
 - **Behaviour review:** after each stage or region, a fresh reviewer gets the diff, the principles and that part's traceability rows, and finds where the code breaks a principle.
-- **Structural review (G9):** a second fresh reviewer gets the owner table and the whole tree, and finds a concern implemented twice or a branch on place or form outside `screen/layout.ts`. Its findings become reject fixtures before their fixes.
+- **Structural review (G9):** a second fresh reviewer gets the engine table and the whole tree. Its findings become reject fixtures before their fixes.
 - After stages 3, 4 and 5, a fresh QA agent is told to break it.
-- A finding is answered by naming the principle, the guarantee or the inventory row that let it through, and fixing that.
+- A finding is answered by naming the principle, the part of C1–C5 or the inventory row that let it through, and fixing that.
 
 ## Old bugs and contradictions, decided
 
-From report C, §3 and §2. Each is decided by `docs/plugin/`; where the docs are silent, by what the screen does today (a rework keeps the current behaviour). The docs that need words are changed in the stage named.
+From report C (§3, §2) and review R3. Each is decided by `docs/plugin/`; where the docs are silent, by what the screen does today (a rework keeps the current behaviour). The variant that carries each decision is named.
 
-| # | What | Decided | Stage |
-|---|---|---|---|
-| 1 | A search in a note clears the **main screen's** filter (`CalendarScreen.ts:881`) | `screen.md:99`: a note's block has one project and no cross. With `filter: "fixed"` a find the note's project hides opens on the full card, as a Done find without the ribbon does; the device's filter is never written | 5 |
-| 2 | A search in a note moves the main screen's funnel place | `writesPlace: false`: a note never writes it. On the main screen a find still sets the place in every mode, as today | 5 |
-| 3 | A note's day list can leave today with no way back (the quick bar's day, a find on another day) | `screen.md:99` shows no day navigation in a note. With `days: "today"`, a task written for another day leaves the list as a card moved by its menu does; a find on another day opens on the full card | 5 |
-| 4 | A note starts the device's carry, writing over a main-screen carry in another tab | `tree: false` gates the device's carry (`deviceCarry`); the note's carry lives in its own model | 5 |
-| 5 | A note builds and hides a calendar, and fetches its events | `calendar: false`: nothing drawn, no need asked | 5 |
-| 6 | A stale comment says the block has no Undo capsule | Gone with the old code; the note's foot has Undo, ⋯, the view button and the plus (`screen.md:99`, decision 29 of the projects spec) | 7 |
-| 7 | `screen.md:39` misses the top row of modes without column titles | The core's `topRow` (projects spec decision 22) stands; `screen.md:39` gains the case: in Rows and By project without a filter the folder button stands in a row of its own | 4 |
-| 8 | `screen.md:99` omits ⋯ in the note's foot | `screen.md:99` gains it (Search, Select tasks), as the screen does today | 5 |
-| 9 | The inventory marks the still layouts' divider desktop only | `screen.md:87` and the code: on the phone too. The traceability notes it on A8.3 | 4 |
-| 10 | `wide` is a platform, not a width | The rule stays; its name in the UI is `form` | 3 |
-| 11 | A note's first frame lacks the Subprojects row (`firstView` with `branches: false`) | `screen.md:99`: the note's view menu has it. `backend` reads the device's Subprojects in the note's first view | 5 |
-| 12 | Double click on free room works in funnel and Rows lists, not in By project | The kit's `List` owns it, so every list has it, By project's parts and the note's lists included; `tasks.md:19` says «списка» for «колонки» | 4 |
-| 13 | Not seen on screen: the phone's bar in a note (`--tc-keyboard-room: 0`), and the note scrolling when a carry reaches the window's edge | Entry × note × phone and carry × note × both forms are matrix cells; the bar rides the keyboard as on the main screen, and an edge scroll that reaches the stack's end goes on in the note's scroller (`Layout.scrollers`) | 5 |
-| 14 | The full card and the desktop search are confined to the note's frame (report C, §2.4) | Kept: the screen today, and no board shows otherwise. The search's panel scrolls the frame's top into view before it opens (as a menu's `intoView`, decision 50), so it never hangs off-screen | 5 |
+| # | What | Decided | Variant | Stage |
+|---|---|---|---|---|
+| 1 | A search in a note clears the **main screen's** filter (`CalendarScreen.ts:881`) | `screen.md:99`: a note has one project and no cross. A find the note's project hides opens full in the note; the device's filter is never written. This is the old bug's fix, and it is what a note shows instead | `search.reveal` `openFull` | 5 |
+| 2 | A search in a note moves the main screen's funnel place | A note never writes it; on the main screen a find sets the place in every mode, as today | `context.writesPlace` | 5 |
+| 3 | A note's day list can leave today with no way back | `screen.md:99`: no day navigation in a note. A find on another day opens full in the note. A field whose place the bar sets to another day **stays open where it is and writes there**, By project's rule (`tasks.md`: «поле остаётся на месте, а задача пишется в выбранный список»); the written card leaves the list as a card moved by its menu does | `search.dayOfFind` `openFull`; `entry.placeMoves` `stay` | 5 |
+| 4 | A note starts the device's carry | A note's carry is its own; the device's carry is never written from it | `carry.device` `silent` | 5 |
+| 5 | A note builds and hides a calendar | Nothing drawn, no need asked | `regions` | 5 |
+| 6 | A stale comment: the block has no Undo capsule | Gone with the old code; the note's foot has Undo, ⋯, the view button and the plus | — | 7 |
+| 7 | `screen.md:39` misses the top row of modes without column titles | The core's `topRow` stands; `screen.md:39` gains the case | — | 4 |
+| 8 | `screen.md:99` omits ⋯ in the note's foot | `screen.md:99` gains it | — | 5 |
+| 9 | The inventory marks the still layouts' divider desktop only | `screen.md:87` and the code: the phone too | — | 4 |
+| 10 | `wide` is a platform, not a width | The rule stays; the UI calls it `form` | — | 3 |
+| 11 | A note's first frame lacks the Subprojects row | `backend` reads the device's Subprojects in the note's first view | — | 5 |
+| 12 | Double click on free room missing in By project | The kit's `List` owns it, so every list has it: a new task at the end of the section double-clicked, else of the last part; `tasks.md:19` says «списка» | — | 4 |
+| 13 | Not seen: the phone's bar in a note; the note scrolling under a carry at the window's edge | Matrix cells; the bar rides the keyboard as on the main screen; edge scroll goes on in the note's scroller | `scroll.chain` | 5 |
+| 14 | The full card and the desktop search confined to the note's frame | Kept, as today; the search's panel first scrolls the frame's top into view | — | 5 |
+| 15 | The full card's project line: `tasks.md` (Задача на весь экран) says the tap opens the project's note in a new tab; the code closes the card and filters the main screen to the project | The code's behaviour stands: on the main screen the tap closes the card and selects the project in the filter; in a note it closes the card. `tasks.md`'s line is corrected to say so | `full.projectTap` `closeAndFilter` / `close` | 3 (doc), 5 |
+| 16 | The settings tab's look | Obsidian's own `Setting` rows, as today | — | 6 |
+| 17 | Blur and the entry | A blur ends the entry on both forms, as today (the window losing focus excepted); no variant | — | 3 |
 
 ## Questions for Max
 
-None. Every place-shaped difference above is answered by `docs/plugin/` or by the screen as it is today; the rest of revision 11 is how the code is built, which Max sees only as the screen staying the same in every place.
+None. Every place-shaped difference is answered by `docs/plugin/` or by the screen as it is today; the rest is how the code is built, which Max sees only as the screen staying the same in every place.
 
 ## Decisions
 
-**Reviewed for revision 11.** Every decision was read against G1–G9. A decision written "in the block", or allowing several stores, CSS motion, a flag per place or logic in a host, is revoked or rewritten; each keeps its product behaviour, and a rewritten one says so in its first words.
+**Reviewed for revisions 11 and 12.** Every decision was read against C1–C5. A decision written "in the block", or allowing several stores, CSS motion, a flag per place, logic in a host or an engine, or an Obsidian `Menu`/`Modal`, is revoked or rewritten; each keeps its product behaviour (revision 11's three undeclared changes, to decisions 51, 52 and 54, are withdrawn), and a rewritten one says so in its first words.
 
 | Decisions | Verdict | Why |
 |---|---|---|
 | 1–11, 13–18, 20–25, 27–30, 32 | Kept | The runtime: no place, no host, no mechanism of the UI |
-| 12 | Rewritten | Polling started "with a mounted screen (slices 3–4)": now with the first screen whose `Layout` draws a calendar |
-| 19, 26 | Rewritten | "A host" drew and opened the session: now `ScreenHost`; adapters reach nothing of the runtime |
-| 31 | Rewritten | "A host makes its stores": one store per screen, the one `Program` (H5) |
-| 33 | Rewritten | Scope all of `obsidian/`; the owner table instead of driver folders (U17, H17); kit-only intrinsic JSX |
-| 34 | Rewritten | Names and states kept; CSS motion only in the motion owner's classes (U16, H4) |
-| 35 | Revoked | The line freeze with allowances (U14, H16): G8's content freeze |
-| 36, 37 | Rewritten | Hosts are the adapters, in both forms; the e2e build holds `UI` and the trap |
-| 38–42 | Kept | The fixture, the test Obsidian, the recorder, shots and budget: place-free |
-| 43 | Revoked | A device flag for one place (U2, H18): one build constant; readiness kept |
-| 44, 56 | Rewritten | "The block's height": the inline frame's, held only by the pin |
-| 45, 47, 49, 60 | Kept | Generic already (45 names the kit's `act`) |
-| 46, 48 | Rewritten | Variables from the layout owner through `motion`; "the frame" is the region |
-| 50, 51, 52, 53, 55 | Rewritten | The column and the look a host handed in, the full card "inside the block's frame", "the search in the block", `islands` and the mount node: now owned by scroll, entry, full card, search (gated by `Layout`), editors and mount |
-| 54 | Revoked as written, rewritten | "The carry in the block" (one stack, no tree, no timeline; U8): one carry for every payload and place |
-| 57 | Rewritten | The e2e "block run" per place (U11, H20): the matrix run, logs compared across places |
-| 58, 59 | Rewritten | The plus's fade aside was a CSS transition: the motion cause `fadeAside`; both are carry payloads |
+| 12 | Rewritten | Polling starts with the first screen that draws a calendar |
+| 19, 26 | Rewritten | `ScreenHost` draws first and opens the session; adapters reach nothing of the runtime |
+| 31 | Rewritten | One store per screen, the one `Program` (H5) |
+| 33 | Rewritten | The compiler first; the guard over the bundle's metafile; one call site per effect API; no escape hatches |
+| 34 | Rewritten | The CSS an allowlist; time and scroll only under the motion engine's classes |
+| 35 | Revoked | The line freeze with allowances: G8's content freeze |
+| 36, 37 | Rewritten | Hosts are the adapters in both forms; the e2e build holds `UI`, the trap per realm with its ledger |
+| 38–42 | Kept | The fixture, the test Obsidian, the recorder, shots and budget |
+| 43 | Revoked | A device flag for one place: one build constant; readiness kept |
+| 44, 56 | Rewritten | The inline frame's height, held only by the pin |
+| 45, 46, 48 | Rewritten | Acts are kit props; static values by the render engine, time by motion; motion measures only named keys |
+| 47, 49, 60 | Kept | Generic already |
+| 50, 55 | Rewritten | No Obsidian `Menu`; the editors engine delegates; the mount engine adopts and places |
+| 51 | Rewritten | The look from the entry's `Layout` part; **a blur ends the entry on both forms, as today** |
+| 52 | Rewritten | **The project line keeps today's behaviour** (close and filter; in a note close); the help page corrected |
+| 53 | Rewritten | The reveal's alternatives are closed variants; the note's are old bugs 1–3's fix |
+| 54 | Rewritten | One carry, **each payload keeping today's look and start** (a settings row follows the finger, the others step aside, no hold) |
+| 57 | Rewritten | The matrix run, logs compared after declared variance |
+| 58, 59 | Rewritten | The foot's fade a motion cause; both are carry payloads |
 
 Made while building slice 1's runtime (`obsidian/runtime/`), each from the closest existing pattern:
 
@@ -787,42 +761,42 @@ Made while building slice 1's runtime (`obsidian/runtime/`), each from the close
 23. **A read's answer is taken like a call's**, every part (text, settings, Projects screen, ids, history) kept where it is kept; it is only never logged. This holds for every read path: views, the clock's day, the lane's questions. On iOS, `calendars.events`/`known` carrying the choice of calendars over is saved this way.
 24. **A failure is kept by its kind.** A read that fails is told once and never marks the writes stuck; a write that fails is what `Runtime.stuck` shows. A read that fails at the start rejects `ready()`.
 25. **Nothing outlives unload, nothing rejects unheard.** The lane's silence timers are cleared and its reads land nowhere after unload; every promise the runtime starts on its own ends in the failure path or the action log; the minute's clock re-arms even when a tick fails.
-26. *(Revision 11: rewritten.)* **A screen reaches the runtime through its own session** (`Runtime.openHost()` → `HostSession`), opened by `ScreenHost` when it mounts: a carry belongs to the session whose call started it, and a session's teardown ends only its own carry and its own subscriptions. Unload ends any carry. `ScreenHost` imports only `obsidian/runtime/Runtime.ts` of the runtime, which re-exports what it uses (`Store`, `HostSession`, the types, `sectionRef`); the adapters import nothing of it (G2); the old `obsidian/ui` imports nothing of it (`tests/architecture.test.ts`).
+26. *(Revision 11: rewritten.)* **A screen reaches the runtime through its own session** (`Runtime.openHost()` → `HostSession`), opened by `ScreenHost` when it mounts: a carry belongs to the session whose call started it, and a session's teardown ends only its own carry and its own subscriptions. Unload ends any carry. `ScreenHost` imports only `obsidian/runtime/Runtime.ts` of the runtime, which re-exports what it uses (`Store`, `HostSession`, the types, `sectionRef`); the adapters import nothing of it (§Architecture); the old `obsidian/ui` imports nothing of it (`tests/architecture.test.ts`).
 27. **A call runs as made, and only a stale answer runs again with fresh keys:** the door finds a task by its key's id wherever the replica's own writes moved it, so `tasks.freshArgs` is needed only when a line changed elsewhere; a replay always uses it. The replica's `fetched` is the sources the runtime was given feeds for.
 28. **What depends on the replica starts when the replica is first built, whichever read builds it:** the first read at the start, or a later read after a change of the file when the first one failed. The minute's clock starts then and `ready()` resolves then.
 29. **A replay pairs the ids a call gave kind by kind** (`DoorAnswer.createdKinds`): a task's with a task's, a section's with a section's, in order, and a kind only when the replay gave as many of it; an id is never mapped to a line of another kind.
 30. **`persisted()`, `drained()` and unload wait for the reads the writer started itself** (after a change event or a write), not only for its writes.
-31. *(Revision 11: rewritten.)* **One store per mounted screen,** made by `ScreenHost` through its session (`HostSession.store`), the one instantiation of `Program<Model, Msg>` (G1); the session's teardown disposes it, so no pass already scheduled renders into a gone screen. A screen never splits its model over several stores (report B, H5).
+31. *(Revision 11: rewritten.)* **One store per mounted screen,** made by `ScreenHost` through its session (`HostSession.store`), the one instantiation of `Program<Model, Msg>` (C1); the session's teardown disposes it, so no pass already scheduled renders into a gone screen. A screen never splits its model over several stores (report B, H5).
 32. **One run per feed at a time:** an ask while a feed runs joins that run, as `CalendarPolling` did.
 
 Made while building slice 2 (the guards, the freeze, the lifecycle test, the e2e harness), revised after its review:
 
-33. *(Revision 11: rewritten.)* **`uiRules` reads the code as the compiler does, and denies by default, across all of `obsidian/`.** The pure parts (`screen/`, `model/`, `update/`) are a project of their own with no DOM and no host (`tsconfig.next-pure.json`, compiled by `npm run build` and by the test): a window, a document, a timer or an element cannot be named there. Everywhere else in `obsidian/` (the old UI only while frozen, G8), TypeScript 7's own API (`typescript/unstable/sync`, its Go compiler; `typescript` pinned to an exact version because the API is marked unstable) resolves every name, member, shorthand property, import (through its alias to what it names) and type to its declaration, so an alias, a string key, a destructuring, a template literal or `Object.assign(el.style, …)` all reach the same declaration. **Anything declared by the host** (the DOM's, the workers' and Node's libraries, Obsidian's module and what it adds to the DOM, Preact's `render`, CodeMirror, and the language's doors to the host and to code named at run time: `globalThis`, `Reflect`, `Function`, `eval`, `Proxy`…) **is reachable only through the owner table** (`tests/guards/owners.ts`): each effect owner its row's APIs beside what every effect owner may (its element's neighbours and own window, data attributes, events as they come, its own listeners); a view the DOM's element and event types and a field's `value`/`checked` and a key event's `key`; `ScreenHost` the effect owners' intents; an adapter Obsidian's view lifecycle and events, leaves and files' names (never files' contents, notices, menus or Obsidian's DOM helpers) and nothing of the DOM. Whatever no row names fails as «deny by default»; `HOST_WORK` names the work a denied reach is, and a few kinds are allowed nowhere (a bare window or document, a door to code named at run time, a class read, a class written whole or from a list, a selector naming a class by `.x` or `[class…]`, an attribute named at run time, the class list taken whole). Attribute names are compared whatever their case. Every class `chrome` writes is a literal `is-…`; every class `motion` writes is a literal `tc-m-…` of `MOTION_CLASSES`. **A host value stays in the host's types** (unchanged: outside the effect owners a value of a DOM, worker or Node type flows only into a type that holds one or Preact's `ContainerNode`; never into a type literal of its own, a cast, `unknown`, `any`, `{}` or a generic helper's `T`; in an effect owner never into `any`, `unknown` or `{}`). A host member named at run time and any access on an untyped value fail. A switch over a `…Msg` union's discriminant, or a `Command`'s, ends in `assertNever`. In a view no `style` or `dangerouslySetInnerHTML`, by JSX, by a spread, or by `h()`/`createElement`, and outside `view/kit/` no intrinsic element (G4). `next/` holds only `.ts` and `.tsx`. A file's part is read by its folder and its owner by its path in the table (`PartOf`, renamed from the guard's old `Place`); a file the table does not name fails (G3). The self-tests are the fixtures of G7.
-34. *(Revision 11: rewritten.)* **The new CSS's names and states** stand as revision 10 had them: below `/* next */` a selector names only the new screen's classes (`tc-n-…` for a kit component, `tc-m-…` for the motion owner's, `is-…` for a state, the root `task-calendar`); every rule is under `.task-calendar` named outside any functional pseudo-class; a state is an `is-…` class, any attribute selector, `:has()` anywhere, a pseudo-class of what the user does, or a `body` class Obsidian does not set; no size property under a state; no custom property set under a state and read by a size property; no in-flow pseudo-element given content or a size; a size property is anything that sizes a box or its content (the list of revision 10). **What changes:** `transition`, `animation`, `@keyframes`, `scroll-behavior` and `will-change` appear only in rules whose selector is a `tc-m-…` class, with durations and easings only as `--tc-motion-…` tokens (G4); the opacity and transform transitions revision 10 allowed on states are gone, slice 3's foot fade among them (decision 58).
+33. *(Revision 12: rewritten.)* **The guard reads the code as the compiler does, and its scope is the bundle.** The guarantee is first the compiler's (C1–C3): the pure project (`screen/`, `model/`, `update/`, `view/Screen.tsx`) and the kit project have no host types, and each engine is a project compiled only with its row's (`tsconfig.engine-<name>.json`). `uiRules` covers what configuration cannot: it reads every input of esbuild's metafile outside `node_modules` (any folder, `.js` and `.d.ts` included) with TypeScript 7's own API (`typescript/unstable/sync`; `typescript` pinned exactly), resolving every name, member, shorthand, import and type to its declaration, so an alias, a string key, a destructuring or `Object.assign(el.style, …)` reaches the same declaration. **Deny by default:** anything the host declares (the DOM's, Node's, Obsidian's, Preact's and CodeMirror's declarations and the language's doors to code named at run time: `globalThis`, `Reflect`, `Function`, `eval`, `Proxy`…) is reachable only from the engine whose row names it; listeners only by the engine that owns their event type; each effect API from exactly one call site. **A host value stays in host-declared types everywhere,** engines included (no type literal of an engine's own can carry a host call, R1 S2-5). A few kinds are allowed nowhere (a bare window or document, a door to code named at run time, a class read, a class written whole, an attribute named at run time). The rest of its rules: module scope holds only declarations in the pure and kit projects; `screen/units.ts`'s `raw` is imported only by engines and the gateway, and the core's pure rules only by the gateway; no `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`, `jscpd:ignore`, `eslint-disable` or `Stryker disable`, no `.skip`/`.only`/`.todo`, no `as` but `as const` (and inside `units.ts`), no ambient declarations outside the dialect files. Its self-tests are the fixtures of §Guards.
+34. *(Revision 12: rewritten.)* **The new CSS is an allowlist.** Below `/* next */`: `.task-calendar` is every rule's leftmost compound (no `body` or host-class ancestor but the theme's `theme-light`); no `@media` or `@container` outside the token block; a selector names only the kit's `tc-n-…`, the motion engine's `tc-m-…`, an `is-…` state or the root; a state is an `is-…` class, an attribute selector, `:has()`, a pseudo-class of what the user does, or a `body` class Obsidian does not set; no size property under a state, and no custom property set under a state and read by a size property; no in-flow pseudo-element given content or a size; a size property is anything that sizes a box or its content (revision 10's list). **Time and scroll belong to engines:** any property whose effect is time- or scroll-driven (transitions, animations, `@keyframes`, `@starting-style`, view transitions, scroll timelines, scroll snapping, `scroll-behavior`, `will-change`, longhands included) appears only under a `tc-m-…` class and never combined with a state or a user-action pseudo-class; durations and easings only as `--tc-motion-…` tokens. A variant class styles its own element only. The root states `overflow-anchor: none` and `scroll-snap-type: none`. Slice 3's foot fade on a state becomes the motion cause `fadeAside` (decision 58).
 35. **Revoked by revision 11.** Decision 35's freeze (lines per directory, «shrinking passes», allowances with a commit and a reason) let the old UI grow beside the new (report B, H16). It is replaced by G8's content freeze: every old file by blob id, changed only to master's version with its port recorded, the list only shrinking. The two lines that route the old screen's task links through `outside()` (decision 37) are already in the baseline taken in stage 3.
 36. *(Revision 11: rewritten.)* **The lifecycle test's hosts** are the adapters, registered in `HOSTS` (`tests/hostLifecycle.test.ts`) as `mount(context, form) → { startGesture, unmount }`, by their path under `next/host/adapters/`; an adapter not registered fails, and each runs in both forms. `tests/helpers/LeakCounter.ts` counts as revision 10 said (listeners on every target of the window's world, `on…` handler properties, observers, timeouts and intervals, frames, idle callbacks, immediates, microtasks not yet run, running animations, scopes, Obsidian event references, subscriptions), after queued microtasks have run.
-37. *(Revision 11: rewritten.)* **The e2e build** is `obsidian/e2e.ts`, built by the harness into `E2E_HOME/build/main.js` (`node esbuild.config.mjs production e2e --outfile=…`; `npm run build:e2e` into `.e2e/build/`) with the first line `// task-calendar <version> e2e`; the root `main.js` is never touched (`--outfile` without `e2e` is refused). It is the only build that holds both UIs (`UI`, G8), and it carries the trap (G6) and its source map. After copying it into the scratch vault the harness checks the copy is this run's build: its first line exactly that of `manifest.json`'s version, written after this run's build started and after the last commit. `createServices` and `createDeps` take the `Http` (default `obsidianHttp`), and the plugin's reach outside Obsidian is one protected method in `obsidian/hostServices.ts` (`outside()`: `open` for links to other apps, `browse` for an address in the browser, `runScript` for the Mac's scripts): the e2e build records them, and takes over `window.open` and `location.assign` in its test window, so nothing opens on Max's Mac.
+37. *(Revision 12: rewritten.)* **The e2e build** is `obsidian/e2e.ts`, built by the harness into `E2E_HOME/build/main.js` (`node esbuild.config.mjs production e2e --outfile=…`; `npm run build:e2e` into `.e2e/build/`) with the first line `// task-calendar <version> e2e`; the root `main.js` is never touched (`--outfile` without `e2e` is refused). It is the only build that holds both UIs (`UI`, G8), and it carries the trap with its effect ledger, installed in every window realm before a screen mounts there, its source map and the coverage counters. After copying it into the scratch vault the harness checks the copy is this run's build: its first line exactly that of `manifest.json`'s version, written after this run's build started and after the last commit. `createServices` and `createDeps` take the `Http` (default `obsidianHttp`), and the plugin's reach outside Obsidian is one protected method in `obsidian/hostServices.ts` (`outside()`: `open`, `browse`, `runScript`): the e2e build records them, and takes over `window.open` and `location.assign` in its test window, so nothing opens on Max's Mac.
 38. **The fixture** is taken once into `.e2e/fixture/` (gitignored with all of `.e2e/`: it holds Max's tasks, never committed) and kept, so baselines stay comparable; `--refresh-fixture` takes it again, and the baselines are recorded again after it (`--update`). The clock stands at 14:20 of the day it was taken. Google's secrets are replaced (`e2e`), the project notes come as stubs holding only the project tag, and the calendars (Google through the fixture network, the phone's and the work files at the paths the settings name) are made up for that day. Every path the fixture names (the tasks file, a note, a calendar) must stay inside its vault: an absolute one or one climbing out (`..`) is refused, when the fixture is read from Max's vault and when the scratch vault is written.
 39. **The test Obsidian of the harness** keeps its profile and vault under `E2E_WORK` (default `.e2e/work`); the harness refuses an `E2E_WORK` or `E2E_HOME` inside `~/Obsidian` or inside the repository outside `.e2e/`, comparing paths as the disk does: the nearest part that exists resolved by `realpath` (links, and on macOS the case the disk holds), the rest appended, then compared without regard to case (so `~/obsidian/e2e` is Max's vault). The vault is written over in place each run (a copy of Max's tasks is never moved to the Bin). A port from 9345 free by `ps` and `lsof`; if another session takes it between the check and the launch, the instance just launched (it has no port of its own then) is ended by its own process id and the launch tried on the next port. A launch in the background (`open -n -g`) with Chromium's switches against an occluded window's throttling, and focus emulation; with those, CDP's own input reaches a window behind others, so every touch, click, wheel and the closing of Obsidian's first dialogs go through `Input.dispatch*`, never a click made in the page. Each platform and theme starts clean: the fixture's tasks file written again, the plugin's device storage cleared, the page reloaded into the platform.
 40. **The recorder** keys a row by the key the view gives it (`data-row`, the model's row key; on the old screen `data-card`, its task's id), or by its whole title where it has neither, with a count among rows of the same base; each element keeps the key it was first given, so rows of one title never swap numbers as they move, and a key passes to another element only once its own left the DOM, so a remounted row keeps it. A carried card is named by its key (`__e2e.keyAt`), never by a cut title. Each row is judged from the frame it first shows in; a row's box takes in its margin below (a folded parent's fold); the place is the leftmost column showing plus the day after today, with its distance from the stage's edge (the view's left or a docked panel's right). The rules, each proven on a frame log made to reproduce a past bug (`tests/e2e/frames.test.ts`): a step that never settles; a row gone for some frames and back (a remount's flash); in a context step, any row animated or between its two places (cards flying in on a project switch); a row the step does not move that moves, and any row that leaves its place and comes back (a jump under a lift); in a swipe, each column moving as one (columns may change their widths, RibbonColumns), one way, never more than 120 px between two frames (the All columns jerk); overshoot; a rest off; a swipe resting off its column's edge or two places away; gaps or overlaps; a gesture that moved nothing. A step waits a person's pause (500 ms) before acting; the mouse lifts a card by moving it (holding opens its menu), the finger by holding; a swipe starts clear of the divider; the trackpad's wheel goes at a delta every 8 ms. The smoke set adds All columns tried sideways (nothing may move), a project chosen and all again, and a card lifted and held.
 41. **Shots** are clipped to the view (Obsidian's chrome is never compared) and compared at 5 of 255 per channel on at most 0.2 % of the pixels (the timeline 6 on 0.3 %), and no more differing pixels may lie together (8 ways) than 4 CSS pixels' worth at the shot's ratio (36 at 3×): a short label one pixel off on the phone view is a tiny share of the shot but a block of touching pixels along its strokes, while the GPU's rounding scatters single ones. A missing baseline fails unless `--update`. Masks are listed by selector and kept with the baseline.
 42. **The budget** comes from a CDP trace of each gesture and a fixed tail of 1.2 s (longer than any transition); the recorder starts before the trace and the wait for rest runs after it, so the harness's polling is never traced. Every harness evaluation marks its run in the page (`console.timeStamp`, `HARNESS` in `frames.ts`), and its script, with the frame sampler's own function, is cut out. From the rest: the page's main thread, its frames (each `FireAnimationFrame`), the script run in each frame (the union of the script events, nested ones once), and every task over 16 ms (the 17–49 ms ones the page's `PerformanceObserver` never tells). It fails a trace with no frame or no script of the page (nothing passes on an empty recording), a frame with 8 ms of script or more and any task over 16 ms, and reports the average over the frames that ran script and the longest frame.
 
-Made while building slice 3 (the note block behind `newBlock`; reviewed above for revision 11):
+Made while building slice 3 (the note block behind `newBlock`; reviewed above):
 
 43. **Revoked by revision 11.** `newBlock` as a device value (`task-calendar:new-screens`) was a flag per place (report B, U2, H18). G8 replaces it with one build constant for every place; no device or synced value chooses a UI. What it carried that is not a flag stays: the runtime's readiness is told when `VaultProjects.ready()` resolves (a plugin loaded into an indexed vault hears no `resolved`), and `core/settings.ts` is not touched. The runtime is composed with its feeds always; a place without a calendar asks for no events (decision 12).
 44. *(Revision 11: rewritten.)* **An inline frame's height is the stylesheet's:** with `Layout.variants.frame` `inline` (a note), the kit's `Frame` is a column as tall as its stack up to `--tc-block-max-h`, past which the stack scrolls; nothing is measured for it. During a carry the region holds its height as it stood, by the pin under the lift (P6), a motion cause like any other, never a frame-specific hold. The old block was at times 1 px short of its rows (its stack scrolled by a pixel); the new one is not, and the e2e comparison crops that pixel (`fit`).
-45. **Views take no event handlers.** Every press goes through `drivers/input.ts`, which delegates by the kit's `act` (`data-n-act`, with the row's `data-n-key` and a `data-n-value`) and feeds the pointer stream to the one recognizer (`update/gesture.ts`); `update` turns an act into its message. Preact's handlers would stay attached to the nodes it removes, which the lifecycle counter counts. *(Revision 11: kept; the act is a kit prop.)*
-46. *(Revision 11: rewritten.)* **Every inline style and CSS variable comes from the model through `motion`:** a row's level and branch offsets, a folded card's room, the select circle's room, the regions' widths, are computed by `screen/layout.ts` (or carry geometry for the float) and written only by `drivers/motion.ts`, on the screen's root key `root/screen`. A variant that sizes a box is a kit component of its own kind with literal classes (a two-line card is as tall as its lines; a branch's end, the fold counter, a meta pair, a repeat-only corner, each panel and row kind), and a class that comes and goes is an `is-…` state that sizes nothing (decision 34).
+45. *(Revision 12: rewritten.)* **Views take no event handlers.** A kit element that can be pressed carries an `act` prop (with its key and value); the render engine writes it as data attributes; the input engine delegates by them and turns each event into one message of unit-branded raw data; the gesture concern recognises presses (`press.ts`) and `update` turns an act into its message. The kit dialect has no `on…` attribute at all.
+46. *(Revision 12: rewritten.)* **Inline styles and CSS variables come from the model, split by time.** Values at rest (a row's level and branch offsets, a folded card's room, the select circle's room, the regions' widths) are computed by the core's rules through the layout concern and written by the render engine, only when they differ. Values that change over time (a transition, the transient channel) are the motion engine's. A variant that sizes a box is a kit element of its own kind with literal classes (a two-line card is as tall as its lines; a branch's end, the fold counter, a meta pair, a repeat-only corner, each panel and row kind), and a class that comes and goes is an `is-…` state that sizes nothing (decision 34).
 47. **A card's marks** are the core's `TaskItem.marks`: the dot of a task in progress (`progressDot`, the card's `is-progress`), the description's mark (`description`) and the subtask counter (`count`); the card reads no status or `can` field for them. Its `data-status` paints only the full card's subtasks (done ticked, given up struck through).
-48. *(Revision 11: rewritten.)* **Motion within one context** is a FLIP over keyed rows, the motion cause `rows`: `motion` reads boxes in the commit phase through `measure.boxesNow`, then slides what moved and fades in what is new; another context (mode, project, the first read) draws in place. A row that leaves fades where it stood and then its room folds, as the old `Motion.leave`: `motion` keeps its node over the frame, fades it, and the rows under it slide up after the fade while the region holds its height (the e2e step «a card done leaves its list» judges it frame by frame, in every place).
+48. *(Revision 12: rewritten.)* **Motion within one context** is a FLIP over keyed rows, the motion cause `rows`, which names the keys it may move: the motion engine asks the measure engine for those boxes only, in the commit phase, then slides what moved and fades in what is new, through its one `animate` over the cause's `AnimationSpec`; another context (mode, project, the first read) draws in place. A row that leaves fades where it stood and then its room folds, as the old `Motion.leave`: the engine keeps its node over the frame, fades it, and the rows under it slide up after the fade while the region holds its height (the e2e step «a card done leaves its list» judges it frame by frame, in every place).
 49. **Layers** mount in the overlay host's node, under their own `.task-calendar` root; `motion` places them from measured anchors (`data-n-anchor`) and fades them in and out; the close's end is `layerGone`, which unpins the lists. A write pick runs its door call at the tap and the lists change once the sheet has gone (R10).
-50. *(Revision 11: rewritten.)* **The task menu** reads the core's `tasks.menu`/`tasks.bulkMenu` as a view need while open; its copy of the card is measured once per menu (`wholeWidth`, `grownStart`); the panel is placed from measurement, under, over or split (`groupsAbove`), and a page change re-places only the panel; a closing menu keeps what it drew; the repeat page writes once at the close (`repeatPage.end`); the month grid is plain date math (no core rule exists for it). Typing picks (Rename, Add subtask, New section, New project) focus their field inside the tap, once it is visible. As the old menu: it opens once its card is in view, the scroller the card scrolls in gliding it in first in the collapse time (the scroll intent `intoView` over `Layout.scrollers`: a list, a note's stack and then the note itself; a finger on it calls the menu off); on the desktop a second click within 250 ms of the one that opened it renames (the gesture `secondPress`, the old double click); the start of the task's description stands by the copy of its card, over or under it where the panel is not, rendered by Obsidian (an `editors` intent, the old `DescriptionPeek`): a tap on it opens the full card, a note's link opens the note.
-51. *(Revision 11: rewritten.)* **The quick entry** runs the core's `entry.*` steps over a session kept in the model, and its jobs in the core's order (`entryJobStep`, `queuedEntryJobs` from `contracts.ts`) in `update/entry.ts` (`runEntryJobs`, after every message). The look (`entryLook`) and the cards about to be drawn for a step that asks for them (`coming`) are computed there from `Layout`, never handed in by a host: `ScreenHost` only runs the door command. The field is Obsidian's editor (`drivers/editors.ts`) restyled by a CodeMirror theme from tokens; on Enter the written card takes the field's box and the next field gets a new row key. While typing, the foot fade is a second element (sizing by state is forbidden); on the phone the room at a list's end is a spacer row. The bar is the kit's `Bar` with `Layout.variants.entry` (`bar` over the keyboard, `capsule` beside the field), and on the phone a blur from the keyboard closing ends the entry (`blurEndsEntry`).
-52. *(Revision 11: rewritten.)* **The full card** is a layer inside the screen's frame, in every place, pinned by id and following Sync through the needs `tasks.find`/`tasks.fullTree`; the description runs in Obsidian's editor through the core's `description.*`; its subtasks' circles are drawn as the old full card's (width 0, the card's padding kept); its rows are keyed `full/<id>`; the project line selects the project (`tasks.selectProjectNode`), through `update/context.ts` and so gated where the filter is fixed. Its task and subtasks are read by the screen's filter (`tasks.find(key, text, filter)`, `tasks.fullTree(item, filter)`): fixed to a project, they show no folder mark, as the core decides.
-53. *(Revision 11: rewritten.)* **The search reveals a pick** through `tasks.reveal`, one reveal for every place, each step gated by the place's `Layout` (report C, §3): where the filter is chosen, it is cleared when it hides the task (`tasks.filterHides`, `screen.md:114`); where it is fixed (a note), a hidden task opens on the full card and the device's filter is never written. Where the screen writes the funnel place, it moves to the task's (Done, Inbox for Backlog, Soon, the calendar); a note never writes it. Where days move, a task of another day takes the day list to that day; where the day is today's (a note), it opens on the full card. A Done task without the ribbon opens on the full card; any other is ringed and scrolled into view (the scroll intent `reveal`).
-54. *(Revision 11: rewritten.)* **The carry is one, for every payload and place** (`update/carry.ts`, `screen/carryGeometry.ts`): a card, its subtasks, the picked cards, the plus, a section, a tree node, a settings row, a timeline slot. The geometry is measured once after the lift renders, per list scroller and target in `Px`, with each scroller's offset, and kept fresh by `measured` while edge scroll moves a scroller; the target is the core's drop rules over it, recomputed on each move and told only when it changes; `carryAt` is called when the target changes and only where `Layout.gates.deviceCarry` holds (the main screen: a note never writes the device's carry); the carried cards' subtasks leave the pinned snapshot; the waiting place is a dashed outline; on a drop the pin goes at once and the float flies onto the landed card, on a cancel the pin stays until the float is back. A long mouse click does nothing, a right click opens the menu.
-55. *(Revision 11: rewritten.)* **The editors and the mount**: `drivers/editors.ts` (today's `islands`) holds the title field and the full card's editors; `drivers/mount.ts` makes, places and removes the screen's own node in its host (a leaf's content; after `.cm-contentContainer` or first in `.mod-footer` of a note) and writes Obsidian's nodes around it (`--tc-block-lift`, `.cm-content`'s growth). Adapters and `ScreenHost` write no DOM (decision 33).
+50. *(Revision 12: rewritten.)* **The task menu** is a kit layer in the one layer stack (no Obsidian `Menu`). It reads the core's `tasks.menu`/`tasks.bulkMenu` as a view need while open; its copy of the card is measured once per menu (`wholeWidth`, `grownStart`); the panel is placed from measurement, under, over or split (`groupsAbove`), and a page change re-places only the panel; a closing menu keeps what it drew; the repeat page writes once at the close (`repeatPage.end`); the month grid is plain date math (no core rule exists for it). Typing picks (Rename, Add subtask, New section, New project) focus their field inside the tap, once it is visible. As the old menu: it opens once its card is in view, the card's scroller gliding it in first in the collapse time (the scroll intent `intoView` over the scroll concern's chain: a list, a note's stack and then the note itself; a finger on it calls the menu off); on the desktop a second click within 250 ms of the one that opened it renames (the gesture `secondPress`, the old double click); the start of the task's description stands by the copy of its card, over or under it where the panel is not, rendered by Obsidian through the editors engine (the old `DescriptionPeek`): a tap on it opens the full card, a note's link opens the note.
+51. *(Revision 12: rewritten.)* **The quick entry** runs the core's `entry.*` steps over a session kept in the model, and its jobs in the core's order (`entryJobStep`, `queuedEntryJobs`) in the entry concern (`runEntryJobs`, after every message). The look (`entryLook`) and the cards about to be drawn for a step that asks for them (`coming`) are computed there from the entry's `Layout` part, never handed in by a host. The field is Obsidian's editor (the editors engine) restyled by a CodeMirror theme from tokens; on Enter the written card takes the field's box and the next field gets a new row key. While typing, the foot fade is a second element (sizing by state is forbidden); on the phone the room at a list's end is a spacer row. The bar is the kit's with the variant `entry.bar` (`keyboardBar` on the phone, `capsule` on the desktop). **A blur ends the entry on both forms, as today** (the window losing focus excepted); revision 11's phone-only gate is withdrawn.
+52. *(Revision 12: rewritten.)* **The full card** is a layer inside the screen's frame, in every place, pinned by id and following Sync through the needs `tasks.find`/`tasks.fullTree`; the description runs in Obsidian's editor through the core's `description.*`; its subtasks' circles are drawn as the old full card's (width 0, the card's padding kept); its rows are keyed `full/<id>`. **A tap on its project line keeps today's behaviour:** on the main screen it closes the card and selects the project in the filter (`tasks.selectProjectNode`); in a note it closes the card and writes nothing (the variant `full.projectTap`: `closeAndFilter`, `close`). `tasks.md`'s line that says the tap opens the project's note is corrected (§Old bugs 15). Its task and subtasks are read by the screen's filter (`tasks.find(key, text, filter)`, `tasks.fullTree(item, filter)`): fixed to a project, they show no folder mark, as the core decides.
+53. *(Revision 12: rewritten.)* **The search reveals a pick** through `tasks.reveal`, one reveal for every place; each alternative is a closed variant of the search's `Layout` part (C4). `reveal`: `clearFilter` (the main screen: a filter that hides the task is cleared, `screen.md:114`) or `openFull` (a note: the task opens full in the note; the device's filter is never written). `dayOfFind`: `moveDay` (the day list goes to the task's day) or `openFull` (a note). The funnel place moves to the task's (Done, Inbox for Backlog, Soon, the calendar) where `context.writesPlace` is `write`. A Done task without the ribbon opens full; any other is ringed and scrolled into view (the scroll intent `reveal`). The note's choices are the fix of old bugs 1–3.
+54. *(Revision 12: rewritten.)* **The carry is one, for every payload and place:** a card, its subtasks, the picked cards, the plus, a section, a tree node, a settings row, a timeline slot, with one slice, one set of messages and the core's hit test and drop rules. **Each payload keeps today's look and start, as a closed variant:** a card, the picked cards, the plus and a timeline slot lift on a finger's hold or a mouse's move, fly as a float and leave a dashed waiting place, and no other card moves; a section floats and waits where it stood, its landing a drop line (decision 59); a tree node's row follows the finger with a line where it will land (`screen.md:52`); a settings row follows the finger itself, starting on a press of its grip with no hold, while the rows it passes step aside (`stepAside`, `settings.md:9`). The geometry is measured once after the lift renders, per scroller and target, and kept fresh by `measured` while edge scroll moves a scroller; the target is the core's, recomputed on each move and told only when it changes; the device's carry is reported (`startCarry`, `carryAt` on a target change) only where `carry.device` is `report` (the main screen); the carried cards' subtasks leave the pinned snapshot; on a drop the pin goes at once and the float flies onto the landed card, on a cancel the pin stays until the float is back. A long mouse click does nothing, a right click opens the menu.
+55. *(Revision 12: rewritten.)* **The editors and the mount**: the editors engine holds the title field, the full card's editors and the description peek, with CodeMirror configured to delegate its keys, focus and scroll; the mount engine makes, places and removes the screen's own node in its host (a leaf's content; after `.cm-contentContainer` or first in `.mod-footer` of a note), the overlay node per window and the adopted rows of a settings list, and writes Obsidian's nodes around the screen (`--tc-block-lift`, `.cm-content`'s growth). Adapters and `ScreenHost` write no DOM.
 56. *(Revision 11: rewritten.)* **A field opened in an inline frame grows it** as any row does, to the CSS's tallest (`--tc-block-max-h`), past which its stack scrolls: the old `BlockHeight` fitted the block to what its stack held, the field among it. Only the pin under a carry holds the region's height. Measured in the test Obsidian (a real click on the plus, the desktop): with Today holding a task the old block grew 571→632 px as the new does; on the e2e fixture, Today empty, the old one stayed 572 px while its stack held 606 px in 558 (`BlockHeight` missed the field row's late height, a race of the old block: its field's bar stood 48 px under the frame's foot, scrolled out), and the new one grows to 620 px. On the phone both grow by 60 px. The new screen keeps the old rule, not its race. The e2e shot of a field open in a note compares the frame top-aligned (`fit` cut at the bottom): the old block's shot stops at the window's foot. The bar's buttons each paint over the one before (`z-index`), as the old bar's: a shrunk shift is covered by the flag. Old defects the e2e run shows and the new screen does not repeat: the written card flashing between field and card (19–21 frames), and the old block sometimes cutting the written card's bottom (4 px) after typing.
 57. *(Revision 11: rewritten.)* **The e2e matrix run** (`npm run e2e -- matrix [place form theme]`, G5) runs every cell of the registry, each platform and theme starting clean, every step judged frame by frame by the same rules in every place, with the trap armed; one concern's logs are compared across the places that offer it. The old-against-new comparison stays an input to it: the e2e build records the old UI's baselines (`UI` `old`) and compares the new one with them in the same run on the same copy of the file. A caret's blink (CodeMirror's `cm-blink`) is no motion of the screen's: the recorder and the rest wait leave it out. `npm run e2e -- budget [place]` is the budget: 300 tasks, 4× CPU, in each place.
 58. *(Revision 11: rewritten.)* **The plus carried** (the old screen's `beginNew`) is a carry payload: pressed and moved, the plus lifts as a float over the same places as a card, a dashed ring standing in its place (solid and filled while the finger is over it); let go on a place, the field of a new task opens there in the same tap through the core's `entry.openAtDrop` (`openAt` in the projects list, `openAtEnd` at a list's end) and the float lands in the field; let go on its ring or nowhere, it flies home. While a card or the plus is carried the plus and the capsule beside it fade aside: the motion cause `fadeAside`, run by `motion` (no CSS transition, decision 34; the old `QuickEntryController`'s look kept); a lifted section leaves them. The region's height is held from the lift's own drawing, by the pin, so a lift that takes rows out of the lists (a section, a parent's subtasks) never shrinks it.

@@ -1,6 +1,6 @@
 # UI refactor: traceability
 
-This file maps every row of the two inventories to the mechanism of `../2026-11-15-ui-refactor.md` (**revision 11**: one screen, places as data, one owner per concern) that owns it, the principle behind it and the stage that rebuilds it.
+This file maps every row of the two inventories to the mechanism of `../2026-11-15-ui-refactor.md` (**revision 12**: one screen whose code cannot express an effect, a rule of the core or a read of the place; one engine per concern) that owns it, the principle behind it and the stage that rebuilds it.
 
 Inputs:
 - `inventory-state-effects.md`: A.1 (45 facts), A.2 (565 locations), B.1–B.5 (819 effect call sites), B.6 (180 event sources);
@@ -10,10 +10,10 @@ Doubts were checked in code at `aa0c20f6`:
 - `core/application`: `PhoneCalls.ts` (the door), `composeCore.ts`, `TaskServiceImpl.ts`, `CalendarServiceImpl.ts`, `calendarDay.ts`, `UndoHistory.ts`, `TaskIdentity.ts`, `TaskRules.ts`, `UndoSteps.ts`, `QuickEntrySession.ts`, `CalendarPolling.ts`, `SettingsServiceImpl.ts`, `contracts.ts` (`TaskKey`, `ProjectsScreenState`, `CarryState`), `projectsScreen.ts`, `screenPlaces.ts`, `viewLayout.ts`, `stackedRows.ts`;
 - `obsidian/`: `main.ts`, `compose.ts`, `infrastructure/` (`VaultTaskFileStore`, `PluginSettings`, `LocalProjectsScreenStore`, `VaultProjects`, `GoogleAuth`), `ui/` (`CalendarScreen`, `DayData`, `DayPeek`, `Reload`, `Swipe`, `layouts/`, `SettingsTab`, `kit/Panel`).
 
-**Revision 11's rerun.** Every row was re-examined for one question: is its owner a concern of the one screen, or a place? Revision 10's owners were already mechanisms (a driver, the layer stack, a gesture, a selector, the runtime), with one exception: the lines owned by "the block host", "the settings-tab host" or `model.place = {kind: "block"…}` (31 lines of the tables below: 20 of the note, 11 of the settings tab).
-- Rows of embedding a note (its registry, placement among Live Preview and Reading view, `--tc-block-lift`, presses kept from the editor) are owned by the note adapter and `drivers/mount.ts`, the only per-place code G2 allows; their stage is 5. Every other row of the note (its height, its keys, its focus, its modes) is owned by the same concern as on the main screen, with the note's `Place` gating it (`Layout`).
-- Rows of the settings tab are owned by the one screen at `Places.settings()`: its row reorder by the one carry, its step aside and settle by `motion`'s causes, its rects by carry geometry; stage 6.
-- `islands` is renamed `editors`, `recognizers/` is the input concern's private part, and `motion` reads boxes through `measure.boxesNow` (the owner table).
+**Revisions 11 and 12's rerun.** Every row was re-examined for one question: is its owner a concern of the one screen, or a place? Revision 10's owners were already mechanisms (a driver, the layer stack, a gesture, a selector, the runtime), with one exception: the lines owned by "the block host", "the settings-tab host" or `model.place = {kind: "block"…}` (31 lines of the tables below: 20 of the note, 11 of the settings tab).
+- Rows of embedding a note (its registry, placement among Live Preview and Reading view, `--tc-block-lift`, presses kept from the editor) are owned by the note adapter and the mount engine, the only per-place code the spec allows (§Architecture); their stage is 5. Every other row of the note (its height, its keys, its focus, its modes) is owned by the same concern as on the main screen, with the note's `Place` gating it (`Layout`).
+- Rows of the settings tab (revision 12, after review R3): its page and controls are owned by the settings adapter on Obsidian's own `Setting` (`host/settings.ts`), its clipboard, Google sign-in and Scriptable loader by `hostServices`, its colour preview and body tokens by `chrome`; its row reorder by the one carry at `Places.rows(list)` (payload `settingsRow`, look `self`), its step aside by the motion cause `stepAside`, its slots by the core's hit test over the adopted rows; stage 6.
+- `islands` is the editors engine, `recognizers/` is the gesture concern's, `motion` reads boxes through the measure engine, the hit test is the core's, and drivers are engines (the engine table). R3's six inconsistencies are fixed (the settings lump split; the reorder as the carry; `stepAside`; the block's fit frame gone; the handler and layout-component words).
 - Stage numbers are revision 11's (below). Rows tagged 3 were built for the block in slice 3 and are reshaped onto the one screen in stage 3; nothing in a row's owner changes with that.
 - A new class, R24 (§Earlier classes), records the ownership fault and its resolution. No row is left over.
 
@@ -44,7 +44,7 @@ Revisions 7 to 10 rest on one claim: the door covers every core call the plugin 
 | `CalendarService.onChange`, `keepFresh` | `CalendarScreen.ts:449, 477` | the runtime's file watch and the network lane, the only fetcher after the switch (P8); `CalendarPolling` run unchanged; the refresh rule as the core's pure decision the network lane asks |
 | `DayService.onDayChange`, `catchUp` | `CalendarScreen.ts:451, 504` | the runtime's clock |
 | `ScreenSettingsStore.onChange` | `viewSettings.ts:117` | `PluginSettings.get()` in the replica, refreshed on its `onChange` |
-| `SettingsService.bindClientSecret` | `SettingsTab.ts` | the settings adapter (`host/adapters/settings.ts`); the call through the runtime |
+| `SettingsService.bindClientSecret` | `SettingsTab.ts` | the settings adapter (`host/settings.ts`) through `hostServices`; the call through the runtime |
 | `GoogleAccount`, `WorkCalendarSetup` | `SettingsTab.ts` | host-owned (`DOOR_COVERAGE`); the token goes through the runtime's settings port (P3) |
 
 **The classes the UI imports from `contracts.ts`.** `QuickEntrySession`, `SectionNameEntry`, `RepeatPage`, `DescriptionDraft` and `DayBoundary`, and the pure rules. The door answers the sessions as `entry.*`, `sectionName.end`, `repeatPage.end`, `description.*` and `boundary.*`, and every rule the UI calls as `rules.*`. `QuickEntrySession`'s job runner is not a door method; revision 10 has `backend` give it a synchronous form, a step function over `EntryAnswer` (checked: `QuickEntrySession.ts:10-49` runs over a `TaskService`-shaped port today, so the form is new core code, not the class run unchanged).
@@ -53,7 +53,7 @@ Revisions 7 to 10 rest on one claim: the door covers every core call the plugin 
 - three places where the door answers as the phone's host: the calendar carry-over, a feed's problem, the project notes' readiness. Revisions 8 to 10 add them to `DoorContext` as `host`, `feedProblems` and `projectsReady` (R12 resolved);
 - shapes: events in milliseconds, `days.boundary` as `{startHour}`, `calendars.isPast` taking `{endMs}`, the entry as `EntryAnswer`. With no facade, only the new screens see them.
 
-**The two UIs side by side: only while building.** Revision 11 never ships them together: the new UI is chosen by one build constant (`UI`), only the e2e build holds both, and the merge that switches to the new UI deletes the old one (G8). While it is built, in the test Obsidian and the e2e comparison, the old screen keeps `composeCore`'s services and the new screen runs on the runtime. Checked in code:
+**The two UIs side by side: only while building.** Revisions 11 and 12 never ship them together: the new UI is chosen by one build constant (`UI`), only the e2e build holds both, and the merge that switches to the new UI deletes the old one (G8). While it is built, in the test Obsidian and the e2e comparison, the old screen keeps `composeCore`'s services and the new screen runs on the runtime. Checked in code:
 - **The file is safe.** `TaskServiceImpl.mutate` applies its operation to the current text inside `vault.process` (`TaskServiceImpl.ts:694-716`), and `UndoHistory.step` takes a step back over the file as it is now. The runtime's `fn` returns the text unchanged when the base moved, and replays. Each screen sees the other's writes as outside changes. No write is lost, and a stale one fails with today's notice.
 - **Tidy does not loop** while both read the settings the same way: both tidy with the same core, so each tidy is a no-op for the other. Revision 10 makes the runtime's settings `PluginSettings.get()`, refreshed on `onChange`, so both read the same settings.
 - **What is not in the file** is held twice: the undo history, the ids and the Projects screen state. Today the leaf and every block share them (one `composeCore`, `compose.ts:61-73`; `ProjectBlocks` gets the same `deps`). Revision 10 accepts two copies only while building and never ships the pair (R17 resolved).
@@ -76,7 +76,7 @@ The spec names the layers but not every field, so this file proposes the field n
 - `model.rowKeys`: `rowKey(taskId)`, given when the user's message makes a row, bound by `CreatedTask` and remapped by the replay's old→new id map with every other id in the model (P1, P3).
 - `needs(model)`, one for the screen: the view answers it draws, its root need given by `Layout` (P2 step 3).
 - `model.overlay`, `model.sheet.full`: layers.
-- `model.place`: a `Place` (`Places.main()`, `Places.note(path)`, `Places.settings()`), read only by `screen/layout.ts`, which derives `Layout` (G1).
+- `model.place`: an opaque `Place` (`Places.main()`, `Places.note(path)`, `Places.rows(list)`), read only by `layoutOf` in `screen/layout.ts`, which derives the `Layout` parts the router hands each concern (C4).
 
 **Runtime (plugin-wide, `obsidian/runtime/`):**
 - the **replica** (`DoorContext`): tasks text, settings (`PluginSettings.get()`, refreshed on `onChange`), undo history, Projects-screen state (following the shared `LocalProjectsScreenStore`), ids, calendar texts, project notes;
@@ -104,10 +104,10 @@ The spec names the layers but not every field, so this file proposes the field n
 - timers, each with a timeout message.
 
 **Edges (P7, P8):**
-- the effect owners of the owner table (`motion`, `measure`, `scroll`, `focus`, `input`, `keys`, `chrome`, `editors`, `overlay`, `mount`), the runtime's timers and `hostServices`; the pure owners `screen/layout.ts`, `screen/carryGeometry.ts` and `update/<concern>.ts`;
-- `update/gesture.ts` (its recognizer) (pure);
+- the engines of the engine table (`render`, `motion`, `measure`, `scroll`, `focus`, `keys`, `input`, `editors`, `mount`, `chrome`, `time`, `hostServices`, the runtime's file and door); the pure concerns under `update/<concern>/`; the core's rules through the gateway `screen/rules.ts`;
+- the gesture concern's recognizer (pure);
 - view answers for each screen's `needs(model)` (`viewsChanged`) and `rules.*` (pure, clock from `model.now`, imported by `update/`, selectors and `motion`; P2 step 3);
-- `host/ScreenHost.ts`, owning what a mounted screen starts and ending what is under way on teardown, and the adapters `host/adapters/{leaf,note,settings}.ts`, which own only their registration with Obsidian (P8, G2).
+- `host/ScreenHost.ts`, owning what a mounted screen starts and ending what is under way on teardown, and the adapters `host/adapters/{leaf,note}.ts`, `host/settings.ts` and `host/registration.ts`, which own only their registration with Obsidian (P8, §Architecture).
 
 **Other names:**
 - **Transient channel:** live values from `input` to `motion`, laid out by the same selectors (P5).
@@ -126,13 +126,13 @@ The spec names the layers but not every field, so this file proposes the field n
 **Stage** is the stage of revision 11 that rebuilds the row (the spec's §Migration):
 - 1: the runtime and the core's part (built): the replica, its stores, the pending log with replay and bounds, the network lane, readiness; `backend`: the cross-call cache with budget tests, the host facts in `DoorContext`, the synchronous forms of the entry's job order and the refresh rule, `tasks.keyOf` and the reconciliation door call.
 - 2: the guards, the freeze, the lifecycle test, the e2e harness (built; extended in 3).
-- 3: the guarantee (the owner table, every guard and its fixtures, the matrix, the trap, `UI`, the content freeze), and slice 3's code reshaped onto the one screen at `Places.main()`: lists, cards, sections, the field, the carry between lists, menus, selection, search, the full card.
+- 3: the construction (the pure, kit and engine projects, the JSX dialects, units and the rules gateway, the engine table and the manifest, every guard and its fixtures, the matrix, the trap and its ledger, `UI`, the content freeze; `backend`'s structural sharing and the rules moved into the core), and slice 3's code reshaped onto the one screen, with `Places.main()` and `Places.note(path)` both mounted: lists, cards, sections, the field, the carry between lists, menus, selection, search, the full card.
 - 4: the rest of the main screen, region by region, into the same owners: the timeline, the ribbon and both swipes, All columns and the dividers, the panel and tree, the carry across every target, the day.
-- 5: the note as a `Place` (`Places.note(path)`, its adapter, the inline frame); its diff touches no owner but layout, mount and scroll's chain.
-- 6: the settings tab as a `Place` (`Places.settings()`).
+- 5: the note completed: its variants, the inline frame, the scroll chain to the note's scroller; its diff adds variant values only (the note is mounted from stage 3).
+- 6: the settings tab on Obsidian's own `Setting` (`host/settings.ts`), its row reorder on the one carry at `Places.rows(list)`.
 - 7: one switch, and in the same merge the deletion of the old screen, its services' plugin wiring, `Picks`, `Reload`, `WriteQueue`, `UI` and the freeze.
 
-"3, 4" means built in stage 3 and extended by a stage-4 region. "1, 3" means the runtime part is built in stage 1 and first used by the screen in stage 3. "3, 5" means the concern is built in 3 and the note's gate of it is set in 5. "Gone" means the new code makes the state unnecessary; it is deleted with the old code in stage 7 if not earlier.
+"3, 4" means built in stage 3 and extended by a stage-4 region. "1, 3" means the runtime part is built in stage 1 and first used by the screen in stage 3. "3, 5" means built in 3, with the note mounted, and completed for the note in 5. "Gone" means the new code makes the state unnecessary; it is deleted with the old code in stage 7 if not earlier.
 
 ## A.1 The 45 facts held in more than one place
 
@@ -144,7 +144,7 @@ Each fact gets one field or one selector. "Seeded" means the field starts from a
 | 2 | The day the header names during a swipe | Selector `headerDay(model)` = `daySwipe.nearer ? neighbourDay : model.day`; `nearer` is set by one discrete message when the slide crosses half. | P1, P3, P6 | 4 |
 | 3 | A tick or draw missed while hidden or held | Gone as a store: data applies at once (P6); anything moving draws the layout it pinned; `model.visible` from `chrome`. | P6 | 4 |
 | 4 | Where the strip stands | `model.read.funnel.place` (the core's answer) plus the ribbon gesture's in-flight `target`; selector `shownPlace`. `atDone` = `shownPlace === "done"`. `firstPlace` seeds `model.read` before the first read. `rightMode` is a one-time host hand-over (plugin runtime). | P1, P3 | 4 |
-| 5 | The view mode and its layout | `model.read.funnel.view` (`ViewChoice`); selector `layoutMode`. `firstView` seeds it before the first read. Mounted layout = the layout component chosen by `layoutMode`. `drawnContext` goes: update compares `read.context` to decide that no transition is emitted. | P1, P5 | 4 |
+| 5 | The view mode and its layout | `model.read.funnel.view` (`ViewChoice`); selector `layoutMode`. `firstView` seeds it before the first read. The regions drawn = `Layout.regions` from `layoutOf`, mapped to kit elements by the one generated `Screen`. `drawnContext` goes: update compares `read.context` to decide that no transition is emitted. | P1, P5 | 4 |
 | 6 | The project filter | `model.read.funnel.filter`; selector `filterNode`. The node a carry was lifted on is carry-gesture state `carry.liftedOn` (a different fact: what to put back). | P1 | 4 |
 | 7 | The projects panel open / docked | `model.read.funnel.panel` (`open`, `docked`). The mid-slide state is a running `Transition` (dock slide), not a field. | P1, P5 | 4 |
 | 8 | The tasks read from the file | `model.read` (`ScreenView`: tasks, day, projects, missing). Menus and the bulk menu hold only keys (`overlay.task.key`, `overlay.bulk.keys`), remapped by the replay's old→new id map; their models, the full card's levels and a neighbour day or place are needs of the screen's `needs(model)`, recomputed on every replica change (`viewsChanged`). Element maps go. | P1, P2, P3 | 4 |
@@ -182,7 +182,7 @@ Each fact gets one field or one selector. "Seeded" means the field starts from a
 | 40 | Phone or desktop | `model.platform.wide` from `chrome`. | P4 | 3, 4 |
 | 41 | Obsidian's status bar over the view | `model.chrome.statusBar` from `chrome`. | P4 | 4 |
 | 42 | Popout windows that get the styles | Plugin runtime's window set (host), fed to `chrome`; not a screen fact. | P7, P8 | 1 |
-| 43 | Which note a block shows | `model.place`, from `Places.note(path)` (G1); the note's project is in its view answer; the blocks map is the note adapter's. | P1 | 5 |
+| 43 | Which note a block shows | `model.place`, from `Places.note(path)` (C4); the note's project is in its view answer; the blocks map is the note adapter's. | P1 | 3, 5 |
 | 44 | Writes waiting to run | The runtime's one replica; door calls run right after `update`, in message order (P2's loop, its chain bounded); the tasks queue writes their texts in that order inside `vault.process`, `fn` checking the base and that the file still sits at `tasksFile` (a changed `tasksFile` counts as gone); the pending log (entries by id with their recorded inputs and the ids their creates produced) holds what is not yet written; replay with recorded `nowMs` and projects screen, current settings, ids remapped over the whole model; on unload the persistence queue outlives the plugin object until empty (P8). | P2, P3, P8 | 1, 3 |
 | 45 | Who holds the screen | `model.interaction.gesture` (one slot); pointer captures are `input`-local. | P6 | 3, 4 |
 
@@ -209,9 +209,9 @@ Row ids number the rows of each domain table of `inventory-state-effects.md` in 
 |---|---|---|---|---|
 | A.2.12,14 | `CS.shownMode`, `CS.atDone` | ribbon gesture `target` + selector `shownPlace` | P1, P6 | 4 |
 | A.2.13,15 | `CS.firstPlace`, `CS.firstView` | initial `model.read` seeded by core `firstPlace`/`firstView` at mount | P1 | 4 |
-| A.2.16 | `CS.layout` | layout component chosen by selector `layoutMode` | P1 | 3, 4 |
+| A.2.16 | `CS.layout` | `Layout.regions`, drawn by the one `Screen` | P1 | 3, 4 |
 | A.2.17,24 | `CS.drawnContext`, `is-redrawn` | gone: update compares `read.context`; a context change emits no transition | P5 | 4 |
-| A.2.18 | `CS.swipe` presence | selector `hasPages(layoutMode)`; `input` attaches the swipe `update/gesture.ts` (its recognizer) while true | P1, P7 | 4 |
+| A.2.18 | `CS.swipe` presence | selector `hasPages(layoutMode)`; `input` attaches the swipe the gesture concern's recognizer while true | P1, P7 | 4 |
 | A.2.19 | parts built once | view components | P1 | 7 |
 | A.2.20 | `folder.el.disabled` | selector `panelLocked(model.entry)` | P1 | 4 |
 | A.2.21-23,25 | root classes `is-note`, `has-wheel`, `has-top-row`, `has-head-lead`, `has-tree`, `has-dock`, `is-block` | kit variant props from `Layout` (`layoutOf(model.place, …)`), `read.funnel.view`, `read.funnel.panel` | P1 | 4 |
@@ -298,7 +298,7 @@ Row ids number the rows of each domain table of `inventory-state-effects.md` in 
 | A.2.180-182,198-199 | drop lines, tree `is-drop` | JSX from `carry.target`; line steps are transitions | P1, P5 | 4 |
 | A.2.183-184 | `TimelineDrop.start/last` | carry gesture `target.timeline` | P6 | 4 |
 | A.2.185-186 | `ArrivingCard` | the door's answer in the drop's own message: the arriving card (P3) | P3, P5 | 1, 3 |
-| A.2.187-191 | `LongPress` state and timer | `update/gesture.ts` (its recognizer) (pure); delay from `model.settings` | P7, P8 | 3 |
+| A.2.187-191 | `LongPress` state and timer | the gesture concern's recognizer (pure); delay from `model.settings` | P7, P8 | 3 |
 | A.2.194 | `ProjectTasks.away` | selector hiding `carry.lifted` across node change | P1 | 4 |
 | A.2.195 | by-project row classes | JSX | P1 | 3, 4 |
 | A.2.196 | `TreeDrop.result` | carry gesture `target.tree` | P6 | 4 |
@@ -317,8 +317,8 @@ Row ids number the rows of each domain table of `inventory-state-effects.md` in 
 | A.2.220 | `CS.landing` | day-swipe gesture `landing`; the incoming day is a view answer for a need of the screen's `needs(model)` (`viewsChanged`), so the switch does not wait | P2, P3, P6 | 4 |
 | A.2.221 | `drawnWaits` + 1000 ms timer | gone: every day, near or far, is drawn from the view answers of the same message's loop (P2) (P3) | P2, P3, P8 | 4 |
 | A.2.222 | `CS.turning` | gone: each turn applies in its own message; a new swipe catches the settle | P3, P6 | 4 |
-| A.2.223,542 | `CarefulPace`, `PointerSpeed` | `update/gesture.ts` (its recognizer) | P7 | 4 |
-| A.2.224-230 | `Swipe` press, stream, timer, holds, round, listeners, capture | `update/gesture.ts` (its recognizer) + ribbon / day-swipe gesture; `round` → transition numbers | P6, P7, P8 | 4 |
+| A.2.223,542 | `CarefulPace`, `PointerSpeed` | the gesture concern's recognizer | P7 | 4 |
+| A.2.224-230 | `Swipe` press, stream, timer, holds, round, listeners, capture | the gesture concern's recognizer + ribbon / day-swipe gesture; `round` → transition numbers | P6, P7, P8 | 4 |
 | A.2.231-236 | `ScreenPager` state | swipe gesture + transient channel; settle is a `Transition`; `catches` → transition numbers (a tap leaves the settle running) | P5 | 4 |
 | A.2.237-238,240 | edge / day / strip track styles and scrub | `motion` (transient channel, scrub between two computed layouts) | P5, P7 | 4 |
 | A.2.239 | `DayTrack.nearer` | day-swipe `nearer`, one message at half | P6 | 4 |
@@ -334,7 +334,7 @@ Row ids number the rows of each domain table of `inventory-state-effects.md` in 
 |---|---|---|---|---|
 | A.2.254-255 | `CS.hourPx`, `CS.wholeDay` | `model.zoom {hourPx, wholeDay}` | P1 | 4 |
 | A.2.256,261 | `zoomFrame`, `PinchZoom.scaled` | transient channel; dispatch on a step | P4, P8 | 4 |
-| A.2.257-260,262-263 | pinch pointers, wheel timer, anchor, limits, capture | pinch gesture + `update/gesture.ts` (its recognizer); wheel settle timer command | P6, P7, P8 | 4 |
+| A.2.257-260,262-263 | pinch pointers, wheel timer, anchor, limits, capture | pinch gesture + the gesture concern's recognizer; wheel settle timer command | P6, P7, P8 | 4 |
 | A.2.264-265 | `Timeline.minor/grid` | selector `gridAt(hourPx)` (transient channel; dispatch on a step) | P1 | 4 |
 | A.2.266-267 | `hourShown`, `--tc-hour` | `motion` variable | P7 | 4 |
 
@@ -367,7 +367,7 @@ Row ids number the rows of each domain table of `inventory-state-effects.md` in 
 | A.2.307,339,479 | `QEC.focused`, group name focus, field focus | `focus` | P7 | 3 |
 | A.2.308 | `QEC.turning` | field layer (the door's `entry.*` session; the job order the core's step function) flag while the bar turns the wheel | P3, P6, P7 | 1, 4 |
 | A.2.309 | `QEC.draws` | gone: the view is drawn in the message (P3) | P2, P3 | 3 |
-| A.2.310,340 | `pressEnding`, `FreeRoomDoubleClick.mouse` | `update/gesture.ts` (its recognizer) | P7 | 3 |
+| A.2.310,340 | `pressEnding`, `FreeRoomDoubleClick.mouse` | the gesture concern's recognizer | P7 | 3 |
 | A.2.311,313-314,316-317,319-325,327-328,330-331 | bar and field look (`is-entering`, bar state, buttons, tint, placeholder, plus hidden) | selectors over `model.entry` → JSX | P1 | 3 |
 | A.2.315,326 | `QuickBar.leaving`, pointer-events while fading | presence transition: the closing layer stays in the stack until `motionSettled`, pinning what it covers (P6) | P5, P6 | 4 |
 | A.2.318 | bar `is-gliding` | keyboard transition | P5 | 3 |
@@ -408,7 +408,7 @@ Row ids number the rows of each domain table of `inventory-state-effects.md` in 
 | A.2.431 | `is-docking` + timer | dock-slide transition | P5, P8 | 4 |
 | A.2.432-436 | desktop capsule room, anchor, away, glide start, position | selectors from `measure` (field box) + `chrome`; `motion` variables | P4, P7 | 3 |
 | A.2.437 | `ObsidianChrome.statusBar` | `chrome` | P7 | 4 |
-| A.2.438 | Settings colour rows wrap | the screen at `Places.settings()`, the one model; the colour rows' wrap from `measure` | P1, P4 | 6 |
+| A.2.438 | Settings colour rows wrap | `host/settings.ts` on Obsidian's `Setting`: the colour rows wrap in Obsidian's own layout, as today | P1, P4 | 6 |
 | A.2.439-441 | peek column styles, invisible, all-day | view draws the neighbour day's layout from its need's answer (the screen's `needs(model)`) | P2, P3, P4 | 4 |
 | A.2.442-444 | `Divider.press/glide`, capture | divider gesture; snap glide transition; `input` | P5, P6 | 4 |
 | A.2.445-447,491 | menu field row / copy raised over the keyboard | selector from `model.chrome.keyboard` + `measure`; `motion` variables | P4, P7 | 3 |
@@ -442,7 +442,7 @@ Row ids number the rows of each domain table of `inventory-state-effects.md` in 
 | A.2.495 | `CS.seen` | update compares `model.settings` before / after (settingsEffect as an update rule) | P1 | 4 |
 | A.2.496-497 | plugin settings in memory, `rightMode` | plugin runtime (`obsidian/runtime/`, `main.ts`): settings held as `PluginSettings.get()` in the replica, refreshed on its `onChange`; the `rightMode` hand-over writes through the shared `LocalProjectsScreenStore`, whose change signal the replica follows; until stage 7 `main.ts` keeps the old services' hand-over | P3, P7 | 1, 7 |
 | A.2.498-500 | view settings stores | `model.device`; device storage only keeps it, through `PluginSettings.partition` (P1) | P2, P3, P7 | 1 |
-| A.2.501-502,509-512 | Settings tab page, colour preview, row reorder | the screen at `Places.settings()`: page and preview from the model; the row reorder is a declared transition | P1, P5 | 6 |
+| A.2.501-502,509-512 | Settings tab page, colour preview, row reorder | `host/settings.ts` on Obsidian's `Setting`: the page; the colour preview's style by `chrome`; the row reorder is the one carry at `Places.rows(list)` | P1, P5 | 6 |
 | A.2.503-508 | card size and priority colour body tokens | `chrome` per window from settings (`chrome` takes it from the model) | P7 | 3, 4 |
 | A.2.513-516 | repeat page / editor | overlay page `repeat` (core `RepeatPage`) | P6, P7 | 3 |
 
@@ -450,11 +450,11 @@ Row ids number the rows of each domain table of `inventory-state-effects.md` in 
 
 | Rows | What | Owner in revision 11 | P | Stage |
 |---|---|---|---|---|
-| A.2.517,519-523 | `ViewWatch.frame`, block registry, `asks` | the note adapter (`host/adapters/note.ts`): its block registry; `asks` go: `projectNoteView` a view answer for a need of the screen's `needs(model)` (`viewsChanged`) | P2, P3, P7, P8 | 5 |
-| A.2.518 | block key scope | `keys`, its policy `Layout.keys` `focus` (Obsidian `Scope`s) | P7 | 5 |
-| A.2.524 | block position, `--tc-block-lift` | `drivers/mount.ts` placement; lift from `measure` | P4, P7 | 5 |
-| A.2.525 | focus in block | `focus` | P7 | 5 |
-| A.2.526-527 | `BlockHeight` | gone: the inline frame's height is the stylesheet's, held by the pin under a carry (decision 44) | P4 | 5 |
+| A.2.517,519-523 | `ViewWatch.frame`, block registry, `asks` | the note adapter (`host/adapters/note.ts`): its block registry; `asks` go: `projectNoteView` a view answer for a need of the screen's `needs(model)` (`viewsChanged`) | P2, P3, P7, P8 | 3, 5 |
+| A.2.518 | block key scope | `keys`, its policy `Layout.keys` `focus` (Obsidian `Scope`s) | P7 | 3, 5 |
+| A.2.524 | block position, `--tc-block-lift` | the mount engine placement; lift from `measure` | P4, P7 | 3, 5 |
+| A.2.525 | focus in block | `focus` | P7 | 3, 5 |
+| A.2.526-527 | `BlockHeight` | gone: the inline frame's height is the stylesheet's, held by the pin under a carry (decision 44) | P4 | 3, 5 |
 
 ### undo
 
@@ -466,7 +466,7 @@ Row ids number the rows of each domain table of `inventory-state-effects.md` in 
 
 | Rows | What | Owner in revision 11 | P | Stage |
 |---|---|---|---|---|
-| A.2.529,538 | teardown list, tab's screen | runtime / `ScreenHost` and `drivers/mount.ts` | P7, P8 | 1, 3 |
+| A.2.529,538 | teardown list, tab's screen | runtime / `ScreenHost` and the mount engine | P7, P8 | 1, 3 |
 | A.2.530 | `CS.changing` | message order on the replica; the tasks queue and the pending log | P2, P3 | 1 |
 | A.2.531 | arbiter claim `naming` | naming layer | P6 | 3 |
 | A.2.532 | `services` for console | plugin runtime (`obsidian/runtime/`) | P7 | 1 |
@@ -478,7 +478,7 @@ Row ids number the rows of each domain table of `inventory-state-effects.md` in 
 | A.2.543-544 | `MonthPicker` month, day marks | overlay page `{month}`; JSX | P6 | 4 |
 | A.2.545 | click listener per render | `editors` (MarkdownRenderer, created once) | P7, P8 | 3 |
 | A.2.546 | kit `Button` classes | JSX | P1 | 3 |
-| A.2.547,551 | per-block / per-row `listening` | gone: Preact listeners | P7 | 3 |
+| A.2.547,551 | per-block / per-row `listening` | gone: no listener per row; the input engine delegates by the kit's `act` (decision 45) | P7 | 3 |
 | A.2.548,550 | ribbon / stage `tc-hidden` | JSX from `read.missing` | P1 | 4 |
 | A.2.549 | `RowsLayout.destroyed` | gone | P7, P8 | 3, 4 |
 | A.2.552-561 | `Motion` styles and WeakMaps | `motion`-local | P7 | 3 |
@@ -561,15 +561,15 @@ Row ids number the rows of each table in file order: B.1.1–142, B.2.1–244, B
 | B.2.131-133 | `EntryRows` drawing | view + `model.rowKeys` | P1 | 3 |
 | B.2.134-135 | keyboard will show / hide | `chrome` → `model.chrome.keyboard`; keyboard transition | P4, P5 | 3 |
 | B.2.136-141 | view settings file / store | Cmd `device.set`: a per-key patch that `PluginSettings.partition` routes to device storage; the store only keeps `model.device` (P1) | P2, P3 | 1 |
-| B.2.142,145-147 | tab: screen create / open / close / resize | the leaf adapter (`host/adapters/leaf.ts`), `ScreenHost`, `drivers/mount.ts`; `measure` | P7, P8 | 1, 3 |
+| B.2.142,145-147 | tab: screen create / open / close / resize | the leaf adapter (`host/adapters/leaf.ts`), `ScreenHost`, the mount engine; `measure` | P7, P8 | 1, 3 |
 | B.2.143-144 | tab key scope, undo / find keys | `keys` driver (Obsidian `Scope`s) → Msgs | P7 | 3, 4 |
-| B.2.148-149 | `ViewWatch` | the note adapter (`host/adapters/note.ts`) with `drivers/mount.ts` | P7 | 5 |
-| B.2.150,152,154-157,159-160,162-163,165-166,168-170 | note block lifecycle, placement, events | the note adapter (`host/adapters/note.ts`) with `drivers/mount.ts` | P7, P8 | 5 |
-| B.2.151,158 | block key scope | `keys`, its policy `Layout.keys` `focus` (Obsidian `Scope`s) | P7 | 5 |
-| B.2.153 | block focus | `focus` | P7 | 5 |
-| B.2.161,164 | block `onChange`, `projectNoteView` | runtime input; `projectNoteView` a view answer for a need of the screen's `needs(model)` (`viewsChanged`) | P2, P3 | 5 |
-| B.2.167 | `--tc-block-lift` | `drivers/mount.ts` placement, lift from `measure` | P4 | 5 |
-| B.2.171-223 | Settings tab and its pages | the screen at `Places.settings()`: until stage 7 the old tab keeps `SettingsServiceImpl` over the shared `PluginSettings`, an outside writer the replica follows through `onChange`; then its calls are door calls, their settings persisted as per-key patches | P2, P3, P7 | 6 |
+| B.2.148-149 | `ViewWatch` | the note adapter (`host/adapters/note.ts`) with the mount engine | P7 | 3, 5 |
+| B.2.150,152,154-157,159-160,162-163,165-166,168-170 | note block lifecycle, placement, events | the note adapter (`host/adapters/note.ts`) with the mount engine | P7, P8 | 3, 5 |
+| B.2.151,158 | block key scope | `keys`, its policy `Layout.keys` `focus` (Obsidian `Scope`s) | P7 | 3, 5 |
+| B.2.153 | block focus | `focus` | P7 | 3, 5 |
+| B.2.161,164 | block `onChange`, `projectNoteView` | runtime input; `projectNoteView` a view answer for a need of the screen's `needs(model)` (`viewsChanged`) | P2, P3 | 3, 5 |
+| B.2.167 | `--tc-block-lift` | the mount engine placement, lift from `measure` | P4 | 3, 5 |
+| B.2.171-223 | Settings tab and its pages | `host/settings.ts` on Obsidian's `Setting` (its controls as today; the clipboard copy B.2.218, Google's status, sign-in and sign-out B.2.211-213, the client secret B.2.210 and the Scriptable loader B.2.217 through `hostServices`; the colour preview across windows B.2.184, 191, 194 by `chrome`; no key scope). Until stage 7 the old tab keeps `SettingsServiceImpl` over the shared `PluginSettings`, an outside writer the replica follows through `onChange`; then its calls are door calls, their settings persisted as per-key patches | P2, P3, P7 | 6 |
 | B.2.224-225,228 | undo button: `canUndo`, `onUndo` | `model.canUndo` (a view answer over the replica's history, `viewsChanged`); Msg `undo` | P1, P2, P3 | 1, 3 |
 | B.2.226 | ⋯ pressed | overlay `more` | P6 | 3 |
 | B.2.227 | `UndoService.onChange` | `model.canUndo` from the view answers over the replica's history (`viewsChanged`) (the old screen keeps `UndoService.onChange` until stage 7, never beside the new screens) | P2 | 1, 3 |
@@ -605,7 +605,7 @@ Row ids number the rows of each table in file order: B.1.1–142, B.2.1–244, B
 | B.3.45-50 | `DragSession` float phases, end, return, targets | carry gesture + `motion` | P5, P6 | 3 |
 | B.3.56-58 | auto-scroll | `scroll` `edge`; offsets back to carry (`scroll` orders; `measure` reports scroll) | P7 | 3 |
 | B.3.59 | `ArrivingCard` toggles | the door's answer over the replica, at once (P3) | P3 | 1, 3 |
-| B.3.60-61 | `LongPress` timer, outcomes | `update/gesture.ts` (its recognizer) | P7, P8 | 3 |
+| B.3.60-61 | `LongPress` timer, outcomes | the gesture concern's recognizer | P7, P8 | 3 |
 | B.3.75-79 | bulk capsule, ring, count, pick circles | JSX from `model.selection` | P1 | 4 |
 | B.3.80-81 | found card scroll | `scroll` reveal | P7 | 4 |
 | B.3.82-84 | peek reads (`dayView`, `events`, `fresh`) | gone as reads: a neighbour day's tasks and cached events are needs of the screen's `needs(model)` (`viewsChanged`); fresh events through the network lane | P2, P3 | 4 |
@@ -613,12 +613,12 @@ Row ids number the rows of each table in file order: B.1.1–142, B.2.1–244, B
 | B.3.91,93-95 | swipe → pager follow / settle / frames | swipe gestures + transient channel + settle transition (a tap leaves the settle running) | P5, P6 | 4 |
 | B.3.97-101 | strip / day tracks | `motion`; day-swipe `nearer`, `landing` | P5 | 4 |
 | B.3.104,106 | wheel dot, label | selectors | P1 | 4 |
-| B.3.105 | wheel timers | `update/gesture.ts` (its recognizer) / timer Cmd | P7, P8 | 4 |
+| B.3.105 | wheel timers | the gesture concern's recognizer / timer Cmd | P7, P8 | 4 |
 | B.3.107,110 | divider and pinch settings writes | Cmd `device.set`: a per-key patch that `PluginSettings.partition` routes to device storage; the store only keeps `model.device` (P1) | P2, P3 | 1 |
 | B.3.108 | divider width live | transient channel; dispatch on a step | P4 | 4 |
 | B.3.111 | pinch scale | transient channel; dispatch on a step | P4 | 4 |
-| B.3.112-113 | wheel preventDefault, wheel zoom settle | `input`; `update/gesture.ts` (its recognizer) timer | P7 | 4 |
-| B.3.114-117 | settings row reorder | the one carry (`update/carry.ts`, a settings-row payload) and its motion causes, at `Places.settings()` | P5, P6 | 6 |
+| B.3.112-113 | wheel preventDefault, wheel zoom settle | `input`; the gesture concern's recognizer timer | P7 | 4 |
+| B.3.114-117 | settings row reorder | the one carry (payload `settingsRow`, look `self`: the row follows the finger, its grip needs no hold) and its motion causes, at `Places.rows(list)` | P5, P6 | 6 |
 | B.3.118 | free-room double click | `input` → entry `openAtEnd` | P7 | 3 |
 | B.3.92 | horizontal wheel preventDefault | `input` | P7 | 4 |
 | B.3.119-135 | pure core rules (`placeAt`, `swipeLanding`, `dividerAt`, …) | pure rules (`rules.*`), imported by `update/` and selectors | P4 | 4 |
@@ -656,7 +656,7 @@ Row ids number the rows of each table in file order: B.1.1–142, B.2.1–244, B
 | B.4.109 | field's own undo | `input` | P7 | 3 |
 | B.4.110 | Refresh now | network lane | P2 | 1 |
 | B.4.130-131 | repeat change / remove | overlay page Msgs | P6 | 3 |
-| B.4.136-140,145 | by-project reads of the model and handlers | selectors; JSX handlers | P1 | 3, 4 |
+| B.4.136-140,145 | by-project reads of the model and handlers | selectors; the kit's `act` | P1 | 3, 4 |
 | B.4.148-149,151-152,161,167 | tree / list drops, close dim, pick node, move project, clear filter | Cmd write | P2, P3 | 1, 3 |
 | B.4.150,155,160 | haptics | Cmd `haptic` | P7 | 1 |
 | B.4.153 | panel width → frame | `measure` | P4, P8 | 4 |
@@ -676,8 +676,8 @@ Row ids number the rows of each table in file order: B.1.1–142, B.2.1–244, B
 | B.5.1-9,12,22,65,68,73-74,83,96,100 | timeline / list core reads (`DayBoundary`, `shownSpan`, `relation`, clock, `isPast`, `listName`, `stepFunnel`) | view answers for the screen's `needs(model)` (`viewsChanged`) and `rules.*` (clock from `model.now`); clock → `model.now` | P2, P3, P7 | 3, 4 |
 | B.5.10-11,13-21,23,40-41,60,63-64,79,90-91,95,103 | pure rules | pure rules (`rules.*`), imported by selectors | P1, P4 | 3, 4 |
 | B.5.24-26,39,42-46,48-50,53,75,81-82,102,104-105 | reads of screen state through deps | selectors | P1 | 3, 4 |
-| B.5.27-29,47,51-52,54,76,107-110 | handlers attached per row / block | JSX handlers → `input` Msgs | P7 | 3 |
-| B.5.30,66,121 | timeline resize, block scroller, block fit frame | `measure` | P4, P8 | 3, 4 |
+| B.5.27-29,47,51-52,54,76,107-110 | handlers attached per row / block | the kit's `act` → the input engine → messages (decision 45) | P7 | 3 |
+| B.5.30,66,121 | timeline resize, block scroller, block fit frame | the measure engine (the timeline, the stack's scroller); the block's fit frame gone: the inline frame's height is the stylesheet's (decision 44) | P4, P8 | 4, 5 |
 | B.5.31 | grips attach | `input` | P7 | 3 |
 | B.5.32 | drop line in body | JSX portal | P1 | 3 |
 | B.5.33-37 | timeline block motions on render | transitions by cause (keyed diff within one context); leaving rows skipped by layout selectors; fold and heights one transition (P4) | P4, P5 | 4 |
@@ -729,10 +729,10 @@ Row ids number the rows of each table in file order: B.1.1–142, B.2.1–244, B
 | B.6.45 | plus pointer | `input` | P7, P8 | 3 |
 | B.6.46 | keyboard events | `chrome` | P4, P8 | 4 |
 | B.6.51,59 | tab / block key scopes | `keys`, its policy `Layout.keys` (`tab` for the leaf, `focus` for a note; Obsidian `Scope`s) | P7, P8 | 3, 5 |
-| B.6.52-58 | note block events | the note adapter (`host/adapters/note.ts`) with `drivers/mount.ts` | P7, P8 | 5 |
+| B.6.52-58 | note block events | the note adapter (`host/adapters/note.ts`) with the mount engine | P7, P8 | 3, 5 |
 | B.6.60,106 | `UndoService.onChange` | `model.canUndo` from the view answers over the replica's history (`viewsChanged`) (the old screen keeps `UndoService.onChange` until stage 7, never beside the new screens) | P2, P8 | 3, 4 |
 | B.6.61 | status bar observer | `chrome` | P7, P8 | 4 |
-| B.6.62-66 | Settings tab events | the screen at `Places.settings()`: inputs → messages through `input` and `editors` | P2, P7, P8 | 6 |
+| B.6.62-66 | Settings tab events | `host/settings.ts`: Obsidian's `Setting` callbacks → door calls, settings as per-key patches | P2, P7, P8 | 6 |
 | B.6.67 | popout opens | `ScreenHost` / `chrome` (`chrome` takes it from the model) | P7, P8 | 1, 3 |
 | B.6.68 | section name field keys / blur | naming layer (door session) | P3, P6, P7, P8 | 3 |
 | B.6.69 | field undo keys | `input` | P7, P8 | 3 |
@@ -740,12 +740,12 @@ Row ids number the rows of each table in file order: B.1.1–142, B.2.1–244, B
 | B.6.79 | auto-scroll frame | `scroll` (`scroll` orders; `measure` reports scroll) | P7, P8 | 3 |
 | B.6.80-81 | flight timers, section float finished | `motionSettled` (timeout message) | P5, P8 | 3 |
 | B.6.82-83 | peek reads resolve | gone: nothing to read ahead; the neighbour day is a need of the screen's `needs(model)`; `eventsLanded` Msg from the network lane | P2, P3, P8 | 4 |
-| B.6.84-86 | swipe pointer, wheel stream timer, pager frame | `update/gesture.ts` (its recognizer) + `motion` | P7, P8 | 4 |
+| B.6.84-86 | swipe pointer, wheel stream timer, pager frame | the gesture concern's recognizer + `motion` | P7, P8 | 4 |
 | B.6.87-88 | pinch pointer / wheel, wheel settle | `input` + pinch gesture | P7, P8 | 4 |
 | B.6.89-90 | wheel pointer, click, keys, timers | `input` + wheel-drag gesture | P7, P8 | 4 |
 | B.6.91,165 | divider gestures (ribbon) | `input` + divider gesture | P7, P8 | 4 |
 | B.6.166 | divider gestures (still layouts) | `input` + divider gesture | P7, P8 | 4 |
-| B.6.92 | settings row reorder | the one carry (a settings-row payload) through `input` and `update/gesture.ts`; the order write a door call (`settings.move*`), persisted as a per-key patch | P3, P6, P7, P8 | 6 |
+| B.6.92 | settings row reorder | the one carry (payload `settingsRow`) through the input engine and the gesture concern; the order write a door call (`settings.move*`), persisted as a per-key patch | P3, P6, P7, P8 | 6 |
 | B.6.93,159-161 | free room double click, plates | `input` → entry | P7, P8 | 3 |
 | B.6.94 | found card frame | `scroll` reveal | P7, P8 | 4 |
 | B.6.96,100-103 | full card refresh, title rename end, description save, focus, Escape | `sheet.full` Msgs; Escape order (layer stack; data applies at once) | P6, P8 | 3 |
@@ -770,7 +770,7 @@ Row ids number the rows of each table in file order: B.1.1–142, B.2.1–244, B
 | B.6.150-151 | wheel / touch drop the anchor | `input` → `userScrolled(timeline)` | P7, P8 | 4 |
 | B.6.153,156-158 | ScrollEdges, ScrollHold | `scroll` (`scroll` orders; `measure` reports scroll) | P7, P8 | 3 |
 | B.6.154,173-174 | motion finished (block gone, row grown / left) | `motionSettled`; leaving rows skipped by layout selectors (P4) | P4, P5, P8 | 3 |
-| B.6.162-164 | note block observers and frame | `measure` | P4, P8 | 5 |
+| B.6.162-164 | note block observers and frame | `measure` | P4, P8 | 3, 5 |
 | B.6.167-168 | strip track callbacks, slide end | `motion` | P5, P8 | 4 |
 | B.6.169-171 | rows observer, fit frame, settle | `measure`; `motionSettled`; heights never held | P4, P5, P8 | 3, 4 |
 | B.6.172 | drop hover in rows | carry target | P6, P8 | 3, 4 |
@@ -787,15 +787,15 @@ Row ids are the ids of `inventory-behaviour.md` (it has no C1.16; C1 holds 23 ro
 | Rows | What | Owner in revision 11 | P | Stage |
 |---|---|---|---|---|
 | A1.1-2 | open the tab (ribbon icon, command) | the leaf adapter opens the view; `ScreenHost` mounts the one screen with `Places.main()` | P7 | 1, 3 |
-| A1.3 | note block appears | the note adapter mounts the one screen with `Places.note(path)` | P7 | 5 |
+| A1.3 | note block appears | the note adapter mounts the one screen with `Places.note(path)` | P7 | 3, 5 |
 | A1.4 | several tabs, popouts | one runtime per plugin: one replica, one tasks queue, one pending log; `chrome` per window | P2, P3, P7, P8 | 1 |
-| A2.1 | tap a card → task menu after reveal | tap `update/gesture.ts` (its recognizer) → overlay `task` with `revealing` (`scroll` orders; `measure` reports scroll) | P6 | 3 |
+| A2.1 | tap a card → task menu after reveal | tap the gesture concern's recognizer → overlay `task` with `revealing` (`scroll` orders; `measure` reports scroll) | P6 | 3 |
 | A2.2 | counter tap folds subtasks | Cmd `toggleCollapsed`; fold motion by cause (keyed diff within one context) | P2, P5 | 3 |
 | A2.3 | folder mark tap → filter | Cmd `selectProjectNode` | P2 | 3 |
 | A2.4,8-9 | right click / click with selection → bulk or task menu | tap order function over `model.selection`; overlay | P6 | 4 |
 | A2.5 | double click → rename | overlay `task` → entry rename (second press within 250 ms) | P6 | 3 |
 | A2.6-7,10 | Cmd-click, Shift-click, tap in select mode | `model.selection`; select mode (layer stack; data applies at once) | P6 | 4 |
-| A2.11-15 | long press / mouse drag lift, cancel, second finger, redraw during press | `update/gesture.ts` (its recognizer) → carry gesture; hand-off to pinch | P6, P7 | 3 |
+| A2.11-15 | long press / mouse drag lift, cancel, second finger, redraw during press | the gesture concern's recognizer → carry gesture; hand-off to pinch | P6, P7 | 3 |
 | A2.16-17 | Done / immovable by-project cards | card `can` from the core; tap only | P1 | 3, 4 |
 | A2.18-21 | double click free room, plates | `input` → entry `openAtEnd` / `openIn` | P6 | 3, 4 |
 | A2.22 | select text in the lifted copy | view (native selection) | P1 | 3 |
@@ -803,7 +803,7 @@ Row ids are the ids of `inventory-behaviour.md` (it has no C1.16; C1 holds 23 ro
 | A3.1 | section header tap | overlay `section` | P6 | 3 |
 | A3.2 | section lift | section-lift gesture | P6 | 3 |
 | A3.3-4 | rename section, new section name | naming layer | P6 | 3 |
-| A4.1-3 | timeline tap, double click, mark | tap `update/gesture.ts` (its recognizer) → overlay / entry / Cmd | P6 | 4 |
+| A4.1-3 | timeline tap, double click, mark | tap the gesture concern's recognizer → overlay / entry / Cmd | P6 | 4 |
 | A4.4-5 | finger hold → menu, then drag with no free moment | hold gesture + overlay at once, then hand-off (layer stack; data applies at once) | P6 | 3 |
 | A4.6 | mouse drag of a block | carry gesture (grab offset) | P6 | 3 |
 | A4.7-8 | long click, right click → select with menu | `model.timeline.selected` + overlay | P6 | 4 |
@@ -827,11 +827,11 @@ Row ids are the ids of `inventory-behaviour.md` (it has no C1.16; C1 holds 23 ro
 | A6.17 | iOS lost lift | `input` (new primary finger ends the gesture) | P7 | 3 |
 | A6.18 | view closed mid-drag | `ScreenHost`'s teardown ends the carry (`endCarry`) and cancels the layer (P8) | P7, P8 | 3 |
 | A6.19 | lifted block leaves the timeline stack | selector `stackTasks` without `carry.lifted`; transition | P1, P5 | 4 |
-| A7.1-5 | finger swipe, vertical scroll, trackpad swipe, ctrl-wheel, rubber band | ribbon swipe gesture + `update/gesture.ts` (its recognizer) | P6, P7 | 4 |
+| A7.1-5 | finger swipe, vertical scroll, trackpad swipe, ctrl-wheel, rubber band | ribbon swipe gesture + the gesture concern's recognizer | P6, P7 | 4 |
 | A7.6 | finger down while the screen runs | a tap leaves the settle running and goes to what it hit | P5, P6 | 4 |
 | A7.7 | new swipe during a run | ribbon swipe catches the running transition | P5, P6 | 4 |
 | A7.8 | no swipe in other modes / block | selector `hasPages` | P1 | 4 |
-| A7.9-14 | wheel tap, quick / slow drag, long press, arrows, cancel | wheel-drag gesture; careful pace `update/gesture.ts` (its recognizer) | P6 | 4 |
+| A7.9-14 | wheel tap, quick / slow drag, long press, arrows, cancel | wheel-drag gesture; careful pace the gesture concern's recognizer | P6 | 4 |
 | A7.15 | leaving Done | update rule on place change | P2 | 4 |
 | A7.16-18 | ‹ ›, title → today, repeated taps | day-swipe gesture; each turn drawn from the view answers of its own message's loop (P2) | P3, P6 | 4 |
 | A7.19 | switch day / place with a field open | the field's door calls run first, in message order; the switch is drawn from the view answers of the same message's loop (P2); a bar place keeps the field layer | P3, P6 | 4 |
@@ -866,18 +866,18 @@ Row ids are the ids of `inventory-behaviour.md` (it has no C1.16; C1 holds 23 ro
 | A13.21 | add subtask on a timeline-only task | overlay + entry at once (layer stack; data applies at once) | P6 | 4 |
 | A13.22 | hand scroll stops following the field | `scroll` `userScrolled` → entry `follow = false` | P7 | 3 |
 | A14.1-10 | full card: close, Escape, Done, circles, subtasks, parent, project, description, bottom row, rename | `model.sheet.full` + sessions (a door session over the replica) + overlay (layer stack; data applies at once) | P3, P6, P7 | 3 |
-| A15.1-3 | note block presses, focus, key scope | the note adapter's presses kept from the editor by `input`; `focus`; `keys` (`Layout.keys` `focus`) | P7 | 5 |
+| A15.1-3 | note block presses, focus, key scope | the note adapter's presses kept from the editor by `input`; `focus`; `keys` (`Layout.keys` `focus`) | P7 | 3, 5 |
 | A15.4-5 | touchmove / touchstart prevented | `input` (synchronous preventDefault) | P7 | 4 |
 | A15.6 | focus, visibility, active leaf | `chrome` → `model.visible` | P4 | 3, 4 |
 | A15.7 | theme change | `chrome` → `model.theme` | P4 | 3, 4 |
 | A15.8 | view resize | `measure` stage size | P4 | 4 |
 | A15.9 | keyboard shows / hides | `chrome` → keyboard transition | P4, P5 | 3 |
 | A15.10 | Create file | Cmd `createFile` | P2 | 3, 4 |
-| A15.11 | settings rows drag | the one carry (a settings-row payload), at `Places.settings()` | P6 | 6 |
+| A15.11 | settings rows drag | the one carry (payload `settingsRow`, look `self`, no hold on the grip), at `Places.rows(list)` | P6 | 6 |
 | A16.1,3 | one gesture at a time; no start while busy | `interaction.gesture` slot + start table | P6 | 3 |
 | A16.2 | hold → drag hand-off | explicit hand-off in the layer table | P6 | 3 |
 | A16.4 | swipe settling counts as free; finger releases the claim | a tap leaves the settle running; only a new swipe catches it (`motionInterrupted`) | P5, P6 | 4 |
-| A16.5-6 | pointer kinds, sideways vs vertical | `update/gesture.ts` (its recognizer) | P7 | 3, 4 |
+| A16.5-6 | pointer kinds, sideways vs vertical | the gesture concern's recognizer | P7 | 3, 4 |
 | A16.7-8 | wheel claim fails, divider claims on down | start table; `input` preventDefault | P6, P7 | 4 |
 | A16.9 | pinch hand-off on a second finger | explicit hand-off | P6 | 4 |
 | A16.10-11 | grip stops propagation, canvas declines blocks | `input` hit targets | P7 | 3 |
@@ -916,7 +916,7 @@ Row ids are the ids of `inventory-behaviour.md` (it has no C1.16; C1 holds 23 ro
 | B2.24 | folder switch knob | overlay transition; the door's answer over the replica, at once (P3) | P3, P5 | 1, 3 |
 | B2.25 | bar rides the keyboard | keyboard transition | P5 | 3 |
 | B2.26 | desktop capsule away (opacity) | CSS opacity stays; presence: the closing layer stays in the stack until `motionSettled`, pinning what it covers (P6) | P5, P6 | 3 |
-| B2.28 | settings rows step aside | `motion`: the fold under a lift, the carry's cause, at `Places.settings()` | P5 | 6 |
+| B2.28 | settings rows step aside | `motion`: the cause `stepAside` (the rows the carried row passes slide by one step), at `Places.rows(list)` | P5 | 6 |
 | B2.30-31 | phone tree panel slide, dim | panel transition | P5 | 4 |
 | B2.32-33 | docked panel and columns slide | dock transition | P5 | 4 |
 | B2.34 | view button hides / moves with the wheel | transition with the ribbon | P5 | 4 |
@@ -939,7 +939,7 @@ Row ids are the ids of `inventory-behaviour.md` (it has no C1.16; C1 holds 23 ro
 | B3.22 | rows fit then re-measure | Rows heights measured, never held; one transition with the fold | P4, P5 | 3, 4 |
 | B3.23 | scroll hold under a shrinking list | `scroll` (ScrollHold) | P7 | 3 |
 | B3.24 | now line every minute | clock → `model.now` | P2 | 1, 3 |
-| B3.25 | settings row settles | `motion`: the drop flight, then the order from the write, at `Places.settings()` | P5 | 6 |
+| B3.25 | settings row settles | `motion`: the drop's settle, then the order from the write, at `Places.rows(list)` | P5 | 6 |
 | B3.26 | timeline opening anchor | (`scroll` orders; `measure` reports scroll) | P7 | 4 |
 | B3.27-29 | question, search row, name fields scrolled into view | `scroll` reveal | P7 | 3, 4 |
 
@@ -954,12 +954,12 @@ Row ids are the ids of `inventory-behaviour.md` (it has no C1.16; C1 holds 23 ro
 | C1.8 | still-layout widths | selector `layoutWidths` over stage size | P4 | 4 |
 | C1.9-14 | rows: room, fade, leaving delay, typing heights, stops | `measure` row heights → selector `stackedLists` | P4 | 3, 4 |
 | C1.15 | foot fade left edge | selector | P4 | 3, 4 |
-| C1.17 | note block height | the inline frame (decision 44); `measure` for what depends on it | P4 | 5 |
-| C1.18-19 | Live Preview end room, note view mutations | the note adapter (`host/adapters/note.ts`) with `drivers/mount.ts` | P4, P7 | 5 |
+| C1.17 | note block height | the inline frame (decision 44); `measure` for what depends on it | P4 | 3, 5 |
+| C1.18-19 | Live Preview end room, note view mutations | the note adapter (`host/adapters/note.ts`) with the mount engine | P4, P7 | 3, 5 |
 | C1.20 | status bar room | `chrome` | P4 | 4 |
 | C1.21-22 | tree panel width, tree divider bounds | `measure`; selector | P4 | 4 |
 | C1.23 | finger px per wheel place | token read once | P4 | 4 |
-| C1.24 | settings rows wrap | `measure`, at `Places.settings()` | P4 | 6 |
+| C1.24 | settings rows wrap | `host/settings.ts`: Obsidian's own layout wraps the rows, as today | P4 | 6 |
 | C2.1,6 | scroll edge fades | `scroll` (`scroll` orders; `measure` reports scroll) | P7 | 3 |
 | C2.2 | scroll hold room | `scroll` | P7 | 3 |
 | C2.3 | FLIP rects | gone (transitions by cause) (keyed diff within one context) | P5 | 3 |
@@ -968,7 +968,7 @@ Row ids are the ids of `inventory-behaviour.md` (it has no C1.16; C1 holds 23 ro
 | C2.7-8 | by-project / tree scroll reset / keep | `scroll` orders (`scroll` orders; `measure` reports scroll) | P7 | 4 |
 | C2.9 | peek over the shown columns, same scroll | view draws the neighbour's layout from its need's answer (the screen's `needs(model)`); scroll copy (`scroll` orders; `measure` reports scroll) | P2, P3, P4 | 4 |
 | C3.1-18 | drag hit tests and flight boxes | drop places computed from `model.measured`, `scrolled` and the core's rules; a flight's end box read by `motion` in the commit phase | P4, P7 | 3, 4 |
-| C3.19 | settings row rects | carry geometry (`screen/carryGeometry.ts`): the drop slot from measured row heights in `Px`, at `Places.settings()` | P4, P7 | 6 |
+| C3.19 | settings row rects | the core's hit test over the adopted rows' measured boxes (units from the measure engine), at `Places.rows(list)` | P4, P7 | 6 |
 | C3.20 | whole-title copy width | `measure` text width | P4 | 3 |
 | C4.1-2 | timeline resize, visible height | `measure` | P4 | 4 |
 | C4.3 | zoom anchor rect | computed from the pointer, `scrolled` and `model.zoom` | P4 | 4 |
@@ -990,13 +990,13 @@ Row ids are the ids of `inventory-behaviour.md` (it has no C1.16; C1 holds 23 ro
 
 | Rows | What | Owner in revision 11 | P | Stage |
 |---|---|---|---|---|
-| D1.1-4 | the four modes | one layout component per `ViewChoice.layout` | P1 | 3, 4 |
+| D1.1-4 | the four modes | `Layout.regions` per `ViewChoice.layout`, drawn by the one `Screen` | P1 | 3, 4 |
 | D1.5-10 | filters and Subprojects row | selectors over `model.read` | P1 | 4 |
 | D1.11,13 | kept per device, fallback | core answers in `model.read` | P1 | 3, 4 |
 | D1.12 | context drawn still, same-context changes move | P5 (keyed diff within one context) | P5 | 3 |
-| D1.14 | one layout at a time; timeline keeps its scroll | layout component; `scroll` keyed (`scroll` orders; `measure` reports scroll) | P1, P7 | 3, 4 |
+| D1.14 | one layout at a time; timeline keeps its scroll | `Layout.regions`; `scroll` keyed (`scroll` orders; `measure` reports scroll) | P1, P7 | 3, 4 |
 | D2.1-7 | panel docked / overlay / by carry / kept / top row / tree rows / missing | selectors over `read.funnel.panel`; transitions | P1 | 4 |
-| D3.1-6 | note block | the one screen at `Places.note(path)`: its gates in `layoutOf` (no tree, calendar, cross, swipe; Rows and By project from the core); the inline frame; `measure` | P1, P7 | 5 |
+| D3.1-6 | note block | the one screen at `Places.note(path)`: its gates in `layoutOf` (no tree, calendar, cross, swipe; Rows and By project from the core); the inline frame; `measure` | P1, P7 | 3, 5 |
 | D4.1 | before the first read | initial model from `firstView` / `firstPlace`; no transition | P1, P5 | 4 |
 | D4.2 | missing file | `read.missing` | P1 | 3, 4 |
 | D4.3-4 | empty lists, empty section | selectors (core words) | P1 | 3 |
@@ -1026,7 +1026,7 @@ Each class left by the runs against revisions 4 to 9 (M1–M23, R1–R22), and e
 | R4 a new row's key across its create | Resolved | P1: the `CreatedTask` id is bound to the row key; P3: the replay's old→new id map is applied to the whole model (row keys, pins, selection, an open card or menu, an entry's target), and a later entry's ids are mapped through it. |
 | R5 the settings store's echo | Resolved | Per-key patches through `PluginSettings.update`, which merges over a fresh read; the replica's settings are `PluginSettings.get()`, refreshed on its `onChange` (P3, table), so our own write and every outside writer arrive the same way. |
 | R6 what a swipe shows while the context changes | Resolved | "Another filter, mode, day or place is drawn from the same replica in the same message" (P3); the neighbour day or place under a swipe is a need of the screen's `needs(model)`, computed in the loop of the message that starts the swipe (P2 step 3). |
-| R7 the guards' scope | Resolved | §Guards, Scope (revision 11): `uiRules` covers all of `obsidian/` (G3); the old screen is frozen by content and exempt until stage 7; the `/* next */` marker splits the CSS. |
+| R7 the guards' scope | Resolved | §Guards (revision 12): the compiler's projects, and `uiRules` over every input of the bundle's metafile (C5); the old screen is frozen by content and exempt until stage 7; the `/* next */` marker splits the CSS. |
 | R8 the preview core is `composeCore` | Resolved | No preview core: every call is `callDoor` over one `DoorContext` (P3); the phone-host assumptions are host facts in `DoorContext`. |
 | R9 calls that act on projects-screen state | Resolved | Every call runs in message order on one replica (P3), and a replay takes only the text, the history and the ids, so a pick, a fold or a carry made after the base stays. Checked: those calls change only `projectsScreen` (`keepProjectsScreen`, `PhoneCalls.ts:452-474`). |
 | R10 a write pick's motion | Resolved | P6: a closing sheet pins the layout under it. |
@@ -1040,7 +1040,7 @@ Each class left by the runs against revisions 4 to 9 (M1–M23, R1–R22), and e
 | R18 what the runtime's settings learn from writers outside its port | Resolved | P3 table: "The replica's settings are `PluginSettings.get()`, refreshed on its `onChange`", with Sync, the token, the hand-over, the migration and the old screen listed. Checked: `PluginSettings` emits on every `update` and on a reload that changed `get()` (`PluginSettings.ts:51-104`), so the old tab's writes reach the replica and both tidy under one reading. |
 | R19 core classes run unchanged against door sessions | Resolved | P3: `backend` gives the entry's job order a step function over `EntryAnswer` and the refresh rule a pure decision over the replica's calendar state; `CalendarPolling` stays. Revision 9 does not name their slice; this file puts them in slice 1 with the core's part. |
 | R20 a replay from the snapshot rolls back calls that are not in the log | Resolved, with R23 | P3: "Only the text, the undo history and the ids are taken from the replay." A kept carry survives a replay that only moves its cards, since its `TaskKey`s carry the id. Revision 10's re-id (a replayed create always gets a new id) is not carried into the kept carry: R23. |
-| M1 the settings tab | Resolved | `Places.settings()`, the one screen in a third place (stage 6); until stage 7 the old tab keeps `SettingsServiceImpl` over the shared `PluginSettings`, which the replica follows. |
+| M1 the settings tab | Resolved | Obsidian's own `Setting` chrome in `host/settings.ts`, its row reorder on the one carry at `Places.rows(list)` (stage 6); until stage 7 the old tab keeps `SettingsServiceImpl` over the shared `PluginSettings`, which the replica follows. |
 | M2 the plugin host | Resolved | The runtime owns the replica, the loop's door calls and view answers, persistence, the network and Obsidian's events (P2, P7); hosts own what they start and end what is under way (P8). |
 | M3 chrome both ways | Resolved | The `chrome` driver; body classes only by it (P7). |
 | M4 synchronous core reads | Resolved | View answers per need (`needs(model)`, P2 step 3) and the pure rules imported directly (P2, P3); the cross-call cache keeps them cheap. |
@@ -1059,7 +1059,7 @@ Each class left by the runs against revisions 4 to 9 (M1–M23, R1–R22), and e
 | M17 the device and settings stores | Resolved | Device values through `PluginSettings` into device storage; synced settings as per-key patches; the replica's settings `PluginSettings.get()` (P3). |
 | M18 the network lane | Resolved | Latest per day, a superseded fetch abandoned; the refresh decision the core's (P3). |
 | M19 cross-screen renames | Resolved | One replica for every new screen; the old leaf never beside them (Migration). |
-| M20 gesture recognition | Resolved | `update/gesture.ts` (its recognizer), pure. |
+| M20 gesture recognition | Resolved | the gesture concern's recognizer, pure. |
 | M21 all service callers | Resolved | New screens call only the runtime; the old screen keeps its services until stage 7 and never runs beside the new ones; what of `createServices` stays live after the switch keeps no undo or ids a screen shows. |
 | M22 a dropped card before its read | Resolved | The door gives the drop's real outcome in the drop's own loop (P2, P3); the gesture's pinned layout moves to it when the flight ends (P6). |
 | M23 key scopes | Resolved | The `keys` driver. |
@@ -1076,7 +1076,7 @@ Each class left by the runs against revisions 4 to 9 (M1–M23, R1–R22), and e
 | R21 where the core's pure rules may be called | Resolved | P2 step 3: "Selectors never call the door. Here 'the core' means `callDoor`, the replica and the view answers"; the pure rules "may be imported by `update/`, selectors and `motion`". §Guards: "`callDoor` and the replica only in the runtime. Outside it, the core may be imported only for the pure rules, which are listed in the guard." Checked: the rules the plugin calls per move (`swipeLanding`, `layoutWidths`, `stackedLists`, `dividerAt`, `placeAt`) are plain core functions. |
 | R22 which view answers the runtime computes | Resolved | P2 step 3: each screen's pure `needs(model)` lists its context's view, the neighbour day or place under a swipe, the task of an open full card or menu and the search's results; one answer per need, memoised by (replica, minute, need); any replica change recomputes every mounted need in the same loop; a runtime test has Sync change an open full card's task. |
 | R23 kept parts after a replay | Resolved (revision 10's P3, kept in 11) | `tasks.reconcile(idMap, dropped)`, a door method `backend` added in slice 1, called after any replay that remapped an id or dropped a call, in the same message as the model's remap (§Rows that do not fit, R23). |
-| **R24 a concern implemented once per place** (revision 11; report B: U1–U20, H1–H20) | Resolved | Revision 10's owners were mechanisms, but nothing made them unique: 31 table lines named a place's host as owner, and slice 3 built the block's own model, lists, carry and host. Revision 11: one `Model`, `Msg`, `update`, `Screen` and `ScreenHost` (G1, G2); the owner table with one owner per concern and deny by default across `obsidian/` (G3); the kit, motion causes, `Px` and required pure rules (G4); the matrix (G5), the trap (G6), tested guards (G7), no coexistence (G8), structural review (G9). Every row's owner is now a concern of the one screen; only embedding rows are an adapter's, with `drivers/mount.ts`. |
+| **R24 a concern implemented once per place** (revisions 11–12; report B: U1–U20, H1–H20; reviews R1–R3) | Resolved | Revision 10's owners were mechanisms, but nothing made them unique: 31 table lines named a place's host as owner, and slice 3 built the block's own model, lists, carry and host. Revision 11 named one owner per concern but enumerated what was forbidden, which leaked (reviews R1–R3). Revision 12: the UI code cannot express an effect, a core rule or a read of the place (C1–C4); one engine per concern in a frozen table (C2); the guards out of the code's reach and the trap's effect ledger (C5); the matrix with declared variance (G5); no coexistence (G8); structural review (G9). Every row's owner is now a concern of the one screen; only embedding rows are an adapter's, with the mount engine. |
 
 All 22 of R1–R22, all 23 of M1–M23 and all 10 faults at the root are resolved by revision 10's text; 0 are not. R21 and R22 are resolved with no remainder. 2 leave a remainder that a new class carries (R14, R20): both come from revision 10's re-id map, which reaches the model but not the carry the core keeps in the replica. Revision 9's architect named no fault at the root; its five wording fixes are in revision 10 and were checked row by row.
 
@@ -1148,3 +1148,5 @@ Against revision 4: 23 classes and 688 rows did not fit. Against revision 5: 7 c
 Revision 10 with `aa0c20f6` resolves R21 (the pure rules may be imported by `update/`, selectors and `motion`; the guard keeps `callDoor` and the replica in the runtime) and R22 (each screen's `needs(model)`), and every earlier class and fault at the root still holds. One narrow class is left, R23 (14 rows): the replay's old→new id map reaches the model but not the carry the core keeps in the replica's projects screen, and the reconciliation door call is named but not given to `backend`. Both are closed by one door method over the kept parts in slice 1 and one runtime test. Five stale sentences (§Resolution, §Architecture, the log's recorded settings, the tidy entry, type imports under the guard) move no row.
 
 **Revision 11.** R23 is closed by `tasks.reconcile` (P3). The fault Max stopped the work for, a concern built once per place, is R24: it moved no row's behaviour, only who owns it. With places as data and one owner per concern, every one of the 2,032 rows maps to a concern of the one screen, the runtime, or (for embedding a note and registering a view) an adapter; none maps to a place. The note's rows are stage 5 and the settings tab's stage 6, each adding a `Place` and its gates, never a mechanism.
+
+**Revision 12.** No row changes its behaviour. The settings tab's lines are split by owner (the settings adapter on Obsidian's `Setting`, `hostServices`, `chrome`, and the one carry at `Places.rows(list)` for the reorder), the settings rows' step aside is the motion cause `stepAside`, the block's fit frame is gone (decision 44), drivers are engines, the hit test is the core's, and the words that named per-row handlers or a layout component per mode now name the kit's `act` and `Layout.regions`. Every row still maps once: 0 left over, 2,032 fit.
