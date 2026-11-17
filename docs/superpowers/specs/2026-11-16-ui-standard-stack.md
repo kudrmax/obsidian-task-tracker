@@ -73,7 +73,8 @@ A feature is checked the way Max uses it, in motion, never by numbers the code u
 3. **Frame checks shared by every scenario**, on a screencast of every frame: what is under the finger is visible and follows it; nothing vanishes, flickers, doubles or jumps further than the gesture moved; zoom keeps the time under the pointer; no stray selection or highlight; text is never cut mid-line.
 4. **States the user reaches**: each scenario also runs zoomed, scrolled to the edges, in a pop-out window, in the phone view, in light and dark.
 5. **Someone else looks.** An agent that did not build the feature watches the recording and the frames to find defects, not to confirm. A feature is done when its scenario and the frame checks pass and that agent finds nothing.
-6. **A defect Max finds** first gets a check that catches it, then the fix.
+6. **Real input, not only synthesized.** A Mac trackpad's swipe (finger phase plus a long momentum tail) can't be faked by hand-written events. Max's real gestures are recorded (wheel and pointer streams with timestamps) and replayed over CDP in every run; every new recording joins the set.
+7. **A defect Max finds** first gets a check that catches it, then the fix.
 
 ## Acceptance criteria
 
