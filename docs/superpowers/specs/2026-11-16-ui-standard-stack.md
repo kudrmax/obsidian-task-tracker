@@ -64,6 +64,17 @@ hosts: the main screen leaf, the note block
 
 Replaced wholesale, then deleted (`trash`): `obsidian/ui/` motion, drag, layouts, guards and per-place code go. Old and new are never shipped side by side; no flag switches between them. `core/`, the door and the iPhone app stay as they are.
 
+## How a feature is checked
+
+A feature is checked the way Max uses it, in motion, never by numbers the code under test computes about itself. Stage 0 passed a timeline that teleported, flickered and dropped tasks at the wrong hour, because the check compared the code's own pixel-to-minute math with itself, at the initial zoom only.
+
+1. **Scenario first.** Before a feature from the list is built, it gets an end-to-end scenario in the test Obsidian: real gestures at human pace (slow, fast, back and forth, released outside a target, repeated), driven over CDP. It fails before the code exists.
+2. **The oracle is what the user sees and means**, read independently of the code: the label or line under the pointer, the card's text on screen, the tasks file on disk. Dropped under «09:00» means the file says 09:00 and the block's top is on that line.
+3. **Frame checks shared by every scenario**, on a screencast of every frame: what is under the finger is visible and follows it; nothing vanishes, flickers, doubles or jumps further than the gesture moved; zoom keeps the time under the pointer; no stray selection or highlight; text is never cut mid-line.
+4. **States the user reaches**: each scenario also runs zoomed, scrolled to the edges, in a pop-out window, in the phone view, in light and dark.
+5. **Someone else looks.** An agent that did not build the feature watches the recording and the frames to find defects, not to confirm. A feature is done when its scenario and the frame checks pass and that agent finds nothing.
+6. **A defect Max finds** first gets a check that catches it, then the fix.
+
 ## Acceptance criteria
 
 - Every behaviour described in `docs/plugin/` works on the phone and on the desktop, in light and dark, checked in the test Obsidian.
