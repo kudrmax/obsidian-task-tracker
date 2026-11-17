@@ -1,8 +1,8 @@
 import { labelTitle } from "../../../domain/Label";
-import { usableLabels } from "../../../settings";
 import type { TaskItem } from "../../contracts";
 import { listCardMenuFrom } from "../../menus";
 import { TaskLookup } from "../tasks";
+import { labelChoices } from "./labelChoices";
 import type { ActionOption } from "./option";
 
 const REFUSED = "Couldn't add the label {name} to this task.";
@@ -21,20 +21,22 @@ function carries(task: TaskItem | null, name: string): boolean {
 export const answerLabel: ActionOption = {
 	key: "label",
 	label: "Label",
-	choices: (settings) => [{ value: null, title: "None" }, ...usableLabels(settings.labels).map((label) => ({ value: label.name, title: labelTitle(label.name) }))],
-	async afterAnswer(name, { task, listed }, tasks) {
-		const refused = REFUSED.replace("{name}", labelTitle(name));
-		const today = listed.today;
-		const menu = tasks.menu(task, listCardMenuFrom(task), { today, day: today, offer: await tasks.sectionOffer(today) });
-		const tile = menu.labels.tiles.find((each) => each.label.name === name);
-		if (!menu.groups.includes("labels") || menu.labels.disabled || !tile) return refused;
-		if (!tile.on) {
-			const [marked] = await tasks.toggleLabel([task.key], name);
-			if (!carries(marked, name)) return refused;
-		}
-		const others = new TaskLookup(await tasks.listed()).all().filter((each) => each.id !== task.id && carries(each, name));
-		if (others.length > 0) await tasks.toggleLabel(others.map((each) => each.key), name);
-		return null;
+	choices: labelChoices,
+	afterAnswer: {
+		async run(name, { task, listed }, tasks) {
+			const refused = REFUSED.replace("{name}", labelTitle(name));
+			const today = listed.today;
+			const menu = tasks.menu(task, listCardMenuFrom(task), { today, day: today, offer: await tasks.sectionOffer(today) });
+			const tile = menu.labels.tiles.find((each) => each.label.name === name);
+			if (!menu.groups.includes("labels") || menu.labels.disabled || !tile) return refused;
+			if (!tile.on) {
+				const [marked] = await tasks.toggleLabel([task.key], name);
+				if (!carries(marked, name)) return refused;
+			}
+			const others = new TaskLookup(await tasks.listed()).all().filter((each) => each.id !== task.id && carries(each, name));
+			if (others.length > 0) await tasks.toggleLabel(others.map((each) => each.key), name);
+			return null;
+		},
+		failedWords: (name) => FAILED.replace("{name}", labelTitle(name)),
 	},
-	failedWords: (name) => FAILED.replace("{name}", labelTitle(name)),
 };

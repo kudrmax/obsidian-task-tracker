@@ -8,6 +8,7 @@ import type {
 	AssistantService,
 	AssistantSetting,
 	PreparedQuestion,
+	TaskItem,
 } from "../contracts";
 import type { SettingsStore, Timers } from "../ports";
 import type { AssistantAction } from "./actions/action";
@@ -17,7 +18,7 @@ import { ModelChoice } from "./ModelChoice";
 import { type HostModels, type ModelReply, NO_MODELS, type StopSignal, StopSwitch } from "./model";
 import { MODEL_PROFILES } from "./models";
 import type { ModelProfile, SettingField } from "./models/profile";
-import { optionValue } from "./options/option";
+import { type ActionOption, optionValue } from "./options/option";
 import { failed, failureWords, goneWords, NO_MODEL_WORDS, PAGE_WORDS, STOPPED } from "./outcomes";
 import { type AssistantPlace, type AssistantTarget, tasksIn } from "./scope";
 import { type AssistantSteps, type AssistantTasks, drawnAnswer, type ListedTasks, TaskLookup } from "./tasks";
@@ -142,8 +143,13 @@ export class AssistantServiceImpl implements AssistantService {
 		const profile = this.choice.chosen();
 		if (profile === null) return failed(action, this.choice.named()?.unavailable ?? NO_MODEL_WORDS, `model "${this.assistant().model}" is not served here`);
 		const listed = await this.tasks.listed();
-		const briefing = briefingOf(action.briefing, listed.today, tasksIn(action.scope, target, listed));
-		if (isEmptyBriefing(briefing)) return failed(action, action.emptyWords, "no open tasks to send");
+		const tasks = tasksIn(action.scope, target, listed);
+		const keepers = this.keepers(action);
+		const briefing = briefingOf(action.briefing, listed.today, tasks, (task) => keepers.some((keeper) => keeper.keeps(task)));
+		if (isEmptyBriefing(briefing)) {
+			const keptAll = keepers.length > 0 && !isEmptyBriefing(briefingOf(action.briefing, listed.today, tasks));
+			return keptAll ? failed(action, keepers[0].allKeptWords, "every open task is kept back") : failed(action, action.emptyWords, "no open tasks to send");
+		}
 		return {
 			kind: "question",
 			actionId: action.id,
@@ -196,14 +202,14 @@ export class AssistantServiceImpl implements AssistantService {
 		const marked = await this.steps.together(async () => {
 			let wrote = false;
 			for (const option of action.options ?? []) {
-				const value = optionValue(option, this.assistant().options[action.id]?.[option.key], this.settings.get());
-				if (value === null) continue;
+				const value = this.valueOf(action, option);
+				if (value === null || !option.afterAnswer) continue;
 				wrote = true;
 				try {
-					const notice = await option.afterAnswer(value, { task: drawn.task, listed }, this.tasks);
+					const notice = await option.afterAnswer.run(value, { task: drawn.task, listed }, this.tasks);
 					if (notice !== null) notices.push(notice);
 				} catch (error) {
-					notices.push(option.failedWords(value));
+					notices.push(option.afterAnswer.failedWords(value));
 					errors.push(`${option.key}: ${String(error)}`);
 				}
 			}
@@ -219,6 +225,20 @@ export class AssistantServiceImpl implements AssistantService {
 			notice: notices.length > 0 ? notices.join("\n") : null,
 			detail: errors.length > 0 ? errors.join("\n") : null,
 		};
+	}
+
+	/** The action's options that keep tasks from the model now, each with its value set. */
+	private keepers(action: AssistantAction): readonly { keeps(task: TaskItem): boolean; readonly allKeptWords: string }[] {
+		return (action.options ?? []).flatMap((option) => {
+			const value = this.valueOf(action, option);
+			if (value === null || !option.keepsBack) return [];
+			const { keepsBack } = option;
+			return [{ keeps: (task: TaskItem) => keepsBack.keeps(value, task), allKeptWords: keepsBack.allKeptWords(value) }];
+		});
+	}
+
+	private valueOf(action: AssistantAction, option: ActionOption): string | null {
+		return optionValue(option, this.assistant().options[action.id]?.[option.key], this.settings.get());
 	}
 
 	private optionRows(action: AssistantAction): readonly AssistantOptionRow[] {

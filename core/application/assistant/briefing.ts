@@ -68,14 +68,20 @@ export interface BriefedTask extends BriefedGoal {
 	readonly parent: string | null;
 }
 
+/** A task kept from the model: it and every task under it are not sent. */
+export type KeptBack = (task: TaskItem) => boolean;
+
+const NONE_KEPT: KeptBack = () => false;
+
 const LIST_WORDS: Readonly<Record<SectionKey, BriefedCandidate["list"]>> = { now: "today", soon: "soon", inbox: "inbox", backlog: "backlog", done: "done" };
 
 /**
  * What Max can start now among `tasks` (open, each with its open subtasks), in file order: a task with no open subtask
  * itself; a folded task only its next step, the one its card shows; an unfolded task with open subtasks not itself but
- * each open subtask by these same rules. A task met twice is a candidate once.
+ * each open subtask by these same rules. A task met twice is a candidate once. A task `kept` back is no candidate, nor is
+ * anything under it: a candidate is left out when it or any task above it is kept back.
  */
-export function candidatesOf(tasks: readonly TaskItem[]): readonly Candidate[] {
+export function candidatesOf(tasks: readonly TaskItem[], kept: KeptBack = NONE_KEPT): readonly Candidate[] {
 	const found: Candidate[] = [];
 	const seen = new Set<string>();
 	const add = (candidate: Candidate): void => {
@@ -84,9 +90,12 @@ export function candidatesOf(tasks: readonly TaskItem[]): readonly Candidate[] {
 		found.push(candidate);
 	};
 	const walk = (item: TaskItem, top: TaskItem, goals: readonly TaskItem[]): void => {
-		if (!item.open) return;
+		if (!item.open || kept(item)) return;
 		const step = item.collapsed ? item.card.step : null;
-		if (step) add(stepOf(item, step, top, goals));
+		if (step) {
+			const candidate = stepOf(item, step, top, goals);
+			if (!kept(step) && !candidate.goals.some(kept)) add(candidate);
+		}
 		else if (item.subtasks.length === 0) add({ item, top, goals, after: [] });
 		else for (const sub of item.subtasks) walk(sub, top, [...goals, item]);
 	};
@@ -106,18 +115,18 @@ function stepOf(folded: TaskItem, step: TaskItem, top: TaskItem, goals: readonly
 	return { item: step, top, goals: [...goals, ...flat[at].above], after: flat.slice(at + 1).map((entry) => entry.item) };
 }
 
-/** The briefing of `tasks` on `today`, the action's kind: refs t1, t2… in the order sent. */
-export function briefingOf(kind: BriefingKind, today: string, tasks: readonly TaskItem[]): Briefing {
-	return kind === "candidates" ? candidatesBriefing(today, tasks) : tasksBriefing(today, tasks);
+/** The briefing of `tasks` on `today`, the action's kind, without the tasks `kept` back: refs t1, t2… in the order sent. */
+export function briefingOf(kind: BriefingKind, today: string, tasks: readonly TaskItem[], kept: KeptBack = NONE_KEPT): Briefing {
+	return kind === "candidates" ? candidatesBriefing(today, tasks, kept) : tasksBriefing(today, tasks, kept);
 }
 
 /** Each open task of `tasks` with its open subtasks right after it, a task met twice sent once. */
-function tasksBriefing(today: string, tasks: readonly TaskItem[]): Briefing {
+function tasksBriefing(today: string, tasks: readonly TaskItem[], kept: KeptBack): Briefing {
 	const briefed: BriefedTask[] = [];
 	const refs: Record<string, string> = {};
 	const seen = new Set<string>();
 	const add = (item: TaskItem, top: TaskItem, parent: string | null): void => {
-		if (!item.open || seen.has(item.id)) return;
+		if (!item.open || kept(item) || seen.has(item.id)) return;
 		seen.add(item.id);
 		const ref = `t${briefed.length + 1}`;
 		refs[ref] = item.id;
@@ -130,9 +139,9 @@ function tasksBriefing(today: string, tasks: readonly TaskItem[]): Briefing {
 }
 
 /** What Max can start now among `tasks`, each with what it is for. */
-function candidatesBriefing(today: string, tasks: readonly TaskItem[]): Briefing {
+function candidatesBriefing(today: string, tasks: readonly TaskItem[], kept: KeptBack): Briefing {
 	const refs: Record<string, string> = {};
-	const candidates = candidatesOf(tasks).map((candidate, index): BriefedCandidate => {
+	const candidates = candidatesOf(tasks, kept).map((candidate, index): BriefedCandidate => {
 		const ref = `t${index + 1}`;
 		refs[ref] = candidate.item.id;
 		const { title, description, ...marks } = briefedGoal(candidate.item, today);

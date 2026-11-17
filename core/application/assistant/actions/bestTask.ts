@@ -1,8 +1,9 @@
 import type { Briefing } from "../briefing";
 import { answerLabel } from "../options/answerLabel";
+import { skipLabel } from "../options/skipLabel";
 import type { AssistantAction } from "./action";
 
-/** Of what Max can start now in Today and Soon (`candidatesOf`), the one that changes his life the most, and why. A goal is never the answer: it has no ref. */
+/** Of what Max can start now in Today and Soon (`candidatesOf`), but for the tasks marked with the skip label, the one that changes his life the most, and why. A goal is never the answer: it has no ref. */
 export const bestTask: AssistantAction = {
 	id: "bestTask",
 	places: ["more"],
@@ -21,7 +22,7 @@ export const bestTask: AssistantAction = {
 		additionalProperties: false,
 	},
 	emptyWords: "Today and Soon have no open tasks.",
-	options: [answerLabel],
+	options: [answerLabel, skipLabel],
 	read(answer, briefing, tasks) {
 		const { taskRef, reason } = (answer ?? {}) as { taskRef?: unknown; reason?: unknown };
 		if (typeof taskRef !== "string" || typeof reason !== "string" || !isCandidate(briefing, taskRef)) return { kind: "failed", why: "badAnswer" };
