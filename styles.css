@@ -458,6 +458,10 @@ body {
 	--tc-answer-gap: var(--tc-space-12);
 	--tc-font-answer-title: var(--tc-font-caption);
 	--tc-answer-notice-gap: var(--tc-space-6);
+	/* The answer's field for what the model missed: a tile of the panel, one row tall when empty, growing with its lines. */
+	--tc-answer-field-pad-y: calc((var(--tc-row) - var(--tc-leading-card)) / 2);
+	--tc-answer-field-pad-x: var(--tc-card-pad-start);
+	--tc-answer-foot-gap: var(--tc-space-8);
 	--tc-month-btn: 32px;
 	--tc-month-icon: var(--tc-icon-m);
 	--tc-day: 36px;
@@ -1371,8 +1375,15 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel.is-answer .tc-answer-note { overflow: visible; }
 .tc-answer-note > :first-child { margin-top: 0; }
 .tc-answer-note > :last-child { margin-bottom: 0; }
-.tc-answer-foot { display: flex; }
-.tc-panel.is-answer button.tc-answer-close { flex: 1; min-width: 0; }
+.tc-answer-foot { display: flex; gap: var(--tc-answer-foot-gap); }
+.tc-panel.is-answer button.tc-answer-close, .tc-panel.is-answer button.tc-answer-save, .tc-panel.is-answer button.tc-answer-again { flex: 1; min-width: 0; }
+.tc-panel.is-answer .tc-answer-foot > button.tc-btn.is-hidden { display: none; }
+.tc-panel.is-answer textarea.tc-answer-field { display: block; width: 100%; min-height: var(--tc-row); box-sizing: border-box; margin: 0; padding: var(--tc-answer-field-pad-y) var(--tc-answer-field-pad-x); border: 0; border-radius: var(--tc-radius-menu-tile); background: var(--tc-menu-tile-bg); box-shadow: none; outline: none; resize: none; field-sizing: content; overflow: hidden; overflow-wrap: anywhere; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-card); color: var(--tc-text); caret-color: var(--tc-accent); -webkit-user-select: text; user-select: text; }
+.tc-panel.is-answer textarea.tc-answer-field:focus { box-shadow: var(--tc-ring-selected); }
+.tc-panel.is-answer textarea.tc-answer-field::placeholder { color: var(--tc-muted); }
+.tc-panel.is-answer textarea.tc-answer-field::selection { background: var(--tc-selection); }
+.tc-answer-failed { margin-top: calc(var(--tc-answer-notice-gap) - var(--tc-answer-gap)); font-size: var(--tc-font-caption); line-height: var(--tc-leading-card); color: var(--tc-muted); }
+.tc-answer-failed[hidden] { display: none; }
 .tc-panel button.tc-menu-back { width: 100%; height: var(--tc-row); box-sizing: border-box; padding: 0 var(--tc-space-16) 0 var(--tc-space-10); border-bottom: var(--tc-band); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
 .tc-menu-back svg { width: var(--tc-back-icon); height: var(--tc-back-icon); stroke-width: var(--tc-stroke-chevron); }
 

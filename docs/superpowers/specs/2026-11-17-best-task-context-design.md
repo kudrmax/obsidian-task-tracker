@@ -75,3 +75,15 @@ The note is not «for Best task»: it is extra context about the task, for any a
   `AssistantTasks`, and the service has `addContext`. The door is unchanged (`AssistantService` stays the host's).
 - backend: the default prompt's sentence is also in the assistant spec's quoted default prompt
   (`2026-11-16-assistant-design.md`), which a test compares word for word.
+- frontend-obsidian: the field is a plain multi-line field in the panel's tile look (the plain pill's ground and radius,
+  the body type, a card's side padding, one row tall when empty, the selected ring while focused); it grows with its
+  lines and the popup scrolls when it outgrows the window. It doesn't take the focus on open: Max reads the answer first.
+- frontend-obsidian: the two pills share the foot in equal halves, Save left, Save and ask again right; «has text» is the
+  field not being empty as typed (spaces alone show the pills; Save then writes nothing, as the core's blank rule says,
+  and closes).
+- frontend-obsidian: the failure line takes the notice's look (caption, muted, the notice's gap under the field); typing
+  hides it until the next try. One write at a time: a second press while a write is under way does nothing.
+- frontend-obsidian: Save and ask again presses the same action whose run gave the answer (the frontend keeps the id the
+  run was pressed with), so it goes through the row's own press: the ring in «⋯», the new popup.
+- frontend-obsidian: ⌘Enter is held by an Obsidian key scope of the field's own while it has the focus: Obsidian's hotkeys
+  hear keys before the page, and ⌘Enter is one of theirs (open a link in a new tab). Other keys (⌘Z, Escape) go on as before.

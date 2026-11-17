@@ -1,5 +1,6 @@
-import type { AssistantOffer, AssistantOutcome, AssistantPlace, AssistantService } from "../../../core/application/contracts";
-import { AnswerPopup, type RenderMarkdown } from "./AnswerPopup";
+import type { AssistantContext, AssistantOffer, AssistantOutcome, AssistantPlace, AssistantService } from "../../../core/application/contracts";
+import { AnswerPopup, type ContextField, type RenderMarkdown } from "./AnswerPopup";
+import { type ModEnterHold, plainModEnter } from "./modEnter";
 
 /** What «⋯» needs of the assistant: its rows, whether one runs, and a tap on a row. */
 export interface AssistantRows {
@@ -28,6 +29,7 @@ export class AssistantAnswers implements AssistantRows {
 		private readonly service: AssistantService,
 		private readonly markdown: MarkdownHost,
 		private readonly log: (detail: string) => void = (detail) => console.warn(`Task Calendar assistant: ${detail}`),
+		private readonly modEnter: ModEnterHold = plainModEnter,
 	) {}
 
 	offers(place: AssistantPlace): readonly AssistantOffer[] {
@@ -48,7 +50,7 @@ export class AssistantAnswers implements AssistantRows {
 		this.awaited.add(run);
 		void run.then((outcome) => {
 			this.awaited.delete(run);
-			this.show(outcome);
+			this.show(outcome, actionId);
 		});
 	}
 
@@ -56,7 +58,8 @@ export class AssistantAnswers implements AssistantRows {
 		this.service.stop(actionId);
 	}
 
-	show(outcome: AssistantOutcome): AnswerPopup | null {
+	/** `actionId`: the button whose run this is, pressed again by the answer's Save and ask again. */
+	show(outcome: AssistantOutcome, actionId: string): AnswerPopup | null {
 		if (outcome.kind === "stopped") return null;
 		if (outcome.detail !== null) this.log(outcome.detail);
 		const held: (() => void)[] = [];
@@ -65,8 +68,20 @@ export class AssistantAnswers implements AssistantRows {
 			held.push(() => shown.release());
 			return shown.done;
 		};
-		const popup = AnswerPopup.open(outcome, render);
+		const popup = AnswerPopup.open(outcome, render, outcome.kind === "task" ? this.contextField(outcome.context, actionId) : null);
 		popup.onClosed(() => held.forEach((release) => release()));
 		return popup;
+	}
+
+	/** The answer's field: its text written to the task the core named, and the same button pressed again after it. */
+	private contextField(context: AssistantContext | null, actionId: string): ContextField | null {
+		if (context === null) return null;
+		return {
+			words: context.words,
+			write: (text) => this.service.addContext(context.taskId, text),
+			again: () => this.press(actionId),
+			log: this.log,
+			modEnter: this.modEnter,
+		};
 	}
 }
