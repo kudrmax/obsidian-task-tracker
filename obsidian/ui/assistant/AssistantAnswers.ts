@@ -17,7 +17,8 @@ export type MarkdownHost = (el: HTMLElement, markdown: string) => { readonly don
 
 /**
  * The plugin's side of a run: it outlives the view, so an answer that comes after the view was closed still shows. An
- * answer or a failure opens the popup; a failure's detail goes to the console (the core has none); Stop shows nothing.
+ * answer or a failure opens the popup; the outcome's detail, when it has one (a failure's, or a write that failed while an
+ * answer was marked), goes to the console once (the core has none); Stop shows nothing.
  */
 export class AssistantAnswers implements AssistantRows {
 	/** A press that joins a run under way gets that run's outcome: it shows once. */
@@ -57,7 +58,7 @@ export class AssistantAnswers implements AssistantRows {
 
 	show(outcome: AssistantOutcome): AnswerPopup | null {
 		if (outcome.kind === "stopped") return null;
-		if (outcome.kind === "failed") this.log(outcome.detail);
+		if (outcome.detail !== null) this.log(outcome.detail);
 		const held: (() => void)[] = [];
 		const render: RenderMarkdown = (el, text) => {
 			const shown = this.markdown(el, text);

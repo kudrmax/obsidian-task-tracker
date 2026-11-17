@@ -252,6 +252,36 @@ describe("AssistantAnswers", () => {
 		expect(log).toHaveBeenCalledWith("authentication_failed");
 	});
 
+	it("a write that failed while marking: the answer shows with its line, the error goes to the console once", async () => {
+		const { assistant, transport } = rig({
+			text: ["## Now", "", "- [ ] Pay rent", "", "## Soon", "", "## Done", ""].join("\n"),
+			settings: { ...DEFAULT_SETTINGS, labels: [{ name: "Focus", color: "orange" as const }], assistant: { ...DEFAULT_SETTINGS.assistant, options: { bestTask: { label: "Focus" } } } },
+			tasksPort: (tasks) => ({
+				listed: () => tasks.listed(),
+				sectionOffer: (date) => tasks.sectionOffer(date),
+				menu: (item, from, screen) => tasks.menu(item, from, screen),
+				toggleLabel: () => Promise.reject(new Error("disk full")),
+			}),
+		});
+		const log = vi.fn();
+		const run = assistant.press("bestTask");
+		await settle();
+		transport.answer({ taskRef: transport.refOf("Pay rent"), reason: "Because." });
+		new AssistantAnswers(assistant, plainMarkdown(), log).show(await run);
+		const popup = document.querySelector<HTMLElement>(".tc-panel.is-answer")!;
+		expect(popup.classList.contains("is-failure")).toBe(false);
+		expect(popup.querySelector(".tc-card .tc-card-title")?.textContent).toBe("Pay rent");
+		expect(popup.querySelector(".tc-answer-notice")?.textContent).toBe("Couldn't move the label Focus.");
+		expect(log).toHaveBeenCalledTimes(1);
+		expect(log.mock.calls[0][0]).toContain("disk full");
+	});
+
+	it("an answer with nothing for the console writes nothing there", async () => {
+		const log = vi.fn();
+		new AssistantAnswers(rig().assistant, plainMarkdown(), log).show(await TASK_OUTCOME());
+		expect(log).not.toHaveBeenCalled();
+	});
+
 	it("Stop shows nothing", () => {
 		expect(new AssistantAnswers(rig().assistant, plainMarkdown(), vi.fn()).show({ kind: "stopped" })).toBeNull();
 		expect(document.querySelector(".tc-panel")).toBeNull();

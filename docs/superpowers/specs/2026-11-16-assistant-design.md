@@ -723,3 +723,6 @@ No Swift stage (R6).
 - **Frontend-obsidian (label):** the notice is a line of its own right under the card, before the reason: caption size
   (`--tc-font-caption`), the caption colour (`--tc-muted`), 6 px from the card (`--tc-answer-notice-gap`, the popup's
   12 px gap pulled in) so it reads as said of the card, flush with the popup's title and reason.
+- **Frontend-obsidian (label):** an outcome's `detail` goes to the console whenever it is not null, a `task`'s as a
+  `failed`'s, once per shown outcome, with the same «Task Calendar assistant:» prefix; the popup is the answer's (no
+  failure look), its `notice` under the card.
