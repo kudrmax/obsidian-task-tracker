@@ -39,6 +39,12 @@ export interface AssistantDeps {
 	readonly profiles?: readonly ModelProfile[];
 }
 
+/** A run as its reply is read: its stop, and the moment its answer's options begin, after which nothing stops it. */
+interface RunGate {
+	readonly stop: StopSignal;
+	marking(): void;
+}
+
 interface Run {
 	readonly stop: StopSwitch;
 	readonly outcome: Promise<AssistantOutcome>;
@@ -152,8 +158,11 @@ export class AssistantServiceImpl implements AssistantService {
 		return this.finished(prepared, reply, null);
 	}
 
-	/** The reply read; `stop`, a run's: stopped before the options' part, the run ends as stopped or timed out, nothing marked. */
-	private async finished(prepared: PreparedQuestion, reply: ModelReply, stop: StopSignal | null): Promise<AssistantOutcome> {
+	/**
+	 * The reply read; `run`, a run's: stopped before the options' part, the run ends as stopped or timed out, nothing marked.
+	 * Once that part has begun (`run.marking()`), a Stop or the timeout is too late: it runs to the end, the run ends with the answer.
+	 */
+	private async finished(prepared: PreparedQuestion, reply: ModelReply, run: RunGate | null): Promise<AssistantOutcome> {
 		const action = this.actionOf(prepared.actionId);
 		const profile = this.choice.profileOf(prepared.modelId);
 		if (profile === null) return failed(action, NO_MODEL_WORDS, `model "${prepared.modelId}" has no profile`);
@@ -165,7 +174,8 @@ export class AssistantServiceImpl implements AssistantService {
 		const tasks = new TaskLookup(listed);
 		const result = action.read(reply.answer, { input: prepared.question.input, refs: prepared.refs }, tasks);
 		if (result.kind === "task") {
-			if (stop?.stopped) return this.finished(prepared, stoppedReply(stop.stopped), null);
+			if (run?.stop.stopped) return this.finished(prepared, stoppedReply(run.stop.stopped), null);
+			run?.marking();
 			return this.answered(action, result.taskId, result.note, listed);
 		}
 		const answer = `answer: ${JSON.stringify(reply.answer)}`;
@@ -229,6 +239,7 @@ export class AssistantServiceImpl implements AssistantService {
 		let settle!: (outcome: AssistantOutcome) => void;
 		const outcome = new Promise<AssistantOutcome>((resolve) => (settle = resolve));
 		let ended = false;
+		let marking = false;
 		const end = (result: AssistantOutcome): void => {
 			if (ended) return;
 			ended = true;
@@ -240,18 +251,22 @@ export class AssistantServiceImpl implements AssistantService {
 		};
 		const timer = this.timers.set(() => {
 			stop.stop("timeout");
-			grace = this.timers.set(() => end(this.timedOut(action)), TIMEOUT_GRACE_MS);
+			grace = this.timers.set(() => {
+				if (!marking) end(this.timedOut(action));
+			}, TIMEOUT_GRACE_MS);
 		}, timeoutMs);
 		stop.onStop((reason) => {
-			if (reason === "user") end(STOPPED);
+			if (reason === "user" && !marking) end(STOPPED);
 		});
 		this.runs.set(key, { stop, outcome });
 		this.emit();
-		this.work(action, target, stop).then(end, (error: unknown) => end(failed(action, this.unknownWords(), `the run failed: ${String(error)}`)));
+		const gate: RunGate = { stop, marking: () => (marking = true) };
+		this.work(action, target, gate).then(end, (error: unknown) => end(failed(action, this.unknownWords(), `the run failed: ${String(error)}`)));
 		return outcome;
 	}
 
-	private async work(action: AssistantAction, target: AssistantTarget, stop: StopSwitch): Promise<AssistantOutcome> {
+	private async work(action: AssistantAction, target: AssistantTarget, gate: RunGate): Promise<AssistantOutcome> {
+		const { stop } = gate;
 		const prepared = await this.prepare(action.id, target);
 		if (prepared.kind !== "question") return prepared;
 		if (stop.stopped !== null) return this.finish(prepared, stoppedReply(stop.stopped));
@@ -261,7 +276,7 @@ export class AssistantServiceImpl implements AssistantService {
 		const transport = await loader();
 		if (stop.stopped !== null) return this.finish(prepared, stoppedReply(stop.stopped));
 		const reply = await transport.ask(prepared.question, this.choice.settingsOf(profile), stop);
-		return this.finished(prepared, stop.stopped === "timeout" && !reply.ok && reply.failure.kind === "stopped" ? stoppedReply("timeout") : reply, stop);
+		return this.finished(prepared, stop.stopped === "timeout" && !reply.ok && reply.failure.kind === "stopped" ? stoppedReply("timeout") : reply, gate);
 	}
 
 	private timedOut(action: AssistantAction): AssistantOutcome {

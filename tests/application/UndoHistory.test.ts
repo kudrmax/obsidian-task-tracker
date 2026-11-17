@@ -96,3 +96,50 @@ describe("UndoHistory", () => {
 		expect(heard).toBe(2);
 	});
 });
+
+describe("UndoHistory.together", () => {
+	it("joins the writes of one action into one step", async () => {
+		const { store, history, svc, key } = setup();
+		await history.together(async () => {
+			await svc.setStatus(await key(0), "done");
+			await svc.remove(await key(0));
+		});
+		expect(store.text).not.toBe(FILE);
+		expect(await history.undo()).toBe("done");
+		expect(store.text).toBe(FILE);
+		expect(history.canUndo()).toBe(false);
+	});
+
+	it("an edit from outside between two writes splits the step, and Undo keeps the edit", async () => {
+		const { store, history, svc, key } = setup();
+		await history.together(async () => {
+			await svc.setStatus(await key(0), "done");
+			await store.write((text) => text.replace("## Soon\n", "## Soon\n\n- [ ] By hand\n"));
+			await svc.remove(await key(0));
+		});
+		expect(await history.undo()).toBe("done");
+		expect(store.text).toContain("- [ ] By hand");
+		expect(store.text).toContain("- [ ] B");
+		expect(store.text).toContain("- [x] A");
+		expect(await history.undo()).toBe("done");
+		expect(store.text).toContain("- [ ] By hand");
+		expect(store.text).not.toContain("- [x] A");
+		expect(store.text).toContain("- [ ] A");
+		expect(history.canUndo()).toBe(false);
+	});
+
+	it("work that throws still leaves what it wrote as one step, and the error goes on", async () => {
+		const { store, history, svc, key } = setup();
+		await expect(
+			history.together(async () => {
+				await svc.setStatus(await key(0), "done");
+				throw new Error("disk full");
+			}),
+		).rejects.toThrow("disk full");
+		expect(await history.undo()).toBe("done");
+		expect(store.text).toBe(FILE);
+		await svc.remove(await key(0));
+		expect(await history.undo()).toBe("done");
+		expect(store.text).toBe(FILE);
+	});
+});

@@ -4,12 +4,20 @@ import { UndoSteps, type UndoWay } from "./UndoSteps";
 import type { PatchIds } from "../domain/TextPatch";
 import type { TaskIdentity } from "./TaskIdentity";
 
+/** Consecutive writes joined into one step: the text before the first, the text after the last. */
+interface Joined {
+	readonly before: string;
+	readonly beforeIds?: PatchIds["before"];
+	readonly after: string;
+	readonly afterIds?: PatchIds["after"];
+}
+
 /** The tasks file's changes the plugin made, kept while it runs: each step back takes one back over the file as it is now. */
 export class UndoHistory implements UndoService {
 	private readonly steps = new UndoSteps();
 	private readonly listeners = new Set<() => void>();
-	/** While `together` runs: the first change's side before and the last change's side after, made one step at its end. */
-	private joined: { first: { text: string; ids?: PatchIds["before"] } | null; last: { text: string; ids?: PatchIds["after"] } | null } | null = null;
+	/** While `together` runs: the writes joined so far, from the first one's before to the last one's after. */
+	private joined: { run: Joined | null } | null = null;
 
 	/** `identity`, the tasks' identity the task service keeps: a step gives each task it brings back the id it had. */
 	constructor(
@@ -20,24 +28,40 @@ export class UndoHistory implements UndoService {
 	/** A change the plugin just made: a new step, and nothing left to do again. `ids`, who the tasks were on each side. */
 	record(before: string, after: string, ids?: PatchIds): void {
 		if (this.joined) {
-			this.joined.first ??= { text: before, ids: ids?.before };
-			this.joined.last = { text: after, ids: ids?.after };
+			const run = this.joined.run;
+			if (run && run.after === before) this.joined.run = { ...run, after, afterIds: ids?.after };
+			else {
+				this.close();
+				this.joined.run = { before, beforeIds: ids?.before, after, afterIds: ids?.after };
+			}
 			return;
 		}
 		if (this.steps.record(before, after, ids)) this.emit();
 	}
 
-	/** The changes `work` makes, one step to take back: an action made of several writes (Best task's label moved). */
+	/**
+	 * The changes `work` makes, one step to take back: an action made of several writes (Best task's label moved). Only
+	 * writes that follow each other join: a change from outside in between (by hand, Sync) closes the step so far, and the
+	 * next write starts another, so the outside change is never taken back with them.
+	 */
 	async together<R>(work: () => Promise<R>): Promise<R> {
 		if (this.joined) return work();
-		this.joined = { first: null, last: null };
+		this.joined = { run: null };
 		try {
 			return await work();
 		} finally {
-			const { first, last } = this.joined;
+			this.close();
 			this.joined = null;
-			if (first && last) this.record(first.text, last.text, first.ids && last.ids ? { before: first.ids, after: last.ids } : undefined);
 		}
+	}
+
+	/** The writes joined so far, made one step. */
+	private close(): void {
+		const run = this.joined?.run;
+		if (!this.joined || !run) return;
+		this.joined.run = null;
+		const ids = run.beforeIds && run.afterIds ? { before: run.beforeIds, after: run.afterIds } : undefined;
+		if (this.steps.record(run.before, run.after, ids)) this.emit();
 	}
 
 	undo(): Promise<UndoOutcome> {

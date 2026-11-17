@@ -108,6 +108,52 @@ describe("Best task marks its answer with the label set", () => {
 		expect(late.store.text).toBe(FILE);
 	});
 
+	it("Stop pressed once the marking has begun is too late: the marking ends and the run ends with the answer", async () => {
+		let pressStop: () => void = () => {};
+		const r = rig({
+			text: FILE,
+			settings: settingsWith("Focus"),
+			tasksPort: (tasks) => ({
+				listed: () => tasks.listed(),
+				sectionOffer: (date) => tasks.sectionOffer(date),
+				menu: (item, from, screen) => tasks.menu(item, from, screen),
+				toggleLabel: async (keys, name) => {
+					pressStop();
+					return tasks.toggleLabel(keys, name);
+				},
+			}),
+		});
+		pressStop = () => r.assistant.stop(BEST);
+		const result = await answered(r, "Pay rent");
+		expect(result).toMatchObject({ kind: "task", notice: null });
+		expect(r.store.text).toContain("- [ ] Pay rent #label/Focus");
+		expect(r.store.text).toContain("- [x] Finished\n");
+		expect(r.assistant.busy).toBe(false);
+	});
+
+	it("the timeout firing once the marking has begun waits for it too", async () => {
+		let fire: () => void = () => {};
+		const r = rig({
+			text: FILE,
+			settings: settingsWith("Focus"),
+			tasksPort: (tasks) => ({
+				listed: () => tasks.listed(),
+				sectionOffer: (date) => tasks.sectionOffer(date),
+				menu: (item, from, screen) => tasks.menu(item, from, screen),
+				toggleLabel: async (keys, name) => {
+					fire();
+					return tasks.toggleLabel(keys, name);
+				},
+			}),
+		});
+		fire = () => {
+			while (r.timers.pending.size > 0) r.timers.fire();
+		};
+		const result = await answered(r, "Pay rent");
+		expect(result).toMatchObject({ kind: "task", notice: null });
+		expect(r.store.text).not.toContain("Old focus #label");
+	});
+
 	it("a write that fails while marking still shows the answer, with a line under it and the error for the console", async () => {
 		const r = rig({
 			text: FILE,

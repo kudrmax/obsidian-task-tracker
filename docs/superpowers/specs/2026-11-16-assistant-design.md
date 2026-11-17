@@ -702,12 +702,15 @@ No Swift stage (R6).
   Refused when that menu has no labels group, its tiles are disabled or the label has no tile, or `toggleLabel` comes back
   without the label on it. The others are found in every list and depth (Done too) by the labels the screen reads, and
   taken off in one `toggleLabel` of them all. (Replaces «the chosen task's opened on the whole screen».)
-- **Backend (label):** the marking's writes are one undo step: `UndoHistory.together(work)` joins every change recorded
-  while `work` runs into one step (the first one's before, the last one's after); the assistant reaches it through its
-  port `AssistantSteps` (`AssistantDeps.steps`, the undo history in `composeCore`). A change made by another action in
-  the same few milliseconds would join that step too: accepted, the marking is two writes in a row.
+- **Backend (label):** the marking's writes are one undo step: `UndoHistory.together(work)` joins the writes recorded
+  while `work` runs, each only when it starts from the text the previous one left. A change from outside in between (by
+  hand, Sync) closes the step so far and the next write starts another, so one Undo never takes that change back (the
+  review: the first version joined across it). The assistant reaches it through its port `AssistantSteps`
+  (`AssistantDeps.steps`, the undo history in `composeCore`).
 - **Backend (label):** a run stopped (Stop or the timeout) before the marking ends as stopped or timed out and marks
-  nothing, also when the answer had already come.
+  nothing, also when the answer had already come. Once the marking has begun it runs to the end and the run ends with the
+  answer: a Stop or the timeout's grace then is too late (the lead, at the re-review: a Stop that settled the run while
+  the writes went on moved the label with no popup).
 - **Backend (label):** a write that throws during the marking keeps the answer: the popup shows the chosen task with
   the option's words («Couldn't move the label {name}.») in `notice`, and the error in the `task` outcome's new
   `detail: string | null`, which the frontend writes to the console as a failure's.
