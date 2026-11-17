@@ -253,7 +253,7 @@ another editor during the wait gets a new id and reads as not found.
 ```
 
 Words, not codes: `list` is today / soon / inbox / backlog (a candidate's list is its top task's), a priority by its
-prefix, projects by name, dates ISO. A briefing is plain data: `{ input: string, refs: Readonly<Record<string, string>> }`,
+prefix, each project by its path in the tree (`Люди → Окружение в Сербии → Где знакомиться`), dates ISO. A briefing is plain data: `{ input: string, refs: Readonly<Record<string, string>> }`,
 `refs` holding the candidates only.
 
 ### Actions
@@ -496,12 +496,15 @@ the prompts still editable (they sync).
 - empty Today and Soon → no call, «Today and Soon have no open tasks.»
 - default prompt:
 
-> You help me choose what to do next. Below is each thing I could start now: a task, or the next step of a bigger
-> task, with the goals it leads to and, for a step, the steps that come after it. If I could do only one of them and
-> nothing else, which one would make the biggest difference? Judge what doing this one now gives: a goal adds weight
-> only as far as this step truly moves it, and the steps after it are not done by it. Weigh impact over urgency; one in
-> progress or with a time today counts for more only if it truly matters more. Answer with its ref, and in two or three
-> short sentences in the language of my tasks, say why this one.
+> You help me choose the one task that matters most. Below is each thing I could start now: a task, or the next step
+> of a bigger task, with the goals above it and, for a step, the steps after it. Pick the one whose doing would change
+> my life the most: what becomes different for me — my relationships, health, money, work, home, freedom — once it is
+> done. Judge by meaning, not by how the task sounds: a step is not more important because it is big, concrete, ends in
+> a finished product or sounds responsible; a short task can matter more than a long one. Count only what this step
+> itself gives: its goals show what it is for, but what the goals or the steps after it would give is not done by it.
+> A due date is urgency, not impact. Don't invent what a task is for; judge by what is written. Answer with its ref,
+> and in two or three short sentences in the language of my tasks, say what changes in my life when this one is done;
+> don't speak about the other tasks.
 
 ## Platforms
 
@@ -660,3 +663,10 @@ No Swift stage (R6).
 - **Frontend-obsidian (review):** the page's own words (Model, Timeout and its line, Prompts and its line, Reset to
   default) are `page.words`; where the chosen model isn't served the page draws no model fields, only the unavailable
   words, Timeout and the prompts.
+- **Lead (impact, 2026-11-17):** the default prompt asks what changes in Max's life, not «the biggest difference», and
+  each project goes as its path in the tree. On Max's 38 candidates the old prompt chose «По коду, Readme и dmg…» in 5
+  of 5 sonnet runs and 3 of 3 opus runs, every time for a goal due today and the steps after it («without it no post»),
+  calling the rest small; the step only sounded big and finished. The new prompt with paths chose the brainstorm about
+  his circle in Belgrade in 5 of 5. Several answers can be right (Max: the photos, the brainstorm, the coffee); what is
+  wrong is a choice by how a task sounds. The time of day, Max's own priorities and the meaning of labels are not sent:
+  Best task picks the task with the most impact, not what to do this minute, and must judge by meaning, not by marks.

@@ -44,6 +44,7 @@ export interface BriefedGoal extends BriefedStep {
 	readonly due: string | null;
 	/** The time it is put on: HH:MM today, else ISO, `2026-11-20T10:00`. */
 	readonly time: string | null;
+	/** Each project with the projects above it, top first: «Люди → Окружение в Сербии → Где знакомиться». */
 	readonly projects: readonly string[];
 	readonly labels: readonly string[];
 }
@@ -161,7 +162,7 @@ function briefedGoal(item: TaskItem, today: string): BriefedGoal {
 		priority: item.priority?.prefix ?? null,
 		due: item.dueDate,
 		time: item.slot ? `${item.slot.date === today ? "" : `${item.slot.date}T`}${minutesToHHMM(item.slot.start)}` : null,
-		projects: item.projects.map((project) => project.name),
+		projects: item.projects.map((project) => project.path.join(" → ")),
 		labels: item.labels.map((label) => labelTitle(label.name)),
 	};
 }

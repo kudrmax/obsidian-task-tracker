@@ -17,7 +17,7 @@ describe("pressing Best task", () => {
 		expect(loads.count).toBe(1);
 		expect(transport.asked).toHaveLength(1);
 		const { question, settings } = transport.asked[0];
-		expect(question.instructions).toMatch(/^You help me choose what to do next\./);
+		expect(question.instructions).toMatch(/^You help me choose the one task that matters most\./);
 		expect(question.answerSchema).toEqual({ type: "object", properties: { taskRef: { type: "string" }, reason: { type: "string" } }, required: ["taskRef", "reason"], additionalProperties: false });
 		expect(JSON.parse(question.input).candidates.map((t: { title: string }) => t.title)).toEqual(["Find the template", "Pay rent", "Find the contract", "Read a book", "Dentist"]);
 		expect(settings).toEqual({ model: "sonnet", path: "" });
