@@ -58,11 +58,18 @@ export const RibbonStage = memo(function RibbonStage({ position }: { /** Where t
 		return x.on("change", (at) => position.set(-at / step));
 	}, [x, position, step]);
 
+	/** The window's measures as motion values: the transforms below read them when the window changes, not as first drawn. */
+	const halfNow = useMotionValue(half);
+	const stepNow = useMotionValue(step);
+	useEffect(() => {
+		halfNow.set(half);
+		stepNow.set(step);
+	}, [half, step, halfNow, stepNow]);
 	/** 0 at Soon–Now, 1 at Now–calendar: the day list's width and the columns' sides follow it. */
-	const toCalendar = useTransform(x, (at) => clamp01((-at - step) / step));
-	const toSoon = useTransform(x, (at) => clamp01(-at / step));
-	const dayWidth = useTransform(() => half + (listWidth.get() - half) * toCalendar.get());
-	const timelineWidth = useTransform(listWidth, (list) => width - DESIGN.dividerWidth - list);
+	const toCalendar = useTransform(() => clamp01((-x.get() - stepNow.get()) / stepNow.get()));
+	const toSoon = useTransform(() => clamp01(-x.get() / stepNow.get()));
+	const dayWidth = useTransform(() => halfNow.get() + (listWidth.get() - halfNow.get()) * toCalendar.get());
+	const timelineWidth = useTransform(() => 2 * halfNow.get() - listWidth.get());
 	const soonSide = useTransform(toSoon, (at) => 1 - at);
 	const daySide = useTransform(toCalendar, (at) => 1 - at);
 

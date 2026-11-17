@@ -61,6 +61,7 @@ export class Cdp {
 	}
 
 	send(method, params = {}) {
+		if (this.#ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error(`the page went away (${method})`));
 		const id = ++this.#id;
 		return new Promise((resolve, reject) => {
 			this.#pending.set(id, { resolve, reject });

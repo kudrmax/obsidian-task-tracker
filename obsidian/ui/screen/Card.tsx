@@ -1,11 +1,11 @@
-import { type CSSProperties, memo, type MouseEvent } from "react";
+import { type CSSProperties, memo } from "react";
 import { type Branch, type CardDue, cardDue, type PriorityColor, type ProjectsStage, textParts, type TaskItem } from "../../../core/application/contracts";
 import { dayOfMonth, monthAbbreviation } from "../dates";
 import { PROPERTY } from "../design";
 import { LABEL_SLOTS } from "../priorityColors";
 import type { LocalDate } from "../types";
 import { Icon } from "./Icon";
-import { useHost, useScreen } from "./ScreenContext";
+import { useScreen } from "./ScreenContext";
 
 /** A title as typed, each link by its word (`textParts`): a link opens only from the menu's copy, never from the card. */
 export function Title({ text, className = "tc-card-title" }: { readonly text: string; readonly className?: string }) {
@@ -88,17 +88,12 @@ function Due({ due }: { readonly due: CardDue | null }) {
 	);
 }
 
-/** The folder of the task's project: a tap chooses the project in the filter; the Mac's tooltip names it. */
+/** The folder of the task's project; the Mac's tooltip names it. (A tap choosing the project comes with the filter's title, stage 3.) */
 function ProjectMark({ item }: { readonly item: TaskItem }) {
-	const { store } = useHost();
 	const project = item.project;
 	if (!project?.mark) return null;
-	const choose = (e: MouseEvent) => {
-		e.stopPropagation();
-		void store.getState().chooseProject(project.name);
-	};
 	return (
-		<span className="tc-project-mark" aria-label={project.name} title={project.name} onClick={choose}>
+		<span className="tc-project-mark" aria-label={project.name} title={project.name}>
 			<Icon name="project" />
 		</span>
 	);

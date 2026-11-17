@@ -25,7 +25,7 @@ export function Divider({ width, bounds, onRelease }: DividerProps) {
 			width.set(stop.width);
 			if (last) onRelease(stop.width);
 		},
-		{ axis: "x", from: () => [width.get(), 0], pointer: { capture: true }, window: win },
+		{ from: () => [width.get(), 0], pointer: { capture: true }, window: win },
 	);
 	const handlers = bind();
 	/** The ribbon's swipe never starts on the divider: its press stays its own. */

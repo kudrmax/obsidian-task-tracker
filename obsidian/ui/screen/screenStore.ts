@@ -11,7 +11,6 @@ import {
 	type FunnelPlace,
 	type FunnelView,
 	NO_DAY_EVENTS,
-	projectNodeOf,
 	type ProjectsView,
 	type TaskItem,
 	type TaskService,
@@ -79,8 +78,6 @@ export interface ScreenActions {
 	saveShare(share: number): void;
 	undo(): Promise<void>;
 	createFile(): Promise<void>;
-	/** A card's folder mark tapped: the project chosen in the filter. */
-	chooseProject(name: string): Promise<void>;
 	/** A minute may have passed: the now line follows. */
 	tickNow(): void;
 	/** Reads of the core the timeline draws by, for the shown day. */
@@ -219,11 +216,6 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 
 			async createFile() {
 				await tasks.createFile();
-				await get().refresh();
-			},
-
-			async chooseProject(name) {
-				await tasks.selectProjectNode(projectNodeOf(name));
 				await get().refresh();
 			},
 

@@ -50,6 +50,12 @@ export const Timeline = memo(function Timeline() {
 	const hourPx = zoomShown(settings.zoom, null, settings.zoomLevels);
 	const scroller = useRef<HTMLDivElement | null>(null);
 	const [room, setRoom] = useState({ top: 0, bottom: 0 });
+	/** How far the timeline is scrolled from its top and how much lies below: the fades at its edges follow them, as a list's do. */
+	const [edges, setEdges] = useState({ above: 0, below: 0 });
+	const follow = (el: HTMLDivElement) => {
+		const next = { above: Math.round(el.scrollTop), below: Math.max(0, Math.round(el.scrollHeight - el.clientHeight - el.scrollTop)) };
+		setEdges((prev) => (prev.above === next.above && prev.below === next.below ? prev : next));
+	};
 	const timed = events.timed;
 	const allDay = events.allDay;
 
@@ -81,6 +87,7 @@ export const Timeline = memo(function Timeline() {
 		const place = scrollPlace({ y: minutesToPx(open.minute, hourPx), canvasTop: DESIGN.labelLift, canvasHeight, visible }, open.kind === "now" ? LAYOUT.nowFraction : 0);
 		setRoom({ top: place.roomTop, bottom: place.roomBottom });
 		el.scrollTop = place.scrollTop;
+		follow(el);
 	}, [date, hourPx, services]);
 
 	const canvasStyle = { [PROPERTY.hour]: px(hourPx), [PROPERTY.roomTop]: px(room.top), [PROPERTY.roomBottom]: px(room.bottom), [PROPERTY.stackEnd]: px(stackEnd) } as CSSProperties;
@@ -90,7 +97,7 @@ export const Timeline = memo(function Timeline() {
 	return (
 		<div className="tc-right" style={{ [PROPERTY.allDayExtraRows]: String(Math.max(0, allDay.length - 1)) } as CSSProperties}>
 			<AllDayRows events={allDay} theme={theme} />
-			<div className="tc-timeline" ref={scroller} data-timeline="">
+			<div className={`tc-timeline${edges.above > 0 ? " is-under-top" : ""}${edges.below > 0 ? " is-under-bottom" : ""}`} style={{ [PROPERTY.scrolled]: px(edges.above), [PROPERTY.scrolledBelow]: px(edges.below) } as CSSProperties} ref={scroller} onScroll={(e) => follow(e.currentTarget)} data-timeline="">
 				<div className="tc-canvas" style={canvasStyle}>
 					{hours.map(({ minute, label }) => (
 						<HourMark key={minute} minute={minute} label={label} style={y(minute)} hidden={hidden(minute, DESIGN.labelLift)} />
