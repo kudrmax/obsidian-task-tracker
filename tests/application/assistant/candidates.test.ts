@@ -22,7 +22,7 @@ const PLAN = [
 	"",
 	"## Soon",
 	"",
-	"- [ ] p1 Move to Belgrade 📅 2026-12-01 🗂️ Life 📁",
+	"- [ ] p1 Move to Belgrade 🗂️ Life 📁",
 	"\t- Start in January, before the lease ends",
 	"\t- [x] Ask the landlord",
 	"\t- [ ] Find a flat",
@@ -47,7 +47,7 @@ const PLAN = [
 async function planned() {
 	const { tasks } = rig({ text: PLAN });
 	const listed = await tasks.listed();
-	return { listed, sent: tasksIn({ kind: "lists", lists: ["now", "soon"] }, { place: "more" }, listed) };
+	return { listed, sent: tasksIn({ kind: "columns", columns: ["today", "soon"] }, { place: "more" }, listed) };
 }
 
 async function input() {
@@ -91,7 +91,7 @@ describe("what Best task chooses among: what Max can start now", () => {
 			labels: [],
 			description: "- near the river",
 			goals: [
-				{ title: "Move to Belgrade", description: "- Start in January, before the lease ends", priority: "p1", due: "2026-12-01", time: null, projects: ["Life"], labels: [] },
+				{ title: "Move to Belgrade", description: "- Start in January, before the lease ends", priority: "p1", due: null, time: null, projects: ["Life"], labels: [] },
 				{ title: "Find a flat", description: null, priority: null, due: null, time: null, projects: ["Life"], labels: [] },
 			],
 			after: [
