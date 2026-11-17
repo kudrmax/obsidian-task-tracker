@@ -52,6 +52,9 @@ He wants a label he puts on a task while the card looks exactly as it would with
 - **Backend: an emptied code field.** `typedColour` answers `null` for empty or blank text (writes nothing, the field
   shows the colour's code again, empty for a clear label). Typing never makes a label clear: No colour is picked from
   the swatches. A code typed for a clear label writes that colour.
+- **Backend: only drawable colours reach a card.** `TaskItem.colors` (and the quick entry's tint) hold only colours
+  `usableColor` accepts, for the priority and the labels alike: a priority saved `"clear"` or any broken colour (a
+  hand-edited `#12345`) paints the card plain, so no frontend ever asks `shadesOf` for one.
 - **Backend: Add label** picks the first preset no label has, else the first preset; never clear.
 - **Obsidian: the No colour swatch.** A circle the size of the others, no fill, outlined and struck through bottom-left
   to top-right in the muted grey (the standard «no fill» swatch), between the six presets and the rainbow «any colour»

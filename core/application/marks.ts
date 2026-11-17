@@ -1,15 +1,19 @@
-import { CLEAR_COLOR, type LabelLevel } from "../domain/Label";
+import type { LabelLevel } from "../domain/Label";
 import { markChoices, type Marks } from "../domain/Marks";
-import type { PriorityColor, PriorityLevel } from "../domain/Priority";
+import { type PriorityColor, type PriorityLevel, usableColor } from "../domain/Priority";
 import type { DraftMarks } from "./contracts";
 
 /** The most colours a card of several labels is painted in: its first labels' in the settings' order. */
 export const MOST_CARD_COLORS = 4;
 
-/** The colours a task is drawn in: its priority's alone, else its coloured labels', at most `MOST_CARD_COLORS`; the first tints it. A clear label paints nothing. */
+/**
+ * The colours a task is drawn in: its priority's alone, else its labels', at most `MOST_CARD_COLORS`; the first tints it.
+ * Only colours that can be drawn (`usableColor`): a clear label, or a colour saved broken, paints nothing.
+ */
 export function markColors(priority: PriorityLevel | null, labels: readonly LabelLevel[]): readonly PriorityColor[] {
-	if (priority) return [priority.color];
-	return labels.flatMap((label) => (label.color === CLEAR_COLOR ? [] : [label.color])).slice(0, MOST_CARD_COLORS);
+	const drawn = (color: string): readonly PriorityColor[] => (usableColor(color) ? [color] : []);
+	if (priority) return drawn(priority.color);
+	return labels.flatMap((label) => drawn(label.color)).slice(0, MOST_CARD_COLORS);
 }
 
 /** What the bar shows for a task typed with `marks`, over the usable `levels` and `labels` in the settings' order. */

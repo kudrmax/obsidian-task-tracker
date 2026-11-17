@@ -4401,8 +4401,9 @@ ${key.title}`.toLowerCase();
   // core/application/marks.ts
   var MOST_CARD_COLORS = 4;
   function markColors(priority, labels) {
-    if (priority) return [priority.color];
-    return labels.flatMap((label) => label.color === CLEAR_COLOR ? [] : [label.color]).slice(0, MOST_CARD_COLORS);
+    const drawn = (color) => usableColor(color) ? [color] : [];
+    if (priority) return drawn(priority.color);
+    return labels.flatMap((label) => drawn(label.color)).slice(0, MOST_CARD_COLORS);
   }
   function draftMarksOf(marks, levels, labels) {
     const choices = markChoices(marks);

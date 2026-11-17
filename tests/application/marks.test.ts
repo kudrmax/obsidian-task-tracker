@@ -28,6 +28,19 @@ describe("markColors", () => {
 	});
 });
 
+describe("markColors over colours that can't be drawn", () => {
+	it("hands only colours usableColor accepts: a priority saved clear or as a broken code paints nothing", () => {
+		const level = (color: string) => ({ prefix: "p1", color: color as LabelLevel["color"] }) as Parameters<typeof markColors>[0];
+		expect(markColors(level("clear"), [label("home", "blue")])).toEqual([]);
+		expect(markColors(level("#12345"), [])).toEqual([]);
+		expect(markColors(level("purple"), [])).toEqual([]);
+	});
+
+	it("leaves out a label of a broken code as it does a clear one", () => {
+		expect(markColors(null, [label("a", "#12345"), label("b", "purple"), label("c", "green")])).toEqual(["green"]);
+	});
+});
+
 describe("draftMarksOf with a clear label", () => {
 	it("tints nothing for a clear label alone, and its tile carries clear", () => {
 		const skip = label("Skip", CLEAR_COLOR);

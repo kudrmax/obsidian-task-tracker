@@ -104,8 +104,9 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   fields. Keys a call answers alone (`tasks.carried`) are the keys of the items handed in, as read: a host finds each
   item by its key.
 - `TaskItem.colors`: at most `MOST_CARD_COLORS` (4) colours, the first coloured labels' in the settings' order (a clear
-  label, `"clear"`, counts for none: Focus and a clear label give `["blue"]`, a clear label alone `[]`); a host paints
-  every one it is given. `TaskItem.labels` still lists a clear label, its `color` `"clear"`.
+  label, `"clear"`, counts for none: Focus and a clear label give `["blue"]`, a clear label alone `[]`); only colours
+  `usableColor` accepts, so a priority or a label saved as `"clear"` or a broken code (`#12345`) paints nothing; a host
+  paints every one it is given. `TaskItem.labels` still lists a clear label, its `color` `"clear"`.
 - `tasks.screen(date)` with no tasks file answers the empty screen with `missing: true`.
 - `tasks.createFile()` answers the new file's text in `tasks`; with a file already there it fails.
 - `tasks.placementTitle(placement)`: the quick entry's place button's words for its `place`: the list's name as the
