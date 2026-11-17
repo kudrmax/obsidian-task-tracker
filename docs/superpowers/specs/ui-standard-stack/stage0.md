@@ -17,7 +17,7 @@ The spike behind [`2026-11-16-ui-standard-stack.md`](../2026-11-16-ui-standard-s
 |---|---|---|---|---|
 | 1 | Card animation + drag together | **PASS** (classic dnd-kit) | Frame samples `stage0/main-b1-*.json`, `stage0/popout-b1-*.json`; file lines after each drop | Within a column: siblings glide 33 px in ~18 frames, 0 reversals, 0 doubles; the overlay flies to the slot, the card shows there in the same frame the overlay goes. Inbox→Soon: target siblings glide, 0 doubles at the drop, written to the gap aimed at. A move by command (no drag): the card glides across (x 56→876 over ~40 frames), siblings in both columns glide, 0 reversals. |
 | 2 | Selective re-render | **PASS** | Render counters in `spike/Screen.tsx` (`b2-rerender.mjs`) | Priority of one task changed: 1 render of that card's face, 0 of any other card, column or block. Longest task 5.1 ms (1×), 11.0 ms (4×). |
-| 3 | Performance, ~240 cards, 4× CPU | **FAIL** | CDP traces (`b3-perf.mjs`, `b3-alt.mjs`), CPU profiles (`prof-dragstart.mjs`) | See «Performance» below: drag start 50–60 ms at 1×, 113–163 ms at 4×; drop 16–24 ms at 1×, 71–112 ms at 4×; first render 31 ms at 1×, 113 ms at 4×. Drag frames stay under 16 ms except where a card crosses columns. |
+| 3 | Performance, ~240 cards, 4× CPU | **FAIL** in the first round; after the second round only the lift misses (see «Performance, second round») | CDP traces (`b3-perf.mjs`, `b3-alt.mjs`), CPU profiles (`prof-dragstart.mjs`) | See «Performance» below: drag start 50–60 ms at 1×, 113–163 ms at 4×; drop 16–24 ms at 1×, 71–112 ms at 4×; first render 31 ms at 1×, 113 ms at 4×. Drag frames stay under 16 ms except where a card crosses columns. |
 | 4 | Timeline: snap, resize, pinch | **PASS** | `b4-drop.mjs`, `b4-resize.mjs`, `b4-pinch.mjs`; `stage0/popout-b4-pinched.png`, `stage0/phone-timeline-pinched.png` | Block moved: overlay top at release 507.09 px, block after the write 507.09 px. List card to the grid: 450.99 → 451.09 px, written `📌 21:30`. Resize by the handle +56 px: 20:55-21:25 → 20:55-22:30, height held 88.7 px = height after the write. Pinch: ctrl+wheel (trackpad) 56 → 145 px an hour; two-finger touch 56 → 182. |
 | 5 | Ribbon swipe, one place | **PASS** desktop (trackpad) and phone (touch) | `b5-gesture.mjs`, `b5-path.mjs`, `b10-phone.mjs` | From the first swipe after a reload: 15 % flick → 1 place, again → 2, back → 1; slow 30 % → stays; slow 60 % → next; 150 % fast flick → exactly 1 place. Furthest the ribbon goes during a gesture: 1.07 places. Touch: same results. |
 | 6 | Divider drag | **PASS** | `b6-divider.mjs`, `b10-pinch.mjs`; `stage0/b6-divider.png` | Width follows the pointer every frame (220→419 in 10 px steps), stops at its bound (1116 px), touch drag −40 px → −39 px. |
@@ -73,6 +73,48 @@ These are how the libraries are documented to be used; the real build must do th
 - **Keyboard sorting** and **auto-scroll while dragging across a long list**: auto-scroll was seen working (the timeline scrolled under a block held near its edge), not measured.
 - **Real trackpad momentum**: the desktop swipes used `Input.synthesizeScrollGesture` (phased wheel events with fling); plain synthetic wheel events without phases do not move a scroll-snap ribbon and gave no flick speed to @use-gesture.
 
+## Performance, second round
+
+The same 302 tasks, the same steps, each run with a freshly generated file. The longest main-thread task of each step (CDP trace), medians of the runs, the range after it; 1× is the Mac, 4× its CPU throttled. Runs: `stage0/round2-runs.jsonl` (`spike/checks/b13-round2.mjs`, `round2-runs.sh`).
+
+What changed, all documented practice:
+
+- **Thin sortable wrapper around a memoized row.** A `Row` (`React.memo`, Motion's element) holds a `SortableCard` (`useSortable` and its transform only) around the memoized face. The column builds its rows and hands them as `children` to the parts that follow the drag (`DropArea` with `useDroppable`, `SortableContext`), so a drag re-renders those and the thin wrappers, never the rows. The overlay's card and «is this row lifted» come from the store (`dragging`), so the lift re-renders one row. The pages are memoized, `items` keep their identity.
+- **TanStack Virtual** (3.14.26) per column, the documented fixed-size list (33 px rows, overscan 3), all ids in the `SortableContext`, the mounted rows rendered inside one translated block, Motion's layout on the mounted rows only. 92 rows mounted instead of 249 cards. A row scrolled into view does not animate in; a task new in the last read does (the store keeps the ids it added).
+- **Motion:** `layout="position"`, `layoutDependency` = the column's order as read, layout and `layoutId` off for the lifted row.
+- **Measuring:** dnd-kit's default `WhileDragging`, `BeforeDragging` and `Always` compared.
+
+| Step | Classic, WhileDragging 1× (9 runs) | 4× (6) | Classic, BeforeDragging 1× (3) | 4× (2) | @dnd-kit/react 1× (3) | 4× (2) |
+|---|---|---|---|---|---|---|
+| First render | 10.4 (9.0–17.6) | 37.2 | 11.0 | 37.0 | 18.8 (16.1–19.4) | 35.7 |
+| Lift, within a column | **28.5** (19.6–32.9) | 59.8 | **16.8** (16.4–20.9) | 37.9 | **17.7** (16.5–18.9) | 28.4 |
+| Drag frame, within | 4.2 | 8.0 | 4.6 | 11.0 | 8.0 | 9.4 |
+| Drop, within | 5.4 | 25.0 | 9.7 | 42.5 | 5.8 | 7.6 |
+| Lift, then crossing into Soon | **23.3** (18.6–28.8) | 53.2 | **22.1** (19.8–23.3) | 43.5 | 14.9 (12.3–16.8) | 30.8 |
+| Frame crossing columns | **16.0** (11.8–18.8) | 51.6 | **17.8** (14.0–18.9) | 54.5 | 12.2 (11.1–12.2) | 22.0 |
+| Drop into Soon | 4.6 | 23.5 | 8.4 | 42.5 | 5.9 | 12.9 |
+| A move by command | 7.6 | 23.7 | 11.7 | 33.8 | 5.0 | 14.9 |
+
+Bold: over 16 ms at 1×. `Always` (3 runs before the final overscan): lift 29.6, drop 10.8, command 10.3 at 1×, no better than the default.
+
+What renders at the lift (classic, counters in `spike/Screen.tsx`): 1 row, 1 face, 0 columns, 12 drop areas, 371 thin wrappers (92 mounted wrappers × 4 commits dnd-kit makes as it activates, measures and finds the first «over»). At the drop: 47 rows (the mounted rows of the two columns, so Motion can measure them), 253 wrappers, 4 columns.
+
+Where the lift's time goes (CPU profile, `prof-dragstart.mjs`, unminified build): classic, about 6 ms in dnd-kit measuring every droppable with its scroll ancestors (`Rect` → `getScrollableAncestors`, not configurable), about 10 ms in the wrappers' four renders, about 3 ms in collision detection; @dnd-kit/react, the sensor's activation and one `PositionObserver`/`FrameObserver` per droppable (about 4 ms), its signals (about 5 ms), forced layout reads (`getBoundingClientRect`, `getComputedStyle`), and React about 2 ms. Mounting fewer cards did not remove it: with only the shown place mounted (69 rows) the classic lift was 13.5–25.8 ms.
+
+**@dnd-kit/react 0.5.3, wired by its guide** (`DragDropProvider`, `useSortable` with `index`/`group`, `move()` in `onDragOver`, each column a `useDroppable` with `CollisionPriority.Low`, virtualized the same way). The jump of the first round was Motion's `layoutId` on rows dnd-kit moves: with Motion removed the rows sort smoothly; with `layoutId` (even with layout off during the drag, which re-rendered all 76 rows at the lift) siblings jumped 35 px for one frame. With Motion's `layout` kept and no `layoutId` the within-column drag is smooth (`spike/AltScreen.tsx`, `altQuiet`) and the lift re-renders one row; the numbers above are that wiring. Two things remain: a **drag across columns still jumps** (siblings show at the new place for a frame, go back, then glide, 35 px, with or without Motion), and without `layoutId` a card moved to another column by a command fades out and in instead of gliding.
+
+**Blockers 1 and 4 with the final classic configuration** (virtualized, wrappers, WhileDragging), main window and a fresh pop-out (`stage0/final-*.json`, `stage0/final-popout-*.json`): within a column 0 reversals, 0 doubles; Inbox→Soon lands at the aimed gap, 0 reversals; a move by command glides in both columns; timeline move overlay 493.09 px → block 493.09 px; list card to the grid 408.99 → 409.09 px; resize held 88.7 px = after. Menu and editor pass as before. The phone emulation was not re-run on this configuration.
+
+### What still misses, and why
+
+Only **the lift**: the one long task when a card is picked up. At 1× it is 16.4–20.9 ms with classic `BeforeDragging`, 19.6–32.9 ms with classic `WhileDragging`, 16.5–18.9 ms with @dnd-kit/react; at 4× 28–60 ms. It is each library's own activation (measuring every drop target, re-rendering every sortable in classic; creating an observer per drop target in the new line), which no documented option turns off, and it does not shrink with fewer mounted cards. Classic's frame crossing columns (median 16–18 ms, the two columns re-render and dnd-kit measures again) is the other step at the edge. Every other step is under 16 ms at 1× in every configuration; at 4× the drops and commands of classic `WhileDragging` are 23–25 ms, the new line's 8–15 ms.
+
+### Recommended configuration
+
+Classic dnd-kit (`@dnd-kit/core` + `sortable`), `MeasuringStrategy.WhileDragging` (the default; `BeforeDragging` brings the lift within a column down to 16.4–20.9 ms but nearly doubles drops and commands at 4×, 42 ms against 25), TanStack Virtual per column with all ids in the `SortableContext`, thin `useSortable` wrappers inside memoized Motion rows, the lifted id and the overlay's card from the store, `DragOverlay` in a portal, Motion `layout="position"` with `layoutDependency` = the order as read and `layoutId` off for the lifted row. It passes blockers 1 and 4 without a jump, including drags across columns and moves by command, and everything but the lift (and, at its edge, the frame crossing columns) is under 16 ms on the Mac. @dnd-kit/react is faster at the lift and across columns but still over 16 ms at the lift and jumps across columns, and it is pre-1.0. Meeting 16 ms at the lift would need a drag library whose activation does not touch every drop target, which neither dnd-kit line offers.
+
 ## Must a library be swapped?
+
+Updated by the second round: no swap is recommended; the classic line, virtualized as above, is the configuration to build on, and the lift is the one step over 16 ms. The first-round answer follows.
 
 Not for correctness: React, Zustand, Motion, @use-gesture, Floating UI and classic dnd-kit do everything in 1, 2, 4–11 with standard usage. The one failure is the 16 ms budget (3): classic dnd-kit's drag start and drop with ~240 mounted cards cost 50–60 ms and 16–24 ms on the Mac, 3× more at 4× throttling. @dnd-kit/react is 2–3× cheaper but jumps and is pre-1.0; mounting fewer cards helps the drop but not the drag start. Deciding it is the lead's: keep classic dnd-kit and accept a long task at the start of a drag and on drops (the budget then holds for frames, taps and typing), or spend a further spike on @dnd-kit/react's integration with Motion and on TanStack Virtual.

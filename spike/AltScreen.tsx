@@ -1,13 +1,15 @@
 import { PointerActivationConstraints, PointerSensor } from "@dnd-kit/dom";
 import { move } from "@dnd-kit/helpers";
-import { DragDropProvider, DragOverlay } from "@dnd-kit/react";
+import { CollisionPriority } from "@dnd-kit/abstract";
+import { DragDropProvider, DragOverlay, useDroppable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { AnimatePresence, motion } from "motion/react";
-import { memo, useMemo, useRef } from "react";
+import { memo, useRef } from "react";
 import { useStore } from "zustand";
 import type { DropFrom } from "../core/application/contracts";
 import { counters } from "./Screen";
-import type { ColumnId, ScreenState, ScreenStore } from "./store";
+import type { ColumnId, ScreenStore } from "./store";
 
 /**
  * The same three columns on @dnd-kit/react (the new line of dnd-kit), to compare against the classic one: whether a drag
@@ -25,9 +27,7 @@ const sensors = [
 ];
 
 export function AltScreen({ store }: { store: ScreenStore }) {
-	const use = <T,>(selector: (s: ScreenState) => T) => useStore(store, selector);
 	const origin = useRef<DropFrom | null>(null);
-	const active = use((s) => s.dragging);
 	return (
 		<DragDropProvider
 			sensors={sensors}
@@ -67,41 +67,76 @@ export function AltScreen({ store }: { store: ScreenStore }) {
 					<AltColumn key={col} col={col} store={store} />
 				))}
 			</div>
-			<DragOverlay>{active ? <div data-overlay={active} className="tcs-card is-overlay">{store.getState().faces[active]?.title}</div> : null}</DragOverlay>
+			<DragOverlay>
+				<AltLifted store={store} />
+			</DragOverlay>
 		</DragDropProvider>
 	);
 }
 
-function AltColumn({ col, store }: { col: ColumnId; store: ScreenStore }) {
+function AltLifted({ store }: { store: ScreenStore }) {
+	const active = useStore(store, (s) => s.dragging);
+	const title = useStore(store, (s) => (s.dragging ? s.faces[s.dragging]?.title : null));
+	return active ? (
+		<div data-overlay={active} className="tcs-card is-overlay">
+			{title}
+		</div>
+	) : null;
+}
+
+const ROW_PX = 33;
+
+/** A column, virtualized like the classic one, with the column itself a low-priority droppable (the multiple-lists guide). */
+const AltColumn = memo(function AltColumn({ col, store }: { col: ColumnId; store: ScreenStore }) {
 	const all = useStore(store, (s) => (s.shown ?? s.columns)[col]);
-	const mounted = useStore(store, (s) => s.mounted);
-	const ids = useMemo(() => (Number.isFinite(mounted) ? all.slice(0, mounted) : all), [all, mounted]);
 	const truth = useStore(store, (s) => s.columns[col]);
+	const scroller = useRef<HTMLDivElement | null>(null);
+	const { ref: dropRef } = useDroppable({ id: `col:${col}`, type: "column", accept: "item", collisionPriority: CollisionPriority.Low });
+	const v = useVirtualizer({ count: all.length, getScrollElement: () => scroller.current, estimateSize: () => ROW_PX, overscan: 3, getItemKey: (i) => all[i] });
+	const items = v.getVirtualItems();
 	return (
 		<div className="tcs-column" data-col={col}>
 			<div className="tcs-column-title">
-				{col} {ids.length}
+				{col} {all.length}
 			</div>
-			<div className="tcs-column-scroll">
-				<AnimatePresence initial={false} mode="popLayout">
-					{ids.map((id, index) => (
-						<AltCard key={id} id={id} index={index} col={col} order={truth} store={store} />
-					))}
-				</AnimatePresence>
+			<div
+				className="tcs-column-scroll"
+				ref={(el) => {
+					scroller.current = el;
+					dropRef(el);
+				}}
+			>
+				<div style={{ height: v.getTotalSize(), position: "relative" }}>
+					<div style={{ position: "absolute", top: 0, left: 0, right: 0, transform: `translateY(${items[0]?.start ?? 0}px)` }}>
+						<AnimatePresence initial={false} mode="popLayout">
+							{items.map((item) => (
+								<AltCard key={all[item.index]} id={all[item.index]} index={item.index} col={col} order={truth} store={store} />
+							))}
+						</AnimatePresence>
+					</div>
+				</div>
 			</div>
 		</div>
 	);
-}
+});
 
+/** A row: Motion's layout only while nothing is dragged, so Motion never moves an element dnd-kit is moving. */
 const AltCard = memo(function AltCard({ id, index, col, order, store }: { id: string; index: number; col: ColumnId; order: readonly string[]; store: ScreenStore }) {
 	counters.card.set(id, (counters.card.get(id) ?? 0) + 1);
 	const { ref, isDragging } = useSortable({ id, index, group: col, type: "item", accept: "item" });
 	const title = useStore(store, (s) => s.faces[id]?.title);
+	const withMotion = useStore(store, (s) => s.altMotion);
+	const quiet = useStore(store, (s) => s.altQuiet);
+	const dragOn = useStore(store, (s) => !s.altQuiet && s.dragging !== null);
+	const body = (
+		<div ref={ref} className={`tcs-card-inner ${isDragging ? "is-placeholder" : ""}`} data-id={id}>
+			<div className="tcs-card">{title}</div>
+		</div>
+	);
+	if (!withMotion) return <div className="tcs-card-outer">{body}</div>;
 	return (
-		<motion.div className="tcs-card-outer" layout={!isDragging} layoutId={isDragging ? undefined : id} layoutDependency={order} transition={SPRING}>
-			<div ref={ref} className={`tcs-card-inner ${isDragging ? "is-placeholder" : ""}`} data-id={id}>
-				<div className="tcs-card">{title}</div>
-			</div>
+		<motion.div className="tcs-card-outer" layout={dragOn ? false : "position"} layoutId={dragOn || quiet ? undefined : id} layoutDependency={order} transition={SPRING}>
+			{body}
 		</motion.div>
 	);
 });

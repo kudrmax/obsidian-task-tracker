@@ -46,6 +46,18 @@ export interface ScreenState {
 	tick: number;
 	/** Measurement only: each column mounts at most this many cards, what a virtualized list would keep mounted. */
 	mounted: number;
+	/** Columns virtualized with TanStack Virtual. */
+	virtual: boolean;
+	/** dnd-kit's droppable measuring strategy. */
+	measuring: "always" | "whileDragging" | "beforeDragging";
+	/** Ids the last read brought that the read before did not have: they enter with an animation, a row scrolled into view does not. */
+	added: ReadonlySet<string>;
+	onlyCurrent: boolean;
+	/** The @dnd-kit/react view's rows with Motion or as plain elements. */
+	altMotion: boolean;
+	/** The @dnd-kit/react rows keep Motion's layout through a drag, without a shared layout id (no re-render at the lift). */
+	altQuiet: boolean;
+	configure(patch: Partial<Pick<ScreenState, "virtual" | "measuring" | "onlyCurrent" | "altMotion" | "altQuiet">>): void;
 	setMounted(n: number): void;
 	/** The ribbon on @use-gesture with the core's landing, or on CSS scroll-snap: the two variants checked. */
 	ribbon: "gesture" | "snap";
@@ -116,6 +128,7 @@ export function createScreenStore(tasks: TaskService, today: () => LocalDate): S
 				slotted: shareArray(prev.slotted, ids(view.day.slotted)),
 				shown: prev.dragging ? prev.shown : null,
 				reads: prev.reads + 1,
+				added: prev.reads === 0 ? new Set() : new Set(Object.keys(items).filter((id) => !prev.items[id])),
 				lastReadMs: performance.now() - t0,
 			});
 		},
@@ -171,6 +184,15 @@ export function createScreenStore(tasks: TaskService, today: () => LocalDate): S
 		},
 		tick: 0,
 		mounted: Infinity,
+		virtual: true,
+		measuring: "whileDragging",
+		onlyCurrent: false,
+		altMotion: true,
+		altQuiet: false,
+		added: new Set<string>(),
+		configure(patch) {
+			set(patch);
+		},
 		setMounted(mounted) {
 			set({ mounted });
 		},

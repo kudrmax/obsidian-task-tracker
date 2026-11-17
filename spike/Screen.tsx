@@ -19,9 +19,10 @@ import type { Modifier } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { autoUpdate, flip, FloatingPortal, offset, shift, useClick, useDismiss, useFloating, useInteractions, useRole } from "@floating-ui/react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useDrag, useGesture } from "@use-gesture/react";
 import { AnimatePresence, motion, useMotionValue, useSpring } from "motion/react";
-import { createContext, memo, useContext, useMemo, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, memo, useCallback, useContext, useMemo, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
@@ -31,7 +32,7 @@ import { EmbeddedEditor, type EditorHost } from "../obsidian/ui/markdown/Embedde
 import { type ColumnId, type ScreenState, type ScreenStore } from "./store";
 
 /** Render counters the CDP scripts read: how often each component drew. */
-export const counters = { card: new Map<string, number>(), column: new Map<string, number>(), block: new Map<string, number>(), face: new Map<string, number>(), screen: 0, editorMounts: 0 };
+export const counters = { card: new Map<string, number>(), wrapper: new Map<string, number>(), dropArea: new Map<string, number>(), column: new Map<string, number>(), block: new Map<string, number>(), face: new Map<string, number>(), screen: 0, editorMounts: 0 };
 const count = (map: Map<string, number>, id: string) => map.set(id, (map.get(id) ?? 0) + 1);
 
 export interface Host {
@@ -162,7 +163,6 @@ function Ribbon() {
 	const place = useScreen((s) => s.place);
 	const x = useSpring(-place * width, SPRING);
 	const origin = useRef<DropFrom | null>(null);
-	const [active, setActive] = useState<string | null>(null);
 	const hourPx = useScreen((s) => s.hourPx);
 
 	useEffect(() => x.set(-place * width), [place, width, x]);
@@ -204,10 +204,7 @@ function Ribbon() {
 	const onDragStart = ({ active }: DragStartEvent) => {
 		const id = String(active.id);
 		const s = store.getState();
-		const node = host.root.querySelector(`[data-block="${id.slice(3)}"], [data-id="${id}"]`) as HTMLElement | null;
-		(win as unknown as { tcsStart: unknown }).tcsStart = { initial: active.rect.current.initial?.top, node: node?.getBoundingClientRect().top, outer: (node?.parentElement as HTMLElement | null)?.style.transform };
 		origin.current = id.startsWith("tl:") ? "timeline" : containerOf(s.columns, id);
-		setActive(id);
 		s.setShown({ ...s.columns });
 		s.setDragging(id);
 	};
@@ -227,10 +224,8 @@ function Ribbon() {
 		const id = String(active.id);
 		const taskId = id.startsWith("tl:") ? id.slice(3) : id;
 		const from = origin.current!;
-		setActive(null);
 		if (over?.id === "timeline") {
 			const top = active.rect.current.translated?.top ?? 0;
-			(win as unknown as { tcsDrop: unknown }).tcsDrop = { top, overTop: over.rect.top, initial: active.rect.current.initial?.top, delta: (arguments[0] as DragEndEvent).delta, grid: (host.root.querySelector(".tcs-grid") as HTMLElement).getBoundingClientRect().top };
 			s.setDragging(null);
 			void s.dropAtTime(taskId, from, ((top - over.rect.top) / s.hourPx) * 60);
 			return;
@@ -252,7 +247,6 @@ function Ribbon() {
 		void s.drop(taskId, from, { kind: "place", column: col, place: { kind: "task", group, before: next ? s.items[next].key : null } });
 	};
 	const onDragCancel = () => {
-		setActive(null);
 		store.getState().setShown(null);
 		store.getState().setDragging(null);
 	};
@@ -263,26 +257,31 @@ function Ribbon() {
 		const el = snapRef.current;
 		if (el && Math.round(el.scrollLeft / width) !== place) el.scrollTo({ left: place * width, behavior: "smooth" });
 	}, [mode, place, width]);
-	const pages = (
+	const pages = useMemo(
+		() => (
 		<>
-			<Page>
+			<Page index={0}>
 				<Column col="inbox" />
 				<Column col="backlog" />
 				<Column col="soon" />
 			</Page>
-			<Page>
+			<Page index={1}>
 				<DayPlace />
 			</Page>
-			<Page>
+			<Page index={2}>
 				<div className="tcs-place-3">Place 3</div>
 			</Page>
 		</>
+		),
+		[],
 	);
+	const measuringMode = useScreen((s) => s.measuring);
+	const measuring = useMemo(() => ({ droppable: { strategy: MEASURING[measuringMode] } }), [measuringMode]);
 	const step = hourPx / 4;
 	const modifiers = [snapToGrid(step)];
 
 	return (
-		<DndContext sensors={sensors} collisionDetection={collision} measuring={{ droppable: { strategy: MeasuringStrategy.Always } }} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
+		<DndContext sensors={sensors} collisionDetection={collision} measuring={measuring} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
 			{mode === "snap" ? (
 				<div className="tcs-ribbon-snap" ref={snapRef} onScrollEnd={(e) => store.getState().setPlace(Math.round(e.currentTarget.scrollLeft / width))}>
 					<div className="tcs-track" style={{ width: width * PLACES }}>
@@ -297,68 +296,132 @@ function Ribbon() {
 				</div>
 			)}
 			{createPortal(
-				<DragOverlay modifiers={modifiers}>{active ? <div data-overlay={active.startsWith("tl:") ? active.slice(3) : active}><Face id={active.startsWith("tl:") ? active.slice(3) : active} overlay /></div> : null}</DragOverlay>,
+				<DragOverlay modifiers={modifiers}>
+					<Lifted />
+				</DragOverlay>,
 				host.root.ownerDocument.body,
 			)}
 		</DndContext>
 	);
 }
 
-function Page({ children }: { children: ReactNode }) {
+const MEASURING = { always: MeasuringStrategy.Always, whileDragging: MeasuringStrategy.WhileDragging, beforeDragging: MeasuringStrategy.BeforeDragging } as const;
+
+/** The card in the overlay: the only part of the drag that follows the store's lifted id. */
+function Lifted() {
+	const active = useScreen((s) => s.dragging);
+	if (!active) return null;
+	const id = active.startsWith("tl:") ? active.slice(3) : active;
+	return (
+		<div data-overlay={id}>
+			<Face id={id} overlay />
+		</div>
+	);
+}
+
+/** Measurement only: with `onlyCurrent` a page away from the shown place mounts nothing, to see what the other places cost a drag. */
+function Page({ index, children }: { index: number; children: ReactNode }) {
 	const { width } = useHost();
+	const away = useScreen((s) => s.onlyCurrent && s.place !== index);
 	return (
 		<div className="tcs-page" style={{ width }}>
+			{away ? null : children}
+		</div>
+	);
+}
+
+const ROW_PX = 33;
+
+/**
+ * A column: its rows built here, handed as children to the parts that follow the drag (droppable, sortable context), so
+ * a drag re-renders those parts and the thin sortable wrappers, never the rows. Virtualized with TanStack Virtual when
+ * the store says so (the documented fixed-size list, all ids in the SortableContext, the mounted ones rendered).
+ */
+const Column = memo(function Column({ col }: { col: ColumnId }) {
+	count(counters.column, col);
+	const all = useScreen((s) => (s.shown ?? s.columns)[col]);
+	const truth = useScreen((s) => s.columns[col]);
+	const virtual = useScreen((s) => s.virtual);
+	const scroller = useRef<HTMLDivElement | null>(null);
+	const v = useVirtualizer({ count: all.length, getScrollElement: () => scroller.current, estimateSize: () => ROW_PX, overscan: 3, getItemKey: (i) => all[i], enabled: virtual });
+	const rows = virtual ? v.getVirtualItems().map((item) => all[item.index]) : all;
+	const offset = virtual ? (v.getVirtualItems()[0]?.start ?? 0) : 0;
+	const list = (
+		<AnimatePresence initial={false} mode="popLayout">
+			{rows.map((id) => (
+				<Row key={id} id={id} order={truth} />
+			))}
+		</AnimatePresence>
+	);
+	return (
+		<div className="tcs-column" data-col={col}>
+			<div className="tcs-column-title">
+				{col} {all.length}
+			</div>
+			<DropArea col={col} scroller={scroller}>
+				<SortableContext items={all as unknown as string[]} strategy={verticalListSortingStrategy}>
+					{virtual ? (
+						<div style={{ height: v.getTotalSize(), position: "relative" }}>
+							<div style={{ position: "absolute", top: 0, left: 0, right: 0, transform: `translateY(${offset}px)` }}>{list}</div>
+						</div>
+					) : (
+						list
+					)}
+				</SortableContext>
+			</DropArea>
+		</div>
+	);
+});
+
+/** The column's scroller as dnd-kit's droppable: re-renders with the drag, its children (the rows) do not. */
+function DropArea({ col, scroller, children }: { col: ColumnId; scroller: { current: HTMLDivElement | null }; children: ReactNode }) {
+	count(counters.dropArea, col);
+	const { setNodeRef } = useDroppable({ id: `col:${col}` });
+	const ref = useCallback(
+		(el: HTMLDivElement | null) => {
+			scroller.current = el;
+			setNodeRef(el);
+		},
+		[scroller, setNodeRef],
+	);
+	return (
+		<div className="tcs-column-scroll" ref={ref}>
 			{children}
 		</div>
 	);
 }
 
-function Column({ col }: { col: ColumnId }) {
-	count(counters.column, col);
-	const all = useScreen((s) => (s.shown ?? s.columns)[col]);
-	const mounted = useStore(useHost().store, (s) => s.mounted);
-	const ids = useMemo(() => (Number.isFinite(mounted) ? all.slice(0, mounted) : all), [all, mounted]);
-	const truth = useScreen((s) => s.columns[col]);
-	const { setNodeRef } = useDroppable({ id: `col:${col}` });
-	return (
-		<div className="tcs-column" data-col={col}>
-			<div className="tcs-column-title">
-				{col} {ids.length}
-			</div>
-			<div className="tcs-column-scroll" ref={setNodeRef}>
-				<SortableContext items={ids as unknown as string[]} strategy={verticalListSortingStrategy}>
-					<AnimatePresence initial={false} mode="popLayout">
-						{ids.map((id) => (
-							<Card key={id} id={id} order={truth} />
-						))}
-					</AnimatePresence>
-				</SortableContext>
-			</div>
-		</div>
-	);
-}
-
-/** A card: the outer element is Motion's (layout, enter, exit), the inner one dnd-kit's (sorting transform). */
-const Card = memo(function Card({ id, order }: { id: string; order: readonly string[] }) {
+/** A row: Motion's element (layout on the reads, enter for a task new in the last read), the drag's state from the store. */
+const Row = memo(function Row({ id, order }: { id: string; order: readonly string[] }) {
 	count(counters.card, id);
-	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+	const lifted = useScreen((s) => s.dragging === id);
+	const fresh = useScreen((s) => s.added.has(id));
 	return (
 		<motion.div
 			className="tcs-card-outer"
-			layout={!isDragging}
-			layoutId={isDragging ? undefined : id}
+			layout={lifted ? false : "position"}
+			layoutId={lifted ? undefined : id}
 			layoutDependency={order}
-			initial={isDragging ? false : { opacity: 0, scale: 0.96 }}
+			initial={fresh ? { opacity: 0, scale: 0.96 } : false}
 			animate={{ opacity: 1, scale: 1 }}
-			exit={isDragging ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.96 }}
+			exit={lifted ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.96 }}
 			transition={SPRING}
 		>
-			<div ref={setNodeRef} className={`tcs-card-inner ${isDragging ? "is-placeholder" : ""}`} style={{ transform: CSS.Translate.toString(transform), transition }} data-id={id} {...attributes} {...listeners}>
-				<Face id={id} />
-			</div>
+			<SortableCard id={id} />
 		</motion.div>
 	);
 });
+
+/** The thin sortable wrapper: dnd-kit's transform and listeners around the memoized face; the part a drag re-renders. */
+function SortableCard({ id }: { id: string }) {
+	count(counters.wrapper, id);
+	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+	return (
+		<div ref={setNodeRef} className={`tcs-card-inner ${isDragging ? "is-placeholder" : ""}`} style={{ transform: CSS.Translate.toString(transform), transition }} data-id={id} {...attributes} {...listeners}>
+			<Face id={id} />
+		</div>
+	);
+}
 
 const Face = memo(function Face({ id, overlay }: { id: string; overlay?: boolean }) {
 	count(counters.face, id);
