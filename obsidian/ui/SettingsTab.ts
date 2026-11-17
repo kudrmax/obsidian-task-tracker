@@ -1,4 +1,4 @@
-import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
+import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App, type EventRef } from "obsidian";
 import { type AssistantService, type CalendarService, type CountField, type GoogleAccount, isPresetColor, type LabelColor, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../../core/application/contracts";
 import type { Theme } from "./eventColors";
 import { inkOf, showPriorityColors, tintOf } from "./priorityColors";
@@ -64,6 +64,9 @@ const SECTION_LABELS: Readonly<Record<keyof SectionNames, string>> = {
 export class TaskCalendarSettingsTab extends PluginSettingTab {
 	/** The page a row opened, while it shows: it goes with the settings, never outliving them. */
 	private page: SettingsPage | null = null;
+	/** The theme the colour rows were drawn in: their circles and codes are that theme's shades. */
+	private drawnTheme: Theme | null = null;
+	private themeWatch: EventRef | null = null;
 
 	constructor(
 		app: App,
@@ -76,6 +79,10 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	override display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+		this.drawnTheme = this.theme;
+		this.themeWatch ??= this.app.workspace.on("css-change", () => {
+			if (this.drawnTheme !== null && this.drawnTheme !== this.theme) this.display();
+		});
 		this.prioritiesGroup(containerEl);
 		this.labelsGroup(containerEl);
 		this.sectionsGroup(containerEl);
@@ -122,6 +129,9 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	/** The settings closed: the page shown over them closes too. */
 	override hide(): void {
 		this.closePage();
+		if (this.themeWatch) this.app.workspace.offref(this.themeWatch);
+		this.themeWatch = null;
+		this.drawnTheme = null;
 		super.hide();
 	}
 

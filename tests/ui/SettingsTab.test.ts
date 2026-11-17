@@ -82,6 +82,26 @@ let calendars: KnownCalendars;
 let disk: Disk;
 let settings: PluginSettings<StoredSettings>;
 let tab: TaskCalendarSettingsTab;
+let workspace: FakeWorkspace;
+
+/** The workspace's events the tab listens to: `css-change` fired when Obsidian's theme changes. */
+class FakeWorkspace {
+	private readonly handlers = new Map<object, { name: string; callback: () => void }>();
+	on(name: string, callback: () => void): object {
+		const ref = {};
+		this.handlers.set(ref, { name, callback });
+		return ref;
+	}
+	offref(ref: object): void {
+		this.handlers.delete(ref);
+	}
+	trigger(name: string): void {
+		for (const handler of [...this.handlers.values()]) if (handler.name === name) handler.callback();
+	}
+	get listening(): number {
+		return this.handlers.size;
+	}
+}
 
 async function settled(): Promise<void> {
 	for (let i = 0; i < 10; i++) await new Promise((resolve) => setTimeout(resolve, 0));
@@ -92,7 +112,8 @@ async function open(file: unknown = START, google: GoogleAccount = loggedOut): P
 	disk = new Disk(file);
 	settings = new PluginSettings(disk, FILE, SETTINGS_FILE);
 	await settings.load();
-	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work, calendars, assistant: rig().assistant });
+	workspace = new FakeWorkspace();
+	tab = new TaskCalendarSettingsTab({ workspace } as unknown as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work, calendars, assistant: rig().assistant });
 	tab.display();
 }
 
@@ -245,6 +266,27 @@ describe("the settings tab: the priority levels", () => {
 		expect(code.value).toBe("FF3B30");
 		type(code, "007AFF");
 		await writes(() => code.dispatchEvent(new Event("blur")), { priorities: [{ prefix: "p1", color: "blue" }, START.priorities[1]] });
+	});
+
+	it("draws the codes again in the new theme's shades when the theme changes while the tab is open", async () => {
+		document.body.className = "theme-light";
+		await open();
+		const code = () => levelRows()[0].querySelector<HTMLInputElement>(".tc-level-hex-input")!;
+		expect(code().value).toBe("FF3B30");
+		document.body.className = "theme-dark";
+		workspace.trigger("css-change");
+		expect(code().value).toBe("FF453A");
+		document.body.className = "theme-light";
+		workspace.trigger("css-change");
+		expect(code().value).toBe("FF3B30");
+	});
+
+	it("keeps a field being typed in when Obsidian's css changes without a new theme, and stops listening once hidden", async () => {
+		const field = levelRows()[0].querySelector<HTMLInputElement>(".tc-level-hex-input")!;
+		workspace.trigger("css-change");
+		expect(levelRows()[0].querySelector(".tc-level-hex-input")).toBe(field);
+		tab.hide();
+		expect(workspace.listening).toBe(0);
 	});
 
 	it("writes nothing for a wrong code or the same colour, and puts the code back", async () => {
