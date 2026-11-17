@@ -48,6 +48,15 @@ export interface ScreenState {
 	landed: Readonly<Record<string, { readonly start: number; readonly end: number | null }>>;
 	/** The pointer is over the time grid: the overlay then plays no drop animation, the card is already in its slot. */
 	overGrid: boolean;
+	/** The present minute from the day's start on the shown day (null: not today), the core's `openAt`. */
+	now: number | null;
+	tickNow(): void;
+	/** The timeline's width, for the overlay drawn as a block over it. */
+	gridWidth: number;
+	setGridWidth(width: number): void;
+	/** Every ribbon swipe decided, for the checks: its direction, how far it was drawn, its speed at the lift, the step. */
+	swipes: readonly { readonly dir: number; readonly moved: number; readonly speed: number; readonly step: number }[];
+	logSwipe(swipe: { dir: number; moved: number; speed: number; step: number; why?: string; events?: number }): void;
 	/** Where the card under the pointer would land on the grid: the core's `dropSpan` of the snapped minute. */
 	preview: { readonly start: number; readonly end: number | null } | null;
 	setPreview(at: { id: string; from: DropFrom; minute: number } | null): void;
@@ -95,7 +104,7 @@ function sameFace(a: CardFace | undefined, b: CardFace): boolean {
 	return !!a && a.title === b.title && a.status === b.status && a.tint === b.tint && a.progress === b.progress;
 }
 
-export function createScreenStore(tasks: TaskService, today: () => LocalDate): ScreenStore {
+export function createScreenStore(tasks: TaskService, today: () => LocalDate, nowMinute: () => number | null = () => null): ScreenStore {
 	let readSeq = 0;
 	const store = createStore<ScreenState>()((set, get) => ({
 		date: today(),
@@ -210,6 +219,19 @@ export function createScreenStore(tasks: TaskService, today: () => LocalDate): S
 		},
 		landed: {},
 		overGrid: false,
+		now: null,
+		tickNow() {
+			const now = nowMinute();
+			if (now !== get().now) set({ now });
+		},
+		gridWidth: 0,
+		setGridWidth(gridWidth) {
+			if (gridWidth !== get().gridWidth) set({ gridWidth });
+		},
+		swipes: [],
+		logSwipe(swipe) {
+			set({ swipes: [...get().swipes, swipe] });
+		},
 		preview: null,
 		setPreview(at) {
 			const s = get();

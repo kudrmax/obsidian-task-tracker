@@ -37,3 +37,7 @@
 .tcs-grid, .tcs-timeline { user-select: none; -webkit-user-select: none; }
 .tcs-block-preview { left: 44px; right: 6px; border-radius: 8px; border: 1px dashed var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 18%, transparent); pointer-events: none; }
 .tcs-block-body .tcs-card { padding: 2px 8px; font-size: 12px; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tcs-overlay { font-size: 13px; }
+.tcs-overlay .tcs-block-overlay { position: relative; left: auto; right: auto; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); border-radius: 8px; }
+.tcs-now { position: absolute; left: 40px; right: 0; height: 2px; margin-top: -1px; background: #e5484d; pointer-events: none; z-index: 2; }
+.tcs-now::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #e5484d; }

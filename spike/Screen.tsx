@@ -25,6 +25,7 @@ import { useDrag, useGesture } from "@use-gesture/react";
 import { AnimatePresence, motion, useMotionValue, useSpring } from "motion/react";
 import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Lethargy } from "lethargy";
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import type { App } from "obsidian";
@@ -52,6 +53,14 @@ const useHost = () => useContext(HostContext)!;
 function useScreen<T>(selector: (s: ScreenState) => T): T {
 	return useStore(useHost().store, selector);
 }
+
+/** A stroke whose deltas stop this long has ended without a fling; its speed is read over the last `SPEED_WINDOW_MS`. */
+const STROKE_QUIET_MS = 120;
+const SPEED_WINDOW_MS = 50;
+const SAME_STROKE_MS = 250;
+
+/** The ribbon's landing: short and decisive, critically damped (about 250 ms to settle within a pixel). */
+const RIBBON_SPRING = { stiffness: 800, damping: 55, mass: 0.9 };
 
 const SPRING = { type: "spring", stiffness: 520, damping: 42, mass: 0.9 } as const;
 const PLACES = 3;
@@ -164,8 +173,12 @@ const topAtPointerOnGrid: Modifier = ({ transform, draggingNodeRect, over, activ
 	if (!draggingNodeRect || !over || over.id !== "timeline" || !activatorEvent) return transform;
 	const at = getEventCoordinates(activatorEvent);
 	if (!at) return transform;
-	return { ...transform, y: transform.y + at.y - draggingNodeRect.top };
+	return { x: over.rect.left + BLOCK_LEFT - draggingNodeRect.left, y: transform.y + at.y - draggingNodeRect.top, scaleX: 1, scaleY: 1 };
 };
+
+/** Where a block's left edge stands in the timeline (`.tcs-block { left }`), and how much narrower than the timeline it is. */
+const BLOCK_LEFT = 44;
+const BLOCK_INSET = 50;
 
 function containerOf(shown: Readonly<Record<ColumnId, readonly string[]>>, id: string): ColumnId | null {
 	if (id.startsWith("col:")) return id.slice(4) as ColumnId;
@@ -177,19 +190,67 @@ function Ribbon() {
 	const host = useHost();
 	const { store, width, win } = host;
 	const place = useScreen((s) => s.place);
-	const x = useSpring(-place * width, SPRING);
+	const x = useSpring(-place * width, RIBBON_SPRING);
 	const origin = useRef<DropFrom | null>(null);
 	const active = useScreen((s) => s.dragging);
 	const overGrid = useScreen((s) => s.overGrid);
+	const preview = useScreen((s) => s.preview);
+	const hourPx = useScreen((s) => s.hourPx);
+	const gridWidth = useScreen((s) => s.gridWidth);
 
 	useEffect(() => x.set(-place * width), [place, width, x]);
 
+	/**
+	 * A trackpad swipe on the wheel. The DOM gives no finger phase, so Lethargy (the standard inertia detector) tells the
+	 * strokes a person makes from the OS's momentum tail: a stroke draws the ribbon with it, at the first inertial delta
+	 * (or when the deltas stop) the fingers have lifted and the core's `swipeLanding` decides, and the tail moves nothing.
+	 * A stroke the other way is a new stroke.
+	 */
+	const lethargy = useMemo(() => new Lethargy(), []);
+	const stroke = useRef<{ dir: number; from: number; moved: number; samples: [number, number][]; lifted: boolean; liftedAt: number } | null>(null);
+	const quiet = useRef(0);
+	const lift = (why: string) => {
+		const s = stroke.current;
+		if (!s || s.lifted) return;
+		s.lifted = true;
+		s.liftedAt = s.samples[s.samples.length - 1]?.[0] ?? 0;
+		win.clearTimeout(quiet.current);
+		const last = s.samples[s.samples.length - 1]?.[0] ?? 0;
+		const recent = s.samples.filter(([t]) => t >= last - SPEED_WINDOW_MS);
+		const span = Math.max(16, last - (recent[0]?.[0] ?? last) + 8);
+		const speed = recent.reduce((sum, [, d]) => sum + d, 0) / span;
+		const step = settle(s.moved, speed);
+		store.getState().logSwipe({ dir: s.dir, moved: Math.round(s.moved), speed: +speed.toFixed(2), step, why, events: s.samples.length });
+	};
+	const wheelStroke = (e: WheelEvent) => {
+		if (e.ctrlKey || e.metaKey || store.getState().dragging) return;
+		if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+		e.preventDefault();
+		const intent = lethargy.check({ deltaY: -e.deltaX });
+		const dir = Math.sign(e.deltaX);
+		let s = stroke.current;
+		/** No hand makes two swipes the same way this close: deltas that way right after a decision are its stroke's, not a new one. */
+		const sameStroke = s?.lifted && s.dir === dir && e.timeStamp - s.liftedAt < SAME_STROKE_MS;
+		if (intent && !sameStroke && (!s || s.lifted || s.dir !== dir)) {
+			if (s && !s.lifted) lift("reverse");
+			s = stroke.current = { dir, from: store.getState().place, moved: 0, samples: [], lifted: false, liftedAt: 0 };
+		}
+		if (!s || s.lifted) return;
+		if (!intent) return lift("inertia");
+		s.moved += e.deltaX;
+		s.samples.push([e.timeStamp, e.deltaX]);
+		const b = bounds();
+		x.jump(Math.max(b.left, Math.min(b.right, -s.from * width - s.moved)));
+		win.clearTimeout(quiet.current);
+		quiet.current = win.setTimeout(() => lift("quiet"), STROKE_QUIET_MS);
+	};
 	const settle = (moved: number, speed: number) => {
 		const from = store.getState().place;
 		const step = swipeLanding(moved, width, speed);
 		const next = Math.max(0, Math.min(PLACES - 1, from + step));
 		store.getState().setPlace(next);
 		x.set(-next * width);
+		return step;
 	};
 	/** The ribbon moves at most one place either way of where the gesture began: use-gesture's bounds, rubber-banded. */
 	const bounds = () => {
@@ -203,15 +264,11 @@ function Ribbon() {
 				if (last) settle(-store.getState().place * width - ox, -vx * dx);
 				else x.jump(ox);
 			},
-			onWheel: ({ offset: [ox], velocity: [vx], direction: [dx], last }) => {
-				if (store.getState().dragging) return;
-				if (last) settle(ox - store.getState().place * width, vx * dx);
-				else x.jump(-ox);
-			},
+			onWheel: ({ event }) => wheelStroke(event as WheelEvent),
 		},
 		{
 			drag: { axis: "x", threshold: 10, filterTaps: true, from: () => [-store.getState().place * width, 0], bounds, rubberband: true },
-			wheel: { axis: "x", from: () => [store.getState().place * width, 0], bounds: () => { const b = bounds(); return { left: -b.right, right: -b.left }; }, rubberband: true },
+			wheel: { eventOptions: { passive: false } },
 			window: win,
 		},
 	);
@@ -328,8 +385,8 @@ function Ribbon() {
 				</div>
 			)}
 			{createPortal(
-				<DragOverlay dropAnimation={overGrid ? null : undefined}>
-					{active ? <Lifted active={active} /> : null}
+				<DragOverlay className="tcs-overlay" dropAnimation={overGrid ? null : DROP}>
+					{active ? <Lifted active={active} block={overGrid && preview ? { width: gridWidth - BLOCK_INSET, height: Math.max(18, (((preview.end ?? preview.start + 15) - preview.start) / 60) * hourPx) } : null} /> : null}
 				</DragOverlay>,
 				host.root.ownerDocument.body,
 			)}
@@ -343,14 +400,25 @@ const MEASURING = { always: MeasuringStrategy.Always, whileDragging: MeasuringSt
  * The card in the overlay, by the id it is given: dnd-kit keeps the overlay's last children through its drop animation,
  * so nothing in them may follow the store's lifted id, which the drop clears at once.
  */
-const Lifted = memo(function Lifted({ active }: { active: string }) {
+const Lifted = memo(function Lifted({ active, block }: { active: string; block: { width: number; height: number } | null }) {
 	const id = active.startsWith("tl:") ? active.slice(3) : active;
+	if (block)
+		return (
+			<div data-overlay={id} className="tcs-block tcs-block-overlay" style={{ width: block.width, height: block.height }}>
+				<div className="tcs-block-body">
+					<Face id={id} />
+				</div>
+			</div>
+		);
 	return (
 		<div data-overlay={id}>
 			<Face id={id} overlay />
 		</div>
 	);
 });
+
+/** The overlay settles into the card's place quickly and without changing size; the card is there the frame it ends. */
+const DROP = { duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" };
 
 /** Measurement only: with `onlyCurrent` a page away from the shown place mounts nothing, to see what the other places cost a drag. */
 function Page({ index, children }: { index: number; children: ReactNode }) {
@@ -444,7 +512,7 @@ const Row = memo(function Row({ id, order }: { id: string; order: readonly strin
 		<motion.div
 			className="tcs-card-outer"
 			layout={lifted ? false : "position"}
-			layoutId={lifted ? undefined : id}
+			layoutId={id}
 			layoutCrossfade={false}
 			layoutDependency={order}
 			initial={fresh ? { opacity: 0, scale: 0.96 } : false}
@@ -515,6 +583,12 @@ function Timeline() {
 	 */
 	const data = useMemo(() => ({ minuteAt: (y: number) => ((y - (grid.current?.getBoundingClientRect().top ?? 0)) / store.getState().hourPx) * 60 }), [store]);
 	const { setNodeRef } = useDroppable({ id: "timeline", data });
+	const { width } = useHost();
+	const listWidth = useScreen((s) => s.listWidth);
+	useEffect(() => {
+		const el = scroller.current;
+		if (el) store.getState().setGridWidth(el.clientWidth);
+	}, [store, width, listWidth]);
 	const scrollerRef = useCallback(
 		(el: HTMLDivElement | null) => {
 			scroller.current = el;
@@ -555,12 +629,26 @@ function Timeline() {
 					</div>
 				))}
 				<Preview hourPx={hourPx} />
+				<NowLine hourPx={hourPx} />
 				{ids.map((id) => (
 					<Block key={id} id={id} hourPx={hourPx} />
 				))}
 			</div>
 		</div>
 	);
+}
+
+/** The red line at the present minute (docs/plugin/screen.md, «Линия «сейчас»»), from the core's `openAt`; it moves every minute. */
+function NowLine({ hourPx }: { hourPx: number }) {
+	const { store, win } = useHost();
+	const now = useScreen((s) => s.now);
+	useEffect(() => {
+		const id = win.setInterval(() => store.getState().tickNow(), 15000);
+		store.getState().tickNow();
+		return () => win.clearInterval(id);
+	}, [store, win]);
+	if (now === null) return null;
+	return <div className="tcs-now" style={{ top: (now / 60) * hourPx }} />;
 }
 
 /** Where the card will land, the core's span for the snapped minute under the pointer, drawn as the block will stand. */
@@ -574,7 +662,7 @@ function Preview({ hourPx }: { hourPx: number }) {
 const Block = memo(function Block({ id, hourPx }: { id: string; hourPx: number }) {
 	count(counters.block, id);
 	const { store, win } = useHost();
-	const slot = useScreen(useShallow((s) => ({ shown: s.items[id]?.slot != null || id in s.landed, landed: id in s.landed, start: s.spanOf(id)?.start ?? 0, end: s.spanOf(id)?.end ?? null })));
+	const slot = useScreen(useShallow((s) => ({ shown: s.items[id]?.slot != null || id in s.landed, start: s.spanOf(id)?.start ?? 0, end: s.spanOf(id)?.end ?? null, read: `${s.items[id]?.slot?.date}-${s.items[id]?.slot?.start}-${s.items[id]?.slot?.end}` })));
 	const { setNodeRef, listeners, attributes, isDragging } = useDraggable({ id: `tl:${id}` });
 	const [held, setHeld] = useState<{ start: number; end: number } | null>(null);
 	const end = slot.end ?? slot.start + 15;
@@ -593,8 +681,8 @@ const Block = memo(function Block({ id, hourPx }: { id: string; hourPx: number }
 	return (
 		<motion.div
 			className={`tcs-block ${isDragging ? "is-placeholder" : ""}`}
-			layout={held || slot.landed ? false : "position"}
-			layoutDependency={`${slot.start}-${slot.end}`}
+			layout={held ? false : "position"}
+			layoutDependency={slot.read}
 			transition={SPRING}
 			style={{ top: (span.start / 60) * hourPx, height: Math.max(18, ((span.end - span.start) / 60) * hourPx) }}
 		>

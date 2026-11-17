@@ -1,0 +1,69 @@
+== oracle
+{"name":"list, zoom 1x, evening","ok":true,"aimed":"23:00","file":"23:00","firstFrameTop":526.6,"lineTopAtRelease":526.6,"blockTop":526.6,"lineTop":526.6,"nowTop":462.1875,"reversals":0,"hourPx":56,"i
+{"name":"list, zoomed in, evening","ok":true,"aimed":"23:00","file":"23:00","firstFrameTop":470.9,"lineTopAtRelease":470.9,"blockTop":470.9,"lineTop":470.9,"nowTop":343.1796875,"reversals":0,"hourPx":
+{"name":"list, zoomed in more, night","ok":true,"aimed":"1:00","file":"01:00","firstFrameTop":470.6,"lineTopAtRelease":470.6,"blockTop":470.6,"lineTop":470.6,"nowTop":-92.1640625,"reversals":0,"hourPx
+{"name":"list, zoomed out, night","ok":true,"aimed":"2:00","file":"02:00","firstFrameTop":698.4,"lineTopAtRelease":698.4,"blockTop":698.4,"lineTop":698.4,"nowTop":538.6953125,"reversals":0,"hourPx":38
+{"name":"block, zoom 1x","ok":true,"aimed":"23:00","file":"23:00","firstFrameTop":526.6,"lineTopAtRelease":526.6,"blockTop":526.6,"lineTop":526.6,"nowTop":463.125,"reversals":0,"hourPx":56,"invisibleF
+{"name":"block, zoomed in","ok":true,"aimed":"23:00","file":"23:00","firstFrameTop":582.9,"lineTopAtRelease":582.9,"blockTop":582.9,"lineTop":582.9,"nowTop":455.1796875,"reversals":0,"hourPx":112.7,"i
+{"name":"block, zoomed out","ok":true,"aimed":"1:00","file":"01:00","firstFrameTop":659.7,"lineTopAtRelease":659.7,"blockTop":659.7,"lineTop":659.7,"nowTop":538.6953125,"reversals":0,"hourPx":38.6,"in
+{"name":"past: list, zoom 1x","ok":true,"aimed":"18:00","file":"18:00","firstFrameTop":414.6,"lineTopAtRelease":414.6,"blockTop":631.1,"lineTop":414.6,"nowTop":631.125,"reversals":0,"hourPx":56,"invis
+{"name":"past: list, zoomed in","ok":true,"aimed":"20:00","file":"20:00","firstFrameTop":470.8,"lineTopAtRelease":470.8,"blockTop":681.2,"lineTop":470.8,"nowTop":681.1796875,"reversals":0,"hourPx":112
+{"name":"past: block, zoom 1x","ok":true,"aimed":"19:00","file":"19:00","firstFrameTop":358.6,"lineTopAtRelease":358.6,"blockTop":519.1,"lineTop":358.6,"nowTop":519.125,"reversals":0,"hourPx":56,"invi
+{"name":"past: block, zoomed out","ok":true,"aimed":"17:00","file":"17:00","firstFrameTop":393.2,"lineTopAtRelease":393.2,"blockTop":581.2,"lineTop":393.2,"nowTop":581.1953125,"reversals":0,"hourPx":3
+== sequences
+{"name":"round 3: block to the list","ok":false,"file":{"slotted":true,"indexInNow":2},"screen":{"inDay":false,"dayIndex":-1,"slotted":true,"rowVisible":false,"blockVisible":true}}
+passed 11 of 12
+== drop visibility and handover
+desk within: 0 faulty frames after release; settle {"overlayGoneMs":205,"overlaySizes":["392x29"],"cardVsOverlay":{"dx":0,"dy":0,"dw":0,"dh":0,"cardOpacity":1}}
+desk cross: 0 faulty frames after release; settle {"overlayGoneMs":205,"overlaySizes":["392x29"],"cardVsOverlay":{"dx":0,"dy":0,"dw":0,"dh":0,"cardOpacity":1}}
+desk timeline: 0 faulty frames after release; settle {"overlayGoneMs":0,"note":"no overlay after release"}
+desk command: 0 faulty frames after release; settle {"overlayGoneMs":0,"note":"no overlay after release"}
+== blockers 1 and 4
+== final within column
+frames 191 overlay frames 100
+order t3,t4,t5,t12961,t6,t7 | file "\n- [ ] Купить квартиру 2\n- [ ] Проверить билеты 3\n- [ ] Разобрать письмо Косте 4\n- [ ] Написать документы 1\n- [ ]
+== final Inbox to Soon
+frames 230 overlay frames 131
+before t3 after soon t137,t138,t3,t140,t141 | file "## Soon\n\n- [ ] Проверить билеты 123 📅 2026-11-18 🗂️ Работа\n- [ ] Разобрать письмо Косте 124\n- [ ] Оплатить 
+== final command move
+frames 158 overlay frames 0
+== final timeline move
+file:///private/tmp/claude-501/-Users-mdmkudryashov-projects-obsidian-my-own-plugins-obsidian-task-tracker/10b8c134-2d84-49f9-9c81-48ded7b4dd36/scratchpad/scripts/dbg2.mjs:4
+const mouse = (type, p) => c.send("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
+                                                                           ^
+
+TypeError: Cannot read properties of null (reading 'x')
+    at mouse (file:///private/tmp/claude-501/-Users-mdmkudryashov-projects-obsidian-my-own-plugins-obsidian-task-tracker/10b8c134-2d84-49f9-9c81-48ded7b4dd36/scratchpad/scripts/dbg2.mjs:4:76)
+    at file:///private/tmp/claude-501/-Users-mdmkudryashov-projects-obsidian-my-own-plugins-obsidian-task-tracker/10b8c134-2d84-49f9-9c81-48ded7b4dd36/scratchpad/scripts/dbg2.mjs:10:7
+
+Node.js v22.22.0
+== final list to timeline
+{"gridTopBefore":-472.90625,"gridTopAtRelease":-472.90625,"overlayTopAtRelease":429.9921875,"blockTopAfter":472.5546875,"line":"- [/] Починить ревью PR 71 📅 2026-11-17 📌 2026-11-17 21:00","hourPx":56}
+== final resize
+{"before":"- [ ] Купить продукты 107 📅 2026-11-17 📌 2026-11-17 22:30-23:00","after":"- [ ] Купить продукты 107 📅 2026-11-17 📌 2026-11-17 22:30-24:00","heightBefore":28,"heightWhile
+== final menu
+{"openedByClick":true,"menuBox":{"x":162,"y":172,"top":120,"left":52,"w":220,"h":104},"inSameDocAsView":true,"closedByEscape":true,"reopened":true,"closedByOutsideClick":true,"itemRan":true,"closedAfterItem":true}
+== final editor
+{"mountsBefore":2,"focused":true,"suggestOpen":true,"text":"Купить молоко [[","echo":"Купить молоко [[","toolbarRenders":20,"mountsAfter":2}
+== timeline frames
+block-slow: 118 frames, 498 samples 
+block-fast: 51 frames, 177 samples 
+list-onto-and-off: 185 frames, 571 samples 
+resize: 91 frames, 403 samples 
+zoom-07: 51 frames, 285 samples 
+zoom-12: 51 frames, 287 samples 
+zoom-top-edge: 51 frames, 284 samples 
+pinch-07: 79 frames, 173 samples 
+block-slow         {"frames":498,"selectionFrames":0,"dragFrames":362,"pointerOffsetChanges":2,"maxOffsetJumpPx":8,"offsets":"-13 -5 -6 -1 0 -2 -3","onGridLagErrorPx":{"median":0.4,"p95":0.8,"max":12.9},"blockVanishedFrames":0}
+block-fast         {"frames":177,"selectionFrames":0,"dragFrames":74,"pointerOffsetChanges":29,"maxOffsetJumpPx":14,"offsets":"0 7 13 -1 8 9 10 5 3 2","onGridLagErrorPx":{"median":1,"p95":1,"max":7.1},"blockVanishedFrames":0}
+list-onto-and-off  {"frames":571,"selectionFrames":0,"dragFrames":471,"pointerOffsetChanges":176,"maxOffsetJumpPx":14,"offsets":"-20 -26 -15 -14 -21 -1 -6 0 -7 -2 -3 4","onGridLagErrorPx":{"median":0.5,"p95":14.6,"max":20.1},"blockVanishedFrames":0}
+resize             {"frames":403,"selectionFrames":0,"dragFrames":0,"pointerOffsetChanges":0,"maxOffsetJumpPx":0,"offsets":"","onGridLagErrorPx":null,"blockVanishedFrames":0}
+zoom-07            {"frames":285,"selectionFrames":0,"hourPx":[59.36,224,88.54536292216875],"anchorDriftPx":0.88}
+zoom-12            {"frames":287,"selectionFrames":0,"hourPx":[59.36,224,88.54536292216875],"anchorDriftPx":0.3}
+zoom-top-edge      {"frames":284,"selectionFrames":0,"hourPx":[59.36,224,88.54536292216875],"anchorDriftPx":0.56}
+pinch-07           {"frames":173,"selectionFrames":0,"hourPx":[56.73386552810668,111.65055830797938,111.65055830797938],"anchorDriftPx":0.28}
+== recorded input
+FAIL max-2026-11-17.json swipes [-1, 1, -1, -1, -1, 1] expected [-1, 1, -1, -1, -1, 1] settle ms [328, 355, 362, 0, 0, 338] drags 21 drop faults 11
+finished
+
+[exited with code 0]

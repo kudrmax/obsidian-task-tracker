@@ -1,6 +1,6 @@
 import { connect, sleep } from "./cdp.mjs";
 import { rectOf } from "./rect.mjs";
-import { VIS_SAMPLER, visibilityFaults } from "./vis.mjs";
+import { VIS_SAMPLER, visibilityFaults, settleCheck } from "./vis.mjs";
 import { writeFileSync, mkdirSync } from "node:fs";
 /** A human-like mouse drag and release, every frame sampled for visibility, plus a CDP screencast. `node b14-flicker.mjs <within|cross|timeline|command> <label>` */
 const kind = process.argv[2] ?? "within", label = process.argv[3] ?? "run";
@@ -13,6 +13,12 @@ c.on("Page.screencastFrame", async (p) => { frames.push(p.metadata.timestamp); w
 let id, from, to;
 if (kind === "command") {
 	id = await st("s.columns.inbox[0]");
+} else if (kind === "cancel") {
+	await c.evaluate(`tcSpike.store.getState().setPlace(0); document.querySelectorAll(".tcs-column-scroll").forEach(e => e.scrollTop = 0); 1`); await sleep(900);
+	id = await st("s.columns.inbox[0]");
+	from = await rectOf(c, `[data-id="${id}"]`);
+	const soon = await rectOf(c, `[data-id="${await st("s.columns.soon[2]")}"]`);
+	to = { x: soon.x, y: 30 };
 } else if (kind === "timeline") {
 	await c.evaluate(`tcSpike.store.getState().setPlace(1); 1`); await sleep(900);
 	await c.evaluate(`document.querySelector(".tcs-timeline").scrollTop = 600; document.querySelectorAll(".tcs-column-scroll").forEach(e => e.scrollTop = 0); 1`); await sleep(300);
@@ -45,6 +51,6 @@ await c.send("Page.stopScreencast");
 const samples = await c.evaluate(`window.__stopVis()`);
 const faults = visibilityFaults(samples);
 writeFileSync(new URL(`../shots/vis-${label}-${kind}.json`, import.meta.url), JSON.stringify({ id, kind, faults, samples }, null, 1));
-console.log(`${label} ${kind}: ${faults.length} faulty frames after release, screencast ${frames.length} frames in ${dir}`);
+console.log(`${label} ${kind}: ${faults.length} faulty frames after release; settle ${JSON.stringify(settleCheck(samples))}; screencast ${frames.length} frames in ${dir}`);
 for (const f of faults.slice(0, 12)) console.log("  ", JSON.stringify(f));
 c.close();

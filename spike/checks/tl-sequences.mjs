@@ -17,7 +17,7 @@ const results = [];
 const check = async (name, id, expect) => { await sleep(1200); const f = await lineOfTask(id), sc = await screenOf(id); const ok = expect(f, sc); results.push({ name, ok, file: { slotted: f.slotted, indexInNow: f.indexInNow }, screen: sc }); console.log(JSON.stringify(results.at(-1))); };
 await c.evaluate(`(async () => { const s = tcSpike.store.getState(); s.setPlace(1); s.setHourPx(56); await new Promise(r => setTimeout(r, 700)); document.querySelector(".tcs-timeline").scrollTop = 840; document.querySelectorAll(".tcs-column-scroll").forEach(e => e.scrollTop = 0); return 1 })()`);
 await sleep(400);
-const visibleBlock = () => st(`s.slotted.find(i => { const r = document.querySelector('[data-block="' + i + '"]')?.getBoundingClientRect(); const t = document.querySelector(".tcs-timeline").getBoundingClientRect(); return r && r.top > t.top + 10 && r.bottom < t.bottom - 10; })`);
+const visibleBlock = () => st(`s.slotted.find(i => { const r = document.querySelector('[data-block="' + i + '"]')?.getBoundingClientRect(); const t = document.querySelector(".tcs-timeline").getBoundingClientRect(); return r && r.top > t.top + 10 && r.bottom < t.bottom - 10 && document.elementFromPoint(r.left + r.width / 2, r.top + 6)?.closest("[data-block]")?.dataset.block === i; })`);
 for (let round = 1; round <= 3; round++) {
 	await c.evaluate(`(async () => { document.querySelector(".tcs-timeline").scrollTop = 840; document.querySelectorAll(".tcs-column-scroll").forEach(e => e.scrollTop = 0); return 1 })()`);
 	await sleep(300);

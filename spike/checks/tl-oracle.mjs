@@ -39,16 +39,22 @@ async function dropCase(name, source, targetLabel, zoomSteps, scrollLabel) {
 	await mouse("mouseMoved", { x: line.x, y: line.y });
 	await sleep(120);
 	line = await lineOf(targetLabel);
-	await c.evaluate(`window.__seen = []; window.__seenOn = true; (function t(){ if (!window.__seenOn) return; const e = document.querySelector('[data-block="${id}"]'); let o = 0; if (e) { o = 1; for (let n = e; n && n !== document.documentElement; n = n.parentElement) o *= +getComputedStyle(n).opacity; } const ov = document.querySelector('[data-overlay="${id}"]'); window.__seen.push(Math.max(o, ov ? 1 : 0)); requestAnimationFrame(t); })(); 1`);
+	await c.evaluate(`window.__seen = []; window.__seenOn = true; (function t(){ if (!window.__seenOn) return; const e = document.querySelector('[data-block="${id}"]'); let o = 0; if (e) { o = 1; for (let n = e; n && n !== document.documentElement; n = n.parentElement) o *= +getComputedStyle(n).opacity; } const ov = document.querySelector('[data-overlay="${id}"]'); window.__seen.push(Math.max(o, ov ? 1 : 0)); window.__tops = window.__tops || []; if (e && !ov) window.__tops.push(e.getBoundingClientRect().top); requestAnimationFrame(t); })(); window.__tops = []; 1`);
 	await mouse("mouseReleased", { x: line.x, y: line.y });
 	await sleep(1500);
 	await c.evaluate(`window.__seenOn = false; 1`);
 	const seen = await c.evaluate(`window.__seen`);
+	const tops = await c.evaluate(`window.__tops`);
+	const nowTop = await c.evaluate(`(() => { const n = document.querySelector(".tcs-now"); return n ? n.getBoundingClientRect().top + 1 : null; })()`);
 	const lineAfter = await lineOf(targetLabel);
 	const block = await rectOf(c, `[data-block="${id}"]`);
 	const ft = await fileTime(id);
-	const ok = ft.time === targetLabel.padStart(5, "0") && block && Math.abs(block.top - lineAfter.y) <= 1 && seen.every((v) => v > 0.95);
-	results.push({ name, ok, aimed: targetLabel, file: ft.time, blockTop: block ? +block.top.toFixed(1) : null, lineTop: +lineAfter.y.toFixed(1), hourPx: await st("s.hourPx"), invisibleFrames: seen.filter((v) => v <= 0.95).length });
+	const past = name.includes("past");
+	let reversals = 0;
+	for (let i = 2; i < tops.length; i++) if (Math.sign(tops[i] - tops[i - 1]) * Math.sign(tops[i - 1] - tops[i - 2]) < 0 && Math.abs(tops[i] - tops[i - 1]) > 1) reversals++;
+	const landedAt = tops.length ? +tops[0].toFixed(1) : null;
+	const ok = ft.time === targetLabel.padStart(5, "0") && block && seen.every((v) => v > 0.95) && (past ? Math.abs(landedAt - line.y) <= 1 && Math.abs(block.top - nowTop) <= 1 && reversals === 0 : Math.abs(block.top - lineAfter.y) <= 1);
+	results.push({ name, ok, aimed: targetLabel, file: ft.time, firstFrameTop: landedAt, lineTopAtRelease: +line.y.toFixed(1), blockTop: block ? +block.top.toFixed(1) : null, lineTop: +lineAfter.y.toFixed(1), nowTop, reversals, hourPx: +(await st("s.hourPx")).toFixed(1), invisibleFrames: seen.filter((v) => v <= 0.95).length });
 }
 const cases = [
 	["list, zoom 1x, evening", "list", "23:00", 0, "22:00"],
@@ -58,6 +64,10 @@ const cases = [
 	["block, zoom 1x", "block", "23:00", 0, "22:00"],
 	["block, zoomed in", "block", "23:00", 12, "22:00"],
 	["block, zoomed out", "block", "1:00", -6, "23:00"],
+	["past: list, zoom 1x", "list", "18:00", 0, "19:00"],
+	["past: list, zoomed in", "list", "20:00", 12, "20:00"],
+	["past: block, zoom 1x", "block", "19:00", 0, "21:00"],
+	["past: block, zoomed out", "block", "17:00", -6, "19:00"],
 ];
 for (const k of cases.filter((k) => !process.env.CASE || k[0].includes(process.env.CASE))) { await dropCase(...k); console.log(JSON.stringify(results.at(-1))); }
 c.close();

@@ -100,7 +100,14 @@ export default class SpikePlugin extends Plugin implements SettingsStore {
 	override async onload(): Promise<void> {
 		const t0 = performance.now();
 		this.services = createServices(this.app, { pluginDir: this.manifest.dir ?? "", shortcuts: { isPhone: Platform.isIosApp, vaultName: this.app.vault.getName(), open: () => undefined } }, this);
-		this.store = createScreenStore(this.services.tasks, () => this.services.days.today());
+		this.store = createScreenStore(
+			this.services.tasks,
+			() => this.services.days.today(),
+			() => {
+				const at = this.services.days.openAt(this.services.days.today());
+				return at.kind === "now" ? at.minute : null;
+			},
+		);
 		this.registerView(VIEW, (leaf) => new SpikeView(leaf, this));
 		this.registerView(ALT_VIEW, (leaf) => new AltView(leaf, this));
 		this.addCommand({ id: "open", name: "Open stack spike", callback: () => void this.open(false) });

@@ -2,7 +2,7 @@
 export const VIS_SAMPLER = `
 window.__vis = (id) => {
 	const out = []; let run = true; const t0 = performance.now();
-	const seen = (e) => { let o = 1, hidden = false, scale = 1; for (let n = e; n && n !== document.documentElement; n = n.parentElement) { const cs = getComputedStyle(n); o *= +cs.opacity; if (cs.visibility === "hidden" || cs.display === "none") hidden = true; const m = cs.transform; if (m && m !== "none") { const v = m.match(/matrix\\(([^)]+)\\)/); if (v) { const [a, b] = v[1].split(",").map(Number); scale *= Math.hypot(a, b); } } } const r = e.getBoundingClientRect(); return { o: +o.toFixed(2), hidden, scale: +scale.toFixed(3), x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width) }; };
+	const seen = (e) => { let o = 1, hidden = false, scale = 1; for (let n = e; n && n !== document.documentElement; n = n.parentElement) { const cs = getComputedStyle(n); o *= +cs.opacity; if (cs.visibility === "hidden" || cs.display === "none") hidden = true; const m = cs.transform; if (m && m !== "none") { const v = m.match(/matrix\\(([^)]+)\\)/); if (v) { const [a, b] = v[1].split(",").map(Number); scale *= Math.hypot(a, b); } } } const r = e.getBoundingClientRect(); return { o: +o.toFixed(2), hidden, scale: +scale.toFixed(3), x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }; };
 	const tick = () => {
 		if (!run) return;
 		const s = window.tcSpike?.store.getState();
@@ -28,4 +28,20 @@ export function visibilityFaults(samples) {
 		else if (overlayGone && (card < 0.99 || f.cards.some((c) => Math.abs(c.scale - 1) > 0.01))) faults.push({ at: f.released, what: "card faded or scaled", card, scale: f.cards.map((c) => c.scale), reads: f.reads });
 	}
 	return faults;
+}
+
+/**
+ * How the overlay hands over to the card: how long after the release it is gone, whether it changed size on the way,
+ * and how far the card stands from the overlay's last frame (x, y, width, height), the card at full opacity.
+ */
+export function settleCheck(samples) {
+	const after = samples.filter((f) => f.released !== null && f.dragging === null);
+	const withOverlay = after.filter((f) => f.overlay.length);
+	const last = withOverlay.at(-1);
+	const firstWithout = after.find((f) => !f.overlay.length && f.released > (last?.released ?? -1));
+	if (!last || !firstWithout) return { overlayGoneMs: last ? null : 0, note: last ? "overlay never left" : "no overlay after release" };
+	const sizes = new Set(withOverlay.map((f) => `${f.overlay[0].w}x${f.overlay[0].h}`));
+	const card = firstWithout.cards.filter((c) => !c.hidden).sort((a, b) => b.o - a.o)[0];
+	const o = last.overlay[0];
+	return { overlayGoneMs: firstWithout.released, overlaySizes: [...sizes], cardVsOverlay: card ? { dx: card.x - o.x, dy: card.y - o.y, dw: card.w - o.w, dh: card.h - o.h, cardOpacity: card.o } : null };
 }
