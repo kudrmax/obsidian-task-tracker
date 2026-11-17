@@ -38,6 +38,8 @@ export class AnswerPopup {
 	private readonly overlay: Overlay;
 	/** Closed: the rendered markdown's own parts are let go. */
 	private readonly closing: (() => void)[] = [];
+	/** Let go the moment the popup begins to close: the field's keys. */
+	private readonly leaving: (() => void)[] = [];
 
 	static open(outcome: ShownOutcome, render: RenderMarkdown, context: ContextField | null = null, doc: Document = activeDocument): AnswerPopup {
 		return new AnswerPopup(outcome, render, context, doc);
@@ -73,20 +75,25 @@ export class AnswerPopup {
 		return { area, failed };
 	}
 
-	/** Save and Save and ask again stand in Close's place while the field holds text; one write at a time. */
+	/**
+	 * Save and Save and ask again stand in Close's place while the field holds text. One write at a time, and a write that
+	 * took is the last: the popup is closing, nothing more is saved. Closed while it was writing (Escape), it asks nothing again.
+	 */
 	private saves(foot: HTMLElement, close: Button, field: ContextInput, context: ContextField): void {
 		let writing = false;
 		const save = async (again: boolean) => {
-			if (writing || field.area.value === "") return;
+			if (writing || this.overlay.isClosed || field.area.value === "") return;
 			writing = true;
 			const result = await context.write(field.area.value);
-			writing = false;
 			if (!result.ok) {
+				writing = false;
 				context.log(result.detail);
+				if (this.overlay.isClosed) return;
 				field.failed.textContent = result.words;
 				field.failed.hidden = false;
 				return;
 			}
+			if (this.overlay.isClosed) return;
 			this.close();
 			if (again) context.again();
 		};
@@ -100,7 +107,7 @@ export class AnswerPopup {
 			field.failed.hidden = true;
 		};
 		field.area.addEventListener("input", typed);
-		this.closing.push(context.modEnter(field.area, () => void save(true)));
+		this.leaving.push(context.modEnter(field.area, () => void save(true)));
 		typed();
 	}
 
@@ -110,6 +117,7 @@ export class AnswerPopup {
 	}
 
 	close(): void {
+		this.leaving.splice(0).forEach((release) => release());
 		void this.overlay.close().then(() => this.closing.splice(0).forEach((release) => release()));
 	}
 }

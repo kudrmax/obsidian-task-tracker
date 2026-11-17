@@ -351,6 +351,41 @@ describe("AssistantAnswers", () => {
 			expect(transport.asked).toHaveLength(2);
 		});
 
+		it("a write that took is the last: a second ⌘Enter or press while the popup fades writes nothing and asks nothing", async () => {
+			const { type, field, popup, store, transport } = await opened();
+			type("Takes a minute");
+			const modEnter = () => field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }));
+			modEnter();
+			await settle();
+			modEnter();
+			popup.querySelector<HTMLButtonElement>(".tc-answer-save")!.click();
+			popup.querySelector<HTMLButtonElement>(".tc-answer-again")!.click();
+			await settle();
+			expect(store.text?.split("Контекст: Takes a minute")).toHaveLength(2);
+			expect(transport.asked).toHaveLength(2);
+		});
+
+		it("Save then ⌘Enter while the popup fades: one line, no second question", async () => {
+			const { type, field, popup, store, transport } = await opened();
+			type("Takes a minute");
+			popup.querySelector<HTMLButtonElement>(".tc-answer-save")!.click();
+			await settle();
+			field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }));
+			await settle();
+			expect(store.text?.split("Контекст: Takes a minute")).toHaveLength(2);
+			expect(transport.asked).toHaveLength(1);
+		});
+
+		it("Save and ask again, then Escape before the write is back: the line is written, nothing is asked again", async () => {
+			const { type, popup, store, transport } = await opened();
+			type("Takes a minute");
+			popup.querySelector<HTMLButtonElement>(".tc-answer-again")!.click();
+			document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+			await settle();
+			expect(store.text).toContain("\t- Контекст: Takes a minute");
+			expect(transport.asked).toHaveLength(1);
+		});
+
 		it("Escape closes without writing", async () => {
 			const { type, popup, store } = await opened();
 			const before = store.text;

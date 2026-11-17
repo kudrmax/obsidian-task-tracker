@@ -319,3 +319,14 @@ export class TFile {
 		readonly extension = "md",
 	) {}
 }
+
+/** Obsidian's key scope: what it registers, and the scope over which it stands. */
+export class Scope {
+	readonly keys: { modifiers: string[]; key: string; run: () => unknown }[] = [];
+
+	constructor(readonly parent?: Scope) {}
+
+	register(modifiers: string[], key: string, run: () => unknown): void {
+		this.keys.push({ modifiers, key, run });
+	}
+}
