@@ -11,6 +11,12 @@ type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "set
 /** Obsidian's own packages: the app provides them at run time (`external` in esbuild.config.mjs). */
 const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
 
+/**
+ * The view's libraries, the stack the UI is built on (docs/superpowers/specs/2026-11-16-ui-standard-stack.md, «The
+ * stack»): drawing and gestures only, no layer of ours. Named one by one, by the exact entry the UI imports.
+ */
+const UI_PACKAGES = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "zustand", "zustand/vanilla", "zustand/react/shallow", "motion/react", "@use-gesture/react", "@tanstack/react-virtual"];
+
 function layerOf(file: string): Layer | null {
 	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";
 	if (file === "core/settings.ts") return "settings";
@@ -31,7 +37,7 @@ const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	domain: (t) => under(t, "domain"),
 	application: (t) => under(t, "domain") || under(t, "application") || t === "core/settings.ts",
 	infrastructure: (t) => !under(t, "ui") && !under(t, "phone") && layerOf(t) !== "root",
-	ui: (t) => under(t, "ui") || t === "core/application/contracts.ts" || OBSIDIAN_PACKAGES.includes(t),
+	ui: (t) => under(t, "ui") || t === "core/application/contracts.ts" || OBSIDIAN_PACKAGES.includes(t) || UI_PACKAGES.includes(t),
 	phone: (t) => under(t, "phone") || t === "core/application/contracts.ts" || t === PHONE_DOOR,
 	settings: (t) => under(t, "domain"),
 	root: () => true,
@@ -110,6 +116,9 @@ describe("the guard itself", () => {
 
 	it("keeps the doors narrow", () => {
 		expect(MAY_IMPORT.phone("core/application/TaskServiceImpl.ts")).toBe(false);
+		expect(MAY_IMPORT.ui("react")).toBe(true);
+		expect(MAY_IMPORT.ui("@anthropic-ai/claude-agent-sdk")).toBe(false);
+		expect(MAY_IMPORT.ui("core/application/TaskServiceImpl.ts")).toBe(false);
 		expect(MAY_IMPORT.phone("core/settings.ts")).toBe(false);
 		expect(MAY_IMPORT.phone("core/application/contracts.ts")).toBe(true);
 		expect(MAY_IMPORT.phone("core/application/PhoneDoor.ts")).toBe(true);

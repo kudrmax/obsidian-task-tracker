@@ -11,7 +11,7 @@ export default defineConfig({
 	test: {
 		setupFiles: ["tests/setup.ts"],
 		projects: [
-			{ extends: true, test: { name: "all", include: ["tests/**/*.test.ts"], exclude: ["tests/**/*.zone.test.ts"] } },
+			{ extends: true, test: { name: "all", include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"], exclude: ["tests/**/*.zone.test.ts"] } },
 			...ZONES.map((zone) => ({ extends: true, test: { name: zone, include: ZONED, env: { TZ: zone } } })),
 		],
 	},

@@ -36,7 +36,8 @@ const context = await esbuild.context({
   bundle: true,
   external: ["obsidian", "electron", "@codemirror/state", "@codemirror/view", ...builtinModules, ...builtinModules.map((name) => `node:${name}`)],
   // The agent SDK calls createRequire(import.meta.url) as it loads; a cjs bundle has no import.meta.
-  define: { "import.meta.url": '"file:///task-calendar/main.js"' },
+  define: { "import.meta.url": '"file:///task-calendar/main.js"', "process.env.NODE_ENV": production ? '"production"' : '"development"' },
+  jsx: "automatic",
   format: "cjs",
   target: "es2020",
   sourcemap: production ? false : "inline",

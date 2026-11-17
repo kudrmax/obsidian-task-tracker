@@ -69,7 +69,7 @@ class Code {
 
 	constructor(root: string) {
 		this.files = readdirSync(root, { recursive: true, encoding: "utf8" })
-			.filter((path) => path.endsWith(".ts"))
+			.filter((path) => path.endsWith(".ts") || path.endsWith(".tsx"))
 			.map((path) => ({ path, text: readFileSync(join(root, path), "utf8") }));
 	}
 
