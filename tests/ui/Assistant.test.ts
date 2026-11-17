@@ -306,7 +306,7 @@ describe("More → Assistant", () => {
 		transport.hints = { path: "/opt/homebrew/bin/claude" };
 		const root = document.body.appendChild(document.createElement("div"));
 		await new AssistantSettingsPage(assistant, vi.fn()).build(root);
-		expect(names(root)).toEqual(["Model", "Claude", "Model", "Path to claude", "Timeout", "Prompts", "Best task", "Label"]);
+		expect(names(root)).toEqual(["Model", "Claude", "Model", "Path to claude", "Timeout", "Prompts", "Best task", "Label", "Skip label"]);
 		const select = root.querySelector("select")!;
 		expect([...select.options].map((o) => [o.value, o.textContent, o.disabled])).toEqual([["claude", "Claude", false]]);
 		const model = root.querySelectorAll("select")[1];
@@ -350,7 +350,7 @@ describe("More → Assistant", () => {
 		await new AssistantSettingsPage(assistant, vi.fn()).build(root);
 		expect(root.querySelector(".tc-assistant-unavailable")?.textContent).toBe("Claude works in Obsidian on the Mac.");
 		expect(root.querySelector("select")!.options[0].disabled).toBe(true);
-		expect(names(root)).toEqual(["Model", "Timeout", "Prompts", "Best task", "Label"]);
+		expect(names(root)).toEqual(["Model", "Timeout", "Prompts", "Best task", "Label", "Skip label"]);
 		expect(root.querySelector("textarea")).not.toBeNull();
 	});
 
@@ -361,7 +361,7 @@ describe("More → Assistant", () => {
 		const worded: AssistantService = Object.assign(Object.create(assistant) as AssistantService, { page: async () => ({ ...page, words }) });
 		const root = document.body.appendChild(document.createElement("div"));
 		await new AssistantSettingsPage(worded, vi.fn()).build(root);
-		expect(names(root)).toEqual(["M", "Claude", "Model", "Path to claude", "T", "P", "Best task", "Label"]);
+		expect(names(root)).toEqual(["M", "Claude", "Model", "Path to claude", "T", "P", "Best task", "Label", "Skip label"]);
 		expect(root.textContent).toContain("TN");
 		expect(root.textContent).toContain("PN");
 		expect(root.querySelector(".tc-assistant-prompt-head button")!.textContent).toBe("R");

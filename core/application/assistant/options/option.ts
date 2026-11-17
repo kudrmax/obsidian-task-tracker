@@ -23,10 +23,26 @@ export interface ActionOption {
 	readonly label: string;
 	/** The row's choices now, in order; the one whose value is null (none) first. A saved value no choice has reads as none. */
 	choices(settings: TaskCalendarSettings): readonly AssistantOptionChoice[];
-	/** After a `task` answer, the value set (never none): does its part through `tasks`; the words drawn under the card, or null. */
-	afterAnswer(value: string, chosen: ChosenTask, tasks: AssistantTasks): Promise<string | null>;
-	/** The words drawn under the card when `afterAnswer` threw (a write that failed). */
+	/** What it does after a `task` answer, the value set (never none); left out, nothing. */
+	readonly afterAnswer?: AfterAnswer;
+	/** What it keeps from the model before the question, the value set (never none); left out, nothing. */
+	readonly keepsBack?: KeepsBack;
+}
+
+/** An option's part after a `task` answer. */
+export interface AfterAnswer {
+	/** Does its part through `tasks`: the words drawn under the card, or null. */
+	run(value: string, chosen: ChosenTask, tasks: AssistantTasks): Promise<string | null>;
+	/** The words drawn under the card when `run` threw (a write that failed). */
 	failedWords(value: string): string;
+}
+
+/** An option's part before the question: tasks the model is not shown. */
+export interface KeepsBack {
+	/** A task kept from the model, with every task under it. */
+	keeps(value: string, task: TaskItem): boolean;
+	/** The words shown instead of a call when it kept back every task there was to send. */
+	allKeptWords(value: string): string;
 }
 
 /** The option's value as saved, when one of its choices still has it; else none. */
