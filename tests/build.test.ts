@@ -42,7 +42,9 @@ describe("main.js", () => {
 			throw new Error(`unknown module ${id}`);
 		};
 		const module = { exports: {} as Record<string, unknown> };
-		runInNewContext(bundle, { require, module, exports: module.exports, window: stub(), document: stub(), globalThis: {} });
+		/** What every WebView has at load, the phone's too: the view's libraries (React's scheduler) reach for them as they load. */
+		const browser = { queueMicrotask, setTimeout, clearTimeout, MessageChannel };
+		runInNewContext(bundle, { require, module, exports: module.exports, window: stub(), document: stub(), globalThis: {}, ...browser });
 		expect(asked).toEqual([]);
 		expect(module.exports.default).toBeTypeOf("function");
 	});

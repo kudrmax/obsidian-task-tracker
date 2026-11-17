@@ -61,7 +61,7 @@ function setup(text: string | null = FILE) {
 	let view: Partial<ViewSettings> = {};
 	const viewFile = { get: () => view as ViewSettings, update: async (patch: Partial<ViewSettings>) => void (view = { ...view, ...patch }), onChange: () => () => undefined };
 	const shown = new ShownSettingsStore(new ScreenSettingsImpl(settings), new ViewSettingsStore(viewFile));
-	const store = createScreenStore({ ...core, settings: shown }, { kind: "main" }, () => true);
+	const store = createScreenStore({ ...core, settings: shown, clock: new FixedClock(NOW) }, { kind: "main" }, () => true);
 	return { store, file, core };
 }
 

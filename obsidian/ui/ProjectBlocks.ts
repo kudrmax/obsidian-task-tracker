@@ -1,5 +1,6 @@
 import { type App, Component, MarkdownView, Scope, type TAbstractFile, type WorkspaceLeaf } from "obsidian";
-import { CalendarScreen, type ViewDeps } from "./CalendarScreen";
+import type { ViewDeps } from "./CalendarScreen";
+import { type MountedScreen, mountScreen } from "./screen/mountScreen";
 import { BlockHeight } from "./BlockHeight";
 import { el } from "./dom";
 import { ViewWatch } from "./ViewWatch";
@@ -11,7 +12,8 @@ import { ViewWatch } from "./ViewWatch";
  */
 class ProjectBlock extends Component {
 	readonly el: HTMLElement;
-	private readonly screen: CalendarScreen;
+	private screen: MountedScreen | null = null;
+	private readonly root: HTMLElement;
 	/** The block's keys, put over Obsidian's while the focus is in the block: the note's Cmd+F and Cmd+Z don't reach the note. */
 	private readonly scope: Scope;
 	private scoped = false;
@@ -22,19 +24,15 @@ class ProjectBlock extends Component {
 	constructor(
 		private readonly app: App,
 		public path: string,
-		deps: ViewDeps,
+		private readonly deps: ViewDeps,
 	) {
 		super();
 		this.el = el(null, "div", "tc-project-block");
 		this.el.tabIndex = -1;
-		const root = el(this.el, "div");
+		this.root = el(this.el, "div", "tc-block-host");
 		this.scope = new Scope(app.scope);
-		const screen = this.addChild(new CalendarScreen(app, root, deps, { view: false, keys: this.scope, note: () => this.path }));
-		this.screen = screen;
-		this.height = new BlockHeight(this.el, root, () => screen.scroller());
-		this.scope.register(["Mod"], "z", () => screen.undoKey("undo"));
-		this.scope.register(["Mod", "Shift"], "z", () => screen.undoKey("redo"));
-		this.scope.register(["Mod"], "f", () => screen.findKey());
+		this.height = new BlockHeight(this.el, this.root, () => this.root.querySelector<HTMLElement>(".tc-rows-stack, .tc-projects-list"));
+		this.scope.register(["Mod"], "z", () => void this.screen?.store.getState().undo());
 	}
 
 	override onload(): void {
@@ -47,19 +45,20 @@ class ProjectBlock extends Component {
 		this.registerDomEvent(this.el, "focusout", (e) => {
 			if (!(e.relatedTarget instanceof Node && this.el.contains(e.relatedTarget))) this.holdKeys(false);
 		});
-		void this.screen.open();
+		this.screen = mountScreen(this.root, this.deps, { kind: "note", path: () => this.path });
 		this.height.start();
 	}
 
 	override onunload(): void {
 		this.height.stop();
 		this.holdKeys(false);
-		this.screen.close();
+		this.screen?.unmount();
+		this.screen = null;
 		this.el.remove();
 	}
 
 	resize(): void {
-		this.screen.resize();
+		this.screen?.refit();
 	}
 
 	private holdKeys(on: boolean): void {

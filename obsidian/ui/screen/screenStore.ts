@@ -1,6 +1,9 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 import {
+	type CalendarEvent,
 	type CalendarService,
+	type Clock,
+	type DayOpening,
 	type DayEvents,
 	dayTitle,
 	type DayService,
@@ -12,11 +15,12 @@ import {
 	type ProjectsView,
 	type TaskItem,
 	type TaskService,
+	type TaskSpan,
 	type UndoService,
 } from "../../../core/application/contracts";
 import type { LocalDate } from "../types";
 import type { ShownSettings, ShownSettingsStore } from "../viewSettings";
-import { type ColumnModel, columnModel, EMPTY_COLUMN, shared } from "./columnModel";
+import { type ColumnModel, columnModel, EMPTY_COLUMN, projectsModel, shared } from "./columnModel";
 
 /** What the screen reads and writes through: the core's services and the device's settings of the view. */
 export interface ScreenServices {
@@ -25,12 +29,16 @@ export interface ScreenServices {
 	readonly undo: UndoService;
 	readonly calendars: CalendarService;
 	readonly settings: Pick<ShownSettingsStore, "get" | "set" | "onChange">;
+	readonly clock: Clock;
 }
 
 /** Where the screen is mounted: the plugin's own leaf, or the block at the end of a project's note. */
 export type ScreenPlace = { readonly kind: "main" } | { readonly kind: "note"; readonly path: () => string };
 
 export const FUNNEL_LISTS: readonly DropColumn[] = ["inbox", "backlog", "soon", "day"];
+
+/** A list the screen draws: a funnel's, or the node's tasks by project. */
+export type ShownList = DropColumn | "projects";
 
 export interface ScreenState {
 	/** `loading` until the first read; `missing` with no tasks file. */
@@ -42,7 +50,7 @@ export interface ScreenState {
 	readonly place: FunnelPlace;
 	/** Every task drawn, by id; an item read the same as before keeps its object, so only a changed card re-renders. */
 	readonly items: Readonly<Record<string, TaskItem>>;
-	readonly columns: Readonly<Record<DropColumn, ColumnModel>>;
+	readonly columns: Readonly<Record<ShownList, ColumnModel>>;
 	/** The day's timeline, by id, in the core's order. */
 	readonly slotted: readonly string[];
 	readonly projects: ProjectsView | null;
@@ -50,6 +58,8 @@ export interface ScreenState {
 	readonly events: DayEvents;
 	readonly settings: ShownSettings;
 	readonly canUndo: boolean;
+	/** The present minute from the shown day's start while it is today (the now line); null on another day. */
+	readonly now: number | null;
 }
 
 export interface ScreenActions {
@@ -71,6 +81,17 @@ export interface ScreenActions {
 	createFile(): Promise<void>;
 	/** A card's folder mark tapped: the project chosen in the filter. */
 	chooseProject(name: string): Promise<void>;
+	/** A minute may have passed: the now line follows. */
+	tickNow(): void;
+	/** Reads of the core the timeline draws by, for the shown day. */
+	spanOf(item: TaskItem): TaskSpan;
+	eventSpan(event: CalendarEvent): { readonly start: number; readonly end: number };
+	isPast(event: CalendarEvent): boolean;
+	/** The clock's hour of the timeline's line `index` hours after the day's start. */
+	hourAt(index: number): number;
+	openAt(date: LocalDate): DayOpening;
+	/** Minutes since midnight by the clock: the now line's pill. */
+	clockMinute(): number;
 	/** Stops following the services. */
 	dispose(): void;
 }
@@ -83,7 +104,11 @@ export type ScreenStore = StoreApi<ScreenState & ScreenActions>;
  * edited, Sync, another tab, the settings) are pushed in from outside React.
  */
 export function createScreenStore(services: ScreenServices, where: ScreenPlace, wide: () => boolean): ScreenStore {
-	const { tasks, days, undo, calendars, settings } = services;
+	const { tasks, days, undo, calendars, settings, clock } = services;
+	const nowOn = (date: LocalDate): number | null => {
+		const open = days.openAt(date);
+		return open.kind === "now" ? open.minute : null;
+	};
 	let reads = 0;
 	let eventReads = 0;
 	const listNames = () => ({ inbox: tasks.listName("inbox"), backlog: tasks.listName("backlog"), soon: tasks.listName("soon"), day: "", done: tasks.listName("done") });
@@ -100,13 +125,14 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 			funnel: null,
 			place: tasks.firstPlace(),
 			items: {},
-			columns: { inbox: EMPTY_COLUMN, backlog: EMPTY_COLUMN, soon: EMPTY_COLUMN, day: EMPTY_COLUMN },
+			columns: { inbox: EMPTY_COLUMN, backlog: EMPTY_COLUMN, soon: EMPTY_COLUMN, day: EMPTY_COLUMN, projects: EMPTY_COLUMN },
 			slotted: [],
 			projects: null,
 			listNames: listNames(),
 			events: NO_DAY_EVENTS,
 			settings: settings.get(),
 			canUndo: undo.canUndo(),
+			now: nowOn(today),
 
 			async refresh() {
 				const read = ++reads;
@@ -131,7 +157,8 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 						const model = columnModel(lists[column], sections ? screen.sections[sections.list] : null, plates?.[column] ?? null);
 						return [column, shared(prev.columns[column], model)];
 					}),
-				) as Record<DropColumn, ColumnModel>;
+				) as Record<ShownList, ColumnModel>;
+				columns.projects = shared(prev.columns.projects, projects ? projectsModel(projects) : EMPTY_COLUMN);
 				set({
 					phase: screen.missing ? "missing" : "ready",
 					funnel: shared(prev.funnel ?? undefined, funnel),
@@ -169,7 +196,7 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 			},
 
 			showDay(date) {
-				set({ date, dayTitle: titleOf(date), events: calendars.events(date, "open").cached ?? NO_DAY_EVENTS });
+				set({ date, dayTitle: titleOf(date), now: nowOn(date), events: calendars.events(date, "open").cached ?? NO_DAY_EVENTS });
 				void get().refresh();
 				void get().refreshEvents();
 			},
@@ -198,6 +225,21 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 			async chooseProject(name) {
 				await tasks.selectProjectNode(projectNodeOf(name));
 				await get().refresh();
+			},
+
+			tickNow() {
+				const now = nowOn(get().date);
+				if (now !== get().now) set({ now });
+			},
+
+			spanOf: (item) => tasks.shownSpan(item, get().date),
+			eventSpan: (event) => days.boundary().clipToDay(get().date, event.start, event.end),
+			isPast: (event) => calendars.isPast(event),
+			hourAt: (index) => days.boundary().hourAt(index),
+			openAt: (date) => days.openAt(date),
+			clockMinute: () => {
+				const at = clock.now();
+				return at.getHours() * 60 + at.getMinutes();
 			},
 
 			dispose() {

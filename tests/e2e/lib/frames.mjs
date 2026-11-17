@@ -1,0 +1,187 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { sleep } from "./cdp.mjs";
+
+/**
+ * What every frame showed, sampled in the page on each animation frame: each card and timeline block in sight (where,
+ * how visible, its text and whether the text is cut), the pointer or finger, and any selected text. Read from the DOM as
+ * it is painted, never from the code under test's own numbers.
+ */
+const SAMPLER = String.raw`(() => {
+	const doc = document;
+	const state = { frames: [], run: true, pointer: null, t0: performance.now() };
+	const onPointer = (e) => { state.pointer = { x: e.clientX, y: e.clientY, down: e.buttons > 0 || e.pointerType === "touch" }; };
+	const onUp = () => { if (state.pointer) state.pointer = { ...state.pointer, down: false }; };
+	doc.addEventListener("pointermove", onPointer, true);
+	doc.addEventListener("pointerdown", onPointer, true);
+	doc.addEventListener("pointerup", onUp, true);
+	const W = innerWidth, H = innerHeight;
+	const opacityOf = (el) => { let o = 1; for (let n = el; n && n !== doc.body; n = n.parentElement) { const cs = getComputedStyle(n); if (cs.visibility === "hidden" || cs.display === "none") return 0; o *= +cs.opacity; } return +o.toFixed(2); };
+	const clipOf = (el) => { let box = { l: 0, t: 0, r: W, b: H }; for (let n = el.parentElement; n && n !== doc.body; n = n.parentElement) { const cs = getComputedStyle(n); if (cs.overflowX !== "visible" || cs.overflowY !== "visible") { const r = n.getBoundingClientRect(); box = { l: Math.max(box.l, r.left), t: Math.max(box.t, r.top), r: Math.min(box.r, r.right), b: Math.min(box.b, r.bottom) }; } } return box; };
+	const tick = () => {
+		if (!state.run) return;
+		const items = [];
+		for (const el of doc.querySelectorAll(".task-calendar [data-id], .task-calendar [data-block]")) {
+			const r = el.getBoundingClientRect();
+			const clip = clipOf(el);
+			const shown = { l: Math.max(r.left, clip.l), t: Math.max(r.top, clip.t), r: Math.min(r.right, clip.r), b: Math.min(r.bottom, clip.b) };
+			if (shown.r - shown.l < 2 || shown.b - shown.t < 2) continue;
+			const title = el.querySelector(".tc-card-title");
+			const tr = title ? title.getBoundingClientRect() : null;
+			items.push({
+				id: el.dataset.id ?? el.dataset.block,
+				kind: el.dataset.id ? "card" : "block",
+				x: +r.left.toFixed(1), y: +r.top.toFixed(1), w: +r.width.toFixed(1), h: +r.height.toFixed(1),
+				whole: shown.l <= r.left + 1 && shown.r >= r.right - 1 && shown.t <= r.top + 1 && shown.b >= r.bottom - 1,
+				o: opacityOf(el),
+				text: title ? title.textContent.length : 0,
+				cut: !!title && title.scrollHeight > title.clientHeight + 1,
+				above: tr ? +(tr.top - r.top).toFixed(1) : 0,
+				below: tr ? +(r.bottom - tr.bottom).toFixed(1) : 0,
+			});
+		}
+		const sel = doc.getSelection();
+		state.frames.push({ t: Math.round(performance.now() - state.t0), items, pointer: state.pointer, selection: sel ? sel.toString().length : 0, track: (() => { const t = doc.querySelector(".tc-ribbon-track"); return t ? +t.getBoundingClientRect().left.toFixed(1) : null; })(), place: (() => { const t = doc.querySelector(".tc-ribbon-track"); const r = doc.querySelector(".tc-ribbon"); if (!t || !r) return null; const box = r.getBoundingClientRect(); const step = (box.width - 16) / 2 + 16; return +((box.left - t.getBoundingClientRect().left) / step).toFixed(3); })() });
+		requestAnimationFrame(tick);
+	};
+	requestAnimationFrame(tick);
+	window.__tcFrames = { stop: () => { state.run = false; doc.removeEventListener("pointermove", onPointer, true); doc.removeEventListener("pointerdown", onPointer, true); doc.removeEventListener("pointerup", onUp, true); return state.frames; } };
+	return 1;
+})()`;
+
+export class FrameRecorder {
+	/** @param {import("./cdp.mjs").Cdp} cdp */
+	constructor(cdp) {
+		this.cdp = cdp;
+	}
+
+	start() {
+		return this.cdp.eval(SAMPLER);
+	}
+
+	stop() {
+		return this.cdp.eval(`window.__tcFrames ? window.__tcFrames.stop() : []`);
+	}
+}
+
+/**
+ * The checks every scenario's frames pass (spec, «How a feature is checked»): nothing visible vanishes for a frame and
+ * comes back (flicker), no task shows twice, nothing jumps further in a frame than `maxStep` px, nothing moves back the
+ * way it came while `monotonic` holds, no text is selected, a card's title is never cut mid-line nor blank, and the
+ * thing under the finger follows it (`follow`).
+ */
+export function frameFaults(frames, { maxStep = Infinity, monotonic = null, follow = null, ignoreBlankBelow = 0 } = {}) {
+	const faults = [];
+	const fault = (frame, kind, detail) => faults.push({ t: frame.t, kind, ...detail });
+	const byId = (frame) => {
+		const map = new Map();
+		for (const item of frame.items) {
+			if (item.o < 0.05) continue;
+			map.set(item.id, [...(map.get(item.id) ?? []), item]);
+		}
+		return map;
+	};
+	const maps = frames.map(byId);
+	frames.forEach((frame, i) => {
+		if (frame.selection > 0) fault(frame, "selection", { chars: frame.selection });
+		for (const [id, copies] of maps[i]) {
+			if (copies.length > 1 && copies.filter((c) => c.kind === "card").length > 1) fault(frame, "double", { id, copies: copies.length });
+			for (const item of copies) {
+				if (item.whole && item.cut) fault(frame, "text cut", { id });
+				if (item.whole && item.text === 0 && item.h > ignoreBlankBelow) fault(frame, "blank card", { id });
+				if (item.whole && item.text > 0 && (item.above < -1 || item.below < -1)) fault(frame, "text out of its card", { id, above: item.above, below: item.below });
+			}
+		}
+		if (i === 0 || i === frames.length - 1) return;
+		for (const [id, copies] of maps[i - 1]) {
+			const before = copies[0];
+			const after = maps[i + 1].get(id)?.[0];
+			if (!after || maps[i].has(id)) continue;
+			const inside = (it) => it.whole;
+			if (inside(before) && inside(after)) fault(frame, "flicker", { id });
+		}
+	});
+	const tracks = new Map();
+	frames.forEach((frame, i) => {
+		for (const [id, copies] of maps[i]) {
+			const at = copies[0];
+			const last = tracks.get(id);
+			if (last && last.i === i - 1) {
+				const dx = at.x - last.x;
+				const dy = at.y - last.y;
+				if (Math.hypot(dx, dy) > maxStep) fault(frame, "jump", { id, dx: +dx.toFixed(1), dy: +dy.toFixed(1) });
+				if (monotonic === "x" && last.dx !== 0 && dx !== 0 && Math.sign(dx) !== Math.sign(last.dx) && Math.abs(dx) > 0.5) fault(frame, "went back", { id, dx: +dx.toFixed(1) });
+				tracks.set(id, { i, x: at.x, y: at.y, dx: dx !== 0 ? dx : last.dx });
+			} else tracks.set(id, { i, x: at.x, y: at.y, dx: 0 });
+		}
+	});
+	if (follow) {
+		let start = null;
+		for (const frame of frames) {
+			const p = frame.pointer;
+			if (!p?.down || frame.track === null) {
+				start = null;
+				continue;
+			}
+			if (!start) {
+				start = { px: p.x, track: frame.track };
+				continue;
+			}
+			const off = frame.track - start.track - (p.x - start.px);
+			if (Math.abs(off) > follow.tolerance && Math.abs(frame.track - start.track) < follow.until) fault(frame, "does not follow the finger", { off: +off.toFixed(1) });
+		}
+	}
+	return faults;
+}
+
+/** A CDP screencast of the page into `dir`, every frame as a JPEG; `stop` gives the files and draws a contact sheet. */
+export class Screencast {
+	/** @param {import("./cdp.mjs").Cdp} cdp */
+	constructor(cdp, dir) {
+		this.cdp = cdp;
+		this.dir = dir;
+		this.files = [];
+		this.off = null;
+	}
+
+	async start() {
+		mkdirSync(this.dir, { recursive: true });
+		this.off = this.cdp.on("Page.screencastFrame", (p) => {
+			const file = join(this.dir, `${String(this.files.length + 1).padStart(4, "0")}.jpg`);
+			writeFileSync(file, Buffer.from(p.data, "base64"));
+			this.files.push({ file, data: p.data, t: p.metadata?.timestamp ?? 0 });
+			void this.cdp.send("Page.screencastFrameAck", { sessionId: p.sessionId }).catch(() => undefined);
+		});
+		await this.cdp.send("Page.startScreencast", { format: "jpeg", quality: 60, everyNthFrame: 1, maxWidth: 800 });
+	}
+
+	async stop() {
+		await sleep(150);
+		await this.cdp.send("Page.stopScreencast").catch(() => undefined);
+		this.off?.();
+		if (this.files.length) await this.sheet();
+		return this.files.map((f) => f.file);
+	}
+
+	/** The frames, at most 48 spread over the whole run, on one image in reading order: drawn by the page's own canvas. */
+	async sheet() {
+		const pick = this.files.length <= 48 ? this.files : Array.from({ length: 48 }, (_, i) => this.files[Math.round((i * (this.files.length - 1)) / 47)]);
+		const png = await this.cdp.eval(`(async () => {
+			const srcs = ${JSON.stringify(pick.map((f) => f.data))};
+			const imgs = await Promise.all(srcs.map((s) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.src = "data:image/jpeg;base64," + s; })));
+			const cols = 8, w = 200, h = Math.round(w * imgs[0].height / imgs[0].width);
+			const c = document.createElement("canvas"); c.width = cols * w; c.height = Math.ceil(imgs.length / cols) * (h + 14);
+			const g = c.getContext("2d"); g.fillStyle = "#808080"; g.fillRect(0, 0, c.width, c.height); g.font = "11px sans-serif";
+			imgs.forEach((img, k) => { const x = (k % cols) * w, y = Math.floor(k / cols) * (h + 14); g.drawImage(img, x, y + 14, w - 2, h - 2); g.fillStyle = "#000"; g.fillText(String(k + 1), x + 3, y + 11); g.fillStyle = "#808080"; });
+			return c.toDataURL("image/png").split(",")[1];
+		})()`);
+		writeFileSync(join(this.dir, "sheet.png"), Buffer.from(png, "base64"));
+	}
+}
+
+/** A screenshot of the window into `file`. */
+export async function screenshot(cdp, file) {
+	const shot = await cdp.send("Page.captureScreenshot", { format: "png" });
+	writeFileSync(file, Buffer.from(shot.data, "base64"));
+	return file;
+}

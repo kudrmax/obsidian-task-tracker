@@ -129,9 +129,13 @@ export class TestObsidian {
 	/** The plugin's view open in a tab of its own, alone in the main area. */
 	async openView() {
 		await this.cdp.eval(`(async () => {
-			for (const leaf of app.workspace.getLeavesOfType("markdown")) leaf.detach();
-			for (const leaf of app.workspace.getLeavesOfType("task-calendar")) leaf.detach();
-			await app.commands.executeCommandById("task-calendar:open");
+			const keep = app.workspace.getMostRecentLeaf(app.workspace.rootSplit) ?? app.workspace.getLeaf(true);
+			const others = [];
+			app.workspace.iterateRootLeaves((leaf) => { if (leaf !== keep) others.push(leaf); });
+			for (const leaf of others) leaf.detach();
+			await keep.setViewState({ type: "empty" });
+			await keep.setViewState({ type: "task-calendar", active: true });
+			app.workspace.setActiveLeaf(keep, { focus: false });
 			return 1;
 		})()`);
 		await sleep(800);

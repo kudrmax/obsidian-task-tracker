@@ -1,0 +1,37 @@
+/**
+ * The block at the end of a project's note (docs/plugin/screen.md, «Блок в заметке проекта»): the project's view, rows by
+ * default, with no timeline, no wheel and no ribbon; the bottom row holds Undo, the view button and the plus; shown in
+ * Reading view and in Live Preview, never written into the note.
+ */
+export default {
+	name: "note-block",
+	features: ["F278", "F279", "F280", "F282"],
+	async run(t) {
+		const note = "Заметка о доме.md";
+		const before = await t.cdp.eval(`app.vault.adapter.read(${JSON.stringify(note)})`);
+		for (const mode of ["preview", "source"]) {
+			await t.cdp.eval(`(async () => {
+				for (const leaf of app.workspace.getLeavesOfType("task-calendar")) leaf.detach();
+				const leaf = app.workspace.getLeaf(false);
+				await leaf.openFile(app.vault.getAbstractFileByPath(${JSON.stringify(note)}), { state: { mode: "${mode}" } });
+				return 1;
+			})()`);
+			await t.sleep(1500);
+			const block = await t.oracle.rect(".tc-project-block .task-calendar.is-note");
+			t.expect(block !== null, `${mode}: the block stands at the note's end`);
+			if (!block) continue;
+			const labels = await t.cdp.eval(`[...document.querySelectorAll(".tc-project-block .tc-row-label")].map((l) => l.textContent)`);
+			t.expect(JSON.stringify(labels) === JSON.stringify(["Inbox", "Backlog", "Soon", "Today"]), `${mode}: the rows by default: ${JSON.stringify(labels)}`);
+			const cards = await t.cdp.eval(`[...document.querySelectorAll(".tc-project-block .tc-card .tc-card-title")].map((c) => c.textContent)`);
+			const home = t.file().split("\n").filter((line) => line.includes("🗂️ Дом")).map((line) => line.replace(/^- \[.\] (p[12] )?/, "").split(" 🗂️")[0]);
+			t.expect(home.length > 0 && JSON.stringify([...cards].sort()) === JSON.stringify([...home].sort()), `${mode}: the project's tasks and only them: ${JSON.stringify(cards)} against ${JSON.stringify(home)}`);
+			const parts = await t.cdp.eval(`({ timeline: !!document.querySelector(".tc-project-block .tc-timeline"), wheel: !!document.querySelector(".tc-project-block .tc-seg"), undo: !!document.querySelector(".tc-project-block .tc-undo"), view: !!document.querySelector(".tc-project-block .tc-view-btn"), plus: !!document.querySelector(".tc-project-block .tc-plus") })`);
+			t.expect(!parts.timeline && !parts.wheel && parts.undo && parts.view && parts.plus, `${mode}: no timeline or wheel; Undo, the view button and the plus: ${JSON.stringify(parts)}`);
+			const grown = await t.cdp.eval(`(() => { const b = document.querySelector(".tc-project-block"); const stack = b.querySelector(".tc-rows-stack"); return { block: b.getBoundingClientRect().height, content: stack.scrollHeight }; })()`);
+			t.expect(grown.block >= Math.min(grown.content, 200), `${mode}: the frame grows with its tasks: ${JSON.stringify(grown)}`);
+			await t.shot(`note-${mode}`);
+		}
+		const after = await t.cdp.eval(`app.vault.adapter.read(${JSON.stringify(note)})`);
+		t.expect(after === before, "the note's text is never written");
+	},
+};

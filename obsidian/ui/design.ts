@@ -27,6 +27,10 @@ export const DESIGN = {
 	deskBarGap: 8,
 	/** A step of the Projects screen's tree: the core's `PROJECTS_INDENT`, a drag's sideways step too. */
 	treeIndent: 12,
+	/** A section's header, and the label over each list of the rows. */
+	groupHead: 26,
+	/** The gap between two lists of the rows, as between two sections. */
+	sectionGap: 10,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -46,6 +50,8 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	barHeight: "--tc-bar-h",
 	deskBarGap: "--tc-desk-bar-gap",
 	treeIndent: "--tc-tree-indent",
+	groupHead: "--tc-group-head-h",
+	sectionGap: "--tc-space-10",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
@@ -81,6 +87,8 @@ export const PROPERTY = {
 	panelY: "--tc-panel-y",
 	/** How deep a subtask's card stands under its task: 0 for a task. */
 	level: "--tc-level",
+	/** Where a ribbon's column stands, 0 its left half (its padding near the screen's edge) to 1 its right half. */
+	side: "--tc-side",
 	/** How many levels back from a subtask's card a line of a task further up passes it. */
 	pass: "--tc-pass",
 	/** How many icons' widths an icon of the wheel stands out of its window. */

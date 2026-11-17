@@ -1,0 +1,4 @@
+{
+	"note": "Read from the wheel stream by hand: six horizontal strokes, each a finger phase (rising deltas) and its momentum tail; negative deltaX is a swipe back. Strokes at +34.0 s (back), +34.7 s (on, started inside the first one's tail), +35.7 s (back), +37.3 s (back), +39.0 s (back), +39.2 s (on). Vertical scrolls at +0.4 s and +7.2 s and a pinch at 0 s must not move the ribbon.",
+	"swipes": [-1, 1, -1, -1, -1, 1]
+}
