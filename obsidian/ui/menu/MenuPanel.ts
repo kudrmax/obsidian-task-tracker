@@ -271,7 +271,9 @@ export function menuRoom(): MenuRoom {
  * How many of a panel's groups stand over the anchor: none (the panel under it), all (over it), or the first few, the
  * rest under it, when the whole fits on neither side. `cuts` are the heights of the panel down to each inner border
  * between groups, `total` its whole height. The first way that fits wins, in that order and with the fewest groups over
- * the anchor; when none fits, the one that leaves the least to scroll. A panel that can't split goes whole to one side.
+ * the anchor. When none fits, a panel that splits keeps over the anchor only the groups that fit there whole, as many as
+ * fit, and the rest scrolls under it: one part scrolls, never the one over the card, whose cut would halve its tiles. A
+ * panel that can't split goes whole to the side that leaves the least to scroll.
  */
 export function groupsAbove(cuts: readonly number[], total: number, above: number, below: number, canSplit: boolean): number {
 	const groups = cuts.length + 1;
@@ -281,7 +283,10 @@ export function groupsAbove(cuts: readonly number[], total: number, above: numbe
 		{ count: groups, overflow: over(total, above) },
 		...(canSplit ? cuts.map((cut, i) => ({ count: i + 1, overflow: over(cut, above) + over(total - cut, below) })) : []),
 	];
-	return (ways.find((way) => way.overflow === 0) ?? ways.reduce((best, way) => (way.overflow < best.overflow ? way : best))).count;
+	const fits = ways.find((way) => way.overflow === 0);
+	if (fits) return fits.count;
+	if (canSplit) return cuts.filter((cut) => cut <= above).length;
+	return ways.reduce((best, way) => (way.overflow < best.overflow ? way : best)).count;
 }
 
 /** A part of a panel taller than its space keeps to it and scrolls. */

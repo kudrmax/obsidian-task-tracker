@@ -38,8 +38,10 @@ describe("groupsAbove", () => {
 		expect(groupsAbove(cuts, total, 360, 100, true)).toBe(3);
 	});
 
-	it("takes the way that leaves the least to scroll when no way fits", () => {
-		expect(groupsAbove(cuts, total, 150, 150, true)).toBe(2);
+	it("when no way fits, keeps over the anchor only the groups that fit there whole, and the rest scrolls under it", () => {
+		expect(groupsAbove(cuts, total, 150, 150, true)).toBe(1);
+		expect(groupsAbove(cuts, total, 220, 100, true)).toBe(2);
+		expect(groupsAbove(cuts, total, 50, 150, true)).toBe(0);
 	});
 
 	it("never splits a panel that can't: the side that leaves less to scroll", () => {
