@@ -53,3 +53,15 @@ He wants a label he puts on a task while the card looks exactly as it would with
   shows the colour's code again, empty for a clear label). Typing never makes a label clear: No colour is picked from
   the swatches. A code typed for a clear label writes that colour.
 - **Backend: Add label** picks the first preset no label has, else the first preset; never clear.
+- **Swift: whether a colour paints is the core's.** `TaskBoard.markInk`, `markShades`, `markPaints` (`apple/Core`,
+  `MarkInk.swift`) ask `rules.usableColor` before `inkOf`/`shadesOf`: a clear label (or any colour the core can't draw)
+  has no ink and no shades, so nothing in the app turns `"clear"` into a hex. The No Color swatch is recognised by
+  `rules.constants().CLEAR_COLOR`, never a literal.
+- **Swift: No Color on the Labels page** is the last swatch of the form's `labelSwatches`, drawn as the system's
+  `circle.slash` in the secondary label colour at the circles' size, ringed when chosen as they are; VoiceOver «No
+  Color». Priorities draw `levelSwatches`, so they never get it. The system colour well beside it shows an empty well
+  for a clear label; a colour picked there writes that colour.
+- **Swift: a clear label's tile and quick-entry row** use the outline `tag` symbol untinted (the menu's own ink, as its
+  uncoloured rows), in place of the filled `tag.fill` a coloured label has; on/off are drawn as for any tile.
+- **Swift: a plain sample card on the Labels page** is the board's plain card resolved at the screen's base level: the
+  settings sheet's raised rows would otherwise lift it to their own colour and hide it in dark.
