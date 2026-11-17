@@ -316,7 +316,7 @@ describe("More → Assistant", () => {
 		expect(root.querySelector(".tc-assistant-note")?.textContent).toBe("Empty: found by itself");
 		expect([...root.querySelectorAll<HTMLElement>(".tc-assistant-hint")].filter((h) => !h.hidden).map((h) => h.textContent)).toEqual(["/opt/homebrew/bin/claude"]);
 		expect(inputs[1].value).toBe("120");
-		expect(root.querySelector("textarea")!.value).toMatch(/^You help me choose what to do/);
+		expect(root.querySelector("textarea")!.value).toMatch(/^You help me choose the one task/);
 		expect(root.querySelector<HTMLButtonElement>(".tc-assistant-prompt-head button")!.disabled).toBe(true);
 	});
 
