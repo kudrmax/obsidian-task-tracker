@@ -158,7 +158,7 @@ struct LabelsPage: View {
                 }
                 Button("Add Label") { Task { await plugin.write("settings.addLabel") } }
             } footer: {
-                Text("A task tagged with a label is drawn in its colour.")
+                Text("A task tagged with a label is drawn in its colour. A label of No Color leaves the card as it is.")
             }
             if let form = plugin.form {
                 Section {

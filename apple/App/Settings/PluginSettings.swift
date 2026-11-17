@@ -15,13 +15,15 @@ final class PluginSettings {
     /// A clear label's colour (`CLEAR_COLOR`): its swatch is No Color.
     private(set) var clear: String?
     private var shades: [String: Themed<Shades>] = [:]
+    /// Each colour's ink as the core gives it, asked once: `nil` for one that paints nothing.
+    @ObservationIgnored private var inks: [String: Themed<String>?] = [:]
 
     func load() async {
         let board = board
         form = try? await Task.detached { try board.read("settings.form", over: try board.files()) }.value
+        if clear == nil { clear = board.clearColor() }
         if presetInk.isEmpty, let constants: [String: JSONValue] = try? board.rule("rules.constants") {
             presets = constants["PRIORITY_COLORS"]?.array.compactMap(\.string) ?? []
-            clear = constants["CLEAR_COLOR"]?.string
             for preset in presets {
                 let dark: String = (try? board.rule("rules.inkOf", [.string(preset), "dark"])) ?? preset
                 let light: String = (try? board.rule("rules.inkOf", [.string(preset), "light"])) ?? preset
@@ -58,7 +60,12 @@ final class PluginSettings {
     /// A colour as a level or a label is drawn in either theme: a preset's own shade, any other as it is; none for a
     /// clear label.
     func ink(_ color: String, _ scheme: ColorScheme) -> Color? {
-        board.markInk(color, dark: scheme == .dark).map { Color(hex: $0) }
+        let ink: Themed<String>?
+        if let known = inks[color] { ink = known } else {
+            ink = board.markInk(color)
+            inks[color] = .some(ink)
+        }
+        return ink.map { Color(hex: scheme == .dark ? $0.dark : $0.light) }
     }
 
     /// The colours a level's row (`of == "level"`) or a label's row offers, as the core's form gives them.

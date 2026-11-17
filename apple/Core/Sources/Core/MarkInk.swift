@@ -3,10 +3,12 @@ import Foundation
 /// A level's or a label's colour as the app draws it, asked of the core: a colour the core can draw (`rules.usableColor`)
 /// has an ink and shades; any other, a clear label's `"clear"` above all, has none and is drawn untinted.
 extension TaskBoard {
-    /// The colour's ink in a theme (`#RRGGBB`), `nil` when it paints nothing.
-    public func markInk(_ color: String, dark: Bool) -> String? {
-        guard markPaints(color) else { return nil }
-        return try? rule("rules.inkOf", [.string(color), .string(dark ? "dark" : "light")])
+    /// The colour's ink in either theme (`#RRGGBB`), `nil` when it paints nothing. A host asks once per colour and keeps it.
+    public func markInk(_ color: String) -> Themed<String>? {
+        guard markPaints(color),
+              let dark: String = try? rule("rules.inkOf", [.string(color), "dark"]),
+              let light: String = try? rule("rules.inkOf", [.string(color), "light"]) else { return nil }
+        return Themed(dark: dark, light: light)
     }
 
     /// The colour's card shades in both themes, `nil` when it paints nothing.

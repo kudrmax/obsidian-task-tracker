@@ -1956,13 +1956,23 @@ final class BoardModel {
 
     /// A level's or a label's colour as a menu's flag draws it, in either theme; none for a clear label.
     func ink(_ color: String, dark: Bool) -> UIColor? {
-        board.markInk(color, dark: dark).map { UIColor(Color(hex: $0)) }
+        markInk(color).map { UIColor(Color(hex: dark ? $0.dark : $0.light)) }
     }
 
     /// A label tile's symbol: filled in its colour, an outline for a clear label, drawn as the menu's uncoloured rows.
     func tagSymbol(_ color: String) -> String {
-        board.markPaints(color) ? "tag.fill" : "tag"
+        markInk(color) == nil ? "tag" : "tag.fill"
     }
+
+    /// A colour's ink in both themes, asked of the core once per colour; `nil` for one that paints nothing.
+    private func markInk(_ color: String) -> Themed<String>? {
+        if let known = inkByColor[color] { return known }
+        let found = board.markInk(color)
+        inkByColor[color] = .some(found)
+        return found
+    }
+
+    @ObservationIgnored private var inkByColor: [String: Themed<String>?] = [:]
 
     /// The card's menu as UIKit draws it, read from the screen as it stands. `later` holds a row that opens a sheet or a
     /// page until the menu has gone. Over the core's rows, as the plugin shows them over its menu: the start of the task's

@@ -21,13 +21,12 @@ import Testing
         let clear = try #require(board.clearColor())
         #expect(!board.markPaints(clear))
         #expect(board.markPaints("blue"))
-        #expect(board.markInk(clear, dark: true) == nil)
-        #expect(board.markInk(clear, dark: false) == nil)
+        #expect(board.markInk(clear) == nil)
         #expect(board.markShades(clear) == nil)
-        #expect(board.markInk("blue", dark: true) == "#0A84FF")
-        #expect(board.markInk("#123456", dark: false) == "#123456")
+        #expect(board.markInk("blue") == Themed(dark: "#0A84FF", light: "#007AFF"))
+        #expect(board.markInk("#123456") == Themed(dark: "#123456", light: "#123456"))
         #expect(board.markShades("blue")?.dark == (try board.rule("rules.shadesOf", ["blue", "dark"], as: Shades.self)))
-        #expect(board.markInk("nonsense", dark: true) == nil)
+        #expect(board.markInk("nonsense") == nil)
     }
 
     @Test func aLabelsRowOffersNoColorAfterThePresetsAndAPrioritysDoesNot() throws {
@@ -60,6 +59,6 @@ import Testing
         let menu = try #require(snapshot.menus[skipped.id])
         let skip = try #require(menu.labels.tiles.first { $0.mark.title == "Skip" })
         #expect(skip.on)
-        #expect(board.markInk(skip.mark.color, dark: true) == nil)
+        #expect(board.markInk(skip.mark.color) == nil)
     }
 }
