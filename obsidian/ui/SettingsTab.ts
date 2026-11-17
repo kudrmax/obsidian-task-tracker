@@ -1,7 +1,7 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
-import { type AssistantService, type CalendarService, type CountField, type GoogleAccount, isPresetColor, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../../core/application/contracts";
+import { type AssistantService, type CalendarService, type CountField, type GoogleAccount, isPresetColor, type LabelColor, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../../core/application/contracts";
 import type { Theme } from "./eventColors";
-import { inkOf, showPriorityColors } from "./priorityColors";
+import { inkOf, showPriorityColors, tintOf } from "./priorityColors";
 import { formatTime } from "./dates";
 import { Button } from "./kit/Button";
 import { el } from "./dom";
@@ -32,18 +32,23 @@ const MARKERS: Readonly<Record<Marker, readonly [string, string]>> = {
 
 const PAINT_NAMES: Readonly<Record<LabelPaint, string>> = { stripes: "Stripes", blend: "Blend" };
 
-/** What a group of colour rows edits: the priorities or the labels, each by its index in the settings. */
-interface ColourRows {
-	readonly rows: readonly { readonly name: string; readonly color: PriorityColor }[];
+/**
+ * What a group of colour rows edits: the priorities or the labels, each by its index in the settings. `C` is the colours
+ * the group has: a level's always paints, a label's may be none.
+ */
+interface ColourRows<C extends LabelColor> {
+	readonly rows: readonly { readonly name: string; readonly color: C }[];
+	/** The circles the row offers, in order, as the form gives them. */
+	readonly swatches: readonly C[];
 	readonly nameClass: string;
 	rename(index: number, name: string): Promise<void>;
-	recolour(index: number, color: PriorityColor): Promise<void>;
+	recolour(index: number, color: C | PriorityColor): Promise<void>;
 	/** A code typed for its colour and left: the colour to write, null for none (`SettingsService.typedColour`). */
 	typed(index: number, text: string): PriorityColor | null;
 	remove(index: number): Promise<void>;
 	move(from: number, to: number): Promise<void>;
 	/** The colour being picked, on the screen and in the menus, before it is saved. */
-	preview(index: number, color: PriorityColor): void;
+	preview(index: number, color: C | PriorityColor): void;
 	readonly deleteTooltip: string;
 }
 
@@ -147,6 +152,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		const levels = this.settings.priorities;
 		this.colourRows(group, {
 			rows: levels.map((level) => ({ name: level.prefix, color: level.color })),
+			swatches: this.settings.levelSwatches,
 			nameClass: "tc-level-prefix",
 			rename: (index, name) => this.service.renameLevel(index, name),
 			recolour: (index, color) => this.service.recolourLevel(index, color),
@@ -167,6 +173,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		const labels = this.settings.labels;
 		this.colourRows(group, {
 			rows: labels.map((label) => ({ name: labelTitle(label.name), color: label.color })),
+			swatches: this.settings.labelSwatches,
 			nameClass: "tc-label-name",
 			rename: (index, name) => this.service.renameLabel(index, name),
 			recolour: (index, color) => this.service.recolourLabel(index, color),
@@ -177,7 +184,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			deleteTooltip: "Delete label",
 		});
 		new Setting(group)
-			.setDesc(`A task tagged #${this.settings.labelTag}/<name> gets the label: the tag's underscores show as spaces. A task may have several labels, or a priority, not both. Labels show in this order in the task menu and on a card.`)
+			.setDesc(`A task tagged #${this.settings.labelTag}/<name> gets the label: the tag's underscores show as spaces. A task may have several labels, or a priority, not both. Labels show in this order in the task menu and on a card. A label of No colour leaves the card as it is.`)
 			.addButton((b) => b.setButtonText("Add label").onClick(() => void this.redrawn(this.service.addLabel())));
 		new Setting(group)
 			.setName("Several labels")
@@ -189,11 +196,12 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	}
 
 	/**
-	 * A row per level or label: its name, the six colours and the circle that picks any other, the chosen one ringed, the
-	 * colour's code, a card in that colour, a bin. The circles are drawn in the shade a card takes, so the colour here is the
-	 * colour on the screen.
+	 * A row per level or label: its name, the colours the form offers and the circle that picks any other, the chosen one
+	 * ringed, the colour's code, a card in that colour, a bin. The circles are drawn in the shade a card takes, so the colour
+	 * here is the colour on the screen. A label's No colour is an empty circle struck through; chosen, the card is a plain
+	 * one and the code is empty.
 	 */
-	private colourRows(group: HTMLElement, spec: ColourRows): void {
+	private colourRows<C extends LabelColor>(group: HTMLElement, spec: ColourRows<C>): void {
 		const rows = group.createDiv("tc-level-rows");
 		wrapWhenNarrow(rows);
 		const reorder = new RowReorder(rows, (from, to) => void this.redrawn(spec.move(from, to)));
@@ -203,33 +211,50 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			const name = new TextComponent(row).setValue(level.name).onChange((value) => void spec.rename(index, value));
 			name.inputEl.addClass(spec.nameClass);
 			const swatches = row.createDiv("tc-swatches");
-			for (const color of PRIORITY_COLORS) {
-				const swatch = Button.create(swatches, { kind: "swatch", label: color, onPress: () => void this.redrawn(spec.recolour(index, color)) });
-				swatch.el.dataset.priority = color;
+			for (const color of spec.swatches) {
+				const tint = tintOf(color);
+				const swatch = Button.create(swatches, {
+					kind: "swatch",
+					label: tint ?? "No colour",
+					cls: tint ? undefined : "tc-swatch-clear",
+					onPress: () => void this.redrawn(spec.recolour(index, color)),
+				});
+				if (tint) swatch.el.dataset.priority = tint;
 				swatch.setOn(color === level.color);
 			}
-			const custom = !isPresetColor(level.color);
+			const chosen = tintOf(level.color);
+			const custom = chosen !== undefined && !isPresetColor(chosen);
 			const well = el(swatches, "div", "tc-swatch-well");
-			if (custom) well.dataset.priority = level.color;
+			if (custom) well.dataset.priority = chosen;
 			well.toggleClass("is-on", custom);
 			el(well, "span", "tc-swatch-well-inner");
 			const picker = well.createEl("input", { cls: "tc-swatch-well-input", type: "color", attr: { "aria-label": "Any colour" } });
-			picker.value = inkOf(level.color, this.theme).toLowerCase();
+			if (chosen) picker.value = inkOf(chosen, this.theme).toLowerCase();
 			const hex = el(row, "div", "tc-level-hex");
 			el(hex, "span", "tc-level-hex-mark", "#");
-			const code = new TextComponent(hex).setValue(inkOf(level.color, this.theme).slice(1));
+			const code = new TextComponent(hex);
 			code.inputEl.addClass("tc-level-hex-input");
 			code.inputEl.setAttribute("aria-label", "Colour code");
 			const preview = el(row, "div", "tc-level-preview");
-			preview.dataset.priority = level.color;
 			el(preview, "span", "tc-progress-dot");
 			el(preview, "span", "tc-level-preview-title", "Call mom");
 			el(preview, "span", "tc-level-preview-time", "10:00");
 			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip(spec.deleteTooltip).onClick(() => void this.redrawn(spec.remove(index)));
-			const show = (color: PriorityColor, withCode?: TextComponent) => {
+			const paint = (color: C | PriorityColor) => {
+				const tint = tintOf(color);
+				if (tint) preview.dataset.priority = tint;
+				else delete preview.dataset.priority;
+			};
+			const codeOf = (color: C | PriorityColor) => {
+				const tint = tintOf(color);
+				return tint ? inkOf(tint, this.theme).slice(1) : "";
+			};
+			paint(level.color);
+			code.setValue(codeOf(level.color));
+			const show = (color: C | PriorityColor, withCode?: TextComponent) => {
 				spec.preview(index, color);
-				preview.dataset.priority = color;
-				withCode?.setValue(inkOf(color, this.theme).slice(1));
+				paint(color);
+				withCode?.setValue(codeOf(color));
 			};
 			picker.addEventListener("input", () => {
 				const color = this.colorOf(picker.value);

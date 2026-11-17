@@ -1,5 +1,5 @@
 import { googleLoggedIn } from "./googleLogin";
-import { labelNameOf, usableLabelTag } from "../domain/Label";
+import { LABEL_SWATCHES, type LabelColor, labelNameOf, usableLabelTag } from "../domain/Label";
 import { hexColor, type PresetColor } from "../domain/Priority";
 import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, LABEL_PAINTS, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import type { CountField, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
@@ -44,6 +44,8 @@ export class SettingsServiceImpl implements SettingsService {
 			priorities: s.priorities,
 			labelTag: s.labelTag,
 			labels: s.labels,
+			levelSwatches: PRIORITY_COLORS,
+			labelSwatches: LABEL_SWATCHES,
 			labelPaint: s.labelPaint,
 			labelPaints: LABEL_PAINTS,
 			cardHeight: s.cardHeight,
@@ -141,7 +143,7 @@ export class SettingsServiceImpl implements SettingsService {
 		return this.patchLabel(index, { name: labelNameOf(title) });
 	}
 
-	recolourLabel(index: number, color: PriorityColor): Promise<void> {
+	recolourLabel(index: number, color: LabelColor): Promise<void> {
 		return this.patchLabel(index, { color });
 	}
 

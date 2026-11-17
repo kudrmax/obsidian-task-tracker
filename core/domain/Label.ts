@@ -1,10 +1,23 @@
-import type { PriorityColor } from "./Priority";
+import { PRIORITY_COLORS, type PriorityColor, usableColor } from "./Priority";
 
-/** A label: a task tagged `#<tag>/<name>` gets the tint of `color`; a task may carry several. */
+/** A label's colour that paints nothing: a card carrying it looks as it would without it. Priorities never take it. */
+export const CLEAR_COLOR = "clear";
+/** A label's colour: a level's, or none (`CLEAR_COLOR`). */
+export type LabelColor = PriorityColor | typeof CLEAR_COLOR;
+
+/** The colours the settings offer a label, in order: the presets, then no colour. */
+export const LABEL_SWATCHES: readonly LabelColor[] = [...PRIORITY_COLORS, CLEAR_COLOR];
+
+/** A colour a label may have: one a level may be drawn in, or none. */
+export function usableLabelColor(color: string): color is LabelColor {
+	return color === CLEAR_COLOR || usableColor(color);
+}
+
+/** A label: a task tagged `#<tag>/<name>` gets the tint of `color` (none for `CLEAR_COLOR`); a task may carry several. */
 export interface LabelLevel {
 	/** As the tag writes it: `Важное_и_срочное`. */
 	readonly name: string;
-	readonly color: PriorityColor;
+	readonly color: LabelColor;
 }
 
 /** A label's name as the screen shows it: the tag's underscores read as spaces. */

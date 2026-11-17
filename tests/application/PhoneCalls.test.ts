@@ -391,6 +391,23 @@ describe("the door's notes", () => {
 	});
 });
 
+describe("a label with no colour through the door", () => {
+	const ok = (answer: DoorAnswer) => (answer as Extract<DoorAnswer, { ok: true }>).result;
+	const clear = JSON.stringify({ labels: [{ name: "Skip", color: "clear" }, { name: "Fast", color: "green" }] });
+	const file = ["## Now", "", "- [ ] Both #label/Skip #label/Fast", "- [ ] Only #label/Skip", ""].join("\n");
+
+	it("paints a card by its coloured labels only, and offers clear among the labels' swatches", () => {
+		const view = ok(callDoor("tasks.screen", [T], { tasks: file, settings: clear, nowMs: NOW.getTime() })) as ScreenView;
+		expect(all(view).map((i) => [i.title, i.labels.map((l) => l.color), i.colors])).toEqual([
+			["Both", ["clear", "green"], ["green"]],
+			["Only", ["clear"], []],
+		]);
+		expect(ok(callDoor("settings.form", [], { tasks: null, settings: clear, nowMs: NOW.getTime() }))).toMatchObject({ labelSwatches: ["red", "orange", "yellow", "green", "teal", "blue", "clear"], levelSwatches: ["red", "orange", "yellow", "green", "teal", "blue"] });
+		expect(ok(callDoor("rules.constants", [], context()))).toMatchObject({ CLEAR_COLOR: "clear" });
+		expect(ok(callDoor("rules.usableLabelColor", ["clear"], context()))).toBe(true);
+	});
+});
+
 describe("the door's timeline", () => {
 	const levels = (settings?: string) => callDoor("timeline.zoomLevels", [], { tasks: null, settings, nowMs: NOW.getTime() });
 
@@ -445,6 +462,7 @@ const SETTINGS_CASES: readonly (readonly [string, ...unknown[]])[] = [
 	["setZoomLevels", "28, x"],
 	["renameLabel", 0, " Very fast "],
 	["recolourLabel", 0, "blue"],
+	["recolourLabel", 0, "clear"],
 	["removeLabel", 0],
 	["addLabel"],
 	["moveLabel", 0, 0],
@@ -453,6 +471,7 @@ const SETTINGS_CASES: readonly (readonly [string, ...unknown[]])[] = [
 	["colourOf", "nope", SHADES],
 	["typedColour", "level", 0, "#123456", SHADES],
 	["typedColour", "label", 0, "nope", SHADES],
+	["typedColour", "label", 0, "", SHADES],
 	["renamePreset", 0, " Дом "],
 	["removePreset", 1],
 	["addPreset"],
@@ -615,6 +634,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.sameLabels", [], []),
 		plain("rules.isPresetColor", "red"),
 		plain("rules.usableColor", "#12AB34"),
+		plain("rules.usableLabelColor", "clear"),
 		plain("rules.acceptsDrop", "inbox", ["soon"]),
 		plain("rules.placesInGap", "soon", "day", false),
 		plain("rules.noteTags", "---\ntags: [project]\n---\n#more"),

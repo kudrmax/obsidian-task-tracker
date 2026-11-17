@@ -1216,7 +1216,7 @@ struct KeyBar: View {
                 Section("Labels") {
                     ForEach(state.marks.tiles.labels, id: \.mark.title) { tile in
                         Toggle(isOn: Binding(get: { tile.on }, set: { _ in host.toggleLabel(tile.mark.title) })) {
-                            Label { Text(host.labelTitle(tile.mark.title)) } icon: { swatch(host, "tag.fill", tile.mark.color) }
+                            Label { Text(host.labelTitle(tile.mark.title)) } icon: { swatch(host, host.model?.tagSymbol(tile.mark.color) ?? "tag", tile.mark.color) }
                         }
                         .disabled(!tile.enabled)
                         .menuActionDismissBehavior(.disabled)
