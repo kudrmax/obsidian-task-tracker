@@ -53,6 +53,6 @@ export function composeCore(ports: CorePorts): Core {
 		days: new DayServiceImpl(ports.clock, ports.settings, tasks, ports.ticker),
 		undo,
 		calendars: new CalendarServiceImpl(files, ports.feeds, ports.clock, ports.settings, ports.timers, ports.work, { canMigrate: ports.isPhone }),
-		assistant: new AssistantServiceImpl({ tasks, settings: ports.settings, timers: ports.timers, models: ports.models }),
+		assistant: new AssistantServiceImpl({ tasks, steps: undo, settings: ports.settings, timers: ports.timers, models: ports.models }),
 	};
 }

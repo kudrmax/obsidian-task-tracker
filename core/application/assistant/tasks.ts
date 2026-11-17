@@ -1,5 +1,6 @@
 import type { LocalDate, SectionKey } from "../../domain/Task";
-import type { TaskCard, TaskItem } from "../contracts";
+import type { MenuFrom, MenuScreen, TaskCard, TaskItem, TaskKey, TaskMenuModel } from "../contracts";
+import type { SectionOffer } from "../sections";
 
 /** Every task of each list as the screen draws it, each with its subtasks, and today: what the assistant reads. */
 export interface ListedTasks {
@@ -7,9 +8,20 @@ export interface ListedTasks {
 	readonly lists: Readonly<Record<SectionKey, readonly TaskItem[]>>;
 }
 
-/** Where the assistant reads the tasks from: the task service, over the file it keeps. */
+/**
+ * Where the assistant reads the tasks from, and how it touches them: the task service, over the file it keeps. It writes only
+ * through the calls a tap in a task's menu makes (`menu` to see the tile, `toggleLabel` to press it), never its own write.
+ */
 export interface AssistantTasks {
 	listed(): Promise<ListedTasks>;
+	sectionOffer(date: LocalDate): Promise<SectionOffer>;
+	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel;
+	toggleLabel(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]>;
+}
+
+/** How several writes of one action become one step to take back (the undo history); left out, each is its own. */
+export interface AssistantSteps {
+	together<R>(work: () => Promise<R>): Promise<R>;
 }
 
 /** The tasks as they are now, by id, closed ones and subtasks at every depth too. */
@@ -26,6 +38,11 @@ export class TaskLookup {
 			}
 		};
 		for (const items of Object.values(listed.lists)) items.forEach(add);
+	}
+
+	/** Every task, closed ones and subtasks at every depth too. */
+	all(): readonly TaskItem[] {
+		return [...this.byId.values()];
 	}
 
 	find(id: string): TaskItem | null {

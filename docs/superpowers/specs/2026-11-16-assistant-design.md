@@ -506,6 +506,34 @@ the prompts still editable (they sync).
 > and in two or three short sentences in the language of my tasks, say what changes in my life when this one is done;
 > don't speak about the other tasks.
 
+## Best task: marking the answer with a label (2026-11-17)
+
+Max: besides the popup, Settings → Assistant gets an optional **label** for Best task, one of the labels he already has
+(the settings' `labels`), or none. With one set, a `task` answer also marks the chosen task with that label, and the label
+is on exactly one task: taken off wherever else it stands.
+
+- **As Max would do it by hand, nothing hard-coded.** The marking goes through the same calls a tap in the task's menu
+  makes (`TaskService.menu` and `toggleLabel`), never its own write and never a copy of the label rules. What the menu
+  would not let Max do, the marking doesn't do: a label tile that is disabled or missing for the chosen task (today: a
+  task with a priority carries no labels) means the marking is refused, and nothing is changed anywhere. If the label
+  rules change one day (labels beside a priority), the marking follows them by itself.
+- **Order:** put on the chosen task first; only if it took (the task as it then stands carries the label) is it taken
+  off every other task that has it, done and given-up ones included, so it ends on exactly one. A refused marking
+  leaves the label where it was.
+- **Which task:** the card the answer is drawn on, through that card's own menu, as Max would mark it by hand (the lead,
+  at the review, replacing «the step gets it»): a task or an unfolded task's subtask is marked itself; a folded task's
+  next step is drawn on the folded task's card, whose menu labels the folded task (`docs/plugin/screen.md`), so the
+  folded task gets the label and the popup and the list show it.
+- **When:** only on a `task` outcome. A failure, Stop, a timeout or `gone` touch no label. The chosen task already
+  carrying it: nothing to put on, it is still taken off the others.
+- **The popup** stays as it is and draws the chosen task as it stands after the marking (its card shows the label). A
+  refused marking adds one line under the card, the core's words: «Couldn't add the label {name} to this task.»
+- **The label gone from the settings** (renamed or removed) reads as none: nothing is marked, the page shows none.
+- **Settings page:** under Best task's prompt, a «Label» row: a dropdown of None and the labels in the settings' order,
+  their titles as the screen shows them; the core gives the rows ready (`AssistantPage`), the frontend only draws them.
+- **Undo:** each write is the menu's own (`toggleLabel`), and the marking's writes (put on, taken off the others) are
+  one step: one Undo puts the label back where it was, never leaving it on two tasks.
+
 ## Platforms
 
 - **Obsidian on the Mac:** everything above.
@@ -663,6 +691,47 @@ No Swift stage (R6).
 - **Frontend-obsidian (review):** the page's own words (Model, Timeout and its line, Prompts and its line, Reset to
   default) are `page.words`; where the chosen model isn't served the page draws no model fields, only the unavailable
   words, Timeout and the prompts.
+- **Backend (label):** an action declares what it does besides its answer as `options: ActionOption[]` (`assistant/options/`):
+  a key, a row label, its choices from the settings and `afterAnswer`. Best task's is `answerLabel`; the service, the page
+  and `set` go over the options and never name one, so the next action with an option adds an entry to its own list.
+  Saved in `AssistantSettings.options` by action id, then option key (`{ bestTask: { label: "Focus" } }`), as `models` is;
+  an old `data.json` without it reads `{}`. A saved value no choice has any more reads as none, on the page and in a run.
+- **Backend (label):** the page carries an action's rows in its prompt's entry (`prompts[i].options`, drawn under that
+  prompt): `{ key, label, choices: { value, title }[], value }`, none first (`value: null`, «None»), the labels in the
+  settings' order by `labelTitle`. `set({ kind: "option", actionId, key, value })` writes one; null is None (the key goes,
+  and an action left with no option goes too).
+- **Backend (label):** the menu the marking reads is the one the screen opens for the card the answer is drawn on
+  (`drawnAnswer`'s `task`), from its list's column (`listCardMenuFrom`: Today's day column, Soon, Inbox, Backlog, Done).
+  Refused when that menu has no labels group, its tiles are disabled or the label has no tile, or `toggleLabel` comes back
+  without the label on it. The others are found in every list and depth (Done too) by the labels the screen reads, and
+  taken off in one `toggleLabel` of them all. (Replaces «the chosen task's opened on the whole screen».)
+- **Backend (label):** the marking's writes are one undo step: `UndoHistory.together(work)` joins the writes recorded
+  while `work` runs, each only when it starts from the text the previous one left. A change from outside in between (by
+  hand, Sync) closes the step so far and the next write starts another, so one Undo never takes that change back (the
+  review: the first version joined across it). The assistant reaches it through its port `AssistantSteps`
+  (`AssistantDeps.steps`, the undo history in `composeCore`).
+- **Backend (label):** a run stopped (Stop or the timeout) before the marking ends as stopped or timed out and marks
+  nothing, also when the answer had already come. Once the marking has begun it runs to the end and the run ends with the
+  answer: a Stop or the timeout's grace then is too late (the lead, at the re-review: a Stop that settled the run while
+  the writes went on moved the label with no popup).
+- **Backend (label):** a write that throws during the marking keeps the answer: the popup shows the chosen task with
+  the option's words («Couldn't move the label {name}.») in `notice`, and the error in the `task` outcome's new
+  `detail: string | null`, which the frontend writes to the console as a failure's.
+- **Backend (label):** the chosen task gone only after the marking wrote is still shown, as it stood when the answer
+  came (no «gone» after a marking).
+- **Backend (label):** the `task` outcome gains `notice: string | null`, the line under the card (null for none), and `detail: string | null` (above); `task`
+  and `card` are read again after the marking. The marking runs in `finish`, so `press` and the door's later `finish`
+  alike mark.
+- **Frontend-obsidian (label):** an option row is a stock `Setting` with a dropdown, drawn right after its prompt's field;
+  each choice is held in the dropdown by its place in `choices` (so none, `null`, needs no stand-in value that a label
+  could also have), and a change sends that choice's `value` as given. The row is drawn whatever the choices: with no
+  labels in the settings it offers None alone.
+- **Frontend-obsidian (label):** the notice is a line of its own right under the card, before the reason: caption size
+  (`--tc-font-caption`), the caption colour (`--tc-muted`), 6 px from the card (`--tc-answer-notice-gap`, the popup's
+  12 px gap pulled in) so it reads as said of the card, flush with the popup's title and reason.
+- **Frontend-obsidian (label):** an outcome's `detail` goes to the console whenever it is not null, a `task`'s as a
+  `failed`'s, once per shown outcome, with the same «Task Calendar assistant:» prefix; the popup is the answer's (no
+  failure look), its `notice` under the card.
 - **Lead (impact, 2026-11-17):** the default prompt asks what changes in Max's life, not «the biggest difference», and
   each project goes as its path in the tree. On Max's 38 candidates the old prompt chose «По коду, Readme и dmg…» in 5
   of 5 sonnet runs and 3 of 3 opus runs, every time for a goal due today and the steps after it («without it no post»),

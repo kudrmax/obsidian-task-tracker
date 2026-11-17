@@ -2116,7 +2116,12 @@ export type AssistantOutcome =
 	 * step: `task` is that folded task, `card` its two-line card (`over` its title, the step below). Any other subtask: `task`
 	 * is the subtask, `card` its own with its task's title in `over`. A task: alone, `over` null.
 	 */
-	| { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly card: TaskCard; readonly note: string }
+	/**
+	 * `task` and `card` are as the tasks stand after the action's options did their part (Best task's label on it).
+	 * `notice`: what an option couldn't do, drawn under the card («Couldn't add the label Focus to this task.»); null for none.
+	 * `detail`: an option's write that failed, for the console (the frontend writes it there, as a failure's); null for none.
+	 */
+	| { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly card: TaskCard; readonly note: string; readonly notice: string | null; readonly detail: string | null }
 	/** `detail` is for the console: the frontend writes it there. */
 	| { readonly kind: "failed"; readonly title: string; readonly words: string; readonly detail: string }
 	/** Stopped by Max: nothing is shown. */
@@ -2145,6 +2150,23 @@ export interface AssistantField {
 	readonly hint: string | null;
 }
 
+/** A choice of an action's option row: `value` null is none («None»); `title` as the screen shows it. */
+export interface AssistantOptionChoice {
+	readonly value: string | null;
+	readonly title: string;
+}
+
+/** An action's option, drawn as a row of choices under its prompt (Best task's «Label»). */
+export interface AssistantOptionRow {
+	/** Written back with `set({ kind: "option", actionId, key, value })`. */
+	readonly key: string;
+	readonly label: string;
+	/** In order, none first. */
+	readonly choices: readonly AssistantOptionChoice[];
+	/** The current choice's value; null for none (also when the saved one is no longer a choice). */
+	readonly value: string | null;
+}
+
 /** The Assistant page's own words, ready to draw. */
 export interface AssistantPageWords {
 	/** The model choice's row. */
@@ -2169,8 +2191,8 @@ export interface AssistantPage {
 	readonly fields: readonly AssistantField[];
 	readonly timeoutSeconds: number;
 	readonly words: AssistantPageWords;
-	/** Each button's prompt, in the order of the buttons. */
-	readonly prompts: readonly { readonly actionId: string; readonly title: string; readonly prompt: string; readonly isDefault: boolean }[];
+	/** Each button's prompt, in the order of the buttons, with its option rows to draw under it (none for most). */
+	readonly prompts: readonly { readonly actionId: string; readonly title: string; readonly prompt: string; readonly isDefault: boolean; readonly options: readonly AssistantOptionRow[] }[];
 }
 
 /** A change on the Assistant page. */
@@ -2181,7 +2203,9 @@ export type AssistantSetting =
 	/** Null or blank: Reset to the default. */
 	| { readonly kind: "prompt"; readonly actionId: string; readonly value: string | null }
 	/** Kept within 10..600. */
-	| { readonly kind: "timeout"; readonly seconds: number };
+	| { readonly kind: "timeout"; readonly seconds: number }
+	/** An action's option row: a choice's value; null is none. */
+	| { readonly kind: "option"; readonly actionId: string; readonly key: string; readonly value: string | null };
 
 /**
  * The assistant: buttons that send some of the tasks to a model with a prompt and read its answer. Every button, model,
@@ -2213,7 +2237,7 @@ export interface AssistantService {
 
 	/** The Assistant page, ready: the models, the chosen one, its fields with values and hints, the timeout, the prompts. */
 	page(): Promise<AssistantPage>;
-	/** Writes the chosen model, a model's field, a prompt or the timeout. */
+	/** Writes the chosen model, a model's field, a prompt, the timeout or an action's option. */
 	set(change: AssistantSetting): Promise<void>;
 
 	/**

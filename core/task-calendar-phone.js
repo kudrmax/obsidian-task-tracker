@@ -2494,7 +2494,7 @@
     zoomLevels: DEFAULT_ZOOM_LEVELS,
     projectTag: "#project",
     groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
-    assistant: { model: "claude", timeoutSeconds: 120, prompts: {}, models: {} }
+    assistant: { model: "claude", timeoutSeconds: 120, prompts: {}, models: {}, options: {} }
   };
   function settingsFrom(saved) {
     const s = saved ?? {};
@@ -2515,13 +2515,17 @@
   function assistantOf(saved) {
     const fallback = DEFAULT_SETTINGS.assistant;
     if (!isRecord(saved)) return fallback;
-    const models = isRecord(saved.models) ? saved.models : {};
     return {
       model: typeof saved.model === "string" ? saved.model : fallback.model,
       timeoutSeconds: sizeOf(saved.timeoutSeconds, ASSISTANT_TIMEOUTS, fallback.timeoutSeconds),
       prompts: stringsOf(saved.prompts),
-      models: Object.fromEntries(Object.entries(models).filter(([, fields]) => isRecord(fields)).map(([id, fields]) => [id, stringsOf(fields)]))
+      models: mapsOf(saved.models),
+      options: mapsOf(saved.options)
     };
+  }
+  function mapsOf(saved) {
+    if (!isRecord(saved)) return {};
+    return Object.fromEntries(Object.entries(saved).filter(([, inner]) => isRecord(inner)).map(([key, inner]) => [key, stringsOf(inner)]));
   }
   function isRecord(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);

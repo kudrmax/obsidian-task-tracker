@@ -2,7 +2,7 @@ import { repeatRow } from "./repeatWords";
 import { addDays } from "../domain/LocalDate";
 import type { LabelLevel } from "../domain/Label";
 import type { PriorityLevel } from "../domain/Priority";
-import { type LocalDate, nextProgress, REMINDER_KINDS, type TaskStatus } from "../domain/Task";
+import { type LocalDate, nextProgress, REMINDER_KINDS, type SectionKey, type TaskStatus } from "../domain/Task";
 import { projectKey } from "../domain/Project";
 import { NO_PROJECT } from "./projects";
 import type { ColumnSections, DropColumn, MenuEditId, MenuGroupId, MenuFrom, MenuProject, ProjectRef, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
@@ -81,6 +81,13 @@ const COLUMNS: ReadonlySet<MenuFrom> = new Set<DropColumn>(["day", "soon", "inbo
 
 /** Where First step is offered: a card of a list column or of the timeline, the cards a folded task is drawn on. */
 const FIRST_STEP_FROM: ReadonlySet<MenuFrom> = new Set<MenuFrom>([...COLUMNS, "timeline"]);
+
+const LIST_CARD_MENU: Readonly<Record<SectionKey, MenuFrom>> = { now: "day", soon: "soon", inbox: "inbox", backlog: "backlog", done: "done" };
+
+/** Where the screen opens a task's menu from when it is drawn as its list's card: its list's column, or Done. */
+export function listCardMenuFrom(item: TaskItem): MenuFrom {
+	return LIST_CARD_MENU[item.list];
+}
 
 /** Whether Select tasks picks a card drawn there: a list column's; never the timeline's, Done's, a stack's or the whole screen's. */
 export function canPick(from: MenuFrom): boolean {

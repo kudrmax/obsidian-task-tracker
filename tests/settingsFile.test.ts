@@ -93,7 +93,7 @@ class Disk implements SettingsPersistence {
 }
 
 /** The assistant's defaults as data.json writes them, after the result mark. */
-const ASSISTANT = '  "assistant": {\n    "model": "claude",\n    "timeoutSeconds": 120,\n    "prompts": {},\n    "models": {}\n  }';
+const ASSISTANT = '  "assistant": {\n    "model": "claude",\n    "timeoutSeconds": 120,\n    "prompts": {},\n    "models": {},\n    "options": {}\n  }';
 
 /** The same defaults written now: the project tag, a setting since Projects, the result mark, since Results, and the assistant, after the keys of 0.4.155. */
 const FILE = OLD_FILE.replace('"cardGap": 2\n}', `"cardGap": 2,\n  "projectTag": "#project",\n  "resultMark": "🎯",\n${ASSISTANT}\n}`);

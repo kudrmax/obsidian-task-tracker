@@ -3,7 +3,9 @@ import type { AssistantAction } from "../../../core/application/assistant/action
 import type { HostModels, ModelQuestion, ModelReply, ModelTransport, StopReason, StopSignal } from "../../../core/application/assistant/model";
 import type { ModelProfile } from "../../../core/application/assistant/models/profile";
 import type { Clock } from "../../../core/application/ports";
+import type { AssistantTasks } from "../../../core/application/assistant/tasks";
 import { TaskServiceImpl } from "../../../core/application/TaskServiceImpl";
+import { UndoHistory } from "../../../core/application/UndoHistory";
 import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../../../core/settings";
 import { FakeSettingsStore } from "../../fakes/FakeSettingsStore";
 import { FakeTimers } from "../../fakes/FakeTimers";
@@ -94,6 +96,7 @@ export async function settle(): Promise<void> {
 export interface Rig {
 	readonly assistant: AssistantServiceImpl;
 	readonly tasks: TaskServiceImpl;
+	readonly undo: UndoHistory;
 	readonly store: InMemoryTaskFileStore;
 	readonly settings: FakeSettingsStore;
 	readonly timers: FakeTimers;
@@ -108,13 +111,16 @@ export interface RigOptions {
 	readonly models?: (transport: FakeTransport, loads: { count: number }) => HostModels;
 	readonly actions?: readonly AssistantAction[];
 	readonly profiles?: readonly ModelProfile[];
+	/** The task service as the assistant reaches it; by default the rig's own. */
+	readonly tasksPort?: (tasks: TaskServiceImpl) => AssistantTasks;
 }
 
 export function rig(options: RigOptions = {}): Rig {
 	const store = new InMemoryTaskFileStore(options.text === undefined ? FILE : options.text);
 	const settings = new FakeSettingsStore(options.settings ?? SETTINGS);
 	const timers = new FakeTimers();
-	const tasks = new TaskServiceImpl(store, settings, clock);
+	const undo = new UndoHistory(store);
+	const tasks = new TaskServiceImpl(store, settings, clock, undo);
 	const transport = new FakeTransport();
 	const loads = { count: 0 };
 	const servedClaude = (t: FakeTransport, l: { count: number }): HostModels => ({
@@ -125,12 +131,13 @@ export function rig(options: RigOptions = {}): Rig {
 		},
 	});
 	const deps: AssistantDeps = {
-		tasks,
+		tasks: options.tasksPort ? options.tasksPort(tasks) : tasks,
 		settings,
 		timers,
+		steps: undo,
 		models: (options.models ?? servedClaude)(transport, loads),
 		actions: options.actions,
 		profiles: options.profiles,
 	};
-	return { assistant: new AssistantServiceImpl(deps), tasks, store, settings, timers, transport, loads };
+	return { assistant: new AssistantServiceImpl(deps), tasks, undo, store, settings, timers, transport, loads };
 }
