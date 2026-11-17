@@ -56,7 +56,7 @@ export interface ScreenState {
 	setGridWidth(width: number): void;
 	/** Every ribbon swipe decided, for the checks: its direction, how far it was drawn, its speed at the lift, the step. */
 	swipes: readonly { readonly dir: number; readonly moved: number; readonly speed: number; readonly step: number }[];
-	logSwipe(swipe: { dir: number; moved: number; speed: number; step: number; why?: string; events?: number }): void;
+	logSwipe(swipe: { dir: number; moved: number; speed: number; step: number; why?: string; events?: number; at?: number }): void;
 	/** Where the card under the pointer would land on the grid: the core's `dropSpan` of the snapped minute. */
 	preview: { readonly start: number; readonly end: number | null } | null;
 	setPreview(at: { id: string; from: DropFrom; minute: number } | null): void;
@@ -77,11 +77,13 @@ export interface ScreenState {
 	altMotion: boolean;
 	/** The @dnd-kit/react rows keep Motion's layout through a drag, without a shared layout id (no re-render at the lift). */
 	altQuiet: boolean;
-	configure(patch: Partial<Pick<ScreenState, "virtual" | "measuring" | "onlyCurrent" | "altMotion" | "altQuiet">>): void;
+	configure(patch: Partial<Pick<ScreenState, "virtual" | "measuring" | "onlyCurrent" | "altMotion" | "altQuiet" | "lethargyStability">>): void;
 	setMounted(n: number): void;
-	/** The ribbon on @use-gesture with the core's landing, or on CSS scroll-snap: the two variants checked. */
-	ribbon: "gesture" | "snap";
-	setRibbon(mode: "gesture" | "snap"): void;
+	/** The ribbon on Embla Carousel (A) or on @use-gesture with Lethargy and the core's landing (B). */
+	ribbon: "embla" | "lethargy";
+	/** Lethargy's window (its `stability`, 8 by default): how many deltas it averages to call one inertial. */
+	lethargyStability: number;
+	setRibbon(mode: "embla" | "lethargy"): void;
 	bump(): void;
 	setHourPx(px: number): void;
 	setPlace(place: number): void;
@@ -272,7 +274,8 @@ export function createScreenStore(tasks: TaskService, today: () => LocalDate, no
 		setMounted(mounted) {
 			set({ mounted });
 		},
-		ribbon: "gesture",
+		ribbon: "embla",
+		lethargyStability: 8,
 		setRibbon(ribbon) {
 			set({ ribbon });
 		},

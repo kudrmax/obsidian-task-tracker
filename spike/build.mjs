@@ -14,7 +14,7 @@ const common = {
 	target: "es2020",
 	minify: process.env.SPIKE_MINIFY !== "0",
 	jsx: "automatic",
-	define: { "process.env.NODE_ENV": '"production"', "import.meta.url": '"file:///task-calendar-spike/main.js"' },
+	define: { "process.env.NODE_ENV": process.env.SPIKE_DEV ? '"development"' : '"production"', "import.meta.url": '"file:///task-calendar-spike/main.js"' },
 	logLevel: "info",
 	metafile: true,
 };

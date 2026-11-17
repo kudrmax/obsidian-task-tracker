@@ -1,0 +1,6 @@
+== phone lethargy
+{"placeAtLoad":0,"afterFirstFlickLeft":1,"draggedByFlick":false,"afterSecondFlickLeft":2,"afterSlow20pctRight":2,"afterSlow70pctRight":1,"afterFlickRight":0,"verticalSwipe":{"scrollTop":0,"dragged":false,"orderKept":true,"place":0},"longPress":{"draggingAt150ms":null,"draggingAt400ms":"t325","placeWhileDragging":0,"columnScrolledWhileDragging":0,"landedInSoonAt":2,"stillInInbox":false},"quickMoveNoDrag":true}
+{"ribbon":true,"errs":[]}
+== phone embla
+{"placeAtLoad":0,"afterFirstFlickLeft":1,"draggedByFlick":false,"afterSecondFlickLeft":2,"afterSlow20pctRight":2,"afterSlow70pctRight":1,"afterFlickRight":0,"verticalSwipe":{"scrollTop":0,"dragged":false,"orderKept":true,"place":0},"longPress":{"draggingAt150ms":null,"draggingAt400ms":"t1297","placeWhileDragging":0,"columnScrolledWhileDragging":0,"landedInSoonAt":2,"stillInInbox":false},"quickMoveNoDrag":true}
+{"ribbon":true,"errs":[]}

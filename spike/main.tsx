@@ -112,6 +112,8 @@ export default class SpikePlugin extends Plugin implements SettingsStore {
 		this.registerView(ALT_VIEW, (leaf) => new AltView(leaf, this));
 		this.addCommand({ id: "open", name: "Open stack spike", callback: () => void this.open(false) });
 		this.addCommand({ id: "open-popout", name: "Open stack spike in a new window", callback: () => void this.open(true) });
+		this.addCommand({ id: "ribbon-embla", name: "Ribbon: Embla", callback: () => this.store.getState().setRibbon("embla") });
+		this.addCommand({ id: "ribbon-lethargy", name: "Ribbon: Lethargy", callback: () => this.store.getState().setRibbon("lethargy") });
 		this.addCommand({ id: "first-inbox-to-soon", name: "Move the first Inbox task to Soon", callback: () => void this.store.getState().moveFirstInboxToSoon() });
 		(window as unknown as { tcSpike: SpikePlugin }).tcSpike = this;
 		this.app.workspace.onLayoutReady(() => void this.store.getState().refresh());

@@ -35,6 +35,8 @@
 		"@floating-ui/react": "^0.27.20",
 		"@tanstack/react-virtual": "^3.14.26",
 		"@use-gesture/react": "^10.3.1",
+		"embla-carousel-react": "^8.6.0",
+		"embla-carousel-wheel-gestures": "^8.1.0",
 		"lethargy": "^1.0.9",
 		"motion": "^14.14.0",
 		"react": "^19.3.1",

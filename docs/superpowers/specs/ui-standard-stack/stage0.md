@@ -210,6 +210,39 @@ Performance on this build (`stage0/round4/perf.jsonl`, 3 runs at 1×, 2 at 4×),
 - Overlapping blocks are not stacked; a block dragged over a list keeps the timeline's width.
 - The pop-out was not re-checked this round: opening one would put a window on Max's screen.
 
+## Round five: the ribbon as in the plugin, Embla against Lethargy
+
+**The ribbon** is now the plugin's (`docs/plugin/screen.md`, «Лента колонок»): Inbox over Backlog, Soon, the day list, the timeline; two columns in the window; three places. At Inbox–Soon and Soon–Now the two columns split the window in half; at Now–calendar the divider sets the day list against the timeline; between Soon–Now and Now–calendar the day list's width follows the ribbon (from half the window to the divider's width), as `RibbonColumns` says. Screenshots: `stage0/round5/r5-*-p{0,1,2}.png`.
+
+Two ribbons, switched by the commands «Ribbon: Embla» (default) and «Ribbon: Lethargy»:
+
+- **A, Embla Carousel** 8.6 with `embla-carousel-wheel-gestures` 8.1, as their docs set one step per swipe: `align: "start"`, `containScroll: "trimSnaps"`, `skipSnaps: false`, `duration: 20`, the wheel plugin with `forceWheelAxis: "x"`; touch by Embla's own drag. Embla decides where a swipe lands (its release force); **the core's `swipeLanding` cannot be plugged in** (Embla has no hook for the landing; `watchDrag` only says whether a drag may start). A mouse drag is the cards', not the ribbon's (`watchDrag` refuses trusted mouse events and lets the plugin's synthetic ones through).
+- **B, @use-gesture + Lethargy + `swipeLanding`**, as in round four, on the new places; its spring stiffened to settle in about 240 ms.
+
+Measured by replaying Max's six recorded swipes (`spike/recordings/max-2026-11-17.json`) and two synthetic held drags at an even pace (`spike/recordings/synthetic-held-drags.json`: 401 px back, then 133 px on, the fingers stopping and lifting without a fling). The Electron input recording carries no deltas, so it cannot be replayed. Times are from the stroke's largest delta in its first 250 ms (the estimated lift of a flick) or from its last delta (the stop of a held drag) to the decision and to the ribbon standing on its place. Full output: `stage0/round5/round5-ribbon.txt`.
+
+| | A: Embla + wheel-gestures | B: Lethargy + `swipeLanding` |
+|---|---|---|
+| Max's six swipes, places reached | 1 → 0 → 1, then nothing: **2 of the 5 place changes**; the swipe begun inside the previous one's tail and the later ones were swallowed | 1 → 0 → 1 → 0 → 1: **all 5** (the 6th is at the end of the row) |
+| Flick: decision after the lift | 62–438 ms, and only for the two it saw | 93–270 ms (two decided 35–61 ms before my lift estimate) |
+| Flick: ribbon on its place after the lift | **1.3–3.1 s** (it follows the whole momentum tail, then animates) | 95–441 ms |
+| Settle animation after the decision | 1.25–2.65 s | 0–241 ms (the ribbon is often already there, having followed the stroke) |
+| Held drag 401 px: decision / on its place after the stop | 157 / 162 ms | the decision came **658 ms before the stop**, while the fingers were still moving (Lethargy took an uneven slow drag for momentum); on its place 418 ms before the stop |
+| Held drag 133 px (springs back) | back 893 ms after the stop | back 46 ms after the stop, but decided 295 ms before it |
+| Tail moving the ribbon after it settled | 0 frames | 0 frames |
+| Stalls | 0 | 0 |
+| Phone emulation, touch: flick, flick, slow 20 %, slow 70 % back, flick back | 1, 2, 2, 1, 0 (one earlier run: 0 for the slow 70 %, two places at once) | 1, 2, 2, 1, 0 |
+| Phone: vertical scroll in Inbox and Soon | scrolls 133–161 px, the ribbon stays | scrolls 161–172 px, the ribbon stays |
+| Phone: long-press drag of a card | **crashed the screen** (React «maximum update depth»): Embla had taken the touch at the press and moved the ribbon under the sortable lists, dnd-kit re-sorted without end. Fixed: at the lift Embla is re-initialised with `watchDrag: false` and back after the drop; now the card lands in Soon, no error | lands in Soon, no error |
+
+What the frames show (`stage0/round5/*-swipes-frames.jpg`): with Embla the ribbon creeps along with the momentum for a second or more and stops between places for many frames before it lands; with Lethargy it reaches each place in a few frames and stands still.
+
+**Still not achieved, plainly:**
+- Embla fails his trackpad: it waits for the momentum to end (the plugin's wheel-gestures library does not see his macOS momentum start, as found in round four) and misses a swipe that starts in the previous one's tail. Its held-drag release (157 ms after the stop) is the one thing it does well.
+- Lethargy settles flicks quickly but decides a slow, uneven held drag while the fingers are still moving; the ribbon then stops following them.
+- Neither tells the finger lift at the moment it happens: on the Mac no API gives it (the coordinator's Electron measurement), so both infer it from the deltas.
+- A drag whose view is torn down mid-way (the crash above) left the store's lifted id set, which blocked every later swipe until it was cleared; the real build must clear it when the screen unmounts.
+
 ## Must a library be swapped?
 
 Updated by the second round: no swap is recommended; the classic line, virtualized as above, is the configuration to build on, and the lift is the one step over 16 ms. The first-round answer follows.
