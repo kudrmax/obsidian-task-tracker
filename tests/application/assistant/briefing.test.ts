@@ -16,10 +16,10 @@ describe("the briefing", () => {
 		const briefing = briefingOf("candidates", tasks.today, tasksIn({ kind: "lists", lists: ["now", "soon"] }, { place: "more" }, tasks));
 		const input = JSON.parse(briefing.input);
 		expect(input.today).toBe(TODAY);
-		const offer = { title: "Write the offer", description: null, priority: "p1", due: null, time: "14:00", projects: ["Offers"], labels: [] };
+		const offer = { title: "Write the offer", description: null, priority: "p1", due: null, time: "14:00", projects: ["Job → Offers"], labels: [] };
 		const bank = { title: "Call the bank", description: null, priority: null, due: "2026-11-20", time: null, projects: [], labels: [] };
 		expect(input.candidates).toEqual([
-			{ ref: "t1", title: "Find the template", list: "today", inProgress: false, priority: null, due: null, time: null, projects: ["Offers"], labels: [], description: null, goals: [offer], after: [] },
+			{ ref: "t1", title: "Find the template", list: "today", inProgress: false, priority: null, due: null, time: null, projects: ["Job → Offers"], labels: [], description: null, goals: [offer], after: [] },
 			{ ref: "t2", title: "Pay rent", list: "today", inProgress: false, priority: null, due: null, time: null, projects: ["Home"], labels: [], description: null, goals: [], after: [] },
 			{ ref: "t3", title: "Find the contract", list: "soon", inProgress: false, priority: null, due: null, time: null, projects: [], labels: [], description: null, goals: [bank], after: [] },
 			{ ref: "t4", title: "Read a book", list: "soon", inProgress: false, priority: null, due: null, time: null, projects: [], labels: ["Good fun"], description: null, goals: [], after: [] },
