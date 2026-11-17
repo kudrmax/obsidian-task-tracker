@@ -61,3 +61,17 @@ The note is not «for Best task»: it is extra context about the task, for any a
 ## Decisions
 
 (Filled by the agents as they build; each entry carried to the other side by the lead.)
+
+- backend: the field's words are one core constant (`CONTEXT_WORDS` in `core/application/assistant/outcomes.ts`), Best
+  task's `context`. `addContext(taskId, text)` takes no action id; its failure line is that constant's `failed`.
+- backend: the line is written by a task-service write of its own, `addContext(key, text)` (`TaskRules.addContext` →
+  `ops.addContext` → the description write `TaskDocument.setDescription`), which reads the description inside the write:
+  an edit made while the popup was open is kept, never overwritten. One write, one step to take back.
+- backend: a closed task is refused twice: before the write (the task as listed) and inside it (the rule throws), so a
+  task closed in between gets nothing either. Gone: not in the file by that id.
+- backend: the description write gathers a description that stands among the subtasks into one block right under the task
+  (as the description editor's save already does); the context line ends that block, before the subtasks.
+- backend: nothing for `obsidian/compose.ts` to wire: `composeCore` passes the task service as the assistant's
+  `AssistantTasks`, and the service has `addContext`. The door is unchanged (`AssistantService` stays the host's).
+- backend: the default prompt's sentence is also in the assistant spec's quoted default prompt
+  (`2026-11-16-assistant-design.md`), which a test compares word for word.

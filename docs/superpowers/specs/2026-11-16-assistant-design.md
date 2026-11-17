@@ -502,7 +502,9 @@ the prompts still editable (they sync).
 > done. Judge by meaning, not by how the task sounds: a step is not more important because it is big, concrete, ends in
 > a finished product or sounds responsible; a short task can matter more than a long one. Count only what this step
 > itself gives: its goals show what it is for, but what the goals or the steps after it would give is not done by it.
-> A due date is urgency, not impact. Don't invent what a task is for; judge by what is written. Answer with its ref,
+> A due date is urgency, not impact. Don't invent what a task is for; judge by what is written. A description line that
+> starts with «Контекст:» is context I added myself, often after an assistant misjudged that task: take it as true and
+> weigh the task with it; it doesn't rule the task out. Answer with its ref,
 > and in two or three short sentences in the language of my tasks, say what changes in my life when this one is done;
 > don't speak about the other tasks.
 

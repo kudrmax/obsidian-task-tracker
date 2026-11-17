@@ -4,7 +4,7 @@ import { isBlankTitle } from "../domain/Priority";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
 import { type Column, columnGroups, columnList } from "../domain/queries";
-import { type LocalDate, type ReminderKind, type Slot, type TaskStatus } from "../domain/Task";
+import { isOpen, type LocalDate, type ReminderKind, type Slot, type TaskStatus } from "../domain/Task";
 import { type LineIds, TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { EntryTags } from "../domain/EntryTags";
 import { taskTitle } from "../domain/TaskTitle";
@@ -501,6 +501,15 @@ export class TaskRules {
 
 	setDescription(key: TaskKey, markdown: string): Operation {
 		return (doc) => ops.setDescription(doc, this.entryOf(doc, key), markdown);
+	}
+
+	/** A context line added at the end of an open task's description (`ops.addContext`); a closed task refuses it. */
+	addContext(key: TaskKey, text: string): Operation {
+		return (doc) => {
+			const entry = this.entryOf(doc, key);
+			if (!isOpen(entry.task.status)) throw new Error("the task is closed");
+			return ops.addContext(doc, entry, text);
+		};
 	}
 
 	remove(key: TaskKey): Operation {

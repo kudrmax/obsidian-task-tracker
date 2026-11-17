@@ -45,3 +45,19 @@ export function markdownLines(markdown: string): readonly string[] {
 	if (markdown.trim() === DESCRIPTION_TEMPLATE.trim()) return [];
 	return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
 }
+
+/** What starts a description line Max adds as context about the task, for any agent that reads the file. */
+export const CONTEXT_PREFIX = "Контекст: ";
+
+/** The context line for `text`: a top-level point, the text trimmed, its line breaks and runs of whitespace one space; null for a blank text. */
+export function contextLine(text: string): string | null {
+	const joined = text.trim().replace(/\s+/g, " ");
+	return joined === "" ? null : `- ${CONTEXT_PREFIX}${joined}`;
+}
+
+/** The description Markdown with the context line for `text` after its last line (the whole description when there is none); null for a blank text. */
+export function withContext(markdown: string | null, text: string): string | null {
+	const line = contextLine(text);
+	if (line === null) return null;
+	return markdown === null ? line : `${markdown}\n${line}`;
+}

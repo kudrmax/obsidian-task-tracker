@@ -1,4 +1,4 @@
-import type { AssistantOutcome, AssistantPageWords } from "../contracts";
+import type { AssistantContextWords, AssistantOutcome, AssistantPageWords } from "../contracts";
 import type { AssistantAction } from "./actions/action";
 import type { FailureKind } from "./model";
 import type { ModelProfile } from "./models/profile";
@@ -19,6 +19,14 @@ export const PAGE_WORDS: AssistantPageWords = {
 	prompts: "Prompts",
 	promptsNote: "What each button asks. The shape of the answer is the plugin's own.",
 	reset: "Reset to default",
+};
+
+/** The words of an answer's field for what the model missed. */
+export const CONTEXT_WORDS: AssistantContextWords = {
+	placeholder: "What did Claude miss?",
+	save: "Save",
+	saveAndAsk: "Save and ask again",
+	failed: "Couldn't save to this task.",
 };
 
 /** A timeout in words: whole minutes as minutes, else seconds. */

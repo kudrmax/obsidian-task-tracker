@@ -15,13 +15,16 @@ export interface ListedTasks {
 
 /**
  * Where the assistant reads the tasks from, and how it touches them: the task service, over the file it keeps. It writes only
- * through the calls a tap in a task's menu makes (`menu` to see the tile, `toggleLabel` to press it), never its own write.
+ * through the calls a tap in a task's menu makes (`menu` to see the tile, `toggleLabel` to press it), and the description
+ * write of the answer's field (`addContext`), never its own write.
  */
 export interface AssistantTasks {
 	listed(): Promise<ListedTasks>;
 	sectionOffer(date: LocalDate): Promise<SectionOffer>;
 	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel;
 	toggleLabel(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]>;
+	/** What Max says Claude missed, as a context line at the end of the task's description: the task service's description write, one step to take back; rejects for a task closed or gone. */
+	addContext(key: TaskKey, text: string): Promise<void>;
 }
 
 /** How several writes of one action become one step to take back (the undo history); left out, each is its own. */

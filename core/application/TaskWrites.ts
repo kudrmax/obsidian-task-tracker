@@ -338,6 +338,10 @@ export class TaskWrites {
 		return nothing(this.rules.setDescription(key, markdown));
 	}
 
+	addContext(key: TaskKey, text: string): Write<void> {
+		return nothing(this.rules.addContext(key, text));
+	}
+
 	remove(key: TaskKey): Write<void> {
 		return nothing(this.rules.remove(key));
 	}

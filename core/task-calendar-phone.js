@@ -185,6 +185,51 @@
     cancelled: "-"
   };
 
+  // core/domain/description.ts
+  var INDENT_RE = /^[ \t]*/;
+  var DESCRIPTION_TEMPLATE = "- ";
+  function indentOf(line) {
+    return INDENT_RE.exec(line)[0];
+  }
+  function descriptionLines(entry) {
+    const lines = [];
+    const children = entry.task.children;
+    let next = 0;
+    for (let i = 0; i < children.length; i++) {
+      const sub = entry.subtasks[next];
+      if (sub && children[i] === sub.raw) {
+        i += sub.task.children.length;
+        next++;
+      } else lines.push(children[i]);
+    }
+    return lines;
+  }
+  function descriptionIndent(entry) {
+    const lines = descriptionLines(entry);
+    if (lines.length === 0) return null;
+    return lines.map(indentOf).reduce((a, b) => b.length < a.length ? b : a);
+  }
+  function descriptionMarkdown(entry) {
+    const indent = descriptionIndent(entry);
+    if (indent === null) return null;
+    return descriptionLines(entry).map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.trimStart()).join("\n");
+  }
+  function markdownLines(markdown) {
+    if (markdown.trim() === DESCRIPTION_TEMPLATE.trim()) return [];
+    return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
+  }
+  var CONTEXT_PREFIX = "Контекст: ";
+  function contextLine(text) {
+    const joined = text.trim().replace(/\s+/g, " ");
+    return joined === "" ? null : `- ${CONTEXT_PREFIX}${joined}`;
+  }
+  function withContext(markdown, text) {
+    const line = contextLine(text);
+    if (line === null) return null;
+    return markdown === null ? line : `${markdown}
+${line}`;
+  }
+
   // core/domain/Priority.ts
   var PRIORITY_COLORS = ["red", "orange", "yellow", "green", "teal", "blue"];
   function isPresetColor(color) {
@@ -266,40 +311,6 @@
     if (date === today) return "today";
     if (date === addDays(today, 1)) return "tomorrow";
     return date === addDays(today, -1) ? "yesterday" : "other";
-  }
-
-  // core/domain/description.ts
-  var INDENT_RE = /^[ \t]*/;
-  var DESCRIPTION_TEMPLATE = "- ";
-  function indentOf(line) {
-    return INDENT_RE.exec(line)[0];
-  }
-  function descriptionLines(entry) {
-    const lines = [];
-    const children = entry.task.children;
-    let next = 0;
-    for (let i = 0; i < children.length; i++) {
-      const sub = entry.subtasks[next];
-      if (sub && children[i] === sub.raw) {
-        i += sub.task.children.length;
-        next++;
-      } else lines.push(children[i]);
-    }
-    return lines;
-  }
-  function descriptionIndent(entry) {
-    const lines = descriptionLines(entry);
-    if (lines.length === 0) return null;
-    return lines.map(indentOf).reduce((a, b) => b.length < a.length ? b : a);
-  }
-  function descriptionMarkdown(entry) {
-    const indent = descriptionIndent(entry);
-    if (indent === null) return null;
-    return descriptionLines(entry).map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.trimStart()).join("\n");
-  }
-  function markdownLines(markdown) {
-    if (markdown.trim() === DESCRIPTION_TEMPLATE.trim()) return [];
-    return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
   }
 
   // core/domain/Repeat.ts
@@ -2056,6 +2067,10 @@
   }
   function setDescription(doc, entry, markdown) {
     return doc.setDescription(entry, markdown);
+  }
+  function addContext(doc, entry, text) {
+    const markdown = withContext(descriptionMarkdown(entry), text);
+    return markdown === null ? doc : doc.setDescription(entry, markdown);
   }
   function remove(doc, entry) {
     return doc.removeEntry(entry);
@@ -7304,6 +7319,14 @@ ${key.title}`.toLowerCase();
     setDescription(key, markdown) {
       return (doc) => setDescription(doc, this.entryOf(doc, key), markdown);
     }
+    /** A context line added at the end of an open task's description (`ops.addContext`); a closed task refuses it. */
+    addContext(key, text) {
+      return (doc) => {
+        const entry = this.entryOf(doc, key);
+        if (!isOpen(entry.task.status)) throw new Error("the task is closed");
+        return addContext(doc, entry, text);
+      };
+    }
     remove(key) {
       return (doc) => remove(doc, this.entryOf(doc, key));
     }
@@ -7802,6 +7825,9 @@ ${key.title}`.toLowerCase();
     }
     setDescription(key, markdown) {
       return nothing(this.rules.setDescription(key, markdown));
+    }
+    addContext(key, text) {
+      return nothing(this.rules.addContext(key, text));
     }
     remove(key) {
       return nothing(this.rules.remove(key));

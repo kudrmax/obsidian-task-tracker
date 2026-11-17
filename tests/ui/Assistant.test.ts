@@ -259,6 +259,7 @@ describe("AssistantAnswers", () => {
 			tasksPort: (tasks) => ({
 				listed: () => tasks.listed(),
 				sectionOffer: (date) => tasks.sectionOffer(date),
+				addContext: (key, text) => tasks.addContext(key, text),
 				menu: (item, from, screen) => tasks.menu(item, from, screen),
 				toggleLabel: () => Promise.reject(new Error("disk full")),
 			}),
