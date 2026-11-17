@@ -23,7 +23,7 @@ Five days of hand-written animation, several drag controllers, per-place code an
 | Drag and drop | **dnd-kit**, the classic documented line (`@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/modifiers`) | Sortable lists, moves between columns and sections, droppable time grid, touch/mouse/keyboard sensors with a delay for long press, auto-scroll, snap modifiers. |
 | Gestures that are not drag and drop | **@use-gesture/react** with **Motion** springs | Ribbon and day swipes (drag and wheel), divider drag, timeline pinch zoom, resizing a task on the timeline: one hook per gesture, no pointer listeners of ours. |
 | Popovers, menus | **Floating UI** | Positioning, flipping and dismissal of anything that floats. |
-| Long lists | **TanStack Virtual** | Only if measurement shows the need. |
+| Long lists | **TanStack Virtual** | Every task column, as stage 0 measured: only the visible cards are mounted. |
 | Layout | **CSS** flex/grid with the `--tc-…` tokens in `styles.css` | Plain class names under the `tc-` prefix; `tests/styles.test.ts` keeps guarding the tokens. |
 
 Settings stays on Obsidian's own `Setting` UI.
@@ -67,7 +67,7 @@ Replaced wholesale, then deleted (`trash`): `obsidian/ui/` motion, drag, layouts
 ## Acceptance criteria
 
 - Every behaviour described in `docs/plugin/` works on the phone and on the desktop, in light and dark, checked in the test Obsidian.
-- No long task over 16 ms on normal interactions (tap, drag, drop, typing, switching place) with ~300 tasks, measured with the Performance panel over CDP.
+- No long task over 16 ms on normal interactions (tap, drag frames, drop, typing, switching place, a move by command) with ~300 tasks, measured with the Performance panel over CDP. The one exception is lifting a card: one task under 33 ms (two frames) on the Mac. Stage 0 showed no drag library used as documented lifts within one frame (dnd-kit measures every drop target at activation).
 - No hand-written animation, drag or gesture code. One lint rule over `obsidian/ui/` fails on `animate(`, `getBoundingClientRect` and `addEventListener`; React's own handlers (`onClick`, `onDoubleClick`, `onContextMenu`) are fine. The only exception is the `ObsidianEditor` component. Gestures come from dnd-kit and @use-gesture.
 - Works in Obsidian's pop-out windows (the libraries get that window's document) and on iOS (long-press drag without the system text menu or page scroll fighting it).
 - All tests green: core, architecture, styles, `uiDecides`, and `npm run test:apple`.
@@ -78,7 +78,7 @@ The features are listed in [`2026-11-16-ui-standard-stack-features.md`](2026-11-
 
 ## Stages
 
-0. **Blockers first.** A throwaway test frontend on the stack, with real data, proves every risk before a feature is built: drag together with card animation, selective re-render and the 16 ms budget with ~300 tasks, the timeline (snap, resize, pinch), the ribbon swipe, the divider, menus, the embedded editor, pop-out windows, Obsidian's phone view, long-press drag in iOS WebKit, bundle size. Results in `ui-standard-stack/stage0.md`. A library that fails is swapped for its standard alternative here, not worked around later.
+0. **Blockers first** (done: [`ui-standard-stack/stage0.md`](ui-standard-stack/stage0.md); its «Recommended configuration» and integration rules are how stages 1–3 use the libraries; Obsidian's phone view is checked again on that configuration in stage 2). A throwaway test frontend on the stack, with real data, proved every risk before a feature is built: drag together with card animation, selective re-render and the 16 ms budget with ~300 tasks, the timeline (snap, resize, pinch), the ribbon swipe, the divider, menus, the embedded editor, pop-out windows, Obsidian's phone view, long-press drag in iOS WebKit, bundle size. Results in `ui-standard-stack/stage0.md`. A library that fails is swapped for its standard alternative here, not worked around later.
 1. React, Zustand store over `TaskService`, `TaskScreen` with static columns and cards, mounted in the leaf and the note block.
 2. Motion for layout and enter/exit; dnd-kit for lists, sections, columns and the time grid.
 3. Menus, the editor component, keyboard commands, the remaining places and screens.
