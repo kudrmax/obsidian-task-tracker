@@ -1,0 +1,50 @@
+== oracle
+{"name":"list, zoom 1x, evening","ok":true,"aimed":"23:00","file":"23:00","blockTop":526.6,"lineTop":526.6,"hourPx":56,"invisibleF
+{"name":"list, zoomed in, evening","ok":true,"aimed":"23:00","file":"23:00","blockTop":470.9,"lineTop":470.9,"hourPx":112.68300242
+{"name":"list, zoomed in more, night","ok":true,"aimed":"1:00","file":"01:00","blockTop":470.6,"lineTop":470.6,"hourPx":179.599586
+{"name":"list, zoomed out, night","ok":true,"aimed":"2:00","file":"02:00","blockTop":698.4,"lineTop":698.4,"hourPx":38.63270773913
+{"name":"block, zoom 1x","ok":true,"aimed":"23:00","file":"23:00","blockTop":526.6,"lineTop":526.6,"hourPx":56,"invisibleFrames":0
+{"name":"block, zoomed in","ok":true,"aimed":"23:00","file":"23:00","blockTop":582.9,"lineTop":582.9,"hourPx":112.68300242279082,"
+{"name":"block, zoomed out","ok":true,"aimed":"1:00","file":"01:00","blockTop":659.7,"lineTop":659.7,"hourPx":38.632707739136,"inv
+== sequences
+passed 12 of 12
+== drop visibility
+desk within: 0 faulty frames after release
+desk cross: 0 faulty frames after release
+desk timeline: 0 faulty frames after release
+desk command: 0 faulty frames after release
+== blockers 1 and 4
+== final2 within column
+frames 190 overlay frames 0
+order t12313,t2,t3,t4,t5,t6 | file "\n- [ ] Написать документы 1\n- [ ] Купить квартиру 2\n- [ ] Проверить билеты 3\n- [ ] Разобрать письмо Косте 4\n- [ ] Оплатить н
+== final2 Inbox to Soon
+frames 232 overlay frames 0
+before t12313 after soon t137,t138,t140,t141,t143 | file "## Soon\n\n- [ ] Проверить билеты 123 📅 2026-11-18 🗂️ Работа\n- [ ] Разобрать письмо Косте 124\n- [ ] Оплатить налоги 1
+== final2 command move
+frames 158 overlay frames 0
+== final2 timeline move
+{"gridTopBefore":-472.90625,"gridTopAtRelease":-472.90625,"overlayTopAtRelease":582.09375,"blockTopAfter":577.09375,"line":"- [ ] Купить продукты 107 📅 2026-11-17 📌 2026-11-17 23:45-00:15","hourPx":56}
+== final2 list to timeline
+{"gridTopBefore":-472.90625,"gridTopAtRelease":-472.90625,"overlayTopAtRelease":429.9921875,"blockTopAfter":441.7578125,"line":"- [/] Починить ревью PR 71 📅 2026-11-17 📌 2026-11-17 21:00","hourPx":56}
+== final2 resize
+{"before":"- [ ] Разобрать маме 109 📅 2026-11-17 📌 2026-11-17 23:20-23:50","after":"- [ ] Разобрать маме 109 📅 2026-11-17 📌 2026-11-17 23:20-23:50","heightBefore":28,"heightWhileHeld":28,"heightAfter":2
+== final2 menu
+{"openedByClick":true,"menuBox":{"x":162,"y":172,"top":120,"left":52,"w":220,"h":104},"inSameDocAsView":true,"closedByEscape":true,"reopened":true,"closedByOutsideClick":true,"itemRan":true,"closedAfterItem":true}
+== final2 editor
+{"mountsBefore":5,"focused":true,"suggestOpen":true,"text":"Купить молоко [[","echo":"Купить молоко [[","toolbarRenders":20,"mountsAfter":5}
+== timeline frames
+block-slow: 107 frames, 501 samples 
+file:///private/tmp/claude-501/-Users-mdmkudryashov-projects-obsidian-my-own-plugins-obsidian-task-tracker/10b8c134-2d84-49f9-9c81-48ded7b4dd36/scratchpad/scripts/tl-record.mjs:74
+await record("block-fast", () => drag({ x: b.x, y: b.top + 8 }, { x: b.x, y: b.top + 8 - 120 }, 280));
+                                             ^
+
+TypeError: Cannot read properties of null (reading 'x')
+    at file:///private/tmp/claude-501/-Users-mdmkudryashov-projects-obsidian-my-own-plugins-obsidian-task-tracker/10b8c134-2d84-49f9-9c81-48ded7b4dd36/scratchpad/scripts/tl-record.mjs:74:46
+    at record (file:///private/tmp/claude-501/-Users-mdmkudryashov-projects-obsidian-my-own-plugins-obsidian-task-tracker/10b8c134-2d84-49f9-9c81-48ded7b4dd36/scratchpad/scripts/tl-record.mjs:59:8)
+    at async file:///private/tmp/claude-501/-Users-mdmkudryashov-projects-obsidian-my-own-plugins-obsidian-task-tracker/10b8c134-2d84-49f9-9c81-48ded7b4dd36/scratchpad/scripts/tl-record.mjs:74:1
+
+Node.js v22.22.0
+block-slow         {"frames":501,"selectionFrames":0,"dragFrames":361,"pointerOffsetChanges":2,"maxOffsetJumpPx":8,"offsets":"-13 -5 -6 -1 0 -2 -3","onGridLagErrorPx":{"median":0.4,"p95":0.8,"max":12.9},"blockVanishedFrames":0}
+finished
+
+[exited with code 0]

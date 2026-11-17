@@ -4,6 +4,7 @@ import {
 	pointerWithin,
 	DndContext,
 	type DragEndEvent,
+	type DragMoveEvent,
 	type DragOverEvent,
 	DragOverlay,
 	type DragStartEvent,
@@ -17,12 +18,12 @@ import {
 } from "@dnd-kit/core";
 import type { Modifier } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { autoUpdate, flip, FloatingPortal, offset, shift, useClick, useDismiss, useFloating, useInteractions, useRole } from "@floating-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useDrag, useGesture } from "@use-gesture/react";
 import { AnimatePresence, motion, useMotionValue, useSpring } from "motion/react";
-import { createContext, memo, useCallback, useContext, useMemo, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
@@ -134,22 +135,37 @@ function Menu() {
 	);
 }
 
-/** The time grid wins under the pointer; elsewhere the sortable lists' closest corners (dnd-kit's documented composition). */
+/**
+ * What is under the pointer decides (dnd-kit's documented composition of `pointerWithin` and `closestCorners`): the time
+ * grid, else a card, else the nearest card of the column the pointer is in; nothing outside any target. A block's overlay
+ * is as wide as the timeline, so its corners must not choose a list on another place.
+ */
 const collision: CollisionDetection = (args) => {
 	const within = pointerWithin(args);
 	const grid = within.find((c) => c.id === "timeline");
-	return grid ? [grid] : closestCorners(args);
+	if (grid) return [grid];
+	const cards = within.filter((c) => !String(c.id).startsWith("col:"));
+	if (cards.length) return cards;
+	const column = within.find((c) => String(c.id).startsWith("col:"));
+	if (column) {
+		const list = `list:${String(column.id).slice(4)}`;
+		const near = closestCorners({ ...args, droppableContainers: args.droppableContainers.filter((d) => d.data.current?.sortable?.containerId === list) });
+		return near.length ? near : [column];
+	}
+	return [];
 };
 
-/** The overlay's top on the time grid's own lines, `step` pixels apart: a dnd-kit modifier over the droppable's rect. */
-const snapToGrid =
-	(step: number): Modifier =>
-	({ transform, draggingNodeRect, over }) => {
-		if (!draggingNodeRect || !over || over.id !== "timeline") return transform;
-		const top = draggingNodeRect.top + transform.y;
-		const snapped = over.rect.top + Math.round((top - over.rect.top) / step) * step;
-		return { ...transform, y: transform.y + snapped - top };
-	};
+/**
+ * Over the time grid the overlay's top rides the pointer, so the time a person aims at with the pointer is the time the
+ * card's top shows; it follows every pixel, the snap is the landing's (the preview), not the overlay's. A dnd-kit
+ * modifier from the activator's coordinates, as its own `snapCenterToCursor` is built.
+ */
+const topAtPointerOnGrid: Modifier = ({ transform, draggingNodeRect, over, activatorEvent }) => {
+	if (!draggingNodeRect || !over || over.id !== "timeline" || !activatorEvent) return transform;
+	const at = getEventCoordinates(activatorEvent);
+	if (!at) return transform;
+	return { ...transform, y: transform.y + at.y - draggingNodeRect.top };
+};
 
 function containerOf(shown: Readonly<Record<ColumnId, readonly string[]>>, id: string): ColumnId | null {
 	if (id.startsWith("col:")) return id.slice(4) as ColumnId;
@@ -163,7 +179,6 @@ function Ribbon() {
 	const place = useScreen((s) => s.place);
 	const x = useSpring(-place * width, SPRING);
 	const origin = useRef<DropFrom | null>(null);
-	const hourPx = useScreen((s) => s.hourPx);
 	const active = useScreen((s) => s.dragging);
 	const overGrid = useScreen((s) => s.overGrid);
 
@@ -222,15 +237,29 @@ function Ribbon() {
 		const at = overIndex < 0 ? target.length : overIndex;
 		s.setShown({ ...s.shown, [from]: s.shown[from].filter((v) => v !== active.id), [to]: [...target.slice(0, at), String(active.id), ...target.slice(at)] });
 	};
+	/** Minutes from the day's start at the overlay's top on the grid (the pointer, by the modifier). */
+	const minuteOnGrid = (active: DragEndEvent["active"], over: NonNullable<DragEndEvent["over"]>) => (over.data.current as { minuteAt(y: number): number }).minuteAt(active.rect.current.translated?.top ?? 0);
+	const onDragMove = ({ active, over }: DragMoveEvent) => {
+		const s = store.getState();
+		const id = String(active.id);
+		s.setPreview(over?.id === "timeline" ? { id: id.startsWith("tl:") ? id.slice(3) : id, from: origin.current!, minute: minuteOnGrid(active, over) } : null);
+	};
 	const onDragEnd = function ({ active, over }: DragEndEvent) {
 		const s = store.getState();
 		const id = String(active.id);
 		const taskId = id.startsWith("tl:") ? id.slice(3) : id;
 		const from = origin.current!;
+		s.setPreview(null);
 		if (over?.id === "timeline") {
-			const top = active.rect.current.translated?.top ?? 0;
-			void s.dropAtTime(taskId, from, ((top - over.rect.top) / s.hourPx) * 60);
+			void s.dropAtTime(taskId, from, minuteOnGrid(active, over));
 			return;
+		}
+		if (over && id.startsWith("tl:")) {
+			const col = containerOf(s.shown ?? s.columns, String(over.id));
+			if (col) {
+				void s.dropFromTimeline(taskId, col, String(over.id).startsWith("col:") ? null : String(over.id));
+				return;
+			}
 		}
 		if (!over || !s.shown || id.startsWith("tl:")) {
 			s.setShown(null);
@@ -249,6 +278,7 @@ function Ribbon() {
 		void s.drop(taskId, from, { kind: "place", column: col, place: { kind: "task", group, before: next ? s.items[next].key : null } });
 	};
 	const onDragCancel = () => {
+		store.getState().setPreview(null);
 		store.getState().setOverGrid(false);
 		store.getState().setShown(null);
 		store.getState().setDragging(null);
@@ -280,11 +310,10 @@ function Ribbon() {
 	);
 	const measuringMode = useScreen((s) => s.measuring);
 	const measuring = useMemo(() => ({ droppable: { strategy: MEASURING[measuringMode] } }), [measuringMode]);
-	const step = hourPx / 4;
-	const modifiers = [snapToGrid(step)];
+	const modifiers = useMemo(() => [topAtPointerOnGrid], []);
 
 	return (
-		<DndContext sensors={sensors} collisionDetection={collision} measuring={measuring} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
+		<DndContext sensors={sensors} collisionDetection={collision} measuring={measuring} modifiers={modifiers} onDragStart={onDragStart} onDragMove={onDragMove} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
 			{mode === "snap" ? (
 				<div className="tcs-ribbon-snap" ref={snapRef} onScrollEnd={(e) => store.getState().setPlace(Math.round(e.currentTarget.scrollLeft / width))}>
 					<div className="tcs-track" style={{ width: width * PLACES }}>
@@ -299,7 +328,7 @@ function Ribbon() {
 				</div>
 			)}
 			{createPortal(
-				<DragOverlay modifiers={modifiers} dropAnimation={overGrid ? null : undefined}>
+				<DragOverlay dropAnimation={overGrid ? null : undefined}>
 					{active ? <Lifted active={active} /> : null}
 				</DragOverlay>,
 				host.root.ownerDocument.body,
@@ -365,7 +394,7 @@ const Column = memo(function Column({ col }: { col: ColumnId }) {
 				{col} {all.length}
 			</div>
 			<DropArea col={col} scroller={scroller}>
-				<SortableContext items={all as unknown as string[]} strategy={verticalListSortingStrategy}>
+				<SortableContext id={`list:${col}`} items={all as unknown as string[]} strategy={verticalListSortingStrategy}>
 					{virtual ? (
 						<div style={{ height: v.getTotalSize(), position: "relative" }}>
 							<div style={{ position: "absolute", top: 0, left: 0, right: 0, transform: `translateY(${offset}px)` }}>{list}</div>
@@ -478,22 +507,54 @@ function Timeline() {
 	const ids = useScreen((s) => s.slotted);
 	const hourPx = useScreen((s) => s.hourPx);
 	const dayStartHour = useHost().dayStartHour;
-	const { setNodeRef, isOver } = useDroppable({ id: "timeline" });
-	const scroller = useRef<HTMLDivElement>(null);
+	const scroller = useRef<HTMLDivElement | null>(null);
+	const grid = useRef<HTMLDivElement>(null);
+	/**
+	 * The droppable is the timeline as seen (its scroller), not the whole day's grid, which reaches far above and below the
+	 * visible part; the minute under a point is read from the grid's place as it stands at that moment.
+	 */
+	const data = useMemo(() => ({ minuteAt: (y: number) => ((y - (grid.current?.getBoundingClientRect().top ?? 0)) / store.getState().hourPx) * 60 }), [store]);
+	const { setNodeRef } = useDroppable({ id: "timeline", data });
+	const scrollerRef = useCallback(
+		(el: HTMLDivElement | null) => {
+			scroller.current = el;
+			setNodeRef(el);
+		},
+		[setNodeRef],
+	);
+	/** The minute under the pointer when a zoom step began and where the pointer stood in the scroller: kept in place. */
+	const anchor = useRef<{ minute: number; offset: number } | null>(null);
 	useGesture(
 		{
-			onPinch: ({ offset: [scale] }) => store.getState().setHourPx(Math.round(56 * scale)),
+			onPinch: ({ offset: [scale], origin: [, oy], first, memo }) => {
+				const el = scroller.current;
+				if (!el) return memo;
+				/** Fixed for the whole gesture (use-gesture's `memo`), so no step's rounding carries into the next. */
+				const fixed = first || !memo ? { minute: ((el.scrollTop + (oy - el.getBoundingClientRect().top)) / store.getState().hourPx) * 60, offset: oy - el.getBoundingClientRect().top } : memo;
+				anchor.current = fixed;
+				store.getState().setHourPx(56 * scale);
+				return fixed;
+			},
 		},
 		{ target: scroller, pinch: { scaleBounds: { min: 0.5, max: 4 }, from: () => [store.getState().hourPx / 56, 0] }, eventOptions: { passive: false }, window: win },
 	);
+	/** Pointer-anchored zoom: the time under the pointer stays under it (scrollTop set before the frame is painted). */
+	useLayoutEffect(() => {
+		const el = scroller.current;
+		const a = anchor.current;
+		if (!el || !a) return;
+		el.scrollTop = (a.minute / 60) * hourPx - a.offset;
+		anchor.current = null;
+	}, [hourPx]);
 	return (
-		<div className="tcs-timeline" ref={scroller}>
-			<div className={`tcs-grid ${isOver ? "is-over" : ""}`} ref={setNodeRef} style={{ height: 24 * hourPx }}>
+		<div className="tcs-timeline" ref={scrollerRef}>
+			<div className="tcs-grid" ref={grid} style={{ height: 24 * hourPx }}>
 				{Array.from({ length: 24 }, (_, h) => (
 					<div key={h} className="tcs-hour" style={{ top: h * hourPx, height: hourPx }}>
 						{(h + dayStartHour) % 24}:00
 					</div>
 				))}
+				<Preview hourPx={hourPx} />
 				{ids.map((id) => (
 					<Block key={id} id={id} hourPx={hourPx} />
 				))}
@@ -502,10 +563,18 @@ function Timeline() {
 	);
 }
 
+/** Where the card will land, the core's span for the snapped minute under the pointer, drawn as the block will stand. */
+function Preview({ hourPx }: { hourPx: number }) {
+	const span = useScreen((s) => s.preview);
+	if (!span) return null;
+	const end = span.end ?? span.start + 15;
+	return <div className="tcs-block tcs-block-preview" style={{ top: (span.start / 60) * hourPx, height: Math.max(18, ((end - span.start) / 60) * hourPx) }} />;
+}
+
 const Block = memo(function Block({ id, hourPx }: { id: string; hourPx: number }) {
 	count(counters.block, id);
 	const { store, win } = useHost();
-	const slot = useScreen(useShallow((s) => ({ shown: s.items[id]?.slot != null || id in s.landed, start: s.spanOf(id)?.start ?? 0, end: s.spanOf(id)?.end ?? null })));
+	const slot = useScreen(useShallow((s) => ({ shown: s.items[id]?.slot != null || id in s.landed, landed: id in s.landed, start: s.spanOf(id)?.start ?? 0, end: s.spanOf(id)?.end ?? null })));
 	const { setNodeRef, listeners, attributes, isDragging } = useDraggable({ id: `tl:${id}` });
 	const [held, setHeld] = useState<{ start: number; end: number } | null>(null);
 	const end = slot.end ?? slot.start + 15;
@@ -524,10 +593,10 @@ const Block = memo(function Block({ id, hourPx }: { id: string; hourPx: number }
 	return (
 		<motion.div
 			className={`tcs-block ${isDragging ? "is-placeholder" : ""}`}
-			layout={held ? false : "position"}
+			layout={held || slot.landed ? false : "position"}
 			layoutDependency={`${slot.start}-${slot.end}`}
 			transition={SPRING}
-			style={{ top: (span.start / 60) * hourPx, height: Math.max(14, ((span.end - span.start) / 60) * hourPx) }}
+			style={{ top: (span.start / 60) * hourPx, height: Math.max(18, ((span.end - span.start) / 60) * hourPx) }}
 		>
 			<div className="tcs-block-body" ref={setNodeRef} data-block={id} {...listeners} {...attributes}>
 				<Face id={id} />

@@ -113,6 +113,64 @@ Only **the lift**: the one long task when a card is picked up. At 1× it is 16.4
 
 Classic dnd-kit (`@dnd-kit/core` + `sortable`), `MeasuringStrategy.WhileDragging` (the default; `BeforeDragging` brings the lift within a column down to 16.4–20.9 ms but nearly doubles drops and commands at 4×, 42 ms against 25), TanStack Virtual per column with all ids in the `SortableContext`, thin `useSortable` wrappers inside memoized Motion rows, the lifted id and the overlay's card from the store, `DragOverlay` in a portal, Motion `layout="position"` with `layoutDependency` = the order as read and `layoutId` off for the lifted row. It passes blockers 1 and 4 without a jump, including drags across columns and moves by command, and everything but the lift (and, at its edge, the frame crossing columns) is under 16 ms on the Mac. @dnd-kit/react is faster at the lift and across columns but still over 16 ms at the lift and jumps across columns, and it is pre-1.0. Meeting 16 ms at the lift would need a drag library whose activation does not touch every drop target, which neither dnd-kit line offers.
 
+## Drop flicker
+
+**What Max saw:** on release the dropped card vanished for a moment, flickered and appeared again «from scratch». The frame checks of the first rounds tracked positions only and treated «no visible copy» as normal, so they passed it.
+
+**Reproduced** (`spike/checks/b14-flicker.mjs`, every frame from release to +900 ms: the card's mounted copies, the opacity of every ancestor, `visibility`, scale, the overlay, plus a CDP screencast): within a column 31 frames and Inbox→Soon 30 frames after release with neither the card nor the overlay visible (`stage0/flicker/vis-before-*.json`).
+
+**Causes, verified one by one:**
+
+1. **The overlay's card followed the store.** dnd-kit keeps the `DragOverlay`'s last children through its drop animation and hides the source card meanwhile (its default `sideEffects`). The overlay's child read the lifted id from the store, which the drop clears at once, so it rendered nothing: no overlay and a hidden card for the whole drop animation (~250 ms), then the card «appeared». Fix: the overlay's card gets its id as a prop (`<DragOverlay>{active ? <Lifted active={active} /> : null}</DragOverlay>`, dnd-kit's documented shape).
+2. **Drops on the timeline flew back.** The overlay's drop animation runs to the source node, which for a list card is the list row, while the block appears on the grid: two cards, one flying back. Fix: no drop animation over the grid (`dropAnimation={null}`, documented), and the block is drawn at once where the core's `dropSpan` puts it, until the write's read arrives (`landed` in the store; the row leaves the list in the same commit).
+3. **A card moved by a command left a ghost.** With Motion's shared `layoutId` the old and the new row crossfaded (opacity dipped to ~0.8 each); with crossfade off the exiting row faded out at the old place. Fix: `layoutCrossfade={false}` and the exit decided when the row leaves (AnimatePresence's `custom`): a task still on the screen has moved, its old row goes at once; only a task gone from the screen fades.
+
+**After** (`stage0/flicker/vis-final-*.json`, main window and phone emulation): 0 faulty frames for a drop within a column, Inbox→Soon, onto the timeline and a move by command; the check now also fails on two visible copies apart and on a card faded or scaled once the overlay is gone.
+
+## Timeline, second round
+
+**What Max saw:** dragging a block teleports with a flicker, a highlight covers the whole calendar during a drag, zoom doesn't keep the time under the pointer, a card let go over 09:00 doesn't land at 09:00, a block dragged back to a list disappears or comes back, short blocks cut their title in half. The earlier checks compared two numbers from the spike's own pixel-to-minute math, so a wrong conversion agreed with itself, and they never zoomed or scrolled first.
+
+**New checks, from what a user sees** (`spike/checks/`):
+
+- `tl-record.mjs` + `tl-analyze.mjs`: screencasts of slow and fast block drags, a list card onto the grid and back off, a resize, ctrl+wheel zoom over 07:00, 12:00 and the top edge, and a trackpad pinch (`Input.synthesizePinchGesture`), sampled every frame: the overlay against the pointer one frame earlier, the selection, blocks that vanish, and the zoom anchor (the time under the pointer, in px at the current zoom). Contact sheets in `stage0/timeline/*-frames.jpg`; I looked at them before and after.
+- `tl-oracle.mjs`: the user's truth, independent of the code under test. The pointer is put on a visible hour label's line («23:00», «1:00», «2:00») after zooming (1×, ~2×, ~3.2×, ~0.7×) and scrolling; after release the tasks file must have that time, the block's top must sit on that label's line within 1 px, and the card must be visible every frame. List cards and blocks.
+- `tl-sequences.mjs`: Max-like sequences, three fast rounds: a block out onto the day list, a list card onto the grid and back off onto the list, a block let go outside any target, a list card onto the grid fast; each ends with the file and the screen compared.
+
+**What the frames showed before, and the causes:**
+
+| Seen | Cause | Fix (standard usage) |
+|---|---|---|
+| The whole calendar tinted during any drag over it | the spike's own `.is-over` style on the 24-hour grid | removed; a landing preview (dashed block at the core's `dropSpan` of the snapped minute) shows where it will land |
+| The block moves in 14 px jumps, «teleports» | `createSnapModifier`-style snapping of the overlay to grid lines | the overlay follows the pointer every pixel; the snap is the landing's (preview, then the write) |
+| A card let go over 23:00 lands at 22:45 (one step early), at every zoom | the overlay's top is the time, but the person aims with the pointer, which sits below the card's top by the grab offset; and the modifier that would align them was on `DragOverlay`, which moves only the picture, not the collision rect dnd-kit reports | a modifier on `DndContext` (`modifiers`, documented: it moves the collision rect too) puts the overlay's top at the pointer over the grid, built as dnd-kit's own `snapCenterToCursor` |
+| A block let go above the timeline (outside) still lands, at some early hour | the droppable was the 24-hour grid, whose rect reaches far above and below the visible part | the droppable is the visible scroller; the minute is read from the grid's place at that moment (`data.minuteAt`) |
+| A block dragged onto the day list lands in Soon, on the other place | `closestCorners` over a block's overlay as wide as the timeline picked cards of the offscreen place | collision is pointer-first: the grid, else the card under the pointer, else the nearest card of the column under the pointer, else nothing (dnd-kit's documented composition) |
+| A block dragged back to a list «disappears, maybe comes back» | the spike never handled timeline→list; the drop was treated as a cancel | the drop writes through `TaskService.drop` from `timeline` with the list place, and the row stands there at once |
+| Zoom: the time under the pointer drifts 51–1176 px | the hour height changed without the scroll position | pointer-anchored zoom: the minute under the pointer is fixed for the whole gesture (use-gesture's `memo`) and `scrollTop` is set in a layout effect, before the frame is painted |
+| The block jumps back to its old place after a drop, then glides | Motion `layout` on the block animated the optimistic move | layout off for a block that was just let go |
+| Short blocks cut the title in half | 14 px minimum height with 6 px padding and a 13 px line | one line, ellipsis, 18 px minimum |
+| Resizing steps in 14 px | the held span was the snapped one | the edge follows the pointer; the snap is the release's |
+| On the phone view drops landed elsewhere | the ribbon got scrolled sideways (`overflow: hidden` lets focus scroll it) and the host missed the phone layout's resize | `overflow: clip` (with `min-height: 0`) on the ribbon; the host follows its element with a `ResizeObserver` |
+
+**After:**
+
+| Check | Before | After |
+|---|---|---|
+| Oracle, 7 drops at 4 zooms, main window | the file one step early in all 7, block 9–15 px above the line | 7/7: file = the aimed hour, block top on the line (0.0 px), 0 invisible frames |
+| Oracle, pop-out | — | 7/7 |
+| Oracle, phone emulation | — | 7/7 |
+| Sequences, 12 steps | 7/12 (block to the list landed in Soon; outside drops wrote a time) | 12/12 main window, 12/12 pop-out, 12/12 phone |
+| Block drag, overlay vs pointer one frame earlier, on the grid | median 7.8–9 px, max 14.5 (snapping) | median 0.4–1 px, p95 0.8–1 px; one shift of the grab offset (≤ 13 px) when the card's top moves to the pointer as it enters the grid |
+| Zoom anchor drift (ctrl+wheel at 07:00, 12:00, top edge; pinch) | 51–1176 px | 0.88, 0.30, 0.56, 0.55 px |
+| Selection during drags | 0 | 0 |
+| Drop visibility (within, Inbox→Soon, timeline, command), desktop and phone | 30–31 frames with nothing visible | 0 faulty frames |
+| Resize | steps of 14 px | the edge follows the pointer (constant 3 px offset), 5 px settle to the line at release |
+
+Blockers 1 and 4 re-run on this build: drags within a column and Inbox→Soon 0 reversals, 0 doubles, written to the aimed gap; a move by command glides; menu and editor pass. Performance on this build (`stage0/round3-final-perf.jsonl`, classic WhileDragging, 3 runs at 1×, 2 at 4×): first render 10.3, lift 27.8 (24.9–29.1), drag frame 3.9, drop 5.1, lift then crossing 29.4, frame crossing 15.8 (15.3–16.0), drop into Soon 4.7, command 11.6 ms at 1×; at 4× 36, 52.5, 7.2, 24.2, 49.2, 40.0, 19.7, 25.7. The lift stays the one step over 16 ms, as in the second round.
+
+**Still open, not fixed here:** overlapping blocks are drawn on top of each other (the spike has no stacking; the core's `stackTasks` exists for it); a past time today rides the now line by the core's rule, so blocks generated earlier in the evening gather there, and a drop onto a past time glides to the now line after the write; the overlay of a block dragged over a list keeps the timeline's width; the one grab-offset shift as a card enters the grid.
+
 ## Must a library be swapped?
 
 Updated by the second round: no swap is recommended; the classic line, virtualized as above, is the configuration to build on, and the lift is the one step over 16 ms. The first-round answer follows.

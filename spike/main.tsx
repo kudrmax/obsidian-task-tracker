@@ -56,6 +56,11 @@ class SpikeView extends ItemView {
 		this.contentEl.addClass("tcs-host");
 		this.root = createRoot(this.contentEl);
 		this.draw();
+		/** Obsidian's onResize misses the layout change of the phone view; the host follows its element's size itself. */
+		const win = this.contentEl.ownerDocument.defaultView!;
+		const observer = new win.ResizeObserver(() => this.draw());
+		observer.observe(this.contentEl);
+		this.register(() => observer.disconnect());
 	}
 
 	override onResize(): void {

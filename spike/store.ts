@@ -38,7 +38,7 @@ export interface ScreenState {
 	moveLastSoonToInbox(): Promise<void>;
 	togglePriority(id: string): Promise<void>;
 	resize(id: string, minute: number): Promise<void>;
-	/** The card's span while its end is held at `minute`, snapped: the core's. */
+	/** The card's span while its end is held at `minute`, following the pointer; the snap is the release's (`resize`). */
 	/** Where the card stands on the day's timeline, minutes from the day's start: the core's. */
 	spanOf(id: string): { readonly start: number; readonly end: number | null } | null;
 	stretch(id: string, minute: number): { readonly start: number; readonly end: number } | null;
@@ -48,6 +48,11 @@ export interface ScreenState {
 	landed: Readonly<Record<string, { readonly start: number; readonly end: number | null }>>;
 	/** The pointer is over the time grid: the overlay then plays no drop animation, the card is already in its slot. */
 	overGrid: boolean;
+	/** Where the card under the pointer would land on the grid: the core's `dropSpan` of the snapped minute. */
+	preview: { readonly start: number; readonly end: number | null } | null;
+	setPreview(at: { id: string; from: DropFrom; minute: number } | null): void;
+	/** A timeline card let go on a list: it stands there at once (before `beforeId`, or last), then the write. */
+	dropFromTimeline(id: string, column: ColumnId, beforeId: string | null): Promise<void>;
 	setOverGrid(over: boolean): void;
 	tick: number;
 	/** Measurement only: each column mounts at most this many cards, what a virtualized list would keep mounted. */
@@ -186,7 +191,7 @@ export function createScreenStore(tasks: TaskService, today: () => LocalDate): S
 		},
 		stretch(id, minute) {
 			const item = get().items[id];
-			return item ? tasks.stretch(item, get().date, "end", tasks.snap(minute, get().hourPx, 9)) : null;
+			return item ? tasks.stretch(item, get().date, "end", minute) : null;
 		},
 		async dropAtTime(id, from, minute) {
 			const s = get();
@@ -205,6 +210,29 @@ export function createScreenStore(tasks: TaskService, today: () => LocalDate): S
 		},
 		landed: {},
 		overGrid: false,
+		preview: null,
+		setPreview(at) {
+			const s = get();
+			const item = at ? s.items[at.id] : null;
+			const span = at && item ? tasks.dropSpan(item, at.from, tasks.snap(at.minute, s.hourPx, 9)) : null;
+			const prev = s.preview;
+			if (prev === span || (prev && span && prev.start === span.start && prev.end === span.end)) return;
+			set({ preview: span });
+		},
+		async dropFromTimeline(id, column, beforeId) {
+			const s = get();
+			const item = s.items[id];
+			if (!item) return;
+			const shown = s.shown ?? s.columns;
+			const list = shown[column].filter((x) => x !== id);
+			const at = beforeId ? list.indexOf(beforeId) : -1;
+			const placed = at < 0 ? [...list, id] : [...list.slice(0, at), id, ...list.slice(at)];
+			const next = placed[placed.indexOf(id) + 1];
+			const prev = placed[placed.indexOf(id) - 1];
+			const group = (next ? s.items[next]?.group : undefined) ?? (prev ? s.items[prev]?.group : undefined) ?? null;
+			set({ shown: { ...shown, [column]: placed }, slotted: s.slotted.filter((x) => x !== id), dragging: null });
+			await get().drop(id, "timeline", { kind: "place", column, place: { kind: "task", group, before: next ? s.items[next].key : null } });
+		},
 		setOverGrid(overGrid) {
 			if (get().overGrid !== overGrid) set({ overGrid });
 		},

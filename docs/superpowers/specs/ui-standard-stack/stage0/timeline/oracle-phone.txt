@@ -1,0 +1,7 @@
+{"name":"list, zoom 1x, evening","ok":true,"aimed":"23:00","file":"23:00","blockTop":562,"lineTop":562,"hourPx":56,"invi
+{"name":"list, zoomed in, evening","ok":true,"aimed":"23:00","file":"23:00","blockTop":506.3,"lineTop":506.3,"hourPx":11
+{"name":"list, zoomed in more, night","ok":true,"aimed":"1:00","file":"01:00","blockTop":506,"lineTop":506,"hourPx":179.
+{"name":"list, zoomed out, night","ok":true,"aimed":"2:00","file":"02:00","blockTop":722.3,"lineTop":722.3,"hourPx":38.6
+{"name":"block, zoom 1x","ok":true,"aimed":"23:00","file":"23:00","blockTop":562,"lineTop":562,"hourPx":56,"invisibleFra
+{"name":"block, zoomed in","ok":true,"aimed":"23:00","file":"23:00","blockTop":618.3,"lineTop":618.3,"hourPx":112.683002
+{"name":"block, zoomed out","ok":true,"aimed":"1:00","file":"01:00","blockTop":683.6,"lineTop":683.6,"hourPx":38.6327077

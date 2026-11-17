@@ -2,7 +2,7 @@ import { connect, mouseDrag, sleep, SAMPLER } from "./cdp.mjs";
 import { rectOf } from "./rect.mjs";
 const c = await connect();
 const line = (id) => c.evaluate(`app.vault.adapter.read("TODOs Tasks.md").then(t => t.split("\\n").find(l => l.includes(tcSpike.store.getState().faces["${id}"].title + " ")))`);
-const id = await c.evaluate(`tcSpike.store.getState().slotted.find(i => { const r = document.querySelector('[data-block="' + i + '"]')?.getBoundingClientRect(); return r && r.top > 250 && r.bottom < 600 && r.height > 20; })`);
+const id = await c.evaluate(`tcSpike.store.getState().slotted.find(i => { const r = document.querySelector('[data-block="' + i + '"]')?.getBoundingClientRect(); const h = document.querySelector('[data-handle="' + i + '"]')?.getBoundingClientRect(); return r && r.top > 250 && r.bottom < 600 && r.height > 20 && document.elementFromPoint(h.left + h.width / 2, h.top + h.height / 2)?.dataset.handle === i; })`);
 const before = await line(id), hb = await rectOf(c, `[data-block="${id}"]`);
 const h = await rectOf(c, `[data-handle="${id}"]`);
 await c.evaluate(SAMPLER);

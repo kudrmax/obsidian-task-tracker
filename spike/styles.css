@@ -6,7 +6,7 @@
 .tcs-stat, .tcs-echo { color: var(--text-muted); font-size: 11px; }
 .tcs-menu { z-index: 50; display: flex; flex-direction: column; min-width: 220px; padding: 4px; border-radius: 8px; background: var(--background-secondary); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
 .tcs-menu button { justify-content: flex-start; margin: 1px 0; }
-.tcs-ribbon { flex: 1; overflow: hidden; touch-action: pan-y; position: relative; }
+.tcs-ribbon { flex: 1; min-height: 0; min-width: 0; overflow: clip; touch-action: pan-y; position: relative; }
 .tcs-track { display: flex; height: 100%; }
 .tcs-page { display: flex; height: 100%; flex-shrink: 0; gap: 6px; padding: 6px; box-sizing: border-box; }
 .tcs-place-3 { margin: auto; font-size: 24px; color: var(--text-faint); }
@@ -34,3 +34,6 @@
 .tcs-ribbon-snap { flex: 1; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
 .tcs-ribbon-snap::-webkit-scrollbar { display: none; }
 .tcs-ribbon-snap .tcs-page { scroll-snap-align: start; scroll-snap-stop: always; }
+.tcs-grid, .tcs-timeline { user-select: none; -webkit-user-select: none; }
+.tcs-block-preview { left: 44px; right: 6px; border-radius: 8px; border: 1px dashed var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 18%, transparent); pointer-events: none; }
+.tcs-block-body .tcs-card { padding: 2px 8px; font-size: 12px; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
