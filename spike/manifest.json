@@ -1,0 +1,9 @@
+{
+	"id": "task-calendar-spike",
+	"name": "Task Calendar Stack Spike",
+	"version": "0.0.1",
+	"minAppVersion": "1.7.2",
+	"description": "Stage 0: the standard UI stack checked in Obsidian. Throwaway.",
+	"author": "kudrmax",
+	"isDesktopOnly": false
+}

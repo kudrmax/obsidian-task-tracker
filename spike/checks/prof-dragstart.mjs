@@ -1,0 +1,11 @@
+import { connect, sleep, profile } from "./cdp.mjs";
+import { rectOf } from "./rect.mjs";
+const c = await connect();
+const st = (e) => c.evaluate(`(() => { const s = tcSpike.store.getState(); return ${e}; })()`);
+const a = await rectOf(c, `[data-id="${await st(`s.columns.inbox[0]`)}"]`);
+const mouse = (type, p) => c.send("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
+await mouse("mousePressed", a);
+const r = await profile(c, async () => { for (let i = 1; i <= 4; i++) { await mouse("mouseMoved", { x: a.x, y: a.y + i * 3 }); await sleep(30); } await sleep(200); }, 90);
+console.log("SELF\n" + r.self.join("\n") + "\nTOTAL\n" + r.total.join("\n"));
+await mouse("mouseReleased", { x: a.x, y: a.y + 12 });
+c.close();

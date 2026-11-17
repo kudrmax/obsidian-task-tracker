@@ -1,0 +1,36 @@
+.tcs-host { padding: 0 !important; overflow: hidden; }
+.tcs-screen { display: flex; flex-direction: column; height: 100%; font-size: 13px; }
+.tcs-toolbar { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--background-modifier-border); }
+.tcs-editor-wrap { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tcs-editor { flex: 1; min-height: 28px; border: 1px solid var(--background-modifier-border); border-radius: 6px; padding: 0 6px; overflow: hidden; }
+.tcs-stat, .tcs-echo { color: var(--text-muted); font-size: 11px; }
+.tcs-menu { z-index: 50; display: flex; flex-direction: column; min-width: 220px; padding: 4px; border-radius: 8px; background: var(--background-secondary); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.tcs-menu button { justify-content: flex-start; margin: 1px 0; }
+.tcs-ribbon { flex: 1; overflow: hidden; touch-action: pan-y; position: relative; }
+.tcs-track { display: flex; height: 100%; }
+.tcs-page { display: flex; height: 100%; flex-shrink: 0; gap: 6px; padding: 6px; box-sizing: border-box; }
+.tcs-place-3 { margin: auto; font-size: 24px; color: var(--text-faint); }
+.tcs-column { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--background-secondary); border-radius: 10px; }
+.tcs-column-title { padding: 6px 8px; font-weight: 600; text-transform: capitalize; }
+.tcs-column-scroll { flex: 1; overflow-y: auto; touch-action: pan-y; padding: 0 6px 40px; }
+.tcs-card-outer { margin-bottom: 4px; }
+.tcs-card-inner { touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.tcs-card-inner.is-placeholder { opacity: 0.3; }
+.tcs-card { padding: 6px 8px; border-radius: 8px; background: var(--background-primary); border-left: 4px solid transparent; cursor: grab; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tcs-card.is-overlay { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); cursor: grabbing; }
+.tcs-card.is-done { text-decoration: line-through; opacity: 0.6; }
+.tcs-day { display: flex; flex: 1; height: 100%; min-width: 0; }
+.tcs-day-list { display: flex; flex-shrink: 0; }
+.tcs-divider { width: 12px; flex-shrink: 0; cursor: col-resize; touch-action: none; background: linear-gradient(to right, transparent 5px, var(--interactive-accent) 5px, var(--interactive-accent) 7px, transparent 7px); }
+.tcs-timeline { flex: 1; overflow-y: auto; position: relative; min-width: 0; touch-action: pan-y; background: var(--background-secondary); border-radius: 10px; }
+.tcs-grid { position: relative; }
+.tcs-grid.is-over { background: color-mix(in srgb, var(--interactive-accent) 8%, transparent); }
+.tcs-hour { position: absolute; left: 0; right: 0; border-top: 1px solid var(--background-modifier-border); color: var(--text-faint); font-size: 10px; padding-left: 4px; box-sizing: border-box; }
+.tcs-block { position: absolute; left: 44px; right: 6px; display: flex; flex-direction: column; }
+.tcs-block.is-placeholder { opacity: 0.3; }
+.tcs-block-body { flex: 1; min-height: 0; overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.tcs-block-body .tcs-card { height: 100%; box-sizing: border-box; background: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-primary)); }
+.tcs-block-handle { height: 8px; margin-top: -8px; cursor: ns-resize; touch-action: none; position: relative; z-index: 1; }
+.tcs-ribbon-snap { flex: 1; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
+.tcs-ribbon-snap::-webkit-scrollbar { display: none; }
+.tcs-ribbon-snap .tcs-page { scroll-snap-align: start; scroll-snap-stop: always; }

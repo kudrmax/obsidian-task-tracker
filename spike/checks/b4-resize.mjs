@@ -1,0 +1,20 @@
+import { connect, mouseDrag, sleep, SAMPLER } from "./cdp.mjs";
+import { rectOf } from "./rect.mjs";
+const c = await connect();
+const line = (id) => c.evaluate(`app.vault.adapter.read("TODOs Tasks.md").then(t => t.split("\\n").find(l => l.includes(tcSpike.store.getState().faces["${id}"].title + " ")))`);
+const id = await c.evaluate(`tcSpike.store.getState().slotted.find(i => { const r = document.querySelector('[data-block="' + i + '"]')?.getBoundingClientRect(); return r && r.top > 250 && r.bottom < 600 && r.height > 20; })`);
+const before = await line(id), hb = await rectOf(c, `[data-block="${id}"]`);
+const h = await rectOf(c, `[data-handle="${id}"]`);
+await c.evaluate(SAMPLER);
+await c.evaluate(`window.__stop = __sample(["${id}"], (id) => '[data-block="' + id + '"]')`);
+const mouse = (type, p) => c.send("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
+await mouse("mousePressed", h);
+for (let i = 1; i <= 20; i++) { await mouse("mouseMoved", { x: h.x, y: h.y + (56 * i) / 20 }); await sleep(20); }
+const mid = await rectOf(c, `[data-block="${id}"]`);
+await mouse("mouseReleased", { x: h.x, y: h.y + 56 });
+await sleep(1200);
+const s = await c.evaluate(`window.__stop()`);
+const after = await rectOf(c, `[data-block="${id}"]`);
+const heights = [...new Set(s.map((r) => r[id]?.[0]).filter(Boolean).map(() => 0))];
+console.log(JSON.stringify({ before, after: await line(id), heightBefore: hb.h, heightWhileHeld: mid.h, heightAfter: after.h, overlayAppeared: s.some((r) => r.overlay) }));
+c.close();

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stack spike drag</title>
+<style>
+html, body { margin: 0; height: 100%; background: #000; color: #eee; font: 15px -apple-system, system-ui, sans-serif; overflow: hidden; overscroll-behavior: none; }
+#root { height: 100%; }
+.screen { display: flex; flex-direction: column; height: 100%; padding-top: env(safe-area-inset-top); box-sizing: border-box; }
+.status { padding: 6px 10px; font: 12px ui-monospace, monospace; background: #222; white-space: pre-wrap; min-height: 64px; }
+.list { flex: 1; overflow-y: auto; touch-action: pan-y; padding: 8px 10px 80px; -webkit-overflow-scrolling: touch; }
+.card-outer { margin-bottom: 6px; }
+.card-inner { touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.card-inner.is-placeholder { opacity: 0.3; }
+.card { padding: 12px 12px; border-radius: 10px; background: #1c1c1e; }
+.card.is-overlay { background: #2c2c2e; box-shadow: 0 10px 30px rgba(0,0,0,.6); }
+</style>
+</head>
+<body><div id="root"></div><script src="page.js"></script></body>
+</html>

@@ -1,0 +1,20 @@
+import { connect, sleep } from "./cdp.mjs";
+import { rectOf } from "./rect.mjs";
+const c = await connect();
+const mouse = (type, p) => c.send("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
+const sel = process.argv[2] ?? "slotted[2]";
+const id = sel === "mid" ? await c.evaluate(`tcSpike.store.getState().slotted.find(i => { const r = document.querySelector('[data-block="' + i + '"]')?.getBoundingClientRect(); return r && r.top > 250 && r.bottom < 520; })`) : await c.evaluate(`tcSpike.store.getState().${sel}`);
+const b = await rectOf(c, `[data-block="${id}"], [data-id="${id}"]`);
+const dx = +(process.argv[3] ?? 0), dy = +(process.argv[4] ?? 89);
+const g0 = await rectOf(c, ".tcs-grid");
+await mouse("mousePressed", b);
+for (let i = 1; i <= 25; i++) { await mouse("mouseMoved", { x: b.x + (dx * i) / 25, y: b.y + (dy * i) / 25 }); await sleep(16); }
+await sleep(200);
+const ov = await rectOf(c, `[data-overlay="${id}"] .tcs-card`);
+const g1 = await rectOf(c, ".tcs-grid");
+await mouse("mouseReleased", { x: b.x + dx, y: b.y + dy });
+await sleep(1500);
+const after = await rectOf(c, `[data-block="${id}"]`);
+const line = await c.evaluate(`app.vault.adapter.read("TODOs Tasks.md").then(t => t.split("\\n").find(l => l.includes(tcSpike.store.getState().faces["${id}"].title + " ")))`);
+console.log(JSON.stringify({ gridTopBefore: g0.top, gridTopAtRelease: g1.top, overlayTopAtRelease: ov?.top, blockTopAfter: after?.top, line, hourPx: await c.evaluate("tcSpike.store.getState().hourPx") }));
+c.close();

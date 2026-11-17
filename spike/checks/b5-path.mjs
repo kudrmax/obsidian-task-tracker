@@ -1,0 +1,13 @@
+import { connect, sleep } from "./cdp.mjs";
+import { rectOf } from "./rect.mjs";
+const c = await connect();
+const r = await rectOf(c, ".tcs-ribbon");
+await c.evaluate(`tcSpike.store.getState().setPlace(0)`); await sleep(800);
+await c.evaluate(`window.__path = []; (function tick(){ window.__path.push(Math.round(document.querySelector(".tcs-track").getBoundingClientRect().left)); if (window.__path.length < 150) requestAnimationFrame(tick); })(); 1`);
+await c.send("Input.synthesizeScrollGesture", { x: r.x, y: r.y, xDistance: -1.5 * r.w, yDistance: 0, gestureSourceType: "mouse", speed: 4000, preventFling: false });
+await sleep(1500);
+const p = await c.evaluate(`window.__path`);
+const pages = p.map((v) => +((r.left - v + 6) / r.w).toFixed(2));
+console.log("track position in places, per frame:", [...new Set(pages)].join(" "));
+console.log("furthest:", Math.max(...pages), "final:", pages.at(-1), "place:", await c.evaluate(`tcSpike.store.getState().place`));
+c.close();

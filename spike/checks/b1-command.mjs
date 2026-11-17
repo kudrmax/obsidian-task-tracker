@@ -1,0 +1,16 @@
+import { connect, SAMPLER, sleep } from "./cdp.mjs";
+import { writeFileSync } from "node:fs";
+const c = await connect();
+await c.evaluate(SAMPLER);
+const st = (e) => c.evaluate(`(() => { const s = tcSpike.store.getState(); return ${e}; })()`);
+const inbox = await st(`s.columns.inbox.slice(0, 3)`), soon = await st(`s.columns.soon.slice(0, 2)`);
+const watch = [inbox[0], inbox[1], soon[0], soon[1]];
+await c.evaluate(`window.__stop = __sample(${JSON.stringify(watch)})`);
+await sleep(100);
+await c.evaluate(`app.commands.executeCommandById("task-calendar-spike:first-inbox-to-soon")`);
+await sleep(1200);
+const samples = await c.evaluate(`window.__stop()`);
+const after = await st(`({ inbox: s.columns.inbox.slice(0, 3), soon: s.columns.soon.slice(0, 3) })`);
+writeFileSync(new URL("../shots/b1-command.json", import.meta.url), JSON.stringify({ watch, after, samples }, null, 1));
+console.log(JSON.stringify({ watch, after }));
+c.close();

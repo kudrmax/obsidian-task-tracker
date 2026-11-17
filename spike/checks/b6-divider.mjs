@@ -1,0 +1,17 @@
+import { connect, mouseDrag, sleep } from "./cdp.mjs";
+import { rectOf } from "./rect.mjs";
+const c = await connect();
+await c.evaluate(`tcSpike.store.getState().setPlace(1)`); await sleep(900);
+const d = await rectOf(c, ".tcs-divider");
+const w0 = (await rectOf(c, ".tcs-day-list")).w;
+await c.evaluate(`window.__w = []; (function t(){ const e = document.querySelector(".tcs-day-list"); window.__w.push(Math.round(e.getBoundingClientRect().width)); if (window.__w.length < 90) requestAnimationFrame(t); })(); 1`);
+await mouseDrag(c, d, { x: d.x + 200, y: d.y }, { steps: 20 });
+await sleep(600);
+const w1 = (await rectOf(c, ".tcs-day-list")).w;
+const path = await c.evaluate(`window.__w`);
+await mouseDrag(c, { x: d.x + 200, y: d.y }, { x: d.x + 2000, y: d.y }, { steps: 10 });
+await sleep(400);
+console.log(JSON.stringify({ before: w0, after: w1, stored: await c.evaluate("tcSpike.store.getState().listWidth"), widthsPerFrame: [...new Set(path)].join(" "), pastTheBound: (await rectOf(c, ".tcs-day-list")).w, bound: (await rectOf(c, ".tcs-ribbon")).w - 120 }));
+await mouseDrag(c, { x: d.x + 2000, y: d.y }, d, { steps: 10 });
+await c.shot("b6-divider");
+c.close();

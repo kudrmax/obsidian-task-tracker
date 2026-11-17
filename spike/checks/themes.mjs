@@ -1,0 +1,10 @@
+import { connect, sleep } from "./cdp.mjs";
+const c = await connect();
+const shotAt = async (name, place) => { await c.evaluate(`tcSpike.store.getState().setPlace(${place}); 1`); await sleep(900); if (place === 1) { await c.evaluate(`document.querySelector(".tcs-timeline").scrollTop = 600; 1`); await sleep(200); } console.log(await c.shot(name)); };
+await c.evaluate(`app.changeTheme("moonstone"); 1`); await sleep(3000);
+await shotAt(`${process.argv[2]}-light-place1`, 0);
+await shotAt(`${process.argv[2]}-light-place2`, 1);
+await c.evaluate(`app.changeTheme("obsidian"); 1`); await sleep(3000);
+await shotAt(`${process.argv[2]}-dark-place2`, 1);
+await c.evaluate(`tcSpike.store.getState().setPlace(0); 1`);
+c.close();
