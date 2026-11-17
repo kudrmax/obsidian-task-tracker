@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
-export const PORT = 9446;
+export const PORT = Number(process.env.CDP_PORT ?? 9446);
 export const SHOTS = new URL("../shots/", import.meta.url).pathname;
 export async function connect(match = process.env.TARGET === "popout" ? (t) => t.title.startsWith("Stack spike") : (t) => t.url.startsWith("app://obsidian.md/index.html")) {
 	const list = await (await fetch(`http://localhost:${PORT}/json/list`)).json();
