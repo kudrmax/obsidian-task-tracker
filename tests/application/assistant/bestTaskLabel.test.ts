@@ -14,6 +14,8 @@ const FILE = [
 	"\t- [ ] Find the template",
 	"\t- [ ] Send it",
 	"- [ ] Old focus #label/Focus",
+	"- [ ] Plan the trip",
+	"\t- [ ] Book the flight",
 	"",
 	"## Soon",
 	"",
@@ -54,16 +56,95 @@ describe("Best task marks its answer with the label set", () => {
 		expect(text).toContain("- [ ] Old focus\n");
 		expect(text).toContain("- [ ] Call the bank #label/Good_fun\n");
 		expect(text).toContain("- [x] Finished\n");
-		expect(result).toMatchObject({ kind: "task", notice: null });
+		expect(result).toMatchObject({ kind: "task", notice: null, detail: null });
 		expect(result.kind === "task" && result.task.labels.map((l) => l.name)).toEqual(["Focus"]);
 	});
 
-	it("marks a folded task's next step, not the folded task", async () => {
+	it("marks the card the answer is drawn on: a folded task's next step marks the folded task, as its card's menu does", async () => {
 		const r = rig({ text: FILE, settings: settingsWith("Focus") });
 		const result = await answered(r, "Find the template");
-		expect(r.store.text).toContain("- [ ] Write the offer 📁\n\t- [ ] Find the template #label/Focus\n");
 		expect(result.kind === "task" && result.task.title).toBe("Write the offer");
-		expect(result.kind === "task" && result.card.step?.labels.map((l) => l.name)).toEqual(["Focus"]);
+		expect(result.kind === "task" && result.task.labels.map((l) => l.name)).toEqual(["Focus"]);
+		expect(r.store.text).toContain("\t- [ ] Find the template\n");
+		expect(r.store.text).not.toContain("Old focus #label");
+	});
+
+	it("an unfolded task's subtask is marked itself", async () => {
+		const r = rig({ text: FILE, settings: settingsWith("Focus") });
+		const result = await answered(r, "Book the flight");
+		expect(r.store.text).toContain("- [ ] Plan the trip\n\t- [ ] Book the flight #label/Focus\n");
+		expect(result.kind === "task" && result.task.labels.map((l) => l.name)).toEqual(["Focus"]);
+	});
+
+	it("is one step to undo: one Undo takes the label back off and puts it back on the others", async () => {
+		const r = rig({ text: FILE, settings: settingsWith("Focus") });
+		await answered(r, "Pay rent");
+		expect(r.store.text).not.toBe(FILE);
+		expect(await r.undo.undo()).toBe("done");
+		expect(r.store.text).toBe(FILE);
+		expect(r.undo.canUndo()).toBe(false);
+		expect(await r.undo.redo()).toBe("done");
+		expect(r.store.text).toContain("- [ ] Pay rent #label/Focus");
+		expect(r.store.text).toContain("- [x] Finished\n");
+	});
+
+	it("moves no label on a run stopped or timed out after the answer came", async () => {
+		const stopped = rig({ text: FILE, settings: settingsWith("Focus") });
+		const outcome = stopped.assistant.press(BEST);
+		await settle();
+		stopped.transport.answer({ taskRef: stopped.transport.refOf("Pay rent"), reason: "Rent." });
+		stopped.assistant.stop(BEST);
+		expect(await outcome).toEqual({ kind: "stopped" });
+		await settle();
+		expect(stopped.store.text).toBe(FILE);
+
+		const late = rig({ text: FILE, settings: settingsWith("Focus") });
+		const lateOutcome = late.assistant.press(BEST);
+		await settle();
+		late.transport.answer({ taskRef: late.transport.refOf("Pay rent"), reason: "Rent." });
+		late.timers.fire();
+		expect(await lateOutcome).toMatchObject({ kind: "failed", words: "Claude didn't answer in 2 minutes." });
+		await settle();
+		expect(late.store.text).toBe(FILE);
+	});
+
+	it("a write that fails while marking still shows the answer, with a line under it and the error for the console", async () => {
+		const r = rig({
+			text: FILE,
+			settings: settingsWith("Focus"),
+			tasksPort: (tasks) => ({
+				listed: () => tasks.listed(),
+				sectionOffer: (date) => tasks.sectionOffer(date),
+				menu: (item, from, screen) => tasks.menu(item, from, screen),
+				toggleLabel: () => Promise.reject(new Error("disk full")),
+			}),
+		});
+		const result = await answered(r, "Pay rent");
+		expect(result).toMatchObject({ kind: "task", note: "Because.", notice: "Couldn't move the label Focus." });
+		expect(result.kind === "task" && result.task.title).toBe("Pay rent");
+		expect(result.kind === "task" && result.detail).toContain("disk full");
+	});
+
+	it("an answer whose task is gone only after the marking is still shown as it stood", async () => {
+		const r = rig({
+			text: FILE,
+			settings: settingsWith("Focus"),
+			tasksPort: (tasks) => {
+				let marked = false;
+				return {
+					listed: async () => (marked ? { ...(await tasks.listed()), lists: { now: [], soon: [], inbox: [], backlog: [], done: [] } } : tasks.listed()),
+					sectionOffer: (date) => tasks.sectionOffer(date),
+					menu: (item, from, screen) => tasks.menu(item, from, screen),
+					toggleLabel: async (keys, name) => {
+						marked = true;
+						return tasks.toggleLabel(keys, name);
+					},
+				};
+			},
+		});
+		const result = await answered(r, "Pay rent");
+		expect(result).toMatchObject({ kind: "task", notice: null, detail: null });
+		expect(result.kind === "task" && result.task.title).toBe("Pay rent");
 	});
 
 	it("is refused where the menu would refuse it (a task with a priority): nothing changes, the popup says so", async () => {

@@ -2119,8 +2119,9 @@ export type AssistantOutcome =
 	/**
 	 * `task` and `card` are as the tasks stand after the action's options did their part (Best task's label on it).
 	 * `notice`: what an option couldn't do, drawn under the card («Couldn't add the label Focus to this task.»); null for none.
+	 * `detail`: an option's write that failed, for the console (the frontend writes it there, as a failure's); null for none.
 	 */
-	| { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly card: TaskCard; readonly note: string; readonly notice: string | null }
+	| { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly card: TaskCard; readonly note: string; readonly notice: string | null; readonly detail: string | null }
 	/** `detail` is for the console: the frontend writes it there. */
 	| { readonly kind: "failed"; readonly title: string; readonly words: string; readonly detail: string }
 	/** Stopped by Max: nothing is shown. */

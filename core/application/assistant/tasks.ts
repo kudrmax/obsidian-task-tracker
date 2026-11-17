@@ -19,6 +19,11 @@ export interface AssistantTasks {
 	toggleLabel(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]>;
 }
 
+/** How several writes of one action become one step to take back (the undo history); left out, each is its own. */
+export interface AssistantSteps {
+	together<R>(work: () => Promise<R>): Promise<R>;
+}
+
 /** The tasks as they are now, by id, closed ones and subtasks at every depth too. */
 export class TaskLookup {
 	private readonly byId = new Map<string, TaskItem>();

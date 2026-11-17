@@ -517,7 +517,10 @@ is on exactly one task: taken off wherever else it stands.
 - **Order:** put on the chosen task first; only if it took (the task as it then stands carries the label) is it taken
   off every other task that has it, done and given-up ones included, so it ends on exactly one. A refused marking
   leaves the label where it was.
-- **Which task:** the chosen candidate itself: a folded task's next step gets the label, not the folded task.
+- **Which task:** the card the answer is drawn on, through that card's own menu, as Max would mark it by hand (the lead,
+  at the review, replacing «the step gets it»): a task or an unfolded task's subtask is marked itself; a folded task's
+  next step is drawn on the folded task's card, whose menu labels the folded task (`docs/plugin/screen.md`), so the
+  folded task gets the label and the popup and the list show it.
 - **When:** only on a `task` outcome. A failure, Stop, a timeout or `gone` touch no label. The chosen task already
   carrying it: nothing to put on, it is still taken off the others.
 - **The popup** stays as it is and draws the chosen task as it stands after the marking (its card shows the label). A
@@ -525,7 +528,8 @@ is on exactly one task: taken off wherever else it stands.
 - **The label gone from the settings** (renamed or removed) reads as none: nothing is marked, the page shows none.
 - **Settings page:** under Best task's prompt, a «Label» row: a dropdown of None and the labels in the settings' order,
   their titles as the screen shows them; the core gives the rows ready (`AssistantPage`), the frontend only draws them.
-- **Undo:** each write is the menu's own, so it undoes as the menu's does.
+- **Undo:** each write is the menu's own (`toggleLabel`), and the marking's writes (put on, taken off the others) are
+  one step: one Undo puts the label back where it was, never leaving it on two tasks.
 
 ## Platforms
 
@@ -693,11 +697,23 @@ No Swift stage (R6).
   prompt): `{ key, label, choices: { value, title }[], value }`, none first (`value: null`, «None»), the labels in the
   settings' order by `labelTitle`. `set({ kind: "option", actionId, key, value })` writes one; null is None (the key goes,
   and an action left with no option goes too).
-- **Backend (label):** the menu the marking reads is the chosen task's opened on the whole screen (`from: "full"`): the
-  menu of exactly that task, a folded task's step included, no sections. Refused when the menu has no labels group, its
-  tiles are disabled or the label has no tile, or `toggleLabel` comes back without the label on it. The others are found
-  in every list and depth (Done too) by the labels the screen reads, and taken off in one `toggleLabel` of them all.
-- **Backend (label):** the `task` outcome gains `notice: string | null`, the line under the card (null for none); `task`
+- **Backend (label):** the menu the marking reads is the one the screen opens for the card the answer is drawn on
+  (`drawnAnswer`'s `task`), from its list's column (`listCardMenuFrom`: Today's day column, Soon, Inbox, Backlog, Done).
+  Refused when that menu has no labels group, its tiles are disabled or the label has no tile, or `toggleLabel` comes back
+  without the label on it. The others are found in every list and depth (Done too) by the labels the screen reads, and
+  taken off in one `toggleLabel` of them all. (Replaces «the chosen task's opened on the whole screen».)
+- **Backend (label):** the marking's writes are one undo step: `UndoHistory.together(work)` joins every change recorded
+  while `work` runs into one step (the first one's before, the last one's after); the assistant reaches it through its
+  port `AssistantSteps` (`AssistantDeps.steps`, the undo history in `composeCore`). A change made by another action in
+  the same few milliseconds would join that step too: accepted, the marking is two writes in a row.
+- **Backend (label):** a run stopped (Stop or the timeout) before the marking ends as stopped or timed out and marks
+  nothing, also when the answer had already come.
+- **Backend (label):** a write that throws during the marking keeps the answer: the popup shows the chosen task with
+  the option's words («Couldn't move the label {name}.») in `notice`, and the error in the `task` outcome's new
+  `detail: string | null`, which the frontend writes to the console as a failure's.
+- **Backend (label):** the chosen task gone only after the marking wrote is still shown, as it stood when the answer
+  came (no «gone» after a marking).
+- **Backend (label):** the `task` outcome gains `notice: string | null`, the line under the card (null for none), and `detail: string | null` (above); `task`
   and `card` are read again after the marking. The marking runs in `finish`, so `press` and the door's later `finish`
   alike mark.
 - **Frontend-obsidian (label):** an option row is a stock `Setting` with a dropdown, drawn right after its prompt's field;

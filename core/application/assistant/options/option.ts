@@ -2,7 +2,10 @@ import type { TaskCalendarSettings } from "../../../settings";
 import type { AssistantOptionChoice, TaskItem } from "../../contracts";
 import type { AssistantTasks, ListedTasks } from "../tasks";
 
-/** The task a `task` answer chose, as it stands when the answer comes, and the tasks around it. */
+/**
+ * What a `task` answer is drawn as when it comes: `task`, the task whose card it is (a folded task's next step: that folded
+ * task), the card Max would tap to act on it by hand; and the tasks around it.
+ */
 export interface ChosenTask {
 	readonly task: TaskItem;
 	readonly listed: ListedTasks;
@@ -22,6 +25,8 @@ export interface ActionOption {
 	choices(settings: TaskCalendarSettings): readonly AssistantOptionChoice[];
 	/** After a `task` answer, the value set (never none): does its part through `tasks`; the words drawn under the card, or null. */
 	afterAnswer(value: string, chosen: ChosenTask, tasks: AssistantTasks): Promise<string | null>;
+	/** The words drawn under the card when `afterAnswer` threw (a write that failed). */
+	failedWords(value: string): string;
 }
 
 /** The option's value as saved, when one of its choices still has it; else none. */

@@ -14,13 +14,13 @@ import type { AssistantAction } from "./actions/action";
 import { ASSISTANT_ACTIONS } from "./actions";
 import { briefingOf, isEmptyBriefing } from "./briefing";
 import { ModelChoice } from "./ModelChoice";
-import { type HostModels, type ModelReply, NO_MODELS, StopSwitch } from "./model";
+import { type HostModels, type ModelReply, NO_MODELS, type StopSignal, StopSwitch } from "./model";
 import { MODEL_PROFILES } from "./models";
 import type { ModelProfile, SettingField } from "./models/profile";
 import { optionValue } from "./options/option";
 import { failed, failureWords, goneWords, NO_MODEL_WORDS, PAGE_WORDS, STOPPED } from "./outcomes";
 import { type AssistantPlace, type AssistantTarget, tasksIn } from "./scope";
-import { type AssistantTasks, drawnAnswer, type ListedTasks, TaskLookup } from "./tasks";
+import { type AssistantSteps, type AssistantTasks, drawnAnswer, type ListedTasks, TaskLookup } from "./tasks";
 
 /** How long a transport stopped by the timeout may take to say why before the run ends as a timeout anyway. */
 export const TIMEOUT_GRACE_MS = 5000;
@@ -30,6 +30,8 @@ const MORE: AssistantTarget = { place: "more" };
 /** What the assistant is put together from: the host's ports, and the buttons and models it knows. */
 export interface AssistantDeps {
 	readonly tasks: AssistantTasks;
+	/** Joins an answer's option writes into one step to take back; left out, each write is its own. */
+	readonly steps?: AssistantSteps;
 	readonly settings: SettingsStore;
 	readonly timers: Timers;
 	readonly models?: HostModels;
@@ -50,11 +52,13 @@ export class AssistantServiceImpl implements AssistantService {
 	private readonly choice: ModelChoice;
 	private readonly actions: readonly AssistantAction[];
 	private readonly tasks: AssistantTasks;
+	private readonly steps: AssistantSteps;
 	private readonly settings: SettingsStore;
 	private readonly timers: Timers;
 
 	constructor(deps: AssistantDeps) {
 		this.tasks = deps.tasks;
+		this.steps = deps.steps ?? { together: (work) => work() };
 		this.settings = deps.settings;
 		this.timers = deps.timers;
 		this.actions = deps.actions ?? ASSISTANT_ACTIONS;
@@ -144,7 +148,12 @@ export class AssistantServiceImpl implements AssistantService {
 		};
 	}
 
-	async finish(prepared: PreparedQuestion, reply: ModelReply): Promise<AssistantOutcome> {
+	finish(prepared: PreparedQuestion, reply: ModelReply): Promise<AssistantOutcome> {
+		return this.finished(prepared, reply, null);
+	}
+
+	/** The reply read; `stop`, a run's: stopped before the options' part, the run ends as stopped or timed out, nothing marked. */
+	private async finished(prepared: PreparedQuestion, reply: ModelReply, stop: StopSignal | null): Promise<AssistantOutcome> {
 		const action = this.actionOf(prepared.actionId);
 		const profile = this.choice.profileOf(prepared.modelId);
 		if (profile === null) return failed(action, NO_MODEL_WORDS, `model "${prepared.modelId}" has no profile`);
@@ -155,28 +164,51 @@ export class AssistantServiceImpl implements AssistantService {
 		const listed = await this.tasks.listed();
 		const tasks = new TaskLookup(listed);
 		const result = action.read(reply.answer, { input: prepared.question.input, refs: prepared.refs }, tasks);
-		if (result.kind === "task") return this.answered(action, profile, result.taskId, result.note, listed);
+		if (result.kind === "task") {
+			if (stop?.stopped) return this.finished(prepared, stoppedReply(stop.stopped), null);
+			return this.answered(action, result.taskId, result.note, listed);
+		}
 		const answer = `answer: ${JSON.stringify(reply.answer)}`;
 		if (result.why === "gone") return failed(action, goneWords(profile), `the task named is closed or gone; ${answer}`);
 		return failed(action, failureWords(profile, "badAnswer", this.assistant().timeoutSeconds), `the answer names no task sent; ${answer}`);
 	}
 
-	/** A `task` answer: the action's options do their part on the chosen task, then it is drawn as the tasks then stand. */
-	private async answered(action: AssistantAction, profile: ModelProfile, taskId: string, note: string, listed: ListedTasks): Promise<AssistantOutcome> {
+	/**
+	 * A `task` answer: the action's options do their part on the card it is drawn on, all their writes one step to take back,
+	 * then it is drawn as the tasks then stand (as it stood, if it is gone by then). An option whose write failed leaves its
+	 * words under the card and its error in `detail`; the answer stays.
+	 */
+	private async answered(action: AssistantAction, taskId: string, note: string, listed: ListedTasks): Promise<AssistantOutcome> {
+		const before = new TaskLookup(listed);
+		const drawn = drawnAnswer(before.find(taskId)!, before);
 		const notices: string[] = [];
-		let now = listed;
-		for (const option of action.options ?? []) {
-			const value = optionValue(option, this.assistant().options[action.id]?.[option.key], this.settings.get());
-			const task = new TaskLookup(now).find(taskId);
-			if (value === null || task === null) continue;
-			const notice = await option.afterAnswer(value, { task, listed: now }, this.tasks);
-			if (notice !== null) notices.push(notice);
-			now = await this.tasks.listed();
-		}
-		const tasks = new TaskLookup(now);
-		const chosen = tasks.find(taskId);
-		if (chosen === null) return failed(action, goneWords(profile), "the task named is gone after its options did their part");
-		return { kind: "task", title: action.title, ...drawnAnswer(chosen, tasks), note, notice: notices.length > 0 ? notices.join("\n") : null };
+		const errors: string[] = [];
+		const marked = await this.steps.together(async () => {
+			let wrote = false;
+			for (const option of action.options ?? []) {
+				const value = optionValue(option, this.assistant().options[action.id]?.[option.key], this.settings.get());
+				if (value === null) continue;
+				wrote = true;
+				try {
+					const notice = await option.afterAnswer(value, { task: drawn.task, listed }, this.tasks);
+					if (notice !== null) notices.push(notice);
+				} catch (error) {
+					notices.push(option.failedWords(value));
+					errors.push(`${option.key}: ${String(error)}`);
+				}
+			}
+			return wrote;
+		});
+		const now = marked ? new TaskLookup(await this.tasks.listed()) : before;
+		const chosen = now.find(taskId);
+		return {
+			kind: "task",
+			title: action.title,
+			...(chosen ? drawnAnswer(chosen, now) : drawn),
+			note,
+			notice: notices.length > 0 ? notices.join("\n") : null,
+			detail: errors.length > 0 ? errors.join("\n") : null,
+		};
 	}
 
 	private optionRows(action: AssistantAction): readonly AssistantOptionRow[] {
@@ -229,7 +261,7 @@ export class AssistantServiceImpl implements AssistantService {
 		const transport = await loader();
 		if (stop.stopped !== null) return this.finish(prepared, stoppedReply(stop.stopped));
 		const reply = await transport.ask(prepared.question, this.choice.settingsOf(profile), stop);
-		return this.finish(prepared, stop.stopped === "timeout" && !reply.ok && reply.failure.kind === "stopped" ? stoppedReply("timeout") : reply);
+		return this.finished(prepared, stop.stopped === "timeout" && !reply.ok && reply.failure.kind === "stopped" ? stoppedReply("timeout") : reply, stop);
 	}
 
 	private timedOut(action: AssistantAction): AssistantOutcome {
