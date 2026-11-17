@@ -40,7 +40,8 @@ for (const file of readdirSync(scenarioDir).filter((f) => f.endsWith(".mjs")).so
 }
 
 const obsidian = await new TestObsidian().start();
-await obsidian.deploy(ROOT);
+/** E2E_BUILD: a folder holding another build (main.js, manifest.json, styles.css) to run the scenarios on, such as the released one. */
+await obsidian.deploy(process.env.E2E_BUILD ?? ROOT);
 console.log(`test Obsidian on port ${obsidian.config.port}, build ${await obsidian.buildMark()}`);
 
 const plugin = `app.plugins.plugins["task-calendar"]`;
@@ -84,6 +85,7 @@ for (const platform of platforms) {
 					await cdp.eval(`${plugin}.services.tasks.setFunnelPlace(${JSON.stringify(place)}).then(() => 1)`);
 				},
 				async open() {
+					await t.input.move(1, 1);
 					await obsidian.openView();
 					if (platform === "phone") await t.input.touchOn();
 					await sleep(600);
@@ -104,6 +106,16 @@ for (const platform of platforms) {
 				shot: (name) => screenshot(cdp, join(out, `${name}.png`)),
 				replay: (recording, opts) => replay(cdp, join(ROOT, "tests/e2e/recordings", recording), opts),
 				sleep,
+				/** Waits until `check` answers truthy, as a person waits for the screen, up to `ms`; its last answer. */
+				async waitFor(check, ms = 5000) {
+					const until = Date.now() + ms;
+					let last = await check();
+					while (!last && Date.now() < until) {
+						await sleep(150);
+						last = await check();
+					}
+					return last;
+				},
 			};
 			writeTasks(obsidian.tasksPath);
 			await sleep(400);

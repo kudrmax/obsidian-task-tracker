@@ -68,17 +68,19 @@ export const RibbonStage = memo(function RibbonStage({ position }: { /** Where t
 
 	const strokes = useMemo(() => new WheelStrokes(), []);
 	const fingerSpeed = useRef(0);
+	const dragFrom = useRef(0);
 	const bind = useGesture(
 		{
-			onDrag: ({ offset: [ox], velocity: [vx], direction: [dx], last, cancel, event, tap }) => {
+			onDrag: ({ offset: [ox], velocity: [vx], direction: [dx], xy: [px], initial: [ix], first, last, cancel, event, tap }) => {
 				if ((event as PointerEvent).pointerType === "mouse" || tap) return cancel();
+				if (first) dragFrom.current = x.get();
 				if (!last) {
 					fingerSpeed.current = -vx * dx;
 					x.jump(ox);
 					return;
 				}
-				const from = offsetOf(store.getState().place);
-				const moved = from - ox;
+				/** Where the finger took the screen, past the bounds too: the bounds only hold what is drawn. */
+				const moved = offsetOf(store.getState().place) - (dragFrom.current + px - ix);
 				const shift = swipeLanding(moved, step, fingerSpeed.current);
 				if (shift !== 0) store.getState().step(shift);
 				x.set(offsetOf(store.getState().place));

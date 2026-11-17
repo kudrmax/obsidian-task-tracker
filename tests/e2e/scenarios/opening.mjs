@@ -16,16 +16,20 @@ export default {
 			t.expect(ribbon !== null, "the ribbon icon «Task Calendar»");
 		}
 
-		await t.cdp.eval(`app.workspace.getLeaf("split").setViewState({ type: "task-calendar", active: true }).then(() => 1)`);
-		await t.sleep(1200);
-		t.expect((await leaves()) === 2, "a second tab with the view");
+		/** Two tabs side by side: the desktop's; the phone shows one tab at a time. */
+		const tabs = t.platform === "desktop" ? 2 : 1;
+		if (tabs === 2) {
+			await t.cdp.eval(`app.workspace.getLeaf("split").setViewState({ type: "task-calendar", active: true }).then(() => 1)`);
+			await t.sleep(1200);
+			t.expect((await leaves()) === 2, "a second tab with the view");
+		}
 		const text = t.file();
 		const added = "Дописано снаружи";
 		const { writeFileSync } = await import("node:fs");
 		writeFileSync(t.tasksPath, text.replace("## Now\n", `## Now\n- [ ] ${added}\n`));
 		await t.sleep(1500);
 		const shown = await t.cdp.eval(`[...document.querySelectorAll('.task-calendar [data-list="day"]')].map((list) => [...list.querySelectorAll(".tc-card-title")].some((c) => c.textContent === ${JSON.stringify(added)}))`);
-		t.expect(shown.length === 2 && shown.every(Boolean), `a task written into the file from outside shows at once in both tabs: ${JSON.stringify(shown)}`);
+		t.expect(shown.length === tabs && shown.every(Boolean), `a task written into the file from outside shows at once in every tab: ${JSON.stringify(shown)}`);
 		await t.open();
 
 		await t.cdp.eval(`app.vault.adapter.remove(app.plugins.plugins["task-calendar"].get().tasksFile ?? "TODOs Tasks.md").then(() => 1)`);

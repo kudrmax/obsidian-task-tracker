@@ -156,3 +156,37 @@ describe("the screen's store", () => {
 		expect(store.getState().phase).toBe("ready");
 	});
 });
+
+describe("the screen's store by project", () => {
+	const PROJECTS = `## Inbox
+- [ ] Своя задача дома 🗂️ Дом
+- [ ] Ремонт крана 🗂️ Кухня
+- [ ] Без проекта
+
+## Projects
+- Дом
+	- Кухня
+
+## Now
+
+## Soon
+- [ ] Позже дома 🗂️ Дом 📅 2026-11-20
+
+## Backlog
+
+## Done
+`;
+
+	it("draws the node's tasks by project: its own part first, a part per subproject, each card with its stage", async () => {
+		const { store, core } = setup(PROJECTS);
+		await core.tasks.setViewMode("byProject");
+		await core.tasks.pickProjectNode("project:Дом", true);
+		await store.getState().refresh();
+		const s = store.getState();
+		const groups = s.columns.projects.groups.map((group) => ({ title: group.title ?? null, header: group.header, rows: group.rows.map((row) => [s.items[row.id].card.title, row.stage?.kind ?? null]) }));
+		expect(groups).toEqual([
+			{ title: null, header: false, rows: [["Своя задача дома", "inbox"], ["Позже дома", "date"]] },
+			{ title: "Кухня", header: true, rows: [["Ремонт крана", "inbox"]] },
+		]);
+	});
+});

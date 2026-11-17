@@ -54,15 +54,19 @@ export default {
 
 		await t.setPlace("soon");
 		await t.open();
-		const soonHeads = await t.cdp.eval(`[...document.querySelectorAll('[data-list="soon"] .tc-group-name')].map((h) => h.textContent)`);
-		t.expect(soonHeads[0] === "No section" && soonHeads.includes("Поездка"), `Soon's sections, its tasks outside one under No section: ${JSON.stringify(soonHeads)}`);
+		const headsShown = () => t.cdp.eval(`[...document.querySelectorAll('[data-list="soon"] .tc-group-name')].map((h) => h.textContent)`);
+		const soonHeads = new Set(await headsShown());
+		const first = [...soonHeads][0];
 		const list = await t.oracle.rect('[data-list="soon"]');
 		const scrolled = await t.frames(async () => {
 			for (let i = 0; i < 60; i++) {
 				void t.input.wheel(list.x, list.y, 0, 60);
 				await t.sleep(16);
+				if (i % 5 === 0) for (const head of await headsShown()) soonHeads.add(head);
 			}
 		}, { cast: "soon-scroll" });
+		for (const head of await headsShown()) soonHeads.add(head);
+		t.expect(first === "No section" && soonHeads.has("Поездка"), `Soon's sections, its tasks outside one under No section, met while scrolling: ${JSON.stringify([...soonHeads])}`);
 		t.expect(scrolled.length === 0, `frames of scrolling Soon: ${JSON.stringify(scrolled.slice(0, 3))}`);
 		const end = await t.cdp.eval(`(() => { const heads = [...document.querySelectorAll('[data-list="soon"] .tc-list-item')].map((i) => i.firstElementChild); const last = heads.slice(-2).map((n) => [n.className, n.textContent]); return last; })()`);
 		t.expect(end.length === 2 && end[0][1] === "Пустая секция" && end[1][0].includes("tc-group-empty") && end[1][1] === "No tasks", `an empty section: its header and the dashed No tasks plate: ${JSON.stringify(end)}`);

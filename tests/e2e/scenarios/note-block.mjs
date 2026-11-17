@@ -11,13 +11,13 @@ export default {
 		const before = await t.cdp.eval(`app.vault.adapter.read(${JSON.stringify(note)})`);
 		for (const mode of ["preview", "source"]) {
 			await t.cdp.eval(`(async () => {
-				for (const leaf of app.workspace.getLeavesOfType("task-calendar")) leaf.detach();
-				const leaf = app.workspace.getLeaf(false);
+				const leaf = app.workspace.getLeavesOfType("task-calendar")[0] ?? app.workspace.getLeaf(false);
+				await leaf.setViewState({ type: "empty" });
 				await leaf.openFile(app.vault.getAbstractFileByPath(${JSON.stringify(note)}), { state: { mode: "${mode}" } });
 				return 1;
 			})()`);
-			await t.sleep(1500);
-			const block = await t.oracle.rect(".tc-project-block .task-calendar.is-note");
+			const block = await t.waitFor(() => t.oracle.rect(".tc-project-block .task-calendar.is-note .tc-card"));
+			await t.sleep(500);
 			t.expect(block !== null, `${mode}: the block stands at the note's end`);
 			if (!block) continue;
 			const labels = await t.cdp.eval(`[...document.querySelectorAll(".tc-project-block .tc-row-label")].map((l) => l.textContent)`);

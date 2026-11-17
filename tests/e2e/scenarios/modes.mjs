@@ -31,7 +31,8 @@ export default {
 		}
 
 		await t.setMode("rows");
-		t.expect(JSON.stringify(await t.oracle.columns()) === JSON.stringify(["Inbox", "Backlog", "Soon", "Today"]), `rows: the labels Inbox, Backlog, Soon and the day, top to bottom, got ${JSON.stringify(await t.oracle.columns())}`);
+		const labels = await t.cdp.eval(`[...document.querySelectorAll(".tc-row-label")].map((l) => l.textContent)`);
+		t.expect(JSON.stringify(labels) === JSON.stringify(["Inbox", "Backlog", "Soon", "Today"]), `rows: the labels Inbox, Backlog, Soon and the day, top to bottom, got ${JSON.stringify(labels)}`);
 		const nav = await t.oracle.rect(".tc-stage-col.is-timeline .tc-day-title");
 		t.expect(nav !== null, "rows: the day's title stands over the timeline");
 		const rows = await t.cdp.eval(`[...document.querySelectorAll(".tc-rows-stack > .tc-row")].map((r) => { const list = r.querySelector(".tc-list"); return { h: Math.round(r.getBoundingClientRect().height), scrolls: list.scrollHeight > list.clientHeight + 1 }; })`);
