@@ -1,0 +1,25 @@
+== embla rec-held
+compdef:153: _comps: assignment to invalid subscript range
+PASS held.json places [1, 0] expected [1, 0] drags 0 drop faults 0 stalls 0
+   stroke {d: -1, 'strokeMs': 944, 'decisionAfterLastDeltaMs': 157, 'settleEndAfterLastDeltaMs': 162, 'liftAfterStartMs': 16, 'decisionAfterLiftMs': 1085, 'settleEndAfterLiftMs': 1090, 'settleAnimationMs': 6, 'step': -1, }
+   stroke {d: 1, 'strokeMs': 544, 'decisionAfterLastDeltaMs': None, 'settleEndAfterLastDeltaMs': 893, 'liftAfterStartMs': 16, 'decisionAfterLiftMs': None, 'settleEndAfterLiftMs': 1421, 'settleAnimationMs': None, 'step': 0, }
+== embla rec-swipes
+FAIL max-swipes.json places [1, 0, 1] expected [1, 0, 1, 0, 1] drags 0 drop faults 0 stalls 0
+   stroke {d: -1, 'strokeMs': 658, 'decisionAfterLastDeltaMs': -129, 'settleEndAfterLastDeltaMs': 2521, 'liftAfterStartMs': 91, 'decisionAfterLiftMs': 438, 'settleEndAfterLiftMs': 3088, 'settleAnimationMs': 2650, 'step': -1, }
+   stroke {d: 1, 'strokeMs': 295, 'decisionAfterLastDeltaMs': None, 'settleEndAfterLastDeltaMs': 2179, 'liftAfterStartMs': 119, 'decisionAfterLiftMs': None, 'settleEndAfterLiftMs': 2355, 'settleAnimationMs': None, 'step': 0, }
+   stroke {d: -1, 'strokeMs': 961, 'decisionAfterLastDeltaMs': -781, 'settleEndAfterLastDeltaMs': 469, 'liftAfterStartMs': 118, 'decisionAfterLiftMs': 62, 'settleEndAfterLiftMs': 1313, 'settleAnimationMs': 1250, 'step': 1, }
+   stroke {d: -1, 'strokeMs': 1028, 'decisionAfterLastDeltaMs': None, 'settleEndAfterLastDeltaMs': 3245, 'liftAfterStartMs': 118, 'decisionAfterLiftMs': None, 'settleEndAfterLiftMs': 4154, 'settleAnimationMs': None, 'step': 0, }
+   stroke {d: -1, 'strokeMs': 200, 'decisionAfterLastDeltaMs': None, 'settleEndAfterLastDeltaMs': 2456, 'liftAfterStartMs': 108, 'decisionAfterLiftMs': None, 'settleEndAfterLiftMs': 2548, 'settleAnimationMs': None, 'step': 0, }
+   stroke {d: 1, 'strokeMs': 1118, 'decisionAfterLastDeltaMs': None, 'settleEndAfterLastDeltaMs': 1289, 'liftAfterStartMs': 189, 'decisionAfterLiftMs': None, 'settleEndAfterLiftMs': 2218, 'settleAnimationMs': None, 'step': 0, }
+== lethargy rec-held
+PASS held.json places [1, 0] expected [1, 0] drags 0 drop faults 0 stalls 0
+   stroke {d: -1, 'strokeMs': 944, 'decisionAfterLastDeltaMs': -658, 'settleEndAfterLastDeltaMs': -418, 'liftAfterStartMs': 16, 'decisionAfterLiftMs': 270, 'settleEndAfterLiftMs': 510, 'settleAnimationMs': 239, 'step': -1, }
+   stroke {d: 1, 'strokeMs': 544, 'decisionAfterLastDeltaMs': -295, 'settleEndAfterLastDeltaMs': 46, 'liftAfterStartMs': 16, 'decisionAfterLiftMs': 233, 'settleEndAfterLiftMs': 574, 'settleAnimationMs': 341, 'step': 0, }
+== lethargy rec-swipes
+PASS max-swipes.json places [1, 0, 1, 0, 1] expected [1, 0, 1, 0, 1] drags 0 drop faults 0 stalls 0
+   stroke {d: -1, 'strokeMs': 658, 'decisionAfterLastDeltaMs': -316, 'settleEndAfterLastDeltaMs': -312, 'liftAfterStartMs': 91, 'decisionAfterLiftMs': 251, 'settleEndAfterLiftMs': 255, 'settleAnimationMs': 4, 'step': -1, }
+   stroke {d: 1, 'strokeMs': 295, 'decisionAfterLastDeltaMs': 40, 'settleEndAfterLastDeltaMs': 264, 'liftAfterStartMs': 119, 'decisionAfterLiftMs': 216, 'settleEndAfterLiftMs': 441, 'settleAnimationMs': 225, 'step': 1, }
+   stroke {d: -1, 'strokeMs': 961, 'decisionAfterLastDeltaMs': -878, 'settleEndAfterLastDeltaMs': -637, 'liftAfterStartMs': 118, 'decisionAfterLiftMs': -35, 'settleEndAfterLiftMs': 206, 'settleAnimationMs': 241, 'step': -1, }
+   stroke {d: -1, 'strokeMs': 1028, 'decisionAfterLastDeltaMs': -796, 'settleEndAfterLastDeltaMs': -796, 'liftAfterStartMs': 118, 'decisionAfterLiftMs': 113, 'settleEndAfterLiftMs': 114, 'settleAnimationMs': 1, 'step': -1, }
+   stroke {d: -1, 'strokeMs': 200, 'decisionAfterLastDeltaMs': -153, 'settleEndAfterLastDeltaMs': -152, 'liftAfterStartMs': 108, 'decisionAfterLiftMs': -61, 'settleEndAfterLiftMs': -60, 'settleAnimationMs': 1, 'step': -1, }
+   stroke {d: 1, 'strokeMs': 1118, 'decisionAfterLastDeltaMs': -837, 'settleEndAfterLastDeltaMs': -834, 'liftAfterStartMs': 189, 'decisionAfterLiftMs': 93, 'settleEndAfterLiftMs': 95, 'settleAnimationMs': 3, 'step': 1, }

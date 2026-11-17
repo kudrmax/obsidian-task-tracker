@@ -113,6 +113,174 @@ Only **the lift**: the one long task when a card is picked up. At 1× it is 16.4
 
 Classic dnd-kit (`@dnd-kit/core` + `sortable`), `MeasuringStrategy.WhileDragging` (the default; `BeforeDragging` brings the lift within a column down to 16.4–20.9 ms but nearly doubles drops and commands at 4×, 42 ms against 25), TanStack Virtual per column with all ids in the `SortableContext`, thin `useSortable` wrappers inside memoized Motion rows, the lifted id and the overlay's card from the store, `DragOverlay` in a portal, Motion `layout="position"` with `layoutDependency` = the order as read and `layoutId` off for the lifted row. It passes blockers 1 and 4 without a jump, including drags across columns and moves by command, and everything but the lift (and, at its edge, the frame crossing columns) is under 16 ms on the Mac. @dnd-kit/react is faster at the lift and across columns but still over 16 ms at the lift and jumps across columns, and it is pre-1.0. Meeting 16 ms at the lift would need a drag library whose activation does not touch every drop target, which neither dnd-kit line offers.
 
+## Drop flicker
+
+**What Max saw:** on release the dropped card vanished for a moment, flickered and appeared again «from scratch». The frame checks of the first rounds tracked positions only and treated «no visible copy» as normal, so they passed it.
+
+**Reproduced** (`spike/checks/b14-flicker.mjs`, every frame from release to +900 ms: the card's mounted copies, the opacity of every ancestor, `visibility`, scale, the overlay, plus a CDP screencast): within a column 31 frames and Inbox→Soon 30 frames after release with neither the card nor the overlay visible (`stage0/flicker/vis-before-*.json`).
+
+**Causes, verified one by one:**
+
+1. **The overlay's card followed the store.** dnd-kit keeps the `DragOverlay`'s last children through its drop animation and hides the source card meanwhile (its default `sideEffects`). The overlay's child read the lifted id from the store, which the drop clears at once, so it rendered nothing: no overlay and a hidden card for the whole drop animation (~250 ms), then the card «appeared». Fix: the overlay's card gets its id as a prop (`<DragOverlay>{active ? <Lifted active={active} /> : null}</DragOverlay>`, dnd-kit's documented shape).
+2. **Drops on the timeline flew back.** The overlay's drop animation runs to the source node, which for a list card is the list row, while the block appears on the grid: two cards, one flying back. Fix: no drop animation over the grid (`dropAnimation={null}`, documented), and the block is drawn at once where the core's `dropSpan` puts it, until the write's read arrives (`landed` in the store; the row leaves the list in the same commit).
+3. **A card moved by a command left a ghost.** With Motion's shared `layoutId` the old and the new row crossfaded (opacity dipped to ~0.8 each); with crossfade off the exiting row faded out at the old place. Fix: `layoutCrossfade={false}` and the exit decided when the row leaves (AnimatePresence's `custom`): a task still on the screen has moved, its old row goes at once; only a task gone from the screen fades.
+
+**After** (`stage0/flicker/vis-final-*.json`, main window and phone emulation): 0 faulty frames for a drop within a column, Inbox→Soon, onto the timeline and a move by command; the check now also fails on two visible copies apart and on a card faded or scaled once the overlay is gone.
+
+## Timeline, second round
+
+**What Max saw:** dragging a block teleports with a flicker, a highlight covers the whole calendar during a drag, zoom doesn't keep the time under the pointer, a card let go over 09:00 doesn't land at 09:00, a block dragged back to a list disappears or comes back, short blocks cut their title in half. The earlier checks compared two numbers from the spike's own pixel-to-minute math, so a wrong conversion agreed with itself, and they never zoomed or scrolled first.
+
+**New checks, from what a user sees** (`spike/checks/`):
+
+- `tl-record.mjs` + `tl-analyze.mjs`: screencasts of slow and fast block drags, a list card onto the grid and back off, a resize, ctrl+wheel zoom over 07:00, 12:00 and the top edge, and a trackpad pinch (`Input.synthesizePinchGesture`), sampled every frame: the overlay against the pointer one frame earlier, the selection, blocks that vanish, and the zoom anchor (the time under the pointer, in px at the current zoom). Contact sheets in `stage0/timeline/*-frames.jpg`; I looked at them before and after.
+- `tl-oracle.mjs`: the user's truth, independent of the code under test. The pointer is put on a visible hour label's line («23:00», «1:00», «2:00») after zooming (1×, ~2×, ~3.2×, ~0.7×) and scrolling; after release the tasks file must have that time, the block's top must sit on that label's line within 1 px, and the card must be visible every frame. List cards and blocks.
+- `tl-sequences.mjs`: Max-like sequences, three fast rounds: a block out onto the day list, a list card onto the grid and back off onto the list, a block let go outside any target, a list card onto the grid fast; each ends with the file and the screen compared.
+
+**What the frames showed before, and the causes:**
+
+| Seen | Cause | Fix (standard usage) |
+|---|---|---|
+| The whole calendar tinted during any drag over it | the spike's own `.is-over` style on the 24-hour grid | removed; a landing preview (dashed block at the core's `dropSpan` of the snapped minute) shows where it will land |
+| The block moves in 14 px jumps, «teleports» | `createSnapModifier`-style snapping of the overlay to grid lines | the overlay follows the pointer every pixel; the snap is the landing's (preview, then the write) |
+| A card let go over 23:00 lands at 22:45 (one step early), at every zoom | the overlay's top is the time, but the person aims with the pointer, which sits below the card's top by the grab offset; and the modifier that would align them was on `DragOverlay`, which moves only the picture, not the collision rect dnd-kit reports | a modifier on `DndContext` (`modifiers`, documented: it moves the collision rect too) puts the overlay's top at the pointer over the grid, built as dnd-kit's own `snapCenterToCursor` |
+| A block let go above the timeline (outside) still lands, at some early hour | the droppable was the 24-hour grid, whose rect reaches far above and below the visible part | the droppable is the visible scroller; the minute is read from the grid's place at that moment (`data.minuteAt`) |
+| A block dragged onto the day list lands in Soon, on the other place | `closestCorners` over a block's overlay as wide as the timeline picked cards of the offscreen place | collision is pointer-first: the grid, else the card under the pointer, else the nearest card of the column under the pointer, else nothing (dnd-kit's documented composition) |
+| A block dragged back to a list «disappears, maybe comes back» | the spike never handled timeline→list; the drop was treated as a cancel | the drop writes through `TaskService.drop` from `timeline` with the list place, and the row stands there at once |
+| Zoom: the time under the pointer drifts 51–1176 px | the hour height changed without the scroll position | pointer-anchored zoom: the minute under the pointer is fixed for the whole gesture (use-gesture's `memo`) and `scrollTop` is set in a layout effect, before the frame is painted |
+| The block jumps back to its old place after a drop, then glides | Motion `layout` on the block animated the optimistic move | layout off for a block that was just let go |
+| Short blocks cut the title in half | 14 px minimum height with 6 px padding and a 13 px line | one line, ellipsis, 18 px minimum |
+| Resizing steps in 14 px | the held span was the snapped one | the edge follows the pointer; the snap is the release's |
+| On the phone view drops landed elsewhere | the ribbon got scrolled sideways (`overflow: hidden` lets focus scroll it) and the host missed the phone layout's resize | `overflow: clip` (with `min-height: 0`) on the ribbon; the host follows its element with a `ResizeObserver` |
+
+**After:**
+
+| Check | Before | After |
+|---|---|---|
+| Oracle, 7 drops at 4 zooms, main window | the file one step early in all 7, block 9–15 px above the line | 7/7: file = the aimed hour, block top on the line (0.0 px), 0 invisible frames |
+| Oracle, pop-out | — | 7/7 |
+| Oracle, phone emulation | — | 7/7 |
+| Sequences, 12 steps | 7/12 (block to the list landed in Soon; outside drops wrote a time) | 12/12 main window, 12/12 pop-out, 12/12 phone |
+| Block drag, overlay vs pointer one frame earlier, on the grid | median 7.8–9 px, max 14.5 (snapping) | median 0.4–1 px, p95 0.8–1 px; one shift of the grab offset (≤ 13 px) when the card's top moves to the pointer as it enters the grid |
+| Zoom anchor drift (ctrl+wheel at 07:00, 12:00, top edge; pinch) | 51–1176 px | 0.88, 0.30, 0.56, 0.55 px |
+| Selection during drags | 0 | 0 |
+| Drop visibility (within, Inbox→Soon, timeline, command), desktop and phone | 30–31 frames with nothing visible | 0 faulty frames |
+| Resize | steps of 14 px | the edge follows the pointer (constant 3 px offset), 5 px settle to the line at release |
+
+Blockers 1 and 4 re-run on this build: drags within a column and Inbox→Soon 0 reversals, 0 doubles, written to the aimed gap; a move by command glides; menu and editor pass. Performance on this build (`stage0/round3-final-perf.jsonl`, classic WhileDragging, 3 runs at 1×, 2 at 4×): first render 10.3, lift 27.8 (24.9–29.1), drag frame 3.9, drop 5.1, lift then crossing 29.4, frame crossing 15.8 (15.3–16.0), drop into Soon 4.7, command 11.6 ms at 1×; at 4× 36, 52.5, 7.2, 24.2, 49.2, 40.0, 19.7, 25.7. The lift stays the one step over 16 ms, as in the second round.
+
+**Still open, not fixed here:** overlapping blocks are drawn on top of each other (the spike has no stacking; the core's `stackTasks` exists for it); a past time today rides the now line by the core's rule, so blocks generated earlier in the evening gather there, and a drop onto a past time glides to the now line after the write; the overlay of a block dragged over a list keeps the timeline's width; the one grab-offset shift as a card enters the grid.
+
+## Round four: Max's trial and his recorded input
+
+Max tried the build; the drag motion itself was right, six things were not. Checked in my own test Obsidian (port 9446, its window moved off screen so it never takes his input or focus) and against his real input, recorded as `spike/recordings/max-2026-11-17.json`. Evidence: `stage0/round4/`.
+
+| Max's report | What the frames and the checks showed | Cause | Fix |
+|---|---|---|---|
+| A drop on a past time «teleports» | the block went to the now line, which the spike did not draw; on the past drops it jumped there in one frame | no now line; the block's Motion `layout` was off while it waited for its read, so the move to the now line was not animated | the red now line from the core's `DayService.openAt` (moves every 15 s); the block's layout keyed on its slot as read, so the optimistic landing does not animate and the read's move to the now line glides |
+| Blocks flicker when put on the calendar | the overlay (a list card's look and width, at the pointer) became a full-width purple block in one frame | the overlay kept the list card's look over the grid | over the grid the overlay is drawn as the block: the timeline's column, its width, its height for the landing's span; a modifier on `DndContext` puts it in the block column |
+| The release is long and shows two cards: one shrinks, another spawns | at the drop the overlay was drawn in Obsidian's 16 px text, the card in the screen's 13 px, so the card «shrank» into another; the drop animation took 250 ms | the overlay is portalled to `body`, outside the screen's styles; dnd-kit's default drop animation | the overlay carries the screen's type (`DragOverlay className`); the drop animation is 180 ms, `cubic-bezier(0.2, 0, 0, 1)`, translation only; the row keeps its `layoutId` through the drag |
+| Ribbon swipes on his trackpad: slow, stall, sometimes no arrival, sometimes a jump | replaying his recording on the old build: the ribbon followed the momentum tail up to 1276 px away, changed place twice in six swipes and landed at the end of each tail (~1 s) | @use-gesture's wheel ends a gesture only when the deltas stop, so the momentum tail was part of it, and a swipe started inside the previous tail merged with it | see below |
+| Past hours were never tested | — | — | the oracle now also drops on past hours (17:00–20:00 at 21:47) |
+| His drags | — | — | replayed from the recording (below) |
+
+**The ribbon on a real trackpad.** The DOM's wheel events carry no finger phase. `wheel-gestures` (Embla's library) was evaluated offline on his six swipes (`spike/checks/wg-offline.mjs`): it found the finger lift in one of them, ~850 ms late, and merged the two swipes that ran into each other; it fails his 120 Hz deltas (its momentum test needs a faster decay than macOS gives per merged pair). `lethargy` (`spike/checks/leth-offline.mjs`) marks his finger strokes and the tails apart, the change up to ~100 ms after the real lift, and sees each reversed swipe as a new stroke. The ribbon now runs on Lethargy (@use-gesture still delivers the events): a stroke draws the ribbon (bounded to one place), the first inertial delta (or 120 ms without deltas) is the lift, the core's `swipeLanding` decides from the stroke's distance and its speed over the last 50 ms, a critically damped spring lands it, and the tail moves nothing. A same-direction stroke within 250 ms of a decision is taken as that stroke's own (Lethargy marks one or two early deltas of a stroke inertial; no hand swipes twice the same way that fast). Vertical scrolls and pinches never touch the ribbon.
+
+**Recorded input as a permanent check.** `spike/checks/replay-all.sh` replays every `spike/recordings/*.json` over CDP at its own timestamps and positions (wheel deltas, pointer moves and presses) and fails on: a swipe that does not step exactly one place its way, a sequence different from the recording's `.expect.json`, the ribbon leaving its place without a decision, a stall, and any drop whose card is not visible in every frame. His drags are anchored on this screen's nearest card or block (his screen held other tasks), keeping his path, speed and timing.
+
+**Results:**
+
+| Check | Before | After |
+|---|---|---|
+| His six trackpad swipes | 2 place changes, the ribbon up to 1276 px off its place, landing at the end of each tail | 6/6 one place each its way (`[-1, 1, -1, -1, -1, 1]` = expected), decided after 1–25 of the stroke's deltas (up to ~200 ms after it began; the finger phases last ~100–120 ms), settled 300–360 ms after the decision, 0 frames off place without a decision, 0 stalls; his vertical scrolls and pinch moved nothing |
+| His drags (9 of 21 anchored inside the window) | — | 0 drop faults |
+| Oracle, 7 future + 4 past drops at 4 zooms, desktop | past hours untested | 11/11: the file has the aimed time; future: the block's top on the hour line; past: first frame on the hour line where released, then a glide with no reversal to the now line (within 1 px) |
+| Oracle, phone emulation | — | 11/11 |
+| Sequences in and out of the timeline | — | 12/12 desktop, 12/12 phone |
+| Drop handover, lists (within, Inbox→Soon, a cancel) | overlay 250 ms, larger type than the card | overlay gone at 196–205 ms, one size the whole way, the card at the overlay's last rect (dx = dy = dw = dh = 0) at full opacity in the frame the overlay goes, 0 faulty frames; desktop and phone |
+| Drop onto the grid | list card's look → block | the overlay is the block (same x, width, height); the block appears at the snapped line in the frame the overlay goes |
+| Blockers 1 and 4, timeline frames, zoom anchor | — | as in the second timeline round (0 reversals, drift ≤ 0.9 px) |
+
+Performance on this build (`stage0/round4/perf.jsonl`, 3 runs at 1×, 2 at 4×), ms at 1× / 4×: first render 9.9 / 41.4, lift 25.1 / 71.9, drag frame 4.8 / 8.3, drop 4.9 / 27.1, lift then crossing 18.9 / 61.5, frame crossing columns 15.0 (14.1–18.4) / 54.8, drop into Soon 4.7 / 26.1, command 11.7 / 30.5.
+
+**Still not achieved, plainly:**
+- On a drop onto the grid the overlay follows the pointer and the block lands on the snapped line: a shift of up to half a grid step (7 px at 56 px an hour, 2–3 px zoomed in) in the frame of the drop. Removing it would need the overlay's drop animation aimed at the block, which dnd-kit aims at the dragged source (the list row); I did not write a custom drop animation.
+- The swipe decision comes up to ~100 ms after the real finger lift (Lethargy's averaging window), not at it; estimated from the number of deltas each decision used, not measured against the trackpad.
+- The lift still costs 25 ms at 1×.
+- Overlapping blocks are not stacked; a block dragged over a list keeps the timeline's width.
+- The pop-out was not re-checked this round: opening one would put a window on Max's screen.
+
+## Round five: the ribbon as in the plugin, Embla against Lethargy
+
+**The ribbon** is now the plugin's (`docs/plugin/screen.md`, «Лента колонок»): Inbox over Backlog, Soon, the day list, the timeline; two columns in the window; three places. At Inbox–Soon and Soon–Now the two columns split the window in half; at Now–calendar the divider sets the day list against the timeline; between Soon–Now and Now–calendar the day list's width follows the ribbon (from half the window to the divider's width), as `RibbonColumns` says. Screenshots: `stage0/round5/r5-*-p{0,1,2}.png`.
+
+Two ribbons, switched by the commands «Ribbon: Embla» (default) and «Ribbon: Lethargy»:
+
+- **A, Embla Carousel** 8.6 with `embla-carousel-wheel-gestures` 8.1, as their docs set one step per swipe: `align: "start"`, `containScroll: "trimSnaps"`, `skipSnaps: false`, `duration: 20`, the wheel plugin with `forceWheelAxis: "x"`; touch by Embla's own drag. Embla decides where a swipe lands (its release force); **the core's `swipeLanding` cannot be plugged in** (Embla has no hook for the landing; `watchDrag` only says whether a drag may start). A mouse drag is the cards', not the ribbon's (`watchDrag` refuses trusted mouse events and lets the plugin's synthetic ones through).
+- **B, @use-gesture + Lethargy + `swipeLanding`**, as in round four, on the new places; its spring stiffened to settle in about 240 ms.
+
+Measured by replaying Max's six recorded swipes (`spike/recordings/max-2026-11-17.json`) and two synthetic held drags at an even pace (`spike/recordings/synthetic-held-drags.json`: 401 px back, then 133 px on, the fingers stopping and lifting without a fling). The Electron input recording carries no deltas, so it cannot be replayed. Times are from the stroke's largest delta in its first 250 ms (the estimated lift of a flick) or from its last delta (the stop of a held drag) to the decision and to the ribbon standing on its place. Full output: `stage0/round5/round5-ribbon.txt`.
+
+| | A: Embla + wheel-gestures | B: Lethargy + `swipeLanding` |
+|---|---|---|
+| Max's six swipes, places reached | 1 → 0 → 1, then nothing: **2 of the 5 place changes**; the swipe begun inside the previous one's tail and the later ones were swallowed | 1 → 0 → 1 → 0 → 1: **all 5** (the 6th is at the end of the row) |
+| Flick: decision after the lift | 62–438 ms, and only for the two it saw | 93–270 ms (two decided 35–61 ms before my lift estimate) |
+| Flick: ribbon on its place after the lift | **1.3–3.1 s** (it follows the whole momentum tail, then animates) | 95–441 ms |
+| Settle animation after the decision | 1.25–2.65 s | 0–241 ms (the ribbon is often already there, having followed the stroke) |
+| Held drag 401 px: decision / on its place after the stop | 157 / 162 ms | the decision came **658 ms before the stop**, while the fingers were still moving (Lethargy took an uneven slow drag for momentum); on its place 418 ms before the stop |
+| Held drag 133 px (springs back) | back 893 ms after the stop | back 46 ms after the stop, but decided 295 ms before it |
+| Tail moving the ribbon after it settled | 0 frames | 0 frames |
+| Stalls | 0 | 0 |
+| Phone emulation, touch: flick, flick, slow 20 %, slow 70 % back, flick back | 1, 2, 2, 1, 0 (one earlier run: 0 for the slow 70 %, two places at once) | 1, 2, 2, 1, 0 |
+| Phone: vertical scroll in Inbox and Soon | scrolls 133–161 px, the ribbon stays | scrolls 161–172 px, the ribbon stays |
+| Phone: long-press drag of a card | **crashed the screen** (React «maximum update depth»): Embla had taken the touch at the press and moved the ribbon under the sortable lists, dnd-kit re-sorted without end. Fixed: at the lift Embla is re-initialised with `watchDrag: false` and back after the drop; now the card lands in Soon, no error | lands in Soon, no error |
+
+What the frames show (`stage0/round5/*-swipes-frames.jpg`): with Embla the ribbon creeps along with the momentum for a second or more and stops between places for many frames before it lands; with Lethargy it reaches each place in a few frames and stands still.
+
+**Still not achieved, plainly:**
+- Embla fails his trackpad: it waits for the momentum to end (the plugin's wheel-gestures library does not see his macOS momentum start, as found in round four) and misses a swipe that starts in the previous one's tail. Its held-drag release (157 ms after the stop) is the one thing it does well.
+- Lethargy settles flicks quickly but decides a slow, uneven held drag while the fingers are still moving; the ribbon then stops following them.
+- Neither tells the finger lift at the moment it happens: on the Mac no API gives it (the coordinator's Electron measurement), so both infer it from the deltas.
+- A drag whose view is torn down mid-way (the crash above) left the store's lifted id set, which blocked every later swipe until it was cleared; the real build must clear it when the screen unmounts.
+
+## Round six: the trackpad as a pager
+
+Max's decision: on the trackpad the ribbon has no in-between states. A stroke of the fingers switches the column; the ribbon does not follow the fingers. Embla is gone (code, dependency, commands); the ribbon is one: `PagerRibbon` in `spike/Screen.tsx`, the stroke detector in `spike/wheelPager.ts`.
+
+**How it works.**
+- Each wheel event goes to a stroke detector; at the start of a new stroke it answers −1 or 1, otherwise 0. The ribbon then moves exactly one place that way at once, with a short spring (stiffness 1400, damping 75: about 240 ms). A stroke during a running spring retargets it from where the ribbon stands (`x.set` on the same Motion spring), so chained strokes add one place each, up to the last place.
+- The momentum tail moves nothing. Vertical events (|dx| ≤ |dy|), pinch (ctrl) and anything during a card drag move nothing.
+- Direction is the sign of the dominant `deltaX`.
+- The detector is fullPage.js's acceleration rule, tuned on Max's recordings: the average of the last 3 deltas against the average of the 70 before them; a stroke starts when it rises above 1.3×, after the run had fallen under 0.85× (rearm), or after 200 ms of quiet, or the other way; at least 12 px within 80 ms (a brush of resting fingers is not a stroke); no second stroke the same way within 110 ms (a dip and rise inside one push).
+- **Lethargy was compared and lost:** on the r5 recording it finds 198 strokes where the acceleration rule finds 97, firing again and again inside one slow push (e.g. 2310.4–2312.1 s: 22 strokes for one movement), and 7 instead of 6 on the first recording.
+- **`rules.swipeLanding` does not fit the pager, plainly:** a stroke always goes a whole place, so the pager feeds it a full step (`swipeLanding(±distance, distance, 0)`), which by definition answers ±1. The call is kept so the place rule stays one, but it decides nothing on the trackpad. It still decides touch.
+- **Touch (the phone) is unchanged:** the ribbon follows the finger and lands by `swipeLanding` from the distance and the finger's speed at the lift. A flick during a landing starts from where the ribbon stands (`from: () => [x.get(), 0]`), so two quick flicks move two places.
+
+**Checks.**
+
+`spike/checks/replay-all.sh` replays every recording in `spike/recordings/` into the test Obsidian over CDP and fails on a missed stroke, an extra place, a stalled ribbon, a drop fault, or a decision 50 ms or more after a stroke's start. New synthetic recordings: `synthetic-chained-{150,250,400}ms.json`, six strokes −1, −1, +1, +1, +1, −1 from Soon, same-way strokes 150/250/400 ms apart, each a rising finger phase (2, 8, 20, 40, 54, 60 px per 8 ms) and a 3.5 %-per-event momentum tail cut by the next stroke. Full output: `stage0/round6/replays.txt`.
+
+| Recording | Places | Swipes | Drop faults / stalls | Time from stroke start to the decision (to the first moving frame) |
+|---|---|---|---|---|
+| Max's six swipes (`max-2026-11-17.json`), with his 21 drags | 1 0 1 0 1, as expected | 6 | 0 / 0 | not named in the recording; offline 19 ms median, 23 ms max after the rise |
+| Max's long session (`max-2026-11-17-r5.json`) | 77 changes, each one place | 96–97 over runs (97 offline) | 0 / 0 | offline after the rise: 17 ms median, 35 ms p90 |
+| Synthetic held drags | 1 0 1, as expected | 2 | 0 / 0 | — |
+| Chained 150 / 250 / 400 ms | 1 0 1 2 1, as expected; the clamped strokes (at Inbox and at the day) leave the ribbon still | 6 each | 0 / 0 | after a pause or a turn: **17–37 ms (22–41 ms)**; a same-way stroke into a running tail: **52–71 ms (55–74 ms)** (four runs) |
+
+**Not met, plainly: a stroke that starts in the same direction inside a still-running momentum tail is decided 52–71 ms after its start, over the 50 ms target.** Two causes, measured:
+1. The detector can only tell the new stroke once its deltas rise above the tail it interrupts. In the synthetic shape the new stroke's first deltas (2, 8, 20) are smaller than the tail (25), so it stands out only at its 6th–7th event: 40–48 ms offline. Shorter comparison windows (the last 2 against the 8–20 before) decide at 32–40 ms but find 108–139 strokes on r5 instead of 97; the extra ones are mid-push wobbles of a slow drag (looked at one by one), i.e. extra places. A «finger landed» rule (a sudden drop under the tail) cuts it to 40 ms but adds strokes on Max's first recording (7–9 instead of 6). Both were rejected: an extra place is worse than 15 ms.
+2. In the page the wheel event reaches the handler 7–25 ms after its timestamp (Chromium delivers wheel events aligned to frames while the ribbon animates), measured with the swipe's `eventAt`.
+
+On Max's own input the case is milder: a real touch stops the macOS momentum, so his recorded chained strokes start after a gap or from a 1–5 px tail, and the detector fires 17 ms (median) after the rise begins. Whether the synthetic tail is too pessimistic can only be settled by a recording of Max chaining strokes fast.
+
+**Frames** (`stage0/round6/chained-250ms-frames.jpg`, a CDP screencast of the 250 ms chain): the ribbon reaches Inbox in about 12 frames and stands; the clamped stroke leaves it still; then Soon, the day, Soon, each reached in a few frames, no creep, no stop between places. One observation, not settled: in the first frames of a slide the column coming in shows its card shells without text for 3–5 frames. The DOM has the text in every one of those frames (probed frame by frame), and round five's screencasts show the same, so it is the raster of my off-screen window (it stands at −5000, 2000 so as not to cover Max's screen); whether a visible window shows it needs one look at a visible window while swiping.
+
+**Phone** (390×844, `app.emulateMobile(true)`, touch over CDP, `spike/checks/phone-pager.mjs`): one flick moves one place; two flicks 90 ms apart (the second during the landing) move two places, both ways; a slow 40 px drag springs back; a slow 280 px drag moves one place; a vertical drag scrolls Inbox and Soon by 150–155 px and moves no place; no exceptions. Places: `stage0/round6/phone-places.jpg`.
+
+**Fixed on the way.** Replaying Max's 21 drags showed 11 drops with one frame of two copies apart (`two visible copies apart` at about 200 ms): when a drag carried a card into another column, its new row, sharing the lifted row's Motion `layoutId`, flew there from the old column; the drop's overlay flew to the card's position mid-flight and the card appeared ~130 px away. The lifted row now has no layout id (`Row` in `Screen.tsx`): 0 drop faults on his drags, and the four drop scenarios (`vis-suite.sh`: within, cross, timeline, by command) still show 0 faulty frames, the overlay meeting the card exactly (dx, dy 0) and gone after 193–199 ms.
+
+**Offline tools** (run on `node_modules/.bin/esbuild spike/wheelPager.ts --bundle --format=esm --platform=node --outfile=spike/checks/wheelPager.mjs`): `pager-offline.mjs` (both detectors over synthetic and recorded streams), `pager-tune.mjs` (the window grid), `pager-rise.mjs` (lag after the rise on a recording), `pager-show.mjs` (deltas around each stroke), `sheet.py` (a contact sheet of a screencast's moving frames).
+
 ## Must a library be swapped?
 
 Updated by the second round: no swap is recommended; the classic line, virtualized as above, is the configuration to build on, and the lift is the one step over 16 ms. The first-round answer follows.
