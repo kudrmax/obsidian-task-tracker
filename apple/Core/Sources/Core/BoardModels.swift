@@ -659,6 +659,9 @@ public struct SettingsForm: Decodable, Sendable {
     public let staleAfterMinutes: Int
     public let workCalendarFile: String
     public let dayStartHours: [Int]
+    /// The colours a priority's row offers (the presets) and a label's (the presets, then `CLEAR_COLOR`, No Color).
+    public let levelSwatches: [String]
+    public let labelSwatches: [String]
     /// Several labels: the paint saved, and the paints offered in order.
     public let labelPaint: String
     public let labelPaints: [String]

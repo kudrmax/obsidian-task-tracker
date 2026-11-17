@@ -67,3 +67,15 @@ He wants a label he puts on a task while the card looks exactly as it would with
 - **Obsidian: phone label rows** (found while checking). Obsidian's phone margin on the row's grip pushed a label row's
   bin onto a line of its own (a label name is wider than a priority prefix); the grip's margin is zeroed on the phone, so
   name, card and bin share the first line as in the priority rows. Not caused by this feature; fixed in the same branch.
+- **Swift: whether a colour paints is the core's.** `TaskBoard.markInk`, `markShades`, `markPaints` (`apple/Core`,
+  `MarkInk.swift`) ask `rules.usableColor` before `inkOf`/`shadesOf`: a clear label (or any colour the core can't draw)
+  has no ink and no shades, so nothing in the app turns `"clear"` into a hex. The No Color swatch is recognised by
+  `rules.constants().CLEAR_COLOR`, never a literal.
+- **Swift: No Color on the Labels page** is the last swatch of the form's `labelSwatches`, drawn as the system's
+  `circle.slash` in the secondary label colour at the circles' size, ringed when chosen as they are; VoiceOver «No
+  Color». Priorities draw `levelSwatches`, so they never get it. The system colour well beside it shows an empty well
+  for a clear label; a colour picked there writes that colour.
+- **Swift: a clear label's tile and quick-entry row** use the outline `tag` symbol untinted (the menu's own ink, as its
+  uncoloured rows), in place of the filled `tag.fill` a coloured label has; on/off are drawn as for any tile.
+- **Swift: a plain sample card on the Labels page** is the board's plain card resolved at the screen's base level: the
+  settings sheet's raised rows would otherwise lift it to their own colour and hide it in dark.
