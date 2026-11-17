@@ -22,12 +22,10 @@ import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { autoUpdate, flip, FloatingPortal, offset, shift, useClick, useDismiss, useFloating, useInteractions, useRole } from "@floating-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useDrag, useGesture } from "@use-gesture/react";
-import useEmblaCarousel from "embla-carousel-react";
-import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures";
 import { AnimatePresence, motion, type MotionValue, useMotionValue, useSpring, useTransform } from "motion/react";
 import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Lethargy } from "lethargy";
+import { AccelerationStrokes } from "./wheelPager";
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import type { App } from "obsidian";
@@ -56,13 +54,6 @@ function useScreen<T>(selector: (s: ScreenState) => T): T {
 	return useStore(useHost().store, selector);
 }
 
-/** A stroke whose deltas stop this long has ended without a fling; its speed is read over the last `SPEED_WINDOW_MS`. */
-const STROKE_QUIET_MS = 120;
-const SPEED_WINDOW_MS = 50;
-const SAME_STROKE_MS = 250;
-
-/** Embla's scroll `duration` (its own unit, 20–60 in its docs; lower is quicker): short, for a decisive landing. */
-const EMBLA_DURATION = 20;
 
 /** The ribbon's landing: short and decisive, critically damped (about 250 ms to settle within a pixel). */
 const RIBBON_SPRING = { stiffness: 1400, damping: 75, mass: 1 };
@@ -270,7 +261,6 @@ function Ribbon() {
 		store.getState().setDragging(null);
 	};
 
-	const mode = useScreen((s) => s.ribbon);
 	const progress = useMotionValue(place === 2 ? 1 : 0);
 	const pages = useMemo(
 		() => (
@@ -297,7 +287,9 @@ function Ribbon() {
 
 	return (
 		<DndContext sensors={sensors} collisionDetection={collision} measuring={measuring} modifiers={modifiers} onDragStart={onDragStart} onDragMove={onDragMove} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
-			<DayProgress.Provider value={progress}>{mode === "embla" ? <EmblaRibbon pages={pages} progress={progress} /> : <LethargyRibbon pages={pages} progress={progress} />}</DayProgress.Provider>
+			<DayProgress.Provider value={progress}>
+				<PagerRibbon pages={pages} progress={progress} />
+			</DayProgress.Provider>
 			{createPortal(
 				<DragOverlay className="tcs-overlay" dropAnimation={overGrid ? null : DROP}>
 					{active ? <Lifted active={active} block={overGrid && preview ? { width: gridWidth - BLOCK_INSET, height: Math.max(18, (((preview.end ?? preview.start + 15) - preview.start) / 60) * hourPx) } : null} /> : null}
@@ -343,69 +335,41 @@ const DayProgress = createContext<MotionValue<number> | null>(null);
 const progressOf = (offset: number, width: number) => Math.max(0, Math.min(1, (offset - width / 2) / (width / 2)));
 
 /**
- * B: the ribbon on @use-gesture with Lethargy telling a trackpad stroke from its momentum tail. A stroke draws the ribbon
- * with it (one place at most); at the first inertial delta (or when the deltas stop) the fingers have lifted and the
- * core's `swipeLanding` decides; a short spring lands it; the tail moves nothing. Touch: use-gesture's drag.
+ * The ribbon. On the trackpad a discrete pager (fullPage.js's way, Max's call): each new stroke of the fingers turns it one
+ * place its way at once, a stroke during the landing adds one more from where the ribbon stands, the momentum tail and
+ * anything vertical or pinched turn nothing; the ribbon does not follow the fingers. On touch it follows the finger and
+ * lands by the core's `swipeLanding`; a flick during a landing carries on from where the ribbon stands.
  */
-function LethargyRibbon({ pages, progress }: { pages: ReactNode; progress: MotionValue<number> }) {
+function PagerRibbon({ pages, progress }: { pages: ReactNode; progress: MotionValue<number> }) {
 	const { store, width, win } = useHost();
 	const place = useScreen((s) => s.place);
 	const offsets = placeOffsets(width);
 	const x = useSpring(-offsets[place], RIBBON_SPRING);
 	useEffect(() => x.on("change", (v) => progress.set(progressOf(-v, width))), [x, progress, width]);
 	useEffect(() => x.set(-placeOffsets(width)[place]), [place, width, x]);
-	const stability = useScreen((s) => s.lethargyStability);
-	const lethargy = useMemo(() => new Lethargy(stability), [stability]);
-	const stroke = useRef<{ dir: number; from: number; moved: number; samples: [number, number][]; lifted: boolean; liftedAt: number } | null>(null);
-	const quiet = useRef(0);
+	const strokes = useMemo(() => new AccelerationStrokes(), []);
 	const fingerSpeed = useRef(0);
-	const bounds = () => {
-		const at = store.getState().place;
-		return { left: -offsets[Math.min(PLACES - 1, at + 1)], right: -offsets[Math.max(0, at - 1)] };
+	/** The place a step leads to: the core's landing for a whole step (a pager's stroke always goes the whole way). */
+	const go = (step: -1 | 1, why: string, eventAt?: number) => {
+		const from = store.getState().place;
+		const distance = width / 2;
+		const shift = swipeLanding(step * distance, distance, 0);
+		const next = Math.max(0, Math.min(PLACES - 1, from + shift));
+		store.getState().setPlace(next);
+		x.set(-offsets[next]);
+		store.getState().logSwipe({ dir: step, moved: 0, speed: 0, step: shift, why, events: 0, at: performance.now(), eventAt });
 	};
 	const settle = (moved: number, speed: number) => {
 		const from = store.getState().place;
-		const neighbour = offsets[Math.min(PLACES - 1, from + Math.sign(moved || 1))] - offsets[from] || width / 2;
-		const step = swipeLanding(moved, Math.abs(neighbour), speed);
+		const step = swipeLanding(moved, width / 2, speed);
 		const next = Math.max(0, Math.min(PLACES - 1, from + step));
 		store.getState().setPlace(next);
 		x.set(-offsets[next]);
 		return step;
 	};
-	const lift = (why: string) => {
-		const s = stroke.current;
-		if (!s || s.lifted) return;
-		s.lifted = true;
-		s.liftedAt = s.samples[s.samples.length - 1]?.[0] ?? 0;
-		win.clearTimeout(quiet.current);
-		const last = s.samples[s.samples.length - 1]?.[0] ?? 0;
-		const recent = s.samples.filter(([t]) => t >= last - SPEED_WINDOW_MS);
-		const span = Math.max(16, last - (recent[0]?.[0] ?? last) + 8);
-		const speed = recent.reduce((sum, [, d]) => sum + d, 0) / span;
-		const step = settle(s.moved, speed);
-		store.getState().logSwipe({ dir: s.dir, moved: Math.round(s.moved), speed: +speed.toFixed(2), step, why, events: s.samples.length, at: performance.now() });
-	};
-	const wheelStroke = (e: WheelEvent) => {
-		if (e.ctrlKey || e.metaKey || store.getState().dragging) return;
-		if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
-		e.preventDefault();
-		const intent = lethargy.check({ deltaY: -e.deltaX });
-		const dir = Math.sign(e.deltaX);
-		let s = stroke.current;
-		/** No hand makes two swipes the same way this close: deltas that way right after a decision are its stroke's. */
-		const sameStroke = s?.lifted && s.dir === dir && e.timeStamp - s.liftedAt < SAME_STROKE_MS;
-		if (intent && !sameStroke && (!s || s.lifted || s.dir !== dir)) {
-			if (s && !s.lifted) lift("reverse");
-			s = stroke.current = { dir, from: store.getState().place, moved: 0, samples: [], lifted: false, liftedAt: 0 };
-		}
-		if (!s || s.lifted) return;
-		if (!intent) return lift("inertia");
-		s.moved += e.deltaX;
-		s.samples.push([e.timeStamp, e.deltaX]);
-		const b = bounds();
-		x.jump(Math.max(b.left, Math.min(b.right, -offsets[s.from] - s.moved)));
-		win.clearTimeout(quiet.current);
-		quiet.current = win.setTimeout(() => lift("quiet"), STROKE_QUIET_MS);
+	const bounds = () => {
+		const at = store.getState().place;
+		return { left: -offsets[Math.min(PLACES - 1, at + 1)], right: -offsets[Math.max(0, at - 1)] };
 	};
 	const bind = useGesture(
 		{
@@ -417,13 +381,19 @@ function LethargyRibbon({ pages, progress }: { pages: ReactNode; progress: Motio
 					const moved = -offsets[store.getState().place] - ox;
 					const step = settle(moved, fingerSpeed.current);
 					store.getState().logSwipe({ dir: Math.sign(moved), moved: Math.round(moved), speed: +fingerSpeed.current.toFixed(2), step, why: "touch", events: 0, at: performance.now() });
-				}
-				else x.jump(ox);
+				} else x.jump(ox);
 			},
-			onWheel: ({ event }) => wheelStroke(event as WheelEvent),
+			onWheel: ({ event }) => {
+				const e = event as WheelEvent;
+				if (e.ctrlKey || e.metaKey || store.getState().dragging) return;
+				if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+				e.preventDefault();
+				const step = strokes.feed({ dx: e.deltaX, dy: e.deltaY, t: e.timeStamp });
+				if (step) go(step, "stroke", e.timeStamp);
+			},
 		},
 		{
-			drag: { axis: "x", threshold: 10, filterTaps: true, from: () => [-offsets[store.getState().place], 0], bounds, rubberband: true },
+			drag: { axis: "x", threshold: 10, filterTaps: true, from: () => [x.get(), 0], bounds, rubberband: true },
 			wheel: { eventOptions: { passive: false } },
 			window: win,
 		},
@@ -433,50 +403,6 @@ function LethargyRibbon({ pages, progress }: { pages: ReactNode; progress: Motio
 			<motion.div className="tcs-track" style={{ x }}>
 				{pages}
 			</motion.div>
-		</div>
-	);
-}
-
-/**
- * A: the ribbon as Embla Carousel with its wheel-gestures plugin, as their docs set one step per swipe: snaps at the
- * places, `skipSnaps: false`, `containScroll`, a short `duration`. Embla decides where a swipe lands (its own release
- * force); the core's `swipeLanding` cannot be plugged in. A mouse drag is the cards', not the ribbon's: Embla takes only
- * the plugin's synthetic mouse events and touch.
- */
-function EmblaRibbon({ pages, progress }: { pages: ReactNode; progress: MotionValue<number> }) {
-	const { store, width } = useHost();
-	const watchDrag = useCallback((_api: unknown, evt: MouseEvent | TouchEvent) => !store.getState().dragging && !(evt.type.startsWith("mouse") && evt.isTrusted), [store]);
-	const [ref, api] = useEmblaCarousel({ align: "start", containScroll: "trimSnaps", skipSnaps: false, duration: EMBLA_DURATION, startIndex: store.getState().place, watchDrag }, [WheelGesturesPlugin({ forceWheelAxis: "x" })]);
-	useEffect(() => {
-		if (!api) return;
-		const onScroll = () => progress.set(progressOf(api.scrollProgress() * width, width));
-		const onSelect = () => {
-			const before = store.getState().place;
-			const next = api.selectedScrollSnap();
-			if (next !== before) {
-				store.getState().logSwipe({ dir: next - before, moved: 0, speed: 0, step: next - before, why: "embla", events: 0, at: performance.now() });
-				store.getState().setPlace(next);
-			}
-		};
-		api.on("scroll", onScroll).on("select", onSelect).on("reInit", onScroll);
-		onScroll();
-		const off = store.subscribe((s, prev) => {
-			if (s.place !== prev.place && api.selectedScrollSnap() !== s.place) api.scrollTo(s.place);
-			/**
-			 * A card lifted by a long press: Embla had already taken the touch (its `watchDrag` is asked only at the press),
-			 * so it is told to let go (`reInit` with `watchDrag: false`, its documented switch) and back after the drop;
-			 * otherwise the ribbon moves under the sortable lists and dnd-kit re-sorts without end.
-			 */
-			if (!!s.dragging !== !!prev.dragging) api.reInit({ watchDrag: s.dragging ? false : watchDrag, startIndex: api.selectedScrollSnap() });
-		});
-		return () => {
-			api.off("scroll", onScroll).off("select", onSelect).off("reInit", onScroll);
-			off();
-		};
-	}, [api, store, progress, width]);
-	return (
-		<div className="tcs-ribbon tcs-embla" ref={ref}>
-			<div className="tcs-track">{pages}</div>
 		</div>
 	);
 }
@@ -564,7 +490,11 @@ const rowVariants = (id: string) => ({
 	gone: (alive: (id: string) => boolean) => (alive(id) ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.96 }),
 });
 
-/** A row: Motion's element (layout on the reads, enter for a task new in the last read), the drag's state from the store. */
+/**
+ * A row: Motion's element (layout on the reads, enter for a task new in the last read), the drag's state from the store.
+ * The lifted row has no layout id: when the drag carries it into another column its new row stands at its place at once
+ * instead of flying there from the old column, so the drop's overlay lands where the card will be, not where it was flying.
+ */
 const Row = memo(function Row({ id, order }: { id: string; order: readonly string[] }) {
 	count(counters.card, id);
 	const lifted = useScreen((s) => s.dragging === id);
@@ -574,7 +504,7 @@ const Row = memo(function Row({ id, order }: { id: string; order: readonly strin
 		<motion.div
 			className="tcs-card-outer"
 			layout={lifted ? false : "position"}
-			layoutId={id}
+			layoutId={lifted ? undefined : id}
 			layoutCrossfade={false}
 			layoutDependency={order}
 			initial={fresh ? { opacity: 0, scale: 0.96 } : false}

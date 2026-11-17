@@ -1,0 +1,12 @@
+PASS max-2026-11-17-r5.json places [1, 0, 1, 0, 1, 0, 1, 0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 0, 1, 2, 1, 2, 1, 2, 1, 0, 1, 2, 1, 0, 1, 0, 1, 0, 1, 0, 1, 2, 1, 0, 1, 2, 1, 2, 1, 0, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 0, 1, 2, 1, 0] expected None drags 0 drop faults 0 stalls 0
+   swipes decided 97 latency from stroke start (decided / first moving frame), ms: n/a
+PASS max-2026-11-17.json places [1, 0, 1, 0, 1] expected [1, 0, 1, 0, 1] drags 21 drop faults 0 stalls 0
+   swipes decided 6 latency from stroke start (decided / first moving frame), ms: n/a
+FAIL synthetic-chained-150ms.json places [1, 0, 1, 2, 1] expected [1, 0, 1, 2, 1] drags 0 drop faults 0 stalls 0
+   swipes decided 6 latency from stroke start (decided / first moving frame), ms: [(26, 30), (60, 'at the end, stays'), (17, 22), (66, 69), (59, 'at the end, stays'), (18, 22)]
+FAIL synthetic-chained-250ms.json places [1, 0, 1, 2, 1] expected [1, 0, 1, 2, 1] drags 0 drop faults 0 stalls 0
+   swipes decided 6 latency from stroke start (decided / first moving frame), ms: [(29, 31), (62, 'at the end, stays'), (37, 41), (64, 68), (55, 'at the end, stays'), (25, 29)]
+FAIL synthetic-chained-400ms.json places [1, 0, 1, 2, 1] expected [1, 0, 1, 2, 1] drags 0 drop faults 0 stalls 0
+   swipes decided 6 latency from stroke start (decided / first moving frame), ms: [(27, 31), (65, 'at the end, stays'), (28, 32), (60, 64), (53, 'at the end, stays'), (28, 35)]
+PASS synthetic-held-drags.json places [1, 0, 1] expected [1, 0, 1] drags 0 drop faults 0 stalls 0
+   swipes decided 2 latency from stroke start (decided / first moving frame), ms: n/a

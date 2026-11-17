@@ -31,9 +31,6 @@
 .tcs-block-body { flex: 1; min-height: 0; overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .tcs-block-body .tcs-card { height: 100%; box-sizing: border-box; background: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-primary)); }
 .tcs-block-handle { height: 8px; margin-top: -8px; cursor: ns-resize; touch-action: none; position: relative; z-index: 1; }
-.tcs-ribbon-snap { flex: 1; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
-.tcs-ribbon-snap::-webkit-scrollbar { display: none; }
-.tcs-ribbon-snap .tcs-page { scroll-snap-align: start; scroll-snap-stop: always; }
 .tcs-grid, .tcs-timeline { user-select: none; -webkit-user-select: none; }
 .tcs-block-preview { left: 44px; right: 6px; border-radius: 8px; border: 1px dashed var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 18%, transparent); pointer-events: none; }
 .tcs-block-body .tcs-card { padding: 2px 8px; font-size: 12px; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -43,4 +40,3 @@
 .tcs-now::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #e5484d; }
 .tcs-stack { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; min-height: 0; }
 .tcs-stack .tcs-column { min-height: 0; }
-.tcs-embla .tcs-track { touch-action: pan-y pinch-zoom; }

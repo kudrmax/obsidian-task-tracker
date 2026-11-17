@@ -243,6 +243,44 @@ What the frames show (`stage0/round5/*-swipes-frames.jpg`): with Embla the ribbo
 - Neither tells the finger lift at the moment it happens: on the Mac no API gives it (the coordinator's Electron measurement), so both infer it from the deltas.
 - A drag whose view is torn down mid-way (the crash above) left the store's lifted id set, which blocked every later swipe until it was cleared; the real build must clear it when the screen unmounts.
 
+## Round six: the trackpad as a pager
+
+Max's decision: on the trackpad the ribbon has no in-between states. A stroke of the fingers switches the column; the ribbon does not follow the fingers. Embla is gone (code, dependency, commands); the ribbon is one: `PagerRibbon` in `spike/Screen.tsx`, the stroke detector in `spike/wheelPager.ts`.
+
+**How it works.**
+- Each wheel event goes to a stroke detector; at the start of a new stroke it answers −1 or 1, otherwise 0. The ribbon then moves exactly one place that way at once, with a short spring (stiffness 1400, damping 75: about 240 ms). A stroke during a running spring retargets it from where the ribbon stands (`x.set` on the same Motion spring), so chained strokes add one place each, up to the last place.
+- The momentum tail moves nothing. Vertical events (|dx| ≤ |dy|), pinch (ctrl) and anything during a card drag move nothing.
+- Direction is the sign of the dominant `deltaX`.
+- The detector is fullPage.js's acceleration rule, tuned on Max's recordings: the average of the last 3 deltas against the average of the 70 before them; a stroke starts when it rises above 1.3×, after the run had fallen under 0.85× (rearm), or after 200 ms of quiet, or the other way; at least 12 px within 80 ms (a brush of resting fingers is not a stroke); no second stroke the same way within 110 ms (a dip and rise inside one push).
+- **Lethargy was compared and lost:** on the r5 recording it finds 198 strokes where the acceleration rule finds 97, firing again and again inside one slow push (e.g. 2310.4–2312.1 s: 22 strokes for one movement), and 7 instead of 6 on the first recording.
+- **`rules.swipeLanding` does not fit the pager, plainly:** a stroke always goes a whole place, so the pager feeds it a full step (`swipeLanding(±distance, distance, 0)`), which by definition answers ±1. The call is kept so the place rule stays one, but it decides nothing on the trackpad. It still decides touch.
+- **Touch (the phone) is unchanged:** the ribbon follows the finger and lands by `swipeLanding` from the distance and the finger's speed at the lift. A flick during a landing starts from where the ribbon stands (`from: () => [x.get(), 0]`), so two quick flicks move two places.
+
+**Checks.**
+
+`spike/checks/replay-all.sh` replays every recording in `spike/recordings/` into the test Obsidian over CDP and fails on a missed stroke, an extra place, a stalled ribbon, a drop fault, or a decision 50 ms or more after a stroke's start. New synthetic recordings: `synthetic-chained-{150,250,400}ms.json`, six strokes −1, −1, +1, +1, +1, −1 from Soon, same-way strokes 150/250/400 ms apart, each a rising finger phase (2, 8, 20, 40, 54, 60 px per 8 ms) and a 3.5 %-per-event momentum tail cut by the next stroke. Full output: `stage0/round6/replays.txt`.
+
+| Recording | Places | Swipes | Drop faults / stalls | Time from stroke start to the decision (to the first moving frame) |
+|---|---|---|---|---|
+| Max's six swipes (`max-2026-11-17.json`), with his 21 drags | 1 0 1 0 1, as expected | 6 | 0 / 0 | not named in the recording; offline 19 ms median, 23 ms max after the rise |
+| Max's long session (`max-2026-11-17-r5.json`) | 77 changes, each one place | 96–97 over runs (97 offline) | 0 / 0 | offline after the rise: 17 ms median, 35 ms p90 |
+| Synthetic held drags | 1 0 1, as expected | 2 | 0 / 0 | — |
+| Chained 150 / 250 / 400 ms | 1 0 1 2 1, as expected; the clamped strokes (at Inbox and at the day) leave the ribbon still | 6 each | 0 / 0 | after a pause or a turn: **17–37 ms (22–41 ms)**; a same-way stroke into a running tail: **52–71 ms (55–74 ms)** (four runs) |
+
+**Not met, plainly: a stroke that starts in the same direction inside a still-running momentum tail is decided 52–71 ms after its start, over the 50 ms target.** Two causes, measured:
+1. The detector can only tell the new stroke once its deltas rise above the tail it interrupts. In the synthetic shape the new stroke's first deltas (2, 8, 20) are smaller than the tail (25), so it stands out only at its 6th–7th event: 40–48 ms offline. Shorter comparison windows (the last 2 against the 8–20 before) decide at 32–40 ms but find 108–139 strokes on r5 instead of 97; the extra ones are mid-push wobbles of a slow drag (looked at one by one), i.e. extra places. A «finger landed» rule (a sudden drop under the tail) cuts it to 40 ms but adds strokes on Max's first recording (7–9 instead of 6). Both were rejected: an extra place is worse than 15 ms.
+2. In the page the wheel event reaches the handler 7–25 ms after its timestamp (Chromium delivers wheel events aligned to frames while the ribbon animates), measured with the swipe's `eventAt`.
+
+On Max's own input the case is milder: a real touch stops the macOS momentum, so his recorded chained strokes start after a gap or from a 1–5 px tail, and the detector fires 17 ms (median) after the rise begins. Whether the synthetic tail is too pessimistic can only be settled by a recording of Max chaining strokes fast.
+
+**Frames** (`stage0/round6/chained-250ms-frames.jpg`, a CDP screencast of the 250 ms chain): the ribbon reaches Inbox in about 12 frames and stands; the clamped stroke leaves it still; then Soon, the day, Soon, each reached in a few frames, no creep, no stop between places. One observation, not settled: in the first frames of a slide the column coming in shows its card shells without text for 3–5 frames. The DOM has the text in every one of those frames (probed frame by frame), and round five's screencasts show the same, so it is the raster of my off-screen window (it stands at −5000, 2000 so as not to cover Max's screen); whether a visible window shows it needs one look at a visible window while swiping.
+
+**Phone** (390×844, `app.emulateMobile(true)`, touch over CDP, `spike/checks/phone-pager.mjs`): one flick moves one place; two flicks 90 ms apart (the second during the landing) move two places, both ways; a slow 40 px drag springs back; a slow 280 px drag moves one place; a vertical drag scrolls Inbox and Soon by 150–155 px and moves no place; no exceptions. Places: `stage0/round6/phone-places.jpg`.
+
+**Fixed on the way.** Replaying Max's 21 drags showed 11 drops with one frame of two copies apart (`two visible copies apart` at about 200 ms): when a drag carried a card into another column, its new row, sharing the lifted row's Motion `layoutId`, flew there from the old column; the drop's overlay flew to the card's position mid-flight and the card appeared ~130 px away. The lifted row now has no layout id (`Row` in `Screen.tsx`): 0 drop faults on his drags, and the four drop scenarios (`vis-suite.sh`: within, cross, timeline, by command) still show 0 faulty frames, the overlay meeting the card exactly (dx, dy 0) and gone after 193–199 ms.
+
+**Offline tools** (run on `node_modules/.bin/esbuild spike/wheelPager.ts --bundle --format=esm --platform=node --outfile=spike/checks/wheelPager.mjs`): `pager-offline.mjs` (both detectors over synthetic and recorded streams), `pager-tune.mjs` (the window grid), `pager-rise.mjs` (lag after the rise on a recording), `pager-show.mjs` (deltas around each stroke), `sheet.py` (a contact sheet of a screencast's moving frames).
+
 ## Must a library be swapped?
 
 Updated by the second round: no swap is recommended; the classic line, virtualized as above, is the configuration to build on, and the lift is the one step over 16 ms. The first-round answer follows.

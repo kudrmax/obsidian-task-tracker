@@ -12,12 +12,21 @@ import { visibilityFaults } from "./vis.mjs";
  */
 const file = process.argv[2];
 const rec = JSON.parse(readFileSync(file, "utf8"));
+// Pauses longer than 2 s are shortened to 2 s (a recording can span many minutes); every time below is the shortened one.
+{
+	let removed = 0, prev = rec.events[0].t;
+	const shift = [];
+	for (const e of rec.events) { const gap = e.t - prev; if (gap > 2000) { removed += gap - 2000; shift.push([e.t, removed]); } prev = e.t; e.t -= removed; }
+	const shorten = (t) => t - ([...shift].reverse().find(([at]) => at <= t)?.[1] ?? 0);
+	if (rec.strokes) rec.strokes = rec.strokes.map((st) => ({ ...st, t: shorten(st.t) }));
+}
 const expectFile = file.replace(/\.json$/, ".expect.json");
 const expected = existsSync(expectFile) ? JSON.parse(readFileSync(expectFile, "utf8")) : null;
 const c = await connect();
 await c.evaluate(`(async () => { const r = require("@electron/remote"); r.getCurrentWindow().setContentSize(${rec.w}, ${rec.h}); r.getCurrentWindow().setPosition(-5000, 2000, false); r.getCurrentWebContents().setBackgroundThrottling(false); const s = tcSpike.store.getState(); s.setPlace(${process.argv[3] ?? 1}); tcSpike.store.setState({ swipes: [] }); await new Promise(r => setTimeout(r, 900)); return 1 })()`);
 await c.evaluate(`
-window.__rp = { frames: [], run: true, last: null };
+window.__rp = { frames: [], run: true, last: null, wheels: [] };
+if (!window.__rpWheel) { window.__rpWheel = true; document.addEventListener("wheel", (e) => window.__rp.wheels.push([Math.round(e.timeStamp), e.deltaX, e.deltaY]), { capture: true, passive: true }); }
 tcSpike.store.subscribe((s) => { if (s.dragging) window.__rp.last = s.dragging.replace(/^tl:/, ""); });
 (function tick() {
 	if (!window.__rp.run) return;
@@ -35,7 +44,8 @@ for (let e of rec.events) {
 	const due = e.t - t0 - (performance.now() - start);
 	if (due > 1) await sleep(due);
 	if (e.type === "wheel") {
-		await c.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: e.x, y: e.y, deltaX: e.dx, deltaY: e.dy, modifiers: e.ctrl ? 2 : 0 });
+		// Not awaited: the commands keep their order on the socket and the recording keeps its pace (a round trip is 8–16 ms).
+		c.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: e.x, y: e.y, deltaX: e.dx, deltaY: e.dy, modifiers: e.ctrl ? 2 : 0 });
 	} else {
 		const type = e.type === "pointerdown" ? "mousePressed" : e.type === "pointerup" ? "mouseReleased" : "mouseMoved";
 		if (type === "mousePressed" && process.env.ANCHOR !== "0") {
@@ -57,6 +67,7 @@ for (let e of rec.events) {
 }
 await sleep(1500);
 const frames = await c.evaluate(`window.__rp.run = false; window.__rp.frames`);
+const received = await c.evaluate(`window.__rp.wheels`);
 const swipes = await c.evaluate(`tcSpike.store.getState().swipes`);
 // Strokes as the recording has them: horizontal deltas, a new stroke at a change of sign or after 150 ms of quiet; the
 // finger lift estimated as the stroke's largest delta in its first 250 ms (the last delta before the monotonic decay).
@@ -84,6 +95,19 @@ const perStroke = strokes.filter((s) => s.events.length >= 5).map((s) => {
 });
 const startPlace = +(process.argv[3] ?? 1);
 const expectedPlaces = expected ? expected.swipes.reduce((acc, st) => [...acc, Math.max(0, Math.min(2, acc.at(-1) + st))], [startPlace]) : null;
+// Synthetic recordings name their strokes: the time from each stroke's first delta to the ribbon being sent on.
+const strokeLatency = (rec.strokes ?? []).map((st, i) => {
+	// From the stroke's first delta as the page received it (the CDP dispatch itself takes 8–20 ms).
+	// The stroke's first delta is the smallest of its way near its dispatch time (a running tail is larger; a coalesced start still is).
+	const near = received.filter(([t, dx]) => Math.abs(t - toPage(st.t) - 10) <= 25 && Math.sign(dx) === st.dir);
+	const first = near.reduce((m, e) => (!m || Math.abs(e[1]) < Math.abs(m[1]) ? e : m), null);
+	const at = first ? first[0] : toPage(st.t);
+	// Strokes and decisions pair in order when their counts agree; otherwise the first decision after the stroke's start.
+	const decided = swipes.length === rec.strokes.length ? swipes[i] : swipes.find((w) => w.at >= at - 1 && w.at <= at + 300);
+	const clamped = expectedPlaces ? expectedPlaces[i + 1] === expectedPlaces[i] : false;
+	const moved = decided && !clamped ? frames.find((f) => f.t >= decided.at && f.off !== null && Math.abs(f.off) >= 0.5) : null;
+	return { dir: st.dir, clamped, decidedAfterStartMs: decided ? Math.round(decided.at - at) : null, firstMovingFrameAfterStartMs: moved ? Math.round(moved.t - at) : null };
+});
 const observed = [startPlace];
 for (const f of frames) if (f.place !== observed.at(-1)) observed.push(f.place);
 const dedup = (a) => a.filter((v, i) => i === 0 || v !== a[i - 1]);
@@ -105,7 +129,7 @@ for (const r of releases) {
 }
 const placeTrace = [];
 for (const f of frames) if (!placeTrace.length || placeTrace.at(-1).place !== f.place) placeTrace.push({ atS: +((f.t - frames[0].t) / 1000).toFixed(2), place: f.place });
-const report = { expectedPlaces: expectedPlaces && dedup(expectedPlaces), observedPlaces: observed, placeTrace, dragsReplayed: releases.filter((r) => frames.some((f) => f.dragging && f.t <= r.t && f.t >= ([...marks].reverse().find((m) => m.type === "mousePressed" && m.t < r.t)?.t ?? 0))).length, recording: file.split("/").pop(), ribbon, stalledFrames: stalls, verticalOrPinchMovedRibbon: null, swipes, swipeFaults, sequence: sequenceOk, expected: expected?.swipes ?? null, drops: releases.length, dropFaults };
-writeFileSync(new URL(`../shots/replay-${file.split("/").pop()}`, import.meta.url), JSON.stringify({ report, frames }, null, 1));
+const report = { strokeLatency, swipeCount: swipes.length, expectedPlaces: expectedPlaces && dedup(expectedPlaces), observedPlaces: observed, placeTrace, dragsReplayed: releases.filter((r) => frames.some((f) => f.dragging && f.t <= r.t && f.t >= ([...marks].reverse().find((m) => m.type === "mousePressed" && m.t < r.t)?.t ?? 0))).length, recording: file.split("/").pop(), ribbon, stalledFrames: stalls, verticalOrPinchMovedRibbon: null, swipes, swipeFaults, sequence: sequenceOk, expected: expected?.swipes ?? null, drops: releases.length, dropFaults };
+writeFileSync(new URL(`../shots/replay-${file.split("/").pop()}`, import.meta.url), JSON.stringify({ report, frames, received, sent: rec.events.filter((e) => e.type === "wheel").length }, null, 1));
 console.log(JSON.stringify(report, null, 1));
 c.close();

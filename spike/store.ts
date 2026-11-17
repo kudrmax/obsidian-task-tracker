@@ -56,7 +56,7 @@ export interface ScreenState {
 	setGridWidth(width: number): void;
 	/** Every ribbon swipe decided, for the checks: its direction, how far it was drawn, its speed at the lift, the step. */
 	swipes: readonly { readonly dir: number; readonly moved: number; readonly speed: number; readonly step: number }[];
-	logSwipe(swipe: { dir: number; moved: number; speed: number; step: number; why?: string; events?: number; at?: number }): void;
+	logSwipe(swipe: { dir: number; moved: number; speed: number; step: number; why?: string; events?: number; at?: number; eventAt?: number }): void;
 	/** Where the card under the pointer would land on the grid: the core's `dropSpan` of the snapped minute. */
 	preview: { readonly start: number; readonly end: number | null } | null;
 	setPreview(at: { id: string; from: DropFrom; minute: number } | null): void;
@@ -77,13 +77,9 @@ export interface ScreenState {
 	altMotion: boolean;
 	/** The @dnd-kit/react rows keep Motion's layout through a drag, without a shared layout id (no re-render at the lift). */
 	altQuiet: boolean;
-	configure(patch: Partial<Pick<ScreenState, "virtual" | "measuring" | "onlyCurrent" | "altMotion" | "altQuiet" | "lethargyStability">>): void;
+	configure(patch: Partial<Pick<ScreenState, "virtual" | "measuring" | "onlyCurrent" | "altMotion" | "altQuiet">>): void;
 	setMounted(n: number): void;
-	/** The ribbon on Embla Carousel (A) or on @use-gesture with Lethargy and the core's landing (B). */
-	ribbon: "embla" | "lethargy";
-	/** Lethargy's window (its `stability`, 8 by default): how many deltas it averages to call one inertial. */
-	lethargyStability: number;
-	setRibbon(mode: "embla" | "lethargy"): void;
+
 	bump(): void;
 	setHourPx(px: number): void;
 	setPlace(place: number): void;
@@ -274,11 +270,7 @@ export function createScreenStore(tasks: TaskService, today: () => LocalDate, no
 		setMounted(mounted) {
 			set({ mounted });
 		},
-		ribbon: "embla",
-		lethargyStability: 8,
-		setRibbon(ribbon) {
-			set({ ribbon });
-		},
+
 		bump() {
 			set({ tick: get().tick + 1 });
 		},
