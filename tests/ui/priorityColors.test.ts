@@ -77,6 +77,7 @@ describe("a label of no colour", () => {
 		expect(tintOf("blue")).toBe("blue");
 		expect(tintOf("#123456")).toBe("#123456");
 		expect(tintOf(undefined)).toBeUndefined();
+		expect(tintOf("#12345" as never)).toBeUndefined();
 		const rules = priorityRules([{ name: "skip", color: "clear" }]);
 		expect(rules).not.toContain("clear");
 		expect(rules).toBe(priorityRules([]));

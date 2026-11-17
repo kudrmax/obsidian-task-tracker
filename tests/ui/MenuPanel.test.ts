@@ -174,6 +174,12 @@ describe("tileGroup", () => {
 		expect(on.querySelector(".tc-menu-badge")).not.toBeNull();
 	});
 
+	it("draws a label whose colour can't be drawn, a code written by hand wrong, as one of no colour", () => {
+		const off = tile({ color: "#12345" as never });
+		expect(off.hasAttribute("data-priority")).toBe(false);
+		expect(off.className).toBe("tc-btn tc-menu-tile is-clear");
+	});
+
 	it("leaves a tile of no mark, a status, as it was: untinted, no cross", () => {
 		const status = tile({ label: "Done", icon: "done" });
 		expect(status.className).toBe("tc-btn tc-menu-tile");

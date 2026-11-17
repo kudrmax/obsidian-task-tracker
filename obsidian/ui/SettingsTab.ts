@@ -184,7 +184,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			deleteTooltip: "Delete label",
 		});
 		new Setting(group)
-			.setDesc(`A task tagged #${this.settings.labelTag}/<name> gets the label: the tag's underscores show as spaces. A task may have several labels, or a priority, not both. Labels show in this order in the task menu and on a card.`)
+			.setDesc(`A task tagged #${this.settings.labelTag}/<name> gets the label: the tag's underscores show as spaces. A task may have several labels, or a priority, not both. Labels show in this order in the task menu and on a card. A label of No colour leaves the card as it is.`)
 			.addButton((b) => b.setButtonText("Add label").onClick(() => void this.redrawn(this.service.addLabel())));
 		new Setting(group)
 			.setName("Several labels")
