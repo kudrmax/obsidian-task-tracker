@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { backRow, groupsAbove, menuRow, type MenuRoom, placePanel } from "../../obsidian/ui/menu/MenuPanel";
+import { backRow, groupsAbove, menuRow, type MenuRoom, type MenuTileSpec, placePanel, tileGroup } from "../../obsidian/ui/menu/MenuPanel";
 
 /** A panel 250 wide of groups this tall in layout, drawn smaller on screen while it grows in from scale(0.94). */
 function growingPanel(heights: readonly number[] = [300]): HTMLElement {
@@ -150,5 +150,33 @@ describe("menuRow", () => {
 		let picked = 0;
 		menuRow(document.body, { label: "Rename", onPick: () => picked++ }).click();
 		expect(picked).toBe(1);
+	});
+});
+
+describe("tileGroup", () => {
+	const tile = (spec: Partial<MenuTileSpec>) => tileGroup(document.body, "is-labels", [[{ label: "Focus", icon: "label", onPick: () => undefined, ...spec }]]).querySelector<HTMLElement>(".tc-menu-tile")!;
+
+	it("tints a coloured label's tile and gives the one the task has the cross that takes it off", () => {
+		const on = tile({ color: "red", on: true });
+		expect(on.dataset.priority).toBe("red");
+		expect(on.className).toBe("tc-btn tc-menu-tile is-on");
+		expect(on.querySelector(".tc-menu-badge")).not.toBeNull();
+	});
+
+	it("draws a label of no colour untinted, never as a colour, on and off as any label", () => {
+		const off = tile({ color: "clear" });
+		expect(off.hasAttribute("data-priority")).toBe(false);
+		expect(off.className).toBe("tc-btn tc-menu-tile is-clear");
+		expect(off.querySelector(".tc-menu-badge")).toBeNull();
+		const on = tile({ color: "clear", on: true });
+		expect(on.hasAttribute("data-priority")).toBe(false);
+		expect(on.className).toBe("tc-btn tc-menu-tile is-clear is-on");
+		expect(on.querySelector(".tc-menu-badge")).not.toBeNull();
+	});
+
+	it("leaves a tile of no mark, a status, as it was: untinted, no cross", () => {
+		const status = tile({ label: "Done", icon: "done" });
+		expect(status.className).toBe("tc-btn tc-menu-tile");
+		expect(status.querySelector(".tc-menu-badge")).toBeNull();
 	});
 });

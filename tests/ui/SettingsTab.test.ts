@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from "vitest";
 import type { App, Plugin } from "obsidian";
-import type { CalendarService, GoogleAccount, ShownCalendar, WorkCalendarSetup } from "../../core/application/contracts";
+import { type CalendarService, type GoogleAccount, PRIORITY_COLORS, type ShownCalendar, type WorkCalendarSetup } from "../../core/application/contracts";
 import { SettingsServiceImpl } from "../../core/application/SettingsServiceImpl";
 import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../../obsidian/infrastructure/PluginSettings";
 import { DEFAULT_SETTINGS } from "../../core/settings";
@@ -267,6 +267,66 @@ describe("the settings tab: the priority levels", () => {
 		await settled();
 		expect(disk.saves).toBe(0);
 		await writes(() => picker.dispatchEvent(new Event("change")), { priorities: [{ prefix: "p1", color: "#123456" }, START.priorities[1]] });
+	});
+});
+
+describe("the settings tab: the labels", () => {
+	const LABELED: FileSettings = { ...START, labels: [{ name: "focus", color: "red" }, { name: "skip", color: "clear" }] };
+	const withLabels = (labels: FileSettings["labels"]) => JSON.stringify({ ...LABELED, labels }, null, 2);
+	const labelRows = () => levelRows().filter((row) => row.querySelector(".tc-label-name"));
+	const circles = (row: HTMLElement) => [...row.querySelectorAll<HTMLElement>(".tc-swatches > button")].map((b) => b.dataset.priority ?? b.getAttribute("aria-label"));
+
+	beforeEach(async () => {
+		await open(LABELED);
+	});
+
+	it("offers a label the six colours and No colour after them, and a level the six alone", () => {
+		expect(circles(labelRows()[0])).toEqual([...PRIORITY_COLORS, "No colour"]);
+		const level = levelRows().find((row) => row.querySelector(".tc-level-prefix"))!;
+		expect(circles(level)).toEqual([...PRIORITY_COLORS]);
+	});
+
+	it("draws No colour as a circle of its own, untinted, ringed when the label has it", () => {
+		const [focus, skip] = labelRows();
+		const clear = (row: HTMLElement) => row.querySelector<HTMLElement>("button[aria-label='No colour']")!;
+		expect(clear(focus).className).toContain("tc-swatch-clear");
+		expect(clear(focus).dataset.priority).toBeUndefined();
+		expect(clear(focus).className).not.toContain("is-on");
+		expect(clear(skip).className).toContain("is-on");
+		expect(skip.querySelectorAll(".tc-swatches .is-on")).toHaveLength(1);
+	});
+
+	it("shows a label of no colour as a plain card with no code", () => {
+		const skip = labelRows()[1];
+		expect(skip.querySelector<HTMLElement>(".tc-level-preview")!.dataset.priority).toBeUndefined();
+		expect(skip.querySelector<HTMLInputElement>(".tc-level-hex-input")!.value).toBe("");
+		expect(skip.querySelector(".tc-swatch-well")!.className).not.toContain("is-on");
+		expect(labelRows()[0].querySelector<HTMLElement>(".tc-level-preview")!.dataset.priority).toBe("red");
+	});
+
+	it("takes the colour off by No colour, and gives it back by a circle", async () => {
+		labelRows()[0].querySelector<HTMLElement>("button[aria-label='No colour']")!.click();
+		await settled();
+		expect(disk.text).toBe(withLabels([{ name: "focus", color: "clear" }, LABELED.labels[1]]));
+		expect(labelRows()[0].querySelector<HTMLElement>(".tc-level-preview")!.dataset.priority).toBeUndefined();
+		labelRows()[1].querySelector<HTMLElement>("button[data-priority='blue']")!.click();
+		await settled();
+		expect(disk.text).toBe(withLabels([{ name: "focus", color: "clear" }, { name: "skip", color: "blue" }]));
+		expect(labelRows()[1].querySelector<HTMLElement>(".tc-level-preview")!.dataset.priority).toBe("blue");
+	});
+
+	it("previews a code typed for a label of no colour, and puts the plain card back when it does not read", async () => {
+		const skip = labelRows()[1];
+		const code = skip.querySelector<HTMLInputElement>(".tc-level-hex-input")!;
+		const preview = skip.querySelector<HTMLElement>(".tc-level-preview")!;
+		type(code, "0a84ff");
+		expect(preview.dataset.priority).toBe("blue");
+		type(code, "xyz");
+		code.dispatchEvent(new Event("blur"));
+		await settled();
+		expect(disk.saves).toBe(0);
+		expect(preview.dataset.priority).toBeUndefined();
+		expect(code.value).toBe("");
 	});
 });
 

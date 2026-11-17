@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MOST_CARD_COLORS, PRIORITY_COLORS, type PriorityColor } from "../../core/application/contracts";
-import { contrast, inkOf, LABEL_SLOTS, priorityRules, shadesOf } from "../../obsidian/ui/priorityColors";
+import { contrast, inkOf, LABEL_SLOTS, priorityRules, shadesOf, tintOf } from "../../obsidian/ui/priorityColors";
 
 const THEMES = ["dark", "light"] as const;
 const BOARD_CARD = { dark: "#1C1C1E", light: "#F2F2F7" };
@@ -68,5 +68,17 @@ describe("the labels' fills", () => {
 		const rules = priorityRules([{ name: "Свой", color: "#123456" }]);
 		expect(rules).toContain(`[data-label1="orange"] { --tc-label-fill-1: ${shadesOf("orange", "dark").fill}; }`);
 		expect(rules).toContain(`body.theme-light [data-label0="#123456"] { --tc-label-fill-0: ${shadesOf("#123456", "light").fill}; }`);
+	});
+});
+
+describe("a label of no colour", () => {
+	it("paints nothing: no tint, and no rule for it in the stylesheet", () => {
+		expect(tintOf("clear")).toBeUndefined();
+		expect(tintOf("blue")).toBe("blue");
+		expect(tintOf("#123456")).toBe("#123456");
+		expect(tintOf(undefined)).toBeUndefined();
+		const rules = priorityRules([{ name: "skip", color: "clear" }]);
+		expect(rules).not.toContain("clear");
+		expect(rules).toBe(priorityRules([]));
 	});
 });

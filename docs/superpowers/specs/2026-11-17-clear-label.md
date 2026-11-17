@@ -53,3 +53,17 @@ He wants a label he puts on a task while the card looks exactly as it would with
   shows the colour's code again, empty for a clear label). Typing never makes a label clear: No colour is picked from
   the swatches. A code typed for a clear label writes that colour.
 - **Backend: Add label** picks the first preset no label has, else the first preset; never clear.
+- **Obsidian: the No colour swatch.** A circle the size of the others, no fill, outlined and struck through bottom-left
+  to top-right in the muted grey (the standard «no fill» swatch), between the six presets and the rainbow «any colour»
+  circle, as `labelSwatches` orders it. Chosen, it is ringed as the others, the ring in the strong ink (it has no colour of
+  its own to ring in). The rainbow circle is not lit for a clear label; its picker starts at its default.
+- **Obsidian: a clear label's row.** The sample card is the plain card (`--tc-card-bg`, the time in the muted grey), the
+  code field empty. A code typed in it previews that colour at once and is written on leaving the field, as for any label;
+  a code that does not read puts the plain card and the empty field back.
+- **Obsidian: a clear label's menu tile.** Untinted: the label icon outlined in the text colour, as the status tiles
+  draw theirs. On: the neutral «on» of the quick panel's place tiles (`--tc-place-on-bg`, ringed in the strong ink) and
+  the cross badge in the strong ink, since a tap takes it off as for any label. The same in the task menu, the bulk menu
+  and the quick bar's label panel (one drawing function, `tileGroup`).
+- **Obsidian: phone label rows** (found while checking). Obsidian's phone margin on the row's grip pushed a label row's
+  bin onto a line of its own (a label name is wider than a priority prefix); the grip's margin is zeroed on the phone, so
+  name, card and bin share the first line as in the priority rows. Not caused by this feature; fixed in the same branch.
