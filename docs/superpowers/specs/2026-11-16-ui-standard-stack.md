@@ -72,9 +72,14 @@ Replaced wholesale, then deleted (`trash`): `obsidian/ui/` motion, drag, layouts
 - Works in Obsidian's pop-out windows (the libraries get that window's document) and on iOS (long-press drag without the system text menu or page scroll fighting it).
 - All tests green: core, architecture, styles, `uiDecides`, and `npm run test:apple`.
 
-## Rough stages
+## What is built
 
+The features are listed in [`2026-11-16-ui-standard-stack-features.md`](2026-11-16-ui-standard-stack-features.md), numbered. Every stage names the features it builds; a feature is done when it works on the phone and the desktop. The list is the scope: nothing is checked "afterwards" to find what got lost.
+
+## Stages
+
+0. **Blockers first.** A throwaway test frontend on the stack, with real data, proves every risk before a feature is built: drag together with card animation, selective re-render and the 16 ms budget with ~300 tasks, the timeline (snap, resize, pinch), the ribbon swipe, the divider, menus, the embedded editor, pop-out windows, Obsidian's phone view, long-press drag in iOS WebKit, bundle size. Results in `ui-standard-stack/stage0.md`. A library that fails is swapped for its standard alternative here, not worked around later.
 1. React, Zustand store over `TaskService`, `TaskScreen` with static columns and cards, mounted in the leaf and the note block.
 2. Motion for layout and enter/exit; dnd-kit for lists, sections, columns and the time grid.
-3. Menus, the editor component, keyboard commands, the remaining places and screens from `docs/plugin/`.
+3. Menus, the editor component, keyboard commands, the remaining places and screens.
 4. Delete the old UI, add the lint rule, measure, check both platforms and both themes, release.
