@@ -55,7 +55,7 @@ hosts: the main screen leaf, the note block
 | Swipes, divider, day slide, resize | @use-gesture reports the gesture; the core decides where it lands (`rules.swipeLanding`: one swipe, one place); a Motion spring takes the ribbon or the divider there. The day changes through `AnimatePresence` with a direction. Resizing a task is `useDrag` on its handle, the new length from the core. |
 | Fading cards at the scroll edge | CSS `mask-image`, switched by a class the list sets from its scroll position. |
 | Same behaviour in the note and the main screen | Both mount the same `TaskScreen`; only props differ. |
-| Phone vs desktop | CSS media and container queries for layout; the platform as a prop; dnd-kit's touch and pointer sensors for input. The ribbon is CSS scroll-snap; where a swipe lands (one place, never two) stays the core's `rules.swipeLanding`. |
+| Phone vs desktop | CSS media and container queries for layout; the platform as a prop; dnd-kit's touch and pointer sensors for input. The ribbon moves by @use-gesture and a Motion spring, bounded to one place each way; where a swipe lands (one place, never two) stays the core's `rules.swipeLanding` (CSS scroll-snap failed stage 0: it ignores short flicks and the core's landing). |
 | Menus and popups | One `Menu`/`Popover` component on Floating UI; its items come ready from the core. |
 | Input fields | Obsidian's editor embedded as one `ObsidianEditor` component: it owns the editor instance, reports text through callbacks, and is the only component allowed to hold a DOM ref. |
 | Keyboard shortcuts | Obsidian's commands and `Scope`, registered once by the host, dispatch the same actions as taps. No per-component key listeners. |
