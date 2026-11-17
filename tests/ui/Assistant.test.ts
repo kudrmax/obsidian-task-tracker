@@ -135,7 +135,7 @@ describe("AssistantAnswers", () => {
 		const outcome = await TASK_OUTCOME();
 		const markdown = plainMarkdown();
 		const answers = new AssistantAnswers(rig().assistant, markdown, vi.fn());
-		answers.show(outcome);
+		answers.show(outcome, "bestTask");
 		const popup = document.querySelector<HTMLElement>(".tc-panel.is-answer")!;
 		expect(document.querySelector(".tc-backdrop")).not.toBeNull();
 		expect(popup.querySelector(".tc-answer-title")?.textContent).toBe("Best task");
@@ -169,7 +169,7 @@ describe("AssistantAnswers", () => {
 			const run = assistant.press("bestTask");
 			await settle();
 			transport.answer({ taskRef: transport.refOf(title), reason: "Because." });
-			new AssistantAnswers(assistant, plainMarkdown(), vi.fn()).show(await run);
+			new AssistantAnswers(assistant, plainMarkdown(), vi.fn()).show(await run, "bestTask");
 			const card = document.querySelector<HTMLElement>(".tc-panel.is-answer .tc-card")!;
 			return { over: card.querySelector(".tc-card-over-text")?.textContent ?? null, title: card.querySelector(".tc-card-title")?.textContent, card };
 		};
@@ -204,7 +204,7 @@ describe("AssistantAnswers", () => {
 			const run = assistant.press("bestTask");
 			await settle();
 			transport.answer({ taskRef: transport.refOf(title), reason: "Because." });
-			new AssistantAnswers(assistant, plainMarkdown(), vi.fn()).show(await run);
+			new AssistantAnswers(assistant, plainMarkdown(), vi.fn()).show(await run, "bestTask");
 			return document.querySelector<HTMLElement>(".tc-panel.is-answer")!;
 		};
 
@@ -236,7 +236,7 @@ describe("AssistantAnswers", () => {
 	});
 
 	it("Escape closes it", async () => {
-		new AssistantAnswers(rig().assistant, plainMarkdown(), vi.fn()).show(await TASK_OUTCOME());
+		new AssistantAnswers(rig().assistant, plainMarkdown(), vi.fn()).show(await TASK_OUTCOME(), "bestTask");
 		document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
 		expect(document.querySelector(".tc-panel.is-answer")?.classList.contains("is-closing")).toBe(true);
 	});
@@ -244,7 +244,7 @@ describe("AssistantAnswers", () => {
 	it("a failure takes the same popup, its words in the reason's place; its detail goes to the console", () => {
 		const log = vi.fn();
 		const failed: AssistantOutcome = { kind: "failed", title: "Couldn't find the best task", words: "Claude Code isn't signed in.", detail: "authentication_failed" };
-		new AssistantAnswers(rig().assistant, plainMarkdown(), log).show(failed);
+		new AssistantAnswers(rig().assistant, plainMarkdown(), log).show(failed, "bestTask");
 		const popup = document.querySelector<HTMLElement>(".tc-panel.is-answer.is-failure")!;
 		expect(popup.querySelector(".tc-answer-title")?.textContent).toBe("Couldn't find the best task");
 		expect(popup.querySelector(".tc-card")).toBeNull();
@@ -259,6 +259,7 @@ describe("AssistantAnswers", () => {
 			tasksPort: (tasks) => ({
 				listed: () => tasks.listed(),
 				sectionOffer: (date) => tasks.sectionOffer(date),
+				addContext: (key, text) => tasks.addContext(key, text),
 				menu: (item, from, screen) => tasks.menu(item, from, screen),
 				toggleLabel: () => Promise.reject(new Error("disk full")),
 			}),
@@ -267,7 +268,7 @@ describe("AssistantAnswers", () => {
 		const run = assistant.press("bestTask");
 		await settle();
 		transport.answer({ taskRef: transport.refOf("Pay rent"), reason: "Because." });
-		new AssistantAnswers(assistant, plainMarkdown(), log).show(await run);
+		new AssistantAnswers(assistant, plainMarkdown(), log).show(await run, "bestTask");
 		const popup = document.querySelector<HTMLElement>(".tc-panel.is-answer")!;
 		expect(popup.classList.contains("is-failure")).toBe(false);
 		expect(popup.querySelector(".tc-card .tc-card-title")?.textContent).toBe("Pay rent");
@@ -278,13 +279,142 @@ describe("AssistantAnswers", () => {
 
 	it("an answer with nothing for the console writes nothing there", async () => {
 		const log = vi.fn();
-		new AssistantAnswers(rig().assistant, plainMarkdown(), log).show(await TASK_OUTCOME());
+		new AssistantAnswers(rig().assistant, plainMarkdown(), log).show(await TASK_OUTCOME(), "bestTask");
 		expect(log).not.toHaveBeenCalled();
 	});
 
 	it("Stop shows nothing", () => {
-		expect(new AssistantAnswers(rig().assistant, plainMarkdown(), vi.fn()).show({ kind: "stopped" })).toBeNull();
+		expect(new AssistantAnswers(rig().assistant, plainMarkdown(), vi.fn()).show({ kind: "stopped" }, "bestTask")).toBeNull();
 		expect(document.querySelector(".tc-panel")).toBeNull();
+	});
+
+	describe("the field for what Claude missed", () => {
+		const opened = async (log = vi.fn()) => {
+			const r = rig();
+			const run = r.assistant.press("bestTask");
+			await settle();
+			r.transport.answer({ taskRef: r.transport.refOf("Pay rent"), reason: "Rent." });
+			const answers = new AssistantAnswers(r.assistant, plainMarkdown(), log);
+			answers.show(await run, "bestTask");
+			const popup = document.querySelector<HTMLElement>(".tc-panel.is-answer")!;
+			const field = popup.querySelector<HTMLTextAreaElement>("textarea.tc-answer-field")!;
+			const type = (text: string) => {
+				field.value = text;
+				field.dispatchEvent(new Event("input"));
+			};
+			const shown = () => [...popup.querySelectorAll<HTMLButtonElement>(".tc-answer-foot > button")].filter((b) => !b.classList.contains("is-hidden")).map((b) => b.textContent);
+			return { ...r, answers, popup, field, type, shown };
+		};
+
+		it("stands under the reason, the core's placeholder in it; empty, the foot is Close alone", async () => {
+			const { popup, field, shown } = await opened();
+			expect(field.previousElementSibling?.classList.contains("tc-answer-note")).toBe(true);
+			expect(field.placeholder).toBe("What did Claude miss?");
+			expect(shown()).toEqual(["Close"]);
+			expect(popup.querySelector<HTMLElement>(".tc-answer-failed")!.hidden).toBe(true);
+		});
+
+		it("with text, Save and Save and ask again take Close's place; emptied, Close comes back", async () => {
+			const { type, shown } = await opened();
+			type("Sixth of the same");
+			expect(shown()).toEqual(["Save", "Save and ask again"]);
+			type("");
+			expect(shown()).toEqual(["Close"]);
+		});
+
+		it("Save writes the line to the chosen task and closes", async () => {
+			const { type, popup, store, transport } = await opened();
+			type("Takes a minute");
+			popup.querySelector<HTMLButtonElement>(".tc-answer-save")!.click();
+			await settle();
+			expect(store.text).toContain("- [ ] Pay rent 🗂️ Home\n\t- Контекст: Takes a minute");
+			expect(popup.classList.contains("is-closing")).toBe(true);
+			expect(transport.asked).toHaveLength(1);
+		});
+
+		it("Save and ask again writes, closes and presses Best task again", async () => {
+			const { type, popup, store, transport } = await opened();
+			type("Takes a minute");
+			popup.querySelector<HTMLButtonElement>(".tc-answer-again")!.click();
+			await settle();
+			expect(store.text).toContain("\t- Контекст: Takes a minute");
+			expect(popup.classList.contains("is-closing")).toBe(true);
+			expect(transport.asked).toHaveLength(2);
+		});
+
+		it("⌘Enter in the field is Save and ask again", async () => {
+			const { type, field, store, transport } = await opened();
+			type("Takes a minute");
+			field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }));
+			await settle();
+			expect(store.text).toContain("\t- Контекст: Takes a minute");
+			expect(transport.asked).toHaveLength(2);
+		});
+
+		it("a write that took is the last: a second ⌘Enter or press while the popup fades writes nothing and asks nothing", async () => {
+			const { type, field, popup, store, transport } = await opened();
+			type("Takes a minute");
+			const modEnter = () => field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }));
+			modEnter();
+			await settle();
+			modEnter();
+			popup.querySelector<HTMLButtonElement>(".tc-answer-save")!.click();
+			popup.querySelector<HTMLButtonElement>(".tc-answer-again")!.click();
+			await settle();
+			expect(store.text?.split("Контекст: Takes a minute")).toHaveLength(2);
+			expect(transport.asked).toHaveLength(2);
+		});
+
+		it("Save then ⌘Enter while the popup fades: one line, no second question", async () => {
+			const { type, field, popup, store, transport } = await opened();
+			type("Takes a minute");
+			popup.querySelector<HTMLButtonElement>(".tc-answer-save")!.click();
+			await settle();
+			field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }));
+			await settle();
+			expect(store.text?.split("Контекст: Takes a minute")).toHaveLength(2);
+			expect(transport.asked).toHaveLength(1);
+		});
+
+		it("Save and ask again, then Escape before the write is back: the line is written, nothing is asked again", async () => {
+			const { type, popup, store, transport } = await opened();
+			type("Takes a minute");
+			popup.querySelector<HTMLButtonElement>(".tc-answer-again")!.click();
+			document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+			await settle();
+			expect(store.text).toContain("\t- Контекст: Takes a minute");
+			expect(transport.asked).toHaveLength(1);
+		});
+
+		it("Escape closes without writing", async () => {
+			const { type, popup, store } = await opened();
+			const before = store.text;
+			type("Takes a minute");
+			document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+			expect(popup.classList.contains("is-closing")).toBe(true);
+			expect(store.text).toBe(before);
+		});
+
+		it("a write that failed keeps the popup and the text, says so under the field, the detail to the console", async () => {
+			const log = vi.fn();
+			const { type, popup, field, store } = await opened(log);
+			store.text = ["## Now", "", "- [ ] Read a book", "", "## Soon", "", "## Done", ""].join("\n");
+			type("Takes a minute");
+			popup.querySelector<HTMLButtonElement>(".tc-answer-save")!.click();
+			await settle();
+			const failed = popup.querySelector<HTMLElement>(".tc-answer-failed")!;
+			expect(failed.hidden).toBe(false);
+			expect(failed.textContent).toBe("Couldn't save to this task.");
+			expect(failed.previousElementSibling).toBe(field);
+			expect(field.value).toBe("Takes a minute");
+			expect(popup.classList.contains("is-closing")).toBe(false);
+			expect(log).toHaveBeenCalledTimes(1);
+		});
+
+		it("a failure's popup has no field", () => {
+			new AssistantAnswers(rig().assistant, plainMarkdown(), vi.fn()).show({ kind: "failed", title: "Couldn't", words: "No.", detail: "x" }, "bestTask");
+			expect(document.querySelector(".tc-answer-field")).toBeNull();
+		});
 	});
 
 	it("a press shows its outcome when it comes, the view or not", async () => {

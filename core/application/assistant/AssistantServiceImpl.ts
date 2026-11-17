@@ -1,5 +1,6 @@
 import { ASSISTANT_TIMEOUTS, type AssistantSettings, sizeOf, type TaskCalendarSettings } from "../../settings";
 import type {
+	AssistantContextResult,
 	AssistantField,
 	AssistantOffer,
 	AssistantOptionRow,
@@ -13,13 +14,14 @@ import type {
 import type { SettingsStore, Timers } from "../ports";
 import type { AssistantAction } from "./actions/action";
 import { ASSISTANT_ACTIONS } from "./actions";
+import { contextLine } from "../../domain/description";
 import { briefingOf, isEmptyBriefing } from "./briefing";
 import { ModelChoice } from "./ModelChoice";
 import { type HostModels, type ModelReply, NO_MODELS, type StopSignal, StopSwitch } from "./model";
 import { MODEL_PROFILES } from "./models";
 import type { ModelProfile, SettingField } from "./models/profile";
 import { type ActionOption, optionValue } from "./options/option";
-import { failed, failureWords, goneWords, NO_MODEL_WORDS, PAGE_WORDS, STOPPED } from "./outcomes";
+import { CONTEXT_WORDS, failed, failureWords, goneWords, NO_MODEL_WORDS, PAGE_WORDS, STOPPED } from "./outcomes";
 import { type AssistantPlace, type AssistantTarget, tasksIn } from "./scope";
 import { type AssistantSteps, type AssistantTasks, drawnAnswer, type ListedTasks, TaskLookup } from "./tasks";
 
@@ -224,7 +226,22 @@ export class AssistantServiceImpl implements AssistantService {
 			note,
 			notice: notices.length > 0 ? notices.join("\n") : null,
 			detail: errors.length > 0 ? errors.join("\n") : null,
+			context: action.context ? { taskId, words: action.context } : null,
 		};
+	}
+
+	async addContext(taskId: string, text: string): Promise<AssistantContextResult> {
+		if (contextLine(text) === null) return { ok: true };
+		const fail = (detail: string): AssistantContextResult => ({ ok: false, words: CONTEXT_WORDS.failed, detail });
+		try {
+			const task = new TaskLookup(await this.tasks.listed()).find(taskId);
+			if (task === null) return fail(`no task "${taskId}": it was removed`);
+			if (!task.open) return fail(`the task "${task.title}" is closed`);
+			await this.tasks.addContext(task.key, text);
+			return { ok: true };
+		} catch (error) {
+			return fail(String(error));
+		}
 	}
 
 	/** The action's options that keep tasks from the model now, each with its value set. */

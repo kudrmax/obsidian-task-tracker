@@ -116,6 +116,7 @@ describe("Best task marks its answer with the label set", () => {
 			tasksPort: (tasks) => ({
 				listed: () => tasks.listed(),
 				sectionOffer: (date) => tasks.sectionOffer(date),
+				addContext: (key, text) => tasks.addContext(key, text),
 				menu: (item, from, screen) => tasks.menu(item, from, screen),
 				toggleLabel: async (keys, name) => {
 					pressStop();
@@ -139,6 +140,7 @@ describe("Best task marks its answer with the label set", () => {
 			tasksPort: (tasks) => ({
 				listed: () => tasks.listed(),
 				sectionOffer: (date) => tasks.sectionOffer(date),
+				addContext: (key, text) => tasks.addContext(key, text),
 				menu: (item, from, screen) => tasks.menu(item, from, screen),
 				toggleLabel: async (keys, name) => {
 					fire();
@@ -161,6 +163,7 @@ describe("Best task marks its answer with the label set", () => {
 			tasksPort: (tasks) => ({
 				listed: () => tasks.listed(),
 				sectionOffer: (date) => tasks.sectionOffer(date),
+				addContext: (key, text) => tasks.addContext(key, text),
 				menu: (item, from, screen) => tasks.menu(item, from, screen),
 				toggleLabel: () => Promise.reject(new Error("disk full")),
 			}),
@@ -180,6 +183,7 @@ describe("Best task marks its answer with the label set", () => {
 				return {
 					listed: async () => (marked ? { ...(await tasks.listed()), lists: { now: [], soon: [], inbox: [], backlog: [], done: [] } } : tasks.listed()),
 					sectionOffer: (date) => tasks.sectionOffer(date),
+					addContext: (key, text) => tasks.addContext(key, text),
 					menu: (item, from, screen) => tasks.menu(item, from, screen),
 					toggleLabel: async (keys, name) => {
 						marked = true;

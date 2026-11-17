@@ -2126,12 +2126,46 @@ export type AssistantOutcome =
 	 * `task` and `card` are as the tasks stand after the action's options did their part (Best task's label on it).
 	 * `notice`: what an option couldn't do, drawn under the card («Couldn't add the label Focus to this task.»); null for none.
 	 * `detail`: an option's write that failed, for the console (the frontend writes it there, as a failure's); null for none.
+	 * `context`: the field for what the model missed, under the note (Best task's); null for an action without one.
 	 */
-	| { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly card: TaskCard; readonly note: string; readonly notice: string | null; readonly detail: string | null }
+	| {
+			readonly kind: "task";
+			readonly title: string;
+			readonly task: TaskItem;
+			readonly card: TaskCard;
+			readonly note: string;
+			readonly notice: string | null;
+			readonly detail: string | null;
+			readonly context: AssistantContext | null;
+	  }
 	/** `detail` is for the console: the frontend writes it there. */
 	| { readonly kind: "failed"; readonly title: string; readonly words: string; readonly detail: string }
 	/** Stopped by Max: nothing is shown. */
 	| { readonly kind: "stopped" };
+
+/** The words of an answer's field for what the model missed, ready to draw. */
+export interface AssistantContextWords {
+	/** The empty field's placeholder: «What did Claude miss?». */
+	readonly placeholder: string;
+	/** The plain pill: writes and closes. */
+	readonly save: string;
+	/** The main pill (and ⌘Enter): writes, then presses the same button again. */
+	readonly saveAndAsk: string;
+	/** The line under the field when the write failed: «Couldn't save to this task.». */
+	readonly failed: string;
+}
+
+/**
+ * An answer's field for what the model missed: its words, and the task its text goes to, written with
+ * `addContext(taskId, text)`. `taskId` is the task the model chose (a folded task's step: the step), not `task`, the card's.
+ */
+export interface AssistantContext {
+	readonly taskId: string;
+	readonly words: AssistantContextWords;
+}
+
+/** What `addContext` came to: written (or nothing to write), or failed with the line to show and `detail` for the console. */
+export type AssistantContextResult = { readonly ok: true } | { readonly ok: false; readonly words: string; readonly detail: string };
 
 /** The first half of a run, for a host that asks the model itself: plain data, travels to the host and back. */
 export interface PreparedQuestion {
@@ -2253,4 +2287,12 @@ export interface AssistantService {
 	prepare(actionId: string, target?: AssistantTarget): Promise<PreparedQuestion | AssistantOutcome>;
 	/** The second half: the model's reply read against the tasks as they are now. */
 	finish(prepared: PreparedQuestion, reply: ModelReply): Promise<AssistantOutcome>;
+
+	/**
+	 * What Max says the model missed (an answer's `context` field), written into the task `taskId` names as the last line of
+	 * its description, `- Контекст: <text>` with the text's lines joined: the task service's description write, one step to
+	 * take back. A blank text writes nothing and is `ok`. A task closed or gone, or a file that couldn't be written: not ok,
+	 * nothing written, the words to show under the field.
+	 */
+	addContext(taskId: string, text: string): Promise<AssistantContextResult>;
 }

@@ -1,5 +1,6 @@
 import { Component, MarkdownRenderer, Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
 import { AssistantAnswers, type MarkdownHost } from "./ui/assistant/AssistantAnswers";
+import { scopedModEnter } from "./ui/assistant/scopedModEnter";
 import { AppleCalendar } from "./infrastructure/AppleCalendar";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 import { openOutside } from "./infrastructure/OutsideLink";
@@ -95,7 +96,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			calendars: services.calendars,
 			settings: this.shownSettings(),
 			clock,
-			assistant: new AssistantAnswers(services.assistant, this.markdown()),
+			assistant: new AssistantAnswers(services.assistant, this.markdown(), undefined, scopedModEnter(this.app)),
 			openInCalendar: (event) => calendarApp.open(event),
 		};
 	}

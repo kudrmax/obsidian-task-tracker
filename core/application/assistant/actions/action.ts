@@ -1,3 +1,4 @@
+import type { AssistantContextWords } from "../../contracts";
 import type { Briefing, BriefingKind } from "../briefing";
 import type { JsonSchema } from "../model";
 import type { AssistantPlace, TaskScope } from "../scope";
@@ -29,6 +30,8 @@ export interface AssistantAction {
 	readonly emptyWords: string;
 	/** What it does besides its answer, each set on the Assistant page under its prompt; none when left out. */
 	readonly options?: readonly ActionOption[];
+	/** Its answer's field for what the model missed, with the field's words; none when left out. */
+	readonly context?: AssistantContextWords;
 	/** The answer read against the briefing and the tasks as they are now. */
 	read(answer: unknown, briefing: Briefing, tasks: TaskLookup): ActionResult;
 }
