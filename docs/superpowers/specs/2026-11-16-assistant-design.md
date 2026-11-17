@@ -684,3 +684,19 @@ No Swift stage (R6).
 - **Frontend-obsidian (review):** the page's own words (Model, Timeout and its line, Prompts and its line, Reset to
   default) are `page.words`; where the chosen model isn't served the page draws no model fields, only the unavailable
   words, Timeout and the prompts.
+- **Backend (label):** an action declares what it does besides its answer as `options: ActionOption[]` (`assistant/options/`):
+  a key, a row label, its choices from the settings and `afterAnswer`. Best task's is `answerLabel`; the service, the page
+  and `set` go over the options and never name one, so the next action with an option adds an entry to its own list.
+  Saved in `AssistantSettings.options` by action id, then option key (`{ bestTask: { label: "Focus" } }`), as `models` is;
+  an old `data.json` without it reads `{}`. A saved value no choice has any more reads as none, on the page and in a run.
+- **Backend (label):** the page carries an action's rows in its prompt's entry (`prompts[i].options`, drawn under that
+  prompt): `{ key, label, choices: { value, title }[], value }`, none first (`value: null`, «None»), the labels in the
+  settings' order by `labelTitle`. `set({ kind: "option", actionId, key, value })` writes one; null is None (the key goes,
+  and an action left with no option goes too).
+- **Backend (label):** the menu the marking reads is the chosen task's opened on the whole screen (`from: "full"`): the
+  menu of exactly that task, a folded task's step included, no sections. Refused when the menu has no labels group, its
+  tiles are disabled or the label has no tile, or `toggleLabel` comes back without the label on it. The others are found
+  in every list and depth (Done too) by the labels the screen reads, and taken off in one `toggleLabel` of them all.
+- **Backend (label):** the `task` outcome gains `notice: string | null`, the line under the card (null for none); `task`
+  and `card` are read again after the marking. The marking runs in `finish`, so `press` and the door's later `finish`
+  alike mark.

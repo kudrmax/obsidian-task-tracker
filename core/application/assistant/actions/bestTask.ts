@@ -1,4 +1,5 @@
 import type { Briefing } from "../briefing";
+import { answerLabel } from "../options/answerLabel";
 import type { AssistantAction } from "./action";
 
 /** Of what Max can start now in Today and Soon (`candidatesOf`), the one with the most impact, and why. A goal is never the answer: it has no ref. */
@@ -20,6 +21,7 @@ export const bestTask: AssistantAction = {
 		additionalProperties: false,
 	},
 	emptyWords: "Today and Soon have no open tasks.",
+	options: [answerLabel],
 	read(answer, briefing, tasks) {
 		const { taskRef, reason } = (answer ?? {}) as { taskRef?: unknown; reason?: unknown };
 		if (typeof taskRef !== "string" || typeof reason !== "string" || !isCandidate(briefing, taskRef)) return { kind: "failed", why: "badAnswer" };

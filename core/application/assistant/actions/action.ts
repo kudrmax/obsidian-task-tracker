@@ -1,6 +1,7 @@
 import type { Briefing, BriefingKind } from "../briefing";
 import type { JsonSchema } from "../model";
 import type { AssistantPlace, TaskScope } from "../scope";
+import type { ActionOption } from "../options/option";
 import type { TaskLookup } from "../tasks";
 
 /** What an answer, read, comes to: a task with the model's note, or why it names none. */
@@ -26,6 +27,8 @@ export interface AssistantAction {
 	readonly answerSchema: JsonSchema;
 	/** No tasks to send: the words shown instead of a call. */
 	readonly emptyWords: string;
+	/** What it does besides its answer, each set on the Assistant page under its prompt; none when left out. */
+	readonly options?: readonly ActionOption[];
 	/** The answer read against the briefing and the tasks as they are now. */
 	read(answer: unknown, briefing: Briefing, tasks: TaskLookup): ActionResult;
 }

@@ -1,7 +1,8 @@
-import { ASSISTANT_TIMEOUTS, type AssistantSettings, sizeOf } from "../../settings";
+import { ASSISTANT_TIMEOUTS, type AssistantSettings, sizeOf, type TaskCalendarSettings } from "../../settings";
 import type {
 	AssistantField,
 	AssistantOffer,
+	AssistantOptionRow,
 	AssistantOutcome,
 	AssistantPage,
 	AssistantService,
@@ -16,9 +17,10 @@ import { ModelChoice } from "./ModelChoice";
 import { type HostModels, type ModelReply, NO_MODELS, StopSwitch } from "./model";
 import { MODEL_PROFILES } from "./models";
 import type { ModelProfile, SettingField } from "./models/profile";
+import { optionValue } from "./options/option";
 import { failed, failureWords, goneWords, NO_MODEL_WORDS, PAGE_WORDS, STOPPED } from "./outcomes";
 import { type AssistantPlace, type AssistantTarget, tasksIn } from "./scope";
-import { type AssistantTasks, drawnAnswer, TaskLookup } from "./tasks";
+import { type AssistantTasks, drawnAnswer, type ListedTasks, TaskLookup } from "./tasks";
 
 /** How long a transport stopped by the timeout may take to say why before the run ends as a timeout anyway. */
 export const TIMEOUT_GRACE_MS = 5000;
@@ -115,7 +117,7 @@ export class AssistantServiceImpl implements AssistantService {
 			prompts: this.actions.map((action) => {
 				const saved = settings.prompts[action.id];
 				const isDefault = saved === undefined || saved.trim() === "";
-				return { actionId: action.id, title: action.title, prompt: isDefault ? action.defaultPrompt : saved, isDefault };
+				return { actionId: action.id, title: action.title, prompt: isDefault ? action.defaultPrompt : saved, isDefault, options: this.optionRows(action) };
 			}),
 		};
 	}
@@ -150,12 +152,41 @@ export class AssistantServiceImpl implements AssistantService {
 			const { kind, detail } = reply.failure;
 			return kind === "stopped" ? STOPPED : failed(action, failureWords(profile, kind, this.assistant().timeoutSeconds), detail);
 		}
-		const tasks = new TaskLookup(await this.tasks.listed());
+		const listed = await this.tasks.listed();
+		const tasks = new TaskLookup(listed);
 		const result = action.read(reply.answer, { input: prepared.question.input, refs: prepared.refs }, tasks);
-		if (result.kind === "task") return { kind: "task", title: action.title, ...drawnAnswer(tasks.find(result.taskId)!, tasks), note: result.note };
+		if (result.kind === "task") return this.answered(action, profile, result.taskId, result.note, listed);
 		const answer = `answer: ${JSON.stringify(reply.answer)}`;
 		if (result.why === "gone") return failed(action, goneWords(profile), `the task named is closed or gone; ${answer}`);
 		return failed(action, failureWords(profile, "badAnswer", this.assistant().timeoutSeconds), `the answer names no task sent; ${answer}`);
+	}
+
+	/** A `task` answer: the action's options do their part on the chosen task, then it is drawn as the tasks then stand. */
+	private async answered(action: AssistantAction, profile: ModelProfile, taskId: string, note: string, listed: ListedTasks): Promise<AssistantOutcome> {
+		const notices: string[] = [];
+		let now = listed;
+		for (const option of action.options ?? []) {
+			const value = optionValue(option, this.assistant().options[action.id]?.[option.key], this.settings.get());
+			const task = new TaskLookup(now).find(taskId);
+			if (value === null || task === null) continue;
+			const notice = await option.afterAnswer(value, { task, listed: now }, this.tasks);
+			if (notice !== null) notices.push(notice);
+			now = await this.tasks.listed();
+		}
+		const tasks = new TaskLookup(now);
+		const chosen = tasks.find(taskId);
+		if (chosen === null) return failed(action, goneWords(profile), "the task named is gone after its options did their part");
+		return { kind: "task", title: action.title, ...drawnAnswer(chosen, tasks), note, notice: notices.length > 0 ? notices.join("\n") : null };
+	}
+
+	private optionRows(action: AssistantAction): readonly AssistantOptionRow[] {
+		const settings: TaskCalendarSettings = this.settings.get();
+		return (action.options ?? []).map((option) => ({
+			key: option.key,
+			label: option.label,
+			choices: option.choices(settings),
+			value: optionValue(option, settings.assistant.options[action.id]?.[option.key], settings),
+		}));
 	}
 
 	/** A run: under way from now (the spinner), stopped by the timeout or by Max, ended once, whichever comes first. */
@@ -273,7 +304,15 @@ function changed(settings: AssistantSettings, change: AssistantSetting): Assista
 			return { ...settings, prompts: withKey(settings.prompts, change.actionId, change.value) };
 		case "field":
 			return { ...settings, models: { ...settings.models, [change.modelId]: withKey(settings.models[change.modelId] ?? {}, change.key, change.value) } };
+		case "option":
+			return { ...settings, options: withMap(settings.options, change.actionId, withKey(settings.options[change.actionId] ?? {}, change.key, change.value)) };
 	}
+}
+
+/** `maps` with `key`'s map set to `map`; an empty one takes the key off. */
+function withMap(maps: Readonly<Record<string, Readonly<Record<string, string>>>>, key: string, map: Readonly<Record<string, string>>): Readonly<Record<string, Readonly<Record<string, string>>>> {
+	const { [key]: _old, ...rest } = maps;
+	return Object.keys(map).length === 0 ? rest : { ...rest, [key]: map };
 }
 
 /** `map` with `key` set to `value`; null or blank takes the key off (the default again). */

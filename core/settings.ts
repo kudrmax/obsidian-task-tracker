@@ -123,6 +123,8 @@ export interface AssistantSettings {
 	readonly prompts: Readonly<Record<string, string>>;
 	/** By model id, by field key; missing: the field's default. */
 	readonly models: Readonly<Record<string, Readonly<Record<string, string>>>>;
+	/** By action id, by option key (Best task's `label`): what an action does besides its answer; missing: none. */
+	readonly options: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 /** The bounds the assistant's timeout is kept in, seconds. */
@@ -163,7 +165,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	zoomLevels: DEFAULT_ZOOM_LEVELS,
 	projectTag: "#project",
 	groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
-	assistant: { model: "claude", timeoutSeconds: 120, prompts: {}, models: {} },
+	assistant: { model: "claude", timeoutSeconds: 120, prompts: {}, models: {}, options: {} },
 };
 
 /** Merges saved data over the defaults, one level deep for the nested objects. */
@@ -184,17 +186,23 @@ export function settingsFrom(saved: unknown): TaskCalendarSettings {
 	};
 }
 
-/** The assistant as saved, field by field over the defaults: prompts and each model's map keep only their strings. */
+/** The assistant as saved, field by field over the defaults: prompts, each model's map and each action's options keep only their strings. */
 export function assistantOf(saved: unknown): AssistantSettings {
 	const fallback = DEFAULT_SETTINGS.assistant;
 	if (!isRecord(saved)) return fallback;
-	const models = isRecord(saved.models) ? saved.models : {};
 	return {
 		model: typeof saved.model === "string" ? saved.model : fallback.model,
 		timeoutSeconds: sizeOf(saved.timeoutSeconds, ASSISTANT_TIMEOUTS, fallback.timeoutSeconds),
 		prompts: stringsOf(saved.prompts),
-		models: Object.fromEntries(Object.entries(models).filter(([, fields]) => isRecord(fields)).map(([id, fields]) => [id, stringsOf(fields)])),
+		models: mapsOf(saved.models),
+		options: mapsOf(saved.options),
 	};
+}
+
+/** A saved map of maps: each inner map's strings, nothing for an entry that is no map. */
+function mapsOf(saved: unknown): Readonly<Record<string, Readonly<Record<string, string>>>> {
+	if (!isRecord(saved)) return {};
+	return Object.fromEntries(Object.entries(saved).filter(([, inner]) => isRecord(inner)).map(([key, inner]) => [key, stringsOf(inner)]));
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {

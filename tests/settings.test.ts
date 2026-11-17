@@ -77,21 +77,28 @@ describe("priority levels", () => {
 
 describe("assistant", () => {
 	it("asks Claude, waits two minutes, keeps no prompt and no model setting unless set", () => {
-		expect(settingsFrom(null).assistant).toEqual({ model: "claude", timeoutSeconds: 120, prompts: {}, models: {} });
+		expect(settingsFrom(null).assistant).toEqual({ model: "claude", timeoutSeconds: 120, prompts: {}, models: {}, options: {} });
 	});
 
 	it("merges a partial assistant over the defaults, two levels deep", () => {
 		const s = settingsFrom({ assistant: { prompts: { bestTask: "Pick one" }, models: { claude: { model: "haiku" }, local: { url: "http://x" } } } });
-		expect(s.assistant).toEqual({ model: "claude", timeoutSeconds: 120, prompts: { bestTask: "Pick one" }, models: { claude: { model: "haiku" }, local: { url: "http://x" } } });
+		expect(s.assistant).toEqual({ model: "claude", timeoutSeconds: 120, prompts: { bestTask: "Pick one" }, models: { claude: { model: "haiku" }, local: { url: "http://x" } }, options: {} });
 		expect(settingsFrom({ assistant: { model: "local", timeoutSeconds: 30 } }).assistant).toMatchObject({ model: "local", timeoutSeconds: 30, prompts: {}, models: {} });
 	});
 
 	it("drops what is not a string, and keeps the timeout within 10..600 seconds", () => {
 		const s = settingsFrom({ assistant: { model: 7, timeoutSeconds: "long", prompts: { bestTask: 3, other: "Ok" }, models: { claude: { model: null, path: "/bin/claude" }, broken: "x", none: null } } });
-		expect(s.assistant).toEqual({ model: "claude", timeoutSeconds: 120, prompts: { other: "Ok" }, models: { claude: { path: "/bin/claude" } } });
+		expect(s.assistant).toEqual({ model: "claude", timeoutSeconds: 120, prompts: { other: "Ok" }, models: { claude: { path: "/bin/claude" } }, options: {} });
 		expect(settingsFrom({ assistant: { timeoutSeconds: 5 } }).assistant.timeoutSeconds).toBe(10);
 		expect(settingsFrom({ assistant: { timeoutSeconds: 6000 } }).assistant.timeoutSeconds).toBe(600);
 		expect(settingsFrom({ assistant: "on" }).assistant).toEqual(DEFAULT_SETTINGS.assistant);
 		expect(storedSettingsFrom({ assistant: { prompts: { bestTask: "Pick" } } }).assistant.prompts).toEqual({ bestTask: "Pick" });
+	});
+
+	it("keeps each action's options by key, strings only; an old file without them has none", () => {
+		expect(settingsFrom({ assistant: { model: "claude" } }).assistant.options).toEqual({});
+		const s = settingsFrom({ assistant: { options: { bestTask: { label: "Focus", other: 3 }, broken: "x" } } });
+		expect(s.assistant.options).toEqual({ bestTask: { label: "Focus" } });
+		expect(settingsFrom(JSON.parse(JSON.stringify(s))).assistant).toEqual(s.assistant);
 	});
 });
