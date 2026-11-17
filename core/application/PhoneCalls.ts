@@ -5,7 +5,7 @@ import { dayRelation } from "../domain/Days";
 import { addDays, MINUTES_PER_DAY, minutesToHHMM } from "../domain/LocalDate";
 import { DESCRIPTION_TEMPLATE } from "../domain/description";
 import { isPresetColor, PRIORITY_COLORS, usableColor } from "../domain/Priority";
-import { labelTitle, sameLabels } from "../domain/Label";
+import { CLEAR_COLOR, labelTitle, sameLabels, usableLabelColor } from "../domain/Label";
 import { sameRule, repeatParts } from "../domain/Repeat";
 import { editRepeat, repeatDraft } from "../domain/RepeatDraft";
 import { nextProgress, REMINDER_KINDS, sameSlot } from "../domain/Task";
@@ -849,6 +849,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	sameLabels,
 	isPresetColor,
 	usableColor,
+	usableLabelColor,
 	acceptsDrop,
 	placesInGap,
 	noteTags,
@@ -918,7 +919,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+const CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, CLEAR_COLOR, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {

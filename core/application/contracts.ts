@@ -2,7 +2,7 @@ import type { GroupName, LocalDate, ReminderKind, SectionKey, Slot, TaskStatus }
 import type { RepeatRule } from "../domain/Repeat";
 import type { EndList, GroupedList, GroupPlace } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
-import type { LabelLevel } from "../domain/Label";
+import type { LabelColor, LabelLevel } from "../domain/Label";
 import type { PresetColor, PriorityColor, PriorityLevel } from "../domain/Priority";
 import type { DayColumn, DayRelation, TaskScreen } from "../domain/Days";
 import type { DueLabel } from "./dayLabels";
@@ -107,7 +107,7 @@ export { allColumnsDividerAt, allColumnsShare, allColumnsWidthAt, allColumnsWidt
 export type { Clock } from "./ports";
 
 /** A priority level, its colours in the order the settings offer them. */
-export { type LabelLevel, labelTitle, sameLabels } from "../domain/Label";
+export { CLEAR_COLOR, type LabelColor, type LabelLevel, labelTitle, sameLabels, usableLabelColor } from "../domain/Label";
 export { isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel, usableColor } from "../domain/Priority";
 export type { DayColumn, DayRelation, EndList, GroupedList, GroupPlace, Placement, TaskDraft, TaskScreen };
 /** How a level's or a label's colour paints a card, and a calendar's an event, in either theme: every frontend draws the same shades. */
@@ -2000,6 +2000,10 @@ export interface SettingsForm {
 	readonly priorities: readonly PriorityLevel[];
 	readonly labelTag: string;
 	readonly labels: readonly LabelLevel[];
+	/** The colours a priority level's row offers, in order: the presets. */
+	readonly levelSwatches: readonly PriorityColor[];
+	/** The colours a label's row offers, in order: the presets, then no colour (`CLEAR_COLOR`). */
+	readonly labelSwatches: readonly LabelColor[];
 	readonly labelPaint: LabelPaint;
 	/** The paints Several labels offers, in order. */
 	readonly labelPaints: readonly LabelPaint[];
@@ -2066,9 +2070,10 @@ export interface SettingsService {
 	setZoomLevels(text: string): Promise<void>;
 	/** The name as shown, its spaces written as underscores. */
 	renameLabel(index: number, title: string): Promise<void>;
-	recolourLabel(index: number, color: PriorityColor): Promise<void>;
+	/** Any of the form's `labelSwatches` or a code; `CLEAR_COLOR` makes the label paint nothing. */
+	recolourLabel(index: number, color: LabelColor): Promise<void>;
 	removeLabel(index: number): Promise<void>;
-	/** A new label `Label_<n>` no label has, in the first colour no label has. */
+	/** A new label `Label_<n>` no label has, in the first preset no label has (never clear). */
 	addLabel(): Promise<void>;
 	moveLabel(from: number, to: number): Promise<void>;
 	/**
@@ -2078,7 +2083,8 @@ export interface SettingsService {
 	colourOf(text: string, shades: Readonly<Record<PresetColor, string>>): PriorityColor | null;
 	/**
 	 * A code typed for the colour of level or label `index` and left: the colour to write (`colourOf`), or null when it is
-	 * no colour or the one it has already; the field then shows its colour's code again.
+	 * no colour (an emptied field too) or the one it has already; the field then shows its colour's code again. Typing never
+	 * makes a label clear: that is the No colour swatch.
 	 */
 	typedColour(of: "level" | "label", index: number, text: string, shades: Readonly<Record<PresetColor, string>>): PriorityColor | null;
 	/** The name trimmed. */

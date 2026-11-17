@@ -39,3 +39,17 @@ He wants a label he puts on a task while the card looks exactly as it would with
 ## Decisions
 
 (Filled by the agents: a gap they found and how they decided it.)
+
+- **Backend: the contract's names.** `CLEAR_COLOR = "clear"` and `LabelColor = PriorityColor | "clear"` in
+  `core/domain/Label.ts`, re-exported by `contracts.ts`; `LabelLevel.color` is a `LabelColor`; `PriorityColor` is
+  unchanged, so `"clear"` never reaches a priority, `shadesOf` or `inkOf`. The door gives `CLEAR_COLOR` in
+  `rules.constants`.
+- **Backend: swatches per group.** `SettingsForm.levelSwatches` (the six presets) and `SettingsForm.labelSwatches` (the
+  presets, then `"clear"`); a frontend draws the list it is given. `PRIORITY_COLORS` stays the presets.
+- **Backend: validating a label's colour.** `usableLabelColor(color)` (contracts, `rules.usableLabelColor`): a
+  `usableColor` or `"clear"`. `usableColor("clear")` stays false, so a priority saved as clear reads as no usable colour.
+  Settings load keeps every saved colour as before; nothing is rewritten.
+- **Backend: an emptied code field.** `typedColour` answers `null` for empty or blank text (writes nothing, the field
+  shows the colour's code again, empty for a clear label). Typing never makes a label clear: No colour is picked from
+  the swatches. A code typed for a clear label writes that colour.
+- **Backend: Add label** picks the first preset no label has, else the first preset; never clear.
