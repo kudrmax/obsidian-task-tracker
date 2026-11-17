@@ -1,10 +1,10 @@
 import { type ButtonComponent, Setting } from "obsidian";
-import type { AssistantField, AssistantPage, AssistantService } from "../../../core/application/contracts";
+import type { AssistantField, AssistantOptionRow, AssistantPage, AssistantService } from "../../../core/application/contracts";
 import { clear, el } from "../dom";
 
 /**
  * More → Assistant, drawn from the core's page: the model to ask, its own settings with what this Mac found (the path of
- * `claude`), how long to wait, and each button's prompt with Reset to default. Where no model is served (the phone), the
+ * `claude`), how long to wait, and each button's prompt with Reset to default and its option rows under it. Where no model is served (the phone), the
  * core's words say why, and the prompts stay editable: they sync.
  */
 export class AssistantSettingsPage {
@@ -110,7 +110,20 @@ export class AssistantSettingsPage {
 				const now = (await this.service.page()).prompts.find((p) => p.actionId === prompt.actionId);
 				if (now) reset?.setDisabled(now.isDefault);
 			});
+			for (const option of prompt.options) this.option(parent, prompt.actionId, option);
 		}
+	}
+
+	/** An action's option: a dropdown of its choices as given, none included; each choice is held by its place in the list. */
+	private option(parent: HTMLElement, actionId: string, option: AssistantOptionRow): void {
+		new Setting(parent).setName(option.label).addDropdown((d) => {
+			option.choices.forEach((choice, i) => d.addOption(String(i), choice.title));
+			d.setValue(String(option.choices.findIndex((choice) => choice.value === option.value)));
+			d.onChange((index) => {
+				const choice = option.choices[Number(index)];
+				if (choice) void this.service.set({ kind: "option", actionId, key: option.key, value: choice.value });
+			});
+		});
 	}
 }
 

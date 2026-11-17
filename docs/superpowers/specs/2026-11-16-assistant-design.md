@@ -700,3 +700,10 @@ No Swift stage (R6).
 - **Backend (label):** the `task` outcome gains `notice: string | null`, the line under the card (null for none); `task`
   and `card` are read again after the marking. The marking runs in `finish`, so `press` and the door's later `finish`
   alike mark.
+- **Frontend-obsidian (label):** an option row is a stock `Setting` with a dropdown, drawn right after its prompt's field;
+  each choice is held in the dropdown by its place in `choices` (so none, `null`, needs no stand-in value that a label
+  could also have), and a change sends that choice's `value` as given. The row is drawn whatever the choices: with no
+  labels in the settings it offers None alone.
+- **Frontend-obsidian (label):** the notice is a line of its own right under the card, before the reason: caption size
+  (`--tc-font-caption`), the caption colour (`--tc-muted`), 6 px from the card (`--tc-answer-notice-gap`, the popup's
+  12 px gap pulled in) so it reads as said of the card, flush with the popup's title and reason.

@@ -457,6 +457,7 @@ body {
 	--tc-answer-pad: var(--tc-space-16);
 	--tc-answer-gap: var(--tc-space-12);
 	--tc-font-answer-title: var(--tc-font-caption);
+	--tc-answer-notice-gap: var(--tc-space-6);
 	--tc-month-btn: 32px;
 	--tc-month-icon: var(--tc-icon-m);
 	--tc-day: 36px;
@@ -1366,6 +1367,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel.is-answer.is-shown { transform: none; }
 .tc-answer-title { font-size: var(--tc-font-answer-title); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); }
 .tc-answer-card { cursor: default; }
+.tc-answer-notice { margin-top: calc(var(--tc-answer-notice-gap) - var(--tc-answer-gap)); font-size: var(--tc-font-caption); line-height: var(--tc-leading-card); color: var(--tc-muted); }
 .tc-panel.is-answer .tc-answer-note { overflow: visible; }
 .tc-answer-note > :first-child { margin-top: 0; }
 .tc-answer-note > :last-child { margin-bottom: 0; }

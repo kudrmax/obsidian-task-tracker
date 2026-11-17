@@ -5,6 +5,7 @@ import { AssistantAnswers, type MarkdownHost } from "../../obsidian/ui/assistant
 import { AssistantSettingsPage } from "../../obsidian/ui/assistant/AssistantPage";
 import { BottomCapsule } from "../../obsidian/ui/BottomCapsule";
 import { type AssistantMenuRows, MoreMenu } from "../../obsidian/ui/menu/MoreMenu";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { rig, settle } from "../application/assistant/assistantFakes";
 
 const NO_UNDO: UndoService = { undo: async () => "nothing", redo: async () => "nothing", canUndo: () => false, canRedo: () => false, onChange: () => () => undefined };
@@ -195,6 +196,33 @@ describe("AssistantAnswers", () => {
 		});
 	});
 
+	describe("what the marking couldn't do, under the card", () => {
+		const LABELLED = { ...DEFAULT_SETTINGS, labels: [{ name: "Focus", color: "orange" as const }], assistant: { ...DEFAULT_SETTINGS.assistant, options: { bestTask: { label: "Focus" } } } };
+		const FILE = ["## Now", "", "- [ ] Pay rent", "- [ ] p1 Sign the lease", "", "## Soon", "", "## Done", ""].join("\n");
+		const shown = async (title: string) => {
+			const { assistant, transport } = rig({ text: FILE, settings: LABELLED });
+			const run = assistant.press("bestTask");
+			await settle();
+			transport.answer({ taskRef: transport.refOf(title), reason: "Because." });
+			new AssistantAnswers(assistant, plainMarkdown(), vi.fn()).show(await run);
+			return document.querySelector<HTMLElement>(".tc-panel.is-answer")!;
+		};
+
+		it("a refused marking: the core's line right under the card, before the reason", async () => {
+			const popup = await shown("Sign the lease");
+			const notice = popup.querySelector<HTMLElement>(".tc-answer-notice")!;
+			expect(notice.textContent).toBe("Couldn't add the label Focus to this task.");
+			expect(notice.previousElementSibling?.classList.contains("tc-answer-card")).toBe(true);
+			expect(notice.nextElementSibling?.classList.contains("tc-answer-note")).toBe(true);
+		});
+
+		it("a marking that took: no line, the card shows the label", async () => {
+			const popup = await shown("Pay rent");
+			expect(popup.querySelector(".tc-answer-notice")).toBeNull();
+			expect(popup.querySelector<HTMLElement>(".tc-answer-card")?.dataset.priority).toBe("orange");
+		});
+	});
+
 	it("a press that joins a run under way shows its answer once", async () => {
 		const { assistant, transport } = rig();
 		const answers = new AssistantAnswers(assistant, plainMarkdown(), vi.fn());
@@ -248,7 +276,7 @@ describe("More → Assistant", () => {
 		transport.hints = { path: "/opt/homebrew/bin/claude" };
 		const root = document.body.appendChild(document.createElement("div"));
 		await new AssistantSettingsPage(assistant, vi.fn()).build(root);
-		expect(names(root)).toEqual(["Model", "Claude", "Model", "Path to claude", "Timeout", "Prompts", "Best task"]);
+		expect(names(root)).toEqual(["Model", "Claude", "Model", "Path to claude", "Timeout", "Prompts", "Best task", "Label"]);
 		const select = root.querySelector("select")!;
 		expect([...select.options].map((o) => [o.value, o.textContent, o.disabled])).toEqual([["claude", "Claude", false]]);
 		const model = root.querySelectorAll("select")[1];
@@ -292,7 +320,7 @@ describe("More → Assistant", () => {
 		await new AssistantSettingsPage(assistant, vi.fn()).build(root);
 		expect(root.querySelector(".tc-assistant-unavailable")?.textContent).toBe("Claude works in Obsidian on the Mac.");
 		expect(root.querySelector("select")!.options[0].disabled).toBe(true);
-		expect(names(root)).toEqual(["Model", "Timeout", "Prompts", "Best task"]);
+		expect(names(root)).toEqual(["Model", "Timeout", "Prompts", "Best task", "Label"]);
 		expect(root.querySelector("textarea")).not.toBeNull();
 	});
 
@@ -303,7 +331,7 @@ describe("More → Assistant", () => {
 		const worded: AssistantService = Object.assign(Object.create(assistant) as AssistantService, { page: async () => ({ ...page, words }) });
 		const root = document.body.appendChild(document.createElement("div"));
 		await new AssistantSettingsPage(worded, vi.fn()).build(root);
-		expect(names(root)).toEqual(["M", "Claude", "Model", "Path to claude", "T", "P", "Best task"]);
+		expect(names(root)).toEqual(["M", "Claude", "Model", "Path to claude", "T", "P", "Best task", "Label"]);
 		expect(root.textContent).toContain("TN");
 		expect(root.textContent).toContain("PN");
 		expect(root.querySelector(".tc-assistant-prompt-head button")!.textContent).toBe("R");
@@ -323,5 +351,44 @@ describe("More → Assistant", () => {
 		}
 		expect(settings.get().assistant.timeoutSeconds).toBe(120);
 		expect(redraw).not.toHaveBeenCalled();
+	});
+
+	describe("an action's option rows, under its prompt", () => {
+		const LABELS = [
+			{ name: "Good_fun", color: "red" },
+			{ name: "Focus", color: "orange" },
+		] as const;
+		const built = async (label: string | null) => {
+			const r = rig({ settings: { ...DEFAULT_SETTINGS, labels: [...LABELS], assistant: { ...DEFAULT_SETTINGS.assistant, options: label === null ? {} : { bestTask: { label } } } } });
+			const root = document.body.appendChild(document.createElement("div"));
+			await new AssistantSettingsPage(r.assistant, vi.fn()).build(root);
+			const row = [...root.querySelectorAll(".setting-item")].find((item) => item.querySelector(".setting-item-name")?.textContent === "Label")!;
+			return { ...r, row, select: row.querySelector("select")! };
+		};
+
+		it("draws the row after the prompt, its choices as given, None first, the current one chosen", async () => {
+			const { row, select } = await built("Focus");
+			expect(row.previousElementSibling?.tagName).toBe("TEXTAREA");
+			expect([...select.options].map((o) => o.textContent)).toEqual(["None", "Good fun", "Focus"]);
+			expect(select.selectedOptions[0].textContent).toBe("Focus");
+		});
+
+		it("none set: None chosen", async () => {
+			const { select } = await built(null);
+			expect(select.selectedOptions[0].textContent).toBe("None");
+		});
+
+		it("a change sets the option through the core; None sets it to none", async () => {
+			const { select, settings } = await built(null);
+			const choose = async (title: string) => {
+				select.value = [...select.options].find((o) => o.textContent === title)!.value;
+				select.dispatchEvent(new Event("change"));
+				await settle();
+			};
+			await choose("Good fun");
+			expect(settings.get().assistant.options).toEqual({ bestTask: { label: "Good_fun" } });
+			await choose("None");
+			expect(settings.get().assistant.options).toEqual({});
+		});
 	});
 });
