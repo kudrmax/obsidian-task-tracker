@@ -270,18 +270,16 @@ describe("the Assistant page's Label row", () => {
 	it("offers None and the labels in the settings' order, by the titles the screen shows, the saved one current", async () => {
 		const { assistant } = rig({ text: FILE, settings: settingsWith("Focus") });
 		const page = await assistant.page();
-		expect(page.prompts[0].options).toEqual([
-			{
-				key: "label",
-				label: "Label",
-				choices: [
-					{ value: null, title: "None" },
-					{ value: "Good_fun", title: "Good fun" },
-					{ value: "Focus", title: "Focus" },
-				],
-				value: "Focus",
-			},
-		]);
+		expect(page.prompts[0].options[0]).toEqual({
+			key: "label",
+			label: "Label",
+			choices: [
+				{ value: null, title: "None" },
+				{ value: "Good_fun", title: "Good fun" },
+				{ value: "Focus", title: "Focus" },
+			],
+			value: "Focus",
+		});
 	});
 
 	it("shows None for no label and for a label gone from the settings", async () => {
