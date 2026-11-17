@@ -503,6 +503,30 @@ the prompts still editable (they sync).
 > progress or with a time today counts for more only if it truly matters more. Answer with its ref, and in two or three
 > short sentences in the language of my tasks, say why this one.
 
+## Best task: marking the answer with a label (2026-11-17)
+
+Max: besides the popup, Settings → Assistant gets an optional **label** for Best task, one of the labels he already has
+(the settings' `labels`), or none. With one set, a `task` answer also marks the chosen task with that label, and the label
+is on exactly one task: taken off wherever else it stands.
+
+- **As Max would do it by hand, nothing hard-coded.** The marking goes through the same calls a tap in the task's menu
+  makes (`TaskService.menu` and `toggleLabel`), never its own write and never a copy of the label rules. What the menu
+  would not let Max do, the marking doesn't do: a label tile that is disabled or missing for the chosen task (today: a
+  task with a priority carries no labels) means the marking is refused, and nothing is changed anywhere. If the label
+  rules change one day (labels beside a priority), the marking follows them by itself.
+- **Order:** put on the chosen task first; only if it took (the task as it then stands carries the label) is it taken
+  off every other task that has it, done and given-up ones included, so it ends on exactly one. A refused marking
+  leaves the label where it was.
+- **Which task:** the chosen candidate itself: a folded task's next step gets the label, not the folded task.
+- **When:** only on a `task` outcome. A failure, Stop, a timeout or `gone` touch no label. The chosen task already
+  carrying it: nothing to put on, it is still taken off the others.
+- **The popup** stays as it is and draws the chosen task as it stands after the marking (its card shows the label). A
+  refused marking adds one line under the card, the core's words: «Couldn't add the label {name} to this task.»
+- **The label gone from the settings** (renamed or removed) reads as none: nothing is marked, the page shows none.
+- **Settings page:** under Best task's prompt, a «Label» row: a dropdown of None and the labels in the settings' order,
+  their titles as the screen shows them; the core gives the rows ready (`AssistantPage`), the frontend only draws them.
+- **Undo:** each write is the menu's own, so it undoes as the menu's does.
+
 ## Platforms
 
 - **Obsidian on the Mac:** everything above.
