@@ -3,7 +3,7 @@ import { answerLabel } from "../options/answerLabel";
 import { skipLabel } from "../options/skipLabel";
 import type { AssistantAction } from "./action";
 
-/** Of what Max can start now in Today and Soon (`candidatesOf`), but for the tasks marked with the skip label, the one that changes his life the most, and why. A goal is never the answer: it has no ref. */
+/** Of what Max can start now in the Today and Soon columns as the screen shows them (`candidatesOf`), but for the tasks marked with the skip label, the one that changes his life the most, and why. A goal is never the answer: it has no ref. */
 export const bestTask: AssistantAction = {
 	id: "bestTask",
 	places: ["more"],
@@ -11,7 +11,7 @@ export const bestTask: AssistantAction = {
 	icon: "sparkles",
 	title: "Best task",
 	failureTitle: "Couldn't find the best task",
-	scope: { kind: "lists", lists: ["now", "soon"] },
+	scope: { kind: "columns", columns: ["today", "soon"] },
 	briefing: "candidates",
 	defaultPrompt:
 		"You help me choose the one task that matters most. Below is each thing I could start now: a task, or the next step of a bigger task, with the goals above it and, for a step, the steps after it. Pick the one whose doing would change my life the most: what becomes different for me — my relationships, health, money, work, home, freedom — once it is done. Judge by meaning, not by how the task sounds: a step is not more important because it is big, concrete, ends in a finished product or sounds responsible; a short task can matter more than a long one. Count only what this step itself gives: its goals show what it is for, but what the goals or the steps after it would give is not done by it. A due date is urgency, not impact. Don't invent what a task is for; judge by what is written. Answer with its ref, and in two or three short sentences in the language of my tasks, say what changes in my life when this one is done; don't speak about the other tasks.",

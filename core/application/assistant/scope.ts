@@ -1,10 +1,10 @@
 import type { SectionKey, TaskItem } from "../contracts";
-import type { ListedTasks } from "./tasks";
+import type { ListedColumn, ListedTasks } from "./tasks";
 
 /** Which tasks an action sends. */
 export type TaskScope =
-	/** The open tasks of these lists, in this order: «now» is what Today shows, «soon» the whole Soon list, dated ones too. */
-	| { readonly kind: "lists"; readonly lists: readonly SectionKey[] }
+	/** The open tasks of these columns as the screen draws them on today, in this order: a dated Soon task stands on its day, in neither. */
+	| { readonly kind: "columns"; readonly columns: readonly ListedColumn[] }
 	/** The target's project, with its subprojects' tasks. */
 	| { readonly kind: "project" }
 	/** The tasks the button was pressed on, with their subtasks. */
@@ -29,7 +29,7 @@ export const OPEN_LISTS: readonly SectionKey[] = ["now", "soon", "inbox", "backl
 
 /** What a scope reads of its target: the places that give it. */
 export const SCOPE_NEEDS: Readonly<Record<TaskScope["kind"], (target: AssistantTarget) => boolean>> = {
-	lists: () => true,
+	columns: () => true,
 	all: () => true,
 	project: (target) => typeof target.projectId === "string" && target.projectId !== "",
 	target: (target) => (target.taskIds?.length ?? 0) > 0,
@@ -46,8 +46,8 @@ export function targetOfPlace(place: AssistantPlace): AssistantTarget {
 export function tasksIn(scope: TaskScope, target: AssistantTarget, listed: ListedTasks): readonly TaskItem[] {
 	const open = (lists: readonly SectionKey[]) => lists.flatMap((list) => listed.lists[list].filter((item) => item.open));
 	switch (scope.kind) {
-		case "lists":
-			return open(scope.lists);
+		case "columns":
+			return scope.columns.flatMap((column) => listed.columns[column].filter((item) => item.open));
 		case "all":
 			return open(OPEN_LISTS);
 		case "project":

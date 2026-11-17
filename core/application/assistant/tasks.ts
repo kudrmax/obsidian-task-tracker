@@ -2,10 +2,15 @@ import type { LocalDate, SectionKey } from "../../domain/Task";
 import type { MenuFrom, MenuScreen, TaskCard, TaskItem, TaskKey, TaskMenuModel } from "../contracts";
 import type { SectionOffer } from "../sections";
 
-/** Every task of each list as the screen draws it, each with its subtasks, and today: what the assistant reads. */
+/** The funnel's columns the assistant can read: Today and Soon, as the screen draws them on today. */
+export type ListedColumn = "today" | "soon";
+
+/** Every task of each list, each with its subtasks, the columns as the screen draws them, and today: what the assistant reads. */
 export interface ListedTasks {
 	readonly today: LocalDate;
 	readonly lists: Readonly<Record<SectionKey, readonly TaskItem[]>>;
+	/** Today: the day's list, then its timeline; Soon: the Soon column, its dated and timed tasks left on their days. */
+	readonly columns: Readonly<Record<ListedColumn, readonly TaskItem[]>>;
 }
 
 /**
