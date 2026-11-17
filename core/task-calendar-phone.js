@@ -474,6 +474,11 @@ ${line}`;
   };
 
   // core/domain/Label.ts
+  var CLEAR_COLOR = "clear";
+  var LABEL_SWATCHES = [...PRIORITY_COLORS, CLEAR_COLOR];
+  function usableLabelColor(color) {
+    return color === CLEAR_COLOR || usableColor(color);
+  }
   function labelTitle(name) {
     return name.replace(/_/g, " ");
   }
@@ -4411,7 +4416,9 @@ ${key.title}`.toLowerCase();
   // core/application/marks.ts
   var MOST_CARD_COLORS = 4;
   function markColors(priority, labels) {
-    return priority ? [priority.color] : labels.slice(0, MOST_CARD_COLORS).map((label) => label.color);
+    const drawn = (color) => usableColor(color) ? [color] : [];
+    if (priority) return drawn(priority.color);
+    return labels.flatMap((label) => drawn(label.color)).slice(0, MOST_CARD_COLORS);
   }
   function draftMarksOf(marks, levels, labels) {
     const choices = markChoices(marks);
@@ -6107,6 +6114,8 @@ ${key.title}`.toLowerCase();
         priorities: s.priorities,
         labelTag: s.labelTag,
         labels: s.labels,
+        levelSwatches: PRIORITY_COLORS,
+        labelSwatches: LABEL_SWATCHES,
         labelPaint: s.labelPaint,
         labelPaints: LABEL_PAINTS,
         cardHeight: s.cardHeight,
@@ -8764,6 +8773,7 @@ ${key.title}`.toLowerCase();
     sameLabels,
     isPresetColor,
     usableColor,
+    usableLabelColor,
     acceptsDrop,
     placesInGap,
     noteTags,
@@ -8831,7 +8841,7 @@ ${key.title}`.toLowerCase();
     onTheDay,
     canPick
   };
-  var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+  var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, CLEAR_COLOR, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };

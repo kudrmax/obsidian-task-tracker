@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { usableLabelColor } from "../core/domain/Label";
+import { usableColor } from "../core/domain/Priority";
 import { DEFAULT_SETTINGS, settingsFrom } from "../core/settings";
 import { storedSettingsFrom } from "../obsidian/settingsFile";
 
@@ -45,6 +47,14 @@ describe("settingsFrom", () => {
 		expect(settingsFrom({ labelPaint: "blend" }).labelPaint).toBe("blend");
 		expect(settingsFrom({ labelPaint: "plaid" }).labelPaint).toBe("stripes");
 		expect(storedSettingsFrom({ labelPaint: "blend" }).labelPaint).toBe("blend");
+	});
+
+	it("keep a label's clear colour; a priority's clear reads as no usable colour, as any unknown one", () => {
+		const saved = { labels: [{ name: "Skip", color: "clear" }], priorities: [{ prefix: "p1", color: "clear" }] };
+		expect(settingsFrom(saved).labels).toEqual([{ name: "Skip", color: "clear" }]);
+		expect(storedSettingsFrom(saved).labels).toEqual([{ name: "Skip", color: "clear" }]);
+		expect(usableColor(settingsFrom(saved).priorities[0].color)).toBe(false);
+		expect(usableLabelColor(settingsFrom(saved).labels[0].color)).toBe(true);
 	});
 
 	it("keeps the other nested keys when one is saved", () => {

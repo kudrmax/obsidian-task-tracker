@@ -99,31 +99,41 @@ struct MarkRow: View {
                 .autocorrectionDisabled()
                 .onSubmit { rename(name) }
             Spacer()
-            // The six preset colours, each its own shade in either theme, as the plugin's circles; the system picker for
-            // any other.
+            // The colours the core offers the row, each its own shade in either theme, as the plugin's circles (a label's
+            // last one, No Color, a slashed circle); the system picker for any other.
             HStack(spacing: 6) {
-                ForEach(plugin.presets, id: \.self) { preset in
+                ForEach(plugin.swatches(of), id: \.self) { swatch in
                     Button {
-                        Task { await plugin.write(of == "level" ? "settings.recolourLevel" : "settings.recolourLabel", [.number(Double(index)), .string(preset)]) }
+                        Task { await plugin.write(of == "level" ? "settings.recolourLevel" : "settings.recolourLabel", [.number(Double(index)), .string(swatch)]) }
                     } label: {
-                        Circle()
-                            .fill(plugin.ink(preset, scheme))
+                        circle(swatch)
                             .frame(width: 18, height: 18)
-                            .overlay { if preset == color { Circle().strokeBorder(Color.primary, lineWidth: 2).padding(-3) } }
+                            .overlay { if swatch == color { Circle().strokeBorder(Color.primary, lineWidth: 2).padding(-3) } }
                     }
                     .buttonStyle(.borderless)
-                    .accessibilityLabel(preset.capitalized)
-                    .accessibilityAddTraits(preset == color ? .isSelected : [])
+                    .accessibilityLabel(swatch == plugin.clear ? "No Color" : swatch.capitalized)
+                    .accessibilityAddTraits(swatch == color ? .isSelected : [])
                 }
             }
             ColorPicker("Color", selection: Binding(
-                get: { plugin.ink(color, scheme) },
+                get: { plugin.ink(color, scheme) ?? .clear },
                 set: { picked in Task { await plugin.recolour(of, index, to: picked, scheme: scheme) } }
             ), supportsOpacity: false)
             .labelsHidden()
         }
         .onAppear { name = title }
         .onChange(of: title) { name = title }
+    }
+
+    @ViewBuilder
+    private func circle(_ swatch: String) -> some View {
+        if let ink = plugin.ink(swatch, scheme) {
+            Circle().fill(ink)
+        } else {
+            Image(systemName: "circle.slash")
+                .resizable()
+                .foregroundStyle(Color(.secondaryLabel))
+        }
     }
 }
 
@@ -148,7 +158,7 @@ struct LabelsPage: View {
                 }
                 Button("Add Label") { Task { await plugin.write("settings.addLabel") } }
             } footer: {
-                Text("A task tagged with a label is drawn in its colour.")
+                Text("A task tagged with a label is drawn in its colour. A label of No Color leaves the card as it is.")
             }
             if let form = plugin.form {
                 Section {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { labelNameOf, labelsOfText, labelTitle, toggledLabel, usableLabels } from "../../core/domain/Label";
+import { CLEAR_COLOR, labelNameOf, labelsOfText, labelTitle, toggledLabel, usableLabelColor, usableLabels } from "../../core/domain/Label";
 import { formatTaskLine, parseTaskLine, type Markers } from "../../core/domain/TaskLine";
 
 const M: Markers = { dueDate: "📅", slot: "⏰", priorities: ["p1"], labelTag: "label", labels: ["Важное", "Срочное", "Приоритет_1"] };
@@ -58,5 +58,13 @@ describe("names", () => {
 	it("toggles a label on at the end, off where it is", () => {
 		expect(toggledLabel(["A"], "B")).toEqual(["A", "B"]);
 		expect(toggledLabel(["A", "B"], "A")).toEqual(["B"]);
+	});
+});
+
+describe("usableLabelColor", () => {
+	it("draws a label in a level's colours or in none: clear", () => {
+		expect(CLEAR_COLOR).toBe("clear");
+		expect(["red", "#FF6A00", "clear"].map(usableLabelColor)).toEqual([true, true, true]);
+		expect(["Clear", "", "purple", "#fff"].map(usableLabelColor)).toEqual([false, false, false, false]);
 	});
 });

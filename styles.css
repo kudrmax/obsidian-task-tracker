@@ -443,6 +443,8 @@ body {
 	/* The circle after the six that picks any colour: a ring of hues round the page's ground, or round the colour once it is one. */
 	--tc-swatch-well: conic-gradient(#FF453A, #FFD60A, #30D158, #40C8E0, #0A84FF, #BF5AF2, #FF453A);
 	--tc-swatch-well-inner: 16px;
+	/* A label's No colour: an empty circle struck through, as the standard «no fill» swatch. */
+	--tc-swatch-clear: linear-gradient(to bottom right, transparent calc(50% - var(--tc-swatch-ring) / 2), var(--tc-muted) 0, var(--tc-muted) calc(50% + var(--tc-swatch-ring) / 2), transparent 0);
 	/* The colour's code beside them, and a card in the colour, as a task in it looks on the screen. */
 	--tc-level-hex-w: 88px;
 	--tc-level-hex-pad: calc(var(--tc-space-10) + 1ch);
@@ -822,6 +824,8 @@ button.tc-btn.is-pill.is-strong { background: var(--tc-ink-strong); color: var(-
 button.tc-btn.is-pill.is-danger { background: var(--tc-danger); color: var(--tc-on-danger); font-weight: var(--tc-weight-semibold); }
 button.tc-btn.is-swatch { width: var(--tc-swatch); height: var(--tc-swatch); flex-shrink: 0; padding: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-fill); }
 button.tc-btn.is-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc-swatch-halo), 0 0 0 calc(2 * var(--tc-swatch-ring)) var(--tc-priority-ink); }
+button.tc-btn.is-swatch.tc-swatch-clear { background: var(--tc-swatch-clear); box-shadow: inset 0 0 0 var(--tc-swatch-ring) var(--tc-muted); }
+button.tc-btn.is-swatch.tc-swatch-clear.is-on { box-shadow: inset 0 0 0 var(--tc-swatch-ring) var(--tc-muted), 0 0 0 var(--tc-swatch-ring) var(--tc-swatch-halo), 0 0 0 calc(2 * var(--tc-swatch-ring)) var(--tc-ink-strong); }
 .task-calendar svg { display: block; }
 /* Hidden by the plugin's own classes, apart from Obsidian's is-hidden. */
 .task-calendar > .tc-hidden { display: none; }
@@ -1328,6 +1332,8 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-menu-tiles.is-four .tc-menu-tile-label:not(.is-long) { width: calc(100% + var(--tc-space-6)); padding: 0; }
 .tc-menu-tile-label.is-long { text-align: left; -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); }
 .tc-menu-badge { position: absolute; top: var(--tc-menu-badge-inset); right: var(--tc-menu-badge-inset); width: var(--tc-menu-badge); height: var(--tc-menu-badge); border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); color: var(--tc-menu-badge-ink); display: flex; align-items: center; justify-content: center; }
+.tc-panel .tc-menu-tile.is-clear.is-on { background: var(--tc-place-on-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-ink-strong); }
+.tc-menu-tile.is-clear > .tc-menu-badge { background: var(--tc-ink-strong); color: var(--tc-bg); }
 .tc-menu-badge svg { width: var(--tc-menu-badge-icon); height: var(--tc-menu-badge-icon); stroke-width: var(--tc-stroke-badge); }
 .tc-menu-row svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
 /* The sections to choose from: a long name fades out; the task's own is checked, the tasks outside any are quieter. */
@@ -1525,6 +1531,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-preset-row input[type="text"].tc-preset-name { flex: 1; min-width: 0; }
 .tc-level-row input[type="text"].tc-label-name { flex: 1 1 var(--tc-label-name-w); width: auto; min-width: var(--tc-label-name-w); margin: 0; }
 .tc-row-grip { touch-action: none; cursor: grab; }
+.is-phone .tc-level-row .tc-row-grip { margin: 0; }
 .tc-level-row.is-dragging { position: relative; z-index: var(--tc-layer-block); opacity: var(--tc-pressed); }
 /* The rows a dragged row passes slide aside, and the row let go glides into its place, as the cards of a list do. */
 .tc-level-row.is-shifting { transition: transform var(--tc-duration-snap) var(--tc-ease-out); }
@@ -1539,6 +1546,8 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-level-row input[type="text"].tc-level-hex-input { width: 100%; padding-left: var(--tc-level-hex-pad); font-family: var(--tc-font-code); }
 .tc-level-preview { position: relative; flex: 1; min-width: var(--tc-level-preview-min); height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); background: var(--tc-priority-fill); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); color: var(--tc-text); }
 .tc-level-preview-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.tc-level-preview:not([data-priority]) { background: var(--tc-card-bg); }
+.tc-level-preview:not([data-priority]) > .tc-level-preview-time { color: var(--tc-muted); }
 .tc-level-preview-time { flex-shrink: 0; font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-priority-meta); font-variant-numeric: tabular-nums; }
 /* A row too narrow for all of it, the phone's and a narrow settings window's: the name, the card and the bin; under them the circles across the row; then the code. */
 :is(.is-phone .modal, .tc-level-rows.is-wrapped) .setting-item.tc-level-row { flex-wrap: wrap; column-gap: var(--tc-space-8); row-gap: var(--tc-space-12); }

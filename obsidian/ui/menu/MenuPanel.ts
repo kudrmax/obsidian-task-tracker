@@ -1,8 +1,9 @@
-import type { PriorityColor, Weekday } from "../../../core/application/contracts";
+import type { LabelColor, PriorityColor, Weekday } from "../../../core/application/contracts";
 import { PROPERTY, tokenPx } from "../design";
 import { el, px } from "../dom";
 import { Button } from "../kit/Button";
 import { icon, type IconName } from "../kit/icons";
+import { tintOf } from "../priorityColors";
 
 /** The wheel's places, which the quick bar's place tiles wear. */
 export type PlaceIconName = "inbox" | "backlog" | "soon" | "now" | "calendar";
@@ -94,8 +95,8 @@ export function priorityDot(parent: HTMLElement, color: PriorityColor, cls: stri
 export interface MenuTileSpec {
 	readonly label: string;
 	readonly icon: IconName;
-	/** A priority level's tile: its flag takes the level's colour, and the task's own level is `on`. */
-	readonly color?: PriorityColor;
+	/** A level's or a label's tile: its icon takes the colour, none for a label of no colour, and the task's own mark is `on`. */
+	readonly color?: LabelColor;
 	/** The tile that stands for what is set now; a level's tile also carries the cross that takes it off. */
 	readonly on?: boolean;
 	/** Shown but not pressed: a label's tile while the task has a priority, a level's while it has labels. */
@@ -103,10 +104,15 @@ export interface MenuTileSpec {
 	readonly onPick: () => void;
 }
 
-/** A tile: the icon over the label; the level a task has carries a badge with a cross, since a tap on it takes the level off. */
+/**
+ * A tile: the icon over the label; the level or label a task has carries a badge with a cross, since a tap on it takes it
+ * off. A label of no colour is drawn untinted, as the menu's other tiles.
+ */
 function menuTile(parent: HTMLElement, spec: MenuTileSpec): HTMLButtonElement {
 	const tile = el(parent, "button", "tc-btn tc-menu-tile");
-	if (spec.color) tile.dataset.priority = spec.color;
+	const tint = tintOf(spec.color);
+	if (tint) tile.dataset.priority = tint;
+	tile.classList.toggle("is-clear", spec.color !== undefined && tint === undefined);
 	tile.classList.toggle("is-on", spec.on === true);
 	tile.disabled = spec.disabled === true;
 	tile.appendChild(icon(spec.icon));

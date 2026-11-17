@@ -103,8 +103,10 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   hands `ids` back, so a task whose line a write changed is found again by it. A host compares ids, never a key's
   fields. Keys a call answers alone (`tasks.carried`) are the keys of the items handed in, as read: a host finds each
   item by its key.
-- `TaskItem.colors`: at most `MOST_CARD_COLORS` (4) colours, the first labels' in the settings' order; a host paints
-  every one it is given.
+- `TaskItem.colors`: at most `MOST_CARD_COLORS` (4) colours, the first coloured labels' in the settings' order (a clear
+  label, `"clear"`, counts for none: Focus and a clear label give `["blue"]`, a clear label alone `[]`); only colours
+  `usableColor` accepts, so a priority or a label saved as `"clear"` or a broken code (`#12345`) paints nothing; a host
+  paints every one it is given. `TaskItem.labels` still lists a clear label, its `color` `"clear"`.
 - `tasks.screen(date)` with no tasks file answers the empty screen with `missing: true`.
 - `tasks.createFile()` answers the new file's text in `tasks`; with a file already there it fails.
 - `tasks.placementTitle(placement)`: the quick entry's place button's words for its `place`: the list's name as the
@@ -608,11 +610,15 @@ The settings screen, every read and write but one, answered by the plugin's own 
 `"stripes"` or `"blend"`; anything else writes nothing), `setCardHeight(px)` and `setCardGap(px)` (Cards: written rounded
 while within the form's `cardHeights` `{ min: 28, max: 40 }` and `cardGaps` `{ min: 0, max: 10 }`, else nothing), `setZoomLevels(text)` (Zoom
 levels as typed, the hour's heights: `"40, 80"` writes `[{ hourPx: 40 }, { hourPx: 80 }]`, the old `"28:60, 56:30"` reads
-too; text that is no list of positive whole numbers writes nothing), `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
+too; text that is no list of positive whole numbers writes nothing), `renameLabel(index, title)`, `recolourLabel(index, color)` (any of the form's `labelSwatches`, `"clear"` included, or a
+code: `recolourLabel(0, "clear")` makes label 0 paint nothing), `removeLabel(index)`, `addLabel()` (never clear),
 `moveLabel(from, to)`, `colourOf(text, shades)` (the preset a typed code is, by the shades the host draws presets in),
 `renamePreset(index, name)`, `removePreset(index)`, `addPreset()`, `movePreset(from, to)`, `setUngrouped(name)`,
 `setGoogleClientId(id)`, `setWorkCalendarFile(path)`, `typedColour(of, index, text, shades)` (a colour code typed for a
-level or a label and left: the colour to write, `null` for no colour or the one it has). `form()` also answers
+level or a label and left: the colour to write, `null` for no colour, an emptied field, or the one it has; typing never
+makes a label clear). `form()` also answers `levelSwatches` (the colours a priority's row offers, in order: the six
+presets) and `labelSwatches` (a label's row: the presets, then `"clear"`, No colour: the app draws the swatches it is
+given and never decides which group has No colour),
 `dayStartHours` (what Day starts at offers), `labelPaint` and `labelPaints` (Several labels: the paint saved, and the
 paints offered in order, `["stripes", "blend"]`), `cardHeight`, `cardGap`, `cardHeights` and `cardGaps` (Cards: the
 sizes saved and the bounds the sliders move within), `zoomLevels` (Zoom levels as the field shows them, `"28, 56, 112,
@@ -801,7 +807,9 @@ as typed, `{ kind: "note", label, target }` for `[[target]]`, `[[target|label]]`
 "url", label, target }` for `[label](https://…)` and a bare address; a link's `label` is drawn in the accent and a tap on
 it opens `target`: a url as it is, a note by `notes.open(target, notes)`, the file the link resolves to; code spans,
 escapes and embeds stay text), `oneLine`, `sameLevels`, `labelTitle`, `sameLabels`,
-`isPresetColor`, `usableColor` (a colour a level or a label may be drawn in: a preset or `#RRGGBB`), `acceptsDrop`,
+`isPresetColor`, `usableColor` (a colour a level or a label may be drawn in: a preset or `#RRGGBB`; never `"clear"`),
+`usableLabelColor` (a colour a label may have: `usableColor`'s, or `"clear"`, no colour; `usableLabelColor("clear")` →
+`true`), `acceptsDrop`,
 `placesInGap`, `canPick(from)` (Select tasks picks a card drawn at `from`, a `MenuFrom`: a list column's, never the
 timeline's, Done's, a stack's or the full screen's), `repeatValue(rule)` (the Repeat row's words, `null` for weeks on a
 schedule), `onTheDay(rule)` (`"On the 5th"` under a monthly schedule's unit, empty for any other), `dayMonth(date)`
@@ -864,7 +872,9 @@ doesn't fit at that width (it then wraps and the copy grows down, as tall as the
 far as it takes to end inside the margin, or at the card's own end if that is further, never past the near margin;
 `grownStart(200, 180, 230, 390, 10)` → `150`);
 `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
-`DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS`, `EVENT_BG_ALPHA`, `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon),
+`DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS`, `CLEAR_COLOR` (`"clear"`: a label's colour that paints nothing; a label tile,
+a quick-entry chip and a label row's sample draw it untinted, and `TaskItem.colors` never carries it; never pass it to
+`shadesOf` or `inkOf`), `EVENT_BG_ALPHA`, `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon),
 `DEFAULT_ZOOM_LEVELS` and `DEFAULT_ZOOM_HOUR` (the zoom a timeline opens at before a pinch settled on another),
 `CARD_HEIGHTS`, `CARD_GAPS` and `DEFAULT_CARD_SIZE` (the Cards bounds and defaults), `LIST_WIDTHS` (`{ min: 110,
 max: 280 }`), `DIVIDER_SNAP` (`{ distance: 8, slowSpeed: 0.08 }`), `MOST_CARD_COLORS` (4), `REPEAT_WORDS` (the repeat page's words: `kinds` `{ schedule: "Schedule", afterDone: "After done" }`,
