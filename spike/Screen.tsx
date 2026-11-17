@@ -164,6 +164,8 @@ function Ribbon() {
 	const x = useSpring(-place * width, SPRING);
 	const origin = useRef<DropFrom | null>(null);
 	const hourPx = useScreen((s) => s.hourPx);
+	const active = useScreen((s) => s.dragging);
+	const overGrid = useScreen((s) => s.overGrid);
 
 	useEffect(() => x.set(-place * width), [place, width, x]);
 
@@ -210,6 +212,7 @@ function Ribbon() {
 	};
 	const onDragOver = ({ active, over }: DragOverEvent) => {
 		const s = store.getState();
+		s.setOverGrid(over?.id === "timeline");
 		if (!over || !s.shown || String(active.id).startsWith("tl:") || over.id === "timeline") return;
 		const from = containerOf(s.shown, String(active.id));
 		const to = containerOf(s.shown, String(over.id));
@@ -226,7 +229,6 @@ function Ribbon() {
 		const from = origin.current!;
 		if (over?.id === "timeline") {
 			const top = active.rect.current.translated?.top ?? 0;
-			s.setDragging(null);
 			void s.dropAtTime(taskId, from, ((top - over.rect.top) / s.hourPx) * 60);
 			return;
 		}
@@ -247,6 +249,7 @@ function Ribbon() {
 		void s.drop(taskId, from, { kind: "place", column: col, place: { kind: "task", group, before: next ? s.items[next].key : null } });
 	};
 	const onDragCancel = () => {
+		store.getState().setOverGrid(false);
 		store.getState().setShown(null);
 		store.getState().setDragging(null);
 	};
@@ -296,8 +299,8 @@ function Ribbon() {
 				</div>
 			)}
 			{createPortal(
-				<DragOverlay modifiers={modifiers}>
-					<Lifted />
+				<DragOverlay modifiers={modifiers} dropAnimation={overGrid ? null : undefined}>
+					{active ? <Lifted active={active} /> : null}
 				</DragOverlay>,
 				host.root.ownerDocument.body,
 			)}
@@ -307,17 +310,18 @@ function Ribbon() {
 
 const MEASURING = { always: MeasuringStrategy.Always, whileDragging: MeasuringStrategy.WhileDragging, beforeDragging: MeasuringStrategy.BeforeDragging } as const;
 
-/** The card in the overlay: the only part of the drag that follows the store's lifted id. */
-function Lifted() {
-	const active = useScreen((s) => s.dragging);
-	if (!active) return null;
+/**
+ * The card in the overlay, by the id it is given: dnd-kit keeps the overlay's last children through its drop animation,
+ * so nothing in them may follow the store's lifted id, which the drop clears at once.
+ */
+const Lifted = memo(function Lifted({ active }: { active: string }) {
 	const id = active.startsWith("tl:") ? active.slice(3) : active;
 	return (
 		<div data-overlay={id}>
 			<Face id={id} overlay />
 		</div>
 	);
-}
+});
 
 /** Measurement only: with `onlyCurrent` a page away from the shown place mounts nothing, to see what the other places cost a drag. */
 function Page({ index, children }: { index: number; children: ReactNode }) {
@@ -346,8 +350,10 @@ const Column = memo(function Column({ col }: { col: ColumnId }) {
 	const v = useVirtualizer({ count: all.length, getScrollElement: () => scroller.current, estimateSize: () => ROW_PX, overscan: 3, getItemKey: (i) => all[i], enabled: virtual });
 	const rows = virtual ? v.getVirtualItems().map((item) => all[item.index]) : all;
 	const offset = virtual ? (v.getVirtualItems()[0]?.start ?? 0) : 0;
+	const { store } = useHost();
+	const alive = useCallback((id: string) => id in store.getState().items, [store]);
 	const list = (
-		<AnimatePresence initial={false} mode="popLayout">
+		<AnimatePresence initial={false} mode="popLayout" custom={alive}>
 			{rows.map((id) => (
 				<Row key={id} id={id} order={truth} />
 			))}
@@ -391,20 +397,31 @@ function DropArea({ col, scroller, children }: { col: ColumnId; scroller: { curr
 	);
 }
 
+/**
+ * How a row leaves, decided when it leaves (AnimatePresence's `custom`): a task still on the screen has moved, its row
+ * goes at once (the card is already at its new place); a task gone from the screen fades.
+ */
+const rowVariants = (id: string) => ({
+	gone: (alive: (id: string) => boolean) => (alive(id) ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.96 }),
+});
+
 /** A row: Motion's element (layout on the reads, enter for a task new in the last read), the drag's state from the store. */
 const Row = memo(function Row({ id, order }: { id: string; order: readonly string[] }) {
 	count(counters.card, id);
 	const lifted = useScreen((s) => s.dragging === id);
 	const fresh = useScreen((s) => s.added.has(id));
+	const variants = useMemo(() => rowVariants(id), [id]);
 	return (
 		<motion.div
 			className="tcs-card-outer"
 			layout={lifted ? false : "position"}
 			layoutId={lifted ? undefined : id}
+			layoutCrossfade={false}
 			layoutDependency={order}
 			initial={fresh ? { opacity: 0, scale: 0.96 } : false}
 			animate={{ opacity: 1, scale: 1 }}
-			exit={lifted ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.96 }}
+			variants={variants}
+			exit="gone"
 			transition={SPRING}
 		>
 			<SortableCard id={id} />
@@ -488,7 +505,7 @@ function Timeline() {
 const Block = memo(function Block({ id, hourPx }: { id: string; hourPx: number }) {
 	count(counters.block, id);
 	const { store, win } = useHost();
-	const slot = useScreen(useShallow((s) => ({ shown: s.items[id]?.slot != null, start: s.spanOf(id)?.start ?? 0, end: s.spanOf(id)?.end ?? null })));
+	const slot = useScreen(useShallow((s) => ({ shown: s.items[id]?.slot != null || id in s.landed, start: s.spanOf(id)?.start ?? 0, end: s.spanOf(id)?.end ?? null })));
 	const { setNodeRef, listeners, attributes, isDragging } = useDraggable({ id: `tl:${id}` });
 	const [held, setHeld] = useState<{ start: number; end: number } | null>(null);
 	const end = slot.end ?? slot.start + 15;

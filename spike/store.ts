@@ -42,7 +42,13 @@ export interface ScreenState {
 	/** Where the card stands on the day's timeline, minutes from the day's start: the core's. */
 	spanOf(id: string): { readonly start: number; readonly end: number | null } | null;
 	stretch(id: string, minute: number): { readonly start: number; readonly end: number } | null;
+	/** Let go on the time grid: the card stands at once where the core's `dropSpan` puts it, then the write. */
 	dropAtTime(id: string, from: DropFrom, minute: number): Promise<void>;
+	/** Cards let go on the grid whose write has not been read back yet, at the span the core gives them. */
+	landed: Readonly<Record<string, { readonly start: number; readonly end: number | null }>>;
+	/** The pointer is over the time grid: the overlay then plays no drop animation, the card is already in its slot. */
+	overGrid: boolean;
+	setOverGrid(over: boolean): void;
 	tick: number;
 	/** Measurement only: each column mounts at most this many cards, what a virtualized list would keep mounted. */
 	mounted: number;
@@ -128,6 +134,7 @@ export function createScreenStore(tasks: TaskService, today: () => LocalDate): S
 				slotted: shareArray(prev.slotted, ids(view.day.slotted)),
 				shown: prev.dragging ? prev.shown : null,
 				reads: prev.reads + 1,
+				landed: {},
 				added: prev.reads === 0 ? new Set() : new Set(Object.keys(items).filter((id) => !prev.items[id])),
 				lastReadMs: performance.now() - t0,
 			});
@@ -136,7 +143,7 @@ export function createScreenStore(tasks: TaskService, today: () => LocalDate): S
 			set({ shown });
 		},
 		setDragging(dragging) {
-			set({ dragging });
+			set(dragging ? { dragging, overGrid: false } : { dragging });
 		},
 		async drop(id, from, to) {
 			const item = get().items[id];
@@ -172,6 +179,8 @@ export function createScreenStore(tasks: TaskService, today: () => LocalDate): S
 			await get().refresh();
 		},
 		spanOf(id) {
+			const landed = get().landed[id];
+			if (landed) return landed;
 			const item = get().items[id];
 			return item?.slot ? tasks.shownSpan(item, get().date) : null;
 		},
@@ -180,7 +189,24 @@ export function createScreenStore(tasks: TaskService, today: () => LocalDate): S
 			return item ? tasks.stretch(item, get().date, "end", tasks.snap(minute, get().hourPx, 9)) : null;
 		},
 		async dropAtTime(id, from, minute) {
-			await get().drop(id, from, { kind: "time", start: tasks.snap(minute, get().hourPx, 9) });
+			const s = get();
+			const item = s.items[id];
+			if (!item) return;
+			const start = tasks.snap(minute, s.hourPx, 9);
+			const without = (ids: readonly string[]) => (ids.includes(id) ? ids.filter((x) => x !== id) : ids);
+			const shown = s.shown ?? s.columns;
+			set({
+				landed: { ...s.landed, [id]: tasks.dropSpan(item, from, start) },
+				slotted: s.slotted.includes(id) ? s.slotted : [...s.slotted, id],
+				shown: { inbox: without(shown.inbox), backlog: without(shown.backlog), soon: without(shown.soon), day: without(shown.day) },
+				dragging: null,
+			});
+			await get().drop(id, from, { kind: "time", start });
+		},
+		landed: {},
+		overGrid: false,
+		setOverGrid(overGrid) {
+			if (get().overGrid !== overGrid) set({ overGrid });
 		},
 		tick: 0,
 		mounted: Infinity,

@@ -1,0 +1,5981 @@
+{
+ "id": "t1297",
+ "kind": "cross",
+ "faults": [],
+ "samples": [
+  {
+   "t": 0,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 12,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 21,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 28,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 37,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 45,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 54,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 62,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 70,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 78,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 86,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 95,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 104,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 112,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 120,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 128,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 138,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 145,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 153,
+   "released": null,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 4
+  },
+  {
+   "t": 182,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 183,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 187,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 194,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 204,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 211,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 76,
+     "y": 157,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 219,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 76,
+     "y": 157,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 227,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 76,
+     "y": 157,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 236,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 76,
+     "y": 157,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 245,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 90,
+     "y": 158,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 253,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 90,
+     "y": 158,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 261,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 90,
+     "y": 158,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 269,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 110,
+     "y": 160,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 278,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 110,
+     "y": 160,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 286,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 110,
+     "y": 160,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 295,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 134,
+     "y": 161,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 302,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 134,
+     "y": 161,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 311,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 134,
+     "y": 161,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 319,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 134,
+     "y": 161,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 328,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 163,
+     "y": 163,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 336,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 163,
+     "y": 163,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 345,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 163,
+     "y": 163,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 352,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 194,
+     "y": 165,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 362,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 194,
+     "y": 165,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 370,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 194,
+     "y": 165,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 378,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 194,
+     "y": 165,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 386,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 227,
+     "y": 168,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 394,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 227,
+     "y": 168,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 404,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 227,
+     "y": 168,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 416,
+   "released": null,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 56,
+     "y": 156,
+     "w": 392
+    },
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 0.961,
+     "x": 474,
+     "y": 157,
+     "w": 377
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 262,
+     "y": 170,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 427,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.01,
+     "hidden": false,
+     "scale": 0.961,
+     "x": 474,
+     "y": 157,
+     "w": 377
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 262,
+     "y": 170,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 429,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.03,
+     "hidden": false,
+     "scale": 0.963,
+     "x": 473,
+     "y": 157,
+     "w": 378
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 262,
+     "y": 170,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 437,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.04,
+     "hidden": false,
+     "scale": 0.966,
+     "x": 473,
+     "y": 156,
+     "w": 379
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 300,
+     "y": 173,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 445,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.07,
+     "hidden": false,
+     "scale": 0.969,
+     "x": 472,
+     "y": 157,
+     "w": 380
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 300,
+     "y": 173,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 453,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.09,
+     "hidden": false,
+     "scale": 0.972,
+     "x": 472,
+     "y": 159,
+     "w": 381
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 300,
+     "y": 173,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 461,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.11,
+     "hidden": false,
+     "scale": 0.975,
+     "x": 471,
+     "y": 161,
+     "w": 382
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 341,
+     "y": 176,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 470,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.13,
+     "hidden": false,
+     "scale": 0.978,
+     "x": 470,
+     "y": 164,
+     "w": 383
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 341,
+     "y": 176,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 478,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.15,
+     "hidden": false,
+     "scale": 0.98,
+     "x": 470,
+     "y": 166,
+     "w": 384
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 341,
+     "y": 176,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 486,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.17,
+     "hidden": false,
+     "scale": 0.983,
+     "x": 469,
+     "y": 169,
+     "w": 385
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 385,
+     "y": 179,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 495,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.19,
+     "hidden": false,
+     "scale": 0.985,
+     "x": 469,
+     "y": 172,
+     "w": 386
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 385,
+     "y": 179,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 503,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.2,
+     "hidden": false,
+     "scale": 0.987,
+     "x": 469,
+     "y": 175,
+     "w": 387
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 385,
+     "y": 179,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 511,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.22,
+     "hidden": false,
+     "scale": 0.989,
+     "x": 468,
+     "y": 177,
+     "w": 388
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 429,
+     "y": 182,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 520,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.23,
+     "hidden": false,
+     "scale": 0.99,
+     "x": 468,
+     "y": 179,
+     "w": 388
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 429,
+     "y": 182,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 527,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.24,
+     "hidden": false,
+     "scale": 0.992,
+     "x": 468,
+     "y": 181,
+     "w": 389
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 429,
+     "y": 182,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 537,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.25,
+     "hidden": false,
+     "scale": 0.993,
+     "x": 467,
+     "y": 182,
+     "w": 389
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 429,
+     "y": 182,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 545,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.26,
+     "hidden": false,
+     "scale": 0.994,
+     "x": 467,
+     "y": 184,
+     "w": 390
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 471,
+     "y": 185,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 552,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.26,
+     "hidden": false,
+     "scale": 0.995,
+     "x": 467,
+     "y": 185,
+     "w": 390
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 471,
+     "y": 185,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 561,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.27,
+     "hidden": false,
+     "scale": 0.996,
+     "x": 467,
+     "y": 186,
+     "w": 390
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 471,
+     "y": 185,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 570,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.27,
+     "hidden": false,
+     "scale": 0.996,
+     "x": 467,
+     "y": 186,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 471,
+     "y": 185,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 578,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.28,
+     "hidden": false,
+     "scale": 0.997,
+     "x": 467,
+     "y": 187,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 513,
+     "y": 188,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 586,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.28,
+     "hidden": false,
+     "scale": 0.997,
+     "x": 466,
+     "y": 188,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 513,
+     "y": 188,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 595,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.28,
+     "hidden": false,
+     "scale": 0.998,
+     "x": 466,
+     "y": 188,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 513,
+     "y": 188,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 602,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.998,
+     "x": 466,
+     "y": 188,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 555,
+     "y": 191,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 611,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 466,
+     "y": 189,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 555,
+     "y": 191,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 621,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 466,
+     "y": 189,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 555,
+     "y": 191,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 628,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 466,
+     "y": 189,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 598,
+     "y": 193,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 636,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 466,
+     "y": 189,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 598,
+     "y": 193,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 644,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 466,
+     "y": 189,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 598,
+     "y": 193,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 653,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 466,
+     "y": 189,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 598,
+     "y": 193,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 661,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 466,
+     "y": 189,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 640,
+     "y": 196,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 670,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 466,
+     "y": 189,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 640,
+     "y": 196,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 684,
+   "released": null,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 474,
+     "y": 157,
+     "w": 392
+    },
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 0.961,
+     "x": 884,
+     "y": 189,
+     "w": 377
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 679,
+     "y": 199,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 694,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.01,
+     "hidden": false,
+     "scale": 0.961,
+     "x": 884,
+     "y": 189,
+     "w": 377
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 679,
+     "y": 199,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 696,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.02,
+     "hidden": false,
+     "scale": 0.963,
+     "x": 883,
+     "y": 189,
+     "w": 377
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 679,
+     "y": 199,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 703,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.04,
+     "hidden": false,
+     "scale": 0.966,
+     "x": 883,
+     "y": 189,
+     "w": 379
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 716,
+     "y": 201,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 711,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.06,
+     "hidden": false,
+     "scale": 0.968,
+     "x": 882,
+     "y": 189,
+     "w": 380
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 716,
+     "y": 201,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 720,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.09,
+     "hidden": false,
+     "scale": 0.972,
+     "x": 882,
+     "y": 189,
+     "w": 381
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 716,
+     "y": 201,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 728,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.11,
+     "hidden": false,
+     "scale": 0.975,
+     "x": 881,
+     "y": 189,
+     "w": 382
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 748,
+     "y": 204,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 736,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.13,
+     "hidden": false,
+     "scale": 0.977,
+     "x": 880,
+     "y": 189,
+     "w": 383
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 748,
+     "y": 204,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 744,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.15,
+     "hidden": false,
+     "scale": 0.98,
+     "x": 880,
+     "y": 189,
+     "w": 384
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 748,
+     "y": 204,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 753,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.17,
+     "hidden": false,
+     "scale": 0.982,
+     "x": 879,
+     "y": 189,
+     "w": 385
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 778,
+     "y": 206,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 762,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.19,
+     "hidden": false,
+     "scale": 0.985,
+     "x": 879,
+     "y": 190,
+     "w": 386
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 778,
+     "y": 206,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 770,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.2,
+     "hidden": false,
+     "scale": 0.987,
+     "x": 879,
+     "y": 191,
+     "w": 387
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 778,
+     "y": 206,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 778,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.21,
+     "hidden": false,
+     "scale": 0.988,
+     "x": 878,
+     "y": 193,
+     "w": 387
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 805,
+     "y": 208,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 786,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.23,
+     "hidden": false,
+     "scale": 0.99,
+     "x": 878,
+     "y": 196,
+     "w": 388
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 805,
+     "y": 208,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 794,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.24,
+     "hidden": false,
+     "scale": 0.992,
+     "x": 878,
+     "y": 199,
+     "w": 389
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 805,
+     "y": 208,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 803,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.25,
+     "hidden": false,
+     "scale": 0.993,
+     "x": 877,
+     "y": 203,
+     "w": 389
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 805,
+     "y": 208,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 812,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.25,
+     "hidden": false,
+     "scale": 0.994,
+     "x": 877,
+     "y": 205,
+     "w": 390
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 830,
+     "y": 209,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 819,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.26,
+     "hidden": false,
+     "scale": 0.995,
+     "x": 877,
+     "y": 208,
+     "w": 390
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 830,
+     "y": 209,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 828,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.27,
+     "hidden": false,
+     "scale": 0.996,
+     "x": 877,
+     "y": 210,
+     "w": 390
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 830,
+     "y": 209,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 836,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.27,
+     "hidden": false,
+     "scale": 0.996,
+     "x": 877,
+     "y": 212,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 851,
+     "y": 211,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 845,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.28,
+     "hidden": false,
+     "scale": 0.997,
+     "x": 877,
+     "y": 214,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 851,
+     "y": 211,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 853,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.28,
+     "hidden": false,
+     "scale": 0.997,
+     "x": 877,
+     "y": 215,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 851,
+     "y": 211,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 862,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.28,
+     "hidden": false,
+     "scale": 0.998,
+     "x": 876,
+     "y": 217,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 867,
+     "y": 212,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 870,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.998,
+     "x": 876,
+     "y": 218,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 867,
+     "y": 212,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 877,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 876,
+     "y": 219,
+     "w": 391
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 867,
+     "y": 212,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 887,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 876,
+     "y": 219,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 877,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 895,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 876,
+     "y": 220,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 877,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 903,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 876,
+     "y": 221,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 877,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 911,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.29,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 876,
+     "y": 221,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 882,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 920,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 0.999,
+     "x": 876,
+     "y": 221,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 882,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 928,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 882,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 936,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 882,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 944,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 953,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 961,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 969,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 978,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 986,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 995,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1003,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1011,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1019,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1028,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1037,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1046,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1053,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1061,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1069,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1078,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1087,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1096,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1104,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1111,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1121,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1128,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1136,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1144,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1152,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1161,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1170,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1178,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1187,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1195,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1203,
+   "released": null,
+   "cards": [
+    {
+     "o": 0.3,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": "t1297",
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1212,
+   "released": 7,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": true,
+   "reads": 4
+  },
+  {
+   "t": 1222,
+   "released": 17,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1229,
+   "released": 24,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 884,
+     "y": 213,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1236,
+   "released": 31,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 883,
+     "y": 214,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1244,
+   "released": 39,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 883,
+     "y": 214,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1252,
+   "released": 47,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 882,
+     "y": 215,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1261,
+   "released": 56,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 882,
+     "y": 216,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1270,
+   "released": 65,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 881,
+     "y": 216,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1278,
+   "released": 73,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 880,
+     "y": 217,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1286,
+   "released": 81,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 880,
+     "y": 218,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1294,
+   "released": 89,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 879,
+     "y": 218,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1303,
+   "released": 98,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 879,
+     "y": 219,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1311,
+   "released": 106,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 879,
+     "y": 219,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1319,
+   "released": 114,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 878,
+     "y": 220,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1328,
+   "released": 123,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 878,
+     "y": 220,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1336,
+   "released": 131,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 878,
+     "y": 220,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1344,
+   "released": 139,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 877,
+     "y": 221,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1352,
+   "released": 147,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 877,
+     "y": 221,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1361,
+   "released": 155,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 877,
+     "y": 221,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1369,
+   "released": 164,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 877,
+     "y": 221,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1378,
+   "released": 173,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 877,
+     "y": 221,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1386,
+   "released": 180,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 221,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1394,
+   "released": 189,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1403,
+   "released": 197,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1411,
+   "released": 206,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1419,
+   "released": 214,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1428,
+   "released": 223,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1436,
+   "released": 231,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1445,
+   "released": 240,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1453,
+   "released": 248,
+   "cards": [
+    {
+     "o": 0,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1461,
+   "released": 256,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1470,
+   "released": 265,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1478,
+   "released": 272,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1487,
+   "released": 281,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1495,
+   "released": 290,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1504,
+   "released": 299,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1511,
+   "released": 306,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1520,
+   "released": 315,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1528,
+   "released": 323,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1537,
+   "released": 331,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1546,
+   "released": 341,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1553,
+   "released": 348,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1562,
+   "released": 357,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1570,
+   "released": 365,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1579,
+   "released": 374,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1587,
+   "released": 382,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1595,
+   "released": 390,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1603,
+   "released": 398,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1611,
+   "released": 406,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1620,
+   "released": 415,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1629,
+   "released": 424,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1636,
+   "released": 431,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1645,
+   "released": 440,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1653,
+   "released": 448,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1662,
+   "released": 457,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1669,
+   "released": 464,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1678,
+   "released": 473,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1687,
+   "released": 482,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1695,
+   "released": 490,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1704,
+   "released": 499,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1712,
+   "released": 507,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1720,
+   "released": 515,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1728,
+   "released": 523,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1737,
+   "released": 532,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1745,
+   "released": 540,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1753,
+   "released": 548,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1762,
+   "released": 557,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1770,
+   "released": 565,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1778,
+   "released": 573,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1787,
+   "released": 581,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1795,
+   "released": 590,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1803,
+   "released": 598,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1811,
+   "released": 606,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1821,
+   "released": 616,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1828,
+   "released": 623,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1836,
+   "released": 631,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1845,
+   "released": 640,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1853,
+   "released": 648,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1862,
+   "released": 657,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1870,
+   "released": 665,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1878,
+   "released": 673,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1887,
+   "released": 681,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1895,
+   "released": 690,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1904,
+   "released": 699,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1912,
+   "released": 706,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1920,
+   "released": 715,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1928,
+   "released": 723,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1937,
+   "released": 732,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1945,
+   "released": 740,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1953,
+   "released": 748,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1962,
+   "released": 757,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1971,
+   "released": 766,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1978,
+   "released": 773,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1987,
+   "released": 782,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 1995,
+   "released": 790,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2003,
+   "released": 798,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2012,
+   "released": 806,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2020,
+   "released": 815,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2028,
+   "released": 823,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2037,
+   "released": 831,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2045,
+   "released": 840,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2053,
+   "released": 848,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2062,
+   "released": 857,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2070,
+   "released": 865,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2078,
+   "released": 873,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2087,
+   "released": 882,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2095,
+   "released": 890,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2104,
+   "released": 899,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  },
+  {
+   "t": 2112,
+   "released": 907,
+   "cards": [
+    {
+     "o": 1,
+     "hidden": false,
+     "scale": 1,
+     "x": 876,
+     "y": 222,
+     "w": 392
+    }
+   ],
+   "overlay": [],
+   "dragging": null,
+   "shown": false,
+   "reads": 5
+  }
+ ]
+}
