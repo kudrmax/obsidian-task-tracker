@@ -1,7 +1,7 @@
 import { type CSSProperties, memo, type ReactNode, useRef } from "react";
 import { RibbonTrack, useRibbon } from "../gestures/Ribbon";
 import type { ListId } from "../port";
-import { useScreen } from "../store";
+import { DayContext, useData, useScreen } from "../store";
 import { useHost } from "../view/host";
 import { Slide } from "../view/Slide";
 import { TaskList } from "../view/TaskList";
@@ -34,18 +34,22 @@ function RibbonColumns() {
 				<ListColumn list="soon" />
 				<ColumnBox className="is-day">
 					<Slide id={`day-${dayOffset}`} way={way} className="tc-slide">
-						<ColumnHead title={<DayTitle />} />
-						<div className="tc-stage-body">
-							<TaskList list="day" />
-						</div>
+						<DayContext.Provider value={dayOffset}>
+							<ColumnHead title={<DayTitle />} />
+							<div className="tc-stage-body">
+								<TaskList list="day" />
+							</div>
+						</DayContext.Provider>
 					</Slide>
 				</ColumnBox>
 				<ColumnBox className="is-timeline">
 					<Slide id={`timeline-${dayOffset}`} way={way} className="tc-slide">
-						<ColumnHead title={null} />
-						<div className="tc-stage-body">
-							<Timeline />
-						</div>
+						<DayContext.Provider value={dayOffset}>
+							<ColumnHead title={null} />
+							<div className="tc-stage-body">
+								<Timeline />
+							</div>
+						</DayContext.Provider>
 					</Slide>
 				</ColumnBox>
 			</RibbonTrack>
@@ -65,7 +69,7 @@ function NoteColumn() {
 const WHOLE = 100;
 
 const ListColumn = memo(function ListColumn({ list, share = COLUMN_SHARE }: { readonly list: ListId; readonly share?: number }) {
-	const title = useScreen((s) => s.shown.lists[list].title);
+	const title = useData((d) => d.lists[list].title);
 	return (
 		<ColumnBox className={`is-${list}`} share={share}>
 			<ColumnHead title={title} />
@@ -89,6 +93,6 @@ function ColumnHead({ title }: { readonly title: ReactNode }) {
 }
 
 function DayTitle() {
-	const title = useScreen((s) => s.shown.day.title);
+	const title = useData((d) => d.day.title);
 	return <span className="tc-day-title">{title}</span>;
 }

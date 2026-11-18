@@ -17,6 +17,8 @@ export interface ScreenState {
 	readonly shown: ScreenData;
 	/** The last read: the order the rows glide by (Motion's `layoutDependency`, stage 0 «Integration findings» 3). */
 	readonly read: ScreenData;
+	/** The day the screen turned away from, as it stood: drawn by the region sliding out while the new day slides in. */
+	readonly left: { readonly dayOffset: number; readonly shown: ScreenData; readonly read: ScreenData } | null;
 	/** The shown day, in days from today, and the way it last turned (the day's slide). */
 	readonly dayOffset: number;
 	readonly dayWay: -1 | 0 | 1;
@@ -88,14 +90,16 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 		};
 
 		const turnDay = (shift: -1 | 1) => {
-			const dayOffset = get().dayOffset + shift;
+			const { dayOffset: from, shown, read } = get();
+			const dayOffset = from + shift;
 			const next = port.read(dayOffset);
-			set({ dayOffset, dayWay: shift, read: next, shown: next, fresh: new Set() });
+			set({ left: { dayOffset: from, shown, read }, dayOffset, dayWay: shift, read: next, shown: next, fresh: new Set() });
 		};
 
 		return {
 			shown: first,
 			read: first,
+			left: null,
 			dayOffset: 0,
 			dayWay: 0,
 			stop: "calendar",

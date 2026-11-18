@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "motion/react";
+import { LayoutGroup, motion, useIsPresent } from "motion/react";
 import { type CSSProperties, forwardRef, type ReactNode } from "react";
 
 /**
@@ -8,19 +8,20 @@ import { type CSSProperties, forwardRef, type ReactNode } from "react";
  * the carried row has no layout and no layout id; no crossfade; a row comes in only when its task is new.
  */
 export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function MovingRow({ id, order, carried, fresh, className, style, index, children }, ref) {
+	/** In a region sliding out (the day turned away from) the row stands still and gives its layout id to the copy coming in. */
+	const still = carried || !useIsPresent();
 	return (
 		<motion.div
 			ref={ref}
 			data-index={index}
 			className={className}
 			style={style}
-			layout={carried ? false : "position"}
-			layoutId={carried ? undefined : `row-${id}`}
+			layout={still ? false : "position"}
+			layoutId={still ? undefined : `row-${id}`}
 			layoutDependency={order}
 			layoutCrossfade={false}
 			initial={fresh ? { opacity: 0, scale: COME_IN_SCALE } : false}
 			animate={{ opacity: 1, scale: 1 }}
-			exit={{ opacity: 0, transition: { duration: 0 } }}
 			transition={GLIDE}
 		>
 			{children}
@@ -43,15 +44,12 @@ export interface MovingRowProps {
 }
 
 /**
- * The rows of one region (a list, the timeline's blocks): a row whose task left goes at once, never fading where it stood
- * while its task is drawn elsewhere (stage 0, «Drop flicker» 3); `mode="popLayout"` lets the rest glide at once.
+ * The rows of one region (a list, the timeline's blocks). A row whose task left goes in the same frame, never lingering
+ * where it stood while its task is drawn elsewhere (stage 0, «Drop flicker» 3): the region holds no exit, and a task moved
+ * to another region glides there by its layout id, as Motion's shared layout does without `AnimatePresence`.
  */
 export function MovingRows({ children }: { readonly children: ReactNode }) {
-	return (
-		<AnimatePresence initial={false} mode="popLayout">
-			{children}
-		</AnimatePresence>
-	);
+	return <LayoutGroup>{children}</LayoutGroup>;
 }
 
 /** Every row that changes place glides there the same way (stage 0's spring). */

@@ -1,4 +1,4 @@
-import { autoUpdate, flip, FloatingFocusManager, FloatingPortal, offset, shift, useDismiss, useFloating, useInteractions, useRole } from "@floating-ui/react";
+import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, offset, shift, useDismiss, useFloating, useInteractions, useRole } from "@floating-ui/react";
 import { createContext, type MutableRefObject, type ReactNode, useContext, useRef } from "react";
 
 /**
@@ -37,7 +37,7 @@ export interface PopoverProps {
 	readonly children: ReactNode;
 }
 
-/** A layer anchored to the element it opened from, as Floating UI's docs build a popover menu. */
+/** A layer anchored to the element it opened from, over the design's backdrop (Floating UI's `FloatingOverlay`), as Floating UI's docs build a popover menu. */
 export function Popover({ open, onClose, root, label, className, children }: PopoverProps) {
 	const anchor = useAnchor();
 	const { refs, floatingStyles, context } = useFloating({
@@ -54,6 +54,7 @@ export function Popover({ open, onClose, root, label, className, children }: Pop
 	if (!open) return null;
 	return (
 		<FloatingPortal root={root}>
+			<FloatingOverlay className="tc-backdrop is-shown" />
 			<FloatingFocusManager context={context} modal={false} initialFocus={-1}>
 				<div ref={refs.setFloating} style={floatingStyles} className={className} aria-label={label} {...getFloatingProps()}>
 					{children}

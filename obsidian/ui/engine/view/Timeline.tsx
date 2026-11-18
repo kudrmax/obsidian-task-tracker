@@ -1,7 +1,7 @@
 import { type CSSProperties, memo, useCallback, useMemo } from "react";
 import { PROPERTY } from "../../design";
 import { BASE_SCALE, TimeScale } from "../layout/timeScale";
-import { useScreen } from "../store";
+import { useData, useScreen } from "../store";
 import { MovingRow, MovingRows } from "./MovingRow";
 
 const px = (n: number) => `${n}px`;
@@ -11,8 +11,8 @@ const px = (n: number) => `${n}px`;
  * (spec, «Time scale»). It scrolls natively; it opens on the now line, revealed by the browser (`scrollIntoView`).
  */
 export const Timeline = memo(function Timeline() {
-	const day = useScreen((s) => s.shown.day);
-	const readBlocks = useScreen((s) => s.read.day.blocks);
+	const day = useData((d) => d.day);
+	const readBlocks = useData((d) => d.day.blocks, true);
 	const now = useScreen((s) => s.now);
 	const scale = BASE_SCALE;
 	const order = useMemo(() => readBlocks.map((b) => `${b.id}@${b.start}-${b.end}:${b.lane}/${b.lanes}`).join(" "), [readBlocks]);
@@ -52,7 +52,7 @@ export const Timeline = memo(function Timeline() {
 });
 
 const BlockFace = memo(function BlockFace({ id }: { readonly id: string }) {
-	const face = useScreen((s) => s.shown.cards[id]);
+	const face = useData((d) => d.cards[id]);
 	if (!face) return null;
 	return (
 		<div className="tc-block-card" data-block={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>

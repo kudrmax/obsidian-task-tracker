@@ -1,6 +1,6 @@
 import { type CSSProperties, memo } from "react";
 import { PROPERTY } from "../../design";
-import { useScreen } from "../store";
+import { useData } from "../store";
 import { Icon } from "./Icon";
 
 export interface CardProps {
@@ -16,7 +16,7 @@ export interface CardProps {
  * 8). The dot of a task in progress, the title fading out on the right, the counter and the description's mark, the date.
  */
 export const Card = memo(function Card({ id, depth = 0, copy = false }: CardProps) {
-	const face = useScreen((s) => s.shown.cards[id]);
+	const face = useData((d) => d.cards[id]);
 	if (!face) return null;
 	const marked = copy ? { "data-copy": id } : { "data-id": id };
 	return (

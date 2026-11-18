@@ -41,10 +41,12 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [] } = {}) {
 	const wheels = rec.events.filter((e) => e.type === "wheel");
 	const t0 = rec.events[0].t;
 	const start = performance.now();
+	/** Each event carries its recorded time (CDP's `timestamp`), so the page reads the person's timing, not this loop's jitter. */
+	const epoch = Date.now() / 1000;
 	for (const e of wheels) {
 		const due = e.t - t0 - (performance.now() - start);
 		if (due > 1) await sleep(due);
-		void cdp.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: e.x, y: e.y, deltaX: e.dx, deltaY: e.dy, modifiers: e.ctrl ? 2 : 0 });
+		void cdp.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: e.x, y: e.y, deltaX: e.dx, deltaY: e.dy, modifiers: e.ctrl ? 2 : 0, timestamp: epoch + (e.t - t0) / 1000 });
 	}
 	await sleep(1200);
 	const shown = await frames.stop();

@@ -35,7 +35,15 @@ export default {
 		await strokes(1, 1);
 		await is(["Today"], "on to the day's calendar");
 
-		const day = await t.frames(() => strokes(1, 1), { cast: "day-slide", maxStep: 400, monotonic: "x" });
+		let mid = null;
+		const day = await t.frames(async () => {
+			const stroke = t.input.stroke(at.x, at.y, 1);
+			await t.sleep(90);
+			mid = await t.cdp.eval(`[...document.querySelectorAll(".tc-day-title")].map((e) => e.textContent)`);
+			await stroke;
+			await t.sleep(750);
+		}, { cast: "day-slide", maxStep: 400, monotonic: "x" });
+		t.expect(JSON.stringify(mid) === JSON.stringify(["Today", "Tomorrow"]), `mid-slide the day going out still shows its own title beside the day coming in: ${JSON.stringify(mid)}`);
 		await is(["Tomorrow"], "a stroke on at the calendar turns to tomorrow");
 		t.expect(day.length === 0, `frames of the day sliding: ${JSON.stringify(day.slice(0, 5))}`);
 		await strokes(-1, 1);

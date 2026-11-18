@@ -3,7 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { SortableList, SortableRow } from "../drag/Drag";
 import { useAnchor } from "../layers/Layers";
 import type { ListId, Row } from "../port";
-import { useScreen, useScreenApi } from "../store";
+import { useData, useScreen, useScreenApi } from "../store";
 import { Card } from "./Card";
 import { MovingRow, MovingRows } from "./MovingRow";
 
@@ -19,8 +19,8 @@ const OVERSCAN = 6;
  * is a `MovingRow`. A task the store asks to reveal is scrolled into sight by the virtualizer's `scrollToIndex`.
  */
 export const TaskList = memo(function TaskList({ list }: { readonly list: ListId }) {
-	const rows = useScreen((s) => s.shown.lists[list].rows);
-	const readRows = useScreen((s) => s.read.lists[list].rows);
+	const rows = useData((d) => d.lists[list].rows);
+	const readRows = useData((d) => d.lists[list].rows, true);
 	const lifted = useScreen((s) => s.lifted);
 	const fresh = useScreen((s) => s.fresh);
 	const reveal = useScreen((s) => s.reveal);
