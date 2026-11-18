@@ -73,19 +73,17 @@ for (const platform of platforms) {
 					tasks: async (list) => oracle.tasksOf(await obsidian.fileText(), list),
 				},
 				file: () => obsidian.fileText(),
-				setFile: (text) => obsidian.setFileText(text),
+				/** The stand's own reach (`window.__tcStand`): an edit from outside, the write delay. */
+				stand: (call) => cdp.eval(`(() => { const r = window.__tcStand.${call}; return r === undefined ? 1 : r; })()`),
 				target,
 				notePath: obsidian.notePath,
 				expect(ok, message) {
 					if (!ok) failures.push(message);
 					return ok;
 				},
-				async setMode(mode) {
-					await cdp.eval(`${target.services}.tasks.setViewMode(${JSON.stringify(mode)}).then(() => 1)`);
+				async setStop(stop) {
+					await cdp.eval(target.setStop(stop));
 					await sleep(500);
-				},
-				async setPlace(place) {
-					await cdp.eval(`${target.services}.tasks.setFunnelPlace(${JSON.stringify(place)}).then(() => 1)`);
 				},
 				async open() {
 					await t.input.move(1, 1);
@@ -125,8 +123,6 @@ for (const platform of platforms) {
 			const errors = [];
 			const off = cdp.on("Runtime.exceptionThrown", (e) => errors.push(e.exceptionDetails?.exception?.description ?? e.exceptionDetails?.text));
 			try {
-				await t.setMode("twoColumns");
-				await t.setPlace("calendar");
 				await t.open();
 				await scenario.run(t);
 			} catch (error) {

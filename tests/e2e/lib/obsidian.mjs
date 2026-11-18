@@ -3,7 +3,9 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Cdp, sleep, targets } from "./cdp.mjs";
-import { mockTasks, PROJECT_NOTE } from "../../../obsidian/stand/mockTasks.ts";
+import { fileText, mockFile } from "../../../obsidian/stand/mockData.ts";
+
+const PROJECT_NOTE = "Заметка о доме";
 
 /**
  * The test Obsidian the checks run in: its own profile and scratch vault, its own debugging port, its window kept off the
@@ -15,7 +17,7 @@ const VAULT_ID = "tce2e";
 const ROOT = new URL("../../../", import.meta.url).pathname;
 
 /**
- * What the checks run on (E2E_TARGET): the stand (the engine over the core in memory, docs/superpowers/specs/2026-11-18-ui-engine.md)
+ * What the checks run on (E2E_TARGET): the stand (the engine over its MockPort, docs/superpowers/specs/2026-11-18-ui-engine.md)
  * or the plugin (over a tasks file in the vault). Each names its plugin, its view, its build and how a check reaches its
  * services, its device settings and the tasks file's text; the screen's root is the same `.task-calendar` in both.
  */
@@ -28,8 +30,8 @@ export const TARGETS = {
 		build: join(ROOT, "build/stand"),
 		buildScript: "build:stand",
 		root: ".task-calendar",
-		services: "window.__tcStand.services",
-		deviceSettings: "window.__tcStand.services.settings",
+		/** A scenario's setup: the ribbon of every open screen at a stop. */
+		setStop: (stop) => `(() => { window.__tcStand.setStop(${JSON.stringify(stop)}); return 1; })()`,
 		inMemory: true,
 	},
 	plugin: {
@@ -40,8 +42,7 @@ export const TARGETS = {
 		build: ROOT,
 		buildScript: "build",
 		root: ".task-calendar",
-		services: `app.plugins.plugins["task-calendar"].services`,
-		deviceSettings: `app.plugins.plugins["task-calendar"].viewSettings`,
+		setStop: (stop) => `app.plugins.plugins["task-calendar"].services.tasks.setFunnelPlace(${JSON.stringify(stop)}).then(() => 1)`,
 		inMemory: false,
 	},
 };
@@ -104,20 +105,16 @@ export class TestObsidian {
 	/** Fresh made-up tasks around now: the stand's in memory, or the plugin's tasks file in the vault. */
 	async newTasks() {
 		if (this.target.inMemory) await this.cdp.eval(`(() => { window.__tcStand.reset(); return 1; })()`);
-		else writeFileSync(this.tasksPath, mockTasks(new Date()));
+		else {
+			const now = new Date();
+			writeFileSync(this.tasksPath, fileText(mockFile(now), now));
+		}
 	}
 
 	/** The tasks file's text as it stands: the user's truth the checks read. */
 	async fileText() {
 		if (this.target.inMemory) return this.cdp.eval(`window.__tcStand.fileText()`);
 		return readFileSync(this.tasksPath, "utf8");
-	}
-
-	/** The tasks file replaced from outside (null: no file), as a hand edit or Sync does. */
-	async setFileText(text) {
-		if (this.target.inMemory) return this.cdp.eval(`(() => { window.__tcStand.setFileText(${JSON.stringify(text)}); return 1; })()`);
-		if (text === null) return this.cdp.eval(`app.vault.adapter.remove("TODOs Tasks.md").then(() => 1)`);
-		writeFileSync(this.tasksPath, text);
 	}
 
 	/** Starts the instance unless it already runs on its port; then connects and makes sure the plugin is on. */
@@ -187,7 +184,9 @@ export class TestObsidian {
 
 	/** Obsidian's dark or light theme, as the person switches it. */
 	async theme(kind) {
-		await this.cdp.eval(`(() => { app.changeTheme("${kind === "light" ? "moonstone" : "obsidian"}"); return 1 })()`);
+		/** The vault's setting, as Settings › Appearance writes it: a vault that follows the system ignores `changeTheme` alone. */
+		const ok = await this.cdp.eval(`(() => { app.vault.setConfig("theme", "${kind === "light" ? "moonstone" : "obsidian"}"); app.updateTheme(); return document.body.classList.contains("theme-${kind}") })()`);
+		if (!ok) throw new Error(`the ${kind} theme did not apply`);
 		await sleep(400);
 	}
 

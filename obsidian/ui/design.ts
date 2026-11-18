@@ -75,6 +75,8 @@ export const PROPERTY = {
 	length: "--tc-len",
 	/** A task card's left edge in the items area: further in when it lies over another card or an event. */
 	x: "--tc-x",
+	/** How far a block of the engine's timeline stands from the items' right edge: blocks that overlap stand side by side. */
+	xEnd: "--tc-x-end",
 	/** The bottom of the last task card: a stack that runs past midnight lengthens the day. */
 	stackEnd: "--tc-stack-end",
 	/** Empty room over the day's first hour and under its last, so the now line can stand in the middle near them. */
@@ -90,10 +92,6 @@ export const PROPERTY = {
 	panelY: "--tc-panel-y",
 	/** How deep a subtask's card stands under its task: 0 for a task. */
 	level: "--tc-level",
-	/** Where a ribbon's column stands, 0 its left half (its padding near the screen's edge) to 1 its right half. */
-	side: "--tc-side",
-	/** How wide the carried copy may grow to show its whole title: the view's width. */
-	carriedMax: "--tc-carried-max",
 	/** How many levels back from a subtask's card a line of a task further up passes it. */
 	pass: "--tc-pass",
 	/** How many icons' widths an icon of the wheel stands out of its window. */

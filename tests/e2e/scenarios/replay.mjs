@@ -14,8 +14,8 @@ export default {
 	platforms: ["desktop"],
 	async run(t) {
 		for (const file of readdirSync(RECORDINGS).filter((f) => f.endsWith(".json") && !f.endsWith(".expect.json")).sort()) {
-			await t.setPlace("soon");
 			await t.open();
+			await t.setStop("soon");
 			const pager = new WheelStrokes();
 			const strokes = JSON.parse(readFileSync(RECORDINGS + file, "utf8")).events.filter((e) => e.type === "wheel").map((e) => pager.feed({ dx: e.dx, dy: e.dy, t: e.t, ctrl: e.ctrl })).filter((step) => step !== 0);
 			const result = await t.replay(file, { startPlace: 1, strokes });

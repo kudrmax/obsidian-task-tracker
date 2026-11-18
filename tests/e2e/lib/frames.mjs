@@ -42,7 +42,7 @@ const SAMPLER = String.raw`(() => {
 			});
 		}
 		const sel = doc.getSelection();
-		state.frames.push({ t: Math.round(performance.now() - state.t0), day: doc.querySelector(".task-calendar .tc-day-title")?.textContent ?? null, items, pointer: state.pointer, selection: sel ? sel.toString().length : 0, track: (() => { const t = doc.querySelector(".tc-ribbon-track"); return t ? +t.getBoundingClientRect().left.toFixed(1) : null; })(), place: (() => { const t = doc.querySelector(".tc-ribbon-track"); const r = doc.querySelector(".tc-ribbon"); if (!t || !r) return null; const box = r.getBoundingClientRect(); const step = (box.width - 16) / 2 + 16; return +((box.left - t.getBoundingClientRect().left) / step).toFixed(3); })() });
+		state.frames.push({ t: Math.round(performance.now() - state.t0), day: doc.querySelector(".task-calendar .tc-day-title")?.textContent ?? null, items, pointer: state.pointer, selection: sel ? sel.toString().length : 0, track: (() => { const t = doc.querySelector(".tc-ribbon-track"); return t ? +t.getBoundingClientRect().left.toFixed(1) : null; })(), place: (() => { const t = doc.querySelector(".tc-ribbon-track"); const r = doc.querySelector(".tc-ribbon"); const cols = t ? t.querySelectorAll(":scope > .tc-stage-col") : []; if (!t || !r || cols.length < 2) return null; const step = cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left; return +((r.getBoundingClientRect().left - t.getBoundingClientRect().left) / step).toFixed(3); })() });
 		requestAnimationFrame(tick);
 	};
 	requestAnimationFrame(tick);

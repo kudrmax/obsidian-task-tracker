@@ -461,8 +461,8 @@ const OWNERS: readonly Owner[] = [
 	{ concern: "Portals and roots: react-dom", imports: (t) => t === "react-dom" || t === "react-dom/client", owners: [`${ENGINE}drag/`, `${ENGINE}mount.tsx`] },
 ];
 
-/** What the engine may import besides itself, React's stack and Obsidian's packages: the design's icons and Obsidian's editor. */
-const ENGINE_MAY_ALSO = ["obsidian/ui/kit/icons.ts", "obsidian/ui/markdown/EmbeddedEditor.ts"];
+/** What the engine may import besides itself, React's stack and Obsidian's packages: the design's icons and measures (`DESIGN`, which agrees with the CSS) and Obsidian's editor. */
+const ENGINE_MAY_ALSO = ["obsidian/ui/kit/icons.ts", "obsidian/ui/design.ts", "obsidian/ui/markdown/EmbeddedEditor.ts"];
 
 /**
  * Touching the page by hand, each with where the standard puts it instead: a library measures and listens, Motion animates,
@@ -507,9 +507,9 @@ describe("the engine's owners", () => {
 		expect(ownerViolations(engineAndStand(), importsOf)).toEqual([]);
 	});
 
-	it("has at most one DndContext", () => {
+	it("has one DndContext", () => {
 		const contexts = engineFiles().flatMap((file) => [...withoutComments(source(file)).matchAll(/<DndContext\b/g)].map(() => file));
-		expect(contexts.length).toBeLessThanOrEqual(1);
+		expect(contexts).toHaveLength(1);
 	});
 
 	it("touches the page by hand nowhere", () => {

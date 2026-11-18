@@ -287,8 +287,8 @@ body {
 	/* The dragged card stands a little taller than the one it was lifted from. */
 	--tc-float-h: calc(var(--tc-card-h) + var(--tc-float-grow));
 	--tc-float-grow: 2px;
-	/* The dashed place a carried card left while the gap is elsewhere: fainter than the gap. */
-	--tc-home-place-opacity: 0.6;
+	/* The stand's note block: the room the engine's screen takes in a note. */
+	--tc-stand-block-h: 420px;
 	/* Over the Projects screen's tree a carried card or project rides this far above the finger. */
 	--tc-float-above: var(--tc-space-16);
 	/* The number of tasks carried at once, on the top card's upper right corner, standing out of it by `out`. */
@@ -1785,40 +1785,38 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .task-calendar.is-note .tc-rows-stack { overflow-y: auto; scrollbar-width: none; padding-bottom: calc(var(--tc-plus-size) + var(--tc-block-inset) + var(--tc-space-20)); }
 
 /*
- * The screen on the standard stack (docs/superpowers/specs/2026-11-16-ui-standard-stack.md): React's components draw the
- * same parts with the same classes; these rules hold what their structure adds. A list mounts only the rows in sight
- * (TanStack Virtual): each row in its own box, placed by the virtualizer, a section's or a card's margins inside it.
+ * The engine (docs/superpowers/specs/2026-11-18-ui-engine.md): React's components draw the same parts with the same
+ * classes; these rules hold what its structure adds. Sizes are CSS: the ribbon's strip is a row of columns, each its share
+ * of it (set by the layout), sliding by its own percent.
  */
-.tc-list-items { position: relative; flex: none; }
-.tc-list-item { position: absolute; top: 0; left: 0; right: 0; display: flow-root; }
-.tc-list-items.is-flow { display: flex; flex-direction: column; gap: var(--tc-card-gap); }
-.tc-list-items.is-flow > .tc-list-item { position: static; }
-.tc-list-item > .tc-group-head:first-child { margin-top: var(--tc-section-gap); }
-.tc-list-item.is-top > .tc-group-head { margin-top: 0; }
-/* The ribbon: a window on the strip of columns, which slides under it; a column's padding follows the side of the window it stands on. */
-.tc-ribbon { position: absolute; left: 0; right: 0; top: var(--tc-day-row-top); bottom: 0; overflow: clip; touch-action: pan-y; }
+.task-calendar.is-engine > .tc-ribbon { position: absolute; inset: 0; overflow: clip; touch-action: pan-y; }
 .tc-ribbon-track { height: 100%; display: flex; }
 .tc-ribbon-track > .tc-stage-col { flex: none; }
-.tc-ribbon-track > :is(.tc-divider, .tc-stage-rule) { position: relative; left: auto; top: auto; bottom: auto; flex: none; margin-top: var(--tc-columns-head); }
-.tc-ribbon-track > .tc-stage-col > :is(.tc-stage-head, .tc-stage-body) { padding: 0 calc(var(--tc-space-2) + var(--tc-side) * (var(--tc-space-10) - var(--tc-space-2))) 0 calc(var(--tc-space-10) - var(--tc-side) * (var(--tc-space-10) - var(--tc-space-2))); }
-.tc-ribbon-track > .tc-stage-col.is-timeline > :is(.tc-stage-head, .tc-stage-body) { padding: 0; }
-/*
- * Drag and drop (docs/superpowers/specs/2026-11-18-ui-engine.md, «Decided» 1): while a card is carried the cards part and the
- * gap is where it lands, its place outline at the depth it will take. The carried copy rides the pointer in dnd-kit's overlay,
- * outside the screen's styles: it carries the screen's type itself.
- */
+.tc-ribbon-track > .tc-stage-col:is(.is-day, .is-timeline) { overflow: clip; }
+/* A region that slides (the shown day's list and its calendar): one layer filling its column, the next sliding in beside it. */
+.tc-slide { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.tc-slide > .tc-stage-body > .tc-timeline { top: 0; }
+/* A long list mounts only the rows in sight (TanStack Virtual): its whole height, the rows in flow in one block placed at the first one's start; a row holds its gap, so its measure is its step. */
+.tc-list-items { position: relative; flex: none; }
+.tc-list-block { position: absolute; top: 0; left: 0; right: 0; }
+.tc-list-item { display: flow-root; padding-bottom: var(--tc-card-gap); }
+.tc-list-item > .tc-group-head { margin-top: var(--tc-section-gap); }
+/* Blocks that overlap stand side by side, each its lane's share of the items' width. */
+.task-calendar.is-engine .tc-items > .tc-block { right: calc(var(--tc-x-end) + var(--tc-item-inset)); }
+/* Drag and drop («Decided» 1): while a card is carried the cards part, and its own place stands where it will land, as an outline at its depth. */
 .tc-drag-source { display: flow-root; touch-action: pan-y; }
-.tc-gap { height: var(--tc-card-h); box-sizing: border-box; margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); border: var(--tc-hairline) dashed var(--tc-dash); border-radius: var(--tc-radius-card); }
+.tc-drag-source.is-lifted > .tc-card { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
+.tc-drag-source.is-lifted > .tc-card > *, .tc-drag-source.is-lifted > .tc-card::before { visibility: hidden; }
+/* The carried copy rides the pointer in dnd-kit's overlay, outside the screen's styles: it carries the screen's type itself. */
 .tc-overlay { font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); z-index: var(--tc-layer-float); }
-.tc-carried { position: relative; width: max-content; min-width: 100%; max-width: var(--tc-carried-max); }
+.tc-carried { position: relative; }
 .tc-carried > .tc-card { background: var(--tc-float-bg); box-shadow: var(--tc-shadow-lift); cursor: grabbing; }
 .tc-carried > .tc-card[data-priority] { background: var(--tc-priority-fill); }
-.tc-carried > .tc-card > .tc-card-title, .tc-carried .tc-card-lines > .tc-card-title { flex: none; -webkit-mask-image: none; mask-image: none; }
-.tc-carried-layer { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-card-h); border-radius: var(--tc-radius-card); box-shadow: var(--tc-shadow-lift); }
-.tc-carried-layer.is-1 { transform: translate(var(--tc-stack-step-x), var(--tc-stack-step-y)); right: calc(2 * var(--tc-stack-step-x)); background: var(--tc-stack-1); }
-.tc-carried-layer.is-2 { transform: translate(calc(2 * var(--tc-stack-step-x)), calc(2 * var(--tc-stack-step-y))); right: calc(2 * var(--tc-stack-step-x) + 2 * var(--tc-stack-step-x)); background: var(--tc-stack-2); }
-/* Looks to choose on the stand (spec, «Not decided»): the place a carried card left, an outline round the card it would go under, the timeline's landing. */
-.tc-gap.is-home { border-color: var(--tc-dash); opacity: var(--tc-home-place-opacity); }
-.tc-card.is-drop-parent { box-shadow: 0 0 0 var(--tc-hairline) var(--tc-accent); }
-.tc-drop-at { position: absolute; left: 0; right: 0; top: calc(var(--tc-y) - var(--tc-now-h) / 2); height: var(--tc-now-h); display: flex; align-items: center; z-index: var(--tc-layer-drop); pointer-events: none; }
-.tc-block.tc-landing-place { box-sizing: border-box; border: var(--tc-hairline) dashed var(--tc-accent); border-radius: var(--tc-radius-card); background: var(--tc-drop-bg); pointer-events: none; }
+/* A layer placed by Floating UI: shown as it mounts, where Floating UI puts it. */
+.tc-panel.tc-floating-menu { width: var(--tc-menu-w); opacity: 1; transform: none; }
+/* The field the plus opens, over the screen's foot, left of the plus. */
+.task-calendar.is-engine > .tc-quick-add { right: calc(var(--tc-plus-size) + var(--tc-space-16) + var(--tc-space-8)); }
+.tc-quick-add > .tc-quick-field { flex: 1; min-width: 0; }
+/* A note's block: the same screen, one list, a fixed room in the note. */
+.tc-stand-block { position: relative; height: var(--tc-stand-block-h); }
+.tc-note-column { position: absolute; inset: 0; display: flex; }
