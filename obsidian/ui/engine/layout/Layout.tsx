@@ -3,13 +3,18 @@ import { RibbonTrack, useRibbon } from "../gestures/Ribbon";
 import type { ListId } from "../port";
 import { DayContext, useData, useScreen } from "../store";
 import { useHost } from "../view/host";
+import { QuickAdd } from "../view/QuickAdd";
 import { Slide } from "../view/Slide";
 import { TaskList } from "../view/TaskList";
+import { TaskMenu } from "../view/TaskMenu";
 import { Timeline } from "../view/Timeline";
 import { COLUMN_SHARE, STRIP_WIDTH } from "./columns";
 
-/** Where a screen is mounted: Obsidian's leaf (the main screen, a pop-out), or a note's block. */
-export type Place = "leaf" | "note";
+/**
+ * Where a screen is mounted: Obsidian's leaf (the main screen, a pop-out), a note's block, or one column alone (the
+ * stand's first step: a list and drag, nothing else on screen).
+ */
+export type Place = "leaf" | "note" | "column";
 
 /**
  * Where things stand (spec, «The owners»): the place's columns. The only module that reads the place. A leaf shows the
@@ -18,7 +23,14 @@ export type Place = "leaf" | "note";
  * «Behaviours Max had to ask for twice»); at the day's calendar too until the divider comes (E2).
  */
 export const Layout = memo(function Layout({ place }: { readonly place: Place }) {
-	return place === "leaf" ? <RibbonColumns /> : <NoteColumn />;
+	if (place === "column") return <NoteColumn />;
+	return (
+		<>
+			{place === "leaf" ? <RibbonColumns /> : <NoteColumn />}
+			<QuickAdd />
+			<TaskMenu />
+		</>
+	);
 });
 
 function RibbonColumns() {

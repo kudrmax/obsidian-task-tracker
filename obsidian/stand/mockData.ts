@@ -132,3 +132,10 @@ export function fileText(file: MockFile, clock: Date): string {
 	}
 	return out.join("\n");
 }
+
+/** The stand's first step (spec 2026-11-18, «Part 1, step by step»): one column of a dozen plain tasks, nothing else. */
+export function oneColumnFile(): MockFile {
+	const names = ["Купить молоко", "Позвонить маме", "Оплатить свет", "Записаться к врачу", "Прочитать книгу", "Починить велосипед", "Ответить Косте", "Собрать документы", "Заказать билеты", "Разобрать почту", "Полить цветы", "Спланировать неделю"];
+	const tasks: MockTask[] = names.map((title, i) => ({ id: `c${i + 1}`, title, level: null, status: " ", due: null, slot: null, description: null, children: [] }));
+	return { inbox: [{ id: "c-s1", name: null, tasks }], now: [{ id: "c-s2", name: null, tasks: [] }], soon: [{ id: "c-s3", name: null, tasks: [] }], backlog: [{ id: "c-s4", name: null, tasks: [] }], done: [{ id: "c-s5", name: null, tasks: [] }] };
+}

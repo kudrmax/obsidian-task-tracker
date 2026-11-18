@@ -1,11 +1,12 @@
 import { ItemView, MarkdownRenderChild, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
 import { KEYS, takesKeys } from "../ui/engine/keys";
+import type { Place } from "../ui/engine/layout/Layout";
 import { type MountedScreen, mountScreen } from "../ui/engine/mount";
 import type { Stop } from "../ui/engine/store";
 import { detectHaptics, type HapticsHost } from "../ui/haptics";
 import { clearPriorityColors, showPriorityColors } from "../ui/priorityColors";
 import { addWindowDocument } from "../ui/windowDocuments";
-import type { ListKey } from "./mockData";
+import { type ListKey, oneColumnFile } from "./mockData";
 import { MockPort, WRITE_DELAYS, type WriteDelay } from "./MockPort";
 
 /** The stand's own view type and code block language: never the plugin's. */
@@ -53,7 +54,7 @@ class StandView extends ItemView {
 	override async onOpen(): Promise<void> {
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
-		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: "leaf", app: this.app, sourcePath: "", haptics: haptics() });
+		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: this.stand.leafPlace, app: this.app, sourcePath: "", haptics: haptics() });
 		this.stand.screens.add(this.screen);
 	}
 
@@ -109,6 +110,21 @@ export interface StandApi {
 export default class TaskCalendarStand extends Plugin {
 	readonly port = new MockPort();
 	readonly screens = new Set<MountedScreen>();
+	/** What a leaf shows: the whole screen, or the first step's one column with a dozen plain tasks. */
+	leafPlace: Place = "leaf";
+
+	/** Shows `place` in every open leaf, with its tasks: the first step's dozen, or the whole made-up file. */
+	private async showStep(place: Place): Promise<void> {
+		this.leafPlace = place;
+		this.port.reset(place === "column" ? oneColumnFile() : undefined);
+		for (const leaf of this.app.workspace.getLeavesOfType(STAND_VIEW)) {
+			const view = leaf.view;
+			if (view instanceof StandView) {
+				await view.onClose();
+				await view.onOpen();
+			}
+		}
+	}
 
 	override async onload(): Promise<void> {
 		const port = this.port;
@@ -138,6 +154,8 @@ export default class TaskCalendarStand extends Plugin {
 		if (!Platform.isMobile) this.addCommand({ id: "open-window", name: "Open the screen in a new window", callback: () => void this.open(true) });
 		this.addCommand({ id: "open-note", name: "Open the note with the screen's block", callback: () => void this.openNote() });
 		this.addCommand({ id: "new-tasks", name: "New made-up tasks", callback: () => port.reset() });
+		this.addCommand({ id: "step-one-column", name: "Step 1: one column and drag", callback: () => void this.showStep("column") });
+		this.addCommand({ id: "whole-screen", name: "The whole screen", callback: () => void this.showStep("leaf") });
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => (port.delay = delay) });
 	}
 

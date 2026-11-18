@@ -5,8 +5,6 @@ import { Layout, type Place } from "../layout/Layout";
 import { StoreContext, type ScreenStore } from "../store";
 import { Card } from "./Card";
 import { HostContext, type ScreenHost } from "./host";
-import { QuickAdd } from "./QuickAdd";
-import { TaskMenu } from "./TaskMenu";
 
 /** Touches stay the screen's: Obsidian's drawers never take a swipe meant for it (stage 0, «Integration findings» 8). */
 const keepTouch = (event: TouchEvent) => event.stopPropagation();
@@ -30,8 +28,6 @@ export function TaskScreen({ store, host, place }: { readonly store: ScreenStore
 					<Drag doc={host.doc} carried={carried} onLift={() => host.haptics.tap()}>
 						<div className={`task-calendar is-engine is-${place}`} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch}>
 							<Layout place={place} />
-							<QuickAdd />
-							<TaskMenu />
 						</div>
 					</Drag>
 				</Layers>

@@ -39,9 +39,9 @@ export class MockPort implements ScreenPort {
 		return fileText(this.file, this.clock());
 	}
 
-	/** New made-up tasks around now. */
-	reset(): void {
-		this.file = mockFile(this.clock());
+	/** New made-up tasks around now; `file` puts a given set instead (the first step's one column). */
+	reset(file: MockFile = mockFile(this.clock())): void {
+		this.file = file;
 		this.changed();
 	}
 
