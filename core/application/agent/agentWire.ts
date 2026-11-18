@@ -1,4 +1,4 @@
-import type { LocalDate, SectionKey, TaskKey } from "../contracts";
+import type { LocalDate, TaskKey } from "../contracts";
 
 export type { LocalDate };
 
@@ -206,36 +206,68 @@ export function present<T extends object>(value: T): T {
 	return Object.fromEntries(Object.entries(value).filter(([, v]) => !empty(v))) as T;
 }
 
-/**
- * A task's key as an opaque ref: its parts as JSON, the bytes in hex, so no list's name shows in it. The task's id is left
- * out: it lives only while one run of the core does.
- */
-export function refOf(key: TaskKey): string {
-	return [...utf8(JSON.stringify([key.section, key.index, key.path, key.raw]))].map((b) => b.toString(16).padStart(2, "0")).join("");
+/** A ref's shape: `t` and 8 hex digits, or 16 for tasks of one file whose 8 would be alike. */
+const REF_RE = /^t(?:[0-9a-f]{8}|[0-9a-f]{16})$/;
+
+/** The text a ref hashes: the task's key, its id left out (it lives only while one run of the core does). */
+function keyText(key: TaskKey): string {
+	return JSON.stringify([key.section, key.index, key.path, key.raw]);
 }
 
-const SECTIONS: readonly SectionKey[] = ["inbox", "now", "soon", "backlog", "done"];
+/** FNV-1a, 32 bits, over the text's UTF-8 bytes from `basis`: 8 hex digits, so no list's name can show in it. */
+function fnv1a(text: string, basis: number): string {
+	let hash = basis >>> 0;
+	for (const byte of utf8(text)) hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
+	return hash.toString(16).padStart(8, "0");
+}
 
-/** The key a ref holds; null for text that is no ref. */
-export function keyOfRef(ref: string): TaskKey | null {
-	if (!/^(?:[0-9a-f]{2})+$/.test(ref)) return null;
-	try {
-		const bytes = ref.match(/../g)!.map((pair) => parseInt(pair, 16));
-		const parts: unknown = JSON.parse(fromUtf8(bytes));
-		if (!Array.isArray(parts) || parts.length !== 4) return null;
-		const [section, index, path, raw] = parts as [unknown, unknown, unknown, unknown];
-		if (!SECTIONS.includes(section as SectionKey) || !Number.isInteger(index) || typeof raw !== "string") return null;
-		if (!Array.isArray(path) || !path.every((i) => Number.isInteger(i))) return null;
-		return { section: section as SectionKey, index: index as number, path: path as number[], raw };
-	} catch {
-		return null;
+const BASIS = 0x811c9dc5;
+const SECOND_BASIS = 0x050c5d1f;
+
+/** A task's short ref: `t` and 8 hex digits of its key's hash. */
+export function shortRef(key: TaskKey): string {
+	return `t${fnv1a(keyText(key), BASIS)}`;
+}
+
+/** A task's long ref, for tasks whose short refs are alike: 16 hex digits, two hashes of the key. */
+function longRef(key: TaskKey): string {
+	return `t${fnv1a(keyText(key), BASIS)}${fnv1a(keyText(key), SECOND_BASIS)}`;
+}
+
+/** Text of a ref's shape (it may still name no task of the file). */
+export function isRef(text: string): boolean {
+	return REF_RE.test(text);
+}
+
+/**
+ * The refs of every task and subtask of one file as read: short, but long for every task whose short ref another task of
+ * the file has too, so a ref never names two tasks. A ref resolves to the key it was made of.
+ */
+export class RefBook {
+	private readonly byKey = new Map<string, string>();
+	private readonly byRef = new Map<string, TaskKey>();
+
+	constructor(keys: readonly TaskKey[]) {
+		const counts = new Map<string, number>();
+		for (const key of keys) counts.set(shortRef(key), (counts.get(shortRef(key)) ?? 0) + 1);
+		for (const key of keys) {
+			const ref = counts.get(shortRef(key))! > 1 ? longRef(key) : shortRef(key);
+			this.byKey.set(keyText(key), ref);
+			this.byRef.set(ref, key);
+		}
+	}
+
+	/** The task's ref; a key of no task of the file gets its short one. */
+	refOf(key: TaskKey): string {
+		return this.byKey.get(keyText(key)) ?? shortRef(key);
+	}
+
+	/** The key a ref names in this file; null for none. */
+	keyOf(ref: string): TaskKey | null {
+		return this.byRef.get(ref) ?? null;
 	}
 }
 
 function utf8(text: string): number[] {
 	return [...unescape(encodeURIComponent(text))].map((ch) => ch.charCodeAt(0));
-}
-
-function fromUtf8(bytes: readonly number[]): string {
-	return decodeURIComponent(escape(String.fromCharCode(...bytes)));
 }

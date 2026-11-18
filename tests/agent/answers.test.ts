@@ -291,8 +291,10 @@ describe("search and task", () => {
 		const ref = (await run(vault, ["inbox"])).answer.sections[0].tasks[0].ref;
 		const other = makeVault({ tasks: "## Inbox\n\n- [ ] Something else\n" });
 		expect((await run(other, ["task", ref])).answer.error.code).toBe("staleTask");
+		expect((await run(vault, ["task", "t00000000"])).answer.error.code).toBe("staleTask");
 		expect((await run(vault, ["task", "inbox-0"])).answer.error.code).toBe("unknownTask");
-		expect((await run(vault, ["task", "ab"])).answer.error.code).toBe("unknownTask");
+		expect((await run(vault, ["task", "tab"])).answer.error.code).toBe("unknownTask");
+		expect((await run(vault, ["task", "T0123ABCD"])).answer.error.code).toBe("unknownTask");
 	});
 
 	it("no ref holds a list's name", async () => {
@@ -300,7 +302,10 @@ describe("search and task", () => {
 		const answers = await Promise.all([["today"], ["week", "this"], ["soon"], ["inbox"], ["backlog"], ["all"], ["project", "Отчёты", "--done"], ["search", "e"]].map((argv) => run(vault, argv)));
 		const refs = answers.flatMap(({ answer }) => refsIn(answer));
 		expect(refs.length).toBeGreaterThan(20);
-		for (const ref of refs) expect(ref).not.toMatch(/inbox|backlog|soon|now|today|done|day/i);
+		for (const ref of refs) {
+			expect(ref).toMatch(/^t[0-9a-f]{8}$/);
+			expect(ref).not.toMatch(/inbox|backlog|soon|now|today|done|day/i);
+		}
 	});
 });
 

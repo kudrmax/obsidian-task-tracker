@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { refOf } from "../../core/application/agent/agentWire";
+import { shortRef as refOf } from "../../core/application/agent/agentWire";
 import type { DropColumn, ScreenView, TaskItem, TaskPlace } from "../../core/application/contracts";
 import { memoryProjectsScreen } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";

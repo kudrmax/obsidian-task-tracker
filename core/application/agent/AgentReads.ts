@@ -23,11 +23,11 @@ import {
 	AgentError,
 	clockTime,
 	defined,
-	keyOfRef,
+	isRef,
 	localMoment,
 	mapNull,
 	present,
-	refOf,
+	RefBook,
 	type WireAll,
 	type WireCalendars,
 	type WireDay,
@@ -89,6 +89,9 @@ const ASSISTANT_LABEL_MEANING: Readonly<Record<string, string>> = {
  * through the contract and only maps it into the program's words: it never filters, sorts, groups, dates or places a task.
  */
 export class AgentReads {
+	/** The refs of the file's tasks, made once the file is read (`needFile`). */
+	private book = new RefBook([]);
+
 	constructor(private readonly s: AgentServices) {}
 
 	/** Today as Max sees it at Now–calendar. */
@@ -168,9 +171,10 @@ export class AgentReads {
 	/** One task whole: every subtask at every depth, closed ones too, and where it is stored. */
 	async task(ref: string): Promise<WireTaskAnswer> {
 		await this.needFile();
-		const key = keyOfRef(ref.trim());
-		if (key === null) throw new AgentError("unknownTask", "not a task's ref: take one from an answer of the program");
-		const item = await this.s.tasks.find(key, "");
+		const text = ref.trim();
+		if (!isRef(text)) throw new AgentError("unknownTask", "not a task's ref: take one from an answer of the program");
+		const key = this.book.keyOf(text);
+		const item = key === null ? null : await this.s.tasks.find(key, "");
 		if (item === null) throw new AgentError("staleTask", "the task is no longer where the ref says: the file or the day changed, read again");
 		const place = await this.s.tasks.placeOf(item);
 		const whole = { ...this.wire(item, place), subtasks: this.subtask(item, item.card.step, true, "date" in place ? place.date : undefined).subtasks };
@@ -261,7 +265,7 @@ export class AgentReads {
 			due: cardDue(item, date)?.date,
 			...own,
 			projects: item.projects.map((project) => project.name),
-			nextStep: mapNull(step, (s): WireStep => ({ ref: refOf(s.key), title: s.title, path: pathTo(item.subtasks, s.id) })),
+			nextStep: mapNull(step, (s): WireStep => ({ ref: this.book.refOf(s.key), title: s.title, path: pathTo(item.subtasks, s.id) })),
 		}) as WireTask;
 	}
 
@@ -273,7 +277,7 @@ export class AgentReads {
 		const levels = this.s.tasks.priorityLevels();
 		const subs = all ? item.allSubtasks : item.subtasks;
 		return present({
-			ref: refOf(item.key),
+			ref: this.book.refOf(item.key),
 			title: item.title,
 			status: STATUS[item.status],
 			time: mapNull(item.slot, (slot) =>
@@ -342,7 +346,14 @@ export class AgentReads {
 	private async needFile(): Promise<void> {
 		const screen = await this.s.tasks.screen(this.s.days.today());
 		if (screen.missing) throw new AgentError("tasksFileMissing", `no tasks file at ${JSON.stringify(this.s.screenSettings.get().tasksFile)} in the vault`);
+		const open = (await this.s.tasks.openTasks()).map((t) => t.item);
+		this.book = new RefBook(everyTask([...open, ...screen.done]).map((item) => item.key));
 	}
+}
+
+/** Every task and subtask of these, at every depth, closed ones too. */
+function everyTask(items: readonly TaskItem[]): TaskItem[] {
+	return items.flatMap((item) => [item, ...everyTask(item.allSubtasks)]);
 }
 
 /** A level's place in the settings' order, 1 the highest. */

@@ -6900,29 +6900,49 @@ function present(value) {
   const empty = (v) => v === void 0 || v === null || v === false || v === "" || Array.isArray(v) && v.length === 0;
   return Object.fromEntries(Object.entries(value).filter(([, v]) => !empty(v)));
 }
-function refOf2(key) {
-  return [...utf8(JSON.stringify([key.section, key.index, key.path, key.raw]))].map((b) => b.toString(16).padStart(2, "0")).join("");
+var REF_RE = /^t(?:[0-9a-f]{8}|[0-9a-f]{16})$/;
+function keyText2(key) {
+  return JSON.stringify([key.section, key.index, key.path, key.raw]);
 }
-var SECTIONS = ["inbox", "now", "soon", "backlog", "done"];
-function keyOfRef(ref) {
-  if (!/^(?:[0-9a-f]{2})+$/.test(ref)) return null;
-  try {
-    const bytes = ref.match(/../g).map((pair) => parseInt(pair, 16));
-    const parts = JSON.parse(fromUtf8(bytes));
-    if (!Array.isArray(parts) || parts.length !== 4) return null;
-    const [section, index, path, raw] = parts;
-    if (!SECTIONS.includes(section) || !Number.isInteger(index) || typeof raw !== "string") return null;
-    if (!Array.isArray(path) || !path.every((i) => Number.isInteger(i))) return null;
-    return { section, index, path, raw };
-  } catch {
-    return null;
+function fnv1a(text, basis) {
+  let hash = basis >>> 0;
+  for (const byte of utf8(text)) hash = Math.imul(hash ^ byte, 16777619) >>> 0;
+  return hash.toString(16).padStart(8, "0");
+}
+var BASIS = 2166136261;
+var SECOND_BASIS = 84696351;
+function shortRef(key) {
+  return `t${fnv1a(keyText2(key), BASIS)}`;
+}
+function longRef(key) {
+  return `t${fnv1a(keyText2(key), BASIS)}${fnv1a(keyText2(key), SECOND_BASIS)}`;
+}
+function isRef(text) {
+  return REF_RE.test(text);
+}
+var RefBook = class {
+  constructor(keys) {
+    this.byKey = /* @__PURE__ */ new Map();
+    this.byRef = /* @__PURE__ */ new Map();
+    const counts2 = /* @__PURE__ */ new Map();
+    for (const key of keys) counts2.set(shortRef(key), (counts2.get(shortRef(key)) ?? 0) + 1);
+    for (const key of keys) {
+      const ref = counts2.get(shortRef(key)) > 1 ? longRef(key) : shortRef(key);
+      this.byKey.set(keyText2(key), ref);
+      this.byRef.set(ref, key);
+    }
   }
-}
+  /** The task's ref; a key of no task of the file gets its short one. */
+  refOf(key) {
+    return this.byKey.get(keyText2(key)) ?? shortRef(key);
+  }
+  /** The key a ref names in this file; null for none. */
+  keyOf(ref) {
+    return this.byRef.get(ref) ?? null;
+  }
+};
 function utf8(text) {
   return [...unescape(encodeURIComponent(text))].map((ch) => ch.charCodeAt(0));
-}
-function fromUtf8(bytes) {
-  return decodeURIComponent(escape(String.fromCharCode(...bytes)));
 }
 
 // core/application/agent/AgentReads.ts
@@ -6939,6 +6959,8 @@ var ASSISTANT_LABEL_MEANING = {
 var AgentReads = class {
   constructor(s) {
     this.s = s;
+    /** The refs of the file's tasks, made once the file is read (`needFile`). */
+    this.book = new RefBook([]);
   }
   /** Today as Max sees it at Now–calendar. */
   async today(filter = {}) {
@@ -7007,9 +7029,10 @@ var AgentReads = class {
   /** One task whole: every subtask at every depth, closed ones too, and where it is stored. */
   async task(ref) {
     await this.needFile();
-    const key = keyOfRef(ref.trim());
-    if (key === null) throw new AgentError("unknownTask", "not a task's ref: take one from an answer of the program");
-    const item = await this.s.tasks.find(key, "");
+    const text = ref.trim();
+    if (!isRef(text)) throw new AgentError("unknownTask", "not a task's ref: take one from an answer of the program");
+    const key = this.book.keyOf(text);
+    const item = key === null ? null : await this.s.tasks.find(key, "");
     if (item === null) throw new AgentError("staleTask", "the task is no longer where the ref says: the file or the day changed, read again");
     const place = await this.s.tasks.placeOf(item);
     const whole = { ...this.wire(item, place), subtasks: this.subtask(item, item.card.step, true, "date" in place ? place.date : void 0).subtasks };
@@ -7093,7 +7116,7 @@ var AgentReads = class {
       due: cardDue(item, date)?.date,
       ...own,
       projects: item.projects.map((project) => project.name),
-      nextStep: mapNull(step, (s) => ({ ref: refOf2(s.key), title: s.title, path: pathTo(item.subtasks, s.id) }))
+      nextStep: mapNull(step, (s) => ({ ref: this.book.refOf(s.key), title: s.title, path: pathTo(item.subtasks, s.id) }))
     });
   }
   /**
@@ -7104,7 +7127,7 @@ var AgentReads = class {
     const levels = this.s.tasks.priorityLevels();
     const subs = all2 ? item.allSubtasks : item.subtasks;
     return present({
-      ref: refOf2(item.key),
+      ref: this.book.refOf(item.key),
       title: item.title,
       status: STATUS[item.status],
       time: mapNull(
@@ -7167,8 +7190,13 @@ var AgentReads = class {
   async needFile() {
     const screen = await this.s.tasks.screen(this.s.days.today());
     if (screen.missing) throw new AgentError("tasksFileMissing", `no tasks file at ${JSON.stringify(this.s.screenSettings.get().tasksFile)} in the vault`);
+    const open = (await this.s.tasks.openTasks()).map((t) => t.item);
+    this.book = new RefBook(everyTask([...open, ...screen.done]).map((item) => item.key));
   }
 };
+function everyTask(items) {
+  return items.flatMap((item) => [item, ...everyTask(item.allSubtasks)]);
+}
 function rankOf(levels, level) {
   return levels.findIndex((l) => l.prefix === level.prefix) + 1;
 }
