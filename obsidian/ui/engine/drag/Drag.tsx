@@ -1,4 +1,4 @@
-import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getClientRect, getFirstCollision, type MeasuringConfiguration, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragMoveEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, TouchSensor, useDraggable, useSensor, useSensors } from "@dnd-kit/core";
+import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getClientRect, getFirstCollision, type MeasuringConfiguration, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragMoveEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, PointerSensor, TouchSensor, useDraggable, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
@@ -25,17 +25,16 @@ export const PLUS = "plus";
 const onPlus = (event: Event): boolean => (event.target as Element | null)?.closest?.("[data-plus]") != null;
 
 /**
- * Touch sensors as dnd-kit's custom sensors are made (a sensor's activators filter what may start it): the plus moves at
- * once under the finger (the old plugin's F175), a card is lifted by the long press.
+ * Sensors as dnd-kit's custom sensors are made (a sensor's activators filter what may start it). A card is lifted by the
+ * mouse or by the long press of a finger (touch events); the plus moves at once under a finger (the old plugin's F175),
+ * started by the pointer events of a touch on it, so the two never listen to the same event (dnd-kit keeps one listener
+ * per event name).
  */
-type TouchActivator = (typeof TouchSensor.activators)[number];
-const touchOnly = (takes: (event: Event) => boolean): TouchActivator[] =>
-	TouchSensor.activators.map((activator) => ({ ...activator, handler: (event, options) => takes(event.nativeEvent) && activator.handler(event, options) }));
-class PlusTouchSensor extends TouchSensor {
-	static override activators = touchOnly(onPlus);
-}
 class CardTouchSensor extends TouchSensor {
-	static override activators = touchOnly((event) => !onPlus(event));
+	static override activators = TouchSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1]) => !onPlus(event.nativeEvent) && activator.handler(event, options) }));
+}
+class PlusTouchSensor extends PointerSensor {
+	static override activators = PointerSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1]) => event.nativeEvent.pointerType === "touch" && onPlus(event.nativeEvent) && activator.handler(event, options) }));
 }
 const LONG_PRESS_MS = 250;
 const LONG_PRESS_TOLERANCE_PX = 5;

@@ -1,7 +1,8 @@
 /**
  * E0, one ObsidianEditor (spec, «Text fields»): the plus opens a field holding Obsidian's own editor with the focus; typed
- * text arrives; on the Mac `[[` opens Obsidian's note search; Enter adds the task where the port puts new ones (the top of
- * Inbox), the list reveals it and it comes in; Escape closes the field.
+ * text arrives; on the Mac `[[` opens Obsidian's note search; the field stands where the port puts new tasks (the end of
+ * Inbox's tasks outside a section), the list reveals it; Enter writes the task there and opens the next field under it;
+ * Escape closes the field.
  */
 export default {
 	name: "e0-editor",
@@ -43,15 +44,15 @@ export default {
 			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
 			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
 		}, { cast: "enter", settleMs: 900 });
-		t.expect((await t.oracle.tasks("Inbox"))[0]?.title === "Купить молоко", `Enter adds it at the top of Inbox in the file: ${(await t.oracle.tasks("Inbox"))[0]?.title}`);
-		t.expect((await t.oracle.cards("inbox"))[0] === "Купить молоко", `the list scrolled back to show it: ${(await t.oracle.cards("inbox"))[0]}`);
-		t.expect((await t.cdp.eval(`!!document.querySelector(".tc-quick-field")`)) === false, "and the field closed");
+		const text2 = (await t.cdp.eval(`window.__tcStand.fileText()`)).split("\n");
+		const inboxAt = text2.indexOf("## Inbox");
+		const firstSection = text2.findIndex((line, i) => i > inboxAt && line.startsWith("### "));
+		const loose = text2.slice(inboxAt + 1, firstSection < 0 ? undefined : firstSection).filter((line) => line.startsWith("- "));
+		t.expect(loose.at(-1)?.endsWith("Купить молоко"), `Enter writes it at the end of Inbox's tasks outside a section: ${loose.at(-1)}`);
+		t.expect((await t.oracle.cards("inbox")).includes("Купить молоко"), "the list shows it, the field in sight");
+		t.expect((await t.cdp.eval(`!!document.querySelector(".tc-entry .tc-quick-field")`)) === true, "and an empty field opened under it");
 		t.expect(added.length === 0, `frames of the new task coming in: ${JSON.stringify(added.slice(0, 4))}`);
 
-		const again = await t.oracle.rect(".tc-plus");
-		if (t.platform === "phone") await t.input.tap(again.x, again.y);
-		else await t.input.click(again.x, again.y);
-		await t.sleep(300);
 		await t.cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
 		await t.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
 		await t.sleep(300);
