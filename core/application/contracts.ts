@@ -2,7 +2,7 @@ import type { GroupName, LocalDate, ReminderKind, SectionKey, Slot, TaskStatus }
 import type { RepeatRule } from "../domain/Repeat";
 import type { EndList, GroupedList, GroupPlace } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
-import type { LabelLevel } from "../domain/Label";
+import type { LabelColor, LabelLevel } from "../domain/Label";
 import type { PresetColor, PriorityColor, PriorityLevel } from "../domain/Priority";
 import type { DayColumn, DayRelation, TaskScreen } from "../domain/Days";
 import type { DueLabel } from "./dayLabels";
@@ -107,7 +107,7 @@ export { allColumnsDividerAt, allColumnsShare, allColumnsWidthAt, allColumnsWidt
 export type { Clock } from "./ports";
 
 /** A priority level, its colours in the order the settings offer them. */
-export { type LabelLevel, labelTitle, sameLabels } from "../domain/Label";
+export { CLEAR_COLOR, type LabelColor, type LabelLevel, labelTitle, sameLabels, usableLabelColor } from "../domain/Label";
 export { isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel, usableColor } from "../domain/Priority";
 export type { DayColumn, DayRelation, EndList, GroupedList, GroupPlace, Placement, TaskDraft, TaskScreen };
 /** How a level's or a label's colour paints a card, and a calendar's an event, in either theme: every frontend draws the same shades. */
@@ -2000,6 +2000,10 @@ export interface SettingsForm {
 	readonly priorities: readonly PriorityLevel[];
 	readonly labelTag: string;
 	readonly labels: readonly LabelLevel[];
+	/** The colours a priority level's row offers, in order: the presets. */
+	readonly levelSwatches: readonly PriorityColor[];
+	/** The colours a label's row offers, in order: the presets, then no colour (`CLEAR_COLOR`). */
+	readonly labelSwatches: readonly LabelColor[];
 	readonly labelPaint: LabelPaint;
 	/** The paints Several labels offers, in order. */
 	readonly labelPaints: readonly LabelPaint[];
@@ -2066,9 +2070,10 @@ export interface SettingsService {
 	setZoomLevels(text: string): Promise<void>;
 	/** The name as shown, its spaces written as underscores. */
 	renameLabel(index: number, title: string): Promise<void>;
-	recolourLabel(index: number, color: PriorityColor): Promise<void>;
+	/** Any of the form's `labelSwatches` or a code; `CLEAR_COLOR` makes the label paint nothing. */
+	recolourLabel(index: number, color: LabelColor): Promise<void>;
 	removeLabel(index: number): Promise<void>;
-	/** A new label `Label_<n>` no label has, in the first colour no label has. */
+	/** A new label `Label_<n>` no label has, in the first preset no label has (never clear). */
 	addLabel(): Promise<void>;
 	moveLabel(from: number, to: number): Promise<void>;
 	/**
@@ -2078,7 +2083,8 @@ export interface SettingsService {
 	colourOf(text: string, shades: Readonly<Record<PresetColor, string>>): PriorityColor | null;
 	/**
 	 * A code typed for the colour of level or label `index` and left: the colour to write (`colourOf`), or null when it is
-	 * no colour or the one it has already; the field then shows its colour's code again.
+	 * no colour (an emptied field too) or the one it has already; the field then shows its colour's code again. Typing never
+	 * makes a label clear: that is the No colour swatch.
 	 */
 	typedColour(of: "level" | "label", index: number, text: string, shades: Readonly<Record<PresetColor, string>>): PriorityColor | null;
 	/** The name trimmed. */
@@ -2120,12 +2126,46 @@ export type AssistantOutcome =
 	 * `task` and `card` are as the tasks stand after the action's options did their part (Best task's label on it).
 	 * `notice`: what an option couldn't do, drawn under the card («Couldn't add the label Focus to this task.»); null for none.
 	 * `detail`: an option's write that failed, for the console (the frontend writes it there, as a failure's); null for none.
+	 * `context`: the field for what the model missed, under the note (Best task's); null for an action without one.
 	 */
-	| { readonly kind: "task"; readonly title: string; readonly task: TaskItem; readonly card: TaskCard; readonly note: string; readonly notice: string | null; readonly detail: string | null }
+	| {
+			readonly kind: "task";
+			readonly title: string;
+			readonly task: TaskItem;
+			readonly card: TaskCard;
+			readonly note: string;
+			readonly notice: string | null;
+			readonly detail: string | null;
+			readonly context: AssistantContext | null;
+	  }
 	/** `detail` is for the console: the frontend writes it there. */
 	| { readonly kind: "failed"; readonly title: string; readonly words: string; readonly detail: string }
 	/** Stopped by Max: nothing is shown. */
 	| { readonly kind: "stopped" };
+
+/** The words of an answer's field for what the model missed, ready to draw. */
+export interface AssistantContextWords {
+	/** The empty field's placeholder: «What did Claude miss?». */
+	readonly placeholder: string;
+	/** The plain pill: writes and closes. */
+	readonly save: string;
+	/** The main pill (and ⌘Enter): writes, then presses the same button again. */
+	readonly saveAndAsk: string;
+	/** The line under the field when the write failed: «Couldn't save to this task.». */
+	readonly failed: string;
+}
+
+/**
+ * An answer's field for what the model missed: its words, and the task its text goes to, written with
+ * `addContext(taskId, text)`. `taskId` is the task the model chose (a folded task's step: the step), not `task`, the card's.
+ */
+export interface AssistantContext {
+	readonly taskId: string;
+	readonly words: AssistantContextWords;
+}
+
+/** What `addContext` came to: written (or nothing to write), or failed with the line to show and `detail` for the console. */
+export type AssistantContextResult = { readonly ok: true } | { readonly ok: false; readonly words: string; readonly detail: string };
 
 /** The first half of a run, for a host that asks the model itself: plain data, travels to the host and back. */
 export interface PreparedQuestion {
@@ -2247,4 +2287,12 @@ export interface AssistantService {
 	prepare(actionId: string, target?: AssistantTarget): Promise<PreparedQuestion | AssistantOutcome>;
 	/** The second half: the model's reply read against the tasks as they are now. */
 	finish(prepared: PreparedQuestion, reply: ModelReply): Promise<AssistantOutcome>;
+
+	/**
+	 * What Max says the model missed (an answer's `context` field), written into the task `taskId` names as the last line of
+	 * its description, `- Контекст: <text>` with the text's lines joined: the task service's description write, one step to
+	 * take back. A blank text writes nothing and is `ok`. A task closed or gone, or a file that couldn't be written: not ok,
+	 * nothing written, the words to show under the field.
+	 */
+	addContext(taskId: string, text: string): Promise<AssistantContextResult>;
 }

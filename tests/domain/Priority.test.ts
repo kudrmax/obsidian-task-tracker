@@ -72,7 +72,7 @@ describe("a priority prefix in a text", () => {
 describe("a colour a level may be drawn in", () => {
 	it("is a preset or a code as the settings write it", () => {
 		expect(["red", "#FF6A00"].map(usableColor)).toEqual([true, true]);
-		expect(["#ff6a00", "FF6A00", " #FF6A00", "purple", "#FFF", "red; x"].map(usableColor)).toEqual([false, false, false, false, false, false]);
+		expect(["#ff6a00", "FF6A00", " #FF6A00", "purple", "#FFF", "red; x", "clear"].map(usableColor)).toEqual([false, false, false, false, false, false, false]);
 	});
 });
 

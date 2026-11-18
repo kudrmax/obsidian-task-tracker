@@ -127,8 +127,7 @@ final class BoardModel {
     /// A level's or a label's shades in both themes, asked once per colour.
     func shades(_ color: String) -> Themed<Shades>? {
         if let known = shadesByColor[color] { return known }
-        guard let dark: Shades = ruleNow("rules.shadesOf", [.string(color), "dark"]), let light: Shades = ruleNow("rules.shadesOf", [.string(color), "light"]) else { return nil }
-        let found = Themed(dark: dark, light: light)
+        guard let found = board.markShades(color) else { return nil }
         shadesByColor[color] = found
         return found
     }
@@ -1955,11 +1954,25 @@ final class BoardModel {
 
     @ObservationIgnored private lazy var repeatWords: RepeatWords? = try? board.repeatWords()
 
-    /// A level's or a label's colour as a menu's flag draws it, in either theme.
+    /// A level's or a label's colour as a menu's flag draws it, in either theme; none for a clear label.
     func ink(_ color: String, dark: Bool) -> UIColor? {
-        guard let hex: String = try? board.rule("rules.inkOf", [.string(color), .string(dark ? "dark" : "light")]) else { return nil }
-        return UIColor(Color(hex: hex))
+        markInk(color).map { UIColor(Color(hex: dark ? $0.dark : $0.light)) }
     }
+
+    /// A label tile's symbol: filled in its colour, an outline for a clear label, drawn as the menu's uncoloured rows.
+    func tagSymbol(_ color: String) -> String {
+        markInk(color) == nil ? "tag" : "tag.fill"
+    }
+
+    /// A colour's ink in both themes, asked of the core once per colour; `nil` for one that paints nothing.
+    private func markInk(_ color: String) -> Themed<String>? {
+        if let known = inkByColor[color] { return known }
+        let found = board.markInk(color)
+        inkByColor[color] = .some(found)
+        return found
+    }
+
+    @ObservationIgnored private var inkByColor: [String: Themed<String>?] = [:]
 
     /// The card's menu as UIKit draws it, read from the screen as it stands. `later` holds a row that opens a sheet or a
     /// page until the menu has gone. Over the core's rows, as the plugin shows them over its menu: the start of the task's

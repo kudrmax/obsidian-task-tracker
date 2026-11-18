@@ -185,6 +185,51 @@
     cancelled: "-"
   };
 
+  // core/domain/description.ts
+  var INDENT_RE = /^[ \t]*/;
+  var DESCRIPTION_TEMPLATE = "- ";
+  function indentOf(line) {
+    return INDENT_RE.exec(line)[0];
+  }
+  function descriptionLines(entry) {
+    const lines = [];
+    const children = entry.task.children;
+    let next = 0;
+    for (let i = 0; i < children.length; i++) {
+      const sub = entry.subtasks[next];
+      if (sub && children[i] === sub.raw) {
+        i += sub.task.children.length;
+        next++;
+      } else lines.push(children[i]);
+    }
+    return lines;
+  }
+  function descriptionIndent(entry) {
+    const lines = descriptionLines(entry);
+    if (lines.length === 0) return null;
+    return lines.map(indentOf).reduce((a, b) => b.length < a.length ? b : a);
+  }
+  function descriptionMarkdown(entry) {
+    const indent = descriptionIndent(entry);
+    if (indent === null) return null;
+    return descriptionLines(entry).map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.trimStart()).join("\n");
+  }
+  function markdownLines(markdown) {
+    if (markdown.trim() === DESCRIPTION_TEMPLATE.trim()) return [];
+    return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
+  }
+  var CONTEXT_PREFIX = "Контекст: ";
+  function contextLine(text) {
+    const joined = text.trim().replace(/\s+/g, " ");
+    return joined === "" ? null : `- ${CONTEXT_PREFIX}${joined}`;
+  }
+  function withContext(markdown, text) {
+    const line = contextLine(text);
+    if (line === null) return null;
+    return markdown === null ? line : `${markdown}
+${line}`;
+  }
+
   // core/domain/Priority.ts
   var PRIORITY_COLORS = ["red", "orange", "yellow", "green", "teal", "blue"];
   function isPresetColor(color) {
@@ -266,40 +311,6 @@
     if (date === today) return "today";
     if (date === addDays(today, 1)) return "tomorrow";
     return date === addDays(today, -1) ? "yesterday" : "other";
-  }
-
-  // core/domain/description.ts
-  var INDENT_RE = /^[ \t]*/;
-  var DESCRIPTION_TEMPLATE = "- ";
-  function indentOf(line) {
-    return INDENT_RE.exec(line)[0];
-  }
-  function descriptionLines(entry) {
-    const lines = [];
-    const children = entry.task.children;
-    let next = 0;
-    for (let i = 0; i < children.length; i++) {
-      const sub = entry.subtasks[next];
-      if (sub && children[i] === sub.raw) {
-        i += sub.task.children.length;
-        next++;
-      } else lines.push(children[i]);
-    }
-    return lines;
-  }
-  function descriptionIndent(entry) {
-    const lines = descriptionLines(entry);
-    if (lines.length === 0) return null;
-    return lines.map(indentOf).reduce((a, b) => b.length < a.length ? b : a);
-  }
-  function descriptionMarkdown(entry) {
-    const indent = descriptionIndent(entry);
-    if (indent === null) return null;
-    return descriptionLines(entry).map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.trimStart()).join("\n");
-  }
-  function markdownLines(markdown) {
-    if (markdown.trim() === DESCRIPTION_TEMPLATE.trim()) return [];
-    return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
   }
 
   // core/domain/Repeat.ts
@@ -463,6 +474,11 @@
   };
 
   // core/domain/Label.ts
+  var CLEAR_COLOR = "clear";
+  var LABEL_SWATCHES = [...PRIORITY_COLORS, CLEAR_COLOR];
+  function usableLabelColor(color) {
+    return color === CLEAR_COLOR || usableColor(color);
+  }
   function labelTitle(name) {
     return name.replace(/_/g, " ");
   }
@@ -2056,6 +2072,10 @@
   }
   function setDescription(doc, entry, markdown) {
     return doc.setDescription(entry, markdown);
+  }
+  function addContext(doc, entry, text) {
+    const markdown = withContext(descriptionMarkdown(entry), text);
+    return markdown === null ? doc : doc.setDescription(entry, markdown);
   }
   function remove(doc, entry) {
     return doc.removeEntry(entry);
@@ -4396,7 +4416,9 @@ ${key.title}`.toLowerCase();
   // core/application/marks.ts
   var MOST_CARD_COLORS = 4;
   function markColors(priority, labels) {
-    return priority ? [priority.color] : labels.slice(0, MOST_CARD_COLORS).map((label) => label.color);
+    const drawn = (color) => usableColor(color) ? [color] : [];
+    if (priority) return drawn(priority.color);
+    return labels.flatMap((label) => drawn(label.color)).slice(0, MOST_CARD_COLORS);
   }
   function draftMarksOf(marks, levels, labels) {
     const choices = markChoices(marks);
@@ -6092,6 +6114,8 @@ ${key.title}`.toLowerCase();
         priorities: s.priorities,
         labelTag: s.labelTag,
         labels: s.labels,
+        levelSwatches: PRIORITY_COLORS,
+        labelSwatches: LABEL_SWATCHES,
         labelPaint: s.labelPaint,
         labelPaints: LABEL_PAINTS,
         cardHeight: s.cardHeight,
@@ -6686,16 +6710,18 @@ ${key.title}`.toLowerCase();
     dayView(s, date, filter) {
       return this.screen(s, date, filter).day;
     }
-    /** Every task of each list, each with its subtasks, and today, the file tidied first: what the assistant reads. No file: every list empty. */
+    /** Every task of each list, each with its subtasks, Today's and Soon's columns as `screen` draws them on today, and today, the file tidied first: what the assistant reads. No file: everything empty. */
     listedRead() {
       const lists = (of) => Object.fromEntries(SEARCH_ORDER.map((key) => [key, of(key)]));
       return {
         reads: true,
         tidies: true,
-        missing: () => ({ today: this.today(), lists: lists(() => []) }),
+        missing: () => ({ today: this.today(), lists: lists(() => []), columns: { today: [], soon: [] } }),
         answer: (s) => {
           const item = this.itemOf(s.today, s.doc);
-          return { today: s.today, lists: lists((key) => s.doc.tasks(key).map(item)) };
+          const screen = this.screen(s, s.today);
+          const columns = { today: [...screen.day.list, ...screen.day.slotted], soon: screen.soon };
+          return { today: s.today, lists: lists((key) => s.doc.tasks(key).map(item)), columns };
         }
       };
     }
@@ -7302,6 +7328,14 @@ ${key.title}`.toLowerCase();
     setDescription(key, markdown) {
       return (doc) => setDescription(doc, this.entryOf(doc, key), markdown);
     }
+    /** A context line added at the end of an open task's description (`ops.addContext`); a closed task refuses it. */
+    addContext(key, text) {
+      return (doc) => {
+        const entry = this.entryOf(doc, key);
+        if (!isOpen(entry.task.status)) throw new Error("the task is closed");
+        return addContext(doc, entry, text);
+      };
+    }
     remove(key) {
       return (doc) => remove(doc, this.entryOf(doc, key));
     }
@@ -7800,6 +7834,9 @@ ${key.title}`.toLowerCase();
     }
     setDescription(key, markdown) {
       return nothing(this.rules.setDescription(key, markdown));
+    }
+    addContext(key, text) {
+      return nothing(this.rules.addContext(key, text));
     }
     remove(key) {
       return nothing(this.rules.remove(key));
@@ -8736,6 +8773,7 @@ ${key.title}`.toLowerCase();
     sameLabels,
     isPresetColor,
     usableColor,
+    usableLabelColor,
     acceptsDrop,
     placesInGap,
     noteTags,
@@ -8803,7 +8841,7 @@ ${key.title}`.toLowerCase();
     onTheDay,
     canPick
   };
-  var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+  var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, CLEAR_COLOR, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };

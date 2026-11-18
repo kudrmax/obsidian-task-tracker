@@ -1,4 +1,4 @@
-import { type LabelLevel, type LabelPaint, PRIORITY_COLORS, type PriorityColor, type PriorityLevel, shadesOf, usableColor } from "../../core/application/contracts";
+import { type LabelColor, type LabelLevel, type LabelPaint, PRIORITY_COLORS, type PriorityColor, type PriorityLevel, shadesOf, usableColor } from "../../core/application/contracts";
 import { onWindowDocument, windowDocuments } from "./windowDocuments";
 
 export { contrast, inkOf, type PriorityShades, shadesOf } from "../../core/application/contracts";
@@ -13,6 +13,11 @@ export const LABEL_SLOTS = [
 	{ attribute: "data-label2", fill: "--tc-label-fill-2" },
 	{ attribute: "data-label3", fill: "--tc-label-fill-3" },
 ] as const;
+
+/** The colour a level or a label paints: none for a label of no colour, or of one that can't be drawn (a code written by hand wrong). */
+export function tintOf(color: LabelColor | undefined): PriorityColor | undefined {
+	return color !== undefined && usableColor(color) ? color : undefined;
+}
 
 const themed = (marked: string, theme: "dark" | "light"): string => (theme === "light" ? marked.split(", ").map((s) => `body.theme-light ${s}`).join(", ") : marked);
 

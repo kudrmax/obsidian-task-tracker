@@ -68,7 +68,7 @@ struct TaskMenu {
             }
         case "labels":
             children = menu.labels.tiles.map { tile in
-                .action(title: model.labelTitle(tile.mark.title), symbol: "tag.fill", tint: tile.mark.color, checked: tile.on, keepsOpen: true, disabled: menu.labels.disabled) { Task { await model.toggleLabel(items, tile.mark.title) } }
+                .action(title: model.labelTitle(tile.mark.title), symbol: model.tagSymbol(tile.mark.color), tint: tile.mark.color, checked: tile.on, keepsOpen: true, disabled: menu.labels.disabled) { Task { await model.toggleLabel(items, tile.mark.title) } }
             }
         case "moves":
             children = menu.moves.map { move in

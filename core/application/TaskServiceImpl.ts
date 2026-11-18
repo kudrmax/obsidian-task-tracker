@@ -540,6 +540,11 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.setDescription(key, markdown));
 	}
 
+	/** A context line at the end of the task's description, one step to take back (`AssistantTasks`). */
+	addContext(key: TaskKey, text: string): Promise<void> {
+		return this.run(this.writes.addContext(key, text));
+	}
+
 	remove(key: TaskKey): Promise<void> {
 		return this.run(this.writes.remove(key));
 	}

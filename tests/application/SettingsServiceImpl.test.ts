@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PriorityLevel, SecretField } from "../../core/application/contracts";
 import { SettingsServiceImpl } from "../../core/application/SettingsServiceImpl";
+import { CLEAR_COLOR } from "../../core/domain/Label";
 import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 
@@ -31,6 +32,40 @@ describe("the form's answers", () => {
 		expect(svc.typedColour("level", 0, "nope", shades)).toBeNull();
 		expect(svc.typedColour("label", 0, "#123456", shades)).toBeNull();
 		expect(svc.typedColour("label", 0, "#654321", shades)).toBe("#654321");
+	});
+});
+
+describe("a label with no colour", () => {
+	const shades = { red: "#FF453A", orange: "#FF9F0A", yellow: "#FFD60A", green: "#30D158", teal: "#40C8E0", blue: "#0A84FF" } as const;
+
+	it("offers each colour group its swatches: labels the presets and clear, priorities the presets alone", () => {
+		const form = service().svc.form();
+		expect(form.levelSwatches).toEqual(["red", "orange", "yellow", "green", "teal", "blue"]);
+		expect(form.labelSwatches).toEqual(["red", "orange", "yellow", "green", "teal", "blue", CLEAR_COLOR]);
+	});
+
+	it("is set by recolourLabel and kept by the form", async () => {
+		const { svc, now } = service({ labels: [{ name: "Skip", color: "red" }] });
+		await svc.recolourLabel(0, CLEAR_COLOR);
+		expect(now().labels).toEqual([{ name: "Skip", color: "clear" }]);
+		expect(svc.form().labels).toEqual([{ name: "Skip", color: "clear" }]);
+	});
+
+	it("is never the colour Add label picks, even when every preset is taken", async () => {
+		const taken = ["red", "orange", "yellow", "green", "teal", "blue"].map((color, i) => ({ name: `L${i}`, color: color as PriorityLevel["color"] }));
+		const { svc, now } = service({ labels: [{ name: "Skip", color: CLEAR_COLOR }, ...taken] });
+		await svc.addLabel();
+		expect(now().labels[now().labels.length - 1].color).toBe("red");
+		const fresh = service({ labels: [{ name: "Skip", color: CLEAR_COLOR }] });
+		await fresh.svc.addLabel();
+		expect(fresh.now().labels[1].color).toBe("red");
+	});
+
+	it("an emptied code field writes nothing: the label keeps its colour, clear or not", () => {
+		const { svc } = service({ labels: [{ name: "Skip", color: CLEAR_COLOR }, { name: "Focus", color: "blue" }] });
+		expect(svc.typedColour("label", 0, "", shades)).toBeNull();
+		expect(svc.typedColour("label", 1, "  ", shades)).toBeNull();
+		expect(svc.typedColour("label", 0, "#123456", shades)).toBe("#123456");
 	});
 });
 

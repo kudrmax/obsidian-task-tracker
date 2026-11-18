@@ -12,11 +12,16 @@ final class PluginSettings {
     private(set) var presetInk: [String: Themed<String>] = [:]
     /// The six preset colours in the core's order (`PRIORITY_COLORS`).
     private(set) var presets: [String] = []
+    /// A clear label's colour (`CLEAR_COLOR`): its swatch is No Color.
+    private(set) var clear: String?
     private var shades: [String: Themed<Shades>] = [:]
+    /// Each colour's ink as the core gives it, asked once: `nil` for one that paints nothing.
+    @ObservationIgnored private var inks: [String: Themed<String>?] = [:]
 
     func load() async {
         let board = board
         form = try? await Task.detached { try board.read("settings.form", over: try board.files()) }.value
+        if clear == nil { clear = board.clearColor() }
         if presetInk.isEmpty, let constants: [String: JSONValue] = try? board.rule("rules.constants") {
             presets = constants["PRIORITY_COLORS"]?.array.compactMap(\.string) ?? []
             for preset in presets {
@@ -26,17 +31,24 @@ final class PluginSettings {
             }
         }
         for mark in (form?.priorities ?? []) + (form?.labels ?? []) where shades[mark.color] == nil {
-            if let dark: Shades = try? board.rule("rules.shadesOf", [.string(mark.color), "dark"]),
-               let light: Shades = try? board.rule("rules.shadesOf", [.string(mark.color), "light"]) {
-                shades[mark.color] = Themed(dark: dark, light: light)
-            }
+            if let found = board.markShades(mark.color) { shades[mark.color] = found }
         }
     }
 
-    /// A level's or a label's card ground, as the cards on the screen are painted.
+    /// A level's or a label's card ground, as the cards on the screen are painted: a clear label's is a plain card's.
     func fill(_ color: String, _ scheme: ColorScheme) -> Color {
-        guard let shades = shades[color] else { return Palette.card(scheme) }
+        guard let shades = shades[color] else { return Self.plainCard(scheme) }
         return Color(hex: scheme == .dark ? shades.dark.fill : shades.light.fill)
+    }
+
+    /// A plain card as the board draws it, on the screen's own level: the sheet's raised rows would lift the system's
+    /// card ground onto their own and hide it.
+    private static func plainCard(_ scheme: ColorScheme) -> Color {
+        let traits = UITraitCollection { traits in
+            traits.userInterfaceStyle = scheme == .dark ? .dark : .light
+            traits.userInterfaceLevel = .base
+        }
+        return Color(UIColor.secondarySystemBackground.resolvedColor(with: traits))
     }
 
     func write(_ method: String, _ arguments: [JSONValue] = []) async {
@@ -45,10 +57,20 @@ final class PluginSettings {
         await load()
     }
 
-    /// A colour as a level or a label is drawn in either theme: a preset's own shade, any other as it is.
-    func ink(_ color: String, _ scheme: ColorScheme) -> Color {
-        if let preset = presetInk[color] { return Color(hex: scheme == .dark ? preset.dark : preset.light) }
-        return Color(hex: color)
+    /// A colour as a level or a label is drawn in either theme: a preset's own shade, any other as it is; none for a
+    /// clear label.
+    func ink(_ color: String, _ scheme: ColorScheme) -> Color? {
+        let ink: Themed<String>?
+        if let known = inks[color] { ink = known } else {
+            ink = board.markInk(color)
+            inks[color] = .some(ink)
+        }
+        return ink.map { Color(hex: scheme == .dark ? $0.dark : $0.light) }
+    }
+
+    /// The colours a level's row (`of == "level"`) or a label's row offers, as the core's form gives them.
+    func swatches(_ of: String) -> [String] {
+        (of == "level" ? form?.levelSwatches : form?.labelSwatches) ?? presets
     }
 
     /// A colour picked for a level or a label: the core reads it as a preset when it is one, and writes it.

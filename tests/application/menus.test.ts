@@ -89,6 +89,11 @@ describe("the labels", () => {
 		expect(toggledLabels([item({ labels: [RED, BLUE] })], "Важное")).toEqual([["Срочное"]]);
 	});
 
+	it("carry a clear label's colour as it is, for the frontends to draw untinted", () => {
+		const skip = { name: "Skip", color: "clear" } as const;
+		expect(taskMenu([item({ labels: [skip] })], T, [], [skip, RED], null).labels.tiles).toEqual([{ label: skip, on: true }, { label: RED, on: false }]);
+	});
+
 	it("of several: on when every task without a priority has it; can't be pressed when every task has a priority", () => {
 		const tasks = [item({ labels: [RED] }), item({ priority: P1 })];
 		expect(taskMenu(tasks, T, [], LABELS, null).labels).toEqual({ tiles: [{ label: RED, on: true }, { label: BLUE, on: false }], disabled: false });

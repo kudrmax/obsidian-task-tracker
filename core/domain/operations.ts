@@ -1,4 +1,5 @@
 import { DayBoundary, MIN_SLOT_MINUTES } from "./DayBoundary";
+import { descriptionMarkdown, withContext } from "./description";
 import { localDateOf } from "./LocalDate";
 import { markChoices, type Marks, marksOf, typedMarks } from "./Marks";
 import type { GroupSettings } from "./Groups";
@@ -184,6 +185,12 @@ export function toggleDone(doc: TaskDocument, entry: TaskEntry): TaskDocument {
 /** The description from Markdown: see `TaskDocument.setDescription`. */
 export function setDescription(doc: TaskDocument, entry: TaskEntry, markdown: string): TaskDocument {
 	return doc.setDescription(entry, markdown);
+}
+
+/** The task's description with a context line about it added at the end: see `withContext`; a blank text writes nothing. */
+export function addContext(doc: TaskDocument, entry: TaskEntry, text: string): TaskDocument {
+	const markdown = withContext(descriptionMarkdown(entry), text);
+	return markdown === null ? doc : doc.setDescription(entry, markdown);
 }
 
 export function remove(doc: TaskDocument, entry: TaskEntry): TaskDocument {

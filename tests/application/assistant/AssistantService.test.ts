@@ -19,7 +19,7 @@ describe("pressing Best task", () => {
 		const { question, settings } = transport.asked[0];
 		expect(question.instructions).toMatch(/^You help me choose the one task that matters most\./);
 		expect(question.answerSchema).toEqual({ type: "object", properties: { taskRef: { type: "string" }, reason: { type: "string" } }, required: ["taskRef", "reason"], additionalProperties: false });
-		expect(JSON.parse(question.input).candidates.map((t: { title: string }) => t.title)).toEqual(["Find the template", "Pay rent", "Find the contract", "Read a book", "Dentist"]);
+		expect(JSON.parse(question.input).candidates.map((t: { title: string }) => t.title)).toEqual(["Pay rent", "Find the template", "Read a book"]);
 		expect(settings).toEqual({ model: "sonnet", path: "" });
 	});
 
@@ -37,9 +37,9 @@ describe("pressing Best task", () => {
 		const { assistant, transport } = rig();
 		const outcome = assistant.press(BEST);
 		await settle();
-		transport.answer({ taskRef: transport.refOf("Find the contract"), reason: "First step." });
+		transport.answer({ taskRef: transport.refOf("Find the template"), reason: "First step." });
 		const result = await outcome;
-		expect(result.kind === "task" && [result.task.title, result.card.over]).toEqual(["Find the contract", "Call the bank"]);
+		expect(result.kind === "task" && [result.task.title, result.card.over]).toEqual(["Find the template", "Write the offer"]);
 	});
 
 	it("a ref the question never sent is a bad answer", async () => {

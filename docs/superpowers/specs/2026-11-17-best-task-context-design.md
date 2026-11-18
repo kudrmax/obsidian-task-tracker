@@ -1,0 +1,89 @@
+# Best task: context Max adds after a wrong pick
+
+Status: lead's spec, 2026-11-17. Obsidian on the Mac only (the assistant lives only there; the iPhone app has none).
+
+## Why
+
+Best task sometimes picks a task for a reason Max knows is wrong: the title reads as something big and new, but Max
+knows it is small («I'm already signed up to five events, this is the sixth»). Claude can't know that; the prompt is not
+at fault. Max wants to tell it right in the answer's popup, keep that note in the task for good, and ask again.
+
+The note is not «for Best task»: it is extra context about the task, for any agent that reads the file.
+
+## What Max sees
+
+1. The answer's popup (title «Best task», the card, Claude's reason) gets a text field under the reason, above the
+   buttons: placeholder **What did Claude miss?**. Multi-line field that grows with its text, panel look, same width as
+   the card.
+2. Field empty: the foot is as today, one **Close**.
+   Field with text: the foot holds two pills side by side: **Save** (plain) and **Save and ask again** (strong, the
+   main one). Close is gone then; Esc and the backdrop still close the popup without writing anything.
+3. **Save**: the text goes into the chosen task's description as its last line, `- Контекст: <text>`, and the popup
+   closes. **Save and ask again**: the same, then Best task runs again at once (the ring in «⋯» spins as after a tap on
+   the row), and the new answer comes in a new popup. ⌘Enter in the field is Save and ask again.
+4. Which task gets the line: the one Claude chose — the step itself when it chose a folded task's next step (the card
+   shows the folded task, but the step is what Claude judged), the subtask when it chose a subtask.
+5. The line is a plain description line: it shows wherever the description shows, can be edited or deleted like any.
+   Several saves add several lines, each at the end.
+6. Undo takes the write back, one step.
+7. The write fails (the task was closed or removed meanwhile, the file couldn't be written): the popup stays open with
+   the text kept, and a line under the field says **Couldn't save to this task.**; details go to the console.
+8. Only a `task` answer has the field; a failure's popup has none.
+
+## What Claude is told
+
+- The default Best task prompt gets one sentence: a description line that starts with «Контекст:» is context Max added
+  himself, often after an assistant misjudged that task; take it as true and weigh the task with it; it doesn't rule the
+  task out.
+- The briefing sends descriptions as now: the line reaches Claude as part of the description (of the candidate, of a
+  goal, of a step after).
+- `docs/plugin/agents.md` tells any agent the same: such a line is Max's own context about the task, to be trusted over a
+  guess from the title.
+
+## The core
+
+- `core/domain/description.ts`: the prefix `Контекст: ` as one constant, and the description with a context line added:
+  the text trimmed, its line breaks and runs of whitespace joined into single spaces; a blank text adds nothing.
+  The line is a top-level point `- Контекст: <text>` after the description's last line (the task's first description
+  when it has none).
+- `AssistantAction` gets an optional `context` (Best task has it): the field's words — placeholder, Save, Save and ask
+  again, the failure line. The `task` outcome carries `context: AssistantContext | null` with these words and the id of
+  the task the line goes to (the chosen one, not the drawn card's).
+- `AssistantService.addContext(taskId, text): Promise<AssistantContextResult>`: writes through the task service's
+  description write (one undo step); result `{ ok: true }` or `{ ok: false, words, detail }`. Blank text writes nothing
+  and is ok. Nothing the UI computes: prefix, joining, which task, all in the core.
+- Contract changes are additions only.
+
+## Not now
+
+- A field on failure popups; editing the line from the popup; a note on tasks Claude didn't choose.
+
+## Decisions
+
+(Filled by the agents as they build; each entry carried to the other side by the lead.)
+
+- backend: the field's words are one core constant (`CONTEXT_WORDS` in `core/application/assistant/outcomes.ts`), Best
+  task's `context`. `addContext(taskId, text)` takes no action id; its failure line is that constant's `failed`.
+- backend: the line is written by a task-service write of its own, `addContext(key, text)` (`TaskRules.addContext` →
+  `ops.addContext` → the description write `TaskDocument.setDescription`), which reads the description inside the write:
+  an edit made while the popup was open is kept, never overwritten. One write, one step to take back.
+- backend: a closed task is refused twice: before the write (the task as listed) and inside it (the rule throws), so a
+  task closed in between gets nothing either. Gone: not in the file by that id.
+- backend: the description write gathers a description that stands among the subtasks into one block right under the task
+  (as the description editor's save already does); the context line ends that block, before the subtasks.
+- backend: nothing for `obsidian/compose.ts` to wire: `composeCore` passes the task service as the assistant's
+  `AssistantTasks`, and the service has `addContext`. The door is unchanged (`AssistantService` stays the host's).
+- backend: the default prompt's sentence is also in the assistant spec's quoted default prompt
+  (`2026-11-16-assistant-design.md`), which a test compares word for word.
+- frontend-obsidian: the field is a plain multi-line field in the panel's tile look (the plain pill's ground and radius,
+  the body type, a card's side padding, one row tall when empty, the selected ring while focused); it grows with its
+  lines and the popup scrolls when it outgrows the window. It doesn't take the focus on open: Max reads the answer first.
+- frontend-obsidian: the two pills share the foot in equal halves, Save left, Save and ask again right; «has text» is the
+  field not being empty as typed (spaces alone show the pills; Save then writes nothing, as the core's blank rule says,
+  and closes).
+- frontend-obsidian: the failure line takes the notice's look (caption, muted, the notice's gap under the field); typing
+  hides it until the next try. One write at a time: a second press while a write is under way does nothing.
+- frontend-obsidian: Save and ask again presses the same action whose run gave the answer (the frontend keeps the id the
+  run was pressed with), so it goes through the row's own press: the ring in «⋯», the new popup.
+- frontend-obsidian: ⌘Enter is held by an Obsidian key scope of the field's own while it has the focus: Obsidian's hotkeys
+  hear keys before the page, and ⌘Enter is one of theirs (open a link in a new tab). Other keys (⌘Z, Escape) go on as before.

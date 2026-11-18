@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from "vitest";
 import type { App, Plugin } from "obsidian";
-import type { CalendarService, GoogleAccount, ShownCalendar, WorkCalendarSetup } from "../../core/application/contracts";
+import { type CalendarService, type GoogleAccount, PRIORITY_COLORS, type ShownCalendar, type WorkCalendarSetup } from "../../core/application/contracts";
 import { SettingsServiceImpl } from "../../core/application/SettingsServiceImpl";
 import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../../obsidian/infrastructure/PluginSettings";
 import { DEFAULT_SETTINGS } from "../../core/settings";
@@ -82,6 +82,26 @@ let calendars: KnownCalendars;
 let disk: Disk;
 let settings: PluginSettings<StoredSettings>;
 let tab: TaskCalendarSettingsTab;
+let workspace: FakeWorkspace;
+
+/** The workspace's events the tab listens to: `css-change` fired when Obsidian's theme changes. */
+class FakeWorkspace {
+	private readonly handlers = new Map<object, { name: string; callback: () => void }>();
+	on(name: string, callback: () => void): object {
+		const ref = {};
+		this.handlers.set(ref, { name, callback });
+		return ref;
+	}
+	offref(ref: object): void {
+		this.handlers.delete(ref);
+	}
+	trigger(name: string): void {
+		for (const handler of [...this.handlers.values()]) if (handler.name === name) handler.callback();
+	}
+	get listening(): number {
+		return this.handlers.size;
+	}
+}
 
 async function settled(): Promise<void> {
 	for (let i = 0; i < 10; i++) await new Promise((resolve) => setTimeout(resolve, 0));
@@ -92,7 +112,8 @@ async function open(file: unknown = START, google: GoogleAccount = loggedOut): P
 	disk = new Disk(file);
 	settings = new PluginSettings(disk, FILE, SETTINGS_FILE);
 	await settings.load();
-	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work, calendars, assistant: rig().assistant });
+	workspace = new FakeWorkspace();
+	tab = new TaskCalendarSettingsTab({ workspace } as unknown as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work, calendars, assistant: rig().assistant });
 	tab.display();
 }
 
@@ -247,6 +268,27 @@ describe("the settings tab: the priority levels", () => {
 		await writes(() => code.dispatchEvent(new Event("blur")), { priorities: [{ prefix: "p1", color: "blue" }, START.priorities[1]] });
 	});
 
+	it("draws the codes again in the new theme's shades when the theme changes while the tab is open", async () => {
+		document.body.className = "theme-light";
+		await open();
+		const code = () => levelRows()[0].querySelector<HTMLInputElement>(".tc-level-hex-input")!;
+		expect(code().value).toBe("FF3B30");
+		document.body.className = "theme-dark";
+		workspace.trigger("css-change");
+		expect(code().value).toBe("FF453A");
+		document.body.className = "theme-light";
+		workspace.trigger("css-change");
+		expect(code().value).toBe("FF3B30");
+	});
+
+	it("keeps a field being typed in when Obsidian's css changes without a new theme, and stops listening once hidden", async () => {
+		const field = levelRows()[0].querySelector<HTMLInputElement>(".tc-level-hex-input")!;
+		workspace.trigger("css-change");
+		expect(levelRows()[0].querySelector(".tc-level-hex-input")).toBe(field);
+		tab.hide();
+		expect(workspace.listening).toBe(0);
+	});
+
 	it("writes nothing for a wrong code or the same colour, and puts the code back", async () => {
 		const code = levelRows()[0].querySelector<HTMLInputElement>(".tc-level-hex-input")!;
 		await rejects(() => {
@@ -267,6 +309,66 @@ describe("the settings tab: the priority levels", () => {
 		await settled();
 		expect(disk.saves).toBe(0);
 		await writes(() => picker.dispatchEvent(new Event("change")), { priorities: [{ prefix: "p1", color: "#123456" }, START.priorities[1]] });
+	});
+});
+
+describe("the settings tab: the labels", () => {
+	const LABELED: FileSettings = { ...START, labels: [{ name: "focus", color: "red" }, { name: "skip", color: "clear" }] };
+	const withLabels = (labels: FileSettings["labels"]) => JSON.stringify({ ...LABELED, labels }, null, 2);
+	const labelRows = () => levelRows().filter((row) => row.querySelector(".tc-label-name"));
+	const circles = (row: HTMLElement) => [...row.querySelectorAll<HTMLElement>(".tc-swatches > button")].map((b) => b.dataset.priority ?? b.getAttribute("aria-label"));
+
+	beforeEach(async () => {
+		await open(LABELED);
+	});
+
+	it("offers a label the six colours and No colour after them, and a level the six alone", () => {
+		expect(circles(labelRows()[0])).toEqual([...PRIORITY_COLORS, "No colour"]);
+		const level = levelRows().find((row) => row.querySelector(".tc-level-prefix"))!;
+		expect(circles(level)).toEqual([...PRIORITY_COLORS]);
+	});
+
+	it("draws No colour as a circle of its own, untinted, ringed when the label has it", () => {
+		const [focus, skip] = labelRows();
+		const clear = (row: HTMLElement) => row.querySelector<HTMLElement>("button[aria-label='No colour']")!;
+		expect(clear(focus).className).toContain("tc-swatch-clear");
+		expect(clear(focus).dataset.priority).toBeUndefined();
+		expect(clear(focus).className).not.toContain("is-on");
+		expect(clear(skip).className).toContain("is-on");
+		expect(skip.querySelectorAll(".tc-swatches .is-on")).toHaveLength(1);
+	});
+
+	it("shows a label of no colour as a plain card with no code", () => {
+		const skip = labelRows()[1];
+		expect(skip.querySelector<HTMLElement>(".tc-level-preview")!.dataset.priority).toBeUndefined();
+		expect(skip.querySelector<HTMLInputElement>(".tc-level-hex-input")!.value).toBe("");
+		expect(skip.querySelector(".tc-swatch-well")!.className).not.toContain("is-on");
+		expect(labelRows()[0].querySelector<HTMLElement>(".tc-level-preview")!.dataset.priority).toBe("red");
+	});
+
+	it("takes the colour off by No colour, and gives it back by a circle", async () => {
+		labelRows()[0].querySelector<HTMLElement>("button[aria-label='No colour']")!.click();
+		await settled();
+		expect(disk.text).toBe(withLabels([{ name: "focus", color: "clear" }, LABELED.labels[1]]));
+		expect(labelRows()[0].querySelector<HTMLElement>(".tc-level-preview")!.dataset.priority).toBeUndefined();
+		labelRows()[1].querySelector<HTMLElement>("button[data-priority='blue']")!.click();
+		await settled();
+		expect(disk.text).toBe(withLabels([{ name: "focus", color: "clear" }, { name: "skip", color: "blue" }]));
+		expect(labelRows()[1].querySelector<HTMLElement>(".tc-level-preview")!.dataset.priority).toBe("blue");
+	});
+
+	it("previews a code typed for a label of no colour, and puts the plain card back when it does not read", async () => {
+		const skip = labelRows()[1];
+		const code = skip.querySelector<HTMLInputElement>(".tc-level-hex-input")!;
+		const preview = skip.querySelector<HTMLElement>(".tc-level-preview")!;
+		type(code, "0a84ff");
+		expect(preview.dataset.priority).toBe("blue");
+		type(code, "xyz");
+		code.dispatchEvent(new Event("blur"));
+		await settled();
+		expect(disk.saves).toBe(0);
+		expect(preview.dataset.priority).toBeUndefined();
+		expect(code.value).toBe("");
 	});
 });
 

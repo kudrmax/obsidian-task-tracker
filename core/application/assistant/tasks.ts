@@ -2,21 +2,29 @@ import type { LocalDate, SectionKey } from "../../domain/Task";
 import type { MenuFrom, MenuScreen, TaskCard, TaskItem, TaskKey, TaskMenuModel } from "../contracts";
 import type { SectionOffer } from "../sections";
 
-/** Every task of each list as the screen draws it, each with its subtasks, and today: what the assistant reads. */
+/** The funnel's columns the assistant can read: Today and Soon, as the screen draws them on today. */
+export type ListedColumn = "today" | "soon";
+
+/** Every task of each list, each with its subtasks, the columns as the screen draws them, and today: what the assistant reads. */
 export interface ListedTasks {
 	readonly today: LocalDate;
 	readonly lists: Readonly<Record<SectionKey, readonly TaskItem[]>>;
+	/** Today: the day's list, then its timeline; Soon: the Soon column, its dated and timed tasks left on their days. */
+	readonly columns: Readonly<Record<ListedColumn, readonly TaskItem[]>>;
 }
 
 /**
  * Where the assistant reads the tasks from, and how it touches them: the task service, over the file it keeps. It writes only
- * through the calls a tap in a task's menu makes (`menu` to see the tile, `toggleLabel` to press it), never its own write.
+ * through the calls a tap in a task's menu makes (`menu` to see the tile, `toggleLabel` to press it), and the description
+ * write of the answer's field (`addContext`), never its own write.
  */
 export interface AssistantTasks {
 	listed(): Promise<ListedTasks>;
 	sectionOffer(date: LocalDate): Promise<SectionOffer>;
 	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel;
 	toggleLabel(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]>;
+	/** What Max says Claude missed, as a context line at the end of the task's description: the task service's description write, one step to take back; rejects for a task closed or gone. */
+	addContext(key: TaskKey, text: string): Promise<void>;
 }
 
 /** How several writes of one action become one step to take back (the undo history); left out, each is its own. */

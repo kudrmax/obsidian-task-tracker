@@ -1,8 +1,9 @@
-import type { PriorityColor, Weekday } from "../../../core/application/contracts";
+import type { LabelColor, PriorityColor, Weekday } from "../../../core/application/contracts";
 import { PROPERTY, tokenPx } from "../design";
 import { el, px } from "../dom";
 import { Button } from "../kit/Button";
 import { icon, type IconName } from "../kit/icons";
+import { tintOf } from "../priorityColors";
 
 /** The wheel's places, which the quick bar's place tiles wear. */
 export type PlaceIconName = "inbox" | "backlog" | "soon" | "now" | "calendar";
@@ -94,8 +95,8 @@ export function priorityDot(parent: HTMLElement, color: PriorityColor, cls: stri
 export interface MenuTileSpec {
 	readonly label: string;
 	readonly icon: IconName;
-	/** A priority level's tile: its flag takes the level's colour, and the task's own level is `on`. */
-	readonly color?: PriorityColor;
+	/** A level's or a label's tile: its icon takes the colour, none for a label of no colour, and the task's own mark is `on`. */
+	readonly color?: LabelColor;
 	/** The tile that stands for what is set now; a level's tile also carries the cross that takes it off. */
 	readonly on?: boolean;
 	/** Shown but not pressed: a label's tile while the task has a priority, a level's while it has labels. */
@@ -103,10 +104,15 @@ export interface MenuTileSpec {
 	readonly onPick: () => void;
 }
 
-/** A tile: the icon over the label; the level a task has carries a badge with a cross, since a tap on it takes the level off. */
+/**
+ * A tile: the icon over the label; the level or label a task has carries a badge with a cross, since a tap on it takes it
+ * off. A label of no colour is drawn untinted, as the menu's other tiles.
+ */
 function menuTile(parent: HTMLElement, spec: MenuTileSpec): HTMLButtonElement {
 	const tile = el(parent, "button", "tc-btn tc-menu-tile");
-	if (spec.color) tile.dataset.priority = spec.color;
+	const tint = tintOf(spec.color);
+	if (tint) tile.dataset.priority = tint;
+	tile.classList.toggle("is-clear", spec.color !== undefined && tint === undefined);
 	tile.classList.toggle("is-on", spec.on === true);
 	tile.disabled = spec.disabled === true;
 	tile.appendChild(icon(spec.icon));
@@ -265,7 +271,9 @@ export function menuRoom(): MenuRoom {
  * How many of a panel's groups stand over the anchor: none (the panel under it), all (over it), or the first few, the
  * rest under it, when the whole fits on neither side. `cuts` are the heights of the panel down to each inner border
  * between groups, `total` its whole height. The first way that fits wins, in that order and with the fewest groups over
- * the anchor; when none fits, the one that leaves the least to scroll. A panel that can't split goes whole to one side.
+ * the anchor. When none fits, a panel that splits keeps over the anchor only the groups that fit there whole, as many as
+ * fit, and the rest scrolls under it: one part scrolls, never the one over the card, whose cut would halve its tiles. A
+ * panel that can't split goes whole to the side that leaves the least to scroll.
  */
 export function groupsAbove(cuts: readonly number[], total: number, above: number, below: number, canSplit: boolean): number {
 	const groups = cuts.length + 1;
@@ -275,7 +283,10 @@ export function groupsAbove(cuts: readonly number[], total: number, above: numbe
 		{ count: groups, overflow: over(total, above) },
 		...(canSplit ? cuts.map((cut, i) => ({ count: i + 1, overflow: over(cut, above) + over(total - cut, below) })) : []),
 	];
-	return (ways.find((way) => way.overflow === 0) ?? ways.reduce((best, way) => (way.overflow < best.overflow ? way : best))).count;
+	const fits = ways.find((way) => way.overflow === 0);
+	if (fits) return fits.count;
+	if (canSplit) return cuts.filter((cut) => cut <= above).length;
+	return ways.reduce((best, way) => (way.overflow < best.overflow ? way : best)).count;
 }
 
 /** A part of a panel taller than its space keeps to it and scrolls. */

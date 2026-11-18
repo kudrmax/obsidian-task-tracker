@@ -315,16 +315,18 @@ export class TaskReads {
 		return this.screen(s, date, filter).day;
 	}
 
-	/** Every task of each list, each with its subtasks, and today, the file tidied first: what the assistant reads. No file: every list empty. */
+	/** Every task of each list, each with its subtasks, Today's and Soon's columns as `screen` draws them on today, and today, the file tidied first: what the assistant reads. No file: everything empty. */
 	listedRead(): Read<ListedTasks> {
 		const lists = (of: (key: SectionKey) => readonly TaskItem[]) => Object.fromEntries(SEARCH_ORDER.map((key) => [key, of(key)])) as Record<SectionKey, readonly TaskItem[]>;
 		return {
 			reads: true,
 			tidies: true,
-			missing: () => ({ today: this.today(), lists: lists(() => []) }),
+			missing: () => ({ today: this.today(), lists: lists(() => []), columns: { today: [], soon: [] } }),
 			answer: (s) => {
 				const item = this.itemOf(s!.today, s!.doc);
-				return { today: s!.today, lists: lists((key) => s!.doc.tasks(key).map(item)) };
+				const screen = this.screen(s!, s!.today);
+				const columns = { today: [...screen.day.list, ...screen.day.slotted], soon: screen.soon };
+				return { today: s!.today, lists: lists((key) => s!.doc.tasks(key).map(item)), columns };
 			},
 		};
 	}
