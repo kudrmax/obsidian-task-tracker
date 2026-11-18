@@ -13,7 +13,7 @@ import type { ListView } from "./sections";
 import type { ZoomLevel } from "./timelineZoom";
 import type { TreePlace } from "../domain/ProjectTree";
 
-export type { GroupName, ReminderKind, SectionKey };
+export type { GroupName, LocalDate, ReminderKind, SectionKey, TaskStatus };
 /** Where a project goes in the tree: among `parent`'s subprojects (null: the top level), right before `before` or last. */
 export type { TreePlace };
 /** What In progress or Stop progress sets on tasks of these statuses. */
@@ -2168,6 +2168,10 @@ export interface SettingsService {
 	bindClientSecret(field: SecretField): void;
 	setWorkCalendarFile(path: string): Promise<void>;
 }
+
+/** The agents' program's answers (`Core.agent`), one method per command, in the program's words (agent CLI spec). */
+export type { AgentFilter, AgentReads, AgentServices, WeekAsk } from "./agent/AgentReads";
+export type { AgentErrorCode, WireAll, WireDay, WireError, WireHelp, WireList, WirePart, WirePlace, WireProject, WireProjectAnswer, WireProjects, WireSearch, WireSection, WireStatus, WireStep, WireTask, WireTaskAnswer, WireTime, WireWeek } from "./agent/agentWire";
 
 import type { ModelQuestion, ModelReply } from "./assistant/model";
 import type { AssistantPlace, AssistantTarget } from "./assistant/scope";

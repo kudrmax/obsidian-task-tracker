@@ -70,8 +70,16 @@ function hitsIn(text: string): string[] {
 		.flatMap((line, i) => DECISIONS.flatMap((d) => [...line.matchAll(d.pattern)].map(() => `${i + 1}: ${d.name}`)));
 }
 
+/**
+ * The frontends the tripwire watches: the Obsidian view, and the agents' program with its answers in the core
+ * (`core/application/agent/`), which only map the screens' reads into words (agent CLI spec, «The one rule»).
+ */
+const WATCHED = ["obsidian/ui", "agent", "core/application/agent"];
+const BUILT = ["agent/build.mjs", "agent/obsidian-task-calendar.mjs"];
+
 const HITS: Readonly<Record<string, string[]>> = Object.fromEntries(
-	files("obsidian/ui")
+	WATCHED.flatMap(files)
+		.filter((file) => !BUILT.includes(file))
 		.map((file) => [file, hitsIn(readFileSync(join(ROOT, file), "utf8"))] as const)
 		.filter(([, hits]) => hits.length > 0),
 );
@@ -91,6 +99,11 @@ describe("the UI decides nothing", () => {
 			.filter(([file, b]) => (HITS[file]?.length ?? 0) < b.count)
 			.map(([file, b]) => `${file}: baseline ${b.count}, now ${HITS[file]?.length ?? 0}`);
 		expect(stale, "Lower these counts in BASELINE (delete a line at zero).").toEqual([]);
+	});
+
+	it("watches the program and its answers", () => {
+		const watched = WATCHED.flatMap(files);
+		expect(watched).toEqual(expect.arrayContaining(["agent/main.ts", "agent/compose.ts", "agent/nodePorts.ts", "core/application/agent/AgentReads.ts", "core/application/agent/agentWire.ts"]));
 	});
 
 	it("trips on the forms it watches and not on drawing", () => {
