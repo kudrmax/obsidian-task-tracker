@@ -36,7 +36,10 @@ export interface ScreenState {
 	/** The present minute from today's start, ticking each minute (spec, «Time»). */
 	readonly now: Now;
 	readonly layer: Layer | null;
-	readonly adding: boolean;
+	/** The new task's field: where it stands (the slot a typed task is written to), open while not null. */
+	readonly entry: Destination | null;
+	/** Counts the fields opened: each new one (after Enter) is a fresh, empty field. */
+	readonly entrySeq: number;
 	/** Tasks new in the last read: their rows come in; a row merely scrolled into sight does not. */
 	readonly fresh: ReadonlySet<string>;
 	/** A task to bring into sight in its list, once per `seq`. */
@@ -60,8 +63,15 @@ export interface ScreenActions {
 	openMenu(id: string): void;
 	closeLayer(): void;
 	act(id: string, item: string): void;
-	setAdding(adding: boolean): void;
-	add(text: string): Promise<void>;
+	/** Opens the new task's field at `at`, or at the port's place for new tasks; null closes it. */
+	openEntry(at?: Destination | null): void;
+	/** The field one level deeper (1) or shallower (-1), as Tab and Shift+Tab do. */
+	indentEntry(by: -1 | 1): void;
+	/**
+	 * The typed text written as a task where the field stands. With `next`, a new empty field opens right under it (batch
+	 * typing); empty text ends typing instead (a subtask's field steps one level out first).
+	 */
+	commitEntry(text: string, next: boolean): Promise<void>;
 	/** Starts following the port and the clock; returns the stop. Called by the screen as it mounts. */
 	start(): () => void;
 }
@@ -121,7 +131,8 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 			pending: false,
 			now: port.now(),
 			layer: null,
-			adding: false,
+			entry: null,
+			entrySeq: 0,
 			fresh: new Set(),
 			reveal: null,
 
@@ -172,14 +183,25 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 				set({ layer: null });
 				write(port.act(id, item));
 			},
-			setAdding(adding) {
-				set({ adding, layer: null });
+			openEntry(at) {
+				set({ entry: at === null ? null : (at ?? port.newTaskPlace(get().dayOffset)), entrySeq: get().entrySeq + 1, layer: null });
 			},
-			async add(text) {
-				const added = port.add(text, "inbox", get().dayOffset);
+			indentEntry(by) {
+				const entry = get().entry;
+				if (entry) set({ entry: { ...entry, depth: Math.max(0, (entry.depth ?? 0) + by) } });
+			},
+			async commitEntry(text, next) {
+				const entry = get().entry;
+				if (!entry) return;
+				if (text.trim() === "") {
+					const depth = entry.depth ?? 0;
+					set({ entry: next && depth > 0 ? { ...entry, depth: depth - 1 } : null });
+					return;
+				}
+				set({ entry: next ? entry : null, entrySeq: get().entrySeq + 1 });
+				const added = port.add(text, entry);
 				write(added);
-				const id = await added;
-				set({ adding: false, reveal: { id, seq: (get().reveal?.seq ?? 0) + 1 } });
+				await added;
 			},
 			start() {
 				const off = port.subscribe(refresh);

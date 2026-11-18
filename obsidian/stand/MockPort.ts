@@ -94,9 +94,17 @@ export class MockPort implements ScreenPort {
 		await this.write(() => this.apply(this.file, id, to));
 	}
 
-	async add(text: string, list: ListId, dayOffset: number): Promise<string> {
-		const task = this.newTask(text.trim(), list === "day" ? dateOf(addDays(this.day(), dayOffset)) : null);
-		await this.write(() => this.listOf(this.file, list, dayOffset)[0].tasks.unshift(task));
+	/** The plus's place, the simplest: the end of Inbox's tasks outside any section. */
+	newTaskPlace(dayOffset: number): Destination {
+		return { list: "inbox", section: null, before: null, dayOffset, depth: 0 };
+	}
+
+	async add(text: string, at: Destination): Promise<string> {
+		const task = this.newTask(text.trim(), null);
+		await this.write(() => {
+			this.nest(this.file, task, { ...at, depth: at.depth ?? 0 }, at.section === undefined ? null : this.sectionFor(this.file, at));
+			task.due = at.list === "day" ? dateOf(addDays(this.day(), at.dayOffset)) : null;
+		});
 		return task.id;
 	}
 

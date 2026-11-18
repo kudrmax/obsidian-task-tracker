@@ -1,29 +1,42 @@
-import { memo } from "react";
+import { memo, type FocusEvent, type CSSProperties } from "react";
+import { PROPERTY } from "../../design";
 import { useScreen, useScreenApi } from "../store";
 import { Icon } from "./Icon";
 import { ObsidianEditor } from "./ObsidianEditor";
 
-/** The plus, and the field it opens: Enter adds the typed task where the port puts new tasks, Escape closes it. */
-export const QuickAdd = memo(function QuickAdd() {
+/** The plus: a tap opens the new task's field at the port's place for new tasks; while the field is open, a tap closes it. */
+export const PlusButton = memo(function PlusButton() {
 	const api = useScreenApi();
-	const adding = useScreen((s) => s.adding);
+	const open = useScreen((s) => s.entry !== null);
 	return (
-		<>
-			{adding ? (
-				<div className="tc-quick-bar tc-quick-add">
-					<ObsidianEditor
-						text=""
-						className="tc-quick-field"
-						onEnter={(text) => {
-							if (text.trim() !== "") void api.getState().add(text);
-						}}
-						onEscape={() => api.getState().setAdding(false)}
-					/>
-				</div>
-			) : null}
-			<button type="button" className="tc-btn is-round is-accent tc-plus" aria-label="New task" onClick={() => api.getState().setAdding(!adding)}>
-				<Icon name={adding ? "cross" : "plus"} />
-			</button>
-		</>
+		<button type="button" className="tc-btn is-round is-accent tc-plus" aria-label={open ? "Close" : "New task"} onClick={() => api.getState().openEntry(open ? null : undefined)}>
+			<Icon name={open ? "cross" : "plus"} />
+		</button>
+	);
+});
+
+/**
+ * The new task's field, standing in its list where the task will be written, at its level (spec, «Text fields»: Obsidian's
+ * own editor). Enter writes the task and opens an empty field under it; Enter on an empty field ends typing; Tab and
+ * Shift+Tab make it a subtask of the task above or take it back out; Escape closes it unwritten; a tap elsewhere writes
+ * what was typed and closes it.
+ */
+export const EntryField = memo(function EntryField({ depth }: { readonly depth: number }) {
+	const api = useScreenApi();
+	const commitOnLeave = (event: FocusEvent<HTMLDivElement>, text: () => string) => {
+		if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+		void api.getState().commitEntry(text(), false);
+	};
+	return (
+		<div className="tc-quick-row tc-entry" style={{ [PROPERTY.level]: String(depth) } as CSSProperties}>
+			<ObsidianEditor
+				text=""
+				className="tc-quick-field"
+				onEnter={(text) => void api.getState().commitEntry(text, true)}
+				onEscape={() => api.getState().openEntry(null)}
+				onTab={(shift) => api.getState().indentEntry(shift ? -1 : 1)}
+				onLeave={commitOnLeave}
+			/>
+		</div>
 	);
 });

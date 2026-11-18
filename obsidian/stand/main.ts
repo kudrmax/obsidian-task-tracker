@@ -140,8 +140,8 @@ export default class TaskCalendarStand extends Plugin {
 			moveFromOutside: (title, list, before) => port.moveFromOutside(title, list, before),
 			setStop: (stop) => this.screens.forEach((screen) => screen.store.getState().setStop(stop)),
 			debug: () => [...this.screens].map((screen) => {
-				const { stop, gesture, lifted, layer, adding, pending, dayOffset } = screen.store.getState();
-				return { stop, gesture, lifted, layer: layer?.kind ?? null, adding, pending, dayOffset };
+				const { stop, gesture, lifted, layer, entry, pending, dayOffset } = screen.store.getState();
+				return { stop, gesture, lifted, layer: layer?.kind ?? null, entry, pending, dayOffset };
 			}),
 		};
 		(window as unknown as { __tcStand?: StandApi }).__tcStand = api;

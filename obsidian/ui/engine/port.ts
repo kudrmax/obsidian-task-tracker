@@ -97,8 +97,10 @@ export interface ScreenPort {
 	preview(id: string, to: Destination): ScreenData;
 	/** Writes a task to `to`; resolves once written and read back. */
 	move(id: string, to: Destination): Promise<void>;
-	/** A new task from its typed text into `list`'s place for new tasks; resolves with its id once read back. */
-	add(text: string, list: ListId, dayOffset: number): Promise<string>;
+	/** Where the plus puts a new task's field on the screen showing the day `dayOffset` days from today. */
+	newTaskPlace(dayOffset: number): Destination;
+	/** A new task from its typed text at `at`; resolves with its id once read back. */
+	add(text: string, at: Destination): Promise<string>;
 	/** What the task's menu offers. */
 	menu(id: string): readonly MenuItem[];
 	/** Runs a menu's item on the task. */

@@ -3,10 +3,11 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { SortableList, SortableRow } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
-import type { ListId, Row } from "../port";
+import type { Destination, ListId, Row } from "../port";
 import { useData, useScreen, useScreenApi } from "../store";
 import { Card } from "./Card";
 import { MovingRow, MovingRows } from "./MovingRow";
+import { EntryField } from "./QuickAdd";
 
 /** A row counts as this tall until it is drawn and measured (a card and its gap at the default size). */
 const ESTIMATE_PX = 37;
@@ -30,6 +31,10 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 		const under = descendantsOf(allRows, lifted);
 		return under.size === 0 ? allRows : allRows.filter((row) => !under.has(row.id));
 	}, [allRows, lifted]);
+	const entry = useScreen((s) => s.entry);
+	const entrySeq = useScreen((s) => s.entrySeq);
+	/** The rows drawn: the list's, with the new task's field standing in its slot when it is in this list. */
+	const drawn = useMemo(() => withEntry(rows, list, entry), [rows, list, entry]);
 	const fresh = useScreen((s) => s.fresh);
 	const reveal = useScreen((s) => s.reveal);
 	const order = useMemo(() => readRows.map((row) => row.id).join(" "), [readRows]);
@@ -41,7 +46,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	 * `rangeExtractor`): dnd-kit carries it by that row. The rows from it to those in sight are mounted with it, so the rows
 	 * still stand in one flow.
 	 */
-	const liftedAt = useMemo(() => (lifted === null ? -1 : rows.findIndex((row) => row.id === lifted)), [rows, lifted]);
+	const liftedAt = useMemo(() => (lifted === null ? -1 : drawn.findIndex((row) => row.id === lifted)), [drawn, lifted]);
 	const rangeExtractor = useCallback(
 		(range: Range) => {
 			const inSight = defaultRangeExtractor(range);
@@ -54,12 +59,20 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	);
 	const virtualizer = useVirtualizer({
 		rangeExtractor,
-		count: rows.length,
+		count: drawn.length,
 		getScrollElement: () => scroller,
 		estimateSize: useCallback(() => ESTIMATE_PX, []),
-		getItemKey: useCallback((i: number) => rows[i]?.id ?? i, [rows]),
+		getItemKey: useCallback((i: number) => drawn[i]?.id ?? i, [drawn]),
 		overscan: OVERSCAN,
 	});
+
+	/** A field just opened (or the next one after Enter) is brought into sight. */
+	useEffect(() => {
+		const at = drawn.findIndex((row) => row.kind === "entry");
+		if (at >= 0) virtualizer.scrollToIndex(at, { align: "auto" });
+		// Once per field opened: the rows it looks in are those drawn then.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [entrySeq]);
 
 	useEffect(() => {
 		if (!reveal) return;
@@ -77,7 +90,13 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 					<SortableList list={list} ids={ids}>
 						<MovingRows>
 							{items.map((item) => {
-								const row = rows[item.index];
+								const row = drawn[item.index];
+								if (row.kind === "entry")
+									return (
+										<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried={false} fresh={false} className="tc-list-item">
+											<EntryField key={entrySeq} depth={row.depth} />
+										</MovingRow>
+									);
 								return (
 									<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
 										<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
@@ -122,3 +141,30 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 		</SortableRow>
 	);
 });
+
+/** A row of the list as drawn: the list's own, or the new task's field. */
+type Drawn = Row | { readonly kind: "entry"; readonly id: string; readonly depth: number };
+
+/**
+ * The list's rows with the new task's field put in its slot: before the task it goes before, else at the end of its
+ * section (in place of an empty section's plate). Its level is no deeper than one under the task above it.
+ */
+function withEntry(rows: readonly Row[], list: ListId, entry: Destination | null): readonly Drawn[] {
+	if (!entry) return rows;
+	const { list: where, section, before } = entry;
+	if (where !== list) return rows;
+	let at = before === null ? -1 : rows.findIndex((row) => row.id === before);
+	let replaces = false;
+	if (at < 0) {
+		const head = section === null || section === undefined ? -1 : rows.findIndex((row) => row.id === section);
+		const from = head + 1;
+		const next = rows.findIndex((row, i) => i >= from && row.kind === "section");
+		at = next < 0 ? rows.length : next;
+		replaces = rows[from]?.kind === "empty";
+		if (replaces) at = from;
+	}
+	const above = rows[at - 1];
+	const depth = Math.min(entry.depth ?? 0, above?.kind === "task" ? above.depth + 1 : 0);
+	const field: Drawn = { kind: "entry", id: "entry", depth };
+	return [...rows.slice(0, at), field, ...rows.slice(replaces ? at + 1 : at)];
+}

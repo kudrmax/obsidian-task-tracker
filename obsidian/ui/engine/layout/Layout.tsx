@@ -3,7 +3,7 @@ import { RibbonTrack, useRibbon } from "../gestures/Ribbon";
 import type { ListId } from "../port";
 import { DayContext, useData, useScreen } from "../store";
 import { useHost } from "../view/host";
-import { QuickAdd } from "../view/QuickAdd";
+import { PlusButton } from "../view/QuickAdd";
 import { Slide } from "../view/Slide";
 import { TaskList } from "../view/TaskList";
 import { TaskMenu } from "../view/TaskMenu";
@@ -23,12 +23,17 @@ export type Place = "leaf" | "note" | "column" | "twoColumns";
  * «Behaviours Max had to ask for twice»); at the day's calendar too until the divider comes (E2).
  */
 export const Layout = memo(function Layout({ place }: { readonly place: Place }) {
-	if (place === "column") return <NoteColumn />;
-	if (place === "twoColumns") return <TwoColumns />;
+	if (place === "column" || place === "twoColumns")
+		return (
+			<>
+				{place === "column" ? <NoteColumn /> : <TwoColumns />}
+				<PlusButton />
+			</>
+		);
 	return (
 		<>
 			{place === "leaf" ? <RibbonColumns /> : <NoteColumn />}
-			<QuickAdd />
+			<PlusButton />
 			<TaskMenu />
 		</>
 	);

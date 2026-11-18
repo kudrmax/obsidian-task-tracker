@@ -1819,8 +1819,8 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 /* A layer placed by Floating UI: shown as it mounts, where Floating UI puts it. */
 .tc-panel.tc-floating-menu { width: var(--tc-menu-w); opacity: 1; transform: none; }
 /* The field the plus opens, over the screen's foot, left of the plus. */
-.task-calendar.is-engine > .tc-quick-add { right: calc(var(--tc-plus-size) + var(--tc-space-16) + var(--tc-space-8)); }
-.tc-quick-add > .tc-quick-field { flex: 1; min-width: 0; }
+/* The new task's field stands in its list as a row, at its level. */
+.tc-list-item > .tc-quick-row { margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); min-height: var(--tc-card-h); }
 /* A note's block: the same screen, one list, a fixed room in the note. */
 .tc-stand-block { position: relative; height: var(--tc-stand-block-h); }
 .tc-note-column { position: absolute; inset: 0; display: flex; }
