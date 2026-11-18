@@ -15,7 +15,7 @@ const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
  * The view's libraries, the stack the UI is built on (docs/superpowers/specs/2026-11-16-ui-standard-stack.md, «The
  * stack»): drawing and gestures only, no layer of ours. Named one by one, by the exact entry the UI imports.
  */
-const UI_PACKAGES = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "zustand", "zustand/vanilla", "zustand/react/shallow", "motion/react", "@use-gesture/react", "@tanstack/react-virtual", "@dnd-kit/core", "@dnd-kit/utilities"];
+const UI_PACKAGES = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "zustand", "zustand/vanilla", "zustand/react/shallow", "motion/react", "@use-gesture/react", "@tanstack/react-virtual", "@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities", "@floating-ui/react"];
 
 function layerOf(file: string): Layer | null {
 	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";
@@ -30,12 +30,6 @@ const HOME: Readonly<Record<string, string>> = { domain: "core", application: "c
 
 const under = (target: string, dir: string): boolean => target.startsWith(`${HOME[dir]}/${dir}/`);
 
-/**
- * The stand (`obsidian/stand`, docs/superpowers/specs/2026-11-18-ui-engine.md): the engine over the real core in memory. It
- * composes the core as the plugin's root does, and nothing imports it.
- */
-const STAND_CORE = ["core/application/contracts.ts", "core/application/composeCore.ts", "core/application/ScreenSettingsImpl.ts"];
-
 /** What the iOS app's entry may use besides the contract: the door, which reaches the same rules the services write with. */
 const PHONE_DOOR = "core/application/PhoneDoor.ts";
 
@@ -48,7 +42,8 @@ const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	phone: (t) => under(t, "phone") || t === "core/application/contracts.ts" || t === PHONE_DOOR,
 	settings: (t) => under(t, "domain"),
 	root: (t) => !under(t, "stand"),
-	stand: (t) => under(t, "stand") || under(t, "ui") || STAND_CORE.includes(t) || t.startsWith("tests/fakes/") || OBSIDIAN_PACKAGES.includes(t) || UI_PACKAGES.includes(t),
+	/** The stand (`obsidian/stand`, docs/superpowers/specs/2026-11-18-ui-engine.md): the engine over `MockPort`, never the core; nothing imports it. */
+	stand: (t) => under(t, "stand") || under(t, "ui") || OBSIDIAN_PACKAGES.includes(t) || UI_PACKAGES.includes(t),
 };
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
@@ -125,7 +120,9 @@ describe("the guard itself", () => {
 	it("keeps the doors narrow", () => {
 		expect(MAY_IMPORT.phone("core/application/TaskServiceImpl.ts")).toBe(false);
 		expect(MAY_IMPORT.ui("react")).toBe(true);
-		expect(MAY_IMPORT.stand("obsidian/ui/engine/mountScreen.tsx")).toBe(true);
+		expect(MAY_IMPORT.stand("obsidian/ui/engine/mount.tsx")).toBe(true);
+		expect(MAY_IMPORT.stand("core/application/contracts.ts")).toBe(false);
+		expect(MAY_IMPORT.stand("tests/fakes/InMemoryTaskFileStore.ts")).toBe(false);
 		expect(MAY_IMPORT.stand("core/application/TaskServiceImpl.ts")).toBe(false);
 		expect(MAY_IMPORT.stand("obsidian/infrastructure/VaultTaskFileStore.ts")).toBe(false);
 		expect(MAY_IMPORT.root("obsidian/stand/main.ts")).toBe(false);
@@ -432,5 +429,129 @@ describe("contracts.ts", () => {
 	it("reads every form of re-export it guards", () => {
 		const sample = 'import { a } from "../domain/A";\nimport type { T } from "../domain/T";\nexport { a, type T };\nexport type { U } from "../domain/U";\nexport { b as c, type V } from "../domain/B";\nexport * from "../domain/D";';
 		expect(contractRuntimeReexports(sample).sort()).toEqual(["* ← ../domain/D", "a ← ../domain/A", "c ← ../domain/B"]);
+	});
+});
+
+/**
+ * The engine's owners (docs/superpowers/specs/2026-11-18-ui-engine.md, «The owners» and «How the owners are kept one»):
+ * every concern of the screen has one owner, a library used the documented way and wrapped once. The table is the spec's,
+ * as data: a library is imported only by its owner, there is one `DndContext`, no component touches the page by hand, the
+ * engine imports nothing from the core, the mounting place is read in the layout only, and the keys are the host's.
+ */
+const ENGINE = "obsidian/ui/engine/";
+const STAND = "obsidian/stand/";
+
+interface Owner {
+	readonly concern: string;
+	/** The imports only the owner may make: a package by its name, or a repository path. */
+	readonly imports: (target: string) => boolean;
+	readonly owners: readonly string[];
+}
+
+const OWNERS: readonly Owner[] = [
+	{ concern: "Screen state: Zustand", imports: (t) => t === "zustand" || t.startsWith("zustand/"), owners: [`${ENGINE}store/`] },
+	{ concern: "Drag and drop: dnd-kit", imports: (t) => t.startsWith("@dnd-kit/"), owners: [`${ENGINE}drag/`] },
+	{ concern: "Gestures that are not drag: @use-gesture", imports: (t) => t.startsWith("@use-gesture/"), owners: [`${ENGINE}gestures/`] },
+	{ concern: "Layers and focus: Floating UI", imports: (t) => t.startsWith("@floating-ui/"), owners: [`${ENGINE}layers/`] },
+	/** Motion: the rows that move and the regions that slide; the gestures let go into its springs (the table's gestures row). */
+	{ concern: "Rows that move, regions that slide: Motion", imports: (t) => t === "motion" || t.startsWith("motion/") || t === "framer-motion", owners: [`${ENGINE}view/MovingRow.tsx`, `${ENGINE}view/Slide.tsx`, `${ENGINE}gestures/`] },
+	{ concern: "Long lists: TanStack Virtual", imports: (t) => t.startsWith("@tanstack/"), owners: [`${ENGINE}view/TaskList.tsx`] },
+	{ concern: "Text fields: Obsidian's editor", imports: (t) => t === "obsidian/ui/markdown/EmbeddedEditor.ts", owners: [`${ENGINE}view/ObsidianEditor.tsx`] },
+	/** The overlay of a carried card goes in a portal (stage 0, «Integration findings» 1); the root is made by the mount. */
+	{ concern: "Portals and roots: react-dom", imports: (t) => t === "react-dom" || t === "react-dom/client", owners: [`${ENGINE}drag/`, `${ENGINE}mount.tsx`] },
+];
+
+/** What the engine may import besides itself, React's stack and Obsidian's packages: the design's icons and Obsidian's editor. */
+const ENGINE_MAY_ALSO = ["obsidian/ui/kit/icons.ts", "obsidian/ui/markdown/EmbeddedEditor.ts"];
+
+/**
+ * Touching the page by hand, each with where the standard puts it instead: a library measures and listens, Motion animates,
+ * the store's tick is the one timer, TanStack Virtual and the browser reveal.
+ */
+const BY_HAND: readonly { readonly name: string; readonly pattern: RegExp; readonly allowed: readonly string[] }[] = [
+	{ name: "a listener added by hand", pattern: /\baddEventListener\s*\(/, allowed: [] },
+	{ name: "a size read from the page", pattern: /\bgetBoundingClientRect\s*\(|\bgetClientRects\s*\(|\bgetComputedStyle\s*\(/, allowed: [] },
+	{ name: "an animation frame", pattern: /\brequestAnimationFrame\s*\(/, allowed: [] },
+	{ name: "an animation by hand", pattern: /(?<![.\w])animate\s*\(|\.animate\s*\(/, allowed: [`${ENGINE}gestures/`] },
+	{ name: "a timer", pattern: /\bset(?:Timeout|Interval)\s*\(/, allowed: [`${ENGINE}store/`] },
+	{ name: "an observer", pattern: /\b(?:Resize|Mutation|Intersection)Observer\b/, allowed: [] },
+	{ name: "a scroll set by hand", pattern: /\.scrollTop\s*=(?!=)|\.scrollLeft\s*=(?!=)|\bscrollTo\s*\(|\bscrollBy\s*\(/, allowed: [] },
+	{ name: "a reveal that is not TanStack Virtual's or the browser's", pattern: /\bscrollIntoView\s*\(/, allowed: [`${ENGINE}view/Timeline.tsx`] },
+	{ name: "a key handled outside the host's key table", pattern: /\bonKey(?:Down|Up|Press)\b|["']key(?:down|up|press)["']|\bnew Scope\b|\baddCommand\s*\(/, allowed: [] },
+];
+
+/** The mounting place (leaf, note) is read in the layout only; the screen hands it there. */
+const PLACE_READERS = [`${ENGINE}layout/`, `${ENGINE}view/TaskScreen.tsx`, `${ENGINE}mount.tsx`];
+
+const ownedBy = (file: string, owners: readonly string[]): boolean => owners.some((o) => (o.endsWith("/") ? file.startsWith(o) : file === o));
+const engineFiles = (): string[] => FILES.filter((f) => f.startsWith(ENGINE));
+const engineAndStand = (): string[] => FILES.filter((f) => f.startsWith(ENGINE) || f.startsWith(STAND));
+
+function ownerViolations(files: readonly string[], importsOfFile: (file: string) => readonly string[]): string[] {
+	return files.flatMap((file) =>
+		importsOfFile(file).flatMap((t) => OWNERS.filter((o) => o.imports(t) && !ownedBy(file, o.owners)).map((o) => `${file} → ${t} (${o.concern}: only ${o.owners.join(", ")})`)),
+	);
+}
+
+function byHandIn(file: string, text: string): string[] {
+	const code = withoutComments(text);
+	return BY_HAND.filter((rule) => rule.pattern.test(code) && !ownedBy(file, rule.allowed)).map((rule) => `${file}: ${rule.name}`);
+}
+
+const readsPlace = (text: string): boolean => /\bplace\b/.test(withoutComments(text));
+
+describe("the engine's owners", () => {
+	const source = (file: string) => readFileSync(join(ROOT, file), "utf8");
+
+	it("imports each library only in its owner", () => {
+		expect(ownerViolations(engineAndStand(), importsOf)).toEqual([]);
+	});
+
+	it("has at most one DndContext", () => {
+		const contexts = engineFiles().flatMap((file) => [...withoutComments(source(file)).matchAll(/<DndContext\b/g)].map(() => file));
+		expect(contexts.length).toBeLessThanOrEqual(1);
+	});
+
+	it("touches the page by hand nowhere", () => {
+		expect(engineFiles().flatMap((file) => byHandIn(file, source(file)))).toEqual([]);
+	});
+
+	it("imports nothing from the core, and of the rest of the plugin only the icons and Obsidian's editor", () => {
+		const outside = engineFiles().flatMap((file) => importsOf(file).filter((t) => (t.startsWith("core/") || t.startsWith("obsidian/") || t.startsWith("tests/")) && !t.startsWith(ENGINE) && !ENGINE_MAY_ALSO.includes(t)).map((t) => `${file} → ${t}`));
+		expect(outside).toEqual([]);
+	});
+
+	it("reads the mounting place in the layout only", () => {
+		expect(engineFiles().filter((file) => !ownedBy(file, PLACE_READERS) && readsPlace(source(file)))).toEqual([]);
+	});
+
+	it("leaves the key table to the host: the stand registers it once", () => {
+		const registering = engineAndStand().filter((file) => /\bKEYS\b/.test(withoutComments(source(file))) && !file.startsWith(`${ENGINE}keys.ts`));
+		expect(registering.every((file) => file.startsWith(STAND))).toBe(true);
+		expect(registering.length).toBeLessThanOrEqual(1);
+	});
+});
+
+describe("the owners' guard itself", () => {
+	it("finds a library imported outside its owner", () => {
+		const imports: Record<string, string[]> = { [`${ENGINE}view/Card.tsx`]: ["@dnd-kit/core", "motion/react", "react"], [`${ENGINE}drag/Sortable.tsx`]: ["@dnd-kit/sortable"], [`${ENGINE}view/MovingRow.tsx`]: ["motion/react"] };
+		expect(ownerViolations(Object.keys(imports), (f) => imports[f])).toEqual([
+			`${ENGINE}view/Card.tsx → @dnd-kit/core (Drag and drop: dnd-kit: only ${ENGINE}drag/)`,
+			`${ENGINE}view/Card.tsx → motion/react (Rows that move, regions that slide: Motion: only ${ENGINE}view/MovingRow.tsx, ${ENGINE}view/Slide.tsx, ${ENGINE}gestures/)`,
+		]);
+	});
+
+	it("finds the page touched by hand, and leaves each standard's own place alone", () => {
+		expect(byHandIn(`${ENGINE}view/Card.tsx`, "el.addEventListener('x', f); const r = el.getBoundingClientRect(); requestAnimationFrame(f); animate(x, 1); setTimeout(f, 1); new ResizeObserver(f); el.scrollTop = 4; <div onKeyDown={f} />")).toEqual(
+			["a listener added by hand", "a size read from the page", "an animation frame", "an animation by hand", "a timer", "an observer", "a scroll set by hand", "a key handled outside the host's key table"].map((name) => `${ENGINE}view/Card.tsx: ${name}`),
+		);
+		expect(byHandIn(`${ENGINE}gestures/useRibbon.ts`, "animate(x, 1, spring)")).toEqual([]);
+		expect(byHandIn(`${ENGINE}store/screenStore.ts`, "setTimeout(tick, 60000)")).toEqual([]);
+		expect(byHandIn(`${ENGINE}view/Card.tsx`, "// el.addEventListener('x', f)\nconst a = el.scrollTop === 3;")).toEqual([]);
+	});
+
+	it("tells a word in a comment from the place read in code", () => {
+		expect(readsPlace("/** the place it was mounted */ const x = 1;")).toBe(false);
+		expect(readsPlace("const wide = place === 'leaf';")).toBe(true);
 	});
 });
