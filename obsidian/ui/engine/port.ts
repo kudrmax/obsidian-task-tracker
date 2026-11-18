@@ -22,8 +22,14 @@ export interface CardFace {
 	readonly due: { readonly day: string; readonly month: string } | null;
 }
 
-/** A row of a list, top to bottom: a task's card at its depth (0 a task, 1 its subtask…), or a section's header. */
-export type Row = { readonly kind: "task"; readonly id: string; readonly depth: number } | { readonly kind: "section"; readonly id: string; readonly title: string };
+/**
+ * A row of a list, top to bottom: a task's card at its depth (0 a task, 1 its subtask…), a section's header, or the plate
+ * under the header of a section with no tasks (`label`: its words).
+ */
+export type Row =
+	| { readonly kind: "task"; readonly id: string; readonly depth: number }
+	| { readonly kind: "section"; readonly id: string; readonly title: string }
+	| { readonly kind: "empty"; readonly id: string; readonly section: string; readonly label: string };
 
 export interface ListData {
 	readonly title: string;
@@ -70,6 +76,8 @@ export interface Destination {
 	readonly before: string | null;
 	readonly dayOffset: number;
 	readonly depth?: number;
+	/** When given, the section it goes into: a section's id, or null for the list's tasks outside any section. */
+	readonly section?: string | null;
 }
 
 /** A menu's item: the port names it and runs it. */

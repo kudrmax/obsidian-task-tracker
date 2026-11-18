@@ -137,6 +137,7 @@ export class MockPort implements ScreenPort {
 		this.take(file, id);
 		task.slot = null;
 		task.due = to.list === "day" ? dateOf(addDays(this.day(), to.dayOffset)) : null;
+		if (to.section !== undefined) return this.nest(file, task, to, this.sectionFor(file, to));
 		if (to.depth !== undefined) return this.nest(file, task, to);
 		const into = to.before ? this.containerOf(file, to.before) : null;
 		if (into) into.splice(into.findIndex((t) => t.id === to.before), 0, task);
@@ -151,9 +152,9 @@ export class MockPort implements ScreenPort {
 	 * out flat with their levels, the task put in before `before` (or at the end) at `to.depth`, no deeper than one under
 	 * the task above it, then each task hung under the nearest one above it a level up. Its own subtasks go with it.
 	 */
-	private nest(file: MockFile, task: MockTask, to: Destination): void {
+	private nest(file: MockFile, task: MockTask, to: Destination, given: MockSection | null = null): void {
 		const sections = this.listOf(file, to.list, to.dayOffset);
-		const section = (to.before ? sections.find((sec) => this.inSection(sec.tasks, to.before ?? "")) : undefined) ?? sections[sections.length - 1];
+		const section = given ?? (to.before ? sections.find((sec) => this.inSection(sec.tasks, to.before ?? "")) : undefined) ?? sections[sections.length - 1];
 		const flat: { task: MockTask; depth: number }[] = [];
 		const lay = (tasks: readonly MockTask[], depth: number) => {
 			for (const t of tasks) {
@@ -175,6 +176,16 @@ export class MockPort implements ScreenPort {
 			stack[f.depth] = f.task;
 		}
 		section.tasks = roots;
+	}
+
+	/** The section a move names: by its id, or the list's tasks outside any section (made first in the list when it has none). */
+	private sectionFor(file: MockFile, to: Destination): MockSection {
+		const sections = this.listOf(file, to.list, to.dayOffset);
+		const named = to.section === null ? sections.find((sec) => sec.name === null) : sections.find((sec) => sec.id === to.section);
+		if (named) return named;
+		const loose: MockSection = { id: `s-loose-${to.list}`, name: null, tasks: [] };
+		sections.unshift(loose);
+		return loose;
 	}
 
 	private inSection(tasks: readonly MockTask[], id: string): boolean {
@@ -262,7 +273,9 @@ export class MockPort implements ScreenPort {
 		};
 		for (const s of sections) {
 			if (s.name !== null) rows.push({ kind: "section", id: s.id, title: s.name });
+			const before = rows.length;
 			for (const t of s.tasks) if (shows(t)) walk(t, 0);
+			if (s.name !== null && rows.length === before) rows.push({ kind: "empty", id: `empty-${s.id}`, section: s.id, label: "No tasks" });
 		}
 		return { title, rows };
 	}

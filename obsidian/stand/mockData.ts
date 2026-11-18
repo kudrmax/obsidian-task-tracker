@@ -156,3 +156,12 @@ export function subtasksFile(): MockFile {
 	file.soon[0].tasks.splice(2, 0, plain("f1", "Переезд", [plain("f2", "Найти грузчиков"), plain("f3", "Упаковать книги")]));
 	return file;
 }
+
+/** The stand's sections step: the subtasks step, with sections in both columns and an empty one. */
+export function sectionsFile(): MockFile {
+	const file = subtasksFile();
+	const take = (from: MockTask[], n: number) => from.splice(from.length - n, n);
+	file.inbox.push({ id: "s-ideas", name: "Идеи", tasks: take(file.inbox[0].tasks, 4) }, { id: "s-empty", name: "Пустая секция", tasks: [] });
+	file.soon.push({ id: "s-trip", name: "Поездка", tasks: take(file.soon[0].tasks, 3) });
+	return file;
+}

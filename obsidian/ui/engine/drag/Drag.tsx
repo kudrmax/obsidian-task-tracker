@@ -3,10 +3,10 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Destination, ListId } from "../port";
+import type { Destination, ListId, Row } from "../port";
 import { DESIGN } from "../../design";
 import { useScreen, useScreenApi } from "../store";
-import { descendantsOf, projectDepth } from "./tree";
+import { descendantsOf, projectDepth, type Slot, slotOf } from "./tree";
 
 /**
  * Drag and drop (spec, «The owners»): one `DndContext` per screen, one `DragOverlay`, one `onDragEnd` that makes one write
@@ -90,17 +90,18 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 	}, []);
 
 	/** Where the card was lifted, and at which level: let go there, nothing is written. */
-	const [origin, setOrigin] = useState<(SortablePlace & { readonly depth: number }) | null>(null);
+	const [origin, setOrigin] = useState<(Slot & { readonly container: string; readonly depth: number }) | null>(null);
 
 	/**
 	 * The level the carried card takes where it stands now, from the pointer's sideways move since the lift (dnd-kit's
 	 * «Sortable tree»), among the rows of the list it is in, its own subtasks folded away.
 	 */
+	const rowsOf = (list: string) => api.getState().shown.lists[list as ListId]?.rows ?? [];
 	const projected = (lifted: Sortable, over: Sortable | null, offsetX: number): number | null => {
-		const position = placeOf(lifted);
-		if (!position) return null;
+		const container = containerOf(lifted);
+		if (container === null) return null;
 		const id = String(lifted.id);
-		const rows = api.getState().shown.lists[position.container as ListId]?.rows ?? [];
+		const rows = rowsOf(container);
 		const under = descendantsOf(rows, id);
 		const visible = under.size === 0 ? rows : rows.filter((row) => !under.has(row.id));
 		return projectDepth(visible, id, over ? String(over.id) : id, offsetX, DESIGN.subtaskIndent, liftedDepth.current);
@@ -119,12 +120,10 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 		liftedLeft.current ??= active.rect.current.initial?.left ?? null;
 		return liftedLeft.current === null || !over ? deltaX : deltaX - (over.rect.left - liftedLeft.current);
 	};
-	/** The level a card takes as it comes into another list: as the projection there would give it, the list's rows around its place. */
-	const crossingDepth = (into: Destination, offsetX: number): number => {
-		const rows = api.getState().shown.lists[into.list]?.rows ?? [];
-		const at = into.before === null ? rows.length : rows.findIndex((row) => row.id === into.before);
-		const above = rows.slice(0, at < 0 ? rows.length : at).reverse().find((row) => row.kind === "task" || row.kind === "section");
-		const below = at >= 0 ? rows[at] : undefined;
+	/** The level a card takes as it comes into another list at `index` of its rows: as the projection there would give it. */
+	const crossingDepth = (rows: readonly Row[], index: number, offsetX: number): number => {
+		const above = rows[index - 1];
+		const below = rows[index];
 		const deepest = above?.kind === "task" ? above.depth + 1 : 0;
 		const shallowest = below?.kind === "task" ? below.depth : 0;
 		return Math.max(shallowest, Math.min(deepest, liftedDepth.current + Math.round(offsetX / DESIGN.subtaskIndent)));
@@ -139,10 +138,11 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 		screen.lift(String(lifted.id));
 		setActive(String(lifted.id));
 		liftedLeft.current = null;
-		const position = placeOf(lifted);
-		const own = position ? api.getState().shown.lists[position.container as ListId]?.rows.find((row) => row.id === String(lifted.id)) : undefined;
+		const container = containerOf(lifted);
+		const rows = container === null ? [] : rowsOf(container);
+		const own = rows.find((row) => row.id === String(lifted.id));
 		liftedDepth.current = own?.kind === "task" ? own.depth : 0;
-		setOrigin(position ? { ...position, depth: liftedDepth.current } : null);
+		setOrigin(container === null ? null : { container, ...slotOf(rows, itemsOf(lifted), String(lifted.id)), depth: liftedDepth.current });
 		onLift();
 	};
 	/**
@@ -150,20 +150,24 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 	 * the port's preview of the card there, and that list's cards part around its place.
 	 */
 	const overList = ({ active: lifted, over, delta }: DragOverEvent) => {
-		const into = crossing(lifted, over, api.getState().dayOffset);
+		const into = crossing(lifted, over);
 		if (!into) return;
-		const to = { ...into, depth: crossingDepth(into, sideways(lifted, over, delta.x)) };
+		const rows = rowsOf(into.list);
+		const id = String(lifted.id);
+		const order = [...into.order.slice(0, into.index), id, ...into.order.slice(into.index)];
+		const to: Destination = { list: into.list as ListId, ...slotOf(rows, order, id), dayOffset: api.getState().dayOffset, depth: crossingDepth(rows, into.index, sideways(lifted, over, delta.x)) };
 		justMoved.current = true;
-		api.getState().carryInto(String(lifted.id), to);
+		api.getState().carryInto(id, to);
 	};
 	const end = ({ active: lifted, over, delta }: DragEndEvent) => {
 		setActive(null);
-		const depth = projected(lifted, over, sideways(lifted, over, delta.x)) ?? undefined;
-		const to = destinationOf(lifted, over, api.getState().dayOffset);
-		const here = placeOf(lifted);
-		const still = to === null && here !== null && origin !== null && here.container === origin.container && here.before === origin.before && depth === origin.depth;
-		const where = to ?? (still || here === null ? null : { list: here.container as ListId, before: here.before, dayOffset: api.getState().dayOffset });
-		api.getState().drop(String(lifted.id), where && depth !== undefined ? { ...where, depth } : where);
+		const id = String(lifted.id);
+		const container = containerOf(lifted);
+		if (container === null) return api.getState().drop(id, null);
+		const depth = projected(lifted, over, sideways(lifted, over, delta.x)) ?? 0;
+		const slot = slotOf(rowsOf(container), orderAfter(lifted, over), id);
+		const still = origin !== null && origin.container === container && origin.section === slot.section && origin.before === slot.before && origin.depth === depth;
+		api.getState().drop(id, still ? null : { list: container as ListId, ...slot, dayOffset: api.getState().dayOffset, depth });
 	};
 	const cancel = () => {
 		if (active) api.getState().drop(active, null);
@@ -188,56 +192,50 @@ interface Sortable {
 	readonly data: { readonly current?: { readonly sortable?: { readonly containerId: string | number; readonly items: readonly (string | number)[] } } | undefined };
 }
 
-/** Where a card stands among a sortable container's items: the container (a list), and the item after it (null: its end). */
-interface SortablePlace {
-	readonly container: string;
-	readonly before: string | null;
-}
-
-function placeOf(card: Sortable): SortablePlace | null {
+/** The list (sortable container) a card stands in now; null when dnd-kit has none for it. */
+function containerOf(card: Sortable): string | null {
 	const at = card.data.current?.sortable;
-	if (!at) return null;
-	const items = at.items.map(String);
-	return { container: String(at.containerId), before: items[items.indexOf(String(card.id)) + 1] ?? null };
+	return at ? String(at.containerId) : null;
 }
 
-/** A list's own drop target, for when no card of it is under the pointer: an empty list, or past its last card. */
+/** The ids of the list a card stands in, in their order now. */
+function itemsOf(card: Sortable): readonly string[] {
+	return (card.data.current?.sortable?.items ?? []).map(String);
+}
+
+/**
+ * The order of the card's list once it is let go, as dnd-kit's sortable list puts it: `arrayMove` to the row under the
+ * pointer within its own list; anywhere else, as it stands.
+ */
+function orderAfter(active: Sortable, over: Sortable | null): readonly string[] {
+	const items = itemsOf(active);
+	const own = containerOf(active);
+	if (!over || over.id === active.id || own === null || containerOf(over) !== own) return items;
+	return arrayMove([...items], items.indexOf(String(active.id)), items.indexOf(String(over.id)));
+}
+
+/** A list's own drop target, for when no row of it is under the pointer: an empty list, or past its last row. */
 const LIST_TARGET = "list:";
 
 /**
- * The carried card is over another list: where it goes there, as dnd-kit's «multiple containers» example puts it — before
- * the card under the pointer, or after it once the carried card's top is past that card's middle; over the list itself,
- * at its end. Null while it stays over its own list.
+ * The carried card is over another list: where it goes there, as dnd-kit's «multiple containers» example puts it — at the
+ * row under the pointer, or after it once the carried card's top is past that row's middle; over the list itself, at its
+ * end. The other list's rows in their order, and the index the card takes among them. Null while it stays over its own.
  */
-function crossing(active: Sortable & { readonly rect: { readonly current: { readonly translated: { readonly top: number } | null } } }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number } }) | null, dayOffset: number): Destination | null {
-	const from = active.data.current?.sortable;
-	if (!over || !from) return null;
+function crossing(active: Sortable & { readonly rect: { readonly current: { readonly translated: { readonly top: number } | null } } }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number } }) | null): { readonly list: string; readonly order: readonly string[]; readonly index: number } | null {
+	const own = containerOf(active);
+	if (!over || own === null) return null;
 	const overId = String(over.id);
 	if (overId.startsWith(LIST_TARGET)) {
 		const list = overId.slice(LIST_TARGET.length);
-		return list === String(from.containerId) ? null : { list: list as ListId, before: null, dayOffset };
+		const order = ((over.data.current as { readonly items?: readonly string[] } | undefined)?.items ?? []).map(String);
+		return list === own ? null : { list, order, index: order.length };
 	}
-	const to = over.data.current?.sortable;
-	if (!to || to.containerId === from.containerId) return null;
-	const items = to.items.map(String);
+	const list = containerOf(over);
+	if (list === null || list === own) return null;
+	const order = itemsOf(over);
 	const below = (active.rect.current.translated?.top ?? 0) > over.rect.top + over.rect.height / 2;
-	const at = items.indexOf(overId) + (below ? 1 : 0);
-	return { list: String(to.containerId) as ListId, before: items[at] ?? null, dayOffset };
-}
-
-/**
- * Where a card let go lands, as dnd-kit's sortable list puts it (`arrayMove` over the list's items): before the task that
- * follows it in the new order, at the list's end after the last. Over its own place, or over another list, it lands
- * nowhere (drags between lists are E1's).
- */
-function destinationOf(active: Sortable, over: Sortable | null, dayOffset: number): Destination | null {
-	const from = active.data.current?.sortable;
-	const to = over?.data.current?.sortable;
-	if (!over || !from || !to || from.containerId !== to.containerId || over.id === active.id) return null;
-	const items = from.items.map(String);
-	const at = items.indexOf(String(over.id));
-	const order = arrayMove(items, items.indexOf(String(active.id)), at);
-	return { list: from.containerId as ListId, before: order[at + 1] ?? null, dayOffset };
+	return { list, order, index: order.indexOf(overId) + (below ? 1 : 0) };
 }
 
 /** A list's sortable tasks: `ids` keeps its identity between draws, or dnd-kit stops gliding (stage 0, finding 4). */
@@ -253,14 +251,17 @@ export function SortableList({ list, ids, children }: { readonly list: ListId; r
 }
 
 /**
- * A task's card as a drag source: the thin wrapper dnd-kit draws again around the memoized card (stage 0, second round).
- * Lifted, it stays where the card will land, as the gap (spec, «Decided»).
+ * A row of a list in dnd-kit's sortable list: the thin wrapper dnd-kit draws again around the memoized card (stage 0,
+ * second round). A task's card is carried by it; lifted, it stays where the card will land, as the gap (spec, «Decided»).
+ * A section's header and an empty section's plate move aside like cards but are not carried (`onTap` absent): a card goes
+ * after them into their section.
  */
-export const SortableRow = memo(function SortableRow({ id, onTap, children }: { readonly id: string; readonly onTap: (target: Element) => void; readonly children: ReactNode }) {
-	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
+export const SortableRow = memo(function SortableRow({ id, onTap, children }: { readonly id: string; readonly onTap?: (target: Element) => void; readonly children: ReactNode }) {
+	const carried = onTap !== undefined;
+	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled: { draggable: !carried, droppable: false } });
 	const style: CSSProperties = { transform: CSS.Translate.toString(transform), transition };
 	return (
-		<div ref={setNodeRef} className={`tc-drag-source${isDragging ? " is-lifted" : ""}`} style={style} {...attributes} {...listeners} onClick={(event) => onTap(event.currentTarget)}>
+		<div ref={setNodeRef} className={`tc-drag-source${isDragging ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget) : undefined}>
 			{children}
 		</div>
 	);

@@ -13,6 +13,35 @@ const HEADER = -1;
 
 const depthOf = (row: Row): number => (row.kind === "task" ? row.depth : HEADER);
 
+/** Where a card stands in a list's order of rows: the section it is in (null: none), and the task right after it (null: none, it ends its section). */
+export interface Slot {
+	readonly section: string | null;
+	readonly before: string | null;
+}
+
+/**
+ * The slot of `id` in `order` (a list's row ids, `id` among them), by the rows around it: the section of the header (or
+ * the empty section's plate) above it, and the task right below it, if a task comes before the next header.
+ */
+export function slotOf(rows: readonly Row[], order: readonly string[], id: string): Slot {
+	const kinds = new Map(rows.map((row) => [row.id, row]));
+	const at = order.indexOf(id);
+	let section: string | null = null;
+	for (let i = at - 1; i >= 0; i--) {
+		const row = kinds.get(order[i]);
+		if (row?.kind === "section") {
+			section = row.id;
+			break;
+		}
+		if (row?.kind === "empty") {
+			section = row.section;
+			break;
+		}
+	}
+	const next = at >= 0 ? kinds.get(order[at + 1] ?? "") : undefined;
+	return { section, before: next?.kind === "task" ? next.id : null };
+}
+
 /**
  * The depth the carried card `activeId` takes when it stands where `overId` is now, moved `offsetX` pixels sideways
  * since the lift; `liftedDepth` is its depth when lifted (the example's `activeItem.depth`, from the tree before the drag);

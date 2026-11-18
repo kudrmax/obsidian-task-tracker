@@ -33,7 +33,8 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	const fresh = useScreen((s) => s.fresh);
 	const reveal = useScreen((s) => s.reveal);
 	const order = useMemo(() => readRows.map((row) => row.id).join(" "), [readRows]);
-	const ids = useMemo(() => rows.filter((row) => row.kind === "task").map((row) => row.id), [rows]);
+	/** Every row is in the sortable list: headers and plates move aside like cards, and a card goes after them into their section. */
+	const ids = useMemo(() => rows.map((row) => row.id), [rows]);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
 	const virtualizer = useVirtualizer({
 		count: rows.length,
@@ -80,9 +81,17 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 	const anchor = useAnchor();
 	if (row.kind === "section")
 		return (
-			<div className="tc-group-head">
-				<span className="tc-group-name">{row.title}</span>
-			</div>
+			<SortableRow id={row.id}>
+				<div className="tc-group-head">
+					<span className="tc-group-name">{row.title}</span>
+				</div>
+			</SortableRow>
+		);
+	if (row.kind === "empty")
+		return (
+			<SortableRow id={row.id}>
+				<div className="tc-group-empty">{row.label}</div>
+			</SortableRow>
 		);
 	return (
 		<SortableRow
