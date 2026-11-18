@@ -18,13 +18,13 @@ const levels = (text, list) => {
  * The plus (the old plugin's F174, F178–F181): a tap opens the new task's field in its list, at the end of Inbox; Enter
  * writes the task and opens an empty field right under it; Tab makes the field a subtask of the task above; Enter on an
  * empty subtask's field steps it out, on an empty field closes it; a tap elsewhere writes what was typed; Escape closes
- * without writing. The words typed are Obsidian's editor's (Input.insertText), the keys real key events.
+ * without writing. The words typed are the field's editor's (Input.insertText), the keys real key events.
  */
 export default {
 	name: "e6-plus",
 	features: ["The plus and the new task's field"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:step-two-columns"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("step-two-columns"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
 		const file = async () => levels(await t.cdp.eval(`window.__tcStand.fileText()`), "Inbox");
 		const plus = await t.cdp.eval(`(() => { const r = document.querySelector(".task-calendar button.tc-plus").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
 		const tap = async (p) => {
@@ -119,6 +119,6 @@ export default {
 		await press("up", plus);
 		await sleep(400);
 		t.expect(!(await field()), "let go back on its ring, nothing opens");
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
 	},
 };

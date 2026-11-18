@@ -67,8 +67,20 @@ export class FrameRecorder {
 }
 
 /**
+ * The limits are measured by time, not per frame: `maxStep` and a card's closeness to its copy (`COPY_CLOSE_PX`) were tuned
+ * on frames of a 120 Hz screen (the test Obsidian on Max's Mac, a frame every `TUNED_FRAME_MS`), so each frame's limit is
+ * that one stretched by its own interval: a speed in px per ms. A browser drawing at 60 Hz (headless Chromium, a 60 Hz
+ * monitor) moves the same motion twice as far between its frames; at 120 Hz the limits are the ones tuned. A frame longer
+ * than a 60 Hz one (frames dropped) gets no more room than a 60 Hz frame: a jump there is a jump a person sees.
+ */
+const TUNED_FRAME_MS = 1000 / 120;
+const LONGEST_FRAME_MS = 1000 / 60;
+const COPY_CLOSE_PX = 2;
+const perFrame = (limit, frames, i) => (i > 0 ? (limit * Math.min(LONGEST_FRAME_MS, Math.max(TUNED_FRAME_MS, frames[i].t - frames[i - 1].t))) / TUNED_FRAME_MS : limit);
+
+/**
  * The checks every scenario's frames pass (spec, «How a feature is checked»): nothing visible vanishes for a frame and
- * comes back (flicker), no task shows twice, nothing jumps further in a frame than `maxStep` px, nothing moves back the
+ * comes back (flicker), no task shows twice, nothing moves faster than `maxStep` px a 120 Hz frame, nothing moves back the
  * way it came while `monotonic` holds, no text is selected, a card's title is never cut mid-line nor blank, and the
  * thing under the finger follows it (`follow`).
  */
@@ -93,7 +105,7 @@ export function frameFaults(frames, { maxStep = Infinity, monotonic = null, foll
 			/** Its card and its copy in one frame are one card only where they lie on each other: the frame the copy lands. */
 			const copy = copies.find((c) => c.kind === "copy");
 			const card = copies.find((c) => c.kind === "card" || c.kind === "block");
-			if (copy && card && Math.hypot(copy.x - card.x, copy.y - card.y) > 2) fault(frame, "card and its copy apart", { id, dx: +(copy.x - card.x).toFixed(1), dy: +(copy.y - card.y).toFixed(1) });
+			if (copy && card && Math.hypot(copy.x - card.x, copy.y - card.y) > perFrame(COPY_CLOSE_PX, frames, i)) fault(frame, "card and its copy apart", { id, dx: +(copy.x - card.x).toFixed(1), dy: +(copy.y - card.y).toFixed(1) });
 			for (const item of copies) {
 				if (item.whole && item.cut) fault(frame, "text cut", { id });
 				if (item.whole && item.text === 0 && item.h > ignoreBlankBelow) fault(frame, "blank card", { id });
@@ -119,7 +131,7 @@ export function frameFaults(frames, { maxStep = Infinity, monotonic = null, foll
 			if (last && last.i === i - 1) {
 				const dx = at.x - last.x;
 				const dy = at.y - last.y;
-				if (Math.hypot(dx, dy) > maxStep) fault(frame, "jump", { id, dx: +dx.toFixed(1), dy: +dy.toFixed(1) });
+				if (Math.hypot(dx, dy) > perFrame(maxStep, frames, i)) fault(frame, "jump", { id, dx: +dx.toFixed(1), dy: +dy.toFixed(1) });
 				if (monotonic === "x" && last.dx !== 0 && dx !== 0 && Math.sign(dx) !== Math.sign(last.dx) && Math.abs(dx) > 0.5) fault(frame, "went back", { id, dx: +dx.toFixed(1) });
 				tracks.set(id, { i, x: at.x, y: at.y, dx: dx !== 0 ? dx : last.dx });
 			} else tracks.set(id, { i, x: at.x, y: at.y, dx: 0 });

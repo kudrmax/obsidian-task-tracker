@@ -25,7 +25,7 @@ export default {
 	name: "e4-sections",
 	features: ["Sections: into a section, to its end, into an empty one"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:step-sections"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("step-sections"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
 
 		const gift = await rowBy(t, "Купить подарок");
 		await carry(t, gift, once(async () => {
@@ -67,6 +67,6 @@ export default {
 		t.expect(drift <= 1, `the empty section's header stays where it stood while the card was held, through the drop: moved ${drift}px`);
 		inbox = await listOf(t, "Inbox");
 		t.expect(inbox.at(-1) === "Полить цветы" && inbox.at(-2) === "### Пустая секция", `under an empty section's header: into it: ${JSON.stringify(inbox.slice(-4))}`);
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
 	},
 };

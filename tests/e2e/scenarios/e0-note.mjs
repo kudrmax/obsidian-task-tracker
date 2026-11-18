@@ -1,17 +1,18 @@
 import { carry } from "../lib/carry.mjs";
 
-/** The block a person sees: the note's reading view (Obsidian also keeps the editing view's, hidden). */
+/** The block a person sees: in the note's reading view, as the test page lays the note out. */
 const BLOCK = ".markdown-reading-view .tc-stand-block";
 
 /**
  * E0, the note's block (spec, principle 1): the same TaskScreen mounted in a note shows its list as the leaf does, and the
- * same drag works in it.
+ * same drag works in it. The note is the test page's stand-in for Obsidian's reading view; the block inside Obsidian's
+ * own note is checked by hand in the test Obsidian.
  */
 export default {
 	name: "e0-note",
 	features: ["E0: the leaf and the note block, one TaskScreen"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { const f = app.vault.getAbstractFileByPath("Заметка о доме.md"); const leaf = app.workspace.getLeaf(false); await leaf.openFile(f, { state: { mode: "preview" } }); return 1; })()`);
+		await t.stand("openNote()");
 		await t.sleep(1200);
 		const block = await t.oracle.rect(`${BLOCK} .task-calendar`);
 		t.expect(block !== null && block.height > 200, `the note shows the screen's block: ${JSON.stringify(block)}`);

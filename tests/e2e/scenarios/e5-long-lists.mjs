@@ -9,7 +9,7 @@ export default {
 	name: "e5-long-lists",
 	features: ["Long lists: the list scrolls under a held card"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:step-long-lists"); await new Promise((r) => setTimeout(r, 800)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("step-long-lists"); await new Promise((r) => setTimeout(r, 800)); return 1; })()`);
 		const phone = t.platform === "phone";
 		const box = await t.cdp.eval(`(() => { const l = document.querySelector('[data-list="inbox"]').getBoundingClientRect(); const e = [...document.querySelectorAll('[data-list="inbox"] .tc-card[data-id]')][1].getBoundingClientRect(); return { top: l.top, bottom: l.bottom, x: e.left + e.width / 2, y: e.top + e.height / 2 }; })()`);
 		const mouse = (type, p, buttons) => t.cdp.send("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, button: "left", buttons, clickCount: 1 });
@@ -46,6 +46,6 @@ export default {
 		t.expect(held.overlay && held.place, `far down, the card is still carried and its place shows: ${JSON.stringify(held)}`);
 		t.expect(at > 40, `let go far down, it lands there in the file: at ${at}`);
 		t.expect(JSON.stringify(await t.oracle.cards("inbox")).includes("Задача 2"), "and on the screen");
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
 	},
 };

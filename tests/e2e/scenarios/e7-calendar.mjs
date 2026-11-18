@@ -25,7 +25,7 @@ export default {
 	name: "e7-calendar",
 	features: ["Step 6: onto and off the calendar; a place that refuses"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:step-calendar"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("step-calendar"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
 		const file = () => t.cdp.eval(`window.__tcStand.fileText()`);
 		/** A task's time in the file as minutes from the day's start, or null without one. */
 		const timeOf = async (title) => {
@@ -122,6 +122,6 @@ export default {
 		const lightAt = await timeOf("Оплатить свет");
 		t.expect(scrolled > scrolledFrom + 100 && lightAt !== null && lightAt.start > lastShown, `held at the calendar's bottom edge it scrolls, and the card lands past the hours first shown: scrolled ${scrolledFrom} → ${scrolled}, written at ${JSON.stringify(lightAt)}, first shown up to ${lastShown}`);
 
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
 	},
 };

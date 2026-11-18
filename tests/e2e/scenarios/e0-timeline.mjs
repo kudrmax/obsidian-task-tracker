@@ -6,14 +6,26 @@
 export default {
 	name: "e0-timeline",
 	features: ["E0: time scale, the minute tick"],
-	async run(t) {
+	/**
+	 * The clock the made-up tasks are laid around: the day's middle, and late evening, where the last blocks fall past
+	 * midnight at the day's end. Read at whatever hour the run happens, the tasks ahead of the clock may not fit the day.
+	 */
+	cases: ["12:00", "22:50"],
+	async run(t, clock) {
+		await t.setClock(clock);
 		const labels = await t.cdp.eval(`[...document.querySelectorAll(".tc-timeline .tc-hour-line")].map((l, i) => ({ y: l.getBoundingClientRect().top, label: document.querySelectorAll(".tc-timeline .tc-hour-label")[i].textContent }))`);
-		const lineOf = (hh) => labels.find((l) => l.label === hh)?.y;
+		/**
+		 * Where a time stands, read off the hour lines in their order down the day: the day runs from its first line's hour
+		 * past midnight (05 … 23, 00 … 04), so a time is placed by its hours since that first line, never by a label's name,
+		 * which a day past midnight shows once at its end. The last hour ends one hour's height under its line.
+		 */
 		const yAt = (time) => {
 			const [h, m] = time.split(":").map(Number);
-			const here = lineOf(String(h).padStart(2, "0"));
-			const next = lineOf(String((h + 1) % 24).padStart(2, "0"));
-			return here === undefined || next === undefined ? null : here + ((next - here) * m) / 60;
+			const first = Number(labels[0]?.label);
+			const at = (h - first + 24) % 24;
+			const here = labels[at]?.y;
+			const height = labels.length > 1 ? (labels[Math.min(at + 1, labels.length - 1)].y - labels[Math.min(at + 1, labels.length - 1) - 1].y) : undefined;
+			return here === undefined || height === undefined || labels[at].label !== String(h).padStart(2, "0") ? null : here + (height * m) / 60;
 		};
 		const now = await t.cdp.eval(`(() => { const n = document.querySelector(".tc-now"); const line = n.querySelector(".tc-now-line").getBoundingClientRect(); return { label: n.querySelector(".tc-now-pill").textContent, y: line.top + line.height / 2 }; })()`);
 		const expected = yAt(now.label);

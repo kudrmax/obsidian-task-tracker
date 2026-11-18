@@ -12,14 +12,13 @@ export default {
 	name: "replay",
 	features: ["F35", "F292"],
 	platforms: ["desktop"],
-	async run(t) {
-		for (const file of readdirSync(RECORDINGS).filter((f) => f.endsWith(".json") && !f.endsWith(".expect.json")).sort()) {
-			await t.open();
-			await t.setStop("soon");
-			const pager = new WheelStrokes();
-			const strokes = JSON.parse(readFileSync(RECORDINGS + file, "utf8")).events.filter((e) => e.type === "wheel").map((e) => pager.feed({ dx: e.dx, dy: e.dy, t: e.t, ctrl: e.ctrl })).filter((step) => step !== 0);
-			const result = await t.replay(file, { startPlace: 1, strokes });
-			t.expect(result.ok, `${file}: places ${JSON.stringify(result.observed)} against ${JSON.stringify(result.expected)}, astray ${result.astray}, stalls ${result.stalls}, frame faults ${JSON.stringify(result.faults.slice(0, 3))}`);
-		}
+	/** Each recording is a case of its own, on a freshly opened screen. */
+	cases: readdirSync(RECORDINGS).filter((f) => f.endsWith(".json") && !f.endsWith(".expect.json")).sort(),
+	async run(t, file) {
+		await t.setStop("soon");
+		const pager = new WheelStrokes();
+		const strokes = JSON.parse(readFileSync(RECORDINGS + file, "utf8")).events.filter((e) => e.type === "wheel").map((e) => pager.feed({ dx: e.dx, dy: e.dy, t: e.t, ctrl: e.ctrl })).filter((step) => step !== 0);
+		const result = await t.replay(file, { startPlace: 1, strokes });
+		t.expect(result.ok, `${file}: places ${JSON.stringify(result.observed)} against ${JSON.stringify(result.expected)}, astray ${result.astray}, stalls ${result.stalls}, frame faults ${JSON.stringify(result.faults.slice(0, 3))}`);
 	},
 };

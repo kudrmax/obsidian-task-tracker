@@ -1,0 +1,46 @@
+/*
+ * What the screen's stylesheet reads from Obsidian, with Obsidian's own values (its app.css): the theme's ground, text and
+ * accent, the fonts and the few sizes, per theme and on the phone; and the leaf the view sits in, where Obsidian's chrome
+ * leaves it: on the desktop right of the ribbon and under the tab bar and the view header (the window 1280×820), on the
+ * phone under the status bar and the view header, over the floating navigation bar (390×844, `app.emulateMobile`).
+ */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body {
+	--accent-h: 258;
+	--accent-s: 88%;
+	--accent-l: 66%;
+	--font-text: ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, "Inter", "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+	--font-monospace: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+	--font-text-size: 16px;
+	--font-ui-smaller: 12px;
+	--line-height-normal: 1.5;
+	--p-spacing: 1rem;
+	--size-4-1: 4px;
+	--border-width: 1px;
+	--keyboard-height: 0px;
+	--setting-items-background: var(--background-primary);
+	font-family: var(--font-text);
+	font-size: var(--font-text-size);
+	background: var(--background-primary);
+	color: var(--text-normal);
+}
+body.theme-dark {
+	--background-primary: #1c1c1c;
+	--text-normal: #dadada;
+	--interactive-accent: hsl(calc(var(--accent-h) - 3), calc(var(--accent-s) * 1.02), calc(var(--accent-l) * 1.15));
+}
+body.theme-light {
+	--background-primary: #ffffff;
+	--text-normal: #222222;
+	--interactive-accent: hsl(var(--accent-h), var(--accent-s), var(--accent-l));
+}
+body.is-mobile.theme-dark { --background-primary: #000000; }
+body.is-phone { --safe-area-inset-bottom: 34px; --navbar-height: 52px; --view-bottom-spacing: calc(var(--safe-area-inset-bottom) - var(--keyboard-height) + var(--navbar-height)); }
+body.is-mobile.theme-light { --text-normal: #000000; }
+.workspace-leaf-content { position: absolute; inset: 74px 0 0 44px; display: flex; flex-direction: column; }
+body.is-phone .workspace-leaf-content { inset: 111px 0 0 0; }
+.workspace-leaf-content > .view-content { flex: 1; min-height: 0; position: relative; }
+.markdown-reading-view { overflow-y: auto; }
+.markdown-preview-view { padding: 16px 32px; }
+.tc-stand-editor { outline: none; min-height: 1lh; white-space: pre-wrap; }

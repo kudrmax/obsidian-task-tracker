@@ -28,7 +28,7 @@ export default {
 	name: "e3-subtasks",
 	features: ["Subtasks by a sideways move; a task carried with its subtasks"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:step-subtasks"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("step-subtasks"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
 		const file = () => t.cdp.eval(`window.__tcStand.fileText()`);
 
 		/**
@@ -75,6 +75,6 @@ export default {
 		const at = soon.indexOf("Спланировать отпуск:0");
 		t.expect(at >= 0 && soon[at + 1] === "Выбрать даты:1" && soon[at + 3] === "Сравнить цены:2", `carried into Soon with its subtasks, still a task: ${JSON.stringify(soon)}`);
 		t.expect(!levels(await file(), "Inbox").some((x) => x.startsWith("Выбрать даты")), "its subtasks left Inbox with it");
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
 	},
 };

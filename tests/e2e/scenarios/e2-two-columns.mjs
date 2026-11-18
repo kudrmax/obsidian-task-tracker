@@ -16,7 +16,7 @@ export default {
 	name: "e2-two-columns",
 	features: ["Step 2: drag between two columns"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:step-two-columns"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("step-two-columns"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
 		const list = async (name) => (await t.oracle.tasks(name)).map((task) => task.title);
 		const [, , third] = await list("Inbox");
 		const [, second, , fourth] = await list("Soon");
@@ -57,6 +57,6 @@ export default {
 		t.expect(JSON.stringify(await t.oracle.cards("inbox")) === JSON.stringify(inbox), `Soon → Inbox: the screen shows the file's Inbox: ${JSON.stringify(await t.oracle.cards("inbox"))}`);
 		t.expect(inboxFaults.length === 0, `Soon → Inbox frames: ${JSON.stringify(inboxFaults.slice(0, 4))}`);
 		t.expect((await t.cdp.eval(`document.querySelectorAll(".tc-card[data-id]").length`)) > 0, "the screen still stands");
-		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
 	},
 };
