@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DropTo, GroupedList, GroupName, SectionKey, TaskItem } from "../../core/application/contracts";
+import { listView } from "../../core/application/contracts";
 import type { DragPayload, ListColumn, NewTaskPayload } from "../../obsidian/ui/drag/DropTarget";
 import { ListDrop } from "../../obsidian/ui/drag/ListDrop";
 import { LAYOUT } from "../../obsidian/ui/design";
@@ -54,9 +55,8 @@ function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | nul
 	const area = document.createElement("div");
 	document.body.appendChild(area);
 	const list = new TaskList(document.createElement("div"), {
-		items: () => items,
+		list: () => listView(items, grouped !== null),
 		day: () => null,
-		grouped: () => grouped !== null,
 		ungroupedName: () => "No section",
 	});
 	area.appendChild(list.el);

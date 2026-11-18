@@ -1,5 +1,4 @@
-import type { DropColumn, DroppedTask, ListPlace, DropFrom, DropOrigin, DropTo, GroupedList, ProjectsLanding, ProjectsNodeId, TaskItem } from "../../../core/application/contracts";
-import type { LocalDate } from "../types";
+import type { DropColumn, DroppedTask, ListPlace, DropFrom, DropOrigin, DropTo, ProjectsLanding, ProjectsNodeId, TaskItem } from "../../../core/application/contracts";
 
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon, and Inbox over Backlog. */
 export type ListColumn = DropColumn;
@@ -11,11 +10,7 @@ export type TaskOrigin = DropFrom;
 export type DragOrigin = DropOrigin;
 
 /** Whose sections a column shows: Inbox's, Backlog's, Soon's, Now's for today, Soon's for a later day with that day as `date`. */
-export interface ColumnSections {
-	readonly list: GroupedList;
-	/** The later day the column shows; null for one of no day or for today. */
-	readonly date: LocalDate | null;
-}
+export type { ColumnSections } from "../../../core/application/contracts";
 
 export interface TaskDragPayload {
 	readonly item: TaskItem;

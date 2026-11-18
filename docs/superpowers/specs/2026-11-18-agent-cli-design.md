@@ -266,3 +266,8 @@ Backend (2026-11-18):
 19. Options: `--project` / `--no-project` only on today, day, week, soon, inbox, backlog, all; `--no-subprojects` with `--project` or on `project`; `--days` (1 to 62) only on `week`; `--done` only on `project`; anything else is `badArgument`. `project` and `search` take every word that follows as the name or the query. No command is `help`.
 20. `time.passed` of a task in `all`, `search`, `project` is judged on its place's day; on a day's timeline, on that day.
 21. `help`'s labels for the assistant come from the Assistant page's option rows (Best task's Label and Skip label), each with the label chosen and what it means.
+
+Obsidian frontend (2026-11-18):
+
+22. Every list the plugin draws in sections takes the core's `columnView` whole: `TaskList` draws one `ListView` (`list()`), never items plus `grouped`/`sections`; a list that shows no sections (Done, a task's subtasks on the whole screen) draws `listView(items, false)`. A column reads its sections from the screen it draws (that screen's day), not from the day selected while the next one loads, so the headers always belong to the cards under them. Before the first read the column draws the selected day's empty list. `tests/uiDecides.test.ts` trips on `columnSections(` or a `listView(` with sections in the frontends.
+23. The card waiting for its section's name (a new section being named) is left out of the screen handed to `columnView`, as it was left out of the items before.

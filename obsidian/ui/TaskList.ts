@@ -1,5 +1,5 @@
 import { ScrollEdges } from "./ScrollEdges";
-import { branchOf, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListRow, type ListSection, type ListView, listView, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import { branchOf, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListRow, type ListView, type TaskItem, type TaskKey } from "../../core/application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
@@ -12,13 +12,10 @@ import { EntryRows, type LevelRow, type ListEntryInput } from "./EntryRows";
 export type { ListEntryInput } from "./EntryRows";
 
 export interface TaskListDeps {
-	items(): readonly TaskItem[];
+	/** The list in its sections as the core groups it: a column's `TaskService.columnView`, or `listView` of a list that shows none. */
+	list(): ListView;
 	/** The day the list shows, whose date its cards leave out; null for a list of no day. */
 	day(): LocalDate | null;
-	/** Whether the list shows its sections: Inbox, Soon, and the day column on today. */
-	grouped?(): boolean;
-	/** The groups of the list the column shows, in file order: where its empty sections stand. */
-	sections?(): readonly ListSection[];
 	/** The header over the tasks outside any section. */
 	ungroupedName?(): string;
 	/** A card waiting for the name of the section it starts: drawn last, under the place for the name. */
@@ -143,8 +140,7 @@ export class TaskList {
 
 	private draw(moving: boolean): void {
 		const day = this.deps.day();
-		const items = this.deps.items();
-		const shape = this.shapeOf(items);
+		const shape = shapeOf(this.deps.list());
 		const entry = this.deps.entry?.(drawingOf(shape)) ?? null;
 		const renaming = this.deps.renaming?.() ?? null;
 		const moves = moving && this.drawnDay === day;
@@ -277,11 +273,7 @@ export class TaskList {
 
 	/** The cards the list is about to draw from what it is to show now, as `listCards` gives them once it has. */
 	get comingCards(): readonly ListCard[] {
-		return drawingOf(this.shapeOf(this.deps.items())).cards;
-	}
-
-	private shapeOf(items: readonly TaskItem[]): ListShape {
-		return shapeOf(listView(items, this.deps.grouped?.() ?? false, this.deps.sections?.() ?? []));
+		return drawingOf(shapeOf(this.deps.list())).cards;
 	}
 
 	/** A card as places in the list see it: in the section it is drawn in. */

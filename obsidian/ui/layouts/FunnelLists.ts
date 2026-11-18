@@ -1,5 +1,5 @@
-import { acceptsDrop, type DropTo, type EntryDrawing, type GroupName, type GroupedList, type ListGroup, type ListSection, type TaskItem, type TaskKey } from "../../../core/application/contracts";
-import type { ColumnSections, ListColumn } from "../drag/DropTarget";
+import { acceptsDrop, type ColumnList, type DropTo, type EntryDrawing, type GroupName, type GroupedList, type ListGroup, type TaskItem, type TaskKey } from "../../../core/application/contracts";
+import type { ListColumn } from "../drag/DropTarget";
 import { ListDrop } from "../drag/ListDrop";
 import { el } from "../dom";
 import { FreeRoomDoubleClick } from "../FreeRoomDoubleClick";
@@ -8,11 +8,9 @@ import type { LocalDate } from "../types";
 
 /** What a funnel's list reads of the screen and hands back to it: the same for its column, its row or its pane, in any layout. */
 export interface FunnelListDeps {
-	/** The column's tasks as read, the card waiting for its section's name left out. */
-	items(column: ListColumn): readonly TaskItem[];
+	/** The column's list as the core groups it (`TaskService.columnView`), the card waiting for its section's name left out. */
+	column(column: ListColumn): ColumnList;
 	day(): LocalDate;
-	sectionsOf(column: ListColumn): ColumnSections | null;
-	listSections(column: ListColumn): readonly ListSection[];
 	naming(column: ListColumn): TaskItem | null;
 	entry(column: ListColumn, drawing: EntryDrawing): ListEntryInput | null;
 	/** The words of the plate the list draws while it draws no card (`ViewChoice.plates`); null for none. */
@@ -46,10 +44,8 @@ export interface FunnelListPlace {
 /** The list of `column` built in `place.area`: every layout builds its funnel lists this one way. */
 export function funnelList(deps: FunnelListDeps, column: ListColumn, place: FunnelListPlace): FunnelList {
 	const list: TaskList = new TaskList(el(place.area, "div"), {
-		items: () => deps.items(column),
+		list: () => deps.column(column),
 		day: () => (column === "day" ? deps.day() : null),
-		grouped: () => deps.sectionsOf(column) !== null,
-		sections: () => deps.listSections(column),
 		onPlate: (plate, group, signal) => plate.addEventListener("click", () => deps.openIn(column, group.name), { signal }),
 		pending: () => deps.naming(column),
 		entry: (drawing) => deps.entry(column, drawing),
@@ -57,7 +53,7 @@ export function funnelList(deps: FunnelListDeps, column: ListColumn, place: Funn
 		emptyLabel: () => deps.emptyLabel(),
 		onEmpty: () => deps.openAtEnd(column),
 		renaming: () => deps.renaming(),
-		onHeader: (head, group, signal) => deps.header(head, deps.sectionsOf(column)?.list ?? (column === "day" ? "now" : column), list, group, signal),
+		onHeader: (head, group, signal) => deps.header(head, deps.column(column).sections?.list ?? (column === "day" ? "now" : column), list, group, signal),
 		ungroupedName: () => deps.ungroupedName(),
 		onCard: (card, item, subtree, signal) => deps.card(card, item, column, subtree, signal),
 	});
@@ -67,7 +63,7 @@ export function funnelList(deps: FunnelListDeps, column: ListColumn, place: Funn
 		place.area,
 		column,
 		(origins) => acceptsDrop(column, origins),
-		() => deps.sectionsOf(column),
+		() => deps.column(column).sections,
 		title?.over ?? false,
 		() => deps.tap(),
 		title ? { el: title.el, drop: () => deps.titleDrop(column) } : null,

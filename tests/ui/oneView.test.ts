@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CarryReport } from "../../obsidian/ui/projects/CarryReport";
+import { listView } from "../../core/application/contracts";
 import { TaskList } from "../../obsidian/ui/TaskList";
 import { PROJECTS_HOVER_MS } from "../../core/application/contracts";
 
@@ -40,7 +41,7 @@ describe("an empty list's plate (spec decision 18)", () => {
 	it("draws «No tasks» where a list draws nothing and its owner asks for it, a tap typing at the end", () => {
 		let words: string | null = "No tasks";
 		let typed = 0;
-		const list = new TaskList(document.createElement("div"), { items: () => [], day: () => null, empty: () => words, onEmpty: () => typed++ });
+		const list = new TaskList(document.createElement("div"), { list: () => listView([], false), day: () => null, empty: () => words, onEmpty: () => typed++ });
 		list.render(false);
 		const plate = list.el.querySelector<HTMLElement>(".tc-list-empty");
 		expect(plate?.textContent).toBe("No tasks");
