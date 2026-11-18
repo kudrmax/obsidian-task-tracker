@@ -110,7 +110,7 @@ describe("the screen's store", () => {
 	});
 
 	it("opens a task's menu with what the port offers, and runs an item through the port", async () => {
-		const { port, store } = screen();
+		const { store } = screen();
 		store.getState().start();
 		const id = store.getState().shown.lists.inbox.rows.find((r) => r.kind === "task")!.id;
 		store.getState().openMenu(id);
