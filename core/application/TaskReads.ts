@@ -5,7 +5,7 @@ import { dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, 
 import { typedMarks } from "../domain/Marks";
 import { priorityOfTitle, withPriority } from "../domain/Priority";
 import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
-import { FuzzyQuery, matchParts, plainDescription, snippetParts, type TextMatch } from "../domain/search";
+import { FuzzyQuery, lettersApart, matchParts, plainDescription, snippetParts, type TextMatch } from "../domain/search";
 import { plainText } from "../domain/TaskText";
 import { isOpen, type LocalDate, type SectionKey, type Slot } from "../domain/Task";
 import { descriptionMarkdown } from "../domain/description";
@@ -106,6 +106,9 @@ const OPEN_ORDER: readonly SectionKey[] = ["inbox", "backlog", "soon", "now"];
 
 /** The most names an unknown project's answer offers instead. */
 const MOST_CANDIDATES = 5;
+/** A name is a typo of a project's while this many letters apart, or one in four of a long name's. */
+const MOST_TYPOS = 2;
+const TYPO_SHARE = 4;
 
 /** The sections a search walks, in the order its results stand. */
 const SEARCH_ORDER: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
@@ -511,15 +514,24 @@ export class TaskReads {
 		return this.timeline().ridesNow(slotted(item), day);
 	}
 
-	/** The node of the project `name` names; none with the closest names, by the search's match, best first. */
+	/**
+	 * The node of the project `name` names; none with the closest names: those the search's match finds, best first, then
+	 * those a typo or two apart (`lettersApart`), nearest first.
+	 */
 	projectNodeNamed({ doc }: Snapshot, name: string): ProjectNodeMatch {
 		const tree = projectTreeOf(doc);
 		const found = tree.find(name);
 		if (found) return { node: projectNodeOf(found.node.name), candidates: [] };
 		const query = FuzzyQuery.of(name);
 		const names = tree.all().map((p) => p.node.name);
-		const scored = query === null ? [] : names.map((n) => ({ name: n, match: query.match(n) })).filter((s) => s.match !== null);
-		return { node: null, candidates: scored.sort((a, b) => b.match!.score - a.match!.score).slice(0, MOST_CANDIDATES).map((s) => s.name) };
+		const matched = query === null ? [] : names.map((n) => ({ name: n, match: query.match(n) })).filter((s) => s.match !== null);
+		const fuzzy = matched.sort((a, b) => b.match!.score - a.match!.score).map((s) => s.name);
+		const typos = names
+			.map((n) => ({ name: n, apart: lettersApart(name, n) }))
+			.filter((t) => t.apart <= Math.max(MOST_TYPOS, Math.floor(name.length / TYPO_SHARE)) && !fuzzy.includes(t.name))
+			.sort((a, b) => a.apart - b.apart)
+			.map((t) => t.name);
+		return { node: null, candidates: [...fuzzy, ...typos].slice(0, MOST_CANDIDATES) };
 	}
 
 	/** Every open task once, under `filter`, in the funnel's order, each with its place. */

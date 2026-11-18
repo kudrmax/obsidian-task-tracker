@@ -202,7 +202,8 @@ describe("projectNodeNamed", () => {
 		const missing = await tasks.projectNodeNamed("Отчт");
 		expect(missing.node).toBeNull();
 		expect(missing.candidates).toContain("Отчёты");
-		expect((await tasks.projectNodeNamed("zzz")).candidates).toEqual([]);
+		expect((await tasks.projectNodeNamed("Отчоты")).candidates).toEqual(["Отчёты"]);
+		expect((await tasks.projectNodeNamed("zzzzzzzzzzzz")).candidates).toEqual([]);
 	});
 });
 

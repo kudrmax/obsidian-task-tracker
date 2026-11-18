@@ -7951,6 +7951,17 @@ function foldedChar(char) {
   if (bare.length === 1) return bare;
   return lower.length === 1 ? lower : char;
 }
+function lettersApart(a, b) {
+  const x = [...folded(a.trim())];
+  const y = [...folded(b.trim())];
+  let row = Array.from({ length: y.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= x.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= y.length; j++) next.push(Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1)));
+    row = next;
+  }
+  return row[y.length];
+}
 function folded(text) {
   let out = "";
   for (let i = 0; i < text.length; i++) out += foldedChar(text.charAt(i));
@@ -8185,6 +8196,8 @@ function sectionsOf2(doc, list) {
 }
 var OPEN_ORDER = ["inbox", "backlog", "soon", "now"];
 var MOST_CANDIDATES = 5;
+var MOST_TYPOS = 2;
+var TYPO_SHARE = 4;
 var SEARCH_ORDER = ["inbox", "backlog", "soon", "now", "done"];
 function byQuality(a, b) {
   if (a.title === null !== (b.title === null)) return a.title ? -1 : 1;
@@ -8527,15 +8540,20 @@ var TaskReads = class {
   ridesNow(item, day) {
     return this.timeline().ridesNow(slotted(item), day);
   }
-  /** The node of the project `name` names; none with the closest names, by the search's match, best first. */
+  /**
+   * The node of the project `name` names; none with the closest names: those the search's match finds, best first, then
+   * those a typo or two apart (`lettersApart`), nearest first.
+   */
   projectNodeNamed({ doc }, name) {
     const tree = projectTreeOf(doc);
     const found = tree.find(name);
     if (found) return { node: projectNodeOf(found.node.name), candidates: [] };
     const query = FuzzyQuery.of(name);
     const names = tree.all().map((p) => p.node.name);
-    const scored = query === null ? [] : names.map((n) => ({ name: n, match: query.match(n) })).filter((s) => s.match !== null);
-    return { node: null, candidates: scored.sort((a, b) => b.match.score - a.match.score).slice(0, MOST_CANDIDATES).map((s) => s.name) };
+    const matched = query === null ? [] : names.map((n) => ({ name: n, match: query.match(n) })).filter((s) => s.match !== null);
+    const fuzzy = matched.sort((a, b) => b.match.score - a.match.score).map((s) => s.name);
+    const typos = names.map((n) => ({ name: n, apart: lettersApart(name, n) })).filter((t) => t.apart <= Math.max(MOST_TYPOS, Math.floor(name.length / TYPO_SHARE)) && !fuzzy.includes(t.name)).sort((a, b) => a.apart - b.apart).map((t) => t.name);
+    return { node: null, candidates: [...fuzzy, ...typos].slice(0, MOST_CANDIDATES) };
   }
   /** Every open task once, under `filter`, in the funnel's order, each with its place. */
   openTasksRead(filter) {
