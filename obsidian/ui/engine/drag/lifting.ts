@@ -1,5 +1,5 @@
 import type { DropColumn } from "../../../../core/application/contracts";
-import type { ScreenState } from "../screenStore";
+import type { ScreenActions, ScreenState } from "../screenStore";
 import type { Lifted } from "./dragState";
 import { listCards } from "./listDrag";
 
@@ -25,6 +25,14 @@ export function liftCard(state: ScreenState, column: DropColumn, id: string): Li
 		return { kind: "task", id, key: item.key, from: column, ids, home: { column, gap: { kind: "gap", index, level, group: group.name } }, layers: ids.length > 1 ? STACK_LAYERS : 0 };
 	}
 	return null;
+}
+
+/** A section lifted by its header: its tasks go with it, its place among the list's sections is where its gap opens first. */
+export function liftSection(state: ScreenState & Pick<ScreenActions, "sectionListOf">, column: DropColumn, groupId: string): Lifted | null {
+	const list = state.sectionListOf(column);
+	const home = state.columns[column].groups.findIndex((group) => group.id === groupId);
+	if (!list || home < 0) return null;
+	return { kind: "section", column, list, group: state.columns[column].groups[home].name, groupId, home };
 }
 
 /** A task's block lifted from the timeline: it has no place in a list to come back to. */

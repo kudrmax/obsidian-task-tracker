@@ -20,14 +20,17 @@ import { createPortal } from "react-dom";
 import { acceptsDrop, carriedMiddle, type DropColumn, levelAt, placeAt, placesInGap } from "../../../../core/application/contracts";
 import { DESIGN, LAYOUT } from "../../design";
 import { useHost, useScreen } from "../ScreenContext";
-import { Carried } from "./Carried";
+import { Carried, CarriedSection } from "./Carried";
 import type { Aim, Lifted } from "./dragState";
 import { DragGeometry, GeometryContext } from "./geometry";
-import { liftBlock, liftCard } from "./lifting";
-import { placedOf } from "./listDrag";
+import { liftBlock, liftCard, liftSection } from "./lifting";
+import { placedOf, sectionSlotAt } from "./listDrag";
 
 /** What a draggable tells the layer at the lift: which card, block, section or the plus it is. */
-export type DragSource = { readonly kind: "card"; readonly column: DropColumn; readonly id: string } | { readonly kind: "block"; readonly id: string };
+export type DragSource =
+	| { readonly kind: "card"; readonly column: DropColumn; readonly id: string }
+	| { readonly kind: "block"; readonly id: string }
+	| { readonly kind: "section"; readonly column: DropColumn; readonly groupId: string };
 
 /** The carried copy settles into its place quickly and without a bounce; its width narrows to the card's as it lands. */
 const DROP_MS = 180;
@@ -63,7 +66,7 @@ export function DragLayer({ children }: { readonly children: ReactNode }) {
 		const source = active.data.current as DragSource | undefined;
 		if (!source) return;
 		const state = store.getState();
-		const lifted: Lifted | null = source.kind === "card" ? liftCard(state, source.column, source.id) : liftBlock(state, source.id);
+		const lifted: Lifted | null = source.kind === "card" ? liftCard(state, source.column, source.id) : source.kind === "section" ? liftSection(state, source.column, source.groupId) : liftBlock(state, source.id);
 		if (!lifted) return;
 		start.current = getEventCoordinates(activatorEvent);
 		state.lift(lifted);
@@ -73,6 +76,13 @@ export function DragLayer({ children }: { readonly children: ReactNode }) {
 	const aimAt = ({ active, over, delta }: DragMoveEvent): Aim => {
 		const drag = store.getState().drag;
 		const carried = active.rect.current.translated;
+		if (drag?.lifted.kind === "section") {
+			/** A section moves among its own list's sections only. */
+			const shape = geometry.list(drag.lifted.column);
+			if (!over || String(over.id) !== `list:${drag.lifted.column}` || !shape || !carried) return { kind: "home" };
+			const y = carried.top + carried.height / 2 - over.rect.top + shape.scrollTop - shape.padTop;
+			return { kind: "slot", column: drag.lifted.column, slot: sectionSlotAt(shape.entries, shape.measured, y) };
+		}
 		if (!drag || drag.lifted.kind !== "task" || !over || !carried) return { kind: "home" };
 		const from = drag.lifted.from;
 		const id = String(over.id);
@@ -125,7 +135,7 @@ export function DragLayer({ children }: { readonly children: ReactNode }) {
 					},
 				};
 	const measuring = useMemo(() => ({ droppable: { strategy: MeasuringStrategy.WhileDragging } }), []);
-	const lifted = useScreen((s) => (s.drag?.lifted.kind === "task" ? s.drag.lifted : null));
+	const lifted = useScreen((s) => s.drag?.lifted ?? null);
 
 	return (
 		<GeometryContext.Provider value={geometry}>
@@ -146,7 +156,7 @@ export function DragLayer({ children }: { readonly children: ReactNode }) {
 				onDragCancel={() => store.getState().cancel()}
 			>
 				{children}
-				{createPortal(<DragOverlay className="tc-overlay" dropAnimation={dropAnimation}>{lifted ? <Carried lifted={lifted} /> : null}</DragOverlay>, win.document.body)}
+				{createPortal(<DragOverlay className="tc-overlay" dropAnimation={dropAnimation}>{lifted?.kind === "task" ? <Carried lifted={lifted} /> : lifted?.kind === "section" ? <CarriedSection lifted={lifted} /> : null}</DragOverlay>, win.document.body)}
 			</DndContext>
 		</GeometryContext.Provider>
 	);

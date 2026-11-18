@@ -59,6 +59,8 @@ export const TaskList = memo(function TaskList({ column, day, scrolls, className
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
 	const [edges, setEdges] = useState<Edges>({ above: 0, below: 0 });
 	const droppable = isDropColumn(column) ? column : null;
+	/** A list whose sections show: its headers lift their sections (By project's parts are not sections). */
+	const grouped = useScreen((s) => (droppable ? s.grouped[droppable] : false));
 	const { setNodeRef: dropRef } = useDroppable({ id: dropId.list(droppable ?? "day"), disabled: droppable === null || !scrolls });
 	const listRef = useCallback(
 		(el: HTMLDivElement | null) => {
@@ -93,14 +95,17 @@ export const TaskList = memo(function TaskList({ column, day, scrolls, className
 
 	const draw = (entry: Entry): ReactNode => {
 		if (entry.kind === "card") return droppable ? <DraggableCard column={droppable} entry={entry} day={day} /> : <Card id={entry.row.id} day={day} level={entry.row.level} branch={entry.row.branch} stage={entry.row.stage} />;
+		if (entry.kind === "gap" && entry.section) return <SectionGap column={droppable!} />;
 		if (entry.kind === "gap") return <Gap id={entry.id} level={entry.level} day={day} />;
 		if (entry.kind === "home") return <div className="tc-gap is-home" style={{ [PROPERTY.level]: String(entry.level) } as CSSProperties} />;
-		if (entry.kind === "head")
-			return (
+		if (entry.kind === "head") {
+			const head = (
 				<div className={`tc-group-head${entry.group.name === null ? " is-ungrouped" : ""}`}>
 					<span className="tc-group-name">{entry.group.title !== undefined ? (entry.group.title ?? "") : (entry.group.name ?? ungrouped)}</span>
 				</div>
 			);
+			return droppable && entry.group.header && grouped ? <DraggableHead column={droppable} groupId={entry.group.id}>{head}</DraggableHead> : head;
+		}
 		if (entry.kind === "plate") return <div className="tc-group-empty" data-group={entry.group.name ?? ""}>{emptyLabel}</div>;
 		return <div className="tc-group-empty tc-list-empty">{entry.words}</div>;
 	};
@@ -134,6 +139,17 @@ export const TaskList = memo(function TaskList({ column, day, scrolls, className
 	);
 });
 
+/** A section's header as a drag source: lifting it carries its section. */
+function DraggableHead({ column, groupId, children }: { readonly column: DropColumn; readonly groupId: string; readonly children: ReactNode }) {
+	const source: DragSource = useMemo(() => ({ kind: "section", column, groupId }), [column, groupId]);
+	const { setNodeRef, listeners, attributes } = useDraggable({ id: dragId.section(column, groupId), data: source });
+	return (
+		<div ref={setNodeRef} className="tc-drag-source" {...listeners} {...attributes}>
+			{children}
+		</div>
+	);
+}
+
 /** A card as a drag source: the thin wrapper dnd-kit re-renders, around the memoized card. */
 function DraggableCard({ column, entry, day }: { readonly column: DropColumn; readonly entry: Extract<Entry, { kind: "card" }>; readonly day: LocalDate | null }) {
 	const source: DragSource = useMemo(() => ({ kind: "card", column, id: entry.row.id }), [column, entry.row.id]);
@@ -158,4 +174,11 @@ function Gap({ id, level, day }: { readonly id: string | null; readonly level: n
 	const { setNodeRef } = useDraggable({ id: id ? carriedId : "gap", disabled: true });
 	if (landed && id) return <Card id={id} day={day} level={level} />;
 	return <div ref={setNodeRef} className={`tc-gap${twoLine ? " is-two-line" : ""}`} style={{ [PROPERTY.level]: String(level) } as CSSProperties} />;
+}
+
+/** The gap a carried section will land in, between the sections: a place outline as tall as a header; the section's node for dnd-kit. */
+function SectionGap({ column }: { readonly column: DropColumn }) {
+	const carriedId = useScreen((s) => (s.drag?.lifted.kind === "section" ? dragId.section(column, s.drag.lifted.groupId) : "section-gap"));
+	const { setNodeRef } = useDraggable({ id: carriedId, disabled: true });
+	return <div ref={setNodeRef} className="tc-group-drop" />;
 }

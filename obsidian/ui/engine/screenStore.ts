@@ -9,11 +9,13 @@ import {
 	type DayService,
 	type DropColumn,
 	type DropTo,
+	groupPlaceOf,
 	placeOfDrop,
 	type ScreenView,
 	StaleTaskError,
 	type FunnelPlace,
 	type FunnelView,
+	type GroupedList,
 	NO_DAY_EVENTS,
 	type ProjectsView,
 	type TaskItem,
@@ -106,6 +108,8 @@ export interface ScreenActions {
 	landed(): void;
 	/** A minute may have passed: the now line follows. */
 	tickNow(): void;
+	/** The list whose sections a column shows on the shown day (`columnSections`); null for one that shows none. */
+	sectionListOf(column: DropColumn): GroupedList | null;
 	/** A minute of the timeline snapped to its grid at this zoom (`TaskService.snap`). */
 	snap(minute: number, hourPx: number): number;
 	/** Where a task let go at `start` on the shown day's timeline lands (`TaskService.dropSpan`). */
@@ -189,6 +193,24 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 			if (!drag) return;
 			const next = { ...drag, phase: "dropping" as const, drawn: drag.drawn || step.drawn === true, flown: drag.flown || step.flown === true };
 			set({ drag: next.drawn && next.flown ? null : next });
+		};
+
+		/**
+		 * A section let go: in the gap between sections, it moves there (`moveGroup`, the place `groupPlaceOf` names); at its own
+		 * place nothing is written. The list keeps the gap until the move is read back and the copy has landed.
+		 */
+		const releaseSection = async (drag: Drag) => {
+			const lifted = drag.lifted;
+			if (lifted.kind !== "section") return;
+			const names = get().columns[lifted.column].groups.map((group) => group.name);
+			const slot = drag.aim.kind === "slot" ? drag.aim.slot : lifted.home;
+			const place = groupPlaceOf(names, lifted.home, slot >= lifted.home ? slot + 1 : slot);
+			set({ drag: { ...drag, phase: "dropping" } });
+			if (place) {
+				await tasks.moveGroup(lifted.list, lifted.group, place);
+				await get().refresh();
+			}
+			settle({ drawn: true });
 		};
 
 		/** What letting go at the aim means for the file; null where it changes nothing (the card's own place). */
@@ -298,6 +320,7 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 			async release() {
 				const drag = get().drag;
 				if (!drag || drag.phase !== "carry") return;
+				if (drag.lifted.kind === "section") return releaseSection(drag);
 				const to = dropOf(drag);
 				if (!to || drag.lifted.kind !== "task") {
 					settle({ drawn: true });
@@ -334,6 +357,7 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 
 			spanOf: (item) => tasks.shownSpan(item, get().date),
 			snap: (minute, hourPx) => tasks.snap(minute, hourPx, LAYOUT.snapTolerance),
+			sectionListOf: (column) => tasks.columnSections(column, get().date)?.list ?? null,
 			landingSpan(start) {
 				const lifted = get().drag?.lifted;
 				if (lifted?.kind !== "task") return null;

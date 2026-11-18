@@ -10,7 +10,7 @@ export type Entry =
 	| { readonly kind: "card"; readonly key: string; readonly row: RowModel; readonly group: GroupModel; readonly parent: boolean }
 	| { readonly kind: "home"; readonly key: string; readonly level: number }
 	| { readonly kind: "empty"; readonly key: string; readonly words: string }
-	| { readonly kind: "gap"; readonly key: string; readonly level: number; readonly id: string | null };
+	| { readonly kind: "gap"; readonly key: string; readonly level: number; readonly id: string | null; readonly section?: boolean };
 
 /** The key of a gap for no task (the plus): a carried task's gap is keyed as its card, so the card takes its row after the drop. */
 export const GAP_KEY = "gap";
@@ -20,6 +20,7 @@ export const GAP_KEY = "gap";
  * opens where the core placed the carried card (`placeAt`), at its depth, in place of an empty section's plate.
  */
 export function entriesOf(model: ColumnModel, column: string, drag: Drag | null, looks: Pick<ScreenLooks, "homePlace" | "parentOutline">): Entry[] {
+	if (drag?.lifted.kind === "section" && drag.lifted.column === column) return sectionEntries(model, drag);
 	const lifted = drag?.lifted.kind === "task" ? new Set(drag.lifted.ids) : null;
 	/**
 	 * Until the drop is over (its screen drawn, its copy landed) the list stands as during the carry: the gap open where the
@@ -74,6 +75,38 @@ export function entriesOf(model: ColumnModel, column: string, drag: Drag | null,
 		if (card.kind === "card") entries[parentAt] = { ...card, parent: true };
 	}
 	return entries;
+}
+
+/** The key of the gap a carried section will land in: the section's own, so its header takes the gap's row after the drop. */
+export const sectionKey = (groupId: string) => `head:${groupId}`;
+
+/**
+ * A list while one of its sections is carried: the section's header and cards leave it; the gap between the sections
+ * opens where the finger is (`slot`, among the sections left), first where the section stood.
+ */
+function sectionEntries(model: ColumnModel, drag: Drag): Entry[] {
+	const lifted = drag.lifted;
+	if (lifted.kind !== "section") return [];
+	const slot = drag.aim.kind === "slot" ? drag.aim.slot : lifted.home;
+	const entries: Entry[] = [];
+	let at = 0;
+	const gap = () => entries.push({ key: sectionKey(lifted.groupId), kind: "gap", level: 0, id: null, section: true });
+	for (const group of model.groups) {
+		if (group.id === lifted.groupId) continue;
+		if (at === slot) gap();
+		at++;
+		if (group.header) entries.push({ key: `head:${group.id}`, kind: "head", group, top: entries.length === 0 });
+		if (group.empty) entries.push({ key: `plate:${group.id}`, kind: "plate", group });
+		for (const row of group.rows) entries.push({ key: `task:${row.id}`, kind: "card", row, group, parent: false });
+	}
+	if (at <= slot) gap();
+	return entries;
+}
+
+/** Where a carried section would land: among the sections left, the gap before the first whose header's middle is below `y`. */
+export function sectionSlotAt(entries: readonly Entry[], measured: readonly Measured[], y: number): number {
+	const box = new Map(measured.map((m) => [m.index, m]));
+	return entries.filter((entry, i) => entry.kind === "head" && (box.get(i)?.start ?? Infinity) + (box.get(i)?.size ?? 0) / 2 < y).length;
 }
 
 /** The entry of the card a gap at `level` would go under: the nearest card above it a level up. */
