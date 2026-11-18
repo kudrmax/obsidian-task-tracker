@@ -1,5 +1,7 @@
 # Plugin UI on the standard frontend stack
 
+**Superseded by [`2026-11-18-ui-engine.md`](2026-11-18-ui-engine.md)**, the one spec of the rework; kept for its history. The feature list and stage 0's results stay in force.
+
 Supersedes [`2026-11-15-ui-refactor.md`](2026-11-15-ui-refactor.md) (revision 15 and everything before it). That spec designed our own engines; this one replaces them with the libraries every app uses.
 
 ## Goal
