@@ -3,7 +3,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Destination, ListId } from "../port";
+import type { Destination, ListId, Row } from "../port";
 import { useScreen, useScreenApi } from "../store";
 import { descendantsOf, levelAt, levelBetween, type Slot, slotOf, type Zone, zoneOf } from "./tree";
 
@@ -137,6 +137,15 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const x = (getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x;
 		return over ? zoneOf(x, over.rect.left, over.rect.width) : "task";
 	};
+	/** The level the carried plus's field would take where the plus stands now among its list's rows: drawn by its place. */
+	const plusLevel = (plus: Sortable, over: Sortable | null, zone: Zone): number | null => {
+		const container = containerOf(plus);
+		if (container === null) return null;
+		const rows = rowsOf(container);
+		const byId = new Map(rows.map((row) => [row.id, row]));
+		const order = itemsOf(plus).map((id): Row => byId.get(id) ?? { kind: "task", id, depth: 0 });
+		return levelAt(order, PLUS, over ? String(over.id) : PLUS, zone);
+	};
 	/** The level the carried card takes where it stands now, among the rows of its list, its own subtasks folded away. */
 	const projected = (lifted: Sortable, over: Sortable | null, zone: Zone): number | null => {
 		const container = containerOf(lifted);
@@ -187,7 +196,10 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	};
 	const move = (event: DragMoveEvent) => {
 		const { active: lifted, over } = event;
-		if (lifted.id === PLUS) return plusOver(event, over);
+		if (lifted.id === PLUS) {
+			plusOver(event, over);
+			return api.getState().setLiftedDepth(plusLevel(lifted, over, zoneUnder(event, over)));
+		}
 		api.getState().setLiftedDepth(projected(lifted, over, zoneUnder(event, over)));
 	};
 

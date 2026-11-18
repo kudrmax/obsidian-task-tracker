@@ -44,7 +44,7 @@ export const EntryField = memo(function EntryField({ depth }: { readonly depth: 
 		<div className="tc-quick-row tc-entry" style={{ [PROPERTY.level]: String(depth) } as CSSProperties}>
 			<ObsidianEditor
 				text=""
-				className="tc-quick-field"
+				className="tc-quick-field tc-title-field"
 				onEnter={(text) => void api.getState().commitEntry(text, true)}
 				onEscape={() => api.getState().openEntry(null)}
 				onTab={(shift) => api.getState().indentEntry(shift ? -1 : 1)}

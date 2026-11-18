@@ -252,6 +252,8 @@ body {
 	/* A section's header in a list: its label at the bottom, a gap over every header but the first. */
 	--tc-group-head-h: 26px;
 	--tc-section-gap: var(--tc-space-10);
+	/** Room over a section's header in the engine's lists: more than between two cards, so a section reads as a new part. */
+	--tc-list-section-gap: var(--tc-space-20);
 	/* The project's folder on a card: as wide as its symbol, at the card's right edge; a tap takes as much as a date's width, over the title's faded end. */
 	--tc-stroke-project-mark: var(--tc-stroke-2);
 	--tc-project-mark-w: var(--tc-icon-s);
@@ -1802,7 +1804,7 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-list-items { position: relative; flex: none; }
 .tc-list-block { position: absolute; top: 0; left: 0; right: 0; }
 .tc-list-item { display: flow-root; padding-bottom: var(--tc-card-gap); }
-.tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head { margin-top: var(--tc-section-gap); }
+.tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head { margin-top: var(--tc-list-section-gap); }
 /* Blocks that overlap stand side by side, each its lane's share of the items' width; a short one is still a whole card (the released screen's stacked cards). */
 .task-calendar.is-engine .tc-items > .tc-block { right: calc(var(--tc-x-end) + var(--tc-item-inset)); min-height: var(--tc-card-h); }
 /* Drag and drop («Decided» 1): while a card is carried the cards part, and its own place stands where it will land, as an outline at its depth. */

@@ -1,5 +1,6 @@
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { PROPERTY } from "../../design";
 import { EmptyPlate, PLUS, SortableList, SortableRow } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
@@ -104,7 +105,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 									return (
 										<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried fresh={false} className="tc-list-item">
 											<SortableRow id={row.id} gap>
-												<div className="tc-card" />
+												<div className="tc-card" style={{ [PROPERTY.level]: String(liftedDepth ?? 0) } as CSSProperties} />
 											</SortableRow>
 										</MovingRow>
 									);
