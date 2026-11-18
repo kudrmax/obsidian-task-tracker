@@ -175,6 +175,9 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const [origin, setOrigin] = useState<(Slot & { readonly container: string; readonly depth: number; readonly at: number | null }) | null>(null);
 	/** The minute the carried card's place stands at on the calendar, while it stands there. */
 	const carriedAt = useRef<number | null>(null);
+	/** A block's start when it was lifted, and the minute its top read there (null until first read over the calendar). */
+	const liftAt = useRef<number | null>(null);
+	const homeTop = useRef<number | null>(null);
 	/** The carried card is over a place that refuses it: its place is home, its level its own, and let go it flies back. */
 	const refusedNow = useRef(false);
 
@@ -260,12 +263,16 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	 * Over the calendar the card's place is its block, at the minute the calendar reads under the carried plate's top (its
 	 * time scale and scroll are its own): the screen draws the port's preview of the task there, as it does in a list.
 	 */
-	const overCalendar = (event: { readonly active: Sortable & { readonly rect: { readonly current: { readonly translated: { readonly top: number } | null } } } }, over: { readonly rect: { readonly top: number }; readonly data: { readonly current?: unknown } }) => {
+	const overCalendar = (event: { readonly active: Sortable & { readonly rect: { readonly current: { readonly translated: { readonly top: number } | null; readonly initial: { readonly top: number } | null } } } }, over: { readonly rect: { readonly top: number }; readonly data: { readonly current?: unknown } }) => {
 		const id = String(event.active.id);
 		const minuteAt = (over.data.current as CalendarData | undefined)?.minuteAt;
 		const top = event.active.rect.current.translated?.top;
 		if (!minuteAt || top === undefined) return;
-		const at = minuteAt(top);
+		/** A block taken from a stack stands below its time: its top read where it was taken is its own start, so brought back there it writes nothing. */
+		const initial = event.active.rect.current.initial?.top;
+		if (liftAt.current !== null && homeTop.current === null && initial !== undefined) homeTop.current = minuteAt(initial);
+		const read = minuteAt(top);
+		const at = read !== null && read === homeTop.current ? liftAt.current : read;
 		if (at === null) return;
 		if (at === carriedAt.current && containerOf(event.active) === CALENDAR) {
 			refusedNow.current = false;
@@ -317,6 +324,8 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		if (container !== null) swipe.current = new SwipeLevel(spotKey(container, itemsOf(lifted).filter((other) => !under.has(other)), String(lifted.id)), depth, liftX, performance.now());
 		const block = container === CALENDAR ? (screen.shown.day.blocks.find((b) => b.id === String(lifted.id)) ?? null) : null;
 		carriedAt.current = block?.start ?? null;
+		liftAt.current = block?.start ?? null;
+		homeTop.current = null;
 		setOrigin(container === null ? null : { container, ...slotOf(rows, itemsOf(lifted), String(lifted.id)), depth, at: block?.start ?? null });
 		onLift();
 	};
