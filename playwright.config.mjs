@@ -17,7 +17,13 @@ export default defineConfig({
 	/** A recording of a person replays at its own pace, minutes long. */
 	timeout: 300_000,
 	reporter: [["list"], ["html", { outputFolder: "build/e2e-report", open: "never" }]],
-	use: { browserName: "chromium", trace: "retain-on-failure", video: "retain-on-failure" },
+	use: {
+		browserName: "chromium",
+		trace: "retain-on-failure",
+		video: "retain-on-failure",
+		/** A horizontal wheel past the page's edge would go back in the tab's history, as Chrome does; Obsidian never does. */
+		launchOptions: { args: ["--overscroll-history-navigation=0"] },
+	},
 	projects: [
 		{ name: "desktop-dark", use: { ...desktop, colorScheme: "dark", theme: "dark" } },
 		{ name: "desktop-light", use: { ...desktop, colorScheme: "light", theme: "light" } },

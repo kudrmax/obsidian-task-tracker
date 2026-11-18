@@ -1,5 +1,5 @@
 import { test as base } from "@playwright/test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { sleep } from "./lib/cdp.mjs";
@@ -86,7 +86,16 @@ async function scenarioTools(page, { platform, theme, out }) {
 			return frameFaults(frames, checks);
 		},
 		shot: (name) => screenshot(cdp, join(out, `${name}.png`)),
-		replay: (recording, opts) => replay(cdp, join(ROOT, "tests/e2e/recordings", recording), opts),
+		/** A recording replayed in a window of its size: an event recorded past this window's edge would never reach the page. */
+		async replay(recording, opts) {
+			const file = join(ROOT, "tests/e2e/recordings", recording);
+			const { w, h } = JSON.parse(readFileSync(file, "utf8"));
+			if (w && h) {
+				await page.setViewportSize({ width: w, height: h });
+				await sleep(400);
+			}
+			return replay(cdp, file, opts);
+		},
 		sleep,
 		/** Waits until `check` answers truthy, as a person waits for the screen, up to `ms`; its last answer. */
 		async waitFor(check, ms = 5000) {
