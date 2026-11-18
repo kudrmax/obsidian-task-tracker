@@ -6,7 +6,7 @@ import type { Stop } from "../ui/engine/store";
 import { detectHaptics, type HapticsHost } from "../ui/haptics";
 import { clearPriorityColors, showPriorityColors } from "../ui/priorityColors";
 import { addWindowDocument } from "../ui/windowDocuments";
-import { type ListKey, oneColumnFile, twoColumnsFile } from "./mockData";
+import { type ListKey, type MockFile, oneColumnFile, subtasksFile, twoColumnsFile } from "./mockData";
 import { MockPort, WRITE_DELAYS, type WriteDelay } from "./MockPort";
 
 /** The stand's own view type and code block language: never the plugin's. */
@@ -114,9 +114,9 @@ export default class TaskCalendarStand extends Plugin {
 	leafPlace: Place = "leaf";
 
 	/** Shows `place` in every open leaf, with its tasks: the first step's dozen, or the whole made-up file. */
-	private async showStep(place: Place): Promise<void> {
+	private async showStep(place: Place, file: MockFile | undefined = place === "column" ? oneColumnFile() : place === "twoColumns" ? twoColumnsFile() : undefined): Promise<void> {
 		this.leafPlace = place;
-		this.port.reset(place === "column" ? oneColumnFile() : place === "twoColumns" ? twoColumnsFile() : undefined);
+		this.port.reset(file);
 		for (const leaf of this.app.workspace.getLeavesOfType(STAND_VIEW)) {
 			const view = leaf.view;
 			if (view instanceof StandView) {
@@ -156,6 +156,7 @@ export default class TaskCalendarStand extends Plugin {
 		this.addCommand({ id: "new-tasks", name: "New made-up tasks", callback: () => port.reset() });
 		this.addCommand({ id: "step-one-column", name: "Step 1: one column and drag", callback: () => void this.showStep("column") });
 		this.addCommand({ id: "step-two-columns", name: "Step 2: two columns and drag between them", callback: () => void this.showStep("twoColumns") });
+		this.addCommand({ id: "step-subtasks", name: "Step 3: subtasks", callback: () => void this.showStep("twoColumns", subtasksFile()) });
 		this.addCommand({ id: "whole-screen", name: "The whole screen", callback: () => void this.showStep("leaf") });
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => (port.delay = delay) });
 	}

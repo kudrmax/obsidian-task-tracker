@@ -60,11 +60,16 @@ export interface ScreenData {
 	readonly day: DayData;
 }
 
-/** Where a task goes: into `list` before the task `before` (null: the list's end); the day list is that of `dayOffset`. */
+/**
+ * Where a task goes: into `list` before the task `before` (null: the list's end); the day list is that of `dayOffset`.
+ * `depth`, when given, is the level it takes there (0 a task, 1 a subtask of the task above…); without it, the level of
+ * the task it goes before.
+ */
 export interface Destination {
 	readonly list: ListId;
 	readonly before: string | null;
 	readonly dayOffset: number;
+	readonly depth?: number;
 }
 
 /** A menu's item: the port names it and runs it. */

@@ -1,10 +1,12 @@
-import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getFirstCollision, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getFirstCollision, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragMoveEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Destination, ListId } from "../port";
+import { DESIGN } from "../../design";
 import { useScreen, useScreenApi } from "../store";
+import { descendantsOf, projectDepth } from "./tree";
 
 /**
  * Drag and drop (spec, «The owners»): one `DndContext` per screen, one `DragOverlay`, one `onDragEnd` that makes one write
@@ -87,33 +89,81 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 		return lastOver.current !== null ? [{ id: lastOver.current }] : [];
 	}, []);
 
-	/** Where the card was lifted: let go there, nothing is written. */
-	const [origin, setOrigin] = useState<SortablePlace | null>(null);
+	/** Where the card was lifted, and at which level: let go there, nothing is written. */
+	const [origin, setOrigin] = useState<(SortablePlace & { readonly depth: number }) | null>(null);
+
+	/**
+	 * The level the carried card takes where it stands now, from the pointer's sideways move since the lift (dnd-kit's
+	 * «Sortable tree»), among the rows of the list it is in, its own subtasks folded away.
+	 */
+	const projected = (lifted: Sortable, over: Sortable | null, offsetX: number): number | null => {
+		const position = placeOf(lifted);
+		if (!position) return null;
+		const id = String(lifted.id);
+		const rows = api.getState().shown.lists[position.container as ListId]?.rows ?? [];
+		const under = descendantsOf(rows, id);
+		const visible = under.size === 0 ? rows : rows.filter((row) => !under.has(row.id));
+		return projectDepth(visible, id, over ? String(over.id) : id, offsetX, DESIGN.subtaskIndent, liftedDepth.current);
+	};
+	/**
+	 * How far the pointer moved sideways since the lift, within the list the card is over now: a card carried into the next
+	 * column has moved by the column's width, which is no indent. The rows of a list all start at its left edge (the indent
+	 * is the card's own margin), so a row's box is where its list starts. Where the lifted card's list starts is kept from
+	 * the first move: dnd-kit measures the card again once it stands in
+	 * another list, so its own box no longer says where it was lifted.
+	 */
+	const liftedLeft = useRef<number | null>(null);
+	/** The carried card's depth when lifted: its level is projected from it, never from where a preview put it meanwhile. */
+	const liftedDepth = useRef(0);
+	const sideways = (active: { readonly rect: { readonly current: { readonly initial: { readonly left: number } | null } } }, over: { readonly rect: { readonly left: number } } | null, deltaX: number): number => {
+		liftedLeft.current ??= active.rect.current.initial?.left ?? null;
+		return liftedLeft.current === null || !over ? deltaX : deltaX - (over.rect.left - liftedLeft.current);
+	};
+	/** The level a card takes as it comes into another list: as the projection there would give it, the list's rows around its place. */
+	const crossingDepth = (into: Destination, offsetX: number): number => {
+		const rows = api.getState().shown.lists[into.list]?.rows ?? [];
+		const at = into.before === null ? rows.length : rows.findIndex((row) => row.id === into.before);
+		const above = rows.slice(0, at < 0 ? rows.length : at).reverse().find((row) => row.kind === "task" || row.kind === "section");
+		const below = at >= 0 ? rows[at] : undefined;
+		const deepest = above?.kind === "task" ? above.depth + 1 : 0;
+		const shallowest = below?.kind === "task" ? below.depth : 0;
+		return Math.max(shallowest, Math.min(deepest, liftedDepth.current + Math.round(offsetX / DESIGN.subtaskIndent)));
+	};
+	const move = ({ active: lifted, over, delta }: DragMoveEvent) => {
+		api.getState().setLiftedDepth(projected(lifted, over, sideways(lifted, over, delta.x)));
+	};
 
 	const start = ({ active: lifted }: DragStartEvent) => {
 		const screen = api.getState();
 		if (!screen.claim("drag")) return;
 		screen.lift(String(lifted.id));
 		setActive(String(lifted.id));
-		setOrigin(placeOf(lifted));
+		liftedLeft.current = null;
+		const position = placeOf(lifted);
+		const own = position ? api.getState().shown.lists[position.container as ListId]?.rows.find((row) => row.id === String(lifted.id)) : undefined;
+		liftedDepth.current = own?.kind === "task" ? own.depth : 0;
+		setOrigin(position ? { ...position, depth: liftedDepth.current } : null);
 		onLift();
 	};
 	/**
 	 * Over another list, the card moves into it at once, as dnd-kit's «multiple containers» example does: the screen draws
 	 * the port's preview of the card there, and that list's cards part around its place.
 	 */
-	const overList = ({ active: lifted, over }: DragOverEvent) => {
-		const to = crossing(lifted, over, api.getState().dayOffset);
-		if (!to) return;
+	const overList = ({ active: lifted, over, delta }: DragOverEvent) => {
+		const into = crossing(lifted, over, api.getState().dayOffset);
+		if (!into) return;
+		const to = { ...into, depth: crossingDepth(into, sideways(lifted, over, delta.x)) };
 		justMoved.current = true;
 		api.getState().carryInto(String(lifted.id), to);
 	};
-	const end = ({ active: lifted, over }: DragEndEvent) => {
+	const end = ({ active: lifted, over, delta }: DragEndEvent) => {
 		setActive(null);
+		const depth = projected(lifted, over, sideways(lifted, over, delta.x)) ?? undefined;
 		const to = destinationOf(lifted, over, api.getState().dayOffset);
 		const here = placeOf(lifted);
-		const still = to === null && here !== null && origin !== null && here.container === origin.container && here.before === origin.before;
-		api.getState().drop(String(lifted.id), to ?? (still || here === null ? null : { list: here.container as ListId, before: here.before, dayOffset: api.getState().dayOffset }));
+		const still = to === null && here !== null && origin !== null && here.container === origin.container && here.before === origin.before && depth === origin.depth;
+		const where = to ?? (still || here === null ? null : { list: here.container as ListId, before: here.before, dayOffset: api.getState().dayOffset });
+		api.getState().drop(String(lifted.id), where && depth !== undefined ? { ...where, depth } : where);
 	};
 	const cancel = () => {
 		if (active) api.getState().drop(active, null);
@@ -121,7 +171,7 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 	};
 
 	return (
-		<DndContext sensors={sensors} collisionDetection={collision} onDragStart={start} onDragOver={overList} onDragEnd={end} onDragCancel={cancel}>
+		<DndContext sensors={sensors} collisionDetection={collision} onDragStart={start} onDragMove={move} onDragOver={overList} onDragEnd={end} onDragCancel={cancel}>
 			{children}
 			{createPortal(
 				<DragOverlay className="tc-overlay" dropAnimation={DROP_ANIMATION}>

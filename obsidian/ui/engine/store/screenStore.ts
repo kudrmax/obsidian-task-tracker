@@ -29,6 +29,8 @@ export interface ScreenState {
 	readonly gesture: Gesture | null;
 	/** The task carried now. */
 	readonly lifted: string | null;
+	/** The level the carried task would take where it stands now (dnd-kit's sortable tree projection); null: its own. */
+	readonly liftedDepth: number | null;
 	/** Data came while a drag or its write held the screen still: read once they end. */
 	readonly pending: boolean;
 	/** The present minute from today's start, ticking each minute (spec, «Time»). */
@@ -49,6 +51,8 @@ export interface ScreenActions {
 	claim(gesture: Gesture): boolean;
 	release(gesture: Gesture): void;
 	lift(id: string): void;
+	/** The carried task's level where it would land, as the pointer's sideways move projects it. */
+	setLiftedDepth(depth: number | null): void;
 	/** The carried task drawn in another list while carried: the port's preview of it there (dnd-kit's «multiple containers»). */
 	carryInto(id: string, to: Destination): void;
 	/** The carried task let go at `to` (null: cancelled, or let go where nothing takes it). */
@@ -113,6 +117,7 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 			stop: "calendar",
 			gesture: null,
 			lifted: null,
+			liftedDepth: null,
 			pending: false,
 			now: port.now(),
 			layer: null,
@@ -141,7 +146,10 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 				if (get().pending) refresh();
 			},
 			lift(id) {
-				set({ lifted: id, layer: null });
+				set({ lifted: id, liftedDepth: null, layer: null });
+			},
+			setLiftedDepth(liftedDepth) {
+				if (get().liftedDepth !== liftedDepth) set({ liftedDepth });
 			},
 			carryInto(id, to) {
 				set({ shown: share(get().shown, port.preview(id, to)) });
@@ -151,7 +159,7 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 					set({ shown: share(get().shown, port.preview(id, to)) });
 					write(port.move(id, to));
 				} else if (get().shown !== get().read) set({ shown: get().read });
-				set({ lifted: null });
+				set({ lifted: null, liftedDepth: null });
 				get().release("drag");
 			},
 			openMenu(id) {

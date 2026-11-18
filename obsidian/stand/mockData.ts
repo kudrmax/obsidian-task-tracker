@@ -147,3 +147,12 @@ export function twoColumnsFile(): MockFile {
 	file.soon[0].tasks = names.map((title, i) => ({ id: `d${i + 1}`, title, level: null, status: " ", due: null, slot: null, description: null, children: [] }));
 	return file;
 }
+
+/** The stand's subtasks step: the two columns, with tasks that have subtasks (one level and two) in both. */
+export function subtasksFile(): MockFile {
+	const file = twoColumnsFile();
+	const plain = (id: string, title: string, children: MockTask[] = []): MockTask => ({ id, title, level: null, status: " ", due: null, slot: null, description: null, children });
+	file.inbox[0].tasks.splice(3, 0, plain("e1", "Спланировать отпуск", [plain("e2", "Выбрать даты"), plain("e3", "Купить билеты", [plain("e4", "Сравнить цены")]), plain("e5", "Забронировать отель")]));
+	file.soon[0].tasks.splice(2, 0, plain("f1", "Переезд", [plain("f2", "Найти грузчиков"), plain("f3", "Упаковать книги")]));
+	return file;
+}

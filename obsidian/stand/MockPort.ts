@@ -137,12 +137,48 @@ export class MockPort implements ScreenPort {
 		this.take(file, id);
 		task.slot = null;
 		task.due = to.list === "day" ? dateOf(addDays(this.day(), to.dayOffset)) : null;
+		if (to.depth !== undefined) return this.nest(file, task, to);
 		const into = to.before ? this.containerOf(file, to.before) : null;
 		if (into) into.splice(into.findIndex((t) => t.id === to.before), 0, task);
 		else {
 			const sections = this.listOf(file, to.list, to.dayOffset);
 			sections[sections.length - 1].tasks.push(task);
 		}
+	}
+
+	/**
+	 * A move at a given level, as the sortable tree example builds its tree again (`buildTree`): the section's tasks laid
+	 * out flat with their levels, the task put in before `before` (or at the end) at `to.depth`, no deeper than one under
+	 * the task above it, then each task hung under the nearest one above it a level up. Its own subtasks go with it.
+	 */
+	private nest(file: MockFile, task: MockTask, to: Destination): void {
+		const sections = this.listOf(file, to.list, to.dayOffset);
+		const section = (to.before ? sections.find((sec) => this.inSection(sec.tasks, to.before ?? "")) : undefined) ?? sections[sections.length - 1];
+		const flat: { task: MockTask; depth: number }[] = [];
+		const lay = (tasks: readonly MockTask[], depth: number) => {
+			for (const t of tasks) {
+				flat.push({ task: t, depth });
+				lay(t.children, depth + 1);
+			}
+		};
+		lay(section.tasks, 0);
+		const at = to.before ? flat.findIndex((f) => f.task.id === to.before) : flat.length;
+		const index = at < 0 ? flat.length : at;
+		const above = flat[index - 1];
+		flat.splice(index, 0, { task, depth: Math.min(to.depth ?? 0, above ? above.depth + 1 : 0) });
+		const roots: MockTask[] = [];
+		const stack: MockTask[] = [];
+		for (const f of flat) {
+			if (f.task !== task) f.task.children = [];
+			stack.length = f.depth;
+			(f.depth === 0 ? roots : stack[f.depth - 1].children).push(f.task);
+			stack[f.depth] = f.task;
+		}
+		section.tasks = roots;
+	}
+
+	private inSection(tasks: readonly MockTask[], id: string): boolean {
+		return tasks.some((t) => t.id === id || this.inSection(t.children, id));
 	}
 
 	private take(file: MockFile, id: string): void {

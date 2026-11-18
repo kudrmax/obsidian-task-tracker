@@ -1,6 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { SortableList, SortableRow } from "../drag/Drag";
+import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
 import type { ListId, Row } from "../port";
 import { useData, useScreen, useScreenApi } from "../store";
@@ -19,9 +20,16 @@ const OVERSCAN = 6;
  * is a `MovingRow`. A task the store asks to reveal is scrolled into sight by the virtualizer's `scrollToIndex`.
  */
 export const TaskList = memo(function TaskList({ list }: { readonly list: ListId }) {
-	const rows = useData((d) => d.lists[list].rows);
+	const allRows = useData((d) => d.lists[list].rows);
 	const readRows = useData((d) => d.lists[list].rows, true);
 	const lifted = useScreen((s) => s.lifted);
+	const liftedDepth = useScreen((s) => s.liftedDepth);
+	/** A carried task's subtasks fold away under it while it is carried (dnd-kit's «Sortable tree»): they travel with it. */
+	const rows = useMemo(() => {
+		if (lifted === null) return allRows;
+		const under = descendantsOf(allRows, lifted);
+		return under.size === 0 ? allRows : allRows.filter((row) => !under.has(row.id));
+	}, [allRows, lifted]);
 	const fresh = useScreen((s) => s.fresh);
 	const reveal = useScreen((s) => s.reveal);
 	const order = useMemo(() => readRows.map((row) => row.id).join(" "), [readRows]);
@@ -54,7 +62,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 								const row = rows[item.index];
 								return (
 									<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
-										<RowFace row={row} />
+										<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
 									</MovingRow>
 								);
 							})}
