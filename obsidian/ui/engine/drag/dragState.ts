@@ -1,63 +1,57 @@
-import type { DropColumn, DropFrom, GapPlace, GroupedList, GroupName, TaskKey } from "../../../../core/application/contracts";
+import type { Gap } from "../mechanics/drop";
+import type { ListId } from "../port";
 
-/** What a finger carries: a task (with its subtasks), the plus, or a section's header with its tasks. */
+/** What a finger carries: a task (with its subtasks) from a list or the timeline, or a section by its header with its tasks. */
 export type Lifted =
 	| {
 			readonly kind: "task";
 			readonly id: string;
-			readonly key: TaskKey;
-			readonly from: DropFrom;
-			/** The ids of the task and of every subtask under it: they leave their list with it. */
+			/** The task and every subtask under it: they leave their list with it. */
 			readonly ids: readonly string[];
-			/** Where it stood in its list, as a place to drop (the core's gap); null for a block of the timeline. */
-			readonly home: { readonly column: DropColumn; readonly gap: GapPlace } | null;
+			/** Where it stood in its list, as a gap; null for a block of the timeline. */
+			readonly home: { readonly list: ListId; readonly gap: Gap } | null;
 			/** How many layers its subtasks draw under the carried card (0 to 2). */
 			readonly layers: number;
 	  }
-	| { readonly kind: "plus" }
 	| {
 			readonly kind: "section";
-			readonly column: DropColumn;
-			readonly list: GroupedList;
-			readonly group: GroupName;
-			readonly groupId: string;
-			/** The section's place among the list's sections it was lifted from. */
+			readonly list: ListId;
+			readonly section: string;
+			readonly title: string | null;
+			/** Its place among its list's sections. */
 			readonly home: number;
 	  };
 
-/** Where the carried thing would land now: a gap of a list, a column's title, a time of the timeline, a slot between sections; `home` nowhere new. */
+/** Where the carried thing would land now: a list's gap, a list's title, a minute of the timeline, a place among sections; `home` nowhere new. */
 export type Aim =
-	| { readonly kind: "gap"; readonly column: DropColumn; readonly gap: GapPlace }
-	| { readonly kind: "title"; readonly column: DropColumn }
-	| { readonly kind: "time"; readonly start: number }
-	| { readonly kind: "slot"; readonly column: DropColumn; readonly slot: number }
+	| { readonly kind: "gap"; readonly list: ListId; readonly gap: Gap }
+	| { readonly kind: "title"; readonly list: ListId }
+	| { readonly kind: "time"; readonly minute: number }
+	| { readonly kind: "slot"; readonly list: ListId; readonly slot: number }
 	| { readonly kind: "home" };
 
 /**
- * A drag under way: what is carried and where it would land. `dropping`: let go, the carried copy flies to its place and
- * the card waits there unseen until it lands.
+ * A drag under way and what is carried. `dropping`: let go, the copy flies to its place. `drawn`: the screen the drop
+ * leaves is drawn (or nothing was written); `flown`: the copy has landed. The drag is over once both are.
  */
 export interface Drag {
 	readonly lifted: Lifted;
 	readonly aim: Aim;
 	readonly phase: "carry" | "dropping";
-	/** Let go, the screen the drop leaves is drawn (or nothing was written): the card stands at its place, unseen. */
 	readonly drawn: boolean;
-	/** Let go, the carried copy has reached the card's place. The drag is over once both are true. */
 	readonly flown: boolean;
 }
 
-/** The id a draggable registers with dnd-kit: a task's card or block, the plus, a section's header. */
+/** The id a draggable registers with dnd-kit: a task's card or block, a section's header. */
 export const dragId = {
 	task: (id: string) => `task:${id}`,
 	block: (id: string) => `block:${id}`,
-	plus: "plus",
-	section: (column: DropColumn, groupId: string) => `section:${column}:${groupId}`,
+	section: (id: string) => `section:${id}`,
 } as const;
 
-/** The id a drop target registers: a list, a column's title, the timeline. */
+/** The id a drop target registers: a list, a list's title, the timeline. */
 export const dropId = {
-	list: (column: DropColumn) => `list:${column}`,
-	title: (column: DropColumn) => `title:${column}`,
+	list: (list: ListId) => `list:${list}`,
+	title: (list: ListId) => `title:${list}`,
 	timeline: "timeline",
 } as const;

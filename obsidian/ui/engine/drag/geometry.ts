@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef } from "react";
-import type { DropColumn } from "../../../../core/application/contracts";
+import type { ListId } from "../port";
 import type { Entry, Measured } from "./listDrag";
 
 /** A list as a drag reads it: the rows it draws, their boxes as the virtualizer measured them, its scroll, the room over its first row. */
@@ -10,32 +10,29 @@ export interface ListShape {
 	readonly padTop: number;
 }
 
-/** The timeline as a drag reads it: the minute at a height of the window, read from its own scroll and zoom. */
+/** The timeline as a drag reads it: the minute at a height of the window, from its own scroll and zoom. */
 export interface TimelineShape {
 	minuteAt(clientY: number, top: number): number;
 	readonly hourPx: number;
 }
 
-/**
- * Where the drag layer reads what the lists and the timeline draw: each registers a reader of its own state while mounted.
- * Nothing is measured here; the readers give what their libraries already know (the virtualizer's boxes, the scroll).
- */
+/** Where the drag layer reads what the lists and the timeline draw: each registers a reader of its own state while mounted. */
 export class DragGeometry {
-	private readonly lists = new Map<DropColumn, () => ListShape>();
+	private readonly lists = new Map<ListId, () => ListShape>();
 	private timelineShape: (() => TimelineShape) | null = null;
 
-	list(column: DropColumn): ListShape | null {
-		return this.lists.get(column)?.() ?? null;
+	list(id: ListId): ListShape | null {
+		return this.lists.get(id)?.() ?? null;
 	}
 
 	timeline(): TimelineShape | null {
 		return this.timelineShape?.() ?? null;
 	}
 
-	registerList(column: DropColumn, read: () => ListShape): () => void {
-		this.lists.set(column, read);
+	registerList(id: ListId, read: () => ListShape): () => void {
+		this.lists.set(id, read);
 		return () => {
-			if (this.lists.get(column) === read) this.lists.delete(column);
+			if (this.lists.get(id) === read) this.lists.delete(id);
 		};
 	}
 
@@ -49,12 +46,11 @@ export class DragGeometry {
 
 export const GeometryContext = createContext<DragGeometry | null>(null);
 
-/** Registers `read` (kept fresh each render) for the list `column` while the component is mounted; nothing outside a drag layer. */
-export function useListShape(column: DropColumn | null, read: () => ListShape): void {
+export function useListShape(id: ListId | null, read: () => ListShape): void {
 	const geometry = useContext(GeometryContext);
 	const latest = useRef(read);
 	latest.current = read;
-	useEffect(() => (geometry && column ? geometry.registerList(column, () => latest.current()) : undefined), [geometry, column]);
+	useEffect(() => (geometry && id ? geometry.registerList(id, () => latest.current()) : undefined), [geometry, id]);
 }
 
 export function useTimelineShape(read: () => TimelineShape): void {
