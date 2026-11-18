@@ -2,8 +2,9 @@
 // obsidian-task-calendar: built from agent/ by `node agent/build.mjs`. Do not edit.
 
 // agent/compose.ts
+import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { join as join2 } from "node:path";
+import { dirname, join as join2 } from "node:path";
 
 // core/application/CalendarPolling.ts
 var CalendarPolling = class {
@@ -11136,6 +11137,13 @@ function runProjectsScreen(subprojects) {
 
 // agent/compose.ts
 var DEFAULT_VAULT = join2(homedir(), "Obsidian");
+function vaultOf(program) {
+  if (!program || !existsSync(program)) return DEFAULT_VAULT;
+  for (let dir = dirname(realpathSync(program)); dir !== dirname(dir); dir = dirname(dir)) {
+    if (existsSync(join2(dir, ".obsidian"))) return dir;
+  }
+  return DEFAULT_VAULT;
+}
 async function composeAgent(host) {
   const settings = await settingsAt(join2(host.vault, SETTINGS_FILE));
   const tasksPath = tasksFilePath(settings.get());
@@ -11156,11 +11164,11 @@ async function composeAgent(host) {
   });
   return core.agent;
 }
-function agentFor(clock) {
-  return (options) => composeAgent({ vault: options.vault ?? DEFAULT_VAULT, subprojects: options.subprojects, ...clock && { clock } });
+function agentFor(clock, vault = DEFAULT_VAULT) {
+  return (options) => composeAgent({ vault: options.vault ?? vault, subprojects: options.subprojects, ...clock && { clock } });
 }
 async function start(argv = process.argv.slice(2)) {
-  const { text, code } = await runProgram(argv, agentFor());
+  const { text, code } = await runProgram(argv, agentFor(void 0, vaultOf(process.argv[1])));
   process.stdout.write(`${text}
 `);
   process.exitCode = code;
