@@ -4,7 +4,7 @@
  * stalls between places. A recording without its `.expect.json` is held to the strokes the pager's rule finds in it.
  */
 import { readdirSync, readFileSync } from "node:fs";
-import { WheelStrokes } from "../../../obsidian/ui/screen/wheelStrokes.ts";
+import { WheelStrokes } from "../../../obsidian/ui/engine/wheelStrokes.ts";
 
 const RECORDINGS = new URL("../recordings/", import.meta.url).pathname;
 

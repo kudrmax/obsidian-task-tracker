@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { composeCore } from "../../../core/application/composeCore";
 import { SourceProblemError } from "../../../core/application/EventSource";
 import type { CalendarSource } from "../../../core/application/contracts";
-import { createScreenStore, type ScreenStore } from "../../../obsidian/ui/screen/screenStore";
+import { createScreenStore, type ScreenStore } from "../../../obsidian/ui/engine/screenStore";
 import { ShownSettingsStore, ViewSettingsStore, type ViewSettings } from "../../../obsidian/ui/viewSettings";
 import { ScreenSettingsImpl } from "../../../core/application/ScreenSettingsImpl";
 import { FixedClock } from "../../fakes/DemoClock";

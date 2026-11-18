@@ -1,5 +1,6 @@
 node_modules
 main.js
+/build/
 .DS_Store
 .worktrees
 docs/design/reference/.chrome-profile

@@ -5,8 +5,9 @@
  *
  *   npm run e2e -- [--only <name part>] [--platform desktop,phone] [--theme dark,light] [--no-build] [--quit]
  *
- * E2E_DIR (the test Obsidian's profile, vault and output; default <tmp>/task-calendar-e2e) and E2E_PORT (its debugging
- * port; default 9447) name the instance. Frames, screencasts and screenshots go to E2E_DIR/out/<scenario>/<platform>-<theme>/.
+ * E2E_TARGET (stand, the default, or plugin) names what runs: the stand's engine over tasks in memory, or the plugin over
+ * the vault's tasks file. E2E_DIR (the test Obsidian's profile, vault and output; default <tmp>/task-calendar-e2e) and
+ * E2E_PORT (its debugging port; default 9447) name the instance. Frames, screencasts and screenshots go to E2E_DIR/out/<scenario>/<platform>-<theme>/.
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
@@ -18,7 +19,6 @@ import { Input } from "./lib/input.mjs";
 import { TestObsidian } from "./lib/obsidian.mjs";
 import * as oracle from "./lib/oracle.mjs";
 import { replay } from "./lib/replay.mjs";
-import { readTasks, writeTasks } from "./lib/tasksFile.mjs";
 
 const ROOT = new URL("../../", import.meta.url).pathname;
 const args = process.argv.slice(2);
@@ -30,7 +30,8 @@ const platforms = option("platform", "desktop,phone").split(",");
 const themes = option("theme", "dark,light").split(",");
 const only = option("only", "");
 
-if (!args.includes("--no-build")) execFileSync("npm", ["run", "build"], { cwd: ROOT, stdio: "inherit" });
+const target = new TestObsidian().target;
+if (!args.includes("--no-build")) execFileSync("npm", ["run", target.buildScript], { cwd: ROOT, stdio: "inherit" });
 
 const scenarioDir = new URL("./scenarios/", import.meta.url).pathname;
 const scenarios = [];
@@ -41,10 +42,10 @@ for (const file of readdirSync(scenarioDir).filter((f) => f.endsWith(".mjs")).so
 
 const obsidian = await new TestObsidian().start();
 /** E2E_BUILD: a folder holding another build (main.js, manifest.json, styles.css) to run the scenarios on, such as the released one. */
-await obsidian.deploy(process.env.E2E_BUILD ?? ROOT);
+await obsidian.deploy(process.env.E2E_BUILD ?? target.build);
 console.log(`test Obsidian on port ${obsidian.config.port}, build ${await obsidian.buildMark()}`);
 
-const plugin = `app.plugins.plugins["task-calendar"]`;
+
 const results = [];
 for (const platform of platforms) {
 	await obsidian.platform(platform);
@@ -63,26 +64,28 @@ for (const platform of platforms) {
 				out,
 				input: new Input(cdp),
 				oracle: {
-					columns: () => oracle.columnsInView(cdp),
-					cards: (list) => oracle.cardsInView(cdp, list),
-					text: () => oracle.screenText(cdp),
+					columns: () => oracle.columnsInView(cdp, target.root),
+					cards: (list) => oracle.cardsInView(cdp, list, target.root),
+					text: () => oracle.screenText(cdp, target.root),
 					rect: (selector, index) => oracle.rectOf(cdp, selector, index),
 					textAt: (x, y) => oracle.textAt(cdp, x, y),
 					/** The tasks of `## list` in the file on disk. */
-					tasks: (list) => oracle.tasksOf(readTasks(obsidian.tasksPath), list),
+					tasks: async (list) => oracle.tasksOf(await obsidian.fileText(), list),
 				},
-				file: () => readTasks(obsidian.tasksPath),
-				tasksPath: obsidian.tasksPath,
+				file: () => obsidian.fileText(),
+				setFile: (text) => obsidian.setFileText(text),
+				target,
+				notePath: obsidian.notePath,
 				expect(ok, message) {
 					if (!ok) failures.push(message);
 					return ok;
 				},
 				async setMode(mode) {
-					await cdp.eval(`${plugin}.services.tasks.setViewMode(${JSON.stringify(mode)}).then(() => 1)`);
+					await cdp.eval(`${target.services}.tasks.setViewMode(${JSON.stringify(mode)}).then(() => 1)`);
 					await sleep(500);
 				},
 				async setPlace(place) {
-					await cdp.eval(`${plugin}.services.tasks.setFunnelPlace(${JSON.stringify(place)}).then(() => 1)`);
+					await cdp.eval(`${target.services}.tasks.setFunnelPlace(${JSON.stringify(place)}).then(() => 1)`);
 				},
 				async open() {
 					await t.input.move(1, 1);
@@ -117,7 +120,7 @@ for (const platform of platforms) {
 					return last;
 				},
 			};
-			writeTasks(obsidian.tasksPath);
+			await obsidian.newTasks();
 			await sleep(400);
 			const errors = [];
 			const off = cdp.on("Runtime.exceptionThrown", (e) => errors.push(e.exceptionDetails?.exception?.description ?? e.exceptionDetails?.text));

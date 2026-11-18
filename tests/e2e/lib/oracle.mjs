@@ -4,9 +4,9 @@
  */
 
 /** The titles a person sees over the columns, left to right: each wholly inside the view. */
-export function columnsInView(cdp) {
+export function columnsInView(cdp, root = ".task-calendar") {
 	return cdp.eval(`(() => {
-		const view = document.querySelector(".task-calendar");
+		const view = document.querySelector(${JSON.stringify(root)});
 		if (!view) return [];
 		const box = view.getBoundingClientRect();
 		const heads = [...view.querySelectorAll(".tc-stage-head .tc-head-title, .tc-pane-head .tc-head-title, .tc-row-label")];
@@ -19,12 +19,12 @@ export function columnsInView(cdp) {
 }
 
 /** The titles of the cards a person sees in the list `list` (`data-list`), top to bottom; partly hidden ones too. */
-export function cardsInView(cdp, list) {
+export function cardsInView(cdp, list, root = ".task-calendar") {
 	return cdp.eval(`(() => {
-		const el = document.querySelector('.task-calendar [data-list="${list}"]');
+		const el = document.querySelector(\`${root} [data-list="${list}"]\`);
 		if (!el) return [];
 		const box = el.getBoundingClientRect();
-		const view = document.querySelector(".task-calendar").getBoundingClientRect();
+		const view = document.querySelector(${JSON.stringify(root)}).getBoundingClientRect();
 		return [...el.querySelectorAll(".tc-card")]
 			.map((card) => ({ card, r: card.getBoundingClientRect() }))
 			.filter(({ r }) => r.bottom > Math.max(box.top, view.top) && r.top < Math.min(box.bottom, view.bottom) && r.right > view.left && r.left < view.right)
@@ -34,8 +34,8 @@ export function cardsInView(cdp, list) {
 }
 
 /** What the screen shows as a whole, for a look-check: every word of the view in reading order. */
-export function screenText(cdp) {
-	return cdp.eval(`document.querySelector(".task-calendar")?.innerText ?? ""`);
+export function screenText(cdp, root = ".task-calendar") {
+	return cdp.eval(`document.querySelector(${JSON.stringify(root)})?.innerText ?? ""`);
 }
 
 /** The element's box, or null when there is none; `index` picks among several. */

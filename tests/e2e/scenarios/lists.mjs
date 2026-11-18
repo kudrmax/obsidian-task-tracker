@@ -25,11 +25,11 @@ export default {
 					branch: !!el.querySelector(".tc-branch"),
 				};
 			})()`);
-		const now = t.oracle.tasks("Now").filter((task) => !task.timed);
+		const now = (await t.oracle.tasks("Now")).filter((task) => !task.timed);
 		const shownDay = await t.oracle.cards("day");
 		const wantedDay = ["Длинная задача, у которой название не помещается в колонку и уходит за правый край карточки", "Задача со ссылкой на Заметка о доме и https://example.com", "Первый шаг свёрнутой", "Задача с описанием"];
 		t.expect(JSON.stringify(shownDay.slice(0, 4)) === JSON.stringify(wantedDay), `today's list starts as the file's Now, a folded task by its next step: ${JSON.stringify(shownDay.slice(0, 4))}`);
-		const timed = t.oracle.tasks("Now").filter((task) => task.timed).map((task) => task.title);
+		const timed = (await t.oracle.tasks("Now")).filter((task) => task.timed).map((task) => task.title);
 		t.expect(timed.every((title) => !shownDay.includes(title)), "today's list leaves out the tasks on today's timeline");
 		t.expect(now.length > 0, "the file has Now tasks");
 
@@ -42,10 +42,10 @@ export default {
 		const plain = await card("Задача с описанием");
 		t.expect(plain?.desc === true && plain.due === null, `the description's mark; no date on the day it is due: ${JSON.stringify(plain)}`);
 		t.expect(folded && plain && folded.height > plain.height, `a folded card is taller: ${folded?.height} > ${plain?.height}`);
-		const projectTask = t.oracle.tasks("Now").find((task) => task.title.includes("73"));
+		const projectTask = (await t.oracle.tasks("Now")).find((task) => task.title.includes("73"));
 		const marked = projectTask ? await card(projectTask.title) : null;
 		t.expect(marked?.folder === "Работа", `a task in a project shows its folder, named on hover: ${JSON.stringify(marked)}`);
-		const prioritized = await card(t.oracle.tasks("Now").find((task) => task.title.includes("71")).title);
+		const prioritized = await card((await t.oracle.tasks("Now")).find((task) => task.title.includes("71")).title);
 		t.expect(prioritized?.priority !== null && prioritized?.dot === true, `a priority's colour and the dot: ${JSON.stringify(prioritized)}`);
 		const sub = await t.cdp.eval(`[...document.querySelectorAll('[data-list="day"] .tc-card')].filter((c) => c.querySelector(".tc-branch")).map((c) => c.querySelector(".tc-card-title").textContent).slice(0, 3)`);
 		t.expect(sub.length >= 2 && sub[0].startsWith("шаг") && sub[1].startsWith("подшаг"), `subtasks under their task with branch lines: ${JSON.stringify(sub)}`);

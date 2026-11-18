@@ -11,7 +11,7 @@ export default {
 		const before = await t.cdp.eval(`app.vault.adapter.read(${JSON.stringify(note)})`);
 		for (const mode of ["preview", "source"]) {
 			await t.cdp.eval(`(async () => {
-				const leaf = app.workspace.getLeavesOfType("task-calendar")[0] ?? app.workspace.getLeaf(false);
+				const leaf = app.workspace.getLeavesOfType("${t.target.viewType}")[0] ?? app.workspace.getLeaf(false);
 				await leaf.setViewState({ type: "empty" });
 				await leaf.openFile(app.vault.getAbstractFileByPath(${JSON.stringify(note)}), { state: { mode: "${mode}" } });
 				return 1;
@@ -23,7 +23,7 @@ export default {
 			const labels = await t.cdp.eval(`[...document.querySelectorAll(".tc-project-block .tc-row-label")].map((l) => l.textContent)`);
 			t.expect(JSON.stringify(labels) === JSON.stringify(["Inbox", "Backlog", "Soon", "Today"]), `${mode}: the rows by default: ${JSON.stringify(labels)}`);
 			const cards = await t.cdp.eval(`[...document.querySelectorAll(".tc-project-block .tc-card .tc-card-title")].map((c) => c.textContent)`);
-			const home = t.file().split("\n").filter((line) => line.includes("🗂️ Дом")).map((line) => line.replace(/^- \[.\] (p[12] )?/, "").split(" 🗂️")[0]);
+			const home = (await t.file()).split("\n").filter((line) => line.includes("🗂️ Дом")).map((line) => line.replace(/^- \[.\] (p[12] )?/, "").split(" 🗂️")[0]);
 			t.expect(home.length > 0 && JSON.stringify([...cards].sort()) === JSON.stringify([...home].sort()), `${mode}: the project's tasks and only them: ${JSON.stringify(cards)} against ${JSON.stringify(home)}`);
 			const parts = await t.cdp.eval(`({ timeline: !!document.querySelector(".tc-project-block .tc-timeline"), wheel: !!document.querySelector(".tc-project-block .tc-seg"), undo: !!document.querySelector(".tc-project-block .tc-undo"), view: !!document.querySelector(".tc-project-block .tc-view-btn"), plus: !!document.querySelector(".tc-project-block .tc-plus") })`);
 			t.expect(!parts.timeline && !parts.wheel && parts.undo && parts.view && parts.plus, `${mode}: no timeline or wheel; Undo, the view button and the plus: ${JSON.stringify(parts)}`);

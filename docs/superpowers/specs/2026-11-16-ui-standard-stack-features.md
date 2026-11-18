@@ -392,3 +392,10 @@ Companion to [`2026-11-16-ui-standard-stack.md`](2026-11-16-ui-standard-stack.md
 - F308. Day and timeline page: Day starts at, Scroll to hour, Long press delay, Zoom levels. [`docs/plugin/settings.md` More → Day and timeline]
 - F309. Tasks file page: File path, Section headings (Inbox, Now, Soon, Backlog, Done), line markers (due, slot, alarm, Live Activity, no-reminder, repeat, collapsed, label tag); names here name the column headers and place tiles. [`docs/plugin/settings.md` More → Tasks file]
 - F310. Assistant page: Model, Model (Claude), Path to claude with the found path or "Not found" under it, Timeout (10–600, invalid reverts), Prompts → Best task with Reset to default, Label (None or a label); on iPhone "Claude works in Obsidian on the Mac." and only Timeout, prompts and Label. [`docs/plugin/settings.md` More → Assistant]
+
+## Added from master (0.4.212–0.4.215, merged 2026-11-18)
+
+- F311. A label may have No colour: a task with only such labels draws untinted, as without them; with several labels only the coloured ones paint it. [`docs/plugin/screen.md` Карточка задачи; `docs/plugin/settings.md` Labels]
+- F312. Best task's answer popup: under the explanation a field «What did Claude miss?» (grows with its text, card-wide); empty: Close alone; with text: Save and Save and ask again (main; ⌘Enter in the field); Esc or a click outside close and write nothing; a failed write keeps the popup and the text, «Couldn't save to this task.» under the field; no field on an error popup. [`docs/plugin/assistant.md` Что Claude не учёл]
+- F313. A menu over a card that fits nowhere keeps only its whole groups of tiles, never one cut mid-tile. [`obsidian/ui/menu/`] (code only)
+- F314. Settings: a priority's or label's colour code follows a theme changed while the settings are open. [`obsidian/ui/SettingsTab.ts`] (code only)

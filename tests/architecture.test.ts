@@ -6,7 +6,7 @@ import { doorMethods } from "../core/application/PhoneCalls";
 
 const ROOT = resolve(__dirname, "..");
 
-type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root";
+type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root" | "stand";
 
 /** Obsidian's own packages: the app provides them at run time (`external` in esbuild.config.mjs). */
 const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
@@ -20,14 +20,21 @@ const UI_PACKAGES = ["react", "react/jsx-runtime", "react-dom", "react-dom/clien
 function layerOf(file: string): Layer | null {
 	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";
 	if (file === "core/settings.ts") return "settings";
+	if (file.startsWith("obsidian/stand/")) return "stand";
 	const m = /^(?:core|obsidian)\/(domain|application|infrastructure|ui|phone)\//.exec(file);
 	return m ? (m[1] as Layer) : null;
 }
 
 /** The folder each layer lives in: the core (`core/`) or the Obsidian frontend (`obsidian/`). */
-const HOME: Readonly<Record<string, string>> = { domain: "core", application: "core", phone: "core", ui: "obsidian", infrastructure: "obsidian" };
+const HOME: Readonly<Record<string, string>> = { domain: "core", application: "core", phone: "core", ui: "obsidian", infrastructure: "obsidian", stand: "obsidian" };
 
 const under = (target: string, dir: string): boolean => target.startsWith(`${HOME[dir]}/${dir}/`);
+
+/**
+ * The stand (`obsidian/stand`, docs/superpowers/specs/2026-11-18-ui-engine.md): the engine over the real core in memory. It
+ * composes the core as the plugin's root does, and nothing imports it.
+ */
+const STAND_CORE = ["core/application/contracts.ts", "core/application/composeCore.ts", "core/application/ScreenSettingsImpl.ts"];
 
 /** What the iOS app's entry may use besides the contract: the door, which reaches the same rules the services write with. */
 const PHONE_DOOR = "core/application/PhoneDoor.ts";
@@ -40,7 +47,8 @@ const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	ui: (t) => under(t, "ui") || t === "core/application/contracts.ts" || OBSIDIAN_PACKAGES.includes(t) || UI_PACKAGES.includes(t),
 	phone: (t) => under(t, "phone") || t === "core/application/contracts.ts" || t === PHONE_DOOR,
 	settings: (t) => under(t, "domain"),
-	root: () => true,
+	root: (t) => !under(t, "stand"),
+	stand: (t) => under(t, "stand") || under(t, "ui") || STAND_CORE.includes(t) || t.startsWith("tests/fakes/") || OBSIDIAN_PACKAGES.includes(t) || UI_PACKAGES.includes(t),
 };
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
@@ -117,6 +125,11 @@ describe("the guard itself", () => {
 	it("keeps the doors narrow", () => {
 		expect(MAY_IMPORT.phone("core/application/TaskServiceImpl.ts")).toBe(false);
 		expect(MAY_IMPORT.ui("react")).toBe(true);
+		expect(MAY_IMPORT.stand("obsidian/ui/engine/mountScreen.tsx")).toBe(true);
+		expect(MAY_IMPORT.stand("core/application/TaskServiceImpl.ts")).toBe(false);
+		expect(MAY_IMPORT.stand("obsidian/infrastructure/VaultTaskFileStore.ts")).toBe(false);
+		expect(MAY_IMPORT.root("obsidian/stand/main.ts")).toBe(false);
+		expect(MAY_IMPORT.ui("obsidian/stand/main.ts")).toBe(false);
 		expect(MAY_IMPORT.ui("@anthropic-ai/claude-agent-sdk")).toBe(false);
 		expect(MAY_IMPORT.ui("core/application/TaskServiceImpl.ts")).toBe(false);
 		expect(MAY_IMPORT.phone("core/settings.ts")).toBe(false);

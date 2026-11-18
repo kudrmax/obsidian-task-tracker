@@ -1,14 +1,13 @@
 import { ItemView, Scope, type WorkspaceLeaf } from "obsidian";
-import type { ViewDeps } from "./CalendarScreen";
-import { type MountedScreen, mountScreen } from "./screen/mountScreen";
+import { CalendarScreen, type ViewDeps } from "./CalendarScreen";
 
 export type { ViewDeps } from "./CalendarScreen";
 
 export const VIEW_TYPE = "task-calendar";
 
-/** The plugin's own tab: the whole screen (`TaskScreen`, place main); Cmd+Z its own while the tab is active. */
+/** The plugin's own tab: the whole screen, Cmd+Z and Cmd+F its own while the tab is active. */
 export class TaskCalendarView extends ItemView {
-	private screen: MountedScreen | null = null;
+	private screen: CalendarScreen | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -30,21 +29,29 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	override async onOpen(): Promise<void> {
-		this.contentEl.empty();
-		this.contentEl.addClass("tc-view");
-		const screen = mountScreen(this.contentEl, this.deps, { kind: "main" });
+		const screen = this.addChild(new CalendarScreen(this.app, this.contentEl, this.deps, { view: true }));
 		this.screen = screen;
 		this.scope = new Scope(this.app.scope);
-		this.scope.register(["Mod"], "z", () => void screen.store.getState().undo());
-		await screen.store.getState().refresh();
+		this.scope.register(["Mod"], "z", () => screen.undoKey("undo"));
+		this.scope.register(["Mod", "Shift"], "z", () => screen.undoKey("redo"));
+		this.scope.register(["Mod"], "f", () => screen.findKey());
+		await screen.open();
 	}
 
 	override async onClose(): Promise<void> {
-		this.screen?.unmount();
+		const screen = this.screen;
 		this.screen = null;
+		if (!screen) return;
+		screen.close();
+		this.removeChild(screen);
 	}
 
 	override onResize(): void {
-		this.screen?.refit();
+		this.screen?.resize();
+	}
+
+	/** The quick field's editor while it has the focus: Obsidian's commands and hotkeys go to it. */
+	get activeEditor(): CalendarScreen["activeEditor"] {
+		return this.screen?.activeEditor ?? null;
 	}
 }

@@ -8,7 +8,7 @@ export default {
 	features: ["F51", "F53"],
 	async run(t) {
 		/** Away from the window's middle, where a slow divider holds (`dividerAt`): this check is of following, not of the hold. */
-		await t.cdp.eval(`app.plugins.plugins["task-calendar"].viewSettings.set({ listShare: 0.62 }).then(() => 1)`);
+		await t.cdp.eval(`${t.target.deviceSettings}.set({ listShare: 0.62 }).then(() => 1)`);
 		await t.open();
 		const handle = await t.oracle.rect(".tc-divider-handle");
 		t.expect(handle !== null, "at Now–calendar the divider shows its handle");
@@ -36,6 +36,6 @@ export default {
 		await t.open();
 		const reopened = await t.oracle.rect(".tc-stage-col.is-day");
 		t.expect(Math.abs(reopened.width - after.width) <= 1, `the width is kept: reopened at ${reopened.width}, let go at ${after.width}`);
-		await t.cdp.eval(`app.plugins.plugins["task-calendar"].viewSettings.set({ listShare: 0.5 }).then(() => 1)`);
+		await t.cdp.eval(`${t.target.deviceSettings}.set({ listShare: 0.5 }).then(() => 1)`);
 	},
 };

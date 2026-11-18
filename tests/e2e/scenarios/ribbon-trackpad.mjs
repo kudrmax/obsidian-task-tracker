@@ -28,7 +28,7 @@ export default {
 
 		const shows = async (list, fileList, filter = () => true) => {
 			const shown = (await t.oracle.cards(list)).slice(0, 5);
-			const wanted = t.oracle.tasks(fileList).filter(filter).slice(0, 5).map((task) => task.title);
+			const wanted = (await t.oracle.tasks(fileList)).filter(filter).slice(0, 5).map((task) => task.title);
 			t.expect(shown.length === 5 && JSON.stringify(shown) === JSON.stringify(wanted), `${list} shows the file's first tasks in order: ${JSON.stringify(shown)} against ${JSON.stringify(wanted)}`);
 		};
 		await shows("soon", "Soon", (task) => !task.dated && !task.timed);

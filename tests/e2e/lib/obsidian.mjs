@@ -1,8 +1,9 @@
 import { execFileSync, spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Cdp, sleep, targets } from "./cdp.mjs";
+import { mockTasks, PROJECT_NOTE } from "../../../obsidian/stand/mockTasks.ts";
 
 /**
  * The test Obsidian the checks run in: its own profile and scratch vault, its own debugging port, its window kept off the
@@ -11,8 +12,37 @@ import { Cdp, sleep, targets } from "./cdp.mjs";
  */
 
 const VAULT_ID = "tce2e";
-const PLUGIN_ID = "task-calendar";
 const ROOT = new URL("../../../", import.meta.url).pathname;
+
+/**
+ * What the checks run on (E2E_TARGET): the stand (the engine over the core in memory, docs/superpowers/specs/2026-11-18-ui-engine.md)
+ * or the plugin (over a tasks file in the vault). Each names its plugin, its view, its build and how a check reaches its
+ * services, its device settings and the tasks file's text; the screen's root is the same `.task-calendar` in both.
+ */
+export const TARGETS = {
+	stand: {
+		pluginId: "task-calendar-stand",
+		viewType: "task-calendar-stand",
+		openCommand: "task-calendar-stand:open",
+		build: join(ROOT, "build/stand"),
+		buildScript: "build:stand",
+		root: ".task-calendar",
+		services: "window.__tcStand.services",
+		deviceSettings: "window.__tcStand.services.settings",
+		inMemory: true,
+	},
+	plugin: {
+		pluginId: "task-calendar",
+		viewType: "task-calendar",
+		openCommand: "task-calendar:open",
+		build: ROOT,
+		buildScript: "build",
+		root: ".task-calendar",
+		services: `app.plugins.plugins["task-calendar"].services`,
+		deviceSettings: `app.plugins.plugins["task-calendar"].viewSettings`,
+		inMemory: false,
+	},
+};
 /** Where the window stands: off every screen, so it never covers the person's work nor takes their input. */
 const OFF_SCREEN = { x: -5000, y: 2000 };
 export const DESKTOP = { width: 1280, height: 820 };
@@ -20,7 +50,9 @@ export const PHONE = { width: 390, height: 844 };
 
 export function e2eConfig() {
 	const dir = process.env.E2E_DIR ?? join(tmpdir(), "task-calendar-e2e");
-	return { dir, port: Number(process.env.E2E_PORT ?? 9447), vault: join(dir, "vault"), user: join(dir, "obsidian-user"), out: process.env.E2E_OUT ?? join(dir, "out") };
+	const target = TARGETS[process.env.E2E_TARGET ?? "stand"];
+	if (!target) throw new Error(`E2E_TARGET is stand or plugin, not ${process.env.E2E_TARGET}`);
+	return { dir, port: Number(process.env.E2E_PORT ?? 9447), vault: join(dir, "vault"), user: join(dir, "obsidian-user"), out: process.env.E2E_OUT ?? join(dir, "out"), target };
 }
 
 /** The profile directory of the process listening on `port`, or null when none listens. */
@@ -42,20 +74,48 @@ export class TestObsidian {
 		this.cdp = null;
 	}
 
+	get target() {
+		return this.config.target;
+	}
+
 	get tasksPath() {
 		return join(this.config.vault, "TODOs Tasks.md");
 	}
 
-	/** The scratch vault and the profile that knows it, made once. */
+	/** The project note: on the stand it holds the stand's block, the plugin puts its own at the note's end. */
+	get notePath() {
+		return `${PROJECT_NOTE}.md`;
+	}
+
+	/** The scratch vault and the profile that knows it; only the target's plugin is on (the other is off in this vault). */
 	prepare() {
-		const { vault, user, out } = this.config;
-		for (const dir of [join(vault, ".obsidian", "plugins", PLUGIN_ID), user, out]) mkdirSync(dir, { recursive: true });
+		const { vault, user, out, target } = this.config;
+		for (const dir of [join(vault, ".obsidian", "plugins", target.pluginId), user, out]) mkdirSync(dir, { recursive: true });
 		const obsidian = join(vault, ".obsidian");
-		writeFileSync(join(obsidian, "community-plugins.json"), JSON.stringify([PLUGIN_ID]));
+		writeFileSync(join(obsidian, "community-plugins.json"), JSON.stringify([target.pluginId]));
 		if (!existsSync(join(obsidian, "app.json"))) writeFileSync(join(obsidian, "app.json"), "{}");
 		writeFileSync(join(user, "obsidian.json"), JSON.stringify({ vaults: { [VAULT_ID]: { path: vault, ts: 1, open: true } } }));
 		writeFileSync(join(user, `${VAULT_ID}.json`), JSON.stringify({ ...OFF_SCREEN, ...DESKTOP, isMaximized: false, devTools: false, zoom: 0 }));
-		if (!existsSync(join(vault, "Заметка о доме.md"))) writeFileSync(join(vault, "Заметка о доме.md"), "Дом.\n");
+		writeFileSync(join(vault, this.notePath), target.inMemory ? "Дом.\n\n```task-calendar-stand\n```\n" : "Дом.\n");
+	}
+
+	/** Fresh made-up tasks around now: the stand's in memory, or the plugin's tasks file in the vault. */
+	async newTasks() {
+		if (this.target.inMemory) await this.cdp.eval(`(() => { window.__tcStand.reset(); return 1; })()`);
+		else writeFileSync(this.tasksPath, mockTasks(new Date()));
+	}
+
+	/** The tasks file's text as it stands: the user's truth the checks read. */
+	async fileText() {
+		if (this.target.inMemory) return this.cdp.eval(`window.__tcStand.fileText()`);
+		return readFileSync(this.tasksPath, "utf8");
+	}
+
+	/** The tasks file replaced from outside (null: no file), as a hand edit or Sync does. */
+	async setFileText(text) {
+		if (this.target.inMemory) return this.cdp.eval(`(() => { window.__tcStand.setFileText(${JSON.stringify(text)}); return 1; })()`);
+		if (text === null) return this.cdp.eval(`app.vault.adapter.remove("TODOs Tasks.md").then(() => 1)`);
+		writeFileSync(this.tasksPath, text);
 	}
 
 	/** Starts the instance unless it already runs on its port; then connects and makes sure the plugin is on. */
@@ -75,7 +135,9 @@ export class TestObsidian {
 			await sleep(1500);
 			await this.connect();
 		}
-		await this.cdp.eval(`(async () => { if (!app.plugins.enabledPlugins.has("${PLUGIN_ID}")) await app.plugins.enablePluginAndSave("${PLUGIN_ID}"); return 1 })()`);
+		const { pluginId } = this.target;
+		const other = Object.values(TARGETS).find((t) => t.pluginId !== pluginId).pluginId;
+		await this.cdp.eval(`(async () => { if (app.plugins.enabledPlugins.has("${other}")) await app.plugins.disablePluginAndSave("${other}"); if (!app.plugins.enabledPlugins.has("${pluginId}")) await app.plugins.enablePluginAndSave("${pluginId}"); return 1 })()`);
 		return this;
 	}
 
@@ -93,17 +155,18 @@ export class TestObsidian {
 		return this.cdp;
 	}
 
-	/** The repository's build, copied in and loaded again. */
-	async deploy(from = ROOT) {
-		const into = join(this.config.vault, ".obsidian", "plugins", PLUGIN_ID);
+	/** The target's build (or `from`), copied in and loaded again. */
+	async deploy(from = this.target.build) {
+		const { pluginId, viewType } = this.target;
+		const into = join(this.config.vault, ".obsidian", "plugins", pluginId);
 		for (const file of ["main.js", "manifest.json", "styles.css"]) copyFileSync(join(from, file), join(into, file));
-		const loaded = await this.cdp.eval(`(async () => { app.workspace.getLeavesOfType("task-calendar").forEach((l) => l.detach()); await app.plugins.disablePlugin("${PLUGIN_ID}"); await app.plugins.loadManifests(); await app.plugins.enablePlugin("${PLUGIN_ID}"); return !!app.plugins.plugins["${PLUGIN_ID}"] })()`);
+		const loaded = await this.cdp.eval(`(async () => { app.workspace.getLeavesOfType("${viewType}").forEach((l) => l.detach()); await app.plugins.disablePlugin("${pluginId}"); await app.plugins.loadManifests(); await app.plugins.enablePlugin("${pluginId}"); return !!app.plugins.plugins["${pluginId}"] })()`);
 		if (!loaded) throw new Error("the plugin did not load: see the test Obsidian's console");
 	}
 
 	/** The first line of the build that runs: the mark a check names the build by. */
 	buildMark() {
-		return this.cdp.eval(`(async () => (await app.vault.adapter.read(app.vault.configDir + "/plugins/${PLUGIN_ID}/main.js")).split("\\n")[0])()`);
+		return this.cdp.eval(`(async () => (await app.vault.adapter.read(app.vault.configDir + "/plugins/${this.target.pluginId}/main.js")).split("\\n")[0])()`);
 	}
 
 	/** The desktop window or Obsidian's phone view (390×844, `app.emulateMobile`), which reloads the window. */
@@ -134,7 +197,7 @@ export class TestObsidian {
 			app.workspace.iterateRootLeaves((leaf) => { if (leaf !== keep) others.push(leaf); });
 			for (const leaf of others) leaf.detach();
 			await keep.setViewState({ type: "empty" });
-			await keep.setViewState({ type: "task-calendar", active: true });
+			await keep.setViewState({ type: "${this.target.viewType}", active: true });
 			app.workspace.setActiveLeaf(keep, { focus: false });
 			return 1;
 		})()`);

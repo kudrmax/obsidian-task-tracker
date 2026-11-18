@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { WheelStrokes } from "../../../obsidian/ui/screen/wheelStrokes";
+import { WheelStrokes } from "../../../obsidian/ui/engine/wheelStrokes";
 
 const RECORDINGS = join(__dirname, "..", "..", "e2e", "recordings");
 
