@@ -1,36 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { descendantsOf, projectDepth } from "../../../obsidian/ui/engine/drag/tree";
+import { descendantsOf, levelAt, levelBetween, zoneOf } from "../../../obsidian/ui/engine/drag/tree";
 import type { Row } from "../../../obsidian/ui/engine/port";
 
 const task = (id: string, depth = 0): Row => ({ kind: "task", id, depth });
-const INDENT = 20;
 
-describe("a carried card's level (dnd-kit's sortable tree projection)", () => {
+describe("the zone across a list (Max, 2026-11-18: the right third makes a subtask)", () => {
+	it("the left two thirds are a task's, the right third a subtask's", () => {
+		expect(zoneOf(10, 0, 300)).toBe("task");
+		expect(zoneOf(199, 0, 300)).toBe("task");
+		expect(zoneOf(200, 0, 300)).toBe("subtask");
+		expect(zoneOf(299, 0, 300)).toBe("subtask");
+	});
+});
+
+describe("a carried card's level by the zone", () => {
 	const rows = [task("a"), task("b"), task("b1", 1), task("b2", 1), task("c")];
 
-	it("stays at its own level without a sideways move", () => {
-		expect(projectDepth(rows, "c", "c", 0, INDENT, 0)).toBe(0);
+	it("in the subtask zone it goes one level under the task above its place", () => {
+		expect(levelAt(rows, "c", "c", "subtask")).toBe(2);
+		expect(levelAt(rows, "b", "b", "subtask")).toBe(1);
 	});
-	it("goes one level deeper for an indent to the right, under the task above it", () => {
-		expect(projectDepth(rows, "c", "c", INDENT, INDENT, 0)).toBe(1);
+	it("in the task zone it is as shallow as its place allows", () => {
+		expect(levelAt(rows, "c", "c", "task")).toBe(0);
+		expect(levelAt(rows, "b2", "b2", "task")).toBe(0);
 	});
-	it("is never deeper than one under the row above it", () => {
-		expect(projectDepth(rows, "c", "c", INDENT * 5, INDENT, 0)).toBe(2);
-		expect(projectDepth(rows, "b", "b", INDENT * 3, INDENT, 0)).toBe(1);
+	it("between a task and its subtask it can only be a sibling subtask", () => {
+		expect(levelBetween(task("b"), task("b1", 1), "task")).toBe(1);
+		expect(levelBetween(task("b"), task("b1", 1), "subtask")).toBe(1);
 	});
-	it("is never shallower than the row below it", () => {
-		expect(projectDepth(rows, "b1", "b1", -INDENT * 3, INDENT, 1)).toBe(1);
-	});
-	it("at the top of a list it is a task", () => {
-		expect(projectDepth(rows, "c", "a", INDENT * 3, INDENT, 0)).toBe(0);
-	});
-	it("right under a section's header it is a task", () => {
-		const sectioned: Row[] = [task("a"), { kind: "section", id: "s", title: "Идеи" }, task("x")];
-		expect(projectDepth(sectioned, "x", "x", INDENT * 2, INDENT, 0)).toBe(0);
+	it("at the top of a list, or right under a section's header, it is a task", () => {
+		expect(levelAt(rows, "c", "a", "subtask")).toBe(0);
+		expect(levelBetween({ kind: "section", id: "s", title: "Идеи" }, task("x"), "subtask")).toBe(0);
 	});
 	it("takes the level where it now stands among the rows", () => {
-		expect(projectDepth(rows, "a", "b2", INDENT, INDENT, 0)).toBe(1);
-		expect(projectDepth(rows, "a", "b2", INDENT * 2, INDENT, 0)).toBe(2);
+		expect(levelAt(rows, "a", "b2", "subtask")).toBe(2);
+		expect(levelAt(rows, "a", "b2", "task")).toBe(0);
 	});
 });
 

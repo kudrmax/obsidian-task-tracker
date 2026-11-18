@@ -21,12 +21,17 @@ export default {
 		const [, , third] = await list("Inbox");
 		const [, second, , fourth] = await list("Soon");
 
+		/** Max, 2026-11-18: past the border between the columns the plate jumped out from under his mouse. */
+		const plateUnder = (x) => t.cdp.eval(`(() => { const r = document.querySelector(".tc-overlay .tc-card")?.getBoundingClientRect(); return r ? ${x} >= r.left && ${x} <= r.right : null; })()`);
+		let soonPlate = null;
+		let soonAim = null;
 		const intoSoon = await cardBy(t, third, "inbox");
 		const soonFaults = await t.frames(
 			() => carry(t, intoSoon, once(async () => {
 				const under = await cardBy(t, fourth, "soon");
-				return { x: under.x, y: under.top + 4 };
-			})),
+				soonAim = { x: under.x, y: under.top + 4 };
+				return soonAim;
+			}), { during: async () => (soonPlate = await plateUnder(soonAim.x)) }),
 			{ maxStep: 80, carried: { id: intoSoon.id, from: 0, until: 1500 } },
 		);
 		await t.sleep(500);
@@ -34,6 +39,7 @@ export default {
 		t.expect(soon.indexOf(third) === soon.indexOf(fourth) - 1, `Inbox → Soon: in the file it stands before «${fourth}»: ${JSON.stringify(soon)}`);
 		t.expect(JSON.stringify(await t.oracle.cards("soon")) === JSON.stringify(soon), `Inbox → Soon: the screen shows the file's Soon: ${JSON.stringify(await t.oracle.cards("soon"))}`);
 		t.expect(soonFaults.length === 0, `Inbox → Soon frames: ${JSON.stringify(soonFaults.slice(0, 4))}`);
+		t.expect(soonPlate === true, `in Soon, past the border, the plate is still under the pointer: ${soonPlate}`);
 
 		const inboxNow = await list("Inbox");
 		const target = inboxNow[3];

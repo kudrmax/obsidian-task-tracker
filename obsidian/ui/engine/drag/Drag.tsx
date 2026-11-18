@@ -3,10 +3,9 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Destination, ListId, Row } from "../port";
-import { DESIGN } from "../../design";
+import type { Destination, ListId } from "../port";
 import { useScreen, useScreenApi } from "../store";
-import { descendantsOf, projectDepth, type Slot, slotOf } from "./tree";
+import { descendantsOf, levelAt, levelBetween, type Slot, slotOf, type Zone, zoneOf } from "./tree";
 
 /**
  * Drag and drop (spec, «The owners»): one `DndContext` per screen, one `DragOverlay`, one `onDragEnd` that makes one write
@@ -57,16 +56,26 @@ const DROP_ANIMATION: DropAnimation = {
  */
 function Carried({ id, carried }: { readonly id: string; readonly carried: DragProps["carried"] }) {
 	const { activatorEvent, activeNodeRect } = useDndContext();
+	const landing = useScreen((s) => s.liftedDepth ?? 0);
+	/**
+	 * Where the pointer took the card is a fact of the lift: kept from the first measure of the lifted card. dnd-kit
+	 * measures the card again wherever it stands later (in another list it is another row), and that box no longer says
+	 * where it was taken.
+	 */
+	const grab = useRef<number | null>(null);
 	const at = activatorEvent ? getEventCoordinates(activatorEvent) : null;
-	const grab = at && activeNodeRect ? at.x - activeNodeRect.left : 0;
-	return <>{carried(id, grab)}</>;
+	if (grab.current === null && at && activeNodeRect) grab.current = at.x - activeNodeRect.left;
+	return <>{carried(id, grab.current ?? 0, landing)}</>;
 }
 
 export interface DragProps {
 	/** The view's own document: the overlay goes on its body (a pop-out window has its own). */
 	readonly doc: Document;
-	/** How the carried card is drawn, by its task's id and where the pointer took it from the card's left edge. */
-	readonly carried: (id: string, grab: number) => ReactNode;
+	/**
+	 * How the carried card is drawn, by its task's id, where the pointer took it from the card's left edge, and the level
+	 * it would land at: let go, it flies into its place in the shape of the card there, indent and all.
+	 */
+	readonly carried: (id: string, grab: number, landing: number) => ReactNode;
 	/** How the carried plus is drawn. */
 	readonly plus: ReactNode;
 	/** A tick under the finger as a card lifts: the host's haptics. */
@@ -102,6 +111,9 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const ofOwn = (hit: { readonly id: UniqueIdentifier; readonly data?: { readonly droppableContainer?: { readonly data: { readonly current?: { readonly sortable?: { readonly containerId: UniqueIdentifier } } } } } }) => hit.id === `${LIST_TARGET}${own}` || hit.data?.droppableContainer?.data.current?.sortable?.containerId === own;
 		const inOwn = underPointer.filter(ofOwn);
 		/** Between the lists, under no list at all, the card stays in its own: only the pointer inside another list moves it there. */
+		/** An empty section's plate under the pointer is the target: the card goes into that section. */
+		const plateHit = underPointer.find((hit) => hit.data?.droppableContainer?.data.current?.plate);
+		if (plateHit) return [plateHit];
 		/** The plus over no list is no list's row: nothing is under it. */
 		if (args.active.id === PLUS && underPointer.length === 0) return [];
 		const hits = inOwn.length > 0 ? inOwn : underPointer.length > 0 ? underPointer : rectIntersection(args).filter(ofOwn);
@@ -119,41 +131,21 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	/** Where the card was lifted, and at which level: let go there, nothing is written. */
 	const [origin, setOrigin] = useState<(Slot & { readonly container: string; readonly depth: number }) | null>(null);
 
-	/**
-	 * The level the carried card takes where it stands now, from the pointer's sideways move since the lift (dnd-kit's
-	 * «Sortable tree»), among the rows of the list it is in, its own subtasks folded away.
-	 */
 	const rowsOf = (list: string) => api.getState().shown.lists[list as ListId]?.rows ?? [];
-	const projected = (lifted: Sortable, over: Sortable | null, offsetX: number): number | null => {
+	/** The zone of its list the pointer is in, by the row (or list) under it: rows stand across their list's whole width. */
+	const zoneUnder = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number } }, over: { readonly rect: { readonly left: number; readonly width: number } } | null): Zone => {
+		const x = (getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x;
+		return over ? zoneOf(x, over.rect.left, over.rect.width) : "task";
+	};
+	/** The level the carried card takes where it stands now, among the rows of its list, its own subtasks folded away. */
+	const projected = (lifted: Sortable, over: Sortable | null, zone: Zone): number | null => {
 		const container = containerOf(lifted);
 		if (container === null) return null;
 		const id = String(lifted.id);
 		const rows = rowsOf(container);
 		const under = descendantsOf(rows, id);
 		const visible = under.size === 0 ? rows : rows.filter((row) => !under.has(row.id));
-		return projectDepth(visible, id, over ? String(over.id) : id, offsetX, DESIGN.subtaskIndent, liftedDepth.current);
-	};
-	/**
-	 * How far the pointer moved sideways since the lift, within the list the card is over now: a card carried into the next
-	 * column has moved by the column's width, which is no indent. The rows of a list all start at its left edge (the indent
-	 * is the card's own margin), so a row's box is where its list starts. Where the lifted card's list starts is kept from
-	 * the first move: dnd-kit measures the card again once it stands in
-	 * another list, so its own box no longer says where it was lifted.
-	 */
-	const liftedLeft = useRef<number | null>(null);
-	/** The carried card's depth when lifted: its level is projected from it, never from where a preview put it meanwhile. */
-	const liftedDepth = useRef(0);
-	const sideways = (active: { readonly rect: { readonly current: { readonly initial: { readonly left: number } | null } } }, over: { readonly rect: { readonly left: number } } | null, deltaX: number): number => {
-		liftedLeft.current ??= active.rect.current.initial?.left ?? null;
-		return liftedLeft.current === null || !over ? deltaX : deltaX - (over.rect.left - liftedLeft.current);
-	};
-	/** The level a card takes as it comes into another list at `index` of its rows: as the projection there would give it. */
-	const crossingDepth = (rows: readonly Row[], index: number, offsetX: number): number => {
-		const above = rows[index - 1];
-		const below = rows[index];
-		const deepest = above?.kind === "task" ? above.depth + 1 : 0;
-		const shallowest = below?.kind === "task" ? below.depth : 0;
-		return Math.max(shallowest, Math.min(deepest, liftedDepth.current + Math.round(offsetX / DESIGN.subtaskIndent)));
+		return levelAt(visible, id, over ? String(over.id) : id, zone);
 	};
 	/**
 	 * The carried plus comes into a list the way a card crosses into another (dnd-kit's «multiple containers»): it becomes
@@ -162,6 +154,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	 */
 	const plusOver = (event: { readonly activatorEvent: Event; readonly delta: { readonly y: number }; readonly active: Sortable }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number } }) | null) => {
 		if (!over) return api.getState().setPlusAt(null);
+		if (plateOf(over)) return;
 		const overId = String(over.id);
 		const own = containerOf(event.active);
 		const list = overId.startsWith(LIST_TARGET) ? overId.slice(LIST_TARGET.length) : containerOf(over);
@@ -173,8 +166,14 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		justMoved.current = true;
 		api.getState().setPlusAt({ into: list as ListId, index: order.indexOf(overId) + (below ? 1 : 0) });
 	};
-	/** The plus let go in a list: the field opens where the rows parted for it, at the level its sideways place asks (the old plugin's F175). */
+	/** The plus let go in a list: the field opens where the rows parted for it, at the level of the zone the pointer is in. */
 	const dropPlus = (event: DragEndEvent) => {
+		const plate = plateOf(event.over);
+		if (plate) {
+			api.getState().setPlusAt(null);
+			api.getState().release("drag");
+			return api.getState().openEntry({ list: plate.list, section: plate.section, before: null, dayOffset: api.getState().dayOffset, depth: 0 });
+		}
 		const list = containerOf(event.active);
 		const order = orderAfter(event.active, event.over);
 		api.getState().setPlusAt(null);
@@ -182,18 +181,14 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		if (list === null) return;
 		const rows = rowsOf(list);
 		const index = order.indexOf(PLUS);
-		const x = (getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x;
-		const box = event.over?.rect;
-		const middle = box ? box.left + box.width / 2 : x;
-		const wanted = x < middle ? 0 : 1 + Math.floor((x - middle) / DESIGN.subtaskIndent);
-		const above = rows.find((row) => row.id === order[index - 1]);
-		const depth = Math.min(wanted, above?.kind === "task" ? above.depth + 1 : 0);
+		const near = (id: string | undefined) => rows.find((row) => row.id === id);
+		const depth = levelBetween(near(order[index - 1]), near(order[index + 1]), zoneUnder(event, event.over));
 		api.getState().openEntry({ list: list as ListId, ...slotOf(rows, order, PLUS), dayOffset: api.getState().dayOffset, depth });
 	};
 	const move = (event: DragMoveEvent) => {
-		const { active: lifted, over, delta } = event;
+		const { active: lifted, over } = event;
 		if (lifted.id === PLUS) return plusOver(event, over);
-		api.getState().setLiftedDepth(projected(lifted, over, sideways(lifted, over, delta.x)));
+		api.getState().setLiftedDepth(projected(lifted, over, zoneUnder(event, over)));
 	};
 
 	const start = ({ active: lifted }: DragStartEvent) => {
@@ -206,12 +201,10 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		}
 		screen.lift(String(lifted.id));
 		setActive(String(lifted.id));
-		liftedLeft.current = null;
 		const container = containerOf(lifted);
 		const rows = container === null ? [] : rowsOf(container);
 		const own = rows.find((row) => row.id === String(lifted.id));
-		liftedDepth.current = own?.kind === "task" ? own.depth : 0;
-		setOrigin(container === null ? null : { container, ...slotOf(rows, itemsOf(lifted), String(lifted.id)), depth: liftedDepth.current });
+		setOrigin(container === null ? null : { container, ...slotOf(rows, itemsOf(lifted), String(lifted.id)), depth: own?.kind === "task" ? own.depth : 0 });
 		onLift();
 	};
 	/**
@@ -219,25 +212,27 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	 * the port's preview of the card there, and that list's cards part around its place.
 	 */
 	const overList = (event: DragOverEvent) => {
-		const { active: lifted, over, delta } = event;
+		const { active: lifted, over } = event;
 		if (lifted.id === PLUS) return plusOver(event, over);
 		const into = crossing(lifted, over);
 		if (!into) return;
 		const rows = rowsOf(into.list);
 		const id = String(lifted.id);
 		const order = [...into.order.slice(0, into.index), id, ...into.order.slice(into.index)];
-		const to: Destination = { list: into.list as ListId, ...slotOf(rows, order, id), dayOffset: api.getState().dayOffset, depth: crossingDepth(rows, into.index, sideways(lifted, over, delta.x)) };
+		const to: Destination = { list: into.list as ListId, ...slotOf(rows, order, id), dayOffset: api.getState().dayOffset, depth: levelBetween(rows[into.index - 1], rows[into.index], zoneUnder(event, over)) };
 		justMoved.current = true;
 		api.getState().carryInto(id, to);
 	};
 	const end = (event: DragEndEvent) => {
-		const { active: lifted, over, delta } = event;
+		const { active: lifted, over } = event;
 		setActive(null);
 		if (lifted.id === PLUS) return dropPlus(event);
 		const id = String(lifted.id);
+		const plate = plateOf(over);
+		if (plate) return api.getState().drop(id, { list: plate.list, section: plate.section, before: null, dayOffset: api.getState().dayOffset, depth: 0 });
 		const container = containerOf(lifted);
 		if (container === null) return api.getState().drop(id, null);
-		const depth = projected(lifted, over, sideways(lifted, over, delta.x)) ?? 0;
+		const depth = projected(lifted, over, zoneUnder(event, over)) ?? 0;
 		const slot = slotOf(rowsOf(container), orderAfter(lifted, over), id);
 		const still = origin !== null && origin.container === container && origin.section === slot.section && origin.before === slot.before && origin.depth === depth;
 		api.getState().drop(id, still ? null : { list: container as ListId, ...slot, dayOffset: api.getState().dayOffset, depth });
@@ -321,7 +316,7 @@ const LIST_TARGET = "list:";
  */
 function crossing(active: Sortable & { readonly rect: { readonly current: { readonly translated: { readonly top: number } | null } } }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number } }) | null): { readonly list: string; readonly order: readonly string[]; readonly index: number } | null {
 	const own = containerOf(active);
-	if (!over || own === null) return null;
+	if (!over || own === null || plateOf(over)) return null;
 	const overId = String(over.id);
 	if (overId.startsWith(LIST_TARGET)) {
 		const list = overId.slice(LIST_TARGET.length);
@@ -377,5 +372,28 @@ export function CarriedPlus({ onTap, children, ring }: { readonly onTap: () => v
 				{children}
 			</button>
 		</>
+	);
+}
+
+/** An empty section's plate a card is over: its list and section. */
+interface Plate {
+	readonly list: ListId;
+	readonly section: string;
+}
+
+function plateOf(over: { readonly data: { readonly current?: unknown } } | null): Plate | null {
+	return (over?.data.current as { readonly plate?: Plate } | undefined)?.plate ?? null;
+}
+
+/**
+ * An empty section's «No tasks» plate: it stands still while cards part (it is no task, only the section's place) and is a
+ * drop target of its own; it lights while a carried card is over it, and a card let go there goes into that section.
+ */
+export function EmptyPlate({ id, list, section, children }: { readonly id: string; readonly list: ListId; readonly section: string; readonly children: ReactNode }) {
+	const { setNodeRef, isOver } = useDroppable({ id, data: { plate: { list, section } } });
+	return (
+		<div ref={setNodeRef} className={`tc-group-empty${isOver ? " is-hot" : ""}`}>
+			{children}
+		</div>
 	);
 }

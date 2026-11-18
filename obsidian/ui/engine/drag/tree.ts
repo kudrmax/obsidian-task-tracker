@@ -2,11 +2,20 @@ import { arrayMove } from "@dnd-kit/sortable";
 import type { Row } from "../port";
 
 /**
- * Subtask depth while a card is carried, as dnd-kit's «Sortable tree» example computes it (`getProjection` in its
- * `utilities.ts`): the card goes one level deeper for every indent the pointer moved right since the lift, one shallower
- * for every indent left, and never deeper than one under the row above it nor shallower than the row below it. A section's
- * header bounds a level like the list's edge: right under it a card is a task, not a subtask.
+ * Subtask level while a card is carried (Max, 2026-11-18): where the pointer stands across the list decides it. In the
+ * right third of the list the card is a subtask, one level under the task above its place; in the left two thirds it is
+ * as shallow as its place allows (a task, or a sibling of the subtasks below it).
  */
+
+/** From this share of the list's width on, the card is a subtask. */
+export const SUBTASK_FROM = 2 / 3;
+
+export type Zone = "task" | "subtask";
+
+/** Which zone of a list (left edge `left`, `width` wide) the pointer at `x` is in. */
+export function zoneOf(x: number, left: number, width: number): Zone {
+	return x >= left + width * SUBTASK_FROM ? "subtask" : "task";
+}
 
 /** The depth a section header stands for: under it no card can be a subtask. */
 const HEADER = -1;
@@ -42,23 +51,21 @@ export function slotOf(rows: readonly Row[], order: readonly string[], id: strin
 	return { section, before: next?.kind === "task" ? next.id : null };
 }
 
-/**
- * The depth the carried card `activeId` takes when it stands where `overId` is now, moved `offsetX` pixels sideways
- * since the lift; `liftedDepth` is its depth when lifted (the example's `activeItem.depth`, from the tree before the drag);
- * `indent` is one level's width.
- */
-export function projectDepth(rows: readonly Row[], activeId: string, overId: string, offsetX: number, indent: number, liftedDepth: number): number {
+/** The level a card takes in `zone` between the row `above` and the row `below` its place. */
+export function levelBetween(above: Row | undefined, below: Row | undefined, zone: Zone): number {
+	const deepest = above ? Math.max(0, depthOf(above) + 1) : 0;
+	const shallowest = below ? Math.max(0, depthOf(below)) : 0;
+	return zone === "subtask" ? Math.max(shallowest, deepest) : Math.min(shallowest, deepest);
+}
+
+/** The level the carried card `activeId` takes when it stands where `overId` is now, the pointer in `zone`. */
+export function levelAt(rows: readonly Row[], activeId: string, overId: string, zone: Zone): number {
 	const from = rows.findIndex((row) => row.id === activeId);
 	if (from < 0) return 0;
 	const found = rows.findIndex((row) => row.id === overId);
 	const to = found < 0 ? from : found;
 	const moved = arrayMove([...rows], from, to);
-	const before = moved[to - 1];
-	const after = moved[to + 1];
-	const wanted = liftedDepth + Math.round(offsetX / indent);
-	const deepest = before ? depthOf(before) + 1 : 0;
-	const shallowest = after ? Math.max(0, depthOf(after)) : 0;
-	return Math.max(shallowest, Math.min(wanted, Math.max(0, deepest)));
+	return levelBetween(moved[to - 1], moved[to + 1], zone);
 }
 
 /** The rows under `id` (its subtasks, theirs…): they fold away while it is carried and travel with it. */

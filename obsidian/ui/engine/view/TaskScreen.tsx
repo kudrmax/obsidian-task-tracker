@@ -1,4 +1,5 @@
 import { type CSSProperties, type TouchEvent, useEffect } from "react";
+import { PROPERTY } from "../../design";
 import { Drag } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
 import { Layout, type Place } from "../layout/Layout";
@@ -18,8 +19,8 @@ const CARRIED_PLUS = (
 );
 
 /** The carried card: a compact plate around the point the pointer took it by (`--tc-grab-x`), the title cut short. */
-const carried = (id: string, grab: number) => (
-	<div className="tc-carried" style={{ "--tc-grab-x": `${grab}px` } as CSSProperties}>
+const carried = (id: string, grab: number, landing: number) => (
+	<div className="tc-carried" style={{ [PROPERTY.grabX]: `${grab}px`, [PROPERTY.landingLevel]: String(landing) } as CSSProperties}>
 		<Card id={id} copy />
 	</div>
 );

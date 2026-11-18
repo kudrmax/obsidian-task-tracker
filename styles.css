@@ -6,7 +6,7 @@
  * number, a colour or a radius written straight into a rule, and on a token no rule uses. To change how something
  * looks, change its token, or add one here with a name that says what it is for.
  *
- * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-hour, --tc-allday-extra-rows, --tc-y,
+ * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-landing-level, --tc-hour, --tc-allday-extra-rows, --tc-y,
  * --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-scrolled-below, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
@@ -1813,7 +1813,7 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-overlay { font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); z-index: var(--tc-layer-float); }
 .tc-carried { position: relative; }
 .tc-carried > .tc-card { width: var(--tc-carried-w); max-width: 100%; margin-left: clamp(0px, calc(var(--tc-grab-x) - var(--tc-carried-w) / 2), calc(100% - var(--tc-carried-w))); background: var(--tc-float-bg); box-shadow: var(--tc-shadow-lift); cursor: grabbing; transition: width var(--tc-duration-fly) var(--tc-ease-fly), margin-left var(--tc-duration-fly) var(--tc-ease-fly), background-color var(--tc-duration-fly) var(--tc-ease-fly), box-shadow var(--tc-duration-fly) var(--tc-ease-fly); }
-.tc-overlay.is-dropping .tc-carried > .tc-card { width: 100%; margin-left: 0px; background: var(--tc-card-bg); box-shadow: none; }
+.tc-overlay.is-dropping .tc-carried > .tc-card { width: calc(100% - var(--tc-landing-level) * var(--tc-subtask-indent)); margin-left: calc(var(--tc-landing-level) * var(--tc-subtask-indent)); background: var(--tc-card-bg); box-shadow: none; }
 .tc-carried > .tc-card[data-priority] { background: var(--tc-priority-fill); }
 .tc-overlay.is-dropping .tc-carried > .tc-card[data-priority] { background: var(--tc-priority-fill); }
 /* A layer placed by Floating UI: shown as it mounts, where Floating UI puts it. */

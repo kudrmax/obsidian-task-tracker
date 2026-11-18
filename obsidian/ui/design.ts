@@ -62,6 +62,8 @@ export const PROPERTY = {
 	listWidth: "--tc-list-width",
 	/** Where the pointer took a carried card, from its left edge: the compact carried plate is drawn around it. */
 	grabX: "--tc-grab-x",
+	/** The level a carried card would land at: let go, it flies into its place indented as the card there. */
+	landingLevel: "--tc-landing-level",
 	/** Where the screen's foot fade starts: past the rows' column, which ends on its own (rows). */
 	fadeLeft: "--tc-fade-left",
 	/** The Projects screen's tree, as wide as its divider was let go at on this device. */

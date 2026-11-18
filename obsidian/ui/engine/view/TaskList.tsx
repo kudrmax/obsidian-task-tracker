@@ -1,6 +1,6 @@
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { PLUS, SortableList, SortableRow } from "../drag/Drag";
+import { EmptyPlate, PLUS, SortableList, SortableRow } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
 import type { Destination, ListId, Row } from "../port";
@@ -47,8 +47,8 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	const fresh = useScreen((s) => s.fresh);
 	const reveal = useScreen((s) => s.reveal);
 	const order = useMemo(() => readRows.map((row) => row.id).join(" "), [readRows]);
-	/** Every row is in the sortable list: headers and plates move aside like cards, and a card goes after them into their section. */
-	const ids = useMemo(() => withPlus.map((row) => row.id), [withPlus]);
+	/** Cards and headers are in the sortable list (headers move aside like cards, a card goes after one into its section); an empty section's plate stands still. */
+	const ids = useMemo(() => withPlus.filter((row) => row.kind !== "empty").map((row) => row.id), [withPlus]);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
 	/**
 	 * While a card is carried, its own row stays mounted however far the list scrolls under it (TanStack Virtual's
@@ -116,7 +116,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 									);
 								return (
 									<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
-										<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
+										<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} list={list} />
 									</MovingRow>
 								);
 							})}
@@ -129,7 +129,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 });
 
 /** A row's face: a section's header, or a task's card as a drag source that opens its menu when tapped. */
-const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
+const RowFace = memo(function RowFace({ row, list }: { readonly row: Row; readonly list: ListId }) {
 	const api = useScreenApi();
 	const anchor = useAnchor();
 	if (row.kind === "section")
@@ -142,9 +142,9 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 		);
 	if (row.kind === "empty")
 		return (
-			<SortableRow id={row.id}>
-				<div className="tc-group-empty">{row.label}</div>
-			</SortableRow>
+			<EmptyPlate id={row.id} list={list} section={row.section}>
+				{row.label}
+			</EmptyPlate>
 		);
 	return (
 		<SortableRow
