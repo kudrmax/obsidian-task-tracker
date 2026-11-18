@@ -162,7 +162,7 @@ public struct BoardList: Sendable, Hashable {
     public let title: String
     public let groups: [BoardGroup]
     public let showsHeaders: Bool
-    /// The column shows sections (`tasks.columnSections`): a section's name may be typed in it.
+    /// The column shows sections (`ColumnList.sections`): a section's name may be typed in it.
     public let sectioned: Bool
     /// Whose sections the column shows (`ColumnSections.list`): what `tasks.moveGroup`, `renameGroup` and `removeGroup`
     /// take; nil for a column that shows none.
@@ -490,13 +490,11 @@ extension TaskBoard {
         let dayTitle: String = try readRule("rules.dayTitle", [.string(day), .string(relation), .string(today)])
         var painter = Painter(board: self, blend: look.labelPaint == "blend", pure: pure)
 
-        func list(_ column: BoardColumn, _ items: [TaskItem], title: String) throws -> BoardList {
-            let sections: ColumnSections? = try read("tasks.columnSections", [.string(column.rawValue), .string(day)], over: files)
+        func list(_ column: BoardColumn, title: String) throws -> BoardList {
+            let view: ColumnList = try read("tasks.columnView", [screen.json, .string(column.rawValue)], over: files)
             let corner = column == .day ? JSONValue.string(day) : .null
             let ungrouped = screen.offer["ungrouped"].string ?? ""
             let titleDrop = screen.titleDrops[column.rawValue]
-            let listSections = sections.flatMap { screen.sections[$0.list] } ?? []
-            let view: ListView = try readRule("rules.listView", [.array(items.map(\.json)), .bool(sections != nil), try .encoding(listSections)])
             let groups = try view.groups.map { group in
                 BoardGroup(
                     id: group.id,
@@ -507,15 +505,15 @@ extension TaskBoard {
                     menu: group.menu,
                     reorder: group.reorder ?? false)
             }
-            return BoardList(column: column, title: title, groups: groups, showsHeaders: view.showsHeaders, sectioned: sections != nil, sectionsOf: sections?.list, titleDrop: titleDrop)
+            return BoardList(column: column, title: title, groups: groups, showsHeaders: view.showsHeaders, sectioned: view.sections != nil, sectionsOf: view.sections?.list, titleDrop: titleDrop)
         }
 
         let name: (String) throws -> String = { try read("tasks.listName", [.string($0)], over: files) }
         let lists: [BoardColumn: BoardList] = [
-            .day: try list(.day, screen.day.list, title: dayTitle),
-            .soon: try list(.soon, screen.soon, title: name("soon")),
-            .inbox: try list(.inbox, screen.inbox, title: name("inbox")),
-            .backlog: try list(.backlog, screen.backlog, title: name("backlog")),
+            .day: try list(.day, title: dayTitle),
+            .soon: try list(.soon, title: name("soon")),
+            .inbox: try list(.inbox, title: name("inbox")),
+            .backlog: try list(.backlog, title: name("backlog")),
         ]
         let events: DayEvents = screen.calendars ? try read("calendars.events", [.string(day)], over: files) : try noDayEvents()
         let (statuses, alert, words) = (events.statuses, events.alert, events.words)
