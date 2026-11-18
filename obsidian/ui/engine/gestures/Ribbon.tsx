@@ -52,7 +52,7 @@ export function useRibbon(ribbon: RefObject<HTMLElement | null>, win: Window): R
 					glide.current?.stop();
 				}
 				const from: number = memo ?? at.get();
-				if (screen.gesture !== "ribbon") {
+				if (api.getState().gesture !== "ribbon") {
 					cancel();
 					return from;
 				}
@@ -60,8 +60,8 @@ export function useRibbon(ribbon: RefObject<HTMLElement | null>, win: Window): R
 				if (width > 0) at.set(from - ox / width);
 				if (last) {
 					const step = swipeStep(-mx, width, -sx);
-					screen.release("ribbon");
-					if (step !== 0) screen.step(step);
+					api.getState().release("ribbon");
+					if (step !== 0) api.getState().step(step);
 					glide.current?.stop();
 					glide.current = animate(at, offsetOf(api.getState().stop), SPRING);
 				}
@@ -76,6 +76,8 @@ export function useRibbon(ribbon: RefObject<HTMLElement | null>, win: Window): R
 			window: win,
 			enabled: !dragging,
 			drag: {
+				/** The pointer is followed on the view's window, not captured by the card under the finger: a long press there can hand it to the drag mid-swipe, and the ribbon's gesture still ends. */
+				pointer: { capture: false },
 				axis: "x",
 				filterTaps: true,
 				from: () => [0, 0],

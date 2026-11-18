@@ -1801,8 +1801,8 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-list-block { position: absolute; top: 0; left: 0; right: 0; }
 .tc-list-item { display: flow-root; padding-bottom: var(--tc-card-gap); }
 .tc-list-item > .tc-group-head { margin-top: var(--tc-section-gap); }
-/* Blocks that overlap stand side by side, each its lane's share of the items' width. */
-.task-calendar.is-engine .tc-items > .tc-block { right: calc(var(--tc-x-end) + var(--tc-item-inset)); }
+/* Blocks that overlap stand side by side, each its lane's share of the items' width; a short one is still a whole card (the released screen's stacked cards). */
+.task-calendar.is-engine .tc-items > .tc-block { right: calc(var(--tc-x-end) + var(--tc-item-inset)); min-height: var(--tc-card-h); }
 /* Drag and drop («Decided» 1): while a card is carried the cards part, and its own place stands where it will land, as an outline at its depth. */
 .tc-drag-source { display: flow-root; touch-action: pan-y; }
 .tc-drag-source.is-lifted > .tc-card { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }

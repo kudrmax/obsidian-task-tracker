@@ -98,6 +98,8 @@ export interface StandApi {
 	moveFromOutside(title: string, list: ListKey, before: string | null): void;
 	/** Puts every open screen's ribbon at `stop`, as a scenario's setup. */
 	setStop(stop: Stop): void;
+	/** For a person debugging on the stand (the checks never read it): each open screen's stop, gesture slot, carried task and layer. */
+	debug(): readonly object[];
 }
 
 /**
@@ -117,6 +119,10 @@ export default class TaskCalendarStand extends Plugin {
 			addFromOutside: (list, title) => port.addFromOutside(list, title),
 			moveFromOutside: (title, list, before) => port.moveFromOutside(title, list, before),
 			setStop: (stop) => this.screens.forEach((screen) => screen.store.getState().setStop(stop)),
+			debug: () => [...this.screens].map((screen) => {
+				const { stop, gesture, lifted, layer, adding, pending, dayOffset } = screen.store.getState();
+				return { stop, gesture, lifted, layer: layer?.kind ?? null, adding, pending, dayOffset };
+			}),
 		};
 		(window as unknown as { __tcStand?: StandApi }).__tcStand = api;
 		this.register(() => delete (window as unknown as { __tcStand?: StandApi }).__tcStand);
